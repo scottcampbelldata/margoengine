@@ -34,6 +34,10 @@ export class BlackHole {
     set galaxy(v: number);
     get timeScale(): number;
     set timeScale(v: number);
+    get diskTime(): number | null;
+    set diskTime(seconds: number | null);
+    get diskInflow(): number;
+    set diskInflow(speed: number);
     get exposure(): number;
     set exposure(v: number);
     get view(): BlackHoleView;
@@ -59,6 +63,8 @@ export interface BlackHoleOptions {
     stars?: number;
     galaxy?: number;
     timeScale?: number;
+    diskTime?: number | null;
+    diskInflow?: number;
     exposure?: number;
     view?: BlackHoleView;
     prefilter?: boolean;
@@ -108,6 +114,8 @@ export function kerrAxisStep(h: number, r: number, theta: number, a: number, b: 
 export function kerrAxisTurn(a: number, b: number, q: number): number;
 
 export function kerrCaptured(r: number, a: number, b: number, q: number): boolean;
+
+export function kerrDiskAdvection(radius: number, age: number, spin: number, inward: number): readonly [radius: number, phase: number];
 
 export function kerrHamiltonian(y: readonly number[], a: number, b: number, q: number): number;
 

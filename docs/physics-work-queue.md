@@ -90,6 +90,10 @@ there, add a line below with the solver ID and what is needed, and build against
   moving-surface velocity and corresponding rigid impulse points. Expose the world's cell size through
   SolverHost. The falling entry uses a pure, fixed-scene swept-sphere adapter and an explicit cell size.
 
+- SPACE-01 reserves module window 8 for the plain and shared orbit kernels. Add the slot to the central table
+  when production solver windows join it. The optional orbit entry publishes inertial positions and velocities
+  as f64 xyz rows and elapsed time as a scalar in its layout-1 registry fields.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.

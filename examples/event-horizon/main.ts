@@ -6,6 +6,7 @@ import type { Vec3 } from '@margoengine/core';
 import { Bloom } from '@margoengine/post/bloom';
 import { PostStack } from '@margoengine/post/stack';
 import { paceEngine } from '@margoengine/quality';
+import { ShaderClock } from '@margoengine/shader';
 import {
   BlackHole,
   type BlackHoleView,
@@ -50,6 +51,7 @@ PostStack.attach(stage.engine, [
 ]);
 
 const hole = BlackHole.attach(stage.engine, { spin: 0.9, accretion: 1, jet: 0.5 });
+const shaderClock = ShaderClock.attach(stage.engine);
 
 // Light paths: a fan of rays from a far viewer on +z, in the plane through the spin axis, plus two side fans.
 let pathCount = 0;
@@ -77,6 +79,8 @@ interface HoleState {
   prefilter?: number;
   paths?: number;
   flareAge?: number;
+  diskTime?: number | null;
+  diskInflow?: number;
   peakTemperature?: number;
 }
 const VIEW_NAMES: BlackHoleView[] = ['beauty', 'redshift', 'beaming', 'temperature', 'orders'];
@@ -91,9 +95,11 @@ function apply(state: { properties?: Record<string, HoleState> }): void {
   if (h.peakTemperature !== undefined) hole.peakTemperature = h.peakTemperature;
   if (h.view !== undefined) hole.view = VIEW_NAMES[Math.min(Math.max(Math.round(h.view), 0), 4)];
   if (h.prefilter !== undefined) hole.prefilter = h.prefilter >= 0.5;
+  if (h.diskTime !== undefined) hole.diskTime = h.diskTime;
+  if (h.diskInflow !== undefined) hole.diskInflow = h.diskInflow;
   if (h.paths !== undefined) showPaths(Math.round(h.paths));
-  // The hot spot started flareAge seconds ago on the shader clock (performance.now, which the shot tool drives).
-  if (h.flareAge !== undefined) hole.flare(performance.now() / 1000 - h.flareAge);
+  // The hot spot starts flareAge seconds before the engine's replayable shader clock.
+  if (h.flareAge !== undefined) hole.flare(shaderClock.time - h.flareAge);
   telemetry();
 }
 
@@ -131,7 +137,7 @@ const toggle = (id: string, on: (pressed: boolean) => void) =>
   });
 toggle('paths', (on) => showPaths(on ? 24 : 0));
 toggle('filter', (on) => (hole.prefilter = on));
-$('#flare').addEventListener('click', () => hole.flare(performance.now() / 1000));
+$('#flare').addEventListener('click', () => hole.flare(shaderClock.time));
 $('#panel').addEventListener('submit', (e) => e.preventDefault());
 telemetry();
 

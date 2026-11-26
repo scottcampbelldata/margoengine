@@ -13,6 +13,7 @@ import {
   crossesEquator,
   diskRedshift,
   jetDoppler,
+  kerrDiskAdvection,
   kerrHorizon,
   kerrIsco,
   kerrLapse,
@@ -22,6 +23,24 @@ import {
 } from '../dist/black-hole.js';
 
 const near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a} vs ${b}`);
+
+test('EVENTHORIZON-1 and EVENTHORIZON-3: the lensed disk follows circular Kerr rotation and radial drift', () => {
+  const radius = 4;
+  const age = 3;
+  const spin = 0.75;
+  const circular = kerrDiskAdvection(radius, age, spin, 0);
+  assert.equal(circular[0], radius);
+  near(circular[1], age / (radius * Math.sqrt(radius) + spin), 4 * Number.EPSILON, 'circular phase');
+  const outer = kerrDiskAdvection(16, age, 0, 0);
+  const inner = kerrDiskAdvection(4, age, 0, 0);
+  near(inner[1] / outer[1], 8, 8 * Number.EPSILON, 'Keplerian differential rotation');
+  const inward = 0.03;
+  const [previous, phase] = kerrDiskAdvection(radius, age, 0, inward);
+  const expected = (2 / inward) * (1 / Math.sqrt(radius) - 1 / Math.sqrt(previous));
+  near(previous, radius + age * inward, 8 * Number.EPSILON, 'emitter backtrace radius');
+  near(phase, expected, 64 * Number.EPSILON, 'integrated angular phase on the shifted interval');
+  assert.ok(phase < inner[1], 'the farther, earlier path has a smaller angular speed');
+});
 
 test('Kerr radii match Bardeen, Press and Teukolsky (1972)', () => {
   near(kerrHorizon(0), 2, 1e-12, 'horizon a=0');

@@ -1625,6 +1625,7 @@ Schwarzschild radius r_s = 2M; the hole sits at the origin with its spin along +
 
 ```ts
 import {BlackHole, traceGeodesic} from 'margoengine/shader/black-hole';
+import {ShaderClock} from 'margoengine/shader';
 import {createStage} from 'margoengine';
 const stage = await createStage('#viewport', {
   backend: 'webgpu',
@@ -1632,7 +1633,7 @@ const stage = await createStage('#viewport', {
 });
 const hole = BlackHole.attach(stage.engine, {spin: 0.9, accretion: 1, jet: 0.5});
 hole.view = 'redshift';                          // 'beauty' (default), 'redshift', 'beaming', 'temperature', 'orders'
-hole.flare(performance.now() / 1000);            // a hot spot that spirals in over 8 s
+hole.flare(ShaderClock.attach(stage.engine).time); // a hot spot that spirals in over 8 s on the engine clock
 const fan = [-3, -2, -1, 1, 2, 3].map((y) => traceGeodesic([0, y, 40], [0, 0, -1], {spin: hole.spin}));
 hole.showGeodesics(fan);                         // the rays drawn as lines; each knows its fate and disk crossings
 ```
@@ -1647,10 +1648,17 @@ hole.showGeodesics(fan);                         // the rays drawn as lines; eac
 | `jet`, `jetLorentz` | 0.5, 5 | Jet brightness (0 to 1) and its bulk Lorentz factor (1 to 20). |
 | `stars`, `galaxy` | 1, 1 | Star field and Milky Way brightness; 0 hides them. |
 | `timeScale` | 6 | Units of M of orbital time per second of the shader clock (`camera.time`). |
+| `diskTime` | null | External texture clock in seconds for replay. Null follows the engine shader clock. |
+| `diskInflow` | 0.002 | Prescribed inward drift in M per unit of orbital time, with zero giving circular advection. |
 | `exposure` | 1 | Linear exposure of the output. |
 | `view` | `'beauty'` | The picture, or a map that explains it: redshift g, beaming g^4, observed temperature, image order. |
 | `prefilter` | true | Band-limit the disk and draw stars as points through the lens (off shows a plain point-sampled march). |
 | `steps` | 260 | Integration steps per ray. |
+
+The material backtraces each disk emitter through Kerr circular angular velocity and a steady radial drift
+before sampling its texture. The beaming map keeps the approaching side's Doppler factor and weights it by
+the moving emission. `hole.diskTime` can receive elapsed seconds from `PhysicsWorld`, and `kerrDiskAdvection`
+gives the corresponding radius and angular phase on the CPU.
 
 The output is linear HDR: the disk's flux peak is about 0.8 before `exposure`, its Doppler-boosted side several times
 that. For a glowing picture, raise `exposure` and end with threshold-free bloom and a filmic curve, as

@@ -21,6 +21,15 @@ feedback, debris impact and dam breach still have their own work-queue rows.
   routes rain and melt, checks water volume in the flood and reads the resulting inundation into Biomes. The demo review
   remains open until the scene consumes those fields and flood depth appears in the shot.
 
+### Fixed 2026-11-25 orbital dynamics and Event Horizon's stationary beaming (SPACE-01)
+
+The orbital catalog had mean-element satellite propagation and lacked a world-stepped N-body solver. The
+Event Horizon beaming view sampled redshift and discarded the moving emission magnitude. Its real-adapter
+fixture also drove wall-clock time while the raw shader reads the engine's shader clock.
+`packages/physics/tests/orbit.test.js` checks the new conservative and atmospheric dynamics.
+`packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
+repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
+
 ### Fixed 2026-11-25 underwater sound lacked depth refraction and water-column arrivals (SOUND-03)
 
 The air propagation path used a fixed sound speed and had no depth axis for water. In a layered water column

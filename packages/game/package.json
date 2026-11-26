@@ -2211,6 +2211,10 @@
       "types": "./dist/physics/underwater.d.ts",
       "import": "./dist/physics/underwater.js"
     },
+    "./physics/orbit": {
+      "types": "./dist/physics/orbit.d.ts",
+      "import": "./dist/physics/orbit.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

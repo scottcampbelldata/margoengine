@@ -54,6 +54,15 @@ first: each names its scope, its evidence file and how to reproduce it.
   tightens after it passes. Reproduce with `node --test packages/physics/tests/coupling/schooling.test.js`
   after building packages. The field and point dynamics were tested with synthetic geometry.
 
+- SPACE-01 orbital dynamics (2026-11-25) reproduces a two-body orbit with fourth-order step refinement and paired
+  barycentre symmetry. The quadrupole and atmosphere checks agree with closed physical models, and the world
+  hashes replay across both memory modes. Run
+  `node --test packages/physics/tests/orbit.test.js packages/physics/tests/coupling/orbit.test.js`.
+  At the same Event Horizon camera, advancing the disk time by 0.5 s changed 29,613 beaming pixels on WebGPU and
+  29,614 on WebGL2 by more than one 8-bit luminance level. Returning to the same explicit disk time changed zero
+  by that measure on both backends. Reproduce with `node packages/shader/test/black-hole-check.mjs` and
+  the same command with `--compat`.
+
 - SOUND-03 underwater acoustics (2026-11-25) reproduces homogeneous Gaussian beam spreading, circular Snell
   arcs, curvature changes at profile knots and reflected arrival depths and pressure. Reproduce with
   `node --test packages/physics/tests/underwater.test.js packages/physics/tests/coupling/underwater.test.js`.

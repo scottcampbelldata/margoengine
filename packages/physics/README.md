@@ -2402,6 +2402,46 @@ For another solver, read the layout-1 f64 ports below. The source ID prefixes ea
 | `signalField` | `.signal` | Real and imaginary on-axis pressure in Pa |
 | `delayField` | `.delay` | Travel time in seconds |
 
+### Orbital mechanics (`margoengine/physics/orbit`)
+
+`OrbitSolver` integrates interacting gravitational bodies and massless tracers on the 60 Hz physics clock.
+The optional SIMD kernel implements reversible fourth-order Yoshida stepping in vacuum, with a Verlet option.
+
+```ts
+import { OrbitSolver, keplerState } from 'margoengine/physics/orbit';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const orbit = await OrbitSolver.load();
+const mass = 5.9722e24;
+const satellite = keplerState({ gravitationalParameter: 3.986004418e14, semimajorAxis: 7e6 });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(orbit, {
+  bodies: [{ position: [0, 0, 0], mass }, satellite],
+  timeScale: 60,
+});
+world.advance(60);
+console.log(orbit.sample(1).position[1] > 0, Math.round(orbit.elapsedSeconds)); // true 60
+```
+
+Use metres, m/s and gravitational masses in kg in one Cartesian inertial frame. A body defaults to zero velocity
+and zero mass. A massless body follows the field and contributes no gravitational force. `timeScale` is simulated
+seconds per world second (default 1). `substeps` is a positive power of two (default 1). Use more subdivisions
+when the closest encounter or orbital period is short compared with a step.
+`integrator` defaults to `'yoshida'` and also accepts `'verlet'`. `softening` is the Plummer length in metres
+(default 0). `gravitationalConstant` defaults to the CODATA value.
+
+An optional `primary` specifies the gravitating body index and its equatorial `radius` in metres.
+`j2` (default 0) adds axial quadrupole gravity. To model atmospheric deceleration, set the primary's
+`density` in kg/m³ at its radius (default 0), `scaleHeight` in metres (default 8500), and
+`angularVelocity` in rad/s (default 0, about inertial z). Give each affected body a `dragAreaPerMass` in m²/kg
+(default 0). The density is a local exponential profile. Use `@margoengine/sciviz/geo`'s existing `SGP4`
+for space-track mean elements. Numerical Cartesian propagation starts from a state in the chosen frame.
+
+`positionField` and `velocityField` publish three f64 values per body and `timeField` publishes elapsed seconds.
+All three ports use layout 1 and the solver ID as the prefix (default `orbit`). `OrbitSolver.load({ signal })`
+can cancel the optional load. `keplerState` samples an ideal ellipse and `keplerDiskSample` integrates
+the phase of a tracer with a prescribed radial drift. A viewer can set `hole.diskTime = orbit.elapsedSeconds`
+to replay a disk on the simulation's clock.
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

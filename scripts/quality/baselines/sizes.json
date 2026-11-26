@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19255259,
+  "total": 19259532,
   "history": [
     {
       "date": "2026-10-24",
@@ -12579,6 +12579,12 @@
       "commit": "fdb7f41cd1",
       "reason": "LIFE-05: 4590 B gzip for the optional force-based pedestrian entry and declared ports. The NavMesh correction stays in the existing ORCA entry and defaults to equal masses. Core and stage add zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "df1d94845f",
+      "reason": "SPACE-01 adds optional orbital mechanics at 4017 B gzip (budget 4273 B) for the world solver and analytic Kepler samples. The plain and shared SIMD assets load separately. Shader/black-hole stays within its existing budget at 25814 B gzip, and core plus stage stays at 24,820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13384,6 +13390,7 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/meshfiles": 2857,
+    "@margoengine/physics/orbit": 4273,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,
