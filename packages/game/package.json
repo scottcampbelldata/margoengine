@@ -1671,6 +1671,10 @@
       "types": "./dist/loaders/vrml.d.ts",
       "import": "./dist/loaders/vrml.js"
     },
+    "./loaders/babylon": {
+      "types": "./dist/loaders/babylon.d.ts",
+      "import": "./dist/loaders/babylon.js"
+    },
     "./loaders/tilt": {
       "types": "./dist/loaders/tilt.d.ts",
       "import": "./dist/loaders/tilt.js"
