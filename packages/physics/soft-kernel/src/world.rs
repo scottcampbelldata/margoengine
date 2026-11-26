@@ -448,6 +448,9 @@ impl World {
             }
             self.solve_volume(h);
         }
+        if vertex_block {
+            self.solve_vertex_block_translation(h);
+        }
         self.solve_rigid(h);
         self.collide(h);
     }

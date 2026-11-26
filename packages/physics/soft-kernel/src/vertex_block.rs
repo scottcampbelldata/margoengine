@@ -8,6 +8,10 @@ use crate::fem::{NONE, TORN_TET, VERTEX_BLOCK_TET};
 pub(crate) type Vec3 = [f64; 3];
 pub(crate) type Columns = [Vec3; 3];
 
+fn active_vertex_block(flag: u32) -> bool {
+    flag & (TORN_TET | VERTEX_BLOCK_TET) == VERTEX_BLOCK_TET
+}
+
 pub(crate) struct VertexBlock {
     pub head: Col<u32>,
     pub next: Col<u32>,
@@ -65,8 +69,7 @@ impl World {
     }
     /// Builds a deterministic incident-corner list. Rebuilding from live flags also handles tears and new body pieces.
     pub(crate) fn prepare_vertex_blocks(&mut self) -> bool {
-        let active = |flag| flag & (TORN_TET | VERTEX_BLOCK_TET) == VERTEX_BLOCK_TET;
-        if !(0..self.fem.count).any(|t| active(self.fem.flags[t])) {
+        if !(0..self.fem.count).any(|t| active_vertex_block(self.fem.flags[t])) {
             return false;
         }
         let head = &mut self.fem.vertex_block.head;
@@ -75,7 +78,7 @@ impl World {
         }
         let next = &mut self.fem.vertex_block.next;
         for t in 0..self.fem.count {
-            if active(self.fem.flags[t]) {
+            if active_vertex_block(self.fem.flags[t]) {
                 for k in 0..4 {
                     let index = 4 * t + k;
                     let particle = self.fem.p[k][t] as usize;
@@ -177,6 +180,55 @@ impl World {
             self.x[i] = (current[0] - dx[0]) as f32;
             self.y[i] = (current[1] - dx[1]) as f32;
             self.z[i] = (current[2] - dx[2]) as f32;
+        }
+    }
+
+    /// Minimize the implicit objective along the free translation after the local sweeps.
+    /// Internal strain and its damping only depend on relative positions. Translating an
+    /// unpinned body to its inertial mass center changes only the quadratic inertial term.
+    pub(crate) fn solve_vertex_block_translation(&mut self, h: f32) {
+        // The host keeps cell ranges contiguous by body, including after compaction or a cut.
+        let mut previous = None;
+        for cell in 0..self.fem.count {
+            if !active_vertex_block(self.fem.flags[cell]) {
+                continue;
+            }
+            let b = self.fem.body[cell] as usize;
+            if previous == Some(b) {
+                continue;
+            }
+            previous = Some(b);
+            if self.bsleep[b] != 0 {
+                continue;
+            }
+            let first = self.b_first[b] as usize;
+            let last = first + self.b_count[b] as usize;
+            let mut total_mass = 0.0;
+            let mut residual = [0.0; 3];
+            for i in first..last {
+                let inverse_mass = self.w[i] as f64;
+                if inverse_mass == 0.0 {
+                    // A pin supplies an external reaction, so uniform translation is not free.
+                    total_mass = 0.0;
+                    break;
+                }
+                let mass = inverse_mass.recip();
+                total_mass += mass;
+                let target = [self.px[i] + h * self.vx[i], self.py[i] + h * self.vy[i], self.pz[i] + h * self.vz[i]];
+                let solved = [self.x[i], self.y[i], self.z[i]];
+                for a in 0..3 {
+                    residual[a] += mass * (target[a] as f64 - solved[a] as f64);
+                }
+            }
+            if total_mass == 0.0 {
+                continue;
+            }
+            let delta = residual.map(|value| value / total_mass);
+            for i in first..last {
+                self.x[i] = (self.x[i] as f64 + delta[0]) as f32;
+                self.y[i] = (self.y[i] as f64 + delta[1]) as f32;
+                self.z[i] = (self.z[i] as f64 + delta[2]) as f32;
+            }
         }
     }
 }

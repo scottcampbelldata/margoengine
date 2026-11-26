@@ -65,6 +65,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   coupled regression drives one of the fragments and measures its rigid anchor moving
   in response. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Linear impulse in vertex blocks (SOFT-04, 2026-11-26). Free isotropic and orthotropic solids
+  retain the analytical applied impulse. After a plane cut, finite incision or face tear, the
+  momentum of both fragments and their dynamic anchor matches the applied force integrated
+  over the world step within the f32 rounding bound. Run
+  `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

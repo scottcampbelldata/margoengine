@@ -404,6 +404,40 @@ test('plane cuts, finite cuts and face tears retain live two-way rigid anchors',
     for (const { body, particle } of anchors) {
       bound(body.particlePosition(particle)[2], anchor.position[2], 1, `${name} keeps the same attached point`);
     }
+    const expected = [0, 0, 12 / 60];
+    const total = result.pieces.reduce(
+      (sum, body) => momentum(body).map((component, axis) => sum[axis] + component),
+      anchor.linearVelocity.map((component) => anchor.mass * component),
+    );
+    // Native position differences reconstruct velocities at 120 Hz. Bound each f32 position or velocity
+    // conversion through the two substeps by its coordinate scale and total finite mass.
+    const positionScale = 2.125;
+    const substeps = 2;
+    const positionWritesPerSubstep = 4;
+    const totalMass = 4 + anchor.mass;
+    const rounding = positionWritesPerSubstep * epsilon32 * positionScale * substeps * 120 * totalMass;
+    for (let axis = 0; axis < 3; axis++) {
+      assert.ok(
+        Math.abs(total[axis] - expected[axis]) <= rounding,
+        `${name} momentum on axis ${axis}: ${total[axis]} versus ${expected[axis]} with roundoff ${rounding}`,
+      );
+    }
+  }
+});
+
+test('finite vertex-block sweeps preserve translation in free isotropic and orthotropic solids', async () => {
+  for (const desc of [tetrahedron(), tetrahedron().setOrthotropicStiffness(wood)]) {
+    const { body, world } = await specimen(desc.setMasses([1, 2, 4, 8]).setSolver('vertex-block'));
+    const impulse = [0.06, 0.12, -0.08];
+    body.applyParticleImpulse(1, impulse);
+    world.advance(1);
+    const actual = momentum(body);
+    const substeps = 2;
+    // The prediction and recentering each round once in native coordinates before velocity reconstruction.
+    const rounding = 2 * epsilon32 * 2.125 * substeps * 120 * body.mass();
+    for (let axis = 0; axis < 3; axis++) {
+      assert.ok(Math.abs(actual[axis] - impulse[axis]) <= rounding, `${actual[axis]} versus ${impulse[axis]}`);
+    }
   }
 });
 

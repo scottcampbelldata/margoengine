@@ -10040,6 +10040,11 @@ of its original material vertex. A stretched attachment keeps the same rigid-loc
 coupled regression applies force on a cut fragment and measures motion of the linked rigid body
 while both duplicate points remain attached.
 
+The vertex-block step solves free translation once after its local elastic sweeps and before the
+rigid rows. Moving every point by the mass-weighted inertial residual minimizes the inertial
+objective while leaving the elastic strain unchanged. This preserves the linear impulse of
+free, damped fragments through rigid attachment coupling at a fixed iteration count.
+
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows
 cells through body compaction, both cut paths, and world snapshots. The existing tear scheduler

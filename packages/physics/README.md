@@ -545,8 +545,9 @@ console.log(body.volume() / body.restVolume(), body.tornCells().length);
 `setSolver('vertex-block')` uses an implicit position update with the exact three-axis elastic Hessian of
 each free vertex. It supports `neo-hookean` tetrahedra and shares the usual rigid contacts, kinematic
 pins, and material damping. The world uses the configured soft `substeps` and `iterations`. Each iteration
-sweeps the free vertices once, and high stiffness or large meshes can need more sweeps. The default
-solver remains `'constraints'`. Change modes with `body.setSolver()` and use `body.solver` to read one.
+sweeps the free vertices once, and high stiffness or large meshes can need more sweeps. Unpinned
+bodies preserve linear momentum during the internal elastic solve even with a fixed number of sweeps.
+The default solver remains `'constraints'`. Change modes with `body.setSolver()` and use `body.solver` to read one.
 
 ```ts
 import { Physics } from '@margoengine/physics';

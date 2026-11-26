@@ -9614,6 +9614,12 @@ can lock near incompressibility or need refinement to resolve bending. This mode
 and shares the rigid/soft contact passes. Its optional entry and kernel sizes are recorded in the
 [entry-size results](../examples/package-benchmarks/results/entry-sizes.json).
 
+Free vertex-block bodies get one exact translational minimization per native substep, preserving
+their inertial linear impulse to working precision before contact. The pass visits live cell
+ranges and reads and translates unpinned body particles once each. It applies to the linear
+movement of the center of mass. Bodies with pins instead exchange reaction with their supports,
+and authored whole-body drag still changes momentum.
+
 The local/global `'projective'` mode uses the corotated material. A local rotation and unit-determinant
 projection per live tetrahedron precedes each global solve. Each matrix application visits its four
 corners once, then the preconditioner acts once per particle. The iteration limits are the configured

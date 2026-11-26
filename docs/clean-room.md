@@ -130,6 +130,16 @@ on the live descendants without deriving a new anchor from the current, possibly
 [A Virtual Node Algorithm for Changing Mesh Topology During Simulation](https://physbam.stanford.edu/papers/stanford2004-01.pdf)
 [XPBD: Position-Based Simulation of Compliant Constrained Dynamics](https://mmacklin.com/xpbd.pdf).
 
+Chen et al.'s 2024 vertex-block objective has a mass-weighted quadratic term about the inertial
+prediction. Elastic and internal damping terms are invariant under uniform translation. After the
+local sweeps, minimizing that objective along a translation gives the mass-weighted mean
+of the inertial position minus the solved position. Margo applies that common displacement
+to every unpinned vertex in a free body before rigid contact. The linear momentum correction
+has the same mass weighting as Dahl and Bargteil's 2019 Eq. 3. The correction is in position
+space so translational velocity reconstruction and subsequent reciprocal contact both see it.
+[Vertex Block Descent](https://www.cemyuksel.com/research/papers/vbd-siggraph2024.pdf)
+[Global Momentum Preservation for Position-based Dynamics](https://cal.cs.umbc.edu/Papers/Dahl-2019-GMP/).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
