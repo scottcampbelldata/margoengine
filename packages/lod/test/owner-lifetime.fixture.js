@@ -27,6 +27,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { LevelStream } = await load('../dist/stream.js');
   const { MSFTMaterialLOD } = await load('../dist/msft.js');
   const { ClusterLOD } = await load('../dist/clusters.js');
+  const { OccluderFade } = await load('../dist/occluder-fade.js');
   const entries = [];
   const populate = (engine, system) => {
     const anchor = engine.createMesh(),
@@ -78,6 +79,29 @@ export async function fixtures(load = (entry) => import(entry)) {
           anchor = engine.createMesh();
         const plugin = factory ? ClusterLOD.attach(engine, hierarchy, anchor) : new ClusterLOD(hierarchy, anchor);
         return { plugin, dispose: () => plugin.dispose() };
+      },
+    });
+    entries.push({
+      name: 'OccluderFade' + suffix,
+      create({ engine, dependency }) {
+        // A wall between the camera and the target, so the plugin holds a fade when it is disposed. The meshes and
+        // their geometry buffers are the caller's, not the plugin's.
+        let target, wall;
+        dependency(() => {
+          target = engine.createMesh().setGeometry(geometry());
+          wall = engine.createMesh().setGeometry(geometry()).setPosition([0, 0, 1]);
+        });
+        const options = { targets: [target], fadeTime: 0 };
+        const plugin = factory ? OccluderFade.attach(engine, options) : new OccluderFade(options);
+        if (!factory) engine.use(plugin);
+        return {
+          plugin,
+          dispose: () => plugin.dispose(),
+          cleanup: () => {
+            target.dispose();
+            wall.dispose();
+          },
+        };
       },
     });
   }

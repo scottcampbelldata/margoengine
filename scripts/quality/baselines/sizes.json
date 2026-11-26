@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20658330,
+  "total": 20663009,
   "history": [
     {
       "date": "2026-10-24",
@@ -13933,6 +13933,12 @@
       "commit": "7e9782ab39",
       "grew": 1,
       "reason": "SEA-08 mean short-wave resistance grows seakeeping from 31849 to 32716 B gzip. The hull computes directional interception and encounter-dependent wall reflectance for its axial force. Splitting it would duplicate the shared hull, spectra and rigid force setup. Core plus Stage remains 24892 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fe947da87",
+      "reason": "lod: new entry lod/occluder-fade (OccluderFade, findOccluders), measured 4422 B gzip (before 0). It loads the bvh root for its Raycaster, as the controls entries do; a copy of the ray and BVH code in lod would cost more than the shared import.",
+      "grew": 2
     }
   ],
   "items": {
@@ -14581,6 +14587,7 @@
     "@margoengine/lod/clusters": 3680,
     "@margoengine/lod/fade": 2542,
     "@margoengine/lod/msft": 2266,
+    "@margoengine/lod/occluder-fade": 4678,
     "@margoengine/lod/stream": 1778,
     "@margoengine/machinery": 31736,
     "@margoengine/machinery/assembly": 1105,
@@ -15732,6 +15739,7 @@
     "leak @margoengine/loaders/threemf-mesh -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/loaders/threemf-mesh -> @margoengine/materials": 1,
     "leak @margoengine/lod -> @margoengine/gltf/pbr-model": 1,
+    "leak @margoengine/lod/occluder-fade -> @margoengine/bvh": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/lines": 1,
     "leak @margoengine/machinery/dimensions -> @margoengine/text": 1,
     "leak @margoengine/machinery/react -> @margoengine/react": 1,

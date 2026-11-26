@@ -232,6 +232,49 @@ fade.prepare(lod); // optional: adds the fade to model levels now, so the first 
 
 The fade patches core's mesh shader while `LODFade` is attached, and adds a lighting effect to a model the first time it fades, or at `prepare`. `fade.finish()` ends every fade at once, and `fade.active` counts them. A switch to or from an `Imposter`, the far level of `hierarchicalLOD`, and everything on WebGL2 stay instant. `shadows` sees both levels during the fade, and picking the one that is on the way out until it ends. A `LODSystem` takes one transition at a time, through `lods.setTransition(fn)`, which is what `LODFade` calls.
 
+## Occluder fade: `margoengine/lod/occluder-fade`
+
+`OccluderFade` keeps a target in view. Each frame it casts rays from the camera to every target through the scene's BVHs (`Raycaster` of `margoengine/bvh`), and the meshes they cross dissolve to `minOpacity` over `fadeTime` seconds, then return when they stop hiding the target. A faded mesh drops a share of its pixels by a fixed 16 by 16 threshold tile (screen-door transparency), so there is no blending and no sorting, the depth buffer stays right, and the target shows through the gaps.
+
+```ts
+import {createStage} from 'margoengine';
+import {PbrMaterial, box} from 'margoengine/core';
+import {OccluderFade} from 'margoengine/lod/occluder-fade';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const engine = stage.engine;
+engine.camera.position = [0, 1, 8];
+const hero = engine.createMesh().setGeometry(box(1, 2, 1));
+const wall = engine.createMesh().setGeometry(box(4, 3, 0.2)).setMaterial(new PbrMaterial({color: '#a55'}));
+wall.setPosition([0, 0, 3]); // between the camera and the hero
+const fade = OccluderFade.attach(engine, {
+  targets: [hero], // meshes, models, [x, y, z] points or [x, y, z, radius] spheres, or functions returning those
+  fadeTime: 0.25, // seconds out, and back in
+  minOpacity: 0.25, // share of its pixels a faded mesh keeps
+  pattern: 'bayer', // or 'blue'
+  padding: 0.25, // world radius around the sight line that must be clear
+});
+engine.onFrame(() => {
+  if (fade.occluders.has(wall)) console.log('the wall draws', fade.opacityOf(wall), 'of its pixels');
+});
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `targets` | `[]` | What to keep in view: a core mesh, a model or materials mesh, `[x, y, z]`, `[x, y, z, radius]`, or a function returning one of the arrays each frame (a bone, a moving point). A mesh or model target is its bounding sphere, and never hides itself. |
+| `fadeTime` | `0.25` | Seconds a mesh takes to fade out, and back in; 0 switches at once. |
+| `minOpacity` | `0.25` | Share of its pixels a fully faded mesh keeps, 0 to 1. 0 removes it. |
+| `pattern` | `'bayer'` | The threshold tile: `'bayer'` is the ordered dither matrix (an even grid), `'blue'` a void-and-cluster blue-noise array (no visible grid). Fixed once made. |
+| `padding` | `0.25` | World radius around each sight line that must be clear: four more rays run beside the centre one at this distance. 0 casts the centre ray only. |
+| `layers` | every layer | Render-layer mask (`setRenderLayers` of `margoengine/cameras/layers`): a mesh on none of these layers is never found. |
+| `filter` | `null` | `(mesh, model?) => boolean`; return false to keep a mesh solid (the ground, a door that must read as closed). |
+| `camera` | `null` | The eye, anything with a `position`; null is the engine's camera. |
+
+Every option but `pattern` is also a property and may change at any time (`fade.targets = [other]`, `fade.minOpacity = 0`). `fade.enabled = false` fades everything back in. `fade.occluders` is the set found at the last frame, `fade.opacityOf(object)` the share of pixels an object draws now, `fade.active` the number of objects not fully solid, and `fade.finish()` makes everything solid at once. `fade.dispose()`, `fade[Symbol.dispose]()` or a `using` declaration removes the plugin, its shader patch and its buffers.
+
+Core meshes fade one by one, also when thousands share a geometry in one draw call. A gltf/pbr model, a materials mesh and an instanced materials mesh fade as a whole: an instanced mesh is found when a ray crosses any of its instances, and all of its instances fade together. A skinned or morphed model's pose lives on the GPU, so it is tested by the bounding sphere of its rest shape instead of its triangles. The fade runs on WebGPU and the WebGL2 compatibility layer with the same pixels. Shadows of a faded mesh stay whole, and picking still finds it. `findOccluders(engine, eye, targets, {padding, layers, filter})` is the search alone, on the CPU, and `occluderKeeps(x, y, opacity, pattern)` and `occluderThresholds(pattern)` give the tile for tools and tests. The first ray to reach a geometry builds its BVH on the page thread; build large ones ahead with `computeGeometryBVHAsync` of `margoengine/bvh`.
+
+Sources: screen-door transparency from Fuchs et al. 1985, "Fast spheres, shadows, textures, transparencies, and image enhancements in Pixel-planes" ([doi](https://doi.org/10.1145/325334.325205)), and Mulder, Groen and van Wijk 1998, "Pixel masks for screen-door transparency" ([doi](https://doi.org/10.1109/VISUAL.1998.745323)); the ordered tile from Bayer 1973, "An optimum method for two-level rendition of continuous-tone pictures" (IEEE ICC '73); the blue-noise tile from Ulichney 1993, "The void-and-cluster method for dither array generation" ([doi](https://doi.org/10.1117/12.152707)); fading what stands between a game camera and its target from Haigh-Hutchinson 2009, "Real-Time Cameras" (Morgan Kaufmann, ISBN 978-0-12-311634-5), and Christie, Olivier and Normand 2008, "Camera Control in Computer Graphics" ([doi](https://doi.org/10.1111/j.1467-8659.2008.01181.x)).
+
 ## Levels from a file: `LOD.fromModel`
 
 A glTF with `MSFT_lod` loads its level nodes too, hidden, as `model.lods`; `extras.MSFT_screencoverage` gives the switches, read as the bounding sphere's height over the viewport's. `LOD.fromModel` reads node levels; `MSFT_lod` on materials is the next section.
