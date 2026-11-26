@@ -3534,7 +3534,8 @@ Batch 160 job 4 retains complete 512 x 512 TransmissionTest (22 primitives)
 and AttenuationTest (23 primitives), all pixels and original viewer/Cycles
 full/direct integer budgets. Native volume estimates a homogeneous refracted
 slab in mesh space with world-space Beer attenuation, including transforms and
-instancing. It does not trace mesh boundaries, add thickness maps or reproduce
+instancing, scaled per texel by a thickness map's green channel (KB4000, 2026-11-26). It does not trace mesh
+boundaries or reproduce
 Cycles multiple scattering. Native tint retains optical depth until the world
 path is known, avoiding intermediate transmittance underflow; binary32 depth
 and transform limits still apply. The separate hooked route retains its

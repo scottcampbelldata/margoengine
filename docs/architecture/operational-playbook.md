@@ -9348,8 +9348,9 @@ parsed limits, binary32 shader evaluation, uniform upload and fallback. The
 28-pixel GPU proof retains all twenty original cases and adds eight cases
 recovering transmittance after binary32/binary64 intermediate underflow, on
 both backends. No core, stage or rendering-backend implementation changes.
-Native thickness maps, boundary tracing, the hooked route's per-unit range
-and complete reference-image losses remain separate. Research and reproduction:
+Native thickness maps landed 2026-11-26 (KB4000: `thicknessTexture.g` scales the tint's optical depth through
+slot 20 of the extended shader; packages/gltf/test/native-volume-path.test.js and the 64-pixel slab proof). Boundary
+tracing, the hooked route's per-unit range and complete reference-image losses remain separate. Research and reproduction:
 [native-volume-range.md](../native-volume-range.md).
 
 ## Draco float range review (section 5 evidence, 2026-11-10)

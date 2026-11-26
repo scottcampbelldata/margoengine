@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { physicalShader, surfaceTintPBR, transmissiveShader } from '../src/shader.ts';
+import { extendedPlan, extendedShader, physicalShader, surfaceTintPBR, transmissiveShader } from '../src/shader.ts';
+import { extendedMaterials } from '../dist/extended.js';
 import { instancedShader, rowsShader } from '../src/instanced-shader.ts';
 import { wgslFunction } from '../../../tests/support/wgsl-eval.js';
 import { wgslModule } from '../../materials/tests/support/wgsl-subset.js';
@@ -14,10 +15,16 @@ function tint(
     ior = 1.5,
     attenuation = [0.25, 0.5, 1],
     opticalDepth = attenuation.map((c) => -Math.log(c)),
+    thicknessTexel,
   } = {},
 ) {
   const depth = opticalDepth.map((c) => (c === Infinity ? -1 : c));
-  const shader = wgslModule(wgslFunction(source, 'margoVolumeTint'), {
+  // A thickness map's texel (G) stands in for the sample of extendedShader's margoThickness.
+  const thickness =
+    thicknessTexel === undefined
+      ? wgslFunction(source, 'margoThickness')
+      : `fn margoThickness(i:Out)->f32 {return ${thicknessTexel.toFixed(6)};}`;
+  const shader = wgslModule(`${thickness}\n${wgslFunction(source, 'margoVolumeTint')}`, {
     f: { eye: [0, 0, 0, 1], ext: [0, ior, depth[2], 0], coordsB: [0, 0, depth[0], depth[1]] },
   });
   return shader.call('margoVolumeTint', { position: direction, normal }, { n: normal }, matrix);
@@ -82,4 +89,52 @@ test('native volume tint uses each instance transform; whole-uniform retention p
   assert.doesNotMatch(instanced, /margoVolumeTint\(i,s,mat3x3f\(f\.model/);
   const rows = rowsShader(instanced, 16);
   assert.equal(rows, undefined, 'texture-dependent tint retains the whole material uniform');
+});
+
+test('KHR_materials_volume thicknessTexture: its G channel scales thicknessFactor in the native tint (KB4000)', () => {
+  // thickness = thicknessFactor x thicknessTexture.g: a texel of 0.5 at factor 2 attenuates as factor 1 does.
+  for (const texel of [0.25, 0.5, 1])
+    close(tint(matrix(1, 1, 1), { opticalDepth: [Math.log(4) * 2, Math.log(2) * 2, 0], thicknessTexel: texel }), [
+      0.25 ** (2 * texel),
+      0.5 ** (2 * texel),
+      1,
+    ]);
+  // A texel of 0 is a thin wall: nothing attenuates, an opaque (black) channel included; any thickness keeps it black.
+  close(tint(matrix(1, 1, 1), { attenuation: [0, 0.5, 1], thicknessTexel: 0 }), [1, 1, 1]);
+  close(tint(matrix(1, 1, 1), { attenuation: [0, 0.5, 1], thicknessTexel: 0.01 }), [0, 0.5 ** 0.01, 1]);
+});
+
+test('a transmissive volume with a thicknessTexture binds slot 20 and the native tint samples its G channel', () => {
+  const thicknessTexture = { index: 3 };
+  const parsed = extendedMaterials.parse({
+    KHR_materials_transmission: { transmissionFactor: 1 },
+    KHR_materials_volume: {
+      thicknessFactor: 2,
+      thicknessTexture,
+      attenuationColor: [0.5, 0.5, 0.5],
+      attenuationDistance: 1,
+    },
+  });
+  assert.ok(parsed, 'a thickness map needs the extended shader, which binds slot 20');
+  assert.equal(parsed.maps[7], thicknessTexture);
+  assert.deepEqual(
+    Object.values(parsed.features).filter(Boolean),
+    [],
+    'no other extended feature switches on for a thickness map',
+  );
+  // Without transmission no volume is entered, so no map binds (diffuse transmission without scatter reads none).
+  assert.equal(extendedMaterials.parse({ KHR_materials_volume: { thicknessFactor: 2, thicknessTexture } }), undefined);
+  const maps = Array.from({ length: 21 }, (_, k) => (k === 20 ? thicknessTexture : undefined));
+  const plan = extendedPlan(maps, parsed.features);
+  const shader = surfaceTintPBR(transmissiveShader(extendedShader(plan)));
+  const slot = plan.slots[20];
+  assert.ok(slot >= 0);
+  assert.ok(
+    wgslFunction(shader, 'margoThickness').includes(
+      `return textureSample(margoMap${slot},margoSampler${slot},uv(i,20)).g;`,
+    ),
+  );
+  assert.equal(shader.split('fn margoThickness(').length, 2, 'one margoThickness: the default is not added');
+  // The physical shader without slot 20 reads the factor alone.
+  assert.match(wgslFunction(source, 'margoThickness'), /return 1\.0;/);
 });

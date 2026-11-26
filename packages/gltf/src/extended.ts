@@ -59,7 +59,11 @@ export const extendedMaterials: GLTFExtendedMaterials = {
         thickness > 0 &&
         extinction.some((c) => c > 0) &&
         (!!diffuse || !!e.KHR_materials_transmission?.transmissionFactor);
-    if (!iridescence && !anisotropy && !diffuse && !bump && !scatter && !rough) return undefined;
+    // KHR_materials_volume: thickness = thicknessFactor x thicknessTexture.g, in the mesh's space. On a transmissive
+    // material the map binds slot 20, which the native volume tint (surfaceTintPBR) and the scatter term read; it binds
+    // at a thickness or attenuation of 0 too, which an animation pointer may raise.
+    const thicknessMap = !!vo?.thicknessTexture && !!e.KHR_materials_transmission;
+    if (!iridescence && !anisotropy && !diffuse && !bump && !scatter && !rough && !thicknessMap) return undefined;
     const color = dt?.diffuseTransmissionColorFactor ?? [1, 1, 1],
       rotation = number(an?.anisotropyRotation, 0, -Infinity, Infinity, 'anisotropy rotation');
     if (!Array.isArray(color) || color.length !== 3)
@@ -84,7 +88,7 @@ export const extendedMaterials: GLTFExtendedMaterials = {
         diffuse ? dt!.diffuseTransmissionColorTexture : undefined,
         bump ? bu!.bumpTexture : undefined,
         scatter ? sc!.multiscatterColorTexture : undefined,
-        scatter ? vo!.thicknessTexture : undefined,
+        scatter || thicknessMap ? vo!.thicknessTexture : undefined,
         ...(rough && dr!.diffuseRoughnessTexture ? [dr!.diffuseRoughnessTexture] : []),
       ],
       // Rows iri (factor, film IOR, thickness min, max in nm), aniso (strength, cos and sin of the rotation, then the
