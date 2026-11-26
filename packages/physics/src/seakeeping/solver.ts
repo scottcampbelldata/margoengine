@@ -20,6 +20,7 @@ import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields'
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from '../crush/port.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
+import { atan2 } from '../ship/propeller.js';
 import { regionWords } from '../world/memory.js';
 import {
   type FieldDescriptor,
@@ -34,6 +35,7 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
+import { type HullBilgeKeel, bilgeKeelDamping, type RollKeel, rollKeelsOf, validateBilgeKeels } from './bilge-keel.js';
 import { courseLoad, courseSpeedLimit, courseWords, type HullCourse } from './course.js';
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
@@ -63,6 +65,8 @@ export interface Hull {
   readonly mesh: HullMesh;
   /** Enable forward-speed strip loads in heave and pitch and the bare-hull roll corrections. */
   readonly course?: HullCourse;
+  /** Thin bilateral or single-side plates that add normal viscous roll damping when wet. */
+  readonly bilgeKeels?: readonly HullBilgeKeel[];
   /**
    * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
    * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
@@ -163,6 +167,8 @@ interface Roll {
   readonly eddy: number;
   readonly linear: number;
   readonly forward?: ForwardRoll;
+  readonly natural: number;
+  readonly keels?: readonly RollKeel[];
   readonly inertia: number;
   readonly own: number;
   readonly stiffness: number;
@@ -303,6 +309,7 @@ export class HullSolver implements Solver<HullParams> {
       throw new TypeError('A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
     let lastCrushPatch = -1;
     for (const hull of hulls) {
+      if (hull.bilgeKeels !== undefined) validateBilgeKeels(hull.bilgeKeels);
       for (const { crushPatch } of hull.openings ?? []) {
         if (crushPatch === undefined) continue;
         if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
@@ -618,7 +625,7 @@ export class HullSolver implements Solver<HullParams> {
           ahead * rateOf(context.level),
           loads,
         );
-      if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, 1 / rateOf(context.level), loads);
+      if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.diffraction)
         this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), loads);
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
@@ -1365,6 +1372,7 @@ export class HullSolver implements Solver<HullParams> {
     at: number,
     pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
     centre: Vec3,
+    t: number,
     dt: number,
     loads: WettedLoads,
   ): void {
@@ -1385,17 +1393,31 @@ export class HullSolver implements Solver<HullParams> {
     const p = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0];
     const course = this.course[this.hulls.indexOf(hull)];
     let c = roll.eddy * Math.abs(p) + roll.linear;
-    if (course && roll.forward) {
+    let speed = 0;
+    if (course) {
       const forward = rotate(q, [1, 0, 0]);
       const horizontal = hypot(forward[0], forward[2]);
       const seen = horizontal > 0 ? (bodies[at + 10]! * forward[0] + bodies[at + 12]! * forward[2]) / horizontal : 0;
-      const speed = Math.max(0, course.speed ?? seen);
+      speed = Math.max(0, course.speed ?? seen);
+    }
+    if (speed > 0 && roll.forward) {
       const { liftPerSpeed, frictionPerSpeed, eddySpeed } = roll.forward;
       const reduced = speed / eddySpeed;
       c =
         (roll.eddy * Math.abs(p)) / (1 + reduced * reduced) +
         roll.linear * (1 + speed * frictionPerSpeed) +
         speed * liftPerSpeed;
+    }
+    if (roll.keels?.length && p !== 0) {
+      const up = rotate(q, [0, 1, 0]);
+      const across = rotate(q, [0, 0, 1]);
+      const angle = atan2(-across[1], up[1]);
+      const sea = this.sea!;
+      c += bilgeKeelDamping(roll.keels, p, angle, roll.natural, sea.density ?? SEA_WATER, speed, (point) => {
+        const r = rotate(q, point);
+        const eta = sea.elevation(pose.position[0] + r[0], pose.position[2] + r[2], t);
+        return eta - pose.position[1] - r[1];
+      });
     }
     const moment = roll.inertia > 0 ? (-c * p) / (1 + (dt * c) / roll.inertia) : -c * p,
       m = rotate(q, [moment, 0, 0]);
@@ -1448,6 +1470,8 @@ export class HullSolver implements Solver<HullParams> {
       eddy: memory.rollEddy,
       linear: memory.rollFriction * Math.sqrt(2 * Math.PI * this.viscosity * natural),
       forward: hull.course ? forwardRollOf(memory, density, natural) : undefined,
+      natural,
+      keels: hull.bilgeKeels ? rollKeelsOf(hull.bilgeKeels, local, memory) : undefined,
       inertia,
       own,
       stiffness,

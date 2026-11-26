@@ -6209,3 +6209,7 @@ In a beam wave of amplitude 0.15 m at 1.9 rad/s, a forward-course hull reaches 0
 ### SEA-08 incident load on a forward course
 
 Held-box head and following-wave fixtures recover the ordinary-strip incident heave and pitch correction within 2.5% of a direct section calculation. A tapered beam-wave case isolates the added-mass slope within 3.5%. The finite-window continuation stays continuous across zero encounter. The live wake perturbation remains available to the hull below the surface. The Wigley tank residuals leave physical qualification open.
+
+### SEA-08 wet bilge keel plate damping
+
+A prismatic hull with configured plates reproduces the published normal drag and forward lift moments within 0.001% of their independent evaluation through the rigid force port. Fully wet, partially wet, dry and opposite roll directions use the same coefficients. The renderer fixture runs the plates on a floating hull with a dispersive wake and exact restored replay. Independent measured roll decay and nonlinear plate loads remain open.
