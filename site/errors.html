@@ -140,6 +140,12 @@
       <p><strong>Cause.</strong> MeshDebugView checks every option before changing any: an unknown name, a mode outside its list, a size outside its range or a colour that is neither a hex string nor three linear numbers is refused. It draws by reading vertex and index storage buffers, so native WebGL2 and a device without vertex-stage storage buffers are refused, and a mesh whose data does not fit one storage binding throws from the frame.</p>
       <p><strong>Fix.</strong> Correct the option the message names, create the engine on WebGPU or the WebGL2 compatibility layer, attach a new view after dispose(), and split a mesh that is too large or leave it out of meshes.</p>
     </section>
+    <section id="scene-emitter">
+      <h2><a href="#scene-emitter">@margoengine/scene/emitter: typed events with async iteration</a></h2>
+      <p class="messages"><code>Emitter.on needs a listener function; see https://margoengine.com/errors#scene-emitter</code> <code>Emitter.events: capacity must be an integer of 1 or more; see https://margoengine.com/errors#scene-emitter</code></p>
+      <p><strong>Cause.</strong> on() or once() was given something that is not a function, or events() was given a capacity that is not an integer of 1 or more.</p>
+      <p><strong>Fix.</strong> Pass a function as the listener, and a whole-number capacity of 1 or more (the default is 64). A listener that throws is not this error: it goes to the <code>onError</code> option of <code>new Emitter({ onError })</code>.</p>
+    </section>
     <section id="scene-helpers">
       <h2><a href="#scene-helpers">@margoengine/lines/scene-helpers: light probe and positional audio helpers</a></h2>
       <p class="messages"><code>LightProbeHelper needs 12 or 27 SH coefficients or a function of the normal; see https://margoengine.com/errors#scene-helpers</code> <code>LightProbeHelper size must be above 0 and exposure 'auto' or 0 and above; see https://margoengine.com/errors#scene-helpers</code> <code>LightProbeHelper position needs 3 finite values; see https://margoengine.com/errors#scene-helpers</code> <code>PositionalAudioHelper needs a PositionalAudio or its shape; see https://margoengine.com/errors#scene-helpers</code> <code>PositionalAudioHelper length must be above 0; see https://margoengine.com/errors#scene-helpers</code></p>

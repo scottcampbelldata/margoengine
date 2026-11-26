@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20506093,
+  "total": 20507338,
   "history": [
     {
       "date": "2026-10-24",
@@ -13305,6 +13305,12 @@
       "commit": "3ea3c16663",
       "grew": 1,
       "reason": "EARTH-05 coupled oblique wheel shear and sidewall force take the optional entry from 12899 to 13328 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "cfd800032",
+      "reason": "New optional entry @margoengine/scene/emitter: a typed Emitter with signal, once, bounded async iteration and dispose; ceiling measured +256 B. The iterator buffer, the error hook and dispose share one listener table, so splitting would duplicate it. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14421,6 +14427,7 @@
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
     "@margoengine/scene/container": 3975,
+    "@margoengine/scene/emitter": 1245,
     "@margoengine/scene/graph": 2254,
     "@margoengine/scene/helpers": 2426,
     "@margoengine/scene/mesh": 2123,
