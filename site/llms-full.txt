@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,250 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,252 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12588,6 +12588,20 @@ subdivision at half the smallest horizontal cell width; the aggregate ledger ret
 ### Developmental wood growth (BIO-02)
 
 The parametric solver places shoots on 60 Hz season boundaries and stores permanent branch structure. The initialization footprint follows the supplied productive seasons and the minimum extension per new branch. The light grid uses cubic voxels with a vertical, distance-attenuated penumbra and horizontal light-seeking gradient. Sites outside the supplied grid receive open light. Roots use a measured water threshold and the mean storage in their own supplied HYDRO-02 cell. The model has no water extraction, leaf anatomy, root branching or moving obstructors. Renderer-adapted coordinates are f32 within an origin cell. The optional growth entry measures 12,386 B minified and 5,474 B gzip. The selected lazy SIMD kernel is 601 B raw in either memory mode. Core and Stage gain zero bytes.
+
+### Enclosed and urban acoustics (SOUND-02)
+
+`@margoengine/physics/room-sound` separates finite specular paths from a linear low-frequency wave field.
+Paths accept convex planar faces and trace direct and reflected segments through the requested order, default two.
+The bounded search reports when its candidate image budget is exceeded. The ray gains are relative to a one-metre
+monopole and keep pressure signs. Their fractional sample impulses use two-point interpolation.
+
+The native scheme has cubic voxels and one real reflection coefficient per air cell at its closed faces.
+Normal-incidence wall admittance is exact in the model. Grazing and mixed-frequency impedance need finer
+geometry or a richer material boundary. For an axis wave resolved with ten cells per wavelength, the
+sinusoidal stencil bounds numerical phase speed from below by 1 − π²/600 of the configured speed.
+Use a finer grid for higher frequencies. The data-free plain and shared variants each measure 753 B raw.
+The optional entry measures 5,758 B gzip. Core plus stage stays at 24,820 B gzip.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -29062,6 +29076,14 @@ positions. Embers, ash, high-speed debris and snow are outside the environmental
 ### Woody plant growth geometry and moving obstacles (BIO-02)
 
 `PlantGrowth` supplies an updated branch graph that `@margoengine/procedural/lsystem` can mesh; run the geometry case in `packages/biomes/tests/coupling/growth.test.js`. New branches avoid the supplied solid voxel grid. The solver still needs a shared moving-obstacle geometry input and an explicit seasonal transfer contract for live scatter and wind-driven branch physics. Branch growth currently changes the shared graph on a season boundary, and users rebuild the mesh from the new graph when needed.
+
+## Open: acoustic room mesh and concert-hall cutaway consumers (SOUND-02)
+
+The room solver accepts an explicit air-mask lattice, and the early path trace accepts finite convex faces.
+To connect dynamic EARTH-02 tunnel or canyon geometry, the solver needs a canonical material and occupancy
+field. The opening fixture proves shadow diffraction with explicit geometry. The concert-hall fixture verifies
+early arrival cutaway points and the README plays the actual convolved response. The filmed scene still needs
+to read those paths and room material inputs. See [Framework requests](physics-work-queue.md#framework-requests).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
