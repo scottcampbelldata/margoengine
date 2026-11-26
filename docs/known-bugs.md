@@ -16907,9 +16907,10 @@ particle hand-off carrying both volume and horizontal momentum across the shallo
 ### Divergence-free narrow-channel surge and boundary exchange (FLUID-01, PA-22)
 
 After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`. The interactive and accurate
-tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.458 and 0.467 against the
+tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.399 and 0.510 against the
 original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
-measured liquid–air tension. The planar model includes excluded pressure volume and surface energy but has
+measured liquid–air tension. The discrete wall correction restores an exact motionless initial lattice.
+The planar boundary includes excluded pressure volume and surface energy but has
 no resolved viscous wall layer. The original release diaphragm is also absent from the rectangular-domain
 model. The parcel contract conserves volume and all momentum components against a closed fixture.
 The SEA-04 and HYDRO-01 production endpoints remain open.

@@ -4568,7 +4568,8 @@ console.log(water.mass, water.sample(0).position, water.statistics.compression);
 
 The particle field publishes f64 XYZ, velocity XYZ, density and mass. Use `positions(out)` to stage active
 XYZ rows for `ParticleLiquid` in `@margoengine/water/liquid`. Reserve `capacity` to append material with `emit`.
-The box's closed faces integrate the pressure kernel beyond their planes. Use `wallPressure: false` for hard
+The box's closed faces sample the pressure kernel beyond their planes on the rest lattice. Select
+`wallKernel: 'analytic'` for the continuous integral. Use `wallPressure: false` for hard
 contacts alone, or per-face `walls` settings for open edges. The optional `surfaceTension` applies a
 separate liquid–air surface energy in N/m. Use `solidLiquidTension` and `solidVaporTension` in the same units
 to select wetting. A larger solid–air value favours wetting and a larger solid–liquid value repels.

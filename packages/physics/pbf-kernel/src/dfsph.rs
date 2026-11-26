@@ -1,5 +1,5 @@
 use crate::grid::{Bucket, Grid};
-use crate::vector::{Vec3, ZERO, add, cross, dot, length, norm2, scale, sqrt, sub};
+use crate::vector::{Vec3, ZERO, add, cross, dot, floor, length, norm2, scale, sqrt, sub};
 use crate::{
     Boundary, Particle, Reaction, Solid, clip_solid, item, item_mut, rebuild, record_impulse,
 };
@@ -25,6 +25,7 @@ pub struct Settings {
     warm_start: f64,
     viscosity_iterations: f64,
     wall_pressure: f64,
+    wall_lattice: f64,
     liquid_vapor: f64,
     solid_liquid: f64,
     solid_vapor: f64,
@@ -207,6 +208,101 @@ fn wall_terms(position: Vec3, settings: &Settings, support: f64) -> (f64, Vec3) 
     (1.0 - fluid, gradient)
 }
 
+struct PlanarLattice {
+    spacing: Vec3,
+    cells: [i64; 3],
+    volume: f64,
+}
+
+impl PlanarLattice {
+    fn new(settings: &Settings) -> Option<Self> {
+        if settings.wall_lattice == 0.0 || settings.walls == 0.0 {
+            return None;
+        }
+        let span = sub(settings.upper, settings.lower);
+        let dimensions = span.map(|width| floor(width / settings.spacing + 0.5).max(1.0));
+        let spacing = [
+            span[0] / dimensions[0],
+            span[1] / dimensions[1],
+            span[2] / dimensions[2],
+        ];
+        // The finite sum resolves the discrete exclusion correction for short
+        // kernels. At larger support-to-spacing ratios use the continuous limit.
+        if spacing.iter().any(|d| *d < 0.25 * settings.support)
+            || dimensions.iter().any(|d| *d > 4_503_599_627_370_496.0)
+        {
+            return None;
+        }
+        let [dx, dy, dz] = spacing.map(|size| size / settings.support);
+        Some(Self {
+            spacing,
+            cells: dimensions.map(|d| d as i64),
+            volume: dx * dy * dz,
+        })
+    }
+
+    fn at(&self, p: Vec3, settings: &Settings, evaluations: &mut f64) -> (f64, Vec3) {
+        let mask = settings.walls as u32;
+        let h = settings.support;
+        let low_distance = sub(p, settings.lower);
+        let high_distance = sub(settings.upper, p);
+        let near = (0..3).any(|axis| {
+            ((mask & (1 << (2 * axis))) != 0 && low_distance[axis] < h)
+                || ((mask & (1 << (2 * axis + 1))) != 0 && high_distance[axis] < h)
+        });
+        if !near {
+            return (0.0, ZERO);
+        }
+        // A coordinate beyond the representable local lattice uses the continuous half-space.
+        if low_distance
+            .iter()
+            .chain(high_distance.iter())
+            .any(|d| !d.is_finite())
+        {
+            return wall_terms(p, settings, h);
+        }
+        let centre = [
+            low_distance[0] / self.spacing[0],
+            low_distance[1] / self.spacing[1],
+            low_distance[2] / self.spacing[2],
+        ];
+        if centre.iter().any(|x| x.abs() > 4_503_599_627_370_496.0) {
+            return wall_terms(p, settings, h);
+        }
+        let low = [0, 1, 2].map(|i| floor(centre[i] - h / self.spacing[i]) as i64);
+        let high = [0, 1, 2].map(|i| floor(centre[i] + h / self.spacing[i]) as i64);
+        let outside = |axis: usize, cell: i64| {
+            (cell < 0 && (mask & (1 << (2 * axis))) != 0)
+                || (cell >= self.cells[axis] && (mask & (1 << (2 * axis + 1))) != 0)
+        };
+        let inverse_h = 1.0 / h;
+        let mut weight = 0.0;
+        let mut derivative = ZERO;
+        for z in low[2]..=high[2] {
+            for y in low[1]..=high[1] {
+                let row = outside(2, z) || outside(1, y);
+                for x in low[0]..=high[0] {
+                    if row || outside(0, x) {
+                        let r = [x, y, z].map(|cell| cell as f64 + 0.5);
+                        let q = [0, 1, 2].map(|i| (centre[i] - r[i]) * self.spacing[i] * inverse_h);
+                        let distance2 = norm2(q);
+                        if distance2 < 1.0 {
+                            *evaluations += 1.0;
+                            let distance = sqrt(distance2);
+                            weight += self.volume * cubic(distance);
+                            derivative = add(
+                                derivative,
+                                scale(gradient(q, distance), self.volume * inverse_h),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        (weight, derivative)
+    }
+}
+
 fn prepare(
     points: &mut [Particle],
     work: &mut [Work],
@@ -217,12 +313,15 @@ fn prepare(
 ) {
     let inverse_h = 1.0 / settings.support;
     let mass_scale = inverse_h * inverse_h * inverse_h / settings.rest;
+    let lattice = PlanarLattice::new(settings);
     for i in 0..points.len() {
         let particle = item(points, i);
-        let (wall_density, wall_gradient) = if settings.wall_pressure > 0.0 {
-            wall_terms(particle.position, settings, settings.support)
-        } else {
+        let (wall_density, wall_gradient) = if settings.wall_pressure == 0.0 {
             (0.0, ZERO)
+        } else if let Some(samples) = &lattice {
+            samples.at(particle.position, settings, evaluations)
+        } else {
+            wall_terms(particle.position, settings, settings.support)
         };
         let mut density = particle.mass * mass_scale * CUBIC + wall_density;
         let mut centre = wall_gradient;

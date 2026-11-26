@@ -280,6 +280,7 @@ test('one closed planar wall adds the exact cubic kernel integral on either half
         [8, 8, 8],
       ],
       walls: [false, false, true, false, false, false],
+      wallKernel: 'analytic',
       particles: [{ position: [0, height, 0] }],
     });
     near(liquid.sample(0).density / 1000, CUBIC / 8 + wallDensity);
@@ -327,6 +328,7 @@ test('equal solid interface energies cancel for an analytic wall and their diffe
         [8, 8, 8],
       ],
       walls: [false, false, true, false, false, false],
+      wallKernel: 'analytic',
       wallPressure: false,
       solidLiquidTension,
       solidVaporTension,
@@ -584,4 +586,35 @@ test('a retransmitted parcel ticket is acknowledged once through later clock tic
   world.restoreSnapshot(snapshot.bytes);
   world.advance(6);
   assert.equal(world.hash(), hash);
+});
+
+test('a resting lattice keeps exact discrete density and zero velocity against walls, edges and corners', async () => {
+  const spacing = 0.04;
+  const size = 4;
+  const points = [];
+  for (let z = 0; z < size; z++)
+    for (let y = 0; y < size; y++)
+      for (let x = 0; x < size; x++) points.push({ position: [x, y, z].map((i) => (i + 0.5) * spacing) });
+  let density = 0;
+  for (let z = -1; z <= 1; z++)
+    for (let y = -1; y <= 1; y++)
+      for (let x = -1; x <= 1; x++) {
+        const q = Math.sqrt(x * x + y * y + z * z) / 2;
+        const w = q <= 0.5 ? 1 - 6 * q ** 2 + 6 * q ** 3 : 2 * (1 - q) ** 3;
+        density += (1000 * CUBIC * w) / 8;
+      }
+  const { world, liquid } = await solve({
+    spacing,
+    particles: points,
+    bounds: [
+      [0, 0, 0],
+      [size * spacing, size * spacing, size * spacing],
+    ],
+  });
+  world.advance(10);
+  assert.equal(liquid.statistics.maximumSpeed, 0);
+  for (const [index, point] of points.entries()) {
+    near(liquid.sample(index).density, density);
+    assert.deepEqual(liquid.sample(index).position, point.position);
+  }
 });

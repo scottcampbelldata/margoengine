@@ -43,7 +43,7 @@ export const DFSPH_PARTICLE_WORDS = 8;
 
 const ZERO: Cell = [0, 0, 0];
 const ONE: Vec3 = [1, 1, 1];
-const SETTINGS_WORDS = 26;
+const SETTINGS_WORDS = 27;
 const WORK_WORDS = 29;
 const BUCKET_WORDS = 4;
 const STATS_WORDS = 10;
@@ -114,6 +114,8 @@ export interface DfsphParams {
   readonly walls?: readonly [boolean, boolean, boolean, boolean, boolean, boolean];
   /** Include the planar wall kernel integral in pressure. Default true. Hard contacts are always active on closed faces. */
   readonly wallPressure?: boolean;
+  /** Planar pressure quadrature. Default lattice for short kernels with analytic fallback. */
+  readonly wallKernel?: 'lattice' | 'analytic';
   /** Liquid–air surface tension in N/m. Default zero. Set 0.07274 for pure water at 20 °C. */
   readonly surfaceTension?: number;
   /** Solid–liquid interface energy in N/m. Default zero. */
@@ -302,6 +304,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
     const viscosity = fraction(params.viscosity ?? 0.000001, 'DFSPH kinematic viscosity', Number.MAX_VALUE);
     if (!Number.isFinite(viscosity / (support * support)))
       throw new RangeError('DFSPH viscosity scale overflows. Reduce viscosity or increase kernel support.');
+    if (params.wallKernel !== undefined && params.wallKernel !== 'lattice' && params.wallKernel !== 'analytic')
+      throw new TypeError('DFSPH wall kernel is unknown. Choose lattice or analytic.');
     const walls = params.walls ?? [true, true, true, true, true, true];
     if (walls.length !== 6 || !walls.every((value) => typeof value === 'boolean'))
       throw new TypeError('DFSPH walls must name six faces. Pass six boolean values in min/max XYZ order.');
@@ -354,6 +358,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       (params.warmStart ?? true) ? 1 : 0,
       viscosityIterations,
       (params.wallPressure ?? true) ? 1 : 0,
+      params.wallKernel === 'analytic' ? 0 : 1,
       liquidVapor,
       solidLiquid,
       solidVapor,

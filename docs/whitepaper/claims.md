@@ -5840,3 +5840,10 @@ mass. The fast tier preserves authored link lengths through a wind reversal and 
 A fixed-camera 720-point proof measures a 0.4825 m tip difference from the still-air control
 and 3,107 changed pixels per backend with the same solved-state replay hash.
 [Reproduce](reproduce.md#strand-guides-soft-03)
+
+### FLUID-01 resting liquid at solid corners
+
+The boxed rest lattice checks the exact discrete cubic kernel density at every site, including faces,
+edges and corners. The continuous wall-volume default raised corner density by 7.1% and launched a
+motionless film at 0.354 m/s in one step. The matching lattice complement gives zero velocity and
+the same kernel density at the wall and in the interior.

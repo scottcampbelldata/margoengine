@@ -231,6 +231,14 @@ integrates its cubic spline with circular sections, yielding the dimensionless h
 fractions approximates overlap, so the gradient matches the same density model.
 [Winchenbach et al.](https://www.cg.informatik.uni-siegen.de/sites/www.cg.informatik.uni-siegen.de/files/data/Publications/2020/semi-analiticBoundaryHandling.pdf).
 
+Rustam Akhunov and Andreas Kolb (2024), *Decoupled Boundary Handling in SPH*, section 3, identifies
+excess boundary density as a cause of still-water motion. The default Margo box uses the discrete
+complement of the same rest lattice that samples the fluid. For each lattice point outside at least one
+closed face it accumulates rest volume times the same value and gradient as the liquid kernel. Face,
+edge and corner samples each enter the sum once. The closed-box regression forms the full reference
+kernel sum independently and measures zero change of velocity and position in the absence of forces.
+[Akhunov and Kolb](https://doi.org/10.1007/s00371-023-03212-2).
+
 Timo Probst and Matthias Teschner (2025), *Unified Pressure, Surface Tension and Friction for SPH Fluids*,
 equations 5–12 and section 5.2, supplies the capillary surface energy gradient. Margo uses the recommended
 cubic surface kernel of three spacings, interface smoothing of 0.05 and rest area of π/4 times the spacing
