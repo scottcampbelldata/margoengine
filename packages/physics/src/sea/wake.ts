@@ -333,11 +333,6 @@ export class WakeSolver implements Solver<WakeParams> {
       fu = u - i,
       fv = v - j,
       at = (field: Float64Array, a: number, b: number) => field[a + nx * b]!,
-      lerp = (field: Float64Array, a: number, b: number) =>
-        (1 - fu) * (1 - fv) * at(field, a, b) +
-        fu * (1 - fv) * at(field, a + 1, b) +
-        (1 - fu) * fv * at(field, a, b + 1) +
-        fu * fv * at(field, a + 1, b + 1),
       ddx = (field: Float64Array, a: number, b: number) => (at(field, a + 1, b) - at(field, a - 1, b)) / (2 * dx),
       ddz = (field: Float64Array, a: number, b: number) => (at(field, a, b + 1) - at(field, a, b - 1)) / (2 * dx),
       blend = (f: (a: number, b: number) => number) =>
@@ -345,13 +340,31 @@ export class WakeSolver implements Solver<WakeParams> {
         fu * (1 - fv) * f(i + 1, j) +
         (1 - fu) * fv * f(i, j + 1) +
         fu * fv * f(i + 1, j + 1);
-    s.height = lerp(h, i, j);
-    s.slope[0] = blend((a, b) => ddx(h, a, b));
-    s.slope[1] = blend((a, b) => ddz(h, a, b));
+    s.height = this.heightAt(h, x, z);
+    // The slope is the central difference of this same reading one cell either side (each 0 within a cell and a half of
+    // the edge), the slope Water draws (`@margoengine/water/wake`), so the normal a hull floats on is the one it shows.
+    s.slope[0] = (this.heightAt(h, x + dx, z) - this.heightAt(h, x - dx, z)) / (2 * dx);
+    s.slope[1] = (this.heightAt(h, x, z + dx) - this.heightAt(h, x, z - dx)) / (2 * dx);
     s.velocity[0] = blend((a, b) => ddx(phi, a, b));
     s.velocity[2] = blend((a, b) => ddz(phi, a, b));
-    s.velocity[1] = this.stepDt > 0 ? (s.height - lerp(previous, i, j)) / this.stepDt : 0;
+    s.velocity[1] = this.stepDt > 0 ? (s.height - this.heightAt(previous, x, z)) / this.stepDt : 0;
     return s;
+  }
+
+  /** A grid field read bilinearly at (x, z), 0 within a cell and a half of the edge, as `sample` reads it. */
+  private heightAt(h: Float64Array, x: number, z: number): number {
+    const { nx, nz, dx } = this,
+      u = (x - this.x0) / dx - 0.5,
+      v = (z - this.z0) / dx - 0.5;
+    if (!(u >= 1 && v >= 1 && u < nx - 2 && v < nz - 2)) return 0;
+    const i = Math.floor(u),
+      j = Math.floor(v),
+      fu = u - i,
+      fv = v - j,
+      k = i + nx * j;
+    return (
+      (1 - fu) * (1 - fv) * h[k]! + fu * (1 - fv) * h[k + 1]! + (1 - fu) * fv * h[k + nx]! + fu * fv * h[k + nx + 1]!
+    );
   }
 
   /** The grid: cells, cell size and its first corner, m. */

@@ -6071,6 +6071,10 @@
       "types": "./dist/water/ripples.d.ts",
       "import": "./dist/water/ripples.js"
     },
+    "./water/wake": {
+      "types": "./dist/water/wake.d.ts",
+      "import": "./dist/water/wake.js"
+    },
     "./water/flow": {
       "types": "./dist/water/flow.d.ts",
       "import": "./dist/water/flow.js"

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19394766,
+  "total": 19396548,
   "history": [
     {
       "date": "2026-10-24",
@@ -12657,6 +12657,12 @@
       "commit": "lane-a",
       "reason": "New optional post entries, 0 to measured B gzip: kawase-blur 8,504, color-average 8,036, lut1d 9,717 (each carries the PostStack; color-average and lut1d reuse the overlay composite for blend modes and masks), depth-downsample 6,770 (carries its DepthTexture capture). Separate entries so an app loads only the pass it imports. Core plus stage unchanged.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(water) draws the wake",
+      "reason": "Water draws a physics wake: @margoengine/water/wake is a new optional entry of 1,680 B gzip (WaterWake: the wake's height grid uploaded once a frame, and the shader that reads it by the solver's own bilinear rule and slope); physics/sea 7,259 to 7,361 B (measured before and after on this Mac) because WakeSolver.sample now takes its slope as the central difference of its bilinear height one cell either side, the slope Water draws, so the normal a hull floats on is the one the camera sees. Nothing to split: the wake entry is one class and only apps that draw a wake load it.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13475,7 +13481,7 @@
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
-    "@margoengine/physics/sea": 7259,
+    "@margoengine/physics/sea": 7361,
     "@margoengine/physics/seakeeping": 10371,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/soft": 111864,
@@ -14232,6 +14238,7 @@
     "@margoengine/water/ships": 11259,
     "@margoengine/water/splash": 5779,
     "@margoengine/water/underwater": 9360,
+    "@margoengine/water/wake": 1680,
     "@margoengine/weather": 8762,
     "@margoengine/weather/audio": 1908,
     "@margoengine/weather/avalanche": 6984,

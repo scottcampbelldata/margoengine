@@ -443,6 +443,42 @@ engine.render({delta: 0});
 console.log(sea.sample(0, 0, 12).height.toFixed(2)); // the height the camera sees at the origin
 ```
 
+### A physics wake, drawn: `WaterWake` (`@margoengine/water/wake`)
+
+`WaterWake.attach(engine, {surface: water, wake})` draws a physics wake (`WakeSolver` of `@margoengine/physics/sea`, or
+anything with a `grid` and `heights()`) on a Water: each frame the wake's height grid, as the solver holds it after its
+last step, goes to the GPU once (its doubles rounded once to f32), and the surface adds it to the waves it draws, read by
+the same bilinear rule and slope as `WakeSolver.sample` (0 within a cell and a half of the grid's edge; the slope a
+central difference one cell either side). So with the wake also among the sea's `patches`, the hull floating on
+`sea.sample` rides the wake the camera sees, and WaveQuery reads it too. `test/wake-agreement.browser.mjs` captures the
+drawn surface at 1,362 vertices, 494 of them on the wake, and checks height and normal against `sea.sample` inside the
+bound in `docs/limits.md` ("Drawn wake"), on WebGPU and the WebGL2 layer: on an Apple M6 the largest difference is 0.04
+percent of the bound. `dispose()` (or the Water's) stops drawing it and frees its two buffers.
+
+```ts
+import {Water} from 'margoengine/water';
+import {WaterWake} from 'margoengine/water/wake';
+import {Engine} from 'margoengine/core';
+import {SpectralSea, WakeSolver} from 'margoengine/physics/sea';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const wake = new WakeSolver();
+const world = new PhysicsWorld({rate: {num: 30, den: 1}}).add(wake, {
+  cells: [256, 128],
+  cellSize: 0.5,
+  // A hull 12 m long at 4 m/s: 0.3 m of water's weight on its waterplane.
+  sources: (t) => [{x: -50 + 4 * t, z: 0, radius: 6, pressure: 1025 * 9.81 * 0.3, volume: 0}],
+});
+const spectrum = {frequencies: Float64Array.from([0.1, 0.2]), directions: Float64Array.from([0, Math.PI]), energy: new Float64Array(4), depth: Infinity, density: 1025};
+const sea = new SpectralSea({waves: spectrum, patches: [wake]});
+const water = Water.attach(engine, {size: [120, 60], segments: 512, sea});
+WaterWake.attach(engine, {surface: water, wake});
+world.advance(10 * 30); // ten seconds of the hull's run
+water.setTime(10);
+engine.render({delta: 0}); // the wake drawn where the physics has it
+```
+
 ### Sliders for every control: settings
 
 `@margoengine/water/settings` lists every live Water control as one table for panels and tools, and names eleven looks made
