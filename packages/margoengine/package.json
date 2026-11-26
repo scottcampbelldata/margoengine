@@ -1967,6 +1967,10 @@
       "types": "./dist/horses/settings.d.ts",
       "import": "./dist/horses/settings.js"
     },
+    "./horses/strands": {
+      "types": "./dist/horses/strands.d.ts",
+      "import": "./dist/horses/strands.js"
+    },
     "./html": {
       "types": "./dist/html.d.ts",
       "import": "./dist/html.js"

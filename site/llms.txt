@@ -250,7 +250,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/robot-planning API](https://margoengine.com/llms/api/robot-planning.md): 5 entry points
 - [@margoengine/rigging API](https://margoengine.com/llms/api/rigging.md): 21 entry points
 - [@margoengine/humans API](https://margoengine.com/llms/api/humans.md): 4 entry points
-- [@margoengine/horses API](https://margoengine.com/llms/api/horses.md): 7 entry points
+- [@margoengine/horses API](https://margoengine.com/llms/api/horses.md): 8 entry points
 - [@margoengine/armies API](https://margoengine.com/llms/api/armies.md): 5 entry points
 - [@margoengine/tween API](https://margoengine.com/llms/api/tween.md): 11 entry points
 - [@margoengine/cinematic API](https://margoengine.com/llms/api/cinematic.md): 10 entry points

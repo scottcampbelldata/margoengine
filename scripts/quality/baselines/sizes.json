@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20436261,
+  "total": 20456090,
   "history": [
     {
       "date": "2026-10-24",
@@ -13209,6 +13209,12 @@
       "commit": "166ad8688c",
       "grew": 1,
       "reason": "EARTH-05 spatial bedrock and hardpan sampling take the optional entry from 10864 to 11340 B gzip. Keeping both with the existing soil stamp preserves one mass ledger and one native loader. Core plus Stage stays 24820 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "9535ab76f9e8ba33b6a285b65e7356b50470ed06",
+      "grew": 3,
+      "reason": "SOFT-03 and PA-71 use the existing horse and skinning path: @margoengine/horses 16724 to 17283 B gzip (ceiling 17802), @margoengine/horses/model 11716 to 12180 B gzip (ceiling 12546), @margoengine/horses/strands 0 to 18228 B gzip (ceiling 18775). The shared optional hair-guide rig, local pose hook and validated ear topology belong in the same horse model. A second rig builder would duplicate the skinned horse. The Physics World and strand modules stay lazy until addStrandHorse runs. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -13701,13 +13707,14 @@
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,
     "@margoengine/headless/video": 13452,
-    "@margoengine/horses": 17226,
+    "@margoengine/horses": 17802,
     "@margoengine/horses/anatomy": 1097,
     "@margoengine/horses/crowd": 12397,
     "@margoengine/horses/gaits": 1467,
-    "@margoengine/horses/model": 12068,
+    "@margoengine/horses/model": 12546,
     "@margoengine/horses/seat": 1758,
     "@margoengine/horses/settings": 2384,
+    "@margoengine/horses/strands": 18775,
     "@margoengine/html": 7487,
     "@margoengine/html/blend": 3698,
     "@margoengine/html/inline": 2744,

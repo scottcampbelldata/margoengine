@@ -55,6 +55,7 @@ export interface HorseModelOptions extends HorseBodyOptions {
     coat?: HorseCoat;
     markings?: HorseMarkings;
     maneLength?: number;
+    strandRig?: boolean;
     tailLength?: number;
     speeds?: Partial<Record<Gait, number>>;
     detail?: 0 | 1 | 2;
@@ -64,6 +65,7 @@ export interface HorseModelOptions extends HorseBodyOptions {
 export interface HorsePose {
     readonly rotations: readonly (readonly [number, number, number, number])[];
     readonly bodyOffset: readonly [number, number, number];
+    readonly jointTranslations?: ReadonlyMap<number, readonly [number, number, number]>;
     readonly scapulaOffsets?: readonly [Readonly<V3>, Readonly<V3>];
 }
 
@@ -73,6 +75,7 @@ export interface HorseSkeleton {
     readonly legs: readonly (readonly number[])[];
     readonly ground: readonly (readonly [number, number, number])[];
     readonly saddle: readonly [number, number, number];
+    readonly strandChains?: readonly (readonly number[])[];
     index(name: string): number;
 }
 
@@ -94,7 +97,7 @@ export function horseJointTranslation(skeleton: HorseSkeleton, pose: HorsePose, 
 
 export function horsePose(skeleton: HorseSkeleton, s: Stride | null, phase?: number, time?: number, amplitude?: number): HorsePose;
 
-export function horseSkeleton(body: HorseBody, tailLength?: number): HorseSkeleton;
+export function horseSkeleton(body: HorseBody, tailLength?: number, maneLength?: number): HorseSkeleton;
 
 export function horseTailFlick(skeleton: HorseSkeleton, pose: HorsePose, seconds: number, strength?: number, side?: -1 | 1): HorsePose;
 

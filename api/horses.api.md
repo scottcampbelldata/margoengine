@@ -31,6 +31,7 @@ export interface Horse {
     advanceTime(delta: number): this;
     seek(time: number): this;
     onStep(step: (dt: number, horse: Horse) => void, reset?: () => void): () => void;
+    onPose(modify: (pose: HorsePose, horse: Horse) => HorsePose): () => void;
     dispose(): void;
     [Symbol.dispose](): void;
 }
@@ -72,6 +73,7 @@ export interface HorseModelOptions extends HorseBodyOptions {
     coat?: HorseCoat;
     markings?: HorseMarkings;
     maneLength?: number;
+    strandRig?: boolean;
     tailLength?: number;
     speeds?: Partial<Record<Gait, number>>;
     detail?: 0 | 1 | 2;
@@ -138,6 +140,7 @@ export interface HorseOptions extends HorseModelOptions {
 export interface HorsePose {
     readonly rotations: readonly (readonly [number, number, number, number])[];
     readonly bodyOffset: readonly [number, number, number];
+    readonly jointTranslations?: ReadonlyMap<number, readonly [number, number, number]>;
     readonly scapulaOffsets?: readonly [Readonly<V3>, Readonly<V3>];
 }
 
@@ -151,6 +154,7 @@ export interface HorseSkeleton {
     readonly legs: readonly (readonly number[])[];
     readonly ground: readonly (readonly [number, number, number])[];
     readonly saddle: readonly [number, number, number];
+    readonly strandChains?: readonly (readonly number[])[];
     index(name: string): number;
 }
 

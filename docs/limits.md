@@ -9797,4 +9797,5 @@ weighted to those guides. The 1.5 s trotting fixture in a 24 m/s reference-heigh
 moved tail, mane and forelock tips by 0.2896, 0.0250 and 0.0579 m relative to the still-air
 run. Both backends produced 1,478 changed pixels and replay hash `f1550b4d0b329005`. The
 body capsules follow the skin pose on each tick. The parameters represent effective hair
-bundles, and bundle-scale stiffness and drag calibration remain open.
+bundles, and bundle-scale stiffness and drag calibration remain open. The horses root and model
+entries measure 17,283 B and 12,180 B gzip. The optional strand horse measures 18,228 B gzip.

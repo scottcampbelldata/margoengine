@@ -5880,8 +5880,8 @@
     },
     "@margoengine/horses": {
       ".": {
-        "raw": 40737,
-        "gzip": 16724
+        "raw": 42278,
+        "gzip": 17283
       },
       "./anatomy": {
         "raw": 1784,
@@ -5892,8 +5892,8 @@
         "gzip": 1266
       },
       "./model": {
-        "raw": 27548,
-        "gzip": 11716
+        "raw": 28813,
+        "gzip": 12180
       },
       "./seat": {
         "raw": 3419,
@@ -5906,6 +5906,10 @@
       "./settings": {
         "raw": 4635,
         "gzip": 2128
+      },
+      "./strands": {
+        "raw": 44695,
+        "gzip": 18228
       }
     },
     "@margoengine/html": {
