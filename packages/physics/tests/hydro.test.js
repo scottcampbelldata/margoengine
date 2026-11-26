@@ -272,6 +272,57 @@ test('the same flood gives the same bits', () => {
   assert.equal(a.world.hash(), b.world.hash());
 });
 
+test('an open sea side lets a long wave leave; a set level reflects it', () => {
+  // A hump of water 0.2 m high on 5 m of still water runs out over the minX side.
+  const reflected = (side) => {
+    const nx = 200,
+      dx = 2,
+      { bed } = ground(nx, 1, nx * dx, dx, () => -5),
+      { water, run } = flood(
+        {
+          bed,
+          level: (x) => 0.2 * Math.exp(-(((x - 200) / 20) ** 2)),
+          roughness: 0,
+          sides: { minX: side, maxX: { sea: 0 } },
+        },
+        60,
+      );
+    // Long enough to reach the side and come back to the middle: c = sqrt(g h) = 7 m/s, 200 m out and 100 back.
+    run(43);
+    let highest = 0;
+    for (let i = 0; i < 100; i++) highest = Math.max(highest, Math.abs(water.sample(i * dx + 1, 1).surface));
+    return highest;
+  };
+  const sea = reflected({ sea: 0 }),
+    level = reflected({ level: 0 });
+  // Each half of the hump is 0.1 m high: a level side sends it back whole (inverted), the sea side a few millimetres.
+  assert.ok(level > 0.07, `a set level reflects ${level} m`);
+  assert.ok(sea < 0.15 * level, `the open sea reflects ${sea} m`);
+});
+
+test('a periodic channel keeps its water exactly while a current runs round it', () => {
+  // A wind-free, frictionless flow round a periodic box: the volume does not change, and nothing piles at the ends.
+  const { bed } = ground(
+      40,
+      8,
+      80,
+      16,
+      (x, z) => -2 + 0.3 * Math.sin((2 * Math.PI * x) / 80) * Math.cos((2 * Math.PI * z) / 16),
+    ),
+    { water, run } = flood({
+      bed,
+      level: 0,
+      velocity: () => [0.8, 0.3],
+      roughness: 0,
+      sides: { minX: 'periodic', maxX: 'periodic', minZ: 'periodic', maxZ: 'periodic' },
+    });
+  const start = water.volume();
+  run(60);
+  assert.ok(Math.abs(water.volume() / start - 1) < 1e-12, `${water.volume()} against ${start}`);
+  assert.equal(water.budget.out, 0);
+  assert.ok(Math.abs(water.sample(79, 8).velocity[0]) > 0.3, 'the current still runs at the far end');
+});
+
 test('settings out of range are refused with what to pass', () => {
   const { bed } = ground(4, 4, 4, 4, () => 0),
     add = (params) => new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new ShallowWaterSolver(), params);
@@ -280,6 +331,7 @@ test('settings out of range are refused with what to pass', () => {
   assert.throws(() => add({ bed, roughness: -1 }), /Manning/);
   assert.throws(() => add({ bed, inflows: [{ position: [40, 0], discharge: 1 }] }), /off the water/);
   assert.throws(() => add({ bed, sides: { minX: 'sea' } }), /'wall', 'open'/);
+  assert.throws(() => add({ bed, sides: { minX: 'periodic' } }), /periodic together/);
   assert.throws(() => add({ bed, buildings: [{ min: [1, 1], max: [0, 2], height: 3 }] }), /min below max/);
   assert.throws(() => add({ bed, buildings: [{ min: [0, 0], max: [1, 1], height: 0 }] }), /height/);
 });

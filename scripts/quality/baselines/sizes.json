@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19396548,
+  "total": 19405277,
   "history": [
     {
       "date": "2026-10-24",
@@ -12663,6 +12663,12 @@
       "commit": "feat(water) draws the wake",
       "reason": "Water draws a physics wake: @margoengine/water/wake is a new optional entry of 1,680 B gzip (WaterWake: the wake's height grid uploaded once a frame, and the shader that reads it by the solver's own bilinear rule and slope); physics/sea 7,259 to 7,361 B (measured before and after on this Mac) because WakeSolver.sample now takes its slope as the central difference of its bilinear height one cell either side, the slope Water draws, so the normal a hull floats on is the one the camera sees. Nothing to split: the wake entry is one class and only apps that draw a wake load it.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c50cf5603",
+      "reason": "physics/surf is a new optional entry (SEA-05): SurfSolver, the surfbeat chain over the shallow water (short-wave energy over a directional sector with shoaling and refraction, Roelvink breaking, a roller, radiation stress, Stokes drift, wave groups, run-up and wet sand); its own entry so scenes without surf pay nothing. physics/hydro grows for the surf's forcing field (radiation stress, Stokes drift, wave-stirred friction on the Eulerian velocity), the open-sea side by Riemann invariants and periodic sides: in the entry because a beach or a coast with surf needs them, and a split would load with every such scene. Core plus stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13471,7 +13477,7 @@
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/foam": 8022,
-    "@margoengine/physics/hydro": 6980,
+    "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
@@ -14532,6 +14538,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/surf": 8057
   }
 }

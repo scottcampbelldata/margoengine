@@ -120,6 +120,10 @@
       "types": "./dist/foam/index.d.ts",
       "import": "./dist/foam.js"
     },
+    "./surf": {
+      "types": "./dist/surf/index.d.ts",
+      "import": "./dist/surf.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"

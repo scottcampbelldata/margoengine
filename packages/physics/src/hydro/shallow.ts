@@ -27,8 +27,18 @@ export const WENO_WET = 0.01;
 const WENO_EPS = 1e-12;
 const SQRT2 = 1.4142135623730951;
 
-/** A side of the grid: a wall, open water (the flow goes on past it as it is, over the bed's slope carried on), or a set water level. */
-export type ShallowSide = 'wall' | 'open' | { readonly level: number | ((time: number) => number) };
+/**
+ * A side of the grid: a wall; open water (the flow goes on past it as it is, over the bed's slope carried on); a set water
+ * level (it holds the surface there, so long waves reflect from it); or the open sea at a level (`sea`), which lets waves
+ * from inside leave: the characteristic coming in is still water at that level's, the one going out the water's own. A
+ * `'periodic'` pair of opposite sides wraps the water round, for a coast or a channel that goes on the same way.
+ */
+export type ShallowSide =
+  | 'wall'
+  | 'open'
+  | 'periodic'
+  | { readonly level: number | ((time: number) => number) }
+  | { readonly sea: number | ((time: number) => number) };
 
 /** The grid the kernel works on: `nx` by `nz` cells of `dx` by `dz` m, cell (i, j) at index i + nx j. */
 export interface ShallowGrid {
@@ -196,11 +206,23 @@ function sweep(
     }
     // The ghosts: a wall mirrors the two cells inside it, open water copies the edge cell twice, a set level holds water to
     // that level over the edge cell's bed with the edge cell's velocity.
-    ghost(L, low, 1, 2, 3, time);
-    ghost(L, high, cells + 2, cells + 1, cells, time);
+    const periodic = low === 'periodic';
+    if (periodic) {
+      // Wrapped round: the ghosts are the far end's cells.
+      for (const [to, from] of [
+        [1, cells + 1],
+        [0, cells],
+        [cells + 2, 2],
+        [cells + 3, 3],
+      ] as const)
+        copy(L, to, from, false);
+    } else {
+      ghost(L, low, 1, 2, 3, time, g);
+      ghost(L, high, cells + 2, cells + 1, cells, time, g);
+    }
     // Face states of every slot (ghosts constant).
     for (let s = 0; s < cells + 4; s++) reconstruct(L, s, cells);
-    for (let f = 0; f <= cells; f++) {
+    for (let f = periodic ? 1 : 0; f <= cells; f++) {
       const e = 8 * (f + 1),
         o = 8 * (f + 2) + 4;
       let hL = faces[e]!,
@@ -238,7 +260,13 @@ function sweep(
         rn[k]! -= leftN / d;
         rt[k]! -= flux[2]! / d;
       } else leaving -= flux[0]! * width;
-      if (f < cells) {
+      if (f === cells && periodic) {
+        // The face past the far end is the near end's first: what leaves one cell there enters the other, exactly.
+        const k = at(0);
+        rh[k]! += flux[0]! / d;
+        rn[k]! += rightN / d;
+        rt[k]! += flux[2]! / d;
+      } else if (f < cells) {
         const k = at(f);
         rh[k]! += flux[0]! / d;
         rn[k]! += rightN / d;
@@ -256,7 +284,7 @@ function sweep(
 }
 
 /** Fills ghost slots `near` and `far` beside edge cell slot `edge` (`inner` the slot behind it) for `side`. */
-function ghost(L: Line, side: ShallowSide, near: number, edge: number, inner: number, time: number): void {
+function ghost(L: Line, side: ShallowSide, near: number, edge: number, inner: number, time: number, g: number): void {
   const far = near === 1 ? 0 : near + 1;
   if (side === 'wall') {
     copy(L, near, edge, true);
@@ -271,6 +299,31 @@ function ghost(L: Line, side: ShallowSide, near: number, edge: number, inner: nu
     L.b[far] = L.b[edge]! + 2 * slope;
     L.w[near] = L.h[near]! + L.b[near]!;
     L.w[far] = L.h[far]! + L.b[far]!;
+  } else if (side === 'periodic') {
+    // Filled by the line's sweep from the far end.
+    return;
+  } else if ('sea' in side) {
+    // Riemann invariants u +- 2 sqrt(g h) along the normal: in from still water at the sea's level, out from the edge cell.
+    const level = typeof side.sea === 'function' ? side.sea(time) : side.sea,
+      b = L.b[edge]!,
+      outside = Math.sqrt(g * Math.max(0, level - b)),
+      inside = Math.sqrt(g * L.h[edge]!),
+      u = L.u[edge]!,
+      // The low side's outside lies at -x: its incoming invariant is u + 2c from outside, the outgoing u - 2c from inside.
+      low = near === 1,
+      plus = low ? 2 * outside : u + 2 * inside,
+      minus = low ? u - 2 * inside : -2 * outside,
+      c = (plus - minus) / 4,
+      depth = c > 0 ? (c * c) / g : 0,
+      velocity = depth > DRY ? (plus + minus) / 2 : 0,
+      leaving = low ? velocity < 0 : velocity > 0;
+    for (const s of [near, far]) {
+      L.h[s] = depth;
+      L.b[s] = b;
+      L.w[s] = depth + b;
+      L.u[s] = velocity;
+      L.v[s] = leaving && depth > DRY ? L.v[edge]! : 0;
+    }
   } else {
     const level = typeof side.level === 'function' ? side.level(time) : side.level,
       b = L.b[edge]!,
@@ -341,15 +394,28 @@ function reconstruct(L: Line, s: number, cells: number): void {
 
 /**
  * Manning's bed friction over `dt`, semi-implicit: (hu, hv) / (1 + dt g n^2 |u| / h^(4/3)) (Chertock, Cui, Kurganov and Wu
- * 2015, Int. J. Numer. Methods Fluids 78(6) 355-383, section 2.2), which slows the flow and never turns it back.
+ * 2015, Int. J. Numer. Methods Fluids 78(6) 355-383, section 2.2), which slows the flow and never turns it back; with waves,
+ * `orbital` is their rms orbital velocity at the bed, m/s.
  */
-export function manning(g: number, n: number, h: number, mu: number, mv: number, dt: number, out: Float64Array): void {
+export function manning(
+  g: number,
+  n: number,
+  h: number,
+  mu: number,
+  mv: number,
+  dt: number,
+  out: Float64Array,
+  orbital = 0,
+): void {
   if (!(n > 0) || h <= DRY) {
     out[0] = h <= DRY ? 0 : mu;
     out[1] = h <= DRY ? 0 : mv;
     return;
   }
-  const speed = Math.sqrt(mu * mu + mv * mv) / h,
+  // Waves stir the bed: the speed the friction sees is sqrt(|u|^2 + (1.16 u_rms)^2) (Ruessink et al. 2001, as the XBeach
+  // manual states it), u_rms the waves' rms orbital velocity at the bed.
+  const stir = 1.16 * orbital,
+    speed = Math.sqrt((mu * mu + mv * mv) / (h * h) + stir * stir),
     damp = 1 + (dt * g * n * n * speed) / pow(h, 4 / 3);
   out[0] = mu / damp;
   out[1] = mv / damp;

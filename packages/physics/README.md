@@ -2249,13 +2249,13 @@ console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.
 - `bed`: the ground, the world's terrain (`terrain.bed` of a `TerrainBed` added before it, the surface over the elevations it publishes) or a bed of its own (`bedSurface`), read every step, so ground that erosion or a crater changes changes the flood; the water's cells are the bed's, and a cell's bed is the mean over its two triangles, the surface colliders see;
 - the water at the start: a `level` (a height, or a function of (x, z): every cell whose bed is lower fills to it) or a `depth`, and a `velocity` function;
 - `roughness`: Manning's n in s/m^(1/3), a number or a function of (x, z) (default 0.03, a natural channel; 0.013 concrete, 0.05 to 0.1 floodplain with brush);
-- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth) or `{level}` (a sea or a lake held at a height in metres, or a function of time: a tide, a surge);
+- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth), `{level}` (a lake or a sea held at a height in metres, or a function of time: a tide, a surge; long waves reflect from it), `{sea}` (the open sea at a height, which lets waves from inside leave: the characteristic coming in is still water at that height's) or `'periodic'` with its opposite side (a coast or a channel that goes on the same way);
 - `buildings`: `{min: [x, z], max: [x, z], height}` boxes that raise the bed under them (Schubert and Sanders' building blocks), so a flood goes round a town's blocks and over them only when deeper than they are tall;
 - `inflows`: rivers and pipes, `{position: [x, z], discharge}` in m^3/s or a function of time (a flood hydrograph);
 - `rain`, a `Precipitation` field (`@margoengine/weather`'s `PrecipitationField`), falling on water and ground alike; `wind`, a framework `Wind`, whose stress rho_a C_D |U| U drags the water (Garratt's C_D);
 - `courant` (default 0.4, at most 0.5), `density` (default 1000), `rate` (its rate level, default the world's base rate).
 
-It publishes the field `surfaceWater`: per cell, the depth h in m and the discharges hu and hv in m^2/s, as f32, x fastest. `water.sample(x, z)` gives the depth, the surface height and the depth-averaged velocity there; `water.flow` is the water as a framework `FlowField` (for tracers, debris and bodies); `water.volume()` the volume, and `water.budget` what came in by the inflows and by rain and what left over the sides since the start, in m^3.
+It publishes the field `surfaceWater`: per cell, the depth h in m and the discharges hu and hv in m^2/s, as f32, x fastest. It takes waves' forcing from the field `surfaceWaterForcing`, which a `SurfSolver` adds to: per cell, the force of the radiation stress over the density, the Stokes drift (the water's momentum is then Lagrangian, and its bed friction acts on what is left of it) and the orbital velocity that stirs the bed. `water.sample(x, z)` gives the depth, the surface height and the depth-averaged velocity there; `water.flow` is the water as a framework `FlowField` (for tracers, debris and bodies); `water.volume()` the volume, and `water.budget` what came in by the inflows and by rain and what left over the sides since the start, in m^3.
 
 ```ts
 import {bedSurface} from 'margoengine/physics/earth';
@@ -2335,6 +2335,58 @@ world.advance(30 * 20); // twenty seconds
 console.log(foam.expectedCoverage(0, 0) > 0.005); // true: whitecaps on about 1 percent of the sea
 console.log(foam.coverage(-12, 0) > 0.5); // true: the wake behind the coaster's stern
 console.log(foam.spray(0, 0, 1) >= 0); // true: droplets per m^2 s um where the foam is
+```
+
+### The surf zone (`@margoengine/physics/surf`)
+
+`SurfSolver` brings a sea or a swell ashore over a `ShallowWaterSolver` (SEA-05). The short waves of one representative period travel in, shoal and refract over the bed. They break as the water shoals (Roelvink's dissipation) and hand what they lose to a roller of broken water. The gradient of their radiation stress drives the shallow water:
+- it sets down before the breakers and up inside them;
+- it runs along the shore as a longshore current;
+- it returns seaward as undertow (the bed's friction acts on the water's flow less the waves' Stokes drift);
+- it streams out through channels in a bar as rips;
+- with `groups`, it surges with the wave groups (surf beat) and runs up and down the beach.
+
+This is the phase-averaged "surfbeat" chain of XBeach (Roelvink et al. 2009). The solver keeps each line's highest run-up and when each cell was last wet, so the wet sand's edge is known. Couple it before the water: `world.couple(['surf', 'water'], 'staggered')`, and give the water an open sea at its offshore side (`sides: {minX: {sea: 0}}`), so the long waves the surf makes can leave. Its settings:
+- `water`: the `ShallowWaterSolver`, added to the world first;
+- `incident`: the waves coming in, `{height, period, direction, spreading = 10, gamma = 3.3}` (significant height and peak period of a JONSWAP sea) or `{waves}`, a `WaveSpectrumField` (`WaveSolver.field`) sampled at the offshore side;
+- `side`, the offshore side they come in over (default `'minX'`), and `alongshore`, `'open'` (default) or `'periodic'` for a coast that goes on the same way (give the water periodic sides there too);
+- `groups` (default true): the incoming energy comes in groups, the envelope of the sea's components, so the water answers with surf beat and swash; off, it is steady;
+- `directions` (default 36 over the incoming half-plane, 5 degrees);
+- `breaking` (`{gamma = 0.55, alpha = 1, n = 10}`), `roller` (`{beta = 0.1}` or `false`), `density` (default 1025) and `rate`.
+
+It publishes the field `surf` (per cell, H_rms, the mean direction and the roller's energy) and adds its forcing to the water's `surfaceWaterForcing`. Reading the surf:
+- `waveHeight(x, z)` (H_rms; H_s is about sqrt 2 times it) and `waveDirection(x, z)`;
+- `rollerEnergy(x, z)`, `stokesDrift(x, z)`, `undertow(x, z)` and `forcing(x, z)`;
+- `runUp(at?)`, the highest the water has reached up the shore on a line or on any line;
+- `wetSand(x, z, window = 600)`, whether a spot was wet within the window.
+
+The water's own `sample` gives the set-up and the currents.
+
+```ts
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {SurfSolver} from 'margoengine/physics/surf';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// A straight beach sloping 1 in 50 from 1.6 m of water, and a 0.4 m sea coming in 20 degrees off the normal.
+const columns = 60, rows = 2, width = 120, depth = 8;
+const elevations = new Float64Array((columns + 1) * (rows + 1));
+for (let c = 0; c <= columns; c++)
+  for (let r = 0; r <= rows; r++) elevations[r + (rows + 1) * c] = -1.6 + 0.02 * ((width * c) / columns);
+const water = new ShallowWaterSolver();
+const surf = new SurfSolver();
+const world = new PhysicsWorld({rate: {num: 30, den: 1}})
+  .add(water, {
+    bed: bedSurface({columns, rows, width, depth, centre: [60, 4]}, elevations),
+    level: 0,
+    sides: {minX: {sea: 0}, minZ: 'periodic', maxZ: 'periodic'},
+  })
+  .add(surf, {water, incident: {height: 0.4, period: 7, direction: (20 * Math.PI) / 180}, alongshore: 'periodic'})
+  .couple(['surf', 'water'], 'staggered');
+world.advance(30 * 120); // two minutes
+console.log(water.sample(60, 4).velocity[1] > 0.1); // true: a longshore current in the surf zone
+console.log(surf.undertow(70, 4)[0] < 0); // true: the undertow runs seaward
+console.log(surf.runUp() > 0.05); // true: the water runs up the beach above its still level
 ```
 
 ### Solver modules on one memory

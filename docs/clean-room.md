@@ -11885,6 +11885,40 @@ full: its surface-slip dynamic pressure gives a smooth body's drag and Magnus li
 flow (a box would take none), so it was not used for these mostly flat-faced bodies; its added mass and separation angle are
 follow-ups. The icosphere, strip and box tessellations are this package's own. Proof: `packages/physics/tests/aero.test.js`.
 
+### The surf zone (SEA-05, `@margoengine/physics/surf`, 2026-11-26)
+
+`packages/physics/src/surf/index.ts` (`SurfSolver`), with the forcing field, the `sea` and `periodic` sides and the wave-stirred
+friction it adds to `packages/physics/src/hydro`. Written from papers and public manuals only (no code of XBeach, SWAN, Delft3D
+or any model was opened):
+
+- D. Roelvink, A. Reniers, A. van Dongeren, J. van Thiel de Vries, R. McCall and J. Lescinski, "Modelling storm impacts on
+  beaches, dunes and barrier islands", Coastal Engineering 56, 1133-1152, 2009, https://doi.org/10.1016/j.coastaleng.2009.08.006
+  (the paper unreachable; the model as the public XBeach manual documents it, read): the wave action balance with refraction
+  (eqs. 1 to 4), Roelvink's breaking (eq. 12, defaults gamma 0.55, alpha 1, n 10), the roller balance with D_r = 2 beta g E_r / c
+  (eqs. 38 to 43), the GLM momentum with bed friction on the Eulerian velocity and the Stokes drift (eqs. 46 to 48), the
+  wave-stirred bed shear with 1.16 u_rms (after Ruessink et al. 2001), the directional sector about the mean direction.
+- The Delft3D-FLOW manual (public), appendix B, read: the roller's radiation stress 2 E_r (cos^2, sin cos, sin^2), the convention
+  under which the roller's momentum, mass flux 2 E_r / c and dissipation agree for Svendsen's (1984) roller; the roller here is
+  carried at c, as XBeach's eq. 38 writes it.
+- M. S. Longuet-Higgins and R. W. Stewart, "Radiation stresses in water waves", Deep-Sea Res. 11, 1964, and A. J. Bowen, D. L.
+  Inman and V. P. Simmons, "Wave 'set-down' and set-up", J. Geophys. Res. 73, 1968, as P. J. Visser (1977) restates and
+  tabulates them (read): the radiation stress, the set-down -(1/8) k H^2 / sinh(2 k h), the set-up slope (3 gamma^2 / 8) / (1 +
+  3 gamma^2 / 8) of the beach's.
+- J. A. Battjes and M. J. F. Stive, "Calibration and verification of a dissipation model for random breaking waves", J.
+  Geophys. Res. 90(C5), 1985 (ICCE 1984 version read): random-wave breaking and its gamma.
+- M. S. Longuet-Higgins (1970), longshore currents, as Fleming and Swart (1982) restate it (read): the shallow-water driving
+  -dS_xy/dx and its balance with the bed.
+- H. F. Stockdon, R. A. Holman, P. A. Howd and A. H. Sallenger, "Empirical parameterization of setup, swash, and runup", Coastal
+  Engineering 53, 2006 (via its restatements): the field set-up the limits compare with.
+- The Riemann invariants u +- 2 sqrt(g h) of the shallow-water equations for the open sea side: a textbook result (and
+  `flood.ts`'s Flather boundary).
+
+The wave groups as the envelope of 48 equal-variance components drawn from the incoming sea by energy on the counter-based
+random numbers, the open-sea side by the invariants, the periodic sides with one face's flux taken by both ends, the stress
+force by central differences with a dry neighbour holding the cell's own stress, the run-up and wet-sand record, and the
+coupling through an accumulated field are this package's own arrangement. Proof: `packages/physics/tests/surf.test.js` and
+`tests/coupling/surf.test.js`.
+
 ### Whitecaps, foam and spray (SEA-13, `@margoengine/physics/foam`, 2026-11-26)
 
 `packages/physics/src/foam/breaking.ts` (breaking statistics of a spectrum), `foam/spray.ts` (spray source functions) and

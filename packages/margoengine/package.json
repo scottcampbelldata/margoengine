@@ -3227,6 +3227,10 @@
       "types": "./dist/physics/foam.d.ts",
       "import": "./dist/physics/foam.js"
     },
+    "./physics/surf": {
+      "types": "./dist/physics/surf.d.ts",
+      "import": "./dist/physics/surf.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"

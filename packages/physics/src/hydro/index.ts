@@ -1,7 +1,8 @@
 // Rivers, floods and dam breaks (HYDRO-01 of docs/physics-solvers.md): conservative shallow water on the terrain bed, a
 // framework solver. Water runs over a `Bed`: the world's `TerrainBed` (`terrain.bed`, the `BedSurface` over the elevations it
 // publishes, read in place every step) or a bed of its own, wets and dries the ground as it goes, loses speed to Manning's bed friction, and
-// takes in rivers' inflows, rain and the wind's stress; its sides are walls, open water or a set level (a sea, a lake).
+// takes in rivers' inflows, rain and the wind's stress; its sides are walls, open water, a set level (a lake),
+// the open sea at a level that lets waves leave, or periodic pairs; and the surf's waves drive it through `surfaceWaterForcing`.
 //
 // The scheme is the kernel of shallow.ts (Chen and Noelle's hydrostatic reconstruction, HLL with Kurganov and Petrova's
 // speeds, WENO-Z or minmod, the semi-implicit Manning friction of Chertock et al.) with two-stage SSP Runge-Kutta (Shu and
@@ -45,6 +46,22 @@ export const SURFACE_WATER_FIELD: FieldDescriptor = {
 };
 /** The layout of the solver's regions: per cell (x fastest), h, hu, hv. */
 export const SURFACE_WATER_LAYOUT = 1;
+/**
+ * The registry field the water takes waves' forcing from, owned by {@link ShallowWaterSolver}: per cell, the force of the
+ * waves' radiation stress over the water's density (m^2/s^2 along x and z: the momentum per area per second it adds), the
+ * waves' Stokes drift (m/s along x and z: the water's momentum is Lagrangian, its bed friction acts on what is left of it),
+ * and the waves' rms orbital velocity at the bed (m/s: it stirs the bed friction). Contributors (the surf zone) add; the
+ * registry sums them by contributor, then cell.
+ */
+export const SURFACE_WATER_FORCING_FIELD: FieldDescriptor = {
+  name: 'surfaceWaterForcing',
+  kind: 'uniformGrid',
+  quantity: 'waveForcing',
+  unit: 'm^2/s^2, m/s',
+  centring: 'cell',
+};
+/** f64 words of a cell's record in `surfaceWaterForcing`: force x, z over density, Stokes drift x, z, rms orbital velocity. */
+export const FORCING_WORDS = 5;
 /** Fresh water's density, kg/m^3. */
 export const WATER_DENSITY = 1000;
 /** Manning's n of a natural channel, clean and straight (Chow 1959, table 5-6), s/m^(1/3): the default roughness. */
@@ -91,7 +108,10 @@ export interface ShallowWaterParams {
   readonly velocity?: (x: number, z: number) => readonly [number, number];
   /** Manning's n, s/m^(1/3), a number or a function of (x, z) (default 0.03, a natural channel; 0 for none). */
   readonly roughness?: number | ((x: number, z: number) => number);
-  /** The four sides, each 'wall' (default), 'open' or `{level}` (a sea or a lake held at a level, m, or a function of time). */
+  /**
+   * The four sides, each 'wall' (default), 'open', `{level}` (a lake or sea held at a level, m, or a function of time: long waves
+   * reflect from it), `{sea}` (the open sea at a level, which lets waves from inside leave), or 'periodic' (with its opposite).
+   */
   readonly sides?: {
     readonly minX?: ShallowSide;
     readonly maxX?: ShallowSide;
@@ -131,7 +151,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private readonly id: string;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
-  private shape!: BedShape;
+  private bedShape!: BedShape;
   private ground!: Bed;
   /** Each cell's raise by the buildings on it, m. */
   private blocks!: Float64Array;
@@ -179,6 +199,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       id: this.id,
       fields: [
         { field: SURFACE_WATER_FIELD, access: 'write' },
+        { field: SURFACE_WATER_FORCING_FIELD, access: 'write' },
         ...(this.runoff ? [{ field: this.runoff.field, access: 'read' as const }] : []),
       ],
       rate: this.level,
@@ -200,7 +221,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       centre: bed.centre ?? [0, 0],
     };
     bedVertexCount(shape);
-    this.shape = shape;
+    this.bedShape = shape;
     this.ground = bed;
     this.host = host;
     this.g = gravityMagnitude(host.gravity);
@@ -215,13 +236,23 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.z0 = shape.centre[1] - shape.depth / 2;
     const sides = params.sides ?? {},
       side = (s: ShallowSide | undefined, name: string): ShallowSide => {
-        if (s === undefined || s === 'wall' || s === 'open') return s ?? 'wall';
-        if (typeof s === 'object' && s !== null && (typeof s.level === 'function' || Number.isFinite(s.level)))
-          return s;
+        if (s === undefined || s === 'wall' || s === 'open' || s === 'periodic') return s ?? 'wall';
+        if (typeof s === 'object' && s !== null) {
+          const v = 'sea' in s ? s.sea : (s as { level: unknown }).level;
+          if (typeof v === 'function' || Number.isFinite(v)) return s;
+        }
         throw new RangeError(
-          `Side ${name} is 'wall', 'open' or {level} with a level in metres or a function of time; got ${String(s)}.`,
+          `Side ${name} is 'wall', 'open', 'periodic', {level} or {sea} with a level in metres or a function of time; got ${String(s)}.`,
         );
       };
+    for (const [a, b] of [
+      ['minX', 'maxX'],
+      ['minZ', 'maxZ'],
+    ] as const)
+      if ((sides[a] === 'periodic') !== (sides[b] === 'periodic'))
+        throw new RangeError(
+          `Sides ${a} and ${b} are periodic together or not at all; make both 'periodic', or neither.`,
+        );
     this.grid = {
       nx,
       nz,
@@ -471,6 +502,13 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       rh[cell]! += q / area;
       inflow += q;
     }
+    const forcing = this.forcing;
+    if (forcing)
+      for (let k = 0; k < n; k++)
+        if (h[k]! > DRY) {
+          rhu[k]! += forcing[FORCING_WORDS * k]!;
+          rhv[k]! += forcing[FORCING_WORDS * k + 1]!;
+        }
     if (runoff)
       for (const { cell, sourceCell } of this.runoffCells) {
         const q = runoff[sourceCell]!;
@@ -505,13 +543,26 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     return { h: rh, hu: rhu, hv: rhv, inflow, rain, out };
   }
 
-  /** Manning's friction over `dt` and the dry cells' momentum. */
+  /**
+   * Manning's friction over `dt` and the dry cells' momentum. With waves the momentum is Lagrangian: the friction acts on the
+   * Eulerian part, h (u - u_S), stirred by the waves' orbital velocity, and the Stokes drift is carried on.
+   */
   private settle(h: Float64Array, hu: Float64Array, hv: Float64Array, dt: number): void {
     const out = new Float64Array(2),
-      g = this.grid.g;
+      g = this.grid.g,
+      forcing = this.forcing;
     for (let k = 0; k < h.length; k++) {
       // The scheme keeps depths at or above 0 under the Courant bound; what rounding leaves below it is no water.
       if (h[k]! < 0) h[k] = 0;
+      if (forcing && h[k]! > DRY) {
+        const at = FORCING_WORDS * k,
+          dx = h[k]! * forcing[at + 2]!,
+          dz = h[k]! * forcing[at + 3]!;
+        manning(g, this.roughness[k]!, h[k]!, hu[k]! - dx, hv[k]! - dz, dt, out, forcing[at + 4]!);
+        hu[k] = out[0]! + dx;
+        hv[k] = out[1]! + dz;
+        continue;
+      }
       manning(g, this.roughness[k]!, h[k]!, hu[k]!, hv[k]!, dt, out);
       hu[k] = out[0]!;
       hv[k] = out[1]!;
@@ -525,7 +576,24 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     p.set(s);
   }
 
-  importPorts(_tick: number): void {}
+  /** The waves' forcing contributors summed into `surfaceWaterForcing` this tick, or none. */
+  private forcing: Float64Array | undefined;
+
+  importPorts(_tick: number): void {
+    const sum = this.host.port(SURFACE_WATER_FORCING_FIELD.name);
+    if (!sum) {
+      this.forcing = undefined;
+      return;
+    }
+    const words = regionWords(this.host.memory, sum.region) as Float64Array,
+      n = this.nx * this.nz;
+    if (words.length !== n * FORCING_WORDS)
+      throw new RangeError(
+        `Contributions to "surfaceWaterForcing" have ${words.length} values; this water has ${n} cells of ${FORCING_WORDS}, so make each on the water's own grid.`,
+      );
+    if (!this.forcing) this.forcing = new Float64Array(n * FORCING_WORDS);
+    this.forcing.set(words);
+  }
 
   exportPorts(tick: number): readonly Port[] {
     return [{ field: SURFACE_WATER_FIELD.name, region: this.published, tick, cell: this.cell }];
@@ -552,6 +620,13 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     out.velocity[0] = velocityOf(h, s[3 * k + 1]!);
     out.velocity[1] = velocityOf(h, s[3 * k + 2]!);
     return out;
+  }
+
+  /** The grid the water lies on: the bed's cells (columns along x, rows along z), its size and its centre. */
+  get shape(): BedShape {
+    if (!this.host)
+      throw new RangeError('This shallow water is not in a world yet; add it with world.add(water, {bed}) first.');
+    return this.bedShape;
   }
 
   /** The water's volume, m^3. */
