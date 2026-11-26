@@ -335,3 +335,98 @@ fn the_implicit_solver_gives_the_same_sag_whatever_the_passes() {
     assert!((one - many).abs() < 0.03 * many, "the sag at one pass is {one}, at many {many}");
     assert!(many > 0.8 * expected && many < 1.05 * expected, "tip sag {many} against Euler-Bernoulli {expected}");
 }
+
+
+fn vertex_block_tet(height: f32, speed: f32, beta: f32) -> World {
+    use margoengine_soft_kernel::fem::{STABLE_NEO_HOOKEAN, VERTEX_BLOCK_TET};
+    let mut w = World::new();
+    w.reserve(4, 0, 1, 0);
+    w.fem_reserve(1, 0, 0);
+    w.particles = 4;
+    w.bodies = 1;
+    w.x[1] = 1.0;
+    w.y[2] = 1.0;
+    w.z[3] = 1.0;
+    w.w[3] = 0.5;
+    assert!(w.set_tet(0, [0, 1, 2, 3], 120.0, 80.0, STABLE_NEO_HOOKEAN));
+    w.fem.flags[0] |= VERTEX_BLOCK_TET;
+    w.fem.imp.beta[0] = beta;
+    w.z[3] = height;
+    w.vz[3] = speed;
+    w
+}
+
+#[test]
+fn a_vertex_block_matches_the_implicit_affine_tet_with_and_without_damping() {
+    let h = 1.0f32 / 30.0;
+    for (z, v, beta) in [(1.1, 0.8, 0.0), (0.9, -1.0, 0.0), (1.2, 1.0, 0.08), (-0.2, 0.0, 0.0)] {
+        let mut tet = vertex_block_tet(z, v, beta);
+        tet.step(h, 1, 1, [0.0; 3]);
+        let h64 = f64::from(h);
+        let mass = 2.0;
+        // With the base pinned, F = diag(1,1,z). Linearized elasticity at rest has stiffness (λ + 2µ)V.
+        let stiffness = (80.0 + 2.0 * 120.0) / 6.0;
+        let drag = f64::from(beta) * stiffness * h64;
+        let elastic = stiffness * h64 * h64;
+        let expected = (mass * f64::from(z + h * v) + elastic + drag * f64::from(z)) / (mass + elastic + drag);
+        let tolerance = 8.0 * f64::from(f32::EPSILON) * expected.abs().max(1.0);
+        assert!((f64::from(tet.z[3]) - expected).abs() < tolerance, "height {} vs {expected}", tet.z[3]);
+        assert_eq!([tet.x[3], tet.y[3]], [0.0, 0.0]);
+        assert_eq!([tet.x[1], tet.y[2]], [1.0, 1.0]);
+    }
+}
+
+fn descent_objective(w: &World, reference: &World, dt: f32) -> f64 {
+    let h2 = f64::from(dt) * f64::from(dt);
+    let mut energy = 0.0;
+    for i in 0..w.particles {
+        if w.w[i] > 0.0 {
+            let d = [w.x[i] - reference.x[i], w.y[i] - reference.y[i], w.z[i] - reference.z[i]];
+            energy += d.into_iter().map(|x| f64::from(x) * f64::from(x)).sum::<f64>() / (2.0 * h2 * f64::from(w.w[i]));
+        }
+    }
+    for t in 0..w.fem.count {
+        let ids = [0, 1, 2, 3].map(|k| w.fem.p[k][t] as usize);
+        let origin = [w.x[ids[0]], w.y[ids[0]], w.z[ids[0]]];
+        let edges = [1, 2, 3].map(|k| [w.x[ids[k]] - origin[0], w.y[ids[k]] - origin[1], w.z[ids[k]] - origin[2]]);
+        let row = |axis: usize| -> [f64; 3] {
+            [0, 1, 2].map(|c| (0..3).map(|r| f64::from(edges[r][axis]) * f64::from(w.fem.b[3 * r + c][t])).sum())
+        };
+        let [a, b, c] = [row(0), row(1), row(2)];
+        let j = a[0] * (b[1] * c[2] - b[2] * c[1]) + a[1] * (b[2] * c[0] - b[0] * c[2]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+        let norm = [a,b,c].iter().flatten().map(|x| x * x).sum::<f64>();
+        let mu = f64::from(w.fem.mu[t]);
+        let lambda = f64::from(w.fem.lambda[t]) + mu;
+        energy += f64::from(w.fem.vol0[t]) * (mu * (norm - 3.0) / 2.0 - mu * (j - 1.0) + lambda * (j - 1.0) * (j - 1.0) / 2.0);
+    }
+    energy
+}
+
+#[test]
+fn each_vertex_block_sweep_reduces_the_same_implicit_energy() {
+    use margoengine_soft_kernel::fem::VERTEX_BLOCK_TET;
+    let make = || {
+        let mut w = bar(2, 1, 1, 0.25, 1_000.0, 18_000.0, 0.41, 0);
+        clamp(&mut w);
+        for i in 0..w.particles {
+            if w.w[i] > 0.0 {
+                w.y[i] -= 0.22 * w.x[i];
+                w.z[i] += 0.1 * w.x[i];
+            }
+        }
+        for t in 0..w.fem.count {
+            w.fem.flags[t] |= VERTEX_BLOCK_TET;
+        }
+        w
+    };
+    let start = make();
+    let h = 1.0 / 30.0;
+    let mut last = descent_objective(&start, &start, h);
+    for passes in [1, 2, 4, 8] {
+        let mut w = make();
+        w.step(h, 1, passes, [0.0; 3]);
+        let energy = descent_objective(&w, &start, h);
+        assert!(energy < last, "pass {passes}: {energy} vs {last}");
+        last = energy;
+    }
+}

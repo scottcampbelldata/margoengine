@@ -1,5 +1,24 @@
 # Clean room
 
+### Volumetric solids and vertex block descent (SOFT-04)
+
+Anka He Chen, Ziheng Liu, Yin Yang and Cem Yuksel, “Vertex Block Descent” (2024), §3.1–3.3, describes implicit
+Euler as minimization of the inertia and elastic energies and visits one vertex at a time. Breannan Smith,
+Fernando de Goes and Theodore Kim, “Stable Neo-Hookean Flesh Simulation” (2018), Eq. 13 and §4.2, gives
+`μ(‖F‖²−3)/2 − μ(J−1) + λ′(J−1)²/2`, where `λ′ = λ + μ` recovers the input Lamé constants at rest.
+The gradient of the shape function is `g`. A single vertex displacement changes `F` by the rank-one product
+`Δx gᵀ`, so `J = det(F)` is affine in that displacement and `dJ = cof(F)g`. The exact per-cell block is
+`μ(g·g)I + λ′ dJ dJᵀ`, with the positive inertia term added per vertex. The native LDLᵀ solve minimizes that
+quadratic without eigenvalue filtering. The dissipative potential uses squared differences in `F` and `J`
+from the start of the substep, scaled by the existing stiffness damping coefficient divided by the step
+length. Its local Hessian has the same form. The VBD paper's §3.3 uses a block-local Rayleigh force.
+Sofien Bouaziz, Sebastian Martin, Tiantian Liu, Ladislav Kavan and Mark Pauly, “Projective Dynamics: Fusing
+Constraint Projections for Fast Simulation” (2014), §3.3, describes the alternating independent projections
+and global linear system of the X-33 method.
+[Chen et al.](https://doi.org/10.1145/3658179),
+[Smith et al.](https://doi.org/10.1145/3180491),
+[Bouaziz et al.](https://doi.org/10.1145/2601097.2601116).
+
 ### Atmospheric lightning (ATMO-07)
 
 Luciano Niemeyer, Luciano Pietronero and Hans J. Wiesmann, “Fractal Dimension of Dielectric Breakdown”

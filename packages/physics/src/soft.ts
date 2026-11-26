@@ -128,6 +128,23 @@ const NO_NEIGHBOUR = 0xffffffff;
 const CELL_MODEL = { 'neo-hookean': 0, corotated: 1, volume: 2 } as const;
 const INTERIOR_CELL = 2;
 const IMPLICIT_CELL = 4;
+const VERTEX_BLOCK_CELL = 8;
+const SOLVER_MODES: readonly SoftSolver[] = ['constraints', 'fem', 'vertex-block'];
+const SOLVER_CODE = { constraints: 0, fem: 1, 'vertex-block': 2 } as const;
+// pflags is already part of the snapshot. Only the first particle of a body owns its mode bits.
+const SOLVER_MODE_SHIFT = 2;
+const SOLVER_MODE_MASK = 3 << SOLVER_MODE_SHIFT;
+
+function checkedSolver(solver: SoftSolver): SoftSolver {
+  if (typeof SOLVER_CODE[solver] !== 'number')
+    throw new RangeError("Use 'constraints', 'fem' or 'vertex-block' for a soft solver.");
+  return solver;
+}
+
+function cellSolverFlag(solver: SoftSolver, model: number): number {
+  if (solver === 'vertex-block') return VERTEX_BLOCK_CELL;
+  return solver === 'fem' && model !== CELL_MODEL.volume ? IMPLICIT_CELL : 0;
+}
 
 let columnNames: readonly string[] = [];
 let cellColumnNames: readonly string[] = [];
@@ -496,9 +513,10 @@ interface BoundMesh {
 /**
  * How a body's cells are solved: `'constraints'` (default) as XPBD constraints, whose stiffness grows with the substeps and passes
  * a step is given; `'fem'` as one linear solve a substep (a linearly implicit step, Baraff and Witkin 1998), whose stiffness does not,
- * the choice for very stiff materials. Cells of the `'volume'` model are always constraints.
+ * the choice for very stiff materials. `'vertex-block'` minimizes the exact local implicit energy of each free vertex for
+ * stable Neo-Hookean solids. Its sweep count follows the soft world's `iterations`. Volume-only cells use constraints.
  */
-export type SoftSolver = 'constraints' | 'fem';
+export type SoftSolver = 'constraints' | 'fem' | 'vertex-block';
 
 /** The elastic model of a body's cells: see {@link CellMaterial.model}. */
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
@@ -1486,8 +1504,7 @@ export class SoftBodyDesc {
   }
   /** Picks how the body's cells are solved, Rapier's `setSolver` (see {@link SoftSolver}). */
   setSolver(solver: SoftSolver): this {
-    if (solver !== 'constraints' && solver !== 'fem') throw new RangeError("Solver must be 'constraints' or 'fem'.");
-    this.solver = solver;
+    this.solver = checkedSolver(solver);
     return this;
   }
   /** Replaces the cells' material (copied). */
@@ -1766,7 +1783,13 @@ export class SoftBody {
   /** @internal Where each particle stood when the last step began (x, y, z), for drawing between steps. */ previous =
     new Float32Array(0);
   /** @internal */ clusterInfo: ClusterInfo[] = [];
-  /** @internal */ solverKind: SoftSolver = 'constraints';
+  /** @internal Native solver mode. It is restored with the cell flags. */
+  get solverKind(): SoftSolver {
+    return this.owner.cellSolver(this);
+  }
+  set solverKind(solver: SoftSolver) {
+    this.owner.setCellSolver(this, checkedSolver(solver));
+  }
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
   /** @internal */ force: Vec3 = [0, 0, 0];
   /** @internal */ pointForces = new Map<number, Vec3>();
@@ -2144,9 +2167,7 @@ export class SoftBody {
   /** Changes how the body's cells are solved, from the next step. */
   setSolver(solver: SoftSolver): this {
     this.check();
-    if (solver !== 'constraints' && solver !== 'fem') throw new RangeError("Solver must be 'constraints' or 'fem'.");
-    this.solverKind = solver;
-    this.owner.writeCellMaterial(this);
+    this.owner.setCellSolver(this, checkedSolver(solver));
     return this;
   }
   /** Number of clusters. */
@@ -2376,6 +2397,10 @@ export class SoftBody {
   setCellMaterial(material: CellMaterial): this {
     this.check();
     checkCellMaterial(material);
+    if (this.solverKind === 'vertex-block' && material.model !== 'neo-hookean')
+      throw new RangeError(
+        'Vertex-block cells use neo-hookean elasticity. Change the solver before changing this model.',
+      );
     this.cellMaterial = material.clone();
     this.owner.writeCellMaterial(this);
     return this;
@@ -2771,6 +2796,9 @@ export class SoftBodies implements PhysicsAttachment {
   create(desc: SoftBodyDesc): SoftBody {
     if (this.disposed)
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
+    const mode = checkedSolver(desc.solver);
+    if (mode === 'vertex-block' && desc.cellMaterial.model !== 'neo-hookean')
+      throw new RangeError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
@@ -2903,7 +2931,6 @@ export class SoftBodies implements PhysicsAttachment {
       range,
       desc.cellMaterial.clone(),
     );
-    body.solverKind = desc.solver;
     body.triangleList = Uint32Array.from(desc.triangles);
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     body.edgeShear = Float32Array.from(desc.edgeShear);
@@ -2967,6 +2994,7 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.bodies.push(body);
     body.remember();
+    this.setCellSolver(body, mode);
     this.writeMaterial(body);
     this.writeCellMaterial(body);
     this.syncCloth();
@@ -3362,13 +3390,39 @@ export class SoftBodies implements PhysicsAttachment {
     this.linkCells(body.cellRange, body.handle);
   }
 
-  /** @internal Writes a body's cell material into its cell rows; the rest shapes stay. */
+  /** @internal The serialized mode for this body, independent of its current tet count. */
+  cellSolver(body: SoftBody): SoftSolver {
+    const mode = (this.columns().pflags[body.firstParticle]! & SOLVER_MODE_MASK) >>> SOLVER_MODE_SHIFT;
+    // Old saves carry the FEM flag in the cell, before there was an explicit body mode.
+    if (mode === 0 && body.cellRange.count > 0 && this.cellColumns().flags![body.cellRange.first]! & IMPLICIT_CELL)
+      return 'fem';
+    return SOLVER_MODES[mode]!;
+  }
+
+  /** @internal Applies a fresh solver mode to existing cells without replacing their material or rest shape. */
+  setCellSolver(body: SoftBody, solver: SoftSolver): void {
+    const f = this.cellColumns();
+    const { first, count } = body.cellRange;
+    if (solver === 'vertex-block' && count > 0 && f.model![first] !== CELL_MODEL['neo-hookean'])
+      throw new RangeError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
+    const flags = this.columns().pflags;
+    flags[body.firstParticle] =
+      (flags[body.firstParticle]! & ~SOLVER_MODE_MASK) | (SOLVER_CODE[solver] << SOLVER_MODE_SHIFT);
+    for (let t = first; t < first + count; t++) {
+      const flags = f.flags![t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL);
+      f.flags![t] = flags | cellSolverFlag(solver, f.model![t]!);
+    }
+  }
+
+  /** @internal Writes a body's material into its cell rows while retaining their rest shapes. */
   writeCellMaterial(body: SoftBody): void {
     const { first, count } = body.cellRange;
     if (count === 0) return;
     const f = this.cellColumns(),
       m = body.cellMaterial,
       [baseMu, baseLambda] = m.lame(),
+      flags = f.flags as unknown as Uint32Array,
+      mode = cellSolverFlag(body.solverKind, CELL_MODEL[m.model]),
       sets = body.clusterInfo.map((info) => new Set(info.members));
     for (let t = first; t < first + count; t++) {
       let stiffness = 1,
@@ -3398,9 +3452,7 @@ export class SoftBodies implements PhysicsAttachment {
       f.damp![t] = rate;
       // The implicit solver damps by a factor on the stiffness: the rate over the square of the cell's wave frequency.
       f.imp_beta![t] = wave > 0 ? rate / (wave * wave) : 0;
-      const flags = f.flags as unknown as Uint32Array;
-      flags[t] =
-        body.solverKind === 'fem' && m.model !== 'volume' ? flags[t]! | IMPLICIT_CELL : flags[t]! & ~IMPLICIT_CELL;
+      flags[t] = (flags[t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL)) | mode;
     }
   }
 
@@ -3581,6 +3633,7 @@ export class SoftBodies implements PhysicsAttachment {
         'tear',
         'flags',
         'damp',
+        'imp_beta',
         ...Array.from({ length: 9 }, (_, k) => `o${k}`),
         'flowed',
         'flow_max',

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Volumetric ladder coupling</title></head>
+<body>
+<canvas width="640" height="360" style="display:block;width:640px;height:360px"></canvas>
+<script type="module">
+  import { Engine, Geometry, PbrMaterial, box } from '/packages/core/dist/index.js';
+  import { Physics } from '../dist/index.js';
+  import { ladder } from './coupling/volumetric-ladder.js';
+
+  await Physics.load();
+  const canvas = document.querySelector('canvas');
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [0.12, 1.23, 1.38], target: [0, 0.88, 0], near: 0.05, far: 10 },
+  });
+  const rungMesh = engine.createMesh().setMaterial(new PbrMaterial({ color: '#c99364', roughness: 0.63 }));
+  const steel = new PbrMaterial({ color: '#626d76', roughness: 0.5 });
+  for (const x of [-0.39, 0.39]) {
+    engine.createMesh().setGeometry(box(0.08, 1.58, 0.13)).setMaterial(steel).setPosition([x, 0.79, 0]);
+    engine.createMesh().setGeometry(box(0.15, 0.045, 0.25)).setMaterial(steel).setPosition([x, 0.025, 0]);
+  }
+  engine.createMesh().setGeometry(box(4, 0.06, 2)).setMaterial(new PbrMaterial({ color: '#807c73' }));
+  const boot = engine.createMesh().setMaterial(new PbrMaterial({ color: '#8f755f', roughness: 0.78 }));
+
+  function surface(body) {
+    const positions = body.particlePositions();
+    const indices = body.triangles();
+    const normals = new Float32Array(positions.length);
+    for (let i = 0; i < indices.length; i += 3) {
+      const a = 3 * indices[i], b = 3 * indices[i + 1], c = 3 * indices[i + 2];
+      const edge = (from, to) => [0, 1, 2].map(axis => positions[to + axis] - positions[from + axis]);
+      const [ux, uy, uz] = edge(a, b), [vx, vy, vz] = edge(a, c);
+      const normal = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+      for (const vertex of [a, b, c]) for (let axis = 0; axis < 3; axis++) normals[vertex + axis] += normal[axis];
+    }
+    for (let i = 0; i < normals.length; i += 3) {
+      const length = Math.hypot(normals[i], normals[i + 1], normals[i + 2]) || 1;
+      for (let axis = 0; axis < 3; axis++) normals[i + axis] /= length;
+    }
+    return new Geometry(positions, normals, indices);
+  }
+
+  window.renderRung = async ({ loaded, showBoot = false }) => {
+    const scene = await ladder(undefined, { mass: loaded ? 35 : 0 });
+    scene.world.advance(120);
+    rungMesh.setGeometry(surface(scene.rung));
+    boot.setGeometry(showBoot ? box(0.106, 0.12, 0.12) : null);
+    if (showBoot) boot.setPosition(scene.boot.position);
+    engine.render({ delta: 1 / 60 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { ...scene.reading(), hash: scene.world.hash(), visible: engine.stats.visible };
+  };
+</script>
+</body>
+</html>

@@ -305,6 +305,7 @@ impl World {
         grow(&mut self.vb_count, bodies);
         grow(&mut self.pflags, particles);
         grow(&mut self.pbody, particles);
+        grow(&mut self.fem.vertex_block.head, particles);
         for v in [&mut self.rest, &mut self.omega, &mut self.zeta, &mut self.lambda, &mut self.tear, &mut self.elimit] {
             grow(v, edges);
         }
@@ -430,6 +431,7 @@ impl World {
             self.lambda[e] = 0.0;
         }
         self.fem_implicit(h);
+        let vertex_block = self.prepare_vertex_blocks();
         self.shape_begin();
         self.fem_begin();
         self.volume_begin();
@@ -440,6 +442,9 @@ impl World {
             }
             self.solve_shape(h);
             self.solve_fem(h);
+            if vertex_block {
+                self.solve_vertex_blocks(h);
+            }
             self.solve_volume(h);
         }
         self.solve_rigid(h);

@@ -540,6 +540,45 @@ console.log(body.volume() / body.restVolume(), body.tornCells().length);
 
 - **The implicit solver.** `desc.setSolver('fem')` (or `body.setSolver`) holds a body's cells with one linear solve a substep, the linearly implicit step of Baraff and Witkin (1998) with the co-rotated stiffness of each cell and a conjugate gradient solve that never forms a matrix, instead of the constraints: its stiffness does not depend on the substeps and passes (a cantilever sags by the same 88 percent of the Euler-Bernoulli deflection at one substep of one pass as at eight of four, where the constraints with one pass sag more than twice as far, and a beam of 2 GPa holds at one substep), so use it for very stiff materials. `soft.femLinearTolerance` (relative residual, default 1e-5), `soft.femMaxLinearIterations` (default 20) and `soft.femMaxDenseDofs` (default 600: a body with that many unknowns or fewer is iterated until its residual is gone, as many passes as it has unknowns if need be, as a direct solve would finish) tune it. It works on the Neo-Hookean (forces of the stable Neo-Hookean stress, the stiffness of the co-rotated one: a quasi-Newton step to the same state) and co-rotated models; `'volume'` cells are always constraints, and the `Fem` bodies share the step with every other body.
 
+#### Vertex block descent
+
+`setSolver('vertex-block')` uses an implicit position update with the exact three-axis elastic Hessian of
+each free vertex. It supports `neo-hookean` tetrahedra and shares the usual rigid contacts, kinematic
+pins, and material damping. The world uses the configured soft `substeps` and `iterations`. Each iteration
+sweeps the free vertices once, and high stiffness or large meshes can need more sweeps. The default
+solver remains `'constraints'`. Change modes with `body.setSolver()` and use `body.solver` to read one.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+import { PhysicsWorld, RigidSolver, SoftSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const soft = await SoftBodies.attach(physics, { substeps: 4, iterations: 24 });
+const wood = new CellMaterial();
+wood.youngsModulus = 2e6;
+wood.density = 650;
+
+const beam = SoftBodyDesc.box([0, 1, 0], [0.7, 0.14, 0.14], [10, 2, 2], wood);
+const ends: number[] = [];
+for (let i = 0; i < beam.particleCount; i++) {
+  const x = beam.positions[3 * i]!;
+  if (x < 0.001 || x > 0.699) ends.push(i);
+}
+const rung = soft.create(beam.setPinnedParticles(ends).setSolver('vertex-block'));
+physics.addBody(null, {
+  position: [0.35, 1.23, 0.07],
+  colliders: { shape: 'box', halfExtents: [0.053, 0.06, 0.06], mass: 35 },
+});
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(new RigidSolver(), { physics })
+  .add(new SoftSolver(), { soft })
+  .couple(['soft', 'rigid'], 'staggered');
+world.advance(60);
+console.log(rung.solver, rung.particlePosition(49), world.hash());
+```
+
 Not in this entry yet: collision through a skin (see `docs/physics-collision-parity.md` for each row).
 
 - **Sails and flags in the wind (AERO-02).** `new SailForce(physics, cloth, {wind, grid: [nu, nv], chord = 'u', density, stall = 0.35, drag = 1.17})` loads a cloth made by `SoftBodyDesc.cloth` with a vortex lattice on its own grid, solved again every step from where its particles are: each cell carries a horseshoe vortex (bound on its quarter chord, trailing from the leech along the apparent wind), the circulations stop the air passing through the sail at every cell's three-quarter chord, and each cell takes the Kutta-Joukowski force of its circulation, shared by its four corners. A cell the air meets more steeply than `stall` radians has separated and takes the flat plate's normal force instead (the `WindForce` law). So a sail's camber, twist and angle to the wind decide its lift (a flat sail of aspect ratio 6 has the lift slope of a wing of that aspect ratio), a sail run square before the wind is pushed, and the load reaches whatever holds the cloth. `chord` names the grid direction from the leading edge to the trailing edge; `wind` is a vector, a function of the point and the time, or a flow field such as `@margoengine/weather`'s `BoundaryLayerWind`; `sail.force` is the last step's total (the load that went into the cloth over the step) and `sail.circulation` each cell's. The load leans on the cloth's own speed through the air, so each corner takes it damped implicitly (backward Euler), and a sail of real sailcloth weight stays steady at the world's step. It is quasi-steady (no wake memory) and one surface thick. While attached it supplies the cloth's air loads: the cloth's own flat-plate drag (`setAirDrag`) is off for that cloth until `remove()`. It loads the cloth's particles, never a rigid body directly, so in a world the `SoftSolver` steps the cloth with the sail's load in it to the same bits as alone, and the load reaches the boat through what holds the cloth (the soft solver's `bodyImpulses` and `bodyForces`).

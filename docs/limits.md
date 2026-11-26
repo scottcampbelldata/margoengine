@@ -9538,6 +9538,15 @@ bed entrainment to their own solvers.
 
 The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
 
+### Volumetric vertex blocks (SOFT-04)
+
+`@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean
+tetrahedra. Each sweep solves the local elastic and inertial energy exactly to working precision.
+An entire body still needs enough sweeps for load to propagate through its mesh. Linear tetrahedra
+can lock near incompressibility or need refinement to resolve bending. This mode uses a serial sweep
+and shares the rigid/soft contact passes. Its optional entry and kernel sizes are recorded in the
+[entry-size results](../examples/package-benchmarks/results/entry-sizes.json).
+
 ### Gas-filled soft shells (SOFT-06)
 
 `@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber

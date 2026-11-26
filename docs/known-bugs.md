@@ -16630,6 +16630,13 @@ volume. A changing atmospheric field requires an application update until the sh
 
 Vehicles now sink into a calibrated yielding surface and feel the resulting suspension load. `packages/road/test/driving.test.js` checks the pressure and spring balance and the effect on the wheel. Persistent ruts and displaced volume require a matching EARTH-05 shear and sediment producer feeding TerrainBed. The road driver operates on authored lanes. The original city and deck shots still need the production bindings.
 
+### The Last Hold ladder and volumetric solver parity (SOFT-04)
+
+The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
+climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support
+fixture uses isotropic elasticity. Timber with directional grain needs an anisotropic material model.
+The prefactored local/global Projective Dynamics variant (X-33) and dedicated GPU compute remain open.
+
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 
 The Event Horizon scene still uses its established SPACE-01 emitter paths. Bind its emissivity and radial transport

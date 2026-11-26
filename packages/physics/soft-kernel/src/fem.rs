@@ -42,6 +42,8 @@ pub const VOLUME: u32 = 2;
 pub const INTERIOR_TET: u32 = 2;
 /// The cell is held by the implicit solver (src/implicit.rs) and not by constraints.
 pub const IMPLICIT_TET: u32 = 4;
+/// The cell uses the VBD solve (src/vertex_block.rs).
+pub const VERTEX_BLOCK_TET: u32 = 8;
 /// No neighbour across a face.
 pub const NONE: u32 = u32::MAX;
 
@@ -125,6 +127,7 @@ pub struct Fem {
     pub ang: [Col<f32>; 3],
     /// The implicit solver's settings and scratch (src/implicit.rs).
     pub imp: crate::implicit::Implicit,
+    pub(crate) vertex_block: crate::vertex_block::VertexBlock,
 }
 
 impl Fem {
@@ -186,6 +189,7 @@ impl Fem {
             lin: [F; 3],
             ang: [F; 3],
             imp: crate::implicit::Implicit::new(),
+            vertex_block: crate::vertex_block::VertexBlock::new(),
         }
     }
 }
@@ -314,6 +318,7 @@ impl World {
             c.resize(clusters);
         }
         f.imp.reserve_cells(tets);
+        f.vertex_block.next.resize(4 * tets);
         f.member.resize(members);
         for c in f.rest.iter_mut() {
             c.resize(members);
@@ -548,7 +553,7 @@ impl World {
     /// One pass over every live tetrahedron and cluster.
     pub(crate) fn solve_fem(&mut self, h: f32) {
         for t in 0..self.fem.count {
-            if self.fem.flags[t] & (TORN_TET | IMPLICIT_TET) != 0 {
+            if self.fem.flags[t] & (TORN_TET | IMPLICIT_TET | VERTEX_BLOCK_TET) != 0 {
                 continue;
             }
             let (mu, lambda, vol) = (self.fem.mu[t], self.fem.lambda[t], self.fem.vol0[t]);

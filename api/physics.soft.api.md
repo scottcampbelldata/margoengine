@@ -228,6 +228,8 @@ export class SoftBodies implements PhysicsAttachment {
     removeCluster(body: SoftBody, cluster: number): void;
     clusterProxy(body: SoftBody, cluster: number): PhysicsBody;
     relinkCells(body: SoftBody): void;
+    cellSolver(body: SoftBody): SoftSolver;
+    setCellSolver(body: SoftBody, solver: SoftSolver): void;
     writeCellMaterial(body: SoftBody): void;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
@@ -290,7 +292,8 @@ export class SoftBody {
     skinCells: Uint32Array<ArrayBuffer>;
     previous: Float32Array<ArrayBuffer>;
     clusterInfo: ClusterInfo[];
-    solverKind: SoftSolver;
+    get solverKind(): SoftSolver;
+    set solverKind(solver: SoftSolver);
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -564,7 +567,7 @@ export interface SoftSoftness {
     dampingRatio: number;
 }
 
-export type SoftSolver = 'constraints' | 'fem';
+export type SoftSolver = (typeof SOLVER_MODES)[number];
 
 export interface SoftSplit {
     pieces: SoftBody[];
@@ -2220,6 +2223,8 @@ type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint
 type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
     targetVelocity?: Vec3;
 };
+
+const SOLVER_MODES: readonly ['constraints', 'fem', 'vertex-block'];
 
 interface ShapeCastHit extends RaycastHit {
     queryPoint: [number, number, number];

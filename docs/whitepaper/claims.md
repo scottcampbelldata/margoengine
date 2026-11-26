@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Volumetric solids (SOFT-04, 2026-11-26). The native vertex block matches the closed-form implicit
+  solution of a pinned tetrahedron under tension, compression, inversion and damping. Additional sweeps
+  reduce the implicit elastic energy on a clamped bar. A tabletop ladder rung bends and vibrates under a
+  real 35 kg rigid load, with reactions through the world ports. Run the crate's `fem` test,
+  `packages/physics/tests/coupling/volumetric-solids.test.js` and `packages/physics/tests/volumetric-solids.browser.mjs`.
+
 - Lightning (ATMO-07, 2026-11-26). The native lattice reproduces the closed-form electric potential in vacuum
   and under uniform volume charge. A return stroke touches the actual terrain and produces a timed acoustic
   source along each segment. The browser regression draws the same solved channel in plain and shared worlds.
