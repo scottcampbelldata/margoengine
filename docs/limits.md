@@ -10304,4 +10304,4 @@ The bilge hull-pressure seakeeping entry is 29,592 B gzip with a 30,480 B ceilin
 
 The `addedMass` path applies the plate’s normal virtual mass through the existing six-axis solve. A dry plate adds zero. The model uses the oscillatory long-plate wall calibration and the current harmonic roll-amplitude estimate. Finite-section and mount-gap corrections, wave excitation of the plates and higher time harmonics remain open. The estimate is a local virtual mass, with no separate time derivative of the plate’s mass matrix during a fast wetting transition.
 
-The bilge virtual-inertia seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.
+The bilge virtual-inertia seakeeping entry is 30,177 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.

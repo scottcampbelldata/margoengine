@@ -14225,10 +14225,12 @@ An authored girder seam can hold and release two adjacent dynamic rigid parts. I
 one projected bending curvature with aligned rest frames and three-axis point-spring
 translation. The angular and point reactions are split within each step. The joint preserves
 its failure curvature and peak tensile strain after release. Use pre-separated meshes and
-body-local collider assets for each part. Distributed shell fracture, cyclic plastic history,
+body-local collider assets for each part. A compartment's authored aperture can latch when
+the seam breaks. Its location and dimensions come from the hull opening, independent of the
+subsequent gap between the halves. Distributed shell fracture, cyclic plastic history,
 automatic shell-part generation and the measured floating-tank breakup remain open.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 24023 B minified and 9435 B gzip under its 9719 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 24016 B minified and 9430 B gzip under its 9719 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14280,6 +14282,11 @@ For fully developed glycerol flow on a 20° glass plate, the modeled depths at t
 are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
+
+The exterior window fixture draws the solved surface with screen-space refraction and
+uses spherical drop geometry. It compares the same rigid pose with each liquid mesh
+hidden in turn. Interior camera attachment, full layered water–glass optics and production
+shot review remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
 The optional thin-film entry is 13,202 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
@@ -14912,21 +14919,27 @@ The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Cor
 
 ### Bilge keel plate damping
 
-`Hull.bilgeKeels` terms apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Plate added inertia, hull pressure, skegs and large-angle decay measurements remain open.
+`Hull.bilgeKeels` normal drag and lift apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Skegs and large-angle decay measurements remain open.
 
 The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
 
 ### Very small bilge keel excursions
 
-The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20. The pressure and added-inertia terms remain open.
+The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20.
 
 The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
 
 ### Attached bilge keel hull pressure
 
-Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Added inertia, forces in the other degrees of freedom, phase lag, and physical measurements of hull-pressure amplitudes remain open.
+Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Other force and torque axes from the pressure footprint, phase lag, and physical measurements of hull-pressure amplitudes remain open.
 
 The bilge hull-pressure seakeeping entry is 29,592 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
+
+### Bilge keel added inertia
+
+The `addedMass` path applies the plate’s normal virtual mass through the existing six-axis solve. A dry plate adds zero. The model uses the oscillatory long-plate wall calibration and the current harmonic roll-amplitude estimate. Finite-section and mount-gap corrections, wave excitation of the plates and higher time harmonics remain open. The estimate is a local virtual mass, with no separate time derivative of the plate’s mass matrix during a fast wetting transition.
+
+The bilge virtual-inertia seakeeping entry is 30,177 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
