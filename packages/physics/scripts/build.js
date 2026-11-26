@@ -69,6 +69,7 @@ await build({
         hydro: resolve(root, 'src/hydro/index.ts'),
         foam: resolve(root, 'src/foam/index.ts'),
         surf: resolve(root, 'src/surf/index.ts'),
+        rogue: resolve(root, 'src/rogue/index.ts'),
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),

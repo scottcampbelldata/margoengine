@@ -2499,6 +2499,47 @@ console.log(surf.undertow(70, 4)[0] < 0); // true: the undertow runs seaward
 console.log(surf.runUp() > 0.05); // true: the water runs up the beach above its still level
 ```
 
+### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
+
+`NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.
+
+Its statistics are the freak-wave parameters of the ECMWF wave model:
+- the steepness, the Benjamin-Feir index and the directionality R;
+- the kurtosis, from four-wave focusing (J(R) BFI^2) plus the bound waves;
+- the skewness, summed from the same kernels over the spectrum, so spreading lowers it;
+- the chance a wave passes 2 H_s, or its crest 1.25 H_s (Tayfun and Fedele's crest law).
+
+`heightChance`, `crestChance`, `expectedMaximum` (the expected largest of N waves) and `kurtosisFactor` (J(R)) are exported, with `seaStatistics(spectrum)` and `pairKernels` (the kernels of two waves).
+
+Rogue waves are real events, each a constrained NewWave: the most likely shape of an extreme crest in this sea, solved into the sea so a crest of the height asked for stands at its place and time with the sea around it still the sea. Each fades in and out within a window of 8 zero-crossing periods and 8 zero-crossing wavelengths, and outside every window the sea is untouched, bit for bit. Its settings:
+- `spectrum` or `waves` (with `at`, the place to sample it, default `[0, 0]`);
+- `components` (default 160; a point costs about their square over 2 multiplications);
+- `cutoff`, the highest frequency kept as a multiple of the peak (default 3);
+- `seed` (default 0), `gravity`, `current` (a water `FlowField` added to the waves' motion) and `temperature` (default 288.15 K);
+- `rogues`: `false`, a list of crests to place (`{position: [x, z], time, crest}`), or a region (`{min, max, from, to}`, default the 2 km square about `at` over the first hour) where the rogues focusing adds beyond the second order's own are drawn at the rate the statistics give. A long-crested narrow storm draws several an hour; a short-crested sea, whose R is above 1, draws none.
+
+Reading the sea:
+- `elevation(x, z, t)`, `linearElevation(x, z, t)`, `sample(x, z, t)` (height, normal, velocity, current, depth, density), `velocity(x, y, z, t)` (linear theory under Wheeler's stretching), `pressure(x, y, z, t)` and `water`;
+- `statistics`, `rogues` and `variance`.
+
+```ts
+import {NonlinearSea} from 'margoengine/physics/rogue';
+import {jonswap} from 'margoengine/physics/waves';
+
+// The North Sea on 1 January 1995: H_s 11.9 m, a peak period of 15 s in 70 m of water, and the Draupner wave's 18.5 m crest.
+const frequencies = Float64Array.from({length: 40}, (_, i) => 0.03 * 20 ** (i / 39));
+const directions = Float64Array.from({length: 36}, (_, j) => -Math.PI + ((j + 0.5) * Math.PI) / 18);
+const spectrum = jonswap(
+  {height: 11.9, period: 15, direction: 0},
+  {frequencies, directions, energy: new Float64Array(40 * 36), depth: 70, density: 1025},
+);
+const sea = new NonlinearSea({spectrum, rogues: [{position: [0, 0], time: 600, crest: 18.5}]});
+console.log(sea.elevation(0, 0, 600).toFixed(1)); // 18.5
+console.log(sea.elevation(0, 0, 600) - sea.linearElevation(0, 0, 600) > 1); // true: the bound waves lift the crest
+console.log(sea.statistics.rogueCrestChance > Math.exp(-12.5)); // true: crests pass 1.25 H_s more often than Rayleigh's
+console.log(sea.elevation(0, 0, 100) === new NonlinearSea({spectrum, rogues: false}).elevation(0, 0, 100)); // true
+```
+
 ### Solver modules on one memory
 
 Every solver module of a world (a Rust crate built to WebAssembly) imports the world's one memory, so a solver reads

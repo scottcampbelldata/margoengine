@@ -11938,6 +11938,56 @@ force by central differences with a dry neighbour holding the cell's own stress,
 coupling through an accumulated field are this package's own arrangement. Proof: `packages/physics/tests/surf.test.js` and
 `tests/coupling/surf.test.js`.
 
+
+### Nonlinear and rogue waves (SEA-03, `@margoengine/physics/rogue`, 2026-11-26)
+
+`packages/physics/src/rogue/index.ts` (`NonlinearSea`, `seaStatistics`, `pairKernels`, `heightChance`, `crestChance`,
+`expectedMaximum`, `kurtosisFactor`). Written from papers and public documentation only (no code of WAVEWATCH III, the ECMWF
+wave model, any HOS or NLS solver or any wave library was opened; no companion code of the papers below):
+
+- J. F. Dalzell, "A note on finite depth second-order wave-wave interactions", Applied Ocean Research 21(3), 105-111, 1999,
+  https://doi.org/10.1016/S0141-1187(99)00002-3 (not read), as T. A. A. Adcock and S. Draper restate it in "The second order
+  contribution to wave crest amplitude: random simulations and NewWave", Proc. 25th ISOPE, 2015, ISOPE-I-15-515 (appendix,
+  read): the sum and difference kernels B+ and B- with alpha, beta, gamma, delta, epsilon and zeta. The pair counting (each
+  unordered pair once, a component with itself at half weight, its own difference term 0) is set by the tests: Stokes's (1/2) k
+  a^2 cos 2 psi deep and its finite-depth form, Longuet-Higgins's (k1 + k2)/2 and -|k1 - k2|/2, and, for close frequencies in
+  finite water, Longuet-Higgins and Stewart's (1962) bound long wave -(2n - 1/2) g / (g h - c_g^2) (0.05 percent apart).
+- A. Alberello, A. Chabchoub, O. Gramstad, A. V. Babanin and A. Toffoli, "Non-Gaussian properties of second-order wave orbital
+  velocity", Coastal Engineering 110, 42-49, 2016, arXiv:1510.01535 (read): the second-order potential (its velocities are not
+  used here, see the limits) and the self-difference term set to 0.
+- ECMWF, IFS Documentation Cy50r1, Part VII: ECMWF Wave Model, chapter 8, "Extreme wave forecasting", 2025,
+  https://www.ecmwf.int/sites/default/files/elibrary/062026/81737-ifs-documentation-cy50r1-part-7-ecmwf-wave-model.pdf (read,
+  sections 8.1 to 8.3.7): C4 = <eta^4> / (3 <eta^2>^2) - 1; eps = k_bar sqrt(m0) with 0.89 omega_bar = omega(k_bar), omega_bar =
+  m0 / m_-1; delta_omega = 1 / (Q_p sqrt(pi)) with Goda's peakedness over E > 0.4 E_p; delta_theta = sqrt(2 (1 - R1)) over the
+  peak band; nu = sqrt(m0 m2 / m1^2 - 1); the deep-water BFI^2 = 2 eps^2 / delta_omega^2 and R = delta_theta^2 / (2 nu^2); the
+  dynamic kurtosis J(R) BFI^2 with J's fit (Gamma 0.9, alpha = 4 sqrt 3 / pi, beta = 1/3 + 2 sqrt 3 / pi, delta = 2 sqrt 3 / pi
+  - 4/3, J(R) = -J(1/R) / R above 1); the height exceedance e^(-2 H^2) (1 + C4 2 H^2 (H^2 - 1)) of N. Mori and P. A. E. M.
+  Janssen, "On kurtosis and occurrence probability of freak waves", J. Phys. Oceanogr. 36, 1471-1483, 2006 (as restated).
+- P. A. E. M. Janssen, "Nonlinear four-wave interactions and freak waves", J. Phys. Oceanogr. 33, 863-884, 2003 (as the IFS
+  documentation restates it): the Benjamin-Feir index and the bound kurtosis 6 eps^2 of a narrow deep sea.
+- M. A. Tayfun and F. Fedele, "Wave-height distributions and nonlinear effects", Ocean Engineering 34, 1631-1649, 2007 (read,
+  key equations), and F. Fedele, C. Lugni and A. Chawla, "The sinking of the El Faro: predicting real world rogue waves during
+  Hurricane Joaquin", Sci. Rep. 7, 2017, arXiv:1703.08161 (read, eqs. 13 to 19): the crest exceedance exp(-8 xi0^2) (1 + Lambda xi0^2
+  (4 xi0^2 - 1)), xi = xi0 + 2 mu xi0^2, mu = lambda_3 / 3, Lambda about 8 lambda_40 / 3 = 8 C4, and the narrowband bound
+  kurtosis lambda_40 = 2 lambda_3^2.
+- M. A. Tayfun, "Narrow-band nonlinear sea waves", J. Geophys. Res. 85, 1548-1552, 1980 (as restated): the narrow deep sea's
+  skewness 3 k sigma, which the tests hold the kernel sum to.
+- P. S. Tromans, A. R. Anaturk and P. Hagemeijer, "A new model for the kinematics of large ocean waves", Proc. 1st ISOPE,
+  1991 (as Adcock and Draper restate it, eq. 4): NewWave, the autocovariance shape of an extreme crest. Its constrained form in
+  a random sea, eta + (A - eta(0)) rho + (0 - eta'(0)) rho' / lambda_2, after P. H. Taylor, P. Jonathan and L. A. Harland, J.
+  Offshore Mech. Arct. Eng. 119, 1997 (not read; known only from memory), so it is derived here from the conditions it meets
+  (the crest's height and a still surface there) and the tests hold those conditions.
+- M. Christou and K. Ewans, "Field measurements of rogue water waves", J. Phys. Oceanogr. 44, 2317-2335, 2014 (as restated): a
+  rogue is a height above 2 H_s or a crest above 1.25 H_s.
+- J. D. Wheeler, "Method for calculating forces produced by irregular waves", J. Petroleum Technology 22, 359-367, 1970 (as
+  the offshore literature restates it): stretching linear kinematics to the instantaneous surface.
+
+The equal-variance draw (stratified quantiles of the frequency marginal, the direction from the bin's distribution), the
+joint solve of several events' crest and slope constraints, the secant correction of each linear crest for the second order's
+rise, the events' space-time window with amplitudes that vary over it, the rate of drawn rogues (one wave per zero-crossing
+wavelength squared per zero-crossing period times the crest chance with the full kurtosis less that with the bound kurtosis),
+the skewness as the kernels' sum over the spectrum's bins and the pressure's second-order rise taken as hydrostatic are this
+package's own arrangement. Proof: `packages/physics/tests/rogue.test.js`.
 ### Whitecaps, foam and spray (SEA-13, `@margoengine/physics/foam`, 2026-11-26)
 
 `packages/physics/src/foam/breaking.ts` (breaking statistics of a spectrum), `foam/spray.ts` (spray source functions) and

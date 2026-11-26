@@ -30,6 +30,7 @@ export const ALWAYS = [
   'packages/physics/src/foam/spray.ts',
   'packages/physics/src/foam/index.ts',
   'packages/physics/src/surf/index.ts',
+  'packages/physics/src/rogue/index.ts',
   'packages/physics/src/vegetation/*.ts',
   'packages/math/src/atmosphere.ts',
   'packages/weather/src/boundary-layer.ts',
