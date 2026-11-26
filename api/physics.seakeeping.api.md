@@ -155,7 +155,7 @@ export interface HullPose {
 export class HullSolver implements Solver<HullParams> {
     readonly id: string;
     readonly wakeSourceField: FieldDescriptor;
-    constructor(id?: string, wake?: HullWake, crushDamage?: FieldDescriptor | undefined);
+    constructor(id?: string, wake?: HullWake, crushDamage?: FieldDescriptor | undefined, girderSeams?: FieldDescriptor | undefined);
     describe(): SolverDescription;
     init(host: SolverHost, params: HullParams): void;
     step(context: StepContext, dt: number): void;
@@ -210,6 +210,7 @@ export interface Opening {
     readonly closes?: number;
     readonly collapse?: number;
     readonly crushPatch?: number;
+    readonly girderJoint?: number;
 }
 
 export const PERMEABILITY = 0.95;
