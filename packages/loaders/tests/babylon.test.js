@@ -150,6 +150,18 @@ test('shared geometries, bone weights and flattening', () => {
   assert.equal(flattenBabylon(s, { onlyVisible: false }).positions.length / 3, 9);
 });
 
+test('flattened group colours are sRGB, as LoadedGroup.color documents, so createMeshes does not darken them', () => {
+  const s = parseBabylon({
+    materials: [{ id: 'm', diffuse: [0.5, 0.25, 1], alpha: 0.5 }], // Standard colours are sRGB in the file
+    meshes: [{ id: 't', materialId: 'm', positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }],
+  });
+  const color = flattenBabylon(s).groups[0].color;
+  near(color[0], 0.5);
+  near(color[1], 0.25);
+  near(color[2], 1);
+  assert.equal(color[3], 0.5);
+});
+
 test('hostile files throw coded errors', () => {
   assert.throws(() => parseBabylon('not json'), isError('syntax'));
   assert.throws(() => parseBabylon('[1,2]'), isError('syntax'));
