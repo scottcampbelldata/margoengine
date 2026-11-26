@@ -79,6 +79,19 @@ operation uses actual subdivided tets so its particles and faces can use the exi
 [Molino, Bao and Fedkiw](https://physbam.stanford.edu/papers/stanford2004-01.pdf)
 [Sifakis, Der and Fedkiw](https://physbam.stanford.edu/papers/stanford2007-04.pdf).
 
+Franziska Seeber, Ani Khaloian-Sarnaghi, Taoyi Yu, Fabian Duddeck and Jan Willem van de Kuilen,
+“Development and validation of an orthotropic 3D elasto-plastic damage model for wood,
+considering fiber deviations” (2024), compares Tsai–Wu, Hashin, Sandhaas and separated modes.
+Equation 26 gives the separated stress-to-strength ratios, with distinct positive and negative
+normal strengths in each direction and three independent shear strengths. The native solve
+uses Green-strain-conjugate stress and shear magnitudes in the material frame. It carries
+one filtered utilization per failure mode and selects whole-cell tear events using the
+largest utilization and the existing interior-strength factor. This uses their initiation
+criterion with the existing topological split. Directional post-peak softening requires a
+separate fracture-energy law. Table 1 supplies the elastic and shear inputs, and the observed
+strength intervals in Table 2 supply independent axial fixtures.
+[Seeber et al.](https://repository.tudelft.nl/record/uuid%3Afe38cfa8-6c48-4832-8906-bbbc1e87cd89).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

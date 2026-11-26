@@ -16846,8 +16846,9 @@ Live 3D tread intersection, high-slip digging and measured berm profiles remain 
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support rung
-now runs with a full orthotropic tensor in native vertex blocks. The fracture threshold uses scalar
-cohesion. Grain-dependent timber fracture remains open.
+now runs with a full orthotropic tensor in native vertex blocks. It can tear when independent
+tensile, compressive or shear stresses exceed authored strengths. Progressive grain-dependent
+softening and crack paths at angles through a cell remain open.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
 Through-element plane cuts work on tetrahedral solids. A finite interior incision still needs
 embedded material geometry and the transfer of skin, spring, cluster and external binding state.

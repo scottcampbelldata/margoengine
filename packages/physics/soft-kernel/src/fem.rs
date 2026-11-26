@@ -134,6 +134,8 @@ pub struct Fem {
     pub(crate) fiber: Col<[f32; 4]>,
     /// Optional orthotropic axes and stiffness in the cell's rest coordinates.
     pub(crate) orthotropy: Col<[f32; 18]>,
+    /// Orthotropic tension, compression and shear strengths and their nine filtered loads.
+    pub(crate) orthotropic_failure: Col<[f32; 18]>,
 }
 
 impl Fem {
@@ -198,6 +200,7 @@ impl Fem {
             vertex_block: crate::vertex_block::VertexBlock::new(),
             fiber: Col::new(),
             orthotropy: Col::new(),
+            orthotropic_failure: Col::new(),
         }
     }
 }
@@ -332,6 +335,9 @@ impl World {
         }
         if !f.orthotropy.is_empty() {
             f.orthotropy.resize(tets);
+        }
+        if !f.orthotropic_failure.is_empty() {
+            f.orthotropic_failure.resize(tets);
         }
         f.member.resize(members);
         for c in f.rest.iter_mut() {
@@ -766,6 +772,7 @@ impl World {
                 continue;
             }
             let (yield_strain, tear) = (self.fem.yield_strain[t], self.fem.tear[t]);
+            self.fem.ratio[t] = self.orthotropic_failure_ratio(t, h);
             if !(yield_strain > 0.0) && !(tear > 0.0) {
                 continue;
             }

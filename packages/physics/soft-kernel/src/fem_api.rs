@@ -68,6 +68,20 @@ pub extern "C" fn soft_fem_orthotropy_rows() -> u32 {
     if rows.is_empty() { 0 } else { rows.as_mut_ptr() as usize as u32 }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_orthotropic_failure(
+    first: u32, count: u32, tx: f32, ty: f32, tz: f32, cx: f32, cy: f32, cz: f32,
+    xy: f32, xz: f32, yz: f32,
+) {
+    world().set_orthotropic_failure(first as usize, count as usize, [tx, ty, tz, cx, cy, cz, xy, xz, yz]);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_orthotropic_failure_rows() -> u32 {
+    let rows = &mut world().fem.orthotropic_failure;
+    if rows.is_empty() { 0 } else { rows.as_mut_ptr() as usize as u32 }
+}
+
 /// Where a tetrahedron or cluster column starts in the memory.
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_column(id: u32) -> u32 {

@@ -656,6 +656,43 @@ body rotates. The tensor supplies the entire elastic law. Use it by itself and k
 `CellMaterial` for density, damping, yield and cohesion. Snapshots and cuts carry the authored axes
 and all the stiffness coefficients.
 
+#### Grain-dependent fracture
+
+Add `strength` to the orthotropic material to let the body tear under different stresses in each
+material axis and shear plane. The tensile and compressive triples use X, Y, Z order. The shear
+triple uses XY, XZ, YZ order. Supply positive strengths in pascals. `CellMaterial.tearSmoothing`
+filters each of these nine stresses before it can trigger a tear. Its default of zero uses the
+current stress. `CellMaterial.interiorStrength` raises the thresholds for interior cells.
+Set `CellMaterial.tearStrain` to zero when using these stress limits.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const soft = await SoftBodies.attach(physics);
+const cell = new CellMaterial();
+const stock = SoftBodyDesc.box([0, 1, 0], [1, 0.2, 0.2], [10, 2, 2], cell);
+const beech = soft.create(stock.setOrthotropicStiffness({
+  youngsModuli: [12500e6, 2050e6, 810e6],
+  shearModuli: [1640e6, 1080e6, 470e6],
+  poissonRatios: [0.43, 0.58, 0.61],
+  strength: {
+    tensile: [139.4e6, 18.2e6, 8e6],
+    compressive: [61.9e6, 15.5e6, 6.7e6],
+    shear: [14e6, 18e6, 15e6],
+  },
+}).setSolver('vertex-block'));
+const stop = soft.onTear((event) => console.log(event.pieces.length));
+physics.step();
+console.log(beech.tornCells().length);
+stop();
+```
+
+These European beech constants follow Seeber et al. (2024), using their measured mean axial
+strengths and published shear inputs. [Experimental study](https://doi.org/10.1016/j.engstruct.2024.117928)
+
 #### Cut through a tetrahedral solid
 
 `soft.cutPlane(body, origin, normal)` slices through the actual volume in world space. It returns
