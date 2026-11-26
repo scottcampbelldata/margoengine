@@ -17,6 +17,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   discharge fixture added 60.002 m³ when the source delivered 60 m³. Run
   `node packages/biomes/tests/water-check.mjs --flow-only`.
 
+- Aquatic locomotion (LIFE-03). The supplied tail wave accelerates a swimmer toward the analytic
+  thrust/drag equilibrium with first-order time convergence. The unpowered coast is exact to roundoff
+  for constant quadratic resistance. Pectoral load changes banking, yaw and station-keeping.
+  The actual sea supplies orbital acceleration and the actual school supplies water-relative intent.
+  Reproduce with `node --test packages/physics/tests/coupling/swim.test.js` after building Physics.
+  The Barrier Bay wake and contact consumer checks use fixture geometry. The shots still need review.
+
 - Land-surface balance (ATMO-09, 2026-11-25). The surface temperature follows the exact discrete solution of a
   linear heat budget. The nonlinear case accounts for radiation, sensible heat, evaporation and conduction to
   f64 roundoff. At the phase boundary, the available heat melts snow with an equal gain in liquid water.

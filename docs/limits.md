@@ -9017,3 +9017,17 @@ hydraulic runs or from measurements.
 
 The optional runoff entry is 3,906 B min+gzip. Its lazy SIMD Wasm images are 7,311 B for plain memory and 7,402 B
 for shared memory before HTTP compression. Both preserve the existing world arena outside their reserved section.
+
+### Aquatic locomotion (`@margoengine/physics/life`, LIFE-03)
+
+The linearly implicit swimmer treats mass and inertia as an ellipsoid with semi-empirical resistance and
+potential-flow strip added mass. Use it for slender-body tail propulsion, pectoral steering/sculling, neutral
+or ballasted bodies, free-surface crossing and stationary control in an ambient flow. It uses local sea
+elevation and slope for wet volume and its centroid. Added inertia scales with wetted fraction. It approximates
+potential flow near the swimmer with one material acceleration sample at the submerged centroid. Breaking
+waves, slamming and vortices layered on the emitted wake impulse require water-side consumers. Thin-body
+forces are cycle-averaged and omit a resolved fluke vortex sheet. Use a wetted mesh or geometric profile to
+supply the true skin area if it differs materially from the ellipsoid. Skin deformation is prescribed by an
+ellipsoid-weighted centreline with a separate contact field for articulated segment loads.
+The optional JavaScript entry measures 7,297 B gzip. Its lazy plain and shared Wasm assets measure 6,410 B and 6,501 B raw, respectively. Shared memory and
+browser use require a runtime with Wasm SIMD. The ordinary page path loads plain Wasm.

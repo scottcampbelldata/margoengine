@@ -44,6 +44,12 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **LIFE-03:** Register swim kernel slot 5 in the module table alongside the other production families.
+  Promote the school's kinematics and intent layouts when the shared fields owner is ready. The swimmer
+  also needs shared world-space contact wrench and per-actuator water impulse layouts for articulated
+  proxies, SEA-12 wakes and SEA-15 sediment. The optional LIFE-03 entry owns those descriptors until the
+  shared contracts are available, and its fixtures exercise both data paths.
+
 - FIRE-06 needs sharable temperature-grid metadata and the framework's K12 sparse linear solver for very stiff heat grids. The optional thermal entry provides backward Euler using a matrix-free stationary solve. Its solid solver reads the temperature and optional phase port using explicitly supplied matching geometry.
 - **LIFE-04 / LIFE-03 / AERO-03:** Move the versioned `schoolIntent` and `schoolKinematics` descriptors and f64 row
   layouts into `@margoengine/math/fields` once the owning body solvers adopt the ports. A shared `SolverHost.cellSize`

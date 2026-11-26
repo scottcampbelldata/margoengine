@@ -92,6 +92,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'swim-kernel',
+    crate: 'packages/physics/swim-kernel',
+    blueprint: 'packages/physics/src/life/swim-kernel.wasm',
+    script: 'packages/physics/scripts/build-swim-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'swim-kernel-shared',
+    crate: 'packages/physics/swim-kernel',
+    blueprint: 'packages/physics/src/life/swim-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-swim-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'school-kernel',
     crate: 'packages/physics/school-kernel',
     blueprint: 'packages/physics/src/schooling/school-kernel.wasm',

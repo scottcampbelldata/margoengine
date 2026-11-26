@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19204227,
+  "total": 19211780,
   "history": [
     {
       "date": "2026-10-24",
@@ -12531,6 +12531,12 @@
       "commit": "06aa29ae98",
       "reason": "SOUND-03 adds its optional physics/underwater entry at 4758 B gzip (budget 5014 B) for world-stepped underwater rays, paraxial Gaussian beams and registered pressure and delay. Core and stage do not load the entry.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "07be44b9c7",
+      "reason": "LIFE-03: add the optional six-degree swimmer at 7297 B gzip with typed sea, school, contact and wake coupling. Keeps the controls and readback together. No bytes added to core or stage.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13331,6 +13337,7 @@
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/hydro": 6980,
     "@margoengine/physics/ice": 4099,
+    "@margoengine/physics/life": 7553,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,

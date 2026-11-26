@@ -16056,3 +16056,12 @@ one frame and restore that snapshot. Restore rejects the unequal region count. T
 accumulator's sum region on first use. A snapshot taken after the first step captures the full layout. The
 regression in `packages/physics/tests/coupling/vegetation.test.js` restores a frame-two snapshot, taken before the
 hit and before either body changes its enabled flag. See BIO-01 in [Framework requests](physics-work-queue.md#framework-requests).
+
+## Open: LIFE-03 swimmer wake and contact consumers in Barrier Bay
+
+The engine's swimmer produces the field data for a pectoral bed jet (BB-7) and the tail wake (BB-8/9).
+The existing scenes still need a sediment solver that accepts the pectoral impulse and a surface/vortex solver
+that consumes the tail impulse. Reproduce the available source with
+`node --test packages/physics/tests/coupling/swim.test.js` after building Physics. The bed fixture reads the
+actual impulse using an analytic disk stand-in. The anemone fixture uses a contact wrench stand-in for BB-3.
+A rendered shot check remains open for each row in [physics-demo-review.md](physics-demo-review.md).

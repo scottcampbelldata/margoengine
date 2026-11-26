@@ -9977,3 +9977,15 @@ rendering accepts live discharge and historic flood classification can sample de
 solver. The coupling tests close both volume budgets, reproduce the steady rating and ponding solution, verify the
 response to rain and melt, and compare frame rates, snapshots and both Wasm memory modes. The renderer test changes the
 inflow after attaching the view and observes the additional water volume on its real WebGPU river grid.
+
+## Aquatic locomotion evidence (LIFE-03)
+
+The optional swimming SIMD kernel reserves world memory slot 5 in plain and shared builds. It imports only
+the world memory. Its region buffers contain state, commands and published fields. The loader gives each
+solver instance its own stack. Unchanged slots and dynamic memory are checked at build time.
+
+`packages/physics/tests/coupling/swim.test.js` verifies the exact thrust and drag reference models,
+a physical bank, a centreline with conserved transverse mass centroid, pectoral station-keeping, hydrostatic
+ballast and a breach. It exercises the actual SEA-02 surface, actual LIFE-04 intent and kinematics, and
+identical replay across frame rates, snapshots and plain/shared memory. Wake and contact consumers use
+documented stand-ins while production sediment, wake and articulated contacts are still being integrated.

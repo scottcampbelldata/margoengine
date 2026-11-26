@@ -13,13 +13,13 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
 // build:packages builds into dist-next and swaps it in (scripts/support/dist-dir.mjs).
 const dist = distDir(root);
-const exposeSchoolWasmUrl = {
-  name: 'expose-school-wasm-url',
+const exposeOptionalWasmUrl = {
+  name: 'expose-optional-wasm-url',
   renderChunk(code) {
-    if (!code.includes('school-kernel')) return null;
+    if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/school-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -34,7 +34,7 @@ await build({
   configFile: false,
   publicDir: false,
   logLevel: 'warn',
-  plugins: [exposeSchoolWasmUrl],
+  plugins: [exposeOptionalWasmUrl],
   build: {
     outDir: dist,
     emptyOutDir: true,
@@ -55,6 +55,7 @@ await build({
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         celestial: resolve(root, 'src/space/index.ts'),
         schooling: resolve(root, 'src/schooling/index.ts'),
+        life: resolve(root, 'src/life/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
@@ -71,6 +72,8 @@ await build({
 });
 for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
+for (const name of ['swim-kernel.wasm', 'swim-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/life', name), resolve(dist, name));
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],

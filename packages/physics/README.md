@@ -2480,3 +2480,65 @@ console.log(fish.position, fish.velocity, fish.intent);
   `SCHOOL_PREDATORS_FIELD`. Otherwise configured predators move at their initial velocities. All three use
   `SCHOOL_LAYOUT`. Set `cellSize: world.cellSize` with custom-size cells to bring inputs and flow samples into the
   correct local frame. `school.read(row, out?)` copies scalar state and intent into ordinary vectors.
+
+## Aquatic locomotion
+
+`SwimSolver` advances fish, cetaceans, rays and divers as six-degree-of-freedom bodies on the world clock.
+The tail's travelling wave supplies thrust, while water resistance, buoyancy and fin loads determine speed,
+course and bank. Sample the spine to pose a rig and read the pectoral displacement to pose its fins.
+
+```js
+import { SwimSolver } from '@margoengine/physics/life';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const swim = await SwimSolver.load();
+world.add(swim, {
+  bodies: [{
+    position: [0, -2, 0],
+    mass: 12.88,
+    length: 0.75,
+    width: 0.2,
+    height: 0.16,
+    tail: { amplitude: 0.07, span: 0.2, wavelength: 0.85 },
+    frequency: 1.5,
+    fins: { area: 0.025, strokeAmplitude: 0.12, strokeFrequency: 1.5 },
+  }],
+});
+world.advance(60);
+const fish = swim.read(0);
+const tail = swim.sampleSpine(0, 1);
+console.log(fish.position, fish.orientation, tail.position, fish.finDisplacement);
+```
+
+Local axes are +z forward, +y dorsal and +x right. Supply a tail's one-sided excursion, full span
+and wavelength in metres. The default stroke is lateral. Set `plane: 'vertical'` for a fluke.
+`swimPropulsion(tail, frequency, throughSpeed, density?)` reports mean thrust, through-flow power,
+efficiency and the Strouhal number. The density default is 1,025 kg/m³. Geometry supplies ellipsoid
+volume and skin area by default. Use measured `volume`, `buoyancyCentre` or `wettedArea` if available.
+Form drag defaults to a coefficient of 0.1 times the frontal area. Transverse drag coefficients default
+to 1 and use elliptical strips. Axial added mass defaults to zero in the slender-body approximation.
+
+Initial velocity and angular velocity default to zero and orientation to identity. Open-loop `frequency`
+defaults to zero. A `target` can specify a position or a world velocity, optionally relative to the water.
+Feedback chooses the beat frequency and fin forces, bounded by the supplied fins and `maximumFrequency`
+(default at least 3 Hz). `responseSeconds` defaults to 1 s. `burstSeconds` and `coastSeconds` select a
+periodic duty cycle. `setControl(row, { effort, buoyancy, target })` changes the normalized effort, displaced
+volume multiplier or target between advances. The world saves these commands in its snapshots.
+`fins.area` is the combined area. Lift and drag coefficients default to 1. Scull amplitude and frequency
+default to zero. The default fore-aft moment arm is one-quarter body length and the default half-spacing is
+half the body width. Set `steering` to local x/y lift and axial sculling commands from −1 to 1.
+
+Pass a `SeaSurface` as `sea` for orbital flow and free-surface swimming or pass a `SeaWater` as `flow`
+for an all-water domain. Standalone water density defaults to 1,025 kg/m³. Kinematic viscosity defaults to
+1.05e−6 m²/s and the laminar-to-ITTC blend begins at Reynolds number 500,000. Set `cellSize: world.cellSize`
+with a custom-sized world. Swimmers publish `SCHOOL_KINEMATICS_FIELD`; `readSchoolIntent: true` reads the
+matching medium-relative intent. Place both solvers in a staggered coupling group with equal row counts.
+`readContacts: true` reads `SWIM_CONTACT_FIELD`, six f64 words of world force and torque about each body's
+centre of mass per stable row. `SWIM_WAKE_FIELD` writes two layout-1 f64 rows per swimmer in tail/fin order,
+each [x, y, z, impulseX, impulseY, impulseZ, radius, wetFraction]. Wakes describe momentum injected during
+the published step. Use `fields` to name separate ports for different groups.
+
+`SwimSolver.load({ id, level, signal })` accepts a solver id (default `swim`), preferred level (default 0)
+and load cancellation. The world raises the rate to resolve the stroke or angular motion. The entry loads its
+own Wasm on demand and uses either plain or shared world memory.

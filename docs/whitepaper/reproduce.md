@@ -4259,3 +4259,12 @@ Build with `npm run build:packages`. Run
 The coupling tests check both analytic frequencies, energy and phase, gust propagation,
 depth decay, failure and contact-driven body release. Run `node packages/scatter/test/states.browser.mjs` and the same
 command with `--compat` to exercise actual colour and shadow pipelines on the two GPU paths.
+
+### LIFE-03 aquatic locomotion
+
+Build Physics with `node packages/physics/scripts/build.js` after the workspace dependencies are built.
+Run `node --test packages/physics/tests/coupling/swim.test.js` for the closed forms, submerged wave and
+school couplings, wake and contact fixtures and replay. Run
+`node scripts/wasm-blueprints.mjs --rebuild --compare --only=swim-kernel,swim-kernel-shared` with the pinned
+Rust target to reproduce the optional Wasm assets.
+From packages/physics, run node scripts/test-browser.js --swim-only and repeat with --compat to check browser loading and snapshot restoration.

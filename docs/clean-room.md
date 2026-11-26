@@ -12565,3 +12565,57 @@ The numerical implementation uses the repository's pinned scalar arithmetic and 
 The work memory and prognostic quantities belong to the world arena. Tests exercise ponding, steady Manning flow,
 wetness-index saturation, volume closure, flood spread, and deterministic replay. The implementation uses the
 publications and this repository's field contracts.
+
+### Aquatic locomotion (LIFE-03, `@margoengine/physics/life`)
+
+- M. J. Lighthill, [Note on the swimming of slender fish](https://doi.org/10.1017/S0022112060001110) (1960),
+  equations 6–7 and 13–16. Read the trailing-edge momentum and power integrals. For a sinusoidal travelling
+  wave of angular frequency ω and wavenumber k with zero trailing envelope slope, mean thrust is
+  m′a²(ω²−k²U²)/4 and through-flow power is m′Ua²ω(ω−kU)/2, where m′ = πρs²/4 and s is the full span.
+  The operating efficiency is (1+kU/ω)/2 when both flux and useful work are positive. At startup the
+  cycle-mean thrust is extrapolated to zero through-flow. A stopped tail applies no active load.
+- M. S. Triantafyllou, G. S. Triantafyllou and D. K. P. Yue,
+  [Hydrodynamics of Fishlike Swimming](https://doi.org/10.1146/annurev.fluid.32.1.33) (2000), publisher
+  abstract on unsteady foil and vortex wake effects. D. Floryan, T. Van Buren, C. W. Rowley and A. J. Smits,
+  [Scaling the propulsive performance of heaving and pitching foils](https://doi.org/10.1017/jfm.2017.302)
+  (2017), sections 2 and 7 for the role of amplitude and reduced frequency. G. K. Taylor, R. L. Nudds and
+  A. L. R. Thomas, [Flying and swimming animals cruise at a Strouhal number tuned for high power efficiency](https://doi.org/10.1038/nature02000)
+  (2003), for the measured 0.2–0.4 range used in one cruise fixture. The simulation reports St = 2af/U
+  across its domain. It leaves species-dependent gait and speed to the supplied parameters.
+- X. Tu and D. Terzopoulos, [Artificial Fishes: Physics, Locomotion, Perception, Behavior](https://faculty.cc.gatech.edu/~turk/bio_sim/articles/fish_terzopoulos.pdf)
+  (1994), sections 2.2–2.4 for local body and fin control. R. W. Blake,
+  [The mechanics of labriform locomotion I. Labriform locomotion in the angelfish](https://citeseerx.ist.psu.edu/document?doi=fd622a360d0729f55e096ee056a307ceb6341662&repid=rep1&type=pdf)
+  (1979), equation 6 for quadratic blade drag. A feathered recovery leaves a half-wave cos² active and the
+  cycle integral of that factor is 1/4. P. Domenici and R. W. Blake,
+  [The kinematics and performance of fish fast-start swimming](https://www.mbl.ku.dk/JFSteffensen/FHL/Reviewjeb1997.pdf)
+  (1997), for body-scaled but species-specific curvature and manoeuvres.
+- T. I. Fossen and O. E. Fjellstad, [Nonlinear modelling of marine vehicles in 6 degrees of freedom](https://www.fossen.biz/publications/1995%20Fossen%20and%20Fjellstad%20JMMS.pdf)
+  (1995), for Kirchhoff momentum transport and separation of rigid and relative-fluid inertia.
+  [MIT 13.021 hydrodynamics supplement](https://web.mit.edu/13.021/13021_2003/suppnotes/supp03.pdf)
+  (2003), for potential-flow added mass of elliptic cross sections. Integrating an ellipsoid's strips gives
+  transverse geometric mass factors 2πLr²/3, geometric pitch/yaw factors πL³r²/30 and the rolling factor
+  πL(rx²−ry²)²/15. Each is multiplied by local wet density. J. R. Morison, M. P. O'Brien, J. W. Johnson and
+  S. A. Schaaf, [The force exerted by surface waves on piles](https://onemine.org/documents/offshore-operation-the-force-exerted-by-surface-waves-on-piles)
+  (1950), equation 4 for undisturbed fluid inertia plus added mass and drag. Material acceleration comes from
+  the velocity difference along a first-order fluid trajectory. A local wave tangent cuts the ellipsoid at
+  normalized level d. Integrating disk sections gives submerged fraction (2+d)(1+d)²/4 for −1 < d < 1.
+- [ITTC Resistance Test, 7.5-02-02-01](https://www.ittc.info/media/11780/75-02-02-01.pdf), ITTC-1957
+  correlation line 0.075/(log10(Re)−2)², paired with the Blasius flat-plate coefficient 1.328/√Re
+  from [NACA TN 4318](https://ntrs.nasa.gov/api/citations/19930085111/downloads/19930085111.pdf), figure 5.
+  Use the smoothstep blend over the configurable transition range [Re₀, 2Re₀]. Drag is linearly implicit
+  with the previous speed in its coefficient. A coast with constant quadratic coefficient therefore steps
+  the straight-line solution exactly at every tick.
+- D. Floryan, T. Van Buren and A. J. Smits, [Forces and energetics of intermittent swimming](https://arxiv.org/abs/1703.00971)
+  (2017), verified the use of an active/recovery duty cycle. D. Weihs,
+  [Dynamics of dolphin porpoising revisited](https://academic.oup.com/icb/article-pdf/42/5/1071/1878017/i1540-7063-042-05-1071.pdf)
+  (2002), describes the submerged burst, glide and aerial phases and sensitivity to the entry/exit process.
+  Preserve ballistic motion while dry. The simulation resolves partial displacement with tangent-plane
+  immersion. Unsteady wave breaking and entry splash feedback require separate fluid solvers.
+
+The spine's smoothstep amplitude envelope has zero trailing slope. A front-loaded quadratic correction
+cancels the mass-weighted transverse motion of the ellipsoid's spine without changing the tail displacement
+or tail slope. Its coefficient is obtained by integrating the envelope against an elliptical cross section.
+The kernel uses Rust SIMD for vector products and square roots, a unit-quaternion midpoint rotation and
+world-owned f64 rows. Wasm exports the exact opposite of the propulsive and fin impulses to the wake port.
+The kernel and bindings were written from the cited equations. The sampling and memory contract come from
+Margo Engine's own field and solver specifications.

@@ -702,6 +702,22 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'SchoolSolver.load() in a runtime that supports shared world memory',
   },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/swim-kernel.wasm',
+    label: 'swim-kernel.wasm',
+    kind: 'Aquatic locomotion kernel (Rust, SIMD)',
+    measure: 'file',
+    when: '`await SwimSolver.load()` (`@margoengine/physics/life`), on demand',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/swim-kernel-shared.wasm',
+    label: 'swim-kernel-shared.wasm',
+    kind: 'Aquatic locomotion kernel for shared memory (Rust, SIMD)',
+    measure: 'file',
+    when: 'SwimSolver.load() in a runtime that supports shared world memory',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics2d',
