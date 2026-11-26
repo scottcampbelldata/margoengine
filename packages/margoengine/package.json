@@ -4499,6 +4499,10 @@
       "types": "./dist/selection/highlight.d.ts",
       "import": "./dist/selection/highlight.js"
     },
+    "./selection/actions": {
+      "types": "./dist/selection/actions.d.ts",
+      "import": "./dist/selection/actions.js"
+    },
     "./shader": {
       "types": "./dist/shader.d.ts",
       "import": "./dist/shader.js"
