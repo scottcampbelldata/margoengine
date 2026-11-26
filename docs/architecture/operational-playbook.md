@@ -10282,6 +10282,19 @@ black off the stroke, screen and add of two half stamps, 0.95^60 kept after one 
 `trail.test.js` (stamp spacing, speed weight, smoothing, one update a frame, steady frames allocate nothing, the stamp
 cap, validation, device restore). Missing: GPU timings.
 
+## Mesh blending (section 5 evidence, 2026-11-26)
+
+`MeshBlend` (`@margoengine/post/mesh-blend`) is an optional post entry; core and stage unchanged. A frame-graph pass at
+order 20 (after the main pass, before the stack composes) redraws the core meshes at 1x into an `rgba16float` tag
+target and its own `depth32float`, reading each mesh's radius from an `r32float` table by entity id. In the stack's HDR
+chain a key pass resolves each pixel to sky, untagged or a tagged key against the stack's resolved depth, then the
+blend pass searches a golden-angle spiral, bisects to the seam, tests that both sides' slope-carried depths meet and
+mixes in the mirrored colour. Fragment work only, so the WebGL2 layer runs the same shaders. Evidence:
+`packages/post/test/mesh-blend-browser.mjs` on WebGPU and the WebGL2 layer (a tagged box's seam with the ground
+softens into red-green mixes; an untagged box's seam, the sky, the tagged box's pixels next to the sky and its sides in
+front of far ground keep every pixel; untagging restores the frame) and `mesh-blend.test.js` (falloff, depth-slope
+rejection from either side, options and tags). Missing: GPU timings, and glTF and terrain tagging.
+
 ## Contact sound evidence (SOUND-04)
 
 The optional Physics modal kernel converts per-track mechanical excitation to audio-rate sample ranges.
