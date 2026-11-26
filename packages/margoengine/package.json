@@ -3715,6 +3715,10 @@
       "types": "./dist/post/render-graph.d.ts",
       "import": "./dist/post/render-graph.js"
     },
+    "./post/mesh-blend": {
+      "types": "./dist/post/mesh-blend.d.ts",
+      "import": "./dist/post/mesh-blend.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"
