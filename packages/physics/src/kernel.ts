@@ -957,10 +957,11 @@ export interface KernelSolverOptions {
    */
   adaptiveChangeDetectionMargin?: boolean;
   /**
-   * Solve a manifold's two to four normal rows together in one exact block (default false), Rapier's block solver: the loads that meet every
+   * Solve a manifold's two to four normal rows together in one exact block (default true), Rapier's block solver: the loads that meet every
    * contact's conditions at once (none negative, none pulling, the points that press holding the gap shut), found by trying which points
    * are free, at zero or at their cap, in place of sweeping the points one at a time. A manifold no assignment settles to rounding goes
-   * to the sweeps. Friction is still solved a point at a time.
+   * to the sweeps. Friction is still solved a point at a time. False sweeps the points one at a time, which can meet a stop with one point
+   * held and the body turning about it (docs/limits.md).
    */
   blockSolver?: boolean;
   /**

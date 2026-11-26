@@ -97,10 +97,10 @@ fn spawn(w: &mut World, random: &mut Stream, rows: &mut Vec<u32>, hull: f32) {
 }
 
 fn scene() -> Vec<u32> {
-    run(false).0
+    run(true).0
 }
 
-/// The scene with the block solver of the manifolds' normal rows on or off.
+/// The scene with the block solver of the manifolds' normal rows on (the default) or off (the sweeps).
 fn run(block_solver: bool) -> (Vec<u32>, Vec<u32>) {
     run_scene(block_solver, true, true)
 }
@@ -279,14 +279,14 @@ fn native_code_matches_the_wasm_build_bit_for_bit() {
     assert_eq!(hashes.len() as u32, STEPS / EVERY);
     assert_eq!(hashes, fixture());
     // Every word of the world, the order of the step included: moves when that order moves, with the state hash as it was.
-    assert_eq!(run(false).1, list("kernelArena"));
+    assert_eq!(run(true).1, list("kernelArena"));
 }
 
 #[test]
-fn native_code_matches_the_wasm_build_with_the_block_solver_on() {
-    let (state, arena) = run(true);
-    assert_eq!(state, list("kernelBlock"));
-    assert_eq!(arena, list("kernelBlockArena"));
+fn native_code_matches_the_wasm_build_with_the_sweeps() {
+    let (state, arena) = run(false);
+    assert_eq!(state, list("kernelSweeps"));
+    assert_eq!(arena, list("kernelSweepsArena"));
 }
 
 /// The block solve answers every manifold of the scene: the sweeps are never needed (feature `counts`).

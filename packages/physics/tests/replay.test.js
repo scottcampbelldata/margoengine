@@ -24,13 +24,13 @@ test('10,000 steps of the kernel give the hashes on file', () => {
   assert.deepEqual(arena, golden.kernelArena, 'the order the steps solved in');
 });
 
-test('10,000 steps of the kernel with the block solver on give the hashes on file', () => {
+test('10,000 steps of the kernel with the sweeps in place of the block solver give the hashes on file', () => {
   const arena = [];
   assert.deepEqual(
-    kernelScene(KernelWorld, REPLAY_STEPS, () => {}, { blockSolver: true }, arena),
-    golden.kernelBlock,
+    kernelScene(KernelWorld, REPLAY_STEPS, () => {}, { blockSolver: false }, arena),
+    golden.kernelSweeps,
   );
-  assert.deepEqual(arena, golden.kernelBlockArena);
+  assert.deepEqual(arena, golden.kernelSweepsArena);
 });
 
 test('10,000 steps through Physics give the hashes on file', () => {

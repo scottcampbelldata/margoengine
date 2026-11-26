@@ -4,10 +4,10 @@ import { REPLAY_ADAPTIVE_STEPS, kernelScene, physicsScene } from './replay-scene
 
 window.runReplay = async () => {
   await Physics.load();
-  const arena = { kernel: [], kernelBlock: [], physics: [], physicsAdaptive: [] };
+  const arena = { kernel: [], kernelSweeps: [], physics: [], physicsAdaptive: [] };
   return {
     kernel: kernelScene(KernelWorld, undefined, undefined, undefined, arena.kernel),
-    kernelBlock: kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }, arena.kernelBlock),
+    kernelSweeps: kernelScene(KernelWorld, undefined, undefined, { blockSolver: false }, arena.kernelSweeps),
     physics: physicsScene(Physics, undefined, arena.physics),
     physicsAdaptive: physicsScene(Physics, REPLAY_ADAPTIVE_STEPS, arena.physicsAdaptive, true),
     arena,

@@ -304,7 +304,7 @@ impl World {
                 tree_root: NONE,
                 tree_free: NONE,
                 tree_used: 0,
-                block_solver: 0,
+                block_solver: 1,
                 adaptive_substeps: 1,
             });
         }

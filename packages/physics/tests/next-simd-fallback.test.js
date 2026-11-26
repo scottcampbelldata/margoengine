@@ -38,12 +38,12 @@ for (const simd of [false, true]) {
   test(`the replay scenes give the committed hashes in the ${simd ? 'SIMD' : 'scalar'} build`, async () => {
     await loadKernel({ simd });
     assert.equal(Physics.kernelVariant, simd ? 'simd' : 'scalar');
-    const [arena, blockArena, physicsArena] = [[], [], []];
+    const [arena, sweepsArena, physicsArena] = [[], [], []];
     assert.deepEqual(kernelScene(KernelWorld, undefined, undefined, undefined, arena), golden.kernel);
     assert.deepEqual(
-      kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }, blockArena),
-      golden.kernelBlock,
-      'the block solver on',
+      kernelScene(KernelWorld, undefined, undefined, { blockSolver: false }, sweepsArena),
+      golden.kernelSweeps,
+      'the sweeps',
     );
     assert.deepEqual(physicsScene(Physics, undefined, physicsArena), golden.physics);
     const adaptiveArena = [];
@@ -54,8 +54,8 @@ for (const simd of [false, true]) {
     );
     assert.deepEqual(adaptiveArena, golden.physicsAdaptiveArena);
     assert.deepEqual(
-      [arena, blockArena, physicsArena],
-      [golden.kernelArena, golden.kernelBlockArena, golden.physicsArena],
+      [arena, sweepsArena, physicsArena],
+      [golden.kernelArena, golden.kernelSweepsArena, golden.physicsArena],
     );
     assert.equal(golden.steps, REPLAY_STEPS);
   });

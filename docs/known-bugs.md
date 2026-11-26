@@ -16095,21 +16095,28 @@ Fixed with KB-PHYS-PILECREEP1, whose cause it shared: the top of the 30-row slab
 now get the stiffness its structures need not to tip, at a finer level of substeps where a quarter of the substep rate is not
 enough (`kernel/src/tilt.rs`). With the block solver the 30-row pile holds at 4.2e-4 to 4.3e-4 m/s from 30 to 90 s (150 m/s at 90 s
 before). Regression: `packages/physics/kernel/tests/solver.rs` `the_block_solver_holds_a_pile_of_thirty_rows_still_for_ninety_seconds`.
-The block solver's default is still off; turning it on is the next change, with KB-PHYS-SPEC1.
+The block solver is the default since 2026-11-25, with KB-PHYS-SPEC1.
 
-## KB-PHYS-SPEC1: the sweeps throw a cube that a wall stops at 6 m/s 0.115 m up, at 8 substeps and 2 passes
+## KB-PHYS-SPEC1 (fixed 2026-11-25): the sweeps threw a cube that a wall stops at 6 m/s 0.115 m up, at 8 substeps and 2 passes
 
 `packages/physics/kernel/tests/voxel.rs`, `a_cube_stopped_by_a_wall_over_the_seam_of_two_grids_is_not_thrown_by_the_cell_under_the_wall`:
 a frictionless 0.4 m cube slid at 6 m/s into a one-block wall, with the kernel's defaults (8 substeps, 2 passes) and the sweeps,
-rises 0.115 m and spins at 6.8 rad/s after the stop (2 passes: 0.115 m; 4 passes: 0.22; 1 pass: 0.0005; the block solve:
-0.0005). Cause: the wall's points are speculative rows when the stop begins (the face is still 0.1 m off), and a speculative
-row only bounds a point's approach by its gap over the substep. Points solved one after another can meet that bound with one
-point stopped and the cube turning about it, an equally valid answer of the same inequalities, and more passes settle on it
-more firmly. The exact block solve of each manifold (`blockSolver`) gives the stop to all the points at once. Fixed by the
-block solver's default, which waits on KB-PHYS-BLOCK1; the test bounds the sweeps at 0.2 m until then. (The 2.2 cm sink that
-was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to its open bottom.)
+rose 0.115 m and spun at 6.8 rad/s after the stop (2 passes: 0.115 m; 4 passes: 0.22; 1 pass: 0.0005). Cause: the wall's points
+are speculative rows when the stop begins (the face is still 0.1 m off), and a speculative row only bounds a point's approach by
+its gap over the substep. Points solved one after another can meet that bound with one point stopped and the cube turning about
+it, an equally valid answer of the same inequalities, and more passes settle on it more firmly. The exact block solve of each
+manifold gives the stop to all the points at once. Fixed by making `blockSolver` the default (3D `Physics` and `KernelWorld`),
+once KB-PHYS-BLOCK1 was fixed: the cube now stops at the wall face and never stands above its rest height (0.39979 m, a slop
+deep) once its 2 mm starting drop has landed, the physical bound for a level, frictionless stop. The test's bound on the throw,
+loosened to 0.2 m while the sweeps were the default, is restored to that 0 m. `blockSolver: false` still sweeps, and still throws
+this cube 0.115 m: that is the method's own ambiguity, recorded as an accepted difference of the option in `docs/limits.md`.
+(The 2.2 cm sink that was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to
+its open bottom.)
 
-
+The flip needed two fixes first: the joint webs' energy ledger read web seed 17's kinematic work as a gain with the block
+solver (KB-PHYS-LEDGER1), and a voxel debris piece on a block's edge rocked without end with it (KB-PHYS-EDGEHOLD1). All 60
+web seeds gain nothing with either solver; web seed 23, which spiked through joint 19 with the block solver before
+a4a479f17, stays in its bounds.
 
 ## Open: a time-zero coupled snapshot predates its accumulator sum region (BIO-01)
 

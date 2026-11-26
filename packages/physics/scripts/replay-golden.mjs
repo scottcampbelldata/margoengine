@@ -8,12 +8,12 @@ import { REPLAY_ADAPTIVE_STEPS, REPLAY_EVERY, REPLAY_STEPS, kernelScene, physics
 await Physics.load();
 const folder = new URL('../tests/fixtures/', import.meta.url);
 mkdirSync(folder, { recursive: true });
-const [kernelArena, kernelBlockArena, physicsArena, physicsAdaptiveArena] = [[], [], [], []];
-// The state hashes (`kernel`, `kernelBlock`, `physics`) leave out the order a step solved in; the arena hashes see every word
+const [kernelArena, kernelSweepsArena, physicsArena, physicsAdaptiveArena] = [[], [], [], []];
+// The state hashes (`kernel`, `kernelSweeps`, `physics`) leave out the order a step solved in; the arena hashes see every word
 // of the world, so they move when that order does. A change that only reorders independent work moves the arena lists and
 // leaves the state ones as they were.
 const kernel = kernelScene(KernelWorld, undefined, undefined, undefined, kernelArena);
-const kernelBlock = kernelScene(KernelWorld, undefined, undefined, { blockSolver: true }, kernelBlockArena);
+const kernelSweeps = kernelScene(KernelWorld, undefined, undefined, { blockSolver: false }, kernelSweepsArena);
 const physics = physicsScene(Physics, undefined, physicsArena);
 const physicsAdaptive = physicsScene(Physics, REPLAY_ADAPTIVE_STEPS, physicsAdaptiveArena, true);
 writeFileSync(
@@ -24,11 +24,11 @@ writeFileSync(
       steps: REPLAY_STEPS,
       every: REPLAY_EVERY,
       kernel,
-      kernelBlock,
+      kernelSweeps,
       physics,
       physicsAdaptive,
       kernelArena,
-      kernelBlockArena,
+      kernelSweepsArena,
       physicsArena,
       physicsAdaptiveArena,
     },

@@ -33,7 +33,9 @@ function reversed(animation, clip, name) {
  * or backward along where it faces, sliding away from the character's root as it falls. How it lands is chaotic, so each push
  * used here lands the same way for every push within 4 of it on the solver as it stands: backward 30 does, from 26 to 34, by
  * at least 2.05 rad between the two clips' fits, straight or turned. Backward 40 did not: one kernel turned it onto its side
- * at 40 and 44 (0.74 rad against 2.11), the one before at 37.
+ * at 40 and 44 (0.74 rad against 2.11), the one before at 37. Forward 40 sat on the edge between face down and face up with
+ * the sweeps; with the block solver the edge is at 41 (32 to 40 land face down, 42 to 48 face up), and 40 lands half on its
+ * side, where neither clip fits within 1 rad (1.08). Forward 36 lands face down for every push from 32 to 40.
  */
 async function fallen(push, { yaw = 0, ...options } = {}) {
   const rig = await realRig(GENERAL, {
@@ -106,8 +108,9 @@ const steps = (path) => path.slice(1).map((p, i) => distance(p, path[i]));
 // Regression: with a linear fade the weight stopped dead on the blend's last frame (d2w = 1/24 there) and the head's step changed
 // by the pose gap over 24, 2.8 cm at push 40; the eased fade has d2w of at most 6/24^2 and no stop. The positions are f32, so the
 // bound carries their rounding too. Every push is checked: how
-// a limp body lands is chaotic (forward pushes of 20 land it face down, 60 and 80 face up, 40 is the edge), and no landing may pop.
-for (const push of [-30, 20, 40, 60, 80])
+// a limp body lands is chaotic (forward pushes of 20 and 36 land it face down, 60 and 80 face up, and the edge between is at 41),
+// and no landing may pop.
+for (const push of [-30, 20, 36, 60, 80])
   rtest(
     `pushed by ${push}: the character comes to the body, and the bones blend into the clip with no pop`,
     async () => {

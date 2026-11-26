@@ -72,7 +72,7 @@ class Stream {
  * and substeps, and lets islands sleep and wakes them.
  * @param visit Called after each step with the world and the step's number.
  * @param arena An array that gets the hash of every word of the world, scratch included, each time the state hash is taken.
- * @param solver Solver settings given to the world before the first step, for a scene run another way (`{blockSolver: true}`).
+ * @param solver Solver settings given to the world before the first step, for a scene run another way (`{blockSolver: false}`).
  */
 export function kernelScene(KernelWorld, steps = REPLAY_STEPS, visit = () => {}, solver = undefined, arena = []) {
   const random = new Stream(0x4d415247),
