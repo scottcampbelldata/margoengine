@@ -37,10 +37,11 @@ import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../worl
 import { courseLoad, courseSpeedLimit, courseWords, type HullCourse } from './course.js';
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
+import { courseWaveCorrection } from './excitation.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
-import { type HullMemory, hullMemory, stillWaterline } from './memory.js';
+import { buildHullMemory, type HullMemory, type HullWaveMemory, stillWaterline } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
@@ -211,7 +212,7 @@ export class HullSolver implements Solver<HullParams> {
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
   private carry: Region | null = null;
-  private readonly memories = new Map<Hull, HullMemory>();
+  private readonly memories = new Map<Hull, HullWaveMemory>();
   private rollDamping = true;
   private viscosity = SEA_VISCOSITY;
   /** Per hull: its eddy coefficient, its linear (friction) roll damping and its roll inertia with the water it carries. */
@@ -220,6 +221,7 @@ export class HullSolver implements Solver<HullParams> {
   /** Per hull: its drift coefficient (N per m of hull and square metre of wave amplitude, summed along it) by frequency. */
   private readonly drifts = new Map<Hull, { frequencies: Float64Array; coefficient: Float64Array }>();
   private waves32 = new Float32Array(0);
+  private courseWaveScratch = new Float64Array(0);
   private greenWater = true;
   private slamming = true;
   private drag = true;
@@ -543,7 +545,7 @@ export class HullSolver implements Solver<HullParams> {
         crush.region.layout !== CRUSH_LAYOUT ||
         crush.region.byteLength % (CRUSH_WORDS * Float64Array.BYTES_PER_ELEMENT) !== 0)
     )
-      throw new MargoError('state', 'Connect the hull to the layout-1 f64 CrushSolver damage port.');
+      throw new MargoError('state', 'Use the layout-1 f64 CrushSolver damage port to connect the hull.');
     const damage = crush && (regionWords(crush.region.memory ?? host.memory, crush.region) as Float64Array);
     if (damage && this.lastCrushPatch * CRUSH_WORDS >= damage.length)
       throw new MargoError('state', 'Choose a hull opening crushPatch within the connected damage port.');
@@ -681,14 +683,15 @@ export class HullSolver implements Solver<HullParams> {
   }
 
   /** The hull's radiation memory at its still-water draft, made at its first step (from its mesh and mass alone). */
-  private memoryOf(hull: Hull, bodies: Float32Array, at: number, local: Vec3, dt: number): HullMemory | null {
+  private memoryOf(hull: Hull, bodies: Float32Array, at: number, local: Vec3, dt: number): HullWaveMemory | null {
     const inverseMass = bodies[at + 16]!;
     if (!(inverseMass > 0)) return null;
     let memory = this.memories.get(hull);
     if (!memory) {
-      memory = hullMemory(hull.mesh, 1 / inverseMass, local, this.sea!.density ?? SEA_WATER, dt, {
+      memory = buildHullMemory(hull.mesh, 1 / inverseMass, local, this.sea!.density ?? SEA_WATER, dt, {
         stations: this.stations,
         window: Math.max(1, this.lags) * dt,
+        waveResponse: this.diffraction && Boolean(hull.course && this.wavesOf()),
       });
       this.memories.set(hull, memory);
     }
@@ -772,6 +775,36 @@ export class HullSolver implements Solver<HullParams> {
       body[3]! += m4;
       body[4]! -= strip.x * f2;
     });
+    const sea = this.wavesOf();
+    const course = this.course[index];
+    if (course && sea && memory.waveResponses) {
+      const forward = rotate(q, [1, 0, 0]);
+      const vx = bodies[at + 10]!;
+      const vz = bodies[at + 12]!;
+      const horizontal = hypot(forward[0], forward[2]);
+      const speed = course.speed ?? (horizontal > 0 ? (vx * forward[0] + vz * forward[2]) / horizontal : 0);
+      if (speed !== 0) {
+        if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
+        const count = sea.waveComponents(t, this.waves32);
+        if (this.courseWaveScratch.length < 3 * memory.stripForms.length)
+          this.courseWaveScratch = new Float64Array(3 * memory.stripForms.length);
+        const [force, moment] = courseWaveCorrection(
+          memory,
+          this.waves32,
+          count,
+          sea.stillDepth ?? Infinity,
+          -this.gravity[1],
+          centre,
+          forward,
+          vx,
+          vz,
+          speed,
+          this.courseWaveScratch,
+        );
+        body[1]! += force;
+        body[5]! += moment;
+      }
+    }
     const f = rotate(q, [body[0]!, body[1]!, body[2]!]),
       m = rotate(q, [body[3]!, body[4]!, body[5]!]);
     for (let k = 0; k < 3; k++) {

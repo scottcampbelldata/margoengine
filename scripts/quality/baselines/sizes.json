@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20600082,
+  "total": 20601975,
   "history": [
     {
       "date": "2026-10-24",
@@ -13729,6 +13729,12 @@
       "commit": "react clustered lights",
       "grew": 1,
       "reason": "react/clustered (new entry) measured 1,675 B, ceiling 1,931: PointLight, SpotLight and RectAreaLight over @margoengine/clustered and its /area entry, both loaded lazily, sharing one Clustered per Canvas or Scene. Its own entry, so no other entry grows."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "0ee0b54faa",
+      "grew": 1,
+      "reason": "SEA-08 incident-wave encounter correction grows seakeeping from 26195 to 27343 B gzip. It reuses the existing section solves and retains the live water convolution. A split would duplicate strip tables or add a second hull load connection. Core plus Stage remains 24846 B."
     }
   ],
   "items": {
@@ -14591,7 +14597,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8539,
-    "@margoengine/physics/seakeeping": 26271,
+    "@margoengine/physics/seakeeping": 28164,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,

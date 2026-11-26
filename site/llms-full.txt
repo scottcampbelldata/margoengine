@@ -14178,7 +14178,13 @@ This is mean progressive folding work for that tube and loading range. Initial p
 oscillations, global buckling and material rate dependence need higher-fidelity constitutive and geometry
 models. The same envelope transfers work to the tube in a separately tested rigid-sled simulation.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 11590 B minified and 5102 B gzip under its 5354 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
+The Smith-method section balances plate and stiffener axial forces and evaluates the moment at an imposed
+curvature. It follows authored load-shortening curves and needs the prior reference strain to select among
+multiple stable branches. It reports 153.6 MN·m² for the independently measured N200 box-girder elastic
+reloading case, with an observed 140–160 MN·m² band. The section uses a sectional constitutive envelope.
+Computed shell buckling curves, cyclic unloading and dynamic hull deformation remain open.
+
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 14450 B minified and 6094 B gzip under its 6350 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14199,10 +14205,15 @@ The optional `wetting` model gives the film a finite equilibrium contact angle b
 Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
-water balance. Measured spreading and contact-angle hysteresis remain open.
+water balance. Measured spreading remains open.
 The optional backing angle map adds one f64 value per film cell. Its pressure and
 implicit stiffness both vary by cell, and the exact two-cell check covers conservative
 motion toward the more wettable side and snapshot replay.
+The optional advancing and receding angles add a rate-independent resistance on the
+resolved precursor. It uses seven f64 scratch values per cell. The residual ceiling is
+512 iterations per wetting substep. Evidence covers a two-cell force balance, both
+directions on a 32 × 32 tilted film, and deterministic replay. Independent measured
+sliding and cases with a steep contact slope remain open.
 An explicitly placed, wetted circular rim can collect a single boundary cell's discharge and
 release timed droplets. Its quasistatic size uses Mori (1990) with a 0–1.4 diameter-to-ideal-volume
 scale ratio and negligible gas density. The 3.2 mm, 1 mL/min water control predicts 50.17 μL
@@ -14217,7 +14228,7 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 8,878 B gzip with a 8,928 B ceiling. Both Wasm assets are 10,119 B raw and each is 4,363 B gzip.
+The optional thin-film entry is 9,159 B gzip with a 9,434 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
@@ -14839,6 +14850,12 @@ The forward-roll seakeeping entry is 25,505 B gzip with a 26,271 B ceiling. Core
 ## React local lights and shading materials (react/clustered, react/textures, 2026-11-26)
 
 `<PointLight>`, `<SpotLight>` and `<RectAreaLight>` (`@margoengine/react/clustered`) share one `Clustered` lighting per Canvas or `<Scene>`, so they take its limits: up to 1,024 point and spot lights and 64 rect area lights (the `Clustered` and `AreaLights` defaults; the components do not expose `maxLights`, the grid or local shadows), WebGPU only (the WebGL2 compatibility layer draws without them). One invalid light (a negative intensity, say) makes the whole list fail and reaches the `onError` of every light component in that Canvas, because the engine validates the list as one. A named `<Scene>`'s lights light that scene's core meshes; the Canvas's glTF and material meshes take only the Canvas's lights, as with `<Environment>`. The shading material components (`<UnlitMaterial>`, `<LambertMaterial>`, `<PhongMaterial>`, `<ToonMaterial>`, `<NormalMaterial>`, `<MatcapMaterial>`, `<DepthMaterial>`) are `TextureMaterial` with the class's `shading`: any option change rebuilds the material mesh, and the mesh needs UV geometry.
+
+### Incident waves on a forward course
+
+The ordinary-strip vertical excitation correction on `Hull.course` uses a `SpectralSea` wavelength, phase and amplitude for each wave. The world-space ship velocity gives the encounter frequency. The water-relative course controls the longitudinal added-mass term. The heave and pitch correction is added to the existing velocity-field convolution, including wake and current. Under very small encounter frequencies the finite-history static mass and continuous odd damping ratio replace the unresolved deep-water singularity. Two 56-value f64 arrays and one static mass value are retained per distinct section at the defaults. The section masses come from deep-water Lewis forms. The orbital wave input follows the specified depth. A free three-dimensional hull and a tank require additional measured qualification.
+
+The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Core and Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

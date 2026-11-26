@@ -1,4 +1,4 @@
-import type { HullMemory } from './memory.js';
+import { type HullMemory, staticAddedMass } from './memory.js';
 
 /** A near-steady course for forward-speed heave, pitch and viscous roll loads. */
 export interface HullCourse {
@@ -29,9 +29,7 @@ export function courseSpeedLimit(memory: HullMemory, diagonal: Float64Array, den
   }
   if (area === 0) return 0;
   const stiffness = density * gravity * (second - (first * first) / area + arm);
-  let mass = memory.heaveInfinite;
-  // A33(0) is A∞33 minus the first time moment of the finite radiation kernel.
-  for (let i = 1; i < diagonal.length; i++) mass -= diagonal[i]! * i * memory.dt * memory.dt;
+  const mass = staticAddedMass(memory.heaveInfinite, diagonal, memory.dt);
   if (stiffness <= 0) return 0;
   return mass > 0 ? Math.sqrt(stiffness / mass) : Infinity;
 }

@@ -10754,3 +10754,7 @@ An opted-in `HullSolver` writes signed waterplane volume at the same world rate 
 ### SEA-08 forward-speed viscous roll
 
 `HullSolver` caches a bare hull's geometry-dependent forward roll coefficients from the same still-water stations as radiation. It uses the course's water-relative longitudinal speed in the lift, friction, and eddy terms before folding them through the existing angular impulse. The analytical torque comparison checks inferred speed and an explicit current-relative override. The production browser fixture checks the moving course hull and deformed wake on both backends.
+
+### SEA-08 encounter-frequency incident forcing
+
+The correction to heave and pitch is computed from the spectral components while the old strip convolution continues to read the live water field. Each distinct section form retains the frequency-domain heave mass and damping only when a forward course and spectral diffraction are in use. A tapered-hull beam-wave control isolates the mass gradient. Head and following waves check the signed encounter terms, and a live wake at depth checks that the correction does not replace the water signal.

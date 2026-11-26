@@ -89,6 +89,16 @@ export interface HullMemory {
   readonly stripForms: readonly DiffractionForm[];
 }
 
+interface WaveResponse {
+  readonly added: Float64Array;
+  readonly damping: Float64Array;
+  readonly staticMass: number;
+}
+
+export interface HullWaveMemory extends HullMemory {
+  readonly waveResponses?: readonly WaveResponse[];
+}
+
 /** The still-water waterline in the body's frame at which `mesh` (upright) displaces `mass` of water of `density`. */
 export function stillWaterline(mesh: HullMesh, mass: number, density: number): number {
   const { vertices } = mesh;
@@ -126,6 +136,7 @@ export function stillWaterline(mesh: HullMesh, mass: number, density: number): n
 
 /** A section's coefficients at one frequency: heave damping, sway, roll and sway-roll damping (b42 the roll moment of a sway). */
 interface SectionDamping {
+  readonly a33: number;
   readonly b33: number;
   readonly b22: number;
   readonly b44: number;
@@ -145,6 +156,17 @@ export function hullMemory(
   dt: number,
   { stations = 24, count = 56, window = 20 } = {},
 ): HullMemory {
+  return buildHullMemory(mesh, mass, centre, density, dt, { stations, count, window });
+}
+
+export function buildHullMemory(
+  mesh: HullMesh,
+  mass: number,
+  centre: readonly [number, number, number],
+  density: number,
+  dt: number,
+  { stations = 24, count = 56, window = 20, waveResponse = false } = {},
+): HullWaveMemory {
   const waterline = stillWaterline(mesh, mass, density),
     sections = hullSections(mesh, waterline, stations).filter((s) => s.breadth > 0 && s.draft > 0),
     // The centre of mass's depth under the waterline (the sections' y runs down): the roll is about it.
@@ -187,8 +209,10 @@ export function hullMemory(
     const list: SectionDamping[] = [];
     for (const w of frequencies) {
       const lateral = lateralSection(form, w, density, pivot, GRAVITY);
+      const heave = heaveSection(form, w, density, GRAVITY);
       list.push({
-        b33: heaveSection(form, w, density, GRAVITY).damping,
+        a33: heave.addedMass,
+        b33: heave.damping,
         b22: lateral.sway.damping,
         b44: lateral.roll.damping,
         b24: lateral.swayOfRoll.damping,
@@ -263,6 +287,7 @@ export function hullMemory(
   // The diffraction loads' sections and their forms, each form's kernels taken once.
   const formIndex = new Map<string, number>(),
     stripForms: DiffractionForm[] = [],
+    waveResponses: WaveResponse[] | undefined = waveResponse ? [] : undefined,
     strips: DiffractionStrip[] = sections.map((s, k) => {
       const form = forms[k]!,
         id = key(form);
@@ -273,16 +298,24 @@ export function hullMemory(
           table = (of: (d: SectionDamping) => number) => kernelOf(frequencies, Float64Array.from(list, of), dt, window);
         index = stripForms.length;
         formIndex.set(id, index);
+        const a33 = heaveAddedMassInfinite(s.breadth, form, density);
+        const k33 = table((d) => d.b33);
         stripForms.push({
           lewis: form,
           breadth: s.breadth,
-          a33: heaveAddedMassInfinite(s.breadth, form, density),
+          a33,
           a22,
           a24,
-          k33: table((d) => d.b33),
+          k33,
           k22: table((d) => d.b22),
           k24: table((d) => (d.b24 + d.b42) / 2),
         });
+        if (waveResponses)
+          waveResponses.push({
+            added: Float64Array.from(list, (d) => d.a33),
+            damping: Float64Array.from(list, (d) => d.b33),
+            staticMass: staticAddedMass(a33, k33, dt),
+          });
       }
       return {
         x: s.x - centre[0],
@@ -304,7 +337,15 @@ export function hullMemory(
     pivot,
     strips,
     stripForms,
+    ...(waveResponses ? { waveResponses } : {}),
   };
+}
+
+/** A(0) is the infinite-frequency mass less the first time moment of the finite radiation kernel. */
+export function staticAddedMass(infinite: number, kernel: Float64Array, dt: number): number {
+  let mass = infinite;
+  for (let lag = 1; lag < kernel.length; lag++) mass -= kernel[lag]! * lag * dt * dt;
+  return mass;
 }
 
 /**

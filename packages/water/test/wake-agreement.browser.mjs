@@ -19,11 +19,13 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
-const motion = process.argv.includes('--forward-course')
-  ? 'course'
-  : process.argv.includes('--hull-motion')
-    ? 'hull'
-    : 'pressure';
+const motion = process.argv.includes('--incident-spectrum')
+  ? 'incident'
+  : process.argv.includes('--forward-course')
+    ? 'course'
+    : process.argv.includes('--hull-motion')
+      ? 'hull'
+      : 'pressure';
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
 const { page, hardware } = browser,
   errors = [];
@@ -35,7 +37,8 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
   const result = await page.evaluate(async (motion) => {
     const hullMotion = motion !== 'pressure';
-    const forwardCourse = motion === 'course';
+    const incident = motion === 'incident';
+    const forwardCourse = incident || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { WaterWake } = await import('/packages/water/dist/wake.js');
@@ -71,6 +74,9 @@ try {
       await Physics.load();
       const hull = new HullSolver('hull', { minimumRadius: 0.35 });
       wake = new WakeSolver('wake', hull.wakeSourceField);
+      const loadSea = incident
+        ? new SpectralSea({ waves: spectrum, seed: 5, patches: [wake] })
+        : { elevation: () => 0 };
       const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
       const body = physics.addBody(null, {
         position: [0, 0.25, 0],
@@ -90,11 +96,12 @@ try {
         .add(new RigidSolver(), { physics })
         .add(hull, {
           hulls: [{ row: body.row, mesh, course: forwardCourse ? { speed: 1 } : undefined }],
-          sea: { elevation: () => 0 },
+          sea: loadSea,
+          drift: false,
           greenWater: false,
           slamming: false,
         })
-        .add(wake, { cells: [96, 96], cellSize: 0.25, depth: 3, sponge: 4 })
+        .add(wake, { cells: [96, 96], cellSize: 0.25, depth: 3, sponge: 4, waterBelow: incident })
         .couple(['hull', 'wake', 'rigid'], 'staggered');
       world.advance(15);
       const snapshot = world.takeSnapshot();

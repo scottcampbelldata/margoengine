@@ -13,6 +13,7 @@ import {
   HULL_BREACHES_FIELD,
   HullSolver,
   heaveSection,
+  heaveAddedMassInfinite,
   lateralSection,
   lewisForm,
   SEA_WATER,
@@ -939,7 +940,7 @@ test("HullSolver: on a SpectralSea's long swell, a box rides up and down as its 
 });
 
 /** A SpectralSea of one wave of amplitude `a` and angular frequency near `w` along x (the spectrum's bin nearest), deep. */
-function oneWave(a, w, seed = 3, direction = 0) {
+function oneWave(a, w, seed = 3, direction = 0, patches) {
   const nf = 34,
     nd = 24,
     lo = Math.log(0.04),
@@ -955,9 +956,175 @@ function oneWave(a, w, seed = 3, direction = 0) {
   return new SpectralSea({
     waves: { frequencies, directions, energy, depth: Infinity, density: SEA_WATER },
     seed,
+    patches,
     gravity: GRAVITY,
   });
 }
+
+test('HullSolver forward encounter correction follows incident strip loads in head and following waves', () => {
+  const [length, depth, beam, draft] = [4, 0.5, 0.7, 0.25];
+  const mass = SEA_WATER * length * beam * draft;
+  const mesh = boxMesh([length, depth, beam]);
+  const form = lewisForm(beam, draft, beam * draft);
+  const omega = 3;
+  const phaseSpeed = GRAVITY / omega;
+  const speed = 1;
+  const dt = 1 / 60;
+  const inertia = (mass * (length ** 2 + depth ** 2)) / 12;
+  const infinite = heaveAddedMassInfinite(beam, form, SEA_WATER);
+  const run = (sea, speed, hullMesh = mesh, wake) => {
+    using physics = new Physics(null, { fixedTimestep: dt, substeps: 1 });
+    const body = physics.addBody(null, {
+      linearVelocity: [speed, 0, 0],
+      enabledTranslations: [true, false, false],
+      lockRotations: true,
+      colliders: { shape: 'box', halfExtents: [length / 2, depth / 2, beam / 2], mass },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+    if (wake)
+      world.add(wake, {
+        cells: [32, 32],
+        cellSize: 0.25,
+        depth: 3,
+        sponge: 0,
+        waterBelow: true,
+        initial: (x) => [0, 0.02 * Math.sin((Math.PI * x) / 2)],
+      });
+    world
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh: hullMesh, course: { speed } }],
+        sea,
+        drift: false,
+        greenWater: false,
+        slamming: false,
+        drag: false,
+      })
+      .couple(wake ? ['wake', 'hull', 'rigid'] : ['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    const forces = new Float64Array(world.memory.buffer, region.byteOffset, region.byteLength / 8);
+    return [forces[body.row * FORCE_WORDS + 1], forces[body.row * FORCE_WORDS + 5]];
+  };
+  const waterOnly = (sea) => ({
+    elevation: sea.elevation.bind(sea),
+    pressure: sea.pressure.bind(sea),
+    water: sea.water,
+    density: sea.density,
+    cell: sea.cell,
+  });
+  const difference = (sea, speed, hullMesh) => {
+    const a = run(sea, speed, hullMesh);
+    const b = run(waterOnly(sea), speed, hullMesh);
+    return [a[0] - b[0], a[1] - b[1]];
+  };
+  for (const heading of [0, 12]) {
+    const sea = oneWave(0.05, omega, 3, heading);
+    const rows = new Float32Array(4);
+    assert.equal(sea.waveComponents(dt / 2, rows), 1);
+    const [kx, kz, amplitude, phase] = rows;
+    const k = Math.hypot(kx, kz);
+    const ground = Math.sqrt(GRAVITY * k);
+    const encounter = ground - kx * speed;
+    const section = heaveSection(form, Math.abs(encounter), SEA_WATER, GRAVITY);
+    const damping = section.damping * (ground / encounter - 1);
+    const massTerm = (section.addedMass - infinite) * (ground - encounter);
+    const orbital = amplitude * ground * Math.exp(-k * draft);
+    const span = (2 * Math.sin((kx * length) / 2)) / kx;
+    const first = (2 * Math.sin((kx * length) / 2) - kx * length * Math.cos((kx * length) / 2)) / (kx * kx);
+    const force = orbital * span * (damping * Math.sin(phase) - massTerm * Math.cos(phase));
+    const moment = orbital * first * (damping * Math.cos(phase) + massTerm * Math.sin(phase));
+    const expected = [
+      (force * mass) / (mass + infinite * length),
+      (moment * inertia) / (inertia + (infinite * length ** 3) / 12),
+    ];
+    const actual = difference(sea, speed);
+    for (let axis = 0; axis < 2; axis++)
+      assert.ok(
+        Math.abs(actual[axis] - expected[axis]) <= 0.025 * Math.abs(expected[axis]),
+        JSON.stringify({ heading, encounter, actual, expected }),
+      );
+  }
+  // A beam wave has no encounter shift on this course. Its correction is the integrated mass gradient alone.
+  const taper = 0.28;
+  const shape = {
+    ...mesh,
+    vertices: Float64Array.from(mesh.vertices, (value, i) =>
+      i % 3 === 2 ? value * (1 + (taper * 2 * mesh.vertices[i - 2]) / length) : value,
+    ),
+  };
+  const beamSea = oneWave(0.05, omega, 3, 6);
+  const rows = new Float32Array(4);
+  beamSea.waveComponents(dt / 2, rows);
+  const waveNumber = Math.hypot(rows[0], rows[1]);
+  const frequency = Math.sqrt(GRAVITY * waveNumber);
+  const velocity = rows[2] * frequency * Math.exp(-waveNumber * draft) * Math.sin(rows[3]);
+  const sectionOf = (x) => {
+    const b = beam * (1 + (2 * taper * x) / length);
+    const f = lewisForm(b, draft, b * draft);
+    return {
+      mass: heaveSection(f, frequency, SEA_WATER, GRAVITY).addedMass,
+      infinite: heaveAddedMassInfinite(b, f, SEA_WATER),
+    };
+  };
+  const first = sectionOf(-length / 2).mass;
+  const last = sectionOf(length / 2).mass;
+  const slices = 100;
+  const ds = length / slices;
+  let massIntegral = 0;
+  let a00 = 0;
+  let a01 = 0;
+  let a11 = 0;
+  for (let i = 0; i < slices; i++) {
+    const x = -length / 2 + (i + 0.5) * ds;
+    const a = sectionOf(x);
+    massIntegral += ds * a.mass;
+    a00 += ds * a.infinite;
+    a01 += ds * a.infinite * x;
+    a11 += ds * a.infinite * x * x;
+  }
+  const force = -speed * velocity * (last - first);
+  const moment = -speed * velocity * ((length / 2) * (first + last) - massIntegral);
+  const determinant = (mass + a00) * (inertia + a11) - a01 * a01;
+  const expected = [
+    (mass * ((inertia + a11) * force - a01 * moment)) / determinant,
+    (inertia * ((mass + a00) * moment - a01 * force)) / determinant,
+  ];
+  const actual = difference(beamSea, speed, shape);
+  for (let axis = 0; axis < 2; axis++)
+    assert.ok(
+      Math.abs(actual[axis] - expected[axis]) <= 0.035 * Math.abs(expected[axis]),
+      JSON.stringify({ label: 'spatial gradient in beam waves', actual, expected }),
+    );
+
+  const matched = oneWave(0.05, 5, 3, 0);
+  const c = (phaseSpeed * omega) / 5;
+  const near = [c - 1e-4, c, c + 1e-4].map((u) => difference(matched, u));
+  assert.ok(near.flat().every(Number.isFinite));
+  assert.ok(
+    near[0].every((load, axis) => Math.abs(load - near[2][axis]) < 0.005 * Math.abs(near[1][axis])),
+    JSON.stringify(near),
+  );
+
+  // The incident spectral correction is additive to the original live subsurface WakeSolver flow.
+  const patch = (spectral) => {
+    const wake = new WakeSolver();
+    const sea = oneWave(0.05, omega, 3, 0, [wake]);
+    return run(spectral ? sea : waterOnly(sea), speed, mesh, wake);
+  };
+  const base = oneWave(0.05, omega, 3, 0);
+  const unpatched = run(waterOnly(base), speed);
+  const observed = patch(false);
+  assert.ok(
+    Math.hypot(observed[0] - unpatched[0], observed[1] - unpatched[1]) > 0.01,
+    JSON.stringify({ label: 'live subsurface wake motion', observed, unpatched }),
+  );
+  const patched = patch(true);
+  const unpatchedCorrection = difference(base, speed);
+  for (let axis = 0; axis < 2; axis++)
+    assert.ok(Math.abs(patched[axis] - observed[axis] - unpatchedCorrection[axis]) < 1e-9);
+});
 
 test('HullSolver forward-course deck contact agrees with a rotating-plane Coulomb calculation', async () => {
   await Physics.load({ threads: true });

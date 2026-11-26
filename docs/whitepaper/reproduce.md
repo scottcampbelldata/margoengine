@@ -4520,3 +4520,7 @@ Build Physics and run `node --test --test-name-pattern "forward speed roll" pack
 ### SEA-08 cabin props on the floating rigid deck
 
 Build Physics and run `node --test --test-name-pattern "forward-course deck contact" packages/physics/tests/coupling/seakeeping.test.js`. The fixed-friction props start in contact at equal travel speed. The solver alone supplies the hull's water loads. The reference reads only the deck motion and integrates the predicted slip in its rotating frame, with calm-water and higher-friction controls and exact replay.
+
+### SEA-08 forward incident-wave loads
+
+Build Physics and run `node --test --test-name-pattern "forward encounter correction" packages/physics/tests/coupling/seakeeping.test.js`. The held-hull fixture compares identical water fields with and without a spectral component list, then checks the difference in heave and pitch against the section equations. The taper has an independent integrated added-mass gradient. The live wake uses `waterBelow: true` and an odd potential so the held hull's centre waterline stays fixed for the comparison. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --incident-spectrum`, then repeat with `MARGO_COMPAT=1`.

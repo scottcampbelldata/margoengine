@@ -6179,3 +6179,7 @@ The inferred and prescribed 1 m/s courses and an inferred 2 m/s course reproduce
 ### SEA-08 rolling deck moves loose props
 
 In a beam wave of amplitude 0.15 m at 1.9 rad/s, a forward-course hull reaches 0.0583 rad of heel. The low-friction prop slides 128.3 mm relative to the deck and stays within 1.622 mm of the independent rotating-plane contact calculation. The higher-friction prop stays within 0.016 mm laterally. Calm water gives less than 1 micrometre of slip. Plain and shared world states match and replay exactly. This engine control covers the contact for EF-3. The producer's cabin and camera still need scene binding.
+
+### SEA-08 incident load on a forward course
+
+Held-box head and following-wave fixtures recover the ordinary-strip incident heave and pitch correction within 2.5% of a direct section calculation. A tapered beam-wave case isolates the added-mass slope within 3.5%. The finite-window continuation stays continuous across zero encounter. The live wake perturbation remains available to the hull below the surface. The Wigley tank residuals leave physical qualification open.
