@@ -40,7 +40,22 @@ const expected = {
     'useMotion',
     'useScroll',
   ],
-  './textures': ['MappedPbrMaterial', 'TextureMaterial', 'TextureProvider', 'useKTX2', 'useTexture', 'useVideoTexture'],
+  './textures': [
+    'DepthMaterial',
+    'LambertMaterial',
+    'MappedPbrMaterial',
+    'MatcapMaterial',
+    'NormalMaterial',
+    'PhongMaterial',
+    'TextureMaterial',
+    'TextureProvider',
+    'ToonMaterial',
+    'UnlitMaterial',
+    'useKTX2',
+    'useTexture',
+    'useVideoTexture',
+  ],
+  './clustered': ['PointLight', 'RectAreaLight', 'SpotLight'],
   './xr-pointer': ['XRPointerEvents', 'dispatchXRPointer'],
   '.': [
     'BoxGeometry',
@@ -256,6 +271,7 @@ const optionalPeers = [
   '@margoengine/splats',
   '@margoengine/viewcube',
   '@margoengine/vfx',
+  '@margoengine/clustered',
 ];
 async function temporary(run) {
   const directory = await mkdtemp(join(testsRoot, '.subpaths-'));

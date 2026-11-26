@@ -6,6 +6,22 @@ import { optionalPeer } from './optional.js';
 import { textureLoaders, identity, own } from './texture-cache.js';
 import { typeError } from '../../shared/errors.js';
 export { MappedPbrMaterial, TextureMaterial, TextureProvider } from './texture-material.js';
+export {
+  UnlitMaterial,
+  LambertMaterial,
+  PhongMaterial,
+  ToonMaterial,
+  NormalMaterial,
+  MatcapMaterial,
+  DepthMaterial,
+  type UnlitMaterialProps,
+  type LambertMaterialProps,
+  type PhongMaterialProps,
+  type ToonMaterialProps,
+  type NormalMaterialProps,
+  type MatcapMaterialProps,
+  type DepthMaterialProps,
+} from './shading-materials.js';
 export type { TextureMaterialProps } from './texture-material.js';
 /** URLs accepted by the image and compressed-image hooks. */
 export type TextureInput = string | readonly string[] | Readonly<Record<string, string>>;

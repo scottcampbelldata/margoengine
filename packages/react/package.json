@@ -276,6 +276,11 @@
       "types": "./dist/clouds.d.ts",
       "react-server": "./dist/rsc/clouds.js",
       "import": "./dist/clouds.js"
+    },
+    "./clustered": {
+      "types": "./dist/clustered.d.ts",
+      "react-server": "./dist/rsc/clustered.js",
+      "import": "./dist/clustered.js"
     }
   },
   "files": [
@@ -331,7 +336,8 @@
     "@margoengine/headless": "^1.0.0",
     "@margoengine/worker": "^1.0.0",
     "@margoengine/toon": "^1.0.0",
-    "@margoengine/vfx": "^1.0.0"
+    "@margoengine/vfx": "^1.0.0",
+    "@margoengine/clustered": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@margoengine/gltf": {
@@ -458,6 +464,9 @@
       "optional": true
     },
     "@margoengine/vfx": {
+      "optional": true
+    },
+    "@margoengine/clustered": {
       "optional": true
     }
   }

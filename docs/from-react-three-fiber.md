@@ -109,10 +109,10 @@ path such as `/controls` means `@margoengine/react/controls`; no path means the 
 | `boxGeometry` and the other geometry tags (R3F) | `BoxGeometry` (root); `SphereGeometry`, `PlaneGeometry`, `CylinderGeometry`, `TorusGeometry` and the rest in `/geometry` | Children of a `Mesh`, with `args` as there. |
 | `meshStandardMaterial` (R3F) | `PbrMaterial` | `color`, `roughness`, `metalness`. With a map or `emissive`, use `MappedPbrMaterial` (`/textures`) or wrap the meshes in `TextureProvider`. |
 | `meshPhysicalMaterial` transmission (R3F) | `MeshTransmissionMaterial` (`/materials`) | |
-| other material tags (basic, lambert, phong, toon, normal, shader materials) | No equivalent | Margo materials are glTF metallic-roughness PBR. |
+| `meshBasicMaterial`, `meshLambertMaterial`, `meshPhongMaterial`, `meshToonMaterial`, `meshNormalMaterial`, `meshMatcapMaterial`, `meshDepthMaterial` (R3F) | `UnlitMaterial`, `LambertMaterial`, `PhongMaterial`, `ToonMaterial`, `NormalMaterial`, `MatcapMaterial`, `DepthMaterial` (`/textures`) | The shading models of `@margoengine/materials`; the mesh needs UV geometry. `shaderMaterial`: pass a `WgslMaterial` (`@margoengine/materials`) to `TextureMaterial` (`/textures`) as `material`. |
 | `directionalLight` (R3F) | `Sun` | `direction` points towards the light; one sun per scene. |
 | `ambientLight`, `hemisphereLight` (R3F) | `AmbientLight`, `HemisphereLight` (`/environment`) | `HemisphereLight` takes `sky` and `ground` colours. |
-| `pointLight`, `spotLight`, `rectAreaLight` (R3F) | No equivalent component | Use `Environment` children such as `Lightformer` (`/environment`) for studio light. |
+| `pointLight`, `spotLight`, `rectAreaLight` (R3F) | `PointLight`, `SpotLight`, `RectAreaLight` (`/clustered`) | The clustered lights of `@margoengine/clustered`, WebGPU only. `SpotLight` takes `direction` instead of a target; `RectAreaLight` takes `direction` and `up` instead of a rotation. |
 | `fog` (R3F) | `Fog` (`/environment`) | |
 | `primitive object={...}` (R3F) | `MeshNode node={mesh}` | Mounts an engine mesh made outside React (`engine.createMesh()`, a model's node); its children attach under it. The caller keeps owning it unless `dispose` is passed. `GeometryResource` mounts a core `Geometry`. |
 | `extend` (R3F) | `extend` | Takes React components, not engine classes. |

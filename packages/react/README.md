@@ -1031,6 +1031,44 @@ export function Valley() {
 }
 ```
 
+### Point, spot and rect area lights
+
+`<PointLight>`, `<SpotLight>` and `<RectAreaLight>` (`@margoengine/react/clustered`) are the local lights of
+`@margoengine/clustered`. Every light component in a Canvas (or a `<Scene>`) shares one `Clustered` lighting, made when
+the first one mounts and removed after the last one unmounts; core meshes, the material meshes (`TextureMaterial` and the
+shading materials) and the Canvas's glTF models receive it. Every prop is live, and `onError` (default: the Canvas's error
+reporting) gets an invalid light or a failed package load. WebGPU only; install the optional `@margoengine/clustered` peer.
+
+- `<PointLight>`: `position` [0, 0, 0], `color` '#ffffff' (hex is sRGB, an `[r, g, b]` array linear), `intensity` 1,
+  `range` 0 (unlimited; otherwise the distance where it ends, windowed smoothly), `decay` 2 (inverse square; 0 none) and
+  `radius` 0 (a point; above 0 a sphere of light with a disc highlight). Up to 1,024 point and spot lights per Canvas.
+- `<SpotLight>`: the point light's props plus `direction` [0, -1, 0], `angle` pi / 4 (cone half-angle, up to pi / 2) and
+  `penumbra` 0 (share of the cone that fades, 0 to 1).
+- `<RectAreaLight>`: `position` [0, 0, 0], `direction` [0, -1, 0] (the side it faces), `width` 1, `height` 1, `up`
+  (default [0, 1, 0], or [0, 0, 1] when `direction` is vertical), `color` '#ffffff', `intensity` 1 and `twoSided` false.
+  Shaded with linearly transformed cosines (GGX specular, Lambert diffuse); every fragment evaluates every area light, at
+  most 64 per Canvas, so keep them few. It loads `@margoengine/clustered/area` when the first one mounts.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
+import { PointLight, SpotLight, RectAreaLight } from '@margoengine/react/clustered';
+import { LambertMaterial } from '@margoengine/react/textures';
+
+export function LitRoom() {
+  return (
+    <Canvas>
+      <PointLight position={[2, 2, 2]} color="#ffd8a0" intensity={8} range={10} />
+      <SpotLight position={[0, 4, 0]} direction={[0, -1, 0]} angle={0.5} penumbra={0.3} intensity={20} />
+      <RectAreaLight position={[0, 3, -2]} direction={[0, -0.5, 1]} width={2} height={1} intensity={4} />
+      <Mesh>
+        <BoxGeometry />
+        <LambertMaterial color="#d0d0d0" />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
+
 `<Voxels world textures>` draws a `VoxelWorld` from `@margoengine/voxel`: chunks are meshed in workers and lit by `@margoengine/voxel/light` (on by default, updated from the Canvas frame loop). Edit the world with `world.setBlock` and the change shows two frames later with no React render; `daylight`, `blockLightColor` and `lightmap` are live. `useBlockTextures(urls)` loads the block textures, one layer per URL, and suspends until they are ready. Needs WebGPU and Web Workers.
 
 ```tsx
@@ -2168,6 +2206,44 @@ of the caller's material or its textures. `geometry` defaults to the enclosing g
 provide it explicitly for custom core geometry without UVs. `roughnessMap` and `transmissionOptions`
 default to absent. `onError` defaults to Canvas error reporting. Use one material owner per Mesh.
 Named Scenes retain their own queues and cleanup on both WebGPU and the compatibility device.
+
+### Unlit, Lambert, Phong, toon, normal, matcap and depth materials
+
+The shading models of `@margoengine/materials`, one component per class, on the enclosing `<Mesh>`: `<UnlitMaterial>`
+(`UnlitMaterial`: colour, maps and emissive, no lighting), `<LambertMaterial>` (diffuse only), `<PhongMaterial>`
+(Lambert plus a Blinn-Phong highlight: `specular` colour and `shininess`), `<ToonMaterial>` (`steps` flat bands, default
+3, or a `gradientMap`), `<NormalMaterial>` (view-space normals as colour), `<MatcapMaterial>` (lit by the `matcap`
+texture) and `<DepthMaterial>` (projected depth, grayscale or `depthPacking`). Each takes the options of its native class
+with that class's defaults (`color` white, `opacity` 1, no maps), plus `geometry`, `renderOrder` (default 0) and
+`onError` as on `TextureMaterial`. Every option is live: a change rebuilds the material mesh in place, and unmounting
+frees it. They need the optional `@margoengine/materials` peer and UV geometry (`BoxGeometry`, `SphereGeometry`,
+`PlaneGeometry`, or a `geometry` prop). For your own WGSL, pass a `WgslMaterial` of `@margoengine/materials` to
+`TextureMaterial`'s `material`.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
+import { SphereGeometry } from '@margoengine/react/geometry';
+import { PhongMaterial, ToonMaterial, UnlitMaterial } from '@margoengine/react/textures';
+
+export function Shading() {
+  return (
+    <Canvas>
+      <Mesh position={[-2, 0, 0]}>
+        <BoxGeometry />
+        <UnlitMaterial color="#e45630" />
+      </Mesh>
+      <Mesh>
+        <SphereGeometry />
+        <PhongMaterial color="#84d6bd" specular="#ffffff" shininess={64} />
+      </Mesh>
+      <Mesh position={[2, 0, 0]}>
+        <SphereGeometry />
+        <ToonMaterial color="#f2c14e" steps={4} />
+      </Mesh>
+    </Canvas>
+  );
+}
+```
 
 Texture options default to slot-selected colour space (sRGB for colour slots), clamp wrapping in S/T,
 linear min/mag filtering, anisotropy 1, 2D sampling, and flipped external-image Y.

@@ -248,3 +248,37 @@ test('image hooks return scalar, tuple and record shapes with cached loading and
     globalThis.createImageBitmap = originalBitmap;
   }
 });
+test('each shading material component builds its shading model on the Mesh, keeps live options and frees on unmount', async () => {
+  const shaded = await import('../dist/textures.js');
+  const cases = [
+    ['UnlitMaterial', 'basic', { color: '#ff0000' }],
+    ['LambertMaterial', 'lambert', { color: '#ffffff' }],
+    ['PhongMaterial', 'phong', { shininess: 64 }],
+    ['ToonMaterial', 'toon', { steps: 4 }],
+    ['NormalMaterial', 'normal', {}],
+    ['MatcapMaterial', 'matcap', {}],
+    ['DepthMaterial', 'depth', {}],
+  ];
+  for (const named of [false, true])
+    for (const [name, shading, props] of cases) {
+      const { scene, tree } = await context(named);
+      const child = (opacity) => h(Mesh, null, h(BoxGeometry), h(shaded[name], { ...props, opacity }));
+      const view = render(tree(child(1)));
+      await act(async () => {});
+      const world = scene.world ?? scene.engine.scene;
+      const models = () => [...world.plugins.values()].filter((plugin) => plugin.primitives);
+      assert.equal(models().length, 1, name);
+      assert.equal(models()[0].material.shading, shading, name);
+      for (const [key, value] of Object.entries(props))
+        if (typeof value === 'number') assert.equal(models()[0].material[key], value, `${name} ${key}`);
+      view.rerender(tree(child(0.5)));
+      await act(async () => {});
+      assert.equal(models().length, 1, `${name} rebuilds in place`);
+      assert.equal(models()[0].material.opacity, 0.5, `${name} opacity is live`);
+      assert.equal(models()[0].material.shading, shading);
+      view.unmount();
+      await act(async () => {});
+      assert.equal(models().length, 0, `${name} frees its material mesh`);
+      assert.equal(scene.engine.meshes.size, 0);
+    }
+});
