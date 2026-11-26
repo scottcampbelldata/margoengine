@@ -292,3 +292,43 @@ test('a report both sides changed, in a later generated-only commit, is built fo
   assert.equal(repo.read('api/scene.api.md'), 'upstream\n');
   assert.equal(repo.git('status', '--porcelain'), '');
 });
+
+// e6b371f6f listed two messages in scripts/errors/entries.js and left site/errors.html as it was; hygiene failed on main.
+test('a branch that changed the errors entries without building the page gets the page built, in its own commit', (t) => {
+  const page = Array(3).fill(
+    "import { readFileSync, writeFileSync } from 'node:fs';\n" +
+      "const want = readFileSync('scripts/errors/entries.js', 'utf8').toUpperCase();\n" +
+      "if (process.argv.includes('--check')) process.exit(readFileSync('site/errors.html', 'utf8') === want ? 0 : 1);\n" +
+      "writeFileSync('site/errors.html', want);\n",
+  );
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    'scripts/errors/entries.js': ['one\n', 'one\n', 'one\ntwo\n'],
+    'scripts/errors/page.mjs': page,
+    'site/errors.html': ['ONE\n', 'ONE\n', 'ONE\n'],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /errors\.html was stale/);
+  assert.equal(repo.read('site/errors.html'), 'ONE\nTWO\n');
+  assert.equal(
+    repo.git('log', '-1', '--format=%s').trim(),
+    'chore: site/errors.html matches scripts/errors/entries.js',
+  );
+});
+
+test('a branch whose errors page already matches its entries gets no extra commit', (t) => {
+  const page = Array(3).fill(
+    "import { readFileSync } from 'node:fs';\n" +
+      "process.exit(readFileSync('site/errors.html', 'utf8') === readFileSync('scripts/errors/entries.js', 'utf8').toUpperCase() ? 0 : 1);\n",
+  );
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    'scripts/errors/entries.js': ['one\n', 'one\n', 'one\ntwo\n'],
+    'scripts/errors/page.mjs': page,
+    'site/errors.html': ['ONE\n', 'ONE\n', 'ONE\nTWO\n'],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(repo.git('log', '--format=%s').trim(), 'work\nupstream\nbase');
+});

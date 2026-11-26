@@ -226,6 +226,30 @@ function replay() {
   return true;
 }
 
+/**
+ * margoengine.com/errors (site/errors.html) is built from scripts/errors/entries.js, and a commit that lists a message there
+ * without running scripts/errors/page.mjs leaves the page stale, which fails hygiene on main (e6b371f6f, the React post
+ * components). Every lane runs this script right before it pushes, so a branch that changed either file gets the page built
+ * again here, as its own commit, when it no longer matches.
+ */
+function refreshErrorsPage() {
+  const page = resolve(root, 'scripts/errors/page.mjs');
+  if (!existsSync(page)) return;
+  const changed = lines(['diff', '--name-only', 'origin/main...HEAD']);
+  if (!changed.some((file) => file === 'scripts/errors/entries.js' || file === 'site/errors.html')) return;
+  if (run(process.execPath, [page, '--check'], { allowFail: true }).status === 0) return;
+  script('scripts/errors/page.mjs');
+  git(['add', '--', 'site/errors.html']);
+  if (git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0) return;
+  const commit = commitTree(
+    rev('HEAD'),
+    git(['write-tree']).stdout.trim(),
+    'chore: site/errors.html matches scripts/errors/entries.js\n',
+  );
+  git(['update-ref', '-m', 'rebase:main: errors page', 'HEAD', commit]);
+  console.log('rebase:main: site/errors.html was stale for scripts/errors/entries.js; built again and committed');
+}
+
 function main() {
   root = git(['rev-parse', '--show-toplevel']).stdout.trim();
   if (!rebasing() && !existsSync(ledger())) {
@@ -256,6 +280,7 @@ function main() {
       stop(`git rebase could not go on:\n${result.stdout}${result.stderr}`);
   }
   if (existsSync(ledger())) regenerate();
+  refreshErrorsPage();
   const markers = conflictMarkers(root);
   if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
   // The commits to push must not delete or revert on a mass scale (the ff88a70e7 sync); a failure stops before "push".
