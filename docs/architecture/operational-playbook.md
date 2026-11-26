@@ -10035,6 +10035,11 @@ smoothed fracture is active and is copied instead of reset during cut or body co
 The browser fixture cuts the loaded LH-4 rung into two meshes and follows the changed boot
 position in both renderers.
 
+Plane cuts, finite incisions and face tears carry each live point attachment to the mapped copies
+of its original material vertex. A stretched attachment keeps the same rigid-local point. The
+coupled regression applies force on a cut fragment and measures motion of the linked rigid body
+while both duplicate points remain attached.
+
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows
 cells through body compaction, both cut paths, and world snapshots. The existing tear scheduler

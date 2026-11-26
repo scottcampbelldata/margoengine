@@ -9635,8 +9635,9 @@ Each fragment inherits the original material, pins and plastic rest basis. A chi
 intersection still needs a rest basis and nodal mass representable in the native f32 state.
 The operation validates all pieces before replacing the body. It builds the edited topology once
 and uses the normal native solve for the fragments. The finite triangle blade in `SoftBodies.cut`
-continues to slice along existing faces. Embedded skins, separate spring or cluster constraints and
-live external bindings need a separate transfer when introducing new cutting vertices. Snapshots
+continues to slice along existing faces. Geometric cuts and face tears retain live rigid anchors
+at the same point in the rigid frame for every surviving copy of the attached vertex. Embedded
+skins, separate spring or cluster constraints and bound meshes need a separate transfer. Snapshots
 of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
 with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
 
@@ -9645,8 +9646,8 @@ existing tetrahedron. Tetrahedra that meet the supporting plane may be subdivide
 neighboring faces remain conforming. Only the triangles covered by the blade are released.
 Cells outside the blade keep their material connections. Tiny subdivisions must fit the
 same f32 geometry and rest-basis requirements as a full plane cut. The API accepts one
-triangle per operation. Arbitrary embedded skins, springs, cluster constraints and live
-bindings still require their own state transfer.
+triangle per operation. Embedded skins, springs, cluster constraints and bound meshes still
+require their own state transfer.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. The complete optional entry measures 136,910 B gzip, with a 42,356 B base
 and a 94,249 B lazy kernel.

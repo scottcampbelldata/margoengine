@@ -26,7 +26,7 @@ async function specimen(desc) {
     .add(new RigidSolver(), { physics })
     .add(new SoftSolver(), { soft })
     .couple(['soft', 'rigid'], 'staggered');
-  return { soft, body: soft.create(desc), world };
+  return { soft, body: soft.create(desc), world, physics };
 }
 
 function tetrahedron() {
@@ -365,5 +365,62 @@ test('a second finite blade can cross an existing incision without losing volume
         face.every((id) => Math.abs(twice.particlePosition(id)[axis] - plane) <= 2 * epsilon32),
       ),
     );
+  }
+});
+
+test('plane cuts, finite cuts and face tears retain live two-way rigid anchors', async () => {
+  const twoCells = () =>
+    new SoftBodyDesc([...position, [0, 0, -2]]).setCells([0, 1, 2, 3, 0, 2, 1, 4]).setSurface().setParticleRadius(0);
+  const operations = [
+    ['plane cut', tetrahedron, (soft, body) => soft.cutPlane(body, [0, 0, 0], [1, -1, 0])],
+    [
+      'finite cut',
+      tetrahedron,
+      (soft, body) =>
+        soft.cutTriangle(body, [
+          [0, 0, -1],
+          [3, 3, -1],
+          [0, 0, 4],
+        ]),
+    ],
+    ['face tear', twoCells, (soft, body) => soft.tear(body, { cells: [0] })],
+  ];
+  for (const [name, make, cut] of operations) {
+    const { soft, body, physics, world } = await specimen(make().setMass(4).setSolver('vertex-block'));
+    const anchor = physics.addBody(null, {
+      position: [0, 0, 0],
+      lockRotations: true,
+      colliders: { shape: 'sphere', radius: 0.01, mass: 3, sensor: true },
+    });
+    body.attachParticle(0, anchor);
+    const result = cut(soft, body);
+    assert.equal(result.pieces.length, 2, name);
+    const anchors = result.destination(0);
+    assert.equal(anchors.length, 2, name);
+    const [first] = anchors;
+    first.body.addParticleForce(first.particle, [0, 0, 12]);
+    world.advance(1);
+    assert.ok(anchor.linearVelocity[2] > 0, `${name} transfers the load to the rigid body`);
+    for (const { body, particle } of anchors) {
+      bound(body.particlePosition(particle)[2], anchor.position[2], 1, `${name} keeps the same attached point`);
+    }
+  }
+});
+
+test('a cut retains the authored local point of a stretched attachment', async () => {
+  const { soft, body, physics, world } = await specimen(tetrahedron().setMass(4).setSolver('vertex-block'));
+  const anchor = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0, -0.02],
+    colliders: { shape: 'sphere', radius: 0.01, sensor: true },
+  });
+  body.attachParticle(0, anchor);
+  anchor.setPosition([0, 0, 0.02]);
+  const split = soft.cutPlane(body, [0, 0, 0], [1, -1, 0]);
+  world.advance(1);
+  const destinations = split.destination(0);
+  assert.equal(destinations.length, 2);
+  for (const { body, particle } of destinations) {
+    bound(body.particlePosition(particle)[2], 0.04, 1, 'both copies return to the original local point');
   }
 });

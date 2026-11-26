@@ -121,6 +121,15 @@ transfer is the same as for a complete plane cut.
 [Sifakis, Der and Fedkiw](https://physbam.stanford.edu/papers/stanford2007-04.pdf)
 [Wang, Jiang, Schroeder and Teran](https://www.math.ucdavis.edu/~jteran/papers/WJST14.pdf).
 
+Geometric cuts and face tears transfer a live point attachment to every surviving copy of its
+original material vertex. Molino, Bao and Fedkiw's 2004 virtual-node construction describes
+duplicating the material degrees of freedom at a cut. Macklin, Müller and Chentanez's 2016
+XPBD formulation uses constraint gradients to update both linked bodies. Margo retains the
+authored rigid-local point through the split and solves its existing reciprocal point rows
+on the live descendants without deriving a new anchor from the current, possibly stretched pose.
+[A Virtual Node Algorithm for Changing Mesh Topology During Simulation](https://physbam.stanford.edu/papers/stanford2004-01.pdf)
+[XPBD: Position-Based Simulation of Compliant Constrained Dynamics](https://mmacklin.com/xpbd.pdf).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

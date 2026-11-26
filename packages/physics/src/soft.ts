@@ -10,7 +10,7 @@ import type { PhysicsCollider } from './collider.js';
 import type { ColliderSettings } from './shapes.js';
 import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
-import { planPlaneCut } from './soft-plane-cut.js';
+import { planPlaneCut, type SlicePlan } from './soft-plane-cut.js';
 import { makeCutPieces } from './soft-plane-pieces.js';
 import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
@@ -5034,7 +5034,29 @@ export class SoftBodies implements PhysicsAttachment {
 
   private splitAfterTear(body: SoftBody, cut?: ReadonlySet<number>): SoftSplit | null {
     if (this.splitOnTear === 'never' || (body.cellRange.count === 0 && this.splitOnTear !== 'all')) return null;
-    return splitBody(this, body, (positions) => new SoftBodyDesc(positions), cut);
+    return this.transferCutAttachments(body, () =>
+      splitBody(this, body, (positions) => new SoftBodyDesc(positions), cut),
+    );
+  }
+
+  private transferCutAttachments(body: SoftBody, edit: () => SoftSplit | null): SoftSplit | null {
+    if (!this.attachments.some((attachment) => attachment.soft === body)) return edit();
+    const before = [...this.attachments];
+    const split = edit();
+    if (!split) return null;
+    const after = new Set(this.attachments);
+    const mapped = before.flatMap((attachment) => {
+      if (attachment.soft !== body) return after.delete(attachment) ? [attachment] : [];
+      if (!attachment.body.valid) return [];
+      // Reuse the authored point in the rigid frame even if the current joint stretches.
+      return split.destinations(attachment.index).map(({ body, particle }) => ({
+        ...attachment,
+        soft: body,
+        index: particle,
+      }));
+    });
+    this.attachments = [...mapped, ...after];
+    return split;
   }
 
   private announce(body: SoftBody, edges: number[], cells: number[], split: SoftSplit | null): SoftTearEvent {
@@ -5152,13 +5174,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.checkSolidCut(body);
     checkVec(origin, 'Cut-plane origin');
     const direction = unitDirection(normal, 'Cut-plane normal');
-    const split = makeCutPieces(
-      this,
-      body,
-      (positions) => new SoftBodyDesc(positions),
-      (current, cells) => planPlaneCut(current, cells, origin, direction),
-    );
-    return this.announce(body, [], [], split);
+    return this.cutGeometrically(body, (current, cells) => planPlaneCut(current, cells, origin, direction));
   }
 
   /**
@@ -5170,11 +5186,15 @@ export class SoftBodies implements PhysicsAttachment {
     if (!Array.isArray(blade) || blade.length !== 3)
       throw new RangeError('A finite blade needs three points. Supply the corners of one world-space triangle.');
     for (const point of blade) checkVec(point, 'Blade point');
-    const split = makeCutPieces(
-      this,
-      body,
-      (positions) => new SoftBodyDesc(positions),
-      (current, cells) => planTriangleCut(current, cells, blade),
+    return this.cutGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
+  }
+
+  private cutGeometrically(
+    body: SoftBody,
+    plan: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
+  ): SoftTearEvent {
+    const split = this.transferCutAttachments(body, () =>
+      makeCutPieces(this, body, (positions) => new SoftBodyDesc(positions), plan),
     );
     return this.announce(body, [], [], split);
   }
@@ -5188,12 +5208,11 @@ export class SoftBodies implements PhysicsAttachment {
       body.cellRange.clusterCount > 0 ||
       body.skin ||
       body.surface ||
-      this.attachments.some((item) => item.soft === body) ||
       this.bound.some((item) => item.soft === body)
     )
       throw new MargoError(
         'state',
-        'A geometric cut needs a tetrahedral body without springs, clusters, skin or external bindings. Use SoftBodyDesc.box or a finite face cut.',
+        'A geometric cut needs a tetrahedral body without springs, clusters, skin or a bound mesh. Use SoftBodyDesc.box or a finite face cut.',
       );
     if (body.tornCells().length > 0)
       throw new MargoError(

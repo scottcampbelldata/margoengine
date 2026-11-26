@@ -752,10 +752,11 @@ physics.step();
 console.log(result.pieces.map((piece) => piece.volume()));
 ```
 
-Start with a tetrahedral solid without separate springs, clusters, an embedded skin, or external
-bindings. The fragments expose their closed boundary triangles when the original body has a mesh
-surface. For a cut that removes the original body, use the returned pieces to bind new rendering
-or constraints.
+Start with a tetrahedral solid without separate springs, clusters, an embedded skin, or a bound
+mesh. The fragments expose their closed boundary triangles when the original body has a mesh
+surface. Existing particle-to-rigid attachments stay at the same point in the rigid body's frame.
+When a cut duplicates an attached vertex, both copies remain attached. Use the returned pieces
+to bind new rendering or constraints.
 
 #### Finite incisions in a solid
 
@@ -775,7 +776,12 @@ const soft = await SoftBodies.attach(physics);
 const desc = new SoftBodyDesc([[0, 0, 0], [2, 0, 0], [0, 2, 0], [0, 0, 2]])
   .setCells([0, 1, 2, 3]).setSurface().setSolver('vertex-block');
 const original = soft.create(desc);
+const anchor = physics.addBody(null, {
+  type: 'fixed', colliders: { shape: 'sphere', radius: 0.01, sensor: true },
+});
+original.attachParticle(0, anchor);
 const { pieces } = soft.cutTriangle(original, [[0.5, 0.2, 0.2], [0.5, 0.65, 0.2], [0.5, 0.2, 0.65]]);
+physics.step();
 console.log(pieces[0]?.triangles().length); // one solid with the two new incision faces
 ```
 

@@ -60,6 +60,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   loaded rung after the finite incision at state hash `3a7de173095e2e65`. Run
   `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Rigid attachments through a cut (SOFT-04, 2026-11-26). Plane cuts, finite incisions
+  and face tears keep each attached material point at its original local anchor. The
+  coupled regression drives one of the fragments and measures its rigid anchor moving
+  in response. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

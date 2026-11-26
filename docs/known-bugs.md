@@ -16888,8 +16888,9 @@ tensile, compressive or shear stresses exceed authored strengths. A progressive 
 tension and shear before tearing. Automatic tears follow cell faces. The finite cutting tool
 can author an oblique crack inside a tetrahedron.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
-Plane cuts and finite interior incisions work on tetrahedral solids. Geometric cutting of bodies
-with embedded skins, springs, clusters or external bindings still needs their state transfer.
+Plane cuts and finite interior incisions work on tetrahedral solids with live rigid anchors.
+Geometric cutting of bodies with embedded skins, springs, clusters or bound meshes still
+needs their state transfer.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 
