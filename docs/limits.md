@@ -9193,3 +9193,6 @@ clock. The scrape and roll spectra use effective roughness profiles. Acoustic mi
 geometry-dependent roughness, and elastic radiation into the room require additional field models.
 The optional joint route computes equivalent scalar fracture excitation from supplied energy and mass.
 A brittle-fracture producer can publish per-track excitation in the same field layout.
+
+The optional entry measures 9,704 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
+raw, fetched only when the caller loads the solver.
