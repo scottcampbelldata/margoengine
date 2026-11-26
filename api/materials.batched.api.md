@@ -38,6 +38,7 @@ export class BatchedMesh implements EnginePlugin {
     isVisible(id: number): boolean;
     itemOf(vertex: number): number;
     bounds(id?: number): Float32Array;
+    boundsInto<T extends Float32Array | Float64Array | number[]>(out: T, id?: number): T;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
