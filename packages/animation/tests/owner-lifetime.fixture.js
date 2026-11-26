@@ -1,7 +1,7 @@
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 import { GLTFAsset, PBRModel } from '../../gltf/dist/pbr.js';
-import { skinnedStrip } from '../test/fixture.js';
+import { morphedStrip, skinnedStrip } from '../test/fixture.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
 export async function fixtures(load = (entry) => import(entry)) {
@@ -12,6 +12,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { VATCrowd, bakeVAT } = await load('../dist/vat.js');
   const { SkinnedCrowd, bakeBones } = await load('../dist/instanced-skin.js');
   const { DeformedPoints } = await load('../dist/deformed-points.js');
+  const { MorphedCrowd, bakeMorphBones } = await load('../dist/instanced-morph.js');
   const { GeometryCachePlayer, encodeGeometryCache } = await load('../dist/geometry-cache.js');
   const model = (engine, data = skinnedStrip()) => new PBRModel(engine, new GLTFAsset(data.doc, data.buffers));
   const morphData = () => {
@@ -67,6 +68,24 @@ export async function fixtures(load = (entry) => import(entry)) {
         const mesh = model(engine),
           plugin = factory ? GLTFInteractivity.attach(mesh) : new GLTFInteractivity(mesh);
         return { plugin, dispose: () => plugin.dispose(), cleanup: () => mesh.dispose() };
+      },
+    });
+    entries.push({
+      name: 'MorphedCrowd' + suffix,
+      create({ engine }) {
+        const mesh = model(engine, morphedStrip()),
+          animation = new Animation(mesh),
+          data = bakeMorphBones(animation, { fps: 2 }),
+          plugin = factory ? MorphedCrowd.attach(engine, data) : new MorphedCrowd(data);
+        plugin.add({ morphs: { lift: 1 } });
+        return {
+          plugin,
+          dispose: () => plugin.dispose(),
+          cleanup() {
+            animation.dispose();
+            mesh.dispose();
+          },
+        };
       },
     });
     entries.push({

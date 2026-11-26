@@ -4823,3 +4823,6 @@ The same CPU selector runs the held-out KVLCC2 case. It constructs a single-comp
 
 ## Points on a deforming mesh (animation/deformed-points)
 Build packages, then `node --test packages/animation/tests/deformed-points.test.js`. Run `node packages/animation/tests/deformed-points-browser.mjs`, then again with `--compat` for the WebGL2 compatibility layer; each prints its measured counts as one JSON line and the backend it ran on.
+
+## Morph weights per crowd member (animation/instanced-morph)
+Build packages, then `node --test packages/animation/tests/instanced-morph.test.js packages/animation/tests/instanced-skin.test.js`. Run `node packages/animation/tests/instanced-morph-browser.mjs`, then again with `--compat` for the WebGL2 compatibility layer; each prints its measured counts as one JSON line and the backend it ran on.

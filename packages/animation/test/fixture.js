@@ -89,3 +89,54 @@ export function bent(x, y, t) {
     s = Math.sin(a);
   return [1 + (x - 1) * c - y * s, (x - 1) * s + y * c, 0];
 }
+/**
+ * The skinned strip with two morph targets: 'lift' raises every vertex 0.5 and tips its normal 0.1 along x; 'stretch'
+ * moves a vertex half its x along x and has no normal offsets. The mesh starts at weights [0.25, 0]. `extra` adds an
+ * unskinned triangle with no targets on a node of its own.
+ */
+export function morphedStrip({ extra = false, ...options } = {}) {
+  const strip = skinnedStrip(options),
+    { doc, buffers, positions } = strip,
+    count = positions.length / 3,
+    add = (data, type = 'VEC3', componentType = 5126) => {
+      const id = buffers.length;
+      buffers.push(data);
+      doc.buffers.push({ byteLength: data.byteLength });
+      doc.bufferViews.push({ buffer: id, byteLength: data.byteLength });
+      doc.accessors.push({ bufferView: id, componentType, count: data.length / (type === 'VEC3' ? 3 : 1), type });
+      return id;
+    },
+    each = (value) =>
+      Float32Array.from({ length: count * 3 }, (_, i) => value(positions[Math.floor(i / 3) * 3], i % 3));
+  doc.meshes[0].primitives[0].targets = [
+    { POSITION: add(each((x, c) => (c === 1 ? 0.5 : 0))), NORMAL: add(each((x, c) => (c === 0 ? 0.1 : 0))) },
+    { POSITION: add(each((x, c) => (c === 0 ? x * 0.5 : 0))) },
+  ];
+  doc.meshes[0].weights = [0.25, 0];
+  doc.meshes[0].extras = { targetNames: ['lift', 'stretch'] };
+  if (extra) {
+    doc.meshes.push({
+      primitives: [
+        {
+          attributes: {
+            POSITION: add(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0])),
+            NORMAL: add(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1])),
+          },
+          indices: add(new Uint32Array([0, 1, 2]), 'SCALAR', 5125),
+        },
+      ],
+    });
+    doc.scenes[0].nodes.push(doc.nodes.push({ mesh: 1, translation: [0, 1, 0] }) - 1);
+  }
+  return strip;
+}
+/** Where vertex (x, y) of the morphed strip is at time t of the bend clip: morphed by [lift, stretch], then bent. */
+export function morphedBent(x, y, t, [lift, stretch]) {
+  const mx = x + x * 0.5 * stretch,
+    my = y + 0.5 * lift;
+  if (x < 1) return [mx, my, 0];
+  const a = (Math.PI / 2) * Math.min(1, t),
+    c = Math.cos(a),
+    s = Math.sin(a);
+  return [1 + (mx - 1) * c - my * s, (mx - 1) * s + my * c, 0];
+}

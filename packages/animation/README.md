@@ -645,7 +645,64 @@ const m = poseBone(bake, {clip: 0}, 0, 0.5);
 console.log(m[7]); // 2: a point on this bone rides 2 m up
 ```
 
-Morph targets stay at the weights they had when baked.
+Morph targets stay at the weights they had when baked; `MorphedCrowd` (next section) gives each member its own.
+
+## Morph weights per crowd member (`@margoengine/animation/instanced-morph`)
+
+`MorphedCrowd` is a `SkinnedCrowd` whose members each carry their own morph weights, set from JavaScript at any time:
+one face smiles while the next one frowns, in the same instanced draw. `bakeMorphBones` bakes like `bakeBones` but
+leaves the live targets out of the vertices and stores their position and normal offsets in the bone texture, after the
+bone rows; each member's weights ride in its instance row, and the vertex shader adds the weighted offsets before it
+skins. The CPU does no per-vertex work.
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {MorphedCrowd, bakeMorphBones} from 'margoengine/animation/instanced-morph';
+const stage = await createStage('#viewport', {backend: 'webgpu', capacity: 2048});
+// Copy this repository's CC0 RobotExpressive asset to the same public URL in your app.
+const model = await loadGLTF(stage.engine, '/examples/assets/robot-expressive.glb');
+const bake = bakeMorphBones(new Animation(model), {fps: 30, clips: ['Walking']});
+model.dispose();
+
+const crowd = MorphedCrowd.attach(stage.engine, bake);
+const [first, second] = bake.morphs.names; // the live targets, in weight order
+for (let i = 0; i < 100; i++)
+  crowd.add({
+    matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, (i % 10) * 2, 0, Math.floor(i / 10) * 2, 1],
+    offset: i * 0.13,
+    morphs: [i % 2], // weights in bake.morphs.names order; a short array sets the first ones
+  });
+crowd.setMorph(0, first, 0.5); // one weight of one member, by name or index
+crowd.set(1, {morphs: {[second]: 1}}); // by name; the weights not named keep their value
+console.log(crowd.getMorph(1, second)); // 1
+```
+
+`bakeMorphBones(animation, {fps = 30, clips, morphs})` takes `bakeBones`'s options and `morphs`: the targets that stay
+live, by name or by index (default: every target of the model). Targets are joined by name across primitives, in
+first-seen order, so a face split over three primitives has one weight per expression; an unnamed target is
+`'Target <index>'`. A target left out of `morphs` is baked in at the weight it has now, as `bakeBones` bakes it. The
+result is a `BoneBake` with `morphs.names` (the live targets), `morphs.weights` (the model's weights when baked: what a
+new member starts with), `morphs.vertices` and `morphs.blocks` (where each vertex finds its offsets).
+
+A member takes everything a `SkinnedCrowd` member does, and `morphs`: an array in `bake.morphs.names` order, or an
+object of weights by name. Weights may be any finite number (below 0 and above 1 extrapolate, as glTF allows); a weight
+of 0 costs no texture reads. `setMorph(index, target, weight)` and `getMorph(index, target)` set and read one weight. A
+weight that is not finite, an unknown target or a member that does not exist throws RangeError and changes nothing.
+Changed weights upload with the next frame.
+
+A bake holds at most 64 live targets (`MORPH_TARGET_LIMIT`): the weights are part of the instance row, four to a
+vector, so a member row is 28 floats plus the target count rounded up to 4. Name the targets you animate in `morphs`
+when a model has more. Offsets cost two texels (32 bytes) per vertex of each primitive that has the target, and nothing
+for primitives without it. Tangent offsets are not carried (the crowd has no tangents). `morphVertices(bake, weights)`
+and `poseMorphedBones(bake, member, time)` are the shader's CPU twins, for bounds and picking. Everything else is
+`SkinnedCrowd`'s: two clips and a blend per member, one material, `shadows.add(crowd)`, `lighting.add(crowd)`.
+
+`packages/animation/tests/instanced-morph-browser.mjs` runs the vertex stage's own morph and skin functions from a
+compute shader on real WebGPU and on the WebGL2 compatibility layer: 48 members with their own weights, clips and blends
+match `poseMorphedBones` within 1e-5 at every vertex, and a member drawn at given weights covers the same pixels as the
+model itself at those weights.
 
 ## Points on a deforming mesh (`@margoengine/animation/deformed-points`)
 

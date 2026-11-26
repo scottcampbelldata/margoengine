@@ -256,7 +256,8 @@ fn skinned(s:Instance,position:vec3f,normal:vec3f,j0:vec4u,j1:vec4u,w0:vec4f,w1:
 }
 `;
 
-const layout = (bake: BoneBake): CrowdLayout => ({
+/** @internal What a skinned crowd draws through VATCrowd; a crowd with more per member (instanced-morph.ts) extends it. */
+export const skinnedCrowdLayout = (bake: BoneBake): CrowdLayout => ({
   vertex: skinnedCrowdVertex,
   stride: SKINNED_CROWD_STRIDE,
   rowSize: bake.bones,
@@ -311,13 +312,19 @@ export class SkinnedCrowd extends VATCrowd {
     engine.use(value);
     return value;
   }
+  /** @internal Floats per member row. */
+  protected readonly stride: number;
   constructor(
     readonly bake: BoneBake,
     options?: VATCrowdOptions,
+    /** @internal */
+    custom?: CrowdLayout,
   ) {
     if (!(bake?.vertices instanceof Float32Array) || !(bake.bones > 0))
       throw new TypeError('Invalid skinned crowd; pass the result of bakeBones');
-    super(bake, options, layout(bake));
+    const layout = custom ?? skinnedCrowdLayout(bake);
+    super(bake, options, layout);
+    this.stride = layout.stride;
   }
   override add(instance: SkinnedCrowdInstance = {}): number {
     return super.add(instance);
@@ -336,7 +343,7 @@ export class SkinnedCrowd extends VATCrowd {
         'Invalid crowd blend; use a blendClip from bake.clips, a finite blendOffset and blendSpeed, and a blend in 0..1',
       );
     super.set(index, instance);
-    const o = index * SKINNED_CROWD_STRIDE,
+    const o = index * this.stride,
       d = this.rows;
     if (blend !== undefined) d[o + 19] = blend;
     if (blendClip !== undefined) d[o + 24] = blendClip;
