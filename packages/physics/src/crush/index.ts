@@ -13,6 +13,9 @@ import type {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
+import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
+
+export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
 
 export {
   resolveCrush,
@@ -75,11 +78,6 @@ export interface CrushParams {
   /** Stable ordering of configured contact surfaces. */
   readonly patches: readonly CrushPatch[];
 }
-
-/** Layout-1 f64 data, in patch order. */
-export const CRUSH_LAYOUT = 1;
-/** Each row stores permanent, total work, peak stroke, peak force, impulse, elastic work, seal loss, and count. */
-export const CRUSH_WORDS = 8;
 
 /** State of one contact patch. Peak and impulse fields describe its most recent impact. */
 export interface CrushPatchState {
@@ -365,7 +363,7 @@ export class CrushSolver implements Solver<CrushParams> {
     this.damageField = {
       name: `${id}:damage`,
       kind: 'surfaceSampleSet',
-      quantity: 'crushDamage',
+      quantity: CRUSH_DAMAGE_QUANTITY,
       unit: 'm, J, N, N s, 1',
       centring: 'particle',
     };
@@ -475,7 +473,7 @@ export class CrushSolver implements Solver<CrushParams> {
       peakForce: values[at + 3]!,
       impulse: values[at + 4]!,
       elasticEnergy: values[at + 5]!,
-      sealLoss: values[at + 6]!,
+      sealLoss: values[at + CRUSH_SEAL_LOSS_WORD]!,
       impacts: values[at + 7]!,
     };
   }

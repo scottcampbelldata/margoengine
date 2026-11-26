@@ -67,6 +67,7 @@ export class Flooding {
     get words(): number;
     get openingCount(): number;
     ends(i: number): readonly [number, number];
+    failOpening(state: Float64Array, opening: number): void;
     initialise(state: Float64Array): void;
     levelOf(i: number, volume: number): number;
     step(state: Float64Array, pose: Pose, sea: Surface, t: number, dt: number, rho: number, g: number): FloodResult;
@@ -146,7 +147,7 @@ export interface HullPose {
 export class HullSolver implements Solver<HullParams> {
     readonly id: string;
     readonly wakeSourceField: FieldDescriptor;
-    constructor(id?: string, wake?: HullWake);
+    constructor(id?: string, wake?: HullWake, crushDamage?: FieldDescriptor | undefined);
     describe(): SolverDescription;
     init(host: SolverHost, params: HullParams): void;
     step(context: StepContext, dt: number): void;
@@ -200,6 +201,7 @@ export interface Opening {
     readonly opens?: number;
     readonly closes?: number;
     readonly collapse?: number;
+    readonly crushPatch?: number;
 }
 
 export const PERMEABILITY = 0.95;

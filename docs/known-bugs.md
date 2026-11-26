@@ -17220,7 +17220,12 @@ move those blocks independently.
 
 ### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
 
-A floating hull can give up normal kinetic energy, recoil from a contact, and publish lost seal integrity through `CrushSolver`. Run the floating service craft test in `packages/physics/tests/coupling/crush.test.js` to reproduce a fully failed seal. The below-deck water mass still needs a SEA-10 compartment and opening geometry to connect a damaged station to hydrostatic head, displaced water and the hull's centre of mass. EF-11 also needs its original scene and the later failure sequence. PA-52 remains open for its other paths.
+A crush station now opens an authored SEA-10 compartment aperture when its seal fails. It transfers
+the inflowing water and its mass to the hull. A flooding hull with exterior hydrodynamic added mass
+disabled used to dereference an absent carried-inertia region when the first water entered. The region is
+now allocated for compartments and the live crush-to-flood test exercises that setting.
+`packages/physics/tests/coupling/crush.test.js` reproduces the connection. Distributed rupture geometry
+and EF-11's production breakup sequence remain open. PA-52 remains open for its other paths.
 
 ### Rain-sheet breakup and shared rain suppression of ocean waves (PA-23)
 

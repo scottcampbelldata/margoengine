@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Crush-triggered flooding (BREAK-03 / SEA-10, 2026-11-26). A full structural seal loss opens a real submersed
+  compartment aperture. Its first inflow falls between independent hydrostatic bounds including the one-step
+  air and water head change, and the flooded hull settles deeper. A partial loss keeps the same aperture closed.
+  Restoring the snapshot reproduces the breach and pose. Run `node --test packages/physics/tests/coupling/crush.test.js`.
 - Square-tube folding work (BREAK-03, 2026-11-26). A curve from tube geometry and tensile properties predicts
   940.1 J of work over 100 mm. Five independent guided AA6063-T5 compressions absorbed 897.4–1048.77 J.
   An additional rigid-sled test checks work transfer through the world port. Run

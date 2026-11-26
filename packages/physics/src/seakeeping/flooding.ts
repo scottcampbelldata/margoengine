@@ -97,7 +97,7 @@ export interface Opening {
   readonly axis?: Vec3;
   /** Its discharge coefficient (default 0.611, a sharp-edged hole). */
   readonly discharge?: number;
-  /** When it opens and shuts, s on the world clock (default open from 0, never shut; shut until it gives way with `collapse`). */
+  /** Opens/closes in world seconds. Defaults to open from zero unless a failure trigger is configured. */
   readonly opens?: number;
   readonly closes?: number;
   /**
@@ -105,6 +105,8 @@ export interface Opening {
    * load: Dankowski's pressure-height criterion). Left out, it never gives way.
    */
   readonly collapse?: number;
+  /** Keep shut by default until this zero-based CrushSolver patch loses its seal. */
+  readonly crushPatch?: number;
 }
 
 /** f64 words of a compartment's state: its water (m^3), its air (kg) and its cargo left (kg). */
@@ -438,7 +440,7 @@ export class Flooding {
       if (!(cd > 0 && cd <= 1))
         throw new RangeError(`Opening ${i}'s discharge coefficient is ${cd}; pass one above 0, at most 1.`);
       const collapse = o.collapse ?? Infinity,
-        opens = o.opens ?? (o.collapse === undefined ? 0 : Infinity),
+        opens = o.opens ?? (o.collapse === undefined && o.crushPatch === undefined ? 0 : Infinity),
         closes = o.closes ?? Infinity;
       if (!(collapse > 0) || Number.isNaN(opens) || Number.isNaN(closes))
         throw new RangeError(
@@ -482,6 +484,13 @@ export class Flooding {
   ends(i: number): readonly [number, number] {
     const o = this.openings[i]!;
     return [o.from, o.to];
+  }
+
+  /** Permanently opens an opening, using its existing saved failure word. */
+  failOpening(state: Float64Array, opening: number): void {
+    if (state.length !== this.words || !Number.isSafeInteger(opening) || opening < 0 || opening >= this.openingCount)
+      throw new RangeError('Pass the Flooding state and the index of an existing opening to failOpening.');
+    state[this.compartments.length * COMPARTMENT_WORDS + opening] = 1;
   }
 
   /** The state at the start: each compartment's water, its air at the atmosphere's pressure, its cargo. */

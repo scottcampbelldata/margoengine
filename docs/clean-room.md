@@ -15059,6 +15059,15 @@ Tables 1 and 3 separately supply the dimensions and tensile data. The independen
 constant in the solver. The numerical sled uses the same geometry/tensile model and checks work
 transfer through the live rigid coupling. [Yob et al. (2016)](https://doi.org/10.5539/mas.v10n1p34)
 
+Hull openings linked to `crushPatch` use the abrupt change in watertight topology modeled by Pekka
+Ruponen, “Progressive Flooding of a Damaged Passenger Ship” (2007), sections 3 and 5.2. The authored
+aperture remains sealed through partial damage. After the irreversible structural seal threshold it
+feeds the existing SEA-10 hydrostatic-head, air and mass integrator. A horizontal aperture at depth `h`
+has dry initial flow `Cᵈ A √(2gh)`. In the coupled fixture, the upper bound assumes a dry, vented
+compartment. The lower bound subtracts the largest possible water level rise and Boyle-pressure head
+within one tick. The same geometry with partial damage stays shut.
+[Ruponen (2007)](https://aaltodoc.aalto.fi/server/api/core/bitstreams/745b4f83-7891-4a64-bf68-25f016159491/content)
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

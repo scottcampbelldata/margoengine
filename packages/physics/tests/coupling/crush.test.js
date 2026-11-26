@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { HullSolver } from '../../dist/seakeeping.js';
+import { ATMOSPHERE, HULL_BREACHES_FIELD, HULL_BREACH_WORDS, HullSolver } from '../../dist/seakeeping.js';
 import { CRUSH_LAYOUT, CRUSH_WORDS, CrushSolver, resolveCrush, squareTubeCrushMaterial } from '../../dist/crush.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
@@ -332,7 +332,7 @@ test('event work is independent of presentation frame rate and of a capped seek'
   }
 });
 
-function floatingHull(quayZ) {
+function floatingHull(quayZ, options = {}) {
   const gravity = [0, -9.81, 0];
   const world = new PhysicsWorld({ rate, gravity, memory: worldMemory(false) });
   const physics = new Physics(null, { arena: world.arena, gravity });
@@ -358,13 +358,31 @@ function floatingHull(quayZ) {
         0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2,
       ]),
     };
-    const hull = new HullSolver();
     const crush = new CrushSolver();
+    const hull = new HullSolver('hull', undefined, options.crushPatch !== undefined ? crush.damageField : undefined);
     const capacity = physics.kernel.capacity;
     const sea = { density: 1000, elevation: () => 0, pressure: (_x, y) => Math.max(0, -9810 * y) };
+    const compartment =
+      options.crushPatch === undefined
+        ? undefined
+        : {
+            compartments: [{ mesh, permeability: 1 }],
+            openings: [
+              {
+                from: 0,
+                to: 'outside',
+                centre: [0, -0.2, 0],
+                normal: [0, -1, 0],
+                width: 0.02,
+                height: 0.02,
+                discharge: 0.6,
+                crushPatch: options.crushPatch,
+              },
+            ],
+          };
     world.add(new RigidSolver(), { physics, capacity });
     world.add(hull, {
-      hulls: [{ row: body.row, mesh }],
+      hulls: [{ row: body.row, mesh, ...compartment }],
       sea,
       gravity,
       addedMass: false,
@@ -383,22 +401,31 @@ function floatingHull(quayZ) {
           radius: 0.1,
           support: { point: [-0.2, 0.1, quayZ] },
           material,
-          sealStroke: 0.1,
+          sealStroke: options.sealStroke ?? 0.1,
         },
       ],
     });
     world.couple(['rigid', hull.id, crush.id], 'staggered');
-    world.advance(30);
-    return { damage: crush.read(0), surge: body.linearVelocity[0], heave: body.position[1] };
-  } finally {
+    return { world, physics, body, crush };
+  } catch (error) {
     physics.dispose();
+    throw error;
   }
 }
 
 test('a floating service hull recoils from a quay while its separate seakeeping load remains active', async () => {
   await Physics.load();
-  const berth = floatingHull(0);
-  const clear = floatingHull(1);
+  const run = (quay) => {
+    const { world, physics, body, crush } = floatingHull(quay);
+    try {
+      world.advance(30);
+      return { damage: crush.read(0), surge: body.linearVelocity[0], heave: body.position[1] };
+    } finally {
+      physics.dispose();
+    }
+  };
+  const berth = run(0);
+  const clear = run(1);
   const result = resolveCrush(material, 16, 0.5);
   close(berth.surge, -result.reboundSpeed, 1e-7);
   close(clear.surge, 0.5, 1e-7);
@@ -407,4 +434,70 @@ test('a floating service hull recoils from a quay while its separate seakeeping 
   assert.equal(clear.damage.impacts, 0);
   close(berth.damage.absorbedEnergy, result.absorbedEnergy, 1e-6);
   close(berth.damage.sealLoss, 1);
+});
+
+test('a structural seal failure opens a real compartment, floods the hull and replays', async () => {
+  await Physics.load();
+  const run = (sealStroke) => {
+    const { world, physics, body, crush } = floatingHull(0, { crushPatch: 0, sealStroke });
+    const opening = () => {
+      const port = world.fields.port(HULL_BREACHES_FIELD.name);
+      const words = regionWords(world.memory, port.region);
+      assert.equal(words[0], 1);
+      return Array.from(words.slice(1, 1 + HULL_BREACH_WORDS));
+    };
+    try {
+      world.advance(1);
+      assert.equal(opening()[8], 0);
+      assert.equal(opening()[9], 0);
+      const saved = world.takeSnapshot();
+      let firstInflow;
+      for (let frame = 2; frame <= 40; frame++) {
+        world.advance(frame);
+        const record = opening();
+        if (record[9] < 0 && !firstInflow) firstInflow = record;
+      }
+      world.advance(75);
+      const heave = body.position[1];
+      const damage = crush.read(0);
+      const hash = world.hash();
+      world.restoreSnapshot(saved.bytes);
+      world.advance(75);
+      assert.equal(world.hash(), hash);
+      return { firstInflow, heave, damage, opening: opening() };
+    } finally {
+      physics.dispose();
+    }
+  };
+
+  const torn = run(0.1);
+  const intact = run(0.4);
+  assert.equal(torn.damage.sealLoss, 1);
+  assert.equal(intact.damage.impacts, 1);
+  assert.ok(intact.damage.sealLoss > 0 && intact.damage.sealLoss < 1);
+  assert.equal(intact.firstInflow, undefined);
+  assert.equal(intact.opening[8], 0);
+  close(torn.opening[8], 0.02 ** 2);
+  assert.ok(torn.heave < intact.heave);
+
+  // The horizontal opening's every point starts at the published depth. Bound the initial
+  // discharge by accounting for the largest possible rise in water and compression of air in one tick.
+  assert.ok(torn.firstInflow);
+  const head = torn.firstInflow[14];
+  const limit = 0.6 * 0.02 ** 2 * Math.sqrt(2 * 9.81 * head);
+  const volume = limit / 60;
+  const backHead = volume / 0.4 ** 2 + (ATMOSPHERE * volume) / (9810 * (0.4 ** 3 - volume));
+  const minimum = limit * Math.sqrt((head - backHead) / head);
+  const inflow = -torn.firstInflow[9];
+  assert.ok(inflow >= minimum && inflow <= limit, `expected ${minimum} to ${limit}, got ${inflow}`);
+});
+
+test('an opening linked to a missing crush patch gives an actionable error', async () => {
+  await Physics.load();
+  const { world, physics } = floatingHull(0, { crushPatch: 1 });
+  try {
+    assert.throws(() => world.advance(4), { code: 'state', message: /crushPatch within the connected damage port/ });
+  } finally {
+    physics.dispose();
+  }
 });

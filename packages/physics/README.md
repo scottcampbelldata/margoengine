@@ -2736,10 +2736,14 @@ world.advance(60);
 console.log(Math.abs(box.position[1] - (D / 2 - T)) < 1e-3); // true: it floats at its draft
 ```
 
-A barge holed in a wing tank, which floods through the hole while its air leaves by a vent, and lists:
+A barge strikes a fixed quay. Its wing tank opens when the crush patch loses its seal, floods while
+air leaves by a vent, and makes the barge list. Pass `CrushSolver.damageField` as the third argument
+to `HullSolver` and use the zero-based `crushPatch` index on the opening. That opening stays shut by
+default until its seal loss reaches `1`. Its configured rectangle then opens permanently.
 
 ```ts
 import {Physics} from 'margoengine/physics';
+import {CrushSolver} from 'margoengine/physics/crush';
 import {HullSolver} from 'margoengine/physics/seakeeping';
 import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
 
@@ -2752,25 +2756,35 @@ const cuboid = (a: number[], b: number[]) => {
 };
 const physics = new Physics(null, {fixedTimestep: 1 / 60});
 // A 20 by 4 by 8 m barge floating at a 2 m draft.
-const barge = physics.addBody(null, {colliders: {shape: 'box', halfExtents: [10, 2, 4], mass: 1025 * 20 * 8 * 2}});
+const barge = physics.addBody(null, {
+  linearVelocity: [0.5, 0, 0],
+  colliders: {shape: 'box', halfExtents: [10, 2, 4], mass: 1025 * 20 * 8 * 2},
+});
 const hull = {
   row: barge.row,
   mesh: cuboid([-10, -2, -4], [10, 2, 4]),
   // A wing tank on the starboard side, the barge's full depth.
   compartments: [{mesh: cuboid([-5, -2, 2.5], [5, 2, 4])}],
   openings: [
-    // A 2 by 0.5 m hole in the side at the bottom, and a vent in the tank's top.
-    {from: 0, to: 'outside' as const, centre: [0, -1.5, 4] as const, normal: [0, 0, 1] as const, width: 2, height: 0.5},
+    // A potential 2 by 0.5 m opening, and a vent in the tank's top.
+    {from: 0, to: 'outside' as const, centre: [0, -1.5, 4] as const, normal: [0, 0, 1] as const, width: 2, height: 0.5, crushPatch: 0},
     {from: 0, to: 'outside' as const, centre: [0, 2, 3.25] as const, normal: [0, 1, 0] as const, width: 0.3, height: 0.3},
   ],
 };
+const crush = new CrushSolver();
+const seakeeping = new HullSolver('hull', undefined, crush.damageField);
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
-  .add(new HullSolver(), {hulls: [hull], sea: {elevation: () => 0}, greenWater: false})
-  .couple(['hull', 'rigid'], 'staggered');
+  .add(crush, {bodyCapacity: physics.kernel.capacity, patches: [{
+    body: barge.row, anchor: [10, 0, 0], normal: [1, 0, 0], radius: 0.3,
+    support: {point: [10.15, 0, 0]}, sealStroke: 0.04,
+    material: {stiffness: 1e6, yieldForce: 1e5, stroke: 0.25},
+  }]})
+  .add(seakeeping, {hulls: [hull], sea: {elevation: () => 0}, greenWater: false})
+  .couple(['rigid', crush.id, seakeeping.id], 'staggered');
 for (let f = 1; f <= 60 * 60; f++) world.advance(f);
 const heel = (2 * Math.asin(barge.rotation[0]) * 180) / Math.PI;
-console.log(heel > 13 && heel < 14.5); // true: it lists about 13.7 degrees as the lost buoyancy says
+if (crush.read(0).sealLoss !== 1 || heel < 13 || heel > 14.5) throw new Error('Expected the damaged barge to list');
 ```
 
 On a sea of waves, the framework's `SpectralSea` from a spectrum (here one 1 m swell of 0.1 Hz along x):

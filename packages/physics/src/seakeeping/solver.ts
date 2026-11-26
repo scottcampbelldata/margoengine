@@ -18,7 +18,9 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
+import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from '../crush/port.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
+import { regionWords } from '../world/memory.js';
 import {
   type FieldDescriptor,
   type Port,
@@ -236,6 +238,7 @@ export class HullSolver implements Solver<HullParams> {
   private readonly floods = new Map<Hull, { flooding: Flooding; at: number; record: number }>();
   private flood: Region | null = null;
   private breaches: Region | null = null;
+  private lastCrushPatch = -1;
 
   /** The hull's signed volume source rows, named from the solver's id. Enabled with the wake option. */
   readonly wakeSourceField: FieldDescriptor;
@@ -243,14 +246,18 @@ export class HullSolver implements Solver<HullParams> {
   private readonly wakePlanes = new Map<Hull, { waterline: number; sections: readonly Section[] }>();
   private readonly wakeRadius: number | null;
 
+  /** Pass CrushSolver.damageField to enable crush-triggered compartment openings. */
   constructor(
     readonly id = 'hull',
     wake?: HullWake,
+    private readonly crushDamage?: FieldDescriptor,
   ) {
     const radius = wake?.minimumRadius ?? 0;
     if (!(Number.isFinite(radius) && radius >= 0))
       throw new MargoError('state', 'Invalid hull wake patch radius. Use a finite nonnegative radius in metres.');
     this.wakeRadius = wake ? radius : null;
+    if (crushDamage && (crushDamage.kind !== 'surfaceSampleSet' || crushDamage.quantity !== CRUSH_DAMAGE_QUANTITY))
+      throw new MargoError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
     if (wake) this.loads.surfacePiercing = false;
     this.wakeSourceField = Object.freeze({
       name: id + '.wakeSources',
@@ -272,6 +279,7 @@ export class HullSolver implements Solver<HullParams> {
         { field: DECK_CLAIMS_FIELD, access: 'read', optional: true },
         { field: HULL_BREACHES_FIELD, access: 'write' },
         ...(this.wakeRadius !== null ? [{ field: this.wakeSourceField, access: 'write' as const }] : []),
+        ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -287,7 +295,17 @@ export class HullSolver implements Solver<HullParams> {
       );
     if (!sea || typeof sea.elevation !== 'function')
       throw new TypeError('A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
+    let lastCrushPatch = -1;
     for (const hull of hulls) {
+      for (const { crushPatch } of hull.openings ?? []) {
+        if (crushPatch === undefined) continue;
+        if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
+          throw new MargoError(
+            'state',
+            'Pass CrushSolver.damageField and a nonnegative crushPatch index for the hull opening.',
+          );
+        lastCrushPatch = Math.max(lastCrushPatch, crushPatch);
+      }
       if (!(Number.isInteger(hull.row) && hull.row >= 0))
         throw new RangeError(
           `A hull's row is a kernel body row (got ${hull.row}); pass the body's row, a whole number of 0 or more.`,
@@ -333,6 +351,7 @@ export class HullSolver implements Solver<HullParams> {
     if (!(Number.isInteger(this.stations) && this.stations >= 2))
       throw new RangeError(`A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
     this.host = host;
+    this.lastCrushPatch = lastCrushPatch;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     this.wakeSources = null;
     this.wakePlanes.clear();
@@ -369,7 +388,9 @@ export class HullSolver implements Solver<HullParams> {
       this.history = host.allocate('history', hulls.length * this.lags * 6 * 8, 'f64', HULL_LAYOUT);
       this.radiated = host.allocate('radiated', hulls.length * 7 * 8, 'f64', HULL_LAYOUT);
     }
-    if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
+    // Internal floodwater contributes inertia even when the exterior hydrodynamic added mass is disabled.
+    if (this.addedMass || hulls.some((hull) => hull.compartments?.length))
+      this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
     this.diffraction = (params.diffraction ?? true) && this.waterOf() !== null;
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     this.greenWater = params.greenWater ?? true;
@@ -511,6 +532,17 @@ export class HullSolver implements Solver<HullParams> {
       );
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
+    const crush = this.crushDamage && context.inputs.get(this.crushDamage.name);
+    if (
+      crush &&
+      (crush.region.type !== 'f64' ||
+        crush.region.layout !== CRUSH_LAYOUT ||
+        crush.region.byteLength % (CRUSH_WORDS * Float64Array.BYTES_PER_ELEMENT) !== 0)
+    )
+      throw new MargoError('state', 'Connect the hull to the layout-1 f64 CrushSolver damage port.');
+    const damage = crush && (regionWords(crush.region.memory ?? host.memory, crush.region) as Float64Array);
+    if (damage && this.lastCrushPatch * CRUSH_WORDS >= damage.length)
+      throw new MargoError('state', 'Choose a hull opening crushPatch within the connected damage port.');
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
@@ -576,7 +608,17 @@ export class HullSolver implements Solver<HullParams> {
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.slamming) this.slamLoad(hull, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.greenWater) this.deckLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), context, loads);
-      const points = this.floodLoad(hull, pose, centre, t, 1 / rateOf(context.level), context.tick, breaches, loads),
+      const points = this.floodLoad(
+          hull,
+          pose,
+          centre,
+          t,
+          1 / rateOf(context.level),
+          context.tick,
+          breaches,
+          loads,
+          damage,
+        ),
         w = hull.row * FORCE_WORDS,
         held =
           this.addedMass || points.length > 0
@@ -1193,12 +1235,22 @@ export class HullSolver implements Solver<HullParams> {
     tick: number,
     breaches: Float64Array,
     loads: WettedLoads,
+    damage: Float64Array | undefined,
   ): number[] {
     const entry = this.floods.get(hull);
     if (!entry || !this.flood) return [];
-    const { flooding, at, record } = entry,
-      state = new Float64Array(this.host!.memory.buffer, this.flood.byteOffset + at * 8, flooding.words),
-      density = this.sea!.density ?? SEA_WATER,
+    const { flooding, at, record } = entry;
+    const state = new Float64Array(this.host!.memory.buffer, this.flood.byteOffset + at * 8, flooding.words);
+    const openings = hull.openings ?? [];
+    if (damage) {
+      for (let k = 0; k < openings.length; k++) {
+        const patch = openings[k]!.crushPatch;
+        if (patch === undefined) continue;
+        const seal = patch * CRUSH_WORDS + CRUSH_SEAL_LOSS_WORD;
+        if (damage[seal]! >= 1) flooding.failOpening(state, k);
+      }
+    }
+    const density = this.sea!.density ?? SEA_WATER,
       g = this.gravity,
       magnitude = hypot(g[0], g[1], g[2]),
       r = flooding.step(state, pose, this.sea!, t, dt, density, magnitude),
@@ -1220,8 +1272,7 @@ export class HullSolver implements Solver<HullParams> {
       add(-r.lost[i]!, r.lostCentre[i * 3]!, r.lostCentre[i * 3 + 1]!, r.lostCentre[i * 3 + 2]!);
     }
     // The breaches: one record an opening to the outside, after the count word.
-    const openings = hull.openings ?? [],
-      q = pose.rotation;
+    const q = pose.rotation;
     let n = record;
     for (let k = 0; k < openings.length; k++) {
       const o = openings[k]!;
