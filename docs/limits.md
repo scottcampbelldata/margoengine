@@ -2631,6 +2631,28 @@ both GPUs (`MARGO_GPU=amd` for the iGPU), noise 0 in 4 runs. The Arc laptop's in
 re-recorded on that laptop. Reproduce: set `fireflies: 'karis'` in packages/creative/examples/earth/main.ts and run
 `node scripts/visual-regression.js --only=earth` against the baselines before and after this re-record.
 
+## Edge 158 visual baselines recorded (2026-11-26)
+
+Scott approved 2026-11-26 (yes to all). Edge updated to 158.0.4370.33 on the RTX A6000, so `visual:check` looks for a
+new profile, `tests/visual/profiles/nvidia-ampere-msedge-158`. Recorded with `npm run visual:update` (4 runs a view,
+noise 0 on every view) at `0a9e9367ce` with a clean tree, after KB-TERRAIN-SAND3 (`a6f41305a3`, the sand ripple clamp
+takes its footprint from the pixel's own derivatives), so the terrain ripples are in the baselines. 81 views: the 78 of
+the Edge 157 profile (recorded at `d9fa86e5bc` and `b6865f6d83`) plus hud-preview high, light and phone, which had no
+157 baseline. None is bit-identical to 157; the changes against it, by view (share of pixels changed, largest step):
+
+| Views | Change against Edge 157 | What it is |
+| --- | --- | --- |
+| gameplay-sandbox x3 (Afterlight) | 90 to 94%, up to 245 levels | sand ripples on the beach (KB-TERRAIN-SAND3, expected), a foam band at the shore, darker grass and trees, particles in other places |
+| windy-meadow x3 | 43 to 58%, up to 39 | lighter haze at the horizon, grass blades shaded differently |
+| character-animation x3 | 23 to 31%, up to 19 | the robot's shading and the floor gradient, a few levels |
+| voxel-ground, -overview, -night, -shapes | 2 to 16%, up to 50 | shadow and light edges |
+| Khronos models x32 | under 30%, up to 10 | material shading, most 1 to 5 levels (ToyCar and BoxVertexColors widest, at most 5) |
+| every other view | under 2%, up to 27 | 1-level noise, a few bright edges |
+
+The Edge 157 profile stays for 157 runs. Review: every view compared pixel by pixel with its 157 baseline and looked at
+on contact sheets passed through `scripts/review-png.mjs`; none shows a defect. Reproduce:
+`npm run visual:check` on Edge 158 at a later commit compares against these.
+
 ## Batch 160 budgets re-recorded (2026-11-11, accepted differences)
 
 Scott's ruling of 2026-11-11 ("Yes, re-record"): the batch 160 reference-rendering budgets in
