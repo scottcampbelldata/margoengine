@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20598151,
+  "total": 20600082,
   "history": [
     {
       "date": "2026-10-24",
@@ -13723,6 +13723,12 @@
       "commit": "FLUID-07-contact-hysteresis",
       "grew": 1,
       "reason": "FLUID-07 adds advancing and receding contact angles with a conservative frictional pressure solve. Thin-film rises from 8878 to 9159 B gzip; cap changes from 8928 to 9434 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "react clustered lights",
+      "grew": 1,
+      "reason": "react/clustered (new entry) measured 1,675 B, ceiling 1,931: PointLight, SpotLight and RectAreaLight over @margoengine/clustered and its /area entry, both loaded lazily, sharing one Clustered per Canvas or Scene. Its own entry, so no other entry grows."
     }
   ],
   "items": {
@@ -14730,6 +14736,7 @@
     "@margoengine/react/cameras": 2077,
     "@margoengine/react/caustics": 3814,
     "@margoengine/react/clouds": 3921,
+    "@margoengine/react/clustered": 1931,
     "@margoengine/react/controls": 10113,
     "@margoengine/react/controls-extra": 6012,
     "@margoengine/react/devtools": 1008,
