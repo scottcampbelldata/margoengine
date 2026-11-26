@@ -146,6 +146,7 @@ export interface TracerOilSpill {
     mass: number;
     position: readonly [number, number];
     start?: number;
+    releaseDuration?: number;
     spreadingCoefficient: number;
     yieldStress?: number;
     material?: TracerMaterial;

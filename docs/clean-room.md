@@ -13294,6 +13294,17 @@ transitions. Antipodal equal-area parcels give the initial patch; each step expa
 and applies the usual surface advection and diffusion. The closed-form check uses all three regimes and exact
 mass and snapshot replay. Independent field validation of oil extent remains open.
 
+V. Maderich, I. Brovchenko and K. T. Jung, [“Oil spreading in instantaneous and continuous spills on rotating
+earth” (2012)](https://doi.org/10.1007/s10652-012-9239-2), Eqs. 27 and 30, give axisymmetric gravity-viscous
+radius laws with 1.06 for a fixed volume and 0.816 for a constant inflow. During feed the radius grows as `t^(7/12)`.
+At shutoff we start the fixed-volume law from the release radius using equivalent age `(0.816/1.06)^4 T`.
+The Fay inertial cap uses the cumulative released volume. The represented source feeds one mixed moving patch,
+so rotation, thickness stratification, separate parcel ages and stationary sources in shear are outside this model.
+The six open-circle radius points in Brönner et al., Fig. 4, are held out. The MGO experiment feeds 4 L over 120 s.
+The model uses the published 846 kg/m³ oil density and nominal seawater properties. The comparison covers 30–240 s
+and gives 0.134 m RMS error versus 1.081 m when the same final volume is released instantly by Fay's law. The
+largest relative error is 13.2%. Radii are read to centimetres from the optically reconstructed equivalent extent.
+
 The waxy film uses U. Brönner, Ø. Johansen, F. Leirvik, T. Nordam, and K. R. Sørheim,
 [“Spreading of waxy oils on calm water” (2018)](https://doi.org/10.1016/j.marpolbul.2018.02.021),
 equations A7–A8. The shear yield stress supplies the stopping thickness through the paper's factor of √3.

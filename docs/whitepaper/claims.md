@@ -290,6 +290,9 @@ first: each names its scope, its evidence file and how to reproduce it.
   Against nine independent terminal tank radii at 180 s, the RMS log radius error falls from 1.056 to 0.480. The largest
   discrepancy, a factor of 3.59 for the 30% waxy blend, remains open. The comparison covers final extent of a coherent film.
   [Brönner et al., Tables 1–2](https://doi.org/10.1016/j.marpolbul.2018.02.021).
+  A constant-rate gravity-driven patch continues spreading at the same radius when the feed stops. Six MGO tank
+  radii give 0.134 m RMS error and a 13.2% maximum relative error. The instantaneous Fay control gives 1.081 m RMS.
+  [Brönner et al., Figure 4](https://doi.org/10.1016/j.marpolbul.2018.02.021).
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
 - Vertical dye diffusion (SEA-15, 2026-11-26). The solver recovers the drift and midpoint variance in a linear

@@ -141,13 +141,92 @@ test('SEA-15 yield resistance improves held-out terminal slick radii in the wax 
   );
 });
 
-test('SEA-15 the coherent wax law rejects negative yield stress and incompatible forcing', () => {
+test('SEA-15 wax and constant-rate oil releases validate their time and forcing bounds', () => {
   const release = { mass: 1, position: [0, 0], spreadingCoefficient: 0 };
   const add = (settings) => new PhysicsWorld().add(new TracerSolver(), { oilSpills: [{ ...release, ...settings }] });
   assert.throws(() => add({ yieldStress: -1 }), /nonnegative shear yield stress/);
   assert.throws(() => add({ yieldStress: 1, spreadingCoefficient: 0.001 }), /fixed-volume gravity-spreading/);
   assert.throws(() => add({ yieldStress: 1, evaporation: {} }), /fixed-volume gravity-spreading/);
   assert.throws(() => add({ yieldStress: 1, dispersion: {} }), /fixed-volume gravity-spreading/);
+  assert.throws(() => add({ releaseDuration: Infinity }), /nonnegative duration/);
+  assert.throws(() => add({ releaseDuration: 1, yieldStress: 1 }), /fed oil patch uses gravity spreading/);
+  assert.throws(() => add({ releaseDuration: 1, spreadingCoefficient: 0.001 }), /fed oil patch uses gravity spreading/);
+});
+
+test('SEA-15 constant-rate gravity spreading tracks the held-out MGO tank run through feed shutoff', (t) => {
+  // Brönner et al. (2018), Table 1 and section 3: 2 L/min for 120 s, marine gas oil, experiment 18.
+  const material = { density: 846, floats: true, colour: [0.05, 0.03, 0.01] };
+  const volume = 0.004;
+  const mass = volume * material.density;
+  const releaseDuration = 120;
+  const start = 0.25;
+  const rate = 4;
+  const waterDensity = 1025;
+  const tracer = new TracerSolver();
+  const batch = { mass, material, start, position: [0, 0], parcels: 32, spreadingCoefficient: 0 };
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+    waterDensity,
+    viscosity: 1e-6,
+    horizontalDiffusivity: 0,
+    oilSpills: [
+      { ...batch, releaseDuration },
+      { ...batch, position: [10, 0] },
+    ],
+  });
+  world.advance(start * rate);
+  assert.equal(tracer.budget.released, 0);
+  assert.equal(tracer.oilFilm(0), undefined);
+  assert.equal(tracer.oilFilm(1), undefined);
+  const reducedGravity = (9.80665 * (waterDensity - material.density)) / waterDensity;
+  // Maderich et al., Eqs. 27 and 30, use different prefactors for continuous and fixed-volume radial motion.
+  const scale = ((reducedGravity * volume ** 2) / 1e-3) ** (1 / 6);
+  const stoppedAt = 0.816 * scale * releaseDuration ** 0.25;
+  const instantaneous = 1.06 * scale;
+  const coastBias = (stoppedAt / instantaneous) ** 4;
+  // Fig. 4, open circles, metres. Axes read to the nearest centimetre. These radii are not model inputs.
+  const observations = [
+    [30, 0.73],
+    [60, 1.14],
+    [90, 1.43],
+    [120, 1.63],
+    [180, 1.84],
+    [240, 1.91],
+  ];
+  let baseline = 0;
+  let fed = 0;
+  let maxRelativeError = 0;
+  let snapshot;
+  for (const [time, observed] of observations) {
+    world.advance((time + start) * rate);
+    const film = tracer.oilFilm(0);
+    const fraction = Math.min(1, time / releaseDuration);
+    const expected =
+      time <= releaseDuration
+        ? stoppedAt * fraction ** (7 / 12)
+        : instantaneous * (coastBias + time - releaseDuration) ** 0.25;
+    assert.ok(Math.abs(film.radius - expected) < 64 * Number.EPSILON * expected);
+    assert.ok(Math.abs(film.meanThickness * Math.PI * film.radius ** 2 - volume * fraction) < 1e-16);
+    const released = mass * (1 + fraction);
+    assert.ok(
+      Math.abs(tracer.budget.released - released) < 64 * Number.EPSILON * released,
+      `${tracer.budget.released} vs ${released} kg at ${time} s`,
+    );
+    assert.equal(tracer.budget.surface, tracer.budget.released);
+    assert.equal(tracer.budget.water, 0);
+    const batchRadius = tracer.oilFilm(1).radius;
+    baseline += (batchRadius - observed) ** 2;
+    fed += (film.radius - observed) ** 2;
+    maxRelativeError = Math.max(maxRelativeError, Math.abs(film.radius - observed) / observed);
+    if (time === 60) snapshot = world.takeSnapshot();
+  }
+  assert.ok(fed < baseline, 'the feed model must explain more of the observed radius history than an instant release');
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance((240 + start) * rate);
+  assert.equal(world.hash(), hash);
+  t.diagnostic(
+    `RMS radius error ${Math.sqrt(baseline / observations.length).toFixed(3)} → ${Math.sqrt(fed / observations.length).toFixed(3)} m. Peak relative error ${(100 * maxRelativeError).toFixed(1)}%.`,
+  );
 });
 
 test('SEA-15 a slick rides live wave height while dye follows submerged orbital flow across an origin cell', () => {

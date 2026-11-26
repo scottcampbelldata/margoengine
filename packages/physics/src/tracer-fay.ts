@@ -25,6 +25,18 @@ export function fayRadius([inertial, viscous, surface]: FayCoefficients, age: nu
   return Math.max(Math.min(inertial * half, viscous * quarter), surface * half * quarter);
 }
 
+/** Constant-rate axisymmetric discharge followed by fixed-volume gravity spreading. */
+export function fedOilRadius([inertial, viscous]: FayCoefficients, age: number, duration: number): number {
+  const fraction = Math.min(1, age / duration);
+  const cap = inertial * Math.sqrt(age) * Math.sqrt(Math.sqrt(fraction));
+  // Maderich et al. (2012), Eqs. 27 and 30. Convert from Fay's 1.45 viscous prefactor.
+  const spreading =
+    age <= duration
+      ? (viscous * 0.816 * Math.sqrt(Math.sqrt(age)) * pow(fraction, 1 / 3)) / 1.45
+      : (viscous * 1.06 * Math.sqrt(Math.sqrt(age - duration + duration * fourth(0.816 / 1.06)))) / 1.45;
+  return Math.min(cap, spreading);
+}
+
 /** Integrated circular area since release, m²·s. Each active Fay radius is a power of time. */
 export function fayAreaTime([inertial, viscous, surface]: FayCoefficients, age: number): number {
   if (inertial === 0 || viscous === 0) return ((2 * Math.PI) / 5) * surface * surface * age * age * Math.sqrt(age);

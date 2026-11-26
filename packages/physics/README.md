@@ -3327,6 +3327,24 @@ world.advance(60);
 console.log(oil.budget.surface, [...oil.particlesOf()].length); // 0.025 64
 ```
 
+Set `releaseDuration` in seconds to feed the total `mass` into one well-mixed patch at a constant rate.
+The default is 0, an instantaneous release. With a positive duration, use zero `spreadingCoefficient` and
+`yieldStress` and omit evaporation and breaking dispersion. The radius grows during the feed and continues
+from the same radius after the feed stops. The supplied current and wind move the patch as a whole.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const feed = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(feed, {
+  oilSpills: [{ mass: 0.5, position: [0, 0], spreadingCoefficient: 0, releaseDuration: 20 }],
+  horizontalDiffusivity: 0,
+});
+world.advance(60);
+console.log(feed.budget.surface); // 0.025 kg after one second
+```
+
 Set `yieldStress`, in Pa, for a coherent waxy film. The default is 0. A positive value uses the fixed-volume
 gravity-spreading model from Brönner et al. with zero `spreadingCoefficient` and no evaporation or breaking-wave
 dispersion. The film approaches a finite radius. Read `oilFilm(index)` for the cell-local centre, nominal radius and

@@ -52,7 +52,7 @@ import {
   evaporationRates,
   type TracerOilEvaporation,
 } from './tracer-evaporation.js';
-import { type FayCoefficients, fayAreaTime, fayCoefficients, fayRadius } from './tracer-fay.js';
+import { type FayCoefficients, fayAreaTime, fayCoefficients, fayRadius, fedOilRadius } from './tracer-fay.js';
 import {
   checkFlocConditions,
   flocDiameter,
@@ -180,7 +180,7 @@ export interface BreachTracerMix {
   fractions: readonly { material: TracerMaterial | keyof typeof TRACER_MATERIALS; fraction: number }[];
 }
 
-/** One finite oil release, represented by a spreading patch of floating tracer parcels. */
+/** One finite batch or constant-rate oil release, represented by a spreading patch of floating tracer parcels. */
 export interface TracerOilSpill {
   /** Oil mass in kg. */
   mass: number;
@@ -188,6 +188,8 @@ export interface TracerOilSpill {
   position: readonly [number, number];
   /** Time of release on the world clock, s (default 0). */
   start?: number;
+  /** Time to feed the total mass uniformly into one gravity-spreading patch, s. Default 0 releases the whole mass at once. */
+  releaseDuration?: number;
   /** Air–water tension minus oil–air and oil–water tensions, N/m. Use zero for gravity-only spreading. */
   spreadingCoefficient: number;
   /** Shear yield stress in Pa for a coherent waxy film (default 0). Positive values require gravity-only, fixed-volume spreading. */
@@ -220,7 +222,7 @@ export interface TracerFlocculation {
 export interface TracerParams {
   /** The sources. */
   sources?: readonly TracerSource[];
-  /** Instantaneous oil releases that spread by Fay's radial model (default none). */
+  /** Finite oil releases with radial spreading (default none). */
   oilSpills?: readonly TracerOilSpill[];
   /** Live surface, wave velocity at depth, and water density (default: flat, still water). */
   sea?: SeaSurface;
@@ -305,6 +307,7 @@ interface OilSpillState {
   mass: number;
   position: readonly [number, number];
   start: number;
+  releaseDuration: number;
   profile: FayCoefficients;
   waxStoppingRadius?: number;
   evaporation?: EvaporationRates;
@@ -698,6 +701,7 @@ export class TracerSolver implements Solver<TracerParams> {
         spreadingCoefficient,
         yieldStress = 0,
         start = 0,
+        releaseDuration = 0,
         parcels = 128,
         material = TRACER_MATERIALS.oil,
       } = spill;
@@ -729,6 +733,13 @@ export class TracerSolver implements Solver<TracerParams> {
       const reducedGravity = this.g * (1 - material.density / waterDensity);
       if (!(yieldStress >= 0 && Number.isFinite(yieldStress)))
         throw new RangeError('Invalid oil yield stress; pass a finite, nonnegative shear yield stress in Pa.');
+      if (!(releaseDuration >= 0 && Number.isFinite(releaseDuration)))
+        throw new RangeError('Invalid oil release duration; pass a finite, nonnegative duration in seconds.');
+      if (releaseDuration > 0 && (yieldStress || spreadingCoefficient || spill.evaporation || spill.dispersion))
+        throw new MargoError(
+          'unsupported',
+          'A fed oil patch uses gravity spreading; pass zero tension and yield stress and omit evaporation and dispersion.',
+        );
       if (yieldStress > 0 && (spreadingCoefficient || spill.evaporation || spill.dispersion))
         throw new MargoError(
           'unsupported',
@@ -751,6 +762,7 @@ export class TracerSolver implements Solver<TracerParams> {
         position,
         mass,
         start,
+        releaseDuration,
         profile,
         waxStoppingRadius:
           yieldStress > 0 ? waxLimit(volume, material.density, reducedGravity, yieldStress) : undefined,
@@ -907,7 +919,11 @@ export class TracerSolver implements Solver<TracerParams> {
       const spill = this.oilSpills[i]!;
       const age = time - spill.start;
       if (!(age > 0) || vapour?.[i] === spill.mass) continue;
-      let radius = fayRadius(spill.profile, age);
+      const { releaseDuration } = spill;
+      const released = releaseDuration > 0 ? spill.mass * Math.min(1, age / releaseDuration) : spill.mass;
+      if (!(released > 0)) continue;
+      let radius =
+        releaseDuration > 0 ? fedOilRadius(spill.profile, age, releaseDuration) : fayRadius(spill.profile, age);
       if (spill.waxStoppingRadius) {
         const viscous = spill.profile[1] * Math.sqrt(Math.sqrt(age));
         radius = Math.min(radius, waxRadius(spill.waxStoppingRadius, viscous));
@@ -919,13 +935,19 @@ export class TracerSolver implements Solver<TracerParams> {
         );
       const previous = radii[i]!;
       if (previous === 0) {
-        this.seedOil(spill, radius, words);
-        book[0]! += spill.mass;
-        book[2]! += spill.mass;
+        this.seedOil(spill, radius, released, words);
       } else if (radius !== previous) {
         this.expandOil(spill, radius / previous, words, waves?.[i]?.centre ?? this.oilCentre(spill, words));
       }
       radii[i] = radius;
+      if (releaseDuration > 0) {
+        if (previous > 0 && tick * dt - spill.start < releaseDuration) this.setOilMass(spill, released, words, false);
+        continue;
+      }
+      if (previous === 0) {
+        book[0]! += released;
+        book[2]! += released;
+      }
       const priorAge = Math.max(0, age - dt);
       let remaining = Math.max(0, spill.mass - (vapour?.[i] ?? 0) - (immersed?.[i] ?? 0));
       let changed = false;
@@ -1032,8 +1054,8 @@ export class TracerSolver implements Solver<TracerParams> {
     );
   }
 
-  private seedOil(spill: OilSpillState, radius: number, words: Float64Array): void {
-    const { first, count, position, material, mass } = spill;
+  private seedOil(spill: OilSpillState, radius: number, mass: number, words: Float64Array): void {
+    const { first, count, position, material } = spill;
     const pairs = Math.floor(count / 2);
     const share = mass / count;
     for (let i = 0; i < count; i++) {
@@ -1443,7 +1465,11 @@ export class TracerSolver implements Solver<TracerParams> {
   /** The mass, kg: released, in the water, floating on the surface and settled on the bed. */
   get budget(): { released: number; water: number; surface: number; bed: number } {
     const b = this.book();
-    return { released: b[0]!, water: b[1]!, surface: b[2]!, bed: b[3]! };
+    // A fed patch keeps all its oil at the surface. Read its current share from the parcels so the
+    // ledger never accumulates rounding error from adding thousands of small per-tick increments.
+    let fed = 0;
+    for (const spill of this.oilSpills) if (spill.releaseDuration > 0) fed += this.oilSurfaceMass(spill, this.words());
+    return { released: b[0]! + fed, water: b[1]!, surface: b[2]! + fed, bed: b[3]! };
   }
 
   /** Cumulative oil vapour, kg. Included in `budget.released` and excluded from the liquid and bed terms. */
@@ -1462,8 +1488,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const radius = (regionWords(this.host.memory, this.spillRadii) as Float64Array)[index]!;
     if (!(radius > 0)) return undefined;
     const words = this.words();
-    const mass =
-      words[spill.first * STRIDE + 3]! * (spill.count - 1) + words[(spill.first + spill.count - 1) * STRIDE + 3]!;
+    const mass = this.oilSurfaceMass(spill, words);
     if (!(mass > 0)) return undefined;
     const volume = mass / this.materials[spill.material]!.density;
     const meanThickness = volume / radius / radius / Math.PI;
@@ -1473,6 +1498,12 @@ export class TracerSolver implements Solver<TracerParams> {
       meanThickness,
       centreThickness: spill.waxStoppingRadius ? meanThickness / WAX_FILM_MEAN : meanThickness,
     };
+  }
+
+  private oilSurfaceMass(spill: OilSpillState, words: Float64Array): number {
+    // All parcels except the last have equal mass. The final one retains the division remainder.
+    const { first, count } = spill;
+    return words[first * STRIDE + 3]! * (count - 1) + words[(first + count - 1) * STRIDE + 3]!;
   }
 
   /** Cumulative kg lifted out of the erodible layer by water jets. Included in `budget.released`. */

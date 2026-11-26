@@ -510,8 +510,9 @@ vapour ledger. The integrated exposure matches an independent quadrature of the 
 A fixed-volume waxy film now reports its thickness and follows the Brönner Bingham yield force. Nine independent
 tank terminal radii lower the RMS log radius error from 1.056 to 0.480 compared with Fay's unyielded radius at the
 reported 180 s measurement time. The simulated 30% blend under-spreads by a factor of 3.59 against the run that
-fractured. Continuous sources, fracture, unyielded oil
-extent and independent evaporation validation remain open.
+fractured. The constant-rate gravity-driven patch now covers the unyielded MGO tank release through shutoff. Its
+six independent radii give 0.134 m RMS error, compared with 1.081 m for the same oil released instantly. Waxy
+continuous flow, fracture, field extent and independent evaporation validation remain open.
 
 Vertical tracers now accept a depth profile and include the diffusivity-gradient drift and midpoint variance from
 Visser (1997). For Coastal Mixing and Optics Experiment 4, the independent EPSONDE microstructure samples drive
