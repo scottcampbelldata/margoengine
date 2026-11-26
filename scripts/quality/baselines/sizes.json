@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20338560,
+  "total": 20341374,
   "history": [
     {
       "date": "2026-10-24",
@@ -13047,6 +13047,12 @@
       "commit": "b3a3d3a6ec",
       "grew": 3,
       "reason": "SOFT-04 vertex block descent: soft entry 110995 to 113913 B gzip. @margoengine/physics/soft: 111864 to 117331 B ceiling (113913 B measured); @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 34593 to 35704 B ceiling (34664 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 76400 to 80702 B ceiling (78351 B measured). Native adjacency and the exact 3x3 Hessian work in the existing lazy soft kernel, sharing material state, cuts and rigid contacts. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "68fd95a7be",
+      "reason": "exporters usdz 22,472 to 22,482, threemf 20,207 to 20,446, dae 15,626 to 15,808, dae-glb 19,390 to 19,426 B gzip measured: the shared scene collector reads LineBatches, and 3MF writes a tint under a texture; a split would add a lazy chunk to every scene writer for 10 to 240 B",
+      "grew": 4
     }
   ],
   "items": {
@@ -13406,8 +13412,8 @@
     "@margoengine/exporters/babylon": 15198,
     "@margoengine/exporters/capture": 7923,
     "@margoengine/exporters/collect": 14143,
-    "@margoengine/exporters/dae": 15626,
-    "@margoengine/exporters/dae-glb": 19390,
+    "@margoengine/exporters/dae": 16283,
+    "@margoengine/exporters/dae-glb": 20009,
     "@margoengine/exporters/draco": 93986,
     "@margoengine/exporters/gcode": 15468,
     "@margoengine/exporters/gltf": 21509,
@@ -13438,7 +13444,7 @@
     "@margoengine/exporters/sparse": 25614,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 10316,
-    "@margoengine/exporters/threemf": 20207,
+    "@margoengine/exporters/threemf": 21060,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -13449,7 +13455,7 @@
     "@margoengine/exporters/unreal-pixel-art": 1126,
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
-    "@margoengine/exporters/usdz": 22472,
+    "@margoengine/exporters/usdz": 23157,
     "@margoengine/exporters/usdz-anim": 28718,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24529,
