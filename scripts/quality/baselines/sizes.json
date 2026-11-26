@@ -13038,7 +13038,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "3205eb0575",
+      "commit": "9166bde3f1",
       "reason": "DYN-05 adds 9673 B gzip from zero for optional rail contacts, sprung bogies, couplers and catenary. The separate plain and shared 571 B Rust SIMD wire kernels fetch on demand. Core and Stage add zero bytes.",
       "grew": 1
     }
