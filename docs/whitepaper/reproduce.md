@@ -5048,7 +5048,7 @@ For the independent Wigley tank comparison, run `node packages/physics/tests/cou
 
 ### SEA-08 hull-launch cavity and splash
 
-Build Physics and run `node --test --test-name-pattern="observes a launching" packages/physics/tests/coupling/entry.test.js`. The two controlled trajectories and wake records agree exactly. Compare the renderer with `node scripts/run-with-timeout.mjs -- node packages/water/test/hull-entry-splash.browser.mjs`, followed by the same fixture with `MARGO_COMPAT=1`. The live splash and the same frame with its particles removed provide a pixel control.
+Build Physics and run `node --test --test-name-pattern="observes a launching" packages/physics/tests/coupling/entry.test.js`. The two controlled trajectories and wake records agree exactly. Run the adjacent "an open launch cavity" test for the controlled pressure feedback, load ownership and underwater seal. Run the "air cavity clips" case in seakeeping.test.js for the closed-form hydrostatic force and moment. Compare the renderer with `node scripts/run-with-timeout.mjs -- node packages/water/test/hull-entry-splash.browser.mjs`, followed by the same fixture with `MARGO_COMPAT=1`. The live splash and the same frame with its particles removed provide a pixel control.
 
 ### SEA-08 full KVLCC2 head-sea resistance and motion
 

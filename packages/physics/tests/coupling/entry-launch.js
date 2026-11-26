@@ -6,7 +6,7 @@ import { PhysicsWorld, RigidSolver, worldMemory } from '../../dist/world.js';
 import { vHull } from './sections.js';
 
 /** A small coated launch hull crossing its own resolved wake. */
-export function makeEntryLaunch({ observed = true, probeMesh, shared = false } = {}) {
+export function makeEntryLaunch({ observed = true, probeMesh, shared = false, pressure = false, mass = 9 } = {}) {
   const mesh = vHull(Math.PI / 5, 0.18, 1);
   // The section fixture points its normals inward. The launch uses an outward-wound hull.
   for (let i = 0; i < mesh.indices.length; i += 3) {
@@ -18,7 +18,7 @@ export function makeEntryLaunch({ observed = true, probeMesh, shared = false } =
     position: [-0.5, 0.36, 0],
     linearVelocity: [0.8, -4, 0],
     enabledRotations: [false, false, false],
-    colliders: { shape: 'box', halfExtents: [0.5, 0.065, 0.18], mass: 9 },
+    colliders: { shape: 'box', halfExtents: [0.5, 0.065, 0.18], mass },
   });
   const bodies = [];
   let probe;
@@ -43,7 +43,8 @@ export function makeEntryLaunch({ observed = true, probeMesh, shared = false } =
     },
     patches: [wake],
   });
-  const entry = new EntrySolver();
+  const entry = new EntrySolver('entry', { cavityPressure: pressure });
+  if (pressure) hull.connectEntryCavity(entry.cavityPressureField);
   world
     .add(new RigidSolver(), { physics })
     .add(hull, {
@@ -55,6 +56,6 @@ export function makeEntryLaunch({ observed = true, probeMesh, shared = false } =
     })
     .add(wake, { cells: [40, 40], cellSize: 0.15, depth: 2, waterBelow: true })
     .add(entry, { bodies, sea })
-    .couple(['hull', 'wake', 'entry', 'rigid'], 'staggered');
-  return { world, physics, vessel, probe, sea, wake, entry };
+    .couple(pressure ? ['entry', 'hull', 'wake', 'rigid'] : ['hull', 'wake', 'entry', 'rigid'], 'staggered');
+  return { world, physics, vessel, probe, sea, wake, entry, hull };
 }

@@ -35,6 +35,7 @@ import {
   GIRDER_SEAM_QUANTITY,
   GIRDER_SEAM_WORDS,
 } from '../crush/port.js';
+import { entryCavityRows, ENTRY_CAVITY_WORDS, isEntryCavityField } from '../entry/cavity-port.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import { atan2 } from '../ship/propeller.js';
 import { regionWords } from '../world/memory.js';
@@ -300,6 +301,7 @@ export class HullSolver implements Solver<HullParams> {
   private lastGirderJoint = -1;
   private lastShellSeam = -1;
   private shellApertures?: { readonly field: FieldDescriptor; readonly cellSize?: number };
+  private entryCavity?: FieldDescriptor;
   private wetChannel?: CrushInertiaChannel;
   private wetMobility: Region | null = null;
 
@@ -376,6 +378,15 @@ export class HullSolver implements Solver<HullParams> {
     return hull;
   }
 
+  /** Uses the wet side of each open entry cavity for this hull's pressure and form drag. */
+  connectEntryCavity(field: FieldDescriptor): this {
+    if (this.host) throw new MargoError('state', 'Connect an entry cavity before adding the hull to the world.');
+    if (!isEntryCavityField(field))
+      throw new MargoError('state', 'Pass EntrySolver.cavityPressureField to connect open entry cavities.');
+    this.entryCavity = field;
+    return this;
+  }
+
   describe(): SolverDescription {
     const level = this.level;
     return {
@@ -391,6 +402,7 @@ export class HullSolver implements Solver<HullParams> {
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
         ...(this.girderSeams ? [{ field: this.girderSeams, access: 'read' as const }] : []),
         ...(this.shellApertures ? [{ field: this.shellApertures.field, access: 'read' as const }] : []),
+        ...(this.entryCavity ? [{ field: this.entryCavity, access: 'read' as const }] : []),
         ...(this.wetChannel
           ? ([
               { field: this.wetChannel.mobility, access: 'write' },
@@ -740,6 +752,10 @@ export class HullSolver implements Solver<HullParams> {
         throw new MargoError('state', 'Use the solver order hull, crush and rigid at the same rate.');
       received = wetInertiaWords(host.memory, receipt, this.capacity, WET_IMPULSE_WORDS);
     }
+    const cavityPort = this.entryCavity && context.inputs.get(this.entryCavity.name);
+    if (this.entryCavity && (cavityPort?.tick !== context.tick || port.tick !== context.tick - 1))
+      throw new MargoError('state', 'Use the solver order entry, hull and rigid at the same rate for cavity pressure.');
+    const cavity = cavityPort && entryCavityRows(host.memory, cavityPort, this.capacity);
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
@@ -756,6 +772,9 @@ export class HullSolver implements Solver<HullParams> {
     for (const [index, hull] of this.hulls.entries()) {
       const at = hull.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
+      const cavityAt = hull.row * ENTRY_CAVITY_WORDS,
+        cavityNormal: Vec3 | undefined =
+          cavity?.[cavityAt] === 1 ? [cavity[cavityAt + 1]!, cavity[cavityAt + 2]!, cavity[cavityAt + 3]!] : undefined;
       this.claim = claims && hull.row < claims.length ? claims[hull.row]! : 0;
       // The pose a fraction of the step on (the body's velocity and spin carried over it), where a load held through the step
       // neither feeds the motion energy nor takes it. The rigid step moves a body by (v + F dt (s + 1) / (2 s m)) dt over its
@@ -794,6 +813,7 @@ export class HullSolver implements Solver<HullParams> {
           centre,
           this.loads,
           this.dragOf(hull, bodies[at + 16]!, v, spin, pose, centre, t),
+          cavityNormal,
         );
       const course = this.course[index];
       const wetWake = wake && this.loads.surfacePiercing && bodies[at + 16]! > 0;

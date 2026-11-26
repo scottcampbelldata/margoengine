@@ -32,7 +32,7 @@ try {
     });
     engine.gpu.pushErrorScope('validation');
     await Physics.load();
-    const { world, physics, sea, wake, entry } = makeEntryLaunch();
+    const { world, physics, vessel, sea, wake, entry } = makeEntryLaunch({ pressure: true });
     const water = Water.attach(engine, { size: [5, 5], segments: 32, sea });
     const drawnWake = WaterWake.attach(engine, { surface: water, wake });
     const emitters = [];
@@ -46,8 +46,10 @@ try {
         return emitter;
       },
     });
+    let cavityOpen = false;
     for (let frame = 1; frame <= 14; frame++) {
       world.advance(frame);
+      cavityOpen ||= entry.bodyState(vessel.row).cavity;
       engine.render({ delta: 1 / 60 });
     }
     await engine.gpu.queue.onSubmittedWorkDone();
@@ -57,11 +59,13 @@ try {
     return {
       observed,
       drawn: drawn?.event,
+      cavityOpen,
       wakeSources: entry.seaSources(),
       hash: world.hash(),
     };
   });
   assert.ok(receipt.observed?.cavity && receipt.observed.crownHeight > 0);
+  assert.ok(receipt.cavityOpen);
   assert.equal(receipt.drawn?.crownHeight, receipt.observed.crownHeight);
   assert.equal(receipt.drawn?.time, receipt.observed.time);
   assert.deepEqual(receipt.wakeSources, []);

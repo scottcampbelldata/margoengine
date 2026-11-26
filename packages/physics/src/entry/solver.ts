@@ -32,6 +32,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { SeaSource, SeaSurface, SeaSurfaceSample } from '@margoengine/math/fields';
 import { hypot, ln, pow } from '@margoengine/math/pinned';
 import {
+  type FieldDescriptor,
   type Port,
   type RateLevel,
   type Region,
@@ -44,6 +45,7 @@ import {
 import { regionWords } from '../world/memory.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { type HullMesh, type SeaQuery, wettedLoads, type WettedLoads } from '../seakeeping/wetted.js';
+import { entryCavityField, ENTRY_CAVITY_LAYOUT, ENTRY_CAVITY_WORDS } from './cavity-port.js';
 import { CAVITY_ALPHA, cavityThreshold, constantSpeedPinch, SECTION_WORDS, sectionRadius2 } from './cavity.js';
 import { slam, slamProfile, type Slam } from './slam.js';
 
@@ -175,6 +177,7 @@ export class EntrySolver implements Solver<EntryParams> {
   private level: RateLevel = 0;
   private capacity = 0;
   private forces: Region | null = null;
+  private cavityPressure: Region | null = null;
   private state: Region | null = null;
   private sections: Region | null = null;
   private log: Region | null = null;
@@ -204,7 +207,15 @@ export class EntrySolver implements Solver<EntryParams> {
     density: 1025,
   };
 
-  constructor(readonly id = 'entry') {}
+  /** Open air cavity directions for observer bodies. Enable this field with the cavityPressure option. */
+  readonly cavityPressureField: FieldDescriptor;
+
+  constructor(
+    readonly id = 'entry',
+    private readonly options: { readonly cavityPressure?: boolean } = {},
+  ) {
+    this.cavityPressureField = entryCavityField(id);
+  }
 
   describe(): SolverDescription {
     return {
@@ -212,6 +223,7 @@ export class EntrySolver implements Solver<EntryParams> {
       fields: [
         { field: BODIES_FIELD, access: 'read' },
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
+        ...(this.options.cavityPressure ? [{ field: this.cavityPressureField, access: 'write' as const }] : []),
       ],
       rate: this.level,
       stableRate: () => (this.host ? this.level : 0),
@@ -278,6 +290,13 @@ export class EntrySolver implements Solver<EntryParams> {
     this.eventCount = events;
     this.shapes = bodies.map((b) => shapeOf(b.mesh));
     this.forces = host.allocate(`${this.id}:forces`, capacity * FORCE_WORDS * 8, 'f64', ENTRY_LAYOUT);
+    if (this.options.cavityPressure)
+      this.cavityPressure = host.allocate(
+        this.cavityPressureField.name,
+        capacity * ENTRY_CAVITY_WORDS * Float64Array.BYTES_PER_ELEMENT,
+        'f64',
+        ENTRY_CAVITY_LAYOUT,
+      );
     this.state = host.allocate(`${this.id}:state`, bodies.length * STATE_WORDS * 8, 'f64', ENTRY_LAYOUT);
     this.sections = host.allocate(
       `${this.id}:sections`,
@@ -326,6 +345,8 @@ export class EntrySolver implements Solver<EntryParams> {
       );
     const out = this.words(this.forces);
     out.fill(0);
+    const cavity = this.cavityPressure ? this.words(this.cavityPressure) : undefined;
+    cavity?.fill(0);
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     const state = this.words(this.state);
     for (let b = 0; b < this.bodies.length; b++) state[b * STATE_WORDS + SOURCE_V] = 0;
@@ -338,7 +359,7 @@ export class EntrySolver implements Solver<EntryParams> {
       const body = this.bodies[b]!,
         at = body.row * BODY_WORDS;
       if (at + BODY_WORDS > rows.length || rows[at + 23] !== 1) continue;
-      this.stepBody(b, body, rows, at, t, 1 / rateOf(context.level), out);
+      this.stepBody(b, body, rows, at, t, 1 / rateOf(context.level), out, cavity);
     }
   }
 
@@ -350,6 +371,7 @@ export class EntrySolver implements Solver<EntryParams> {
     t: number,
     dt: number,
     out: Float64Array,
+    cavity?: Float64Array,
   ) {
     const sea = this.sea!,
       state = this.words(this.state),
@@ -427,12 +449,15 @@ export class EntrySolver implements Solver<EntryParams> {
     // The cavity: sections opened as the widest section passes, and the pinch.
     let cavityVolume = 0;
     if (state[s + CAVITY] === 1) cavityVolume = this.cavity(b, state, s, t, centre, speed, R0, surfaceHeight);
-    if (body.effectsOnly) return;
     const open = state[s + CAVITY] === 1;
     // The sea's pressure over the wetted surface, the air's inside an open cavity: behind the plane through the centre
     // across the body's motion (its widest section, where the contact line is pinned).
-    const ahead: V3 = speed > 0 ? [vr[0] / speed, vr[1] / speed, vr[2] / speed] : [0, -1, 0],
-      seaQuery: SeaQuery = open
+    const ahead: V3 = speed > 0 ? [vr[0] / speed, vr[1] / speed, vr[2] / speed] : [0, -1, 0];
+    if (body.effectsOnly) {
+      if (open && cavity) cavity.set([1, ...ahead], body.row * ENTRY_CAVITY_WORDS);
+      return;
+    }
+    const seaQuery: SeaQuery = open
         ? {
             elevation: (x, z, tt) => sea.elevation(x, z, tt),
             pressure: (x, y, z, tt) =>
@@ -894,13 +919,16 @@ export class EntrySolver implements Solver<EntryParams> {
   exportPorts(tick: number): readonly Port[] {
     if (!this.forces)
       throw new MargoError('state', 'EntrySolver is not in a world yet; add it with world.add(solver, {bodies, sea}).');
-    return [{ field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] }];
+    const ports: Port[] = [{ field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] }];
+    if (this.cavityPressure)
+      ports.push({ field: this.cavityPressureField.name, region: this.cavityPressure, tick, cell: [0, 0, 0] });
+    return ports;
   }
 
   importPorts(): void {}
 
   stateRegions(): readonly Region[] {
-    return [this.state, this.sections, this.log].filter((r): r is Region => r !== null);
+    return [this.state, this.sections, this.log, this.cavityPressure].filter((r): r is Region => r !== null);
   }
 
   extraState(): readonly Region[] {
