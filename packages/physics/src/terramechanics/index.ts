@@ -230,6 +230,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private budgetRegion!: Region;
   private pressure?: Region;
   private workRegion?: Region;
+  private faces?: Region;
   private response!: Region;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
@@ -333,6 +334,13 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     if (this.pressureField) {
       this.pressure = allocate('soil-pressure', count);
       this.workRegion = allocate('soil-work', 3);
+      let level = Math.ceil(count / 16);
+      let words = level;
+      while (level > 1) {
+        level = Math.ceil(level / 32);
+        words += level;
+      }
+      this.faces = host.allocate('soil-repose-faces', words * 4, 'u32', SOIL_LAYOUT);
     }
     this.profiles = profiles.map((profile, row) => {
       if (!profile) return null;
@@ -443,6 +451,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.floor,
       this.budgetRegion.byteOffset,
       this.workRegion?.byteOffset ?? 0,
+      this.faces?.byteOffset ?? 0,
       columns + 1,
       rows + 1,
       dx / columns,
@@ -500,9 +509,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.change.clear();
     this.words(this.dust).fill(0);
     this.words(this.response).fill(0);
-    if (this.pressure && this.workRegion) {
+    if (this.pressure && this.workRegion && this.faces) {
       this.words(this.pressure).fill(0);
       this.words(this.workRegion).fill(0);
+      const faceWords = regionWords(this.host.memory, this.faces);
+      faceWords[faceWords.length - 1] = 0;
     }
     const bed = context.inputs.get(BED_FIELD.name);
     if (
@@ -554,7 +565,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     }
     const feet = this.legged && context.inputs.get(LEGGED_CONTACT_FIELD.name);
     if (feet) this.footsteps(feet, this.fixed.length + this.inputRows, bed.region, dt);
-    if (this.pressure && this.workRegion && this.words(this.workRegion)[0]! > 0) {
+    if (this.pressure && this.workRegion && this.faces && this.words(this.workRegion)[0]! > 0) {
       const { columns, rows, width, depth } = this.terrain;
       const slope = this.material.reposeSlope;
       const moved = this.kernel.repose(
@@ -562,14 +573,14 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         this.change.state.byteOffset,
         this.pressure.byteOffset,
         bed.region.byteOffset,
+        this.faces.byteOffset,
+        this.workRegion.byteOffset,
         columns + 1,
         rows + 1,
         (slope * width) / columns,
         (slope * depth) / rows,
       );
-      const work = this.words(this.workRegion);
-      work[1] = columns * (rows + 1) + rows * (columns + 1);
-      work[2] = moved;
+      this.words(this.workRegion)[2] = moved;
     }
   }
 

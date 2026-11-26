@@ -10436,7 +10436,8 @@ aeolian sources. Tests include both clocks at their shared times and audit the h
 
 Both tiers use the same coupling contracts. The resolved tier balances integrated vertex pressure with the input
 force and exposes a layout-1 pressure grid. The native repose sweep transfers unconstrained, newly deposited loose
-soil across each grid face at most once per step. Reported work gives raster-vertex visits and grid faces examined,
-and the volume moved is auditable without a timer.
+soil across each grid face at most once per step. It schedules only faces adjacent to current loose material
+and visits them in the same order as a complete sweep. A transfer schedules any later faces it can reach.
+Reported work gives raster-vertex visits and candidate faces examined, and the volume moved is auditable without a timer.
 The browser fixture rebuilds the Terrain mesh from the published bed sampler on demand. The same physical relief
 reaches WebGPU and WebGL2 without transferring a solver-specific render texture.

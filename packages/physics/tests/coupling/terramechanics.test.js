@@ -122,7 +122,7 @@ test('resolved rounded footprints integrate the independent square-profile solut
   close(bed.elevations()[32 * 65 + 32], -crest / coefficient, (1024 * eps * crest) / coefficient);
   close(bed.volume(), 0, 2048 * eps * soil.budget.removed);
   assert.ok(soil.work.relaxedVolume > 0 && soil.work.rasterVisits > 0);
-  assert.equal(soil.work.reposeFaces, 2 * 64 * 65);
+  assert.ok(soil.work.reposeFaces > 0 && soil.work.reposeFaces < 2 * 64 * 65);
   const mark = world.takeSnapshot();
   world.advance(15);
   const hash = world.hash();
@@ -172,6 +172,57 @@ test('a projected tread rotates two unequal lugs while their gap stays unloaded'
     world.restoreSnapshot(saved.bytes);
     world.advance(20);
     assert.equal(world.hash(), hash);
+  }
+});
+
+test('sparse repose matches a complete ordered face sweep on a large bed', async () => {
+  const terrain = { columns: 256, rows: 384, width: 8, depth: 12, centre: [0, 0] };
+  const nx = terrain.columns + 1;
+  const nz = terrain.rows + 1;
+  const patches = [
+    { ...patch, x: -2.875, z: -4.25, rounded: true, load: 1800 },
+    { ...patch, x: 2.875, z: 4.25, rounded: true, load: 3100 },
+  ];
+  const material = { compaction: 0.17, dustFraction: 0 };
+  const baseline = await Terramechanics.load({ tier: 'resolved' });
+  const flat = planted(baseline, terrain, { ...material, reposeSlope: 1e6 }, { patches });
+  flat.world.advance(1);
+  const areas = bedVertexAreas(terrain);
+  const original = regionWords(flat.world.memory, baseline.stateRegions()[0]).slice();
+  const pressure = regionWords(flat.world.memory, flat.world.fields.port(baseline.pressureField.name).region);
+  for (const slope of [0.2, 0]) {
+    const expected = original.slice();
+    let transferred = 0;
+    const limitX = (slope * terrain.width) / terrain.columns;
+    const limitZ = (slope * terrain.depth) / terrain.rows;
+    const face = (a, b, maxRise) => {
+      if (pressure[a] > 0 || pressure[b] > 0) return;
+      const [src, dst] = expected[a] > expected[b] ? [a, b] : [b, a];
+      const excess = expected[src] - expected[dst] - maxRise;
+      if (excess <= 0 || expected[src] <= 0) return;
+      const volume = Math.min(excess / (1 / areas[src] + 1 / areas[dst]), expected[src] * areas[src]);
+      expected[src] -= volume / areas[src];
+      expected[dst] += volume / areas[dst];
+      transferred += volume;
+    };
+    for (let x = 0; x < nx; x++)
+      for (let z = 0; z < nz; z++) {
+        const i = x * nz + z;
+        if (x + 1 < nx) face(i, i + nz, limitX);
+        if (z + 1 < nz) face(i, i + 1, limitZ);
+      }
+    const soil = await Terramechanics.load({ tier: 'resolved' });
+    const actual = planted(soil, terrain, { ...material, reposeSlope: slope }, { patches });
+    actual.world.advance(1);
+    const deltas = regionWords(actual.world.memory, soil.stateRegions()[0]);
+    for (let i = 0; i < deltas.length; i++) {
+      assert.equal(deltas[i], expected[i], `native bed increment at vertex ${i}`);
+    }
+    assert.equal(soil.work.relaxedVolume, transferred);
+    if (slope > 0) {
+      const fullFaces = (nx - 1) * nz + (nz - 1) * nx;
+      assert.ok(soil.work.reposeFaces < fullFaces / 100, `${soil.work.reposeFaces} of ${fullFaces} faces`);
+    }
   }
 });
 

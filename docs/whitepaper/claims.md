@@ -5793,3 +5793,6 @@ each recorded 3,906 changed pixels between the flat bed and the loaded footprint
 camera and lighting. The measured center elevation fell 72 mm in that render fixture.
 The discrete two-lug test rotates a tread through 90°, preserves zero pressure between its components and
 matches the independently integrated peak depth for both orientations.
+Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
+matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
+which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

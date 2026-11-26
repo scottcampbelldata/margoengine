@@ -57,6 +57,83 @@ fn bounds(centre: f64, radius: f64, origin: f64, spacing: f64, size: usize) -> (
     (start.min(size), end.min(size))
 }
 
+// Candidate faces use the full grid's x-major order. Each higher word marks nonempty words one level below.
+struct FaceQueue {
+    words: *mut u32,
+    levels: [usize; 7],
+    top: usize,
+}
+
+impl FaceQueue {
+    fn new(words: *mut u32, vertices: usize) -> Self {
+        let mut levels = [0; 7];
+        let mut count = vertices.div_ceil(16);
+        let mut top = 0;
+        while count > 1 {
+            levels[top + 1] = levels[top] + count;
+            count = count.div_ceil(32);
+            top += 1;
+        }
+        Self { words, levels, top }
+    }
+
+    unsafe fn add(&self, face: usize) {
+        let mut path = [0; 7];
+        path[0] = face / 32;
+        for level in 1..=self.top {
+            path[level] = path[level - 1] / 32;
+        }
+        for level in (1..=self.top).rev() {
+            let parent = self.words.add(self.levels[level] + path[level]);
+            let bit = 1 << (path[level - 1] % 32);
+            if *parent & bit == 0 {
+                *self.words.add(self.levels[level - 1] + path[level - 1]) = 0;
+                *parent |= bit;
+            }
+        }
+        *self.words.add(path[0]) |= 1 << (face % 32);
+    }
+
+    unsafe fn next(&self) -> Option<usize> {
+        if *self.words.add(self.levels[self.top]) == 0 {
+            return None;
+        }
+        let mut face = 0;
+        for level in (0..=self.top).rev() {
+            let bits = *self.words.add(self.levels[level] + face);
+            face = face * 32 + bits.trailing_zeros() as usize;
+        }
+        let mut child = face;
+        for level in 0..=self.top {
+            let word_index = child / 32;
+            let word = self.words.add(self.levels[level] + word_index);
+            *word &= !(1 << (child % 32));
+            if *word != 0 {
+                break;
+            }
+            child = word_index;
+        }
+        Some(face)
+    }
+
+    unsafe fn around(&self, vertex: usize, nx: usize, nz: usize, first: usize) {
+        let x = vertex / nz;
+        let z = vertex % nz;
+        if x > 0 && 2 * (vertex - nz) >= first {
+            self.add(2 * (vertex - nz));
+        }
+        if z > 0 && 2 * vertex - 1 >= first {
+            self.add(2 * vertex - 1);
+        }
+        if x + 1 < nx && 2 * vertex >= first {
+            self.add(2 * vertex);
+        }
+        if z + 1 < nz && 2 * vertex + 1 >= first {
+            self.add(2 * vertex + 1);
+        }
+    }
+}
+
 #[inline]
 unsafe fn depth_at(patch: &Patch, side: f64, station: f64) -> f64 {
     if side.abs() > 1.0 || station.abs() > 1.0 {
@@ -124,6 +201,7 @@ pub unsafe extern "C" fn stamp(
     floor: f64,
     budget: *mut f64,
     work: *mut f64,
+    faces: *mut u32,
     nx: usize,
     nz: usize,
     dx: f64,
@@ -211,10 +289,15 @@ pub unsafe extern "C" fn stamp(
     let loose = removed - compacted - suspended;
     let deposited = if rim_area > 0.0 {
         let fill = loose / rim_area;
+        let queue = FaceQueue::new(faces, nx * nz);
         for x in x_start..x_end {
             for z in z_start..z_end {
                 let i = x * nz + z;
-                *deltas.add(i) += *rim.add(i) * fill;
+                let deposit = *rim.add(i) * fill;
+                *deltas.add(i) += deposit;
+                if resolved && deposit > 0.0 && *deltas.add(i) > 0.0 {
+                    queue.around(i, nx, nz, 0);
+                }
             }
         }
         if resolved {
@@ -242,22 +325,33 @@ pub unsafe extern "C" fn repose(
     deltas: *mut f64,
     pressure: *const f64,
     heights: *const f32,
+    faces: *mut u32,
+    work: *mut f64,
     nx: usize,
     nz: usize,
     limit_x: f64,
     limit_z: f64,
 ) -> f64 {
     let mut moved = 0.0;
-    let mut face = |a: usize, b: usize, limit: f64| {
+    let queue = FaceQueue::new(faces, nx * nz);
+    let mut examined = 0;
+    while let Some(face) = queue.next() {
+        examined += 1;
+        let a = face / 2;
+        let (b, limit) = if face % 2 == 0 {
+            (a + nz, limit_x)
+        } else {
+            (a + 1, limit_z)
+        };
         if *pressure.add(a) > 0.0 || *pressure.add(b) > 0.0 {
-            return;
+            continue;
         }
         let ha = *heights.add(a) as f64 + *deltas.add(a);
         let hb = *heights.add(b) as f64 + *deltas.add(b);
         let (source, target) = if ha > hb { (a, b) } else { (b, a) };
         let gradient = (ha - hb).abs() - limit;
         if gradient <= 0.0 || *deltas.add(source) <= 0.0 {
-            return;
+            continue;
         }
         let source_area = *areas.add(source);
         let target_area = *areas.add(target);
@@ -266,17 +360,10 @@ pub unsafe extern "C" fn repose(
         *deltas.add(source) -= volume / source_area;
         *deltas.add(target) += volume / target_area;
         moved += volume;
-    };
-    for x in 0..nx {
-        for z in 0..nz {
-            let i = x * nz + z;
-            if x + 1 < nx {
-                face(i, i + nz, limit_x);
-            }
-            if z + 1 < nz {
-                face(i, i + 1, limit_z);
-            }
+        if *deltas.add(target) > 0.0 {
+            queue.around(target, nx, nz, face + 1);
         }
     }
+    *work.add(1) = examined as f64;
     moved
 }
