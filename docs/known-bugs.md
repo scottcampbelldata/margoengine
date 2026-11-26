@@ -143,29 +143,39 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   Results of a scene with air loads change at f32 rounding from before; the physics is unchanged. Regression:
   `packages/physics/tests/world-air-solver.test.js`, "stepped alone, an air load comes off exactly when it stops".
 
-### Open 2026-11-25, narrowed the same day: a strong wind still grows the sea somewhat fast (KB-SEA-GROWTH1, physics waves)
+### Open 2026-11-26: a 20 m/s sea with unlimited fetch grows past the Pierson-Moskowitz height (KB-SEA-FULLDEV1, physics waves)
+
+- **Repro:** `WaveSolver` with one periodic cell (`cells: [1, 1]`, `cellSize: 1e7`, `periodic: ['x', 'z']`), a steady 20 m/s
+  wind and `warmUp: 72 * 3600`: the significant height is 122 percent of Pierson-Moskowitz's 0.21 U^2 / g (10 m/s: 106
+  percent, and 105 percent of its period).
+- **Cause:** not yet traced. The fetch law is right on a resolved grid (KB-SEA-GROWTH1), so the growth rates are not the
+  suspect; the balance at full development is (the breaking's saturation threshold against the input at old wave ages),
+  and the Pierson-Moskowitz limit itself is reported low by later work (Alves, Banner and Young 2003, not read yet). Next:
+  read it, and compare the developed spectrum's peak and its energy against it at 10, 20 and 30 m/s.
+
+### Fixed 2026-11-26: a strong wind grew the sea too fast, and the fetch law was flatter than measured (KB-SEA-GROWTH1, physics waves)
 
 - **Repro (as first filed):** `WaveSolver` with `cells: [30, 1]`, `cellSize: 4000`, `periodic: ['z']`, a steady 20 m/s wind
-  toward +x and `warmUp: 12 * 3600`: the significant height at 6, 14, 30, 62 and 118 km fetch was 1.84, 2.42, 3.16, 4.07 and
-  5.04 m against JONSWAP's 0.79, 1.21, 1.77, 2.54 and 3.51 m (g^2 E / U^4 = 1.6e-7 chi).
-- **Cause, found:** three parts. (1) WAM Cycle 3's input and whitecapping scale with U*, and SWAN's drag fit raises U* / U10
-  with the wind, so a 20 m/s sea grew relatively faster than a 10 m/s one. (2) First-order upwind propagation smeared the
-  energy downwind, flattening the fetch law to about chi^0.55 against the measured chi^0.9. (3) The comparison itself was
-  biased: a first-order cell's value belongs at its downwind face, not its centre. JONSWAP's own relation is also the
-  highest of the published fits; Kahma and Calkoen's composite (5.2e-7 chi^0.9) is the reference now.
-- **Fixed:** the ST4 source terms of Ardhuin et al. (2010) are the default (the waves' own stress feeds back on the sea's
-  roughness, and the short waves shelter each other with s_u calibrated to 1; docs/clean-room.md), and propagation is the
-  third-order ULTIMATE QUICKEST scheme. Against Kahma and Calkoen at a dimensionless fetch chi = g x / U^2 of 1,125, 3,125
-  and 10,125 (48 cells), the height is now +23, +7 and -8 percent at 20 m/s (was +72, +41 and +4 percent against JONSWAP
-  with first-order propagation at 6 to 118 km) and +2, -9 and -23 percent at 10 m/s. Regression:
-  `packages/physics/tests/waves.test.js`, "a gale of 20 m/s grows the sea as Kahma and Calkoen measured, not faster
-  (KB-SEA-GROWTH1)": 24 cells, +16 and -5 percent at chi 2,750 and 9,750, held within 20 percent.
-- **Still open:** the fetch law is still flatter than measured: energy grows about as chi^0.66 over chi 1,000 to 10,000
-  against Kahma and Calkoen's chi^0.9, so the sea is high at short fetches and low at long ones. At 30 m/s the height is 38,
-  21 and 7 percent above Kahma and Calkoen at those three fetches; with unlimited fetch a 20 m/s sea passes the
-  Pierson-Moskowitz height, reaching 122 percent of it after 72 hours (10 m/s: 106 percent). Not yet traced between the ST4
-  drag at strong winds, the DIA's strength C_nl4 = 2.5e7 and the residual diffusion of a 48-cell grid; the next step is a
-  point-model run with the terms switched off one at a time, and a finer grid, against the same data.
+  and `warmUp: 12 * 3600`: the significant height at 6 to 118 km fetch was 1.84 to 5.04 m against JONSWAP's 0.79 to 3.51 m.
+  After the first fix (ST4 and third-order propagation, 526cc95c9) a 48-cell grid still grew energy as chi^0.66 against
+  Kahma and Calkoen's chi^0.9.
+- **Cause:** four parts.
+  - WAM Cycle 3's input and whitecapping scale with u*, and SWAN's drag fit raises u* / U10 with the wind.
+  - First-order upwind propagation smeared the energy downwind.
+  - The grids were too coarse at the coast. The young waves' fast growth was spread over too long a fetch, so short
+    fetches ran high and the law flattened. Every source-term constant tried left the slope at 0.62 to 0.66; refining the
+    cells alone took it to 0.74 (0.80 in friction-velocity scaling against the law's 0.79).
+  - The reference: Kahma and Calkoen's U10-scaled composite is the highest of the published laws at long fetch.
+- **Fixed:**
+  - ST4 is the default and propagation is ULTIMATE QUICKEST (526cc95c9).
+  - The sheltering is calibrated on a resolved grid against Kahma and Calkoen's stable law in friction-velocity scaling,
+    the community's protocol (Liu et al. 2019). There it is within 4.6 percent rms at 20 m/s and 3.8 at 30 (validation),
+    and the published TEST471 roughness cap is restored.
+  - The README and docs/limits.md state the resolution a coast needs.
+  - `frictionVelocity(x, z)` reports u*.
+- **Regression:** `packages/physics/tests/waves.test.js`, "a gale of 20 m/s grows the sea along its fetch as Kahma and
+  Calkoen measured, in friction-velocity scaling (KB-SEA-GROWTH1)": e* within 15 percent below and 25 above the law, and the
+  slope in 0.7 to 0.9. WAM Cycle 3 fails it at 1.6 times the law, and a grid of twice the cell gives 0.68.
 
 ### Fixed 2026-11-25: a cloth attached to a rigid body blew up when its free particles took impulses (KB-SOFT-ATTACHKICK1, physics soft)
 

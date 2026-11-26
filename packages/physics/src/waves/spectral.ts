@@ -300,6 +300,8 @@ export class WaveSolver implements Solver<WaveParams> {
   private physics: 'st4' | 'wam3' = 'st4';
   private energy!: Region;
   private clock!: Region;
+  /** Each cell's friction velocity u* in its last source step, m/s (derived each step; kept so a restore reports it too). */
+  private friction!: Region;
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
   /** @param id The solver's id (default `'waves'`). */
@@ -403,6 +405,7 @@ export class WaveSolver implements Solver<WaveParams> {
     const per = count * directions;
     this.energy = host.allocate('spectrum', n * per * 8, 'f64', WAVE_LAYOUT);
     this.clock = host.allocate('clock', 16, 'f64', WAVE_LAYOUT);
+    this.friction = host.allocate('friction', n * 8, 'f64', WAVE_LAYOUT);
     const blank = (): WaveSpectrumSample => ({
       frequencies: this.freqs,
       directions: this.dirs,
@@ -449,7 +452,7 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   extraState(): readonly Region[] {
-    return [this.clock];
+    return [this.clock, this.friction];
   }
 
   /** Seconds of sea time simulated since the start (after any warm-up). */
@@ -490,6 +493,16 @@ export class WaveSolver implements Solver<WaveParams> {
   }
 
   /** The significant wave height at (x, z), m. */
+  /**
+   * The wind's friction velocity u* over the water at (x, z) in the last step, m/s: with ST4 the waves' own roughness sets it
+   * (young, steep seas drag harder), with WAM Cycle 3 the drag fit of U10. The stress on the sea is rho_a u*^2; 0 without wind.
+   */
+  frictionVelocity(x: number, z: number): number {
+    const r = Math.min(this.nx - 1, Math.max(0, Math.floor((x - this.x0) / this.h))),
+      c = Math.min(this.nz - 1, Math.max(0, Math.floor((z - this.z0) / this.h)));
+    return (regionWords(this.host.memory, this.friction) as Float64Array)[r + this.nx * c]!;
+  }
+
   significantHeight(x: number, z: number): number {
     return significantHeight(this.sample(x, z));
   }
@@ -715,6 +728,7 @@ export class WaveSolver implements Solver<WaveParams> {
             drag = (0.55 + 2.97 * ut - 1.49 * ut * ut) * 1e-3;
           ustar = u10 * pow(drag > 0 ? drag : 0, 0.5);
         }
+        (regionWords(this.host.memory, this.friction) as Float64Array)[at] = ustar;
         const sigmaPM = (TWO_PI * 0.13 * g) / (28 * (ustar > 0 ? ustar : 1e-9));
         let gamma = 0,
           meanS = 0,

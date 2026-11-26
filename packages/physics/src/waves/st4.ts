@@ -6,9 +6,8 @@
 // 2.99 to 2.105, and section 2.3.10, eqs. 2.110 to 2.124, with its parameter tables 2.6 and 2.7, read 2026-11-25: public
 // documentation, the code was not read), cross-checked against F. Ardhuin et al., "Semi-empirical dissipation source
 // functions for ocean waves. Part I", J. Phys. Oceanogr. 40, 2010 (arXiv:0907.4240, read in part: eqs. 8 to 25). The
-// constants are the manual's TEST471 set, the one it recommends at global scale, with two the sources disagree on settled:
-// the roughness cap z0_max = 0.002 of TEST405 (the paper's eq. 23 gives 0.0015 as an example; the growth tests cannot tell
-// them apart) and the sheltering s_u calibrated to 1, the paper's own TEST441 value (see `ST4.shelter`).
+// constants are the manual's TEST471 set, the one it recommends at global scale, but for the sheltering s_u, calibrated to
+// 1 (the value TEST471 had before 2012 and TEST500 has; the manual's table 2.6 and its caption; see `ST4.shelter`).
 //
 // - Input: S_in = (rho_a / rho_w) (beta_max / kappa^2) e^Z Z^4 (u*' / C + z_alpha)^2 cos^2(theta - theta_u) sigma E for
 //   Z < 0, Z = ln(k z_1) + kappa / [cos(theta - theta_u) (u*' / C + z_alpha)] (eqs. 2.99 and 2.100), with U10 = (u* /
@@ -32,14 +31,15 @@ import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 /** The manual's TEST471 constants (WAVEWATCH III 5.16, tables 2.6 and 2.7). */
 export const ST4 = {
   windHeight: 10,
-  /** The largest Charnock roughness, m: caps the drag of the roughest seas (the paper's eq. 23; TEST405 0.002). */
-  roughnessMax: 0.002,
+  /** The largest Charnock roughness, m: TEST471's 1.002 (no cap in practice; TEST405 0.002; fetch growth cannot tell them apart). */
+  roughnessMax: 1.002,
   alpha0: 0.0095,
   betaMax: 1.43,
   zAlpha: 0.006,
   /**
-   * The sheltering s_u, calibrated: the sources give 0.3 (TEST471), 0.4 and 1 (the paper's TEST441); fitted on Kahma and
-   * Calkoen's fetch-limited growth at 10 and 20 m/s over 0, 0.3, 0.6 and 1 (docs/clean-room.md), 1 fits best.
+   * The sheltering s_u, calibrated: the sources give 0.3 (TEST471) and 1 (TEST471 before 2012, TEST500); fitted on Kahma and
+   * Calkoen's stable fetch law in friction-velocity scaling at 10 and 20 m/s on a resolved grid (docs/clean-room.md), 1 fits
+   * best.
    */
   shelter: 1,
   s1: 0.66,

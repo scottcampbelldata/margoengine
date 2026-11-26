@@ -1669,6 +1669,7 @@
     "imports": "import { CSS3DObject } from '@margoengine/labels';",
     "exports": [
       "CSS3DObject",
+      "Hotspot",
       "Label",
       "LabelRenderer",
       "boxAnchorPoint",

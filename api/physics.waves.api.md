@@ -61,6 +61,7 @@ export class WaveSolver implements Solver<WaveParams> {
     };
     get field(): WaveSpectrumField;
     sample(x: number, z: number, out?: WaveSpectrumSample): WaveSpectrumSample;
+    frictionVelocity(x: number, z: number): number;
     significantHeight(x: number, z: number): number;
     peakPeriod(x: number, z: number): number;
 }

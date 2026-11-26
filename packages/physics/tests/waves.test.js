@@ -97,30 +97,64 @@ test('a wind sea grows with fetch as JONSWAP found (gale off a coast, 10 m/s), w
   }
 });
 
-test('a gale of 20 m/s grows the sea as Kahma and Calkoen measured, not faster (KB-SEA-GROWTH1)', () => {
-  // Kahma and Calkoen's composite (as Hwang 2006 tabulates it): g^2 E / U^4 = 5.2e-7 chi^0.9. First-order propagation and
-  // WAM Cycle 3's u*-scaled input grew this sea 40 to 130 percent too high; the third-order scheme and ST4 keep it within 20
-  // percent in height (measured +16 and -5 percent).
+test('a gale of 20 m/s grows the sea along its fetch as Kahma and Calkoen measured, in friction-velocity scaling (KB-SEA-GROWTH1)', () => {
+  // Kahma and Calkoen's stable fetch law, e* = g^2 E / u*^4 = 2.1e-3 chi*^0.79 with chi* = g x / u*^2 (as Liu et al. 2019 state
+  // it, valid for chi* 3e4 to 4e6), on a grid that resolves the coast: cells of g dx / U^2 = 62.5. A coarser grid smears the
+  // young waves' fast growth over too long a fetch and flattens the law (chi*^0.68 at twice the cell); WAM Cycle 3 grows this
+  // sea 60 percent too high. Measured: e* at 1.17, 1.12 and 1.07 of the law at chi 500, 1,000 and 3,500, and a slope of 0.74.
   const U = 20,
-    n = 24,
-    dx = (1.2e4 * U * U) / g / n,
+    n = 64,
+    dx = (4000 * U * U) / g / n,
     { waves } = sea({
       cells: [n, 1],
       cellSize: dx,
       centre: [(n * dx) / 2, 0],
       wind: steady(U),
       periodic: ['z'],
-      interval: 180,
-      warmUp: 36 * 3600,
+      interval: 120,
+      warmUp: 12 * 3600,
       frequencies: { min: 0.03, max: 1, count: 30 },
+    }),
+    points = [500, 1000, 3500].map((chi) => {
+      const x = (Math.round((chi * U * U) / g / dx - 0.5) + 0.5) * dx,
+        ustar = waves.frictionVelocity(x, 0),
+        energy = (waves.significantHeight(x, 0) / 4) ** 2;
+      return { chiStar: (g * x) / (ustar * ustar), eStar: (g * g * energy) / ustar ** 4 };
     });
-  for (const cell of [5, 19]) {
-    const fetch = (cell + 0.5) * dx,
-      chi = (g * fetch) / (U * U),
-      kahma = 4 * Math.sqrt(5.2e-7 * chi ** 0.9) * ((U * U) / g),
-      hs = waves.significantHeight(fetch, 0);
-    assert.ok(Math.abs(hs / kahma - 1) < 0.2, `chi ${chi.toFixed(0)}: Hs ${hs} m against ${kahma} m`);
+  for (const { chiStar, eStar } of points) {
+    const law = 2.1e-3 * chiStar ** 0.79;
+    assert.ok(eStar > 0.85 * law && eStar < 1.25 * law, `chi* ${chiStar.toFixed(0)}: e* ${eStar} against ${law}`);
   }
+  const first = points[0],
+    last = points[points.length - 1],
+    slope = Math.log(last.eStar / first.eStar) / Math.log(last.chiStar / first.chiStar);
+  assert.ok(slope > 0.7 && slope < 0.9, `e* grows as chi*^${slope.toFixed(2)}, against 0.79`);
+});
+
+test("the wind's friction velocity comes from the waves with ST4 and from the drag fit with WAM Cycle 3", () => {
+  const U = 20,
+    make = (physics) =>
+      sea({
+        cells: [8, 1],
+        cellSize: 4000,
+        centre: [16000, 0],
+        wind: steady(U),
+        periodic: ['z'],
+        warmUp: 6 * 3600,
+        frequencies: { min: 0.04, max: 1, count: 24 },
+        physics,
+      }).waves,
+    st4 = make('st4'),
+    wam3 = make('wam3'),
+    ut = U / 31.5;
+  // WAM Cycle 3: U*^2 = C_D U10^2, C_D = (0.55 + 2.97 U~ - 1.49 U~^2) 1e-3 exactly.
+  assert.ok(
+    Math.abs(wam3.frictionVelocity(10000, 0) / (U * Math.sqrt((0.55 + 2.97 * ut - 1.49 * ut * ut) * 1e-3)) - 1) < 1e-12,
+  );
+  // ST4: the young sea's own roughness, a drag of 2 to 3 per mille at 20 m/s (measured 2.2e-3), higher where the waves are younger.
+  const drag = (x) => (st4.frictionVelocity(x, 0) / U) ** 2;
+  assert.ok(drag(30000) > 1.8e-3 && drag(30000) < 3e-3, `C_D ${drag(30000)}`);
+  assert.ok(drag(2000) > drag(30000), 'a younger sea drags harder');
 });
 
 test('with unlimited fetch the sea grows with duration toward the fully developed sea', () => {

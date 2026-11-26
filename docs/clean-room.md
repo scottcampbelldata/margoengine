@@ -11954,31 +11954,56 @@ JONSWAP builder's cos^2 spread, and the arctangent from arithmetic are this pack
   three different scaling wind velocities", J. Geophys. Res. 111, C02005, 2006, tabulates it; JONSWAP and Pierson-Moskowitz
   as in the SEA-01 record above.
 
-Published constants, taken as they stand (TEST471 unless named): alpha_0 0.0095, beta_max 1.43, z_alpha 0.006, kappa 0.4,
-the wind height 10 m, z0_max 0.002 (TEST405; the paper's eq. 23 example is 0.0015), s1 0.66, s2 -0.018, s3 0.022, Re_c 1.5e5
-(times 4 / H_s), s5 1.2, s7 3.6e5, r_z 0.04, C_ds -2.2e-5, B_r 0.0009, the +-80 degree saturation sector, delta_d 0.3, C_cu
--0.40344, r_cu 0.5, the cutoff 2.5 f_m and the quadruplets' C_nl4 2.5e7. One constant was calibrated:
+Published constants, taken as they stand (TEST471): alpha_0 0.0095, beta_max 1.43, z_alpha 0.006, kappa 0.4, the wind
+height 10 m, z0_max 1.002, s1 0.66, s2 -0.018, s3 0.022, Re_c 1.5e5 (times 4 / H_s), s5 1.2, s7 3.6e5, r_z 0.04, C_ds -2.2e-5,
+B_r 0.0009, the +-80 degree saturation sector, delta_d 0.3, C_cu -0.40344, r_cu 0.5, the cutoff 2.5 f_m and the quadruplets'
+C_nl4 2.5e7. One constant was calibrated:
 
-- **The sheltering s_u.** The sources disagree: 0.3 (TEST471), 0.4 (another of the manual's sets) and 1 (the paper's
-  TEST441). Data fitted: Kahma and Calkoen's fetch law at U10 = 10 and 20 m/s, at chi = 1,125, 3,125 and 10,125 (48 cells
-  over chi 0 to 12,000, a steady wind, warmed up for 24 hours times U10 / 10 m/s). Method: a grid search over s_u in {0,
-  0.3, 0.6, 1} crossed with z0_max in {0.0015, 0.002, none}, minimising the root mean square of ln(E / E_KC) over the six
-  points. Result: rms 0.56 at s_u = 0, 0.35 at 0.3 and at 0.6, 0.30 at 1; z0_max moved it by under 0.01. Fitted value s_u =
-  1, the top of the published range: the error still falls there, so 1 is a bound of the search rather than an interior
-  optimum, and the uncertainty is one-sided (from about 0.3 up the error is within 0.05 of its least). Values above 1 were
-  not tried, being outside what the literature reports.
-- **Validation, on data not fitted:** at 30 m/s the height is +38, +21 and +7 percent of Kahma and Calkoen at the same three
-  fetches (+75, +46 and +22 percent of JONSWAP's relation); with unlimited fetch at 10 m/s (a single periodic cell, 72
-  hours) 106 percent of the Pierson-Moskowitz height and 105 percent of its period; at 20 m/s 122 percent of its height.
-  The 10 m/s JONSWAP test at 31 and 59 km stays within 8 and 4 percent in height. The fetch law that remains, about
-  chi^0.66 against chi^0.9, is open as KB-SEA-GROWTH1 (docs/known-bugs.md).
+- **The sheltering s_u.** The manual gives 0.3 for TEST471 and 1 for TEST471 before March 2012 and for TEST500 (table 2.6 and
+  its caption). Data fitted: Kahma and Calkoen's stable fetch law in friction-velocity scaling, e* = g^2 E / u*^4 = 2.1e-3
+  chi*^0.79, chi* = g x / u*^2, valid for chi* 3e4 to 4e6, as Liu et al. (2019) restate it from Komen et al. (1994) and use it
+  to test ST4 (their figure 2: ST4 with the DIA within 4 percent rms in e*). U10 = 10 and 20 m/s, every cell past the first
+  five (their protocol) inside the valid range, on 192 cells over chi = g x / U^2 of 0 to 12,000. Method: compare the
+  published values 0.3 and 1, minimising the rms of ln(e* / law). Result: 1 fits best, rms 0.108 (10 m/s) and 0.046 (20
+  m/s), against 0.125 and 0.099 at 0.3, whose drag is also higher (C_D 2.53e-3 against 2.25e-3 at 20 m/s). z0_max 0.002
+  against 1.002 changed nothing to three figures. Both values lie in the published range; above 1 was not tried.
+- **The first calibration (2026-11-25) was on an unresolved grid.** It fitted s_u on Kahma and Calkoen's composite in U10
+  scaling on 48 cells over chi 0 to 12,000 and found a fetch law flatter than measured, chi^0.66 (KB-SEA-GROWTH1). The cause
+  was the grid, not the physics. The slope was the same, 0.62 to 0.66, for every source-term change tried: swell
+  dissipation off; cumulative breaking off; C_nl4 3e7; B_r 0.0008; TEST471 as published. It was also the same with a 30 s
+  source step, 48 frequencies, 36 directions or a 48 h warm-up. It steepened with the cells alone: 0.63 at 48, 0.69 at 96,
+  0.74 at 192 (0.80 in friction-velocity scaling against the law's 0.79). Liu et al. (2019) and Tolman and Chalikov (1996)
+  nest three grids for this reason and drop the first five points. The drag hardly changes along the fetch (C_D 1.52e-3 to
+  1.49e-3 at 10 m/s), so a sea-state-dependent drag does not cause the slope.
+- **Validation, on data not fitted:**
+  - At 30 m/s on the resolved grid: rms 0.038 and a slope of 0.76 in friction-velocity scaling.
+  - In U10 scaling at 10 m/s: the height within 14 percent of Hwang's fetch law, e = 6.19e-7 chi^0.81 (Hwang and Fan 2017,
+    restating Hwang 2006), and of JONSWAP's, e = 1.6e-7 chi, over chi 1,000 to 10,000. Kahma and Calkoen's composite,
+    5.2e-7 chi^0.9, is the highest of the published laws at long fetch (Hwang's, Young and Verhagen's deep-water law and
+    JONSWAP's lie 23 to 48 percent below it at chi 1e4).
+  - Duration growth at 10 m/s, unlimited fetch: 106 percent of the Pierson-Moskowitz height and 105 percent of its period
+    at 72 hours. At 20 m/s it reaches 122 percent of the Pierson-Moskowitz height, open as KB-SEA-FULLDEV1.
+  - A 300 s source step lowers the short-fetch end: the action limiter, a fixed amount of action a step, then shapes the
+    growth. ST4 was tuned at steps where it rarely acts.
+- Sources for this record, read 2026-11-26 (papers and public documentation, no code):
+  - Q. Liu, W. E. Rogers, A. V. Babanin, I. R. Young, L. Romero, S. Zieger, F. Qiao and C. Guan, "Observation-based source
+    terms in the third-generation wave model WAVEWATCH III: updates and verification", J. Phys. Oceanogr. 49, 489-517,
+    2019, https://doi.org/10.1175/JPO-D-18-0137.1, section 3a and figure 2.
+  - P. A. Hwang and Y. Fan, "Low-frequency mean square slopes and dominant wave spectral properties: toward tropical
+    cyclone remote sensing", J. Phys. Oceanogr. 47, 2017, eqs. 1 and 2, restating Hwang (2006).
+  - I. R. Young and L. A. Verhagen, "Fetch limited spectral evolution in finite depth water", Proc. 25th ICCE, 1996.
+  - V. E. Zakharov, S. I. Badulin, P. A. Hwang and G. Caulliez, "Universality of sea wave growth and its physical roots",
+    J. Fluid Mech. 780, 2015, arXiv:1411.7235: the spread of measured fetch exponents, 0.7 to 1.1.
+  - Tolman and Chalikov (1996) known through Liu et al.; Komen et al. (1994) through Liu et al.; Kahma and Calkoen (1992)
+    through both.
 
 The mean frequency from the action's p = 0.5 moment for the cutoff, the Madsen friction factor solved by bisection with
 its 0.3 cap below a_b / K_N = 1.57, the precomputed per-cell tables of the saturation's cos^2 sector and of the cumulative
 term's weights, the friction velocity iterated to 1e-7 on U10 = (u* / kappa) ln(z_u / z_1), the face value taken at the
 upstream two cells and the downstream one with first order beside land, an open edge or a short stencil, and the axis order
-alternating per substep are this package's own arrangement. Proof: `packages/physics/tests/waves.test.js`, "a gale of 20
-m/s grows the sea as Kahma and Calkoen measured, not faster (KB-SEA-GROWTH1)" and the 10 m/s JONSWAP test with both physics.
+alternating per substep are this package's own arrangement. Proof: `packages/physics/tests/waves.test.js`, "a gale of 20 m/s grows the sea along its fetch as Kahma and Calkoen
+measured, in friction-velocity scaling (KB-SEA-GROWTH1)", the friction-velocity test, and the 10 m/s JONSWAP test with
+both physics.
 
 ### Flight: wings, rotors and lifting gas (AERO-03, `WingForce`, `RotorForce` and `LiftingGas` in `@margoengine/physics/flight`, 2026-11-25)
 
