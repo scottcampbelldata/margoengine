@@ -20,6 +20,7 @@ import {
   reaches,
   type Skin,
   tetDeterminant,
+  closedSurface,
 } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 import {
@@ -5582,26 +5583,6 @@ function spinImpulse(body: PhysicsBody, spin: Vec3): Vec3 {
     z += along * a[2];
   }
   return [x, y, z];
-}
-
-/**
- * Whether triangles (three particle indices each) close a surface wound one way: every edge is met once each way round, by
- * the two triangles either side of it. A body of cells has such a surface (`setSurface`, and each piece of a cut), so its
- * surface collider knows its inside.
- */
-function closedSurface(triangles: ArrayLike<number>): boolean {
-  if (triangles.length === 0) return false;
-  const edges = new Map<string, number>();
-  for (let t = 0; t + 2 < triangles.length; t += 3)
-    for (let k = 0; k < 3; k++) {
-      const key = `${triangles[t + k]} ${triangles[t + ((k + 1) % 3)]}`;
-      edges.set(key, (edges.get(key) ?? 0) + 1);
-    }
-  for (const [key, count] of edges) {
-    const [a, b] = key.split(' ');
-    if (count !== 1 || edges.get(`${b} ${a}`) !== 1) return false;
-  }
-  return true;
 }
 
 /** The columns of the table of rigid bodies a step's contacts meet, one row each, built afresh at the start of every step. */

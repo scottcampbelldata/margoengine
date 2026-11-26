@@ -1090,6 +1090,61 @@ test('a box mesh is filled by every cube of its lattice, whichever way its faces
     }
 });
 
+// KB-SOFT-SPLITDENSITY1: carryCutSurface copied the surface collider's density into every piece's rebuilt surface, and an
+// open mesh (a torn cloth, a skin the cut left open) cannot hold mass, so the rebuild threw. A closed piece keeps the density.
+test('a piece keeps its surface density when its mesh is closed and has none when the cut or tear left it open', async () => {
+  const { soft } = await create([0, 0, 0], 8, 2);
+  soft.splitOnTear = 'cells';
+  const vertices = [],
+    indices = [];
+  for (const x of [0, 0.4]) for (const y of [0, 0.4]) for (const z of [0, 0.4]) vertices.push(x, y, z);
+  for (const [a, b, c, d] of [
+    [0, 1, 3, 2],
+    [4, 6, 7, 5],
+    [0, 4, 5, 1],
+    [2, 3, 7, 6],
+    [0, 2, 6, 4],
+    [1, 5, 7, 3],
+  ])
+    indices.push(a, b, c, a, c, d);
+  const blade = [
+    [0.2, -1, -1],
+    [0.2, 3, -1],
+    [0.2, -1, 3],
+  ];
+  for (const [skinned, density] of [
+    [false, 3],
+    [true, 0],
+  ]) {
+    const cube = soft.create(SoftBodyDesc.volumetric(vertices, indices, 0.1, skinned).setVolumeFactor(1));
+    soft.createSurfaceCollider(cube, { density: 3 });
+    const cut = soft.cut(cube, blade);
+    assert.equal(cut.pieces.length, 2, 'a cut of a body with a surface density does not throw');
+    for (const piece of cut.pieces) {
+      assert.ok(piece.surface, 'each piece has a surface collider');
+      assert.equal(
+        piece.surface.colliders[0].density(),
+        density,
+        skinned ? 'the cut left the skin open, so it holds no mass' : 'a closed surface keeps the density',
+      );
+    }
+  }
+  const n = 6,
+    cloth = soft.create(SoftBodyDesc.cloth([0, 1, 0], [0.1, 0, 0], [0, 0, 0.1], n, n));
+  soft.createSurfaceCollider(cloth);
+  const pairs = cloth.edges(),
+    across = [];
+  for (let e = 0; e < pairs.length / 2; e++) {
+    const a = Math.floor(pairs[e * 2] / n),
+      b = Math.floor(pairs[e * 2 + 1] / n);
+    if (Math.min(a, b) <= 2 && Math.max(a, b) >= 3) across.push(e);
+  }
+  soft.splitOnTear = 'all';
+  const torn = soft.tear(cloth, { edges: across });
+  assert.equal(torn.pieces.length, 2);
+  for (const piece of torn.pieces) assert.ok(piece.surface, 'an open piece still gets a surface collider');
+});
+
 test('a skin is drawn between steps by alpha, carried by the interpolated cells (PA-06)', async () => {
   const { physics, soft } = await create([0, -9.81, 0], 8, 4);
   const { vertices, indices } = boxMesh();

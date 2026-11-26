@@ -14734,14 +14734,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-26: a cloth torn in two fails to rebuild its surface (KB-SOFT-SPLITDENSITY1, physics soft)
+### Fixed 2026-11-26: a cloth torn in two failed to rebuild its surface (KB-SOFT-SPLITDENSITY1, physics soft)
 
-- **Repro:** `node --test --test-name-pattern="cloth torn in two" packages/physics/tests/soft-cells.test.js` fails on
+- **Repro:** `node --test --test-name-pattern="cloth torn in two" packages/physics/tests/soft-cells.test.js` failed on
   `main` with "A trimesh with a mass or a density must be a closed surface".
-- **Cause:** `packages/physics/src/soft-split.ts` copies `density: collider.density()` into the rebuilt surface
-  collider (since ef1a72d01, which rebuilt query surfaces after cuts), so an open cloth piece is given a density and
-  fails the closed-trimesh check. Found by the SOFT-04 verification in
-  [physics-solver-audit.md](physics-solver-audit.md); the failing test is the regression test.
+- **Cause:** `packages/physics/src/soft-split.ts` copied `density: collider.density()` into the rebuilt surface
+  collider (since ef1a72d01, which rebuilt query surfaces after cuts), so an open piece was given a density and failed
+  the closed-trimesh check. That held for a torn cloth and for a cut skinned body, whose skin the blade leaves open.
+  Found by the SOFT-04 verification in [physics-solver-audit.md](physics-solver-audit.md).
+- **Fix:** the density is carried only when the mesh the surface collider is made from (the skin when there is one,
+  else the triangles) is closed, tested with `closedSurface` (moved to `soft-volume.ts`). An open piece gets its surface
+  with no density, as before ef1a72d01.
+- **Regression:** the test above, and "a piece keeps its surface density when its mesh is closed and has none when the cut
+  or tear left it open" in the same file (fails on the previous code for the skinned cut).
 
 ### Open 2026-11-26: position-based liquid clamps hide compression (KB-PBF-CLAMP1, physics pbf)
 

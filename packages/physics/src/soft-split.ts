@@ -4,7 +4,7 @@
 // with the rest shapes, plastic flow and rest lengths its cells and edges had.
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 import { CRACK_FRONT_MASK, NUCLEATED_CELL } from './soft-tensile-seam.js';
-import { boundaryTriangles } from './soft-volume.js';
+import { boundaryTriangles, closedSurface } from './soft-volume.js';
 
 const TORN = 1;
 const PINNED = 1;
@@ -31,6 +31,7 @@ export function carryCutSurface(soft: SoftBodies, original: SoftBody, piece: Sof
   const collider = original.surface?.colliders[0];
   if (!collider?.valid || piece.triangleList.length === 0) return;
   const { collision, contactForce } = collider.activeEvents();
+  const skin = piece.meshIndices();
   soft.createSurfaceCollider(piece, {
     friction: collider.friction(),
     restitution: collider.restitution(),
@@ -46,7 +47,9 @@ export function carryCutSurface(soft: SoftBodies, original: SoftBody, piece: Sof
     activeHooks: collider.activeHooks(),
     contactForceEvents: contactForce,
     contactForceThreshold: collider.contactForceEventThreshold(),
-    density: collider.density(),
+    // Only a closed mesh can hold mass (a trimesh with a density must enclose a volume): a torn cloth keeps none, nor does a
+    // piece whose skin the cut left open. The surface collider is made from the skin when there is one, else the triangles.
+    ...(closedSurface(skin.length ? skin : piece.triangleList) ? { density: collider.density() } : {}),
     userData: collider.userData,
   });
 }

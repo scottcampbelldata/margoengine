@@ -272,3 +272,23 @@ export function boundaryTriangles(cells: ArrayLike<number>, positions: ArrayLike
   }
   return out;
 }
+
+/**
+ * Whether triangles (three particle indices each) close a surface wound one way: every edge is met once each way round, by
+ * the two triangles either side of it. A body of cells has such a surface (`setSurface`, and each piece of a cut), so its
+ * surface collider knows its inside.
+ */
+export function closedSurface(triangles: ArrayLike<number>): boolean {
+  if (triangles.length === 0) return false;
+  const edges = new Map<string, number>();
+  for (let t = 0; t + 2 < triangles.length; t += 3)
+    for (let k = 0; k < 3; k++) {
+      const key = `${triangles[t + k]} ${triangles[t + ((k + 1) % 3)]}`;
+      edges.set(key, (edges.get(key) ?? 0) + 1);
+    }
+  for (const [key, count] of edges) {
+    const [a, b] = key.split(' ');
+    if (count !== 1 || edges.get(`${b} ${a}`) !== 1) return false;
+  }
+  return true;
+}
