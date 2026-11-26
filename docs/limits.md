@@ -9635,6 +9635,17 @@ The event splits the mesh along existing tetrahedral faces. It represents brittl
 a directional fracture-energy or post-peak softening law. The optional soft entry measures
 133,213 B gzip, including a 39,449 B base and 93,115 B lazy native kernel.
 
+With `strength.fractureEnergy`, each tetrahedron also stores a six-mode energy calibration,
+nine irreversible damage quantities, and its active signs and fracture state. The law
+regularizes work per area using `h = (6V₀)^(1/3)`. To represent a descending branch, the
+tetrahedron must satisfy `h < 2EG/f²` for each tensile or shear mode. Refine the mesh if the
+authored material cannot satisfy this condition. The closed-form fracture work applies to
+a single localized mode. Mixed-mode cracks use independent histories and the existing
+inter-element crack path. For interior cells, `interiorStrength` scales the stress thresholds
+and its square scales the work per area. Cuts retain the accumulated damage and recalculate
+the geometric length for the smaller child tetrahedra. Snapshot layout includes the optional
+damage rows only when a body authors fracture energy.
+
 ### Gas-filled soft shells (SOFT-06)
 
 `@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber

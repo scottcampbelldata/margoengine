@@ -31,7 +31,13 @@ const beech = {
 };
 const deviation = { tensile: [38.5 * MPa, 1 * MPa, 0.5 * MPa], compressive: [4.3 * MPa, 0.9 * MPa, 0.4 * MPa] };
 
-async function specimen({ smooth = 0, leadingBody = false, twoCells = false } = {}) {
+async function specimen({
+  smooth = 0,
+  leadingBody = false,
+  twoCells = false,
+  length = 1,
+  materialProfile = beech,
+} = {}) {
   const physics = new Physics(null, { fixedTimestep: dt, gravity: [0, 0, 0] });
   const soft = await SoftBodies.attach(physics, { substeps: 1, iterations: 4 });
   const world = new PhysicsWorld({ rate })
@@ -43,12 +49,13 @@ async function specimen({ smooth = 0, leadingBody = false, twoCells = false } = 
     : null;
   const material = new CellMaterial();
   material.tearSmoothing = smooth;
+  const rest = (twoCells ? [...positions, [0, 0, -1]] : positions).map((p) => p.map((x) => x * length));
   const body = soft.create(
-    new SoftBodyDesc(twoCells ? [...positions, [0, 0, -1]] : positions)
+    new SoftBodyDesc(rest)
       .setCells(twoCells ? [0, 1, 2, 3, 0, 2, 1, 4] : [0, 1, 2, 3], material)
       .setSurface()
       .setPinnedParticles(twoCells ? [0, 1, 2, 3, 4] : [0, 1, 2, 3])
-      .setOrthotropicStiffness(beech)
+      .setOrthotropicStiffness(materialProfile)
       .setSolver('vertex-block'),
   );
   return { world, soft, body, first };
@@ -180,4 +187,80 @@ test('authored strength requires positive stresses and keeps scalar tear criteri
       ),
     /positive finite float32/,
   );
+});
+
+// Seeber et al. (2024), Table 1. 1 N/mm equals 1000 J/m².
+const calibrated = {
+  ...beech,
+  strength: { ...beech.strength, fractureEnergy: { tensile: [10000, 710, 710], shear: [1200, 1200, 600] } },
+};
+const bendRollingShear = (body, length, utilization) => {
+  const shear = (utilization * beech.strength.shear[2]) / beech.shearModuli[2];
+  body.setParticlePosition(3, [0, length * shear, length * Math.sqrt(1 - shear * shear)]);
+};
+
+test('beech rolling shear softens progressively and tears only after its fracture-energy displacement', async () => {
+  const length = 0.001;
+  const { body, soft, world } = await specimen({ twoCells: true, length, materialProfile: calibrated });
+  const strength = beech.strength.shear[2];
+  const beta =
+    (2 * beech.shearModuli[2] * calibrated.strength.fractureEnergy.shear[2]) / (length * strength * strength);
+  const k = 1.6;
+  bendRollingShear(body, length, k);
+  world.advance(1);
+  assert.equal(body.isCellTorn(0), false);
+  const first = soft.copyCrackBand(body);
+  const expected = 1 - (beta - k) / ((beta - 1) * k);
+  assert.ok(Math.abs(first[14] - expected) < 64 * epsilon32);
+  bendRollingShear(body, length, 0.2);
+  world.advance(2);
+  assert.equal(soft.copyCrackBand(body)[14], first[14], 'unloading preserves irreversible damage');
+  const events = [];
+  const stop = soft.onTear((event) => events.push(event));
+  bendRollingShear(body, length, beta * 1.02);
+  world.advance(6);
+  stop();
+  assert.equal(events.length, 1);
+  const [cut] = events;
+  assert.deepEqual(cut.cells, [0]);
+  assert.equal(cut.pieces.length, 2);
+  assert.equal(soft.copyCrackBand(cut.destination(3)[0].body)[14], 1);
+  assert.equal(soft.copyCrackBand(cut.destination(3)[0].body)[16], 1);
+});
+
+test('cutting a partially damaged cell preserves its damage and snapshot replay', async () => {
+  const length = 0.0005;
+  const make = async () => {
+    const { body, soft, world } = await specimen({ length, materialProfile: calibrated });
+    bendRollingShear(body, length, 1.8);
+    world.advance(1);
+    const history = soft.copyCrackBand(body);
+    assert.ok(history[14] > 0 && history[14] < 1);
+    const { pieces } = soft.cutPlane(body, [length * 0.43, 0, 0], [1, 0, 0]);
+    for (const piece of pieces) {
+      const state = soft.copyCrackBand(piece);
+      for (let i = 0; i < state.length; i += history.length)
+        assert.deepEqual(state.subarray(i, i + history.length), history);
+    }
+    return world;
+  };
+  const a = await make();
+  const b = await make();
+  a.advance(5);
+  b.advance(3);
+  b.restoreSnapshot(a.takeSnapshot().bytes);
+  a.advance(8);
+  b.advance(8);
+  assert.equal(a.hash(), b.hash());
+});
+
+test('physically too coarse cells are refused before a fracture-energy material enters the world', async () => {
+  const { soft, world } = await specimen({ length: 0.001, materialProfile: calibrated });
+  const before = world.hash();
+  const coarse = new SoftBodyDesc(positions)
+    .setCells([0, 1, 2, 3])
+    .setOrthotropicStiffness(calibrated)
+    .setSolver('vertex-block');
+  assert.throws(() => soft.create(coarse), /Refine the tetrahedra/);
+  assert.equal(world.hash(), before);
 });

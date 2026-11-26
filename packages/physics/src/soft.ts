@@ -41,6 +41,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_orthotropy_rows(): number;
   soft_fem_orthotropic_failure(first: number, count: number, ...strengths: number[]): void;
   soft_fem_orthotropic_failure_rows(): number;
+  soft_fem_crack_band(first: number, count: number, ...lengths: number[]): void;
+  soft_fem_crack_band_rows(): number;
   soft_fem_column(id: number): number;
   soft_tet_set(
     t: number,
@@ -563,6 +565,16 @@ export interface SoftOrthotropicStrength {
   readonly compressive: Vec3;
   /** XY, XZ and YZ shear strengths. */
   readonly shear: Vec3;
+  /** Optional post-peak fracture work per unit area, in joules per square metre. */
+  readonly fractureEnergy?: SoftOrthotropicFractureEnergy;
+}
+
+/** Directional tensile and shear fracture-energy calibration for irreversible softening. */
+export interface SoftOrthotropicFractureEnergy {
+  /** X, Y and Z tensile fracture energies. */
+  readonly tensile: Vec3;
+  /** XY, XZ and YZ shear fracture energies. */
+  readonly shear: Vec3;
 }
 
 const ORTHOTROPY_WORDS = 18;
@@ -570,6 +582,9 @@ const NO_ORTHOTROPY = Array<number>(ORTHOTROPY_WORDS).fill(0);
 const STRENGTH_COUNT = 9;
 const FAILURE_WORDS = 2 * STRENGTH_COUNT;
 const NO_ORTHOTROPIC_FAILURE = Array<number>(STRENGTH_COUNT).fill(0);
+const BAND_LIMITS = 6;
+const BAND_WORDS = 17;
+const NO_CRACK_BAND = Array<number>(BAND_LIMITS).fill(0);
 
 function strengthWords({ tensile, compressive, shear }: SoftOrthotropicStrength): readonly number[] {
   checkVec(tensile, 'Orthotropic tensile strengths');
@@ -584,6 +599,23 @@ function strengthWords({ tensile, compressive, shear }: SoftOrthotropicStrength)
 function checkStrengthModel(strength: readonly number[] | null, material: CellMaterial): void {
   if (strength && material.tearStrain > 0)
     throw new RangeError('Orthotropic strengths already govern fracture. Set CellMaterial.tearStrain to zero.');
+}
+
+function criticalBandLengths(material: SoftOrthotropy, strengths: readonly number[]): readonly number[] | null {
+  const energy = material.strength?.fractureEnergy;
+  if (!energy) return null;
+  checkVec(energy.tensile, 'Tensile fracture energies');
+  checkVec(energy.shear, 'Shear fracture energies');
+  const stiffness = [...material.youngsModuli, ...material.shearModuli];
+  const failure = [...strengths.slice(0, 3), ...strengths.slice(6)];
+  const lengths = [...energy.tensile, ...energy.shear].map((work, i) =>
+    Math.fround((2 * stiffness[i]! * work) / (failure[i]! * failure[i]!)),
+  );
+  if (lengths.some((length) => !(length > 0 && Number.isFinite(length))))
+    throw new RangeError(
+      'Fracture energies give unrepresentable band lengths. Supply positive finite energies in J/m².',
+    );
+  return Object.freeze(lengths);
 }
 
 function unitDirection(direction: Vec3, label: string): Vec3 {
@@ -972,6 +1004,9 @@ export class SoftBodyDesc {
   /** @internal */ fiber: SoftFiber | null = null;
   /** @internal */ orthotropy: readonly number[] | null = null;
   /** @internal */ orthotropicStrength: readonly number[] | null = null;
+  /** @internal */ crackBand: readonly number[] | null = null;
+  /** @internal A split inherits the validated reference volumes from the original cells. */
+  inheritedBand = false;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
   /** @internal */ clusterHertz = 0;
   /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
@@ -1664,8 +1699,11 @@ export class SoftBodyDesc {
   setOrthotropicStiffness(material: SoftOrthotropy | null): this {
     const elastic = material ? orthotropicWords(material) : null;
     const strength = material?.strength ? strengthWords(material.strength) : null;
+    const band = material && strength ? criticalBandLengths(material, strength) : null;
     this.orthotropy = elastic;
     this.orthotropicStrength = strength;
+    this.crackBand = band;
+    this.inheritedBand = false;
     return this;
   }
   /** Replaces the cells' material (copied). */
@@ -1770,6 +1808,7 @@ export class SoftBodyDesc {
       this.fiber = other.fiber;
       this.orthotropy = other.orthotropy;
       this.orthotropicStrength = other.orthotropicStrength;
+      this.crackBand = other.crackBand;
     }
     for (const p of other.cells) this.cells.push(p + base);
     for (const group of other.clusterGroups) this.clusterGroups.push(group.map((p) => p + base));
@@ -1970,6 +2009,11 @@ export class SoftBody {
   get orthotropicStrength(): readonly number[] | null {
     this.check();
     return this.owner.cellOrthotropicStrength(this);
+  }
+  /** @internal The material's critical length per tensile and shear channel. */
+  get crackBand(): readonly number[] | null {
+    this.check();
+    return this.owner.cellCrackBand(this);
   }
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
   /** @internal */ force: Vec3 = [0, 0, 0];
@@ -2983,6 +3027,17 @@ export class SoftBodies implements PhysicsAttachment {
         'Orthotropic stiffness uses vertex blocks. Select vertex-block and supply either the orthotropic tensor or a separate fiber.',
       );
     checkStrengthModel(desc.orthotropicStrength, desc.cellMaterial);
+    if (desc.crackBand && !desc.inheritedBand) {
+      const limit = Math.min(...desc.crackBand);
+      const maxDeterminant = limit * limit * limit;
+      for (let i = 0; i < desc.cells.length; i += 4) {
+        const [a, b, c, d] = [desc.cells[i]!, desc.cells[i + 1]!, desc.cells[i + 2]!, desc.cells[i + 3]!];
+        if (Math.abs(tetDeterminant(desc.positions, a, b, c, d)) >= maxDeterminant)
+          throw new RangeError(
+            'A cell is too coarse for the authored fracture energy. Refine the tetrahedra in the solid.',
+          );
+      }
+    }
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
@@ -3180,6 +3235,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.writeFiber(range, fiber);
     this.writeOrthotropy(range, desc.orthotropy);
     this.writeOrthotropicStrength(range, desc.orthotropicStrength);
+    this.writeCrackBand(range, desc.crackBand);
     body.remember();
     this.setCellSolver(body, mode);
     this.writeMaterial(body);
@@ -3708,6 +3764,37 @@ export class SoftBodies implements PhysicsAttachment {
     );
   }
 
+  private writeCrackBand({ first, count }: CellRange, lengths: readonly number[] | null): void {
+    this.exports.soft_fem_crack_band(first, count, ...(lengths ?? NO_CRACK_BAND));
+  }
+
+  private crackBandWords(): Float32Array | undefined {
+    const at = this.exports.soft_fem_crack_band_rows();
+    if (at !== 0 && this.cellTotal > 0)
+      return new Float32Array(this.exports.memory.buffer, at, this.cellTotal * BAND_WORDS);
+  }
+
+  /** @internal The six critical lengths copied into a fragment's descriptor. */
+  cellCrackBand({ cellRange }: SoftBody): readonly number[] | null {
+    const view = this.crackBandWords();
+    const first = cellRange.first * BAND_WORDS;
+    if (!view || cellRange.count === 0 || view[first] === 0) return null;
+    return Array.from(view.subarray(first, first + BAND_LIMITS));
+  }
+
+  /** @internal Copies the irreversible damage state before changing topology. */
+  copyCrackBand({ cellRange }: SoftBody): Float32Array | null {
+    const view = this.crackBandWords();
+    const first = cellRange.first * BAND_WORDS;
+    if (!view || cellRange.count === 0 || view[first] === 0) return null;
+    return view.slice(first, first + cellRange.count * BAND_WORDS);
+  }
+
+  /** @internal Carries the damage histories to the new tetrahedra. */
+  restoreCrackBand(first: number, history: Float32Array, start = 0, count = 1): void {
+    this.crackBandWords()!.set(history.subarray(start * BAND_WORDS, (start + count) * BAND_WORDS), first * BAND_WORDS);
+  }
+
   private fiberWords(): Float32Array | undefined {
     const at = this.exports.soft_fem_fiber_rows();
     if (at !== 0 && this.cellTotal > 0) return new Float32Array(this.exports.memory.buffer, at, this.cellTotal * 4);
@@ -3835,6 +3922,7 @@ export class SoftBodies implements PhysicsAttachment {
       fiberSaved = keep.map((b) => this.cellFiber(b)),
       orthotropySaved = keep.map((b) => this.cellOrthotropy(b)),
       fractureSaved = keep.map((b) => this.copyOrthotropicFailure(b)),
+      bandSaved = keep.map((b) => this.copyCrackBand(b)),
       c = this.columns(),
       cols = [
         'x',
@@ -4043,6 +4131,9 @@ export class SoftBodies implements PhysicsAttachment {
       const damage = fractureSaved[k];
       if (damage) this.restoreOrthotropicFailure(next.first, damage, 0, r.count);
       else this.writeOrthotropicStrength(next, null);
+      const band = bandSaved[k];
+      if (band) this.restoreCrackBand(next.first, band, 0, r.count);
+      else this.writeCrackBand(next, null);
       this.clusterTotal += r.clusterCount;
       this.memberTotal += r.memberCount;
     });
@@ -4150,6 +4241,9 @@ export class SoftBodies implements PhysicsAttachment {
       this.bodies.some(({ cellRange }) => cellRange.count > 0 && fracture[cellRange.first * FAILURE_WORDS]! > 0)
     )
       out.push(['cell.orthotropicFailure', fracture]);
+    const band = this.crackBandWords();
+    if (band && this.bodies.some(({ cellRange }) => cellRange.count > 0 && band[cellRange.first * BAND_WORDS]! > 0))
+      out.push(['cell.crackBand', band]);
     return out;
   }
 

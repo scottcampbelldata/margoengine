@@ -17,6 +17,7 @@ extern crate alloc;
 
 pub mod api;
 mod col;
+mod crack_band;
 pub mod attach;
 mod rigid;
 pub mod collide;
