@@ -6,7 +6,7 @@ import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // standard, physical, unlit and blended materials) records every GPU call, descriptor, shader module and buffer
 // write of gltf/pbr + shadows + clustered + environment at `ref` and at the candidate: they must be identical.
 // Run (after npm run build:packages): node examples/package-benchmarks/proofs/gltf-pbr-lighting-hooks.proof.js [ref] [pin] [--current]
-// --current advanced to 4ac01b34e9 (Shadows' soft filter turns its noise a golden-ratio step each frame, KB-LOOK-TV-PENUMBRA1; e2177dc6e5 before it; 67e90fef9d before core's vertex stage kept a finite normal at a zero determinant, KB-GLTFA B1; 14d8dc8e3b before Shadows' soft filter read its tap counts and focus from the frame uniform).
+// --current advanced to 5255f3c074 (Shadows' soft filter turns its noise a golden-ratio step each frame, KB-LOOK-TV-PENUMBRA1; e2177dc6e5 before it; 67e90fef9d before core's vertex stage kept a finite normal at a zero determinant, KB-GLTFA B1; 14d8dc8e3b before Shadows' soft filter read its tap counts and focus from the frame uniform).
 // Pinned: 15c87f1 against cf2953e, the commit that replaced the text patches with hooks. --current: 667d1a26 (641246d3 before the PCSS search spanned to the nearest caster; b953071e before views and samplers were cached per texture and state; 57250a49 before the materials draw work) against the
 // working tree, including the approved cotangent frame, IBL energy, phone shadows and PBR Neutral output (claims.md).
 // f8a36ca's IBL BRDF LUT storage-buffer change is mapped back by binding-limit.proof.js for its older pinned refs.
@@ -16,7 +16,7 @@ import { mockGPU, context } from './gpu-recorder.js';
 import { Engine, TransformStore } from '../../../packages/core/dist/extension.js';
 import { animatedTriangle } from '../../../tests/support/gltf-pbr-fixture.js';
 
-const { ref, pin } = refs('15c87f1', 'cf2953e', '4ac01b34e9');
+const { ref, pin } = refs('15c87f1', 'cf2953e', '5255f3c074');
 const load = async () => {
   const all = await Promise.all(
     [['gltf', 'src/pbr.ts'], ['shadows'], ['clustered'], ['environment']].map(([name, entry]) =>
