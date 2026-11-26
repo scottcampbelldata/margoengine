@@ -14018,6 +14018,10 @@
       "./underwater": {
         "raw": 10452,
         "gzip": 4758
+      },
+      "./life": {
+        "raw": 17208,
+        "gzip": 7286
       }
     },
     "@margoengine/physics2d": {
@@ -17675,6 +17679,16 @@
       "raw": 8710,
       "gzip": 4523,
       "brotli": 4100
+    },
+    "packages/physics/dist/swim-kernel.wasm": {
+      "raw": 6410,
+      "gzip": 3563,
+      "brotli": 3262
+    },
+    "packages/physics/dist/swim-kernel-shared.wasm": {
+      "raw": 6501,
+      "gzip": 3628,
+      "brotli": 3284
     },
     "packages/physics/dist/vegetation-kernel.wasm": {
       "raw": 6456,

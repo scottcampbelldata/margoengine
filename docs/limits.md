@@ -9029,5 +9029,5 @@ waves, slamming and vortices layered on the emitted wake impulse require water-s
 forces are cycle-averaged and omit a resolved fluke vortex sheet. Use a wetted mesh or geometric profile to
 supply the true skin area if it differs materially from the ellipsoid. Skin deformation is prescribed by an
 ellipsoid-weighted centreline with a separate contact field for articulated segment loads.
-The optional JavaScript entry measures 7,297 B gzip. Its lazy plain and shared Wasm assets measure 6,410 B and 6,501 B raw, respectively. Shared memory and
+The optional JavaScript entry measures 7,286 B gzip. The plain and shared Wasm assets measure 6,410 B and 6,501 B raw. Shared memory and
 browser use require a runtime with Wasm SIMD. The ordinary page path loads plain Wasm.
