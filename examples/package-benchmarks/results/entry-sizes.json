@@ -18329,7 +18329,7 @@
       "entry": "./soft",
       "base": {
         "raw": 121226,
-        "gzip": 39450
+        "gzip": 39449
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
