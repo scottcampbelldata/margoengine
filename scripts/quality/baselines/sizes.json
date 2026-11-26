@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20021651,
+  "total": 20028493,
   "history": [
     {
       "date": "2026-10-24",
@@ -12765,6 +12765,12 @@
       "commit": "ea6114769",
       "reason": "@margoengine/physics: the kernel's threaded build (Wasm SIMD and atomics for a shared memory), a third lazy blueprint chunk of about 247 KB deflated that only loadKernel({threads: true}) fetches, so the lazy kernel items and the package total grow by it (budgets 535450 to 795608 and 618161 to 889499 B) while a world that does not ask downloads nothing more; the base entry grows from 90777 to about 91255 B measured (budget 93993) for useThreads, stepAsync and the worker launch. The worker needs a module built with atomics, which the plain builds cannot be.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "660579824",
+      "reason": "xr/near: new optional entry, near-interaction behaviours (hand constraint, follow in view, surface magnetism, six-DoF drag and two-pointer scale, app bar, near menu, slate): 6842 B gzip; one cohesive module sharing the pointer-frame, panel and poke code, a split would duplicate them",
+      "grew": 1
     }
   ],
   "items": {
@@ -14415,6 +14421,7 @@
     "@margoengine/xr/layers": 4612,
     "@margoengine/xr/locomotion": 3390,
     "@margoengine/xr/models": 3600,
+    "@margoengine/xr/near": 7098,
     "@margoengine/xr/occlusion": 3198,
     "@margoengine/xr/performance": 1582,
     "@margoengine/xr/pointer": 2675,
