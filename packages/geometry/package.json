@@ -55,6 +55,10 @@
       "types": "./dist/utils.d.ts",
       "import": "./dist/utils.js"
     },
+    "./node-graph": {
+      "types": "./dist/node-graph.d.ts",
+      "import": "./dist/node-graph.js"
+    },
     "./extras": {
       "types": "./dist/extras.d.ts",
       "import": "./dist/extras.js"
