@@ -17,7 +17,9 @@ import {
   fuelBed,
   slopeFactor,
   windFactor,
+  RADIANT_SHARE,
 } from '../dist/fire-front.js';
+import { RADIANT_FRACTION } from '../dist/smoke.js';
 
 const MPH = 0.44704,
   CHAIN_H = 20.1168 / 3600; // m/s per chain/hour
@@ -602,6 +604,26 @@ test('smokeEmission: 0 before ignition, then the fuel burned (heat over 18,622 k
   double.advanceTime(60);
   near(double.smokeEmission, 2 * front.smokeEmission, 1e-9, 'the yield scales it');
   assert.throws(() => FireFront.create({ smokeYield: -1 }), RangeError);
+});
+
+// KB-WEATHER-FIREHAZE1: the front reports the flames' radiant power, the share its smoke columns glow with, so a
+// WeatherDrive can light the smoke haze over the fire from below.
+test('radiantPower: 0 before ignition, then the radiant 0.3 of the heat release, the share the smoke columns glow with', () => {
+  assert.equal(RADIANT_SHARE, RADIANT_FRACTION, 'the front and its smoke columns radiate one share');
+  const front = FireFront.create({
+    size: [400, 400],
+    cell: 4,
+    fuel: 'FM1',
+    wind: [5, 0],
+    spotting: 0,
+    ignitions: [{ at: [-100, 0], radius: 6 }],
+  });
+  assert.equal(front.radiantPower, 0, 'nothing burns before the first step');
+  front.advanceTime(60);
+  const watts = front.segments().reduce((s, x) => s + x.heat, 0) / 0.7;
+  near(front.radiantPower, 0.3 * watts, 1e-9, 'watts');
+  // The same fuel burned: the smoke and the light are two shares of one release.
+  near(front.radiantPower / front.smokeEmission, (0.3 * 18.622e6) / 15, 1e-9, 'watts per gram of smoke');
 });
 
 // KB-FIRE-CROWN1: crown fire. Van Wagner 1977's initiation and active criteria, Rothermel 1991's crown rate, the crown

@@ -21,6 +21,7 @@ import {
   sprayFromWind,
   sunTransmittance,
   hazeLight,
+  fireHazeLight,
   visibility,
   windProfile,
 } from './air.js';
@@ -89,6 +90,8 @@ export interface SkyTarget {
 export interface FireTarget {
   readonly options: object;
   readonly smokeEmission: number;
+  /** The flames' radiant power now, watts (`FireFront.radiantPower`): it lights the smoke haze from below. None gives no light. */
+  readonly radiantPower?: number;
 }
 /** A cloud layer (`VolumetricClouds` from `@margoengine/sky/volumetric-clouds`). */
 export interface CloudLayerTarget {
@@ -232,6 +235,12 @@ export interface DriveOptions {
   smokeFromFire?: boolean;
   /** Crosswind width in metres over which a fire's smoke mixes. Default 2,000. */
   smokeWidth?: number;
+  /**
+   * Light of the fires on the smoke haze (KB-WEATHER-FIREHAZE1): the light on the sky fog gains the fires' summed
+   * `radiantPower` as `fireHazeLight` gives it over `smokeWidth`, times this, so a valley burning under its smoke glows
+   * orange from below, at night with no other light. 0 turns it off. Default 1.
+   */
+  fireLight?: number;
   /**
    * Dry and wet the dead fuel of the fires with the weather: each fire's `moisture`, `moisture10` and `moisture100` that is
    * unset (or the drive's own last value) becomes the 1, 10 and 100 hour fuel moisture of `FuelMoistureModel`:
@@ -401,7 +410,7 @@ export function validateDrive(o: DriveOptions): void {
     (typeof o.smokeLight !== 'number' || !Number.isFinite(o.smokeLight) || o.smokeLight < 0 || o.smokeLight > 100)
   )
     throw new RangeError('WeatherDrive smokeLight must be a number from 0 to 100; pass a finite value in range');
-  for (const key of ['ashLight', 'sprayLight'] as const) {
+  for (const key of ['ashLight', 'sprayLight', 'fireLight'] as const) {
     const v = o[key];
     if (v !== undefined && (typeof v !== 'number' || !Number.isFinite(v) || v < 0 || v > 100))
       throw new RangeError(`WeatherDrive ${key} must be a number from 0 to 100; pass a finite value in range`);
@@ -609,6 +618,14 @@ export class WeatherDrive {
       const raised = smokeFromEmission(grams, state.wind, o.smokeWidth);
       if (raised > state.smoke) state = { ...state, smoke: raised };
     }
+    // The flames' light on the haze over them (KB-WEATHER-FIREHAZE1), from the fronts that report their radiant power.
+    let radiant = 0;
+    for (const fire of fires) {
+      const p = fire.radiantPower;
+      if (typeof p === 'number' && Number.isFinite(p) && p > 0) radiant += p;
+    }
+    const fireLight = radiant > 0 && (o.fireLight ?? 1) > 0 ? fireHazeLight(radiant, o.smokeWidth) : undefined;
+    if (fireLight) for (let i = 0; i < 3; i++) fireLight[i] *= o.fireLight ?? 1;
     const here = o.listener?.position ?? o.position ?? [0, 0, 0];
     const eruptions =
       o.eruptions !== undefined
@@ -669,6 +686,7 @@ export class WeatherDrive {
           s.extinction,
           [o.dustLight ?? 1, o.smokeLight ?? 1, o.ashLight ?? 1, o.sprayLight ?? 1],
           skyTarget,
+          fireLight,
         );
       }
       this.dimSun(skyTarget, state);
@@ -868,13 +886,15 @@ export class WeatherDrive {
   // the air through the smoke, ash and spray (`hazeLight`), so a thick layer darkens the haze; the colour the fog had
   // comes back when they are not. A colour a person set meanwhile is kept as the one to come back to. As the sun sets
   // the haze's sunlight hands over to the night's light on the air by the sky's own blend (`airLight`,
-  // KB-WEATHER-NIGHTHAZE1), so the haze is moonlit at night, not the afternoon's.
+  // KB-WEATHER-NIGHTHAZE1), so the haze is moonlit at night, not the afternoon's. The fires below add their own light
+  // (`fire`, `fireHazeLight`, KB-WEATHER-FIREHAZE1), so the haze over a burning valley glows orange at night.
   private tintFog(
     fog: { color?: readonly [number, number, number] },
     state: WeatherState,
     extinction: number,
     lights: readonly number[],
     sky: SkyTarget,
+    fire?: readonly number[],
   ): void {
     if (heldFromWeather(fog, 'color')) return;
     const record = this.fogColors.get(fog),
@@ -896,7 +916,7 @@ export class WeatherDrive {
         for (let i = 0; i < 3; i++) color[i] += share === 1 ? c[i]! * lit : c[i]! * share * lit;
       }
       const light = airLight(sky, state);
-      if (light) for (let i = 0; i < 3; i++) color[i] *= light[i]!;
+      if (light || fire) for (let i = 0; i < 3; i++) color[i] *= (light ? light[i]! : 1) + (fire ? fire[i]! : 0);
       const original = record && fog.color === record.wrote ? record.original : fog.color;
       this.fogColors.set(fog, { original, wrote: color });
       fog.color = color;

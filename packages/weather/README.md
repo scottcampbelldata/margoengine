@@ -1164,6 +1164,25 @@ A `WeatherDrive` does three things for it, all package calls:
   crosswind width of 2 km (`smokeWidth`) and the 2 km layer. `smokeFromFire: false` turns it off, and a smoke the state
   holds itself is never lowered. The drive also hands each front its wind every frame (`setWind`, the 10 m wind at the
   front), so a fire given as `fires` spreads in the weather's wind (KB-FIRE-DRIVEWIND1).
+- **The fire lights its smoke from below.** A front also reports its flames' `radiantPower` in watts (the radiant 0.3
+  of its heat release, the share its smoke columns glow with); the light on the sky fog gains
+  `fireHazeLight(watts, smokeWidth)`: half that power going up, the share an isotropic source on the ground sends through
+  a disc of the box's area (`smokeWidth` squared) at the middle of the 2 km layer, spread over it, as a share of the noon
+  sun's 1,000 W/m^2 in the flames' orange (`FIRE_LIGHT_COLOR`). So a valley burning under its smoke pall glows orange at
+  night instead of going black, and the moon's light adds to it (KB-WEATHER-FIREHAZE1). A 45 GW blowup (a smoke of
+  about 0.6 in a 5 m/s wind) lights the haze at 0.56, 0.24, 0.07 of the noon sun. `fireLight` scales it (default 1, 0
+  off); a fire that reports no `radiantPower` gives the haze no light.
+
+```js
+import { WeatherMachine, fireHazeLight } from 'margoengine/weather';
+import { WeatherDrive } from 'margoengine/weather/drive';
+
+// The haze over a 45 GW blowup: the light on it, red green blue, as a share of the noon sun.
+console.log(fireHazeLight(1.34e10).map((t) => t.toFixed(2)).join(' '), 'of the noon sun on the smoke');
+const fire = { options: {}, smokeEmission: 36000, radiantPower: 1.34e10 };
+const drive = new WeatherDrive({ weather: new WeatherMachine('clear'), fires: fire, fireLight: 1 });
+console.log(drive.update(0).smoke.toFixed(2), 'smoke');
+```
 
 ```js
 import { WeatherMachine } from 'margoengine/weather';

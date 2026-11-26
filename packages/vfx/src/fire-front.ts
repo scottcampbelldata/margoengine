@@ -715,6 +715,11 @@ export interface FireFrontOptions {
 
 /** The heat of combustion of the fuel (Rothermel 1972's 8,000 Btu/lb), joules per kilogram. */
 const HEAT_OF_COMBUSTION = 18.622e6;
+/**
+ * The share of a fire's heat release it radiates: `RADIANT_FRACTION` of `@margoengine/vfx/smoke` (Drysdale 2011: 0.2 to
+ * 0.4; NISTIR 6546: about 0.3), kept here so the front does not load the smoke entry; a test pins the two equal.
+ */
+export const RADIANT_SHARE = 0.3;
 
 // The 16 neighbours a cell spreads to: the 8 touching ones and the 8 knight moves, so the grid's own directions do not
 // show in the shape of the burn (Richards 1990 uses the continuous front; 16 directions keep its error under 2 percent).
@@ -1051,6 +1056,16 @@ export class FireFront implements EnginePlugin {
     let watts = 0;
     for (const s of this.segs.values()) watts += s.heat / 0.7;
     return ((this.options.smokeYield ?? 15) * watts) / HEAT_OF_COMBUSTION;
+  }
+  /**
+   * The flames' radiant power now, watts: the share of the front's heat release it radiates, {@link RADIANT_SHARE} (the
+   * `RADIANT_FRACTION` of `@margoengine/vfx/smoke` its smoke columns glow with), over the convective 0.7 of the heat it
+   * releases. `WeatherDrive` lights the smoke haze from below with it (KB-WEATHER-FIREHAZE1). 0 while nothing burns.
+   */
+  get radiantPower(): number {
+    let convective = 0;
+    for (const s of this.segs.values()) convective += s.heat;
+    return (RADIANT_SHARE / 0.7) * convective;
   }
   /** True while a cell burns or an ignition waits. */
   get active(): boolean {

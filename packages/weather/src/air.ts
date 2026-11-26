@@ -575,6 +575,40 @@ function slabTransmission(tau: number, w: number, g: number): number {
   return (2 * k * e) / (k + g1 + (k - g1) * e * e);
 }
 
+/** The linear colour of a flame's light (the `GLOW_COLOR` a fire's glow lights its smoke columns with in `@margoengine/vfx/lit`). */
+export const FIRE_LIGHT_COLOR: readonly [number, number, number] = [1, 0.42, 0.12];
+/** The noon sun's irradiance on level ground, W/m^2: the light the haze colours are referred to (share 1). */
+export const NOON_IRRADIANCE = 1000;
+
+/**
+ * The share of the noon sun's light ({@link NOON_IRRADIANCE}) that fires radiating `radiantPower` watts (a fire front's
+ * `radiantPower`: the radiant 0.3 of its release, Drysdale 2011) put on the smoke haze over them, red, green and blue,
+ * the flames' colour ({@link FIRE_LIGHT_COLOR}) times E / 1,000 W/m^2. E is the box model's light as
+ * {@link smokeFromEmission} is its smoke: the upward half of the radiant power, the share of it an isotropic source
+ * on the ground sends through a disc of the box's area (`width` squared, radius rho = width / sqrt(pi)) at the middle
+ * of the smoke layer (h = {@link SMOKE_LAYER_DEPTH} / 2), 1 - h / sqrt(h^2 + rho^2) (the point-to-disc view factor,
+ * M. F. Modest, "Radiative Heat Transfer", 3rd ed., Academic Press, 2013, ch. 4), spread over that area. The haze's
+ * airlight is its diffusion colour times the light on it (Koschmieder 1924), so a valley burning under a smoke pall
+ * at night glows orange from below (the night fire light that VIIRS's day/night band images, J. Wang, Y. Zhou and
+ * others, "Detecting nighttime fire combustion phase by hybrid application of visible and infrared radiation from
+ * Suomi NPP VIIRS", Remote Sens. Environ. 237, 111466, 2020, https://doi.org/10.1016/j.rse.2019.111466). Exactly
+ * [0, 0, 0] for no radiant power.
+ * @throws RangeError for a negative or non-finite power, or a width that is not above 0.
+ */
+export function fireHazeLight(radiantPower: number, width = 2000): [number, number, number] {
+  if (typeof radiantPower !== 'number' || !Number.isFinite(radiantPower) || radiantPower < 0)
+    throw new RangeError('Fire radiant power must be a finite number of watts, 0 or more; got ' + String(radiantPower));
+  if (typeof width !== 'number' || !Number.isFinite(width) || !(width > 0))
+    throw new RangeError('Smoke width must be a finite number of metres above 0; got ' + String(width));
+  if (radiantPower === 0) return [0, 0, 0];
+  const h = SMOKE_LAYER_DEPTH / 2,
+    rho2 = (width * width) / Math.PI,
+    through = 1 - h / Math.sqrt(h * h + rho2),
+    e = (0.5 * radiantPower * through) / (width * width),
+    share = e / NOON_IRRADIANCE;
+  return [FIRE_LIGHT_COLOR[0] * share, FIRE_LIGHT_COLOR[1] * share, FIRE_LIGHT_COLOR[2] * share];
+}
+
 /**
  * The share of the light on clean air that still lights the air under the smoke, ash and spray of a state, red, green
  * and blue, with the sun `elevation` radians up: the direct sun the layers let through, t ({@link sunTransmittance}),
