@@ -503,41 +503,22 @@ addEventListener('keydown', event => {
 engine.start();
 ```
 
-## Drive the gizmo with a ray
+## Ray drivers
 
-A pointer is not the only thing that can hold a handle. `rayHover(origin, direction)` lights the handle a world ray
-points at and returns its name, `rayDown(origin, direction)` grabs it (false when the ray points at none),
-`rayMove(origin, direction)` drags it and `rayUp()` lets go. The ray is an origin and a direction in world space, for
-example an XR controller's target ray; `@margoengine/xr/gizmo` feeds a headset's controllers to these calls. Modes,
-spaces, pivots, several objects, snapping, `cancelDrag()`, `reset()` and the events work as with a pointer.
+A pointer is not the only thing that can hold a handle: `GizmoRayDriver` in `@margoengine/xr/gizmo` drives the gizmo
+with world rays (`rayHover`, `rayDown`, `rayMove`, `rayUp`, `scaleDown`, `scaleTo`), and `XRGizmo` beside it feeds it
+a headset's controllers. That code lives there, so a desktop app does not load it. The gizmo keeps the hook a driver
+works through, which application code has no use for:
 
-- An arrow or scale cube follows the point of its axis nearest the ray. When the ray runs within 2.5 degrees of the
-  axis that point is not steady, so the handle follows the hand's own travel along the axis instead and carries on
-  from where it is when the ray turns away, with no jump.
-- A plane handle follows the ray over its plane, and a ring turns by the angle the ray sweeps on the ring's plane.
-- The view ring, the free turn and the centre scale handle read the ray's travel across a plane facing the ray at the
-  grab.
-- `scaleDown()` starts a two-point scale in any mode and `scaleTo(factor)` sizes everything attached about the gizmo
-  (1 is the size at the start, the scale snap applies) until `rayUp()`.
+- `aim` (default null) is the driver's world ray. While it is set, picks and drags read it in place of the camera ray
+  through the pointer, and the end of a drag clears it.
+- `setAxis(name)` lights a handle, `begin(action, x, y)` starts a drag of one named action whatever the lit handle,
+  and `endDrag()` ends the drag as a pointer release does.
 
-```ts
-import {Engine, box} from 'margoengine/core';
-import {TransformControls} from 'margoengine/controls/transform';
-
-const engine = await Engine.create(document.querySelector('canvas')!);
-const crate = engine.createMesh().setGeometry(box());
-const gizmo = TransformControls.attach(engine, {translationSnap: 0.25});
-gizmo.attach(crate);
-engine.render();
-// A ray from a hand at [0.5, 2, 3] down to the X arrow, then swung to meet the axis one unit further along.
-const hand = [0.5, 2, 3], reach = 0.6 * gizmo.frame()!.size;
-const toward = (x: number) => [x - hand[0], -hand[1], -hand[2]];
-if (gizmo.rayDown(hand, toward(reach))) {
-  gizmo.rayMove(hand, toward(reach + 1));
-  gizmo.rayUp();
-}
-console.log(crate.position.x); // 1
-```
+Under a ray an arrow or scale cube follows the point of its axis nearest the ray (Ericson 2005, section 5.1.8). When
+the ray runs within 2.5 degrees of the axis that point is not steady, so the handle follows the ray origin's own travel
+along the axis instead and carries on from where it is when the ray turns away, with no jump. Pointer drags are
+unchanged.
 
 ## Arcball gizmo, focus and keyboard
 
@@ -785,7 +766,7 @@ length is stable. Bad options throw a RangeError that ends with its fix, and `fr
 - Orbit, map, first-person, pointer-lock and walk controls do not roll (see above). Without `enableRoll`, trackball rotation cannot pass over the poles.
 - Orthographic cameras come from @margoengine/cameras (dolly becomes ortho zoom there; pan and the gizmo read the orthographic height from `camera.matrix`).
 - `attachMany` sizes each object along its own axes: under `world` space or another object's axes, a non-uniform stretch on a turned object gives its axes their share of the stretch instead of a shear.
-- A ray's pick radius is 1.5 degrees about the ray (`rayHover`, `rayDown`), whatever the distance. The gizmo's size, the view ring and the flipped arrows still follow the engine camera.
+- Under a ray driver (`aim` set) the gizmo's size, the view ring and the flipped arrows still follow the engine camera, not the ray.
 - With `occlude` and no `occluder`, a handle hidden behind geometry can still be grabbed: picking is on the CPU and has no scene depth. A parent with non-uniform scale and rotation shears its children; `TransformControls` drags use the parent's rotation without the shear.
 - `DragControls` moves a model whole: `recursive` and `transformGroup` follow core mesh children, not the nodes of a model. Skinned models are grabbed in their bind pose (see @margoengine/bvh).
 

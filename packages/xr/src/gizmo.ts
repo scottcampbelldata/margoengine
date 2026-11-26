@@ -3,7 +3,8 @@
 // targetRaySpace points along its -Z axis; the session fires selectstart/selectend and squeezestart/squeezeend with the
 // input source), Mine, Brooks and Sequin 1997 (two-handed scaling by the ratio of the hands' separation) and Bowman and
 // Hodges 1997 (ray-casting to pick at a distance, then manipulating about the object rather than the hand). The handle
-// shapes, constraints and snapping are the gizmo's own: this entry only feeds it rays.
+// shapes, constraints and snapping are the gizmo's own: this entry only feeds it rays, through the gizmo's `aim` hook.
+import { add, cross, dot, normalize, scale, sub } from '@margoengine/math/vec3';
 import { rangeError } from '../../shared/errors.js';
 import type { XRController } from './controller.js';
 import type { XRFrameState, XRInputSource, XRNativeSession } from './types.js';
@@ -14,25 +15,41 @@ export interface XRGizmoHost {
   readonly controllers: readonly XRController[];
   onFrame(callback: (state: XRFrameState) => void): () => void;
 }
+type V3 = [number, number, number];
+/** The world ray a driver hands the gizmo in place of a pointer: `TransformAim` of `@margoengine/controls/transform`. */
+export interface XRGizmoAim {
+  ray: { origin: V3; direction: V3 };
+  /** The frame of the ray when it grabbed, a stand-in screen `screen` pixels square. */
+  b: { position: V3; forward: V3; right: V3; up: V3; distance: number; tanHalf: number };
+  screen: number;
+  /** Kept by the gizmo: the ray's nearest point along a dragged axis and what steadies it near parallel. */
+  along: number;
+  from: V3;
+  bias: number;
+  parallel: boolean;
+  /** The size factor of a two-point scale, or null for a ray drag. */
+  factor: number | null;
+}
 /**
- * The gizmo a ray drives. `TransformControls` of `@margoengine/controls/transform` fits. Rays are an origin and a
- * direction in world space.
+ * The gizmo a ray drives, by its pointer methods and its ray hook `aim`. `TransformControls` of
+ * `@margoengine/controls/transform` fits.
  */
 export interface XRGizmoTarget {
   /** True while a handle is dragged. */
   readonly dragging: boolean;
-  /** Lights the handle the ray points at and returns its name, or null. */
-  rayHover(origin: readonly number[], direction: readonly number[]): string | null;
-  /** Grabs the handle the ray points at; false when it points at none. */
-  rayDown(origin: readonly number[], direction: readonly number[]): boolean;
-  /** Continues the grab. */
-  rayMove(origin: readonly number[], direction: readonly number[]): void;
-  /** Ends a grab or a two-point scale; with neither, puts out the hover light. */
-  rayUp(): void;
-  /** Starts a two-point scale; false when it cannot. */
-  scaleDown(): boolean;
-  /** Sizes the two-point scale: `factor` times the size at `scaleDown`. */
-  scaleTo(factor: number): void;
+  readonly enabled: boolean;
+  /** The lit or dragged handle. */
+  readonly axis: string | null;
+  /** While set, the gizmo picks and drags by this ray; the end of a drag clears it. */
+  aim: XRGizmoAim | null;
+  /** Where the gizmo is and the unit vector from it to the eye, or null with nothing attached. */
+  frame(): { origin: readonly number[]; eye: readonly number[] } | null;
+  pick(x: number, y: number): string | null;
+  setAxis(axis: string | null): void;
+  pointerDown(x: number, y: number): void;
+  pointerMove(x: number, y: number): void;
+  begin(action: { op: 'scale'; axis: 'XYZ' }, x: number, y: number): void;
+  endDrag(): void;
 }
 /** A hover, grab or release of the gizmo by a controller. */
 export interface XRGizmoEvent {
@@ -60,7 +77,129 @@ export interface XRGizmoOptions {
   signal?: AbortSignal;
 }
 
-const METHODS = ['rayHover', 'rayDown', 'rayMove', 'rayUp', 'scaleDown', 'scaleTo'] as const;
+const METHODS = ['frame', 'pick', 'setAxis', 'pointerDown', 'pointerMove', 'begin', 'endDrag'] as const;
+/** Side in pixels of the stand-in screen of a ray, and tan of half its field: the 8 pixel pick radius spans 1.5 degrees. */
+const SCREEN = 300;
+const CENTRE = SCREEN / 2;
+const TAN = 0.5;
+/** A ray's aim with how far along the ray the gizmo was at the grab. */
+type Aim = XRGizmoAim & { reach: number };
+
+/**
+ * Drives a transform gizmo with world rays: an origin and a direction in world space (the direction need not be unit).
+ * `XRGizmo` feeds it controller rays; any other ray source (a tracked stylus, a second camera) can call it directly.
+ */
+export class GizmoRayDriver {
+  constructor(readonly gizmo: XRGizmoTarget) {
+    if (!gizmo || METHODS.some((name) => typeof gizmo[name] !== 'function'))
+      throw rangeError(
+        'GizmoRayDriver needs a gizmo with frame, pick, setAxis, pointerDown, pointerMove, begin and endDrag; pass a TransformControls',
+        'arguments',
+      );
+  }
+  /** True while a handle is dragged. */
+  get dragging(): boolean {
+    return this.gizmo.dragging;
+  }
+  private take(origin: readonly number[], direction: readonly number[]): Aim | null {
+    const length = Math.hypot(direction[0], direction[1], direction[2]);
+    if (!(length > 0 && Number.isFinite(length) && Number.isFinite(origin[0] + origin[1] + origin[2])))
+      throw rangeError(
+        'GizmoRayDriver ray must be a finite origin and a non-zero direction; pass [x, y, z] and [x, y, z]',
+        'arguments',
+      );
+    const f = this.gizmo.enabled ? this.gizmo.frame() : null;
+    if (!f) return null;
+    const from: V3 = [origin[0], origin[1], origin[2]],
+      forward: V3 = [direction[0] / length, direction[1] / length, direction[2] / length],
+      right = normalize(cross(forward, Math.abs(forward[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0])) as V3;
+    return {
+      ray: { origin: from, direction: forward },
+      b: { position: from, forward, right, up: cross(right, forward) as V3, distance: 1, tanHalf: TAN },
+      screen: SCREEN,
+      reach: Math.max(1e-3, Math.hypot(...sub(f.origin, from))),
+      along: 0,
+      from,
+      bias: 0,
+      parallel: false,
+      factor: null,
+    };
+  }
+  /**
+   * Lights the handle a world ray points at, as a hovering pointer does, and returns its name or null. During a drag it
+   * returns the dragged handle and changes nothing.
+   */
+  rayHover(origin: readonly number[], direction: readonly number[]): string | null {
+    const g = this.gizmo,
+      aim = this.take(origin, direction);
+    if (g.dragging) return g.axis;
+    g.aim = aim;
+    const axis = aim && g.pick(CENTRE, CENTRE);
+    g.aim = null;
+    g.setAxis(axis);
+    return axis;
+  }
+  /**
+   * Grabs the handle a world ray points at and starts a drag, as a pointer press does. Returns false when the ray points
+   * at no handle or a drag is under way. Follow with `rayMove` and end with `rayUp`.
+   */
+  rayDown(origin: readonly number[], direction: readonly number[]): boolean {
+    const g = this.gizmo;
+    if (g.dragging || !this.rayHover(origin, direction)) return false;
+    g.aim = this.take(origin, direction);
+    g.pointerDown(CENTRE, CENTRE);
+    if (!g.dragging) g.aim = null;
+    return g.dragging;
+  }
+  /** Continues a `rayDown` drag with the ray's new place. */
+  rayMove(origin: readonly number[], direction: readonly number[]): void {
+    const g = this.gizmo,
+      aim = g.aim as Aim | null,
+      next = aim && aim.factor === null && g.dragging ? this.take(origin, direction) : null;
+    if (!aim || !next) return;
+    aim.ray = next.ray;
+    // The handles dragged across the view follow the ray's point at the grab distance over the grab's stand-in screen.
+    const b = aim.b,
+      d = sub(add(next.ray.origin, scale(next.ray.direction, aim.reach)), b.position),
+      depth = dot(d, b.forward),
+      half = depth * b.tanHalf;
+    if (depth > 0) g.pointerMove((dot(d, b.right) / half + 1) * CENTRE, (1 - dot(d, b.up) / half) * CENTRE);
+  }
+  /**
+   * Starts a two-point scale in any mode: `scaleTo(factor)` then sizes everything attached about the gizmo, with the
+   * scale snap, until `rayUp`. Returns false when nothing is attached or a drag is under way.
+   */
+  scaleDown(): boolean {
+    const g = this.gizmo,
+      f = g.dragging ? null : g.frame(),
+      aim = f && this.take(add(f.origin, f.eye), scale(f.eye, -1));
+    if (!aim) return false;
+    aim.factor = 1;
+    g.aim = aim;
+    g.begin({ op: 'scale', axis: 'XYZ' }, CENTRE, CENTRE);
+    if (!g.dragging) g.aim = null;
+    return g.dragging;
+  }
+  /** Sets the size of a `scaleDown` drag to `factor` times the size it began with (1 leaves it as it was). */
+  scaleTo(factor: number): void {
+    if (!(Number.isFinite(factor) && factor > 0))
+      throw rangeError(
+        'GizmoRayDriver scaleTo factor must be a finite number above 0; pass a ratio such as 1.5',
+        'arguments',
+      );
+    const g = this.gizmo,
+      aim = g.aim;
+    if (!aim || aim.factor === null || !g.dragging) return;
+    aim.factor = factor;
+    g.pointerMove(CENTRE, CENTRE);
+  }
+  /** Ends a `rayDown` or `scaleDown` drag, as a pointer release does; with no drag, the highlight of `rayHover` goes out. */
+  rayUp(): void {
+    const g = this.gizmo;
+    if (!g.dragging) g.setAxis(null);
+    else if (g.aim) g.endDrag();
+  }
+}
 const HANDS = ['left', 'right', 'none'];
 
 /**
@@ -83,6 +222,7 @@ export class XRGizmo {
   private readonly hands: readonly string[];
   private readonly twoHandScale: boolean;
   private readonly minSeparation: number;
+  private readonly gizmo: GizmoRayDriver;
 
   /** Attaches the driver; `dispose()` or `using` detaches it. */
   static attach(xr: XRGizmoHost, gizmo: XRGizmoTarget, options: XRGizmoOptions = {}): XRGizmo {
@@ -91,7 +231,7 @@ export class XRGizmo {
   }
   private constructor(
     private readonly xr: XRGizmoHost,
-    private readonly gizmo: XRGizmoTarget,
+    gizmo: XRGizmoTarget,
     private readonly options: XRGizmoOptions,
   ) {
     const button = options.button ?? 'select';
@@ -100,11 +240,7 @@ export class XRGizmo {
     this.minSeparation = options.minSeparation ?? 0.02;
     if (typeof xr?.onFrame !== 'function' || !Array.isArray(xr.controllers))
       throw rangeError('XRGizmo needs an XR host with controllers and onFrame; pass the XR manager', 'arguments');
-    if (!gizmo || METHODS.some((name) => typeof gizmo[name] !== 'function'))
-      throw rangeError(
-        'XRGizmo needs a gizmo with rayHover, rayDown, rayMove, rayUp, scaleDown and scaleTo; pass a TransformControls',
-        'arguments',
-      );
+    this.gizmo = new GizmoRayDriver(gizmo);
     if (
       (button !== 'select' && button !== 'squeeze') ||
       !this.hands.length ||

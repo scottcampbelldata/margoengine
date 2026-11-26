@@ -478,7 +478,44 @@ enter.onclick=()=>void xr.requestSession('immersive-vr').catch(engine.onError);
 addEventListener('pagehide',()=>{drive.dispose();gizmo.dispose();},{once:true});
 ```
 
-`XRGizmo.attach(xr, gizmo, options)` takes the `XR` (any `{session, controllers, onFrame}` host) and any gizmo with `rayHover`, `rayDown`, `rayMove`, `rayUp`, `scaleDown` and `scaleTo`. `drive.grabbing` is the controller holding a handle, `drive.scaling` is true during a two-hand scale, and `dispose()` or `using` lets go and removes every listener. A bad host, gizmo or option throws a `RangeError` that names the fix. Poses are read in the XR reference space and taken as world space. A ray within 2.5 degrees of the arrow it drags has no steady nearest point on it, so there the arrow follows the hand's own travel along the axis and does not jump. A controller that leaves the session, or a session that ends, lets go. After a two-hand scale a hand that is still pressing presses again to grab. Not run on a headset: it is tested with simulated input sources and poses.
+`XRGizmo.attach(xr, gizmo, options)` takes the `XR` (any `{session, controllers, onFrame}` host) and a `TransformControls` (any gizmo with its pointer methods and ray hook: `frame`, `pick`, `setAxis`, `pointerDown`, `pointerMove`, `begin`, `endDrag` and `aim`). `drive.grabbing` is the controller holding a handle, `drive.scaling` is true during a two-hand scale, and `dispose()` or `using` lets go and removes every listener. A bad host, gizmo or option throws a `RangeError` that names the fix. Poses are read in the XR reference space and taken as world space. A ray within 2.5 degrees of the arrow it drags has no steady nearest point on it, so there the arrow follows the hand's own travel along the axis and does not jump. A controller that leaves the session, or a session that ends, lets go. After a two-hand scale a hand that is still pressing presses again to grab. Not run on a headset: it is tested with simulated input sources and poses.
+
+### Any world ray: `GizmoRayDriver`
+
+`XRGizmo` works through `GizmoRayDriver`, which the entry also exports for rays that are not XR controllers (a tracked stylus, a second camera, a test). `new GizmoRayDriver(gizmo)` wraps a `TransformControls`; a ray is an origin and a direction in world space, and the direction need not be unit. The ray code lives in this entry, so `@margoengine/controls/transform` on a desktop page does not carry it.
+
+| Method | What it does |
+| --- | --- |
+| `rayHover(origin, direction)` | Lights the handle the ray points at and returns its name, or null. During a drag it returns the dragged handle and changes nothing. The pick radius is 1.5 degrees about the ray. |
+| `rayDown(origin, direction)` | Grabs the handle the ray points at and starts a drag. False when it points at none or a drag is under way. |
+| `rayMove(origin, direction)` | Continues the drag. An arrow or scale cube follows the point of its axis nearest the ray; a plane handle follows the ray over its plane; a ring turns by the angle the ray sweeps on its plane; the view ring, the free turn and the centre scale handle read the ray's travel across a plane facing the ray at the grab. |
+| `rayUp()` | Ends a `rayDown` or `scaleDown` drag; with no drag, puts out the hover light. A pointer drag is left alone. |
+| `scaleDown()` | Starts a two-point scale in any mode. False when nothing is attached or a drag is under way. |
+| `scaleTo(factor)` | Sizes everything attached about the gizmo: 1 is the size at `scaleDown`, and the scale snap applies. |
+| `dragging`, `gizmo` | True while a handle is dragged; the gizmo driven. |
+
+A ray that is not finite or has a zero direction, and a `scaleTo` factor that is not above 0, throw a `RangeError`. A disabled gizmo or one with nothing attached takes no ray. Modes, spaces, pivots, several objects, snapping, `cancelDrag()`, `reset()` and the events work as with a pointer.
+
+```ts
+import {Engine, box} from 'margoengine/core';
+import {TransformControls} from 'margoengine/controls/transform';
+import {GizmoRayDriver} from 'margoengine/xr/gizmo';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const crate = engine.createMesh().setGeometry(box());
+const gizmo = TransformControls.attach(engine, {translationSnap: 0.25});
+gizmo.attach(crate);
+engine.render();
+const rays = new GizmoRayDriver(gizmo);
+// A ray from a hand at [0.5, 2, 3] down to the X arrow, then swung to meet the axis one unit further along.
+const hand = [0.5, 2, 3], reach = 0.6 * gizmo.frame()!.size;
+const toward = (x: number) => [x - hand[0], -hand[1], -hand[2]];
+if (rays.rayDown(hand, toward(reach))) {
+  rays.rayMove(hand, toward(reach + 1));
+  rays.rayUp();
+}
+console.log(crate.position.x); // 1
+```
 
 Sources: WebXR Device API, W3C (input sources, `targetRaySpace`, select and squeeze events), https://www.w3.org/TR/webxr/; C. Ericson, Real-Time Collision Detection, 2005, section 5.1.8 (closest points of two lines), https://realtimecollisiondetection.net/; M. Mine, F. Brooks and C. Sequin, Moving Objects in Space: Exploiting Proprioception in Virtual-Environment Interaction, SIGGRAPH 1997 (two-handed scaling), https://doi.org/10.1145/258734.258747; D. Bowman and L. Hodges, An Evaluation of Techniques for Grabbing and Manipulating Remote Objects in Immersive Virtual Environments, I3D 1997 (ray-casting and HOMER), https://doi.org/10.1145/253284.253301; D. Mendes, F. Caputo, A. Giachetti, A. Ferreira and J. Jorge, A Survey on 3D Virtual Object Manipulation: From the Desktop to Immersive Virtual Environments, Computer Graphics Forum 2019 (widgets that separate degrees of freedom), https://doi.org/10.1111/cgf.13390.
 

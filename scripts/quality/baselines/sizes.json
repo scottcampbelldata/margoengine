@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20659977,
+  "total": 20659736,
   "history": [
     {
       "date": "2026-10-24",
@@ -14173,6 +14173,12 @@
       "commit": "113a391fde",
       "grew": 1,
       "reason": "SEA-12 shape drag, wind silhouette, field cells and the optional Rust binding grow physics/loads from 16180 to 20816 B gzip. The same solver must compose these forces on a shared body row and can select its TypeScript or native wrench path. Each 2,884 B native module is loaded from the optional entry only. A separate geometry entry would still be needed by every caller supplying a shape that pierces the water."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f8140fd20",
+      "reason": "Gizmo split (manager's ruling on PR #604): the ray drivers rayHover, rayDown, rayMove, rayUp, scaleDown and scaleTo leave TransformControls for GizmoRayDriver in xr/gizmo, so a desktop page stops paying for XR code. Measured gzip at one base (acbe01aba): controls/transform 13,279 to 12,763 B (ceiling 14,362 to 13,146), controls root 29,670 to 29,175 B (ceiling 31,182 to 30,051), xr/gizmo 1,541 to 2,342 B (ceiling 1,797 to 2,598). controls/transform keeps the aim hook and the closest-point axis solve with its parallel guard. Only these three rows are written",
+      "grew": 1
     }
   ],
   "items": {
@@ -14389,7 +14395,7 @@
     "@margoengine/compute/sparse": 7238,
     "@margoengine/compute/stream": 1324,
     "@margoengine/compute/subgroups": 2537,
-    "@margoengine/controls": 30561,
+    "@margoengine/controls": 30051,
     "@margoengine/controls/arcball": 9211,
     "@margoengine/controls/behaviors": 1156,
     "@margoengine/controls/box-gizmo": 6812,
@@ -14406,7 +14412,7 @@
     "@margoengine/controls/profiles": 960,
     "@margoengine/controls/third-person": 5280,
     "@margoengine/controls/trackball": 4608,
-    "@margoengine/controls/transform": 13678,
+    "@margoengine/controls/transform": 13146,
     "@margoengine/controls/transitions": 14045,
     "@margoengine/controls/walk": 14267,
     "@margoengine/core": 22467,
@@ -15883,7 +15889,7 @@
     "@margoengine/xr/ar-extra": 3289,
     "@margoengine/xr/body": 1757,
     "@margoengine/xr/device-check": 2344,
-    "@margoengine/xr/gizmo": 1797,
+    "@margoengine/xr/gizmo": 2598,
     "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,
     "@margoengine/xr/launch": 1618,

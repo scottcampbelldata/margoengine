@@ -557,6 +557,20 @@ export class TrackballControls extends Controls {
     update(delta?: number): boolean;
 }
 
+export interface TransformAim {
+    ray: {
+        origin: V3;
+        direction: V3;
+    };
+    b: Basis;
+    screen: number;
+    along: number;
+    from: V3;
+    bias: number;
+    parallel: boolean;
+    factor: number | null;
+}
+
 export class TransformControls extends EventDispatcher {
     readonly engine: EngineKernel;
     element: ControlElement | null;
@@ -583,6 +597,7 @@ export class TransformControls extends EventDispatcher {
     dragging: boolean;
     fixed: boolean;
     readonly overlay: OverlayRenderer;
+    aim: TransformAim | null;
     readonly pluginName: string;
     static attach(engine: EngineKernel, options?: TransformControlsOptions): TransformControls;
     constructor(engine: EngineKernel, options?: TransformControlsOptions);
@@ -634,14 +649,14 @@ export class TransformControls extends EventDispatcher {
     pick(x: number, y: number): HandleName | null;
     dispose(): void;
     [Symbol.dispose]: () => void;
+    setAxis(axis: HandleName | null): void;
+    endDrag(): void;
     pointerDown(x: number, y: number): void;
+    begin(action: {
+        op: Exclude<TransformMode, 'all'>;
+        axis: HandleName;
+    }, x: number, y: number): void;
     pointerMove(x: number, y: number): void;
-    rayHover(origin: readonly number[], direction: readonly number[]): HandleName | null;
-    rayDown(origin: readonly number[], direction: readonly number[]): boolean;
-    rayMove(origin: readonly number[], direction: readonly number[]): void;
-    scaleDown(): boolean;
-    scaleTo(factor: number): void;
-    rayUp(): void;
 }
 
 export interface TransformControlsOptions {

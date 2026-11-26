@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { box } from '@margoengine/core';
 import { Engine as Runtime, TransformStore } from '@margoengine/core/extension';
-import { TransformControls } from '../dist/transform.js';
-import { FakeElement, close } from './control-fakes.js';
+import { TransformControls } from '../../controls/dist/transform.js';
+import { GizmoRayDriver } from '../dist/gizmo.js';
+import { FakeElement, close } from '../../controls/tests/control-fakes.js';
 
 class Canvas extends FakeElement {
   width = 800;
@@ -19,6 +20,10 @@ async function rig(t, given = {}) {
     engine = new Runtime(canvas, store, renderer, { position: [6, 4, 6], target: [0, 0, 0] }, null),
     mesh = engine.createMesh().setGeometry(box()),
     gizmo = new TransformControls(engine, given);
+  // The ray methods live in the driver; the tests below call them on the gizmo they drive.
+  const driver = new GizmoRayDriver(gizmo);
+  for (const name of ['rayHover', 'rayDown', 'rayMove', 'rayUp', 'scaleDown', 'scaleTo'])
+    gizmo[name] = (...ray) => driver[name](...ray);
   gizmo.attach(mesh);
   engine.render();
   t.after(() => {

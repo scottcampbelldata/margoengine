@@ -164,13 +164,16 @@ interface DragStart {
   members: Member[] | null;
 }
 
-/** A world ray that drives the gizmo in place of a pointer (see `rayDown`). */
-interface Aim {
+/**
+ * A world ray that drives the gizmo in place of a pointer. Set on `TransformControls.aim` by a ray driver
+ * (`GizmoRayDriver` of `@margoengine/xr/gizmo`); application code has no use for it.
+ */
+export interface TransformAim {
   ray: { origin: V3; direction: V3 };
   /** The frame of the ray when it grabbed: a stand-in screen for the handles that are dragged across the view. */
   b: Basis;
-  /** How far along the ray the gizmo was at the grab. */
-  reach: number;
+  /** Side in pixels of that stand-in screen; the driver's pointer coordinates are in it. */
+  screen: number;
   /** Where the ray was nearest the dragged axis, as a distance along it, and the ray origin that gave it. */
   along: number;
   from: V3;
@@ -189,9 +192,6 @@ const GIZMO_SCREEN_FRACTION = 0.2;
 const GIZMO_TAN_CAP = Math.tan((3 * Math.PI) / 8);
 /** An axis must face this far past side-on (cos of its angle to the view line) to flip, so a side view does not flicker. */
 const FLIP_MARGIN = 0.05;
-/** Side in pixels of the stand-in screen of a ray, and tan of half its field: the 8 pixel pick radius spans 1.5 degrees. */
-const AIM_SCREEN = 300;
-const AIM_TAN = 0.5;
 /** sin^2 of the angle between a ray and an axis (2.5 degrees) under which their nearest point is not trusted. */
 const AIM_PARALLEL = 0.002;
 
@@ -251,7 +251,11 @@ export class TransformControls extends EventDispatcher {
   private widthValue = 2.5;
   readonly overlay = new OverlayRenderer();
   private drag: DragStart | null = null;
-  private aim: Aim | null = null;
+  /**
+   * Ray-driver hook: while set, picks and drags read this world ray in place of the camera ray through the pointer.
+   * The end of a drag clears it. Default null.
+   */
+  aim: TransformAim | null = null;
   private pointerId: number | null = null;
   private resetState: { position: V3; quaternion: Q4; scale: V3 } | null = null;
   /** Everything `attachMany` attached, the active object included; empty with one object. */
@@ -689,7 +693,7 @@ export class TransformControls extends EventDispatcher {
   }
   /** The camera basis and the view's rectangle on the element in CSS pixels (core viewports are fractions unless `pixels`). */
   private screen(): { b: Basis; x: number; y: number; width: number; height: number } | null {
-    if (this.aim) return { b: this.aim.b, x: 0, y: 0, width: AIM_SCREEN, height: AIM_SCREEN };
+    if (this.aim) return { b: this.aim.b, x: 0, y: 0, width: this.aim.screen, height: this.aim.screen };
     const e = this.element;
     if (!e) return null;
     const w = Math.max(1, e.clientWidth),
@@ -730,7 +734,8 @@ export class TransformControls extends EventDispatcher {
     const rect = this.element?.getBoundingClientRect?.() ?? { left: 0, top: 0 };
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   }
-  private setAxis(axis: HandleName | null): void {
+  /** Lights a handle, or none with null, as a hovering pointer does. The pointer handler and ray drivers call it. */
+  setAxis(axis: HandleName | null): void {
     if (axis === this.axis) return;
     this.axis = axis;
     this.dispatchEvent({ type: 'axis-changed', value: axis });
@@ -783,7 +788,8 @@ export class TransformControls extends EventDispatcher {
     this.endDrag();
     if (event.pointerType === 'touch') this.setAxis(null);
   };
-  private endDrag(): void {
+  /** Ends the drag, if any, as a pointer release does, and clears `aim`. The pointer handler and ray drivers call it. */
+  endDrag(): void {
     this.pointerId = null;
     this.holdingSnap = false;
     this.aim = null;
@@ -799,7 +805,8 @@ export class TransformControls extends EventDispatcher {
   pointerDown(x: number, y: number): void {
     if (this.axis) this.begin(handleAction(this.axis, this.mode), x, y);
   }
-  private begin(action: { op: Exclude<TransformMode, 'all'>; axis: HandleName }, x: number, y: number): void {
+  /** Starts a drag of one named action whatever the lit handle (`pointerDown` passes the lit handle's). Ray-driver hook. */
+  begin(action: { op: Exclude<TransformMode, 'all'>; axis: HandleName }, x: number, y: number): void {
     const object = this.attached(),
       f = this.frame(),
       s = this.screen();
@@ -1062,94 +1069,6 @@ export class TransformControls extends EventDispatcher {
     }
     aim.from = r.origin;
     return madd(d.origin, a, aim.along);
-  }
-  private takeAim(origin: readonly number[], direction: readonly number[]): Aim | null {
-    const length = Math.hypot(direction[0], direction[1], direction[2]);
-    if (!(length > 0 && Number.isFinite(length) && Number.isFinite(origin[0] + origin[1] + origin[2])))
-      throw rangeError(
-        'TransformControls ray must be a finite origin and a non-zero direction; pass [x, y, z] and [x, y, z]',
-        'controls-transform',
-      );
-    const f = this.enabled ? this.frame() : null;
-    if (!f) return null;
-    const from: V3 = [origin[0], origin[1], origin[2]],
-      forward: V3 = [direction[0] / length, direction[1] / length, direction[2] / length],
-      right = normalize(cross(forward, Math.abs(forward[1]) < 0.99 ? [0, 1, 0] : [1, 0, 0])) as V3;
-    return {
-      ray: { origin: from, direction: forward },
-      b: { position: from, forward, right, up: cross(right, forward) as V3, distance: 1, tanHalf: AIM_TAN },
-      reach: Math.max(1e-3, Math.hypot(...sub(f.origin, from))),
-      along: 0,
-      from,
-      bias: 0,
-      parallel: false,
-      factor: null,
-    };
-  }
-  /**
-   * Lights the handle a world ray points at, as a hovering pointer does, and returns its name or null. `origin` and
-   * `direction` are in world space (an XR controller's target ray; `direction` need not be unit). During a drag it
-   * returns the dragged handle and changes nothing.
-   */
-  rayHover(origin: readonly number[], direction: readonly number[]): HandleName | null {
-    const aim = this.takeAim(origin, direction);
-    if (this.dragging) return this.axis;
-    this.aim = aim;
-    const axis = aim && this.pick(AIM_SCREEN / 2, AIM_SCREEN / 2);
-    this.aim = null;
-    this.setAxis(axis);
-    return axis;
-  }
-  /**
-   * Grabs the handle a world ray points at and starts a drag, as a pointer press does. Returns false when the ray points
-   * at no handle or a drag is under way. Follow with `rayMove` and end with `rayUp`.
-   */
-  rayDown(origin: readonly number[], direction: readonly number[]): boolean {
-    if (this.dragging || !this.rayHover(origin, direction)) return false;
-    this.aim = this.takeAim(origin, direction);
-    this.pointerDown(AIM_SCREEN / 2, AIM_SCREEN / 2);
-    if (!this.dragging) this.aim = null;
-    return this.dragging;
-  }
-  /** Continues a `rayDown` drag with the ray's new place. */
-  rayMove(origin: readonly number[], direction: readonly number[]): void {
-    const aim = this.aim,
-      next = aim && aim.factor === null && this.dragging ? this.takeAim(origin, direction) : null;
-    if (!aim || !next) return;
-    aim.ray = next.ray;
-    // The handles dragged across the view follow the ray's point at the grab distance over the grab's stand-in screen.
-    const p = project(aim.b, madd(next.ray.origin, next.ray.direction, aim.reach), AIM_SCREEN, AIM_SCREEN);
-    if (p.depth > 0) this.pointerMove(p.x, p.y);
-  }
-  /**
-   * Starts a two-point scale in any mode: `scaleTo(factor)` then sizes everything attached about the gizmo, with the
-   * scale snap, until `rayUp`. Returns false when nothing is attached or a drag is under way.
-   */
-  scaleDown(): boolean {
-    const f = this.dragging ? null : this.frame(),
-      aim = f && this.takeAim(add(f.origin, f.eye), scale(f.eye, -1));
-    if (!aim) return false;
-    this.aim = { ...aim, factor: 1 };
-    this.begin({ op: 'scale', axis: 'XYZ' }, AIM_SCREEN / 2, AIM_SCREEN / 2);
-    if (!this.dragging) this.aim = null;
-    return this.dragging;
-  }
-  /** Sets the size of a `scaleDown` drag to `factor` times the size it began with (1 leaves it as it was). */
-  scaleTo(factor: number): void {
-    if (!(Number.isFinite(factor) && factor > 0))
-      throw rangeError(
-        'TransformControls scaleTo factor must be a finite number above 0; pass a ratio such as 1.5',
-        'controls-transform',
-      );
-    const aim = this.aim;
-    if (!aim || aim.factor === null || !this.dragging) return;
-    aim.factor = factor;
-    this.pointerMove(AIM_SCREEN / 2, AIM_SCREEN / 2);
-  }
-  /** Ends a `rayDown` or `scaleDown` drag, as a pointer release does; with no drag, the highlight of `rayHover` goes out. */
-  rayUp(): void {
-    if (!this.dragging) this.setAxis(null);
-    else if (this.aim) this.endDrag();
   }
 
   // ---- several objects ----
