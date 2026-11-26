@@ -235,7 +235,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | LANDED c82d68bf98 |
-| SEA-03 | Nonlinear waves, rogue waves | none | Claude | CLAIMED |
+| SEA-03 | Nonlinear waves, rogue waves | none | Claude | LANDED 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Open | OPEN |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
