@@ -45,6 +45,7 @@ export interface DriveOptions {
     fires?: FireTarget | readonly FireTarget[];
     smokeFromFire?: boolean;
     smokeWidth?: number;
+    fireLight?: number;
     fuelMoistureFromWeather?: boolean;
     fuelTimeScale?: number;
     fuelMoistureStart?: DeadFuelMoisture;
@@ -95,6 +96,7 @@ export interface EruptionTarget {
 export interface FireTarget {
     readonly options: object;
     readonly smokeEmission: number;
+    readonly radiantPower?: number;
 }
 
 export interface FogVolumeTarget {
