@@ -34,7 +34,8 @@ const NORMAL = 'windNormal(scatterTurn(n,c,s,up),bend,wind)';
 const STRIDE = 13;
 const RECORD = 8;
 
-// Each cell key and coefficient record lives in a sorted array, identically for every pass and LOD.
+// Each cell key and coefficient record lives in a sorted array, identically for every pass and LOD. plantMode is the
+// tip-normalized clamped/free mode and its derivative on dimensionless height.
 const shader = (
   group: number,
   binding: number,
@@ -55,7 +56,6 @@ fn plantCellIndex(root:vec2f)->i32 {
  }
  return -1;
 }
-// Tip-normalized clamped/free mode and derivative on dimensionless height.
 fn plantMode(h:f32,beta:f32,c:f32,tip:f32)->vec2f {
  let x=h*beta; let e=exp(x); let ch=(e+1.0/e)*0.5; let sh=(e-1.0/e)*0.5;
  let sn=sin(x); let cs=cos(x);
