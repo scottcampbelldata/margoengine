@@ -296,7 +296,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
-| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
+| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Codex | BUILDING (codex/physics-break03) |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | LANDED 64bedcf038 |
 | LIFE-03 | Aquatic locomotion | physics/life | Codex | LANDED 708e96a06b |
 | LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | LANDED 006faf6368 |
