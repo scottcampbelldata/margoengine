@@ -37,6 +37,26 @@
       "status": "exempt",
       "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
     },
+    "bvh:GPUSceneBVH.instances": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUSceneBVH.nodes": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUSceneBVH.params": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUSceneBVH.positions": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
+    "bvh:GPUSceneBVH.triangles": {
+      "status": "exempt",
+      "reason": "an object the package makes and hands out (an output or internal resource), never a caller input"
+    },
     "bvh:ModelPrimitiveLike.buffers": {
       "status": "exempt",
       "reason": "a draw, caster or pick record one package hands another each frame (rule 6)"
