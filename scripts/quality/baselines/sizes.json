@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20578765,
+  "total": 20579556,
   "history": [
     {
       "date": "2026-10-24",
@@ -14047,6 +14047,12 @@
       "commit": "3d71906a85",
       "grew": 1,
       "reason": "SEA-08 coupled launch cavity: @margoengine/physics/entry changes from 9053 to 9429 B gzip. These bytes carry the per-hull cavity direction and clip pressure during the existing surface load solve. A split would duplicate the field and wetted-geometry path."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "1f0be45072",
+      "reason": "BREAK-03 native multipoint shell contact advances @margoengine/physics/crush from 20253 to 20599 B gzip. Ceiling 20426 to 21217 B. The live manifold shares the sheet mesh and the rigid force bridge. A separate entry would duplicate that state and still load the same native solver.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14875,7 +14881,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 5981,
-    "@margoengine/physics/crush": 20426,
+    "@margoengine/physics/crush": 21217,
     "@margoengine/physics/decomposition": 11103,
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 4523,
