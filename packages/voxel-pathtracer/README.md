@@ -576,6 +576,12 @@ window.addEventListener('pagehide', () => {
 }, { once: true });
 ```
 
+On the layer a frame's samples land in a later frame (the route below reads a census back first), so the viewport
+differs from WebGPU in one way: while the camera moves, the frame shows the newest batch that has landed, traced with
+the camera of a frame or two before, with the denoiser's history reprojected into that camera. `stats.samples` counts
+the samples of the current camera, so it reads 0 while such an image shows; when the camera rests, its own batch
+replaces the image and the count rises as on WebGPU. A scene or option change still starts from nothing.
+
 The WebGL2 kernels are the WebGPU ones except `trace`: its stores cannot run on the GPU on WebGL2, so its path loop runs
 as a sequence of fragment programs cut from the same shader text (`src/compat-staged.ts`): `start` (the camera ray),
 then per loop iteration `hit`, `vertex`, `surface`, and `sample`, `shadow` and `gather` for each light kind, then
@@ -798,6 +804,9 @@ Numbers on other GPUs are not measured.
     raw at 64 before);
   - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.47 against the converged image,
     raw frames 16.00, a still camera 2.80, the same on the WebGL2 layer (each step waits for its sample to land);
+  - a camera that moves every frame and never waits for a sample (`denoisemoving`, 30 frames, steps a tenth as
+    long): RMS 4.14 against the converged image at the last position and 16.09 raw on WebGPU, 4.38 and 16.07 on the
+    WebGL2 layer, where the frame shows the batch that landed (one raw sample at rest: 16.09);
   - the pixels a camera move uncovers (24 frames, 1 sample each, pillars before a wall): RMS 6.49 against the
     converged image where the last frame uncovered them, 4.74 two frames on, 4.64 where the history was kept;
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2

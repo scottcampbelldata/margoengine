@@ -117,8 +117,9 @@ const frames=async(n)=>{for(let i=0;i<n;i++){engine.render({delta:0});await devi
 const shot=async()=>{await frames(2);engine.render({delta:0});return readCanvas();};
 // A step of a viewport run: frames until the view holds `count` samples, within 60 s; the canvas then shows that image
 // (read it before anything is awaited). One frame on WebGPU; on the WebGL2 layer's route a frame launches a batch that
-// lands tens of frames later, and a camera that moved meanwhile would drop it (KB-VPT-ROUTE-MOVING). `settle`: the
-// frame's GPU work is waited for, as `frames` does.
+// lands in a later frame (tens of these frames later, which do not wait for the display), and until it does the view
+// shows the image of an earlier camera (KB-VPT-ROUTE-MOVING, the `denoisemoving` case). `settle`: the frame's GPU work
+// is waited for, as `frames` does.
 const sampled=async(t,count,settle)=>{const end=performance.now()+60000;
  for(;;){engine.render({delta:0});if(t.stats.samples>=count)break;
   if(performance.now()>end)throw new Error(`viewport: ${count} samples not reached in 60 s`);
@@ -1305,6 +1306,27 @@ window.check={
   });
   const moving=await run({denoise:true},true),raw=await run({denoise:false},true),still=await run({denoise:true},false);
   return {moving:rms(moving),raw:rms(raw),still:rms(still),errors:errors.splice(0)};
+ },
+ // KB-VPT-ROUTE-MOVING: a camera that moves every frame and never waits for a sample, as a user orbiting does, must be
+ // shown a traced image. On the WebGL2 layer's route a frame's batch lands in a later frame; the view shows it then, as
+ // the image of the camera it was traced with. The steps are small (a tenth of denoisehistory's), so an image a frame or
+ // two behind still matches the converged image at the last position: 8-bit RGB RMS of the last frame's canvas against
+ // it, denoised and raw, beside one raw sample of a resting camera there. A frame that draws no traced image shows the
+ // engine's own frame, far from all of them.
+ async denoisemoving(){
+  const scene=scenes.opaque(),steps=30,at=(k)=>[[18+0.02*k,14,26-0.015*k],[-3,3,-2]];
+  look(...at(steps-1));
+  const ref=await withTracer(scene,{maxSamples:2048,samplesPerFrame:64},async(t)=>{await converged(t);engine.render({delta:0});return readCanvas();});
+  const rms=(a)=>{let s=0,n=0;for(let i=0;i<a.length;i+=4)for(let k=0;k<3;k++){s+=(a[i+k]-ref[i+k])**2;n++;}return Math.sqrt(s/n);};
+  const run=(options)=>withTracer(scene,{samplesPerFrame:1,...options},async(t)=>{
+   look(...at(0));await sampled(t,1,true);
+   for(let k=1;k<steps-1;k++){look(...at(k));engine.render({delta:0});await device().queue.onSubmittedWorkDone();await new Promise((r)=>setTimeout(r,20));}
+   look(...at(steps-1));engine.render({delta:0});
+   return readCanvas();
+  });
+  const moving=await run({denoise:true}),raw=await run({denoise:false});
+  const sample=await withTracer(scene,{samplesPerFrame:1,denoise:false},async(t)=>{look(...at(steps-1));await sampled(t,1,false);return readCanvas();});
+  return {moving:rms(moving),raw:rms(raw),sample:rms(sample),errors:errors.splice(0)};
  },
  // What a camera move uncovers (KB1664): a row of pillars before a lamp-lit wall, the camera moving sideways one sample a
  // frame, so every frame uncovers a strip of wall and floor beside each pillar, which has no history to reproject.

@@ -40,6 +40,8 @@
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
 // - denoisepeak: a lamp-lit stretch of wall keeps its level and loses error through the denoiser (16, 64 samples);
 // - denoisehistory: the viewport's denoiser while the camera moves, against the converged image and a still camera;
+// - denoisemoving: a camera that moves every frame without waiting for a sample is shown a traced image (on the
+//   WebGL2 layer the batch that landed, a frame or two behind; KB-VPT-ROUTE-MOVING);
 // - denoisedisocclusion: the same on the pixels a camera move uncovers (no history to reproject), against the pixels
 //   that keep their history and the raw frame (KB1664); `--picture` writes the frames and the pixel classes as PNGs;
 // - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path; camera motion
@@ -732,6 +734,19 @@ try {
     assert.deepEqual(r.errors, []);
     assert.ok(r.moving <= r.raw / 2.5, 'moving camera: the denoised history stays well below one raw sample');
     assert.ok(r.moving <= r.still * 2.5, 'moving camera: within reach of the still camera (no ghosting)');
+  }
+  if (wanted('denoisemoving')) {
+    const r = await run('denoisemoving');
+    console.log(
+      `  camera moving every frame, never waiting: RMS ${r.moving.toFixed(2)} (raw ${r.raw.toFixed(2)}, one raw sample at rest ${r.sample.toFixed(2)})`,
+    );
+    assert.deepEqual(r.errors, []);
+    // Before KB-VPT-ROUTE-MOVING the WebGL2 layer drew no traced image while the camera moved: both read 185.86.
+    assert.ok(
+      r.raw <= r.sample * 1.5,
+      'moving camera: the frame shows a traced sample (at most a frame or two behind)',
+    );
+    assert.ok(r.moving <= r.raw / 2, 'moving camera: the denoised history stays well below one raw sample');
   }
   if (wanted('denoisedisocclusion')) {
     const picture = args.includes('--picture'),

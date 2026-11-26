@@ -10959,8 +10959,22 @@ Evidence that now exists: `packages/voxel-pathtracer/tests/browser-check.mjs den
 bounds the viewport denoiser's error on the uncovered ones against the pixels that keep their history (6.49, 4.74 and
 4.64 of 255 on an RTX A6000, the same on WebGPU and the WebGL2 layer). `denoisehistory` and this case wait for each
 step's sample to land, so both run on the layer's route. Still missing: a filter that brings the uncovered pixels to
-the level of the rest (five candidates measured worse, docs/known-bugs.md Batch 99 job 2), and a traced image while
-the camera moves on the layer (KB-VPT-ROUTE-MOVING).
+the level of the rest (five candidates measured worse, docs/known-bugs.md Batch 99 job 2).
+
+## Voxel path tracer viewport while the camera moves on the WebGL2 layer (KB-VPT-ROUTE-MOVING, section 5 evidence, 2026-11-26)
+
+On the layer the trace kernel is a route of fragment programs that the CPU drives, and a frame's batch of samples
+lands in a later frame, once its last census is read back. A view therefore tells two restarts apart: one for the
+camera alone keeps the image on screen and lets a batch that starts an image run on, and the batch is shown when it
+lands as the image of the camera it was traced with (history reprojected into that camera, first-hit depth of that
+camera); any other restart (scene, options, size, device, a released view) drops the batch and the image. A batch that
+only adds samples to an image the camera has left is dropped, so the new camera's first batch starts sooner. Evidence
+that exists: `packages/voxel-pathtracer/tests/route-moving.test.js` (a recording device: every frame of a moving
+camera draws the image of the camera one frame before; the two kinds of restart) and the `denoisemoving` case of
+`tests/browser-check.mjs` (RTX A6000, layer on ANGLE Direct3D 11: 4.38 denoised and 16.07 raw against the converged
+image at the last position, 16.09 for one raw sample at rest; 186.28 before, when no traced image was drawn;
+WebGPU 4.14 and 16.09). Still missing: the lag in frames measured in a page that draws at the display's rate (the
+case's frames do not wait for the display), a run on ANGLE Metal and OpenGL, and a second GPU vendor.
 
 ## Synchronous raycasts on GPU-deformed meshes (KB-BVH-SYNCPOSE1, section 5 evidence, 2026-11-26)
 

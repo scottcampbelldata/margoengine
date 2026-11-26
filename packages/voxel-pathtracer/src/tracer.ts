@@ -256,8 +256,18 @@ interface ViewState {
   /** Never reused: names this view's sums on the WebGL2 route. */
   serial: number;
   samples: number;
-  // Bumped whenever the view's accumulation restarts: a trace of the WebGL2 route that lands after it is dropped.
+  // Bumped whenever the view's accumulation restarts.
   epoch: number;
+  // Bumped when it restarts for anything but a move of the camera (scene, options, size, device, a released view): a
+  // trace of the WebGL2 route that lands after that is dropped.
+  cut: number;
+  /**
+   * On the WebGL2 route, while the view's camera has no samples yet: the samples of the image on screen, traced with an
+   * earlier camera (0: none). A camera move keeps the image until a batch for a later camera lands (KB-VPT-ROUTE-MOVING).
+   */
+  held: number;
+  /** View-projection of the camera the image on screen was traced with (the view's own, but for a held image). */
+  matrix: Float64Array;
   key: Float64Array;
   /** The view's last denoised frame (its camera, scene version and size) and whether the camera moved since. */
   history: {
@@ -279,7 +289,7 @@ interface ViewState {
   height: number;
   requested: [number, number];
   limitedBy: VoxelPathTracerStats['limitedBy'];
-  /** Corner rays of the camera the view last traced with, for its denoiser. */
+  /** Corner rays of the camera the image on screen was traced with, for its denoiser. */
   corners: Float32Array;
   /** The engine frame (`onPreUpdate` count) the view was last drawn in. */
   drawn: number;
@@ -291,11 +301,16 @@ interface ViewState {
   /**
    * The view's trace on the route, running on its own (TraceRoute.run awaits its census read-backs): `landed` once
    * its sums are complete, when the view's next draw adds them into its image (`adds`, one per dispatch) and counts
-   * its samples.
+   * its samples. `s0` samples were in the image it adds to (0: it starts one), traced with the camera of `matrix` and
+   * `corners`.
    */
   routeJob?: {
     epoch: number;
+    cut: number;
+    s0: number;
     count: number;
+    matrix: Float64Array;
+    corners: Float32Array;
     width: number;
     adds: { inputs: TraceInputs; rows: number; key: string }[];
     landed: boolean;
@@ -611,11 +626,26 @@ export class VoxelPathTracer implements EnginePlugin {
     for (const v of this.#views.values()) this.#restartView(v, true);
   }
 
-  // A new image in view `v`; `forget`: its denoiser history is stale too.
-  #restartView(v: ViewState, forget: boolean): void {
+  // A new image in view `v`; `forget`: its denoiser history is stale too. `hold` (the WebGL2 route, when only the
+  // camera moved): the image on screen stays until a batch for a later camera lands, since a batch lands a frame or more
+  // after the frame that starts it and a camera that moves every frame would otherwise never be shown one.
+  #restartView(v: ViewState, forget: boolean, hold = false): void {
+    if (hold) v.held = v.samples || v.held;
+    else {
+      v.held = 0;
+      v.cut++;
+    }
     v.samples = 0;
     v.epoch++;
     if (forget) v.history.valid = false;
+  }
+
+  // Whether a trace of the WebGL2 route still belongs to view `v`'s image: nothing but the camera changed since it
+  // started, and it either starts an image (shown when it lands, whatever the camera did meanwhile) or adds to the one
+  // the view's camera still accumulates. A batch that would add to an image the camera has left is dropped: that image
+  // is on screen already, and the new camera's first batch starts sooner.
+  #routeFits(v: ViewState, job: { epoch: number; cut: number; s0: number }): boolean {
+    return job.cut === v.cut && (job.s0 === 0 || job.epoch === v.epoch);
   }
 
   #newView(): ViewState {
@@ -623,6 +653,9 @@ export class VoxelPathTracer implements EnginePlugin {
       serial: this.#viewSerial++,
       samples: 0,
       epoch: 0,
+      cut: 0,
+      held: 0,
+      matrix: new Float64Array(16),
       key: new Float64Array(30),
       history: {
         matrix: new Float32Array(16),
@@ -664,7 +697,9 @@ export class VoxelPathTracer implements EnginePlugin {
     v.image = undefined;
     v.routeJob = undefined;
     v.samples = 0;
+    v.held = 0;
     v.epoch++;
+    v.cut++;
     for (const key of v.routeKeys) this.#gpu?.routeReady?.release(key);
     v.routeKeys.clear();
     if (!image) return;
@@ -1605,16 +1640,18 @@ export class VoxelPathTracer implements EnginePlugin {
     }
   }
 
-  // View `v`'s accumulation key: scene, settings, size and every camera value a ray depends on.
-  #moved(v: ViewState, c: Context, width: number, height: number): boolean {
+  // View `v`'s accumulation key: scene, settings, size and every camera value a ray depends on. 0: unchanged; 1: only
+  // the camera changed; 2: the scene, the settings or the size did.
+  #moved(v: ViewState, c: Context, width: number, height: number): 0 | 1 | 2 {
     const k = v.key,
       cam = c.camera,
       values = [this.#version, width, height, ...cam.matrix, ...cam.position, ...cam.target, ...cam.up];
-    let changed = false;
+    let changed: 0 | 1 | 2 = 0;
     for (let i = 0; i < values.length; i++)
       if (!Object.is(k[i], values[i])) {
         k[i] = values[i];
-        changed = true;
+        if (i < 3) changed = 2;
+        else if (!changed) changed = 1;
       }
     return changed;
   }
@@ -1697,7 +1734,6 @@ export class VoxelPathTracer implements EnginePlugin {
     let groups = [view.traceGroup!];
     if (chunks.length === 1) {
       if (!write(view.frame, 0, chunks[0])) return false;
-      v.corners.set(this.#corners);
     } else {
       const align = device.limits.minUniformBufferOffsetAlignment ?? 256,
         stride = Math.ceil(FRAME_BYTES / align) * align,
@@ -1718,13 +1754,15 @@ export class VoxelPathTracer implements EnginePlugin {
         };
       }
       for (const [i, k] of chunks.entries()) if (!write(view.bands.frames, i * stride, k)) return false;
-      v.corners.set(this.#corners);
       groups = view.bands.groups;
     }
     if ('sums' in pipeline) {
-      this.#routeViewport(gpu, v, pipeline, groups, chunks, width, count);
+      // The image on screen keeps its camera until this batch lands (#execute).
+      this.#routeViewport(gpu, v, pipeline, groups, chunks, width, s0, count, c.camera.matrix);
       return true;
     }
+    v.corners.set(this.#corners);
+    v.matrix.set(c.camera.matrix);
     // Each band goes to the GPU in a submission of its own, ahead of the frame's commands (which read the image): a
     // watchdog that preempts only between submissions sees at most one band's work at a time (dispatch.ts).
     const t0 = performance.now(),
@@ -1757,8 +1795,9 @@ export class VoxelPathTracer implements EnginePlugin {
   // census back between windows, so the frame cannot wait for them); nothing else is traced in the view, and its frame
   // uniforms are not rewritten, until a later draw of it adds the finished sums and starts the next (#execute). Its
   // sums are kept under the view's own keys, so another view's trace queued meanwhile cannot overwrite them. A restart
-  // of the view (camera, scene, options, dispose, a lost device, the view released) stops it at its next window and its
-  // sums are dropped.
+  // of the view for anything but its camera (scene, options, size, dispose, a lost device, the view released) stops it
+  // at its next window and its sums are dropped; so does a camera move when it adds to an image (#routeFits). A trace
+  // that starts an image runs on through camera moves and is shown when it lands (KB-VPT-ROUTE-MOVING).
   #routeViewport(
     gpu: Gpu,
     v: ViewState,
@@ -1766,18 +1805,24 @@ export class VoxelPathTracer implements EnginePlugin {
     groups: GPUBindGroup[],
     chunks: TraceChunk[],
     width: number,
+    s0: number,
     count: number,
+    matrix: ArrayLike<number>,
   ): void {
     const route = gpu.routeReady as TraceRoute,
       inputs = gpu.inputs as WeakMap<GPUBindGroup, TraceInputs>,
       job = {
         epoch: v.epoch,
+        cut: v.cut,
+        s0,
         count,
+        matrix: Float64Array.from(matrix),
+        corners: this.#corners.slice(0),
         width,
         adds: chunks.map((k, i) => ({ inputs: inputs.get(groups[i])!, rows: k.rows, key: `${v.serial}:${i}` })),
         landed: false,
       },
-      stale = () => this.#disposed || gpu.lost || this.#gpu !== gpu || v.released || v.epoch !== job.epoch,
+      stale = () => this.#disposed || gpu.lost || this.#gpu !== gpu || v.released || !this.#routeFits(v, job),
       check = () => {
         if (stale()) throw new DOMException('The viewport image restarted', 'AbortError');
       },
@@ -1851,13 +1896,17 @@ export class VoxelPathTracer implements EnginePlugin {
       };
     } else
       Object.assign(view, this.#targets(gpu, view, width, height, o.denoise !== false, this.#snapshot.focusing, true));
-    if (this.#moved(v, c, width, height) || (gpu.pipelines && v.previewing)) {
-      this.#restartView(v, false);
-      v.restarted = true;
+    const moved = this.#moved(v, c, width, height);
+    if (moved || (gpu.pipelines && v.previewing)) {
+      // On the WebGL2 route a batch lands in a later frame: when only the camera moved, the image on screen is held
+      // until one for a later camera lands (and that batch, not this frame, marks the denoiser's restart).
+      const hold = moved === 1 && gpu.routeReady !== undefined && gpu.pipelines !== undefined && !v.previewing;
+      this.#restartView(v, false, hold);
+      if (!hold) v.restarted = true;
     }
     // A new image (camera, scene, sampling options, reset, enable): the denoised one is stale even when the new
-    // accumulation reaches the same sample count in one frame.
-    if (!v.samples) view.denoisedAt = -1;
+    // accumulation reaches the same sample count in one frame. A held image keeps its denoised one.
+    if (!v.samples && !v.held) view.denoisedAt = -1;
     v.previewing = !gpu.pipelines;
     v.width = width;
     v.height = height;
@@ -1880,17 +1929,30 @@ export class VoxelPathTracer implements EnginePlugin {
       view.denoisedAt = -1;
     }
     // A WebGL2 route trace that has landed (#routeViewport) is added and counted first, so the image and its count change
-    // together. It traced the image as it was, so after a restart it is dropped. Its add goes to the GPU in a submission
-    // of its own, ahead of this frame's frame-uniform writes: the add reads the frame uniform the trace was given, and the
-    // same frame then starts the next trace (KB-L6b-ti: waiting a frame more for that cost one frame in three or four).
+    // together. It traced the image as it was, so after a restart for anything but the camera it is dropped (#routeFits).
+    // Its add goes to the GPU in a submission of its own, ahead of this frame's frame-uniform writes: the add reads the
+    // frame uniform the trace was given, and the same frame then starts the next trace (KB-L6b-ti: waiting a frame more
+    // for that cost one frame in three or four). A batch that started an image replaces the one on screen: when the
+    // camera moved while it ran, it is held as the image of the camera it was traced with, and the denoiser reprojects
+    // its history into that camera (KB-VPT-ROUTE-MOVING).
     const landed = v.routeJob?.landed ? v.routeJob : undefined;
     if (landed) {
       v.routeJob = undefined;
-      if (landed.epoch === v.epoch) {
+      if (this.#routeFits(v, landed)) {
         const e = device.createCommandEncoder({ label: 'voxel-pathtracer route add' });
         for (const a of landed.adds) (gpu.routeReady as TraceRoute).add(e, a.inputs, landed.width, a.rows, a.key);
         device.queue.submit([e.finish()]);
-        v.samples += landed.count;
+        const samples = landed.s0 + landed.count;
+        if (landed.epoch === v.epoch) {
+          v.samples = samples;
+          v.held = 0;
+        } else v.held = samples;
+        v.matrix.set(landed.matrix);
+        v.corners.set(landed.corners);
+        if (!landed.s0) {
+          v.restarted = true;
+          view.denoisedAt = -1;
+        }
       }
     }
     if (v.previewing) {
@@ -1933,16 +1995,18 @@ export class VoxelPathTracer implements EnginePlugin {
       }
       v.lastTrace = now;
     } else v.lastTrace = 0;
-    if (!v.samples) return;
+    // The image on screen: the view's camera's, or on the WebGL2 route the one held from an earlier camera.
+    const shown = v.samples || v.held;
+    if (!shown) return;
     const denoised = !v.previewing && o.denoise !== false && view.denoiseGroups !== undefined;
     // 'auto': every frame while the image is sparse, then as the samples grow by a quarter, and at convergence.
     const due =
       o.denoise === true ||
       view.denoisedAt <= 0 ||
-      v.samples < 32 ||
-      v.samples >= view.denoisedAt * 1.25 ||
-      v.samples >= o.maxSamples;
-    if (denoised && view.denoisedAt !== v.samples && due) {
+      shown < 32 ||
+      shown >= view.denoisedAt * 1.25 ||
+      shown >= o.maxSamples;
+    if (denoised && view.denoisedAt !== shown && due) {
       // History: kept by the view (8); used (16) when only the camera changed since it was written; 64 the
       // accumulation restarted (the camera moved).
       const h = v.history,
@@ -1950,12 +2014,12 @@ export class VoxelPathTracer implements EnginePlugin {
       view.resolved = this.#denoiseParams(
         device,
         view,
-        v.samples,
+        shown,
         [0, 0, width, height],
         8 | (reuse ? 16 : 0) | (v.restarted ? 64 : 0),
         v,
       );
-      h.matrix.set(c.camera.matrix);
+      h.matrix.set(v.matrix);
       h.corners.set(v.corners);
       h.version = this.#version;
       h.width = width;
@@ -1963,12 +2027,13 @@ export class VoxelPathTracer implements EnginePlugin {
       h.valid = true;
       v.restarted = false;
       this.#encodeDenoise(gpu, c.encoder, view);
-      view.denoisedAt = v.samples;
+      view.denoisedAt = shown;
     }
+    // The camera the image was traced with (its first-hit depth is that camera's).
     const u = this.#view,
       inverse = this.#inverse;
-    if (!invertMatrix(c.camera.matrix, inverse)) return;
-    u.set(c.camera.matrix, 0);
+    if (!invertMatrix(v.matrix, inverse)) return;
+    u.set(v.matrix, 0);
     u.set(inverse, 16);
     u.set([width, height, rect[2], rect[3]], 32);
     const mode =
@@ -1977,8 +2042,8 @@ export class VoxelPathTracer implements EnginePlugin {
       (o.toneMapping === 'aces-narkowicz' ? 4 : 0) |
       (o.toneMapping === 'agx' ? 8 : 0);
     // First-hit depth only where pixels are the camera's own perspective rays (far otherwise).
-    const depth = o.projection === 'camera' && !o.distortion ? 1 / v.samples : 0;
-    u.set([denoised ? 1 : 1 / v.samples, 2 ** o.exposure, mode, depth], 36);
+    const depth = o.projection === 'camera' && !o.distortion ? 1 / shown : 0;
+    u.set([denoised ? 1 : 1 / shown, 2 ** o.exposure, mode, depth], 36);
     u.set([o.gamma ?? 0, o.vignette, rect[0], rect[1]], 40);
     device.queue.writeBuffer(view.uniform, 0, u);
     const pass = c.encoder.beginRenderPass({

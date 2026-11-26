@@ -58,22 +58,34 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   script's cases sum to 265.9 s against its 600 s limit.
 - **Regression:** `tests/voxel-pathtracer-gpu-split.test.js`, which fails without the entry.
 
-### Open 2026-11-26: on the WebGL2 layer a camera that moves every frame is shown no traced image (KB-VPT-ROUTE-MOVING, voxel-pathtracer)
+### Fixed 2026-11-26: on the WebGL2 layer a camera that moved every frame was shown no traced image (KB-VPT-ROUTE-MOVING, voxel-pathtracer)
 
 - **Repro:** at 7e04c03161, `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/browser-check.mjs denoisehistory`
   (RTX A6000, ANGLE Direct3D 11): "moving camera, 1 sample a frame for 30 frames: RMS 185.86 (raw frames 185.86, still
   camera 4.99)" and the case fails; on WebGPU the same case reads 5.44, 16.00 and 2.78. The canvas is as far from the
-  converged image with the denoiser as without it, which is what a frame with no traced sample gives.
-- **Cause:** on the layer's route a frame launches a batch of samples that lands tens of frames later
-  (`#routeViewport` in `packages/voxel-pathtracer/src/tracer.ts`). A camera change restarts the view, a batch that
-  lands after a restart is dropped (its epoch is not the view's), and a view with no samples draws nothing. A camera
-  that moves every frame therefore never gets a sample on screen until it rests. The case moved the camera every
-  frame; nobody saw it fail because `test:gpu:denoise` stops earlier on the layer (KB-L5a-10).
-- **Done 2026-11-26 (the check):** the steps of `denoisehistory` and `denoisedisocclusion` wait until their sample
-  has landed (`sampled` in `tests/browser-check.html`); both cases now give the same numbers on WebGPU and on the
-  layer (5.47, 16.00, 2.80).
-- **Still open (the tracer):** while the camera moves on the layer, the viewport should keep showing an image: the
-  last one that landed, or the batch in flight once it lands, reprojected as the denoiser's history is.
+  converged image with the denoiser as without it, which is what a frame with no traced sample gives. At 6e77101bc2
+  the `denoisemoving` case (below) reads 186.28 denoised and 186.28 raw on the layer.
+- **Cause:** on the layer's route a frame starts a batch of samples that lands in a later frame: its last census is
+  read back, which WebGL2 delivers in a later task (`#routeViewport` in `packages/voxel-pathtracer/src/tracer.ts`). A
+  camera change restarted the view, a batch that landed after a restart was dropped (its epoch was not the view's),
+  and a view with no samples draws nothing. A camera that moved every frame therefore never got a sample on screen
+  until it rested. `denoisehistory` moved the camera every frame; nobody saw it fail because `test:gpu:denoise`
+  stopped earlier on the layer (KB-L5a-10).
+- **Fix:** a restart for a camera move alone no longer drops the route's work. A batch that starts an image runs on
+  through camera moves and is shown when it lands, as the image of the camera it was traced with: the denoiser
+  reprojects its history into that camera, and the display writes that camera's first-hit depth. The view keeps that
+  image (`held`) until a batch for a later camera lands, so a moving camera sees an image one batch behind (a frame
+  or two) in place of none. A batch that would only add samples to an image the camera has left is still dropped, so
+  the new camera's first batch starts sooner, and a restart for anything else (scene, options, size, a restored
+  device, a released view) drops the batch and the held image as before. `stats.samples` still counts the samples of
+  the view's own camera (0 while a held image shows). WebGPU traces inside the frame and is unchanged.
+- **Measured (RTX A6000, layer on ANGLE Direct3D 11):** `denoisemoving` (30 frames, the camera moving every frame and
+  never waiting for a sample; 8-bit RMS of the last frame against the converged image at the last position): 4.38
+  denoised and 16.07 raw, against 16.09 for one raw sample of a resting camera (WebGPU: 4.14, 16.09, 16.09).
+  `denoisehistory` and `denoisedisocclusion` read as before on both (5.47, 16.00, 2.80; 6.49, 4.74, 4.64).
+- **Regression:** `packages/voxel-pathtracer/tests/route-moving.test.js` (CPU, a recording device of the layer: every
+  frame of a moving camera draws the image of the camera one frame before, a batch for a camera that was left is not
+  added, a scene change drops both), and the `denoisemoving` case of `tests/browser-check.mjs` in `test:gpu:denoise`.
 
 ### Open 2026-11-26: a collider of several kernel shapes raises its events and contact pairs once for each piece (KB-PHYSICS2D-PAIRS1, physics2d)
 
