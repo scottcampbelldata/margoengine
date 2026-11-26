@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20549724,
+  "total": 20551160,
   "history": [
     {
       "date": "2026-10-24",
@@ -13567,6 +13567,12 @@
       "commit": "4726a5be29",
       "grew": 1,
       "reason": "EARTH-02 grows the optional granular-flow entry from 5545 to 5965 B gzip (ceiling 6221 B) for the live EARTH-08 cross-section and its inertial and friction projections. Splitting that path would repeat the conservative grid and its native binding. Core plus Stage stay 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c24932beff",
+      "reason": "SOFT-05 adds per-cell anatomical material assembly and conservative cut transfer: tissue 2962 to 3126 B and soft 145708 to 146293 B gzip. The material columns and cut transfer already belong to the shared soft kernel. A split would duplicate that state path. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)) cap 46399 to 47835 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14435,7 +14441,7 @@
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 146534,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 46399,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 47835,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 103021,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,

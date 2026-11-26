@@ -2290,6 +2290,7 @@ class SoftBody {
     material: SoftBodyMaterial;
     cellRange: CellRange;
     cellMaterial: CellMaterial;
+    cellMaterials: readonly CellMaterial[] | null;
     constructor(owner: SoftBodies,
     handle: number,
     firstParticle: number,
@@ -2404,6 +2405,7 @@ class SoftBody {
     resetPlasticity(): this;
     setCellMaterial(material: CellMaterial): this;
     getCellMaterial(): CellMaterial;
+    cellMaterialAt(cell: number): CellMaterial;
     setMaterial(material: SoftBodyMaterial): this;
     getMaterial(): SoftBodyMaterial;
     setGravityScale(scale: number): this;
@@ -2452,6 +2454,7 @@ class SoftBodyDesc {
     triangles: number[];
     cells: number[];
     cellMaterial: CellMaterial;
+    cellMaterials: readonly CellMaterial[] | null;
     fiber: SoftFiber | null;
     orthotropy: readonly number[] | null;
     orthotropicStrength: readonly number[] | null;
@@ -2509,6 +2512,7 @@ class SoftBodyDesc {
     setFiberStiffness(direction: Vec3, modulus: number): this;
     setOrthotropicStiffness(material: SoftOrthotropy | null): this;
     setCellMaterial(material: CellMaterial): this;
+    setCellMaterials(materials: readonly CellMaterial[]): this;
     setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
     resolvedMasses(): number[];
     setEdges(pairs: ArrayLike<number>): this;
