@@ -6,8 +6,9 @@ import {instancedGLTF} from '/tests/support/instanced-gltf.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 window.nativeGlass=async()=>{
  const rows=[];
- // taa: TAA's scene capture (order -70) owns the live color before native glass begins (-40).
- for(const [samples,layers,taa] of [[1,1],[1,2],[4,1],[4,2],[4,1,true],[1,1,true]]){
+ // taa: TAA's scene capture (order -70) owns the live color before native glass begins (-40). depth: the shared scene
+ // depth (water, html, clustered contact) begins inside the glass capture and ends after it (KB-FILM-NEST2).
+ for(const [samples,layers,taa,depth] of [[1,1],[1,2],[4,1],[4,2],[4,1,true],[1,1,true],[1,1,false,true],[4,1,false,true],[4,2,false,true]]){
   const canvas=document.body.appendChild(document.createElement('canvas'));
   const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
   try{
@@ -17,11 +18,12 @@ window.nativeGlass=async()=>{
    }});
    parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
    if(taa){const {TAA}=await import('/packages/taa/dist/index.js');TAA.attach(engine);}
+   if(depth){const {acquireDepth}=await import('/packages/shared/gpu.js');acquireDepth(engine);}
    await waitForPipelines(async()=>{engine.render({culling:false,samples});await engine.gpu.queue.onSubmittedWorkDone();});
    const png=canvas.toDataURL('image/png');
    engine.scene.background='#000000';
    await waitForPipelines(async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();});
-   rows.push({samples,layers,taa:!!taa,png,lit:canvas.toDataURL('image/png')});
+   rows.push({samples,layers,taa:!!taa,depth:!!depth,png,lit:canvas.toDataURL('image/png')});
   }finally{engine.dispose();canvas.remove();}
  }
  return rows;
@@ -117,11 +119,14 @@ window.externalGlass=async()=>{
 };
 // GAP-FILM-LATE: glass under an HDR capture (Tonemap, Bloom) drew each frame into the frame after. Settled on a red
 // background, one frame on blue must read blue at once: the same picture as a second blue frame, not the red one.
+// The shared scene depth is the same case from inside: it ends after the glass first presented (KB-FILM-NEST2).
 window.hdrNesting=async()=>{
  const {Tonemap}=await import('/packages/tonemap/dist/index.js');
  const {Bloom}=await import('/packages/post/dist/index.js');
  const rows=[];
- for(const [effect,make] of [['tonemap',()=>new Tonemap()],['bloom',()=>new Bloom()]]) for(const samples of [1,4]){
+ const {acquireDepth}=await import('/packages/shared/gpu.js');
+ const use=(Effect)=>(engine)=>engine.use(new Effect());
+ for(const [effect,attach] of [['tonemap',use(Tonemap)],['bloom',use(Bloom)],['scene depth',acquireDepth]]) for(const samples of [1,4]){
   const canvas=document.body.appendChild(document.createElement('canvas'));
   const engine=await Engine.create(canvas,{backend:'webgpu',...(samples===1?{exactSize:[8,8]}:{}),camera:{position:[0,0,1],target:[0,0,0]}});
   try{
@@ -129,7 +134,7 @@ window.hdrNesting=async()=>{
     emissiveFactor:[0.1,0.15,0.2],extensions:{KHR_materials_transmission:{transmissionFactor:1},KHR_materials_ior:{ior:1}},
    }});
    parseGLTF(engine,input.doc,input.buffers,[],{materials:extendedMaterials});
-   engine.use(make());
+   attach(engine);
    const frame=async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();};
    engine.scene.background='#ff0000';
    await waitForPipelines(frame);

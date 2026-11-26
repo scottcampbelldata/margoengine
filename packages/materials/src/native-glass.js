@@ -30,7 +30,10 @@ class NativeGlass {
     // before they wrote this frame into it, and every frame showed the one before (GAP-FILM-LATE). Below -25, so
     // environment probes (scenePasses) skip it as they skip the other captures.
     graph.add({ name: this.name + ':begin', order: -40, execute: (c) => this.begin(c) });
-    graph.add({ name: this.name + ':present', order: 29, execute: (c) => this.present(c) });
+    graph.add({ name: this.name + ':present', order: 29, execute: (c) => this.present(c, false) });
+    // A capture that began inside this one can end after 29 (the shared scene depth at 10000, sciviz volume depth at
+    // 39): the glass then waits for it, or it would present a colour nothing was drawn into (KB-FILM-NEST2).
+    graph.add({ name: this.name + ':present-nested', order: 10000.5, execute: (c) => this.present(c, true) });
   }
   begin(c) {
     if (c.backend !== 'webgpu' || linearHdr(c.format) || ![...this.users].some((active) => active())) return;
@@ -118,8 +121,8 @@ class NativeGlass {
     pass.draw(3);
     pass.end();
   }
-  present(c) {
-    if (frames.get(c) !== this) return;
+  present(c, nested) {
+    if (frames.get(c) !== this || (!nested && this.redirected && c.color !== this.colorView)) return;
     if (this.redirected) {
       if (this.multisample) c.encoder.beginRenderPass(this.resolution).end();
       const pass = c.encoder.beginRenderPass({
