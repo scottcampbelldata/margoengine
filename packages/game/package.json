@@ -2263,6 +2263,10 @@
       "types": "./dist/physics/surf.d.ts",
       "import": "./dist/physics/surf.js"
     },
+    "./physics/rogue": {
+      "types": "./dist/physics/rogue.d.ts",
+      "import": "./dist/physics/rogue.js"
+    },
     "./physics/ice": {
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"
