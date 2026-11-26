@@ -132,6 +132,79 @@ test('ThinFilmSolver: malformed wetting parameters report the range and its fix'
   });
 });
 
+test('ThinFilmSolver: a suspended film amplifies the long mode and damps the short mode', async () => {
+  // Fermigier et al. (1992), equation 1.3 and the silicone-oil properties in section 2.
+  const n = 32;
+  const dx = 0.0008;
+  const h = 0.0002;
+  const epsilon = 1e-10;
+  const density = 970;
+  const viscosity = 1;
+  const surfaceTension = 0.021;
+  const frames = 480;
+  for (const [mode, unstable] of [
+    [4, true],
+    [8, false],
+  ]) {
+    const cosines = Array.from({ length: n }, (_, i) => Math.cos((mode * Math.PI * (i + 0.5)) / n));
+    const { world, film } = await patch({
+      cells: [n, 1],
+      spacing: dx,
+      v: [0, 0, 1],
+      depth: cosines.map((value) => h + epsilon * value),
+      density,
+      viscosity,
+      surfaceTension,
+      suspended: true,
+    });
+    const eigenvalue = (4 * Math.sin((mode * Math.PI) / (2 * n)) ** 2) / (dx * dx);
+    const mobility = h ** 3 / (3 * viscosity);
+    const gravity = 1 - dt * mobility * density * world.gravity[1] * eigenvalue;
+    const capillary = 1 + dt * mobility * surfaceTension * eigenvalue ** 2;
+    const initial = world.takeSnapshot();
+    world.advance(frames);
+    const amplitude = (film.depths().reduce((sum, value, i) => sum + (value - h) * cosines[i], 0) * 2) / n;
+    const bound = (24 * frames * epsilon * epsilon) / h + 32 * frames * Number.EPSILON * h;
+    close(amplitude, epsilon * (gravity / capillary) ** frames, bound);
+    assert.equal(amplitude > epsilon, unstable);
+    close(film.budget.stored, film.budget.initial, 16 * frames * n * Number.EPSILON * film.budget.initial);
+    const hash = world.hash();
+    world.restoreSnapshot(initial.bytes);
+    world.advance(frames);
+    assert.equal(world.hash(), hash);
+  }
+});
+
+test('ThinFilmSolver: a suspended film rejects removal of its restoring surface tension', async () => {
+  await assert.rejects(() => patch({ cells: [4, 1], spacing: 0.001, suspended: true, surfaceTension: 0 }), {
+    name: 'RangeError',
+    code: 'PHYSICS_INPUT_RANGE',
+    message: /Use positive surface tension/,
+  });
+});
+
+test('ThinFilmSolver: rapid suspended growth subdivides at the capillary–gravity rate', async () => {
+  const h = 0.0006;
+  const density = 970;
+  const viscosity = 0.005;
+  const surfaceTension = 0.021;
+  const { world, film } = await patch({
+    cells: [32, 1],
+    spacing: 0.0008,
+    v: [0, 0, 1],
+    depth: h,
+    density,
+    viscosity,
+    surfaceTension,
+    suspended: true,
+  });
+  const growth = (h ** 3 * (density * world.gravity[1]) ** 2) / (12 * viscosity * surfaceTension);
+  world.advance(1);
+  assert.ok(4 * dt * growth > 1);
+  assert.equal(film.budget.substeps, Math.ceil(4 * dt * growth));
+  assert.ok(film.depths().every((value) => value === h));
+});
+
 test('ThinFilmSolver: a level puddle is a fixed point on an uneven substrate', async () => {
   const dx = 0.05;
   const base = [0.0001, 0.0002, -0.0001, -0.0001, 0.00004, -0.0002];

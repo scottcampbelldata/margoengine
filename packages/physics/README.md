@@ -4597,6 +4597,9 @@ Set `wetting` for a partially wetting surface. Enter the equilibrium contact ang
 include the resolved precursor layer in the initial depth. The layer contributes to the same water
 budget as the rest of the film. Omit `wetting` to run without disjoining pressure.
 
+Set `suspended: true` on the underside of a panel with its normal pointing into the liquid.
+Gravity can then amplify long disturbances while surface tension damps short ones.
+
 Pass a `Precipitation` field for rain arriving at the moving panel and a `Wind` for surface shear.
 A registered rain input can instead publish m/s as a scalar or per cell. The optional `impacts` input
 publishes layout-1 f64 rows of U, V, radius, deposited m³ and inward impact speed. A tick is consumed

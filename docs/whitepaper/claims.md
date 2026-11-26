@@ -6110,6 +6110,12 @@ The film reaches the observed glycerol depth for three independently measured pu
 on a 20° glass plate. Starting from a dry plate gives the same modeled depth at both tested
 grid resolutions within the figure's measurement bands. [Reproduce](reproduce.md#fluid-07-measured-inclined-film)
 
+### FLUID-07 suspended film
+
+The suspended-film solve amplifies a long disturbance and damps a short disturbance at the
+discrete rates from the gravity–capillarity dispersion relation. The closed patch conserves
+water and reproduces the same state hash after restore. [Reproduce](reproduce.md#fluid-07-suspended-film)
+
 Proof capture (2026-11-26, KB-LOOK-TV-PENUMBRA1): the deformed-shadows, gltf-pbr-lighting-hooks and quality-presets --current references advance to 5feaab3d71, whose `Shadows` and `VirtualShadows` write the soft filter's per-frame noise turn (`jitter`, default true: fract(n phi) for the n frames whose clock moved) into the free `soft.w` of their frame uniforms, and whose PCSS spiral starts at `(noise + soft.w)` turns. The call logs differ only in that uniform float and the shader module text; the counts of draws, dispatches, bindings and uploads are unchanged. `packages/shadows/test/sampling.test.js` pins the turn sequence, the pause, `resetTime` and `jitter: false`. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=deformed-shadows,gltf-pbr-lighting-hooks,quality-presets`.
 
 ### Depth-averaged natural granular runout (EARTH-02)

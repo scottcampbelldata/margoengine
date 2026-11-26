@@ -4459,3 +4459,13 @@ of digitization allowance. The published theory lines and measured depths never 
 ### SEA-08 heave and pitch at forward speed
 
 Build `node scripts/build-modern.js --precompiled --only=physics`, then run `node --test --test-name-pattern "HullSolver forward speed" packages/physics/tests/coupling/seakeeping.test.js`. The fixture compares the complex heave and pitch transfer amplitudes at 3 rad/s and 2 m/s, restores the same course history in both arena types, holds a trimmed body steady, and checks the error when a broad hull loses pitch restoring.
+
+### FLUID-07 suspended film
+
+Run `node --test --test-name-pattern="suspended" packages/physics/tests/thin-film.test.js`
+from a built physics entry. The closed strip uses 0.2 mm silicone oil from the laboratory setup.
+Separate cosine perturbations exercise both signs of the discretized growth rate. The test
+checks the ratio `(1 + dt M ρg λ) / (1 + dt M σ λ²)` per step, where `λ` is the discrete
+Laplacian eigenvalue. A higher-growth case checks subdivision against the derived capillary–
+gravity rate and verifies the uniform-state fixed point.
+[Fermigier et al. (1992), Eq. 1.3 and §2](https://doi.org/10.1017/S0022112092001447)

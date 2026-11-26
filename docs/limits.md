@@ -9544,9 +9544,12 @@ coordinates and can carry a sampled substrate height. Viscous shear is held at i
 over each coupling interval. Strongly curved glass needs multiple patches and flying splash
 droplets need a separate ballistic solver. Rim coalescence is by the shared depth field.
 The film accepts registered impact events and transfers their pressure to a local wake, while
-the film keeps their deposited water. Normal pressure acts along the supported side of the
-surface. Detaching films, contact-angle dynamics on a steep drop, thin-film interference and
-general rain damping of ocean waves are outside this equation.
+the film keeps their deposited water. The `suspended` option includes adverse normal gravity
+and requires positive surface tension. It resolves the early growth of an underside film
+within the long-wave approximation. With the silicone oil properties in Fermigier et al.
+(1992), the predicted most amplified wavelength is 13.2 mm and their observed roll spacing
+was 12.5 mm. Pinch-off, steep contact lines, optical interference and ocean rain damping
+remain open.
 
 The optional `wetting` model gives the film a finite equilibrium contact angle by adding
 Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
@@ -9558,7 +9561,7 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 6,512 B gzip with a 6,768 B ceiling. Both Wasm assets are 9,624 B raw and each is 4,197 B gzip.
+The optional thin-film entry is 6,585 B gzip with a 6,768 B ceiling. Both Wasm assets are 9,832 B raw and each is 4,279 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

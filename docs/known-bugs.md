@@ -17172,6 +17172,8 @@ general sea keeps its existing wind-wave damping because heterogeneous rain supp
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
 The thin-film precursor model now supplies an equilibrium contact angle. Dynamic hysteresis
 and comparison against independent measured drop spreading remain open.
+The reversed-gravity film test reproduces the growth of a long underside disturbance.
+Finite depth columns still require a separate free-surface representation to pinch off a drop.
 
 ## Open: environmental airborne sources, feedback and filmed bindings (ATMO-06)
 

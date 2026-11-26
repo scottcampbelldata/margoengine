@@ -15036,6 +15036,14 @@ actual rigid bodies as well as a fixed support.
   published PIV/PLIF error bars in Figure 9(a–c) supply the held-out depth check. The
   fixture starts dry and uses the 20° plate and 350 mm probe from the experimental setup.
   [Journal and original figure](https://doi.org/10.3390/coatings10060599)
+- M. Fermigier, L. Limat, J. E. Wesfreid, P. Boudinet and C. Quilliet, “Two-dimensional
+  patterns in Rayleigh–Taylor instability of a thin layer” (1992).
+  Equation 1.3 gives the linear rate `M(ρg q² − σq⁴)` under an inverted plate when gas
+  inertia and density are negligible. The film treats the adverse normal gravity explicitly
+  and retains implicit curvature. The fastest mode has rate `M(ρg)²/(4σ)`. At that
+  wavelength the explicit gravity coefficient is twice the rate, so the native solver
+  subdivides to keep the explicit contribution at most one-half per step.
+  [Journal](https://doi.org/10.1017/S0022112092001447)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves

@@ -56,6 +56,7 @@ export interface ThinFilmOptions {
     readonly density?: number;
     readonly viscosity?: number;
     readonly surfaceTension?: number;
+    readonly suspended?: boolean;
     readonly slip?: number;
     readonly pinning?: number;
     readonly wetting?: {

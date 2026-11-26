@@ -236,7 +236,9 @@ impl Film {
                 .write(*self.base.add(i) + *self.height.add(i));
         }
         self.hydraulic_pressure(work.trial, k, work.pressure);
-        let mut k = k;
+        // Gravity pulling liquid away from the backing enters only the right-hand side.
+        // The implicit capillary and supporting-pressure terms remain positive semidefinite.
+        let mut k = k.max(0.0);
         if let Some(wetting) = self.wetting.as_ref() {
             if wetting.stiffness > 0.0 {
                 for i in 0..n {
@@ -448,6 +450,7 @@ impl Film {
         let mut rainfall = 0.0;
         let mut evaporation = 0.0;
         let mut max_adv: f64 = 0.0;
+        let mut max_depth: f64 = 0.0;
         zero(exits, n);
         for i in 0..n {
             let added = *rain.add(i) * dt;
@@ -458,13 +461,14 @@ impl Film {
             rainfall += added;
             evaporation += leaving;
             if h > 0.0 {
+                max_depth = max_depth.max(h);
                 let slope = model.density * (forcing.gravity_u.abs() + forcing.gravity_v.abs());
                 let air = forcing.shear_u.abs() + forcing.shear_v.abs();
                 // Characteristic speed uses d(q)/dh, including the open edge head.
                 let speed = h * (h + 2.0 * model.slip) / model.viscosity * slope
                     + (h + model.slip) / model.viscosity * air;
                 let edge_speed = if drains {
-                    2.0 * grid.inv_dx * k * h * h * (4.0 * h / 3.0 + 3.0 * model.slip)
+                    2.0 * grid.inv_dx * k.abs() * h * h * (4.0 * h / 3.0 + 3.0 * model.slip)
                         / model.viscosity
                 } else {
                     0.0
@@ -472,8 +476,16 @@ impl Film {
                 max_adv = max_adv.max(speed + edge_speed);
             }
         }
+        let advective_steps = 2.0 * max_adv * dt * grid.inv_dx;
+        let growth_steps = if k < 0.0 {
+            // The fastest long-wave mode has growth M k²/(4 sigma). Its explicit
+            // gravity term is twice that rate. Keep its update at half or less.
+            dt * self.mobility(max_depth) * (k * k / model.surface_tension)
+        } else {
+            0.0
+        };
         let substeps =
-            f64x2_extract_lane::<0>(f64x2_ceil(f64x2_splat(2.0 * max_adv * dt * grid.inv_dx)))
+            f64x2_extract_lane::<0>(f64x2_ceil(f64x2_splat(advective_steps.max(growth_steps))))
                 .max(1.0);
         if !(rainfall.is_finite() && evaporation.is_finite() && substeps <= f64::from(u32::MAX)) {
             return 1;

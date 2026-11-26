@@ -78,6 +78,8 @@ export interface ThinFilmOptions {
   readonly viscosity?: number;
   /** Liquid-air surface tension. Defaults to 0.0728 N/m. */
   readonly surfaceTension?: number;
+  /** Let normal gravity destabilize a film on the underside of its surface. Defaults to false. */
+  readonly suspended?: boolean;
   /** Navier slip length. Defaults to zero metres. */
   readonly slip?: number;
   /** Static contact-line retention per unit width, N/m. Defaults to zero. */
@@ -135,6 +137,7 @@ interface FilmState {
   readonly wind?: Wind;
   readonly precipitation?: Precipitation;
   readonly drains: readonly boolean[];
+  readonly suspended: boolean;
   readonly constants: Region;
   readonly wetting?: Region;
   readonly bottom: Region;
@@ -377,6 +380,12 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     if (drains.length !== 4 || drains.some((edge) => typeof edge !== 'boolean'))
       throw new RangeError('Invalid thin-film drains. Pass four booleans in u-low, u-high, v-low, v-high order.');
     const surfaceTension = number('surface tension', opts.surfaceTension ?? 0.0728, 0);
+    const suspended = opts.suspended ?? false;
+    if (suspended && surfaceTension === 0)
+      throw Object.assign(
+        new RangeError('Suspended thin films need capillary pressure. Use positive surface tension.'),
+        { code: 'PHYSICS_INPUT_RANGE' },
+      );
     const wettingValues = wettingConstants(opts.wetting, surfaceTension);
     const constantsValues = [
       positive('inverse spacing', 1 / spacing),
@@ -434,6 +443,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       wind: opts.wind,
       precipitation: opts.precipitation,
       drains,
+      suspended,
       constants,
       wetting,
       bottom,
@@ -529,8 +539,9 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       shearU += drag * slipU;
       shearV += drag * slipV;
     }
+    const normalGravity = -dot(effective, frame.n);
     words(s, s.forcing).set([
-      Math.max(0, -dot(effective, frame.n)),
+      s.suspended ? normalGravity : Math.max(0, normalGravity),
       dot(effective, frame.u),
       dot(effective, frame.v),
       shearU,
