@@ -12690,7 +12690,7 @@
     },
     {
       "date": "2026-11-25",
-      "commit": "2865e8c581",
+      "commit": "b6e01ceb4c",
       "reason": "HYDRO-06 entry sizes, previous record to current: @margoengine/physics/groundwater 0→3939 B (ceiling 0→4195 B). The optional groundwater entry carries the aquifer registry interface and loads its arena kernel on demand. The kernel has no static data and can share full worlds without occupying a reserved module window. A further split would add a request for the aquifer registry interface.",
       "grew": 1
     }
