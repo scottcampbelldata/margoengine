@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,280 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,282 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12756,6 +12756,18 @@ is chosen before the world starts. Contact tracks the two tread reactions and a 
 load. Post-rail motion retains an arclength and independent spring and fall coordinates. The
 catenary uses a tensioned fixed-anchor contact wire with linear waves and a single sprung pickup
 per configured car. The powered separation event is for animation. The optional rail entry measures 23,282 B minified and 9,673 B gzip. The plain and shared wire kernels each measure 571 B raw. Core and Stage gain zero bytes.
+
+### Tracks and footprints on a physical bed (EARTH-05)
+
+Terramechanics treats one prepared material as a projected footprint of uniform mean pressure. Bearing and shear
+parameters come from the soil's material tests. Resolve the patch and its adjacent berm with several grid vertices.
+The ground is a height field, so it represents indentation and surface displacement without overhangs or buried layers.
+The stored indentation is the peak depth at each vertex. More passes at the same peak load can reach fresh ground but
+do not model subgrade fatigue. The optional uniform excavation floor should match TerrainBed's bedrock. Material
+pushed past the patch's modeled bounds is accounted for separately from compaction and lofted mineral dust.
+
+The optional entry is 9,206 B gzip with a 9,483 B ceiling. Both Wasm assets are 2,042 B raw and 1,194 B gzip each.
+The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -29475,7 +29487,12 @@ volume. A changing atmospheric field requires an application update until the sh
 
 ### Loose road surface persistence (DYN-04 / EARTH-05)
 
-Vehicles now sink into a calibrated yielding surface and feel the resulting suspension load. `packages/road/test/driving.test.js` checks the pressure and spring balance and the effect on the wheel. Persistent ruts and displaced volume require a matching EARTH-05 shear and sediment producer feeding TerrainBed. The road driver operates on authored lanes. The original city and deck shots still need the production bindings.
+Vehicles sink into a calibrated yielding surface and feel the resulting suspension load. EARTH-05 now transfers the
+real wheel and belt loads to TerrainBed and refits the same collider before the next rigid step. Live hoof and biped
+pressures produce persistent relief and loft mineral dust. Varying bedrock and subsurface layers need a shared
+profile contract. The original city, deck, horse and courier shots still need the production bindings. The current
+tier uses mean loads. Validation against recorded plate and footprint profiles and spatially resolved patch stresses
+remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

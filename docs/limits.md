@@ -9625,3 +9625,15 @@ is chosen before the world starts. Contact tracks the two tread reactions and a 
 load. Post-rail motion retains an arclength and independent spring and fall coordinates. The
 catenary uses a tensioned fixed-anchor contact wire with linear waves and a single sprung pickup
 per configured car. The powered separation event is for animation. The optional rail entry measures 23,282 B minified and 9,673 B gzip. The plain and shared wire kernels each measure 571 B raw. Core and Stage gain zero bytes.
+
+### Tracks and footprints on a physical bed (EARTH-05)
+
+Terramechanics treats one prepared material as a projected footprint of uniform mean pressure. Bearing and shear
+parameters come from the soil's material tests. Resolve the patch and its adjacent berm with several grid vertices.
+The ground is a height field, so it represents indentation and surface displacement without overhangs or buried layers.
+The stored indentation is the peak depth at each vertex. More passes at the same peak load can reach fresh ground but
+do not model subgrade fatigue. The optional uniform excavation floor should match TerrainBed's bedrock. Material
+pushed past the patch's modeled bounds is accounted for separately from compaction and lofted mineral dust.
+
+The optional entry is 9,206 B gzip with a 9,483 B ceiling. Both Wasm assets are 2,042 B raw and 1,194 B gzip each.
+The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.

@@ -16714,7 +16714,12 @@ volume. A changing atmospheric field requires an application update until the sh
 
 ### Loose road surface persistence (DYN-04 / EARTH-05)
 
-Vehicles now sink into a calibrated yielding surface and feel the resulting suspension load. `packages/road/test/driving.test.js` checks the pressure and spring balance and the effect on the wheel. Persistent ruts and displaced volume require a matching EARTH-05 shear and sediment producer feeding TerrainBed. The road driver operates on authored lanes. The original city and deck shots still need the production bindings.
+Vehicles sink into a calibrated yielding surface and feel the resulting suspension load. EARTH-05 now transfers the
+real wheel and belt loads to TerrainBed and refits the same collider before the next rigid step. Live hoof and biped
+pressures produce persistent relief and loft mineral dust. Varying bedrock and subsurface layers need a shared
+profile contract. The original city, deck, horse and courier shots still need the production bindings. The current
+tier uses mean loads. Validation against recorded plate and footprint profiles and spatially resolved patch stresses
+remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

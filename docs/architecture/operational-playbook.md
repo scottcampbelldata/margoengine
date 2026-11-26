@@ -10389,3 +10389,12 @@ The optional `@margoengine/physics/lava` entry joins the 60 Hz solver graph. A s
 ### Rail wheelsets and catenary (DYN-05)
 
 The optional rail solver owns layout-1 f64 car and cable regions. It consumes ATMO-09 wetness directly through the field registry. The numeric state includes springs, axle speeds, controls and wire deflections. The Rust SIMD cable kernel works in the same arena and has no active static data in either memory mode. Its two lanes carry lateral and vertical waves. Focused proofs cover static axle loads, rolling distance, cant, a rail joint, wet-braking slip, coupler reactions, wire lift, contact loss, deterministic scrub and rendered asset motion on both backends.
+
+### Terrain-contact footprints (EARTH-05)
+
+An optional slot-free SIMD kernel rasterizes pressure-driven indentation and redistributes loose volume using
+TerrainBed's exact triangulated nodal areas. The native state keeps the maximum indentation, while the area-integrated
+ledger splits cut material among the berm, compaction, dry fines and outflow. The optional rigid adapter observes the
+existing wheel and belt loads and refits the registered height field. The adapter snapshots the belt shear history and
+the collider-height mirror. LIFE-01 foot rows are another input. ATMO-06 consumes the same mineral dust grid used for
+aeolian sources. Tests include both clocks at their shared times and audit the held source mass at an intermediate tick.

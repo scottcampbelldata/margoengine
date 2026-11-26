@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20360320,
+  "total": 20369803,
   "history": [
     {
       "date": "2026-10-24",
@@ -13077,6 +13077,12 @@
       "commit": "FG-17-WIND",
       "reason": "@margoengine/scatter/read: readScatter pose: true (FG-17-WIND), the compute kernel that runs the scatter's own vertex pose and patches for every culled instance now and with the wind before, its uniform, chunked readback and options; measured gzip 2899 B, was 1159. The pose WGSL comes from the root entry through velocityParts().poseSource (with its own copy the entry measured 4220 B); a separate entry would add a second readback of the same rings. Budget (measured + max(3%, 256 B)): 1415 to 3155 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "be51f15878",
+      "grew": 1,
+      "reason": "EARTH-05 adds optional soil footprint and native pixel-grid redistribution at 9206 B gzip. The Physics root goes from 865782 to 865981 B for the owning tracked attachment's motion snapshot, including belt shear. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -13940,6 +13946,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
     "@margoengine/physics/surf": 9345,
+    "@margoengine/physics/terramechanics": 9483,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,

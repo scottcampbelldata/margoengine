@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|rail)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|rail|terramechanics)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -49,6 +49,7 @@ await build({
         robots: resolve(root, 'src/robots.ts'),
         world: resolve(root, 'src/world/index.ts'),
         earth: resolve(root, 'src/earth/index.ts'),
+        terramechanics: resolve(root, 'src/terramechanics/index.ts'),
         rail: resolve(root, 'src/rail/index.ts'),
         seismic: resolve(root, 'src/seismic/index.ts'),
         lightning: resolve(root, 'src/lightning/index.ts'),
@@ -190,6 +191,9 @@ for (const name of ['tsunami-kernel.wasm', 'tsunami-kernel-shared.wasm'])
 
 for (const name of ['lava-kernel.wasm', 'lava-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/lava', name), resolve(dist, name));
+
+for (const name of ['terramechanics-kernel.wasm', 'terramechanics-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/terramechanics', name), resolve(dist, name));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);
