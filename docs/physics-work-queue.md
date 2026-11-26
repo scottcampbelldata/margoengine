@@ -498,6 +498,6 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 336a4413c4 |
-| FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
+| FLUID-03 | FLIP and APIC grid-particle liquids | `physics/flip`: APIC liquid box on the world, held to the sea at its open sides (waves in, water out to the wake), solid slip, aeration and spray for SEA-13, 2-D and 3-D dam breaks | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), built 290aba7e2, 2232ca7c4, 4e2e6f26d, 4ec0717e8, 0dddec890, dbe79b009, efd218e88, e998f2989, 815e0fc77; short of the standard on the Wasm port, two-way wave passage, KB-FLIP-CREST1 and the MARIN validation |
 | HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
 | ATMO-04 | Precipitation microphysics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |

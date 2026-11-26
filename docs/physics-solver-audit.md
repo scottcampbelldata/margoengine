@@ -401,6 +401,37 @@ Tp 9.3 s. Stable air gives 5.23 m and unstable air 7.22 m; the split is in Kahma
 - Snow: Locatelli and Hobbs (1974, JGR) give fall-speed and mass laws for aggregates of unrimed dendrites, for
   densely rimed dendrites and for the graupel types, but not for single dendrites. Their table belongs in the test.
 
+**FLUID-03 built (2026-11-26), not LANDED: what is done and what its upgrades start from.** Checked against the
+eight points before setting a status, it falls short on points 2 (no MARIN validation), 4 (no two-way wave passage)
+and 6 (hot loops in TypeScript, no Wasm or threads), and crest overturning (KB-FLIP-CREST1) is open, so it stands
+REOPENED and its upgrades go to Codex under the split of the work queue. Done, one line each:
+
+- Crashing crests: the liquid box sits in the sea where waves steepen (290aba7e2); `flip.test.js`.
+- A box held to the sea keeps a calm sea calm, keeps its water and passes waves in phase (2232ca7c4, KB-FLIP-SEABAND1).
+- Water slips along a solid as along the box's sides and comes back out of one (4e2e6f26d, KB-FLIP-SOLIDSLIP1).
+- Waves come in at the sides from the wake, and the box gives the wake its water; the sea's velocity at depth below a
+  patch (4ec0717e8); `sea-wake.test.js`.
+- Trapped air by particle deficit, foam over it and spray handed to SEA-13 (0dddec890).
+- The 3-D dam break against Lobovsky et al. 2014 (efd218e88, `check-dambreak3d.mjs`).
+- The plunging-breaker study measured as Erinin et al. measure, and the gauge control (dbe79b009, e998f2989).
+
+Findings the upgrades start from:
+
+- **Pressure-coupled open sides were tried and not shipped (815e0fc77, `docs/limits.md`).** Making the box's sides a
+  pressure boundary driven by the sea, in place of the band that holds the particles to the sea, let the incoming
+  wave in too strongly: a 3 cm wave read 43 to 73 percent too high inside the box, so the code was reverted. Two-way
+  wave passage needs a coupling that keeps the water and does not pump it, for example an overlapping box and wake.
+- **Gauge control (e998f2989, KB-FLIP-CREST1).** The liquid's wave group matches the sea's at every grid resolution
+  up to the focus; the grids part only at the crest, where the jet speed does not converge. Crest overturning is the
+  open part.
+- **MARIN 3-D dam break data (SPHERIC Test 2).** The measured series are on the SPHERIC benchmark page,
+  https://www.spheric-sph.org/tests/test-02, as one zip: `test_case_2_exp_data.xls` (water heights H1 to H4 and
+  pressures P1 to P8), the case PDF `test_case_2_v1p1.pdf` and a Fortran file (code: not to be read under the clean
+  room). The ComFLOW copies at math.rug.nl return 404.
+
+Open, for Codex: the Rust/Wasm port with SIMD and threads; two-way wave passage through an overlapping box and wake
+that keeps the water; KB-FLIP-CREST1 (crest overturning); the MARIN validation against SPHERIC Test 2.
+
 **SEA-02 and SEA-04: the water's velocity below a patch, done (4ec0717e8, FLUID-03).** Codex builds on it:
 
 - `WakeSolver` made with `waterBelow` keeps the potential's gradient at depth layers each step, each mode decaying as

@@ -6813,6 +6813,8 @@ off a floor of restitution 0 now bounces at half its restitution unless it sets 
 differ meet at their mean. Snapshots written before (version 13 and earlier) read with the average.
 ## Own 2D shapes beyond the first six (2026-11-24)
 
+`Vehicle2D` (`@margoengine/physics2d/vehicle`, 2026-11-26) is Rapier's ray cast vehicle seen from the side. Accepted differences from Rapier's 3D controller: no steering and no sideways grip (the axle points out of the screen); its wheel pushes are held on the chassis as forces over each step, beside the body's own forces, so they act in every substep (an impulse before the step would make the chassis's velocity read 3/8 of g dt high at rest with 4 substeps) and `resetForces` on the chassis clears them until the next step; one ray per wheel, so a wheel can drop into a gap narrower than itself. Rapier 2D 0.21.0 has no vehicle controller to compare against. Tests: `packages/physics2d/tests/vehicle.test.js`.
+
 `triangle`, `trimesh`, `heightfield`, `halfspace`, `compound`, `voxels`, `borderRadius` and one-sided polylines are options of `Physics2D` colliders (`packages/physics2d/src/shapes.ts`). Accepted differences from Rapier: `borderRadius` grows the shape outward as Rapier's round shapes do, so a box of `width` 20 with radius 6 is 32 wide; a `trimesh` is one convex piece per triangle, so a body sliding over its seams can catch there unless it is made with `fixInternalEdges` (2026-11-26, `kernel/src/seams.rs`), which joins the triangles: shared edges are found by exact vertex positions, so an edge that meets another only in part (a T-junction) is outline, not a seam; removing one triangle's kernel shape alone would leave its neighbours' seams as they were (the facade removes a mesh whole), and a new outline on one (`set_shape_core`) drops its seams. Rapier's `ORIENTED` has nothing to add in 2D (the triangles are solid, so a point inside the mesh is always found) and its `DEFORMABLE` has no call in Rapier's JavaScript API that moves the vertices afterwards; a `halfspace` is a polygon 200,000 world units across and deep, not infinite; `voxels` collide as merged outlines with no thickness, as tile maps do, so a very fast body needs `ccd: true`, and answer every scene query (point, ray, overlap, cast, projection) from the filled cells themselves (`kernel/src/voxel.rs`, a lookup and a grid walk; a voxels collider cannot be rotated, and its query-only shape adds no mass and touches nothing); a `heightfield` is a chain with smooth joins, solid on the up side. A one-sided polyline is solid on the side its right-hand normals point to (left to right is up on screen) and a body that is already behind it stays behind; ray queries still meet it from both sides. A `mass` on a compound or mesh is spread over its pieces by area. Tests: `packages/physics2d/tests/shapes-more.test.js` and `kernel/tests/chain.rs`.
 
 ## Own 2D snapshots, debug lines and added mass (2026-11-24)
@@ -15252,6 +15254,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   layer (5.47, 16.00, 2.80).
 - **Still open (the tracer):** while the camera moves on the layer, the viewport should keep showing an image: the
   last one that landed, or the batch in flight once it lands, reprojected as the denoiser's history is.
+
+### Open 2026-11-26: a collider of several kernel shapes raises its events and contact pairs once for each piece (KB-PHYSICS2D-PAIRS1, physics2d)
+
+- **Repro:** a ball rolling along a `trimesh`, `polyline`, concave `polygon`, `compound` or `heightfield` collider in
+  `@margoengine/physics2d`. It raises `contactstart` and `contactend` each time it crosses from one piece (triangle,
+  segment or convex part) to the next, where Rapier raises one `contactstart` while the two colliders touch at all.
+  `physics.contactPairs(collider)` lists one pair for each pair of pieces, and `contactPair(a, b)` returns the first
+  of them, so `contactPair(a, b).touching` and `intersectionPair(a, b)` can read false while another piece touches.
+- **Cause:** the facade (`src/physics.ts`, `collectEvents` and `contactPairs`) passes on the kernel's events and
+  contacts, which belong to pairs of kernel shapes, with each shape mapped to its collider but never gathered per pair
+  of colliders.
+- **Fix (drafted, not landed):** count the touching pairs of shapes per pair of colliders and raise the event only when
+  the count leaves or returns to 0, counted again from the kernel after a restore. Give `ContactPair2D` one entry per
+  collider pair, with a manifold for each pair of shapes.
+
+### Open 2026-11-26: `Collider2D.setShape` refuses an outline of several kernel shapes (KB-PHYSICS2D-SETSHAPE1, physics2d)
+
+- **Repro:** `collider.setShape({ shape: 'trimesh', ... })`, or any concave polygon, polyline or compound, throws
+  `RangeError`. Rapier's `setShape` takes any shape.
+- **Cause:** `setShape` uses the kernel's `set_shape_core`, which replaces one convex core in place. An outline of
+  several pieces needs its kernel shapes replaced, with the touching pairs carried across so the change raises no
+  events of its own (this waits on KB-PHYSICS2D-PAIRS1).
+- **Fix (not started):** replace the collider's kernel shapes under the same `Collider2D`, re-apply its mass mode and
+  seams, and carry its touching pairs across the swap. Parity row C2-09 records the gap.
 
 ### Fixed 2026-11-26: a long thin body that hit a wall hard and spinning swung through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
 
