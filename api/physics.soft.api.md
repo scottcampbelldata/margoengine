@@ -567,7 +567,7 @@ export interface SoftSoftness {
     dampingRatio: number;
 }
 
-export type SoftSolver = (typeof SOLVER_MODES)[number];
+export type SoftSolver = 'constraints' | 'fem' | 'vertex-block';
 
 export interface SoftSplit {
     pieces: SoftBody[];
@@ -2223,8 +2223,6 @@ type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint
 type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
     targetVelocity?: Vec3;
 };
-
-const SOLVER_MODES: readonly ['constraints', 'fem', 'vertex-block'];
 
 interface ShapeCastHit extends RaycastHit {
     queryPoint: [number, number, number];

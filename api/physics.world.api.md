@@ -2229,6 +2229,8 @@ class SoftBodies implements PhysicsAttachment {
     removeCluster(body: SoftBody, cluster: number): void;
     clusterProxy(body: SoftBody, cluster: number): PhysicsBody;
     relinkCells(body: SoftBody): void;
+    cellSolver(body: SoftBody): SoftSolver;
+    setCellSolver(body: SoftBody, solver: SoftSolver): void;
     writeCellMaterial(body: SoftBody): void;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
@@ -2291,7 +2293,8 @@ class SoftBody {
     skinCells: Uint32Array<ArrayBuffer>;
     previous: Float32Array<ArrayBuffer>;
     clusterInfo: ClusterInfo[];
-    solverKind: SoftSolver;
+    get solverKind(): SoftSolver;
+    set solverKind(solver: SoftSolver);
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -2565,7 +2568,7 @@ interface SoftSoftness {
     dampingRatio: number;
 }
 
-type SoftSolver = 'constraints' | 'fem';
+type SoftSolver = 'constraints' | 'fem' | 'vertex-block';
 
 interface SoftTearEvent {
     body: SoftBody;
