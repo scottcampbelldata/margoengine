@@ -9645,6 +9645,7 @@ inter-element crack path. For interior cells, `interiorStrength` scales the stre
 and its square scales the work per area. Cuts retain the accumulated damage and recalculate
 the geometric length for the smaller child tetrahedra. Snapshot layout includes the optional
 damage rows only when a body authors fracture energy.
+The optional soft entry measures 134,833 B gzip, with a 40,017 B base and 94,249 B lazy kernel.
 
 ### Gas-filled soft shells (SOFT-06)
 
