@@ -9,7 +9,16 @@ import { margoError } from '../../shared/errors.js';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
 import { PostStack } from './stack.js';
-import { vertex, reduceShader, downsampleShader, traceFunctions, march } from './hiz.js';
+import {
+  vertex,
+  reduceShader,
+  downsampleShader,
+  traceFunctions,
+  march,
+  createHiZ,
+  encodeHiZ,
+  type HiZ,
+} from './hiz.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
 import type { SSRCapture, SSRModel } from './ssr.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
@@ -256,8 +265,7 @@ export class SSGI implements EnginePlugin {
   private base?: GPURenderPipelineDescriptor;
   private single?: GPURenderPipelineDescriptor;
   private hiz?: GPUTextureView;
-  private hizGroups: GPUBindGroup[] = [];
-  private hizSizes: number[][] = [];
+  private hizLevels?: HiZ;
   private material: GPUTextureView[] = [];
   private chain?: GPUTextureView;
   private chainGroups: GPUBindGroup[] = [];
@@ -438,7 +446,7 @@ export class SSGI implements EnginePlugin {
     v[35] = o.thickness ?? 0.5;
     v[36] = o.maxDistance ?? 10;
     v[37] = o.steps ?? 32;
-    v[38] = this.hizGroups.length;
+    v[38] = this.hizLevels!.groups.length;
     v[39] = +this.enabled;
     v[40] = rays;
     v[41] = o.intensity ?? 1;
@@ -506,13 +514,7 @@ export class SSGI implements EnginePlugin {
       this.pass = this.context = undefined;
       Object.assign(c, { color, depth, descriptor });
     }
-    const pass = c.encoder.beginComputePass();
-    for (let i = 0; i < this.hizGroups.length; i++) {
-      pass.setPipeline(i ? this.reduce! : this.reduceDepth!);
-      pass.setBindGroup(0, this.hizGroups[i]);
-      pass.dispatchWorkgroups(Math.ceil(this.hizSizes[i][0] / 8), Math.ceil(this.hizSizes[i][1] / 8));
-    }
-    pass.end();
+    encodeHiZ(c.encoder, this.hizLevels!, this.reduceDepth!, this.reduce!);
   }
   private fullscreen(
     c: Context,
@@ -689,17 +691,8 @@ export class SSGI implements EnginePlugin {
     if (depth !== scene) this.ownDepth = depth.createView();
     const half = [Math.max(1, c.width >> 1), Math.max(1, c.height >> 1)],
       levels = Math.max(1, Math.min(6, Math.floor(Math.log2(Math.min(c.width, c.height)))));
-    const hiz = texture(half, 'r32float', sampled | GPUTextureUsage.STORAGE_BINDING, levels);
-    this.hiz = hiz.createView();
-    for (let i = 0; i < levels; i++) {
-      this.hizSizes.push([Math.max(1, half[0] >> i), Math.max(1, half[1] >> i)]);
-      this.hizGroups.push(
-        bind(device, i ? this.reduce! : this.reduceDepth!, [
-          i ? hiz.createView({ baseMipLevel: i - 1, mipLevelCount: 1 }) : this.depthView,
-          hiz.createView({ baseMipLevel: i, mipLevelCount: 1 }),
-        ]),
-      );
-    }
+    this.hizLevels = createHiZ(device, this.depthView, this.reduceDepth!, this.reduce!, half, levels, texture);
+    this.hiz = this.hizLevels.view;
     this.material = formats.map((format) => texture([c.width, c.height], format, attachment).createView());
     this.clearPass = { colorAttachments: [{ view: this.material[0], loadOp: 'clear', storeOp: 'store' }] };
     this.extra = [1, 2].map((i) => ({
@@ -739,8 +732,7 @@ export class SSGI implements EnginePlugin {
     this.width = this.height = 0;
     this.target = undefined;
     this.input = undefined;
-    this.hizGroups = [];
-    this.hizSizes = [];
+    this.hizLevels = undefined;
     this.material = [];
     this.chainGroups = [];
     this.chainPasses = [];

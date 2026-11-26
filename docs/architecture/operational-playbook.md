@@ -363,6 +363,29 @@ group 1 bound once, the light words, steady frames build nothing, a disposed sce
 left live). Missing: ReSTIR GI reservoir reuse (Ouyang et al. 2021) and an SVGF denoise (Schied et al. 2017), a GPU
 cost figure, and traced hits that carry the multi-bounce history (they are lit directly).
 
+Piece 6d (2026-11-26): device fallback. The plan was to run both effects as SSR and SSGI below the WebGL2 layer's full
+tier; measured, the half-float tier traces correctly (RTGI 181 against 180.54, RTReflections 208 against 208.46, the
+full tier's figures) and the LDR tier already refuses every HDR PostStack, so neither tier falls back. The device that
+cannot trace is one at WebGPU's compatibility feature level with too few storage buffers in a fragment shader
+(`maxStorageBuffersInFragmentStage`; 4 by default at that level, and OpenGL ES 3.1 requires none): the traced passes
+bind the scene's 4 (RTReflections) or those and SSGI's rays (RTGI, 5). `TracedLight.active` (`src/rt-shade.ts`) checks
+the limit for both effects, warns once per device life with a linked `unsupported` error and runs the plain passes; it
+never throws. A device that reports no such limit (a core device, the WebGL2 layer) traces. Bug found on the way and
+fixed: plain SSR and SSGI failed every frame at the compatibility level, because each Hi-Z reduction read mip i-1 and
+wrote mip i of one r32float texture in one dispatch, which that level forbids. `createHiZ` and `encodeHiZ`
+(`src/hiz.ts`, shared by SSR and SSGI) now reduce each level into a texture of its own there and copy it into the
+pyramid; at the full level the reduction is unchanged. Cost at the compatibility level: one texture copy per Hi-Z level
+a frame (6 at most) and the levels' memory twice (an r32float half-resolution pyramid, about 2.8 MB at 1920 x 1080).
+Evidence: `rt-gi-browser.mjs` and `rt-reflections-browser.mjs` in `test:gpu` with `--mode=half-float` and
+`--mode=compatibility` (identical figures to native on the RTX A6000; the compatibility leg failed validation before the
+Hi-Z fix), and `rt-gi-browser.mjs --mode=short`, a real compatibility-level device held to 4 fragment storage buffers:
+one warning, every frame SSGI's 0. Chrome will not hold a device below 4, so the RTReflections short case is CPU only.
+CPU: `packages/post/test/traced-fallback.test.js` (one short of the need: plain shaders, no group 1, no light uniform,
+one warning over two frames; exactly the need or no limit: traced, no warning; a restore warns again) and
+`hiz-compat-level.test.js` (at the compatibility level no SSR or SSGI bind group holds two views of one texture and one
+copy per level runs in order; at the full level no copy). Missing: a run on a real OpenGL ES or Direct3D 11 class
+device.
+
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 
 New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object

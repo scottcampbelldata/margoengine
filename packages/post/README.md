@@ -249,6 +249,9 @@ cameras, an eye inside the part and image-based light.
 models, `@margoengine/materials` meshes, `Terrain` (@margoengine/terrain) and `Water` (@margoengine/water) added with
 `ssr.add(model)`. It is an HDR `PostStack` effect;
 `SSR.attach(engine, options)` runs it alone in its own one-effect stack (tone mapped like SSAO alone).
+At WebGPU's compatibility feature level, where one dispatch may not bind two views of a texture, SSR and SSGI reduce
+each Hi-Z level into a texture of its own and copy it into the pyramid (one copy per level a frame, and the levels'
+memory twice); elsewhere the pyramid is reduced in place.
 
 ```ts
 import {createStage} from 'margoengine';
@@ -396,8 +399,12 @@ rt.options.stochastic = true; // rough surfaces trace their sampled rays through
   and the resolve averages them as before.
 - **Fallback.** A disposed scene, or one made on a device that was lost, runs as plain SSR (the same passes, no
   trace) until `rt.options.scene` is given a new one. Swapping the scene costs one bind group, not a shader.
-- **Checked on a real GPU** (`test/rt-reflections-browser.mjs`, WebGPU and the WebGL2 layer, identical figures on an
-  RTX A6000): a mirror floor under a red box above the view, which SSR alone leaves dark, shows the box's underside
+- **Devices.** The traced passes bind the scene's 4 storage buffers in a fragment shader. A device at WebGPU's
+  compatibility feature level that allows fewer (`maxStorageBuffersInFragmentStage`; 4 by default at that level, and
+  an OpenGL ES 3.1 GPU need allow none) warns once with code `unsupported` and runs as plain SSR; it never throws.
+  The WebGL2 layer traces on its full and half-float tiers; its LDR tier refuses any HDR PostStack.
+- **Checked on a real GPU** (`test/rt-reflections-browser.mjs`: WebGPU, WebGPU at the compatibility level, the WebGL2
+  layer and its half-float tier, identical figures on an RTX A6000 apart from the rough count, 2,684 to 2,747): a mirror floor under a red box above the view, which SSR alone leaves dark, shows the box's underside
   (1,415 pixels), median 208 against the closed form 208.46 (display of the floor's split-sum weight times albedo x
   ambient + emissive); the sun from below behind a plate leaves it unlit, without the plate it is lit (248), and
   `shadows: false` equals the unshadowed frame exactly; a rough floor with `stochastic` shows the box on 2,699 pixels.
@@ -593,8 +600,12 @@ gi.options.shadows = false;    // skip the sun's shadow ray at traced hits (defa
   view vector is the ray's reverse.
 - **Fallback.** A disposed scene, or one made on a device that was lost, runs as plain SSGI until `gi.options.scene`
   is given a new one.
-- **Checked on a real GPU** (`test/rt-gi-browser.mjs`, WebGPU and the WebGL2 layer, identical figures on an RTX
-  A6000): a white matte floor under a wide emissive ceiling that is never on screen, sun and ambient off, which SSGI
+- **Devices.** The traced trace binds 5 storage buffers in a fragment shader (the scene's 4 and SSGI's rays). A device
+  at WebGPU's compatibility level that allows fewer warns once with code `unsupported` and runs as plain SSGI; it never
+  throws. The WebGL2 layer traces on its full and half-float tiers; its LDR tier refuses any HDR PostStack.
+- **Checked on a real GPU** (`test/rt-gi-browser.mjs`: WebGPU, WebGPU at the compatibility level, the WebGL2 layer and
+  its half-float tier, identical figures on an RTX A6000; at the compatibility level held to 4 fragment storage
+  buffers it warns once and every frame is SSGI's 0): a white matte floor under a wide emissive ceiling that is never on screen, sun and ambient off, which SSGI
   alone leaves black, reads 181 against the closed form 180.54 (display of emissive x the mean distance fade, 0.99888)
   with one bounce and with `multiBounce`; the floor turned away from the ceiling stays 0, and a disposed scene gives
   SSGI's 0 back.

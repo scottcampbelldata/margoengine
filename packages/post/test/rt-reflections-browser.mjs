@@ -9,11 +9,16 @@
 //   equals the unshadowed one exactly.
 // - Rough floor (0.8) with `stochastic`: the traced rough rays bring the box into the floor.
 // - A disposed scene runs as SSR: no red in the rough floor, and the mirror pixels are the plain SSR frame (dark).
+// --mode= runs the page on another device (traced-device.js): 'half-float' (the layer's half-float tier) and
+// 'compatibility' (native WebGPU at the compatibility level) trace as above. The level's default is 4 storage buffers in
+// a fragment shader, what the traced passes bind, so no browser device is short of them; traced-fallback.test.js covers
+// a device that is (rt-gi-browser.mjs runs the short case on a real device: RTGI binds 5).
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { pbrNeutral } from '../../shared/display.js';
 import { postBrowser } from './post-browser.mjs';
 
+const mode = process.argv.find((arg) => arg.startsWith('--mode='))?.slice(7);
 const albedo = [1, 0, 0],
   emissive = [0.5, 0, 0],
   ambientStrength = 0.15,
@@ -33,7 +38,9 @@ await postBrowser(
   () => launchBrowser({ headless: true }),
   async (page, shot) => {
     await page.evaluate(
-      async ({ albedo, emissive }) => {
+      async ({ albedo, emissive, mode }) => {
+        const { tracedDevice, legDevice } = await import('/packages/post/test/traced-device.js'),
+          warnings = await tracedDevice(mode, 4);
         const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
           { MeshBVH } = await import('/packages/bvh/dist/index.js'),
           { GPUSceneBVH } = await import('/packages/bvh/dist/gpu-scene.js'),
@@ -68,6 +75,8 @@ await postBrowser(
         const rt = new RTReflections({ scene, maxRoughness: 0.6 });
         PostStack.attach(engine, [rt]);
         window.t = {
+          warnings,
+          device: legDevice(engine),
           engine,
           rt,
           scene,
@@ -80,7 +89,7 @@ await postBrowser(
           },
         };
       },
-      { albedo, emissive },
+      { albedo, emissive, mode },
     );
     const frames = async (n, code = '') => {
       await page.evaluate(`${code}; window.t.frames(${n})`);
@@ -105,9 +114,12 @@ await postBrowser(
         `window.t.rt.options.stochastic = false;
         window.t.floor.setMaterial(new window.t.PbrMaterial({ color: '#ffffff', roughness: 0, metalness: 1 }))`,
       );
-    const layer = await page.evaluate(() => {
+    const { device, warnings } = await page.evaluate(() => {
       window.t.engine.dispose();
-      return !!globalThis.__margoCompat;
+      return {
+        device: window.t.device,
+        warnings: window.t.warnings.map((warning) => ({ code: warning?.code, message: String(warning?.message) })),
+      };
     });
 
     // The box's reflection: clearly red pixels of the mirror frame.
@@ -137,7 +149,8 @@ await postBrowser(
       return n;
     };
     const result = {
-      device: layer ? 'webgl2-layer' : 'webgpu',
+      device,
+      warnings: warnings.length,
       expected: +expected.toFixed(2),
       pixels: mask.length,
       mirror: median(mirror),
@@ -149,6 +162,8 @@ await postBrowser(
       plainBrightest: Math.max(...mask.map((i) => plain.data[i])),
     };
     console.log(JSON.stringify(result));
+    if (mode) assert.ok(device.includes(mode === 'half-float' ? '(half-float)' : 'compatibility level'), device);
+    assert.equal(warnings.length, 0, 'no warning');
     assert.ok(result.pixels > 300, 'the off-screen box shows in the mirror floor');
     assert.ok(
       Math.abs(result.mirror - expected) <= 0.02 * expected,
