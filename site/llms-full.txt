@@ -31779,8 +31779,9 @@ measurements require separate models and evidence.
 ### Granular erosion at the voxel and ray-bed boundaries (EARTH-01, PA-42, BB-7)
 
 The optional continuum produces shear yield and persistent compaction on the live
-terrain bed. The falling-sand voxel source still needs a conserved material
-handoff to replace its one-cell movement and water deletion. The BB-7 fixture
+terrain bed. Falling voxel sand now transfers a displaced liquid's full packed
+state to the vacated cell. The voxel-to-continuum material handoff for repose
+and pile evolution is still open. The BB-7 fixture
 still needs the ray's water-momentum input and a continuous bed-height update
 from the moving grains. The existing sand plume is a separate effect.
 
