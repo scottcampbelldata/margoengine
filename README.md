@@ -10,7 +10,8 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 **[Build something in 5 minutes: a textured, lit scene with shadows and picking](#build-something-in-5-minutes)** ·
 [Start here: guides by goal](docs/start-here.md) · [Demos](#demos) ·
 [Coming from three.js](docs/from-threejs.md) ·
-[Coming from Babylon.js](docs/from-babylon.md)
+[Coming from Babylon.js](docs/from-babylon.md) ·
+[Coming from PlayCanvas](docs/from-playcanvas.md)
 
 The core and the stage together are 24,846 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
