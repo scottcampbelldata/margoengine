@@ -49,7 +49,11 @@ pub struct Work {
     wall_drag: WallDrag,
     surface_slope: f64,
     solid_slope: f64,
+    heads: [u32; 27],
+    heads_padding: u32,
 }
+
+const _: () = assert!(core::mem::size_of::<Work>() == 49 * 8);
 
 #[inline]
 fn cubic(q: f64) -> f64 {
@@ -87,9 +91,10 @@ impl Neighborhood<'_, '_> {
         &self,
         i: usize,
         position: Vec3,
+        heads: &[u32; 27],
         mut use_neighbor: impl FnMut(usize, f64, Vec3, f64),
     ) {
-        self.grid.nearby(position, |j| {
+        self.grid.visit_heads(heads, |j| {
             if i == j {
                 return;
             }
@@ -142,11 +147,13 @@ fn visit(
     boundary: &[Boundary],
     grid: &Grid<'_>,
     settings: &Settings,
+    heads: &[u32; 27],
     use_neighbor: impl FnMut(usize, f64, Vec3, f64),
 ) {
     neighborhood(points, boundary, grid, settings, settings.support).around(
         i,
         item(points, i).position,
+        heads,
         use_neighbor,
     );
 }
@@ -425,12 +432,15 @@ fn prepare(
     grid: &Grid<'_>,
     settings: &Settings,
     evaluations: &mut f64,
+    neighborhoods: &mut f64,
 ) {
     let inverse_h = 1.0 / settings.support;
     let mass_scale = inverse_h * inverse_h * inverse_h / settings.rest;
     let lattice = PlanarLattice::new(settings);
     for i in 0..points.len() {
         let particle = item(points, i);
+        let heads = grid.heads(particle.position);
+        *neighborhoods += 1.0;
         let (wall_density, wall_gradient, wall_drag) = if settings.wall_pressure == 0.0 {
             (0.0, ZERO, WallDrag::ZERO)
         } else if let Some(samples) = &lattice {
@@ -446,18 +456,27 @@ fn prepare(
         let mut density = particle.mass * mass_scale * CUBIC + wall_density;
         let mut centre = wall_gradient;
         let mut diagonal = 0.0;
-        visit(i, points, boundary, grid, settings, |j, _, grad, weight| {
-            *evaluations += 1.0;
-            density += weight;
-            centre = add(centre, grad);
-            // Boundary particles have prescribed velocity during the liquid solve.
-            if j < points.len() {
-                diagonal += norm2(grad);
-            }
-        });
+        visit(
+            i,
+            points,
+            boundary,
+            grid,
+            settings,
+            &heads,
+            |j, _, grad, weight| {
+                *evaluations += 1.0;
+                density += weight;
+                centre = add(centre, grad);
+                // Boundary particles have prescribed velocity during the liquid solve.
+                if j < points.len() {
+                    diagonal += norm2(grad);
+                }
+            },
+        );
         let denominator = diagonal + norm2(centre);
         let w = item_mut(work, i);
         w.wall_gradient = wall_gradient;
+        w.heads = heads;
         w.wall_drag = wall_drag;
         w.inverse = if denominator > 0.0 {
             1.0 / denominator
@@ -483,16 +502,24 @@ fn pressure_error(
     let mut complementarity = 0.0;
     for (i, (p, w)) in points.iter().zip(work.iter_mut()).enumerate() {
         let mut derivative = dot(p.velocity, w.wall_gradient);
-        visit(i, points, boundary, grid, settings, |j, _, grad, _| {
-            *evaluations += 1.0;
-            let velocity = if j < points.len() {
-                item(points, j).velocity
-            } else {
-                let b = item(boundary, j - points.len());
-                body_velocity(item(shapes, b.shape as usize), b.position)
-            };
-            derivative += dot(sub(p.velocity, velocity), grad);
-        });
+        visit(
+            i,
+            points,
+            boundary,
+            grid,
+            settings,
+            &w.heads,
+            |j, _, grad, _| {
+                *evaluations += 1.0;
+                let velocity = if j < points.len() {
+                    item(points, j).velocity
+                } else {
+                    let b = item(boundary, j - points.len());
+                    body_velocity(item(shapes, b.shape as usize), b.position)
+                };
+                derivative += dot(sub(p.velocity, velocity), grad);
+            },
+        );
         // Eqs. (7–12): solve only compression at a free surface. Store both residuals
         // as normalized rates, so one symmetric velocity update serves either solve.
         let bias = if density {
@@ -528,22 +555,30 @@ fn pressure_velocity(
     for (i, p) in points.iter().enumerate() {
         let lambda = item(work, i).lambda;
         let mut change = scale(item(work, i).wall_gradient, -lambda);
-        visit(i, points, boundary, grid, settings, |j, _, grad, _| {
-            *evaluations += 1.0;
-            if j < points.len() {
-                change = sub(change, scale(grad, lambda + item(work, j).lambda));
-            } else {
-                let b = item(boundary, j - points.len());
-                let dv = scale(grad, -lambda);
-                change = add(change, dv);
-                record_impulse(
-                    trial,
-                    item(shapes, b.shape as usize),
-                    b.position,
-                    scale(dv, -p.mass),
-                );
-            }
-        });
+        visit(
+            i,
+            points,
+            boundary,
+            grid,
+            settings,
+            &item(work, i).heads,
+            |j, _, grad, _| {
+                *evaluations += 1.0;
+                if j < points.len() {
+                    change = sub(change, scale(grad, lambda + item(work, j).lambda));
+                } else {
+                    let b = item(boundary, j - points.len());
+                    let dv = scale(grad, -lambda);
+                    change = add(change, dv);
+                    record_impulse(
+                        trial,
+                        item(shapes, b.shape as usize),
+                        b.position,
+                        scale(dv, -p.mass),
+                    );
+                }
+            },
+        );
         item_mut(work, i).change = change;
     }
     // The pressure dual is quadratic for this fixed neighborhood, with
@@ -797,20 +832,28 @@ fn diffuse(
         let drag = settings.viscosity * dt * wall_scale * wall_scale;
         w.residual = scale(w.wall_drag.multiply(p.velocity), -drag);
         w.diagonal = add([1.0; 3], scale(w.wall_drag.diagonal, drag));
-        visit(i, points, boundary, grid, settings, |j, q, grad, _| {
-            *evaluations += 1.0;
-            let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
-            let v = if j < points.len() {
-                item(points, j).velocity
-            } else {
-                let b = item(boundary, j - points.len());
-                body_velocity(item(shapes, b.shape as usize), b.position)
-            };
-            for k in 0..3 {
-                w.diagonal[k] += weight * axis[k] * axis[k];
-            }
-            w.residual = add(w.residual, along(axis, sub(v, p.velocity), weight));
-        });
+        visit(
+            i,
+            points,
+            boundary,
+            grid,
+            settings,
+            &w.heads,
+            |j, q, grad, _| {
+                *evaluations += 1.0;
+                let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
+                let v = if j < points.len() {
+                    item(points, j).velocity
+                } else {
+                    let b = item(boundary, j - points.len());
+                    body_velocity(item(shapes, b.shape as usize), b.position)
+                };
+                for k in 0..3 {
+                    w.diagonal[k] += weight * axis[k] * axis[k];
+                }
+                w.residual = add(w.residual, along(axis, sub(v, p.velocity), weight));
+            },
+        );
         w.direction = precondition(w.residual, w.diagonal);
         squared += dot(w.direction, w.residual);
     }
@@ -825,16 +868,24 @@ fn diffuse(
             let wall_scale = settings.rest / item(points, i).density;
             let drag = settings.viscosity * dt * wall_scale * wall_scale;
             let mut product = add(w.direction, scale(w.wall_drag.multiply(w.direction), drag));
-            visit(i, points, boundary, grid, settings, |j, q, grad, _| {
-                *evaluations += 1.0;
-                let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
-                let neighbor = if j < points.len() {
-                    item(work, j).direction
-                } else {
-                    ZERO
-                };
-                product = add(product, along(axis, sub(w.direction, neighbor), weight));
-            });
+            visit(
+                i,
+                points,
+                boundary,
+                grid,
+                settings,
+                &item(work, i).heads,
+                |j, q, grad, _| {
+                    *evaluations += 1.0;
+                    let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
+                    let neighbor = if j < points.len() {
+                        item(work, j).direction
+                    } else {
+                        ZERO
+                    };
+                    product = add(product, along(axis, sub(w.direction, neighbor), weight));
+                },
+            );
             denominator += dot(w.direction, product);
             item_mut(points, i).velocity = product;
         }
@@ -859,21 +910,29 @@ fn diffuse(
         p.velocity = w.rhs;
     }
     for (i, p) in points.iter().enumerate() {
-        visit(i, points, boundary, grid, settings, |j, q, grad, _| {
-            *evaluations += 1.0;
-            if j >= points.len() {
-                let b = item(boundary, j - points.len());
-                let object = item(shapes, b.shape as usize);
-                let relative = sub(p.velocity, body_velocity(object, b.position));
-                let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
-                record_impulse(
-                    reactions,
-                    object,
-                    b.position,
-                    along(axis, relative, p.mass * weight),
-                );
-            }
-        });
+        visit(
+            i,
+            points,
+            boundary,
+            grid,
+            settings,
+            &item(work, i).heads,
+            |j, q, grad, _| {
+                *evaluations += 1.0;
+                if j >= points.len() {
+                    let b = item(boundary, j - points.len());
+                    let object = item(shapes, b.shape as usize);
+                    let relative = sub(p.velocity, body_velocity(object, b.position));
+                    let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
+                    record_impulse(
+                        reactions,
+                        object,
+                        b.position,
+                        along(axis, relative, p.mass * weight),
+                    );
+                }
+            },
+        );
     }
     used
 }
@@ -893,6 +952,7 @@ fn capillary(
     settings: &Settings,
     dt: f64,
     evaluations: &mut f64,
+    neighborhoods: &mut f64,
 ) {
     let support = 3.0 * settings.spacing;
     let neighbors = neighborhood(points, boundary, grid, settings, support);
@@ -903,7 +963,7 @@ fn capillary(
     for (i, (p, w)) in points.iter().zip(work.iter_mut()).enumerate() {
         let mut fluid = p.mass * neighbors.inverse_rest_volume * CUBIC;
         let mut solid = 0.0;
-        neighbors.around(i, p.position, |j, _, _, weight| {
+        neighbors.around(i, p.position, &w.heads, |j, _, _, weight| {
             *evaluations += 1.0;
             if j < points.len() {
                 fluid += weight;
@@ -927,14 +987,21 @@ fn capillary(
         }
         let mut fluid = 0.0;
         let mut solid = sample.volume * neighbors.boundary_volume_scale * CUBIC;
-        neighbors.around(points.len() + index, sample.position, |j, _, _, weight| {
-            *evaluations += 1.0;
-            if j < points.len() {
-                fluid += weight;
-            } else {
-                solid += weight;
-            }
-        });
+        let heads = grid.heads(sample.position);
+        *neighborhoods += 1.0;
+        neighbors.around(
+            points.len() + index,
+            sample.position,
+            &heads,
+            |j, _, _, weight| {
+                *evaluations += 1.0;
+                if j < points.len() {
+                    fluid += weight;
+                } else {
+                    solid += weight;
+                }
+            },
+        );
         *item_mut(boundary_color, index) = settings.solid_vapor
             * interface_slope(1.0 - fluid - solid)
             - settings.solid_liquid * interface_slope(fluid);
@@ -946,7 +1013,7 @@ fn capillary(
         let w = item(work, i);
         let mut impulse = w.change;
         let fluid_volume = p.mass * neighbors.inverse_rest_volume;
-        neighbors.around(i, p.position, |j, _, grad, _| {
+        neighbors.around(i, p.position, &w.heads, |j, _, grad, _| {
             *evaluations += 1.0;
             if j < points.len() {
                 let color = w.surface_slope + item(work, j).surface_slope;
@@ -999,7 +1066,7 @@ pub unsafe extern "C" fn solve_dfsph(
     trial: *mut Reaction,
     body_count: usize,
     settings: *const Settings,
-    stats: *mut [f64; 10],
+    stats: *mut [f64; 11],
     dt: f64,
     boundary_color: *mut f64,
 ) -> u32 {
@@ -1061,11 +1128,20 @@ pub unsafe extern "C" fn solve_dfsph(
     let mut divergence_rounds = 0.0;
     let mut viscosity_rounds = 0.0;
     let mut evaluations = 0.0;
+    let mut neighborhoods = 0.0;
     let mut density_error = 0.0;
     let mut divergence_error = 0.0;
     let mut normal_impulse = 0.0;
     rebuild(&mut grid, points, boundary);
-    prepare(points, work, boundary, &grid, settings, &mut evaluations);
+    prepare(
+        points,
+        work,
+        boundary,
+        &grid,
+        settings,
+        &mut evaluations,
+        &mut neighborhoods,
+    );
     while remaining > 0.0 && !points.is_empty() {
         let drift = points
             .iter()
@@ -1097,6 +1173,7 @@ pub unsafe extern "C" fn solve_dfsph(
                 settings,
                 step,
                 &mut evaluations,
+                &mut neighborhoods,
             );
         }
         viscosity_rounds += diffuse(
@@ -1130,7 +1207,15 @@ pub unsafe extern "C" fn solve_dfsph(
             normal_impulse += contacts(settings, p, shapes, reactions);
         }
         rebuild(&mut grid, points, boundary);
-        prepare(points, work, boundary, &grid, settings, &mut evaluations);
+        prepare(
+            points,
+            work,
+            boundary,
+            &grid,
+            settings,
+            &mut evaluations,
+            &mut neighborhoods,
+        );
         let (rounds, error) = pressure(
             points,
             work,
@@ -1173,6 +1258,7 @@ pub unsafe extern "C" fn solve_dfsph(
         divergence_error,
         viscosity_rounds,
         normal_impulse,
+        neighborhoods,
     ];
     grid.clear();
     0

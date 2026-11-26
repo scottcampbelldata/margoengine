@@ -114,6 +114,7 @@ export interface DfsphStatistics {
     readonly divergenceIterations: number;
     readonly viscosityIterations: number;
     readonly pairEvaluations: number;
+    readonly neighborhoodSearches: number;
     readonly compression: number;
     readonly divergence: number;
     readonly maximumSpeed: number;

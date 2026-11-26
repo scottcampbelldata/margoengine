@@ -4582,7 +4582,8 @@ same `cellSize` on both sides of a floating-origin scene.
 `@margoengine/physics/dfsph` solves density and velocity divergence independently on the world clock. The
 default `accurate` profile allows up to 40 density and 32 divergence iterations per advective substep.
 The `interactive` profile uses 12 for each. Both use the same cubic kernel, implicit kinematic viscosity and
-sparse native grid. Run it at a higher dyadic `rate` for fast liquid and small features.
+sparse native grid. The statistics report actual pair evaluations and `neighborhoodSearches` separately.
+Run it at a higher dyadic `rate` for fast liquid and small features.
 
 ```ts
 import { DfsphSolver } from '@margoengine/physics/dfsph';

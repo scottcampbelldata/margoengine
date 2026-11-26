@@ -9728,14 +9728,17 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 7,914 B gzip. Each lazy native asset measures 33,256 B raw and 12,480 B gzip.
+The DFSPH entry measures 7,930 B gzip. Each lazy native asset measures 29,616 B raw and 11,643 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
 are reported when iteration budgets are reached. The clock switches to smaller advective substeps above
 0.4 spacings of travel. The support radius, contact radius and arena capacity control resolved detail.
 Plain and shared Wasm preserve the same clocked state and snapshot. Shared memory does not parallelize the
-native loops.
+native loops. The grid reuses 27 connected-list head indices per fluid row between position updates.
+This takes 112 extra bytes per reserved particle row, including alignment. A rebuild refreshes those
+indices before new density or divergence calculations. Capillary interactions centred on solid samples
+take their own neighborhood query from the same grid.
 
 Closed planar walls sample the outside volume of the cubic pressure kernel on a rest lattice. The sample
 spacing fits each axis of the domain and every exterior site belongs to the union of closed faces.

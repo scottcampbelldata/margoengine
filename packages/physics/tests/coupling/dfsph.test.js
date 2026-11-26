@@ -393,6 +393,7 @@ test('coupled pressure constraints reach the minimum-impulse velocity in a compr
   });
   world.advance(1);
   assert.ok(liquid.statistics.divergenceIterations > 1);
+  assert.equal(liquid.statistics.neighborhoodSearches, 2 * positions.length);
   for (let i = 0; i < 3; i++) assert.ok(Math.abs(liquid.sample(i).velocity[0] - expected) <= bound);
 });
 
@@ -673,4 +674,24 @@ test('analytic wall shear dissipates tangential motion and vanishes beyond the k
     else near(speed, initial);
     previous = speed;
   }
+});
+
+test('advecting across grid cells rebuilds candidates before the divergence pass', async () => {
+  const { world, liquid } = await solve({
+    spacing: 0.5,
+    support: 1,
+    bounds: wide,
+    divergenceTolerance: 1e-13,
+    particles: [
+      { position: [0.99, 0, 0], velocity: [0.9, 0, 0] },
+      { position: [2.01, 0, 0], velocity: [-0.9, 0, 0] },
+    ],
+  });
+  world.advance(1);
+  near(liquid.sample(0).position[0], 0.99 + DT * 0.9);
+  near(liquid.sample(1).position[0], 2.01 - DT * 0.9);
+  near(liquid.sample(0).velocity[0], 0);
+  near(liquid.sample(1).velocity[0], 0);
+  assert.equal(liquid.statistics.neighborhoodSearches, 4);
+  assert.equal(liquid.statistics.divergenceIterations, 1);
 });

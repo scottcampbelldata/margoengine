@@ -44,9 +44,9 @@ export const DFSPH_PARTICLE_WORDS = 8;
 const ZERO: Cell = [0, 0, 0];
 const ONE: Vec3 = [1, 1, 1];
 const SETTINGS_WORDS = 27;
-const WORK_WORDS = 35;
+const WORK_WORDS = 49;
 const BUCKET_WORDS = 4;
-const STATS_WORDS = 10;
+const STATS_WORDS = 11;
 const MODAL_WORDS = 5;
 const CUBIC = 8 / Math.PI;
 
@@ -73,6 +73,8 @@ export interface DfsphStatistics {
   readonly divergenceIterations: number;
   readonly viscosityIterations: number;
   readonly pairEvaluations: number;
+  /** Sparse-grid neighborhoods retrieved during the last world step. */
+  readonly neighborhoodSearches: number;
   /** Mean positive predicted excess density as a fraction of rest density. */
   readonly compression: number;
   /** Mean positive normalized density rate, s⁻¹. */
@@ -563,6 +565,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       densityIterations: s[2]!,
       divergenceIterations: s[3]!,
       pairEvaluations: s[4]!,
+      neighborhoodSearches: s[10]!,
       compression: s[5]!,
       maximumSpeed: s[6]!,
       divergence: s[7]!,

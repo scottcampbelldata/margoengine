@@ -70,6 +70,7 @@ impl<'a> Grid<'a> {
         bucket.head = id as u32 + 1;
     }
 
+    #[cfg(feature = "pbf")]
     pub fn nearby(&self, p: Vec3, mut visit: impl FnMut(usize)) {
         let cell = self.cell(p);
         for z in -1..=1 {
@@ -91,6 +92,43 @@ impl<'a> Grid<'a> {
                         id = *item(self.next, point);
                     }
                 }
+            }
+        }
+    }
+
+    /// The candidate chain heads are fixed until the next spatial rebuild.
+    #[cfg(feature = "dfsph")]
+    pub fn heads(&self, p: Vec3) -> [u32; 27] {
+        let cell = self.cell(p);
+        let mut heads = [END; 27];
+        let mut index = 0;
+        for z in -1..=1 {
+            for y in -1..=1 {
+                for x in -1..=1 {
+                    let (ix, iy, iz) = (
+                        cell[0].checked_add(x),
+                        cell[1].checked_add(y),
+                        cell[2].checked_add(z),
+                    );
+                    if let (Some(ix), Some(iy), Some(iz)) = (ix, iy, iz) {
+                        *item_mut(&mut heads, index) =
+                            item(self.buckets, self.slot([ix, iy, iz])).head;
+                    }
+                    index += 1;
+                }
+            }
+        }
+        heads
+    }
+
+    #[cfg(feature = "dfsph")]
+    pub fn visit_heads(&self, heads: &[u32; 27], mut visit: impl FnMut(usize)) {
+        for &head in heads {
+            let mut id = head;
+            while id != END {
+                let point = (id - 1) as usize;
+                visit(point);
+                id = *item(self.next, point);
             }
         }
     }

@@ -5863,3 +5863,10 @@ The lattice wall test evaluates an independent radial viscous weight for each ex
 the exact backward-Euler tangential speed. The analytic wall test measures monotonic dissipation inside
 the support and zero change outside. Both start without a hard collision, so the tests exercise viscous
 stress exclusively.
+
+### FLUID-01 sparse neighborhood reuse
+
+The pressure-chain test carries out several divergence iterations in two geometry states and records
+exactly two sparse neighborhood searches per particle. A separate regression starts two particles
+in cells separated by a whole support distance and advances them into the same cell. The divergence
+pass sees the new pair immediately. The force traversal order and support tests are unchanged.
