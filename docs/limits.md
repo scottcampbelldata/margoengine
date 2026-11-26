@@ -9894,6 +9894,8 @@ limit the paired impulse. A configured skid exponent adds signed two-region shea
 braking, including lockup. A configured shear radius uses actual wheel and ground speed.
 The optional side-force field combines rim shear and passive sidewall earth pressure with default
 gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
+A supplied `lateralShearLength` resolves directional shear in forward rolling within the same
+yield magnitude. Measured FJS-1 cases cover side force near 0.6 slip and four yaw angles.
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in

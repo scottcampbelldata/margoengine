@@ -4940,6 +4940,9 @@ To couple sideways soil loading, pass the same descriptor from `soilWheelSideFor
 force in N along the wheel's right axis. The resolved model combines sideways rim shear and
 sidewall earth pressure. It uses the prepared soil's density and `sidewallGravity`, which defaults
 to 9.81 m/s². The rigid wheel applies the force at the contact and limits it to oppose side slip.
+Set a measured `lateralShearLength` on prepared soil to use separate transverse and longitudinal
+mobilization on the forward rolling rim. Omit it for the combined shear model.
+[FJS-1 measured side-load example](tests/coupling/terramechanics.test.js).
 
 Set a rolling wheel's `bermProfile` to `'cross-track'` to form two soil banks beside its path.
 The projected wheel geometry splits the uncompacted material at oblique angles. Material is

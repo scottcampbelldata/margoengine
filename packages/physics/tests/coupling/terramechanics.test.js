@@ -981,6 +981,55 @@ test('a yawed smooth wheel reproduces the sidewall earth pressure integral', asy
   }
 });
 
+test('held-out Ishigami side loads at four measured yaw angles match the directional soil shear', async () => {
+  const terrain = { columns: 80, rows: 160, width: 0.4, depth: 0.8, centre: [0, 0] };
+  const wheelReaction = soilWheelReactionField('fjs-measured-wheel');
+  const wheelSideForce = soilWheelSideForceField('fjs-measured-side');
+  const wheel = { radius: 0.09, lugHeight: 0.01, peakFraction: 0.4, peakSlip: 0.15, exitFraction: -Math.sqrt(0.9) };
+  // Ishigami et al. (2007), Figure 12. The tested points are the plotted means near 0.6 slip.
+  // Each tuple lists yaw, marker centre x, and the bounds of the overlapping experimental marks.
+  const points = [
+    [5, 223.26, 225.37, 230.0],
+    [10, 445.3, 216.89, 223.83],
+    [15, 224.42, 382.92, 388.21],
+    [20, 448.83, 376.21, 382.51],
+  ];
+  const pointsPerSlip = (280.359 - 119.71) / 0.9;
+  const pointsPerNewton = (242.844 - 222.199) / 10;
+  for (const [i, [degrees, x, top, bottom]] of points.entries()) {
+    const beta = (degrees * Math.PI) / 180;
+    const slip = (x - (i % 2 ? 342.31 : 119.71)) / pointsPerSlip;
+    const zero = i < 2 ? 242.844 : 415.284;
+    const lower = (zero - bottom) / pointsPerNewton;
+    const upper = (zero - top) / pointsPerNewton;
+    const material = {
+      cohesiveModulus: 1370,
+      frictionalModulus: 814_000,
+      cohesion: 800,
+      friction: Math.tan((37.2 * Math.PI) / 180),
+      exponent: 1,
+      density: 1600,
+      shearLength: 0.043 * beta + 0.036,
+      lateralShearLength: 0.02 * beta + 0.013,
+      dustFraction: 0,
+    };
+    const { world } = await rollingBench(terrain, material, wheel, {
+      width: 0.11,
+      length: 0.12,
+      load: 6.6 * 9.81,
+      speed: 0.03 * (1 - slip),
+      slip,
+      lateral: Math.tan(beta),
+      wheelReaction,
+      wheelSideForce,
+      shared: i % 2 !== 0,
+    });
+    world.advance(1);
+    const [side] = regionWords(world.memory, world.fields.port(wheelSideForce.name).region);
+    assert.ok(side >= lower && side <= upper, `${degrees}° side load ${side} N outside [${lower}, ${upper}] N`);
+  }
+});
+
 test('a locked smooth wheel has the exact saturated two-region axle moment', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const radius = 0.125;

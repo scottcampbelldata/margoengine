@@ -364,6 +364,19 @@ arc uses its cylindrical reference. Full dynamic camber forces remain a separate
 [Matsumura and Ishigami, “Visualization and analysis of wheel camber angle effect for slope traversability using an in-wheel camera” (2021)](https://doi.org/10.1016/j.jterra.2020.09.002),
 [Li, Ding and Liu, “Attitude-based dynamic and kinematic models for wheels of mobile robot on deformable slope” (2016)](https://doi.org/10.1016/j.robot.2015.10.006).
 
+Ishigami, Miwa, Nagatani and Yoshida (2007) use independent longitudinal and transverse
+displacements and shear lengths in Eqs. 12–15. An optional lateral length enables those
+forward rim expressions and projects total mobilization onto the Mohr–Coulomb yield circle
+when both axes would exceed it. The existing passive wedge supplies the sidewall contribution.
+The FJS-1 wheel uses the published radius, width, speed, load, soil properties and the
+Table 1 expressions for both shear lengths in radians. An angular exit fraction of
+`-√0.9` is the small-angle equivalent of the lower reported rear/fore sinkage ratio.
+Figure 12 in the author PDF has 0–0.9 slip across 160.649 pt and 10 N across 20.645 pt.
+The test uses four published marker centres near 0.6 slip and the bounds of the paired
+experimental marks at 5°, 10°, 15° and 20°. No plotted forces supplied the material fit.
+The test checks one slip neighbourhood. The high-slip endpoint and full dynamic camber
+loads need additional measured comparisons. [Ishigami et al., “Terramechanics-Based Model for Steering Maneuver of Planetary Exploration Rovers on Loose Soil” (2007), Figure 12](https://k-nagatani.org/pdf/2007-JFR-Genya-online.pdf#page=14).
+
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement
 magnitudes in the shear law and projects the force in the direction of the local slip velocity
 (dissertation Eqs. 5.10–5.14 and 5.20–5.21). The sidewall depth is measured from the chord between

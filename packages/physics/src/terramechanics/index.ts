@@ -49,6 +49,8 @@ export interface SoilMaterial {
   readonly friction?: number;
   /** Janosi–Hanamoto shear displacement K, m. Default 0.025. */
   readonly shearLength?: number;
+  /** Separate transverse shear displacement, m, for forward rolling with a side-force port. Default coupled shear. */
+  readonly lateralShearLength?: number;
   /** Share of displaced bulk volume compacted in place. Default 0.2. */
   readonly compaction?: number;
   /** Fraction of the uncompacted displacement that becomes airborne dry mineral material. Default 0.0005. */
@@ -253,6 +255,8 @@ function materialOf(input: SoilMaterial = {}): Required<SoilMaterial> {
     cohesion: finite(input.cohesion ?? 500, 'cohesion', 0),
     friction,
     shearLength: positive(input.shearLength ?? 0.025, 'shear length'),
+    lateralShearLength:
+      input.lateralShearLength === undefined ? 0 : positive(input.lateralShearLength, 'lateral shear length'),
     compaction: finite(input.compaction ?? 0.2, 'compaction', 0, 1),
     dustFraction: finite(input.dustFraction ?? 0.0005, 'dust fraction', 0, 1),
     density: positive(input.density ?? 1600, 'bulk density'),
@@ -557,7 +561,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 57);
+    this.nativePatch = allocate('soil-patch-scratch', 58);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -852,6 +856,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       rolling?.grouserFill ? Math.max(-1, Math.min(1, longitudinalSlip)) : 0,
       sweptSoil,
       crossGrade,
+      material.lateralShearLength,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,

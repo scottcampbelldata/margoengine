@@ -79,6 +79,7 @@ struct Patch {
     grouser_slip: f64,
     swept_soil: f64,
     cross_grade: f64,
+    lateral_shear_length: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -348,9 +349,18 @@ fn rolling_load<const REACTION: bool>(
     (exit, peak): (f64, f64),
 ) -> RollingReaction {
     let rim = p.wheel_radius;
-    let lug_entry = 2.0 * arc_sin(root(0.5 * (1.0 - rim * cos(entry) / (rim + p.lug_height))));
+    let directional = p.skid >= 0.0 && p.side_reaction != 0.0 && p.lateral_shear_length > 0.0;
+    let lug_entry = if directional {
+        entry
+    } else {
+        2.0 * arc_sin(root(0.5 * (1.0 - rim * cos(entry) / (rim + p.lug_height))))
+    };
     let lug_sine = sin(lug_entry);
-    let shear_radius = rim + 0.5 * p.lug_height;
+    let shear_radius = if directional {
+        rim
+    } else {
+        rim + 0.5 * p.lug_height
+    };
     let mut normal = 0.0;
     let mut drawbar = 0.0;
     let mut axle_torque = 0.0;
@@ -434,7 +444,13 @@ fn rolling_load<const REACTION: bool>(
             } else {
                 let travel = 1.0 - p.drive_slip;
                 let slide = rim * ((lug_entry - at) - travel * (lug_sine - sine));
-                if lateral_active {
+                if directional {
+                    let across = shear_radius * (entry - at) * travel * lateral_slip;
+                    let x = 1.0 - exp(-slide.max(0.0) / p.shear_length);
+                    let y = (1.0 - exp(-across.abs() / p.lateral_shear_length)).copysign(across);
+                    let yield_limit = slip_magnitude(x, y).max(1.0);
+                    (x / yield_limit, y / yield_limit)
+                } else if lateral_active {
                     let velocity = travel * lateral_slip;
                     mobilized_motion(
                         slide.max(0.0),

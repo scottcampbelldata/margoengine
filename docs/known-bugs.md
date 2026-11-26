@@ -17018,8 +17018,9 @@ Grouser transport can backfill its solver-owned trench from earlier cuts or feed
 The straight locked condition matches both measured relative bank crests. Absolute scanned
 profiles at powered slip and oblique angles remain open.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
-brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
-opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
+brake cases pass. Oblique rolling publishes shear and sidewall force, with a live opposing chassis
+impulse. Directional rolling shear matches FJS-1 side loads around 0.6 slip at four yaw angles.
+Reverse travel and the high-slip end of that side-load range remain open.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 
