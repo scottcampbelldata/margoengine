@@ -9700,6 +9700,10 @@ For fully developed glycerol flow on a 20° glass plate, the modeled depths at t
 are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
+An independent glycerine release video also supports the cube-root law for the incline front
+before fingering. It supplies a normalized front increment. The absolute movie lengths,
+recording-to-laboratory clock relationship and finger growth remain outside the validation.
+[Reproduce](whitepaper/reproduce.md#fluid-07-incline-front-history)
 
 `surfaceGeometry()` draws the cell-centred height field as a triangulated free surface in
 the backing's local frame. This geometry has the spatial resolution of the film grid.

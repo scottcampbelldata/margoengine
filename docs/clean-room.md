@@ -15514,6 +15514,14 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   simulated radii. The release starts from the gate geometry without a similarity profile.
   The gravity-only approximation omits the experimental surface-tension effects near the front.
   [Journal](https://doi.org/10.1017/S0022112082001797)
+- Herbert E. Huppert, “Flow and instability of a viscous current down a slope” (1982),
+  equations 2 and 7, and “Gravity currents: a personal perspective” (2006), supplementary Movie 1.
+  A finite-volume release on a slope has a late profile `h ∝ sqrt(x)` and front distance
+  `x_N = (9 A² g sin θ t / (4 ν))^(1/3)`. Its downstream mass centroid is `3x_N/5`.
+  The separate simulation starts from a prescribed 5 cm gate and 8 cm² cross section. The movie
+  supplies only the ratio of consecutive increments of cubed front distance, which cancels an
+  unknown constant image scale, recording speed and start time. No video measurement sets a
+  solver input. [Nature](https://doi.org/10.1038/300427a0) · [Supplementary Movie 1](https://doi.org/10.1017/S002211200600930X)
 - Gene H. Golub and Charles F. Van Loan, “Matrix Computations”, fourth edition (2013), §4.3.
   A strip's face gradient times its transpose has diagonals `−1, 2, −1`. Its square gives the
   curvature term's five bands. The film pressure solve factors that symmetric positive definite

@@ -4610,6 +4610,25 @@ Figure 9. The test records both caps in the original 3305 × 1207 raster and inc
 of digitization allowance. The published theory lines and measured depths never enter the solve.
 [Wang, Jia and Duan (2020), Figure 9](https://www.mdpi.com/2079-6412/10/6/599#coatings-10-00599-f009)
 
+### FLUID-07 incline front history
+
+Run `node --test --test-name-pattern="gated incline" packages/physics/tests/thin-film.test.js`
+from a built physics entry. Initialize a hydrostatic wedge behind a 5 cm gate on an 8° slope,
+with an independently prescribed cross-sectional area of 8 cm². The 1 and 2 mm simulations
+conserve area and measure the streamwise mass centroid at 90, 180 and 270 s. Its front estimate
+is within 5% of the Huppert (1982) similarity solution at each time.
+
+In Huppert's separate 2006 laboratory Movie 1, read the 352 × 288 QuickTime samples at playback
+6, 12 and 18 s. In source columns 95 through 214, interpolate the last red boundary where
+`R − max(G, B)` crosses 30 in rows 53 through 105. The column averages are 79.291, 86.151 and
+91.477 px. Rectify the centerline distance with `(y − y₀) / (1 + p(y − y₀))`. The rear plate edge
+gives `y₀ = 49 px`, and the apparent side separation gives `p = 0.003 px⁻¹`. Varying those
+measurements through 47–51 px and 0.0025–0.0035 px⁻¹ and sweeping red thresholds 15–45 gives
+the 0.78–1.06 band for the ratio of successive cubed-distance increments. Equal intervals
+cancel a constant playback speed and the start offset. This observable uses no lab response
+to initialize or calibrate the simulation and does not require matching the film's absolute clock.
+[Original law](https://doi.org/10.1038/300427a0) · [Laboratory video](https://doi.org/10.1017/S002211200600930X)
+
 ### SEA-08 heave and pitch at forward speed
 
 Build `node scripts/build-modern.js --precompiled --only=physics`, then run `node --test --test-name-pattern "HullSolver forward speed" packages/physics/tests/coupling/seakeeping.test.js`. The fixture compares the complex heave and pitch transfer amplitudes at 3 rad/s and 2 m/s, restores the same course history in both arena types, holds a trimmed body steady, and checks the error when a broad hull loses pitch restoring.

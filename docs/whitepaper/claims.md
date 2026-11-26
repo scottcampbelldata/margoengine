@@ -6273,6 +6273,14 @@ The film reaches the observed glycerol depth for three independently measured pu
 on a 20° glass plate. Starting from a dry plate gives the same modeled depth at both tested
 grid resolutions within the figure's measurement bands. [Reproduce](reproduce.md#fluid-07-measured-inclined-film)
 
+### FLUID-07 incline front history
+
+A gated release on an 8° slope reproduces the absolute cube-root similarity law to 4.2% in the
+late spanwise-uniform phase. The ratio of successive cubed front-distance increments is 1.0124–1.0132
+on 1 and 2 mm grids. Independently digitized glycerine footage gives 1.012 nominally and a
+0.78–1.06 interval under colour and perspective sensitivity. The physical test inputs are
+prescribed separately from the video measurements. [Reproduce](reproduce.md#fluid-07-incline-front-history)
+
 ### FLUID-07 suspended film
 
 The suspended-film solve amplifies a long disturbance and damps a short disturbance at the

@@ -483,6 +483,49 @@ test('ThinFilmSolver: a fixed-volume gravity current predicts the measured absol
   }
 });
 
+test('ThinFilmSolver: a gated incline retains Huppert’s measured cube-root front history', async () => {
+  const gravity = 9.80665;
+  const incline = (8 * Math.PI) / 180;
+  const downslope = gravity * Math.sin(incline);
+  const area = 8e-4;
+  const kinematicViscosity = 9.8e-4;
+  const gate = 0.05;
+  const density = 1260;
+  const times = [90, 180, 270];
+  // Independent movie digitization over equal playback intervals (Huppert 2006, Movie 1).
+  const measured = [0.78, 1.06];
+  for (const count of [450, 900]) {
+    const spacing = 0.9 / count;
+    const positions = Array.from({ length: count }, (_, i) => (i + 0.5) * spacing);
+    const depth = positions.map((x) => (x < gate ? area / gate + (x - gate / 2) * Math.tan(incline) : 0));
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate: { num: 1, den: 1 }, gravity: [0, -gravity, 0] }).add(film, {
+      cells: [1, count],
+      spacing,
+      depth,
+      density,
+      viscosity: density * kinematicViscosity,
+      surfaceTension: 0,
+      u: [1, 0, 0],
+      v: [0, -Math.sin(incline), -Math.cos(incline)],
+    });
+    const cubes = times.map((time) => {
+      world.advance(time);
+      const heights = film.depths();
+      const water = heights.reduce((sum, h) => sum + h, 0);
+      const moment = heights.reduce((sum, h, i) => sum + h * positions[i], 0);
+      // Huppert's late-time profile h ∝ sqrt(x) has a centroid at 3/5 of the nose distance.
+      const nose = (5 * moment) / (3 * water);
+      const expected = Math.cbrt((9 * area ** 2 * downslope * time) / (4 * kinematicViscosity));
+      close(spacing * water, area, 64 * time * Number.EPSILON * area);
+      close(nose, expected, 0.05 * expected);
+      return nose ** 3;
+    });
+    const ratio = (cubes[2] - cubes[1]) / (cubes[1] - cubes[0]);
+    assert.ok(ratio >= measured[0] && ratio <= measured[1], `n=${count}, cube increment ratio ${ratio}`);
+  }
+});
+
 test('ThinFilmSolver: malformed wetting parameters report the range and its fix', async () => {
   const options = { cells: [4, 1], spacing: 0.001 };
   await assert.rejects(() => patch({ ...options, wetting: null }), {
