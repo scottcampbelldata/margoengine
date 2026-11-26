@@ -3,7 +3,7 @@
 // from; closing the server first, with the browser still open, never called back and the suite (every assertion
 // passed) was killed after 600 s. So: browser context, then browser, then the servers' connections, then the servers,
 // then the child processes' whole trees, all inside one budget that names what was still open when it ran out.
-import { execFile, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
 
 /** How long `closeAll` may take in all before it throws. */
 export const SHUTDOWN_BUDGET_MS = 30_000;
@@ -273,6 +273,99 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile, { kill = fal
       (error, stdout) => resolve(error ? ids : [...String(stdout).matchAll(/\d+/g)].map((match) => Number(match[0]))),
     );
   });
+}
+
+/**
+ * The script of {@link startKiller}: reads `<sinceMs> <pid,pid,...>` lines and ends each pid that started no later than
+ * `sinceMs` through that same checked handle, as `waitSignaled` with `kill` does, then answers `done`. Nothing inside a
+ * line stops the loop: a pid that is gone, unreadable, newer or already terminating is skipped.
+ */
+export const KILLER_SCRIPT = [
+  "[Console]::Out.WriteLine('ready')",
+  'while ($null -ne ($line = [Console]::In.ReadLine())) {',
+  '  $parts = $line.Split(" ")',
+  '  $since = [DateTimeOffset]::FromUnixTimeMilliseconds([long]$parts[0]).UtcDateTime',
+  '  foreach ($id in $parts[1].Split(",")) {',
+  '    try {',
+  '      $p = [Diagnostics.Process]::GetProcessById([int]$id)',
+  '      $start = $p.StartTime',
+  '      if ($null -ne $start -and $start.ToUniversalTime() -le $since) { $p.Kill() }',
+  '    } catch { }',
+  '  }',
+  "  [Console]::Out.WriteLine('done')",
+  '}',
+].join('\n');
+
+/**
+ * Windows: a Windows PowerShell started now and kept waiting, so ending pids later does not wait for PowerShell to
+ * start: 2 to 5 s on the loaded laptop and past `waitSignaled`'s 10 s bound in 4 closes of 18, when the kill was never
+ * made (KB-HOST-KILLLATE1). `kill(pids, sinceMs)` resolves once each pid that started by `sinceMs` has been ended, or
+ * after `timeoutMs`; with the process not ready yet, gone or not answering it falls back to `fallback` (default:
+ * `waitSignaled` with `kill`). `close()` ends the waiting process.
+ * @param {{ spawnProcess?: typeof spawn, fallback?: (pids: number[], sinceMs: number) => Promise<unknown>, timeoutMs?: number }} [options]
+ */
+export function startKiller({
+  spawnProcess = spawn,
+  fallback = (pids, sinceMs) => waitSignaled(pids, 1, sinceMs, undefined, { kill: true }),
+  timeoutMs = 10_000,
+} = {}) {
+  const child = spawnProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', KILLER_SCRIPT], {
+    stdio: ['pipe', 'pipe', 'ignore'],
+    windowsHide: true,
+  });
+  let ready = false,
+    gone = false,
+    buffer = '';
+  const waiting = [];
+  child.on('error', () => (gone = true));
+  child.on('exit', () => {
+    gone = true;
+    for (const done of waiting.splice(0)) done(false);
+  });
+  child.stdin.on('error', () => (gone = true));
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', (text) => {
+    buffer += text;
+    let at;
+    while ((at = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, at).trim();
+      buffer = buffer.slice(at + 1);
+      if (line === 'ready') ready = true;
+      else if (line === 'done') waiting.shift()?.(true);
+    }
+  });
+  // Waiting for pids must not hold its owner open: the owner closes it when it ends anyway.
+  child.unref();
+  for (const stream of [child.stdin, child.stdout]) stream.unref?.();
+  return {
+    /** The waiting PowerShell's pid. It ends with its owner: Node starts each child in a job that kills it on close. */
+    pid: child.pid,
+    get ready() {
+      return ready && !gone;
+    },
+    async kill(pids, sinceMs) {
+      const ids = pids.filter((pid) => Number.isInteger(pid) && pid > 0);
+      if (!ids.length) return;
+      if (!ready || gone) return void (await fallback(ids, sinceMs));
+      let timer;
+      const answered = await Promise.race([
+        new Promise((done) => {
+          waiting.push(done);
+          child.stdin.write(`${Math.round(sinceMs)} ${ids.join(',')}\n`);
+        }),
+        new Promise((done) => (timer = setTimeout(() => done(false), timeoutMs))),
+      ]);
+      clearTimeout(timer);
+      if (answered) return;
+      // A late `done` would answer the next request: a process that missed its bound is not used again.
+      this.close();
+      await fallback(ids, sinceMs);
+    },
+    close() {
+      gone = true;
+      child.stdin.end();
+    },
+  };
 }
 
 /**

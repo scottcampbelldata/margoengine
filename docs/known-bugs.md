@@ -727,9 +727,15 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   20 of 20 runs alone (laptop at 90% CPU from other lanes; 8 of 13 before). Regression: tests/browser-host.test.js
   ("acknowledges the end only once the listed children have been ended", "sends the listing time with the end
   request"; both fail on the old host and suite).
-- **Still open under heavy load:** beside four CPU hogs (100% CPU) it passed 16 of 20; the 4 failures are not traced
-  yet. Candidates: PowerShell not starting within `waitSignaled`'s 10 s limit (the kill is then never made), or killed
-  Edge children still unsignalled at the end of the test's own 10 s wait.
+- **Heavy load, fixed 2026-11-26:** beside four CPU hogs (100% CPU) it still passed only 16 of 20. Traced over 18 timed
+  kills: in 4 the kill's Windows PowerShell had not started within `waitSignaled`'s 10 s bound, was ended there, and
+  no child was killed; in the other 14 it took 1.9 to 5.4 s and every child had exited. (Killed Edge children also
+  stayed unsignalled past 10 s in 13 of those 14, which the close test does not wait on: it waits only for pids still
+  running.) The host now starts its PowerShell at launch and keeps it waiting (`startKiller` in
+  scripts/support/shutdown.mjs), so the end request costs no PowerShell start; with that process not ready, gone or
+  silent past 10 s the kill falls back to `waitSignaled` as before, and a process that missed its bound is not used
+  again. It ends with its host, closed or not (Node starts each child in a job that kills it on close). The real close
+  test then passed 20 of 20 beside four CPU hogs (3.1 min, 100% CPU). Regression: tests/killer.test.js.
 
 ### Fixed 2026-11-25: SSAO and GTAO occluded one-pixel tips of a lone face's silhouette (KB-SSAO-SILHOUETTE1, post, normal reconstruction)
 
