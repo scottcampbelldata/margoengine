@@ -1264,6 +1264,13 @@ counters and timer latencies, not under a CPU profile: the V8 sampler raises the
 tick. Still missing: the same counts on Firefox and on ANGLE Metal; per-context program compiles remain (WebGL2 has no
 program binaries).
 
+Aborted maps (KB-SHOT-COMPATLOST1, 2026-11-26): a map the layer cuts off names its cause, the device loss ("The device
+was lost before the buffer mapped") or the buffer's own destroy ("The buffer was destroyed before it mapped"), both
+AbortError as WebGPU rejects them (W3C WebGPU, https://www.w3.org/TR/webgpu/, `GPUBuffer.mapAsync` and `destroy()`).
+Before, a destroy read as a loss. `LightProbes.bake()` reports any aborted readback map as its coded interruption.
+Evidence: `packages/webgl2-compat/test/task-polling.test.js`, `packages/environment/tests/probes.test.js`. Missing: the
+ANGLE Metal device loss behind the orrery shot is not reproduced on ANGLE Direct3D 11 or Vulkan (Intel Arc 140V).
+
 check:owners CPU runs (2026-11-18): the CPU model runs one package per process, each under its own 120 s limit
 (`cpuRuns` and `CPU_LIMIT_MS` in `scripts/support/owner-lifetime-registry.mjs`), and a timeout names the case still
 running (`package/fixture/target/lifetime`). One process for all 75 fixtures summed about 160 s under one 120 s limit

@@ -157,6 +157,39 @@ test('map readiness also yields a port task, checks every pending result and rej
   await assert.rejects(CompatBuffer.prototype.mapAsync.call(buffer, 1), { name: 'AbortError' });
 });
 
+// KB-SHOT-COMPATLOST1: a buffer destroyed while its map waited was rejected as "The device was lost", so a page that
+// destroyed its own readback buffer was sent looking for a device loss that never happened.
+test('a map aborted by its own buffer destroy names the destroy, and a device loss names the loss', async () => {
+  const pending = (destroy) => {
+    const buffer = {
+      destroyed: false,
+      device: { destroyed: false, queue: {}, gl: { flush() {} } },
+      readbacks: [{}],
+      shadowValid: true,
+      mapState: 'unmapped',
+      size: 4,
+      usage: 1,
+      shadow: new Uint8Array(4),
+      settle: () => {
+        destroy(buffer);
+        return false;
+      },
+    };
+    return CompatBuffer.prototype.mapAsync.call(buffer, 1);
+  };
+  await assert.rejects(
+    pending((b) => {
+      b.destroyed = true;
+      b.mapState = 'unmapped';
+    }),
+    { name: 'AbortError', message: 'The buffer was destroyed before it mapped' },
+  );
+  await assert.rejects(
+    pending((b) => (b.device.destroyed = true)),
+    { name: 'AbortError', message: /^The device was lost before the buffer mapped/ },
+  );
+});
+
 test('nonforcing settlement does not block on a readback and leaves every later write queued', () => {
   let applied = 0;
   const buffer = {
