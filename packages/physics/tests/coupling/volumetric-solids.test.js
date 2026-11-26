@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { CellMaterial, SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
+import { PhysicsWorld, RigidSolver, SoftSolver } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 import { ladder, tensileLadder } from './volumetric-ladder.js';
 
@@ -117,6 +118,95 @@ for (const solver of ['vertex-block', 'projective']) {
     assert.ok(pieces.every((piece) => Number.isFinite(piece.volume()) && piece.volume() > 0));
   });
 }
+
+test('gelatin and passive flesh retain their measured small-strain stiffnesses', async () => {
+  const step = 1 / 60;
+  const length = 0.125;
+  const mass = 0.03;
+  const poisson = 0.45;
+  const displacement = length * 0.0008;
+  const cases = [
+    // Gravelle and Marangoni (2021), Table 1, unfilled B-type gelatin at 4 percent, pH 6.
+    ['gelatin', 10_570 / (2 * (1 + poisson))],
+    // Geerligs et al. (2008), porcine subcutaneous tissue at 10 rad/s and 37 °C.
+    ['passive flesh', 7500],
+  ];
+  for (const [name, shear] of cases) {
+    const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: step });
+    const soft = await SoftBodies.attach(physics, { substeps: 1, iterations: 2 });
+    soft.cellDamping = 0;
+    const material = Object.assign(new CellMaterial(), {
+      youngsModulus: 2 * shear * (1 + poisson),
+      poissonRatio: poisson,
+      deformationDamping: 0,
+    });
+    const desc = new SoftBodyDesc([
+      [0, 0, 0],
+      [length, 0, 0],
+      [0, length, 0],
+      [0, 0, length],
+    ])
+      .setCells([0, 1, 2, 3], material)
+      .setSolver('vertex-block')
+      .setPinnedParticles([0, 1, 2])
+      .setParticleMass(mass)
+      .setLinearDamping(0);
+    const body = soft.create(desc);
+    body.setParticlePosition(3, [displacement, 0, length]);
+    physics.step();
+    // This deformation holds J=1. The shear stiffness is µV/L² and a vertex block solves
+    // the single backward-Euler displacement exactly. Each authored conversion uses f32.
+    const stiffness = (shear * length) / 6;
+    const expected = (mass * displacement) / (mass + step * step * stiffness);
+    const actual = body.particlePosition(3);
+    const allowance = 16 * 2 ** -23 * displacement;
+    assert.ok(Math.abs(actual[0] - expected) <= allowance, `${name} shear: ${actual[0]} versus ${expected}`);
+    assert.deepEqual(actual.slice(1), [0, length], name);
+  }
+});
+
+test('a thin ice sheet remains intact below the measured surface strain and fractures above it', async () => {
+  // Frederking and Timco (1983), Table I series 1 test 1. Infer the apparent small-deflection
+  // modulus from the measured beam stiffness and the surface stress from its failure load.
+  const [length, width, thickness, force, slope] = [0.6, 0.123, 0.062, 135, 84_000];
+  const inertia = (width * thickness ** 3) / 12;
+  const young = (slope * length ** 3) / (3 * inertia);
+  const strain = (force * length * thickness) / (2 * inertia * young);
+  const green = (extension) => extension + (extension * extension) / 2;
+  const material = Object.assign(new CellMaterial(), { youngsModulus: young, poissonRatio: 0.3, density: 917 });
+  for (const fraction of [0.9, 1.1]) {
+    const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / 60 });
+    const soft = await SoftBodies.attach(physics);
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(new SoftSolver(), { soft })
+      .couple(['soft', 'rigid'], 'staggered');
+    const grid = SoftBodyDesc.box([0, 0, 0], [4, 1, 2], [4, 1, 2]);
+    const scale = [length / 4, thickness, width / 2];
+    const desc = new SoftBodyDesc(grid.positions.map((coordinate, i) => coordinate * scale[i % 3]))
+      .setCells(grid.cells, material)
+      .setSurface()
+      .setSolver('vertex-block');
+    desc
+      .setPinnedParticles(Array.from({ length: desc.particleCount }, (_, i) => i))
+      .setTensileNucleation(green(strain));
+    const body = soft.create(desc);
+    const events = [];
+    soft.onTear((event) => events.push(event));
+    const mass = body.mass();
+    for (let particle = 0; particle < body.particles; particle++) {
+      const [x, y, z] = body.particlePosition(particle);
+      body.setParticleKinematicTarget(particle, [x * (1 + fraction * strain), y, z]);
+    }
+    world.advance(1);
+    assert.equal(events.length, fraction > 1 ? 1 : 0);
+    if (events.length === 0) continue;
+    const pieces = events[0].pieces;
+    const currentMass = pieces.reduce((sum, piece) => sum + piece.mass(), 0);
+    assert.ok(pieces.every((piece) => Number.isFinite(piece.volume()) && piece.volume() > 0));
+    assert.ok(Math.abs(currentMass - mass) <= 16 * 2 ** -23 * mass);
+  }
+});
 
 test('automatic cracks remain finite when continued remeshing reaches the native geometry resolution', async () => {
   const scene = await tensileLadder(0, 0.005);

@@ -215,6 +215,22 @@ bonded facet when the total exceeds that critical value.
 [A Virtual Crack Closure-Integral Method for Three-Dimensional Crack Problems Using Linear Tetrahedral Finite Elements](https://doi.org/10.3970/cmes.2005.010.229)
 [3-D Mixed Mode Delamination Fracture Criteria](https://ntrs.nasa.gov/citations/20060048260).
 
+Gravelle and Marangoni (2021), Table 1, measured a Young's modulus of 10.57 ± 0.64 kPa
+for unfilled 4% B-type gelatin at pH 6. Geerligs et al. (2008) reported 7.5 kPa shear
+modulus for porcine subcutaneous tissue at 10 rad/s and 37 °C in the small-strain
+regime. These are elastic inputs for independent one-step simple-shear tests, with
+Poisson ratio 0.45 authored for both. The tested backward-Euler displacement uses
+the exact stiffness `μV/L²` of a tetrahedron sheared with its base fixed.
+
+Frederking and Timco (1983), Table I, series 1, test 1, measured 84 N/mm stiffness
+and 135 N peak force in a 600 × 123 × 62 mm freshwater ice cantilever. Their Eqs. 1–2
+give an apparent modulus of 2.476 GPa and a flexural stress of 1.028 MPa. The resulting
+outer-fiber strain `σ/E = 0.00041518` sets the threshold for a separate uniform-extension
+sheet fixture. The solver holds at 90% and opens at 110%, conserving mass in the cut.
+[Dataset on the small- and large deformation mechanical properties of emulsion-filled gelatin hydrogels](https://doi.org/10.1016/j.dib.2021.107410)
+[Linear viscoelastic behavior of subcutaneous adipose tissue](https://doi.org/10.3233/BIR-2008-0517)
+[On Measuring Flexural Properties of Ice Using Cantilever Beams](https://doi.org/10.3189/S0260305500005243).
+
 Shewchuk's 1997 work on robust geometric predicates motivates checking the determinant
 in the coordinates that the native kernel will hold. An automatic crack is eligible only
 when the replacement has representable f32 vertex positions, affine rest bases and nodal masses.
