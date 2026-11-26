@@ -9776,6 +9776,22 @@ shaded against 0.99999 lit, the frame darker inside the shaded mask, 1 everywher
 tools/shot/test/look-masks-check.mjs (every mask check runs on a real shot). Missing: local lights' shadows in the
 visibility, core meshes as the subject.
 
+**Plants in the masks (KB-LOOK-MASKOCCLUDE1, 2026-11-26).** A lit `Scatter` (`@margoengine/scatter`, the `material`
+option) is a capture model: `setCapture`/`draw(c, 'capture')` draw this frame's three LOD rings (the main camera's culled
+set, as `drawShadow`) into the hook's pass with the colour pass's own lit stage (vertex, wind, LOD dither, blade normal,
+maps and cut-out), its lighting kept in a dead block and the return replaced by the hook's `margoSSR` (scatter
+`src/capture.ts`), depth greater-equal and written. Capture pipelines are keyed by the effect's declarations and kept
+apart from the colour pipelines, so one Scatter in two effects never recompiles either. `SceneTargets.add(model,
+{ground: false})` sets `t.ground` 0, so `litGround` and `shadedGround` read 0 on plants while they still hide the ground
+and write every other output; core's Frame text (`struct Frame { camera`) is accepted by the terrain-form hook.
+`BiomeObjects` and `BiomeView` forward one hook to every child scatter (and the view to its terrain and horizon).
+Evidence: scatter test/capture.test.js (stage text, hook checks, per-effect cache, textured cut-out),
+post test/scene-targets.test.js, biomes tests/objects.test.js (shared hook, release, disposed parts),
+post test/scene-targets-scatter-browser.mjs (WebGPU and the WebGL2 layer: 466 lit and 341 shaded ground pixels on the
+plants before, 0 and 0 with `{ground: false}`, 823 plant pixels, mean height 0.63 m, 52 edge pixels apart from the
+4x multisampled frame). Missing: `ScatterInstances` capture, the timber-valley masks check on a real shot, and the
+cost on a forest (one draw per ring per scatter per effect).
+
 **Sky occlusion (KB-LOOK-POST-SKYOCC1, 2026-11-17, GPU maths).** GTAO's kernel gains `sky()`: with `skyRadius` above 0
 (frame `size.zw` = reach and steps, both 0 when off) the slices search their horizons again out to the reach, samples
 spaced by the square of their index from 1 pixel out (4 before KB-GTAO-OPENFLOOR1), each sample slid into the slice, and the

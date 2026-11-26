@@ -5,7 +5,8 @@
 // @margoengine/scenes/timber-valley as a shot page for tools/shot (shot files from shotFilesFromScene with this page).
 // URL: any catalogue setting but quality (look, weather, fire, fireTime, hour, date, houses, windFrom, seed). The page
 // gives the shot tool `timberShot.engine`, `timberShot.aovs` (geometry, depth as nearness exp(-distance / 2000 m), and
-// SceneTargets' look masks penumbra, subject, lit and shadow with the terrain added), `timberShot.apply` (the scene's
+// SceneTargets' look masks penumbra, subject, lit and shadow with the terrain added and the scattered plants, trees and
+// snags added as not ground, so they hide the ground behind them; `plants` marks them, KB-LOOK-MASKOCCLUDE1), `timberShot.apply` (the scene's
 // own time follows the shot clock: fire, sky and weather) and `timberShot.settings` (per-shot rows through each
 // package's own apply function). The scene has no subject yet (the town draws no buildings and no people are ready), so
 // the subject mask stays empty. WebGPU only (SceneTargets and the terrain).
@@ -23,13 +24,15 @@ scene.view(scene.views[0],45);
 const targets=SceneTargets.attach(engine,{outputs:{
   geometry:{wgsl:'vec4f(1, 0, 0, 1)',format:'r8unorm'},
   depth:{wgsl:'vec4f(exp(-distance(t.eye, t.position) / 2000.0), 0, 0, 1)',format:'r32float'},
-  penumbra:'penumbra',subject:'subject',lit:'litGround',shadow:'shadedGround'}});
+  penumbra:'penumbra',subject:'subject',lit:'litGround',shadow:'shadedGround',
+  plants:{wgsl:'vec4f(1.0-t.ground, 0, 0, 1)',format:'r8unorm'}}});
 targets.add(scene.parts.view.terrain);
+if(scene.parts.view.objects)targets.add(scene.parts.view.objects,{ground:false});
 
 let last=null;
 globalThis.timberShot={
   engine,scene,
-  aovs:()=>({device:engine.gpu,textures:Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow'].map(n=>[n,targets.texture(n)]))}),
+  aovs:()=>({device:engine.gpu,textures:Object.fromEntries(['geometry','depth','penumbra','subject','lit','shadow','plants'].map(n=>[n,targets.texture(n)]))}),
   async apply(state,{time}){if(last!==null&&time>last)scene.advanceTime(time-last);last=time;},
   settings(values){scene.applySettings(values);},
 };

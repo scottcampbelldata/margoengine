@@ -185,6 +185,11 @@ export class FarForest implements Disposable {
     this.#running = false;
   }
 
+  /** The stand-ins' scatters, one per kind (a capture effect draws them: `BiomeObjects.setCapture`). */
+  get scatters(): readonly Scatter[] {
+    return this.#parts.flatMap((p) => (p.scatter ? [p.scatter] : []));
+  }
+
   /** Stand-ins drawn at most (the sum of the kinds' counts). */
   get count(): number {
     return this.#parts.reduce((n, p) => n + p.scatter!.count, 0);

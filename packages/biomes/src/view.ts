@@ -14,6 +14,8 @@ import type { WetGround, WetGroundLook } from '@margoengine/terrain/wet-ground';
 import type { Water, WaterLight, WaterOptions } from '@margoengine/water';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { captureScene } from '../../shared/scene-scope.js';
+import { drawCapture, shareCapture } from '../../shared/capture.js';
+import type { PassContext } from '@margoengine/core/extension';
 import { type BiomeDefinition, type Dimension, fieldDimension } from './define.js';
 // The toolkit comes through the package name, so the view shares the root's copy (a view always has a world).
 import { clampInt, divFloor, hash3, imod, ONE, wendland } from '@margoengine/biomes/toolkit';
@@ -838,6 +840,18 @@ let views = 0;
 /** Seconds wet plants take to dry to 1/e when `wetness` gives none: WetGround's default `dryTime`, so both dry together. */
 const WET_DRY_TIME = 10800;
 
+type ViewPassContext = Extract<PassContext, { backend: 'webgpu' }>;
+/** What `BiomeView.setCapture` takes: `@margoengine/post` SSR's capture hook, as terrain and scatter declare it. */
+export interface ViewCapture {
+  declarations(code: string): string;
+  readonly targets: readonly GPUColorTargetState[];
+  begin(): GPURenderPassEncoder;
+}
+type CaptureModel = {
+  setCapture(hook: ViewCapture): () => void;
+  draw(c: ViewPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
+};
+
 /**
  * A biome world drawn as terrain: heights and ground materials from the world, streamed around the camera at full
  * detail and redrawn where the world changes (paint, edits). WebGPU only (the terrain package draws it).
@@ -942,6 +956,10 @@ export class BiomeView implements Disposable {
   #disposed = false;
   #horizon?: Terrain;
   #makeHorizon?: () => Terrain | undefined;
+  /** `setCapture`'s hook, each part's share of it (terrain, horizon, objects) and the dispose listeners. */
+  #capture?: ViewCapture;
+  readonly #captured = new Map<CaptureModel, () => void>();
+  readonly #disposers = new Set<() => void>();
   /** The far ground past the world (option `horizon`), made once the world's ground weights are in, or undefined. */
   get horizon(): Terrain | undefined {
     return this.#horizon;
@@ -2118,6 +2136,62 @@ export class BiomeView implements Disposable {
     return this.#wetGround;
   }
 
+  /**
+   * Lets a capture hook (`@margoengine/post` SSR, LightBounce: `ssr.add(view)`) draw the whole view with its own
+   * materials: the terrain, the horizon ground and every scattered object (`BiomeObjects.setCapture`), in one call.
+   * Water is not part of it (add it on its own). For the look masks add `view.terrain` and `view.objects` with `{ground:
+   * false}` to SceneTargets instead, so plants are not counted as ground. Returns a remover.
+   * @throws TypeError for a bad hook or a disposed view.
+   */
+  setCapture(hook: ViewCapture): () => void {
+    if (
+      this.#disposed ||
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
+      throw new TypeError(
+        'Invalid biome view capture hook; pass an object with declarations() and begin() functions and a targets array to a live BiomeView.',
+      );
+    this.#releaseCapture();
+    this.#capture = hook;
+    return () => {
+      if (this.#capture !== hook) return;
+      this.#releaseCapture();
+      this.#capture = undefined;
+    };
+  }
+
+  /** Calls `callback` once when the view is disposed; returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('BiomeView onDispose needs a function');
+    this.#disposers.add(callback);
+    return () => this.#disposers.delete(callback);
+  }
+
+  /**
+   * `mode` 'capture': draws the terrain, the horizon and the objects into the capture hook's pass (`setCapture`);
+   * `color` and `depth` are unused. Does nothing without a hook or after disposal.
+   */
+  draw(c: ViewPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
+    const hook = this.#capture;
+    if (mode !== 'capture' || !hook || this.#disposed) return;
+    void color;
+    void depth;
+    const parts: CaptureModel[] = [this.terrain, ...(this.#horizon ? [this.#horizon] : [])];
+    if (this.#objects) parts.push(this.#objects);
+    for (const part of parts) {
+      if (!this.#captured.has(part)) this.#captured.set(part, shareCapture(part, hook));
+      drawCapture(part, hook, c);
+    }
+  }
+
+  #releaseCapture(): void {
+    for (const restore of this.#captured.values()) restore();
+    this.#captured.clear();
+  }
+
   /** The stored objects and detail the view draws (`count`, `gpuBytes`, `dropped`), or undefined with `objects: false`. */
   get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined {
     return this.#objects;
@@ -2139,6 +2213,8 @@ export class BiomeView implements Disposable {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#releaseCapture();
+    this.#capture = undefined;
     this.#lifetime.abort(fault('disposed', 'BiomeView disposed', 'biomes'));
     this.#made.clear();
     this.#off();
@@ -2164,6 +2240,9 @@ export class BiomeView implements Disposable {
     this.#textures = undefined;
     this.#firstDone?.();
     for (const done of this.#idle.splice(0)) done();
+    const listeners = [...this.#disposers];
+    this.#disposers.clear();
+    for (const listener of listeners) listener();
   }
 
   [Symbol.dispose](): void {
