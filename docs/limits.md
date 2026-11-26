@@ -9294,6 +9294,20 @@ attachments when the frame is multisampled) and one output-size colour texture. 
 (packages/post/test/upscale-math.js) within 2 of 255 codes on WebGPU and the WebGL2 layer (8-bit rounding of the
 intermediate). GPU cost not measured (build phase).
 
+### Image filter graph (`@margoengine/post/filter-graph`, 2026-11-26)
+
+WebGPU and the WebGL2 layer. At most 256 blocks a graph, aggregates 8 deep, 8 images and 32 params a block; `scale`
+above 0 up to 4; `size` 1 to 16384 and every pass within the device's maxTextureDimension2D; a pass reads at most
+`maxSampledTexturesPerShaderStage` textures; one fused `'texel'` read along any chain of a pass (a second starts a
+new pass, which keeps shader size linear); a `'texel'` input is meant for one read a pixel, since a fused producer
+runs again at each call. Images are uploaded as `rgba8unorm`, straight alpha, display (sRGB) values; intermediates are `rgba16float`. Merged and unmerged output differ by at most 1 of 255 per channel in 8-bit
+output. By design: a block read with filtering (`'sample'`) is not substituted into its reader, so it costs a pass,
+because evaluating it at the reader's coordinates would not equal filtering its texture; a block with two readers is
+drawn once into a texture rather than computed twice; blocks are written in WGSL; there is no visual editor. A graph's
+wiring, scales and constants are fixed when the runtime is made (values and `enabled` are live). `read` takes `rgba8unorm` or `bgra8unorm` output. After a device loss, borrowed
+textures and closed `VideoFrame`s are gone: set them again. Video and camera input need a page
+(`HTMLVideoElement`); in a worker pass `VideoFrame`s to `setImage`. GPU cost not measured.
+
 ## Playground
 
 The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2026-11-26:

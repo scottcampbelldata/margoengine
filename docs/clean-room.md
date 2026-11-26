@@ -14940,3 +14940,27 @@ Euler–Bernoulli uniform-load tip deflection times `(1 − 1/n)²` for `n` equa
 links with a clamped first segment and half endpoint mass. The test compares four
 independent subdivisions against this discrete result with a bound for geometric
 nonlinearity and shear. Its tip converges to the continuum solution.
+
+## Image filter graph (2026-11-26)
+
+`@margoengine/post/filter-graph`. The graph format, the access kinds, the fusion rule, the name prefixing, the
+rounding of fused results, the runtime and every block's WGSL are Margo's, written from the research and web standards
+below.
+
+Research compared:
+- Bo Qiao, Oliver Reiche, Frank Hannig and Jurgen Teich, *From Loop Fusion to Kernel Fusion: A Domain-Specific
+  Approach to Locality Optimization*, CGO 2019, https://doi.org/10.1109/CGO.2019.8661176 (point and local operators;
+  fusing a producer into a point reader repeats no work, which is the rule used; local-to-local pairs stay unfused).
+- Jonathan Ragan-Kelley, Connelly Barnes, Andrew Adams, Sylvain Paris, Fredo Durand and Saman Amarasinghe, *Halide: A
+  Language and Compiler for Optimizing Parallelism, Locality, and Recomputation in Image Processing Pipelines*, PLDI
+  2013, https://people.csail.mit.edu/jrk/halide-pldi13.pdf (inlined against stored stages; here a stage with two
+  readers or many taps is stored, never recomputed).
+- Michael McCool, Stefanus Du Toit, Tiberiu Popa, Bryan Chan and Kevin Moule, *Shader Algebra*, ACM Transactions on
+  Graphics 23(3), 2004, https://doi.org/10.1145/1015706.1015801 (connecting shaders as function composition).
+- Mark Jarzynski and Marc Olano, *Hash Functions for GPU Rendering*, JCGT 9(3), 2020,
+  https://jcgt.org/published/0009/03/02/ (the `noise` block uses the first component of pcg3d).
+- W3C, *Compositing and Blending Level 1*, https://www.w3.org/TR/compositing-1/ (`composite` blend modes and source
+  over); Rec. ITU-R BT.709 (luma and colour difference in the grey, key and mask blocks); Rodrigues' rotation formula
+  (1840, `hue`); Irwin Sobel and Gary Feldman, *A 3x3 Isotropic Gradient Operator for Image Processing*, 1968
+  (`edges`).
+- W3C, *WebGPU Shading Language*, https://www.w3.org/TR/WGSL/ (`quantizeToF16`, explicit-level texture reads).

@@ -1977,6 +1977,136 @@ the scene's depth. Values above 1 (an HDR canvas) are upscaled but not sharpened
 [docs/limits.md](../../docs/limits.md#spatial-upscaler-margoenginepostupscale-2026-11-26); sources in
 [docs/clean-room.md](../../docs/clean-room.md#spatial-upscaler-2026-11-26).
 
+## Image filter graphs with no scene: `ImageFilterGraph`
+
+`@margoengine/post/filter-graph` (13,446 B min+gzip, its own entry; nothing else of post comes with it) runs a
+graph of image filters on images, video or the camera. It needs no engine or scene: it makes its own WebGPU device (or
+takes yours, such as `engine.gpu`), and runs on the WebGL2 compatibility layer once `install()` from
+`@margoengine/webgl2-compat` has run. A graph is plain JSON data. Blocks that can share a shader are fused into one
+pass, and passes that do not overlap share intermediate textures.
+
+```ts
+import {ImageFilterGraph, parseFilterBlock, parseFilterGraph, type FilterGraph} from 'margoengine/post/filter-graph';
+const canvas = document.querySelector('canvas')!;
+// A custom block is one annotated WGSL file. 'pixel' images arrive as colours, then params, in header order.
+const split = parseFilterBlock(`// filter-block {"type":"split","images":{"input":"pixel"},"params":{"at":{"type":"float","default":0.5}}}
+fn apply(uv: vec2f, color: vec4f, at: f32) -> vec4f {
+  return select(color, color.bgra, uv.x > at);
+}
+`);
+const graph: FilterGraph = {
+  inputs: {photo: {type: 'image'}, amount: {type: 'float', default: 1, min: 0, max: 1}},
+  nodes: [
+    {id: 'grey', type: 'black-and-white', images: {input: 'photo'}, params: {amount: '$amount'}},
+    {id: 'blocks', type: 'pixelate', images: {input: 'grey'}, params: {size: 6}},
+    {id: 'swap', type: 'split', images: {input: 'blocks'}},
+    {id: 'frame', type: 'vignette', images: {input: 'swap'}},
+  ],
+  output: 'frame',
+  blocks: [split], // a saved graph carries its own block types
+};
+const filter = await ImageFilterGraph.create(graph, {canvas});
+console.log(filter.passes.length); // 1: all four blocks run in one pass
+
+// Any image: here one painted in code. A canvas or video is read again every frame.
+const picture = new OffscreenCanvas(320, 240);
+const paint = picture.getContext('2d')!;
+paint.fillStyle = '#d07030';
+paint.fillRect(0, 0, 320, 240);
+paint.fillStyle = '#3070d0';
+paint.fillRect(80, 60, 160, 120);
+filter.setImage('photo', picture);
+// Or: await filter.load('photo', 'photo.jpg'), a video URL, a Blob, a MediaStream or {camera: true}.
+filter.render();
+
+filter.set('amount', 0.25); // live values change with no rebuild
+filter.set('blocks.size', 12);
+filter.set('swap.enabled', false); // a disabled block passes its first image through
+filter.render(); // or filter.start() to draw every animation frame, and filter.stop() to end it
+
+const saved = JSON.stringify(filter.save()); // the graph with the values set above
+const again = await ImageFilterGraph.create(parseFilterGraph(saved), {size: [320, 240]});
+again.setImage('photo', picture);
+again.render();
+const {data} = await again.read(); // straight-alpha RGBA8; again.output is the texture
+console.log(data.length);
+again.dispose();
+filter.dispose(); // frees every GPU object and closes a camera it opened
+```
+
+### Graphs
+
+`{inputs, nodes, output, blocks?, version?}`. An input is `{type: 'image'}` or a value
+(`{type, default, min?, max?}` of type `float`, `int`, `bool`, `vec2`, `vec3`, `vec4` or `color`). A node is
+`{id, type, images?, params?, consts?, scale?, enabled?, optimize?}`: `images` names a node or an image input for each
+image of the block; a param is a value, `'$input'` (one input may drive many params) or `'$time'` (`render({time})`,
+or the seconds since `start()`); `consts` are fixed when the runtime is made; `scale` (above 0 up to 4, default 1)
+sizes the block against the output; `enabled` (default true) may be `'$input'`; `optimize` (default true) false keeps
+it in its own pass. `set` and `get` take an input's name, or `node.param` and `node.enabled` of a node holding its own
+value; `filter.parameters` lists them. Unused blocks cost nothing. A graph has at most 256 blocks.
+
+### Custom and aggregate blocks
+
+A block is data, `{type, images?, params?, consts?, scale?, optimize?, wgsl}`, carried in the graph's `blocks` or
+passed in the options (a graph's own type wins, and either replaces a built-in of that name). `wgsl` declares
+`fn apply(uv, <a vec4f per 'pixel' image>, <a value per param>) -> vec4f`, with any helpers, `const`s and `struct`s;
+names are made unique per node, so a block may be used many times. A `'pixel'` image arrives as the colour at this
+pixel; `'texel'` and `'sample'` images are read with `sample_<name>(uv)` and measured with `size_<name>()`:
+`'texel'` reads one unfiltered texel a pixel, `'sample'` reads filtered, as many times as the block likes. `filterSize()` is the pass size and `filterOutputSize()` the graph's. Colours are
+straight alpha, and values outside 0..1 survive between blocks. A graph is reused as a block with
+`{type: 'my-look', graph}`: its image and value inputs become the block's images and params (nesting at most 8 deep).
+`parseFilterBlock` reads the one-file form shown above.
+
+### The optimizer
+
+A block is fused into the pass of the block reading it when that is its only reader, both have the same `scale`, the
+read is `'pixel'` or `'texel'` (one fused `'texel'` read along any chain of a pass), neither says
+`optimize: false`, and the pass still reads no more textures than the
+device's `maxSampledTexturesPerShaderStage`. A filtered (`'sample'`) read keeps its producer in a texture, and so
+does a block read twice. Fused results are rounded as the texture they stand in for would round them: merged and
+unmerged (`optimize: false`) pictures differ by at most 1 of 255 in 8-bit output. `filter.passes` lists the blocks of
+every pass, and `planFilterGraph(graph)` gives the same plan, with each pass's WGSL, without a GPU.
+
+### Built-in blocks
+
+| Blocks | Reads | Params (defaults) |
+| --- | --- | --- |
+| `black-and-white`, `saturation`, `invert`, `sepia` | pixel | `amount` (1) |
+| `exposure`, `hue`, `opacity`, `premultiply-alpha` | pixel | `stops` (0); `angle` radians (0); `opacity` (1); none |
+| `brightness-contrast`, `levels`, `color-matrix` | pixel | `brightness` (0), `contrast` (1); `inBlack` (0), `inWhite` (1), `gamma` (1), `outBlack` (0), `outWhite` (1); rows `red`, `green`, `blue`, `alpha` (identity) and `offset` (0) |
+| `tint`, `vignette`, `noise` | pixel | `color` (`#ffb070`), `amount` (0.5); `amount` (0.5), `radius` (0.75), `softness` (0.45), `color` (black); `amount` (0.08), `seed` (0; bind `'$time'`) |
+| `posterize`, `threshold`, `green-screen` | pixel | `steps` (6); `level` (0.5), `softness` (0); `key` (`#00ff00`), `similarity` (0.4), `smoothness` (0.1), `spill` (0.1) |
+| `mask` (`input`, `mask`) | pixel | `invert` (false); const `CHANNEL` luminance, alpha or red |
+| `composite` (`background`, `foreground`) | pixel | `opacity` (1); const `MODE` over, add, multiply, screen, overlay, difference, darken or lighten |
+| `wipe` (`start`, `end`) | pixel | `progress` (0.5), `angle` (0), `softness` (0.02) |
+| `solid-color`, `gradient` (no image; give `size` without a canvas) | none | `color` (black); `start` (black), `end` (white), `angle` (0) |
+| `pixelate` | texel | `size` in output pixels (8) |
+| `kaleidoscope`, `mirror`, `tile` | sample | `segments` (6), `angle` (0), `center` (middle); `position` (0.5), const `AXIS` x or y; `count` ([2, 2]) |
+| `transform`, `ripple`, `sprite-sheet` | sample | `offset`, `scale`, `rotation` (identity; transparent outside); `amplitude` (0.01), `frequency` (30), `phase` in cycles (0); `columns` (4), `rows` (4), `frame` (0) |
+| `directional-blur`, `blur` | sample | `radius` in output pixels (8); `directional-blur` also `angle` (0) and const `TAPS` low, medium (default) or high; `blur` is a two-direction aggregate at half size |
+| `sharpen`, `edges`, `chromatic-aberration` | sample | `amount` (0.5; 1; 3 pixels) |
+
+### Runtime
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `device` | its own | A device to run on. An owned one restores itself after a loss; for yours call `restore(newDevice)` |
+| `canvas` | none | Shown here, with premultiplied alpha; without it the picture is `output` |
+| `target` | none | Your texture to draw into (`RENDER_ATTACHMENT`; `read` also needs `COPY_SRC`) |
+| `size` | follows | `[width, height]`; else the canvas's or the first image's, each frame (`resize()`). A `target` is drawn at its own size |
+| `format` | `'rgba8unorm'` | Format of the runtime's own output texture |
+| `optimize` | `true` | False draws one pass a block |
+| `blocks` | none | Custom block types |
+| `signal` | none | Cancels creation (`load`, `read` and `restore` take one too) |
+| `onError` | `reportError` | Receives a failed automatic restore |
+
+`setImage(name, source)` takes an `ImageBitmap`, `ImageData`, `<img>`, `<video>`, canvas, `VideoFrame`, filterable
+`GPUTexture` or `null`; `load(name, source)` opens URLs, Blobs, streams and the camera and closes what it opened.
+`render()` returns false while a needed image is missing or not ready. A steady frame makes no buffer, texture, bind
+group or pipeline. Errors are coded and link to [the error page](https://margoengine.com/errors#filter-graph).
+Limits are in [docs/limits.md](../../docs/limits.md#image-filter-graph-margoenginepostfilter-graph-2026-11-26); sources
+in [docs/clean-room.md](../../docs/clean-room.md#image-filter-graph-2026-11-26). A visual editor is not included.
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for

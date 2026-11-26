@@ -10320,6 +10320,26 @@ softens into red-green mixes; an untagged box's seam, the sky, the tagged box's 
 front of far ground keep every pixel; untagging restores the frame) and `mesh-blend.test.js` (falloff, depth-slope
 rejection from either side, options and tags). Missing: GPU timings, and glTF and terrain tagging.
 
+## Image filter graph (section 5 evidence, 2026-11-26)
+
+`@margoengine/post/filter-graph` is an optional post entry that runs on a bare `GPUDevice`; core and stage unchanged.
+A graph compiles (`filter-graph-plan.ts`, no GPU calls) into full-screen passes. Fusion rule: a block joins its only
+reader's pass when the read is at the reader's pixel or one unfiltered texel and both have one size; each block becomes
+a WGSL function of `uv`, its names prefixed per node. Compilers inline these calls, so a producer is called from one
+place (its colour kept in a `let` that the disabled branch reads too), and a chain fuses at most one texel read, whose
+disabled branch needs a second call: calling twice doubled the code per fused block, and the first build, with an
+11-block chain, did not compile within 150 s on the WebGL2 layer's Direct3D 11 route. Fused results go through `quantizeToF16` (clamped to the binary16
+range), the rounding of the `rgba16float` intermediate they stand in for: without it an 11-block chain ending in a
+chroma key differed by 5 codes of 255 from one pass a block; with it, none on the checked adapter. Pass uniforms are
+one `array<vec4f>`; layouts are explicit; every fragment finds `uv` from `position.xy`, so merged and unmerged blocks
+run at the same coordinates. All texture reads are `textureSampleLevel` or `textureLoad`, valid in any control flow,
+so the WebGL2 layer runs the same WGSL. Evidence: `packages/post/test/filter-graph-browser.mjs` on WebGPU and the
+WebGL2 layer (every built-in block draws; merged against unmerged within 1 code on six graphs: pointwise 11 passes to
+1, texel 4 to 1, tree 6 to 1, steps 4 to 1, sampled 4 to 3, scaled and disabled 6 to 5; live values with no new
+pipeline; canvas, texture, URL, stream and camera inputs; restore) and `filter-graph.test.js` (merge rules,
+validation, no GPU object made in a steady frame, owners freed, loss). Missing: GPU timings, a run on a second GPU
+vendor, and a physical camera.
+
 ## Contact sound evidence (SOUND-04)
 
 The optional Physics modal kernel converts per-track mechanical excitation to audio-rate sample ranges.
