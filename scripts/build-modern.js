@@ -351,7 +351,11 @@ async function sizeRecords() {
   // 2026-11-15, core's colour vertex declares its clip position @invariant (WGSL 12.10), so the passes that redraw core
   // meshes with depthCompare 'equal' (TAA object velocity, SSAO, SSGI and SSR replays, the selection mask) match its depth
   // bit for bit: core 22,220 -> 22,226 B (+6 B). Strict ceiling one byte above it.
-  const CORE_ONLY_CEILING = 22_227;
+  // 2026-11-26, core bug fix KB-CLEAR-CAPTURE1 under the same rulings (a core bug fix passes the cap by what it
+  // measures): a background clears a capture's linear target (a post effect's float capture, an -srgb one) with the
+  // colour decoded from sRGB, sharing one decode with core's material colours: core 22,225 -> 22,262 B (+37 B). Strict
+  // ceiling one byte above it.
+  const CORE_ONLY_CEILING = 22_263;
   assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
   assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
   const { modules, ...baseSize } = await measureCoreStage();

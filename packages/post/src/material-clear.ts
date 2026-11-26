@@ -1,5 +1,5 @@
 import type { PassContext } from '@margoengine/core/extension';
-import { clearColorValue, clearDraw, releaseClears } from '../../shared/clear-color.js';
+import { captureClearColor, clearDraw, releaseClears } from '../../shared/clear-color.js';
 import { retire } from '../../shared/frame-resources.js';
 import { applyView, partialRect, viewRect } from '../../shared/view-rect.js';
 
@@ -55,7 +55,8 @@ export class MaterialClear {
         values: this.values,
         depthFormat: clearDepth ? c.descriptor.depthStencil!.format : undefined,
         writeDepth: clearDepth,
-        tint: ownedDepth ? clearColorValue(c.view?.clear?.color) : zero,
+        // A material target is a capture's: the colour as core's own attachment clear of a whole view writes it.
+        tint: ownedDepth ? captureClearColor(c.view?.clear?.color, c.format) : zero,
       });
     } finally {
       pass.end();

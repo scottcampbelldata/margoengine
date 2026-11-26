@@ -6,7 +6,6 @@
 // In Margo PostStack takes the effects in order. It captures the scene itself, follows the canvas size, and the
 // engine's ordinary frame renders it.
 import { Engine } from '@margoengine/core';
-import { ColorBackground } from '@margoengine/environment';
 import { sphereGeometry } from '@margoengine/geometry';
 import { createMesh, PbrMaterial } from '@margoengine/materials';
 import { Bloom } from '@margoengine/post/bloom';
@@ -17,8 +16,8 @@ import type { Example } from './example.ts';
 
 const postProcessing: Example = async (canvas, say) => {
   const engine = await Engine.create(canvas, { camera: { position: [0, 1.2, 5], target: [0, 0, 0], fov: 45 } });
-  // With a post chain the scene is captured in linear light, so the backdrop comes from ColorBackground.
-  ColorBackground.attach(engine, { color: '#18181b' });
+  // Under the chain the background is light in the scene, tone-mapped with it.
+  engine.scene.background = '#18181b';
   engine.lighting.direction.set([-2, 4, 3, 1.5]);
 
   const sphere = sphereGeometry(0.45, 48, 24);
