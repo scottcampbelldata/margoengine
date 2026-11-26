@@ -3207,6 +3207,10 @@
       "types": "./dist/physics/entry.d.ts",
       "import": "./dist/physics/entry.js"
     },
+    "./physics/flip": {
+      "types": "./dist/physics/flip.d.ts",
+      "import": "./dist/physics/flip.js"
+    },
     "./physics/sea": {
       "types": "./dist/physics/sea.d.ts",
       "import": "./dist/physics/sea.js"

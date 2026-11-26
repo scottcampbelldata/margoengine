@@ -88,4 +88,5 @@ export {
   rateLevelOf,
   type RigidSolverParams,
 } from './solvers/rigid.js';
+export { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from './deck.js';
 export { SoftSolver, type SoftSolverParams } from './solvers/soft.js';

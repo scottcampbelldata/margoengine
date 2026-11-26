@@ -12765,6 +12765,30 @@ by mass, independently limited lateral acceleration, and the exact drag-only spe
   weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.
 
 
+### Grid-particle liquids (`FlipSolver`, `DeckWaterSolver`, `@margoengine/physics/flip`, 2026-11-26, FLUID-03)
+
+Written from papers and notes read as text (no code, no companion repositories):
+
+- C. Jiang, C. Schroeder, A. Selle, J. Teran and A. Stomakhin, "The affine particle-in-cell method", ACM Trans. Graph.
+  34(4), 51, 2015, and the J. Comput. Phys. version, arXiv 1603.06188: the MAC-grid transfers (a vector c_a a face axis,
+  trilinear weights, the gradient of the weight in place of D_p^-1) and their conservation of linear and angular
+  momentum.
+- Y. Zhu and R. Bridson, "Animating sand as a fluid", ACM Trans. Graph. 24(3), 2005: eight particles a cell, the
+  surface from the particles (k(s) = max(0, (1 - s^2)^3), R twice the spacing), velocity carried into the air.
+- R. Bridson and M. Muller-Fischer, "Fluid simulation", SIGGRAPH 2007 course notes, and R. Bridson, Fluid Simulation for
+  Computer Graphics, 2nd ed., 2015: the MAC grid, the pressure system, MIC(0) with tau = 0.97 and its sigma = 0.25 guard.
+- F. Gibou, R. Fedkiw, L.-T. Cheng and M. Kang, J. Comput. Phys. 176, 205-227, 2002 (as the course notes give it): the
+  ghost-fluid free surface, theta = phi_i / (phi_i - phi_j), held at 0.01 or more.
+- H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10: the rotating frame's
+  d'Alembert, Euler, centrifugal and Coriolis accelerations, for the box riding a hull.
+- M. Roberts, "The unreasonable effectiveness of quasirandom sequences", 2018 (the R2 sequence of the plastic number):
+  the inflow's particle places along a bulwark.
+- J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns on a rigid horizontal plane",
+  Phil. Trans. R. Soc. A 244, 312-324, 1952, table 2 (the check).
+
+No constant is calibrated. The surface's particle radius (half a cell) and the extrapolation depth (two faces) are
+Zhu and Bridson's choices.
+
 ### Water entry and exit (`EntrySolver`, `@margoengine/physics/entry`, 2026-11-26, SEA-14)
 
 Written from papers read as text (no code, no companion repositories):

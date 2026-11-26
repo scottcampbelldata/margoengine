@@ -88,6 +88,10 @@
       "types": "./dist/entry/index.d.ts",
       "import": "./dist/entry.js"
     },
+    "./flip": {
+      "types": "./dist/flip/index.d.ts",
+      "import": "./dist/flip.js"
+    },
     "./sea": {
       "types": "./dist/sea/index.d.ts",
       "import": "./dist/sea.js"

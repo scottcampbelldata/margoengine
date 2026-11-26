@@ -2276,6 +2276,41 @@ world.advance(96); // a tenth of a second
 console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in with a cavity, which pinches
 ```
 
+### Water that splashes and pours (`FlipSolver`, `DeckWaterSolver`, `@margoengine/physics/flip`)
+
+`FlipSolver` is FLUID-03: water in a box of cells that collapses, splashes, overturns and pours, as APIC particles
+(Jiang et al. 2015) on a grid that keeps it incompressible with a free surface (Gibou et al.'s ghost fluid). Give it
+the box (`cells`, `cellSize`, `origin`), where the water starts (`initial(x, y, z)`, eight particles a cell), solid
+boxes it flows round (`solids`) and the sides open to the air (`open`), where water leaves for the sea
+(`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell.
+`positions()` gives the particles for drawing, `velocityAt` and `pressureAt` read the grid. Martin and Moyce's dam
+break is its check: the front within 2 percent of their measurements.
+
+`DeckWaterSolver` is green water on a hull's deck: the same liquid in a box riding a rigid body (`row`, `offset` in
+the body's frame), feeling the frame's acceleration as the hull heaves and rolls. It takes the sea where it comes over
+the bulwarks from the `deckInflow` port, gives water over an open side back to the sea, and holds the hull with the
+deck's load through `bodyForces`. It claims its hull in `deckClaims`, so the hull's exceedance solver leaves its own
+deck load out.
+
+```ts
+import {FlipSolver} from 'margoengine/physics/flip';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// A column of water 0.3 m wide and 0.6 m high let go in a tank 2 m long.
+const water = new FlipSolver();
+const world = new PhysicsWorld({rate: {num: 120, den: 1}}).add(water, {
+  cells: [80, 32, 1],
+  cellSize: 0.025,
+  initial: (x, y) => x < 0.3 && y < 0.6,
+  rate: 1,
+});
+world.advance(60); // half a second
+let front = 0;
+const p = water.positions();
+for (let i = 0; i < p.length; i += 3) front = Math.max(front, p[i]);
+console.log(front > 1); // true: the surge has run more than a metre
+```
+
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
 
 `TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.
