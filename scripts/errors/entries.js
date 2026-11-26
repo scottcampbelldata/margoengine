@@ -213,6 +213,22 @@ export const entries = [
     fix: 'Correct the option the message names, create the engine on WebGPU or the WebGL2 compatibility layer, attach a new view after dispose(), and split a mesh that is too large or leave it out of meshes.',
   },
   {
+    id: 'scene-registry',
+    title: '@margoengine/scene/assets: asset references, preload groups and templates',
+    kind: 'family',
+    messages: [
+      'asset "key" is not defined; nothing to release; see https://margoengine.com/errors#scene-registry',
+      'asset "key" was released more often than it was acquired; pair each acquire() with one release(); see https://margoengine.com/errors#scene-registry',
+      'asset "key" was removed while it loaded; do not remove() a key in use; see https://margoengine.com/errors#scene-registry',
+      'preload group "name" is already defined, or is not defined; defineGroup() it first; see https://margoengine.com/errors#scene-registry',
+      'template "name" is already defined, or is not defined; defineTemplate() it first; see https://margoengine.com/errors#scene-registry',
+      'template cycle: a -> b -> a; a template cannot instantiate itself, directly or through another; see https://margoengine.com/errors#scene-registry',
+    ],
+    cause:
+      'release() was called for a key that is not defined or more often than acquire() took references (a count must never go below 0), a key was removed while acquire() was loading it, a group or template name was reused or unknown, or a template reached itself through context.instantiate while it was being built.',
+    fix: 'Call release() exactly once for every acquire() (a preload group holds its own references until releaseGroup(), a template until releaseTemplate()), define a group or template before using it and under a name not used yet, and break the loop: build the shared part into one template and let the others instantiate it.',
+  },
+  {
     id: 'scene-emitter',
     title: '@margoengine/scene/emitter: typed events with async iteration',
     kind: 'family',
