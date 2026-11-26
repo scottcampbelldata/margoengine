@@ -364,6 +364,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   Reproduce with `node --test --test-name-pattern='Troll oil' packages/physics/tests/coupling/tracers.test.js`.
   [MMS 2005-020, Tables 5.1, 5.3 and 5.5](https://www.boem.gov/sites/default/files/boem-newsroom/Library/Publications/2005/2005_020.pdf).
 
+- Closed-pool oil dissolution (SEA-15, 2026-11-26). Separate oil and water inventories predict 67.60 µg of
+  dissolved naphthalene at 24 h against 75.70 µg measured in a Kuwait oil sample. The 10.7% residual uses
+  independent solubility, molecular-weight and transfer inputs. Conservation and the optional first-order
+  biodegradation sink have analytic tests. Open-water exposure and biodegradation measurements remain open.
+  Reproduce with `node --test --test-name-pattern='finite-film partition|soluble oil' packages/physics/tests/coupling/tracers.test.js`.
+  [Ali, Table 3.12](https://doi.org/10.24382/3595).
+
 - Cohesive tracer growth and breakup (SEA-15, 2026-11-26). The shear-limited closure predicts 15 sampled phases
   of three dilution trials with 6.58 µm RMS error against 6.84 µm of measured temporal scatter. The largest
   mean error is 12.22 µm. The fitted data come from separate constant-concentration runs. Snapshot restore

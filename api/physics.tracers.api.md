@@ -138,6 +138,12 @@ export interface TracerOilDispersion {
     breaking: TracerBreakerExposure | ((x: number, z: number, time: number) => TracerBreakerExposure);
 }
 
+export interface TracerOilDissolution {
+    waterVolume: number;
+    solutes: readonly TracerOilSolute[];
+    transferArea?: number;
+}
+
 export interface TracerOilEmulsification {
     maximumWaterFraction: number;
     halfTimeAt10: number;
@@ -160,6 +166,18 @@ export interface TracerOilEvaporation {
     referenceThickness?: number;
 }
 
+export interface TracerOilSolute {
+    massFraction: number;
+    oilWaterPartition: number;
+    transferVelocity: number;
+    biodegradationHalfLife?: number;
+}
+
+export interface TracerOilSoluteMass {
+    dissolved: number;
+    biodegraded: number;
+}
+
 export interface TracerOilSpill {
     mass: number;
     position: readonly [number, number];
@@ -171,6 +189,7 @@ export interface TracerOilSpill {
     parcels?: number;
     evaporation?: TracerOilEvaporation;
     emulsification?: TracerOilEmulsification;
+    dissolution?: TracerOilDissolution;
     dispersion?: TracerOilDispersion;
 }
 
@@ -219,6 +238,8 @@ export class TracerSolver implements Solver<TracerParams> {
         bed: number;
     };
     get evaporatedMass(): number;
+    get biodegradedMass(): number;
+    oilSolute(index: number, solute: number): TracerOilSoluteMass | undefined;
     oilFilm(index: number): {
         centre: readonly [number, number];
         radius: number;

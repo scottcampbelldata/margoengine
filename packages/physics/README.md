@@ -3514,6 +3514,35 @@ world.advance(600);
 console.log(slick.oilEmulsion(0)!.waterMass > 0); // true
 ```
 
+Set `dissolution` to exchange named soluble oil fractions, listed in the order you want to read them,
+with a well-mixed volume of water in m³. For each fraction, supply its original oil mass share,
+its oil-to-water equilibrium concentration ratio and its interfacial transfer velocity in m/s.
+Fractions outside the list remain in the slick. The optional `transferArea` is in m² and defaults to
+the growing Fay area. An optional `biodegradationHalfLife` removes dissolved oil on a first-order
+time scale in seconds. Its default preserves the whole soluble inventory. `oilSolute(spill, solute)`
+reports dissolved and biodegraded mass in kg. Dissolved oil counts in `budget.water`.
+`biodegradedMass` reports the total transformed oil across all releases. Use this closed-pool model
+for a fixed release with optional emulsification. Bulk evaporation and droplet dispersion use separate
+oil models with their own inputs.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const slick = new TracerSolver();
+const world = new PhysicsWorld().add(slick, {
+  oilSpills: [{
+    mass: 5, position: [0, 0], spreadingCoefficient: 0.001,
+    dissolution: {
+      waterVolume: 0.5,
+      solutes: [{ massFraction: 0.05, oilWaterPartition: 100, transferVelocity: 1e-5, biodegradationHalfLife: 3600 }],
+    },
+  }],
+});
+world.advance(600);
+console.log(slick.oilSolute(0, 0)!.dissolved > 0); // true
+```
+
 Set `verticalDiffusivityProfile` to use different mixing rates at different depths. Supply at least two depths in
 ascending order, in metres below the local free surface, with diffusivity in m²/s. The solver interpolates between
 knots, extends the endpoints as constants and includes the drift associated with the diffusivity gradient. Omitting
