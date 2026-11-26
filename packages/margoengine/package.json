@@ -5715,6 +5715,10 @@
       "types": "./dist/vfx/shapes.d.ts",
       "import": "./dist/vfx/shapes.js"
     },
+    "./vfx/node-system": {
+      "types": "./dist/vfx/node-system.d.ts",
+      "import": "./dist/vfx/node-system.js"
+    },
     "./vfx/schedule": {
       "types": "./dist/vfx/schedule.d.ts",
       "import": "./dist/vfx/schedule.js"
