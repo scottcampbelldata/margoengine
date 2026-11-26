@@ -156,3 +156,34 @@ test('drive() reads a source, applies every frame and stops on abort; dispose en
   assert.throws(() => driver.update(frame(neutral, 0)), { code: 'disposed' });
   assert.throws(() => new FaceDriver({ minScore: 2 }), RangeError);
 });
+
+test('a NaN or Infinity score or point leaves the previous weight and rotation', () => {
+  const model = { primitives: [{ targetNames: ['jawOpen', 'eyeBlinkLeft'], weights: [0, 0] }] };
+  const scores = (jaw, time) => ({
+    time,
+    faces: [
+      {
+        landmarks: [],
+        blendshapes: { jawOpen: jaw, eyeBlinkLeft: 0.5 },
+        transform: results.face.facialTransformationMatrixes[0].data,
+      },
+    ],
+    hands: [],
+    poses: [],
+  });
+  const driver = new FaceDriver();
+  driver.update(scores(0.4, 0));
+  driver.apply(model);
+  const state = driver.update(scores(Number.NaN, 33));
+  assert.equal(state.weights.jawOpen, 0.4);
+  driver.apply(model);
+  assert.ok(Math.abs(model.primitives[0].weights[0] - 0.4) < 1e-12);
+  assert.ok(Number.isFinite(driver.update(scores(Number.POSITIVE_INFINITY, 66)).weights.jawOpen));
+
+  const marks = new FaceDriver({ smoothing: false }).calibrate(frame(neutral, 0));
+  const good = marks.update(frame(expression, 33));
+  const broken = expression.map((p, i) => (i === 14 || i === 33 ? { x: Number.NaN, y: p.y, z: p.z } : p));
+  const held = marks.update(frame(broken, 66));
+  assert.equal(held.weights.jawOpen, good.weights.jawOpen);
+  assert.deepEqual(held.rotation, good.rotation);
+});

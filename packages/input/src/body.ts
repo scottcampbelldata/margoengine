@@ -143,6 +143,26 @@ const clampAngle = (q: Q, limit: number): Q => {
   return [q[0] * k, q[1] * k, q[2] * k, Math.cos(half)];
 };
 
+/**
+ * Each bone's depth below its root, after checking `parents` is a forest: as long as the bone list, every entry -1 or
+ * another bone's index, and every chain reaching a root within `count` steps.
+ */
+const boneDepths = (count: number, parents: readonly number[]): number[] => {
+  if (!Array.isArray(parents) || parents.length !== count)
+    throw new MargoError('state', 'BodyDriver skeleton parents must be an array as long as names' + HELP);
+  parents.forEach((p, i) => {
+    if (!Number.isInteger(p) || p < -1 || p >= count || p === i)
+      throw new MargoError('state', 'BodyDriver skeleton parents must each be -1 or another bone index' + HELP);
+  });
+  return parents.map((_, i) => {
+    let depth = 0;
+    for (let p = parents[i]; p >= 0; p = parents[p])
+      if (++depth >= count)
+        throw new MargoError('state', 'BodyDriver skeleton parents form a cycle; every chain must reach a root' + HELP);
+    return depth;
+  });
+};
+
 /** {@link BodyDriver} options; every one is optional. */
 export interface BodyDriverOptions {
   /**
@@ -229,11 +249,14 @@ export class BodyDriver implements Disposable {
     if (!(minVisibility >= 0 && minVisibility <= 1) || !(minScore >= 0 && minScore <= 1))
       throw new RangeError('Body minVisibility and minScore must be in 0..1' + HELP);
     if (!(hold >= 0)) throw new RangeError('Body hold must be seconds >= 0' + HELP);
+    for (const value of Object.values(limits))
+      if (!(value >= 0 && value <= Math.PI)) throw new RangeError('Body limits must be radians in 0..pi' + HELP);
     if (!(aspect > 0) || !Number.isFinite(aspect))
       throw new RangeError('Body aspect must be a finite width / height above 0' + HELP);
     if (!skeleton || !Array.isArray(skeleton.names) || typeof skeleton.setPose !== 'function')
       throw new TypeError('BodyDriver needs a skeleton with names, parents, getPose and setPose' + HELP);
     if (smoothing) new OneEuroFilter(smoothing);
+    const depths = boneDepths(skeleton.names.length, skeleton.parents);
     this.options = { parts, minVisibility, minScore, hold, smoothing, mirror, aspect };
     const lower = new Map(skeleton.names.map((n, i) => [n.toLowerCase(), i]));
     const find = (name: string | undefined): number => {
@@ -244,8 +267,9 @@ export class BodyDriver implements Disposable {
     };
     // Rest pose, model space.
     const restPos: V[] = [];
-    const world = (i: number): void => {
-      if (this.restWorld[i]) return;
+    // Parents before children (validated acyclic), so each bone reads its parent's rest transform.
+    const order = skeleton.names.map((_, i) => i).sort((a, b) => depths[a] - depths[b]);
+    for (const i of order) {
       const p = skeleton.getPose(i),
         parent = skeleton.parents[i],
         t: V = [p.translation[0], p.translation[1], p.translation[2]],
@@ -253,16 +277,14 @@ export class BodyDriver implements Disposable {
       if (parent < 0) {
         this.restWorld[i] = r;
         restPos[i] = t;
-        return;
+        continue;
       }
-      world(parent);
       const pr = this.restWorld[parent],
         pp = restPos[parent],
         o = rotate(pr, t);
       this.restWorld[i] = mul(pr, r);
       restPos[i] = [pp[0] + o[0], pp[1] + o[1], pp[2] + o[2]];
-    };
-    skeleton.names.forEach((_, i) => world(i));
+    }
     const add = (target: BoneTarget, part: BodyPart, hand?: 'left' | 'right') => {
       const index = find(target.bone);
       if (index < 0) return;
@@ -299,8 +321,7 @@ export class BodyDriver implements Disposable {
     if (!this.bound.length)
       throw new MargoError('state', 'No humanoid bone of the targets is in the skeleton; pass a bones map' + HELP);
     // Parents first, so each bone reads its parent's new rotation.
-    const depth = (i: number): number => (skeleton.parents[i] < 0 ? 0 : 1 + depth(skeleton.parents[i]));
-    this.bound.sort((a, b) => depth(a.index) - depth(b.index));
+    this.bound.sort((a, b) => depths[a.index] - depths[b.index]);
   }
   /** Bone names the driver writes, in update order. */
   get bones(): string[] {
@@ -330,6 +351,7 @@ export class BodyDriver implements Disposable {
     for (const r of refs) {
       const p = points[mirror && pose ? POSE_TWIN[r] : r];
       if (!p || (p.visibility ?? 1) < minVisibility || (p.presence ?? 1) < minVisibility) return null;
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) return null;
       const k = world ? 1 : aspect;
       // Detector frame (x right, y down, z away from the camera) to model space (y up, facing the camera along +z).
       x += (mirror ? -p.x : p.x) * k;
@@ -411,7 +433,9 @@ export class BodyDriver implements Disposable {
         b.restLocal,
         clampAngle(mul(inv(b.restLocal), mul(inv(worldOf(b.parent)), mul(delta, b.restWorld))), b.limit),
       );
-      const l = Math.hypot(...local) || 1;
+      const l = Math.hypot(...local);
+      // A degenerate turn keeps the bone's last pose rather than writing a garbage rotation.
+      if (!Number.isFinite(l) || l === 0) continue;
       sk.setPose(b.index, { rotation: local.map((v) => v / l) as Q });
       world.set(b.index, mul(worldOf(b.parent), local));
       // Children cached from the old pose are stale.
@@ -426,7 +450,10 @@ export class BodyDriver implements Disposable {
     return (this.current = { tracked: driven > 0 || this.current.tracked, driven, time });
   }
   private isBelow(i: number, ancestor: number): boolean {
-    for (let p = this.skeleton.parents[i]; p >= 0; p = this.skeleton.parents[p]) if (p === ancestor) return true;
+    // Bounded by the bone count as well as by the constructor's cycle check.
+    const parents = this.skeleton.parents;
+    for (let p = parents[i], steps = 0; p >= 0 && steps < parents.length; p = parents[p], steps++)
+      if (p === ancestor) return true;
     return false;
   }
   /** Update from every frame of `source` until it ends or `signal` aborts. */

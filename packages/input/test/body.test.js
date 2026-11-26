@@ -177,3 +177,39 @@ test('smoothing lags a step, drive() reads a source and dispose ends the driver'
   assert.throws(() => driver.update(frame(66)), { code: 'disposed' });
   assert.throws(() => new BodyDriver(sk, { hold: -1 }), RangeError);
 });
+
+test('a skeleton whose parents are not a forest is refused before any walk', () => {
+  const NAMES = ['hips', 'spine', 'leftUpperArm', 'leftLowerArm'];
+  const rig = (parents, names = NAMES) => ({
+    names,
+    parents,
+    getPose: () => ({ translation: [0.2, 0, 0], rotation: [0, 0, 0, 1] }),
+    setPose() {},
+  });
+  const refused = { name: 'MargoError', code: 'state' };
+  assert.throws(() => new BodyDriver(rig([-1, 0, 3, 2])), refused); // two-bone cycle
+  assert.throws(() => new BodyDriver(rig([-1, 1, 1, 2])), refused); // self-parent
+  assert.throws(() => new BodyDriver(rig([-1, 0, 7, 2])), refused); // out of range
+  assert.throws(() => new BodyDriver(rig([-1, 0.5, 1, 2])), refused); // not an index
+  assert.throws(() => new BodyDriver(rig([-1, 0, 1])), refused); // shorter than names
+  // A valid rig still drives.
+  const sk = skeleton(),
+    driver = new BodyDriver(sk, { smoothing: false }).calibrate(frame(0, { body: pose(fixture.tpose) }));
+  driver.update(frame(33, { body: pose(fixture.tpose, fixture.bent) }));
+  near(direction(sk, 'leftUpperArm', 'leftLowerArm'), [0, -1, 0]);
+});
+
+test('a NaN or Infinity landmark leaves the bone as it was; a limit outside 0..pi is refused', () => {
+  const sk = skeleton(),
+    driver = new BodyDriver(sk).calibrate(frame(0, { body: pose(fixture.tpose) }));
+  driver.update(frame(0, { body: pose(fixture.tpose, fixture.bent) }));
+  const before = [...sk.rotations[sk.index('leftLowerArm')]];
+  driver.update(frame(33, { body: pose(fixture.tpose, fixture.bent, { 15: [Number.NaN, 0, 0, 0.99] }) }));
+  assert.deepEqual(sk.rotations[sk.index('leftLowerArm')], before);
+  driver.update(
+    frame(66, { body: pose(fixture.tpose, fixture.bent, { 15: [0.17, Number.POSITIVE_INFINITY, 0, 0.99] }) }),
+  );
+  assert.deepEqual(sk.rotations[sk.index('leftLowerArm')], before);
+  for (const bad of [Number.NaN, -0.1, 4, Number.POSITIVE_INFINITY])
+    assert.throws(() => new BodyDriver(skeleton(), { limits: { leftLowerArm: bad } }), RangeError);
+});

@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,224 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,226 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12356,6 +12356,22 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
 
+### Layered snowpack (ICE-01)
+
+The model resolves a vertical column for each sample, with a fresh surface layer and the configured initial layers.
+It represents freeze/thaw, surface-settling overburden, pairwise conduction, capillary storage and gravity drainage.
+It uses bulk density and viscosity. Grain metamorphism, vapor diffusion and hydraulic travel time through the pack
+require more state. The optional Weather renderer consumes the stored ground and snow depth directly.
+
+Snow drift uses local near-surface wind and the flux capacity of adjacent columns, with closed lateral boundaries.
+The overhang stores a labeled fraction of the rim mass and gives a direction and extension at its specified density
+and thickness. It represents accretion and scouring. Fracturing a three-dimensional cornice requires a structural
+model. The slab field reports a static interface safety factor, with no assessment of fracture propagation.
+Weather's blocked footprints and drag act on the dense avalanche layer. The powder cloud is transported separately.
+
+The optional snowpack entry is 5,737 B min+gzip. Its plain and shared Wasm variants are each 6,455 B raw. The
+Weather avalanche entry is 7,195 B min+gzip with its obstacle terms.
+
 ### Dune and snow transport (EARTH-07)
 
 The solver resolves a single grain material and a mobile surface layer on the uniform `TerrainBed` grid.
@@ -12474,16 +12490,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-26: a deck volume on a held dynamic hull fed by the sea's inflow pushes the hull up (KB-FLIP-DECKLOAD1, physics flip)
+### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
 - **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh
   water, `HullSolver` writing `deckInflow` and `DeckWaterSolver` (inflow on, the deck box on the deck, cells [20, 6, 10] of
-  0.1 m). The deck volume takes the inflow and settles at 0.438 m^3, but its load on the hull (its forces region, y) settles
-  at +1,124 N, up, where the water's weight is -4,297 N. With a fixed body, still water placed at the start and no inflow
-  (its own test) the load is the weight.
-- **Cause:** not yet found, in the deck volume's load on a moving (held) body or from inflow-made particles. The hull
+  0.1 m). The deck volume takes the inflow and settles at 0.438 m^3 (4,297 N), but its load on the hull (its forces region,
+  y) settles at -2,198 N after 6 s. KB-FLIP-DECKLOAD1's fix brought the same case from +1,124 N; its regression (0.3 m of
+  water placed at the start, no inflow) takes the full weight.
+- **Cause:** not yet found, in how the deck volume's load treats water made by the inflow on a held hull. The hull
   solver's side is right: it sees the claim and leaves its own deck load out (`packages/physics/tests/deck-water.test.js`,
   "the deck volume claims its hull").
+
 ### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
 
 - **Repro:** a dynamic hull held by locks (or by contacts, joints, a mooring) with a `DeckWaterSolver` on it: 0.3 m of
@@ -28759,6 +28776,13 @@ the event by hand. A physics world with `ModalContactRigidSolver` and `ModalSoun
 an impulse, rolling or scraping excitation, with sound and damping set by the contacted materials.
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
+
+## Fixed: snow lacked melt energy and dense slides ignored obstacles (ICE-01, PA-33)
+
+The visual snow layer could stay in place after warming. The older avalanche modeled plant damage without taking
+momentum from the dense flow. Bind Weather's snow cover to `Snowpack` and give `Avalanche` the live pack,
+obstacle drag or building footprints. Reproduce the former faults with `packages/physics/tests/coupling/snowpack.test.js`,
+`packages/weather/tests/snowpack-check.mjs` and `packages/weather/tests/avalanche.test.js`.
 
 ## Fixed: dune and snow rendering lacked a moving surface layer (EARTH-07, PA-46 and PA-63)
 

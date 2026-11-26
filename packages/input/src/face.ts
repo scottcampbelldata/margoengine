@@ -181,7 +181,8 @@ export function measureFace(landmarks: readonly Landmark[], aspect = 1): FaceMea
   };
 }
 
-const clamp01 = (v: number) => (v > 0 ? (v < 1 ? v : 1) : 0);
+// NaN stays NaN, so a bad input is seen (and held over) rather than read as 0.
+const clamp01 = (v: number) => (v > 0 ? (v < 1 ? v : 1) : v <= 0 ? 0 : Number.NaN);
 /**
  * ARKit weights 0..1 for {@link LANDMARK_BLENDSHAPES} from a face mesh, against a neutral face (default
  * {@link NEUTRAL_FACE}; pass a calibrated one for a real person). Each weight is the change of one measure from neutral
@@ -356,7 +357,8 @@ export class FaceDriver implements Disposable {
         const v = face.blendshapes![name];
         if (v === undefined) continue;
         const n = this.neutralScores[name] ?? 0;
-        weights[name] = clamp01(n < 1 ? (v - n) / (1 - n) : 0);
+        // NaN passes through so update() can hold the last good weight.
+        weights[name] = Number.isFinite(v) ? clamp01(n < 1 ? (v - n) / (1 - n) : 0) : Number.NaN;
       }
     } else weights = faceWeightsFromLandmarks(face.landmarks, this.neutral, aspect);
     let rotation: Quat;
@@ -409,6 +411,14 @@ export class FaceDriver implements Disposable {
       weights = Object.fromEntries(Object.entries(weights).map(([k, v]) => [swap(k), v]));
       rotation = [rotation[0], -rotation[1], -rotation[2], rotation[3]];
     }
+    // A non-finite score or point keeps the last good value instead of reaching the filters and the morph targets.
+    for (const [name, v] of Object.entries(weights))
+      if (!Number.isFinite(v)) {
+        const last = this.current.weights[name];
+        if (last === undefined) delete weights[name];
+        else weights[name] = last;
+      }
+    if (!rotation.every(Number.isFinite)) rotation = [...this.current.rotation] as Quat;
     if (smoothing) ({ weights, rotation } = this.smooth(weights, rotation, t, false));
     this.lastGood = t;
     return (this.current = { weights, rotation, tracked: true, time });
