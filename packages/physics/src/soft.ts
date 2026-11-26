@@ -14,9 +14,11 @@ import { planPlaneCut, type SlicePlan } from './soft-plane-cut.js';
 import { makeCutPieces } from './soft-plane-pieces.js';
 import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
+import { bindTensileSeam, type BoundTensileSeam, openTensileSeam, type SoftTensileSeam } from './soft-tensile-seam.js';
 import { planTriangleCut } from './soft-triangle-cut.js';
 
 export type { SoftDestination, SoftSplit } from './soft-split.js';
+export type { SoftTensileSeam } from './soft-tensile-seam.js';
 
 interface SoftExports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
@@ -1007,6 +1009,7 @@ export class SoftBodyDesc {
   /** @internal */ orthotropy: readonly number[] | null = null;
   /** @internal */ orthotropicStrength: readonly number[] | null = null;
   /** @internal */ crackBand: readonly number[] | null = null;
+  /** @internal */ tensileSeam: SoftTensileSeam | null = null;
   /** @internal A split inherits the validated reference volumes from the original cells. */
   inheritedBand = false;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
@@ -1628,6 +1631,12 @@ export class SoftBodyDesc {
     if (this.cells.length === 0)
       throw new RangeError('A skin needs cells to ride in: build the body with cells first.');
     this.skin = bindSkin(vertices, indices, this.positions, this.cells);
+    return this;
+  }
+
+  /** Opens a weak triangular patch automatically when its cell reaches the specified tensile strain. */
+  setTensileSeam(seam: SoftTensileSeam | null): this {
+    this.tensileSeam = seam;
     return this;
   }
 
@@ -2792,6 +2801,7 @@ export class SoftBodies implements PhysicsAttachment {
   steps = 0;
   private bound: BoundMesh[] = [];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
+  private readonly tensileSeams = new Map<SoftBody, BoundTensileSeam>();
   private particleCount = 0;
   private edgeCount = 0;
   private cellView: Columns | null = null;
@@ -3029,6 +3039,19 @@ export class SoftBodies implements PhysicsAttachment {
         'Orthotropic stiffness uses vertex blocks. Select vertex-block and supply either the orthotropic tensor or a separate fiber.',
       );
     checkStrengthModel(desc.orthotropicStrength, desc.cellMaterial);
+    const seam = desc.tensileSeam && bindTensileSeam(desc.tensileSeam, desc.positions, desc.cells);
+    if (
+      seam &&
+      (desc.edgePairs.length ||
+        desc.bendPairs.length ||
+        desc.clusterGroups.length ||
+        desc.skin ||
+        desc.orthotropicStrength ||
+        desc.cellMaterial.tearStrain > 0)
+    )
+      throw new RangeError(
+        'A tensile seam needs a tetrahedral solid without springs, clusters, skin or native tear limits. Use a separate solid.',
+      );
     if (desc.crackBand && !desc.inheritedBand) {
       const limit = Math.min(...desc.crackBand);
       const maxDeterminant = limit * limit * limit;
@@ -3249,6 +3272,7 @@ export class SoftBodies implements PhysicsAttachment {
     // A surface collider only when asked: the particles and the faces meet rigid bodies in the soft step, and a mesh would answer
     // a second time.
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
+    if (seam) this.tensileSeams.set(body, seam);
     return body;
   }
 
@@ -4147,6 +4171,7 @@ export class SoftBodies implements PhysicsAttachment {
       info.proxy = null;
     }
     this.attachments = this.attachments.filter((a) => a.soft !== body);
+    this.tensileSeams.delete(body);
     for (const mesh of this.bound.filter((m) => m.soft === body)) mesh.host.remove();
     this.bound = this.bound.filter((m) => m.soft !== body);
     body.surface?.remove();
@@ -4364,9 +4389,11 @@ export class SoftBodies implements PhysicsAttachment {
       this.cellTornByHand = false;
       this.report(c);
     }
-    for (const body of this.bodies) if (body.surface) this.moveSurface(body, c);
-    for (const mesh of this.bound) this.moveBound(mesh, c);
-    this.updateSleep(dt, c);
+    if (this.tensileSeams.size > 0) this.openTensileSeams();
+    const live = this.columns();
+    for (const body of this.bodies) if (body.surface) this.moveSurface(body, live);
+    for (const mesh of this.bound) this.moveBound(mesh, live);
+    this.updateSleep(dt, live);
   }
 
   /**
@@ -4869,6 +4896,11 @@ export class SoftBodies implements PhysicsAttachment {
     settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {},
   ): PhysicsCollider {
     if (soft.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
+    if (this.tensileSeams.has(soft))
+      throw new MargoError(
+        'state',
+        'A tensile seam cannot split a separately bound collider. Use createSurfaceCollider for the fracture surface.',
+      );
     const count = mesh.vertices.length / 3;
     if (!Number.isInteger(count) || count < 3)
       throw new RangeError('A mesh has vertices, three numbers each; pass at least three of them.');
@@ -5174,7 +5206,8 @@ export class SoftBodies implements PhysicsAttachment {
     this.checkSolidCut(body);
     checkVec(origin, 'Cut-plane origin');
     const direction = unitDirection(normal, 'Cut-plane normal');
-    return this.cutGeometrically(body, (current, cells) => planPlaneCut(current, cells, origin, direction));
+    const split = this.splitGeometrically(body, (current, cells) => planPlaneCut(current, cells, origin, direction));
+    return this.announce(body, [], [], split);
   }
 
   /**
@@ -5186,17 +5219,27 @@ export class SoftBodies implements PhysicsAttachment {
     if (!Array.isArray(blade) || blade.length !== 3)
       throw new RangeError('A finite blade needs three points. Supply the corners of one world-space triangle.');
     for (const point of blade) checkVec(point, 'Blade point');
-    return this.cutGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
+    const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
+    return this.announce(body, [], [], split);
   }
 
-  private cutGeometrically(
+  private splitGeometrically(
     body: SoftBody,
     plan: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
-  ): SoftTearEvent {
-    const split = this.transferCutAttachments(body, () =>
+  ): SoftSplit | null {
+    return this.transferCutAttachments(body, () =>
       makeCutPieces(this, body, (positions) => new SoftBodyDesc(positions), plan),
     );
-    return this.announce(body, [], [], split);
+  }
+
+  private openTensileSeams(): void {
+    for (const [body, seam] of [...this.tensileSeams]) {
+      if (body.removed || body.asleep) continue;
+      const blade = openTensileSeam(seam, (particle) => body.particlePosition(particle));
+      if (!blade || body.tornCells().length > 0) continue;
+      const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
+      if (split) this.announce(body, [], [seam.cell], split);
+    }
   }
 
   private checkSolidCut(body: SoftBody): void {
@@ -5241,6 +5284,7 @@ export class SoftBodies implements PhysicsAttachment {
       for (const info of body.clusterInfo) if (info.proxy?.valid) this.physics.removeBody(info.proxy);
     }
     this.bodies.length = 0;
+    this.tensileSeams.clear();
     this.listeners.clear();
   }
   [Symbol.dispose](): void {

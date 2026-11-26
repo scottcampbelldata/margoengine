@@ -540,3 +540,119 @@ test('a face tear carries live query settings from a surface collider to both pi
     assert.equal(collider.isSensor(), true);
   }
 });
+
+test('an authored tensile seam opens off-face at the analytical strain and replays from an intact snapshot', async () => {
+  const crease = [
+    [0.5, 0.2, 0.2],
+    [0.5, 0.65, 0.2],
+    [0.5, 0.2, 0.65],
+  ];
+  const create = async () => {
+    const item = await specimen(
+      tetrahedron()
+        .setPinnedParticles([0, 1, 2, 3])
+        .setSolver('vertex-block')
+        .setTensileSeam({ cell: 0, triangle: crease, openingStrain: 0.005 }),
+    );
+    const events = [];
+    item.soft.onTear((event) => events.push(event));
+    return { ...item, events };
+  };
+  const a = await create();
+  const b = await create();
+  const pull = ({ body, world }, frame, stretch) => {
+    position.forEach(([x, y, z], i) => body.setParticleKinematicTarget(i, [3 - y, 1 + stretch * x, z - 1]));
+    world.advance(frame);
+  };
+  pull(a, 1, 0.92);
+  pull(a, 2, 1);
+  pull(a, 3, 1.004);
+  assert.equal(a.events.length, 0, 'compression, rotation and subcritical tension leave the seam intact');
+  b.world.advance(1);
+  b.world.restoreSnapshot(a.world.takeSnapshot().bytes);
+  for (const item of [a, b]) {
+    pull(item, 4, 1.006);
+    assert.equal(item.events.length, 1);
+    const { cells, pieces } = item.events[0];
+    assert.deepEqual(cells, [0]);
+    assert.equal(pieces.length, 1, 'the finite internal seam retains the rest of the original material connection');
+    const [piece] = pieces;
+    const indices = piece.triangles();
+    let openedArea = 0;
+    for (let i = 0; i < indices.length; i += 3) {
+      const [p, q, r] = [...indices.subarray(i, i + 3)].map((slot) => piece.particlePosition(slot));
+      if ([p, q, r].every((vertex) => Math.abs(vertex[1] - (1 + 1.006 * 0.5)) < 4 * epsilon32)) {
+        openedArea += Math.abs((q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2])) / 2;
+      }
+    }
+    bound(openedArea, 0.45 * 0.45, 1, 'the two lips total twice the authored triangle area in the rotated plane');
+    item.world.advance(5);
+    assert.equal(item.events.length, 1);
+  }
+  assert.equal(a.world.hash(), b.world.hash());
+});
+
+test('a tensile seam rejects points outside its material cell and purely face-aligned triangles', async () => {
+  await assert.rejects(
+    specimen(
+      tetrahedron().setTensileSeam({
+        cell: 0,
+        triangle: [
+          [0.5, 0, 0],
+          [0.5, 0.5, 0],
+          [0.5, 0, 2],
+        ],
+        openingStrain: 0.01,
+      }),
+    ),
+    /outside its cell/,
+  );
+  await assert.rejects(
+    specimen(tetrahedron().setTensileSeam({ cell: 0, triangle: position.slice(0, 3), openingStrain: 0.01 })),
+    /lies on a cell face/,
+  );
+});
+
+test('applied tensile force opens a native volumetric seam inside the tetrahedron', async () => {
+  const openingStrain = 0.005;
+  const stiffness = 1200;
+  const material = Object.assign(new CellMaterial(), {
+    youngsModulus: stiffness,
+    poissonRatio: 0,
+    deformationDamping: 0,
+  });
+  const { soft, body, world } = await specimen(
+    tetrahedron()
+      .setCells([0, 1, 2, 3], material)
+      .setMass(4)
+      .setPinnedParticles([0, 2, 3])
+      .setLinearDamping(4)
+      .setSolver('vertex-block')
+      .setTensileSeam({
+        cell: 0,
+        triangle: [
+          [0.5, 0.2, 0.2],
+          [0.5, 0.65, 0.2],
+          [0.5, 0.2, 0.65],
+        ],
+        openingStrain,
+      }),
+  );
+  const events = [];
+  soft.onTear((event) => events.push(event));
+  // In this constrained axial configuration, stable Neo-Hookean with Poisson ratio zero gives
+  // P_xx = E (stretch - 1). The corner's force is P_xx times rest volume divided by edge length.
+  const criticalStretch = Math.sqrt(1 + 2 * openingStrain);
+  const criticalForce = (unitVolume * stiffness * (criticalStretch - 1)) / 2;
+  body.addParticleForce(1, [criticalForce / 4, 0, 0]);
+  world.advance(120);
+  assert.equal(events.length, 0);
+  assert.ok(body.particlePosition(1)[0] > 2);
+  body.resetForces().addParticleForce(1, [2 * criticalForce, 0, 0]);
+  world.advance(240);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].pieces.length, 1);
+  assert.ok(
+    events[0].destination(1)[0].body.particlePosition(events[0].destination(1)[0].particle)[0] > 2 * criticalStretch,
+  );
+});

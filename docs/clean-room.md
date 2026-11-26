@@ -148,6 +148,15 @@ in Bridson, Fedkiw and Anderson (2002).
 [Arbitrary Cutting of Deformable Tetrahedralized Objects](https://physbam.stanford.edu/papers/stanford2007-04.pdf)
 [Robust Treatment of Collisions, Contact and Friction for Cloth Animation](https://www.cs.ubc.ca/~rbridson/docs/cloth2002.pdf).
 
+Li and Barbič (2014), §3, define Green strain as `E = (FᵀF − I)/2`. For a patch normal
+`n` in the rest solid, the opening measure is `nᵀ E n = (|Fn|² − 1)/2`. Margo compares it
+with the authored tensile strain at the end of the soft tick. The patch's three points stay
+at their exact affine coordinates in the changing cell until the finite cutting planner opens it.
+Romanowicz and Grygorczuk's 2024 pinewood Mode I experiments motivated the choice of a
+specified material plane. The option does not emulate the paper's cohesive crack-growth law.
+[Stable Orthotropic Materials](https://viterbi-web.usc.edu/~jbarbic/orthotropic/LiBarbicStableOrthotropicMaterials-SCA2014.pdf)
+[The effect of crack orientation on the mode I fracture resistance of pinewood](https://doi.org/10.1007/s10704-024-00798-z).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

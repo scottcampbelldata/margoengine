@@ -16888,8 +16888,8 @@ The LH-4 rung fixture bends, vibrates and supports a rigid load through live wor
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support rung
 now runs with a full orthotropic tensor in native vertex blocks. It can tear when independent
 tensile, compressive or shear stresses exceed authored strengths. A progressive option softens
-tension and shear before tearing. Automatic tears follow cell faces. The finite cutting tool
-can author an oblique crack inside a tetrahedron.
+tension and shear before tearing. A prescribed tensile seam can open inside a tetrahedron.
+Unseeded cracks still follow cell faces and need stress-directed off-face propagation.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
 Plane cuts and finite interior incisions work on tetrahedral solids with live rigid anchors and
 their own deformable surface colliders. Geometric cutting of bodies with embedded skins, springs,

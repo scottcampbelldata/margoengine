@@ -76,6 +76,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   exactly after stepping. Separate pieces retain the original live collider settings, including
   through a face tear. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Authored tensile seams (SOFT-04, 2026-11-26). The finite patch remains intact for compression,
+  rigid rotation and subcritical extension. It opens under a supercritical modeled load. In the
+  rotated fixture, both lips have their analytically expected area. Restoring an intact snapshot
+  repeats the opening and final hash. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

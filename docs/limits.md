@@ -9673,6 +9673,12 @@ Cells outside the blade keep their material connections. Tiny subdivisions must 
 same f32 geometry and rest-basis requirements as a full plane cut. The API accepts one
 triangle per operation. Embedded skins, springs, cluster constraints and separately bound meshes still
 require their own state transfer.
+An optional tensile seam opens one authored triangle inside a cell. It samples the cell after
+the soft step, and consumes the seam when the topology changes. Use it with an unskinned tetrahedral
+solid without springs, clusters or other native fracture criteria. The intact body has the usual
+elasticity up to the strain threshold. Normal compression, inverted cells and pure rigid rotation
+cannot trigger the seam. Restore an intact snapshot into the same topology with the same authored
+seam to replay the event. Unseeded fracture still follows existing cell faces.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.

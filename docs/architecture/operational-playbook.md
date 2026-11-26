@@ -10056,6 +10056,11 @@ before the source collider is removed. A ray can see the cut immediately and aga
 body moves. The replacement inherits the live contact, query and event settings, including
 changes since the body was authored.
 
+A tensile seam evaluates normal Green strain in its intact tetrahedron after native contact.
+The seam rides the cell in affine coordinates. When the prescribed positive opening is exceeded,
+the finite cut builds real separate lips, transfer preserves linear momentum, and the common
+tear event reports the source cell. An intact snapshot replays the same opening and state hash.
+
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows
 cells through body compaction, both cut paths, and world snapshots. The existing tear scheduler
