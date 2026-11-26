@@ -17,6 +17,7 @@
 import { cos, pow } from '@margoengine/math/pinned';
 import { heaveSection, lateralSection } from './radiation.js';
 import { hullSections, type LewisForm, lewisForm, type Section } from './strips.js';
+import { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 import { GRAVITY, type HullMesh, wettedLoads } from './wetted.js';
 
 /** A coupled pair of the hull's motions (0 surge, 1 heave, 2 sway, 3 roll, 4 yaw, 5 pitch), its damping and its kernel. */
@@ -41,6 +42,13 @@ export interface HullMemory {
   readonly lateralInfinite: Float64Array;
   /** The step the kernels are sampled at. */
   readonly dt: number;
+  /**
+   * The roll moment its bilge eddies shed, -rollEddy p |p| for a roll rate p about the centre of mass (N m s^2): the sum over the
+   * sections of 1/2 rho d^4 C_R times their width, C_R Ikeda's (viscous.ts).
+   */
+  readonly rollEddy: number;
+  /** Its skin friction in roll at frequency w is rollFriction sqrt(2 pi nu w) (N m s), nu the water's kinematic viscosity. */
+  readonly rollFriction: number;
 }
 
 /** The still-water waterline in the body's frame at which `mesh` (upright) displaces `mass` of water of `density`. */
@@ -104,7 +112,15 @@ export function hullMemory(
     // The centre of mass's depth under the waterline (the sections' y runs down): the roll is about it.
     pivot = waterline - centre[1];
   if (sections.length === 0)
-    return { waterline, frequencies: new Float64Array(1), pairs: [], lateralInfinite: new Float64Array(36), dt };
+    return {
+      waterline,
+      frequencies: new Float64Array(1),
+      pairs: [],
+      lateralInfinite: new Float64Array(36),
+      dt,
+      rollEddy: 0,
+      rollFriction: 0,
+    };
   let widest = 0,
     narrowest = Infinity;
   for (const s of sections) {
@@ -193,7 +209,16 @@ export function hullMemory(
     put(3, 4, -a24 * x * w);
     put(4, 4, a22 * x * x * w);
   });
-  return { waterline, frequencies, pairs: tables, lateralInfinite, dt };
+  // The viscous roll damping of each section about the centre of mass, summed along the hull.
+  let rollEddy = 0,
+    rollFriction = 0;
+  sections.forEach((s, k) => {
+    const form = forms[k]!,
+      d2 = s.draft * s.draft;
+    rollEddy += 0.5 * density * d2 * d2 * eddyRollCoefficient(form, s.breadth, s.draft, pivot) * s.width;
+    rollFriction += FRICTION * density * frictionGirth(form, pivot) * s.width;
+  });
+  return { waterline, frequencies, pairs: tables, lateralInfinite, dt, rollEddy, rollFriction };
 }
 
 /**

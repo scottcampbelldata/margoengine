@@ -12225,7 +12225,7 @@ These are this package's own, each checked:
 
 Proof: `packages/physics/tests/seakeeping.test.js` (energy, reciprocity, the half circle) and
 `tests/coupling/seakeeping.test.js` (a box driven sideways sways and rolls within 3 percent of the coupled frequency-domain
-equations at 60 steps a second, measured 1.1 to 2.3; 0.2 to 0.5 at 240). No constant is calibrated.
+equations at 60 steps a second, measured 0.3 to 1.1; 0.05 to 0.9 at 240). No constant is calibrated.
 
 ### FIRE-06 heat conduction and phase change (`@margoengine/physics/thermal`, 2026-11-25)
 
@@ -12250,3 +12250,34 @@ M. Raffel, [Background-oriented schlieren (BOS) techniques](https://elib.dlr.de/
 The kiln test reads the temperature registry port and passes each value into the existing Planck-spectrum emitter. Colour conversion uses the [CIE 1931 standard colorimetric observer](https://www.cie.co.at/datatable/cie-1931-colour-matching-functions-2-degree-observer), CIE 2019. The turbofan test uses a fixed pressure gas stand-in after applying heat. The expected temperature and the density ratio follow conservation of enthalpy and the ideal gas law. [NASA Glenn Burner Thermodynamics](https://www.grc.nasa.gov/www/k-12/airplane/burnth.html) and [NASA Glenn Equation of State](https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/equation-of-state/).
 
 The Rust stencil, SIMD enthalpy inversion, TypeScript bridge and shader implementation were written from the published methods. No companion code was used.
+
+### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
+
+`packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the
+solver applies them. Written from ITTC Recommended Procedure 7.5-02-07-04.5, "Estimation of Roll Damping", revision 02,
+2024 (https://www.ittc.info/media/11942/75-02-07-045.pdf), section 4.2.1, read for this job:
+- the component sum and the equivalent linearisation (eqs. 22-26);
+- the eddy-making component at zero speed (eqs. 42-44, after Ikeda, Himeno and Tanaka 1978, Ikeda et al. 1977, with
+  Katayama et al. 2022's form), and the bilge radius from the area coefficient (eq. 57);
+- Kato's skin friction (eqs. 37-39, Kato 1957).
+
+These are this package's own:
+- **The eddy component in time**, as the quadratic moment -1/2 rho d^4 C_R p |p| that eq. 42 defines C_R by, not its
+  linearisation at an amplitude.
+- **The friction section by section**, with the girth and its mean distance from the roll axis integrated on the Lewis
+  contour, in place of Kato's whole-ship regressions, and taken at the hull's natural roll frequency (the restoring moment
+  from the wetted surface heeled each way, over the roll inertia with its added inertia at infinite frequency).
+- **The implicit damping**: -c p / (1 + dt c / I), backward Euler on the damping alone.
+- **The axis held at most 0.95 d deep**, the formula's range.
+
+Validation on data nothing was fitted to: the box of Jung, Chang and Jo, "Viscous effect on the roll motion of a
+rectangular structure", J. Eng. Mech. 132(2), 190-200, 2006, as Gu, Day and others report it (STAB 2015,
+https://strathprints.strath.ac.uk/53608/): 0.3 m by 0.1 m at 0.05 m draft, roll inertia 0.236 kg m^2/m, natural period
+0.93 s, added roll inertia 0.124 kg m^2/m, equivalent damping 0.519 N m s/m from 15 degrees. Its centre of gravity is
+not published; it is the one the measured period gives (KG 0.0625 m). The solver gives a decay coefficient 7.7 percent
+under the measured and a period 3.2 percent short (`tests/coupling/seakeeping.test.js`). No constant is calibrated: every
+coefficient is the procedure's.
+
+The load point in the step is this package's own: a restoring load -k x taken at x + theta v dt, held through a rigid
+step of s symplectic-Euler substeps, has the update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), so
+theta = (s - 1) / (2 s) neither feeds nor drains the motion; the radiation force is carried there linearly.
