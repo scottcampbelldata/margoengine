@@ -1166,8 +1166,11 @@ engine.dispose();
   left out, with `material` (a trace material without its id; default grey, roughness 1, metalness 0); default none).
 - `scatter` (a list of `readScatter` results from `@margoengine/scatter/read`): each scatter gets one double-sided
   material from its colour, roughness and metalness, and each non-empty LOD ring one mesh `scatter-<n>-<ring>` with
-  one placement per instance. The readback holds the instances the camera saw in the last frame, rigidly placed (no
-  wind bend); read again after the camera or the field moves. Default none.
+  one placement per instance. The readback holds the instances the camera saw in the last frame, rigidly placed; a
+  ring read with `readScatter(..., { pose: true })` comes in instead as one world-space mesh of its posed vertices
+  (the wind's bend as drawn, grass blades, plant states, trampling) whose `previousPositions` are the pose under the
+  frame before's wind, so a tracer `shutter` above 0 blurs the sway. Read again after the camera or the field moves.
+  Default none.
 - Terrain triangles are built on every call, since a terrain's heights can change in place: build the scene once and
   reuse it while they hold. At `step` 1 the traced mesh holds the heightmap's exact samples; the drawn clipmap
   triangulates at its own cell spacing, so match `cellSize` to the texel spacing for the two to agree.
@@ -1199,7 +1202,9 @@ engine.dispose();
   1.000 over 3,037 covered pixels at 128 x 96, the same on both; and a drawn 33 x 33 `Terrain` with a round hole
   (`cellSize` on the texel spacing) against its traced `TerrainQuery`: IoU 0.998 over 5,314 covered pixels (3 drawn
   only, 10 traced only, along the outline), the same on both; and a GPU `Scatter` of 40 boxes aligned to sloped ground,
-  read back by `readScatter`: IoU 0.9996 over 2,430 covered pixels, the same on both.
+  read back by `readScatter`: IoU 0.9996 over 2,430 covered pixels, the same on both; and a windy field of 30 tall
+  boxes (wind strength 1) read back with `pose: true`: IoU 1.000 over 1,572 pixels against the drawn, bent field,
+  where the rigid read scores 0.541, the same on both.
 
 ## Heterogeneous coloured media
 

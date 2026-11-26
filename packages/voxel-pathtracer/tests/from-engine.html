@@ -108,5 +108,63 @@ window.runScatter=async(compat=false)=>{
   const drawn=raw[1]+raw[6]+raw[11];
   return {errors,tilt,drawn,fadeRings:fade.rings.map(r=>r.transforms.length/16),iou:both/either,covered:both,rasterOnly,traceOnly,rings:read.rings.map(r=>r.transforms.length/16),meshes:scene.meshes.length,color:read.color};
  }finally{tracer.dispose();scatter.dispose();heightmap?.destroy();engine.dispose();}
+};
+// FG-17-WIND: a windy field read back with pose: true. The traced posed field must match the drawn, bent one; the
+// rigid read must not (the bend is real); each read's shutter-open pose must be the frame before's pose bit for bit;
+// and the pose kernel must build with the scatter's own patches (grass blades, trampling).
+window.runWind=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const {Scatter}=await import('/packages/scatter/dist/index.js'),{GrassScatter}=await import('/packages/scatter/dist/grass.js');
+ const {TrampledScatter}=await import('/packages/scatter/dist/interact.js'),{readScatter}=await import('/packages/scatter/dist/read.js');
+ const W=128,H=96;installGPU({gpu:navigator.gpu});const canvas=createHeadlessCanvas({width:W,height:H});
+ const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,5,9],target:[0,0.8,0],fov:50,near:0.1,far:200}});
+ engine.scene.background='#000000';
+ const errors=[];const device=engineRuntime(engine).gpu;device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+ const signal=()=>AbortSignal.timeout(60000);
+ const field=Scatter.attach(engine,box(0.25,2,0.25),{count:30,area:[8,6],scale:[0.8,1.2],lod:[30,40,50],seed:4,color:[0.9,0.8,0.6],wind:[1,0.2,1]});
+ const frame=async(delta)=>{engine.render({delta});await device.queue.onSubmittedWorkDone();};
+ await frame(0.4);
+ const start=await readScatter(engine,field,{pose:true,signal:signal()});
+ await frame(0.4);await frame(0.4);
+ const before=await readScatter(engine,field,{pose:true,signal:signal()});
+ await frame(0.3);
+ const raster=await readPixels(engine,{signal:signal()});
+ const posed=await readScatter(engine,field,{pose:true,signal:signal()}),rigid=await readScatter(engine,field,{signal:signal()});
+ // Instances match across frames by their root (the cull's slot order may differ); vertices compare bit for bit.
+ const byRoot=(read)=>{const m=new Map(),r=read.rings[0],v=r.geometry.vertices.length/6;for(let k=0;k<r.transforms.length/16;k++)m.set(r.transforms[k*16+12]+','+r.transforms[k*16+14],k*v*3);return {m,v};};
+ const shutterOpen=(now,then)=>{const a=byRoot(now),b=byRoot(then);let worst=0,matched=0,moved=0;
+  for(const [key,at] of a.m){const bt=b.m.get(key);if(bt===undefined)continue;matched++;
+   for(let i=0;i<a.v*3;i++){worst=Math.max(worst,Math.abs(now.rings[0].posed.previousPositions[at+i]-then.rings[0].posed.positions[bt+i]));moved=Math.max(moved,Math.abs(now.rings[0].posed.positions[at+i]-then.rings[0].posed.positions[bt+i]));}}
+  return {worst,matched,moved};};
+ const open=shutterOpen(posed,before),first=start.rings[0].posed;
+ let still=0;for(let i=0;i<first.positions.length;i++)still=Math.max(still,Math.abs(first.positions[i]-first.previousPositions[i]));
+ const env={ground:false,skyIntensity:0,sunIntensity:3,sunDirection:[0.4,0.8,0.3]};
+ const iou=async(read)=>{
+  const scene=traceSceneFromEngine(engine,{scatter:[read],base:{revision:1,models:[],instances:[],materials:[],environment:env}});
+  const tracer=await ComposedVoxelPathTracer.create(engine,{scene,features:[meshPBR()],denoise:false,signal:AbortSignal.timeout(120000)});
+  try{await tracer.ready;const image=await tracer.renderImage({width:W,height:H,samples:4,jitter:false,aovs:true,signal:AbortSignal.timeout(120000)});
+   let both=0,either=0;for(let i=0;i<W*H;i++){const r=raster.data[i*4]+raster.data[i*4+1]+raster.data[i*4+2]>0,t=image.instance[i]<=-4;if(r&&t)both++;if(r||t)either++;}
+   return {iou:both/either,covered:both,meshes:scene.meshes.length,instances:scene.meshInstances.length};}finally{tracer.dispose();}
+ };
+ const tracedPosed=await iou(posed),tracedRigid=await iou(rigid);
+ const r0=posed.rings[0],verts=r0.geometry.vertices.length/6,count=r0.transforms.length/16;
+ field.dispose();
+ // The pose kernel with the scatter's own patches: grass blades (the strip built in the vertex stage) and trampling.
+ const grass=GrassScatter.attach(engine,{count:200,area:[6,6],lod:[10,20,30],lodFade:0,seed:5,wind:[1,0.3,0.8]});
+ await frame(0.2);await frame(0.2);
+ const blades=await readScatter(engine,grass,{pose:true,signal:signal()});grass.dispose();
+ const g=blades.rings[0],gv=g.geometry.vertices.length/6,gn=g.transforms.length/16;
+ let finite=true,unit=0,top=0;
+ for(let i=0;i<g.posed.positions.length;i++)finite&&=Number.isFinite(g.posed.positions[i])&&Number.isFinite(g.posed.previousPositions[i]);
+ for(let i=0;i<g.posed.normals.length;i+=3)unit=Math.max(unit,Math.abs(Math.hypot(g.posed.normals[i],g.posed.normals[i+1],g.posed.normals[i+2])-1));
+ for(let i=1;i<g.posed.positions.length;i+=3)top=Math.max(top,g.posed.positions[i]);
+ const trampled=TrampledScatter.attach(engine,box(0.06,1,0.02),{count:100,area:[6,6],lod:[10,20,30],seed:2,wind:[0.4,1,0.5]});
+ await frame(0.2);await frame(0.2);
+ const trodden=await readScatter(engine,trampled,{pose:true,signal:signal()});trampled.dispose();
+ const t0=trodden.rings[0];
+ engine.dispose();
+ return {errors,posed:tracedPosed,rigid:tracedRigid,open,still,count,positions:r0.posed.positions.length,verts,indices:r0.posed.indices.length,meshIndices:r0.geometry.indices.length,
+  rigidPosed:rigid.rings[0].posed===undefined,grass:{count:gn,positions:g.posed.positions.length,verts:gv,finite,unit,top},
+  trampled:{count:t0.transforms.length/16,positions:t0.posed?.positions.length??0,verts:t0.geometry.vertices.length/6}};
 };window.ready=true;
 </script></html>
