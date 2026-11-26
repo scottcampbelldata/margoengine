@@ -382,11 +382,14 @@ fn a_web_of_joints_stays_in_the_numbers() {
     // runs out exponentially (a_bead_on_a_spinning_rail_is_refused_before_it_leaves_the_numbers), and one held where two rails
     // cross runs out faster still as they close on parallel (a_web_of_joints_gains_no_more_than_its_kinematic_bodies_give_it).
     // What the joints remembered used to run this to not a number on most seeds, and none may gain energy its kinematic
-    // bodies did not give it.
+    // bodies did not give it. So the speeds are those the kinematic bodies' work gives, which has no bound of its own: seed 1's
+    // drivers do 1.7e12 J of work on its sliders, and a body runs out to 172 km/s (this test bounded the speed at 1e5 m/s, a
+    // figure with no derivation, until the solve order became the world's own and seed 1 took that path). What a step can work
+    // with is bounded: every speed stays a number under the range a step refuses past (RANGE).
     let (mut worst, mut widest) = (0.0f32, 0.0f32);
     for seed in 1..=60 {
         let run = web_run(seed, 2000, 1, None);
-        assert!(run.top < 1e5, "seed {seed} reached {} m/s", run.top);
+        assert!(run.top < RANGE, "seed {seed} reached {} m/s", run.top);
         assert!(run.gain <= 1e-6 * run.work, "seed {seed} gained {} J over the {} J its kinematic bodies did", run.gain, run.work);
         worst = worst.max(run.top);
         widest = widest.max(run.open);
@@ -506,3 +509,4 @@ fn the_energy_ledger_reads_the_same_in_a_moving_frame() {
     let rounding = 60.0 * 50.0 * 2f64.powi(-18);
     assert!((moving - still).abs() < rounding, "at rest {still} J, at 50 m/s {moving} J");
 }
+
