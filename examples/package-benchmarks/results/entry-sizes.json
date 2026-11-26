@@ -14138,6 +14138,10 @@
       "./tsunami": {
         "raw": 15406,
         "gzip": 6538
+      },
+      "./vortices": {
+        "raw": 15229,
+        "gzip": 6113
       }
     },
     "@margoengine/physics2d": {
@@ -15716,12 +15720,12 @@
         "gzip": 9276
       },
       "./hurricane": {
-        "raw": 6074,
-        "gzip": 2595
+        "raw": 6278,
+        "gzip": 2692
       },
       "./tornado": {
-        "raw": 24624,
-        "gzip": 10048
+        "raw": 24741,
+        "gzip": 10119
       }
     },
     "@margoengine/splats": {
