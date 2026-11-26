@@ -823,6 +823,72 @@ renamed rigs with different bone axes, and models driven by their `Animation`.
 
 `cloneModel` makes the copy in the scene of its source model (the scene the source is registered in), so a clone of a model in a second scene stays beside it, whichever scene is active when you call it. An abort or a failure leaves nothing in either scene.
 
+## Mixer: blended actions (`@margoengine/animation/mixer`)
+
+`AnimationMixer` plays several clips on one root at the same time and blends them per property. The root is a
+model, an `Animation`, a `Skeleton`, or a plain object that hosts bound property tracks. `AnimationMixer.attach(engine,
+root)` registers the mixer with the engine, so its clock advances in each frame. `new AnimationMixer(root)` builds the
+same mixer unregistered, for a caller that drives it with `update(delta)` or `advanceTime(delta)`. Attaching a model
+makes an `Animation` for it and pauses that `Animation`, so the mixer alone poses the model. Transform tracks need a
+`Skeleton` or `Animation` root; a plain object takes property tracks only (clips from `createKeyframeClip`).
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {AnimationMixer} from 'margoengine/animation/mixer';
+const stage = await createStage('#viewport', {backend: 'webgpu', capacity: 2048});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+const mixer = AnimationMixer.attach(stage.engine, model);
+const idle = mixer.clipAction('Idle').play();
+const walk = mixer.clipAction('Walking').play();
+idle.crossFadeTo(walk, 0.5); // idle fades out and walking fades in over half a second
+walk.setDuration(2); // one walking cycle takes 2 s
+mixer.dispose(); // restores the original pose and disposes the Animation the mixer made
+model.dispose();
+stage.dispose();
+```
+
+### Exports
+
+- `AnimationMixer` (class). `static attach(engine, root)` creates, registers and returns a mixer; disposing it removes
+  its registration. `time` (default `0`) is the global clock in seconds and `timeScale` (default `1`) its signed rate.
+  `clipAction(clip, root = the mixer's root, blendMode = NormalAnimationBlendMode)` returns the cached action for that
+  clip, root and blend mode, creating it once; `clip` is a glTF clip name or index (an `Animation` root), or an
+  `ActionClip` object. `existingAction(clip, root?)` returns the cached action or `null` and never creates one.
+  `update(delta)` advances the clocks and blends once; `advanceTime(delta)` moves the clocks without writing a pose;
+  `setTime(time)` rewinds every action and seeks to `time`; `stopAllAction()` stops every action and restores the
+  original pose. `uncacheAction(clip, root?)`, `uncacheClip(clip)` and `uncacheRoot(root)` drop cached actions (stop
+  them first); `uncacheRoot` also disposes the `Animation` the mixer made for that root. `getRoot()` returns the default
+  root. `dispose()` and `[Symbol.dispose]()` stop everything, restore the originals and dispose only the `Animation`s
+  the mixer created, never the model. The engine calls `setup(engine)` and `onPreUpdate(delta)`, its plugin hooks.
+- `AnimationAction` (class), made by `clipAction`. Options with their defaults: `time` (`0`), `timeScale` (`1`),
+  `weight` (`1`), `enabled` (`true`), `paused` (`false`), `clampWhenFinished` (`false` disables the action when it ends;
+  `true` holds its end pose), `loop` (`LoopRepeat`) and `repetitions` (`Infinity`). `blendMode` is
+  read-only and set at creation. Methods: `play()` starts or resumes without resetting the clock; `stop()` stops, restores
+  the original pose on the next update and rewinds; `reset()` rewinds and clears envelopes; `startAt(time)` delays the
+  start to a mixer time; `isScheduled()` reports whether `play()` was called and not stopped, and `isRunning()` also needs it enabled, at a non-zero rate and past its `startAt` time; `getClip()`,
+  `getMixer()`, `getRoot()`, `getEffectiveWeight()` and `getEffectiveTimeScale()` read it back;
+  `setEffectiveWeight(weight)` sets the weight and cancels a fade, `setEffectiveTimeScale(scale)` sets the rate and cancels a warp;
+  `setDuration(seconds)` sets the time scale so one pass takes `seconds` (positive); `syncWith(action)` copies another
+  action's clock and rate; `setLoop(mode, repetitions = Infinity)` takes `LoopOnce`, `LoopRepeat` or `LoopPingPong` and a
+  count of at least 1; `fadeIn(duration)` and `fadeOut(duration)` ramp the weight from 0 to 1 or 1 to 0 (`fadeIn` does
+  not start the action: call `play()`); `stopFading()` cancels a fade; `warp(from, to, duration)` ramps the rate from
+  `from` to `to` over `duration` seconds; `halt(duration)` slows the rate to 0 over `duration`; `stopWarping()` cancels
+  a warp; `crossFadeTo(action, duration, warp = false)` fades this action out and `action` in, and `crossFadeFrom(action,
+  duration, warp = false)` does the same from the other side. `warp` matches the two cycle rates during the fade (both
+  clips need a positive duration). `step`, `contribute`, `uses`, `usesDiscrete` and `rewind` are the mixer's own
+  per-frame hooks; app code does not call them.
+- `LoopOnce` (`2200`): play once, clamped at the end. `LoopRepeat` (`2201`): repeat from the opposite end. This is the
+  default. `LoopPingPong` (`2202`): alternate forward and backward passes.
+- `NormalAnimationBlendMode` (`2500`): weighted replacement, with the original pose filling the weight below one. This
+  is the default. `AdditiveAnimationBlendMode` (`2501`): adds translation and property deltas, multiplies scale deltas
+  and composes rotation deltas. Categorical (boolean or string) tracks have no additive arithmetic and throw with it.
+- Types: `ActionLoop` (the three loop constants), `ActionClip` (a glTF clip, a `KeyframeClip` or a discrete clip) and
+  `MixerRoot` (`object`).
+
+Blending normalises by the total weight of the actions that touch a property, so two full-weight actions average, and a
+property that no action touches returns to its original value.
+
 ## Film time: seeking animation to a cut
 
 `Animation`, `PlaybackAnimation`, `AnimationGroup`, `AnimationMixer`, `AnimationLOD`, `MorphWeightPlayer`, `VATCrowd`

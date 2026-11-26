@@ -117,11 +117,16 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the clear is written (core), or in every capture that redirects it. Needs a maintainer decision (frozen core). Use
   `ColorBackground` meanwhile.
 
-### Open 2026-11-26: `@margoengine/animation/mixer` is not in the package README (KB-ANIM-MIXERDOC1, animation)
+### Fixed 2026-11-26: `@margoengine/animation/mixer` is not in the package README (KB-ANIM-MIXERDOC1, animation)
 
 - **Repro:** `packages/animation/README.md` names `AnimationMixer` only in its film-time paragraph: no import path, no
   example and no list of the action calls, although the entry is public.
 - **Cause:** the entry landed without its README section.
+- **Fix:** `packages/animation/README.md` has a section for the mixer entry: its import path, a copy-paste example, and
+  every export with its options and their defaults (`AnimationMixer.attach`, `clipAction`, `update`, `setTime`, the
+  `AnimationAction` options and calls, the three loop modes, the two blend modes and the types), taken from
+  `packages/animation/src/mixer.ts` and `api/animation.mixer.api.md`.
+- **Check:** `npm run check:readme-run -- --packages=animation` runs the new example as a reader would paste it.
 
 ### Open 2026-11-26: the look masks see ground through plants and trees, so bounce reads over 100 percent (KB-LOOK-MASKOCCLUDE1, scatter, biomes)
 
