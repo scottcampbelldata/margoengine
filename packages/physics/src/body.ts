@@ -655,6 +655,7 @@ export class PhysicsBody {
     this.columns.sleepLimit[this.row] = other.columns.sleepLimit[other.row];
     this.columns.sleepAfter[this.row] = other.columns.sleepAfter[other.row];
     this.additionalPgsIterations = other.additionalPgsIterations;
+    this.additionalSubsteps = other.additionalSubsteps;
     this.enabledTranslations = other.enabledTranslations;
     this.enabledRotations = other.enabledRotations;
     this.gyroscopicForces = other.gyroscopicForces;
@@ -680,6 +681,21 @@ export class PhysicsBody {
     if (!Number.isInteger(passes) || passes < 0 || passes > 0xffffffff)
       throw new RangeError('Additional PGS iterations must be a whole number from 0 to 4294967295; pass extra passes.');
     this.columns.extraPasses[this.row] = passes;
+  }
+  /**
+   * Substeps the island of this body takes on top of the world's `substeps`, each step (default 0): Rapier's
+   * `additional_solver_iterations`. The island steps at the world's substeps plus the most any of its bodies asks for, so a
+   * stiff or fast part of a scene is solved finer than the rest; with `adaptiveSubsteps` its level cuts that count finer still.
+   * Islands step one by one (the default) for this to be the island's alone; stepped all at once, the whole world takes it.
+   */
+  get additionalSubsteps(): number {
+    return this.columns.extraSubsteps[this.row];
+  }
+  set additionalSubsteps(substeps: number) {
+    if (!Number.isInteger(substeps) || substeps < 0 || substeps > 1024)
+      throw new RangeError('Additional substeps must be a whole number from 0 to 1024; pass extra substeps a step.');
+    this.world().wake(this.row);
+    this.columns.extraSubsteps[this.row] = substeps;
   }
   /**
    * Continuous collision (default false), Rapier's `enableCcd`: a fast dynamic body is swept from where each step starts

@@ -365,6 +365,8 @@ export const JOINT_DISTANCE = 1 << 27;
 export const JOINT_BROKEN = 1 << 29;
 /** The turning motors drive frame B toward the `jointDrive` rotation in frame A (a cone's rotation motor). */
 export const JOINT_DRIVE = 1 << 30;
+/** `jointMode`: a motor joint's sliding motors are capped as one force vector, its turning motors as one torque vector. */
+export const JOINT_MODE_VECTOR_CAPS = 1;
 /** The caller switched the joint off: it solves nothing until switched on. */
 export const JOINT_DISABLED = 1 << 31;
 /** Bits of the `colliderFlags` column. */

@@ -390,17 +390,18 @@ impl World {
 
     /// The impulses island `window` carries (its contacts' and joints') were made at its last level's substeps: scaled to the
     /// length of this level's, as a step whose substep changes length scales them.
-    pub(crate) fn rescale_warm(&mut self, level: u32) {
+    pub(crate) fn rescale_warm(&mut self, level: u32, extra: u32) {
+        let base = self.header().substeps;
         let (first, end) = self.window.pairs;
         for i in first..end {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
             let body = if self.flags(a) & KIND == DYNAMIC { a } else { b };
-            let before = self.uu(SUBSTEP_LEVEL, body);
-            if before == level {
+            let (before, more) = (self.uu(SUBSTEP_LEVEL, body), self.uu(SUBSTEP_EXTRA, body));
+            if before == level && more == extra {
                 continue;
             }
-            let ratio = scale_of(before, level);
+            let ratio = if more == extra { scale_of(before, level) } else { scale_counts(base, more, before, extra, level) };
             for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
                 let at = row * MANIFOLD + k;
                 self.set_s(CONTACT_NORMAL_IMPULSE, at, self.s(CONTACT_NORMAL_IMPULSE, at) * ratio);
@@ -413,11 +414,11 @@ impl World {
             let row = self.uu(SOLVE_JOINTS, i) as usize;
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
             let body = if self.flags(a) & KIND == DYNAMIC { a } else { b };
-            let before = self.uu(SUBSTEP_LEVEL, body);
-            if before == level {
+            let (before, more) = (self.uu(SUBSTEP_LEVEL, body), self.uu(SUBSTEP_EXTRA, body));
+            if before == level && more == extra {
                 continue;
             }
-            let ratio = scale_of(before, level);
+            let ratio = if more == extra { scale_of(before, level) } else { scale_counts(base, more, before, extra, level) };
             for k in 0..6 {
                 self.set_s(JOINT_IMPULSE_0 + k, row, self.s(JOINT_IMPULSE_0 + k, row) * ratio);
                 self.set_s(JOINT_MOTOR_0 + k, row, self.s(JOINT_MOTOR_0 + k, row) * ratio);
@@ -426,11 +427,12 @@ impl World {
     }
 
     /// Records the level island `window` stepped at on each of its bodies.
-    pub(crate) fn keep_level(&mut self, level: u32) {
+    pub(crate) fn keep_level(&mut self, level: u32, extra: u32) {
         let (column, start, end) = self.window.bodies;
         for i in start..end {
             let at = self.uu(column, i) as usize;
             self.set_u(SUBSTEP_LEVEL, at, level);
+            self.set_u(SUBSTEP_EXTRA, at, extra);
         }
     }
 }
@@ -440,6 +442,13 @@ impl World {
 /// substep, but the part a passing strike left does not, and doubled at each coarser level it fed a joint web a runaway (a body
 /// went 19, 35, 53, 89, 124, 339, 3,514 then 384,954 m/s as its island came down four levels in four steps). Going coarser, the
 /// passes add what the shorter guess lacks.
+/// The same for a change of extra substeps too: the old substep's length over the new one's, (base + more) 2^before against
+/// (base + extra) 2^level substeps a step, and 1 going coarser, for the reason above.
+fn scale_counts(base: u32, more: u32, before: u32, extra: u32, level: u32) -> f32 {
+    let (from, to) = (base.saturating_add(more) << before, base.saturating_add(extra) << level);
+    if from >= to { 1.0 } else { from as f32 / to as f32 }
+}
+
 fn scale_of(from: u32, to: u32) -> f32 {
     if from > to { 1.0 } else { 1.0 / (1u32 << (to - from)) as f32 }
 }

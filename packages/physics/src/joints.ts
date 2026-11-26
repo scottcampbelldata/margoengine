@@ -11,6 +11,7 @@ import {
   JOINT_LIMIT,
   JOINT_LOCK,
   JOINT_MOTOR_FORCE,
+  JOINT_MODE_VECTOR_CAPS,
   JOINT_MOTOR_ON,
   type KernelWorld,
 } from './kernel.js';
@@ -132,6 +133,22 @@ export type JointOptions =
        * of them in `limits`: for sliding axes `[min, max]` of the combined distance, for the swing `[0, max]`.
        */
       coupled?: readonly JointDof[];
+    })
+  /**
+   * Drives body B toward a pose relative to body A (Box2D's motor joint): `linearOffset` is where B's anchor should sit in
+   * A's anchor frame and `angularOffset` how B should be turned in A's frame, reached by a critically damped spring of
+   * `frequency` hertz (per kilogram, so a heavy body and a light one move alike) whose pull is capped at `maxForce` newtons
+   * and `maxTorque` newton metres as vectors, whatever the direction. Nothing is locked: past its caps the body is free. A
+   * character's root to its animation, a hand to a held prop, a crane's hook to its target.
+   */
+  | (JointBase & {
+      type: 'motor';
+      linearOffset?: Vec3;
+      angularOffset?: Quat;
+      maxForce?: number;
+      maxTorque?: number;
+      frequency?: number;
+      dampingRatio?: number;
     });
 
 /** Kind of joint, the `type` of {@link JointOptions}. */
@@ -196,6 +213,8 @@ const locks: Readonly<Partial<Record<JointType | 'cone', number>>> = {
   // The first axis of these two is the line between the anchors, and what it reads is their distance.
   rope: JOINT_DISTANCE | (JOINT_LIMIT << SLIDE),
   spring: JOINT_DISTANCE | (JOINT_MOTOR_ON << SLIDE) | (JOINT_MOTOR_FORCE << SLIDE),
+  // Nothing locked; six motors toward the offset, the turning ones through the drive's frame.
+  motor: JOINT_DRIVE | (JOINT_MOTOR_ON * 63),
 };
 
 /** A motor given as a frequency and damping ratio, as the stiffness and damping of the acceleration model it means. */
@@ -663,6 +682,77 @@ export class PhysicsJoint {
     if (dof === undefined) return [this.unit()];
     return [this.free(dof)];
   }
+  private motorJoint(): void {
+    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type !== 'motor')
+      throw new TypeError("Motor targets and caps need a motor joint; add one with type: 'motor'.");
+  }
+  /**
+   * Where a motor joint drives body B: `linearOffset`, its anchor's place in A's anchor frame, and `angularOffset`, a unit
+   * quaternion of B's turn in A's frame (default none). Wakes both bodies.
+   * @throws TypeError on any other joint; RangeError for an offset that is not finite or a rotation that is not a unit quaternion.
+   */
+  setMotorTarget(linearOffset: Vec3, angularOffset: Quat = [0, 0, 0, 1]): this {
+    this.motorJoint();
+    checkVec(linearOffset, 'Motor joint linearOffset');
+    const [x, y, z, w] = angularOffset,
+      squared = x * x + y * y + z * z + w * w;
+    if (!(squared > 0.998 && squared < 1.002))
+      throw new RangeError('A motor joint angularOffset is a unit quaternion [x, y, z, w]; normalize it.');
+    const columns = this.owner.kernel.columns as never as Record<string, Float32Array>,
+      n = 1 / sqrtOf(squared),
+      { row } = this;
+    for (let k = 0; k < 3; k++) columns[`jointTarget${k}`]![row] = linearOffset[k]!;
+    columns['jointDriveX']![row] = x * n;
+    columns['jointDriveY']![row] = y * n;
+    columns['jointDriveZ']![row] = z * n;
+    columns['jointDriveW']![row] = w * n;
+    this.wake();
+    return this;
+  }
+  /** A motor joint's target: `[linearOffset, angularOffset]`. */
+  get motorTarget(): [[number, number, number], [number, number, number, number]] {
+    this.motorJoint();
+    const c = this.owner.kernel.columns,
+      { row } = this;
+    return [
+      [c.jointTarget0[row]!, c.jointTarget1[row]!, c.jointTarget2[row]!],
+      [c.jointDriveX[row]!, c.jointDriveY[row]!, c.jointDriveZ[row]!, c.jointDriveW[row]!],
+    ];
+  }
+  /**
+   * A motor joint's caps: the most force (N) and torque (N m) it pulls with, each as a vector, `Infinity` for none.
+   * @throws RangeError for a cap below 0.
+   */
+  setMotorCaps(maxForce: number, maxTorque: number): this {
+    this.motorJoint();
+    if (!(maxForce >= 0) || !(maxTorque >= 0))
+      throw new RangeError('Motor joint caps must be 0 or more, or Infinity; pass newtons and newton metres.');
+    const columns = this.owner.kernel.columns as never as Record<string, Float32Array>;
+    for (let k = 0; k < 6; k++) columns[`jointCap${k}`]![this.row] = k < 3 ? maxForce : maxTorque;
+    this.wake();
+    return this;
+  }
+  /**
+   * A motor joint's spring: its natural frequency in hertz and damping ratio (1, critical, by default), per kilogram, so
+   * a body of any mass follows its target the same way while under the caps.
+   * @throws RangeError for a frequency or ratio below 0 or not finite.
+   */
+  setMotorSpring(frequency: number, dampingRatio = 1): this {
+    this.motorJoint();
+    const spring = springForm({ frequency, dampingRatio }),
+      columns = this.owner.kernel.columns as never as Record<string, Float32Array>,
+      { row } = this;
+    for (let k = 0; k < 6; k++) {
+      columns[`jointStiffness${k}`]![row] = spring.stiffness!;
+      columns[`jointDamping${k}`]![row] = spring.damping!;
+      columns[`jointSpeed${k}`]![row] = 0;
+      if (k >= 3) columns[`jointTarget${k}`]![row] = 0;
+    }
+    this.owner.kernel.columns.jointFlags[row] &= ~(JOINT_MOTOR_FORCE * 63);
+    this.wake();
+    return this;
+  }
   /** Generic joints: keeps one free axis between `min` and `max`, in radians or units, from frame A to frame B. */
   setAxisLimits(dof: JointDof, min: number, max: number): this {
     const axis = this.free(dof);
@@ -866,7 +956,7 @@ export function createJoint(
     throw new RangeError(`Spring model must be 'force' or 'acceleration'; got ${String(options.model)}.`);
   if (locked === undefined)
     throw new TypeError(
-      `Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring or generic.`,
+      `Unknown joint type ${String(type)}; use fixed, spherical, revolute, prismatic, cone, rope, spring, motor or generic.`,
     );
   checkVec(anchorA, 'anchorA');
   checkVec(anchorB, 'anchorB');
@@ -967,6 +1057,12 @@ export function createJoint(
   if (type === 'cone') {
     if (options.axis) kernel.setJointAxis(row, options.axis);
     joint.setCone(options.swing, options.twist);
+  }
+  if (type === 'motor') {
+    columns.jointMode[row] = JOINT_MODE_VECTOR_CAPS;
+    joint.setMotorSpring(options.frequency ?? 5, options.dampingRatio ?? 1);
+    joint.setMotorCaps(options.maxForce ?? Infinity, options.maxTorque ?? Infinity);
+    joint.setMotorTarget(options.linearOffset ?? [0, 0, 0], options.angularOffset ?? [0, 0, 0, 1]);
   }
   if (type === 'generic') {
     if (couple?.swing) {

@@ -153,6 +153,9 @@ columns! {
     OWN_FRAME_W f32 Body,
     // Solver passes the body's island takes on top of the world's.
     EXTRA_PASSES u32 Body,
+    // Substeps the body's island takes on top of the world's (Rapier's `additional_solver_iterations`): the island steps at the
+    // world's substeps plus the most any of its bodies asks for.
+    EXTRA_SUBSTEPS u32 Body,
     // The first of the body's joints: the chain runs through JOINT_NEXT_A or JOINT_NEXT_B, whichever side the body is on.
     FIRST_JOINT u32 Body,
     // Sleep: seconds under the threshold, and the energy the window began with.
@@ -209,6 +212,8 @@ columns! {
     // The level the body's island last stepped at: its step was cut into 2^level times the world's substeps (tilt.rs). State: the
     // impulses the body's contacts and joints carry were made at that substep's length.
     SUBSTEP_LEVEL u32 Body,
+    // The extra substeps the body's island last stepped at, beside its level: state for the same reason.
+    SUBSTEP_EXTRA u32 Body,
     // Tipping (tilt.rs), worked out once a step: the mass a body holds up, its count of supports, its conductance to the ground
     // through them, the tipping stiffness gravity takes from it, the sum that bounds the structure above, and the heights of
     // the contacts below and above it.
@@ -372,6 +377,8 @@ columns! {
     ISLAND_READY u32 BodyList,
     // The most extra passes any body of the island asks for.
     ISLAND_PASSES u32 BodyList,
+    // The most extra substeps any body of the island asks for.
+    ISLAND_SUBSTEPS u32 BodyList,
     // Each island's substep level and the first multibody stamp its walks take, planned before the islands solve
     // (`plan_islands`), so islands can solve at once in any order.
     ISLAND_LEVEL u32 BodyList,
@@ -590,6 +597,8 @@ columns! {
     JOINT_ROTOR_3 f32 Joint,
     JOINT_ROTOR_4 f32 Joint,
     JOINT_ROTOR_5 f32 Joint,
+    // JOINT_MODE_ bits: how a joint's motors are capped (a motor joint caps its force and its torque as vectors, not per axis).
+    JOINT_MODE u32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
     SOLVE_JOINTS u32 JointList,
     // The joint whose scratch keeps the sums of this one's island, for the warm start; NONE with no body to move.
@@ -1001,14 +1010,17 @@ pub const JOINT_DRIVE: u32 = 1 << 30;
 /// The caller switched the joint off (`joint.enabled = false`): it solves nothing until switched on, and its bodies keep the
 /// contact rule the joint gave them.
 pub const JOINT_DISABLED: u32 = 1 << 31;
+/// JOINT_MODE: the three sliding motors' impulse is capped as one vector at axis 0's cap, and the three turning motors' at axis
+/// 3's (Box2D's motor joint, Catto 2011), so a pull on a slant is no stronger than one along an axis.
+pub const JOINT_MODE_VECTOR_CAPS: u32 = 1;
 /// Any reason a joint solves nothing.
 pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, the solving joints' scratch, which is indexed by place in
 /// their list, and the rotor speeds read at each substep's start. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 46] = [
-    ISLAND_LEVEL, ISLAND_STAMP, MB_HELD,
+pub const SCRATCH: [usize; 47] = [
+    ISLAND_LEVEL, ISLAND_STAMP, MB_HELD, ISLAND_SUBSTEPS,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,

@@ -14180,6 +14180,21 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### The motor joint and extra substeps per island (`@margoengine/physics`, 2026-11-26)
+
+Built from texts only; no other code was read. Box2D's motor joint and Rapier's `additional_solver_iterations` were matched
+by their public documentation.
+
+- E. Catto, "Soft Constraints" and "Modeling and Solving Constraints", GDC 2011 (box2d.org publications), and the Box2D v3
+  documentation of the motor joint: a joint that drives a relative pose with its accumulated linear and angular impulses
+  each clamped to a maximum force and torque as vectors.
+- E. Catto, "Solver2D" (box2d.org blog, 2024), soft step: the substep a constraint is solved at; an island at more
+  substeps solves the same rows at a shorter length.
+- Margo's own: the vector cut after the per-axis motor rows, pushed back along each row; the island's count as the world's
+  substeps plus the most its bodies ask, with warm starts and break loads read at that count and the adaptive level on top.
+- Checked against: gravity sag of the per-kilogram spring, the capped speed on a slant, a moving anchor; an island with
+  extra substeps equal bit for bit to a world stepped at that count.
+
 ### Physics worlds in netcode: rollback, snapshot diffs and server bodies (`@margoengine/netcode/physics`, 2026-11-26)
 
 Built from texts only; no other code was read.

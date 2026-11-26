@@ -221,9 +221,12 @@ impl World {
         let adaptive = self.header().adaptive_substeps != 0;
         for group in 0..self.header().islands as usize {
             self.window = self.group_window(group);
-            let level = if adaptive { self.island_level(dt, substeps) } else { 0 };
+            // An island a body asks extra substeps of steps at the world's plus the most any of them asks (Rapier's
+            // `additional_solver_iterations`), and its adaptive level cuts that count finer.
+            let base = substeps.saturating_add(self.uu(ISLAND_SUBSTEPS, group));
+            let level = if adaptive { self.island_level(dt, base) } else { 0 };
             self.set_u(ISLAND_LEVEL, group, level);
-            self.claim_stamps(substeps << level);
+            self.claim_stamps(base << level);
             self.set_u(ISLAND_STAMP, group, self.window.mb_call);
         }
     }
@@ -235,15 +238,16 @@ impl World {
         let mut inner = now();
         self.window = self.group_window(group);
         let level = self.uu(ISLAND_LEVEL, group);
-        let count = self.header().substeps << level;
+        let extra = self.uu(ISLAND_SUBSTEPS, group);
+        let count = self.header().substeps.saturating_add(extra) << level;
         let hi = dt / count as f32;
         self.window.substeps = count;
         self.window.mb_call = self.uu(ISLAND_STAMP, group);
-        self.rescale_warm(level);
+        self.rescale_warm(level, extra);
         let (raw, damping) = (self.header().contact_hertz, self.header().contact_damping);
         let stiffness = soft(if raw * hi > 0.25 { 0.25 / hi } else { raw }, damping, hi);
         self.run_substeps(hi, count, stiffness, &mut inner, true);
-        self.keep_level(level);
+        self.keep_level(level, extra);
     }
 
     /// The step after its islands: what no island holds, the kinematic bodies' moves, joint breaking, continuous collision
@@ -261,15 +265,31 @@ impl World {
             self.window = self.group_window(self.header().islands as usize);
             self.window.substeps = substeps;
             self.claim_stamps(substeps);
-            self.rescale_warm(0);
+            self.rescale_warm(0, 0);
             self.run_substeps(h, substeps, stiffness, &mut inner, true);
-            self.keep_level(0);
+            self.keep_level(0, 0);
             self.window = self.whole_window();
             self.integrate_kinematics(h, substeps);
         } else {
+            // All islands at once, at the world's substeps plus the most any island asks for.
+            let extra = (0..self.header().islands as usize).map(|g| self.uu(ISLAND_SUBSTEPS, g)).max().unwrap_or(0);
+            let count = substeps.saturating_add(extra);
             self.window = self.whole_window();
-            self.claim_stamps(substeps);
-            self.run_substeps(h, substeps, stiffness, &mut inner, false);
+            self.claim_stamps(count);
+            if extra == 0 {
+                self.run_substeps(h, substeps, stiffness, &mut inner, false);
+            } else {
+                let hc = dt / count as f32;
+                let hertz = self.header().contact_hertz;
+                let stiffness = soft(if hertz * hc > 0.25 { 0.25 / hc } else { hertz }, damping, hc);
+                self.run_substeps(hc, count, stiffness, &mut inner, false);
+            }
+            // The extra this step took, for the break loads and a later island-by-island step's warm start; levels untouched.
+            let (column, start, end) = self.window.bodies;
+            for i in start..end {
+                let at = self.uu(column, i) as usize;
+                self.set_u(SUBSTEP_EXTRA, at, extra);
+            }
         }
         let mut stamp = times.stamp;
         let mut lap = |world: &mut World, phase: usize| {

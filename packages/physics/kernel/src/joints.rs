@@ -649,7 +649,12 @@ impl World {
             let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
             let body = if self.flags(a) & KIND == DYNAMIC { a } else { b };
             let level = if self.island_major && self.header().adaptive_substeps != 0 { self.uu(SUBSTEP_LEVEL, body) } else { 0 };
-            let h = h / (1u32 << level) as f32;
+            let extra = self.uu(SUBSTEP_EXTRA, body);
+            let h = if extra == 0 {
+                h / (1u32 << level) as f32
+            } else {
+                self.header().step_dt / (self.header().substeps.saturating_add(extra) << level) as f32
+            };
             let load = |w: &World, first: usize| {
                 let (x, y, z) = (w.s(JOINT_IMPULSE_0 + first, row), w.s(JOINT_IMPULSE_0 + first + 1, row), w.s(JOINT_IMPULSE_0 + first + 2, row));
                 sqrt(x * x + y * y + z * z) / h
@@ -1286,6 +1291,9 @@ impl World {
                     self.motor_row(row, k, flags & (JOINT_MOTOR_FORCE << k) != 0, &rows[k], at[k], h, &mut body_a, &mut body_b);
                 }
             }
+            if self.uu(JOINT_MODE, row) & JOINT_MODE_VECTOR_CAPS != 0 {
+                self.cap_motor_vectors(row, &rows, h, &mut body_a, &mut body_b);
+            }
         }
         for k in 0..6 {
             if flags & (JOINT_LIMIT << k) != 0 {
@@ -1465,6 +1473,26 @@ impl World {
         }
         let room = if top > asked { TURN * asked / top } else { TURN };
         if h * turn > room { room / (h * turn) } else { 1.0 }
+    }
+
+    /// A motor joint's caps: the impulse the three sliding motors hold, as one vector, cut back to axis 0's cap over the substep,
+    /// and the three turning motors' to axis 3's, each pushed back along its own rows. Each axis was capped alone as it solved;
+    /// cutting the sum keeps its direction, as Box2D cuts its motor joint's accumulated impulse (Catto 2011).
+    fn cap_motor_vectors(&mut self, row: usize, rows: &[Row; 6], h: f32, a: &mut Moving, b: &mut Moving) {
+        for first in [0usize, 3] {
+            let held = [self.s(JOINT_MOTOR_0 + first, row), self.s(JOINT_MOTOR_0 + first + 1, row), self.s(JOINT_MOTOR_0 + first + 2, row)];
+            let length = sqrt(held[0] * held[0] + held[1] * held[1] + held[2] * held[2]);
+            let cap = h * self.s(JOINT_CAP_0 + first, row);
+            if !(length > cap) {
+                continue;
+            }
+            let share = cap / length;
+            for k in 0..3 {
+                let total = held[k] * share;
+                rows[first + k].push(a, b, total - held[k]);
+                self.set_s(JOINT_MOTOR_0 + first + k, row, total);
+            }
+        }
     }
 
     /// A motor on one axis: a soft row toward its target and target speed, capped at its most force over this substep.

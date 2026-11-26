@@ -1227,7 +1227,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | Export | Purpose |
 | --- | --- |
 | `Physics` | The world and engine plugin: `update`, `step`, `sync`, `addBody`, `addJoint`, `createCharacterController`, `raycast`, `raycastAll`, `shapeCast`, `projectPoint`, `intersectPoint`, `intersectShape`, `touching`, `contactPoints`, `on`, `debugRender`, `dispose`; `kernel` is the solver's world, with its columns, `hash`, `snapshot` and `restore` |
-| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `addForceAtPoint`, `applyImpulse`, `applyImpulseAtPoint` (both forms take a point too), `addTorque`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, `appliedForce`, `appliedTorque`, `setAdditionalMass`, `setMassProperties`, `mass`, `centerOfMass`, `principalInertia`, `inertiaFrame`, `additionalPgsIterations`, sleep and wake, `gravityScale`, `ccd`, locks (`lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations`), `addCollider`, `removeCollider`, `remove`, `colliders` |
+| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `addForceAtPoint`, `applyImpulse`, `applyImpulseAtPoint` (both forms take a point too), `addTorque`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, `appliedForce`, `appliedTorque`, `setAdditionalMass`, `setMassProperties`, `mass`, `centerOfMass`, `principalInertia`, `inertiaFrame`, `additionalPgsIterations`, `additionalSubsteps`, sleep and wake, `gravityScale`, `ccd`, locks (`lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations`), `addCollider`, `removeCollider`, `remove`, `colliders` |
 | `PhysicsCollider` | What `body.colliders`, events and query hits hand you, one object per collider: `shape`, `body`, `handle`, `valid`, `boundingRadius`, read and set `friction`, `restitution`, `density`, `sensor`, `enabled`, `collisionGroups`, `solverGroups`; `translation`, `rotation`, `translationWrtParent`, `rotationWrtParent`, `halfExtents`, `radius`, `halfHeight`, `vertices`, `indices`, `containsPoint`; for `voxels`, `setVoxel`, `combineVoxelStates`, `propagateVoxelChange`. It throws a `state` error once removed. |
 | `PhysicsJoint` | `setLimits`, `setMotor`, `setRotationMotor` (spherical joints: a spring toward a rotation), `setAxisLimits` and `setAxisMotor` (generic joints: one axis), `clearMotor`, `anchorA`, `anchorB`, `contactsEnabled`, `remove` |
 | `CharacterController` | `move(desired)` per fixed step, `grounded`, `collisions`, `platform`, `innerBody`, `onContact`, `dispose` |
@@ -1252,7 +1252,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | `interpolate` | `true` | Interpolate meshes between steps |
 | `timeScale` | `1` | Slow motion or fast forward |
 | `paused` | `false` | Paused worlds keep their meshes but do not step |
-| `substeps` | `8` | Equal pieces each step is split into; more is stiffer stacks and joints. `iterations` (default 2) are the solver passes in each. `physics.substeps` reads and sets it later (`solverIterations` is its old name); `body.additionalPgsIterations` (default 0) adds passes for that body's island alone |
+| `substeps` | `8` | Equal pieces each step is split into; more is stiffer stacks and joints. `iterations` (default 2) are the solver passes in each. `physics.substeps` reads and sets it later (`solverIterations` is its old name); `body.additionalPgsIterations` (default 0) adds passes for that body's island alone, and `body.additionalSubsteps` (default 0, Rapier's `additional_solver_iterations`) substeps: the island steps at `substeps` plus the most any of its bodies asks, the rest of the world as before |
 | `contactFilter` | none | `(a, b) => boolean \| 'noForces'` per candidate pair |
 | `name` | `'physics'` | Plugin name, for more than one world per engine |
 
@@ -2199,6 +2199,23 @@ physics.addBody(null, {position: [0, 0.6, 0], colliders: {shape: 'sphere', radiu
 physics.step();
 const {vertices, colors} = physics.debugRender({boxes: true});
 console.log(vertices.length / 6 > 12, colors.length / 4 === vertices.length / 3); // true true
+physics.dispose();
+```
+
+### Motor joint
+
+`type: 'motor'` drives body B toward a pose relative to body A, Box2D's motor joint: `linearOffset` is where B's anchor should sit in A's anchor frame and `angularOffset` how B should be turned in A's frame (a unit quaternion). A critically damped spring of `frequency` hertz (default 5, `dampingRatio` 1) pulls it there per kilogram, so a light body and a heavy one follow alike, and its pull is capped at `maxForce` newtons and `maxTorque` newton metres (default `Infinity`) as vectors: a pull on a slant is no stronger than one along an axis. Nothing is locked, so past its caps the body is free: a character's root following its animation, a held prop following a hand, a hook following a crane's target. `joint.setMotorTarget(linearOffset, angularOffset?)`, `setMotorCaps(maxForce, maxTorque)` and `setMotorSpring(frequency, dampingRatio?)` change it as it runs, and `joint.motorTarget` reads the target. Under gravity a body hangs `g / (2 pi frequency)^2` below its target (9.9 mm at 5 Hz); a capped pull cannot brake as hard as the spring asks, so a body pulled far at a low cap overshoots and swings in.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+const hand = physics.addBody(null, {type: 'kinematicPosition', position: [0, 1.2, 0]});
+const cup = physics.addBody(null, {position: [0.5, 0.2, 0], colliders: {shape: 'cylinder', radius: 0.04, halfHeight: 0.05, mass: 0.3}});
+physics.addJoint(hand, cup, {type: 'motor', linearOffset: [0.1, 0, 0], maxForce: 20, maxTorque: 2});
+for (let i = 0; i < 120; i++) physics.step();
+console.log(cup.position.map((v) => v.toFixed(2)).join(' ')); // '0.10 1.19 0.00'
 physics.dispose();
 ```
 

@@ -624,6 +624,15 @@ type JointOptions = (JointBase & {
     limits?: Readonly<Partial<Record<JointDof, readonly [number, number]>>>;
     motors?: Readonly<Partial<Record<JointDof, MotorOptions>>>;
     coupled?: readonly JointDof[];
+})
+ | (JointBase & {
+    type: 'motor';
+    linearOffset?: Vec3;
+    angularOffset?: Quat;
+    maxForce?: number;
+    maxTorque?: number;
+    frequency?: number;
+    dampingRatio?: number;
 });
 
 interface JointOwner {
@@ -1370,6 +1379,8 @@ class PhysicsBody {
     set gravityScale(value: number);
     get additionalPgsIterations(): number;
     set additionalPgsIterations(passes: number);
+    get additionalSubsteps(): number;
+    set additionalSubsteps(substeps: number);
     get ccd(): boolean;
     set ccd(enabled: boolean);
     get softCcdPrediction(): number;
@@ -1597,6 +1608,10 @@ class PhysicsJoint {
     setFriction(maxForce: number): this;
     setArmature(inertia: number, dof?: JointDof): this;
     armature(dof?: JointDof): number;
+    setMotorTarget(linearOffset: Vec3, angularOffset?: Quat): this;
+    get motorTarget(): [[number, number, number], [number, number, number, number]];
+    setMotorCaps(maxForce: number, maxTorque: number): this;
+    setMotorSpring(frequency: number, dampingRatio?: number): this;
     setAxisLimits(dof: JointDof, min: number, max: number): this;
     setAxisMotor(dof: JointDof, motor: MotorOptions): this;
     clearMotor(): this;

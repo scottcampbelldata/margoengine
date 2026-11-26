@@ -397,6 +397,11 @@ impl World {
                 self.set_u(ISLAND_COUNT, id as usize, 0);
                 self.set_u(ISLAND_READY, id as usize, 1);
                 self.set_u(ISLAND_PASSES, id as usize, 0);
+                self.set_u(ISLAND_SUBSTEPS, id as usize, 0);
+            }
+            let more = self.uu(EXTRA_SUBSTEPS, body as usize);
+            if more > self.uu(ISLAND_SUBSTEPS, id as usize) {
+                self.set_u(ISLAND_SUBSTEPS, id as usize, more);
             }
             let extra = self.uu(EXTRA_PASSES, body as usize);
             if extra > self.uu(ISLAND_PASSES, id as usize) {
@@ -435,6 +440,8 @@ impl World {
                 let extra = self.uu(ISLAND_PASSES, id);
                 most = most.max(extra);
                 self.set_u(ISLAND_PASSES, kept, extra);
+                let more = self.uu(ISLAND_SUBSTEPS, id);
+                self.set_u(ISLAND_SUBSTEPS, kept, more);
                 self.set_u(ISLAND_START, kept, first);
                 self.set_u(ISLAND_COUNT, kept, count);
                 for at in first..first + count {
