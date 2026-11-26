@@ -393,6 +393,8 @@ export const BODY_CCD = 1 << 13,
   BODY_CCD_ACTIVE = 1 << 14;
 /** Bit of the `flags` column: the body's gyroscopic term is off. */
 export const BODY_NO_GYROSCOPIC = 1 << 16;
+/** Bit of the `flags` column: a kinematicPosition body on a smooth path to its target (`setNextVelocity`). */
+export const BODY_SMOOTH_PATH = 1 << 18;
 /** An event's first word: the first collider's row under this mask, the sensor bit, and the top bit when it started. */
 export const EVENT_COLLIDER = (1 << 30) - 1;
 export const EVENT_SENSOR = 1 << 30;

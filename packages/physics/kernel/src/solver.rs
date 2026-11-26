@@ -180,6 +180,8 @@ impl Moving {
 impl World {
     #[inline(always)]
     pub fn moving(&self, at: usize) -> Moving {
+        let substeps = if self.window.substeps > 0 { self.window.substeps } else { self.header().substeps };
+        let (linear, angular) = self.kinematic_velocity(at, self.window.substep, substeps, self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
         Moving {
             mass: self.v(SOLVE_MASS_X, at),
             inertia: Sym {
@@ -190,8 +192,8 @@ impl World {
                 yz: self.s(SOLVE_INERTIA_YZ, at),
                 zz: self.s(SOLVE_INERTIA_ZZ, at),
             },
-            linear: self.v(LINEAR_X, at),
-            angular: self.v(ANGULAR_X, at),
+            linear,
+            angular,
         }
     }
 
@@ -530,8 +532,9 @@ impl World {
         for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
-            let (linear_a, angular_a) = (self.v(LINEAR_X, a), self.v(ANGULAR_X, a));
-            let (linear_b, angular_b) = (self.v(LINEAR_X, b), self.v(ANGULAR_X, b));
+            let (substep, substeps) = (self.window.substep, if self.window.substeps > 0 { self.window.substeps } else { self.header().substeps });
+            let (linear_a, angular_a) = self.kinematic_velocity(a, substep, substeps, self.v(LINEAR_X, a), self.v(ANGULAR_X, a));
+            let (linear_b, angular_b) = self.kinematic_velocity(b, substep, substeps, self.v(LINEAR_X, b), self.v(ANGULAR_X, b));
             let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
             let (turn_a, turn_b) = (angular_a.scale(h), angular_b.scale(h));
             // The arm's move over a turn t, arm - R(-t) arm = t x arm - (t x (t x arm)) / 2 to second order, written so (the

@@ -383,6 +383,40 @@ console.log(tentacle.points().length, hose.held('end')); // 75 true
 hose.release('end'); // the hose is let go at the tank
 ```
 
+## Loose props on a moving deck
+
+Props resting on a moving body (cups, plates and chairs in a ship's saloon, crates in a lift) stick, slide and tip as its
+accelerations ask, through ordinary contacts with friction. A deck driven by forces (a hull the sea solvers move) needs
+nothing more.
+- A deck driven to its pose each step (`kinematicPosition`) should also get the velocity and spin to reach each pose with,
+  `setNextVelocity`, as the motion's own derivative. It then moves on a smooth path through the step. Driven at one speed
+  a step, its whole change of speed lands in a step's first substep, where a prop's friction holds only mu N h, and props
+  slip.
+- Keep the deck within a few hundred metres of the origin: f32 poses far out round each move the same way, and a deck 1 km
+  out at 17 m/s loses its props 0.4 m a minute (`docs/known-bugs.md`, KB-PHYS-POSEROUND1).
+- Up to 16 substeps a prop holds where friction holds it; from 32 it still slips slowly (`docs/known-bugs.md`,
+  KB-PHYS-FINECONE1).
+- Give a prop that must hold one collider where it touches: a body touching through several (a chair on four legs)
+  creeps about 2 cm in 36 s under a storm deck's changing load where one box holds within 2 mm (`docs/known-bugs.md`,
+  KB-PHYS-MULTIPAIRCREEP1).
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null);
+const roll = (t: number) => 0.3 * Math.sin((2 * Math.PI * t) / 10); // 17 degrees at 10 s
+const deck = physics.addBody(null, {type: 'kinematicPosition', colliders: {shape: 'box', halfExtents: [6, 0.25, 4]}});
+const cup = physics.addBody(null, {position: [0, 0.35, 0], colliders: {shape: 'box', halfExtents: [0.04, 0.1, 0.04], friction: 0.6}});
+for (let i = 1; i <= 600; i++) {
+  const t = i / 60, a = roll(t), spin = 0.3 * ((2 * Math.PI) / 10) * Math.cos((2 * Math.PI * t) / 10);
+  deck.setNextRotation([Math.sin(a / 2), 0, 0, Math.cos(a / 2)]);
+  deck.setNextVelocity([0, 0, 0], [spin, 0, 0]);
+  physics.step();
+}
+console.log(cup.position[1] > 0); // true: still on the deck after ten seconds of rolling
+```
+
 ## Drag joint
 
 `new DragJoint(physics, body, point, {frequency = 5, damping = 0.7, maxForce})` grabs a dynamic body at a world point and pulls that point toward a target, as a mouse joint does (the soft constraint of Catto, GDC 2011, as a frequency and a damping ratio, so a light body and a heavy one follow the pointer alike). Move the target with `setTarget(point)`, read the grabbed point with `gripPoint()`, and let go with `remove()` (removing the body lets go too). `maxForce` caps the pull in newtons so a far target cannot hurl a body.
@@ -1227,7 +1261,7 @@ A body on a part below the root is fitted at that part's world scale. A skinned 
 | Export | Purpose |
 | --- | --- |
 | `Physics` | The world and engine plugin: `update`, `step`, `sync`, `addBody`, `addJoint`, `createCharacterController`, `raycast`, `raycastAll`, `shapeCast`, `projectPoint`, `intersectPoint`, `intersectShape`, `touching`, `contactPoints`, `on`, `debugRender`, `dispose`; `kernel` is the solver's world, with its columns, `hash`, `snapshot` and `restore` |
-| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`), velocities, `addForce`, `addForceAtPoint`, `applyImpulse`, `applyImpulseAtPoint` (both forms take a point too), `addTorque`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, `appliedForce`, `appliedTorque`, `setAdditionalMass`, `setMassProperties`, `mass`, `centerOfMass`, `principalInertia`, `inertiaFrame`, `additionalPgsIterations`, `additionalSubsteps`, sleep and wake, `gravityScale`, `ccd`, locks (`lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations`), `addCollider`, `removeCollider`, `remove`, `colliders` |
+| `PhysicsBody` | Pose, teleport (`setPosition`, `setRotation`), kinematic targets (`setNextPosition`, `setNextRotation`, and `setNextVelocity` for a smooth path), velocities, `addForce`, `addForceAtPoint`, `applyImpulse`, `applyImpulseAtPoint` (both forms take a point too), `addTorque`, `applyTorqueImpulse`, `resetForces`, `resetTorques`, `appliedForce`, `appliedTorque`, `setAdditionalMass`, `setMassProperties`, `mass`, `centerOfMass`, `principalInertia`, `inertiaFrame`, `additionalPgsIterations`, `additionalSubsteps`, sleep and wake, `gravityScale`, `ccd`, locks (`lockTranslations`, `lockRotations`, `enabledTranslations`, `enabledRotations`), `addCollider`, `removeCollider`, `remove`, `colliders` |
 | `PhysicsCollider` | What `body.colliders`, events and query hits hand you, one object per collider: `shape`, `body`, `handle`, `valid`, `boundingRadius`, read and set `friction`, `restitution`, `density`, `sensor`, `enabled`, `collisionGroups`, `solverGroups`; `translation`, `rotation`, `translationWrtParent`, `rotationWrtParent`, `halfExtents`, `radius`, `halfHeight`, `vertices`, `indices`, `containsPoint`; for `voxels`, `setVoxel`, `combineVoxelStates`, `propagateVoxelChange`. It throws a `state` error once removed. |
 | `PhysicsJoint` | `setLimits`, `setMotor`, `setRotationMotor` (spherical joints: a spring toward a rotation), `setAxisLimits` and `setAxisMotor` (generic joints: one axis), `clearMotor`, `anchorA`, `anchorB`, `contactsEnabled`, `remove` |
 | `CharacterController` | `move(desired)` per fixed step, `grounded`, `collisions`, `platform`, `innerBody`, `onContact`, `dispose` |
@@ -2354,6 +2388,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Capability (Rapier 3D) | Kernel and `margoengine/physics` | Status | Tests |
 | --- | --- | --- | --- |
 | Body types: dynamic, fixed, kinematic position-based, kinematic velocity-based | `addBody`, `setType`, `setNextPosition` | full | `next-bodies.test.js`, `next-events.test.js` |
+| Kinematic position-based bodies on a smooth path: a target with the velocity and spin to reach it with, the body moving through the step on the cubic Hermite path of its pose, target and end speeds, so what rides on it feels its acceleration through the step (beyond Rapier, whose kinematic bodies move at one speed a step) | `setNextVelocity` | full | `kernel/tests/solver.rs`, `deck-props.test.js` |
 | Pose, linear and angular velocity, teleport with or without waking | `setPosition`, `setRotation`, `setLinearVelocity`, `setAngularVelocity` | full | `next-bodies.test.js`, `next-dynamics.test.js` |
 | Forces, torques, impulses, torque impulses, forces and impulses at a point, reset forces | `addForce`, `addForceAtPoint`, `addTorque`, `applyImpulse`, `applyImpulseAtPoint`, `applyTorqueImpulse`, `resetForces`, `resetTorques` | full | `next-dynamics.test.js` |
 | Linear and angular damping, gravity scale | body options | full | `next-damping-gravity.test.js`, `next-dynamics.test.js` |

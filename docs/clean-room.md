@@ -17064,3 +17064,30 @@ The reference model easing into a new heading, the gain scheduling by a tenth of
 the rudder is hard over and the drift low-passed over 10 L / U are this package's own arrangement. Proof:
 `packages/physics/tests/ship.test.js` (the three autopilot and Holtrop tests).
 
+
+
+## physics loose props on a moving deck: friction anchors on a turning body, smooth kinematic paths (2026-11-26)
+
+Files: `packages/physics/kernel/src/solver.rs` (`tally_drift`), `packages/physics/kernel/src/integrate.rs` (`kinematic_pose`,
+`smooth_velocity`, `kinematic_velocity`), `packages/physics/src/body.ts` (`setNextVelocity`). No rival engine source and no
+paper's companion code was read.
+
+- E. Catto, "Solver2D" (2024), https://box2d.org/posts/2024/02/solver2d/ . Used: the soft step with a relaxing pass, and
+  friction anchors held fixed in each body over a step. The anchors' slide over a substep is our own derivation below.
+- The exponential map of rotations (Rodrigues' formula; any rigid-body dynamics text, for example R. M. Murray, Z. Li and
+  S. S. Sastry, *A Mathematical Introduction to Robotic Manipulation*, CRC Press 1994, chapter 2). Used: an arm turned by a
+  rotation vector t moves by t x a + t x (t x a) / 2 + O(t^3). Measured from the arm after the turn, as the tally reads it,
+  the second-order term changes sign: a - R(-t) a = t x a - t x (t x a) / 2.
+- The Baker-Campbell-Hausdorff series, E. Hairer, C. Lubich and G. Wanner, *Geometric Numerical Integration*, 2nd ed.,
+  Springer 2006, section III.4, https://doi.org/10.1007/3-540-30666-8 ; and A. Iserles, H. Z. Munthe-Kaas, S. P. Norsett and
+  A. Zanna, "Lie-group methods", *Acta Numerica* 9 (2000), https://doi.org/10.1017/S0962492900002154 . Used:
+  log(exp(X) exp(Y)) = X + Y + [X, Y] / 2 + ([X, [X, Y]] + [Y, [Y, X]]) / 12 + ..., with the bracket of so(3) the cross
+  product. With X = b and Y = -a, the turn between two poses on a rotation-vector path is b - a + (a x b) / 2 +
+  (a + b) x (a x b) / 12 to third order (our own reduction). A fourth-order bound, |a|^2 |b - a| / 12, is what the
+  regression allows.
+- The cubic Hermite basis (any numerical analysis text). Used: the path of position and rotation vector from the step's
+  pose to its target, with the speeds at both ends, so its speed is continuous across steps.
+
+Own derivations: the friction demand of a prop on a ship's deck, R^T (a - g) at the prop, from the deck's motion in doubles
+(`packages/physics/tests/deck-props.test.js`); the tipping criterion, half width over the height of the centre of mass
+against that demand; the slow-heel onset at atan mu.

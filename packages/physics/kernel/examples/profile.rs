@@ -71,6 +71,7 @@ fn step(w: &mut World, dt: f32, clock: &mut Clock) {
     let hertz = if hertz * h > 0.25 { 0.25 / h } else { hertz };
     let stiffness = soft(hertz, damping, h);
     for substep in 0..substeps {
+        w.window.substep = substep;
         w.integrate_velocities(h);
         clock.lap(6);
         w.refresh_joints();
@@ -92,7 +93,7 @@ fn step(w: &mut World, dt: f32, clock: &mut Clock) {
             w.solve_contacts(h, stiffness, true, substep as usize, least, false);
             clock.lap(10);
         }
-        w.integrate_poses(h, substep + 1 == substeps);
+        w.integrate_poses(h, substep, substeps);
         w.tally_drift(h);
         clock.lap(11);
         w.refresh_joints();

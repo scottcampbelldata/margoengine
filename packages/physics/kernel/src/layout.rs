@@ -85,6 +85,20 @@ columns! {
     CENTER_X f32 Body,
     CENTER_Y f32 Body,
     CENTER_Z f32 Body,
+    // A kinematic body on a smooth path (SMOOTH_PATH): the velocity and spin it reaches its target with, and those it began
+    // the step with (its last target's), world axes.
+    TARGET_LINEAR_X f32 Body,
+    TARGET_LINEAR_Y f32 Body,
+    TARGET_LINEAR_Z f32 Body,
+    TARGET_ANGULAR_X f32 Body,
+    TARGET_ANGULAR_Y f32 Body,
+    TARGET_ANGULAR_Z f32 Body,
+    START_LINEAR_X f32 Body,
+    START_LINEAR_Y f32 Body,
+    START_LINEAR_Z f32 Body,
+    START_ANGULAR_X f32 Body,
+    START_ANGULAR_Y f32 Body,
+    START_ANGULAR_Z f32 Body,
     LOCAL_CENTER_X f32 Body,
     LOCAL_CENTER_Y f32 Body,
     LOCAL_CENTER_Z f32 Body,
@@ -919,6 +933,9 @@ pub const ASKED_TO_SLEEP: u32 = 1 << 15;
 pub const NO_GYROSCOPIC: u32 = 1 << 16;
 /// Taken out of the world by the step because its numbers left the range (see `check_range`); stays set, with DISABLED.
 pub const QUARANTINED: u32 = 1 << 17;
+/// A kinematicPosition body that reaches its target at a velocity (TARGET_LINEAR_X, TARGET_ANGULAR_X), moving through the
+/// step along the cubic of its pose, its target and its speeds at both ends (`World::smooth_velocity`), not at one speed.
+pub const SMOOTH_PATH: u32 = 1 << 18;
 
 // Bits of the COLLIDER_FLAGS column.
 /// Sees overlaps and pushes nothing.

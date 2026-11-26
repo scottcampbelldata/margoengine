@@ -90,6 +90,16 @@ fn scene(w: &mut World) {
             dynamic(w, SHAPE_BOX, [0.4; 3], v3(8.5 + stack as f32 * 2.5, 0.9 + level as f32 * 0.81, 0.0));
         }
     }
+    // A kinematic body on a smooth path (SMOOTH_PATH) under a stack: its chords are read at each island's stages.
+    let smooth = w.add_body(KINEMATIC_POSITION).unwrap();
+    w.add_collider(smooth, SHAPE_BOX, [1.5, 0.25, 1.5], [0.0; 3], IDENTITY, 0.0).unwrap();
+    w.set_v(POSITION_X, smooth as usize, v3(-14.0, 0.25, 6.0));
+    w.set_v(TARGET_X, smooth as usize, v3(-13.6, 0.5, 6.0));
+    w.set_v(TARGET_LINEAR_X, smooth as usize, v3(3.0, 0.0, 0.5));
+    w.set_u(FLAGS, smooth as usize, w.flags(smooth as usize) | SMOOTH_PATH);
+    for level in 0..3 {
+        dynamic(w, SHAPE_BOX, [0.4; 3], v3(-14.0, 0.9 + level as f32 * 0.81, 6.0));
+    }
     for i in 0..6 {
         let spinner = dynamic(w, SHAPE_BOX, [0.3, 0.2, 0.4], v3(-10.0 + i as f32 * 1.5, 2.0, 0.0));
         w.set_v(ANGULAR_X, spinner as usize, v3(3.0 * i as f32, 20.0, 1.0));
