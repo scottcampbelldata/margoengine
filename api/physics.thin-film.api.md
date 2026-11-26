@@ -92,6 +92,7 @@ export interface ThinFilmLoadOptions {
     readonly id?: string;
     readonly rigid?: boolean;
     readonly hydrostaticLoad?: boolean;
+    readonly impactRecoil?: boolean;
     readonly rainField?: FieldDescriptor;
     readonly impacts?: FieldDescriptor;
     readonly waveSources?: boolean;

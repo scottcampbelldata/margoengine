@@ -15286,6 +15286,12 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   solid surface” (1997). The optional absorbing receiver represents deposition with conserved liquid
   volume. The experiments distinguish deposition from a separate splash regime.
   [Journal](https://doi.org/10.1007/s003480050073)
+- Xiaolong Yu, Yifan Shao, Kwee-Yan Teh and David L. S. Hung, “Force of droplet impact on thin
+  liquid films” (2022). The resolved force history depends on film depth and on the short
+  impact timescale. The rigid option represents the unresolved, absorbed normal impulse
+  `−ρ V U n`. Deposit the droplet in the film and apply this impulse and its moment about
+  the body centre through the registered body force port. The wake option owns the other
+  route for that pulse. [Journal](https://doi.org/10.1063/5.0083437)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves

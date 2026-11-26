@@ -571,6 +571,69 @@ class Impacts {
   }
 }
 
+test('ThinFilmSolver: an absorbed off-centre impact delivers one rigid impulse and torque', async () => {
+  await Physics.load();
+  const dt = 1 / rate.num;
+  const gravity = [0, 0, 0];
+  const mass = 10;
+  const density = 998;
+  const halfExtents = [0.3, 0.04, 0.3];
+  const angle = Math.PI / 6;
+  const sine = Math.sin(angle);
+  const cosine = Math.cos(angle);
+  const world = new PhysicsWorld({ rate, gravity, memory: worldMemory(false) });
+  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: dt, gravity });
+  const body = rigid.addBody(null, { colliders: { shape: 'box', halfExtents, mass } });
+  const film = await ThinFilmSolver.load({ rigid: true, impactRecoil: true, impacts: input });
+  world
+    .add(new RigidSolver(), { physics: rigid })
+    .add(film, { bodyRow: body.row, cells: [6, 6], spacing: 0.04, u: [cosine, sine, 0], density })
+    .add(new Impacts(), {});
+  world.couple(['rigid', 'thin-film'], 'staggered');
+  world.advance(2);
+  const checkpoint = world.takeSnapshot();
+  world.advance(3);
+  assert.equal(film.budget.impacts, hit.volume);
+  const impulse = density * hit.volume * hit.speed;
+  const fx = (impulse * sine) / dt;
+  const fy = (-impulse * cosine) / dt;
+  const tz = (-hit.u * impulse) / dt;
+  const expectedForce = [fx, fy, 0, hit.v * fy, -hit.v * fx, tz];
+  const { region } = film.exportPorts(2).find((port) => port.field === BODY_FORCES_FIELD.name);
+  const row = regionWords(world.memory, region).subarray(6 * body.row, 6 * (body.row + 1));
+  for (const [i, expected] of expectedForce.entries())
+    assert.ok(Math.abs(row[i] - expected) <= 128 * Number.EPSILON * (impulse / dt));
+
+  world.advance(4);
+  const inertia = (mass * (halfExtents[0] ** 2 + halfExtents[1] ** 2)) / 3;
+  for (const [actual, expected] of [
+    [body.linearVelocity[0], (fx * dt) / mass],
+    [body.linearVelocity[1], (fy * dt) / mass],
+    [body.angularVelocity[2], (tz * dt) / inertia],
+  ]) {
+    // Rigid mass, inverse inertia, force and velocity pass through f32 fields.
+    assert.ok(Math.abs(actual - expected) <= 16 * 2 ** -24 * Math.abs(expected), `${actual} vs ${expected}`);
+  }
+  const velocity = [...body.linearVelocity];
+  world.advance(8);
+  assert.deepEqual(body.linearVelocity, velocity);
+  assert.equal(film.budget.impacts, hit.volume);
+  const hash = world.hash();
+  world.restoreSnapshot(checkpoint.bytes);
+  world.advance(8);
+  assert.equal(world.hash(), hash);
+});
+
+test('ThinFilmSolver: one impact pulse has one momentum receiver', async () => {
+  await assert.rejects(
+    () => ThinFilmSolver.load({ rigid: true, impactRecoil: true, impacts: input, waveSources: true }),
+    {
+      code: 'PHYSICS_INPUT_RANGE',
+      message: /omit waveSources/,
+    },
+  );
+});
+
 async function platforms(count) {
   const loaded = await Promise.all(
     Array.from({ length: count }, () => ThinFilmSolver.load({ impacts: input, waveSources: true })),

@@ -9605,13 +9605,15 @@ receiver covers deposition. Moving receivers, splashing, rebound, satellite brea
 pinch-off away from a configured outlet remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
 The optional `hydrostaticLoad` adds the film's normal gravitational force and moment to
 its rigid mount. The coupled test checks both a supported tray and an off-centre underside
-patch. Transient added mass, tangential wall traction and impact recoil remain open.
+patch. The optional `impactRecoil` sends the resolved volume's incoming normal impulse
+and its moment to the rigid mount over one world tick. Transient added mass, tangential
+wall traction and the time profile of the collision force remain open.
 For fully developed glycerol flow on a 20° glass plate, the modeled depths at the 350 mm probe
 are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 13,004 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 13,199 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

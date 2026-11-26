@@ -51,6 +51,8 @@ export interface ThinFilmLoadOptions {
   readonly rigid?: boolean;
   /** Send the film's normal gravitational load to the mounted rigid body. Defaults to false. */
   readonly hydrostaticLoad?: boolean;
+  /** Send absorbed droplets' normal impulse to the mounted rigid body. Defaults to false. */
+  readonly impactRecoil?: boolean;
   /** Optional layout-1 rain rate in m/s. Accepts a scalar or one value per film cell. */
   readonly rainField?: FieldDescriptor;
   /** Optional layout-1 impact rows in the local UV plane. */
@@ -198,6 +200,11 @@ interface Frame {
   readonly center: Vec3;
   readonly velocity: Vec3;
   readonly angular: Vec3;
+}
+
+interface ImpactRecoil {
+  readonly force: Vec3;
+  readonly torque: Vec3;
 }
 
 function number(label: string, value: number, min = -Infinity): number {
@@ -375,6 +382,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
   /** Layout-1 timed drop records, one per configured circular outlet. */
   readonly dropsField: FieldDescriptor;
   private readonly fields: readonly FieldUse[];
+  private readonly loadsMount: boolean;
   private readonly windSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly rainSample: PrecipitationSample = {
     rate: 0,
@@ -409,13 +417,21 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     });
     if (options.rainField && options.rainField.name === options.impacts?.name)
       throw new RangeError('Repeated thin-film inputs. Use different names for rain and impacts.');
+    if (options.impactRecoil && (!options.rigid || !options.impacts || options.waveSources))
+      throw Object.assign(
+        new RangeError(
+          'Thin-film impact recoil needs one mounted impulse receiver. Load with rigid and impacts, and omit waveSources.',
+        ),
+        { code: 'PHYSICS_INPUT_RANGE' },
+      );
+    this.loadsMount = Boolean(options.hydrostaticLoad || options.impactRecoil);
     this.fields = [
       { field: this.filmField, access: 'write' },
       { field: this.dripsField, access: 'write' },
       ...(options.waveSources ? [{ field: this.waveField, access: 'write' as const }] : []),
       ...(options.drops ? [{ field: this.dropsField, access: 'write' as const }] : []),
       ...(options.rigid ? [{ field: BODIES_FIELD, access: 'read' as const }] : []),
-      ...(options.hydrostaticLoad ? [{ field: BODY_FORCES_FIELD, access: 'accumulate' as const }] : []),
+      ...(this.loadsMount ? [{ field: BODY_FORCES_FIELD, access: 'accumulate' as const }] : []),
       ...(options.rainField ? [{ field: options.rainField, access: 'read' as const }] : []),
       ...(options.impacts ? [{ field: options.impacts, access: 'read' as const }] : []),
     ];
@@ -443,8 +459,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const rawV = unit('v tangent', opts.v ?? [0, 0, -1]);
     const v = unit('orthogonal v tangent', minus(rawV, scale(u, dot(u, rawV))));
     const bodyRow = opts.bodyRow === undefined ? undefined : size('body row', opts.bodyRow, 0);
-    if (this.options.hydrostaticLoad && bodyRow === undefined)
-      throw new MargoError('state', 'Thin-film weight needs a mount. Load with rigid: true and pass a body row.');
+    if (this.loadsMount && bodyRow === undefined)
+      throw new MargoError('state', 'Thin-film body loads need a mount. Load with rigid: true and pass a body row.');
     if (
       (this.options.rigid !== undefined && this.options.rigid !== (bodyRow !== undefined)) ||
       (bodyRow !== undefined && !this.options.rigid)
@@ -533,8 +549,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const wettingMap = wettingValues?.cells && allocate('wetting-map', count);
     const contactAngles = wettingValues?.contact && allocate('contact-angles', 2);
     const forces =
-      this.options.hydrostaticLoad && bodyRow !== undefined
-        ? allocate('body-forces', FORCE_WORDS * bodyRowsOf(host, 'Thin-film weight', [bodyRow]))
+      this.loadsMount && bodyRow !== undefined
+        ? allocate('body-forces', FORCE_WORDS * bodyRowsOf(host, 'Thin-film body loads', [bodyRow]))
         : undefined;
     const outlets = entries && {
       entries,
@@ -738,7 +754,13 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     return index;
   }
 
-  private impactRain(s: FilmState, frame: Frame, context: StepContext, dt: number, rates: Float64Array) {
+  private impactRain(
+    s: FilmState,
+    frame: Frame,
+    context: StepContext,
+    dt: number,
+    rates: Float64Array,
+  ): { added: number; tick: number; recoil?: ImpactRecoil } {
     const waves = s.nextWaves && words(s, s.nextWaves);
     waves?.fill(0);
     const descriptor = this.options.impacts;
@@ -752,6 +774,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const density = words(s, s.constants)[1]!;
     const h = words(s, s.depth);
     let added = 0;
+    let force = ORIGIN;
+    let torque = ORIGIN;
     for (let i = 0; i < impacts.length; i += FILM_IMPACT_WORDS) {
       const volume = number('impact volume', impacts[i + 3]!, 0);
       if (volume === 0) continue;
@@ -763,6 +787,11 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         throw new RangeError('Thin-film impact is outside the patch. Use coordinates inside the UV extent.');
       const j = this.spread(s, rates, u, v, r, volume / (s.area * dt));
       added += volume;
+      if (this.options.impactRecoil && inward > 0) {
+        const reaction = scale(frame.n, (-density * volume * inward) / dt);
+        force = plus(force, reaction);
+        torque = plus(torque, cross(minus(position(frame, u, v), frame.center), reaction));
+      }
       if (waves && h[j]! > 0 && inward > 0) {
         // The wave field carries pressure only. The film already counts the deposited water.
         const projection = Math.max(0, frame.n[1]);
@@ -779,7 +808,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         waves[at + 3] = (integrated + (density * volume * inward * projection) / (dt * shape)) / (spread * spread);
       }
     }
-    return { added, tick: published.tick };
+    return { added, tick: published.tick, recoil: this.options.impactRecoil ? { force, torque } : undefined };
   }
 
   step(context: StepContext, dt: number): void {
@@ -828,7 +857,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     budget[5] = delta[3]!;
     budget[6] = delta[4]!;
     words(s, s.motion).set([1, ...velocity, impact.tick]);
-    this.writeRecords(s, f);
+    this.writeRecords(s, f, impact.recoil);
   }
 
   private releaseDrops(s: FilmState, frame: Frame, cell: Cell, dt: number): void {
@@ -866,12 +895,13 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     }
   }
 
-  private writeRecords(s: FilmState, frame?: Frame): void {
+  private writeRecords(s: FilmState, frame?: Frame, recoil?: ImpactRecoil): void {
     const out = words(s, s.cellRecords);
     const h = words(s, s.depth);
     const base = words(s, s.bottom);
     const drains = words(s, s.drips);
     const load = frame && s.forces;
+    const support = load && this.options.hydrostaticLoad;
     let thickness = 0;
     let momentU = 0;
     let momentV = 0;
@@ -884,14 +914,16 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         out[at + 2] = base[i]!;
         out[at + 3] = h[i]!;
         out[at + 4] = drains[i]!;
-        if (load) {
+        if (support) {
           thickness += h[i]!;
           momentU += h[i]! * out[at]!;
           momentV += h[i]! * out[at + 1]!;
         }
       }
     }
-    if (load && frame) {
+    let force = ORIGIN;
+    let torque = ORIGIN;
+    if (support && frame) {
       const g = dot(s.gravity, frame.n);
       const normal = s.suspended ? g : Math.min(0, g);
       const traction = scale(frame.n, normal * words(s, s.constants)[1]! * s.area);
@@ -899,8 +931,14 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         scale(minus(frame.origin, frame.center), thickness),
         plus(scale(frame.u, momentU), scale(frame.v, momentV)),
       );
-      const force = scale(traction, thickness);
-      const torque = cross(moment, traction);
+      force = scale(traction, thickness);
+      torque = cross(moment, traction);
+    }
+    if (load) {
+      if (recoil) {
+        force = plus(force, recoil.force);
+        torque = plus(torque, recoil.torque);
+      }
       words(s, load).set([...force, ...torque], s.bodyRow! * FORCE_WORDS);
     }
   }
