@@ -93,6 +93,7 @@ export class FireFront implements EnginePlugin {
     get burningCells(): number;
     get smokeColumns(): readonly Smoke[];
     get smokeEmission(): number;
+    get radiantPower(): number;
     get active(): boolean;
     ignite(x: number, z: number, radius?: number, time?: number): this;
     advanceTime(delta: number): void;
@@ -214,6 +215,8 @@ export interface FuelModel {
 }
 
 export const NO_FUEL = 3;
+
+export const RADIANT_SHARE = 0.3;
 
 export const UNBURNT = 0;
 

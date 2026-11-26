@@ -31,6 +31,8 @@ export interface DeadFuelMoisture {
     moisture100: number;
 }
 
+export const FIRE_LIGHT_COLOR: readonly [number, number, number];
+
 export const FUEL_TIMELAGS: readonly [number, number, number];
 
 export class FuelMoistureModel {
@@ -60,6 +62,8 @@ export const KOSCHMIEDER = 3.912;
 export interface MachineOptions {
     seed?: number;
 }
+
+export const NOON_IRRADIANCE = 1000;
 
 export const RAIN_FUEL_MOISTURE = 0.35;
 
@@ -247,6 +251,8 @@ export function dustFromWind(speed: number, threshold?: number): number;
 export function dustVisibility(pm10: number): number;
 
 export function equilibriumMoisture(humidity: number, temperature: number): number;
+
+export function fireHazeLight(radiantPower: number, width?: number): [number, number, number];
 
 export function fogDensity(state: WeatherState): number;
 
