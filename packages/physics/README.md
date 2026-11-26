@@ -3417,7 +3417,10 @@ console.log(film?.radius, film?.centreThickness);
 
 Set `evaporation` for a release with a modified distillation curve. Supply slick temperature and initial boiling
 point in kelvin, the slope in kelvin per distilled volume fraction, and air-side transfer in m/s. All four inputs
-stay constant for the release. `evaporatedMass` is cumulative vapour mass in kilograms. Add it to the water,
+stay constant for the release. By default, the exposed area grows with Fay spreading. For a known fixed area, set
+`evaporation.referenceThickness` to the initial volume divided by that area, in metres. This changes how the
+solver calculates evaporation while the visible slick continues to spread. `evaporatedMass` is cumulative
+vapour mass in kilograms. Add it to the water,
 surface and bed terms to account for `budget.released`.
 
 ```ts

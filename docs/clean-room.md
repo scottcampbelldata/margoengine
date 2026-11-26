@@ -13369,6 +13369,18 @@ find that many crude oils are weakly sensitive to wind. The transfer coefficient
 validation of the expanding-slick evaporation model remains open. The early, intermediate and late analytical cases
 compare against independent quadrature at 30 and 60 world steps per second.
 
+For a fixed exposure area, `referenceThickness = V₀/A` makes the exposure `θ = kt / referenceThickness`.
+W. Stiver and D. Mackay's [Environment Canada report EE-49 (1983), Eqs. 3, 7 and 13 and Figs. 9 and 12](https://publications.gc.ca/collections/collection_2024/eccc/en40/En40-249-49-eng.pdf)
+defines the same dimensionless exposure for tray evaporation and saturated gas stripping. A straight-line fit to the
+12 Norman Wells atmospheric distillation circles in Fig. 9 gives an intercept of 380.03 K and slope of 463.83 K
+per unit distilled fraction. The largest fit residual is 3.26 K. Allowing 1 K for plot reading gives 4.3 K for
+the distillation input. The comparison uses the seven 0 °C measured circles in Fig. 12. Equation 18 was fitted
+to the 22 °C rate data, and the solid prediction line in Fig. 12 supplies no reference values. The world clock
+maps 1,000 exposure units to a second. The test propagates the distillation error, 0.001 fraction and 75
+exposure units for plot reading, and half a tick through Eq. 13. The peak discrepancy is 0.45 percentage points.
+This covers fixed exposure, with a constant-density conversion from volume to mass. An independent measurement
+of evaporation from a freely expanding slick remains open.
+
 Depth-dependent vertical diffusion uses André W. Visser, [“Using random walk models to simulate the vertical distribution of particles in a turbulent water column” (1997)](https://doi.org/10.3354/meps158275), equation 6.
 The random step includes the diffusivity-gradient drift and evaluates its variance at half that drift. A manufactured
 linear profile verifies the first two moments and the midpoint using a uniform control with the same random input.

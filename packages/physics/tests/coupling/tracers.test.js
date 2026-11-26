@@ -493,6 +493,73 @@ test('SEA-15 evaporation integrates the spreading area and conserves released, l
   }
 });
 
+test('SEA-15 fixed-area exposure agrees with independent 0 °C Norman Wells evaporation measurements', (t) => {
+  // Stiver and Mackay (EE-49, 1983). Fit the boiling curve to the 12 Norman Wells markers in Fig. 9.
+  // The evaporation measurements in Fig. 12 were collected at 0 °C, outside the 22 °C rate regression.
+  const evaporation = {
+    temperature: 273.15,
+    initialBoilingPoint: 380.03,
+    distillationSlope: 463.83,
+    massTransferCoefficient: 0.01,
+    referenceThickness: 1e-5,
+  };
+  const measured = [
+    [560, 0.0791],
+    [1490, 0.1243],
+    [4210, 0.1795],
+    [9370, 0.2291],
+    [13240, 0.249],
+    [20660, 0.2774],
+    [32280, 0.299],
+  ];
+  const mass = 0.025;
+  const rate = 60;
+  const exposureRate = evaporation.massTransferCoefficient / evaporation.referenceThickness;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+    capacity: 4,
+    oilSpills: [{ mass, position: [0, 0], spreadingCoefficient: 0, parcels: 4, evaporation }],
+    horizontalDiffusivity: 0,
+  });
+  const slope = (10.3 * evaporation.distillationSlope) / evaporation.temperature;
+  let maximumError = 0;
+  for (const [exposure, fraction] of measured) {
+    world.advance(Math.round((exposure / exposureRate) * rate));
+    // The distillation fit residual plus plot reading uncertainty is ≤4.3 K. The largest effect
+    // on evaporated fraction is that error divided by the distillation slope (Eq. 13).
+    // Fig. 12 reading adds 0.001 in fraction and up to 75 in exposure, plus half a tick.
+    const exposureError = 75 + exposureRate / (2 * rate);
+    const bound = 4.3 / evaporation.distillationSlope + 0.001 + Math.log(exposure / (exposure - exposureError)) / slope;
+    const predicted = tracer.evaporatedMass / mass;
+    const error = Math.abs(predicted - fraction);
+    assert.ok(error <= bound, `exposure ${exposure}: ${predicted} vs ${fraction} ± ${bound}`);
+    assert.ok(Math.abs(tracer.budget.surface + tracer.evaporatedMass - mass) < 1e-15);
+    maximumError = Math.max(maximumError, error);
+  }
+  t.diagnostic(`Peak evaporation error ${(100 * maximumError).toFixed(2)} percentage points.`);
+});
+
+test('SEA-15 fixed evaporative exposure requires a finite positive reference thickness', () => {
+  for (const referenceThickness of [0, -1e-5, NaN, Infinity]) {
+    const tracer = new TracerSolver();
+    const evaporation = {
+      temperature: 273.15,
+      initialBoilingPoint: 380,
+      distillationSlope: 460,
+      massTransferCoefficient: 0.01,
+      referenceThickness,
+    };
+    assert.throws(
+      () =>
+        new PhysicsWorld().add(tracer, {
+          capacity: 2,
+          oilSpills: [{ mass: 0.025, position: [0, 0], spreadingCoefficient: 0, parcels: 2, evaporation }],
+        }),
+      /positive finite referenceThickness/,
+    );
+  }
+});
+
 test('SEA-15 a completely evaporated release clears its parcels and leaves the other slick unchanged', () => {
   const tracer = new TracerSolver();
   const config = { temperature: 300, initialBoilingPoint: 300, distillationSlope: 0, massTransferCoefficient: 3 };

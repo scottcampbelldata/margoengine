@@ -12,15 +12,18 @@ export interface TracerOilEvaporation {
   distillationSlope: number;
   /** Air-side mass-transfer coefficient in m/s. Use 0 for no transfer. */
   massTransferCoefficient: number;
+  /** Initial oil volume divided by a prescribed fixed exposure area, in metres. Defaults to the evolving Fay area. */
+  referenceThickness?: number;
 }
 
 export interface EvaporationRates {
   growth: number;
   slowdown: number;
+  fixedArea: boolean;
 }
 
 export function evaporationRates(options: TracerOilEvaporation, initialVolume: number): EvaporationRates {
-  const { temperature, initialBoilingPoint, distillationSlope, massTransferCoefficient } = options;
+  const { temperature, initialBoilingPoint, distillationSlope, massTransferCoefficient, referenceThickness } = options;
   if (
     !(temperature > 0 && initialBoilingPoint > 0 && distillationSlope >= 0 && massTransferCoefficient >= 0) ||
     ![temperature, initialBoilingPoint, distillationSlope, massTransferCoefficient].every(Number.isFinite)
@@ -29,20 +32,27 @@ export function evaporationRates(options: TracerOilEvaporation, initialVolume: n
       'unsupported',
       'Oil evaporation parameters are outside range; use positive kelvin temperatures and finite nonnegative slope and transfer.',
     );
-  // Environment Canada (1990), section 3.1. Separate the vapour factor and initial volume from the area integral.
-  const growth = (massTransferCoefficient / initialVolume) * exp(6.3 - 10.3 * (initialBoilingPoint / temperature));
+  if (referenceThickness !== undefined && !(referenceThickness > 0 && Number.isFinite(referenceThickness)))
+    throw new MargoError(
+      'unsupported',
+      'Oil exposure thickness is outside range; use a positive finite referenceThickness.',
+    );
+  // Stiver and Mackay, EE-49, Eqs. 3 and 13. At fixed area, the area/volume ratio is 1/referenceThickness.
+  const growth =
+    (massTransferCoefficient / (referenceThickness ?? initialVolume)) *
+    exp(6.3 - 10.3 * (initialBoilingPoint / temperature));
   const slowdown = 10.3 * (distillationSlope / temperature);
   if (!(Number.isFinite(growth) && Number.isFinite(slowdown)))
     throw new MargoError(
       'unsupported',
       'Oil exposure coefficients exceed numeric range; use a physical volume, distillation curve and transfer coefficient.',
     );
-  return { growth, slowdown };
+  return { growth, slowdown, fixedArea: referenceThickness !== undefined };
 }
 
 export function evaporatedFraction(rates: EvaporationRates, radius: FayCoefficients, age: number): number {
   if (rates.growth === 0) return 0;
-  const exposure = rates.growth * fayAreaTime(radius, age);
+  const exposure = rates.growth * (rates.fixedArea ? age : fayAreaTime(radius, age));
   if (rates.slowdown === 0) return Math.min(1, exposure);
   const argument = rates.slowdown * exposure;
   if (!Number.isFinite(argument)) return Math.min(1, (ln(rates.slowdown) + ln(exposure)) / rates.slowdown);

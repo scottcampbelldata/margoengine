@@ -142,6 +142,7 @@ export interface TracerOilEvaporation {
     initialBoilingPoint: number;
     distillationSlope: number;
     massTransferCoefficient: number;
+    referenceThickness?: number;
 }
 
 export interface TracerOilSpill {
