@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20623627,
+  "total": 20624119,
   "history": [
     {
       "date": "2026-10-24",
@@ -13813,6 +13813,12 @@
       "commit": "6d02861ab",
       "reason": "physics/surge new entry (SEA-07 tides and storm surge, 5,112 B built) and its umbrellas; physics/hydro 7,652 to 8,577 B built for the Coriolis force, the forcing potential the surge adds to the bed and the water's time scale with its work count; physics/world 17,737 to 18,021 B for the world's time-scale check (a field read at another time scale than its writer's is refused). Each is one feature in its owning entry; splitting the world check into a lazy entry would leave mismatched scales unchecked. Core and stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "812a5f0218",
+      "grew": 1,
+      "reason": "SEA-15's horizontal scale-dependent dispersion moves physics/tracers from 12184 to 12662 B gzip. The optional ceiling rises from 12550 to 13042 B. The dispersion law shares the particle transport loop and stores its release ages in the tracer snapshot. A split would duplicate the transport loop or require a second solver to track the same particles."
     }
   ],
   "items": {
@@ -14690,7 +14696,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 13395,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 12550,
+    "@margoengine/physics/tracers": 13042,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
