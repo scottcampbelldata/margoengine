@@ -13218,13 +13218,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "6fb4d565a3",
-      "grew": 1,
-      "reason": "SOFT-04 adds nine directional stress limits and their independently filtered tear histories in the native solver, moving the soft entry from 131482 to 133213 B gzip. @margoengine/physics/soft: 132662 to 137210 B ceiling (133213 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
-    },
-    {
-      "date": "2026-11-26",
-      "commit": "e8688c552e",
+      "commit": "b9293fe8a0",
       "grew": 1,
       "reason": "SOFT-04 adds nine directional stress limits and their independently filtered tear histories in the native solver, moving the soft entry from 131482 to 133213 B gzip. @margoengine/physics/soft: 132662 to 137210 B ceiling (133213 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
