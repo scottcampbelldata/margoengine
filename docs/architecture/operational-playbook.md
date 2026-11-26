@@ -10106,3 +10106,12 @@ the world clock and both native memory modes. HYDRO-02 supplies the exact water 
 receives the actual seepage volume. The aquifer and the surface solver keep independent volume ledgers.
 The production browser bundle fetches both kernels under cross-origin isolation and reproduces the same state
 hash in the two memory modes.
+
+### Grounded glacier flow and drainage (ICE-02)
+
+`@margoengine/physics/glacier` imports world memory and runs its own SIMD Wasm at level 0. Face-wise
+volume conservation, a positive donor limiter and the sparse implicit solve are checked on analytic
+and stiff non-flat grids. Layout-1 f64 fields expose thickness, crevasse depth, velocity, drainage
+and per-step releases. Real HYDRO-01 matches discharged melt volume. Identical full hashes cover
+plain/shared Wasm, frame-rate changes and snapshot replay. The wave-source fixture verifies only
+delivery of released volume to a registry reader. A SEA-06 impulse response needs its own solver.

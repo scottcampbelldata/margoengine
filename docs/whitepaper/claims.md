@@ -5536,3 +5536,11 @@ same aquifer volume, and water leaving the aquifer as seepage adds the same shal
 memory modes preserve the same deterministic state across frame rates and snapshot restoration.
 Proof in [the groundwater coupling tests](../../packages/physics/tests/coupling/groundwater.test.js) and
 [the arena placement test](../../packages/physics/tests/groundwater.test.js).
+
+### Grounded glacier flow and meltwater routing (ICE-02)
+
+The optional glacier solver reproduces the exact two-column lagged Glen update and hydrostatic
+crevasse depth, preserves closed ice volume to floating-point roundoff, and transfers the independently
+computed liquid volume into the real shallow-water solver. Native plain and shared builds, different
+frame rates and snapshot replay agree by state hash. Build Physics and run
+`node --test packages/physics/tests/glacier.test.js packages/physics/tests/coupling/glacier.test.js`.

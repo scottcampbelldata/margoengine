@@ -99,6 +99,10 @@ there, add a line below with the solver ID and what is needed, and build against
   when production solver windows join it. The optional orbit entry publishes inertial positions and velocities
   as f64 xyz rows and elapsed time as a scalar in its layout-1 registry fields.
 
+- **ICE-02:** Reserve static module window 14. Add shared layout-1 f64 glacier outlet discharge (m³/s) and
+  per-tick marine and dry ice-release volumes (m³) for HYDRO-02 and SEA-06. ICE-02 publishes these descriptors
+  in the optional glacier entry, couples discharge to HYDRO-01 and exercises a wave-source reader.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.

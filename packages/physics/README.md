@@ -3129,3 +3129,38 @@ and an abort `signal`. The linear solve defaults to a relative residual of `1e-1
 `secondsPerSecond` defaults to 1. When accelerating underground time, outlet rates still describe volume per
 world second so a receiving stream gets the actual exported volume. The model records total storage, recharge,
 boundary inflow and outflow, spring discharge and seepage in cubic metres.
+
+## Glacier and ice-sheet flow
+
+`@margoengine/physics/glacier` advances grounded ice over a rectangular cell-centred bed. It solves
+Glen shallow-ice flow, opens surface crevasses under tension, releases marine calving and dry icefall
+volumes, and sends meltwater down a D8 surface drainage graph. Simulation runs on the world clock.
+
+```ts
+import { GlacierSolver } from '@margoengine/physics/glacier';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const glacier = await GlacierSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(glacier, {
+  nx: 3, nz: 2, dx: 100,
+  bed: [80, 45, 0, 75, 40, -5],
+  thickness: [90, 60, 20, 90, 60, 20],
+  melt: 1e-8, timeScale: 86400,
+});
+world.advance(60);
+console.log(glacier.sample(2, 1), glacier.budget);
+```
+
+Grid arrays are x-fast. Each cell is grounded (boundary 0), open water (1), or a dry cliff receiver
+(2). Water and cliff receivers have no grounded ice or snowfall. Outer edges are closed to ice
+transport. Unspecified thickness, accumulation, melt and crevasse water default to zero. The
+default Glen exponent is 3 and the temperate rate factor is 2.4e-24 Pa⁻³ s⁻¹. Ice and water
+densities default to 917 and 1000 kg/m³. Sea level defaults to 0 m, dz to dx, and timeScale to 1.
+`GlacierSolver.load({ id, signal })` accepts an optional field prefix (default glacier) and cancellation.
+
+All six published fields use layout-1 f64 cells. `thicknessField` and `crevasseField` are metres,
+`velocityField` stores x and z component planes in m/s of simulated time, and `meltwaterField`
+publishes m³ of liquid per world second at each outlet. Pass that descriptor and the appropriate
+outlet indices to `ShallowWaterSolver`. `calvingField` and `icefallField` publish the ice volume
+in m³ released during the current tick, at the source cell. They reset on the next step. Budget
+volumes use ice density. Use the same climate and suitable time scales for physically linked solvers.

@@ -14054,6 +14054,10 @@
       "./groundwater": {
         "raw": 9420,
         "gzip": 3939
+      },
+      "./glacier": {
+        "raw": 7741,
+        "gzip": 3519
       }
     },
     "@margoengine/physics2d": {
@@ -17815,6 +17819,16 @@
       "raw": 11142,
       "gzip": 3356,
       "brotli": 3012
+    },
+    "packages/physics/dist/glacier-kernel.wasm": {
+      "raw": 15437,
+      "gzip": 6189,
+      "brotli": 5527
+    },
+    "packages/physics/dist/glacier-kernel-shared.wasm": {
+      "raw": 15525,
+      "gzip": 6250,
+      "brotli": 5583
     }
   },
   "splits": {

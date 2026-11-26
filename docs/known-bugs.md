@@ -16230,3 +16230,10 @@ Previously HYDRO-02 could export soil drainage, but no aquifer stored that water
 through springs and seepage. Connect its recharge port to `GroundwaterSolver` and give the existing shallow-water
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
+
+### Glacier calving still needs the water impulse solver (PA-25)
+
+Advance `GlacierSolver` with a submerged grounded front and its adjacent open-water cell. The
+glacier publishes detached volume and its drainage independently. A live wave requires SEA-06
+to convert the released ice volume and location into a water-source impulse, so the current
+registry observer proves delivery only. The avalanche, lava and lahar cases remain open in PA-25.

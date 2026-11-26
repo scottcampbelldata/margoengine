@@ -15,6 +15,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/glacier-kernel.wasm',
+    label: 'glacier-kernel.wasm',
+    kind: 'Rust SIMD shallow-ice flow and fracture',
+    measure: 'file',
+    when: 'GlacierSolver.load() from the optional /glacier entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/glacier-kernel-shared.wasm',
+    label: 'glacier-kernel-shared.wasm',
+    kind: 'Rust SIMD shallow-ice flow and fracture, shared world memory',
+    measure: 'file',
+    when: 'GlacierSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/groundwater-kernel.wasm',
     label: 'groundwater-kernel.wasm',
     kind: 'Rust SIMD groundwater flow',

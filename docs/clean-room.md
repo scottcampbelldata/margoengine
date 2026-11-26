@@ -13218,3 +13218,32 @@ The aquifer keeps water thickness relative to its bottom, so small inputs surviv
 Tests reconstruct the fixed-head solution, a two-cell material contact, a draining spring, and the water-volume
 exchange with the existing runoff and shallow-water solvers. The implementation uses the papers and the repository's
 field contracts.
+
+## Glacier and ice-sheet flow (ICE-02)
+
+- Ralf Greve and Heinz Blatter, [Dynamics of Ice Sheets and Glaciers](https://doi.org/10.1007/978-3-642-03415-2),
+  2009, chapters 4, 5 and 7. Grounded, no-slip shallow ice with Glen exponent 3 yields the depth-integrated
+  flux q = −(2/5) A (ρᵢg)³ H⁵ |∇s|² ∇s, with thickness H and surface s = bed + H.
+- Ed Bueler, Craig S. Lingle, Jed A. Kallen-Brown, Latrice N. Bowman and David N. Covey,
+  [Exact time-dependent similarity solutions for isothermal shallow ice sheets](https://www.cs.uaf.edu/~bueler/simice.pdf),
+  2005, section 7, compare arithmetic face-thickness (type I) with averaged cell diffusivities.
+  Ed Bueler, [Stable finite volume element schemes for the shallow-ice approximation](https://doi.org/10.1017/jog.2015.3),
+  2016, separates face fluxes and positive thickness on nonflat bed. The Margo implementation freezes the
+  symmetric face diffusivity for each backward-Euler step, solves its five-point linear system with
+  Jacobi-preconditioned CG, and limits summed outgoing face transfer to available donor ice.
+- C. J. van der Veen, [Fracture mechanics approach to penetration of surface crevasses on glaciers](https://doi.org/10.1016/S0165-232X(97)00022-0), 1998, compares ice overburden, tensile stress and
+  water pressure at the crack tip. The optional glacier uses the closely-spaced, zero-net-stress
+  approximation without crack-tip toughness, appropriate for a first-order grid-scale fracture front.
+- Douglas I. Benn, Charles R. Warren and Ruth H. Mottram, [Calving processes and the dynamics of calving glaciers](https://doi.org/10.1016/j.earscirev.2007.02.002), 2007, equations (10), (11) and section 4.6. The dry Nye depth
+  is 2 (ε̇/A)^(1/3)/(ρᵢg). An already opening crack gains the hydrostatic term (ρw/ρᵢ) times its water
+  column. The solver obtains tensile strain by projecting the discrete free-surface velocity gradient
+  along local flow. Freeboard is the marine break-off threshold, and the buoyancy ratio follows Archimedes.
+- Antoine Pralong and Martin Funk, [Dynamic damage model of crevasse opening and application to glacier calving](https://doi.org/10.1029/2004JB003104), 2005, studied failure of a hanging glacier. Here a dry receiver
+  needs an actual drop in bed elevation and a through-column fracture. Grid release evaluates the
+  failure threshold, while trajectories or damage below a released column belong to separate solvers.
+- John F. O’Callaghan and David M. Mark, [The extraction of drainage networks from digital elevation data](https://doi.org/10.1016/S0734-189X(84)80011-0), 1984. Connect each active surface cell to its steepest of
+  eight descending neighbours using metric distances. A topological sweep transmits each liquid volume once.
+
+The tests derive the exact two-column backward-Euler update, the linear-slope Glen velocity, the Nye
+depth and its hydrostatic increment, and the closed mass balance. The HYDRO-01 fixture measures the actual
+flood inlet volume. A registry-only observer uses the source layout SEA-06 will consume.

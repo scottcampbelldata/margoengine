@@ -9210,3 +9210,25 @@ Detailed unsaturated pressure and moisture profiles, multiple aquifer layers and
 spring openings are outside this model. HYDRO-02 calculates recharge through the active soil.
 
 The optional JavaScript entry measures 3,939 B min+gzip. Both Wasm variants are 11,142 B before HTTP compression.
+
+### Grounded glacier and ice-sheet flow (ICE-02)
+
+The rectangular x-z grid resolves isothermal, grounded, no-slip ice with the shallow-ice approximation,
+a constant Glen exponent of 3, and constant or per-cell climatic inputs. It uses the world's gravity
+component along the vertical axis. External edges are closed to ice. Horizontal stress transmission,
+basal sliding and lubrication, floating shelves and evolving bed topography are outside this model.
+At an open-water boundary, waterline or flotation failure removes a whole grid cell's ice. Dry cliff
+release needs full crevasse penetration. Resolve the terminus with smaller cells for smaller events.
+The volume ports support downstream motion and impact solvers.
+
+The step lags the nonlinear face weight and uses a symmetric backward-Euler solve with a relative
+residual norm target of √(f64 machine epsilon). The initial residual is evaluated from differences
+in surface elevation. Limit accelerated time steps for accuracy on steep or rapidly evolving terrain.
+D8 drains each source to an outlet or local depression during the same tick. It represents no
+routing delay, subglacial storage or lake spill. Discharge is in m³ per world second even if the ice
+runs on accelerated physical time.
+
+The optional entry is 3,519 B min+gzip with a 3,775 B ceiling. Plain and shared Wasm are 15,437 B
+and 15,525 B raw, or 6,189 B and 6,250 B gzip. A solver reserves 260 B of arena and scratch per cell,
+144 B of fixed config and budget, and a 64 KiB instance stack. Core and stage together stay at
+24,820 B gzip.

@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'glacier-kernel',
+    crate: 'packages/physics/glacier-kernel',
+    blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',
+    script: 'packages/physics/scripts/build-glacier-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'glacier-kernel-shared',
+    crate: 'packages/physics/glacier-kernel',
+    blueprint: 'packages/physics/src/glacier/glacier-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-glacier-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'groundwater-kernel',
     crate: 'packages/physics/groundwater-kernel',
     blueprint: 'packages/physics/src/groundwater/groundwater-kernel.wasm',

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19461141,
+  "total": 19464916,
   "history": [
     {
       "date": "2026-10-24",
@@ -12711,6 +12711,12 @@
       "commit": "SEA-08 wave drift",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: the waves' drift: a section's two-dimensional scattering derived from the radiation solution (scatterSection, its reflected and transmitted waves and the held loads), the hull's beam-sea motions and far-field drift table, the Froude-Krylov mean taken off, and Newman's approximation over the sea's waves; measured gzip (Mac build) 13440 B, was 10910; without it a moored or drifting hull takes none of the waves' mean push (the wall's 1/2 rho g a^2 in short waves), and a split would load one hull solve from two entries. Budget (measured + max(3%, 256 B)): 11237 to 13843 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "130a317319",
+      "reason": "ICE-02 adds optional grounded glacier flow and D8 drainage at 3519 B gzip (ceiling 3775 B). The plain and shared sparse SIMD kernels load on request. Core plus stage remains 24,820 B gzip.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13523,6 +13529,7 @@
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/foam": 8022,
     "@margoengine/physics/groundwater": 4195,
+    "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/landscape": 4603,

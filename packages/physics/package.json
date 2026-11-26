@@ -136,6 +136,10 @@
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"
     },
+    "./glacier": {
+      "types": "./dist/glacier/index.d.ts",
+      "import": "./dist/glacier.js"
+    },
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
