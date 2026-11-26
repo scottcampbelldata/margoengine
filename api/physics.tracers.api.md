@@ -84,6 +84,13 @@ export interface TracerMaterial {
     colour: readonly [number, number, number];
 }
 
+export interface TracerOilEvaporation {
+    temperature: number;
+    initialBoilingPoint: number;
+    distillationSlope: number;
+    massTransferCoefficient: number;
+}
+
 export interface TracerOilSpill {
     mass: number;
     position: readonly [number, number];
@@ -91,6 +98,7 @@ export interface TracerOilSpill {
     spreadingCoefficient: number;
     material?: TracerMaterial;
     parcels?: number;
+    evaporation?: TracerOilEvaporation;
 }
 
 export interface TracerParams {
@@ -131,6 +139,7 @@ export class TracerSolver implements Solver<TracerParams> {
         surface: number;
         bed: number;
     };
+    get evaporatedMass(): number;
     get jetErosion(): number;
     particlesOf(): Generator<{
         position: [number, number, number];

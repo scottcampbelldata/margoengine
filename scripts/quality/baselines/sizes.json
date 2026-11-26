@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20609001,
+  "total": 20609646,
   "history": [
     {
       "date": "2026-10-24",
@@ -13765,6 +13765,12 @@
       "commit": "6fbbf8e86a",
       "reason": "BREAK-03 continuous plastic compression grows the optional crush entry from 7159 to 7606 B gzip. The ceiling rises from 7415 to 7862 B. The new solver reuses the prepared material envelope, existing rigid port and damage ledger. A split would repeat the same contact or force the caller to register and reconcile a second damage writer.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ea90ef5dd0",
+      "grew": 1,
+      "reason": "SEA-15's Mackay evaporation moves physics/tracers from 10376 to 11002 B gzip. The optional ceiling rises from 10688 to 11333 B. The evaporation kernel uses the existing Fay profile and shares the tracer parcel mass and snapshot ledger. A separate entry would duplicate the parcel and ledger path or require a second solver for one release."
     }
   ],
   "items": {
@@ -14642,7 +14648,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 12180,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 10688,
+    "@margoengine/physics/tracers": 11333,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
