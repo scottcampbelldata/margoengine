@@ -33,6 +33,7 @@
     "test:browser:granular-mpm": "cd ../.. && node packages/physics/tests/granular-mpm.browser.mjs",
     "test:browser:synoptic": "cd ../.. && node packages/physics/tests/synoptic.browser.mjs",
     "test:browser:seismic": "cd ../.. && node packages/physics/tests/seismic.browser.mjs",
+    "test:browser:tissue": "cd ../.. && node packages/physics/tests/tissue.browser.mjs && node packages/physics/tests/tissue.browser.mjs --compat",
     "test:browser:volumetric-solids": "cd ../.. && node packages/physics/tests/volumetric-solids.browser.mjs",
     "build:airborne": "node scripts/build-airborne-kernel.mjs",
     "build:accretion": "node scripts/build-accretion-kernel.mjs",
@@ -58,6 +59,10 @@
     "./soft": {
       "types": "./dist/soft.d.ts",
       "import": "./dist/soft.js"
+    },
+    "./tissue": {
+      "types": "./dist/tissue.d.ts",
+      "import": "./dist/tissue.js"
     },
     "./meshfiles": {
       "types": "./dist/meshfiles.d.ts",

@@ -891,6 +891,68 @@ physics.step();
 console.log(load.force[1] > 0); // true: lift across the wind
 ```
 
+### Skeletal soft tissue
+
+Load `@margoengine/physics/tissue` for tetrahedral tissue driven by fixed or kinematic bones. Each binding holds a
+particle at a bone-local point in metres. Attach a `sliding` plane when the skin should travel across the underlying
+body. Its `localNormal` is normalized by the solver. The normal spring uses `stiffness` in N/m and `damping` in
+N·s/m. Damping defaults to local critical damping, `2 * sqrt(mass * stiffness)`. The coupling acts only in the normal
+direction, and the surrounding tissue supplies its elastic resistance. Keep each bone live and fixed or kinematic in
+the same rigid world. Set `cellSize` to the world cell width if the world uses a value other than 4096 m.
+
+<!-- example:node -->
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+import { TissueSolver } from '@margoengine/physics/tissue';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0], fixedTimestep: 1 / 60 });
+const bone = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0, 0] });
+const soft = await SoftBodies.attach(physics);
+const tissue = soft.create(new SoftBodyDesc([
+  [0, 0, 0], [0.03, 0, 0], [0, 0.03, 0], [0, 0, 0.03],
+]).setCells([0, 1, 2, 3]).setSurface().setSolver('vertex-block').setPinnedParticles([0, 1, 2]));
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(new RigidSolver(), { physics })
+  .add(new TissueSolver(), {
+    soft,
+    bindings: [{
+      tissue, particle: 3, bone, localPoint: [0, 0, 0.03],
+      sliding: { localNormal: [0, 0, 1], stiffness: 80 },
+    }],
+  })
+  .couple(['rigid', 'tissue'], 'staggered');
+bone.setPosition([0.004, 0, 0.002]);
+world.advance(1);
+console.log(tissue.particlePosition(3));
+physics.dispose();
+```
+
+The solver takes bone position, rotation and velocities from the world bodies field. A sliding binding uses a
+bone-local plane and a single implicit normal spring and damper before the native volumetric step. Bone motion is
+prescribed. Dynamic objects can still contact the tissue through the underlying soft solver. A restored world should
+supply the same bindings to its matching rigid and soft bodies before reading the snapshot.
+
+Clean-room references for the kinematic and sliding boundary conditions:
+
+- Joseph Teran, Eftychios Sifakis, Geoffrey Irving and Ronald Fedkiw, *Robust Quasistatic Finite Elements and Flesh
+  Simulation* (2005), §§4 and 9 and Fig. 3. [Paper](https://math.ucdavis.edu/~jteran/papers/TSIF05.pdf)
+- Sung-Hee Lee, Eftychios Sifakis and Demetri Terzopoulos, *Comprehensive Biomechanical Modeling and Simulation of
+  the Upper Body* (2009), models attachment and the layered structure.
+  [Paper](https://pages.cs.wisc.edu/~sifakis/papers/TOG09-Lee-Sifakis-Terzopoulos.pdf)
+- Dinesh K. Pai et al., *The Human Touch: Measuring Contact with Real Human Soft Tissues* (2018), §§2.3 and 5,
+  measures tangential skin displacement and uses an elastic coupling over a curved inner body. The local plane
+  represents a patch of that sliding interface.
+  [Paper](https://www.cs.ubc.ca/research/HumanTouch/HumanTouchSIGGRAPH2018.pdf)
+- David Baraff and Andrew Witkin, *Large Steps in Cloth Simulation* (1998), §3 Eq. 4. Substituting the linear
+  normal force `-k*d - c*v` and updating the gap with the new relative velocity gives the impulse
+  `-h*(k*d + (c+h*k)*v)/(1+h*(c+h*k)/m)`.
+  [Paper](https://graphics.stanford.edu/courses/cs448b-00-winter/papers/baraff_98.pdf)
+- Breannan Smith, Fernando de Goes and Theodore Kim, *Stable Neo-Hookean Flesh Simulation* (2018), supplies the
+  native volume constitutive law. [Paper](https://www.tkim.graphics/NEO/StableNeoHookean2018.pdf)
+
 ### Gas pressure in a closed shell
 
 `setGasPressure({pressure, volume, ambientPressure})` uses absolute pressures in pascals. The optional `volume` is the

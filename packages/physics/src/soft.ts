@@ -2110,6 +2110,10 @@ export class SoftBody {
   get valid(): boolean {
     return !this.removed;
   }
+  /** @internal Whether an optional soft solver may step this body. */
+  belongsTo(soft: SoftBodies): boolean {
+    return this.owner === soft && this.valid;
+  }
   private check(index?: number): void {
     if (this.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
     if (index !== undefined && (!Number.isInteger(index) || index < 0 || index >= this.particles))
@@ -2900,6 +2904,11 @@ export class SoftBodies implements PhysicsAttachment {
     this.substeps = count(options.substeps ?? 8, 'substeps', 1);
     this.iterations = count(options.iterations ?? 2, 'iterations', 1);
     physics.attach(this);
+  }
+
+  /** @internal Identity guard for skeletal proxies bound to this soft world. */
+  ownsTissueBone(bone: PhysicsBody): boolean {
+    return this.physics.getBodies().includes(bone);
   }
 
   /** Loads the kernel (once per app) and joins `physics`. @throws AbortError when `signal` aborts first. */

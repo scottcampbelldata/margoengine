@@ -9589,6 +9589,20 @@ bed entrainment to their own solvers.
 
 The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
 
+### Skeletal tissue attachments (SOFT-05)
+
+`@margoengine/physics/tissue` drives finite tetrahedral tissue from the rigid solver's layout-2 bodies field.
+Each particle takes at most one bone binding. The prescribed bone can be fixed or kinematic. Its local anchor
+either pins the particle or supplies a plane with normal compliance and damping. The local sliding plane has
+an unbounded frictionless tangent and no curvature. Its normal-only backward Euler update is partitioned from
+the native volume solve. Fast changes to bone orientation are sampled on the solver tick. Skin and fat
+layer calibration and active fiber contraction remain open.
+
+The pinned tetrahedron fixture matches the analytic small-displacement response with an allowance of 16 binary32
+epsilon times the specimen length. A 0.5 m tangent translation leaves its entire particle state bit-identical.
+The same native surface shows a 40.167 mm normal displacement under the rendered control and unchanged render
+pixels under the tangent shift on WebGPU and WebGL2. The fixture is a material coupon.
+
 ### Volumetric vertex blocks (SOFT-04)
 
 `@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean

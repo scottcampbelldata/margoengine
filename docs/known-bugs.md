@@ -17152,6 +17152,13 @@ brake cases pass. Oblique rolling publishes shear and sidewall force, with a liv
 impulse. Directional rolling shear matches FJS-1 side loads around 0.6 slip at four yaw angles.
 Reverse travel and the high-slip end of that side-load range remain open.
 
+### Active and layered soft tissue (SOFT-05)
+
+The skeletal tissue fixture in `packages/physics/tests/coupling/tissue.test.js` deforms a homogeneous
+tetrahedron. The current solver couples each bound particle to a local bone plane. It still needs active
+muscle fibers, independently calibrated materials in joined muscle, fat and skin layers, and sliding
+along a curved body interface for the catalog's full anatomical result.
+
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed

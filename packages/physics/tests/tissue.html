@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Sliding tissue test</title></head>
+<body style="margin:0">
+<canvas width="448" height="320" style="display:block;width:448px;height:320px"></canvas>
+<script type="module">
+  import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
+  import { Physics } from '../dist/index.js';
+  import { createTissueFixture } from './coupling/tissue-fixture.js';
+
+  await Physics.load();
+  const canvas = document.querySelector('canvas');
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    camera: { position: [1.2, 0.9, 1.65], target: [0.2, 0.14, 0.23], near: 0.1, far: 10 },
+  });
+  const mesh = engine.createMesh().setMaterial(new PbrMaterial({ color: '#bf7566', roughness: 0.65 }));
+
+  function surface(body) {
+    const positions = body.particlePositions();
+    const triangles = body.triangles();
+    const flat = new Float32Array(3 * triangles.length);
+    const normals = new Float32Array(flat.length);
+    const indices = new Uint32Array(triangles.length);
+    for (let i = 0; i < triangles.length; i++) {
+      const source = 3 * triangles[i];
+      flat.set(positions.subarray(source, source + 3), 3 * i);
+      indices[i] = i;
+    }
+    for (let i = 0; i < flat.length; i += 9) {
+      const u = [0, 1, 2].map((axis) => flat[i + 3 + axis] - flat[i + axis]);
+      const v = [0, 1, 2].map((axis) => flat[i + 6 + axis] - flat[i + axis]);
+      const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      const magnitude = Math.hypot(...n);
+      const normal = n.map((value) => value / magnitude);
+      for (let j = 0; j < 9; j += 3) normals.set(normal, i + j);
+    }
+    return new Geometry(flat, normals, indices);
+  }
+
+  window.renderTissue = async (position) => {
+    const { world, tissue } = await createTissueFixture(true, position);
+    world.advance(1);
+    const geometry = surface(tissue);
+    mesh.setGeometry(geometry);
+    engine.render({ delta: 1 / 60 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { vertex: tissue.particlePosition(3), hash: world.hash(), visible: engine.stats.visible };
+  };
+</script>
+</body>
+</html>

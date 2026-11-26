@@ -9,6 +9,13 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Skeletal tissue boundary (SOFT-05, 2026-11-26). A real kinematic bone translates and rotates a tetrahedral
+  insertion through the rigid bodies field. The sliding variant matches the small-extension normal solution
+  and produces the same particle positions under an additional 0.5 m tangential shift. An independent world
+  restores an identical continuation hash. Both renderer backends draw the displaced surface and preserve the
+  frame bytes under the tangential shift. Run `packages/physics/tests/coupling/tissue.test.js` and
+  `packages/physics/tests/tissue.browser.mjs`.
+
 - Volumetric solids (SOFT-04, 2026-11-26). The native vertex block matches the closed-form implicit
   solution of a pinned tetrahedron under tension, compression, inversion and damping. Additional sweeps
   reduce the implicit elastic energy on a clamped bar. A tabletop ladder rung bends and vibrates under a

@@ -45,6 +45,7 @@ await build({
         'kernel-thread': resolve(root, 'src/kernel-thread.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
+        tissue: resolve(root, 'src/tissue.ts'),
         meshfiles: resolve(root, 'src/meshfiles.ts'),
         robots: resolve(root, 'src/robots.ts'),
         world: resolve(root, 'src/world/index.ts'),
