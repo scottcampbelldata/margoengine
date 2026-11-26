@@ -303,6 +303,13 @@ signed whole-particle volume and a three-component momentum receipt. The second 
 conserved quantities only after a clocked acceptance.
 [Thürey et al.](https://matthias-research.github.io/pages/publications/breakingWaves.pdf).
 
+H. Norman Abramson, ed. (1966), *The Dynamic Behavior of Liquids in Moving Containers*, NASA SP-106
+section 2.2, gives the independent first free-surface mode for a rectangular tank,
+`omega² = g k tanh(k H)` with `k = pi / L`. The regression initializes the associated potential-flow velocity
+on an undisturbed surface and estimates one full period from the phase at the two ends. At 0.36 m depth
+and 0.9 m length, the result is 1.168 s against the 1.165 s reference, a difference of 0.0033 s at 120 Hz.
+[NASA SP-106](https://ntrs.nasa.gov/api/citations/19670006555/downloads/19670006555.pdf).
+
 ### Position-based particle liquids (FLUID-02)
 
 Miles Macklin and Matthias Müller (2013), *Position Based Fluids*, equations 1–14 and 15–17, supplies the

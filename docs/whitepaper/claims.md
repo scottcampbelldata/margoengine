@@ -5872,3 +5872,9 @@ The pressure-chain test carries out several divergence iterations in two geometr
 exactly two sparse neighborhood searches per particle. A separate regression starts two particles
 in cells separated by a whole support distance and advances them into the same cell. The divergence
 pass sees the new pair immediately. The force traversal order and support tests are unchanged.
+
+### FLUID-01 rectangular-tank gravity wave
+
+The accurate profile's free surface completes the first mode in 1.168 s in the 640-particle rectangular
+tank. The independent linear prediction is 1.165 s. The difference is within one 120 Hz frame and the
+mass remains 58.32 kg. The smaller-depth and narrow-channel cases continue to need validation.

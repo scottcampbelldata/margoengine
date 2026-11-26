@@ -695,3 +695,67 @@ test('advecting across grid cells rebuilds candidates before the divergence pass
   assert.equal(liquid.statistics.neighborhoodSearches, 4);
   assert.equal(liquid.statistics.divergenceIterations, 1);
 });
+
+test('the accurate liquid reproduces the fundamental gravity-wave period in a closed rectangular tank', {
+  timeout: 45000,
+}, async () => {
+  // NASA SP-106, section 2.2: omega² = g*k*tanh(k*h), k = pi / tank length.
+  // Start at the equilibrium surface with the mode's divergence-free velocity.
+  const rate = 120;
+  const spacing = 0.045;
+  const nx = 20;
+  const ny = 8;
+  const nz = 4;
+  const length = nx * spacing;
+  const depth = ny * spacing;
+  const width = nz * spacing;
+  const gravity = 9.81;
+  const k = Math.PI / length;
+  const omega = Math.sqrt(gravity * k * Math.tanh(k * depth));
+  const expectedPeriod = (2 * Math.PI) / omega;
+  const amplitude = 0.02 * length;
+  const factor = (amplitude * omega) / Math.sinh(k * depth);
+  const particles = [];
+  const ends = [];
+  for (let z = 0; z < nz; z++)
+    for (let y = 0; y < ny; y++)
+      for (let x = 0; x < nx; x++) {
+        const position = [x, y, z].map((i) => (i + 0.5) * spacing);
+        const [px, py] = position;
+        const velocity = [
+          -factor * Math.sin(k * px) * Math.cosh(k * py),
+          factor * Math.cos(k * px) * Math.sinh(k * py),
+          0,
+        ];
+        if (y === ny - 1 && (x < 2 || x >= nx - 2)) ends.push([particles.length, x < 2 ? 1 : -1]);
+        particles.push({ position, velocity });
+      }
+  const { world, liquid } = await solve(
+    {
+      spacing,
+      viscosity: 1e-6,
+      particles,
+      bounds: [
+        [0, 0, 0],
+        [length, depth + 4 * spacing, width],
+      ],
+    },
+    { gravity: [0, -gravity, 0], rate: { num: rate, den: 1 } },
+    { rate: 1 },
+  );
+  let previous = 0;
+  let crest = 0;
+  let period = NaN;
+  for (let frame = 1; frame <= Math.ceil(1.5 * rate * expectedPeriod); frame++) {
+    world.advance(frame);
+    const surface = ends.reduce((sum, [i, sign]) => sum + sign * liquid.sample(i).position[1], 0) / (2 * nz);
+    crest = Math.max(crest, surface);
+    if (previous < 0 && surface > 0 && crest > amplitude / 2) {
+      period = (frame - 1 + previous / (previous - surface)) / rate;
+      break;
+    }
+    previous = surface;
+  }
+  assert.ok(Math.abs(period - expectedPeriod) <= 1 / rate, `wave period ${period} versus ${expectedPeriod} s`);
+  near(liquid.mass, 1000 * length * depth * width);
+});
