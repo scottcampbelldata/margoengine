@@ -2,6 +2,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { cos, sin } from '@margoengine/math/pinned';
 import { BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT, BedChange, bedVertexCount, type BedShape } from '../earth/bed.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
+import { SEISMIC_LAYOUT, SEISMIC_SURFACE_WORDS } from '../seismic/ports.js';
 import { regionWords } from '../world/memory.js';
 import type { FieldDescriptor, FieldUse, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 import {
@@ -25,6 +26,8 @@ export interface GranularFlowLoadOptions {
   readonly depositToTerrain?: boolean;
   /** Publish signed submerged-volume changes for SeaSource consumers. Default false. */
   readonly marineDisplacement?: boolean;
+  /** The layout-1 groundField of a registered SeismicGround, extended across Z. Optional. */
+  readonly groundField?: FieldDescriptor;
   /** Cancel loading of the optional native kernels. */
   readonly signal?: AbortSignal;
 }
@@ -142,6 +145,7 @@ interface State {
   readonly ledger: Region;
   readonly deposit?: DepositState;
   readonly marine?: MarineState;
+  readonly shaking?: Region;
   readonly regions: readonly Region[];
 }
 
@@ -210,6 +214,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     private readonly liveTerrain: boolean,
     private readonly depositToTerrain: boolean,
     private readonly marineDisplacement: boolean,
+    private readonly groundField?: FieldDescriptor,
   ) {
     if (typeof id !== 'string' || !id.trim() || id !== id.trim())
       throw new RangeError('Invalid granular flow ID. Use a nonempty name without outer whitespace.');
@@ -230,6 +235,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     this.fields = [
       { field: this.flowField, access: 'write' },
       ...(marineDisplacement ? [{ field: this.seaSourceField, access: 'write' as const }] : []),
+      ...(groundField ? [{ field: groundField, access: 'read' as const }] : []),
       ...(liveTerrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ...(depositToTerrain ? [{ field: BED_CHANGE_FIELD, access: 'accumulate' as const }] : []),
     ];
@@ -241,6 +247,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     liveTerrain = false,
     depositToTerrain = false,
     marineDisplacement = false,
+    groundField,
     signal,
   }: GranularFlowLoadOptions = {}): Promise<GranularFlowSolver> {
     return new GranularFlowSolver(
@@ -249,6 +256,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       liveTerrain || depositToTerrain,
       depositToTerrain,
       marineDisplacement,
+      groundField,
     );
   }
 
@@ -266,7 +274,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     const dz = grid.depth / grid.rows;
     finite(dx * dz, 'cell area', Number.MIN_VALUE);
     finite(dx + dz, 'cell size', Number.MIN_VALUE);
-    const gravity = finite(-host.gravity[1], 'downward gravity', 0);
+    const gravity = finite(-host.gravity[1], 'downward gravity', this.groundField ? Number.MIN_VALUE : 0);
     if (options.seaLevel !== undefined && !this.marineDisplacement)
       throw new RangeError('Granular seaLevel requires a marine field. Enable marineDisplacement when loading.');
     const seaLevel = finite(options.seaLevel ?? 0, 'sea datum');
@@ -342,6 +350,9 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
         )
       : undefined;
     const marine = this.marineDisplacement ? this.allocateMarine(host, count) : undefined;
+    const shaking = this.groundField
+      ? host.allocate('granular-shaking', grid.columns * 2 * amount, 'f64', SEISMIC_LAYOUT)
+      : undefined;
     const regions = [state, ledger];
     if (roughness) regions.push(roughness);
     if (deposit) regions.push(deposit.change.state);
@@ -365,6 +376,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       ledger,
       deposit,
       marine,
+      shaking,
       regions,
     };
     words(s, state).set(initial);
@@ -442,11 +454,47 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     }
   }
 
+  private readGround(context: StepContext, s: State, descriptor: FieldDescriptor, target: Region): void {
+    const port = context.inputs.get(descriptor.name);
+    const stride = SEISMIC_SURFACE_WORDS;
+    const rowBytes = stride * Float64Array.BYTES_PER_ELEMENT;
+    if (
+      !port ||
+      port.region.type !== 'f64' ||
+      port.region.layout !== SEISMIC_LAYOUT ||
+      port.region.byteLength < rowBytes ||
+      port.region.byteLength % rowBytes !== 0 ||
+      !port.cell.every((value, i) => value === context.cell[i])
+    )
+      throw new RangeError('Invalid granular ground motion. Use the SeismicGround field in the same world cell.');
+    const ground = regionWords(s.host.memory, port.region);
+    for (let at = 0; at < ground.length; at += stride) {
+      const x = finite(ground[at]!, 'ground sample X');
+      finite(ground[at + 5]!, 'ground X acceleration');
+      finite(ground[at + 6]!, 'ground Y acceleration');
+      if (at > 0 && x <= ground[at - stride]!)
+        throw new RangeError('Granular ground samples are unordered. Use strictly increasing X positions.');
+    }
+    const out = words(s, target);
+    const west = s.grid.centre[0] - s.grid.width / 2;
+    let low = 0;
+    for (let x = 0; x < s.grid.columns; x++) {
+      const point = west + (x + 0.5) * s.dx;
+      while (low + stride < ground.length && ground[low + stride]! <= point) low += stride;
+      const high = Math.min(ground.length - stride, low + stride);
+      const span = ground[high]! - ground[low]!;
+      const mix = span > 0 ? Math.max(0, Math.min(1, (point - ground[low]!) / span)) : 0;
+      out[2 * x] = finite((1 - mix) * ground[low + 5]! + mix * ground[high + 5]!, 'interpolated ground X');
+      out[2 * x + 1] = finite((1 - mix) * ground[low + 6]! + mix * ground[high + 6]!, 'interpolated ground Y');
+    }
+  }
+
   step(context: StepContext, dt: number): void {
     const s = this.attached();
     const work = words(s, s.working);
     work.set(words(s, s.state));
     if (this.liveTerrain) this.readBed(context, s, work);
+    if (s.shaking && this.groundField) this.readGround(context, s, this.groundField, s.shaking);
     const substeps = s.kernel.granular_step(
       s.working.byteOffset,
       s.trial.byteOffset,
@@ -460,6 +508,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       s.turbulence,
       s.roughness?.byteOffset ?? 0,
       s.grainLoad,
+      s.shaking?.byteOffset ?? 0,
     );
     if (substeps < 0)
       throw new RangeError(
@@ -499,6 +548,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       s.friction,
       s.roughness?.byteOffset ?? 0,
       s.grainLoad,
+      s.shaking?.byteOffset ?? 0,
     );
     if (result !== 0)
       throw new RangeError(

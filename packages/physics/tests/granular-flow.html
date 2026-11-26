@@ -5,6 +5,7 @@
   <script type="module">
     import { TerrainBed } from '/packages/physics/dist/earth.js';
     import { GranularFlowSolver } from '/packages/physics/dist/granular-flow.js';
+    import { SeismicGround } from '/packages/physics/dist/seismic.js';
     import { TsunamiSolver } from '/packages/physics/dist/tsunami.js';
     import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
 
@@ -47,8 +48,20 @@
         return { hash: world.hash(), mass: solver.depositBudget.mass, volume: bed.volume(-2),
           elevation: solver.sample(1, 1).bedElevation, marine: solver.marineBudget, admitted: sea.budget.admittedSourceVolume };
       };
+      const shaking = async (sharedMemory) => {
+        const ground = await SeismicGround.load();
+        const flow = await GranularFlowSolver.load({ groundField: ground.groundField });
+        const grid = { columns: 39, rows: 3, width: 39, depth: 3, centre: [19.5, 0] };
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(sharedMemory) })
+          .add(ground, { width: 39, depth: 18, spacing: [1, 1], absorbingCells: 0,
+            material: { density: 2200, compressionalSpeed: 35, shearSpeed: 20 },
+            initialVelocity: (x) => [0.1 * Math.sin((2 * Math.PI * x) / 16), 0] })
+          .add(flow, { grid, depth: 0.25, friction: 0.015, turbulence: Infinity });
+        world.advance(12);
+        return { hash: world.hash(), discharge: flow.sample(19, 1).discharge[0] };
+      };
       return { plain: await simulate(false), shared: await simulate(true), roughPlain: await rough(false), roughShared: await rough(true),
-        depositPlain: await deposit(false), depositShared: await deposit(true) };
+        depositPlain: await deposit(false), depositShared: await deposit(true), seismicPlain: await shaking(false), seismicShared: await shaking(true) };
     };
   </script>
 </body>

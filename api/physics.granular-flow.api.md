@@ -25,6 +25,7 @@ export interface GranularFlowLoadOptions {
     readonly liveTerrain?: boolean;
     readonly depositToTerrain?: boolean;
     readonly marineDisplacement?: boolean;
+    readonly groundField?: FieldDescriptor;
     readonly signal?: AbortSignal;
 }
 
@@ -53,7 +54,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     readonly flowField: FieldDescriptor;
     readonly seaSourceField: FieldDescriptor;
     private constructor();
-    static load({ id, liveTerrain, depositToTerrain, marineDisplacement, signal }?: GranularFlowLoadOptions): Promise<GranularFlowSolver>;
+    static load({ id, liveTerrain, depositToTerrain, marineDisplacement, groundField, signal }?: GranularFlowLoadOptions): Promise<GranularFlowSolver>;
     describe(): {
         id: string;
         fields: readonly FieldUse[];

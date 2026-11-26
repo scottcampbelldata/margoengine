@@ -15032,8 +15032,8 @@
         "gzip": 6103
       },
       "./granular-flow": {
-        "raw": 14282,
-        "gzip": 5545
+        "raw": 15542,
+        "gzip": 5965
       },
       "./tissue": {
         "raw": 6958,
@@ -19151,14 +19151,14 @@
       "brotli": 5528
     },
     "packages/physics/dist/granular-flow-kernel.wasm": {
-      "raw": 9101,
-      "gzip": 4063,
-      "brotli": 3741
+      "raw": 9620,
+      "gzip": 4255,
+      "brotli": 3875
     },
     "packages/physics/dist/granular-flow-kernel-shared.wasm": {
-      "raw": 9101,
-      "gzip": 4063,
-      "brotli": 3741
+      "raw": 9620,
+      "gzip": 4255,
+      "brotli": 3875
     }
   },
   "splits": {

@@ -380,7 +380,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 | EARTH-10 (lava) ↔ ICE-05, ICE-01, SEA-14, EARTH-02 | ICE-05 heat, meltwater and steam. Lava displacement enters SEA-06 on the layout shared with SEA-14. TerrainBed supplies heights and LavaSolver publishes solid deposits. | Staggered ICE-05 heat and phase exchange, plus one-way signed displacement into water. Direct distributed ICE-01 and EARTH-02 bindings still need the shared contracts. |
 | EARTH-03 ↔ EARTH-02 | Dense core produces the powder cloud; the cloud's deposit changes the bed | two-way |
 | EARTH-02/03 → BIO-01, BREAK-02 | Dynamic pressure fells trees and walls; obstacles take momentum from the flow (PA-33) | two-way |
-| EARTH-08 → BREAK-02, EARTH-02, DYN-01, cameras | Ground acceleration shakes bodies, triggers slides and liquefaction | one-way |
+| EARTH-08 → BREAK-02, EARTH-02, DYN-01, cameras | Ground acceleration shakes bodies, triggers slides and liquefaction | one-way. EARTH-02 consumes the live horizontal and vertical SeismicGround records for inertial drive and Coulomb unloading. |
 | BREAK-01 ↔ DYN-01/DYN-08 | Fracture creates bodies; contact impulses cause damage | two-way |
 | DYN-01 ↔ EARTH-04, EARTH-05 | Rubble contact, soil reaction on vehicles, feet and hooves | two-way |
 | EARTH-05 ↔ terrain bed | Redistributed volume and changed height-field and foot contacts | two-way, `packages/physics/tests/coupling/terramechanics.test.js` |

@@ -108,6 +108,7 @@ struct Model<'a> {
     turbulence: f64,
     roughness: Option<&'a Roughness>,
     grain_load: f64,
+    shaking: Option<&'a [[f64; 2]]>,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -132,9 +133,16 @@ fn apparent_step(
     x: bool,
     transverse_bed_slope: f64,
     transverse_surface_slope: f64,
+    shaking: [f64; 2],
 ) -> f64 {
-    if model.grain_load == 0.0 || model.gravity == 0.0 {
+    if model.gravity == 0.0 {
         return step;
+    }
+    let support = (1.0 + shaking[1] / model.gravity).max(0.0);
+    let horizontal = shaking[0] / model.gravity;
+    let driving_step = step * support + if x { width * horizontal } else { 0.0 };
+    if model.grain_load == 0.0 || support == 0.0 {
+        return driving_step;
     }
     let weight = low.depth + high.depth;
     let time = model.gravity * dt;
@@ -153,12 +161,12 @@ fn apparent_step(
         let speed = length(length(average_x, average_z), vertical);
         friction = roughness.friction(0.5 * weight / metric, speed, model.gravity);
     }
-    let friction = friction * model.grain_load;
+    let friction = friction * model.grain_load * support;
     if friction == 0.0 {
-        return step;
+        return driving_step;
     }
-    let slope_impulse = ((low.depth - high.depth) - step) * (time / width);
-    let cross_impulse = -transverse_surface_slope * time;
+    let slope_impulse = ((low.depth - high.depth) - driving_step) * (time / width);
+    let cross_impulse = -(transverse_surface_slope + if x { 0.0 } else { horizontal }) * time;
     let (trial_x, trial_z) = if x {
         (average_x + slope_impulse, average_z + cross_impulse)
     } else {
@@ -171,7 +179,7 @@ fn apparent_step(
         // At exact rest this also avoids roundoff in reconstructing a static free surface.
         return low.depth - high.depth + (if x { average_x } else { average_z }) * (width / time);
     }
-    step + (normal / magnitude) * friction * width
+    driving_step + (normal / magnitude) * friction * width
 }
 
 fn face(
@@ -184,6 +192,7 @@ fn face(
     model: &Model,
     x: bool,
     neighbours: (usize, usize, usize),
+    support_columns: (usize, usize),
 ) {
     let a = unsafe { *state.get_unchecked(left) };
     let b = unsafe { *state.get_unchecked(right) };
@@ -207,6 +216,11 @@ fn face(
                 + ((a_high.depth - a_low.depth) + (b_high.depth - b_low.depth)) * derivative;
         }
     }
+    let shaking = model.shaking.map_or([0.0; 2], |motion| {
+        let left = unsafe { motion.get_unchecked(support_columns.0) };
+        let right = unsafe { motion.get_unchecked(support_columns.1) };
+        [0.5 * (left[0] + right[0]), 0.5 * (left[1] + right[1])]
+    });
     let offset = apparent_step(
         a,
         b,
@@ -217,6 +231,7 @@ fn face(
         x,
         bed_cross,
         surface_cross,
+        shaking,
     );
     let ha = (a.depth - offset.max(0.0)).max(0.0);
     let hb = (b.depth - (-offset).max(0.0)).max(0.0);
@@ -289,6 +304,7 @@ fn advance(
                     if z + 1 < nz { nx } else { 0 },
                     nx,
                 ),
+                (i - start, i - start + 1),
             );
         }
         wall(state, next, last, -dt / model.dx, model.gravity, true);
@@ -308,6 +324,7 @@ fn advance(
                 model,
                 false,
                 (usize::from(x > 0), usize::from(x + 1 < nx), 1),
+                (x, x),
             );
         }
         wall(state, next, last, -dt / model.dz, model.gravity, false);
@@ -334,6 +351,13 @@ fn advance(
     true
 }
 
+fn shaking_columns<'a>(address: *const f64, nx: usize) -> Option<&'a [[f64; 2]]> {
+    if address.is_null() {
+        return None;
+    }
+    Some(unsafe { core::slice::from_raw_parts(address.cast::<[f64; 2]>(), nx) })
+}
+
 // Callers use two independently allocated arena regions of nx*nz columns. Work is transactional
 // at the public port: the TypeScript adapter copies this scratch state out only on success.
 #[unsafe(no_mangle)]
@@ -350,6 +374,7 @@ pub extern "C" fn granular_step(
     turbulence: f64,
     roughness: *const f64,
     grain_load: f64,
+    ground: *const f64,
 ) -> i32 {
     let count = nx * nz;
     let work = unsafe { core::slice::from_raw_parts_mut(work.cast::<Column>(), count) };
@@ -362,6 +387,7 @@ pub extern "C" fn granular_step(
         turbulence,
         roughness: unsafe { roughness.cast::<Roughness>().as_ref() },
         grain_load,
+        shaking: shaking_columns(ground, nx),
     };
     let mut remaining = dt;
     let mut steps = 0;
@@ -401,6 +427,10 @@ fn slope_axis(
     high: usize,
     intervals: usize,
     width: f64,
+    support: f64,
+    body_slope: f64,
+    has_low: bool,
+    has_high: bool,
 ) -> (f64, f64) {
     if intervals == 0 {
         return (0.0, 0.0);
@@ -410,8 +440,11 @@ fn slope_axis(
     let bed = (b.bed - a.bed) / (intervals as f64 * width);
     // A centred surface derivative is zero at a symmetric peak. Both sides still
     // drive outward motion there, so arrest checks the steepest downhill secant.
-    let to_low = (column.bed - a.bed) + (column.depth - a.depth);
-    let to_high = (column.bed - b.bed) + (column.depth - b.depth);
+    let to_low = (column.bed - a.bed) * support
+        + (column.depth - a.depth)
+        + if has_low { body_slope * width } else { 0.0 };
+    let to_high = (column.bed - b.bed) * support + (column.depth - b.depth)
+        - if has_high { body_slope * width } else { 0.0 };
     (bed, to_low.max(to_high).max(0.0) / width)
 }
 
@@ -437,7 +470,25 @@ fn deposit_candidate(
     let east = usize::from(x + 1 < nx);
     let near = usize::from(z > 0);
     let far = usize::from(z + 1 < nz);
-    let (bx, sx) = slope_axis(cells, column, i - west, i + east, west + east, model.dx);
+    let (support, body_slope) = model.shaking.map_or((1.0, 0.0), |motion| {
+        let [ax, ay] = unsafe { *motion.get_unchecked(x) };
+        ((1.0 + ay / model.gravity).max(0.0), ax / model.gravity)
+    });
+    if support == 0.0 {
+        return false;
+    }
+    let (bx, sx) = slope_axis(
+        cells,
+        column,
+        i - west,
+        i + east,
+        west + east,
+        model.dx,
+        support,
+        body_slope,
+        west > 0,
+        east > 0,
+    );
     let (bz, sz) = slope_axis(
         cells,
         column,
@@ -445,6 +496,10 @@ fn deposit_candidate(
         i + far * nx,
         near + far,
         model.dz,
+        support,
+        0.0,
+        near > 0,
+        far > 0,
     );
     let speed = length(length(ux, uz), bx * ux + bz * uz);
     let mut stop = model.friction;
@@ -456,7 +511,7 @@ fn deposit_candidate(
             return false;
         }
     }
-    speed <= speed_limit && length(sx, sz) <= stop * model.grain_load
+    speed <= speed_limit && length(sx, sz) <= stop * model.grain_load * support
 }
 
 // Freeze a subcritical plug in one transfer after advection. The two triangles assigned to
@@ -477,6 +532,7 @@ pub extern "C" fn granular_deposit(
     friction: f64,
     roughness: *const f64,
     grain_load: f64,
+    ground: *const f64,
 ) -> i32 {
     let count = nx * nz;
     let vertices = (nx + 1) * (nz + 1);
@@ -493,6 +549,7 @@ pub extern "C" fn granular_deposit(
         turbulence: f64::INFINITY,
         roughness: unsafe { roughness.cast::<Roughness>().as_ref() },
         grain_load,
+        shaking: shaking_columns(ground, nx),
     };
     let mut mass = 0.0;
     let mut impulse_x = 0.0;

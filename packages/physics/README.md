@@ -5320,3 +5320,24 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
 world.advance(180);
 console.log(flow.marineBudget.displacedVolume, sea.budget.admittedSourceVolume);
 ```
+
+To drive a slide with elastic ground motion, load with `groundField: ground.groundField` from a registered `SeismicGround` in the same world cell. This option defaults to absent. The solver interpolates the X/depth cross-section along X and extends that section across the flow grid along Z. X ground acceleration drives relative motion in the opposite direction. Upward ground acceleration increases the normal contact load.
+
+```js
+import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
+import { SeismicGround } from '@margoengine/physics/seismic';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const ground = await SeismicGround.load();
+const flow = await GranularFlowSolver.load({ groundField: ground.groundField });
+const grid = { columns: 39, rows: 3, width: 39, depth: 3, centre: [19.5, 0] };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(ground, {
+    width: 39, depth: 18, spacing: [1, 1],
+    material: { density: 2200, compressionalSpeed: 35, shearSpeed: 20 },
+    initialVelocity: (x) => [0.1 * Math.sin((2 * Math.PI * x) / 16), 0],
+  })
+  .add(flow, { grid, depth: 0.25, friction: 0.015 });
+world.advance(12);
+console.log(flow.sample(19, 1).discharge);
+```

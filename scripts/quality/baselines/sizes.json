@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20549304,
+  "total": 20549724,
   "history": [
     {
       "date": "2026-10-24",
@@ -13561,6 +13561,12 @@
       "grew": 0,
       "added": 1,
       "reason": "EARTH-01 adds a 5751 B gzip optional voxel bridge; root changes from 6044 to 6048 B gzip to share the atomic change notification path. A separate root copy would duplicate the voxel world class and break shared identity. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "4726a5be29",
+      "grew": 1,
+      "reason": "EARTH-02 grows the optional granular-flow entry from 5545 to 5965 B gzip (ceiling 6221 B) for the live EARTH-08 cross-section and its inertial and friction projections. Splitting that path would repeat the conservative grid and its native binding. Core plus Stage stay 24846 B."
     }
   ],
   "items": {
@@ -14396,7 +14402,7 @@
     "@margoengine/physics/flip": 11699,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
-    "@margoengine/physics/granular-flow": 5801,
+    "@margoengine/physics/granular-flow": 6221,
     "@margoengine/physics/granular-mpm": 6217,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,

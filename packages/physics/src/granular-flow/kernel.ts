@@ -36,6 +36,7 @@ export interface GranularFlowKernel {
     friction: number,
     roughness: number,
     grainLoad: number,
+    ground: number,
   ): number;
   granular_step(
     work: number,
@@ -50,6 +51,7 @@ export interface GranularFlowKernel {
     turbulence: number,
     roughness: number,
     grainLoad: number,
+    ground: number,
   ): number;
 }
 

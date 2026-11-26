@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TerrainBed } from '../../dist/earth.js';
 import { GranularFlowSolver } from '../../dist/granular-flow.js';
+import { SEISMIC_LAYOUT, SeismicGround } from '../../dist/seismic.js';
 import { TsunamiSolver } from '../../dist/tsunami.js';
 import { PhysicsWorld, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
@@ -254,4 +255,108 @@ test('EARTH-02 already submerged material only displaces its net change when it 
   assert.equal(slide.depositBudget.mass, 1800);
   assert.equal(slide.mass, 0);
   assert.equal(bed.requestedVolume(), 4.5);
+});
+
+function constantGround(ax, ay) {
+  let region;
+  const field = {
+    name: 'prescribedGround',
+    kind: 'particleSet',
+    centring: 'particle',
+    quantity: 'ground motion',
+    unit: 'm, m/s, m/s^2',
+  };
+  return {
+    field,
+    describe: () => ({
+      id: 'groundForGranularTest',
+      fields: [{ field, access: 'write' }],
+      rate: 0,
+      stableRate: () => 0,
+    }),
+    init(host) {
+      region = host.allocate('motion', 16 * 8, 'f64', SEISMIC_LAYOUT);
+      new Float64Array(host.memory.buffer, region.byteOffset, 16).set([
+        -50,
+        0,
+        0,
+        0,
+        0,
+        ax,
+        ay,
+        0,
+        50,
+        0,
+        0,
+        0,
+        0,
+        ax,
+        ay,
+        0,
+      ]);
+    },
+    step() {},
+    importPorts() {},
+    exportPorts: (tick) => [{ field: field.name, region, tick, cell: [0, 0, 0] }],
+    stateRegions: () => [region],
+    extraState: () => [],
+  };
+}
+
+test('EARTH-02 the seismic port crosses the Coulomb yield only at the effective normal load', async () => {
+  const g = 9.81;
+  const shape = { columns: 41, rows: 3, width: 20.5, depth: 1.5, centre: [0, 0] };
+  const mu = 0.2;
+  for (const [groundX, groundY] of [
+    [-1, 0],
+    [-3, 0],
+    [3, 0],
+    [-1.5, 0],
+    [-1.5, -4],
+  ]) {
+    const ground = constantGround(groundX, groundY);
+    const grain = await GranularFlowSolver.load({ groundField: ground.field });
+    const world = new PhysicsWorld({ rate, gravity: [0, -g, 0] })
+      .add(ground, null)
+      .add(grain, { grid: shape, depth: 1, friction: mu, turbulence: Infinity });
+    world.advance(1);
+    const sample = grain.sample(20, 1);
+    const excess = Math.max(0, Math.abs(groundX) - mu * (g + groundY));
+    const acceleration = Math.sign(-groundX) * excess;
+    const width = shape.width / shape.columns;
+    // Integrating an interface pressure from h to h - a*dx/g gives the first-order
+    // hydrostatic reconstruction error a² dx / (2gh) on this flat uniform layer.
+    const discretization = (width * excess * excess) / (2 * g);
+    assert.ok(Math.abs(60 * sample.discharge[0] - acceleration) <= discretization + 512 * Number.EPSILON * g);
+    assert.equal(sample.depth, 1);
+    assert.equal(sample.discharge[1], 0);
+  }
+});
+
+async function shaking(fps = rate, shared = false) {
+  const ground = await SeismicGround.load();
+  const slide = await GranularFlowSolver.load({ groundField: ground.groundField });
+  const grid = { columns: 39, rows: 3, width: 39, depth: 3, centre: [19.5, 0] };
+  const world = new PhysicsWorld({ rate: fps, memory: worldMemory(shared) })
+    .add(ground, {
+      width: 39,
+      depth: 18,
+      spacing: [1, 1],
+      absorbingCells: 0,
+      material: { density: 2200, compressionalSpeed: 35, shearSpeed: 20 },
+      initialVelocity: (x) => [0.1 * Math.sin((2 * Math.PI * x) / 16), 0],
+    })
+    .add(slide, { grid, depth: 0.25, friction: 0.015, turbulence: Infinity });
+  return { world, ground, slide };
+}
+
+test('EARTH-02 uses real EARTH-08 pulses and conserves mass through checkpoint replay', async () => {
+  const { slide, world, ground } = await shaking();
+  const mass = slide.mass;
+  world.advance(12);
+  assert.notEqual(ground.motion(19).acceleration[0], 0);
+  assert.ok(Math.abs(slide.sample(19, 1).discharge[0]) > 0.001);
+  assert.ok(Math.abs(slide.mass - mass) <= 128 * Number.EPSILON * mass);
+  const runs = await Promise.all([shaking({ num: 24, den: 1 }), shaking({ num: 24, den: 1 }, true)]);
+  seekEqualsContinuous(() => runs.shift().world, { frames: 24, at: 6, cap: 333 });
 });

@@ -24,14 +24,15 @@ page.on('response', (response) => {
 try {
   await page.waitForFunction(() => typeof window.runGranularFlow === 'function', null, { timeout: 20000 });
   assert.deepEqual([...assets], []);
-  const { plain, shared, roughPlain, roughShared, depositPlain, depositShared } = await page.evaluate(() =>
-    window.runGranularFlow(),
-  );
+  const { plain, shared, roughPlain, roughShared, depositPlain, depositShared, seismicPlain, seismicShared } =
+    await page.evaluate(() => window.runGranularFlow());
   assert.equal(plain.isShared, false);
   assert.equal(shared.isShared, true);
   assert.deepEqual(plain, { ...shared, isShared: false });
   assert.deepEqual(roughPlain, roughShared);
   assert.deepEqual(depositPlain, depositShared);
+  assert.deepEqual(seismicPlain, seismicShared);
+  assert.ok(Math.abs(seismicPlain.discharge) > 0.001);
   assert.equal(depositPlain.mass, 900);
   assert.equal(depositPlain.volume, 2.25);
   assert.equal(depositPlain.elevation, -1.625);
@@ -45,7 +46,7 @@ try {
   assert.deepEqual([...assets].sort(), ['granular-flow-kernel-shared.wasm', 'granular-flow-kernel.wasm']);
   assert.deepEqual(errors, []);
   console.log(
-    `Browser EARTH-02 plain/shared parity for terrain ridge ${plain.hash} and rough-bed chute ${roughPlain.hash}, TerrainBed consolidation ${depositPlain.hash}`,
+    `Browser EARTH-02 plain/shared parity for terrain ridge ${plain.hash} and rough-bed chute ${roughPlain.hash}, TerrainBed consolidation ${depositPlain.hash} and connected seismic motion ${seismicPlain.hash}`,
   );
 } finally {
   await close();
