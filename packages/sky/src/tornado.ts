@@ -14,6 +14,7 @@ import { fullscreen } from '../../shared/gpu.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView, viewRect } from '../../shared/view-rect.js';
 import { linearHdr } from '../../shared/hdr-format.js';
+import { compactDeficit, compactPeakWind, compactTangential } from '../../shared/vortex-balance.js';
 import { sunlight } from './atmosphere.js';
 import { depthWGSL, sceneDepth } from './depth.js';
 // A tornado under a supercell: the vortex's wind and pressure (the Rankine combined vortex with the decay outside the
@@ -187,7 +188,7 @@ export interface TornadoWind {
 export interface TornadoWeather {
   /** How much of the storm is here, 0 to 1 (1 inside, 0 past four mesocyclone radii). */
   weight: number;
-  /** Mean wind, m/s, at most 60 (the weather's range; {@link Tornado.windAt} has the true speed). */
+  /** Mean 10 m wind in m/s. */
   wind: number;
   /** Gustiness 0 to 1. */
   gust: number;
@@ -226,10 +227,7 @@ export interface TornadoGroundScar {
 }
 const G = 9.80665;
 const AMBIENT = 1013.25;
-/** Radius of maximum wind of a Burgers-Rott vortex over its r0. */
-export const BURGERS_PEAK_RADIUS = 1.1209064204856645;
-/** Peak wind of a Burgers-Rott vortex over G / (2 pi r0). */
-export const BURGERS_PEAK_WIND = 0.6381726863389515;
+export { BURGERS_PEAK_RADIUS, BURGERS_PEAK_WIND, expIntegral } from '../../shared/vortex-balance.js';
 /** EF0's lowest 3 s gust, m/s (WSEC 2006). */
 export const EF0_GUST = 29;
 const DEG = Math.PI / 180;
@@ -240,43 +238,6 @@ const smoothstep = (a: number, b: number, x: number) => {
 };
 const inRange = (v: unknown, lo: number, hi: number) =>
   typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
-/** The exponential integral E1(x) for x > 0: its series below 1, a continued fraction above (Abramowitz and Stegun 5.1). */
-export function expIntegral(x: number): number {
-  if (!(x > 0)) return x === 0 ? Infinity : NaN;
-  if (x <= 1) {
-    let sum = 0,
-      term = 1;
-    for (let k = 1; k < 40; k++) {
-      term *= -x / k;
-      sum -= term / k;
-      if (Math.abs(term / k) < 1e-17) break;
-    }
-    return -0.5772156649015329 - Math.log(x) + sum;
-  }
-  // The continued fraction e^-x / (x + 1 / (1 + 1 / (x + 2 / (1 + 2 / (x + ...))))), evaluated by modified Lentz.
-  let b = x + 1,
-    c = 1e300,
-    d = 1 / b,
-    h = d;
-  for (let i = 1; i < 200; i++) {
-    const a = -i * i;
-    b += 2;
-    d = 1 / (a * d + b);
-    c = b + a / c;
-    const del = c * d;
-    h *= del;
-    if (Math.abs(del - 1) < 1e-15) break;
-  }
-  return h * Math.exp(-x);
-}
-// The Burgers-Rott pressure integral F(x) = int_x^inf (1 - e^-u)^2 / u^2 du = (1 - e^-x)^2 / x + 2 E1(x) - 2 E1(2x),
-// so the deficit is rho (G / 2 pi r0)^2 F(x) / 2, and F(0) = 2 ln 2.
-function burgersF(x: number): number {
-  if (x < 1e-8) return 2 * Math.LN2 - x;
-  if (x > 300) return 1 / x;
-  const e = -Math.expm1(-x);
-  return (e * e) / x + 2 * (expIntegral(x) - expIntegral(2 * x));
-}
 /**
  * Checks `o` and returns its numbers with the defaults filled in.
  * @throws TypeError for a bad pair, path or colour; RangeError for a value outside its range (each named in the message).
@@ -373,36 +334,15 @@ export function tornadoStrength(s: ResolvedTornado, t: number): number {
 }
 /** The peak tangential wind of `s` at strength `k` (0 to 1 of its deficit), m/s, from the central deficit. */
 export function tornadoPeakWind(s: ResolvedTornado, k = 1): number {
-  const dp = s.dp * k;
-  // Rankine with decay a: the deficit at the centre is rho Vm^2 (1/2 + 1/(2a)); Burgers-Rott: rho (G/2 pi r0)^2 ln 2.
-  return s.burgers
-    ? BURGERS_PEAK_WIND * Math.sqrt(dp / (s.rho * Math.LN2))
-    : Math.sqrt(dp / (s.rho * (0.5 + 0.5 / s.decay)));
+  return compactPeakWind(s.dp * k, s.rho, s.decay, s.burgers);
 }
 /** The tangential wind at radius `r` metres, m/s, at strength `k`. */
 export function tornadoWind(r: number, s: ResolvedTornado, k = 1): number {
-  if (!(r > 0) || !(k > 0)) return 0;
-  const vm = tornadoPeakWind(s, k);
-  if (s.burgers) {
-    const r0 = s.rc / BURGERS_PEAK_RADIUS,
-      x = (r * r) / (r0 * r0);
-    return ((vm / BURGERS_PEAK_WIND) * -Math.expm1(-x)) / (r / r0);
-  }
-  return r <= s.rc ? (vm * r) / s.rc : vm * (s.rc / r) ** s.decay;
+  return k > 0 ? compactTangential(r / s.rc, tornadoPeakWind(s, k), s.decay, s.burgers) : 0;
 }
-/** The pressure deficit at radius `r` below the air round the tornado, Pa, at strength `k` (cyclostrophic balance). */
+/** The pressure deficit at radius `r` below the air round the tornado, Pa, at strength `k`. */
 export function tornadoDeficit(r: number, s: ResolvedTornado, k = 1): number {
-  if (!(k > 0)) return 0;
-  const vm = tornadoPeakWind(s, k),
-    rho = s.rho;
-  if (s.burgers) {
-    const r0 = s.rc / BURGERS_PEAK_RADIUS,
-      g = vm / BURGERS_PEAK_WIND;
-    return 0.5 * rho * g * g * burgersF((r * r) / (r0 * r0));
-  }
-  const a = s.decay;
-  if (r <= s.rc) return rho * vm * vm * (0.5 / a + 0.5 * (1 - (r * r) / (s.rc * s.rc)));
-  return ((rho * vm * vm) / (2 * a)) * (s.rc / r) ** (2 * a);
+  return k > 0 ? compactDeficit(r / s.rc, s.dp * k, s.decay, s.burgers) : 0;
 }
 /**
  * The radius of the condensation funnel at `height` metres, at strength `k`: where the deficit cools the air to its
@@ -625,8 +565,7 @@ export class Tornado {
     return 'inflow';
   }
   /**
-   * The storm's weather at `(x, z)` on the weather's scales, for `WeatherRegions`' `storms`: mean wind (at most 60
-   * m/s), gustiness, direction, rain, cloud overhead (the base out to the mesocyclone, the deck past it), lightning and
+   * The storm's weather at `(x, z)` on the weather's scales, for `WeatherRegions`' `storms`: mean wind in m/s, gustiness, direction, rain, cloud overhead (the base out to the mesocyclone, the deck past it), lightning and
    * humidity, and the storm's `weight` there (1 inside, fading to 0 from three to four mesocyclone radii).
    */
   weatherAt(x: number, z: number, t = 0): TornadoWeather {
@@ -637,7 +576,7 @@ export class Tornado {
       rate = this.rainAt(x, z, t);
     return {
       weight: 1 - smoothstep(3 * s.mesoRadius, 4 * s.mesoRadius, r),
-      wind: Math.min(60, wind.speed),
+      wind: wind.speed,
       gust: clamp01(0.4 + 0.6 * Math.min(1, wind.speed / 30)),
       windDirection: wind.direction,
       rain: Math.min(1, Math.cbrt(rate / 80)),

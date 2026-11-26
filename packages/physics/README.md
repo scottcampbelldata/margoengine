@@ -3232,6 +3232,36 @@ Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic f
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
 
+## Tropical cyclones and compact vortices
+
+`StormVortex` is a world-space `Wind` with surface pressure in pascals, a moving centre and a 10 m
+wind profile. The default tropical cyclone has a 30 km peak-radius scale and a 6,000 Pa central
+pressure deficit. A tornado, waterspout, dust devil, or fire whirl uses a compact cyclostrophic
+profile. Select `compactProfile: 'rankine'` for the algebraic outer tail or use the default Burgers–Rott.
+The field supports plants, airborne particles, and rigid wind loads. Bind a visual hurricane with
+`StormVortex.fromHurricane(storm.resolved)` to keep centre, pressure and wind consistent.
+
+```ts
+import { StormVortex, VortexForcing } from 'margoengine/physics/vortices';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const storm = new StormVortex({ pressureDrop: 15000, radius: 30000, translation: [5, 0] });
+const coupling = new VortexForcing();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(coupling, {
+  vortex: storm,
+  probes: [[30000, 10, 0]],
+});
+world.advance(1);
+const { velocity, pressure } = coupling.weather();
+console.log(Math.hypot(velocity[0], velocity[2]) > 60, pressure < storm.ambientPressure);
+```
+
+Enable `{ rigid: true }` on `VortexForcing` to apply drag and torque to selected rigid rows and publish
+loads and retained limit crossings. Enable `{ water: true }` to contribute spatial pressure gradients
+and wind stress on a matching shallow-water grid. Use `StormVortex.inverseBarometer()` for an open
+boundary's pressure correction. If another producer already supplies the wind stress, use
+`water.windStress: false`.
+
 ## Seismic waves and ground motion
 
 `@margoengine/physics/seismic` solves P and SV waves through a vertical geological section. Supply density
