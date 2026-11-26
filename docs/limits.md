@@ -9738,7 +9738,7 @@ uniform excavation floor should match TerrainBed's bedrock. The volume ledger re
 modeled bounds, compaction and lofted mineral dust.
 
 The optional entry is 10,366 B gzip with a 10,388 B ceiling. Both Wasm assets are 10,951 B raw and 4,823 B gzip each.
-The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+The Physics root is 865,979 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
