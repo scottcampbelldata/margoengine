@@ -1,0 +1,151 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Instance attributes</title><style>body{margin:0;background:#000}canvas{width:256px;height:256px;display:block}</style></head><body>
+<script type="module">
+// Real-adapter checks of per-instance attributes; instance-attributes-browser.mjs judges the numbers. Each check draws a
+// small scene and returns canvas bytes read back from a copy of the frame.
+import {Engine} from '/packages/core/dist/index.js';
+import {PbrMaterial,UnlitMaterial,createMesh,createInstancedMesh} from '/packages/materials/dist/index.js';
+import {materialPlugin} from '/packages/materials/dist/plugins.js';
+import {instanceAttributes} from '/packages/materials/dist/instance-attributes.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {VirtualShadows} from '/packages/shadows/dist/virtual.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {Picking} from '/packages/selection/dist/index.js';
+import {TAA} from '/packages/taa/dist/index.js';
+import {CulledModels} from '/packages/culling/dist/models.js';
+import {FrontToBack} from '/packages/culling/dist/sort.js';
+const size=256,front={position:[0,0,5],target:[0,0,0],fov:60},half=5*Math.tan(Math.PI/6);
+const scene=async()=>{
+  document.querySelector('canvas')?.remove();
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=size;document.body.append(canvas);
+  const engine=await Engine.create(canvas,{backend:'webgpu',camera:front}),errors=[];
+  engine.stop();engine.onError=e=>errors.push(String(e));
+  const watch=()=>engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+  watch();
+  const render=async(n=3)=>{for(let i=0;i<n;i++){engine.render({delta:1/60});await engine.gpu.queue.onSubmittedWorkDone();}};
+  const bytes=async()=>{await render(2);engine.render({delta:1/60});const b=await createImageBitmap(canvas),c=new OffscreenCanvas(size,size),x=c.getContext('2d');x.drawImage(b,0,0);return x.getImageData(0,0,size,size).data;};
+  return {engine,errors,render,bytes,watch};
+};
+const quad=(h=2,z=0)=>({positions:[-h,-h,z,h,-h,z,h,h,z,-h,h,z],normals:[0,0,1,0,0,1,0,0,1,0,0,1],uvs:[0,0,1,0,1,1,0,1],indices:[0,1,2,0,2,3]});
+// RGB bytes at world point (x, y) on the z = 0 plane.
+const at=(data,x,y=0)=>{const px=Math.min(size-1,Math.floor((x/half+1)*size/2)),py=Math.min(size-1,Math.floor((1-y/half)*size/2)),k=(py*size+px)*4;return [data[k],data[k+1],data[k+2]];};
+const three=data=>[at(data,-1.5),at(data,0),at(data,1.5)];
+// Quads that differ only by what their instance's attributes say: a shift in the vertex stage, a colour at the output.
+const swarm=(data,name='swarm')=>materialPlugin({name,instanceAttributes:data,vertex:`position.x += ${name}_shift;`,output:`color = ${name}_tint;`});
+const swarmData=(capacity)=>instanceAttributes(capacity,{shift:{type:'f32',default:1.5},tint:{type:'color',default:[0,0,1]}});
+window.check={
+  // Every instance reads its own row; single, bulk, in-place and reset edits reach the next frame; rows past the
+  // capacity read the defaults; a device restore draws the same; two plugins read two sets.
+  async colours(){
+    const {engine,errors,bytes,watch}=await scene();
+    const data=swarmData(2),plugin=swarm(data),material=new UnlitMaterial({features:[plugin]});
+    data.setBuffer('shift',[-1.5,0]);data.setBuffer('tint',[1,0,0,0,1,0]);
+    // Three instances over a capacity of two: the third reads the defaults (blue at +1.5).
+    createInstancedMesh(engine,quad(0.5),material,3);
+    const first=three(await bytes());
+    data.set('tint',1,[1,1,0]);const single=three(await bytes());
+    data.setBuffer('shift',[0,-1.5]);const bulk=three(await bytes());
+    data.array('tint').set([0,1,1],0);data.update('tint',0,1);const inPlace=three(await bytes());
+    data.reset('tint',0);const reset=three(await bytes());
+    const previous=engine.gpu;previous.destroy();await previous.lost;await engine.rebootDevice();watch();
+    const restored=three(await bytes());
+    data.set('tint',1,[1,0,1]);const afterRestore=three(await bytes());
+    // A second plugin with its own attributes runs after the first and halves instance 1 only.
+    const dim=instanceAttributes(3,{keep:{type:'f32',default:1}});dim.set('keep',1,0);
+    material.features=[plugin,materialPlugin({name:'dim',instanceAttributes:dim,output:'color *= dim_keep;'})];
+    const two=three(await bytes());
+    // Off and on again in one step: shadow records and bind groups follow the new buffers.
+    material.features=[];material.features=[plugin];const again=three(await bytes());
+    engine.dispose();data.dispose();dim.dispose();
+    return {errors,first,single,bulk,inPlace,reset,restored,afterRestore,two,again};
+  },
+  // Every type reads its own floats of its own row.
+  async types(){
+    const {engine,errors,bytes}=await scene();
+    const data=instanceAttributes(3,{f:'f32',two:'vec2f',three:'vec3f',four:'vec4f',tint:'color',basis:'mat3x3f',pose:'mat4x4f'});
+    const plugin=materialPlugin({name:'t',instanceAttributes:data,vertex:'position.x += t_pose[3][1];',
+      output:'color = vec3f(t_f + t_two.y, t_three.z + t_basis[1][1] - 1.0 + t_basis[2][0], t_pose[3][0] + t_four.w) * t_tint;'});
+    createInstancedMesh(engine,quad(0.5),new UnlitMaterial({features:[plugin]}),3);
+    // pose[13] places each quad (-1.5, 0, 1.5); pose[12] feeds blue.
+    for(let i=0;i<3;i++)data.set('pose',i,[1,0,0,0,0,1,0,0,0,0,1,0,0.1*i,(i-1)*1.5,0,1]);
+    data.set('tint',0,[0,0,0]);
+    data.set('f',1,0.2).set('two',1,[9,0.4]).set('three',1,[9,9,0.2]).set('basis',1,[9,9,9,9,1.5,9,0.1,9,9]).set('four',1,[9,9,9,0.3]);
+    data.set('f',2,1).set('three',2,[9,9,1]).set('tint',2,[0,1,0]);
+    const out=three(await bytes());engine.dispose();return {errors,out};
+  },
+  // Plain meshes sharing the material and geometry read row 0, whatever order they are drawn or batched in.
+  async plain(){
+    const {engine,errors,bytes}=await scene();
+    const data=swarmData(4),material=new UnlitMaterial({features:[swarm(data)]}),geometry=quad(0.4);
+    data.setBuffer('shift',[0,2,2,2]);data.setBuffer('tint',[1,0,0,0,1,0,0,1,0,0,1,0]);
+    for(const x of [-1.5,0,1.5])createMesh(engine,geometry,material).root.setPosition([x,0,0]);
+    const out=three(await bytes());engine.dispose();return {errors,out};
+  },
+  // A GPU culler and a sorter would reorder rows: these instances stay in place, so each keeps its values.
+  async culled(){
+    const {engine,errors,bytes}=await scene();
+    const data=swarmData(3),material=new UnlitMaterial({features:[swarm(data)]});
+    data.setBuffer('shift',[0,0,0]);data.setBuffer('tint',[1,0,0,0,1,0,0,0,1]);
+    const mesh=createInstancedMesh(engine,quad(0.5),material,3);
+    // Instance 0 is far outside the view (a culler would compact it away); 2 is nearer than 1 (a sorter would swap them).
+    mesh.instances.setMatrices(0,new Float32Array([100,-1.5,0.5].flatMap((x,k)=>[1,0,0,0,0,1,0,0,0,0,1,0,x===0.5?1.2:x,0,k===2?0.5:0,1])));
+    CulledModels.attach(engine,[mesh]);engine.use(new FrontToBack({models:[mesh]}));
+    const out=three(await bytes());engine.dispose();return {errors,out};
+  },
+  // Cascaded or virtual shadows follow each instance's attribute move, live.
+  async shadow(virtual){
+    const {engine,errors,bytes}=await scene();
+    engine.lighting.direction.set([1,0,1,2]);engine.lighting.radiance.set([1,1,1,0]);
+    const data=instanceAttributes(2,{shift:'f32'});data.setBuffer('shift',[1,-0.5]);
+    const plugin=materialPlugin({name:'move',instanceAttributes:data,vertex:'position.x += move_shift;'});
+    const shadows=virtual?VirtualShadows.attach(engine):Shadows.attach(engine,{resolution:1024,filter:'hard'}),
+      wall=createMesh(engine,quad(half*2),new PbrMaterial({roughness:1,toneMapped:false})),
+      caster=createInstancedMesh(engine,quad(0.4,1),new PbrMaterial({features:[plugin]}),2);
+    shadows.add(wall);shadows.add(caster);
+    const sample=async()=>{const d=await bytes();return {zero:at(d,0),left:at(d,-1.5),one:at(d,1),open:at(d,-1.5,1.5)};};
+    const first=await sample();data.set('shift',0,2);const moved=await sample();
+    engine.dispose();return {errors,first,moved};
+  },
+  // A local spot shadow (its own pipeline layout) and GPU picking follow the move too.
+  async local(){
+    const {engine,errors,bytes}=await scene();
+    engine.lighting.radiance.set([0,0,0,0]);
+    const data=instanceAttributes(2,{shift:'f32'});data.setBuffer('shift',[1,20]);
+    const plugin=materialPlugin({name:'move',instanceAttributes:data,vertex:'position.x += move_shift;'});
+    const lights=Clustered.attach(engine);
+    lights.setLights([{position:[3,0,4],direction:[-0.6,0,-0.8],angle:0.9,range:20,intensity:60,castShadow:true}]);
+    const wall=createMesh(engine,quad(half*2),new PbrMaterial({roughness:1,toneMapped:false}));
+    lights.add(wall);
+    const shadows=LocalShadows.attach(engine,{lights,resolution:1024}),
+      caster=createInstancedMesh(engine,quad(0.4,1),new PbrMaterial({features:[plugin]}),2);
+    shadows.add(caster);
+    const sample=async()=>{const d=await bytes();return {near:at(d,0.2),far:at(d,1.9),open:at(d,-1.5,1)};};
+    const first=await sample();data.set('shift',0,2);const moved=await sample();
+    engine.dispose();return {errors,first,moved};
+  },
+  async picking(){
+    const {engine,errors,render}=await scene();
+    const data=instanceAttributes(1,{shift:'f32'});data.set('shift',0,1.5);
+    const mesh=createMesh(engine,quad(0.4),new UnlitMaterial({features:[materialPlugin({name:'move',instanceAttributes:data,vertex:'position.x += move_shift;'})]}));
+    const picking=Picking.attach(engine);await render();
+    const hit=async x=>(await picking.pick((x/half+1)*size/2,size/2))!==null;
+    const out={errors,there:await hit(1.5),centre:await hit(0)};
+    data.set('shift',0,0);await render();out.back=await hit(0);out.left=await hit(1.5);
+    const two=createInstancedMesh(engine,quad(0.4),mesh.material,1);two.root.setPosition([0,1.5,0]);data.set('shift',0,1.5);await render();
+    out.instancedThere=(await picking.pick((1.5/half+1)*size/2,(1-1.5/half)*size/2))!==null;
+    engine.dispose();return out;
+  },
+  // TAA draws object velocity of a moving mesh through the same row load.
+  async velocity(){
+    const {engine,errors,render}=await scene(),device=engine.gpu,make=device.createShaderModule.bind(device);
+    let moved=0;
+    device.createShaderModule=d=>{if(d.code.includes('previousVertices')&&d.code.includes('margoInstanceLoad_move(margoRow)'))moved++;return make(d);};
+    const data=instanceAttributes(1,{shift:'f32'}),
+      mesh=createMesh(engine,quad(0.4),new PbrMaterial({features:[materialPlugin({name:'move',instanceAttributes:data,vertex:'position.x += move_shift;'})]}));
+    TAA.attach(engine);
+    for(let i=0;i<6;i++){mesh.root.setPosition([i*0.1,0,0]);data.set('shift',0,i*0.05);await render(1);}
+    engine.dispose();return {errors,moved};
+  },
+};
+window.ready=true;
+</script></body></html>

@@ -13,6 +13,11 @@ export const instancedDepth = (code) =>
     .replace('@location(4) color:vec4f', '@location(4) color:vec4f,' + instanceInput)
     .replaceAll('f.model*vec4f(', 'f.model*mat4x4f(i.m0,i.m1,i.m2,i.m3)*vec4f(')
     .replace('o.alpha=i.color.a;', 'o.uv=o.uv*i.uvt.xy+i.uvt.zw;o.alpha=i.color.a*i.tint.a;');
+/**
+ * True when the primitive's material reads data by instance index (gltf/pbr `shading.instanceRows`, materials
+ * `instanceAttributes`): a culler or sorter that reordered its rows would give instances each other's values.
+ */
+export const readsRows = (primitive) => !!primitive.material?.shading?.instanceRows;
 /** World matrix of instance `k` (node matrix times the instance's node-space matrix) into `out`. */
 export function instanceMatrix(node, data, k, out) {
   const o = k * 24;
