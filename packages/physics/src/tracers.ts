@@ -153,6 +153,8 @@ export interface TracerBedJets {
   material?: 'sand' | 'silt';
   /** Wall stress model. Default 'wall-jet', with 'footprint' for clearances below one jet diameter. */
   shear?: 'wall-jet' | 'footprint';
+  /** Half the bedform height or the equivalent roughness height, m. The fin-jet default and minimum are 1% of local water depth. */
+  suspensionReferenceHeight?: number;
   /** Shields threshold for initiation of motion. Default: the Soulsby–Whitehouse curve for the selected grain. */
   criticalShields?: number;
   /** Optional linear erosion rate at unit excess stress, kg/m²/s. Default: van Rijn's grain-dependent pick-up. */
@@ -278,6 +280,7 @@ interface JetBed {
   pickupScale: number;
   pickupExponent: number;
   limit: number;
+  suspensionReferenceHeight: number;
   rings?: Float64Array;
 }
 
@@ -537,6 +540,7 @@ export class TracerSolver implements Solver<TracerParams> {
       const {
         material = 'sand',
         shear = 'wall-jet',
+        suspensionReferenceHeight = 0,
         criticalShields,
         erodibility,
         availableMass = Infinity,
@@ -550,6 +554,10 @@ export class TracerSolver implements Solver<TracerParams> {
       )
         throw new RangeError(
           'Invalid erodible tracer bed; pass sand or silt, wall-jet or footprint shear, positive Shields and non-negative erosion and mass.',
+        );
+      if (!(suspensionReferenceHeight >= 0 && Number.isFinite(suspensionReferenceHeight)))
+        throw new RangeError(
+          'Invalid tracer bed reference height; pass a finite, nonnegative suspensionReferenceHeight in metres.',
         );
       const grains = TRACER_MATERIALS[material];
       if (!(waterDensity < grains.density && this.g > 0))
@@ -574,6 +582,7 @@ export class TracerSolver implements Solver<TracerParams> {
         pickupScale,
         pickupExponent: erodibility === undefined ? 1.5 : 1,
         limit: availableMass,
+        suspensionReferenceHeight,
         rings:
           this.useBedJets && shear === 'wall-jet'
             ? new Float64Array(2 * (JET_CORE_RINGS + JET_OUTER_RINGS))
@@ -1238,9 +1247,10 @@ export class TracerSolver implements Solver<TracerParams> {
           pz = centreZ + distance * sin(angle),
           floor = this.bedAt(px, pz),
           surface = this.surfaceAt(px, pz, time);
-        if (!(floor < surface)) continue;
+        // Van Rijn (1984), Part II, Eq. 37: use the suspension reference plane as the parcel release level.
+        const py = floor + Math.max(0.01 * (surface - floor), bed.suspensionReferenceHeight);
+        if (!(floor < py && py < surface)) continue;
         const share = mass / JET_PARCELS;
-        const py = floor + Math.min(spread * 0.3, (surface - floor) * 0.5);
         free = this.liftBedParcel([px, py, pz], share, free, bed, words, book);
       }
     }

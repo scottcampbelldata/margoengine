@@ -13233,6 +13233,13 @@ The downstream stress test reads four submerged electrochemical observations of 
 (1994) from Phares Fig. 10 (H/D = 2, Re = 42,600), with both log axes bounded by the marker sizes.
 Those observations were separate from the Poreh law's calibration and the Fig. 5b theoretical samples.
 
+Van Rijn's Part II Eq. 37 uses a suspension reference plane at half the bedform height, or at the equivalent
+roughness height if bedform measurements are unavailable, with a minimum of 1% of local water depth. The
+tracer uses that plane to represent where lifted parcels enter suspension. The visual fixture takes half of
+the 35 mm ripple height reported in J. Fredsøe, K. H. Andersen, and B. M. Sumer, [“Wave plus current over a
+ripple-covered bed” (1999)](https://orbit.dtu.dk/en/publications/wave-plus-current-over-a-ripple-covered-bed/).
+The ripple height is a physical input for the fixed-camera fixture. An independent ray-plume profile remains open.
+
 For clearances shorter than a diameter, or explicitly prescribed footprint shear, the reduced model spreads
 the wake radius by 0.1 m per metre of travel and uses 5% of incident normal momentum flux. These jet constants
 are modelling choices. An explicitly prescribed linear erosion option is available for a specified bed.

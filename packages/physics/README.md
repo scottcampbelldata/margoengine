@@ -3497,7 +3497,10 @@ use this simpler model. Sand (default) or silt lifts where shear exceeds the Sou
 grain size, water density and viscosity. The default van Rijn pick-up
 rate increases with the three-halves power of relative excess stress. Give `criticalShields` to override onset,
 or set `erodibility` to use a linear rate in kg/m²/s at unit excess stress for a prescribed bed. `availableMass`
-defaults to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
+defaults to an unlimited layer. The parcels enter suspension at van Rijn's reference plane, 1% of the local
+water depth above the bed by default. Set `suspensionReferenceHeight` to half the bedform height or to the
+equivalent roughness in metres when bedform dimensions are unavailable. The solver applies the same 1% minimum
+and requires the plane to be below the surface. The parcels drift with `water` and settle at their grain speed. Read `jetErosion`
 for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. `TracerSolver.withBedChange(id)` also deforms a live
 `TerrainBed`. Give `mobileLayer.thickness` in metres and `porosity` as a volume fraction in [0, 1). Place the layer
 above bedrock and use one sediment writer on it. The layer loses the mass carried in the puff and receives it when

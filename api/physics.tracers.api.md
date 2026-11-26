@@ -66,6 +66,7 @@ export const TRACER_MATERIALS: {
 export interface TracerBedJets {
     material?: 'sand' | 'silt';
     shear?: 'wall-jet' | 'footprint';
+    suspensionReferenceHeight?: number;
     criticalShields?: number;
     erodibility?: number;
     availableMass?: number;

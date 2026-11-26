@@ -492,6 +492,9 @@ coupling and exact replay. Independent dispersion measurements remain open.
 BB-7's live terrain exchange now debits the parcels' packed volume from a finite mobile layer and deposits
 it under the settled grains. The CPU and render fixtures check cut, deposit, final volume and replay.
 The original shot binding, independent lifted mass and multi-writer bedrock acceptance remain open.
+Fin-jet parcels now enter at the van Rijn Part II Eq. 37 reference level using measured bedform height or
+roughness when supplied and a minimum of 1% of the local depth. The fixture checks explicit and default levels
+through the live ray. The rough-bed render moves 17.1 px downstream and leaves 674.8 µm of bed relief on both backends.
 
 The SEA-15 consumer is rebased on Lane D's `4ec0717e8a`. A calm-spectrum test with a real `WakeSolver`
 confirms submerged dye follows the analytical potential gradient through `SpectralSea.water`.

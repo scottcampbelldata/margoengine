@@ -64,7 +64,8 @@
       },
     };
     world.add(tracers, {
-      bed, water, bedJets: { availableMass: 0.023, mobileLayer: layer },
+      // Eq. 37 uses half the bedform height. Fredsøe et al. (1999) ran with 35 mm ripples.
+      bed, water, bedJets: { availableMass: 0.023, suspensionReferenceHeight: 0.035 / 2, mobileLayer: layer },
       horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
     });
     world.couple([swim.id, 'tracers', 'bed'], 'staggered');

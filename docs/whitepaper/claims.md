@@ -258,8 +258,9 @@ first: each names its scope, its evidence file and how to reproduce it.
 
 - Ray fin and seabed coupling (BB-7, 2026-11-26). The live swimming port entrains sand from the near bed
   and leaves a distant bed or still fins clear. The terrain and suspension volume ledger closes as the plume
-  settles. The rendered fixture moves 16.6 pixels downstream and leaves 549.7 µm of bed relief on WebGPU and
-  the WebGL2 compatibility backend.
+  settles. The fin-jet parcels start at the van Rijn Eq. 37 reference level. CPU tests check both the default
+  1% of water depth and an explicitly supplied height. With a reference plane 17.5 mm above the bed, the
+  rendered fixture moves 17.1 pixels downstream and leaves 674.8 µm of bed relief on WebGPU and WebGL2.
   Reproduce with `node --test packages/physics/tests/coupling/swim.test.js` and
   `node packages/environment/tests/swim-sediment.browser.mjs` with and without `--compat` after building.
 

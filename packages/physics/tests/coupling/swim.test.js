@@ -394,12 +394,19 @@ test('BB-7 the live pectoral wall jet integrates annular pickup and replays its 
     tracer.jetErosion,
   );
   assert.ok(particles.every(({ position }) => Math.hypot(position[0], position[2]) > 0));
+  for (const { position } of particles) close(position[1], -0.5 + 0.01 * 0.5, Number.EPSILON);
   const start = world.takeSnapshot();
   world.advance(20);
   const hash = world.hash();
   world.restoreSnapshot(start.bytes);
   world.advance(20);
   assert.equal(world.hash(), hash);
+
+  const exposed = new TracerSolver('tracers', { bedJets: true });
+  const shallow = put(await SwimSolver.load(), [ray]);
+  shallow.add(exposed, { bed: 0.5, bedJets: { suspensionReferenceHeight: 0.5 } });
+  shallow.advance(1);
+  assert.equal(exposed.jetErosion, 0);
 });
 
 test('the sediment bed rejects viscosity too small to compute a finite pickup rate', () => {
@@ -422,6 +429,7 @@ test('BB-7 the same sand leaves the live bed, drifts, and builds a downstream de
   const surface = -0.5;
   const porosity = 0.4;
   const thickness = 0.002;
+  const suspensionReferenceHeight = 0.01;
   const bulkDensity = 2650 * (1 - porosity);
   const flow = { medium: 'water', cell: zero, sample: () => ({ velocity: [0.5, 0, 0], density, temperature: 280 }) };
   const world = put(swimmer, [ray]);
@@ -435,7 +443,7 @@ test('BB-7 the same sand leaves the live bed, drifts, and builds a downstream de
   });
   world.add(tracer, {
     bed: terrain.bed,
-    bedJets: { availableMass: 0.046, mobileLayer: { thickness, porosity } },
+    bedJets: { availableMass: 0.046, suspensionReferenceHeight, mobileLayer: { thickness, porosity } },
     water: flow,
     horizontalDiffusivity: 0,
     verticalDiffusivity: 0,
@@ -445,6 +453,8 @@ test('BB-7 the same sand leaves the live bed, drifts, and builds a downstream de
   world.advance(1);
   const suspended = tracer.budget.water;
   assert.ok(suspended > 0);
+  for (const { position } of tracer.particlesOf())
+    close(position[1], surface + suspensionReferenceHeight, Number.EPSILON);
   close(bulkDensity * (start - terrain.volume(surface)), suspended, 1e-9);
   assert.equal(terrain.refusedVolume(), 0);
 
