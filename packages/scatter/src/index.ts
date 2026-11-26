@@ -35,6 +35,7 @@ import { fadeCode, pixelFootprint, poseShader } from './pose.js';
 import { outsideLod } from './lod.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 export type { ScatterWind } from './wind.js';
+export type { ScatterCapture } from './capture.js';
 export { WIND_THRASH_FROM, windClockRate } from './wind.js';
 import { pathSegments, validateExclusions, type GroundBounds, type GroundPath } from './placement.js';
 import {
@@ -52,6 +53,7 @@ import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { loadCompatRoute } from '../../shared/compat.js';
 import { coverBlend, coverCode, splitDeclaration } from './cover.js';
+import { captureStage, type ScatterCapture } from './capture.js';
 export { coverCode, coverDeclaration, splitDeclaration } from './cover.js';
 import { OrderedCull, candidateShader } from './order.js';
 import { unitLight } from '../../shared/unit-light.js';
@@ -583,6 +585,15 @@ export class Scatter implements EnginePlugin {
     format: '',
   };
   private pbrBindings: GPUBindGroupEntry[] = [];
+  /** `setCapture`'s hook, the dispose listeners, and the capture stages with their groups and per-view frame uniforms. */
+  private capture?: ScatterCapture;
+  private readonly disposers = new Set<() => void>();
+  private readonly capturePipelines = new Map<string, GPURenderPipeline>();
+  private readonly captureRings = new Map<GPURenderPipeline, GPUBindGroup[]>();
+  private readonly captureLighting = new Map<GPURenderPipeline, GPUBindGroup[]>();
+  private captureBindings: GPUBindGroupEntry[] = [];
+  private captureUniforms: GPUBuffer[] = [];
+  private readonly captureValues = new Float32Array(32);
   private readonly pbrGroups = new Map<GPURenderPipeline, GPUBindGroup>();
   private readonly presentation = overlayDepthPass();
   private readonly attachment = this.presentation.colorAttachments[0];
@@ -1142,7 +1153,7 @@ export class Scatter implements EnginePlugin {
       name: this.name + ':lod',
       order: 1.5,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
+        if (c.backend === 'webgpu') this.drawColour(c);
       },
     });
   }
@@ -1267,6 +1278,85 @@ export class Scatter implements EnginePlugin {
       id = key + (part === 'opaque' ? '' : ':' + part) + (depth ? ':depth' : '');
     let pipeline = this.pipelines.get(id);
     if (!pipeline) {
+      const code = this.stageCode(c, lit, part, depth);
+      if (code === undefined) return undefined;
+      const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, lit) : code });
+      pipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: this.vertexState(module),
+        fragment: {
+          module,
+          entryPoint: 'fragment',
+          targets: [{ format: c.format, ...(blend ? { blend: coverBlend } : {}), ...(depth ? { writeMask: 0 } : {}) }],
+          ...(own ? { constants: { C: 1 } } : {}),
+        },
+        ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
+        multisample: c.descriptor.multisample,
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthWriteEnabled: !blend,
+          depthCompare: 'greater-equal',
+        },
+      });
+      this.pipelines.set(id, pipeline);
+    }
+    let groups = this.renderGroups.get(pipeline);
+    if (!groups) this.renderGroups.set(pipeline, (groups = this.ringGroups(c, pipeline, lit)));
+    let lighting = this.pbrGroups.get(pipeline);
+    if (lit && !lighting) {
+      lighting = c.device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: this.pbrUniform! } }, ...c.bindings],
+      });
+      this.pbrGroups.set(pipeline, lighting);
+    }
+    return { pipeline: pipeline!, groups, lighting };
+  }
+  /** The vertex state of every colour and capture stage: positions, normals and, with `textures`, uvs. */
+  private vertexState(module: GPUShaderModule): GPUVertexState {
+    return {
+      module,
+      entryPoint: 'vertex',
+      buffers: [
+        {
+          arrayStride: this.uvs ? 32 : 24,
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },
+            { shaderLocation: 1, offset: 12, format: 'float32x3' },
+            ...(this.uvs ? [{ shaderLocation: 2, offset: 24, format: 'float32x2' as const }] : []),
+          ],
+        },
+      ],
+    };
+  }
+  /** One instance group per LOD ring for `pipeline`: the ring's instances, the material, the route's count, the pose. */
+  private ringGroups(c: ScatterPassContext, pipeline: GPURenderPipeline, lit: boolean): GPUBindGroup[] {
+    return this.colourInstances().map((buffer, ring) => {
+      const count = this.route ? [this.route.ringCount(ring)] : [];
+      return lit
+        ? c.device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(1),
+            entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map(
+              (resource, binding) => ({ binding, resource }),
+            ),
+          })
+        : group(c.device, pipeline, [{ buffer: this.uniform! }, { buffer }, ...count, ...this.poseEntries()]);
+    });
+  }
+  /**
+   * The WGSL of one colour stage (see `colourPipeline`), or with `declarations` (a capture hook's, for this frame's
+   * shader) its capture stage: the same lit stage ending in the hook's `margoSSR` (see ./capture.ts), maps applied
+   * after it, a covered part only as its coverage-depth form. Undefined when a covered part cannot carry coverage.
+   */
+  private stageCode(
+    c: ScatterPassContext,
+    lit: boolean,
+    part: 'opaque' | 'cover' | 'body' | 'tip',
+    depth: boolean,
+    declarations?: string,
+  ): string | undefined {
+    const cover = part === 'cover' || part === 'tip';
+    {
       const blades = this.values[78] > 0,
         clusters = this.values[75] > 0,
         translucent = blades && this.translucency > 0,
@@ -1314,6 +1404,15 @@ export class Scatter implements EnginePlugin {
               `let linear=$1+foliageTranslucency(normalize(i.normal)*select(-1.0,1.0,facing),v,l,1.0,i.transl)*i.color*frame.radiance.xyz*frame.light.w;`,
             );
       }
+      if (declarations !== undefined) {
+        const captured = captureStage(code, declarations);
+        if (captured === undefined)
+          throw new MargoError(
+            'unsupported',
+            "Scatter capture needs core's lit fragment; a plugin replaced it. Remove that plugin or the capture",
+          );
+        code = captured;
+      }
       if (lit && this.uvs) code = texturedFragment(code, this.cut, coreNormal);
       if (cover) {
         const covered = coverCode(
@@ -1326,78 +1425,32 @@ export class Scatter implements EnginePlugin {
         code = covered;
       }
       if (part === 'body' || part === 'tip') code = splitDeclaration + code;
-      code = this.poseCode(code, lit ? 1 : 0, 2);
-      const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, lit) : code });
-      pipeline = c.device.createRenderPipeline({
-        layout: 'auto',
-        vertex: {
-          module,
-          entryPoint: 'vertex',
-          buffers: [
-            {
-              arrayStride: this.uvs ? 32 : 24,
-              attributes: [
-                { shaderLocation: 0, offset: 0, format: 'float32x3' },
-                { shaderLocation: 1, offset: 12, format: 'float32x3' },
-                ...(this.uvs ? [{ shaderLocation: 2, offset: 24, format: 'float32x2' as const }] : []),
-              ],
-            },
-          ],
-        },
-        fragment: {
-          module,
-          entryPoint: 'fragment',
-          targets: [{ format: c.format, ...(blend ? { blend: coverBlend } : {}), ...(depth ? { writeMask: 0 } : {}) }],
-          ...(own ? { constants: { C: 1 } } : {}),
-        },
-        ...(culled ? { primitive: { cullMode: 'back' as const } } : {}),
-        multisample: c.descriptor.multisample,
-        depthStencil: {
-          format: c.descriptor.depthStencil!.format,
-          depthWriteEnabled: !blend,
-          depthCompare: 'greater-equal',
-        },
-      });
-      this.pipelines.set(id, pipeline);
+      return this.poseCode(code, lit ? 1 : 0, 2);
     }
-    let groups = this.renderGroups.get(pipeline);
-    if (!groups) {
-      groups = this.colourInstances().map((buffer, ring) => {
-        const count = this.route ? [this.route.ringCount(ring)] : [];
-        return lit
-          ? c.device.createBindGroup({
-              layout: pipeline!.getBindGroupLayout(1),
-              entries: [{ buffer }, { buffer: this.materialUniform! }, ...count, ...this.poseEntries()].map(
-                (resource, binding) => ({
-                  binding,
-                  resource,
-                }),
-              ),
-            })
-          : group(c.device, pipeline!, [{ buffer: this.uniform! }, { buffer }, ...count, ...this.poseEntries()]);
-      });
-      this.renderGroups.set(pipeline, groups);
-    }
-    let lighting = this.pbrGroups.get(pipeline);
-    if (lit && !lighting) {
-      lighting = c.device.createBindGroup({
-        layout: pipeline.getBindGroupLayout(0),
-        entries: [{ binding: 0, resource: { buffer: this.pbrUniform! } }, ...c.bindings],
-      });
-      this.pbrGroups.set(pipeline, lighting);
-    }
-    return { pipeline: pipeline!, groups, lighting };
   }
-  private draw(c: ScatterPassContext): void {
+  /** Writes the lit material uniform: the material, `variation`, wind, ground fit, blades, clusters, footprint. */
+  private writeMaterial(device: GPUDevice): void {
+    this.materialValues.set(this.options.material!.data);
+    // The material's alpha and spare slot, which the lit vertex stage does not read: `variation` hue and value.
+    if (this.looks()) [this.materialValues[3], this.materialValues[7]] = this.tint;
+    this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades, clusters
+    this.materialValues[20] = this.translucency; // read by the translucent shader only
+    this.materialValues[21] = this.values[80]; // the pixel footprint, material[5].y
+    device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
+  }
+  /** Core's frame uniform (camera, eye, unit light, radiance, ambient) for `camera` into `values`. */
+  private frameValues(values: Float32Array, camera: ScatterPassContext['camera']): void {
+    values.set(camera.matrix);
+    values.set(camera.position, 16);
+    unitLight(values, 20, this.engine!.lighting.direction);
+    values.set(this.engine!.lighting.radiance, 24);
+    values.fill(1, 28, 31);
+    if (this.engine!.lighting.ambient) values.set(this.engine!.lighting.ambient, 28);
+  }
+  private drawColour(c: ScatterPassContext): void {
     const lit = !!this.options.material;
     if (lit) {
-      this.materialValues.set(this.options.material!.data);
-      // The material's alpha and spare slot, which the lit vertex stage does not read: `variation` hue and value.
-      if (this.looks()) [this.materialValues[3], this.materialValues[7]] = this.tint;
-      this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades, clusters
-      this.materialValues[20] = this.translucency; // read by the translucent shader only
-      this.materialValues[21] = this.values[80]; // the pixel footprint, material[5].y
-      c.device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
+      this.writeMaterial(c.device);
       if (this.pbrShader !== c.shader) {
         this.pipelines.clear();
         this.renderGroups.clear();
@@ -1408,12 +1461,7 @@ export class Scatter implements EnginePlugin {
         this.pbrGroups.clear();
         this.pbrBindings = snapshotBindings(c.bindings);
       }
-      this.pbrValues.set(c.camera.matrix);
-      this.pbrValues.set(c.camera.position, 16);
-      unitLight(this.pbrValues, 20, this.engine!.lighting.direction);
-      this.pbrValues.set(this.engine!.lighting.radiance, 24);
-      this.pbrValues.fill(1, 28, 31);
-      if (this.engine!.lighting.ambient) this.pbrValues.set(this.engine!.lighting.ambient, 28);
+      this.frameValues(this.pbrValues, c.camera);
       c.device.queue.writeBuffer(this.pbrUniform!, 0, this.pbrValues as Float32Array<ArrayBuffer>);
     }
     // Without the fade, single-sided materials cull back faces in the rasterizer. Override C=1 (which compiles out
@@ -1485,6 +1533,141 @@ export class Scatter implements EnginePlugin {
     }
     pass.end();
     this.drawn(c);
+  }
+  /**
+   * Lets a capture hook (`@margoengine/post` SSR, SceneTargets, LightBounce: `targets.add(scatter)`) draw the plants'
+   * material with `draw(c, 'capture', ...)`: this frame's LOD rings with the colour pass's own stage (wind, LOD dither,
+   * blade normal, maps and cut-out) ending in the hook's `margoSSR`, depth tested (greater-equal) and written. Covered
+   * rings capture where their coverage passes the pose's threshold, as their depth pass keeps them. Returns a remover.
+   * Without a hook the Scatter draws exactly as before.
+   * @throws TypeError for a bad hook or a disposed Scatter; MargoError `unsupported` for an unlit one (no `material`).
+   */
+  setCapture(hook: ScatterCapture): () => void {
+    if (
+      this.disposed ||
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
+      throw new TypeError(
+        'Invalid scatter capture hook; pass an object with declarations() and begin() functions and a targets array to a live Scatter.',
+      );
+    if (!this.options.material)
+      throw new MargoError(
+        'unsupported',
+        'Scatter capture needs a lit Scatter (the material option): an unlit one has no world position, sun or material to capture',
+      );
+    this.capture = hook;
+    return () => {
+      if (this.capture === hook) this.capture = undefined;
+    };
+  }
+  /** Calls `callback` once when the Scatter is disposed; returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('Scatter onDispose needs a function');
+    this.disposers.add(callback);
+    return () => this.disposers.delete(callback);
+  }
+  /**
+   * `mode` 'capture': draws this frame's rings into the capture hook's pass (`setCapture`); `color` and `depth` are
+   * unused (the hook's pass has its own). Does nothing without a hook, before the first distribute or after disposal.
+   */
+  draw(c: ScatterPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
+    const hook = this.capture;
+    if (mode !== 'capture' || !hook || this.disposed || !this.commands || !this.materialUniform || !this.engine) return;
+    void color;
+    void depth;
+    // Keyed by the declarations this draw's effect returns: one Scatter in two effects keeps each effect's stage.
+    const declarations = hook.declarations(c.shader),
+      key =
+        hook.targets.map((t) => t.format).join(',') +
+        ':' +
+        c.descriptor.multisample?.count +
+        ':' +
+        c.descriptor.depthStencil!.format +
+        this.stageKey() +
+        '\0' +
+        declarations +
+        '\0' +
+        c.shader;
+    const parts = [0, 1, 2].map((i) => this.coverRing(i)),
+      opaque = this.capturePipeline(c, hook, key, 'opaque', declarations)!,
+      covered = parts.some((p) => p !== 'opaque')
+        ? this.capturePipeline(c, hook, key, 'cover', declarations)
+        : undefined;
+    this.writeMaterial(c.device);
+    const view = c.view?.index ?? 0;
+    let uniform = this.captureUniforms[view];
+    if (!uniform)
+      uniform = this.captureUniforms[view] = c.device.createBuffer({
+        size: 128,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+    this.frameValues(this.captureValues, c.camera);
+    c.device.queue.writeBuffer(uniform, 0, this.captureValues as Float32Array<ArrayBuffer>);
+    if (!sameBindings(this.captureBindings, c.bindings)) {
+      this.captureLighting.clear();
+      this.captureBindings = snapshotBindings(c.bindings);
+    }
+    const pass = hook.begin();
+    let current: GPURenderPipeline | undefined, rings: GPUBindGroup[] | undefined;
+    for (let i = 0; i < 3; i++) {
+      const use = parts[i] !== 'opaque' && covered ? covered : opaque;
+      if (use !== current) {
+        current = use;
+        pass.setPipeline(use);
+        let lighting = this.captureLighting.get(use);
+        if (!lighting) this.captureLighting.set(use, (lighting = []));
+        lighting[view] ??= c.device.createBindGroup({
+          layout: use.getBindGroupLayout(0),
+          entries: [{ binding: 0, resource: { buffer: uniform } }, ...c.bindings],
+        });
+        pass.setBindGroup(0, lighting[view]);
+        rings = this.captureRings.get(use);
+        if (!rings) this.captureRings.set(use, (rings = this.ringGroups(c, use, true)));
+        if (this.maps) pass.setBindGroup(2, this.mapGroup(c.device, use, 2, 3));
+      }
+      pass.setBindGroup(1, rings![i]);
+      pass.setVertexBuffer(0, this.vertices[i]);
+      pass.setIndexBuffer(this.indices[i], 'uint32');
+      if (this.route) pass.drawIndexed(this.geometries[i].indices.length, this.ringCapacity());
+      else pass.drawIndexedIndirect(this.colourCommands(), i * 20);
+    }
+  }
+  /** The capture pipeline of one part ('cover': a covered ring's coverage-depth form) for the hook's targets. */
+  private capturePipeline(
+    c: ScatterPassContext,
+    hook: ScatterCapture,
+    key: string,
+    part: 'opaque' | 'cover',
+    declarations: string,
+  ): GPURenderPipeline | undefined {
+    const id = key + ':' + part;
+    let pipeline = this.capturePipelines.get(id);
+    if (pipeline) return pipeline;
+    const code = this.stageCode(c, true, part, part === 'cover', declarations);
+    if (code === undefined) return undefined;
+    const module = c.device.createShaderModule({ code: this.route ? this.route.vertex(code, true) : code });
+    pipeline = c.device.createRenderPipeline({
+      layout: 'auto',
+      vertex: this.vertexState(module),
+      fragment: { module, entryPoint: 'fragment', targets: hook.targets as GPUColorTargetState[] },
+      multisample: c.descriptor.multisample,
+      depthStencil: {
+        format: c.descriptor.depthStencil!.format,
+        depthWriteEnabled: true,
+        depthCompare: 'greater-equal',
+      },
+    });
+    if (this.capturePipelines.size >= 32) this.forgetCapture();
+    this.capturePipelines.set(id, pipeline);
+    return pipeline;
+  }
+  private forgetCapture(): void {
+    this.capturePipelines.clear();
+    this.captureRings.clear();
+    this.captureLighting.clear();
   }
   /**
    * How the colour pass draws LOD ring `ring` (default 'opaque'). 'cover' draws it with partial coverage: blended over
@@ -1698,6 +1881,10 @@ export class Scatter implements EnginePlugin {
     this.pbrShader = '';
     this.pbrBindings.length = 0;
     this.pbrGroups.clear();
+    for (const b of this.captureUniforms) b.destroy();
+    this.captureUniforms = [];
+    this.captureBindings = [];
+    this.forgetCapture();
     this.uniform = this.commands = undefined;
     this.fallback = undefined;
     this.compute = undefined;
@@ -1752,6 +1939,10 @@ export class Scatter implements EnginePlugin {
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;
+    this.capture = undefined;
+    const listeners = [...this.disposers];
+    this.disposers.clear();
+    for (const listener of listeners) listener();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {
