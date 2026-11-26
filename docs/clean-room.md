@@ -13415,6 +13415,24 @@ Research compared:
   mode is Margo's: the median is one of the samples, unchanged by the nonlinear depth encoding, and lies on the surface
   covering most of the footprint.
 
+## Trail texture (2026-11-26)
+
+`@margoengine/post/trail` `TrailTexture`. Feature names and options were compared with the public documentation of
+drei's `useTrailTexture` (https://drei.docs.pmnd.rs/misc/use-trail-texture) and its live examples; no source of it was
+read. The texture identity kept across frames (fade into a second target, copy back), the half-radius stamp spacing,
+the frame-speed weight and the cut to black below 1/1024 are Margo's.
+
+Research compared:
+- Thomas Porter and Tom Duff, *Compositing Digital Images*, SIGGRAPH 1984, https://doi.org/10.1145/800031.808606
+  (stamps composited over the trail).
+- Rafael Gonzalez and Richard Woods, *Digital Image Processing*, 4th ed., 2018, ch. 3 (screen, additive and lighten
+  combinations of intensities).
+- Robert G. Brown, *Smoothing, Forecasting and Prediction of Discrete Time Series*, 1963 (exponential smoothing of the
+  pointer samples).
+- Turner Whitted, *Anti-Aliased Line Drawing Using Brush Extrusion*, SIGGRAPH 1983, and Steve Strassmann, *Hairy
+  Brushes*, SIGGRAPH 1986 (a stroke as a brush footprint swept along the path; sampling it closer than its radius leaves
+  no gaps).
+
 ## Contact and modal sound (SOUND-04)
 
 - Kees van den Doel and Dinesh K. Pai, [*The Sounds of Physical Shapes*](https://www.persianney.com/kvdoelcsubc/publications/sound-shapes.pdf)

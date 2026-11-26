@@ -10134,6 +10134,17 @@ Evidence: `packages/post/test/utility-passes-browser.mjs` on WebGPU and the WebG
 DepthDownsample texels and normals equal to a CPU reduction in all four modes for 2 x 2 and uneven footprints), and
 `utility-passes.test.js`. Missing: GPU timings, and a visual comparison of the blur against a large Gaussian.
 
+## Trail texture (section 5 evidence, 2026-11-26)
+
+`TrailTexture` (`@margoengine/post/trail`) is an optional post entry; core and stage unchanged. One frame-graph pass
+before main, once a frame (marked in `onPreUpdate`, so multi-view frames update it once): a full-screen fade into a
+second `rgba16float` target, instanced stamp quads with a fixed-function blend (screen, add or max), then a copy back,
+so the exposed texture keeps its identity. Fragment and vertex work only, so the WebGL2 layer runs the same shaders.
+Evidence: `packages/post/test/trail-browser.mjs` on WebGPU and the WebGL2 layer (an unbroken line from a fast move,
+black off the stroke, screen and add of two half stamps, 0.95^60 kept after one second, black after five) and
+`trail.test.js` (stamp spacing, speed weight, smoothing, one update a frame, steady frames allocate nothing, the stamp
+cap, validation, device restore). Missing: GPU timings.
+
 ## Contact sound evidence (SOUND-04)
 
 The optional Physics modal kernel converts per-track mechanical excitation to audio-rate sample ranges.
