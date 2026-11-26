@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,140 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,142 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12199,6 +12199,19 @@ sediment; external inflow at that edge carries clear water. Use the source grid'
 
 The optional sediment entry measures 5,256 B min+gzip. The plain and shared SIMD Wasm files are 12,483 B and
 12,571 B before HTTP compression. The Flood entry measures 14,457 B min+gzip with the concentration upload.
+
+### Pedestrian contact and crowd motion (LIFE-05)
+
+`@margoengine/physics/pedestrians` models horizontal translation, finite shoulder turn rate, and
+a specified ground height. Its uniformly oriented ellipses give an analytic projected footprint.
+An approximate support along the line of centres is used for ellipse pairs. It computes the normal
+and sliding impulse once per broadphase pair in canonical order. The density response is locally
+compressible. The open approach uses the measured time-to-collision power law with a finite reaction
+offset. The solver raises the dyadic rate so ideally dt·√(2k/m)≤1/2 for the lightest body and travel
+per tick stays inside half the shortest footprint radius. Multi-floor surfaces use separate groups or
+walkable route guidance with a height sampler. Injury, fall and ragdoll transitions use external
+consumers of the force/pose ports. Doorway and terrain fixtures use simulated actors and route geometry.
+The optional JavaScript entry is 4,590 B gzip. The plain and shared Wasm assets are 12,041 B and 12,129 B raw.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -28295,6 +28308,15 @@ size or surrounding geometry. `hailSphere` now converts the measured diameter an
 for each body, and `Hail` can draw poses from a falling-body solver. `fallingBoundaryFromPhysics` sweeps each sphere
 against fixed colliders. The two-diameter equilibrium fixture is in `packages/weather/tests/hail-physics.test.js`.
 The swept wall and raised platform fixtures are in `packages/physics/tests/coupling/falling.test.js`.
+
+## Open: pedestrian force hand-off in Opening Night and City-to-Street
+
+The frame-independent pedestrian solver publishes per-walker compressed load and net contact force.
+The Opening Night clips still need the production ragdoll and foot-placement consumers, and
+CITY-TO-STREET-2 still needs vehicle and rail actors. Run
+`node --test packages/physics/tests/coupling/pedestrians.test.js` after building Physics and NavMesh
+to reproduce the measured contact impulses, doorway release and real route grade.
+See LIFE-05 in [Framework requests](physics-work-queue.md#framework-requests).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
