@@ -147,6 +147,25 @@ export interface LocalShadowDraw {
    */
   readonly layer: number;
 }
+/**
+ * One layer of the shadow maps, as `LocalShadows.shadowMap` gives it for `ShadowMapViewer` (`@margoengine/shadows/viewer`).
+ * Borrowed: the texture belongs to the shadows and changes when they reallocate, so ask again each frame.
+ */
+export interface LocalShadowMap {
+  /** The `depth32float` texture array holding every layer. */
+  readonly texture: GPUTexture;
+  /** The array layer (0 in atlas mode, where every map is a tile of one layer). */
+  readonly layer: number;
+  /** Point, spot and area faces are perspective; directional cascades orthographic. */
+  readonly projection: 'perspective' | 'orthographic';
+  /** Always true: the light's near plane is stored as 1 and its far plane as 0. */
+  readonly reversed: boolean;
+  /** Perspective near and far distances, world units (0 for orthographic). */
+  readonly near: number;
+  readonly far: number;
+  /** The texels the map covers: x, y, width, height (a smaller `shadow.resolution` or an atlas tile). */
+  readonly rect: readonly [number, number, number, number];
+}
 /** A caster `LocalShadows.add` takes besides a core mesh, such as a gltf/pbr model, materials mesh or terrain. */
 export interface LocalShadowSource {
   /** Casters drawn into each shadowed light's maps. */
@@ -553,6 +572,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
   private readonly viewports = new Uint32Array(TOTAL_LAYERS * 2);
   private readonly slots = new Float32Array(MAX_LIGHTS * SLOT_FLOATS).fill(NaN);
   private readonly dirtyLayers = new Uint8Array(TOTAL_LAYERS);
+  /** Per layer, for `shadowMap`: kind (1 point, 2 spot, 3 directional, 4 area, 0 none), light index, face, near, far, width, height. */
+  private readonly mapInfo = new Float64Array(TOTAL_LAYERS * 7);
   private readonly bases = new Int32Array(MAX_LIGHTS);
   /** First layer of each shadowed directional and area light (after the point and spot layers). */
   private readonly sunBases = new Int32Array(MAX_DIRECTIONAL_SHADOWS);
@@ -652,6 +673,34 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
     };
   }
   /** Re-renders every shadow map next frame. */
+  /**
+   * One shadow map as last rendered, for a debug view (`ShadowMapViewer` from `@margoengine/shadows/viewer`): a point
+   * light's cube face (`face` 0-5: +x, -x, +y, -y, +z, -z), a spot light's map, a directional light's cascade (`face`
+   * is the cascade) or an area light's face. `index` is the light's place in its own list (`Clustered.list`,
+   * `DirectionalLights.list`, `AreaLights.list`). Null when that light has no map (not `castShadow`, past `maxLights`,
+   * or before the first frame).
+   */
+  shadowMap(kind: 'point' | 'spot' | 'directional' | 'area', index: number, face = 0): LocalShadowMap | null {
+    const code = ['point', 'spot', 'directional', 'area'].indexOf(kind) + 1,
+      info = this.mapInfo;
+    if (!code) throw new TypeError("LocalShadows.shadowMap kind must be 'point', 'spot', 'directional' or 'area'");
+    if (!this.map) return null;
+    for (let layer = 0; layer < this.layers; layer++) {
+      const o = layer * 7;
+      if (info[o] !== code || info[o + 1] !== index || info[o + 2] !== face) continue;
+      const [x, y] = this.atlasMode ? this.mapOrigin(layer) : [0, 0];
+      return {
+        texture: this.map,
+        layer: this.atlasMode ? 0 : layer,
+        projection: code === 3 ? 'orthographic' : 'perspective',
+        reversed: true,
+        near: info[o + 3],
+        far: info[o + 4],
+        rect: [x, y, info[o + 5], info[o + 6]],
+      };
+    }
+    return null;
+  }
   invalidate(): void {
     this.changed = true;
   }
@@ -823,6 +872,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
       soft = false;
     const bases = this.bases.fill(0),
       lightList = this.lights.list;
+    this.mapInfo.fill(0);
     if (count > this.radii.length) {
       this.radii = new Float32Array(this.lights.maxLights);
       this.radiusList = undefined;
@@ -888,6 +938,8 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           `A castShadow light's shadow.resolution exceeds LocalShadows resolution ${size}; lower it or raise resolution`,
         );
       const radius = radii[j];
+      for (let face = 0; face < (point ? 6 : 1); face++)
+        this.mapInfo.set([data[at + 13] < 0.5 ? 1 : 2, j, face, near, range, width, height], (base + face) * 7);
       let same = slots[s + 11] === base && slots[s + 10] === (point ? 1 : 0) && slots[s + 9] === radius;
       const smaller = width !== size || height !== size;
       if (this.viewports[base * 2] !== (smaller ? width : 0) || this.viewports[base * 2 + 1] !== (smaller ? height : 0))
@@ -1218,6 +1270,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
           scaled ? box.hy : (box.hy * size) / (size - 4),
         );
         this.place(layer, SUN_MATRICES + cascade * 16, width, height, size);
+        this.mapInfo.set([3, light.index, k, 0, 0, width, height], layer * 7);
         values[SUN_CASCADES + cascade * 4] = Math.max((2 * box.hx) / (width - 4), (2 * box.hy) / (height - 4));
         values[SUN_CASCADES + cascade * 4 + 1] = (width - 2) / size;
         values[SUN_CASCADES + cascade * 4 + 2] = (height - 2) / size;
@@ -1244,6 +1297,7 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         const layer = base + face;
         lightMatrix(this.matrices, layer * 64, light.center, axes[face], AREA_FACE_TAN, light.near, light.far);
         this.place(layer, AREA_MATRICES + (s * 6 + face) * 16, width, height, size);
+        this.mapInfo.set([4, light.index, face, light.near, light.far, width, height], layer * 7);
       }
       // The guard band: UV between the 45-degree face and its map's edge, less the bilinear filter's reach.
       const small = Math.min(width, height),

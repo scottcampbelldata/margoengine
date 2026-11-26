@@ -1,3 +1,13 @@
+### Section 5 evidence: shadow map viewer, WebGPU and the WebGL2 layer (2026-11-25)
+
+`ShadowMapViewer` (`@margoengine/shadows/viewer`) is a debug overlay: it loads the chosen depth layer with `textureLoad`
+(the WebGL2 layer turns a load-only depth binding into a float one, `floatDepthLoads`), mirrors reversed depth and
+linearises perspective depth with the map's near and far. A one-layer texture is bound as a '2d' view unless it was made
+for '2d-array' (the compatibility level binds only the dimension a texture was made for). Evidence:
+`packages/shadows/test/viewer-browser.mjs` reads the grey at a spot map's and a point light's -y face's centre, the floor
+4 from the light, as round(255 (4 - near) / (far - near)) = 127 within 2, an empty face as 255 and a `bounds` cascade at
+the middle of its box, on WebGPU and with `--compat`. Missing: no check yet over `ShadowAtlas` tiles or an area light face.
+
 ### Section 5 evidence: shader resources on the WebGL2 layer over ANGLE Direct3D 11 (2026-11-25)
 
 The WebGL2 layer's GLSL back end now counts a stage's texture units and uniform blocks together: ANGLE's Direct3D 11

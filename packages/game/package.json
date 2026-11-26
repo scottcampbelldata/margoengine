@@ -2971,6 +2971,10 @@
       "types": "./dist/shadows/ibl.d.ts",
       "import": "./dist/shadows/ibl.js"
     },
+    "./shadows/viewer": {
+      "types": "./dist/shadows/viewer.d.ts",
+      "import": "./dist/shadows/viewer.js"
+    },
     "./sky": {
       "types": "./dist/sky.d.ts",
       "import": "./dist/sky.js"

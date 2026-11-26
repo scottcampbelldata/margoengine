@@ -1,0 +1,45 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Shadows: shadow map viewer</title><style>body{margin:0;background:#000}canvas{display:block;width:128px;height:128px}</style></head><body><canvas width="128" height="128"></canvas>
+<script type="module">
+// Shadow map viewer over a spot light's map, a point light's cube faces and a Shadows cascade. viewer-browser.mjs asserts.
+import {Engine,box} from '/packages/core/dist/index.js';
+import {Clustered} from '/packages/clustered/dist/index.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
+import {Shadows} from '/packages/shadows/dist/index.js';
+import {ShadowMapViewer,cascadeMap} from '/packages/shadows/dist/viewer.js';
+const canvas=document.querySelector('canvas'),errors=[];
+const engine=await Engine.create(canvas,{backend:'webgpu',camera:{position:[0,10,10],target:[0,0,0],near:0.1,far:100}}),device=engine.gpu;
+engine.stop();
+engine.onError=(e)=>errors.push(String(e));
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+engine.lighting.direction.set([0,-1,0]);
+// Floor top at y = 0; both local lights 4 above it, range 8.
+const floor=engine.createMesh().setGeometry(box(8,0.1,8)).setPosition([0,-0.05,0]);
+const lights=Clustered.attach(engine,{grid:[4,4,4]});
+lights.setLights([
+  {position:[0,4,0],range:8,direction:[0,-1,0],outerAngle:0.6,castShadow:true},
+  {position:[0,4,0],range:8,castShadow:true},
+]);
+const local=LocalShadows.attach(engine,{lights,resolution:256});
+local.add(floor);
+const sun=Shadows.attach(engine,{resolution:256,bounds:{min:[-4,-1,-4],max:[4,1,4]}});
+sun.add(floor);
+const reader=new OffscreenCanvas(1,1).getContext('2d',{willReadFrequently:true});
+let map=null;
+const viewer=ShadowMapViewer.attach(engine,{source:()=>map,x:0,y:0,size:64});
+const frames=async(n)=>{device.pushErrorScope('validation');for(let i=0;i<n;i++){engine.render();await device.queue.onSubmittedWorkDone();}const e=await device.popErrorScope();if(e)errors.push(e.message);};
+await frames(2);
+window.check={
+  // Grey at the centre of the viewer (the map's centre) for one map, and what the map says it is.
+  async read(which){
+    const [kind,index,face]=which;
+    map=kind==='cascade'?cascadeMap(sun,index):local.shadowMap(kind,index,face);
+    const info=map&&{projection:map.projection,reversed:map.reversed,near:map.near,far:map.far,layer:map.layer,rect:map.rect};
+    await frames(1);
+    // Read in the task that rendered: a WebGPU canvas keeps its picture only until the task ends.
+    engine.render();reader.drawImage(canvas,32,32,1,1,0,0,1,1);
+    return {grey:reader.getImageData(0,0,1,1).data[0],info,errors};
+  },
+  dispose(){viewer[Symbol.dispose]();return errors;},
+};
+window.ready=true;
+</script></body></html>

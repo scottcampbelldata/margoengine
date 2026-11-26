@@ -469,6 +469,36 @@ Such a source keeps one uniform per cascade, so its pages go to the GPU four at 
 
 Memory at the default pool size is 134,218,752 B (two 64 MiB pools and an 8 KiB page table; `memoryBytes` reports it). WebGPU only, directional light only.
 
+## Shadow map viewer
+
+`@margoengine/shadows/viewer` draws one shadow map layer in a corner of the frame, grey from the light's near plane (black) to its far plane (white), for checking what a light sees, how a cascade is fitted or where acne starts. `cascadeMap(shadows, k)` gives cascade `k` of a `Shadows`; `LocalShadows.shadowMap(kind, index, face)` (`@margoengine/clustered/shadows`) gives a point light's cube face (`face` 0 to 5: +x, -x, +y, -y, +z, -z), a spot light's map, a directional light's cascade or an area light's face, by the light's place in its own list. Perspective maps are stored as reversed depth (near 1, far 0); the viewer mirrors the value back and linearises it with the map's near and far, so the grey is proportional to distance. Orthographic maps are already linear. WebGPU and the WebGL2 compatibility layer.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { Clustered } from '@margoengine/clustered';
+import { LocalShadows } from '@margoengine/clustered/shadows';
+import { Shadows } from '@margoengine/shadows';
+import { ShadowMapViewer, cascadeMap } from '@margoengine/shadows/viewer';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const floor = engine.createMesh().setGeometry(box(8, 0.1, 8));
+const sun = Shadows.attach(engine);
+sun.add(floor);
+const lights = Clustered.attach(engine);
+lights.setLights([{ position: [0, 4, 0], range: 8, castShadow: true }]);
+const local = LocalShadows.attach(engine, { lights });
+local.add(floor);
+// Cascade 1 at the top left; switch to the point light's floor-facing cube face.
+const viewer = ShadowMapViewer.attach(engine, { source: () => cascadeMap(sun, 1), size: 256 });
+engine.render();
+viewer.source = () => local.shadowMap('point', 0, 3);
+engine.render();
+viewer.dispose();
+engine.dispose();
+```
+
+Options: `source` (a map layer, or a function called each frame; null draws nothing), `x` and `y` (top-left corner in drawing-buffer pixels, default 8), `size` (width in pixels, default 256; the height follows the map's aspect), `name` (default `'shadow-map-viewer'`) and `order` (default 1000, with the other overlays). Any depth texture can be shown with a `{ texture, layer, projection, reversed, near, far, rect }` of your own; `shadowDepthToLinear(z, map)` is the same conversion on the CPU. Sources: Lance Williams, Casting Curved Shadows on Curved Surfaces (SIGGRAPH 1978, https://dl.acm.org/doi/10.1145/965139.807402), for shadow depth maps; Rouslan Dimitrov, Cascaded Shadow Maps (NVIDIA, 2007, https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf) and Fan Zhang, Hanqiu Sun, Leilei Xu and Lee Kit Lun, Parallel-Split Shadow Maps for Large-scale Virtual Environments (VRCIA 2006, https://doi.org/10.1145/1128923.1128975), for cascades; Nathan Reed, Depth Precision Visualized (NVIDIA developer blog, 2015, https://developer.nvidia.com/content/depth-precision-visualized), for reversed depth. No rival source was read.
+
 ## Update scheduling: `cadence`
 
 `cadence` updates far cascades less often. A held cascade keeps its map and its matrix, so a far shadow can lag by those frames.

@@ -1783,6 +1783,10 @@
       "types": "./dist/shadows/ibl.d.ts",
       "import": "./dist/shadows/ibl.js"
     },
+    "./shadows/viewer": {
+      "types": "./dist/shadows/viewer.d.ts",
+      "import": "./dist/shadows/viewer.js"
+    },
     "./stage/gltf": {
       "types": "./dist/stage/gltf.d.ts",
       "import": "./dist/stage/gltf.js"

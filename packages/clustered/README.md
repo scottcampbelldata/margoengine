@@ -1056,6 +1056,8 @@ bindings of a shadow-enabled effect; the default second argument is false.
 
 `dispose()`/`destroy()` releases resources and receiver hooks. Device restoration recreates buffers and reuploads the light list. The package stays separate from core, stage and PBR assets.
 
+`LocalShadows.shadowMap(kind, index, face)` returns one map as last rendered (its depth texture, layer, reversed perspective or orthographic projection, near and far, and the texels it covers, an atlas tile included) for a debug view: pass it to `ShadowMapViewer` from `@margoengine/shadows/viewer`, as `ShadowMapViewer.attach(engine, { source: () => shadows.shadowMap('point', 0, 3) })` for the first light's -y cube face. `kind` is `'point'` (faces 0 to 5: +x, -x, +y, -y, +z, -z), `'spot'`, `'directional'` (face = cascade) or `'area'`, and `index` the light's place in its own list; it returns null for a light without a map.
+
 ## Many lights
 
 `ClusteredOptions.maxLights` raises the point and spot light cap from 1,024 to as many as 65,536 for city and

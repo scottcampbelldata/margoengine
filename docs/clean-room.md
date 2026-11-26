@@ -1,5 +1,9 @@
 # Clean room
 
+### Shadow map viewer in Shadows (2026-11-25)
+
+Lance Williams, Casting Curved Shadows on Curved Surfaces (SIGGRAPH 1978, https://dl.acm.org/doi/10.1145/965139.807402), for shadow depth maps; Rouslan Dimitrov, Cascaded Shadow Maps (NVIDIA, 2007, https://developer.download.nvidia.com/SDK/10.5/opengl/src/cascaded_shadow_maps/doc/cascaded_shadow_maps.pdf) and Fan Zhang, Hanqiu Sun, Leilei Xu and Lee Kit Lun, Parallel-Split Shadow Maps for Large-scale Virtual Environments (VRCIA 2006, https://doi.org/10.1145/1128923.1128975), for cascades; Nathan Reed, Depth Precision Visualized (NVIDIA developer blog, 2015, https://developer.nvidia.com/content/depth-precision-visualized), for reversed depth. `ShadowMapViewer` (`@margoengine/shadows/viewer`) loads one texel per pixel of the chosen layer, mirrors reversed depth, turns a perspective value into distance with d = near * far / (far - z (far - near)) and shows (d - near) / (far - near) as grey. The engine's own light matrices (clustered `lightMatrix` and `orthographicShadow`, shadows `fitCascades`) fix which maps are reversed. The viewer's name comes from public documentation only; no rival source was read.
+
 ### Light probe and positional audio helpers in Lines (2026-11-25)
 
 Ravi Ramamoorthi and Pat Hanrahan, [An Efficient Representation for Irradiance Environment Maps](https://graphics.stanford.edu/papers/envmap/), SIGGRAPH 2001, give the nine real L2 basis constants and the clamped-cosine band factors (pi, 2pi/3, pi/4) that `shIrradiance` evaluates; the coefficient order is the engine's own `Environment.sh` layout. The W3C [Web Audio API](https://www.w3.org/TR/webaudio/#PannerNode) PannerNode section defines `coneInnerAngle` and `coneOuterAngle` as whole cone angles in degrees about the orientation (360: no cone) and the `refDistance` / `maxDistance` parameters that `PositionalAudioHelper` draws. Helper names come from public documentation only; no rival source was read.

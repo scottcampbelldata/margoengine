@@ -96,6 +96,21 @@ export const entries = [
     fix: 'Pass `environment.sh.irradiance`, 12 or 27 floats, or a function such as `(n) => probes.irradianceAt(position, n)`; a size above 0; `exposure` as `auto` or a number of 0 or more. Pass a `PositionalAudio` or an object with `worldPosition`, `worldDirection`, `refDistance`, `maxDistance` and `panner.coneInnerAngle` / `coneOuterAngle`.',
   },
   {
+    id: 'shadow-map-viewer',
+    title: '@margoengine/shadows/viewer: shadow map debug view',
+    kind: 'family',
+    messages: [
+      'ShadowMapViewer needs a source: a shadow map layer or a function returning one; see https://margoengine.com/errors#shadow-map-viewer',
+      'ShadowMapViewer needs a non-empty name and a finite order; see https://margoengine.com/errors#shadow-map-viewer',
+      'ShadowMapViewer x and y must be 0 or more and size above 0; see https://margoengine.com/errors#shadow-map-viewer',
+      "ShadowMapViewer layer 4 is outside the texture's 4 layers; see https://margoengine.com/errors#shadow-map-viewer",
+      'ShadowMapViewer perspective maps need near above 0 and a finite far above near; see https://margoengine.com/errors#shadow-map-viewer',
+    ],
+    cause:
+      'The viewer was made without a map, with a position or size that is negative or not finite, or was given a layer the texture does not have, or a perspective map without the near and far planes it needs to turn depth into distance.',
+    fix: 'Pass `source: () => cascadeMap(shadows, k)` or `() => localShadows.shadowMap(kind, index, face)`, which return null until a map exists; keep `x`, `y` at 0 or more and `size` above 0. For a texture of your own give `projection`, `reversed` and, for a perspective map, `near` above 0 and `far` above it.',
+  },
+  {
     id: 'wav',
     title: '@margoengine/audio/wav: reading and writing WAV files',
     kind: 'family',

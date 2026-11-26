@@ -2,6 +2,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Shadows } = await load('../dist/index.js');
   const { VirtualShadows } = await load('../dist/virtual.js');
   const { IBLShadows } = await load('../dist/ibl.js');
+  const { ShadowMapViewer } = await load('../dist/viewer.js');
   const { PostStack } = await load('../../post/dist/stack.js');
   const { MeshBVH } = await load('../../bvh/dist/index.js');
   return [
@@ -27,6 +28,13 @@ export async function fixtures(load = (entry) => import(entry)) {
           effect = new IBLShadows(bvh, { width: 2, height: 1, data: new Float32Array([1, 1, 1, 4, 4, 4]) }),
           plugin = PostStack.attach(engine, [effect]);
         return { plugin, dispose: () => plugin.dispose(), cleanup: () => effect.dispose() };
+      },
+    },
+    {
+      name: 'ShadowMapViewer',
+      create: () => {
+        const plugin = new ShadowMapViewer({ source: () => null });
+        return { plugin, dispose: () => plugin.dispose() };
       },
     },
   ];

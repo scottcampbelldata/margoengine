@@ -41,7 +41,8 @@
     "prepack": "npm --prefix ../.. run build:packages",
     "test:gpu:rt-alpha": "cd ../.. && node packages/shadows/test/rt-alpha-browser.mjs",
     "test:gpu:rt-alpha-attach": "cd ../.. && node packages/shadows/test/rt-alpha-attach-browser.mjs",
-    "test:gpu:ibl": "cd ../.. && node packages/shadows/test/ibl-browser.mjs"
+    "test:gpu:ibl": "cd ../.. && node packages/shadows/test/ibl-browser.mjs",
+    "test:gpu:viewer": "cd ../.. && node packages/shadows/test/viewer-browser.mjs && node packages/shadows/test/viewer-browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
@@ -84,6 +85,10 @@
     "./ibl": {
       "types": "./dist/ibl.d.ts",
       "import": "./dist/ibl.js"
+    },
+    "./viewer": {
+      "types": "./dist/viewer.d.ts",
+      "import": "./dist/viewer.js"
     }
   },
   "files": [

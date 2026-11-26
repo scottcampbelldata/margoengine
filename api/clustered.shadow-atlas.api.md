@@ -233,6 +233,16 @@ interface LocalShadowDraw {
     readonly layer: number;
 }
 
+interface LocalShadowMap {
+    readonly texture: GPUTexture;
+    readonly layer: number;
+    readonly projection: 'perspective' | 'orthographic';
+    readonly reversed: boolean;
+    readonly near: number;
+    readonly far: number;
+    readonly rect: readonly [number, number, number, number];
+}
+
 interface LocalShadowOptions {
     resolution?: number;
     maxLights?: number;
@@ -351,6 +361,7 @@ class LocalShadows implements EnginePlugin, ClusteredShadow {
     add(source: LocalShadowSource | MeshHandle, { dynamic }?: {
         dynamic?: boolean;
     }): () => void;
+    shadowMap(kind: 'point' | 'spot' | 'directional' | 'area', index: number, face?: number): LocalShadowMap | null;
     invalidate(): void;
     get directionalShadow(): string | undefined;
     get areaShadow(): string | undefined;
