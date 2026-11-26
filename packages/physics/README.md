@@ -1752,7 +1752,7 @@ console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post
 `@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. Allocating may grow the world's memory, which detaches every typed-array view over it (any solver's), so a solver takes its views after it allocates and makes them afresh at each use, never holding one across steps: a solver added to a running world grows the memory under the others. The field registry below keeps the fields between them, and `PhysicsWorld` drives them.
 
 ```ts
-import {rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
+import {Arena, rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
 
 // A ball falling under the world's gravity, its height and speed in one f64 region.
 class Fall implements Solver<{height: number}> {
@@ -1790,16 +1790,13 @@ class Fall implements Solver<{height: number}> {
   }
 }
 
-const memory = new WebAssembly.Memory({initial: 1});
-let next = 0;
+const arena = new Arena();
 const host: SolverHost = {
-  memory,
+  memory: arena.memory,
   gravity: [0, -9.81, 0],
-  allocate: (name, byteLength, type, layout) => {
-    const region = {name, byteOffset: next, byteLength, type, layout};
-    next += byteLength;
-    return region;
-  },
+  allocate: arena.allocate.bind(arena),
+  resize: arena.resize.bind(arena),
+  free: arena.free.bind(arena),
   port: () => undefined,
 };
 const fall = new Fall();
