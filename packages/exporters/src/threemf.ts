@@ -70,10 +70,10 @@ const colorOf = (r: number, g: number, b: number, a: number): string => {
 interface Shape {
   vertices: number[];
   triangles: number[];
-  /** For each corner of each triangle, the index of its colour (or, with `texture`, its texture coordinate) in `palette`. */
+  /** For each corner of each triangle, the index in `palette` of its colour, or with `texture` of its `u v tint`. */
   corners?: number[];
   palette?: string[];
-  /** The image the palette's `u v` coordinates sample. */
+  /** The image the palette's coordinates sample, each multiplied by its tint. */
   texture?: TextureData;
 }
 
@@ -167,6 +167,17 @@ function textureCoordinates(geometry: Geo, material: Mat): ((vertex: number) => 
   };
 }
 
+/**
+ * A textured corner's tint: the vertex colour times the material's, without alpha, as the materials extension takes the
+ * first layer of a `multiproperties` as opaque (section 5).
+ */
+function tintOf(geometry: Geo, material: Mat): (vertex: number) => string {
+  const own = vertexColors(geometry, material),
+    [r, g, b] = material.color,
+    flat = colorOf(r, g, b, 1);
+  return own ? (vertex) => own(vertex).slice(0, 7) : () => flat;
+}
+
 /** The scene `world` matrix with the turn to Z up, column-major. */
 function upright(world: ArrayLike<number>, zUp: boolean): number[] {
   const out = Array.from(world);
@@ -190,7 +201,7 @@ function itemTransform(placed: readonly number[], scale: number): string {
  * object holding every part in place, so a slicer prints what the scene shows; with `assembly: false` each node is a build
  * item instead, one object for each geometry, and a mirroring node draws a reflected object those nodes share. Either way no
  * transform carries a reflection, so a slicer sees nothing inside out. Colours come from the material's
- * base colour and from vertex colours; the base colour texture is written as a materials-extension texture (`texture2d` and `texture2dgroup`, with its texture transform and wrap) where the geometry has the UV set it uses, and wins over vertex colours on that mesh; other maps are not written. Vertices are welded by position, but a slicer still needs
+ * base colour and from vertex colours; the base colour texture is written as a materials-extension texture (`texture2d` and `texture2dgroup`, with its texture transform and wrap) where the geometry has the UV set it uses; a base colour factor or vertex colours that are not white are a colour group multiplied with it (`multiproperties`), their alpha left out; other maps are not written. Vertices are welded by position, but a slicer still needs
  * a closed mesh to print: an open one is written as it is.
  *
  * @example
@@ -265,27 +276,55 @@ export async function export3MF(
     }
     return at;
   };
+  const colorGroup = (colors: readonly string[]): number => {
+    const at = id++;
+    groups.push(
+      `<m:colorgroup id="${at}">${colors.map((color) => `<m:color color="${color}"/>`).join('')}</m:colorgroup>`,
+    );
+    return at;
+  };
+  /**
+   * The property group a textured shape's corners index, from their `u v tint` entries. White tints leave the texture
+   * group alone; any other is a colour group under the texture, multiplied with it in a `multiproperties`.
+   */
+  const textureGroup = (palette: readonly string[], texture: TextureData): number => {
+    const coordinates = new Map<string, number>(),
+      tints = new Map<string, number>(),
+      indexIn = (known: Map<string, number>, key: string): number => {
+        let at = known.get(key);
+        if (at === undefined) known.set(key, (at = known.size));
+        return at;
+      },
+      rows = palette.map((entry) => {
+        const [u, v, tint] = entry.split(' ');
+        return `<m:multi pindices="${indexIn(tints, tint)} ${indexIn(coordinates, `${u} ${v}`)}"/>`;
+      }),
+      image = textureId(texture),
+      at = id++;
+    groups.push(
+      `<m:texture2dgroup id="${at}" texid="${image}">${[...coordinates.keys()]
+        .map((uv) => {
+          const [u, v] = uv.split(' ');
+          return `<m:tex2coord u="${u}" v="${v}"/>`;
+        })
+        .join('')}</m:texture2dgroup>`,
+    );
+    // With white alone, each entry is its own coordinate, so the corners' indices serve the texture group as they are.
+    if (tints.size === 1 && tints.has('#FFFFFF')) return at;
+    const colors = colorGroup([...tints.keys()]),
+      layered = id++;
+    groups.push(
+      `<m:multiproperties id="${layered}" pids="${colors} ${at}" blendmethods="multiply">${rows.join('')}</m:multiproperties>`,
+    );
+    return layered;
+  };
   /** Adds a shape's vertices and triangles to lists that may hold others; `pindex` is its colour where the object's differs. */
   const append = (shape: Shape, vertices: string[], faces: string[], pindex?: number): void => {
     const { triangles, corners, palette, texture } = shape,
       first = vertices.length;
     let group = 0;
-    if (palette && texture) {
-      group = id++;
-      groups.push(
-        `<m:texture2dgroup id="${group}" texid="${textureId(texture)}">${palette
-          .map((uv) => {
-            const [u, v] = uv.split(' ');
-            return `<m:tex2coord u="${u}" v="${v}"/>`;
-          })
-          .join('')}</m:texture2dgroup>`,
-      );
-    } else if (palette) {
-      group = id++;
-      groups.push(
-        `<m:colorgroup id="${group}">${palette.map((color) => `<m:color color="${color}"/>`).join('')}</m:colorgroup>`,
-      );
-    }
+    if (palette && texture) group = textureGroup(palette, texture);
+    else if (palette) group = colorGroup(palette);
     for (let v = 0; v < shape.vertices.length; v += 3) {
       const [x, y, z] = [shape.vertices[v], shape.vertices[v + 1], shape.vertices[v + 2]];
       vertices.push(`<vertex x="${num(x)}" y="${num(y)}" z="${num(z)}"/>`);
@@ -324,7 +363,10 @@ export async function export3MF(
         'unsupported',
         '3MF holds solids to print, and a node scaled to 0 on an axis has no volume; give it a nonzero scale or leave it out',
       );
-    const colors = coordinates ?? vertexColors(geometry, material);
+    const tint = coordinates && tintOf(geometry, material),
+      colors = coordinates
+        ? (vertex: number) => `${coordinates(vertex)} ${tint!(vertex)}`
+        : vertexColors(geometry, material);
     if (together) {
       const shape = shapeOf(
         moved(geometry.positions, upright(item.world, zUp)),

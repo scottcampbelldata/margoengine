@@ -318,7 +318,7 @@ test('a base colour texture becomes texture2d and texture2dgroup, read back corn
   assert.equal(matched, read.uvs.length / 2, 'every coordinate read back is one that was written');
 });
 
-test('texture transform, wrap and a shared image are written once, and the texture wins over vertex colours', async () => {
+test('texture transform, wrap and a shared image are written once, and white vertex colours add no colour group', async () => {
   const uvs = new Float32Array((box.positions.length / 3) * 2).fill(0.25),
     colored = { ...box, uvs, colors: new Float32Array(box.positions.length).fill(1), colorSize: 3 },
     texture = { image: png, mimeType: 'image/png', wrapS: 'clamp', wrapT: 'mirror', magFilter: 'nearest' },
@@ -338,6 +338,65 @@ test('texture transform, wrap and a shared image are written once, and the textu
   // u = 0.5 + 0.25 * 2, v = 1 - (0 + 0.25 * 2) for the transformed node.
   assert.match(text, /<m:tex2coord u="1" v="0.5"\/>/);
   assert.match(text, /<m:tex2coord u="0.25" v="0.75"\/>/);
+});
+
+test('a base colour factor and vertex colours multiply the texture as multiproperties layers', async () => {
+  const count_ = box.positions.length / 3,
+    uvs = new Float32Array(count_ * 2).map((_, i) => ((i * 37) % 100) / 100),
+    colors = new Float32Array(count_ * 3).map((_, i) => ((i * 13) % 10) / 10),
+    material = { color: [0.5, 0.25, 1, 1], baseColorTexture: { image: png, mimeType: 'image/png' } },
+    srgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+  for (const assembly of [true, false]) {
+    const file = await export3MF(
+        { nodes: [{ geometry: { ...box, uvs, colors, colorSize: 3 }, material }] },
+        { upAxis: 'z', assembly },
+      ),
+      text = await model(file),
+      read = await parse3MFMaterials(file);
+    assert.equal(count(text, /<m:multiproperties /g), 1);
+    assert.match(text, /blendmethods="multiply"/);
+    const [group] = read.groups;
+    assert.deepEqual(
+      group.layers.map((l) => [l.kind, l.blend]),
+      [
+        ['color', 'mix'],
+        ['texture', 'multiply'],
+      ],
+    );
+    const tint = read.attributes[group.layers[0].attribute],
+      coords = read.attributes[group.layers[1].attribute];
+    // Every corner carries the colour and the coordinate of its own source vertex (found by position and face).
+    for (let c = 0; c < box.indices.length; c++) {
+      const v = box.indices[c],
+        want = [0, 1, 2].map((k) => srgb(colors[v * 3 + k] * material.color[k]));
+      for (let k = 0; k < 3; k++)
+        assert.ok(Math.abs(tint[c * 4 + k] - want[k]) <= 0.5 / 255 + 1e-6, `corner ${c}.${k}`);
+      assert.ok(Math.abs(coords[c * 2] - uvs[v * 2]) < 1e-5, `u ${c}`);
+      assert.ok(Math.abs(coords[c * 2 + 1] - uvs[v * 2 + 1]) < 1e-5, `v ${c}`);
+    }
+  }
+});
+
+test('a factor alone tints a texture, and two factors on one image stay apart', async () => {
+  const uvs = new Float32Array((box.positions.length / 3) * 2).fill(0.25),
+    textured = { ...box, uvs },
+    texture = { image: png, mimeType: 'image/png' },
+    file = await export3MF(
+      {
+        nodes: [
+          { geometry: textured, material: { color: [1, 0, 0, 1], baseColorTexture: texture } },
+          { translation: [5, 0, 0], geometry: textured, material: { color: [0, 1, 0, 1], baseColorTexture: texture } },
+          { translation: [10, 0, 0], geometry: textured, material: { baseColorTexture: texture } },
+        ],
+      },
+      { assembly: false },
+    ),
+    text = await model(file);
+  assert.equal(count(text, /<m:texture2d /g), 1);
+  assert.equal(count(text, /<m:multiproperties /g), 2, 'a white factor writes the texture alone');
+  assert.equal(count(text, /<item /g), 3);
+  assert.match(text, /<m:color color="#FF0000"\/>/);
+  assert.match(text, /<m:color color="#00FF00"\/>/);
 });
 
 test('a material without the UV set it needs keeps its colours and writes no texture', async () => {
