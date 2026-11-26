@@ -248,7 +248,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
 | FLUID-02 | Position based fluids (fast mode) | none | Open | OPEN |
 | FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
-| HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Open | OPEN |
+| HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Codex | BUILDING (codex/physics-hydro-03) |
 | ATMO-10 | Synoptic weather and moisture transport | stand-in | Open | OPEN |
 | EARTH-01 | MPM continuum | stand-in | Open | OPEN |
 | EARTH-02 | Depth-averaged granular flow | partial | Open | OPEN |
