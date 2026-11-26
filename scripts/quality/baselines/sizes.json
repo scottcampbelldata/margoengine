@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20562916,
+  "total": 20566762,
   "history": [
     {
       "date": "2026-10-24",
@@ -13975,6 +13975,12 @@
       "commit": "6949e5f75",
       "reason": "horses/crowd 12,397 to 12,522 B gzip: the horses lane's traction and support grade, live stride, stance-duty trunk excursion, hoof release and gait continuity changes since 2026-11-20 grew the shared model chunk that the crowd entry loads; a split would load the same model code twice",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3de9ed49e8",
+      "grew": 1,
+      "reason": "New optional materials/batched-lod entry (BatchedLOD: per-item frustum culling through a refitted bounding volume hierarchy and up to 8 distance levels with hysteresis for BatchedMesh items), before 0 B; 3590 B gzip, ceiling 3846 B. It imports BatchedMesh as a type only, so it adds none of the Material code that materials/batched carries; materials/batched gains boundsInto inside its ceiling and lod shares its level pick as packages/shared/lod-pick.js inside its ceiling."
     }
   ],
   "items": {
@@ -14646,6 +14652,7 @@
     "@margoengine/materials/alpha-hash": 1615,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 41223,
+    "@margoengine/materials/batched-lod": 3846,
     "@margoengine/materials/eye": 4661,
     "@margoengine/materials/fake-shadows": 39249,
     "@margoengine/materials/fur": 4113,
