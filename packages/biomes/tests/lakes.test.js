@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { BiomeWorld } from '../dist/index.js';
 import { hydrology, hydrologyOf, riversOf } from '../dist/hydrology.js';
 import { BiomeView } from '../dist/view.js';
-import { lakeLevels, NO_LAKE, riverSources, riverWater, viewWater } from '../dist/rivers.js';
+import { climateDischarge, lakeLevels, NO_LAKE, riverSources, riverWater, viewWater } from '../dist/rivers.js';
 
 // A 7 x 7 grid 1 m apart: low border, a rim at 20 m with one spill corner at 12 m, a pit of 3 x 3 inside it at 0 m with
 // one corner at 11.5 m (filled only 0.5 m, under the 1 m lake depth, but on the same flat fill).
@@ -172,4 +172,17 @@ test('view flow: bad flow settings are rejected before anything loads; riverSour
   assert.deepEqual(riverSources([Int32Array.of(5)], heightAt, 20, 4), []);
   assert.throws(() => riverSources(lines, heightAt, Number.NaN, 4), RangeError);
   assert.throws(() => riverSources(lines, 3, 20, 4), TypeError);
+});
+
+test('mean river head inflow is rainfall excess times its actual catchment area', () => {
+  const rainfall = 1000; // one metre a year
+  const world = { bounds: [5, 10, 205, 110], sampleRegion: () => ({ rainfall, alpha: 1 }) };
+  const flow = climateDischarge(world, { nx: 3, nz: 1, step: 100000, flow: Int32Array.of(1, 2, 3) });
+  const first = 10000 / (365.25 * 86400);
+  assert.equal(flow(5, 10), first);
+  assert.equal(flow(105, 10), 2 * first);
+  assert.equal(flow(205, 10), 3 * first);
+  assert.equal(flow(400, 10), 0);
+  world.sampleRegion = () => ({ rainfall, alpha: 0.5 });
+  assert.ok(flow(105, 10) >= 0 && flow(105, 10) < 2 * first);
 });

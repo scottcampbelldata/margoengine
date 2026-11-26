@@ -15,6 +15,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/runoff-kernel.wasm',
+    label: 'runoff-kernel.wasm',
+    kind: 'Rust SIMD catchment runoff',
+    measure: 'file',
+    when: 'RainfallRunoff.load(), only from the optional /runoff entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/runoff-kernel-shared.wasm',
+    label: 'runoff-kernel-shared.wasm',
+    kind: 'Rust SIMD catchment runoff, shared world memory',
+    measure: 'file',
+    when: 'RainfallRunoff.load() on a host with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/thermal-kernel.wasm',
     label: 'thermal-kernel.wasm',
     kind: 'Rust SIMD heat conduction',

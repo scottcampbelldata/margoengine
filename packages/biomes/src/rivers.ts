@@ -5,7 +5,10 @@
 // averaged along the line, so it falls with the bed as one smooth slope; a lake's is its fill level. The world's terrain hides the water wherever the real
 // ground is above it, so the banks draw the edge, not this grid. Our own layout.
 import { rangeError, typeError } from '../../shared/errors.js';
+import { moistureIndex } from './climate.js';
+import { ONE } from './fixed.js';
 import type { Hydrology, HydrologyWorld } from './hydrology.js';
+import type { BiomeWorld } from './world.js';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 
@@ -153,28 +156,73 @@ export async function viewWater(
 
 /**
  * Inflows that make river water flow (`RiverSource` of `@margoengine/water/rivers`): one per line, at its higher end,
- * `discharge` m^3/s over a square of half side `radius` metres. Lines are `[x, z, ...]` millimetres.
+ * `discharge` m^3/s over a square of half side `radius` metres. A function can supply the live discharge at each head.
+ * Lines are `[x, z, ...]` millimetres.
  * @example
  * Rivers.attach(water, { sources: riverSources(world.rivers, (x, z) => world.heightAt(x, z), 20, 8) });
  */
 export function riverSources(
   lines: readonly Int32Array[],
   heightAt: (x: number, z: number) => number,
-  discharge: number,
+  discharge: number | ((x: number, z: number) => number),
   radius: number,
 ): { position: [number, number]; discharge: number; radius: number }[] {
   if (!Array.isArray(lines) || typeof heightAt !== 'function')
     throw typeError('riverSources needs the river lines (world.rivers) and a heightAt(x, z) function', 'biomes');
-  if (!Number.isFinite(discharge) || discharge < 0 || discharge > 100000 || !Number.isFinite(radius) || radius < 0)
+  if (
+    (typeof discharge !== 'function' && (!Number.isFinite(discharge) || discharge < 0 || discharge > 100000)) ||
+    !Number.isFinite(radius) ||
+    radius < 0
+  )
     throw rangeError('riverSources needs discharge 0..100000 m^3/s and a finite radius >= 0 metres', 'biomes');
   const sources: { position: [number, number]; discharge: number; radius: number }[] = [];
   for (const line of lines) {
     if (line.length < 2) continue;
     const a: [number, number] = [line[0] / 1000, line[1] / 1000], // float division: mm to metres
       b: [number, number] = [line[line.length - 2] / 1000, line[line.length - 1] / 1000]; // float division: mm to metres
-    sources.push({ position: heightAt(...a) >= heightAt(...b) ? a : b, discharge, radius });
+    const position = heightAt(...a) >= heightAt(...b) ? a : b;
+    const rate = typeof discharge === 'function' ? discharge(...position) : discharge;
+    if (!Number.isFinite(rate) || rate < 0 || rate > 100000)
+      throw rangeError(
+        'riverSources needs a finite discharge 0..100000 m^3/s at each river head; return one',
+        'biomes',
+      );
+    sources.push({ position, discharge: rate, radius });
   }
   return sources;
+}
+
+/**
+ * Estimate mean discharge at a river head from its contributing area and local annual precipitation less actual
+ * evapotranspiration. Use a RainfallRunoff discharge function for a time-varying storm.
+ */
+export function climateDischarge(
+  world: Pick<BiomeWorld, 'bounds' | 'sampleRegion'>,
+  drainage: Pick<Hydrology, 'flow' | 'nx' | 'nz' | 'step'>,
+): (x: number, z: number) => number {
+  const { nx, nz, step, flow } = drainage;
+  const [originX, originZ] = world.bounds;
+  const cell = step / 1000;
+  const secondsPerYear = 365.25 * 86400;
+  return (x, z) => {
+    const i = Math.round((x - originX) / cell);
+    const j = Math.round((z - originZ) / cell);
+    if (!(i >= 0 && i < nx && j >= 0 && j < nz)) return 0;
+    const { rainfall, alpha } = world.sampleRegion(x, z);
+    if (rainfall === 0 || alpha === 0) return 0;
+    // Invert the same Fu-Budyko curve used to store alpha = AET / PET. Since AET <= rainfall,
+    // rainfall / alpha bounds PET. The adjacent integers are the resolution of the model's annual rates.
+    const target = Math.round(alpha * ONE);
+    let lo = 0;
+    let hi = Math.ceil(rainfall / alpha);
+    while (hi - lo > 1) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (moistureIndex(mid, rainfall) > target) lo = mid;
+      else hi = mid;
+    }
+    const excess = Math.max(0, rainfall - alpha * lo);
+    return (flow[i + nx * j]! * cell * cell * excess) / (1000 * secondsPerYear);
+  };
 }
 
 /** The result of {@link riverWater}: the ground and the surface for a `Water`'s `terrain` and `fill`. */

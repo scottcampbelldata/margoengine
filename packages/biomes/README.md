@@ -1,5 +1,29 @@
 # @margoengine/biomes
 
+## Runoff into rivers
+
+Flowing rivers can consume the current catchment discharge. Give `BiomeView.attach` the option
+`water: { rivers: 'hydrology', flow: { runoff } }` after adding a `RainfallRunoff` solver to the world,
+or use `riverSources` to query that source independently. With `flow: true`, the view estimates annual
+mean flow from contributing area and the local precipitation and moisture index.
+
+```ts
+import { riverSources } from '@margoengine/biomes/rivers';
+import { RainfallRunoff } from '@margoengine/physics/runoff';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const runoff = await RainfallRunoff.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(runoff, { nx: 2, nz: 1, dx: 10, downstream: [1, -1], rainRate: 0.0001 });
+world.advance(120);
+const line = Int32Array.of(5000, 5000, 15000, 5000);
+const inflows = riverSources([line], x => 20 - x, (x, z) => runoff.dischargeAt(x, z), 5);
+console.log(inflows);
+```
+
+For disturbance history, `flood.water.sample(period, x, z)` can read depth and velocity from the
+hydraulically resolved run for that return period. Use the grid origin and metre coordinates of the flood bed.
+
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. Forests, meadows, snow and sand land where the climate puts them, and
 the same seed gives the same bytes on every machine. This package is optional and tree-shakable and adds 0 bytes to

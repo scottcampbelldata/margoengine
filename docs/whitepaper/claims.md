@@ -9,6 +9,14 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Catchment runoff (HYDRO-02, 2026-11-25). The wetting front follows the integrated Green-Ampt ponding solution
+  and a steady reach holds its Manning depth. Rain and melt enter the world fields and the volume leaving the
+  catchment matches the water received by the flood solver to floating-point roundoff. The storm wets downstream
+  cells and updates the Biomes inundation layer. Reproduce with `node --test packages/physics/tests/runoff.test.js
+  packages/physics/tests/coupling/runoff.test.js` after building Physics, Weather and Biomes. The live WebGPU
+  discharge fixture added 60.002 m³ when the source delivered 60 m³. Run
+  `node packages/biomes/tests/water-check.mjs --flow-only`.
+
 - Land-surface balance (ATMO-09, 2026-11-25). The surface temperature follows the exact discrete solution of a
   linear heat budget. The nonlinear case accounts for radiation, sensible heat, evaporation and conduction to
   f64 roundoff. At the phase boundary, the available heat melts snow with an equal gain in liquid water.

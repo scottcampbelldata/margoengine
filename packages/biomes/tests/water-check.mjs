@@ -16,9 +16,27 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
+function checkFlowing(flowing) {
+  assert.deepEqual(flowing.errors, []);
+  assert.equal(flowing.still.changed, 0, `still river cells that changed: ${flowing.still.changed}`);
+  assert.ok(flowing.moving.changed > 10, `flowing river cells that changed by over 1 cm: ${flowing.moving.changed}`);
+  assert.ok(flowing.unfed.changed > 10, `river cells that drained without inflow: ${flowing.unfed.changed}`);
+  // The live source starts after the initial readback. Three seconds at 20 m³/s add 60 m³.
+  assert.ok(
+    flowing.moving.volume[1] - flowing.unfed.volume[1] > 30,
+    `the inflow adds water: ${flowing.moving.volume[1]} m^3 against ${flowing.unfed.volume[1]} m^3 without it`,
+  );
+}
 await runSuite(
   async () => {
     await page.waitForFunction(() => window.ready, null, { timeout: 60000 });
+    if (process.argv.includes('--flow-only')) {
+      const flowing = await page.evaluate(() => window.check.flowing());
+      assert.deepEqual(pageErrors, []);
+      checkFlowing(flowing);
+      console.log('ok biomes running river discharge', flowing.moving.volume[1] - flowing.unfed.volume[1], 'm³');
+      return;
+    }
     const r = await page.evaluate(() => window.check.run());
     assert.equal(r.validation, null);
     assert.deepEqual(r.errors, []);
@@ -72,16 +90,7 @@ await runSuite(
     assert.deepEqual(pageErrors, []);
     // List 3 batch 63 job 2: with flow the river moves (cells change over 3 s, the inflow keeps more water than none); without
     // flow it stands.
-    const flowing = r.flowing;
-    assert.deepEqual(flowing.errors, []);
-    assert.equal(flowing.still.changed, 0, `still river cells that changed: ${flowing.still.changed}`);
-    assert.ok(flowing.moving.changed > 10, `flowing river cells that changed by over 1 cm: ${flowing.moving.changed}`);
-    assert.ok(flowing.unfed.changed > 10, `river cells that drained without inflow: ${flowing.unfed.changed}`);
-    // 3 s of 20 m^3/s per line is 60 m^3 per line; volumes are in m^3.
-    assert.ok(
-      flowing.moving.volume[1] - flowing.unfed.volume[1] > 30,
-      `the inflow adds water: ${flowing.moving.volume[1]} m^3 against ${flowing.unfed.volume[1]} m^3 without it`,
-    );
+    checkFlowing(r.flowing);
     await mkdir('test-results', { recursive: true });
     await writeFile('test-results/biomes-water-check.json', JSON.stringify({ hardware, result: r }, null, 1));
     console.log(

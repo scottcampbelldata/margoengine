@@ -8988,3 +8988,15 @@ The rigid adapter uses a fixed standing trunk proxy, so the rigid impact sees a 
 passes normal impulse to the bending modes at the stored contact heights. A released stem uses one authored rigid
 geometry with the pose and velocity of its detached chord. Release needs a preallocated dynamic fragment at the
 matching section height. Scatter can hide the entire failed instance when a separate body draws the fragment.
+
+### Catchment runoff (HYDRO-02, 2026-11-25)
+
+`@margoengine/physics/runoff` uses fixed directed drainage links and one active soil-water layer per cell.
+The surface rating assumes a wide Manning section. Use the shallow-water solver for backwater, reversed flow
+and two-dimensional inundation at an outlet. The next soil step takes up routed water left upstream or downstream
+by the current routing step. Climate-only BiomeView flows use a quantized local climate representative of the
+contributing area. Event hydrographs use the live field. Calibrated flood return periods must come from separate
+hydraulic runs or from measurements.
+
+The optional runoff entry is 3,906 B min+gzip. Its lazy SIMD Wasm images are 7,311 B for plain memory and 7,402 B
+for shared memory before HTTP compression. Both preserve the existing world arena outside their reserved section.

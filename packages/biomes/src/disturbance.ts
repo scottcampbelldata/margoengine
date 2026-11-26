@@ -40,6 +40,13 @@ export interface FloodOptions {
   readonly returnPeriods?: readonly number[];
   /** Flood periods at or below this integer 1..65535 cap succession at grass. Default 2. */
   readonly wetland?: number;
+  /** Hydraulically resolved floods for the listed return periods, sampled in world metres. */
+  readonly water?: {
+    /** Position of grid corner (0, 0), [x, z] metres. Default [0, 0]. */
+    readonly origin?: readonly [number, number];
+    /** Samples a flood run for the requested return period. Depth is in m and velocity in m/s along [x, z]. */
+    sample(period: number, x: number, z: number): { depth: number; velocity: readonly [number, number] };
+  };
 }
 
 /** Options for independent disturbance data; no option modifies a world.
@@ -275,6 +282,42 @@ function floodLayers(
   }
 }
 
+function hydraulicFloodLayers(
+  grid: HeightGrid,
+  water: Uint8Array,
+  periods: readonly number[],
+  flood: Uint16Array,
+  source: NonNullable<FloodOptions['water']>,
+): void {
+  const { nx, nz, step } = grid;
+  const [x0, z0] = source.origin ?? [0, 0];
+  if (!Number.isFinite(x0) || !Number.isFinite(z0) || typeof source.sample !== 'function')
+    throw typeError('disturbance flood water needs a finite origin and sample(period, x, z); supply both', 'biomes');
+  for (let j = 0; j < nz; j++) {
+    const z = z0 + (j * step) / 1000;
+    for (let i = 0; i < nx; i++) {
+      const cell = i + nx * j;
+      if (water[cell]) {
+        flood[cell] = 1;
+        continue;
+      }
+      const x = x0 + (i * step) / 1000;
+      for (const period of periods) {
+        const { depth, velocity } = source.sample(period, x, z);
+        if (!(depth >= 0 && Number.isFinite(depth) && Number.isFinite(velocity?.[0]) && Number.isFinite(velocity?.[1])))
+          throw rangeError(
+            'disturbance flood samples need finite depth >= 0 and velocity components; return SI values',
+            'biomes',
+          );
+        if (depth > 0) {
+          flood[cell] = period;
+          break;
+        }
+      }
+    }
+  }
+}
+
 // Binary heap ordered by (arrival minute, cell index), including ties.
 class ArrivalHeap {
   private readonly cells: number[] = [];
@@ -494,7 +537,10 @@ export function disturbance(
     const periods = flooding.returnPeriods ?? DEFAULT_PERIODS;
     ascending(periods, 2, 'flood returnPeriods');
     wetland = integer(flooding.wetland ?? 2, 1, 65535, 'flood wetland period');
-    if (hydrology) floodLayers(hydrology, grid, water, periods, flood);
+    if (flooding.water !== undefined) {
+      object(flooding.water, 'flood water');
+      hydraulicFloodLayers(grid, water, periods, flood, flooding.water);
+    } else if (hydrology) floodLayers(hydrology, grid, water, periods, flood);
   }
   for (let c = 0; c < n; c++) stage[c] = stageAt(age[c], flood[c] && flood[c] <= wetland ? 1 : 255, stages);
   return { height: grid.height.slice(), nx: grid.nx, nz: grid.nz, step: grid.step, seed, years, age, flood, stage };

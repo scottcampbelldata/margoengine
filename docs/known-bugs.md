@@ -6,12 +6,13 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-25 RITS-10 atmospheric-river scene still needs basin runoff and flooding
+### Open 2026-11-25 RITS-10 atmospheric-river scene still needs its watershed inputs wired
 
 - **Repro** Re-render RITS-10 at 7:55–8:20 and 9:48–10:15 and check the terrain, streams and valley floor.
-- **Cause** The demo needs the complete rainfall-runoff and flood-depth chain from HYDRO-02 and HYDRO-01. The ATMO-09
-  regression verifies the ground wetness, material response and local runoff flux in isolation. The scene review
-  remains open until the surface output is consumed and flood depth appears in the shot.
+- **Cause** The original scene has no connected precipitation → catchment → flood solver inputs. The engine fixture
+  routes rain and melt, checks water volume in the flood and reads the resulting inundation into Biomes. The demo review
+  remains open until the scene consumes those fields and flood depth appears in the shot.
+
 ### Fixed 2026-11-25: fixed ice geometry could not respond to world-clock heating (ICE-05)
 
 The prior ice render shapes had no phase-change state. A pulse delivering fusion, sensible and vaporisation

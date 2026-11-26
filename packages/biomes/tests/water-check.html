@@ -78,9 +78,7 @@ async function river(){
  sky.dispose();e.dispose();world.dispose();c2.remove();
  return {points,share:changed/(c2.width*c2.height),errors};
 }
-// List 3 batch 63 job 2: rivers that flow. The same coast world's river with `flow: true`: water/rivers takes in
-// 20 m^3/s at each line's high end and moves the river state from frame to frame (the filled channel drains to the
-// sea, and the inflow keeps more water in it than the same flow with no inflow); without flow it stands exactly still.
+// River flow takes the live catchment discharge at each head. A change after attach must reach the running river.
 async function flowing(){
  const c2=document.createElement('canvas');c2.className='sea';c2.width=360;c2.height=225;document.body.append(c2);
  const world=await BiomeWorld.create({biomes:[presets.temperate],climate:{latitude:46,rainfall:1200},height:{relief:{seed:3,relief:900,base:300,rivers:1,coast:'south'}}});
@@ -95,14 +93,22 @@ async function flowing(){
   // Depths in metres and each cell's area in m^2 over the world's bounds (the river terrain covers them).
   const [x0,z0,x1,z1]=world.bounds,depth=new Float64Array(w*h);for(let i=0;i<w*h;i++)depth[i]=all[i*4];return {depth,area:((x1-x0)/w)*((z1-z0)/h)};
  };
- async function run(flow){
+ async function run(flow,startStorm){
   const view=await BiomeView.attach(e,world,{objects:false,water:{rivers:'auto',flow}});
   await view.ready;await view.whenIdle();await waitForPipelines(frame);await view.whenIdle();
-  const a=await state(view);for(let i=0;i<90;i++)await frame();const b=await state(view);
+  const a=await state(view);startStorm?.();for(let i=0;i<90;i++)await frame();const b=await state(view);
   let volume=[0,0],changed=0;for(let i=0;i<a.depth.length;i++){volume[0]+=a.depth[i]*a.area;volume[1]+=b.depth[i]*a.area;if(Math.abs(a.depth[i]-b.depth[i])>0.01)changed++;}
   view.dispose();return {volume,changed,cells:a.depth.length,area:a.area};
  }
- const still=await run(false),moving=await run(true),unfed=await run({discharge:0});
+ const [{RainfallRunoff},{PhysicsWorld}]=await Promise.all([
+  import('/packages/physics/dist/runoff.js'),import('/packages/physics/dist/world.js'),
+ ]);
+ const runoff=await RainfallRunoff.load(),catchment=new PhysicsWorld({rate:{num:60,den:1}});
+ const [x0,z0,x1,z1]=world.bounds, dx=x1-x0, dz=z1-z0, width=10, slope=0.05, roughness=0.035, discharge=20;
+ const normalDepth=(discharge*roughness/(width*Math.sqrt(slope)))**(3/5);
+ catchment.add(runoff,{nx:1,nz:1,dx,dz,origin:[x0,z0],downstream:[-1],width,slope,roughness,
+  conductivity:0,initialDepth:normalDepth,rainRate:discharge/(dx*dz)});
+ const still=await run(false),moving=await run({runoff},()=>catchment.advance(1)),unfed=await run({discharge:0});
  e.dispose();world.dispose();c2.remove();
  return {still,moving,unfed,errors};
 }
@@ -144,6 +150,7 @@ async function lakes(){
  return {lake,river,lines:lines.length,errors};
 }
 window.check={
+ flowing,
  async run(){
   const {climate,relief}=presetWorlds.wetland,world=await BiomeWorld.create({climate,height:{relief}});
   // On land 50 m from the shore (about x = -1,300 m), looking west out to sea.

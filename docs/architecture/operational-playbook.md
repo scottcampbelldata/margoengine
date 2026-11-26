@@ -9958,3 +9958,14 @@ impulse and failure state, identical plain and shared results, and bit-identical
 crown shifts and the root stays in place in regular and tiled instancing on WebGPU and the WebGL2 layer.
 The coupling suite also sends a rigid impact into a fixed trunk proxy, releases a preallocated fragment, and
 restores a snapshot from before impact. The standing and released enabled states, pose and hash replay exactly.
+
+### Catchment runoff and resolved flood inflow (HYDRO-02)
+
+The runoff entry uses Rust SIMD for grid forcing and a topologically ordered finite-volume step for soil and surface
+water. Green-Ampt integration solves through ponding. The depth–discharge relation is implicit and the ordered upstream
+solve transfers the same water volume between adjacent cells. Depth, soil water, recharge and outlet discharge have
+separate world-registry fields. The outlet field feeds shallow-water source terms on the simulation clock. Biome river
+rendering accepts live discharge and historic flood classification can sample depth and velocity from the same flood
+solver. The coupling tests close both volume budgets, reproduce the steady rating and ponding solution, verify the
+response to rain and melt, and compare frame rates, snapshots and both Wasm memory modes. The renderer test changes the
+inflow after attaching the view and observes the additional water volume on its real WebGPU river grid.

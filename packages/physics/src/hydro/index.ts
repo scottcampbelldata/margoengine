@@ -56,6 +56,14 @@ export interface ShallowInflow {
   readonly discharge: number | ((time: number) => number);
 }
 
+/** Points where runoff from an upstream drainage solver enters the shallow-water grid. */
+export interface ShallowRunoffInput {
+  /** Layout-1 f64 outlet discharges, in m³/s, such as a RainfallRunoff outletField. */
+  readonly field: FieldDescriptor;
+  /** Map each selected index in the upstream outlet grid to [x, z] metres on the shallow-water bed. */
+  readonly outlets: ReadonlyArray<{ readonly sourceCell: number; readonly position: readonly [number, number] }>;
+}
+
 /**
  * A building standing on the ground: the box from `min` to `max` [x, z] m raises the bed of every cell whose centre is in it
  * by `height` m (the building-block method of Schubert and Sanders 2012), so water flows round it, and over it only when
@@ -135,6 +143,8 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private g = 0;
   private roughness!: Float64Array;
   private inflows: { cell: number; discharge: number | ((time: number) => number) }[] = [];
+  private runoff?: ShallowRunoffInput;
+  private runoffCells: ReadonlyArray<{ readonly sourceCell: number; readonly cell: number }> = [];
   private rain: Precipitation | undefined;
   private wind: Wind | undefined;
   private density = WATER_DENSITY;
@@ -145,15 +155,32 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private published!: Region;
   private readonly flowSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
-  /** @param id The solver's id (default `'water'`). */
-  constructor(id = 'water') {
+  /** @param id The solver's id (default `'water'`).
+   * @param runoff Optional drainage outlets supplied through a registry field.
+   */
+  constructor(id = 'water', runoff?: ShallowRunoffInput) {
     this.id = id;
+    if (runoff) {
+      if (runoff.field.unit !== 'm^3/s')
+        throw new RangeError('Shallow-water runoff is a discharge; bind an outlet field in m^3/s.');
+      const seen = new Set<number>();
+      const outlets = runoff.outlets.map(({ sourceCell, position }) => {
+        if (!Number.isSafeInteger(sourceCell) || sourceCell < 0 || seen.has(sourceCell))
+          throw new RangeError('Invalid shallow-water runoff outlet; use a unique nonnegative source cell index.');
+        seen.add(sourceCell);
+        return { sourceCell, position: [position[0], position[1]] as const };
+      });
+      this.runoff = { field: { ...runoff.field }, outlets };
+    }
   }
 
   describe(): SolverDescription {
     return {
       id: this.id,
-      fields: [{ field: SURFACE_WATER_FIELD, access: 'write' }],
+      fields: [
+        { field: SURFACE_WATER_FIELD, access: 'write' },
+        ...(this.runoff ? [{ field: this.runoff.field, access: 'read' as const }] : []),
+      ],
       rate: this.level,
       stableRate: () => this.level,
     };
@@ -256,23 +283,34 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
         this.roughness[i + nx * j] = n;
       }
     for (const inflow of params.inflows ?? []) {
-      const [x, z] = inflow.position ?? [Number.NaN, Number.NaN],
-        i = Math.floor((x - this.x0) / dx),
-        j = Math.floor((z - this.z0) / dz);
-      if (!(i >= 0 && i < nx && j >= 0 && j < nz))
-        throw new RangeError(`An inflow at (${x}, ${z}) lies off the water's grid; put it on the bed.`);
+      const cell = this.inflowCell(inflow.position);
       if (typeof inflow.discharge !== 'function' && !Number.isFinite(inflow.discharge))
         throw new RangeError(
           `An inflow's discharge is m^3/s or a function of time (got ${inflow.discharge}); pass one.`,
         );
-      this.inflows.push({ cell: i + nx * j, discharge: inflow.discharge });
+      this.inflows.push({ cell, discharge: inflow.discharge });
     }
+    this.runoffCells =
+      this.runoff?.outlets.map(({ sourceCell, position }) => ({
+        sourceCell,
+        cell: this.inflowCell(position),
+      })) ?? [];
     this.state = host.allocate('state', count * 3 * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.ledger = host.allocate('ledger', LEDGER * 8, 'f64', SURFACE_WATER_LAYOUT);
     this.published = host.allocate('published', count * 3 * 4, 'f32', SURFACE_WATER_LAYOUT);
     // The start: a level or a depth, and a velocity, at each cell centre.
     this.fill(params);
     this.publish();
+  }
+
+  private inflowCell(position: readonly [number, number]): number {
+    const [x, z] = position ?? [Number.NaN, Number.NaN];
+    const { dx, dz } = this.grid;
+    const i = Math.floor((x - this.x0) / dx);
+    const j = Math.floor((z - this.z0) / dz);
+    if (!(i >= 0 && i < this.nx && j >= 0 && j < this.nz))
+      throw new RangeError(`An inflow at (${x}, ${z}) lies off the water's grid; put it on the bed.`);
+    return i + this.nx * j;
   }
 
   /** Fills the water at the start from `params` over the cells' beds. */
@@ -326,13 +364,27 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   }
 
   step(context: StepContext, dt: number): void {
+    const port = this.runoff && context.inputs.get(this.runoff.field.name);
+    let runoff: Float64Array | undefined;
+    if (port) {
+      if (port.region.layout !== 1 || port.region.type !== 'f64')
+        throw new RangeError('Invalid shallow-water runoff layout; publish scalar layout-1 f64 discharges.');
+      runoff = regionWords(this.host.memory, port.region) as Float64Array;
+      for (const { sourceCell } of this.runoffCells) {
+        const rate = runoff[sourceCell]!;
+        if (!(rate >= 0 && Number.isFinite(rate)))
+          throw new RangeError(
+            'Invalid shallow-water outlet discharge; publish a finite nonnegative rate for each mapped source.',
+          );
+      }
+    }
     this.cell = context.cell;
     this.cellBeds(this.ground.elevations);
     const t0 = context.tick / rateOf(context.level);
     let t = 0;
     while (t < dt) {
       const sub = Math.min(dt - t, this.substep());
-      this.advance(t0 + t, sub);
+      this.advance(t0 + t, sub, runoff);
       t += sub;
     }
     this.publish();
@@ -357,7 +409,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   }
 
   /** One substep of `dt` from time `t`: SSP Runge-Kutta 2, friction and the sources. */
-  private advance(t: number, dt: number): void {
+  private advance(t: number, dt: number, runoff?: Float64Array): void {
     const s = this.words(),
       n = this.nx * this.nz,
       h = new Float64Array(n),
@@ -368,7 +420,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       hu[k] = s[3 * k + 1]!;
       hv[k] = s[3 * k + 2]!;
     }
-    const r0 = this.rates(h, hu, hv, t),
+    const r0 = this.rates(h, hu, hv, t, runoff),
       h1 = new Float64Array(n),
       hu1 = new Float64Array(n),
       hv1 = new Float64Array(n);
@@ -378,7 +430,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       hv1[k] = hv[k]! + dt * r0.hv[k]!;
     }
     this.settle(h1, hu1, hv1, dt);
-    const r1 = this.rates(h1, hu1, hv1, t + dt),
+    const r1 = this.rates(h1, hu1, hv1, t + dt, runoff),
       ledger = this.ledgerWords();
     for (let k = 0; k < n; k++) {
       h[k] = 0.5 * (h[k]! + h1[k]! + dt * r1.h[k]!);
@@ -403,6 +455,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     hu: Float64Array,
     hv: Float64Array,
     t: number,
+    runoff?: Float64Array,
   ): { h: Float64Array; hu: Float64Array; hv: Float64Array; inflow: number; rain: number; out: number } {
     const n = h.length,
       rh = new Float64Array(n),
@@ -418,6 +471,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       rh[cell]! += q / area;
       inflow += q;
     }
+    if (runoff)
+      for (const { cell, sourceCell } of this.runoffCells) {
+        const q = runoff[sourceCell]!;
+        rh[cell]! += q / area;
+        inflow += q;
+      }
     if (this.rain || this.wind) {
       const { nx, nz } = this;
       for (let j = 0; j < nz; j++)

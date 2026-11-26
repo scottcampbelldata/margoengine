@@ -12501,3 +12501,37 @@ offset `d(y)`, (x',y',z') = (x+d_x(y),y,z+d_z(y)); the inverse-transpose Jacobia
 y component, to `n_y - dot(n_xz, slope)`. See Alan H. Barr, *Global and local deformations of solid primitives*,
 1984, [doi:10.1145/964965.808573](https://doi.org/10.1145/964965.808573), §3. Tests render a displaced crown,
 its planted root, and a tiled counterpart on WebGPU and the WebGL2 compatibility layer.
+
+### Rainfall runoff, infiltration and channel routing (HYDRO-02, 2026-11-25)
+
+- W. H. Green and G. A. Ampt, [Studies on Soil Physics, Part I](https://www.cambridge.org/core/journals/journal-of-agricultural-science/article/abs/studies-on-soil-phyics/6EE03D61E70FCEFD6EAE4D59BFCC1FF9),
+  1911, pp. 1–24, establishes the sharp wetting-front conductivity and capillary relation. The publisher extract was
+  checked against the modern expression and integrated form in the
+  [USACE Green-Ampt technical reference](https://www.hec.usace.army.mil/confluence/rasdocs/ras1dtechref/latest/overview-of-optional-capabilities/modeling-precipitation-and-infiltration/green-ampt).
+  R. G. Mein and C. L. Larson, [Modeling infiltration during a steady rain](https://doi.org/10.1029/WR009i002p00384),
+  1973, separates rainfall-limited infiltration from the ponded step. S.-T. Chu,
+  [Infiltration during an unsteady rain](https://doi.org/10.1029/WR014i003p00461), 1978, retains infiltration from before
+  ponding. The ponded flux is `Ks(1 + A/F)`, with `A` equal to suction head times moisture deficit. For a tick with
+  constant rain `r > Ks`, the threshold is `F = Ks A/(r-Ks)`. Solving the integrated law inside the available-water
+  interval preserves both continuity at ponding and the water budget.
+- K. J. Beven and M. J. Kirkby, [A Physically Based, Variable Contributing Area Model of Basin Hydrology](https://www.tandfonline.com/doi/pdf/10.1080/02626667909491834),
+  1979, Eqs. 4–9, relates saturation to `ln(a/tan β)` and mean water storage. The solver applies the
+  resulting local deficit as a further cap on infiltration. Each grid cell keeps independent soil water and uses
+  a linear store for downward recharge.
+- M. J. Lighthill and G. B. Whitham, [On Kinematic Waves I. Flood Movement in Long Rivers](https://courses.physics.ucsd.edu/2018/Fall/physics218a/Whitham_Lighthill_Kinematic%20Waves%201.pdf),
+  1955, Eqs. 1–6 and §§2, 4, gives the conservation equation and the one-directional rating-law characteristics.
+  The wide Manning section has rating `Q = w sqrt(S) h^(5/3)/n`. Positive characteristics give the upstream
+  face discharge and backward Euler balances that face flux with cell storage. The implicit system is triangular
+  in drainage order. The substitution `h = u³` gives a monotone equation in `u³` and `u⁵`. The exact routed volume
+  is debited upstream and credited downstream.
+- R. E. Horton, [Erosional development of streams and their drainage basins](https://pdodds.w3.uvm.edu/research/papers/others/1945/horton1945a.pdf),
+  1945, discusses infiltration excess and drainage structure. L. B. Leopold and T. Maddock Jr.,
+  [The hydraulic geometry of stream channels and some physiographic implications](https://doi.org/10.3133/pp252),
+  1953, describes observed relationships between discharge and channel hydraulics. BiomeView estimates mean flows
+  from contributing area times annual precipitation less actual evapotranspiration. It inverts the existing
+  Fu-Budyko moisture-index function for the local climate estimate. A live view can take the routed discharge.
+
+The numerical implementation uses the repository's pinned scalar arithmetic and a SIMD pass for rain and melt.
+The work memory and prognostic quantities belong to the world arena. Tests exercise ponding, steady Manning flow,
+wetness-index saturation, volume closure, flood spread, and deterministic replay. The implementation uses the
+publications and this repository's field contracts.

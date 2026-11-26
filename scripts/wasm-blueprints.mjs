@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'runoff-kernel',
+    crate: 'packages/physics/runoff-kernel',
+    blueprint: 'packages/physics/src/runoff/runoff-kernel.wasm',
+    script: 'packages/physics/scripts/build-runoff-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'runoff-kernel-shared',
+    crate: 'packages/physics/runoff-kernel',
+    blueprint: 'packages/physics/src/runoff/runoff-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-runoff-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'thermal-kernel',
     crate: 'packages/physics/thermal-kernel',
     blueprint: 'packages/physics/src/thermal/thermal-kernel.wasm',

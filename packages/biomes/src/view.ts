@@ -277,10 +277,19 @@ export type BiomeWaterSettings = Omit<
   readonly lakes?: 'auto' | false;
   /**
    * Rivers that flow downstream instead of standing still (`@margoengine/water/rivers`, loaded with import() only when
-   * set): `true`, or the volume each river line takes in at its higher end, 0..100000 m^3/s (default 20), and the
-   * solver substeps per frame (default 8). Applies to the first 16 lines. Needs `rivers`. Default false: still water.
+   * set). `true` estimates each head's annual mean discharge from its climate and catchment. An object can provide
+   * explicit discharge, a live runoff query, or solver substeps (default 8). Applies to the first 16 lines.
+   * Needs `rivers`. Default false: still water.
    */
-  readonly flow?: boolean | { readonly discharge?: number; readonly substeps?: number };
+  readonly flow?:
+    | boolean
+    | {
+        /** Explicit discharge per head, in m³/s. Defaults to the catchment estimate. */
+        readonly discharge?: number;
+        /** A live discharge source in world metres. A RainfallRunoff solver exposes this query. */
+        readonly runoff?: { dischargeAt(x: number, z: number): number };
+        readonly substeps?: number;
+      };
 };
 
 /** What `BiomeViewOptions.shadows` needs: a `Shadows` (`@margoengine/shadows`), of which only `add` is used. */
@@ -929,6 +938,7 @@ export class BiomeView implements Disposable {
   #river?: { dispose(): void; readonly options: { fill(x: number, z: number): number | undefined } };
   #paint?: typeof import('@margoengine/biomes/rivers').paintRiverbed;
   #rivers?: { dispose(): void };
+  #refreshRiverSources?: () => void;
   #disposed = false;
   #horizon?: Terrain;
   #makeHorizon?: () => Terrain | undefined;
@@ -1145,17 +1155,21 @@ export class BiomeView implements Disposable {
       throw typeError("BiomeView water must be true, false, 'auto' or Water settings", 'biomes');
     const { rivers, lakes, flow, ...waterSettings } = typeof water === 'object' ? water : ({} as BiomeWaterSettings);
     if (flow !== undefined && typeof flow !== 'boolean' && (typeof flow !== 'object' || flow === null))
-      throw typeError('BiomeView water flow must be true, false or { discharge, substeps }', 'biomes');
-    const discharge = typeof flow === 'object' ? (flow.discharge ?? 20) : 20,
+      throw typeError('BiomeView water flow must be true, false or { discharge, runoff, substeps }', 'biomes');
+    const discharge = typeof flow === 'object' ? flow.discharge : undefined,
+      runoff = typeof flow === 'object' ? flow.runoff : undefined,
       substeps = typeof flow === 'object' ? flow.substeps : undefined;
+    if (runoff !== undefined && (typeof runoff?.dischargeAt !== 'function' || discharge !== undefined))
+      throw typeError(
+        'BiomeView flow runoff needs dischargeAt(x, z); choose either runoff or explicit discharge',
+        'biomes',
+      );
     if (
-      !Number.isFinite(discharge) ||
-      discharge < 0 ||
-      discharge > 100000 ||
+      (discharge !== undefined && (!Number.isFinite(discharge) || discharge < 0 || discharge > 100000)) ||
       (substeps !== undefined && (!Number.isInteger(substeps) || substeps < 1 || substeps > 64))
     )
       throw rangeError(
-        'BiomeView water flow needs discharge 0..100000 m^3/s and substeps an integer 1..64 (default 20 and 8)',
+        'BiomeView water flow needs discharge 0..100000 m^3/s and substeps an integer 1..64 (default 8)',
         'biomes',
       );
     if (
@@ -1379,19 +1393,29 @@ export class BiomeView implements Disposable {
             }),
           );
         if (flow && river?.lines.length && view.#water && !view.#disposed) {
-          const [{ Rivers }, { riverSources }] = await Promise.all([
+          const [{ Rivers }, { riverSources, climateDischarge }, drainage] = await Promise.all([
               import('@margoengine/water/rivers'),
               import('@margoengine/biomes/rivers'),
+              discharge === undefined && runoff === undefined
+                ? import('@margoengine/biomes/hydrology').then(({ hydrologyOf }) => hydrologyOf(world))
+                : undefined,
             ]),
-            cell = Math.max(x1 - x0, z1 - z0) / Math.max(view.#width, view.#depth); // float division: metres per cell
+            cell = Math.max(x1 - x0, z1 - z0) / Math.max(view.#width, view.#depth),
+            rate = runoff
+              ? (x: number, z: number) => runoff.dischargeAt(x, z)
+              : (discharge ?? climateDischarge(world, drainage!)),
+            sources = () => riverSources(river.lines.slice(0, 16), (x, z) => world.heightAt(x, z), rate, cell);
           // dispose() may have run while the solver loaded; the water it disposed takes no Rivers.
-          if (!view.#disposed)
-            view.#rivers = held.run(() =>
+          if (!view.#disposed) {
+            const rivers = held.run(() =>
               Rivers.attach(view.#water!, {
-                sources: riverSources(river.lines, (x, z) => world.heightAt(x, z), discharge, cell).slice(0, 16),
+                sources: sources(),
                 ...(substeps !== undefined ? { substeps } : {}),
               }),
             );
+            view.#rivers = rivers;
+            if (runoff) view.#refreshRiverSources = () => rivers.setSources(sources());
+          }
         }
       }
       if (options.signal?.aborted) {
@@ -1474,6 +1498,7 @@ export class BiomeView implements Disposable {
    */
   #frame(delta: number): void {
     if (this.#disposed) return;
+    this.#refreshRiverSources?.();
     this.#lastFrame = this.#clock();
     const p = this.#engine.camera.position,
       eye: [number, number] = [p[0], p[2]];
@@ -2132,6 +2157,7 @@ export class BiomeView implements Disposable {
     this.#objects?.dispose();
     this.#plantStates?.dispose();
     this.#rivers?.dispose();
+    this.#refreshRiverSources = undefined;
     this.#water?.dispose();
     this.#river?.dispose();
     this.#placement?.dispose();

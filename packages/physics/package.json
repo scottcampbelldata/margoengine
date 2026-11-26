@@ -107,6 +107,10 @@
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"
+    },
+    "./runoff": {
+      "types": "./dist/runoff/index.d.ts",
+      "import": "./dist/runoff.js"
     }
   },
   "files": [

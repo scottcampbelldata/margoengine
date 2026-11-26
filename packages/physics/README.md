@@ -49,6 +49,39 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
+## Rainfall runoff and channel inflow
+
+`@margoengine/physics/runoff` turns rain and snowmelt into soil water, groundwater recharge and routed
+discharge. It integrates the Green-Ampt wetting front, handles saturation on a wetness-index grid, and
+routes excess water downstream using the implicit kinematic-wave balance.
+
+```ts
+import { bedSurface } from '@margoengine/physics/earth';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { RainfallRunoff } from '@margoengine/physics/runoff';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const runoff = await RainfallRunoff.load();
+const flood = new ShallowWaterSolver('valley', {
+  field: runoff.outletField,
+  outlets: [{ sourceCell: 2, position: [5, 5] }],
+});
+const bed = bedSurface({ columns: 2, rows: 1, width: 20, depth: 10, centre: [10, 5] }, new Float64Array(6));
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(runoff, { nx: 3, nz: 1, dx: 10, downstream: [1, 2, -1], rainRate: 0.0001 });
+world.add(flood, { bed });
+world.advance(120);
+console.log(runoff.read(2, 0).outflow, runoff.budget, flood.budget.inflow);
+```
+
+The X index varies fastest. A downstream entry of `-1` is an outlet. Supply elevations or explicit
+hydraulic slopes, and use `wetnessIndex` for the natural-log index (the Biomes Q8 values divided by 256).
+Rain may come from the physical `Precipitation` contract or a layout-1 scalar or grid port in m/s.
+An ATMO-09 water-flux port supplies snowmelt and evaporation. All published regions are layout-1
+f64 grids. Depth and soil water use metres, infiltration and recharge use m/s, and channel and outlet
+discharge use m³/s. The runoff budget measures every external gain and loss in m³. Match the area
+upstream of a mapped outlet to the flood grid it feeds so direct flood rain and routed basin rain are each counted once.
+
 ## Rooted plants in wind and water
 
 `@margoengine/physics/vegetation` models each plant as a tapered cantilever with two bending modes on each horizontal axis. Set its geometry, tissue density and Young’s modulus in SI units. A `FlowField` supplies the velocity and density of air or water at the plant and at the world clock's time.
