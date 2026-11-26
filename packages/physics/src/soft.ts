@@ -123,6 +123,10 @@ const GF_PER_CM = 9.80665e-3 / 0.01;
  * chapter 3), the value `WindForce` and `SailForce` take for a surface the air meets square.
  */
 const PLATE_DRAG = 1.17;
+/** A circular cylinder's drag across the flow below the drag crisis (Hoerner, Fluid-Dynamic Drag, 1965), for Morison's drag. */
+const MORISON_DRAG = 1.2;
+/** A circular cylinder's added-mass coefficient across the flow (potential flow), for Morison's inertia. */
+const MORISON_ADDED = 1;
 const INTEGER_COLUMNS = new Set([
   'pflags',
   'pbody',
@@ -2034,6 +2038,18 @@ export class SoftBodyDesc {
     return this;
   }
   /** @internal */ airDrag = true;
+  /**
+   * The density of the body's material, kg/m^3, for the water it displaces in {@link SoftBodies.water}: each particle
+   * displaces its mass over this, so the water holds it up by that volume's weight and its acceleration pushes on it.
+   * Left out, the body displaces nothing (a cloth, whose sheet's added mass and drag the water still takes).
+   */
+  setDensity(density: number): this {
+    if (!(density > 0 && Number.isFinite(density)))
+      throw new RangeError("A soft body's density is a finite number of kg/m^3 above 0; pass one.");
+    this.density = density;
+    return this;
+  }
+  /** @internal */ density: number | null = null;
   /** Moves every particle by this vector when the body is created. */
   setTranslation(translation: Vec3): this {
     checkVec(translation, 'Translation');
@@ -2132,6 +2148,11 @@ export class SoftBody {
   /** @internal A shear edge's spring per unit of shear rigidity (see SoftBodyDesc.edgeShear). */
   edgeShear = new Float32Array(0);
   /** @internal Whether its faces feel the air (SoftBodyDesc.setAirDrag). */ airDrag = true;
+  /** @internal Its material's density (SoftBodyDesc.setDensity), or null when it displaces no water. */ density:
+    | number
+    | null = null;
+  /** @internal The particle radius given to it, for a rope's diameter in the water. */ waterRadius: number | null =
+    null;
   /** @internal How many `SailForce`s supply its air loads: while any does, the default drag leaves it alone. */ airLoads = 0;
   /** @internal Whether its surface holds a volume, and the volume at rest. */ volumeOn = false;
   /** @internal */ surfaceRest = 0;
@@ -2949,6 +2970,24 @@ export class SoftBodies implements PhysicsAttachment {
    * Give it the wind the scene's `WindForce` and `SailForce` blow with, so every body feels one air.
    */
   wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField | null = null;
+  /**
+   * The water the bodies are in, or null (the default, none): its surface's height over (x, z) at time t, its velocity
+   * (a flow field of `@margoengine/math/fields`, such as `SpectralSea`'s `water`, whose waves' orbits then sway what is in
+   * it; still water when left out) and its density (default 1025, sea water). Under its surface each particle takes
+   * Morison's loads (Morison, O'Brien, Johnson and Schaaf 1950): the weight of the water it displaces (its body's
+   * density, `SoftBodyDesc.setDensity`) upward, the water's acceleration on it and on the water it carries, that water's
+   * inertia, and the drag of the water past it: a rope's segments as cylinders across the flow (C_D 1.2, Hoerner 1965;
+   * added mass that of their cross-section, C_a 1), a cloth's faces as plates (C_N 1.17) with the added mass of a disk of
+   * the sheet's area ((8/3) rho a^3, Lamb's), shared by area. A particle half out of the water takes half.
+   */
+  water: {
+    readonly elevation?: (x: number, z: number, t: number) => number;
+    readonly flow?: FlowField;
+    readonly density?: number;
+  } | null = null;
+  private readonly waterSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+  /** Per particle row, the water's steady acceleration this step (x, y, z), taken in each substep. */
+  private waterAccel = new Float64Array(0);
   private readonly airSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
   private constructor(
@@ -3345,6 +3384,8 @@ export class SoftBodies implements PhysicsAttachment {
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     body.edgeShear = Float32Array.from(desc.edgeShear);
     body.airDrag = desc.airDrag;
+    body.density = desc.density;
+    body.waterRadius = desc.radius ?? null;
     body.grid = desc.grid && { ...desc.grid };
     if (desc.skin) {
       body.skin = desc.skin;
@@ -4414,6 +4455,10 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.particleCount === 0) return;
     // Where every particle starts the step, for drawing between steps.
     for (const body of this.bodies) body.remember();
+    if (this.water) {
+      if (this.waterAccel.length < 3 * this.particleCount) this.waterAccel = new Float64Array(3 * this.particleCount);
+      this.waterAccel.fill(0);
+    }
     this.applyForces(this.columns(), dt);
     const h = dt / this.substeps,
       g = this.physics.gravity,
@@ -4431,6 +4476,16 @@ export class SoftBodies implements PhysicsAttachment {
     let extra = 0;
     for (const b of this.bodies) extra = Math.max(extra, b.additionalIterations);
     for (let piece = 0; piece < this.substeps; piece++) {
+      if (this.water) {
+        const w = this.columns(),
+          a = this.waterAccel;
+        for (let row = 0; row < this.particleCount; row++) {
+          if (w.w[row] === 0) continue;
+          w.vx[row] = w.vx[row]! + a[3 * row]! * h;
+          w.vy[row] = w.vy[row]! + a[3 * row + 1]! * h;
+          w.vz[row] = w.vz[row]! + a[3 * row + 2]! * h;
+        }
+      }
       this.exports.soft_pre(h, this.iterations + extra, g[0], g[1], g[2]);
       // A body touched by many particles settles over a few passes, each meeting the body where the last left it.
       for (let pass = 0; pass < 4; pass++) this.exports.soft_apply(h, h * (piece + 1));
@@ -4905,6 +4960,210 @@ export class SoftBodies implements PhysicsAttachment {
         c.vz[row] = c.vz[row]! + fz * dt;
       }
       if (body.airDrag && body.airLoads === 0 && body.triangleList.length > 0) this.airDrag(body, c, dt);
+      if (this.water) this.waterLoads(body, c, dt);
+    }
+  }
+
+  /** How much of a particle at (x, y, z) of radius r is under the water's surface at time t, 0 to 1. */
+  private submerged(x: number, y: number, z: number, r: number, t: number): number {
+    const surface = this.water?.elevation?.(x, z, t) ?? 0,
+      depth = surface - y;
+    return r > 0 ? Math.min(1, Math.max(0, (depth + r) / (2 * r))) : depth > 0 ? 1 : 0;
+  }
+
+  /** The water's velocity at a point and time (still water without a flow). */
+  private waterVelocity(x: number, y: number, z: number, t: number): Vec3 {
+    const flow = this.water?.flow;
+    if (!flow) return [0, 0, 0];
+    const v = flow.sample(x, y, z, t, this.waterSample).velocity;
+    return [v[0], v[1], v[2]];
+  }
+
+  /**
+   * The water's loads on a body over a step (SoftBodies.water): per particle, Morison's buoyancy, the water's
+   * acceleration on it and on the water it carries, and that water's inertia, taken implicitly (the particle's inverse
+   * mass is 1 / (m + m_a) under water, its own back out of it, with gravity's pull on it set to m g / (m + m_a)); per
+   * segment or face, the drag of the water past it in the closed form of quadratic drag over the step.
+   */
+  private waterLoads(body: SoftBody, c: Columns, dt: number): void {
+    const water = this.water!,
+      rho = water.density ?? 1025,
+      first = body.firstParticle,
+      n = body.particles,
+      time = this.physics.stepCount * dt,
+      g = this.physics.gravity,
+      radius = body.waterRadius ?? 0,
+      scale = c.gravity_scale[body.handle]!,
+      added = new Float64Array(n),
+      share = new Float64Array(n),
+      volume = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      const row = first + i;
+      share[i] = this.submerged(c.x[row]!, c.y[row]!, c.z[row]!, radius, time);
+      volume[i] = body.density ? body.masses[i]! / body.density : 0;
+    }
+    // A segment's volume: each end's shared among the segments that meet there (so a rope's end segments are whole).
+    const degree = new Float64Array(n);
+    if (body.triangleList.length === 0)
+      for (let e = 0; e < body.structural; e++) {
+        degree[c.ea[body.firstEdge + e]! - first]! += 1;
+        degree[c.eb[body.firstEdge + e]! - first]! += 1;
+      }
+    const segment = (pa: number, pb: number) =>
+      volume[pa - first]! / Math.max(1, degree[pa - first]!) + volume[pb - first]! / Math.max(1, degree[pb - first]!);
+    // The water each particle carries: a cloth's sheet as a disk of its area shared by area; a rope's segments as cylinders
+    // of their volume (its body's density) or, with none, of its particles' radius.
+    const list = body.triangleList;
+    if (list.length > 0) {
+      let total = 0;
+      const area = new Float64Array(n);
+      for (let t = 0; t < list.length; t += 3) {
+        const [a, b, d] = [first + list[t]!, first + list[t + 1]!, first + list[t + 2]!],
+          ux = c.x[b]! - c.x[a]!,
+          uy = c.y[b]! - c.y[a]!,
+          uz = c.z[b]! - c.z[a]!,
+          vx = c.x[d]! - c.x[a]!,
+          vy = c.y[d]! - c.y[a]!,
+          vz = c.z[d]! - c.z[a]!,
+          A =
+            Math.sqrt(
+              (uy * vz - uz * vy) * (uy * vz - uz * vy) +
+                (uz * vx - ux * vz) * (uz * vx - ux * vz) +
+                (ux * vy - uy * vx) * (ux * vy - uy * vx),
+            ) / 2;
+        total += A;
+        for (const k of [list[t]!, list[t + 1]!, list[t + 2]!]) area[k]! += A / 3;
+      }
+      const a = Math.sqrt(total / Math.PI),
+        disk = (8 / 3) * rho * a * a * a;
+      for (let i = 0; i < n; i++) added[i] = total > 0 ? (disk * area[i]!) / total : 0;
+    } else {
+      const { ea, eb } = c;
+      for (let e = 0; e < body.structural; e++) {
+        const pa = ea[body.firstEdge + e]!,
+          pb = eb[body.firstEdge + e]!,
+          dx = c.x[pb]! - c.x[pa]!,
+          dy = c.y[pb]! - c.y[pa]!,
+          dz = c.z[pb]! - c.z[pa]!,
+          L = Math.sqrt(dx * dx + dy * dy + dz * dz),
+          // The segment's cylinder: of its particles' volume along it, as its drag takes it, or of their radius.
+          own = segment(pa, pb),
+          section = own > 0 ? own : Math.PI * radius * radius * L;
+        added[pa - first]! += (MORISON_ADDED * rho * section) / 2;
+        added[pb - first]! += (MORISON_ADDED * rho * section) / 2;
+      }
+    }
+    // Per particle: buoyancy, the water's acceleration on it and its water, and the water's inertia.
+    const h = dt / 2;
+    for (let i = 0; i < n; i++) {
+      const row = first + i,
+        m = body.masses[i]!,
+        s = share[i]!;
+      if (c.w[row] === 0) continue;
+      const ma = s * added[i]!,
+        mass = m + ma;
+      c.w[row] = 1 / mass;
+      if (!(s > 0)) continue;
+      const V = s * volume[i]!,
+        x = c.x[row]!,
+        y = c.y[row]!,
+        z = c.z[row]!,
+        before = this.waterVelocity(x, y, z, time - h),
+        after = this.waterVelocity(x, y, z, time + h),
+        // The kernel pulls every particle down by g times its gravity scale; under water its pull is m g scale - rho V g
+        // over the mass it moves with.
+        pull = (m * scale - rho * V) / mass - scale,
+        push = (rho * V + ma) / mass;
+      // Accelerations, taken in each substep with gravity's (a jump at the step's start would leave a drift).
+      const accel = this.waterAccel;
+      accel[3 * row] = pull * g[0] + (push * (after[0] - before[0])) / dt;
+      accel[3 * row + 1] = pull * g[1] + (push * (after[1] - before[1])) / dt;
+      accel[3 * row + 2] = pull * g[2] + (push * (after[2] - before[2])) / dt;
+    }
+    // Drag: faces as plates, rope segments as cylinders across the flow.
+    const quadratic = (k: number, un: number) => un / (1 + k * Math.abs(un) * dt);
+    if (list.length > 0) {
+      for (let t = 0; t < list.length; t += 3) {
+        const a = first + list[t]!,
+          b = first + list[t + 1]!,
+          d = first + list[t + 2]!,
+          under = (share[list[t]!]! + share[list[t + 1]!]! + share[list[t + 2]!]!) / 3,
+          w = (c.w[a]! + c.w[b]! + c.w[d]!) / 9;
+        if (!(under > 0 && w > 0)) continue;
+        const ux = c.x[b]! - c.x[a]!,
+          uy = c.y[b]! - c.y[a]!,
+          uz = c.z[b]! - c.z[a]!,
+          vx = c.x[d]! - c.x[a]!,
+          vy = c.y[d]! - c.y[a]!,
+          vz = c.z[d]! - c.z[a]!,
+          nx = uy * vz - uz * vy,
+          ny = uz * vx - ux * vz,
+          nz = ux * vy - uy * vx,
+          twice = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (!(twice > 0)) continue;
+        const nn: Vec3 = [nx / twice, ny / twice, nz / twice],
+          flow = this.waterVelocity(
+            (c.x[a]! + c.x[b]! + c.x[d]!) / 3,
+            (c.y[a]! + c.y[b]! + c.y[d]!) / 3,
+            (c.z[a]! + c.z[b]! + c.z[d]!) / 3,
+            time,
+          ),
+          un =
+            ((c.vx[a]! + c.vx[b]! + c.vx[d]!) / 3 - flow[0]) * nn[0] +
+            ((c.vy[a]! + c.vy[b]! + c.vy[d]!) / 3 - flow[1]) * nn[1] +
+            ((c.vz[a]! + c.vz[b]! + c.vz[d]!) / 3 - flow[2]) * nn[2];
+        if (un === 0) continue;
+        const k = 0.5 * rho * PLATE_DRAG * (twice / 2) * under * w,
+          impulse = (quadratic(k, un) - un) / w / 3;
+        for (const row of [a, b, d]) {
+          const wr = c.w[row]!;
+          c.vx[row] = c.vx[row]! + wr * impulse * nn[0];
+          c.vy[row] = c.vy[row]! + wr * impulse * nn[1];
+          c.vz[row] = c.vz[row]! + wr * impulse * nn[2];
+        }
+      }
+    } else {
+      const { ea, eb } = c;
+      for (let e = 0; e < body.structural; e++) {
+        const a = ea[body.firstEdge + e]!,
+          b = eb[body.firstEdge + e]!,
+          under = (share[a - first]! + share[b - first]!) / 2,
+          w = (c.w[a]! + c.w[b]!) / 4;
+        if (!(under > 0 && w > 0)) continue;
+        const ax = c.x[b]! - c.x[a]!,
+          ay = c.y[b]! - c.y[a]!,
+          az = c.z[b]! - c.z[a]!,
+          L = Math.sqrt(ax * ax + ay * ay + az * az);
+        if (!(L > 0)) continue;
+        const t: Vec3 = [ax / L, ay / L, az / L],
+          // Its diameter: of the cylinder its particles' volume makes along it, or twice its particles' radius.
+          V = segment(a, b),
+          diameter = V > 0 ? Math.sqrt((4 * V) / (Math.PI * L)) : 2 * radius;
+        if (!(diameter > 0)) continue;
+        const flow = this.waterVelocity(
+            (c.x[a]! + c.x[b]!) / 2,
+            (c.y[a]! + c.y[b]!) / 2,
+            (c.z[a]! + c.z[b]!) / 2,
+            time,
+          ),
+          rel: Vec3 = [
+            (c.vx[a]! + c.vx[b]!) / 2 - flow[0],
+            (c.vy[a]! + c.vy[b]!) / 2 - flow[1],
+            (c.vz[a]! + c.vz[b]!) / 2 - flow[2],
+          ],
+          along = rel[0] * t[0] + rel[1] * t[1] + rel[2] * t[2],
+          cross: Vec3 = [rel[0] - along * t[0], rel[1] - along * t[1], rel[2] - along * t[2]],
+          speed = Math.sqrt(cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]);
+        if (!(speed > 0)) continue;
+        const k = 0.5 * rho * MORISON_DRAG * diameter * L * under * w,
+          impulse = (quadratic(k, speed) - speed) / w / 2;
+        for (const row of [a, b]) {
+          const wr = c.w[row]!;
+          c.vx[row] = c.vx[row]! + (wr * impulse * cross[0]) / speed;
+          c.vy[row] = c.vy[row]! + (wr * impulse * cross[1]) / speed;
+          c.vz[row] = c.vz[row]! + (wr * impulse * cross[2]) / speed;
+        }
+      }
     }
   }
 
@@ -4965,8 +5224,10 @@ export class SoftBodies implements PhysicsAttachment {
         ((c.vx[a]! + c.vx[b]! + c.vx[d]!) / 3 - air[0]) * n[0] +
         ((c.vy[a]! + c.vy[b]! + c.vy[d]!) / 3 - air[1]) * n[1] +
         ((c.vz[a]! + c.vz[b]! + c.vz[d]!) / 3 - air[2]) * n[2];
-      if (un === 0) continue;
-      const k = 0.5 * rho * PLATE_DRAG * area * w,
+      // Under the water's surface the water takes the face instead (waterLoads).
+      const dry = this.water ? 1 - this.submerged(middle[0], middle[1], middle[2], 0, time) : 1;
+      if (un === 0 || !(dry > 0)) continue;
+      const k = 0.5 * rho * PLATE_DRAG * area * w * dry,
         after = un / (1 + k * Math.abs(un) * dt),
         // The impulse at the face's middle along n that takes its normal speed from un to after; each corner a third.
         impulse = (after - un) / w / 3;

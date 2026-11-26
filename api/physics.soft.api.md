@@ -191,6 +191,11 @@ export class SoftBodies implements PhysicsAttachment {
     substeps: number;
     iterations: number;
     wind: Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField | null;
+    water: {
+        readonly elevation?: (x: number, z: number, t: number) => number;
+        readonly flow?: FlowField;
+        readonly density?: number;
+    } | null;
     private constructor();
     ownsTissueBone(bone: PhysicsBody): boolean;
     static attach(physics: Physics, options?: SoftBodiesOptions): Promise<SoftBodies>;
@@ -322,6 +327,8 @@ export class SoftBody {
     edgeKinds: Uint8Array<ArrayBuffer>;
     edgeShear: Float32Array<ArrayBuffer>;
     airDrag: boolean;
+    density: number | null;
+    waterRadius: number | null;
     airLoads: number;
     volumeOn: boolean;
     surfaceRest: number;
@@ -528,6 +535,8 @@ export class SoftBodyDesc {
     setLinearDamping(damping: number): this;
     setAirDrag(on: boolean): this;
     airDrag: boolean;
+    setDensity(density: number): this;
+    density: number | null;
     setTranslation(translation: Vec3): this;
 }
 

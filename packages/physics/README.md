@@ -477,6 +477,7 @@ A woven sheet (`cloth`, `clothTube`, `clothAnisotropic`) is a fabric. By default
 - **Damping.** The threads lose what the fabric's tensile resilience RT says a stretch cycle loses, zeta = (1 - RT) / (4 pi) (`fabricTensileDamping`, Jacobsen 1930).
 - **Weight.** A woven sheet given no mass weighs its fabric's areal density (`material.arealDensity`, 0.12 kg/m^2 for cotton shirting), each particle a third of the triangles around it.
 - **Air.** The faces of a body of triangles feel the air (`desc.setAirDrag(on)`, default on): a flat plate's drag, 1/2 rho 1.17 A |u_n| u_n (Hoerner 1965) on the air moving through each face, against `soft.wind` (a velocity, a function of the point and the time, or a flow field; still air when unset), rho the flow field's or the standard atmosphere's at the face's height. A `SailForce` on a cloth supplies its air loads instead, and turns this off for that cloth while it is attached.
+- **Water.** Give the bodies water (`soft.water = {elevation, flow, density}`: its surface's height over (x, z) at a time, its velocity as a flow field such as `SpectralSea`'s `water`, and its density, default 1025) and under its surface each particle takes Morison's loads (Morison, O'Brien, Johnson and Schaaf 1950): the weight of the water it displaces upward (its body's `desc.setDensity(kg/m^3)`; left out, the body displaces nothing), the water's acceleration on it and on the water it carries, that water's inertia, and the drag of the water past it. A rope's segments are cylinders across the flow (drag 1.2, Hoerner 1965; carried water that of their own volume), a cloth's faces plates (1.17) whose sheet carries the water of a disk of its area ((8/3) rho a^3). The carried water is taken implicitly (a particle under water moves with its mass and its water's), so a light cloth in the sea is as stable as in the air. A particle half out of the water takes half; the air leaves a face under the water alone. So a hose or a kelp frond sways with the waves' orbits, a curtain in a flooded cabin hangs heavy, and a weighted net sinks at its drag's speed. Measured: a rope as dense as the water stays put (to 1e-4 m), one twice as dense sinks broadside within 0.5 percent of its cylinder drag's speed, a pendulum in water swings within 0.5 percent of the period its carried water and buoyancy set, a rope as dense as the water rides an oscillating current within 1.3 percent, and a weighted tarp sinks flat within 0.3 percent of its plate drag's speed.
 - **Friction.** Contacts with rigid bodies hold back a slide within Coulomb's bound, solved with the sheet's rows (staggered projections, Kaufman et al. 2008), so a box on a cloth holds below its friction angle and slides above it.
 
 Migration: before this, a woven sheet's particles weighed 1 kg each (Rapier's default), its threads and diagonals were rigid edges that the sweep left stretching under load, and it felt no air. A cloth of 10 cm cells then weighed 100 kg/m^2, eight hundred times cotton, which is why it sagged and draped like a heavy blanket. For the old behaviour, give the body `setParticleMass(1)`, set `material.tensile = null` and `material.shear = null` (rigid threads and diagonals, now solved exactly) and `setAirDrag(false)`; `SoftBodyMaterial.uniform(hertz, damping)` (Rapier's material) does all but the air.
@@ -497,6 +498,33 @@ const flag = soft.create(
 );
 for (let i = 0; i < 120; i++) physics.step();
 console.log(flag.particlePosition(20 * 11 + 5)[0] > 1); // true: the flag streams downwind of its staff
+```
+
+A hose tied to the seabed in a swell: the waves' orbits sway it, its rubber a little denser than the sea:
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {SpectralSea} from 'margoengine/physics/sea';
+import {SoftBodies, SoftBodyDesc} from 'margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 60});
+const soft = await SoftBodies.attach(physics);
+// One 1 m swell of 0.12 Hz along x over 20 m of water.
+const frequencies = Float64Array.from({length: 34}, (_, i) => 0.04 * 25 ** (i / 33));
+const directions = Float64Array.from({length: 24}, (_, j) => (2 * Math.PI * j) / 24);
+const energy = new Float64Array(34 * 24);
+const bin = frequencies.findIndex((f) => f >= 0.12);
+energy[bin * 24] = 1 / 2 / (((frequencies[bin + 1] - frequencies[bin - 1]) / 2) * ((2 * Math.PI) / 24));
+const sea = new SpectralSea({waves: {frequencies, directions, energy, depth: 20, density: 1025}});
+soft.water = {elevation: (x, z, t) => sea.elevation(x, z, t), flow: sea.water, density: 1025};
+// A 6 m hose, 5 cm across, from the seabed up: rubber at 1200 kg/m^3.
+const volume = (Math.PI * 0.05 * 0.05 * 0.2) / 4;
+const hose = soft.create(
+  SoftBodyDesc.rope([0, -20, 0], [0, -14, 0], 31).setParticleMass(1200 * volume).setDensity(1200).setPinnedParticles([0]),
+);
+for (let i = 0; i < 600; i++) physics.step();
+console.log(Math.abs(hose.particlePosition(30)[0]) > 0.05); // true: the swell's orbits sway its free end
 ```
 
 ### Solid bodies: tetrahedral cells, plasticity, tearing and clusters
