@@ -6133,6 +6133,12 @@ release time of each detached drop, and the test accounts for all water held and
 the rim. The quasistatic prediction lies 2.6% below the independently observed cycle volume.
 [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+### FLUID-07 mounted film weight
+
+A mounted patch puts its integrated normal water weight and moment on the rigid body's
+force port. The gravity-isolated tray responds at the acceleration given by the published
+load and its mass. [Reproduce](reproduce.md#fluid-07-mounted-film-weight)
+
 Proof capture (2026-11-26, KB-LOOK-TV-PENUMBRA1): the deformed-shadows, gltf-pbr-lighting-hooks and quality-presets --current references advance to 5feaab3d71, whose `Shadows` and `VirtualShadows` write the soft filter's per-frame noise turn (`jitter`, default true: fract(n phi) for the n frames whose clock moved) into the free `soft.w` of their frame uniforms, and whose PCSS spiral starts at `(noise + soft.w)` turns. The call logs differ only in that uniform float and the shader module text; the counts of draws, dispatches, bindings and uploads are unchanged. `packages/shadows/test/sampling.test.js` pins the turn sequence, the pause, `resetTime` and `jitter: false`. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=deformed-shadows,gltf-pbr-lighting-hooks,quality-presets`.
 
 ### Depth-averaged natural granular runout (EARTH-02)

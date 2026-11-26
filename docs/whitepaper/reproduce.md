@@ -4497,3 +4497,10 @@ and supplies the documented model difference.
 Build Physics and run `node --test --test-name-pattern "HullSolver wake source" packages/physics/tests/coupling/seakeeping.test.js`. The rigid hull publishes motion at the world base rate and the actual WakeSolver advances it. The tests measure the waterplane volume, pitch and roll moments, a distant-height gauge and exact replay. Steady surge, fully dry and fully submerged controls check that no volume is injected.
 
 Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --hull-motion` for the renderer. Repeat with `MARGO_COMPAT=1`. The same height and normal error bounds used for the pressure-patch fixture apply to the live hull's volume sources.
+
+### FLUID-07 mounted film weight
+
+Run `node --test --test-name-pattern="mounted film transmits" packages/physics/tests/coupling/thin-film.test.js`.
+The force is the integral of normal hydrostatic traction over the film. The offset case
+also checks its moment about the body centre. A 10 kg tray with its own gravity disabled
+responds to the mounted film through the real rigid force port. [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)

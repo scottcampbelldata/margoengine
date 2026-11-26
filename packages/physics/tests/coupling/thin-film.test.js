@@ -9,7 +9,7 @@ import {
   THIN_FILM_WORDS,
   ThinFilmSolver,
 } from '../../dist/thin-film.js';
-import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import { BODY_FORCES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const rate = { num: 60, den: 1 };
@@ -301,6 +301,55 @@ test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', as
     return;
   }
   assert.fail('Expected the moving sill to detach a drop within eight seconds.');
+});
+
+test('ThinFilmSolver: a mounted film transmits its normal weight and moment to the rigid body', async () => {
+  await Physics.load();
+  const spacing = 0.1;
+  const depth = 0.0002;
+  const density = 998;
+  const mass = 10;
+  const dt = 1 / rate.num;
+  for (const offset of [0, 0.1]) {
+    const suspended = offset !== 0;
+    const axis = suspended ? 1 : -1;
+    const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
+    const rigid = new Physics(null, { arena: world.arena, fixedTimestep: dt });
+    const body = rigid.addBody(null, {
+      gravityScale: 0,
+      colliders: { shape: 'box', halfExtents: [0.3, 0.04, 0.3], mass },
+    });
+    const film = await ThinFilmSolver.load({ rigid: true, hydrostaticLoad: true });
+    world.add(new RigidSolver(), { physics: rigid }).add(film, {
+      bodyRow: body.row,
+      cells: [4, 3],
+      spacing,
+      depth,
+      density,
+      suspended,
+      origin: [offset - 0.2, 0, -0.15 * axis],
+      v: [0, 0, axis],
+    });
+    world.couple(['rigid', 'thin-film'], 'staggered');
+    const weight = 12 * spacing * spacing * depth * density * world.gravity[1];
+    world.advance(1);
+    const force = film.exportPorts(1).find((port) => port.field === BODY_FORCES_FIELD.name);
+    const values = regionWords(world.memory, force.region);
+    const at = body.row * 6;
+    for (const [i, expected] of [0, weight, 0, 0, 0, offset * weight].entries())
+      assert.ok(Math.abs(values[at + i] - expected) <= 64 * Number.EPSILON * Math.abs(weight));
+    if (offset === 0) {
+      world.advance(4);
+      const before = body.linearVelocity[1];
+      world.advance(5);
+      const after = body.linearVelocity[1];
+      const change = after - before;
+      const expected = (weight * dt) / mass;
+      // The rigid integrator rounds the force factors and stores both velocities in f32 columns.
+      const rounding = 2 ** -24 * (Math.abs(before) + Math.abs(after) + 4 * Math.abs(expected));
+      assert.ok(Math.abs(change - expected) <= rounding, `${change} vs ${expected}`);
+    }
+  }
 });
 
 const input = {

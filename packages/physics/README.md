@@ -4732,6 +4732,29 @@ velocity, volume per drop, first offset from the tick start, interval between dr
 A zero count means the rim released no water that tick. `dripsField` carries the uncaptured
 edge discharge, while `budget.dripped` counts all water leaving the backing.
 
+To transfer the film's normal weight and moment to a mounted body, enable `hydrostaticLoad`
+and add the rigid solver before the film. Couple the two solvers with the staggered scheme.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+import { ThinFilmSolver } from '@margoengine/physics/thin-film';
+
+await Physics.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+const tray = physics.addBody(null, {
+  gravityScale: 0,
+  colliders: { shape: 'box', halfExtents: [0.25, 0.01, 0.25], mass: 4 },
+});
+const film = await ThinFilmSolver.load({ rigid: true, hydrostaticLoad: true });
+world.add(new RigidSolver(), { physics });
+world.add(film, { bodyRow: tray.row, cells: [4, 4], spacing: 0.1, origin: [-0.2, 0, 0.2], depth: 0.0002 });
+world.couple(['rigid', 'thin-film'], 'staggered');
+world.advance(4);
+console.log(tray.linearVelocity[1]);
+```
+
 ## Windborne dust, mist and sea spray
 
 `@margoengine/physics/airborne` moves individual environmental parcels using local wind, diameter-dependent

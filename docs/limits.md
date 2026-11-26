@@ -9571,12 +9571,15 @@ scale ratio and negligible gas density. The 3.2 mm, 1 mL/min water control predi
 per drop, 2.6% below the 51.5 μL cycle volume from Zhang and Basaran (1996). Each event carries
 the rim pose and velocity. Flight dynamics, satellite breakup and free pinch-off away from
 an outlet remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
+The optional `hydrostaticLoad` adds the film's normal gravitational force and moment to
+its rigid mount. The coupled test checks both a supported tray and an off-centre underside
+patch. Transient added mass, tangential wall traction and impact recoil remain open.
 For fully developed glycerol flow on a 20° glass plate, the modeled depths at the 350 mm probe
 are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 8,264 B gzip with a 8,520 B ceiling. Both Wasm assets are 9,832 B raw and each is 4,279 B gzip.
+The optional thin-film entry is 8,667 B gzip with a 8,928 B ceiling. Both Wasm assets are 9,832 B raw and each is 4,279 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
