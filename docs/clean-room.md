@@ -168,9 +168,9 @@ linearly, and the stress uses the relative velocity of air and water.
 Jan Bender and Dan Koschier (2015, 2017), *Divergence-Free SPH for Incompressible and Viscous Fluids*,
 section 3 equations 7–12 and Algorithms 1–3, supply the two implicit pressure projections, warm starts and CFL
 scheme. The kernel gradients are normalized by reference density. The positive density-prediction residual is
-divided by the step duration, so the two passes use the same symmetric velocity update. A bounded line step
-minimizes the upper quadratic bound of the squared positive residual. This keeps the boundary reaction
-scaled by the same amount as the fluid correction. Margo uses the cubic spline for both kernel value and
+divided by the step duration, so the two passes use the same symmetric velocity update. The bounded line step maximizes the quadratic pressure dual within the nonnegative multipliers.
+Previously applied pressure can relax as the other constraints converge. Boundary reactions follow the same
+velocity correction. Margo uses the cubic spline for both kernel value and
 gradient and shares the position-based entry's 27-cell sparse hash. [2015 paper](https://animation.rwth-aachen.de/media/papers/2015-SCA-DFSPH.pdf),
 [2017 paper](https://dankoschier.github.io/resources/papers/BK17.pdf).
 
@@ -193,13 +193,22 @@ integrates its cubic spline with circular sections, yielding the dimensionless h
 fractions approximates overlap, so the gradient matches the same density model.
 [Winchenbach et al.](https://www.cg.informatik.uni-siegen.de/sites/www.cg.informatik.uni-siegen.de/files/data/Publications/2020/semi-analiticBoundaryHandling.pdf).
 
+Timo Probst and Matthias Teschner (2025), *Unified Pressure, Surface Tension and Friction for SPH Fluids*,
+equations 5–12 and section 5.2, supplies the capillary surface energy gradient. Margo uses the recommended
+cubic surface kernel of three spacings, interface smoothing of 0.05 and rest area of π/4 times the spacing
+squared. Unlike the older cohesion kernel evaluated in Akinci et al. (2013), the contribution drops away
+in the liquid interior. The capillary force is split from the density solve, with substeps bounded by the
+maximum represented wave number on the discrete spacing. Sampled solid interfaces use both half
+energies and publish matching reactions. Analytic planes use the same kernel fraction for the solid
+energy difference. The SI example uses the IAPWS tabulated 0.07274 N/m for pure water at 20 °C.
+[Probst and Teschner](https://cg.informatik.uni-freiburg.de/publications/2024_TOG_unifiedPressureSurfaceTensionFriction_v3.pdf),
+[Akinci et al.](https://cg.informatik.uni-freiburg.de/publications/2013_SIGGRAPHASIA_surfaceTensionAdhesion.pdf),
+[IAPWS](https://iapws.org/technical-guidance/release/Surf-H2O).
+
 The lab diagnostic follows J. C. Martin and W. J. Moyce (1952), *An Experimental Study of the Collapse of Liquid
 Columns on a Rigid Horizontal Plane*, section 3 and Table 2. The measured spread intervals exclude the unknown
-diaphragm release time. The native calculation has an early surge in that narrow channel, recorded in
-`docs/known-bugs.md`. Gizem Akinci, Nadir Akinci and Matthias Teschner (2013), *Versatile Surface Tension and
-Adhesion for SPH Fluids*, supplies the cohesion and adhesion scheme considered for the capillarity follow-up.
-[Martin and Moyce](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf),
-[Akinci et al.](https://cg.informatik.uni-freiburg.de/publications/2013_SIGGRAPHASIA_surfaceTensionAdhesion.pdf).
+diaphragm release time. The early narrow-channel surge remains reproducible with `--capillary`.
+[Martin and Moyce](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf).
 
 ### Position-based particle liquids (FLUID-02)
 

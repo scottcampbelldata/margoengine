@@ -5815,3 +5815,8 @@ and warm pressure restore bit-for-bit across both Wasm memories. A solved water 
 Water particle surface in WebGPU and WebGL2. Both show 1,800 liquid particles retaining 77.175 kg and
 a front at 1.982 m. Each backend changes more than 16,200 frame pixels. The narrow-channel physical
 validation remains open.
+
+The FLUID-01 capillary tests independently differentiate the two-particle surface energy and check the
+opposite impulse on a real rigid boundary sample. A three-particle chain resolves to the minimum-impulse
+velocity once the coupled pressure multipliers relax. The capillary state replays through shared and plain
+memories and snapshot restore.

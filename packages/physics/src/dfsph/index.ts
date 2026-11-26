@@ -34,8 +34,8 @@ export const DFSPH_PARTICLE_WORDS = 8;
 
 const ZERO: Cell = [0, 0, 0];
 const ONE: Vec3 = [1, 1, 1];
-const SETTINGS_WORDS = 23;
-const WORK_WORDS = 26;
+const SETTINGS_WORDS = 26;
+const WORK_WORDS = 29;
 const BUCKET_WORDS = 4;
 const STATS_WORDS = 10;
 const MODAL_WORDS = 5;
@@ -103,6 +103,12 @@ export interface DfsphParams {
   readonly walls?: readonly [boolean, boolean, boolean, boolean, boolean, boolean];
   /** Include the planar wall kernel integral in pressure. Default true. Hard contacts are always active on closed faces. */
   readonly wallPressure?: boolean;
+  /** Liquid–air surface tension in N/m. Default zero. Set 0.07274 for pure water at 20 °C. */
+  readonly surfaceTension?: number;
+  /** Solid–liquid interface energy in N/m. Default zero. */
+  readonly solidLiquidTension?: number;
+  /** Solid–air interface energy in N/m. Default zero. Higher values favour wetting. */
+  readonly solidVaporTension?: number;
   /** Interactive caps both pressure passes at 12 iterations. Accurate allows 40 density and 32 divergence. Default accurate. */
   readonly profile?: 'interactive' | 'accurate';
   /** Maximum density iterations per advective substep. Overrides the profile. */
@@ -141,6 +147,7 @@ type State = {
   readonly next: Region;
   readonly used: Region;
   readonly boundary: Region;
+  readonly boundaryColor: Region;
   readonly shapes: Region;
   readonly impulses: Region;
   readonly pressureImpulses: Region;
@@ -281,6 +288,14 @@ export class DfsphSolver implements Solver<DfsphParams> {
     const bodyCapacity = this.rigid ? bodyRowsOf(host, this.id, rows, params.bodyCapacity) : 0;
     const surfaces = boundaries.map((b) => prepareBoundary(b, spacing, support, bodyCapacity, cubicWeight, CUBIC));
     const sampleCount = surfaces.reduce((sum, surface) => sum + surface.samples.length, 0);
+    const liquidVapor = fraction(params.surfaceTension ?? 0, 'DFSPH surface tension', Number.MAX_VALUE);
+    const solidLiquid = fraction(params.solidLiquidTension ?? 0, 'DFSPH solid–liquid tension', Number.MAX_VALUE);
+    const solidVapor = fraction(params.solidVaporTension ?? 0, 'DFSPH solid–air tension', Number.MAX_VALUE);
+    const capillary = Math.max(liquidVapor, solidLiquid, solidVapor) > 0;
+    if (capillary) {
+      const reach = positive(3 * spacing, 'DFSPH surface kernel support');
+      positive(1 / (density * reach * reach * reach), 'DFSPH inverse surface kernel mass scale');
+    }
     const particles = params.particles ?? [];
     const capacity = whole(params.capacity ?? particles.length, particles.length, 'DFSPH particle capacity');
     const words = Math.max(1, capacity);
@@ -289,7 +304,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
     const bytes =
       8 *
         ((3 * DFSPH_PARTICLE_WORDS + WORK_WORDS) * words +
-          BOUNDARY_WORDS * sampleCount +
+          (BOUNDARY_WORDS + Number(capillary)) * sampleCount +
           SOLID_WORDS * surfaces.length +
           2 * IMPULSE_WORDS * bodyCapacity) +
       4 * (bucketCount * BUCKET_WORDS + 2 * (capacity + sampleCount));
@@ -315,6 +330,9 @@ export class DfsphSolver implements Solver<DfsphParams> {
       (params.warmStart ?? true) ? 1 : 0,
       viscosityIterations,
       (params.wallPressure ?? true) ? 1 : 0,
+      liquidVapor,
+      solidLiquid,
+      solidVapor,
     ];
     const f64 = (name: string, count: number) => host.allocate(name, Math.max(1, count) * 8, 'f64', DFSPH_LAYOUT);
     const state: State = {
@@ -336,6 +354,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       next: host.allocate('dfsph-neighbour-links', Math.max(1, words + sampleCount) * 4, 'u32', DFSPH_LAYOUT),
       used: host.allocate('dfsph-occupied-buckets', Math.max(1, words + sampleCount) * 4, 'u32', DFSPH_LAYOUT),
       boundary: f64('dfsph-boundaries', sampleCount * BOUNDARY_WORDS),
+      boundaryColor: f64('dfsph-boundary-interface', capillary ? sampleCount : 0),
       shapes: f64('dfsph-solids', surfaces.length * SOLID_WORDS),
       impulses: f64('dfsph-body-impulses', bodyCapacity * IMPULSE_WORDS),
       pressureImpulses: f64('dfsph-pressure-impulses', bodyCapacity * IMPULSE_WORDS),
@@ -418,6 +437,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       state.settings.byteOffset,
       state.stats.byteOffset,
       dt,
+      state.boundaryColor.byteOffset,
     );
     if (error)
       throw new MargoError(

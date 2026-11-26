@@ -279,3 +279,138 @@ test('one closed planar wall adds the exact cubic kernel integral on either half
     near(liquid.sample(0).density / 1000, CUBIC / 8 + wallDensity);
   }
 });
+
+test('the free surface follows the published energy gradient with matched pair momentum', async () => {
+  const spacing = 0.5;
+  const distance = 0.7;
+  const surface = 0.072;
+  const h = 3 * spacing;
+  const q = distance / h;
+  const volume = spacing ** 3;
+  const contribution = 1 - (volume / h ** 3) * CUBIC * (2 - 6 * q ** 2 + 6 * q ** 3);
+  const slope = contribution / Math.sqrt(contribution ** 2 + 0.05 ** 2);
+  const gradient = (CUBIC * q * (12 - 18 * q)) / h ** 4;
+  const area = (Math.PI / 4) * spacing ** 2;
+  const impulse = 2 * DT * surface * slope * area * volume * gradient;
+  const { world, liquid } = await solve({
+    spacing,
+    support: 1,
+    bounds: wide,
+    particles: pair(distance, ZERO),
+    surfaceTension: surface,
+    divergenceTolerance: 10,
+  });
+  world.advance(1);
+  near(liquid.sample(0).velocity[0] * liquid.sample(0).mass, impulse);
+  near(liquid.sample(1).velocity[0] * liquid.sample(1).mass, -impulse);
+  assert.ok(liquid.sample(0).position[0] > -distance / 2);
+});
+
+test('equal solid interface energies cancel for an analytic wall and their difference controls wetting', async () => {
+  const height = 0.36;
+  for (const [solidLiquidTension, solidVaporTension, sign] of [
+    [0.08, 0, 1],
+    [0.08, 0.08, 0],
+    [0, 0.08, -1],
+  ]) {
+    const { world, liquid } = await solve({
+      spacing: 0.5,
+      support: 1,
+      bounds: [
+        [-8, 0, -8],
+        [8, 8, 8],
+      ],
+      walls: [false, false, true, false, false, false],
+      wallPressure: false,
+      solidLiquidTension,
+      solidVaporTension,
+      particles: [{ position: [0, height, 0] }],
+    });
+    world.advance(1);
+    assert.equal(Math.sign(liquid.sample(0).position[1] - height), sign);
+  }
+});
+
+test('sampled solid wetting exchanges opposite capillary force with the real rigid plate', async () => {
+  await Physics.load({ threads: false });
+  const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(false) });
+  const rigid = new Physics(null, { arena: world.arena, gravity: ZERO, fixedTimestep: DT });
+  try {
+    const halfExtents = [0.04, 0.2, 0.2];
+    const body = rigid.addBody(null, {
+      position: [0.46, 0.45, 0.5],
+      colliders: { shape: 'box', halfExtents, mass: 2, sensor: true },
+    });
+    world.add(new RigidSolver(), { physics: rigid, capacity: rigid.kernel.capacity });
+    const liquid = await DfsphSolver.load(world.memory, { rigid: true });
+    world.add(liquid, {
+      spacing: 0.04,
+      viscosity: 0,
+      wallPressure: false,
+      solidVaporTension: 0.072,
+      densityTolerance: 1,
+      divergenceTolerance: 10,
+      boundaries: [{ body: body.row, halfExtents }],
+      particles: [{ position: [0.34, 0.49, 0.5] }],
+    });
+    world.couple(['rigid', liquid.id], 'staggered');
+    world.advance(1);
+    const { region } = liquid.exportPorts(1).find(({ field }) => field === BODY_IMPULSES_FIELD.name);
+    const momentum = liquid.sample(0).velocity[0] * liquid.sample(0).mass;
+    assert.ok(momentum > 0);
+    near(regionWords(world.memory, region)[6 * body.row], -momentum);
+  } finally {
+    rigid.dispose();
+  }
+});
+
+test('coupled pressure constraints reach the minimum-impulse velocity in a compressed three-particle chain', async () => {
+  const positions = [-0.65, 0, 0.7];
+  const velocities = [0.5, -0.1, -0.5];
+  const expected = velocities.reduce((a, b) => a + b) / velocities.length;
+  // The two end constraints require v0 <= v1 <= v2 because only adjacent
+  // particles interact. The projection of the descending input is its mean.
+  const tolerance = 1e-12;
+  const volume = 0.5 ** 3;
+  const gaps = [0, 1].map((i) => positions[i + 1] - positions[i] + DT * (velocities[i + 1] - velocities[i]));
+  const weakestGradient = Math.min(...gaps.map((q) => 6 * CUBIC * volume * (1 - q) ** 2));
+  const bound = (3 * tolerance) / weakestGradient;
+  const { world, liquid } = await solve({
+    spacing: 0.5,
+    support: 1,
+    bounds: wide,
+    divergenceTolerance: tolerance,
+    divergenceIterations: 512,
+    particles: positions.map((x, i) => ({ position: [x, 0, 0], velocity: [velocities[i], 0, 0] })),
+  });
+  world.advance(1);
+  assert.ok(liquid.statistics.divergenceIterations > 1);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs(liquid.sample(i).velocity[0] - expected) <= bound);
+});
+
+test('wet capillarity and warm pressure restore in the middle of a native step sequence', async () => {
+  let other;
+  for (const shared of [false, true]) {
+    const { world } = await solve(
+      {
+        spacing: 0.11,
+        support: 0.22,
+        bounds: wide,
+        surfaceTension: 0.07274,
+        particles: pair(0.18, [0.04, 0, 0]),
+        boundaries: [{ shape: 'sphere', centre: [0, -0.18, 0], radius: 0.1 }],
+        solidVaporTension: 0.06,
+      },
+      { memory: worldMemory(shared) },
+    );
+    world.advance(8);
+    const snapshot = world.takeSnapshot();
+    world.advance(18);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(18);
+    assert.equal(world.hash(), hash);
+    if (other !== undefined) assert.equal(hash, other);
+    other = hash;
+  }
+});

@@ -25,6 +25,9 @@ pub struct Settings {
     warm_start: f64,
     viscosity_iterations: f64,
     wall_pressure: f64,
+    liquid_vapor: f64,
+    solid_liquid: f64,
+    solid_vapor: f64,
 }
 
 #[repr(C)]
@@ -32,6 +35,7 @@ pub struct Work {
     change: Vec3,
     inverse: f64,
     lambda: f64,
+    multiplier: f64,
     saved_density: f64,
     saved_divergence: f64,
     error: f64,
@@ -41,6 +45,8 @@ pub struct Work {
     rhs: Vec3,
     diagonal: Vec3,
     wall_gradient: Vec3,
+    surface_slope: f64,
+    solid_slope: f64,
 }
 
 #[inline]
@@ -64,6 +70,69 @@ fn gradient(r: Vec3, q: f64) -> Vec3 {
     scale(r, factor)
 }
 
+struct Neighborhood<'a, 'grid> {
+    points: &'a [Particle],
+    boundary: &'a [Boundary],
+    grid: &'a Grid<'grid>,
+    inverse_support: f64,
+    inverse_rest_volume: f64,
+    boundary_volume_scale: f64,
+}
+
+impl Neighborhood<'_, '_> {
+    #[inline]
+    fn around(
+        &self,
+        i: usize,
+        position: Vec3,
+        mut use_neighbor: impl FnMut(usize, f64, Vec3, f64),
+    ) {
+        self.grid.nearby(position, |j| {
+            if i == j {
+                return;
+            }
+            let (neighbor, volume) = if j < self.points.len() {
+                let p = item(self.points, j);
+                (p.position, p.mass * self.inverse_rest_volume)
+            } else {
+                let b = item(self.boundary, j - self.points.len());
+                (b.position, b.volume * self.boundary_volume_scale)
+            };
+            let r = scale(sub(position, neighbor), self.inverse_support);
+            let q2 = norm2(r);
+            if q2 < 1.0 {
+                let q = sqrt(q2);
+                use_neighbor(
+                    j,
+                    q,
+                    scale(gradient(r, q), volume * self.inverse_support),
+                    volume * cubic(q),
+                );
+            }
+        });
+    }
+}
+
+#[inline]
+fn neighborhood<'a, 'grid>(
+    points: &'a [Particle],
+    boundary: &'a [Boundary],
+    grid: &'a Grid<'grid>,
+    settings: &Settings,
+    support: f64,
+) -> Neighborhood<'a, 'grid> {
+    let inverse_support = 1.0 / support;
+    let scale = settings.support / support;
+    Neighborhood {
+        points,
+        boundary,
+        grid,
+        inverse_support,
+        inverse_rest_volume: inverse_support * inverse_support * inverse_support / settings.rest,
+        boundary_volume_scale: scale * scale * scale,
+    }
+}
+
 #[inline]
 fn visit(
     i: usize,
@@ -71,36 +140,14 @@ fn visit(
     boundary: &[Boundary],
     grid: &Grid<'_>,
     settings: &Settings,
-    mut use_neighbor: impl FnMut(usize, f64, Vec3, f64),
+    use_neighbor: impl FnMut(usize, f64, Vec3, f64),
 ) {
-    let position = item(points, i).position;
-    let inverse_h = 1.0 / settings.support;
-    let mass_scale = inverse_h * inverse_h * inverse_h / settings.rest;
-    grid.nearby(position, |j| {
-        if i == j {
-            return;
-        }
-        let (neighbor, volume) = if j < points.len() {
-            let p = item(points, j);
-            (p.position, p.mass * mass_scale)
-        } else {
-            let b = item(boundary, j - points.len());
-            (b.position, b.volume)
-        };
-        let r = scale(sub(position, neighbor), inverse_h);
-        let q2 = norm2(r);
-        if q2 < 1.0 {
-            let q = sqrt(q2);
-            use_neighbor(
-                j,
-                q,
-                scale(gradient(r, q), volume * inverse_h),
-                volume * cubic(q),
-            );
-        }
-    });
+    neighborhood(points, boundary, grid, settings, settings.support).around(
+        i,
+        item(points, i).position,
+        use_neighbor,
+    );
 }
-
 #[inline]
 fn body_velocity(object: &Solid, at: Vec3) -> Vec3 {
     add(object.linear, cross(object.angular, sub(at, object.centre)))
@@ -132,10 +179,7 @@ fn half_space(q: f64) -> (f64, f64) {
     (16.0 * (moment2 - q * moment1), -16.0 * moment1)
 }
 
-fn wall_terms(position: Vec3, settings: &Settings) -> (f64, Vec3) {
-    if settings.wall_pressure == 0.0 {
-        return (0.0, ZERO);
-    }
+fn wall_terms(position: Vec3, settings: &Settings, support: f64) -> (f64, Vec3) {
     let mask = settings.walls as u32;
     let mut fluid = 1.0;
     let mut gradient = ZERO;
@@ -143,13 +187,13 @@ fn wall_terms(position: Vec3, settings: &Settings) -> (f64, Vec3) {
         let mut miss = 1.0;
         let mut slope = 0.0;
         if (mask & (1 << (2 * axis))) != 0 {
-            let q = (position[axis] - settings.lower[axis]) / settings.support;
+            let q = (position[axis] - settings.lower[axis]) / support;
             let (density, derivative) = half_space(q);
             miss -= density;
             slope += derivative;
         }
         if (mask & (1 << (2 * axis + 1))) != 0 {
-            let q = (settings.upper[axis] - position[axis]) / settings.support;
+            let q = (settings.upper[axis] - position[axis]) / support;
             let (density, derivative) = half_space(q);
             miss -= density;
             slope -= derivative;
@@ -157,7 +201,7 @@ fn wall_terms(position: Vec3, settings: &Settings) -> (f64, Vec3) {
         // Opposite half-spaces are disjoint. At right-angle edges the product
         // removes shared kernel volume approximately, keeping the gradient consistent.
         gradient = scale(gradient, miss);
-        gradient[axis] = fluid * slope / settings.support;
+        gradient[axis] = fluid * slope / support;
         fluid *= miss;
     }
     (1.0 - fluid, gradient)
@@ -175,7 +219,11 @@ fn prepare(
     let mass_scale = inverse_h * inverse_h * inverse_h / settings.rest;
     for i in 0..points.len() {
         let particle = item(points, i);
-        let (wall_density, wall_gradient) = wall_terms(particle.position, settings);
+        let (wall_density, wall_gradient) = if settings.wall_pressure > 0.0 {
+            wall_terms(particle.position, settings, settings.support)
+        } else {
+            (0.0, ZERO)
+        };
         let mut density = particle.mass * mass_scale * CUBIC + wall_density;
         let mut centre = wall_gradient;
         let mut diagonal = 0.0;
@@ -210,8 +258,9 @@ fn pressure_error(
     dt: f64,
     density: bool,
     evaluations: &mut f64,
-) -> f64 {
-    let mut total = 0.0;
+) -> (f64, f64) {
+    let mut compression = 0.0;
+    let mut complementarity = 0.0;
     for (i, (p, w)) in points.iter().zip(work.iter_mut()).enumerate() {
         let mut derivative = dot(p.velocity, w.wall_gradient);
         visit(i, points, boundary, grid, settings, |j, _, grad, _| {
@@ -232,9 +281,16 @@ fn pressure_error(
             0.0
         };
         w.error = bias + derivative;
-        total += w.error.max(0.0);
+        compression += w.error.max(0.0);
+        // A positive existing multiplier must also relax when it over-corrects.
+        complementarity += if w.multiplier > 0.0 {
+            w.error.abs()
+        } else {
+            w.error.max(0.0)
+        };
     }
-    total / points.len().max(1) as f64
+    let inverse_count = 1.0 / points.len().max(1) as f64;
+    (compression * inverse_count, complementarity * inverse_count)
 }
 
 fn pressure_velocity(
@@ -270,25 +326,12 @@ fn pressure_velocity(
         });
         item_mut(work, i).change = change;
     }
-    // A bounded least-squares Jacobi step uses the actual derivative of the
-    // predicted density under this velocity change. The step cannot increase
-    // the squared positive compression: the full quadratic bounds it above.
-    let mut descent = 0.0;
-    let mut curvature = 0.0;
-    for (i, w) in work.iter().enumerate() {
-        let mut derivative = dot(w.change, w.wall_gradient);
-        visit(i, points, boundary, grid, settings, |j, _, grad, _| {
-            *evaluations += 1.0;
-            let neighbor = if j < points.len() {
-                item(work, j).change
-            } else {
-                ZERO
-            };
-            derivative += dot(sub(w.change, neighbor), grad);
-        });
-        descent -= w.error.max(0.0) * derivative;
-        curvature += derivative * derivative;
-    }
+    // The pressure dual is quadratic for this fixed neighborhood, with
+    // directional gradient lambda·error and curvature |Dᵀlambda|².
+    // Constrain the line to the non-negative multiplier segment.
+    let (descent, curvature) = work.iter().fold((0.0, 0.0), |(slope, norm), w| {
+        (slope + w.lambda * w.error, norm + norm2(w.change))
+    });
     let fraction = if curvature > 0.0 {
         (descent / curvature).clamp(0.0, 1.0)
     } else {
@@ -318,6 +361,9 @@ fn pressure(
     density: bool,
     evaluations: &mut f64,
 ) -> (f64, f64) {
+    for w in work.iter_mut() {
+        w.multiplier = 0.0;
+    }
     let mut error = pressure_error(
         points,
         work,
@@ -339,7 +385,7 @@ fn pressure(
     };
     let mut warm = false;
     for w in work.iter_mut() {
-        w.lambda = if error > tolerance && settings.warm_start > 0.0 && w.error > 0.0 {
+        w.lambda = if error.1 > tolerance && settings.warm_start > 0.0 && w.error > 0.0 {
             let saved = if density {
                 w.saved_density / dt
             } else {
@@ -363,6 +409,14 @@ fn pressure(
             settings,
             evaluations,
         );
+        fraction
+    } else {
+        0.0
+    };
+    for w in work.iter_mut() {
+        w.multiplier = fraction * w.lambda;
+    }
+    if fraction > 0.0 {
         error = pressure_error(
             points,
             work,
@@ -374,24 +428,14 @@ fn pressure(
             density,
             evaluations,
         );
-        fraction
-    } else {
-        0.0
-    };
-    for w in work.iter_mut() {
-        if density {
-            w.saved_density = fraction * w.lambda * dt;
-        } else {
-            w.saved_divergence = fraction * w.lambda;
-        }
     }
     let mut used = 0.0;
     for _ in 0..iterations as usize {
-        if error <= tolerance {
+        if error.1 <= tolerance {
             break;
         }
         for w in work.iter_mut() {
-            w.lambda = w.error.max(0.0) * w.inverse;
+            w.lambda = (w.error * w.inverse).max(-w.multiplier);
         }
         let fraction = pressure_velocity(
             points,
@@ -408,11 +452,7 @@ fn pressure(
             break;
         }
         for w in work.iter_mut() {
-            if density {
-                w.saved_density += fraction * w.lambda * dt;
-            } else {
-                w.saved_divergence += fraction * w.lambda;
-            }
+            w.multiplier = (w.multiplier + fraction * w.lambda).max(0.0);
         }
         used += 1.0;
         error = pressure_error(
@@ -427,7 +467,14 @@ fn pressure(
             evaluations,
         );
     }
-    (used, error)
+    for w in work.iter_mut() {
+        if density {
+            w.saved_density = w.multiplier * dt;
+        } else {
+            w.saved_divergence = w.multiplier;
+        }
+    }
+    (used, error.0)
 }
 
 fn remove_inward(p: &mut Particle, normal: Vec3, surface_velocity: Vec3, friction: f64) -> Vec3 {
@@ -606,6 +653,103 @@ fn diffuse(
     }
     used
 }
+#[inline]
+fn interface_slope(contribution: f64) -> f64 {
+    contribution.max(0.0) / sqrt(contribution * contribution + 0.05 * 0.05)
+}
+
+fn capillary(
+    points: &mut [Particle],
+    work: &mut [Work],
+    boundary: &[Boundary],
+    boundary_color: &mut [f64],
+    shapes: &[Solid],
+    reactions: &mut [Reaction],
+    grid: &Grid<'_>,
+    settings: &Settings,
+    dt: f64,
+    evaluations: &mut f64,
+) {
+    let support = 3.0 * settings.spacing;
+    let neighbors = neighborhood(points, boundary, grid, settings, support);
+    let area = core::f64::consts::FRAC_PI_4 * settings.spacing * settings.spacing;
+
+    // Probst and Teschner, Eqs. (8), (10), and (12). Vertex energy uses the
+    // positive free surface residue and the kernel fraction occupied by the solid.
+    for (i, (p, w)) in points.iter().zip(work.iter_mut()).enumerate() {
+        let mut fluid = p.mass * neighbors.inverse_rest_volume * CUBIC;
+        let mut solid = 0.0;
+        neighbors.around(i, p.position, |j, _, _, weight| {
+            *evaluations += 1.0;
+            if j < points.len() {
+                fluid += weight;
+            } else {
+                solid += weight;
+            }
+        });
+        let (plane, derivative) = wall_terms(p.position, settings, support);
+        w.surface_slope = settings.liquid_vapor * interface_slope(1.0 - fluid - solid - plane);
+        w.solid_slope = settings.solid_liquid * interface_slope(solid + plane);
+        let wall_slope = settings.solid_vapor * interface_slope(plane);
+        w.change = scale(
+            derivative,
+            (w.surface_slope - w.solid_slope + wall_slope) * area * dt,
+        );
+    }
+    for (index, sample) in boundary.iter().enumerate() {
+        if sample.volume == 0.0 {
+            *item_mut(boundary_color, index) = 0.0;
+            continue;
+        }
+        let mut fluid = 0.0;
+        let mut solid = sample.volume * neighbors.boundary_volume_scale * CUBIC;
+        neighbors.around(points.len() + index, sample.position, |j, _, _, weight| {
+            *evaluations += 1.0;
+            if j < points.len() {
+                fluid += weight;
+            } else {
+                solid += weight;
+            }
+        });
+        *item_mut(boundary_color, index) = settings.solid_vapor
+            * interface_slope(1.0 - fluid - solid)
+            - settings.solid_liquid * interface_slope(fluid);
+    }
+
+    // Negative derivative of the surface energy, Eq. (11). Pair forces are
+    // central. The force on any rigid boundary sample is recorded at that point.
+    for (i, p) in points.iter().enumerate() {
+        let w = item(work, i);
+        let mut impulse = w.change;
+        let fluid_volume = p.mass * neighbors.inverse_rest_volume;
+        neighbors.around(i, p.position, |j, _, grad, _| {
+            *evaluations += 1.0;
+            if j < points.len() {
+                let color = w.surface_slope + item(work, j).surface_slope;
+                impulse = add(impulse, scale(grad, color * area * dt));
+            } else {
+                let index = j - points.len();
+                let b = item(boundary, index);
+                let solid_volume = b.volume * neighbors.boundary_volume_scale;
+                let color = w.surface_slope - w.solid_slope
+                    + *item(boundary_color, index) * fluid_volume / solid_volume;
+                let contact = scale(grad, color * area * dt);
+                impulse = add(impulse, contact);
+                record_impulse(
+                    reactions,
+                    item(shapes, b.shape as usize),
+                    b.position,
+                    scale(contact, -1.0),
+                );
+            }
+        });
+        item_mut(work, i).change = impulse;
+    }
+    for (p, w) in points.iter_mut().zip(work.iter()) {
+        p.velocity = add(p.velocity, scale(w.change, 1.0 / p.mass));
+    }
+}
+
 fn bound_extent(object: &Solid) -> f64 {
     if object.active >= 2.0 {
         object.half[0] + object.half[1]
@@ -633,6 +777,7 @@ pub unsafe extern "C" fn solve_dfsph(
     settings: *const Settings,
     stats: *mut [f64; 10],
     dt: f64,
+    boundary_color: *mut f64,
 ) -> u32 {
     let (points, work, boundary, shapes, reactions, trial, settings, stats) = unsafe {
         (
@@ -646,12 +791,27 @@ pub unsafe extern "C" fn solve_dfsph(
             &mut *stats,
         )
     };
+    let surface = settings
+        .liquid_vapor
+        .max(settings.solid_liquid)
+        .max(settings.solid_vapor);
+    let grid_radius = if surface > 0.0 {
+        settings.support.max(3.0 * settings.spacing)
+    } else {
+        settings.support
+    };
+    let boundary_color = unsafe {
+        core::slice::from_raw_parts_mut(
+            boundary_color,
+            if surface > 0.0 { boundary_count } else { 0 },
+        )
+    };
     let mut grid = unsafe {
         Grid::new(
             core::slice::from_raw_parts_mut(buckets, bucket_count),
             core::slice::from_raw_parts_mut(next, count + boundary_count),
             core::slice::from_raw_parts_mut(used, count + boundary_count),
-            1.0 / settings.support,
+            1.0 / grid_radius,
         )
     };
     reactions.fill([0.0; 6]);
@@ -662,6 +822,15 @@ pub unsafe extern "C" fn solve_dfsph(
     }
     let travel = 0.4 * settings.spacing.min(2.0 * settings.radius);
     let gravity = length(settings.gravity);
+    let capillary_step = if surface > 0.0 {
+        let inverse_wave_number = settings.spacing / core::f64::consts::PI;
+        sqrt(
+            settings.rest * inverse_wave_number * inverse_wave_number * inverse_wave_number
+                / surface,
+        )
+    } else {
+        dt
+    };
     let mut remaining = dt;
     let mut substeps = 0.0;
     let mut density_rounds = 0.0;
@@ -683,6 +852,7 @@ pub unsafe extern "C" fn solve_dfsph(
         } else {
             remaining
         };
+        let step = step.min(capillary_step);
         let following = remaining - step;
         if !speed.is_finite() || following == remaining || dt / step >= u32::MAX as f64 {
             grid.clear();
@@ -690,6 +860,20 @@ pub unsafe extern "C" fn solve_dfsph(
         }
         for p in points.iter_mut() {
             p.velocity = add(p.velocity, scale(settings.gravity, step));
+        }
+        if surface > 0.0 {
+            capillary(
+                points,
+                work,
+                boundary,
+                boundary_color,
+                shapes,
+                reactions,
+                &grid,
+                settings,
+                step,
+                &mut evaluations,
+            );
         }
         viscosity_rounds += diffuse(
             points,

@@ -27,12 +27,14 @@ for (let x = 0; x < n; x++)
       particles.push({ position: [(x + 0.5) * spacing, (y + 0.5) * spacing, (z + 0.5) * spacing] });
 const target = [1.44, 2.33, 3.0];
 const trials = [];
+const capillary = process.argv.includes('--capillary');
 for (const profile of ['interactive', 'accurate']) {
   const { world, liquid } = await solve(
     {
       spacing,
       profile,
       viscosity: 1e-6,
+      surfaceTension: capillary ? 0.07274 : 0,
       bounds: [
         [0, 0, 0],
         [8 * a, 3 * a, a],

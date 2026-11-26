@@ -4524,7 +4524,7 @@ const particles = Array.from({ length: 64 }, (_, i) => ({
     (0.5 + Math.floor(i / 4) % 4) * spacing,
   ] as const,
 }));
-world.add(water, { particles, spacing, density: 1000, viscosity: 1e-6 });
+world.add(water, { particles, spacing, density: 1000, viscosity: 1e-6, surfaceTension: 0.07274 });
 world.advance(24);
 console.log(water.mass, water.sample(0).position, water.statistics.compression);
 ```
@@ -4532,8 +4532,9 @@ console.log(water.mass, water.sample(0).position, water.statistics.compression);
 The particle field publishes f64 XYZ, velocity XYZ, density and mass. Use `positions(out)` to stage active
 XYZ rows for `ParticleLiquid` in `@margoengine/water/liquid`. Reserve `capacity` to append material with `emit`.
 The box's closed faces integrate the pressure kernel beyond their planes. Use `wallPressure: false` for hard
-contacts alone, or per-face `walls` settings for open edges. Free-surface pressure corrects compression and
-does not supply surface tension.
+contacts alone, or per-face `walls` settings for open edges. The optional `surfaceTension` applies a
+separate liquid–air surface energy in N/m. Use `solidLiquidTension` and `solidVaporTension` in the same units
+to select wetting. A larger solid–air value favours wetting and a larger solid–liquid value repels.
 
 A fixed or rigid-body box, sphere or capsule uses sampled pressure at its moving surface. For live rigid
 exchange, load with `rigid: true`, set the boundary's `body` row and use

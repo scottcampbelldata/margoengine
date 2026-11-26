@@ -16885,12 +16885,12 @@ particle hand-off carrying both volume and horizontal momentum across the shallo
 
 ### Divergence-free narrow-channel surge and boundary exchange (FLUID-01, PA-22)
 
-After building Physics, run `node packages/physics/tests/dfsph-lab.mjs`. The interactive tier reaches the next
-Martin–Moyce Table 2 station in a normalized interval of about 0.397 against the original 0.71–1.14 trial span,
-with a measurement allowance of about 0.149. The simulated front contains early thin jets. The test geometry's
-planar pressure integral accounts for excluded volume, while the current model leaves out liquid-air surface
-tension and a viscous boundary layer on the planar walls. Their contributions to the measured discrepancy
-still need to be separated. The present real couplings are rigid reactions and the modal impact field.
+After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`. The interactive and accurate
+tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.458 and 0.467 against the
+original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
+measured liquid–air tension. The planar model includes excluded pressure volume and surface energy but has
+no resolved viscous wall layer. The original release diaphragm is also absent from the rectangular-domain
+model. The present real field couplings are rigid reactions and the modal impact field.
 
 ### Rail production shot and full track contact (DYN-05)
 

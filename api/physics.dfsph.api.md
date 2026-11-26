@@ -41,6 +41,9 @@ export interface DfsphParams {
     readonly bounds?: readonly [lower: Vec3, upper: Vec3];
     readonly walls?: readonly [boolean, boolean, boolean, boolean, boolean, boolean];
     readonly wallPressure?: boolean;
+    readonly surfaceTension?: number;
+    readonly solidLiquidTension?: number;
+    readonly solidVaporTension?: number;
     readonly profile?: 'interactive' | 'accurate';
     readonly densityIterations?: number;
     readonly divergenceIterations?: number;

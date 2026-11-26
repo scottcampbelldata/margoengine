@@ -1,5 +1,5 @@
 import type { SolverHost } from '../world/solver.js';
-import { bindLiquidKernel, loadLiquidKernel } from '../pbf/kernel.js';
+import { bindLiquidKernel, loadLiquidKernel, type PbfKernel } from '../pbf/kernel.js';
 
 export async function loadDfsphKernel(memory: WebAssembly.Memory, signal?: AbortSignal): Promise<WebAssembly.Module> {
   const shared = typeof SharedArrayBuffer !== 'undefined' && memory.buffer instanceof SharedArrayBuffer;
@@ -10,5 +10,7 @@ export async function loadDfsphKernel(memory: WebAssembly.Memory, signal?: Abort
 }
 
 export function bindDfsphKernel(host: SolverHost, module: WebAssembly.Module, memory: WebAssembly.Memory) {
-  return bindLiquidKernel(host, module, memory, 'dfsph');
+  return bindLiquidKernel(host, module, memory, 'dfsph') as (
+    ...args: [...Parameters<PbfKernel['solve_pbf']>, boundaryColor: number]
+  ) => number;
 }

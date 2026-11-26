@@ -27,7 +27,7 @@
   const initial = [];
   for (let x = 0; x < 10; x++) for (let y = 0; y < 18; y++) for (let z = 0; z < 10; z++)
     initial.push({ position: [(x + .5) * spacing, (y + .5) * spacing, (z + .5) * spacing] });
-  world.add(dfsph, { spacing, particles: initial, bounds: [[0, 0, 0], [2.0, 1.1, 0.35]], boundaries: [obstruction], profile: 'interactive' });
+  world.add(dfsph, { spacing, particles: initial, bounds: [[0, 0, 0], [2.0, 1.1, 0.35]], boundaries: [obstruction], profile: 'interactive', surfaceTension: 0.07274 });
   const positions = new Float32Array(3 * initial.length);
   dfsph.positions(positions);
   const liquid = ParticleLiquid.attach(stage.engine, {

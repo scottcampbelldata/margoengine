@@ -14172,8 +14172,8 @@
         "gzip": 6103
       },
       "./dfsph": {
-        "raw": 15735,
-        "gzip": 6508
+        "raw": 16177,
+        "gzip": 6649
       }
     },
     "@margoengine/physics2d": {
@@ -18165,14 +18165,14 @@
       "brotli": 6237
     },
     "packages/physics/dist/dfsph-kernel.wasm": {
-      "raw": 23671,
-      "gzip": 9364,
-      "brotli": 8022
+      "raw": 28814,
+      "gzip": 10683,
+      "brotli": 9075
     },
     "packages/physics/dist/dfsph-kernel-shared.wasm": {
-      "raw": 23671,
-      "gzip": 9364,
-      "brotli": 8017
+      "raw": 28814,
+      "gzip": 10683,
+      "brotli": 9101
     }
   },
   "splits": {

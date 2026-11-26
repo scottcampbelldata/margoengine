@@ -9693,7 +9693,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 6,508 B gzip. Each lazy native asset measures 23,671 B raw and 9,364 B gzip.
+The DFSPH entry measures 6,649 B gzip. Each lazy native asset measures 28,814 B raw and 10,683 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -9704,9 +9704,11 @@ native loops.
 
 Closed planar walls integrate the cubic pressure kernel. Perpendicular-wall overlap is approximated.
 Rigid boxes, spheres and capsules use sampled boundaries and hold their last published pose during the
-fluid substeps. Contact audio represents an impulse on one selected modal track. Surface tension, bubble
-acoustics, shallow-water exchange and film production bindings are open. The narrow-channel surge is early
-against the cited experimental range.
+fluid substeps. Contact audio represents an impulse on one selected modal track. Capillarity uses one liquid and
+uniform material energies on its solids. The interface spans a three-spacing kernel neighbourhood.
+The capillary force runs before pressure and leaves out the paper's simultaneous nonlinear pressure and friction
+solve. The narrow-channel surge remains early. Bubble acoustics, shallow-water exchange and film production
+bindings are open.
 
 ### Position-based particle water (FLUID-02)
 
