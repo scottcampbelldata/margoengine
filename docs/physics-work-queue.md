@@ -253,7 +253,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | EARTH-08 | Seismic waves and ground shaking | none | Open | OPEN |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Open | OPEN |
-| ICE-01 | Snowpack | partial | Open | OPEN |
+| ICE-01 | Snowpack | partial | Codex | BUILDING (codex/physics-ice-01) |
 | ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | LANDED 096242cb21 |
 | ICE-03 | Iceberg rigid-body dynamics and calving | stand-in | Codex | BUILDING (codex/physics-lane-2) |
 | ICE-04 | Pack ice and floes | stand-in | Open | OPEN |
