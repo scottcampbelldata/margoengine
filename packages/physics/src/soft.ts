@@ -667,9 +667,13 @@ function checkMaterial(material: SoftBodyMaterial): void {
   if (material.shear) {
     const { rigidity, hysteresis } = material.shear;
     if (!(rigidity > 0 && Number.isFinite(rigidity)))
-      throw new RangeError('A fabric shear rigidity is a positive number of gf/(cm deg), as KES-F measures it.');
+      throw new RangeError(
+        'A fabric shear rigidity is a positive number of gf/(cm deg), as KES-F measures it; pass the measured value.',
+      );
     if (!(hysteresis >= 0 && Number.isFinite(hysteresis)))
-      throw new RangeError('A fabric shear hysteresis is 0 or more gf/cm, as KES-F measures it.');
+      throw new RangeError(
+        'A fabric shear hysteresis is 0 or more gf/cm, as KES-F measures it; pass the measured value.',
+      );
   }
   if (material.tensile)
     for (const t of [material.tensile.warp, material.tensile.weft])
@@ -678,10 +682,10 @@ function checkMaterial(material: SoftBodyMaterial): void {
         !(t.resilience >= 0 && t.resilience <= 100)
       )
         throw new RangeError(
-          'A fabric tension is a positive strain (EMT, percent) and energy (WT, gf cm/cm^2) and a resilience (RT) of 0 to 100 percent, as KES-F measures them.',
+          'A fabric tension is a positive strain (EMT, percent) and energy (WT, gf cm/cm^2) and a resilience (RT) of 0 to 100 percent, as KES-F measures them; pass the measured values.',
         );
   if (material.arealDensity !== null && !(material.arealDensity > 0 && Number.isFinite(material.arealDensity)))
-    throw new RangeError('A fabric areal density is a positive number of kg/m^2, or null.');
+    throw new RangeError('A fabric areal density is a positive number of kg/m^2, or null; pass one of those.');
   checkSoftness(material.shapeMatchingSoftness, 'Shape matching softness');
   checkSoftness(material.volumeSoftness, 'Volume softness');
   if (!(material.tearStrain >= 0 && Number.isFinite(material.tearStrain)))
@@ -1559,7 +1563,7 @@ export class SoftBodyDesc {
     if (this.triangles.length === 0)
       throw new RangeError('A fabric is a woven sheet; give it a body of triangles (cloth, clothTube, trimesh).');
     if (!(fabric.arealDensity > 0 && Number.isFinite(fabric.arealDensity)))
-      throw new RangeError('A fabric has a positive areal density in kg/m^2.');
+      throw new RangeError('A fabric needs a positive areal density in kg/m^2; set arealDensity.');
     const material = this.material.clone();
     material.shear = { ...fabric.shear };
     material.tensile = { warp: { ...fabric.tensile.warp }, weft: { ...fabric.tensile.weft } };
@@ -1567,7 +1571,9 @@ export class SoftBodyDesc {
     this.setMaterial(material);
     const masses = this.areaMasses(fabric.arealDensity);
     if (masses.some((m) => !(m > 0)))
-      throw new RangeError('Every particle of a fabric lies on a triangle with an area.');
+      throw new RangeError(
+        'Every particle of a fabric lies on a triangle with an area; remove loose particles and degenerate triangles.',
+      );
     return this.setMasses(masses);
   }
   /** Each particle `density` (kg/m^2) times a third of the area of the triangles around it. */

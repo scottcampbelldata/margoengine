@@ -167,7 +167,7 @@ export class ContactPointModification {
   }
   set distance(value: number) {
     if (!Number.isFinite(value))
-      throw new RangeError(`A contact distance is a finite number of metres (got ${value}).`);
+      throw new RangeError(`A contact distance is a finite number of metres (got ${value}); pass one.`);
     const c = this.kernel.columns,
       row = this.row,
       body = c.colliderBody[c.pairB[row]!]!,

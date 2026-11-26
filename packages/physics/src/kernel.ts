@@ -2421,7 +2421,7 @@ export class KernelWorld {
       )
     )
       throw new RangeError(
-        `Collider ${collider} cannot move to body ${body}: one is gone, or it is a compound's child.`,
+        `Collider ${collider} cannot move to body ${body}: one is gone, or it is a compound's child; pass a live collider of its own and a live body.`,
       );
   }
   setColliderPose(collider: number, position: readonly number[], rotation: readonly number[]): void {
@@ -3182,7 +3182,10 @@ export class KernelWorld {
   handle(kind: KernelHandle['kind'], row: number): KernelHandle {
     const handle = { kind, row, generation: this.generationOf(kind, row) };
     if (!this.rowLive(kind, row))
-      throw new MargoError('state', `The ${kind} row ${row} holds nothing: it was removed or never made.`);
+      throw new MargoError(
+        'state',
+        `The ${kind} row ${row} holds nothing: it was removed or never made; use a row the kernel returned and has not freed.`,
+      );
     return handle;
   }
   /** Whether the thing a handle named is still there: its row has not been freed since. */
@@ -3197,7 +3200,7 @@ export class KernelWorld {
     if (!this.isLive(handle))
       throw new MargoError(
         'state',
-        `The ${handle.kind} handle for row ${handle.row} (generation ${handle.generation}) is stale: its ${handle.kind} was removed.`,
+        `The ${handle.kind} handle for row ${handle.row} (generation ${handle.generation}) is stale: its ${handle.kind} was removed; check isLive(handle) before use.`,
       );
   }
   private generationOf(kind: KernelHandle['kind'], row: number): number {
