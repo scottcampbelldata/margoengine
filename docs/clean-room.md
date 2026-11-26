@@ -12885,6 +12885,11 @@ Written from papers and notes read as text (no code, no companion repositories):
   Computer Graphics, 2nd ed., 2015: the MAC grid, the pressure system, MIC(0) with tau = 0.97 and its sigma = 0.25 guard.
 - F. Gibou, R. Fedkiw, L.-T. Cheng and M. Kang, J. Comput. Phys. 176, 205-227, 2002 (as the course notes give it): the
   ghost-fluid free surface, theta = phi_i / (phi_i - phi_j), held at 0.01 or more.
+- T. Kugelstadt, A. Longva, N. Thuerey and J. Bender, "Implicit density projection for volume conserving liquids", IEEE
+  TVCG 27(4), 2021, https://doi.org/10.1109/TVCG.2019.2947437 (Algorithm 1, eqs. 10 to 12, section 3.2): the particles'
+  density on the grid (trilinear, rest density at eight particles a cell), held at 1 or more beside the air and to 0.5
+  to 1.5, the solids sampled as water at rest; a second pressure solve with the density's deviation as its source,
+  whose gradient moves the particles, their velocities unchanged.
 - H. Goldstein, C. Poole and J. Safko, Classical Mechanics, 3rd ed., 2002, section 4.10: the rotating frame's
   d'Alembert, Euler, centrifugal and Coriolis accelerations, for the box riding a hull.
 - M. Roberts, "The unreasonable effectiveness of quasirandom sequences", 2018 (the R2 sequence of the plastic number):

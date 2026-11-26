@@ -37,7 +37,7 @@ export const faceV = (g: GridShape, i: number, j: number, k: number): number => 
 export const faceW = (g: GridShape, i: number, j: number, k: number): number => i + g.nx * (j + g.ny * k);
 
 /**
- * Makes the velocity divergence-free in the liquid: solves for the pressure (Pa) with a free surface at phi = 0 (phi at
+ * Makes the velocity divergence-free in the liquid (or of divergence `source`, per cell, where given): solves for the pressure (Pa) with a free surface at phi = 0 (phi at
  * the cell centres, negative in the liquid) and solid walls, and subtracts dt / rho grad p from the face velocities.
  * Returns the conjugate-gradient iterations it took. `pressure` holds the result, and starts the solve.
  */
@@ -54,6 +54,7 @@ export function project(
   open: readonly boolean[] = [false, false, false, false, false, false],
   tolerance = 1e-6,
   maxIterations = 400,
+  source?: Float64Array,
 ): number {
   const { nx, ny, nz, h } = g,
     n = nx * ny * nz,
@@ -106,7 +107,8 @@ export function project(
           vU = solidOrOut(nbrs[3]![0]) ? 0 : v[faceV(g, i, j + 1, k)]!,
           wB = solidOrOut(nbrs[4]![0]) ? 0 : w[faceW(g, i, j, k)]!,
           wF = solidOrOut(nbrs[5]![0]) ? 0 : w[faceW(g, i, j, k + 1)]!;
-        rhs[c] = -(uR - uL + vU - vD + wF - wB) / h;
+        // The divergence the velocity is to have, `source` (0 but in the density projection), less what it has.
+        rhs[c] = (source ? source[c]! : 0) - (uR - uL + vU - vD + wF - wB) / h;
       }
   // MIC(0) (Bridson 2015, ch. 5): tau = 0.97, and sigma = 0.25 guards a small pivot.
   const precon = new Float64Array(n),

@@ -2295,7 +2295,7 @@ console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in 
 (Jiang et al. 2015) on a grid that keeps it incompressible with a free surface (Gibou et al.'s ghost fluid). Give it
 the box (`cells`, `cellSize`, `origin`), where the water starts (`initial(x, y, z)`, eight particles a cell), solid
 boxes it flows round (`solids`) and the sides open to the air (`open`), where water leaves for the sea
-(`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell.
+(`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell, and after each the particles that cluster are moved apart by Kugelstadt et al.'s implicit density projection, so the water keeps its volume.
 `positions()` gives the particles for drawing, `velocityAt` and `pressureAt` read the grid. Martin and Moyce's dam
 break is its check: the front within 2 percent of their measurements.
 

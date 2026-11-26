@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20145913,
+  "total": 20146852,
   "history": [
     {
       "date": "2026-10-24",
@@ -12855,6 +12855,12 @@
       "commit": "7a5fc90bc0",
       "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(physics) deck volume keeps its water's volume",
+      "reason": "physics/flip 9,249 to 10,188 B gzip (this Mac): Kugelstadt et al.'s implicit density projection after each advection (the particles' density on the grid, the walls sampled as water at rest, a second pressure solve moving clustered particles apart) and the inflow placing particles only in cells with room (KB-FLIP-DECKLOAD2). It is part of the liquid's step; a separate entry would carry the solver again.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13674,7 +13680,7 @@
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 9249,
+    "@margoengine/physics/flip": 10188,
     "@margoengine/physics/foam": 8022,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/groundwater": 4195,

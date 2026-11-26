@@ -45,6 +45,8 @@ export interface DeckWaterOptions {
 }
 
 const DECK_LAYOUT = 1;
+/** Cells inward from a bulwark the sea's inflow may enter. */
+const INFLOW_LAYERS = 4;
 
 /** Green water on a hull's deck, riding its body. `id` is `'deckWater'` unless a world holds more. */
 export class DeckWaterSolver extends FlipSolver {
@@ -189,7 +191,14 @@ export class DeckWaterSolver extends FlipSolver {
     if (this.inflow) this.takeInflow(context, dt);
   }
 
-  /** The sea coming over the bulwarks: particles along each segment of this hull, as much volume as its flux brings. */
+  /**
+   * The sea coming over the bulwarks: particles along each segment of this hull, as much volume as its flux brings. Each
+   * particle is an eighth of a cell of water, so each goes into a cell with room for it (fewer than eight): the first
+   * of the cells inward from the bulwark, up to INFLOW_LAYERS deep, at its place along the segment and up through the
+   * inflow's height. Packing them into full cells made a liquid of half the volume they stood for, whose load was half
+   * their weight (KB-FLIP-DECKLOAD2). Volume that finds no room waits, at most two steps of the flux: a deck full by the
+   * bulwark takes no more.
+   */
   private takeInflow(context: StepContext, dt: number): void {
     const port = context.inputs.get(DECK_INFLOW_FIELD.name);
     if (!port) return;
@@ -202,6 +211,14 @@ export class DeckWaterSolver extends FlipSolver {
       p = this.words(this.particleRegion),
       countWords = this.words(this.countRegion);
     let count = countWords[0]!;
+    // How many particles each cell holds now.
+    const held = new Uint8Array(nx * ny * nz);
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        c = cell(this.grid, Math.floor(p[o]! / h), Math.floor(p[o + 1]! / h), Math.floor(p[o + 2]! / h));
+      if (held[c]! < 255) held[c]!++;
+    }
+    let flux = 0;
     for (let r = 0; r < records; r++) {
       const o = 1 + r * DECK_INFLOW_WORDS;
       if (rec[o] !== this.row) continue;
@@ -210,35 +227,47 @@ export class DeckWaterSolver extends FlipSolver {
         n: V3 = [rec[o + 7]!, rec[o + 8]!, rec[o + 9]!],
         depth = rec[o + 10]!,
         u: V3 = [rec[o + 11]!, rec[o + 12]!, rec[o + 13]!],
-        flux = rec[o + 14]!;
-      if (!(flux > 0 && depth > 0)) continue;
-      carry[0]! += flux * dt;
-      while (carry[0]! >= volume) {
+        q = rec[o + 14]!;
+      if (!(q > 0 && depth > 0)) continue;
+      flux += q;
+      carry[0]! += q * dt;
+      let misses = 0;
+      while (carry[0]! >= volume && misses < 8) {
         if (count >= this.capacity)
           throw new MargoError('state', `Deck water holds at most ${this.capacity} particles; raise its particles.`);
-        // An R2 sequence (Roberts' low-discrepancy plastic-number sequence) by the particles made so far: along the
-        // segment and up through the inflow's height, half a cell in from the bulwark.
+        // An R2 sequence (Roberts' low-discrepancy plastic-number sequence) by the particles tried so far: along the
+        // segment and up through the inflow's height.
         const k = carry[1]!,
           s = (0.5 + k * 0.7548776662466927) % 1,
-          t = (0.5 + k * 0.5698402909980532) % 1,
-          x = a[0] + s * (b[0] - a[0]) + 0.5 * h * n[0],
-          y = a[1] + s * (b[1] - a[1]) + 0.5 * h * n[1] + t * depth,
-          z = a[2] + s * (b[2] - a[2]) + 0.5 * h * n[2];
-        carry[0]! -= volume;
+          t = (0.5 + k * 0.5698402909980532) % 1;
         carry[1] = k + 1;
-        if (!(x > 0 && y > 0 && z > 0 && x < nx * h && y < ny * h && z < nz * h)) continue;
-        if (this.solid[cell(this.grid, Math.floor(x / h), Math.floor(y / h), Math.floor(z / h))]) continue;
-        const at = count * PARTICLE_WORDS;
-        p.fill(0, at, at + PARTICLE_WORDS);
-        p[at] = x;
-        p[at + 1] = y;
-        p[at + 2] = z;
-        p[at + 3] = u[0];
-        p[at + 4] = u[1];
-        p[at + 5] = u[2];
-        count++;
+        let placed = false;
+        for (let layer = 0; layer < INFLOW_LAYERS && !placed; layer++) {
+          const inward = (layer + 0.5) * h,
+            x = a[0] + s * (b[0] - a[0]) + inward * n[0],
+            y = a[1] + s * (b[1] - a[1]) + inward * n[1] + t * depth,
+            z = a[2] + s * (b[2] - a[2]) + inward * n[2];
+          if (!(x > 0 && y > 0 && z > 0 && x < nx * h && y < ny * h && z < nz * h)) continue;
+          const c = cell(this.grid, Math.floor(x / h), Math.floor(y / h), Math.floor(z / h));
+          if (this.solid[c] || held[c]! >= 8) continue;
+          held[c]!++;
+          const at = count * PARTICLE_WORDS;
+          p.fill(0, at, at + PARTICLE_WORDS);
+          p[at] = x;
+          p[at + 1] = y;
+          p[at + 2] = z;
+          p[at + 3] = u[0];
+          p[at + 4] = u[1];
+          p[at + 5] = u[2];
+          count++;
+          carry[0]! -= volume;
+          placed = true;
+        }
+        misses = placed ? 0 : misses + 1;
       }
     }
+    // Volume with no room waits, two steps of the flux at most.
+    carry[0] = Math.min(carry[0]!, 2 * flux * dt);
     countWords[0] = count;
   }
 

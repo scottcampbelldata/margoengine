@@ -21,16 +21,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   300, bit for bit). The joint web's seed 1 now takes another path, on which its drivers do 1.7e12 J of work and a body
   reaches 172 km/s with no energy gained; `a_web_of_joints_stays_in_the_numbers` bounded speeds at 1e5 m/s, a figure with
   no derivation, and now bounds them by the range a step refuses past (RANGE), the energy ledger holding the physics.
-### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
+
+### Fixed 2026-11-26: a held hull's deck volume fed by the sea's inflow took about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
 - **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh
   water, `HullSolver` writing `deckInflow` and `DeckWaterSolver` (inflow on, the deck box on the deck, cells [20, 6, 10] of
   0.1 m). The deck volume takes the inflow and settles at 0.438 m^3 (4,297 N), but its load on the hull (its forces region,
   y) settles at -2,198 N after 6 s. KB-FLIP-DECKLOAD1's fix brought the same case from +1,124 N; its regression (0.3 m of
   water placed at the start, no inflow) takes the full weight.
-- **Cause:** not yet found, in how the deck volume's load treats water made by the inflow on a held hull. The hull
-  solver's side is right: it sees the claim and leaves its own deck load out (`packages/physics/tests/deck-water.test.js`,
-  "the deck volume claims its hull").
+- **Cause:** the water was right to the load; the particles were not right to the water. Each particle stands for an
+  eighth of a cell of water, but the inflow put its particles along the bulwark whether a cell there was full or not,
+  and particles then clustered where the flow converged and against the walls that stop them (FLIP's known volume loss):
+  at 6 s the deck's particles stood 16.8 to a cell, so the liquid the grid kept, and its load, were half the water they
+  counted.
+- **Fix:** the inflow puts each particle in the first cell inward from the bulwark with room for it (fewer than eight),
+  and the liquid now runs the implicit density projection of Kugelstadt, Longva, Thuerey and Bender (IEEE TVCG 27(4),
+  2021) after each advection: the particles' density on the grid, held at 1 or more beside the air and to 0.5 to 1.5,
+  with the walls sampled as water at rest, drives a second pressure solve whose gradient moves the particles apart.
+  The same case now holds the hull with -4,578 N for 4,393 N of water (within the grid's bound), its particles at 7.2 a
+  cell.
+- **Regression:** `packages/physics/tests/deck-water.test.js`, "the deck volume claims its hull, so the hull carries one
+  deck load, not two": the deck volume's load equals its water's weight within rho g l b h / 2.
 
 ### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
 
