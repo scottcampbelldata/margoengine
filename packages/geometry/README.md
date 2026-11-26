@@ -127,6 +127,23 @@ const sticker = decalGeometry(wallGeometry, wallMatrix, [0, 1, 0.1], [0, 0, 0, 1
   Each returned coordinate is read once and must be finite.
   Normals are `dP/du x dP/dv` by central differences, so a surface whose parameters turn counter-clockwise seen from
   outside faces out; at poles the normal is taken a small step inside the parameter square. Seams are not welded.
+- Named surfaces and knots on top of `parametricGeometry` (also from `@margoengine/geometry/extras`):
+
+  ```ts
+  import {kleinBottleGeometry, mobiusStripGeometry, knotGeometry, mobiusSurface, parametricGeometry} from 'margoengine/geometry/extras';
+
+  const bottle = kleinBottleGeometry({kind: 'bottle', slices: 96, stacks: 48}); // or kind: 'figure8', radius 2
+  const band = mobiusStripGeometry({radius: 1, width: 0.5, halfTwists: 1}); // one side: draw it double-sided
+  const trefoil = knotGeometry('trefoil', {tube: 0.25, tubularSegments: 256}); // 'figure-eight', 'cinquefoil', 'three-twist'
+  const ribbon = parametricGeometry(mobiusSurface(2, 1, 3), 128, 8); // the surface function, for your own grid
+  ```
+
+  `kleinBottleSurface(scale)`, `kleinFigure8Surface(radius, scale)` and `mobiusSurface(radius, width, halfTwists,
+  scale)` return the `(u, v)` functions themselves. The classic bottle (MathWorld, "Klein Bottle") is about 8 units
+  across before `scale` and glues P(0, v) to P(1, 1/2 - v); the figure-8 immersion glues P(1, v) to P(0, 1 - v). The
+  Möbius strip's area is 2 pi R w and `halfTwists` 2 gives the twisted annulus. Knots are a closed Catmull-Rom centre
+  line swept with a circle (`tube`, `tubularSegments`, `radialSegments`, `scale`), checked against pi r^2 L; the (p, q)
+  torus knots of any other kind stay `torusKnotGeometry` of the main entry. Surfaces are not welded at their seams.
 - `decalGeometry(target, matrix, position, orientation, size, {offset, backfaces})`: `orientation` is a quaternion
   or Euler XYZ radians. Triangles facing the projector are clipped to the box's six planes (Sutherland-Hodgman) and
   fanned back, keeping the target's winding (also under a mirroring matrix). UVs are `x / size.x + 0.5` and
