@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20644711,
+  "total": 20645619,
   "history": [
     {
       "date": "2026-10-24",
@@ -14125,6 +14125,12 @@
       "commit": "feat(physics2d) trimesh flags",
       "reason": "the same trimesh flags",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "196eedd1b7",
+      "grew": 1,
+      "reason": "SEA-15 oil dissolution and biodegradation move physics/tracers from 16474 to 17356 B gzip. The optional ceiling rises from 16969 to 17877 B. Reversible mass transfer shares the existing oil parcels, mass ledger and replay regions. An independent entry would need a new bidirectional mass port and duplicate ownership of the dissolved inventory."
     }
   ],
   "items": {
@@ -15009,7 +15015,7 @@
     "@margoengine/physics/thermal": 6905,
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 16969,
+    "@margoengine/physics/tracers": 17877,
     "@margoengine/physics/tsunami": 5780,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9250,

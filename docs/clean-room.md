@@ -13421,6 +13421,33 @@ error is 36.74 points at 1 h. This checks late water uptake. Early uptake kineti
 viscosity and spreading under coalescence remain open. The model reports mixture thickness and uses the
 existing Fay footprint.
 
+Reversible oil dissolution uses the interfacial concentration difference in Henrik Rye,
+[*A Multicomponent Oil Spill Model for Dissolved Aromatic Concentrations* (1995), Eq. 4](https://iosc.kglmeridian.com/downloadpdf/view/journals/iosc/1995/1/article-p49.xml)
+and Jonas Gros et al., [*First Day of an Oil Spill on the Open Sea* (2014), Eq. 2](https://doi.org/10.1021/es502437e).
+The two well-mixed reservoirs exchange a constituent at `k A (M_o/(K V_o) − M_w/V_w)`. Oil and
+water volumes and the equilibrium partition ratio are constant. The dissolved pool can also lose
+mass at a supplied first-order rate. This is the dilute, constant-biomass limit of the Monod
+model in [Vilcáez, Li and Hubbard, *A New Model for the Biodegradation Kinetics of Oil Droplets* (2013), Eq. 4–5](https://doi.org/10.1186/1467-4866-14-4).
+The finite update solves the two-compartment system exactly for constant area. With a changing
+footprint it uses the interval mean Fay area. The no-decay case integrates that area exactly.
+The ledger has separate dissolved and biodegraded inventories and restores them on seek.
+
+The holdout uses Lulwa Nasser Ali, [*The Dissolution and Photodegradation of Kuwait Crude Oil in Seawater* (1994), §2.4.2 and Table 3.12](https://doi.org/10.24382/3595).
+The starting oil composition, water volume, stir time and area describe the experiment.
+The partition ratio comes from the dilute liquid solubility from
+[Rojo-Nieto, Smith, Perales and Mayer (2012), Table 1](https://doi.org/10.1016/j.aquatox.2012.04.006),
+and the 210 g/mol average for a separate Kuwaiti export assay, reported by
+[M. R. Riazi, *Oil Spill Occurrence, Simulation, and Behavior* (2021), Table 7.1](https://www.routledge.com/oil-spill-occurrence-simulation-and-behavior/riazi/p/book/9780367742560).
+The transfer velocity uses the midpoint of the separate Brent crude experiments in
+[Ghoshal, Pasion and Alshafie (2004)](https://doi.org/10.1021/es034832j),
+with the range transcribed by [Liu, Maier, Grathwohl and Haderlein (2012), Table 2](https://doi.org/10.1061/(ASCE)EE.1943-7870.0000528).
+The simulation gives 67.60 µg of naphthalene at 24 h against Ali's 75.70 µg GC-MS measurement
+(10.7% low). The comparison threshold uses twice the independent 7% seawater solubility
+coefficient of variation. The solubility assay was at 20 °C and the Kuwait preparation was at
+25 °C. The endpoint tests one constituent close to equilibrium. Compound-specific exchange
+kinetics, measured biodegradation, open-water plume transport, air transfer, and dissolving
+droplets remain open.
+
 Depth-dependent vertical diffusion uses André W. Visser, [“Using random walk models to simulate the vertical distribution of particles in a turbulent water column” (1997)](https://doi.org/10.3354/meps158275), equation 6.
 The random step includes the diffusivity-gradient drift and evaluates its variance at half that drift. A manufactured
 linear profile verifies the first two moments and the midpoint using a uniform control with the same random input.

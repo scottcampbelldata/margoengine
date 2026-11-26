@@ -560,6 +560,169 @@ test('SEA-15 fixed evaporative exposure requires a finite positive reference thi
   }
 });
 
+test('SEA-15 soluble oil exchanges with finite water and biodegrades with the two-compartment exact solution', () => {
+  const mass = 2;
+  const density = 800;
+  const soluteMass = 0.25 * mass;
+  const rate = 20;
+  const kineticRate = 0.4;
+  const waterVolume = 0.01;
+  const transferArea = 0.5;
+  const transferVelocity = (kineticRate * waterVolume) / transferArea;
+  const partition = waterVolume / (mass / density);
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+    capacity: 4,
+    oilSpills: [
+      {
+        mass,
+        material: { density, floats: true, colour: [0.1, 0.1, 0] },
+        position: [0, 0],
+        spreadingCoefficient: 0,
+        parcels: 4,
+        dissolution: {
+          waterVolume,
+          transferArea,
+          solutes: [
+            {
+              massFraction: 0.25,
+              oilWaterPartition: partition,
+              transferVelocity,
+              biodegradationHalfLife: Math.LN2 / kineticRate,
+            },
+            { massFraction: 0.1, oilWaterPartition: partition, transferVelocity },
+          ],
+        },
+      },
+    ],
+  });
+  const check = (age) => {
+    world.advance(age * rate);
+    const root = Math.sqrt(5);
+    const slow = Math.exp((-kineticRate * (3 - root) * age) / 2);
+    const fast = Math.exp((-kineticRate * (3 + root) * age) / 2);
+    const dissolved = (soluteMass * (slow - fast)) / root;
+    const surface = 0.5 * soluteMass * ((1 + 1 / root) * slow + (1 - 1 / root) * fast);
+    const biodegraded = soluteMass - surface - dissolved;
+    const stable = 0.05 * mass * -Math.expm1(-2 * kineticRate * age);
+    assert.ok(Math.abs(tracer.oilSolute(0, 0).dissolved - dissolved) < 5e-13);
+    assert.ok(Math.abs(tracer.oilSolute(0, 0).biodegraded - biodegraded) < 5e-13);
+    assert.ok(Math.abs(tracer.oilSolute(0, 1).dissolved - stable) < 5e-13);
+    assert.equal(tracer.oilSolute(0, 1).biodegraded, 0);
+    assert.equal(tracer.oilSolute(0, 2), undefined);
+    assert.ok(Math.abs(tracer.budget.water - dissolved - stable) < 5e-13);
+    assert.ok(Math.abs(tracer.budget.surface - (mass - dissolved - stable - biodegraded)) < 5e-13);
+    assert.ok(Math.abs(tracer.biodegradedMass - biodegraded) < 5e-13);
+    const film = tracer.oilFilm(0);
+    assert.ok(Math.abs(film.meanThickness * Math.PI * film.radius ** 2 * density - tracer.budget.surface) < 5e-13);
+  };
+  check(2);
+  const snapshot = world.takeSnapshot();
+  check(8);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  check(8);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 dissolution on the expanding Fay footprint is invariant to tick partition', () => {
+  function released(rate) {
+    const tracer = new TracerSolver();
+    const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+      capacity: 2,
+      oilSpills: [
+        {
+          mass: 0.5,
+          position: [0, 0],
+          start: 0.035,
+          spreadingCoefficient: 0.03,
+          parcels: 2,
+          dissolution: {
+            waterVolume: 0.001,
+            solutes: [{ massFraction: 0.3, oilWaterPartition: 2, transferVelocity: 0.0002 }],
+          },
+        },
+      ],
+    });
+    world.advance(2 * rate);
+    const dissolved = tracer.oilSolute(0, 0).dissolved;
+    assert.ok(dissolved > 0 && dissolved < 0.15);
+    assert.ok(Math.abs(tracer.budget.surface + tracer.budget.water - 0.5) < 1e-15);
+    return dissolved;
+  }
+  assert.ok(Math.abs(released(20) - released(64)) < 5e-15);
+});
+
+test('SEA-15 finite-film partition predicts measured naphthalene in independently assayed Kuwait seawater', (t) => {
+  // Ali (1994), Table 3.12: 7.9 g oil, 850 mL water, 3950 µg naphthalene initially in the oil.
+  // The exchange area and exposure come from the §2.4.2 preparation, not the GC-MS water result.
+  const mass = 7.9e-3;
+  const density = 878;
+  const initialNaphthalene = 3950e-9;
+  // The ideal dilute mixture uses independent subcooled liquid solubility from Rojo-Nieto et al.,
+  // Table 1, and molecular weights of 128.17 and 210 g/mol for naphthalene and Kuwaiti Export oil.
+  const liquidSolubility = 0.098929754;
+  const partition = (density * 128.17) / (liquidSolubility * 210);
+  const tracer = new TracerSolver();
+  // One simulated second is one lab hour. Use the midpoint of Ghoshal et al.'s independent
+  // BBL crude exchange velocity range 7–12 × 10⁻⁴ cm/s. The 24 h result is near equilibrium.
+  const world = new PhysicsWorld({ rate: { num: 20, den: 1 } }).add(tracer, {
+    capacity: 4,
+    oilSpills: [
+      {
+        mass,
+        material: { density, floats: true, colour: [0.1, 0.1, 0] },
+        position: [0, 0],
+        spreadingCoefficient: 0,
+        parcels: 4,
+        dissolution: {
+          waterVolume: 0.00085,
+          transferArea: 0.00654,
+          solutes: [
+            { massFraction: initialNaphthalene / mass, oilWaterPartition: partition, transferVelocity: 9.5e-6 * 3600 },
+          ],
+        },
+      },
+    ],
+  });
+  world.advance(480);
+  const measured = 75.7e-9;
+  const actual = tracer.oilSolute(0, 0).dissolved;
+  // Two times the independent seawater-solubility coefficient of variation in Rojo-Nieto Table 1.
+  assert.ok(Math.abs(actual - measured) <= 2 * 0.07 * actual, `${actual * 1e9} vs ${measured * 1e9} µg`);
+  t.diagnostic(
+    `24 h dissolved naphthalene ${(actual * 1e9).toFixed(2)} µg vs ${(measured * 1e9).toFixed(2)} µg GC-MS.`,
+  );
+});
+
+test('SEA-15 soluble oil rejects nonphysical exchange parameters with recovery guidance', () => {
+  const solute = { massFraction: 0.1, oilWaterPartition: 100, transferVelocity: 1e-5 };
+  for (const invalid of [
+    { ...solute, oilWaterPartition: 0 },
+    { ...solute, massFraction: 1.1 },
+    { ...solute, transferVelocity: Infinity },
+    { ...solute, biodegradationHalfLife: -1 },
+  ]) {
+    const tracer = new TracerSolver();
+    assert.throws(
+      () =>
+        new PhysicsWorld().add(tracer, {
+          capacity: 2,
+          oilSpills: [
+            {
+              mass: 0.025,
+              position: [0, 0],
+              spreadingCoefficient: 0,
+              parcels: 2,
+              dissolution: { waterVolume: 0.01, solutes: [invalid] },
+            },
+          ],
+        }),
+      /use finite positive partition, transfer velocity and optional half-life/,
+    );
+  }
+});
+
 test('SEA-15 emulsion takes up water at the specified half time and thickens the oil film with exact replay', () => {
   const mass = 0.025;
   const oilDensity = 870;

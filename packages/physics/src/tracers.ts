@@ -47,6 +47,13 @@ import {
   turbulentVerticalStep,
 } from './tracer-diffusion.js';
 import {
+  advanceOilDissolution,
+  type OilDissolution,
+  oilDissolution,
+  type TracerOilDissolution,
+  type TracerOilSoluteMass,
+} from './tracer-dissolution.js';
+import {
   emulsionParameters,
   emulsionProperties,
   emulsionWaterVolume,
@@ -97,6 +104,7 @@ export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-d
 export type { TracerBedWash } from './tracer-bed-wash.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
 export type { TracerOilEmulsion, TracerOilEmulsification } from './tracer-emulsion.js';
+export type { TracerOilDissolution, TracerOilSolute, TracerOilSoluteMass } from './tracer-dissolution.js';
 export type { TracerFlocConditions, TracerFlocEnvironment } from './tracer-floc.js';
 export type { TracerBreakerExposure, TracerOilDispersion } from './tracer-oil-dispersion.js';
 
@@ -214,6 +222,8 @@ export interface TracerOilSpill {
   evaporation?: TracerOilEvaporation;
   /** Wind-dependent water uptake in the floating oil (default none). */
   emulsification?: TracerOilEmulsification;
+  /** Dissolution and optional first-order biodegradation in a well-mixed water volume (default none). */
+  dissolution?: TracerOilDissolution;
   /** Delvigne–Sweeney entrainment under breaking waves, with buoyant resurfacing (default none). */
   dispersion?: TracerOilDispersion;
 }
@@ -330,6 +340,7 @@ interface OilSpillState {
   waxStoppingRadius?: number;
   evaporation?: EvaporationRates;
   emulsification?: Required<TracerOilEmulsification>;
+  dissolution?: OilDissolution;
   drops?: { first: number; law: OilDispersionLaw; materials: readonly number[] };
 }
 
@@ -407,6 +418,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private spillVapour?: Region;
   private spillWater?: Region;
   private spillEmulsion?: Region;
+  private spillSolutes?: Region;
   private dropletOwners?: Map<number, number>;
   private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
   private horizontalLaw?: HorizontalDispersionLaw;
@@ -721,6 +733,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private initOilSpills(spills: readonly TracerOilSpill[], capacity: number): void {
     const { waterDensity, viscosity } = this.params;
     let first = capacity;
+    let soluteWords = 0;
     for (const spill of spills) {
       const {
         mass,
@@ -762,16 +775,21 @@ export class TracerSolver implements Solver<TracerParams> {
         throw new RangeError('Invalid oil yield stress; pass a finite, nonnegative shear yield stress in Pa.');
       if (!(releaseDuration >= 0 && Number.isFinite(releaseDuration)))
         throw new RangeError('Invalid oil release duration; pass a finite, nonnegative duration in seconds.');
-      const weathering = spill.evaporation || spill.dispersion || spill.emulsification;
+      const weathering = spill.evaporation || spill.dispersion || spill.emulsification || spill.dissolution;
       if (releaseDuration > 0 && (yieldStress || spreadingCoefficient || weathering))
         throw new MargoError(
           'unsupported',
-          'A fed oil patch uses gravity spreading; pass zero tension and yield stress and omit evaporation, dispersion and emulsification.',
+          'A fed oil patch uses gravity spreading; pass zero tension and yield stress and omit oil weathering.',
         );
       if (yieldStress > 0 && (spreadingCoefficient || weathering))
         throw new MargoError(
           'unsupported',
-          'Waxy oil uses a fixed-volume gravity-spreading law; use zero spreading coefficient and omit evaporation, dispersion and emulsification.',
+          'Waxy oil uses a fixed-volume gravity-spreading law; use zero spreading coefficient and omit oil weathering.',
+        );
+      if (spill.dissolution && (spill.evaporation || spill.dispersion))
+        throw new MargoError(
+          'unsupported',
+          'Bulk evaporation and droplet dispersion do not track dissolved constituents; omit evaporation and dispersion when using dissolution.',
         );
       const profile = fayCoefficients(volume, reducedGravity, waterDensity, viscosity, spreadingCoefficient);
       if (!profile.every(Number.isFinite) || !(fayRadius(profile, 1) > 0))
@@ -782,6 +800,8 @@ export class TracerSolver implements Solver<TracerParams> {
       first -= parcels;
       const surfaceFirst = first;
       const drops = spill.dispersion && this.reserveOilDrops(spill.dispersion, material, first);
+      const dissolution = spill.dissolution && oilDissolution(spill.dissolution, mass, volume, soluteWords);
+      soluteWords += 2 * (dissolution?.solutes.length ?? 0);
       if (drops) first = drops.first;
       this.oilSpills.push({
         first: surfaceFirst,
@@ -796,6 +816,7 @@ export class TracerSolver implements Solver<TracerParams> {
           yieldStress > 0 ? waxLimit(volume, material.density, reducedGravity, yieldStress) : undefined,
         evaporation: spill.evaporation && evaporationRates(spill.evaporation, volume),
         emulsification: spill.emulsification && emulsionParameters(spill.emulsification, volume, waterDensity),
+        dissolution,
         drops,
       });
     }
@@ -808,6 +829,7 @@ export class TracerSolver implements Solver<TracerParams> {
       this.spillWater = this.host.allocate('oil-spill-water', 8 * this.oilSpills.length, 'f64', 1);
     if (this.oilSpills.some((spill) => spill.emulsification))
       this.spillEmulsion = this.host.allocate('oil-spill-emulsion', 8 * this.oilSpills.length, 'f64', 1);
+    if (soluteWords > 0) this.spillSolutes = this.host.allocate('oil-spill-solutes', 8 * soluteWords, 'f64', 1);
   }
 
   private reserveOilDrops(options: TracerOilDispersion, material: TracerMaterial, free: number) {
@@ -938,6 +960,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const vapour = this.spillVapour && (regionWords(this.host.memory, this.spillVapour) as Float64Array);
     const immersed = this.spillWater && (regionWords(this.host.memory, this.spillWater) as Float64Array);
     const emulsion = this.spillEmulsion && (regionWords(this.host.memory, this.spillEmulsion) as Float64Array);
+    const solutes = this.spillSolutes && (regionWords(this.host.memory, this.spillSolutes) as Float64Array);
     const windFactors =
       emulsion &&
       this.oilSpills.map((spill, i) => {
@@ -994,6 +1017,18 @@ export class TracerSolver implements Solver<TracerParams> {
       const priorAge = Math.max(0, age - dt);
       let remaining = Math.max(0, spill.mass - (vapour?.[i] ?? 0) - (immersed?.[i] ?? 0));
       let changed = false;
+      if (solutes && spill.dissolution) {
+        const areaTime =
+          spill.dissolution.transferArea === undefined
+            ? fayAreaTime(spill.profile, age) - fayAreaTime(spill.profile, priorAge)
+            : 0;
+        const transfer = advanceOilDissolution(spill.dissolution, solutes, areaTime, age - priorAge);
+        const withdrawn = transfer.dissolved + transfer.biodegraded;
+        book[1]! += transfer.dissolved;
+        book[2]! -= withdrawn;
+        remaining = Math.max(0, this.oilSurfaceMass(spill, words) - withdrawn);
+        changed = withdrawn !== 0;
+      }
       if (vapour && spill.evaporation) {
         const previousMass = vapour[i]!;
         const exposed = spill.mass * evaporatedFraction(spill.evaporation, spill.profile, age);
@@ -1036,7 +1071,8 @@ export class TracerSolver implements Solver<TracerParams> {
             windFactors![i]! * (age - priorAge),
           );
       }
-      if (changed) this.setOilMass(spill, remaining, words, (immersed?.[i] ?? 0) > 0);
+      if (changed)
+        this.setOilMass(spill, remaining, words, spill.dissolution !== undefined || (immersed?.[i] ?? 0) > 0);
     }
   }
 
@@ -1533,6 +1569,7 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.spillVapour) regions.push(this.spillVapour);
     if (this.spillWater) regions.push(this.spillWater);
     if (this.spillEmulsion) regions.push(this.spillEmulsion);
+    if (this.spillSolutes) regions.push(this.spillSolutes);
     if (this.dispersionAges) regions.push(this.dispersionAges);
     if (this.flocculation) regions.push(this.flocculation.sizes);
     return regions;
@@ -1557,6 +1594,24 @@ export class TracerSolver implements Solver<TracerParams> {
     if (!this.spillVapour) return 0;
     const vapour = regionWords(this.host.memory, this.spillVapour) as Float64Array;
     return vapour.reduce((total, mass) => total + mass, 0);
+  }
+
+  /** Cumulative biodegraded oil, kg. Included in `budget.released` and excluded from the liquid and bed terms. */
+  get biodegradedMass(): number {
+    if (!this.spillSolutes) return 0;
+    const solutes = regionWords(this.host.memory, this.spillSolutes) as Float64Array;
+    let total = 0;
+    for (let i = 1; i < solutes.length; i += 2) total += solutes[i]!;
+    return total;
+  }
+
+  /** Dissolved and biodegraded oil by spill and solute index. Dissolved mass is included in `budget.water`. */
+  oilSolute(index: number, solute: number): TracerOilSoluteMass | undefined {
+    const dissolution = this.oilSpills[index]?.dissolution;
+    if (!this.spillSolutes || !dissolution?.solutes[solute]) return undefined;
+    const solutes = regionWords(this.host.memory, this.spillSolutes) as Float64Array;
+    const first = dissolution.first + 2 * solute;
+    return { dissolved: solutes[first]!, biodegraded: solutes[first + 1]! };
   }
 
   /** Nominal axisymmetric film at a finite release's centre in cell-local metres. Thickness is in metres. */
