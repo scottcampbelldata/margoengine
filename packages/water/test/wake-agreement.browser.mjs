@@ -22,6 +22,7 @@ process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const modes = [
   ['--bilge-keels', 'bilge'],
   ['--surge-panels', 'surge'],
+  ['--tidal-course', 'tide'],
   ['--incident-spectrum', 'incident'],
   ['--forward-course', 'course'],
   ['--hull-motion', 'hull'],
@@ -39,7 +40,8 @@ try {
   const result = await page.evaluate(async (motion) => {
     const hullMotion = motion !== 'pressure';
     const surge = motion === 'surge';
-    const incident = motion === 'incident' || surge;
+    const tide = motion === 'tide';
+    const incident = motion === 'incident' || surge || tide;
     const bilge = motion === 'bilge';
     const forwardCourse = incident || bilge || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
@@ -77,8 +79,22 @@ try {
       await Physics.load();
       const hull = new HullSolver('hull', { minimumRadius: 0.35 });
       wake = new WakeSolver('wake', hull.wakeSourceField);
+      const current = tide
+        ? {
+            cell: [0, 0, 0],
+            medium: 'water',
+            sample(_x, _y, _z, _t, out) {
+              out.velocity[0] = 0.25;
+              out.velocity[1] = 0;
+              out.velocity[2] = 0.1;
+              out.density = spectrum.density;
+              out.temperature = 288.15;
+              return out;
+            },
+          }
+        : undefined;
       const loadSea = incident
-        ? new SpectralSea({ waves: spectrum, seed: 5, patches: [wake] })
+        ? new SpectralSea({ waves: spectrum, seed: 5, patches: [wake], current })
         : { elevation: () => 0 };
       const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
       const body = physics.addBody(null, {
@@ -102,7 +118,7 @@ try {
             {
               row: body.row,
               mesh,
-              course: forwardCourse ? { speed: 1 } : undefined,
+              course: tide ? {} : forwardCourse ? { speed: 1 } : undefined,
               surgeAddedMass: surge,
               bilgeKeels: bilge
                 ? [

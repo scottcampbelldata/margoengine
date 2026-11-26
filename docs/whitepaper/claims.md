@@ -6303,3 +6303,7 @@ The held-out Irkal BK10 model at 0.12 m draft and 20° release has a measured da
 ### SEA-08 3D high-frequency surge added mass
 
 The refined half-sphere driven through the real rigid force port agrees with the analytical normalized added mass to within 1%. The coarse near-bed geometry matches a separate numerical panel integration. The dry-hull and disabled controls recover zero axial added mass. The live wake renders the solver on both backends with exact restored replay.
+
+### SEA-08 forward course in tidal flow
+
+With 1 m/s world velocity and 0.25 m/s longitudinal current, the inferred course gives the exact same six held loads as an explicit 0.75 m/s. A matching drift current gives the same loads as an explicitly zero course. The previous world-velocity inference changed heave by 54.63 N and roll by 3.044 N m in this fixture.

@@ -4636,3 +4636,7 @@ Build Physics and run `node --test --test-name-pattern "held-out Irkal BK10" pac
 ### SEA-08 three-dimensional surge panels
 
 Build Physics and run `node --test --test-name-pattern "3D surge mass" packages/physics/tests/coupling/seakeeping.test.js`. The test measures acceleration under a held longitudinal force, infers the virtual mass and compares coarse and refined hemispheres with the published high-frequency limit. It also checks a rigid bed, explicit off and dry cases. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --surge-panels` with WebGPU and with `MARGO_COMPAT=1` for the live wake.
+
+### SEA-08 an inferred course through the tide
+
+Build Physics and run `node --test --test-name-pattern "through the mean current" packages/physics/tests/coupling/seakeeping.test.js`. The controlled course and the inferred one see the same waves and mean tide. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --tidal-course` with WebGPU and again with `MARGO_COMPAT=1`. The test compares the drawn wake against its numerical surface and verifies restored replay.

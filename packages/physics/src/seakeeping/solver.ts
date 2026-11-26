@@ -16,7 +16,7 @@
 // State: the hulls' motion histories (the radiation's memory). Each step's load and added mass otherwise come from where
 // the bodies are and the sea at that time.
 import { MargoError } from '@margoengine/math/errors';
-import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields';
+import type { FlowSample, SeaSurface, SeaSurfaceSample, SeaWater } from '@margoengine/math/fields';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
 import {
   CRUSH_DAMAGE_QUANTITY,
@@ -235,6 +235,14 @@ export class HullSolver implements Solver<HullParams> {
   private waves: Region | null = null;
   private diffraction = true;
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+  private readonly surfaceSample: SeaSurfaceSample = {
+    height: 0,
+    normal: [0, 1, 0],
+    velocity: [0, 0, 0],
+    current: [0, 0, 0],
+    depth: 0,
+    density: 0,
+  };
   /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
   private carry: Region | null = null;
   private readonly memories = new Map<Hull, HullWaveMemory>();
@@ -560,6 +568,23 @@ export class HullSolver implements Solver<HullParams> {
     return water && typeof water.sample === 'function' ? water : null;
   }
 
+  private inferredCourseSpeed(
+    velocity: readonly number[],
+    rotation: readonly [number, number, number, number],
+    centre: Vec3,
+    t: number,
+  ): number {
+    const forward = rotate(rotation, [1, 0, 0]);
+    const horizontal = hypot(forward[0], forward[2]);
+    if (horizontal === 0) return 0;
+    const sea = this.sea as Partial<SeaSurface>;
+    const current =
+      typeof sea.sample === 'function' ? sea.sample(centre[0], centre[2], t, this.surfaceSample).current : undefined;
+    const vx = velocity[0]! - (current?.[0] ?? 0);
+    const vz = velocity[2]! - (current?.[2] ?? 0);
+    return (vx * forward[0] + vz * forward[2]) / horizontal;
+  }
+
   step(context: StepContext, dt: number): void {
     const host = this.host;
     if (!host || !this.sea || !this.forces)
@@ -660,6 +685,8 @@ export class HullSolver implements Solver<HullParams> {
           this.loads,
           this.dragOf(hull, bodies[at + 16]!, v, spin, pose, centre, t),
         );
+      const course = this.course[index];
+      const speed = course ? (course.speed ?? this.inferredCourseSpeed(v, turned, centre, t)) : 0;
       if (wake && this.loads.surfacePiercing && bodies[at + 16]! > 0)
         this.displaceWake(hull, index, 1 / bodies[at + 16]!, pose, centre, v[1]!, spin, dt, wake);
       if (this.radiation)
@@ -672,11 +699,12 @@ export class HullSolver implements Solver<HullParams> {
           context.tick,
           1 / rateOf(context.level),
           ahead * rateOf(context.level),
+          speed,
           loads,
         );
-      if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
+      if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), speed, loads);
       if (this.diffraction)
-        this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), loads);
+        this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), speed, loads);
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.slamming) this.slamLoad(hull, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.greenWater) this.deckLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), context, loads);
@@ -772,6 +800,7 @@ export class HullSolver implements Solver<HullParams> {
     tick: number,
     t: number,
     dt: number,
+    speed: number,
     loads: WettedLoads,
   ): void {
     const q = pose.rotation,
@@ -838,8 +867,6 @@ export class HullSolver implements Solver<HullParams> {
       const forward = rotate(q, [1, 0, 0]);
       const vx = bodies[at + 10]!;
       const vz = bodies[at + 12]!;
-      const horizontal = hypot(forward[0], forward[2]);
-      const speed = course.speed ?? (horizontal > 0 ? (vx * forward[0] + vz * forward[2]) / horizontal : 0);
       if (speed !== 0) {
         if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
         const count = sea.waveComponents(t, this.waves32);
@@ -1423,6 +1450,7 @@ export class HullSolver implements Solver<HullParams> {
     centre: Vec3,
     t: number,
     dt: number,
+    courseSpeed: number,
     loads: WettedLoads,
   ): void {
     const q = pose.rotation,
@@ -1436,15 +1464,8 @@ export class HullSolver implements Solver<HullParams> {
     if (!memory) return;
     const roll = this.rollState(hull, bodies, at, q, local, memory);
     const p = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0];
-    const course = this.course[this.hulls.indexOf(hull)];
     let c = roll.eddy * Math.abs(p) + roll.linear;
-    let speed = 0;
-    if (course) {
-      const forward = rotate(q, [1, 0, 0]);
-      const horizontal = hypot(forward[0], forward[2]);
-      const seen = horizontal > 0 ? (bodies[at + 10]! * forward[0] + bodies[at + 12]! * forward[2]) / horizontal : 0;
-      speed = Math.max(0, course.speed ?? seen);
-    }
+    const speed = Math.max(0, courseSpeed);
     if (speed > 0 && roll.forward) {
       const { liftPerSpeed, frictionPerSpeed, eddySpeed } = roll.forward;
       const reduced = speed / eddySpeed;
@@ -1552,6 +1573,7 @@ export class HullSolver implements Solver<HullParams> {
     tick: number,
     dt: number,
     theta: number,
+    speed: number,
     loads: WettedLoads,
   ): void {
     const q = pose.rotation,
@@ -1579,7 +1601,6 @@ export class HullSolver implements Solver<HullParams> {
       const x = horizontal > 0 ? forward[0] / horizontal : 0;
       const z = horizontal > 0 ? forward[2] / horizontal : 0;
       const horizontalSpeed = bodies[at + 10]! * x + bodies[at + 12]! * z;
-      const speed = course.speed ?? horizontalSpeed;
       let limit = this.courseLimits.get(hull);
       if (limit === undefined) {
         limit = courseSpeedLimit(memory, diagonal.kernel, this.sea!.density ?? SEA_WATER, -this.gravity[1]);

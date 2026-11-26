@@ -1007,6 +1007,64 @@ test('HullSolver 3D surge mass converges for a floating hemisphere', () => {
   assert.throws(() => measure(coarse, true, 0, 0.9), /draft smaller than the local water depth/);
 });
 
+test('HullSolver infers its forward course through the mean current while retaining wave encounter', () => {
+  const held = (currentSpeed, speed) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60, substeps: 1 });
+    const body = physics.addBody(null, {
+      position: [0, D / 2 - T, 0],
+      linearVelocity: [1, 0.06, 0],
+      angularVelocity: [0.125, 0, 0.08],
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: SEA_WATER * L * B * T },
+    });
+    const sea = new SpectralSea({
+      waves: {
+        frequencies: Float64Array.of(0.42),
+        directions: Float64Array.of(Math.PI),
+        energy: Float64Array.of(0.004),
+        depth: 4,
+        density: SEA_WATER,
+      },
+      current: {
+        cell: [0, 0, 0],
+        medium: 'water',
+        sample(_x, _y, _z, _t, out) {
+          out.velocity[0] = currentSpeed;
+          out.velocity[1] = 0;
+          out.velocity[2] = 0.24;
+          out.density = SEA_WATER;
+          out.temperature = 288.15;
+          return out;
+        },
+      },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh: boxMesh([L, D, B]), course: { speed, trim: 0.03 } }],
+        sea,
+        drift: false,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    const row = new Float64Array(world.memory.buffer, region.byteOffset + body.row * FORCE_WORDS * 8, FORCE_WORDS);
+    return Array.from(row);
+  };
+  const predicted = held(0.25, 0.75);
+  assert.deepEqual(
+    held(0.25, undefined),
+    predicted,
+    'the centreline current feeds radiation, diffraction and viscous roll',
+  );
+  const throughGround = held(0.25, 1);
+  assert.ok(Math.abs(predicted[1] - throughGround[1]) > 5 && Math.abs(predicted[3] - throughGround[3]) > 1);
+  assert.deepEqual(held(1, undefined), held(1, 0), 'a hull that drifts with the tide has zero advective course');
+});
+
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });

@@ -2,7 +2,7 @@ import { type HullMemory, staticAddedMass } from './memory.js';
 
 /** A near-steady course for forward-speed heave, pitch and viscous roll loads. */
 export interface HullCourse {
-  /** Constant longitudinal water-relative speed, m/s. Default the hull's horizontal forward velocity. */
+  /** Constant longitudinal water-relative speed, m/s. Default the horizontal speed relative to the sampled mean current. */
   readonly speed?: number;
   /** Steady bow-up trim, radians. Default zero for a level mean waterline. */
   readonly trim?: number;
