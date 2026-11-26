@@ -56,7 +56,8 @@ first: each names its scope, its evidence file and how to reproduce it.
 - Finite volumetric incisions (SOFT-04, 2026-11-26). The exact blade makes two moving
   surfaces inside a single tetrahedron while conserving its mass and volume. A blade
   across shared faces separates complete pieces. The oblique multi-cell fixture verifies
-  the expected total cut area and boundary connectivity. Run
+  the expected total cut area and boundary connectivity. Both browser renderers replay the
+  loaded rung after the finite incision at state hash `3a7de173095e2e65`. Run
   `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,

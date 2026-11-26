@@ -2265,6 +2265,7 @@ class SoftBodies implements PhysicsAttachment {
     }): SoftTearEvent;
     cut(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent;
     cutPlane(body: SoftBody, origin: Vec3, normal: Vec3): SoftTearEvent;
+    cutTriangle(body: SoftBody, blade: readonly [Vec3, Vec3, Vec3]): SoftTearEvent;
     afterSync(): void;
     bodyRemoved(_body: PhysicsBody): void;
     dispose(): void;

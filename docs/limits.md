@@ -9647,6 +9647,9 @@ Cells outside the blade keep their material connections. Tiny subdivisions must 
 same f32 geometry and rest-basis requirements as a full plane cut. The API accepts one
 triangle per operation. Arbitrary embedded skins, springs, cluster constraints and live
 bindings still require their own state transfer.
+In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
+600 tetrahedra. The complete optional entry measures 136,910 B gzip, with a 42,356 B base
+and a 94,249 B lazy kernel.
 
 Optional orthotropic failure uses nine stress limits in the material frame. It compares the
 stress conjugate to Green strain with each positive tension, compression, or shear strength.
