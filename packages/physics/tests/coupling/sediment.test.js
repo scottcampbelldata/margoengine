@@ -223,8 +223,8 @@ test('real flow, bank and bed fields replay across frame rates, snapshots and bo
   const make = (fps, memory) => actualWater(solvers.shift(), fps, memory).world;
   frameRateIndependent((fps) => make(fps));
   seekEqualsContinuous(() => make());
-  const plain = make(rate, worldMemory({ shared: false }));
-  const shared = make(rate, worldMemory({ shared: true }));
+  const plain = make(rate, worldMemory(false));
+  const shared = make(rate, worldMemory(true));
   plain.advance(90);
   shared.advance(90);
   assert.equal(plain.hash(), shared.hash());

@@ -222,8 +222,8 @@ test('registry coupling and the watershed hash survive frame rate, snapshots and
   const make = await stormFactory(7);
   frameRateIndependent((fps) => make(fps).world);
   seekEqualsContinuous(() => make({ num: 24, den: 1 }).world);
-  const plain = make(rate, worldMemory({ shared: false })).world;
-  const shared = make(rate, worldMemory({ shared: true })).world;
+  const plain = make(rate, worldMemory(false)).world;
+  const shared = make(rate, worldMemory(true)).world;
   plain.advance(240);
   shared.advance(240);
   assert.equal(plain.hash(), shared.hash());

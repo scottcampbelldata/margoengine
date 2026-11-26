@@ -251,8 +251,8 @@ test('landscape, terrain budget and regional fields replay across frame rates an
   const make = (frameRate = rate, memory) => create(plain, [2, 1, 0.5, 0], settings, { rate: frameRate, memory }).world;
   frameRateIndependent(make);
   seekEqualsContinuous(() => make(), { at: 20, frames: 60 });
-  const one = make(rate, worldMemory({ shared: false }));
-  const two = create(shared, [2, 1, 0.5, 0], settings, { memory: worldMemory({ shared: true }) }).world;
+  const one = make(rate, worldMemory(false));
+  const two = create(shared, [2, 1, 0.5, 0], settings, { memory: worldMemory(true) }).world;
   one.advance(60);
   two.advance(60);
   assert.equal(one.hash(), two.hash());

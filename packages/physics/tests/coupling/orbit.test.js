@@ -95,8 +95,8 @@ test('OrbitSolver: N-body worlds have identical hashes across frame rates and af
 
 test('OrbitSolver: distinct plain and shared SIMD builds give identical full hashes', async () => {
   const make = await factory(2);
-  const plain = make(rate, worldMemory({ shared: false }));
-  const shared = make(rate, worldMemory({ shared: true }));
+  const plain = make(rate, worldMemory(false));
+  const shared = make(rate, worldMemory(true));
   plain.advance(180);
   shared.advance(180);
   assert.equal(plain.hash(), shared.hash());

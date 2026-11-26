@@ -208,8 +208,8 @@ test('the read port and patch replay exactly at alternate frame rates and after 
   const rates = [0, 0.0004, 0.0001, 0.0003, 0.0005, 0.0001, 0];
   frameRateIndependent((fps) => storm(rates, fps).world);
   seekEqualsContinuous(() => storm(rates, { num: 24, den: 1 }).world);
-  const plain = storm(rates, rate, worldMemory({ shared: false })).world;
-  const shared = storm(rates, rate, worldMemory({ shared: true })).world;
+  const plain = storm(rates, rate, worldMemory(false)).world;
+  const shared = storm(rates, rate, worldMemory(true)).world;
   plain.advance(120);
   shared.advance(120);
   assert.equal(plain.hash(), shared.hash());

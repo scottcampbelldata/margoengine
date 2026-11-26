@@ -206,7 +206,7 @@ test('FallingSolver samples the world clock and origin cells and replays across 
   let used = 0;
   const make = (fps, shared = false) => {
     const fall = fallers[used++];
-    return new PhysicsWorld({ rate: fps, cellSize, memory: worldMemory({ shared }) }).add(
+    return new PhysicsWorld({ rate: fps, cellSize, memory: worldMemory(shared) }).add(
       fall,
       { bodies, wind: air, cellSize },
       cell,
