@@ -23,6 +23,7 @@ export function readmeNodeFetch(request = globalThis.fetch, root = externalAsset
 
 const decoder = 'packages/decoders/tests/fixtures/';
 export const README_FILES = {
+  '/sketches/ribbon.tilt': 'packages/loaders/tests/fixtures/tilt/ribbon.tilt',
   '/xr-pointer-box.glb': 'packages/exporters/tests/fixtures/Box.glb',
   '/models/robot.qb': 'packages/voxel-edit/tests/fixtures/readme/robot.qb',
   '/toy_car.usdz': 'packages/usdz/tests/fixtures/real/animated/BoxAnimated.usdz',

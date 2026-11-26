@@ -63,3 +63,5 @@ validation tests/_archive/3mf-Verify), in 3mf-samples/, SHA-256:
   f22b9ef59061057e392468f12b2eebf2fed06774857b020498bb2d785b4b2666 MUSTFAIL_3MF100_Extension_Chapter5e_ReferenceToMultiProperties.3mf
   9c9bcf83f2be06cf089bd0e84a55fe35a9b40224a568ce37f4d763e9a1970504 MUSTPASS_Chapter5.1a_MaterialResources_CompositeAndMultiProperties.3mf
   c3a7799a75e02c2b559f3ef60f75536d0f20cdaca3e808869721b4e2b3d0b8a1 MUSTPASS_Chapter5.1b_MaterialResources_MultiObjects_CompositeAndMultiProperties.3mf
+
+tilt/ribbon.tilt: made by Margo (tilt/make.mjs) from the Open Brush file format notes; no third-party content.

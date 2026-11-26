@@ -81,6 +81,10 @@ export type { DXFOptions, DXFResult, DXFLayer, DXFText, DXFSolid, DXFLines, DXFC
 export type { ThreeMFOptions, ThreeMFResult } from './threemf.js';
 export { parsePCD, parsePCDHeader } from './pcd.js';
 export type { PCDOptions, PCDHeader, PCDField } from './pcd.js';
+export { parseTilt, parseTiltSketch } from './tilt.js';
+export type { TiltOptions, TiltStroke, LoadedTilt } from './tilt.js';
+export { parsePRWM } from './prwm.js';
+export type { PRWMOptions, PRWMGeometry } from './prwm.js';
 export { parseOFF } from './off.js';
 export type { OFFOptions } from './off.js';
 export { parseXYZ } from './xyz.js';

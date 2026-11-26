@@ -96,6 +96,14 @@
       "types": "./dist/vrml.d.ts",
       "import": "./dist/vrml.js"
     },
+    "./tilt": {
+      "types": "./dist/tilt.d.ts",
+      "import": "./dist/tilt.js"
+    },
+    "./prwm": {
+      "types": "./dist/prwm.d.ts",
+      "import": "./dist/prwm.js"
+    },
     "./gcode": {
       "types": "./dist/gcode.d.ts",
       "import": "./dist/gcode.js"

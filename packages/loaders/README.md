@@ -78,6 +78,8 @@ Every parser returns the same `LoadedGeometry`:
 | `parseBVH` (`/mocap`) | See [Motion capture](#motion-capture-bvh) |
 | `parseASF`, `parseAMC` (`/mocap`) | See [Acclaim and CMU motion capture](#acclaim-and-cmu-motion-capture-asf-and-amc) |
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
+| `parsePRWM` (`/prwm`) | See [PRWM](#prwm) |
+| `parseTilt` (`/tilt`, async) | See [Tilt Brush](#tilt-brush) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
@@ -639,6 +641,35 @@ Transform { translation 0 1 0 children
   }
 }`);
 console.log(scene.groups?.[0].color, scene.warnings);
+```
+
+## PRWM
+
+`parsePRWM(bytes, {maxVertices, maxTriangles})` from `./prwm` reads Packed Raw WebGL Model version 1 (specification: github.com/kchapelier/PRWM, `specifications/prwm.md`), little or big endian, indexed (16 or 32 bit) or not. Attributes named `position`, `normal`, `uv` (`uv0`, `texcoord`) and `color` fill `positions`, `normals`, `uvs` and `colors` (normalized integers become floats; `color` keeps RGB); any other attribute lands flattened in `attributes[name]`. `layout` lists each attribute's name, component count, `normalized` and `integer` flags. A non-indexed file gets the triangle list 0, 1, 2, ... (`nonIndexed: true`). Reserved encodings, version 0, a missing position attribute, out-of-range indices and truncation throw a `LoaderError` with a `code`. PRWM has no magic bytes, so `detectFormat` does not guess it; call it by name.
+
+```ts
+import { parsePRWM } from '@margoengine/loaders/prwm';
+
+// One triangle, one float position attribute, little endian, non-indexed: version 1, 1 attribute, 3 values, 0 indices.
+const header = [1, 0x01, 3, 0, 0, 0, 0, 0];
+const name = [...'position'].map((c) => c.charCodeAt(0)).concat(0, 0x21, 0, 0); // flag: float, 3 components, encoding 1
+const data = new Uint8Array(header.length + name.length + 36);
+data.set([...header, ...name]);
+new Float32Array(data.buffer, header.length + name.length, 9).set([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+const model = parsePRWM(data);
+console.log(model.positions.length, [...model.indices]); // 9 [0, 1, 2]
+```
+
+## Tilt Brush
+
+`parseTilt(bytes, {scale, rightHanded, widthScale, minControlPoints, signal, maxVertices, ...zip limits})` from `./tilt` reads a Tilt Brush or Open Brush `.tilt` sketch (a zip behind a 16-byte `tilT` header, holding `data.sketch` and `metadata.json`; format notes at docs.openbrush.app/developer-notes/open-brush-file-format) and returns `{geometry, strokes, brushes, metadata, version}`. Every stroke becomes a flat ribbon through its control points: width `size * pressure * widthScale` along the controller's local X axis, one vertex colour (the stroke's RGB) and one group per stroke (`color`, `name` = the brush GUID from `metadata.json`'s `BrushIndex`, `properties.brushIndex`). Draw it double-sided. `scale` is metres per sketch unit (default 0.1: sketches are in decimetres); `rightHanded` (default true) mirrors Tilt Brush's left-handed space into the engine's and keeps the winding. `strokes` keeps every stroke as stored (colour, size, control points with orientation, pressure and timestamp). Stroke and control point extension fields are skipped by their size; only pressure and timestamp are read. Brush looks (glow, fire, ink) are not reproduced: ribbons carry the colour only. `parseTiltSketch(bytes)` reads an already-unzipped `data.sketch`.
+
+```ts
+import { parseTilt } from '@margoengine/loaders/tilt';
+
+const bytes = new Uint8Array(await (await fetch('/sketches/ribbon.tilt')).arrayBuffer());
+const { geometry, strokes, brushes } = await parseTilt(bytes, { signal: AbortSignal.timeout(10_000) });
+console.log(geometry.positions.length / 6, strokes.length, brushes.length); // control points, strokes, brushes
 ```
 
 ## G-code
