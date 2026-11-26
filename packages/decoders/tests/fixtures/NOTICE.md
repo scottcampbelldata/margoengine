@@ -10,6 +10,10 @@ Fixtures are used only by the tests and are not part of the published package (`
   (c) 2023 Wayfair, model and textures by Eric Chadwick,
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
 - `Dot_C.ktx2` and `Rib_N.ktx2`: see `KTX2-README.md`.
+- `zstd/*.zst` are Zstandard streams that Node 26.13 (`zlib.zstdCompressSync`) made from test data built in
+  `streams.test.js` (40 copies of `Avocado.bin`, under its CC0 grant) and `zstd-destination.test.js` (generated
+  bytes), so those tests run on a Node without Zstandard. Each test checks on every Node with Zstandard that its
+  file still decodes to its input; `MARGO_ZSTD_FIXTURES=write` rewrites them.
 - `webp/` and `bc/`: see `webp/NOTICE.md`.
 - `ktx2-layers/`: see `ktx2-layers/NOTICE.md`.
 - `ktx2-hdr/`: see `ktx2-hdr/NOTICE.md`.

@@ -1,6 +1,6 @@
 // Run the canonical correctness drivers unchanged through the shipped Firefox's BiDi endpoint.
 // BROWSER_EXECUTABLE supplies the binary; no installed path or user profile is committed.
-import { registerHooks } from 'node:module';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { runLimited } from '../../../scripts/support/run-limited.mjs';
@@ -23,13 +23,7 @@ if (leaf) {
   if (!leaves.includes(leaf)) throw new Error(`Unknown matrix leaf ${leaf}`);
   const browserURL = new URL('../../../scripts/browser.js', import.meta.url).href;
   const bridgeURL = new URL('./support/firefox-bidi.mjs', import.meta.url).href;
-  registerHooks({
-    resolve(specifier, context, nextResolve) {
-      const result = nextResolve(specifier, context);
-      if (result.url === browserURL && context.parentURL !== bridgeURL) return { ...result, url: bridgeURL };
-      return result;
-    },
-  });
+  await moduleHooks([{ resolved: browserURL, except: bridgeURL, url: bridgeURL }]);
   await import(new URL(leaf, import.meta.url));
 } else {
   if (!process.env.BROWSER_EXECUTABLE) throw new Error('Set BROWSER_EXECUTABLE to the shipped Firefox executable');

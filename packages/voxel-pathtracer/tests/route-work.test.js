@@ -6,21 +6,13 @@
 // same (browser-check's `determinism` draws every kind and every iteration and compares bit for bit).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
-import { existsSync } from 'node:fs';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { VoxelPathTracer } from '../dist/index.js';
 import { fakeDevice, fakeEngine, settle, simpleScene } from './support.js';
 
 // The stager is internal to the route's chunk: load its source (Node strips the types; `./x.js` imports are `x.ts`).
-registerHooks({
-  resolve: (specifier, context, next) => {
-    if (/^\.\.?\/.*\.js$/.test(specifier) && context.parentURL?.endsWith('.ts'))
-      if (existsSync(new URL(specifier.replace(/\.js$/, '.ts'), context.parentURL)))
-        return next(specifier.replace(/\.js$/, '.ts'), context);
-    // A JavaScript module (packages/shared) or a package.
-    return next(specifier, context);
-  },
-});
+// A JavaScript module (packages/shared) or a package loads as it is.
+await moduleHooks([{ source: new URL('../src/', import.meta.url).href }]);
 const { partPlan } = await import('../src/compat.ts');
 const { MAX_LIGHT_KINDS } = await import('../src/compat-staged.ts');
 

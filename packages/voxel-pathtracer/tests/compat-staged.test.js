@@ -5,7 +5,7 @@
 // those left with an occlusion query read back without a stall, and every vertex starts its light sum empty.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { checkWGSL } from '../../webgl2-compat/dist/wgsl.js';
 import { VoxelPathTracer } from '../dist/index.js';
 import { ResampledVoxelPathTracer, resampledEmitters } from '../dist/resampled.js';
@@ -550,12 +550,7 @@ for (const [name, attach] of cases)
 
 test('the route runs one pass of light kind 1 per resampled proposal, in the order the kernel does', async () => {
   // The stager is internal to the route's chunk: load its source (Node strips the types; `./x.js` imports are `x.ts`).
-  registerHooks({
-    resolve: (specifier, context, next) =>
-      /^\.\.?\/.*\.js$/.test(specifier) && context.parentURL?.endsWith('.ts')
-        ? next(specifier.replace(/\.js$/, '.ts'), context)
-        : next(specifier, context),
-  });
+  await moduleHooks([{ source: new URL('../src/', import.meta.url).href }]);
   const { stagedTrace } = await import('../src/compat-staged.ts');
   for (const [attach, steps] of [
     [(e) => VoxelPathTracer.attach(e, { scene: simpleScene() }), [0, 1, 2, 3, 4]],

@@ -1,20 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { Engine, TransformStore } from '@margoengine/core/extension';
 import { Stage } from '@margoengine/stage';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
-const imports = [];
-registerHooks({
-  resolve(specifier, context, next) {
-    if (['@margoengine/gltf/pbr', '@margoengine/animation'].includes(specifier)) {
-      imports.push(specifier);
-      throw Object.assign(new Error(`Cannot find package '${specifier}'`), { code: 'ERR_MODULE_NOT_FOUND' });
-    }
-    return next(specifier, context);
+// Each optional package is a module that records its specifier and fails as a package that is not installed does.
+const imports = (globalThis.margoGltfRoutingImports = []);
+await moduleHooks([
+  {
+    pattern: '^@margoengine/(?:gltf/pbr|animation)$',
+    module: `globalThis.margoGltfRoutingImports.push(%s);
+      throw Object.assign(new Error("Cannot find package '" + %s + "'"), { code: 'ERR_MODULE_NOT_FOUND' });`,
   },
-});
+]);
 const { addGLTF } = await import('@margoengine/stage/gltf');
 const triangle = () => ({
   asset: { version: '2.0' },

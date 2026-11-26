@@ -1,10 +1,16 @@
 // The built-in Zstandard decoder (RFC 8878) against streams made by Node's own zstd (node:zlib, used only as a
-// black-box encoder), the SPZ version 4 fixture, and damaged, truncated, over-limit and aborted input.
+// black-box encoder), the SPZ version 4 fixture, and damaged, truncated, over-limit and aborted input. On a Node
+// without Zstandard (22.12) every test still runs: `stream` reads the streams Node made once (fixtures/zstd), and
+// `zstd` stores its input in raw blocks, which is enough for the tests of frames, checksums, limits and aborts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import { constants as P } from 'node:zlib';
-import { noZstd as skip, zstdCompressSync, zstdDecompressSync } from '../../../scripts/support/node-compat.mjs';
+import {
+  zstdCompressSync,
+  zstdConstants as P,
+  zstdDecompressSync,
+  zstdFixture,
+} from '../../../scripts/support/node-compat.mjs';
 
 // The decoder is an internal, lazily loaded chunk of the build (parseSpz imports it for version 4 files).
 const chunk = readdirSync(new URL('../dist/', import.meta.url)).find((f) => /^zstd-.*\.js$/.test(f));
@@ -12,12 +18,24 @@ const { decompressZstd } = await import(new URL(`../dist/${chunk}`, import.meta.
 
 const fixture = (name) => new Uint8Array(readFileSync(new URL(`./fixtures/${name}`, import.meta.url)));
 
-/** Compresses with Node's zstd; `params` maps ZSTD_c_* names to values. */
-function zstd(bytes, params = {}) {
-  const p = {};
-  for (const [k, v] of Object.entries(params)) p[P[`ZSTD_c_${k}`]] = v;
-  return new Uint8Array(zstdCompressSync(bytes, { params: p }));
-}
+/** `params` (ZSTD_c_* names to values) with zstd's parameter numbers as keys. */
+const numbered = (params) => Object.fromEntries(Object.entries(params).map(([k, v]) => [P[`ZSTD_c_${k}`], v]));
+
+/** Compresses with Node's zstd (on Node 22.12: stores in raw blocks); `params` maps ZSTD_c_* names to values. */
+const zstd = (bytes, params = {}) => new Uint8Array(zstdCompressSync(bytes, { params: numbered(params) }));
+
+/** fixtures/zstd/<name>-<params>.zst: `l19-c` is level 19 with a checksum (w: window log, n: no content size). */
+const fileOf = (name, { compressionLevel: level, windowLog, checksumFlag, contentSizeFlag }) =>
+  new URL(
+    `./fixtures/zstd/${name}-l${level}${windowLog ? `-w${windowLog}` : ''}${checksumFlag ? '-c' : ''}${contentSizeFlag === 0 ? '-n' : ''}.zst`,
+    import.meta.url,
+  );
+
+/**
+ * A stream of `bytes` (or of each of a list, one frame after another) with compressed blocks: Node's own, or on Node
+ * 22.12 the checked-in file Node made (zstdFixture checks on every other Node that the file still decodes to `bytes`).
+ */
+const stream = (name, bytes, params) => new Uint8Array(zstdFixture(fileOf(name, params), bytes, numbered(params)));
 
 /** Deterministic test data: word-like text, random bytes, runs, and a real binary file. */
 function corpus() {
@@ -51,9 +69,7 @@ function corpus() {
   };
 }
 
-test('decodes Node zstd output at every level, with checksums, small windows and no content size', {
-  skip,
-}, async () => {
+test('decodes Node zstd output at every level, with checksums, small windows and no content size', async () => {
   const data = corpus();
   const settings = [
     { compressionLevel: 1 },
@@ -72,9 +88,19 @@ test('decodes Node zstd output at every level, with checksums, small windows and
       assert.equal(out.length, bytes.length, `${name} ${JSON.stringify(params)} length`);
       assert.ok(Buffer.from(out).equals(Buffer.from(bytes)), `${name} ${JSON.stringify(params)} bytes`);
     }
+  // The same settings as checked-in streams, so Huffman literals, FSE sequences and matches are decoded on a Node
+  // without Zstandard too: the small inputs whole and the start of the large ones, as one file of frames a setting.
+  const { alphabet, empty, one, small, runs, zeros, text, ply, rleLiterals } = data,
+    parts = [alphabet, empty, one, small, runs, zeros, text.subarray(0, 60_000), ply.subarray(0, 100_000)];
+  for (const params of settings) {
+    const out = await decompressZstd(stream('mixed', parts, params));
+    assert.ok(Buffer.from(out).equals(Buffer.concat(parts)), `mixed ${JSON.stringify(params)}`);
+  }
+  const rle = await decompressZstd(stream('rle-literals', rleLiterals, settings[3]));
+  assert.ok(Buffer.from(rle).equals(Buffer.from(rleLiterals)), 'RLE literals');
 });
 
-test('decodes several frames with skippable frames between them, and checks every xxHash64', { skip }, async () => {
+test('decodes several frames with skippable frames between them, and checks every xxHash64', async () => {
   const { text, ply } = corpus(),
     a = zstd(text, { checksumFlag: 1 }),
     b = zstd(ply.subarray(0, 100_000), { compressionLevel: 19 }),
@@ -85,7 +111,7 @@ test('decodes several frames with skippable frames between them, and checks ever
   assert.equal((await decompressZstd(skippable)).length, 0, 'only skippable frames decode to nothing');
 });
 
-test('a failed content checksum, a reserved bit and bad magic throw RangeError', { skip }, async () => {
+test('a failed content checksum, a reserved bit and bad magic throw RangeError', async () => {
   const packed = zstd(corpus().text, { checksumFlag: 1 });
   const bad = packed.slice();
   bad[bad.length - 1] ^= 1;
@@ -98,23 +124,29 @@ test('a failed content checksum, a reserved bit and bad magic throw RangeError',
   await assert.rejects(decompressZstd('nope'), TypeError);
 });
 
-test('every truncation of a stream throws RangeError', { skip }, async () => {
-  for (const bytes of [corpus().small, corpus().text.subarray(0, 20_000)]) {
-    const packed = zstd(bytes, { compressionLevel: 19, checksumFlag: 1 });
-    for (let n = 0; n < packed.length; n++)
-      await assert.rejects(decompressZstd(packed.subarray(0, n)), RangeError, `prefix ${n} of ${packed.length}`);
+test('every truncation of a stream throws RangeError', async () => {
+  for (const [name, bytes] of [
+    ['small', corpus().small],
+    ['text-20k', corpus().text.subarray(0, 20_000)],
+  ]) {
+    const whole = stream(name, bytes, { compressionLevel: 19, checksumFlag: 1 });
+    for (let n = 0; n < whole.length; n++)
+      await assert.rejects(decompressZstd(whole.subarray(0, n)), RangeError, `prefix ${n} of ${whole.length}`);
   }
 });
 
-test('damaged bytes throw RangeError or, with a checksum, can never return wrong data', { skip }, async () => {
+test('damaged bytes throw RangeError or, with a checksum, can never return wrong data', async () => {
   const { text, ply } = corpus();
   let seed = 3,
     thrown = 0;
   const rand = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 2 ** 32;
-  for (const source of [text.subarray(0, 60_000), ply.subarray(0, 200_000)]) {
-    const packed = zstd(source, { compressionLevel: 19, checksumFlag: 1 });
+  for (const [name, source] of [
+    ['text-60k', text.subarray(0, 60_000)],
+    ['ply-200k', ply.subarray(0, 200_000)],
+  ]) {
+    const whole = stream(name, source, { compressionLevel: 19, checksumFlag: 1 });
     for (let trial = 0; trial < 300; trial++) {
-      const bad = packed.slice(),
+      const bad = whole.slice(),
         at = 6 + Math.floor(rand() * (bad.length - 10));
       bad[at] ^= 1 + Math.floor(rand() * 255);
       try {
@@ -129,7 +161,7 @@ test('damaged bytes throw RangeError or, with a checksum, can never return wrong
   assert.ok(thrown > 500, `${thrown} of 600 damaged streams were refused`);
 });
 
-test('window and output limits are enforced before decoding', { skip }, async () => {
+test('window and output limits are enforced before decoding', async () => {
   const text = corpus().text;
   const windowed = zstd(text, { windowLog: 20, contentSizeFlag: 0 });
   await assert.rejects(
@@ -158,7 +190,7 @@ test('a frame that needs a dictionary throws MargoError unsupported', async () =
   assert.equal((await decompressZstd(none)).length, 0);
 });
 
-test('an AbortSignal stops decoding, before it starts and while it runs', { skip }, async () => {
+test('an AbortSignal stops decoding, before it starts and while it runs', async () => {
   const packed = zstd(new Uint8Array(64 << 20));
   await assert.rejects(decompressZstd(packed, { signal: AbortSignal.abort(new Error('stop')) }), /stop/);
   const controller = new AbortController(),

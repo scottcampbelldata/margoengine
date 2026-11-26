@@ -928,8 +928,8 @@ test('native option validation errors reach pass onError with no plugin leak', a
 
 test('missing optional peers report the original import failure once to pass, composer or engine onError', async () => {
   const source = `import assert from 'node:assert/strict';
-    import {registerHooks} from 'node:module';import React from 'react';import {JSDOM} from 'jsdom';
-    registerHooks({resolve(specifier,context,next){if(specifier==='@margoengine/post/bloom'){const error=new Error('Cannot find optional peer @margoengine/post/bloom');error.code='ERR_MODULE_NOT_FOUND';throw error;}return next(specifier,context);}});
+    import {moduleHooks} from ${JSON.stringify(new URL('../../../scripts/support/node-compat.mjs', import.meta.url).href)};import React from 'react';import {JSDOM} from 'jsdom';
+    await moduleHooks([{specifier:'@margoengine/post/bloom',error:'Cannot find optional peer @margoengine/post/bloom',code:'ERR_MODULE_NOT_FOUND'}]);
     const dom=new JSDOM('<!doctype html><html><body></body></html>');
     for(const key of ['window','document','HTMLElement','HTMLCanvasElement','navigator'])Object.defineProperty(globalThis,key,{configurable:true,value:dom.window[key]});
     globalThis.IS_REACT_ACT_ENVIRONMENT=true;

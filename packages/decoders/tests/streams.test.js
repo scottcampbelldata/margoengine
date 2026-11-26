@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { constants } from 'node:zlib';
-import { noZstd, zstdCompressSync } from '../../../scripts/support/node-compat.mjs';
+import { zstdConstants as constants, zstdFixture } from '../../../scripts/support/node-compat.mjs';
 import { Worker } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { decodeLZ4, decodeLZ4Block } from '@margoengine/decoders/lz4';
@@ -13,6 +12,14 @@ const manifest = JSON.parse(new TextDecoder().decode(fixture('manifest.json')));
 const source = new Uint8Array(readFileSync(new URL('./fixtures/Avocado.bin', import.meta.url)));
 const expected = new Uint8Array(source.length * 40);
 for (let i = 0; i < 40; i++) expected.set(source, i * source.length);
+// `expected` compressed at a level, with a checksum and no content size: Node's own where node:zlib has Zstandard,
+// the checked-in fixtures/zstd/avocado-x40-l<level>.zst elsewhere (zstdFixture checks each file still decodes).
+const compressed = (level) =>
+  zstdFixture(new URL(`./fixtures/zstd/avocado-x40-l${level}.zst`, import.meta.url), expected, {
+    [constants.ZSTD_c_compressionLevel]: level,
+    [constants.ZSTD_c_checksumFlag]: 1,
+    [constants.ZSTD_c_contentSizeFlag]: 0,
+  });
 
 test('LZ4 reads stored blocks, empty files, frames without checksums and framed dictionaries', async () => {
   const stored = new Uint8Array(
@@ -41,10 +48,9 @@ test('LZ4 reads stored blocks, empty files, frames without checksums and framed 
 
 test('standalone stream entries decode in a Node worker without browser APIs', {
   timeout: 15000,
-  skip: noZstd,
 }, async () => {
   const worker = new Worker(new URL('./support/stream-worker.mjs', import.meta.url), {
-    workerData: { lz4: fixture(manifest.frames[0]), zstd: zstdCompressSync(expected) },
+    workerData: { lz4: fixture(manifest.frames[0]), zstd: compressed(3) },
   });
   try {
     const decoded = await new Promise((resolve, reject) => {
@@ -139,18 +145,10 @@ test('LZ4 validates options and cancels before or between blocks without swallow
   await assert.rejects(pending, (error) => error === reason);
 });
 
-test('standalone Zstandard matches native compressed data, with concatenation, unknown sizes and destination reuse', {
-  skip: noZstd,
-}, async () => {
+test('standalone Zstandard matches native compressed data, with concatenation, unknown sizes and destination reuse', async () => {
   const frames = [];
   for (const level of [-5, 1, 3, 9, 19]) {
-    const bytes = zstdCompressSync(expected, {
-      params: {
-        [constants.ZSTD_c_compressionLevel]: level,
-        [constants.ZSTD_c_checksumFlag]: 1,
-        [constants.ZSTD_c_contentSizeFlag]: 0,
-      },
-    });
+    const bytes = compressed(level);
     assert.deepEqual(await decompressZstd(bytes), expected);
     frames.push(bytes);
   }

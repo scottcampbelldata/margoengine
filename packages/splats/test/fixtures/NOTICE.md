@@ -42,3 +42,8 @@ The existing Niantic raccoon-v2.ply MIT excerpt above was passed to the document
 - ksplat-1-oracle.json: 24263 bytes; SHA-256 45bae7cf3a647cbe91c53f1ea7ba240583b0db2b4d10a45bb93dd343822cd8b4
 - raccoon-2.ksplat: 408128 bytes; SHA-256 24ac0df884c4bade2fb325135403f8bcb69f9a962c12c9b100f37f54ea420321
 - ksplat-2-oracle.json: 45085 bytes; SHA-256 6d8cf0026f62a09ac3e9ff284e97da75060a3003b7779937a919ee2b897d09d8
+
+`zstd/*.zst` are Zstandard streams that Node 26.13 (`zlib.zstdCompressSync`) made from test data built in
+`test/zstd.test.js` (generated text and bytes, and the start of `raccoon-v2.ply`, under that file's grant), so the
+decoder tests run on a Node without Zstandard. The test checks on every Node with Zstandard that each file still
+decodes to its input; `MARGO_ZSTD_FIXTURES=write` rewrites them.
