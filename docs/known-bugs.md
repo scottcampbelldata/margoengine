@@ -32,6 +32,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   follows each CI job's npm scripts through their imports and fails on a job that reaches `git merge-base` without a
   full checkout (it named `lint` and `test` on the old ci.yml).
 
+### Fixed 2026-11-26: GitHub CI's bundler matrix and Node 22 tests failed on CI setup, not on code (KB-CI-PWVERSION1, KB-CI-ORACLE1, KB-CI-FIXTURES1, ci)
+
+- **Repro:** PR 68: "End-user proof on Node 22" (job 139720307968) stopped in `modern:test:bundlers` with
+  `Executable doesn't exist` for chromium-headless-shell 1255; "node22 unit tests" (job 139720354973) had 29
+  `ERR_MODULE_NOT_FOUND` for packages/physics/tests/oracle/dist/index.js, `Missing Required test fixture` in gltf,
+  environment and loaders, and `cannot start chromium` in ecs.
+- **Causes:** (1) scripts/bundler-matrix.mjs installed Playwright at npm's latest, and scripts/modern-package-tests.js at
+  the devDependency range, while CI's `npx playwright install chromium` fetched the browsers of the installed version.
+  (2) The physics comparison oracle was built only by the package's own `npm test`, and CI runs the test files after
+  `build:packages`. (3) The test and Node 22 jobs never fetched the Required external test assets or installed
+  Chromium.
+- **Fixed:** both fixtures pin the installed Playwright (scripts/support/playwright-version.mjs); `build:packages` builds
+  the oracle; both jobs fetch the assets (cached on the asset list) and install Chromium before the tests.
+  Regressions: tests/ci-playwright.test.js, tests/build-test-fixtures.test.js and tests/ci-test-jobs.test.js, each
+  failing on the old file.
+
 ### Fixed 2026-11-26: the branches of a multibody under a fixed root were islands that walked each other's links (KB-PHYS-MBISLAND1, physics kernel)
 
 - **Repro:** `packages/physics/tests/next-multibody.test.js`, "two branches under a fixed root are one island, and swing as
