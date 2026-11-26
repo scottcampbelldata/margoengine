@@ -1029,7 +1029,11 @@ export class Picking implements EnginePlugin {
             return (
               inView(scope, node) &&
               !p?.instances &&
-              (!p || !!p.deformed || intersects(matrix, node.matrix, sphere(p), this.clip))
+              // A shader that moves vertices (displacement, material plugins) leaves the geometry's sphere.
+              (!p ||
+                !!p.deformed ||
+                !!(p.material as { displacement?: unknown }).displacement ||
+                intersects(matrix, node.matrix, sphere(p), this.clip))
             );
           },
           id: (node, source, index) => {

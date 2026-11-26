@@ -413,6 +413,7 @@ interface MaterialFeature {
     caster?(device: GPUDevice, material: Material, map: CasterDisplacement | undefined): CasterDisplacement | undefined;
     attach?(material: Material): void;
     detach?(material: Material): void;
+    readonly instanceRows?: boolean;
 }
 
 type MaterialMesh<M extends Material | readonly Material[] = Material> = PBRModel & {

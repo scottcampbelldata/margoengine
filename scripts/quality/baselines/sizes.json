@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20393448,
+  "total": 20397176,
   "history": [
     {
       "date": "2026-10-24",
@@ -13137,6 +13137,12 @@
       "commit": "feat(inspector) MeshDebugView",
       "reason": "New optional entry @margoengine/inspector/mesh-debug: absent to 6877 B gzip (WGSL view shader, option checks, buffer lifetime); it imports only shared helpers, so no other entry grows. One shader draws every view, so splitting modes would duplicate it. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d8e800d08",
+      "reason": "materials/instance-attributes is a new optional entry, before 0 B, 3008 B gzip (ceiling 3264): per-instance attribute storage, checks, dirty-row uploads, its WGSL and the serialization codec. materials/plugins 4461 to 4923 B gzip (ceiling 4715 to 5179): the instance attribute option and row index in every depth pass, plus the output point on unlit, normal and matcap shadings and a new caster id after buffers are freed (two bug fixes). A plugin without attributes does not load the new entry; splitting the plugin hook out would need a second shader composer. Core plus stage unchanged.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13809,10 +13815,11 @@
     "@margoengine/materials/fake-shadows": 39249,
     "@margoengine/materials/fur": 4113,
     "@margoengine/materials/hair": 4112,
+    "@margoengine/materials/instance-attributes": 3264,
     "@margoengine/materials/layered": 3230,
     "@margoengine/materials/mips": 12364,
     "@margoengine/materials/object-normal": 950,
-    "@margoengine/materials/plugins": 4715,
+    "@margoengine/materials/plugins": 5179,
     "@margoengine/materials/portal": 29788,
     "@margoengine/materials/prefilter": 1933,
     "@margoengine/materials/presets": 532,

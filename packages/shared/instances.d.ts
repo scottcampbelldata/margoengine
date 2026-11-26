@@ -6,3 +6,5 @@ export function instanceMatrix<T extends Float32Array | Float64Array>(
   k: number,
   out: T,
 ): T;
+/** True when the primitive's material reads data by instance index, so its instance rows must keep their order. */
+export function readsRows(primitive: object): boolean;

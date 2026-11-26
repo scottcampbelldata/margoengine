@@ -14431,3 +14431,12 @@ Vertex pulling by `vertex_index` from storage buffers follows the WebGPU and WGS
 (https://www.w3.org/TR/webgpu/, https://www.w3.org/TR/WGSL/).
 
 Size: new entry, absent to 6,877 B min+gzip, ceiling 7,133 B. No other entry grows; core and stage unchanged.
+
+## Per-instance attributes (`@margoengine/materials/instance-attributes`, 2026-11-26)
+
+- B. Dudash, [Animated Crowd Rendering](https://developer.nvidia.com/gpugems/gpugems3/part-i-geometry/chapter-2-animated-crowd-rendering) (GPU Gems 3, chapter 2, 2007): per-instance data fetched in the vertex shader by instance index.
+- F. Carucci, [Inside Geometry Instancing](https://developer.nvidia.com/gpugems/gpugems2/part-i-geometric-complexity/chapter-3-inside-geometry-instancing) (GPU Gems 2, chapter 3, 2005): where per-instance data can live (constants, a second vertex stream) and what each limits.
+- W3C, [WebGPU](https://www.w3.org/TR/webgpu/) and [WGSL](https://www.w3.org/TR/WGSL/): the `instance_index` built-in, read-only storage buffers and flat interpolation.
+
+Margo-own: one storage buffer with a block per attribute and a default row, `var<private>` values loaded per row, a flat
+varying for fragment points, and cullers that leave row-indexed materials in place.

@@ -9,7 +9,15 @@ import { wgsl } from '../../core/dist/shaders.js';
 import { shadowDepth } from '../../shadows/src/shader.ts';
 import { objectVelocity } from '../../taa/src/shader.ts';
 import { displacedDepth } from '../../shared/displacement.js';
-import { PbrMaterial, Texture, WgslMaterial, createMesh } from '../dist/index.js';
+import {
+  MatcapMaterial,
+  NormalMaterial,
+  PbrMaterial,
+  Texture,
+  UnlitMaterial,
+  WgslMaterial,
+  createMesh,
+} from '../dist/index.js';
 import { materialPlugin, materialPluginCodec } from '../dist/plugins.js';
 import { captureMaterialLibrary, restoreMaterialLibrary } from '../dist/serialization.js';
 
@@ -146,6 +154,25 @@ test('on a WgslMaterial a plugin surface runs after its shade', async () => {
   const { code } = await drawn(material);
   assert.match(code, /s=shade\(i,s\);\s*s=margoPlugin_wave_surface\(i,s\);/);
   assert.match(code, /vec4f\(margoPV\.position,1\)/);
+});
+
+test('the output point runs on shadings that return before the lit code', async () => {
+  // An unlit, normal or matcap material returned early, so its output plugins were silently never called.
+  for (const Class of [UnlitMaterial, NormalMaterial, MatcapMaterial]) {
+    const { code, engine } = await drawn(
+      new Class({ features: [materialPlugin({ name: 'paint', output: 'color = vec3f(1.0, 0.0, 0.0);' })] }),
+    );
+    try {
+      const early = code.slice(code.indexOf('if(f.coordsB.w<0.5){'));
+      assert.match(
+        early.slice(0, early.indexOf('var color=')),
+        /var color:vec3f=[^;]*;color=margoPlugin_paint_output\(i,s,v,color\);return vec4f\(color,alpha\);/,
+        Class.name,
+      );
+    } finally {
+      engine.dispose();
+    }
+  }
 });
 
 test('more than eight plugins on one material are refused', () => {
