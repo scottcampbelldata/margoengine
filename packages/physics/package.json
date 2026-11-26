@@ -152,6 +152,10 @@
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
     },
+    "./aeolian": {
+      "types": "./dist/aeolian/index.d.ts",
+      "import": "./dist/aeolian.js"
+    },
     "./groundwater": {
       "types": "./dist/groundwater/index.d.ts",
       "import": "./dist/groundwater.js"

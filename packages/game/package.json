@@ -2259,6 +2259,10 @@
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/aeolian": {
+      "types": "./dist/physics/aeolian.d.ts",
+      "import": "./dist/physics/aeolian.js"
+    },
     "./physics/groundwater": {
       "types": "./dist/physics/groundwater.d.ts",
       "import": "./dist/physics/groundwater.js"

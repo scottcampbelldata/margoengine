@@ -13224,6 +13224,40 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+### Aeolian transport and blowing snow (EARTH-07)
+
+- G. Sauermann, K. Kroy and H. J. Herrmann (2001), [Continuum saltation model for sand dunes](https://doi.org/10.1103/PhysRevE.64.031305).
+  Equations 32–36 supply the partition of wind stress between air and grains and the saturated moving column.
+  Equations 46–47 give spatial saturation. With fixed mean grain speed `u`, the time-domain terms are
+  `mSat = 2 alpha (tau - tauImpact) / g` and `growth = u / lSat`, with
+  `lSat = 2 alpha u² tauImpact / (g gamma (tau - tauImpact))`. This implementation uses their simplified-model
+  `alpha = 0.35`, `gamma = 0.2` and `Cd = 3` to set the drag relaxation length `4 rhoGrain d / (3 Cd rhoAir)`.
+  It solves the resulting reaction by backward Euler, computes face transport from the updated areal mass,
+  and derives the advection substeps from the face-crossing speed. Equation 43 transports the equal and opposite
+  bed change. Direct fluid entrainment seeds one grain per square metre per `sqrt(d/g)` above the fluid threshold,
+  a mesh-area-independent seed for the simplified model's zero-mass equilibrium.
+- B. T. Werner (1995), [Eolian dunes: Computer simulations and attractor interpretation](https://doi.org/10.1130/0091-7613(1995)023%3C1107:EDCSAA%3E2.3.CO;2).
+  The model illustrates saltation plus downhill transfer at repose. Here an implicit pair transfer apportions
+  the slope correction using both vertices' bed areas and bounds it by the donor's mobile mass.
+- P. S. Jackson and J. C. R. Hunt (1975), [Turbulent wind flow over a low hill](https://doi.org/10.1002/qj.49710143015),
+  and K. Kroy, G. Sauermann and H. J. Herrmann (2002), [Minimal model for aeolian sand dunes](https://doi.org/10.1103/PhysRevE.66.031302).
+  Use the low-hill stress correction proportional to `H[dh/ds] + B dh/ds` along the wind. The discrete symmetric
+  sum uses the caller's integration reach and the active bed extent. Its coefficient defaults are exposed for input
+  conditions. A negative predicted surface stress is replaced by zero.
+- J. F. Kok, E. J. R. Parteli, T. I. Michaels and D. Bou Karam (2012), [The physics of wind-blown sand and dust](https://doi.org/10.1088/0034-4885/75/10/106901).
+  Section 2.2 and Table 2.3 distinguish the fluid and impact thresholds on Earth. The default impact velocity
+  is 0.8 times the Bagnold fluid velocity. Equation 4.14 gives vertical dust emission as efficiency per metre
+  times the horizontal saltation flux. The default 0.001/m lies within the reported range and scales with exposure.
+- J. W. Pomeroy and D. M. Gray (1990), [Saltation of snow](https://doi.org/10.1029/WR026i007p01583).
+  Equation 11 gives `Q = 0.68 rho uImpact (uStar² - uVegetation² - uImpact²) / (g uStar)` when positive.
+  The exposure controls the share of stress acting on snow, so `uStar² - uVegetation² = exposure uStar²`.
+  The paper's fixed grain-speed closure uses `2.8 uImpact`. Dividing the flux by that speed gives the equilibrium
+  moving column in the same conservative finite-volume solver. Snow's default threshold is 0.2 m/s.
+
+The Rust implementation and the renderer integration were written from these equations and descriptions. The
+renderer samples moving mass and grain velocity at the emitter and maps the mass to opacity as `m / (m + referenceMass)`.
+This opacity function is a visualization setting. Terrain and transported mass are advanced on the physics clock.
+
 ### Groundwater and springs (HYDRO-06)
 
 - Lorenzo A. Richards, [Capillary conduction of liquids through porous mediums](https://doi.org/10.1063/1.1745010),

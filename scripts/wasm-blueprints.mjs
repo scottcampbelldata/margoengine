@@ -78,6 +78,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'aeolian-kernel',
+    crate: 'packages/physics/aeolian-kernel',
+    blueprint: 'packages/physics/src/aeolian/aeolian-kernel.wasm',
+    script: 'packages/physics/scripts/build-aeolian-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'aeolian-kernel-shared',
+    crate: 'packages/physics/aeolian-kernel',
+    blueprint: 'packages/physics/src/aeolian/aeolian-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-aeolian-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'groundwater-kernel',
     crate: 'packages/physics/groundwater-kernel',
     blueprint: 'packages/physics/src/groundwater/groundwater-kernel.wasm',

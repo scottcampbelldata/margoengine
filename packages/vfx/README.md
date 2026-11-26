@@ -1419,7 +1419,7 @@ console.log(sand.time); // 0
 
 - Options, read every frame (a change of `ground`, `mask`, `amount`, `seed` or the wind direction lays the particles out
   again): `ground` (a height function `(x, z) => y` or a grid `{samples, width, depth, cellSize, origin}`; required),
-  `wind` (`{speed, direction, gust, gustPeriod}`, or a `WindField` from `@margoengine/weather`; required; `direction`
+  `wind` (`{speed, direction, gust, gustPeriod}`, or a `WindField` from `@margoengine/weather`; required for prescribed transport; `direction`
   is where it blows toward in radians, 0 toward +z and pi/2 toward +x), `mask` (0 to 1 at world x, z: 0 where the sand
   is wet, grassed or paved), `amount` (1), `threshold` (default `sandThreshold(grainSize)`), `grainSize` (0.00025 m),
   `windHeight` (10 m), `color` (the grain albedo, `[0.5, 0.42, 0.29]` linear), `streak` (0.6 m), `height` (0.3 m),
@@ -1442,6 +1442,36 @@ console.log(sand.time); // 0
   sphere, with a single-scattering albedo from the bed colour (Hapke 1981). Sources are in `docs/clean-room.md`.
 - Limits: the sand is drawn within `range` of the camera, `limit` particles at most; with no `sky` the grains are lit
   by the engine's ambient term only, so under a bright clear sky the plumes read as faint smudges (`docs/limits.md`).
+
+#### Blown snow from a live bed
+
+Pass an attached `AeolianTransport` as `transport` to use the bed's moving mass and velocity. Supply a live terrain
+sampler as `ground`. `referenceMass` sets the moving mass at half visual strength (0.02 kg/m² by default).
+`sandEmission` reports the visual strength at a point when given the same options. Advance the physics world and
+set the effect clock to the corresponding time when seeking a shot.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { AeolianTransport } from 'margoengine/physics/aeolian';
+import { TerrainBed } from 'margoengine/physics/earth';
+import { PhysicsWorld } from 'margoengine/physics/world';
+import { BlownSand } from 'margoengine/vfx/blown-sand';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  backend: 'webgpu', camera: { position: [-4, 2, -5], target: [0, 0.4, 2] },
+});
+const grid = { columns: 16, rows: 16, width: 16, depth: 16, centre: [0, 0] as const };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const terrain = new TerrainBed();
+const transport = await AeolianTransport.load();
+world.add(terrain, { ...grid, elevations: (_x, z) => Math.max(0, 0.8 - Math.abs(z) * 0.16) });
+world.add(transport, { grid, material: 'snow', frictionVelocity: [0, 0.55], open: { maxZ: true } });
+world.advance(180);
+const bed = terrain.bed;
+const snow = BlownSand.attach(engine, { ground: (x, z) => bed.sample(x, z).elevation, transport, color: [0.87, 0.90, 0.94] });
+snow.time = 3;
+engine.render({ delta: 0 });
+```
 
 ### Cannon fire and burning hulls
 

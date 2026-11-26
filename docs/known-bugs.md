@@ -16268,6 +16268,13 @@ an impulse, rolling or scraping excitation, with sound and damping set by the co
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
 
+## Fixed: dune and snow rendering lacked a moving surface layer (EARTH-07, PA-46 and PA-63)
+
+A static height seed and a separately prescribed plume could not move terrain or represent an exposed ridge losing
+snow. `AeolianTransport` sends resolved bed change to `TerrainBed`, and `BlownSand` can now draw its moving layer.
+Reproduce with `packages/physics/tests/coupling/aeolian.test.js` and `packages/vfx/test/blown-sand-check.mjs`.
+The [TREE-5 review](physics-demo-review.md) tracks integration into the filmed scene and the atmosphere-side fields.
+
 ## Fixed: soil drainage had no groundwater storage or spring receiver (HYDRO-06)
 
 Previously HYDRO-02 could export soil drainage, but no aquifer stored that water or passed it back to the surface

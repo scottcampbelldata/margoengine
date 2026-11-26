@@ -85,12 +85,26 @@ export interface BlownSandSkyLight {
   bindings(): GPUBindGroupEntry[];
 }
 
-/** Options of {@link BlownSand}. Read every frame; a change of `ground`, `mask`, `amount`, `seed` or the wind direction lays the particles out again. */
+/** Local saltation sampled from a resolved bed, such as `AeolianTransport` from `@margoengine/physics/aeolian`. */
+export interface BlownSandTransport {
+  /** Changes when the solver updates its field. */
+  readonly revision: number;
+  /** Horizontal limits in metres, [minX, minZ, maxX, maxZ]. */
+  readonly bounds: readonly [number, number, number, number];
+  /** Areal moving mass (kg/m²) and horizontal velocity (m/s). */
+  sample(x: number, z: number): { readonly mass: number; readonly velocity: readonly [number, number] } | undefined;
+}
+
+/** Options of {@link BlownSand}. Read every frame when drawing the particles. */
 export interface BlownSandOptions {
   /** The terrain, as a height function or a height grid. Required. */
   ground: BlownSandGround;
-  /** The wind: `{speed, direction, gust, gustPeriod}` or anything with those as `options` (a `WindField`). Required. */
-  wind: BlownSandWind | { readonly options: BlownSandWind };
+  /** Prescribed `{speed, direction, gust, gustPeriod}` or a `WindField`. Required unless `transport` is supplied. */
+  wind?: BlownSandWind | { readonly options: BlownSandWind };
+  /** Live saltation for blowing sand or snow. When set, the renderer uses the solver's mass and velocity. */
+  transport?: BlownSandTransport;
+  /** Moving mass for half-strength opacity with live transport, kg/m². Default 0.02. */
+  referenceMass?: number;
   /** Share of the ground that can lose sand, 0..1 at world (x, z): 0 where it is wet, grassed or paved. Default all 1. */
   mask?: ((x: number, z: number) => number) | null;
   /** Density of the blowing sand, 0 (none) to 1. Default 1. */
@@ -162,6 +176,7 @@ export function sandThreshold(grainSize = 0.00025, height = 10, roughness = 0.00
 
 /** The settings of {@link BlownSand}, as data: default, range, unit and meaning of each (for tools and scene settings). */
 export const BLOWN_SAND_SETTINGS: Readonly<Record<string, BlownSandSetting>> = Object.freeze({
+  referenceMass: { default: 0.02, unit: 'kg/m²', about: 'moving mass at half-strength opacity with live transport' },
   amount: { default: 1, range: [0, 1], about: 'density of the blowing sand (0 none)' },
   threshold: {
     default: 'sandThreshold(grainSize)',
@@ -246,6 +261,7 @@ interface FrameValues {
   seed: number;
   height: number;
   streak: number;
+  physical: boolean;
 }
 
 /** Gust factor of the wind at world (x, z) and time t: a field frozen in the mean flow (Taylor), two scales. */
@@ -282,12 +298,18 @@ export interface BlownSandGrain {
 
 /** The particle `o / FLOATS` of `d` at time `f.time` (the vertex shader's `particle`, in the same order). */
 function particle(d: ArrayLike<number>, o: number, f: FrameValues, opacity: number): BlownSandGrain {
+  if (f.physical) {
+    const vx = d[o + 14],
+      vz = d[o + 15],
+      speed = Math.hypot(vx, vz);
+    f = { ...f, dx: vx / speed, dz: vz / speed, speed };
+  }
   const kind = d[o + 9],
     id = d[o + 10] >>> 0,
     lod = d[o + 11],
     r1 = rand(id, 1),
     r2 = rand(id, 2),
-    v0 = (kind === 1 ? 0.6 : kind === 2 ? 0.45 : 0.5) * f.speed * (0.8 + 0.4 * r2),
+    v0 = f.physical ? f.speed : (kind === 1 ? 0.6 : kind === 2 ? 0.45 : 0.5) * f.speed * (0.8 + 0.4 * r2),
     life = Math.min(6, Math.max(0.4, (TRAVEL * (0.6 + 0.4 * r1)) / Math.max(v0, 0.5))),
     c = f.time / life + d[o + 3],
     n = Math.floor(c),
@@ -301,7 +323,7 @@ function particle(d: ArrayLike<number>, o: number, f: FrameValues, opacity: numb
     jz = (j2 - 0.5) * 0.8,
     bx = d[o] + f.dx * jx - f.dz * jz,
     bz = d[o + 2] + f.dz * jx + f.dx * jz,
-    g = gustAt(f, bx, bz, born),
+    g = f.physical ? 1 : gustAt(f, bx, bz, born),
     v = v0 * Math.max(g, 0),
     s = v * age,
     t01 = age / life,
@@ -311,7 +333,7 @@ function particle(d: ArrayLike<number>, o: number, f: FrameValues, opacity: numb
     // The ground under the particle: the base profile at the distance travelled, tilted by the jitter across it.
     ground = d[o + 1] + profileAt(d, o, s + jx) + (d[o + 12] * -f.dz + d[o + 13] * f.dx) * jz;
   // Shear velocity over its threshold where it was born: the site's speed-up times the gust, over the threshold ratio.
-  const flux = sandFlux(f.ratio * d[o + 8] * g);
+  const flux = f.physical ? d[o + 8] : sandFlux(f.ratio * d[o + 8] * g);
   let y: number, alpha: number, half: [number, number];
   if (kind === 1) {
     // Spindrift: blown off the brink, the flow separates and the sand flies out over the slip face, spreading.
@@ -322,17 +344,19 @@ function particle(d: ArrayLike<number>, o: number, f: FrameValues, opacity: numb
   } else if (kind === 2) {
     // The haze sheet: the saltation curtain seen as a whole, standing on the ground, lifted by each gust front.
     const top = f.height * 1.4 * (0.7 + 0.6 * h1),
-      here = gustAt(f, x, z, f.time);
+      here = f.physical ? flux : sandFlux(f.ratio * d[o + 8] * gustAt(f, x, z, f.time));
     y = ground + top * 0.4;
     half = [(1.4 + 1.4 * r2) * lod, top * 0.6];
-    alpha = sandFlux(f.ratio * d[o + 8] * here) * smoothstep(0, 0.25, t01) * (1 - smoothstep(0.7, 1, t01)) * 0.22;
+    alpha = here * smoothstep(0, 0.25, t01) * (1 - smoothstep(0.7, 1, t01)) * 0.22;
   } else {
     // A streak of saltating sand riding the ground at an exponentially distributed height, inside a streamer.
     const hop = f.height * 0.33 * -Math.log(1 - 0.95 * h1),
       width = 0.05 + 0.2 * r1,
       along = x * f.dx + z * f.dz - 0.5 * f.speed * f.time,
       across = z * f.dx - x * f.dz,
-      streamer = smoothstep(-0.15, 0.45, noise(along / 2.5, across / 0.45, f.time / 1.3, f.seed ^ 0x2c1b));
+      streamer = f.physical
+        ? 1
+        : smoothstep(-0.15, 0.45, noise(along / 2.5, across / 0.45, f.time / 1.3, f.seed ^ 0x2c1b));
     half = [f.streak * (0.35 + 0.3 * r2) * lod, width * 0.5 * lod];
     y = ground + Math.max(hop * smoothstep(0, 0.15, t01), half[1] * 0.8);
     alpha = flux * streamer * smoothstep(0, 0.1, t01) * (1 - smoothstep(0.75, 1, t01)) * 0.5;
@@ -366,17 +390,19 @@ function site(
   z: number,
   dx: number,
   dz: number,
+  physical = false,
 ): Site {
   const at = (s: number) => height(x + dx * s, z + dz * s),
     h0 = height(x, z),
     slope = (at(1) - at(-1)) / 2;
   let hilbert = 0;
   // (1 / pi) integral of h'(xi) / (x - xi): slopes upwind minus downwind at geometric distances, weight ln 3 each.
-  for (const L of [3, 9, 27]) {
-    const up = (at(-L + 1) - at(-L - 1)) / 2,
-      down = (at(L + 1) - at(L - 1)) / 2;
-    hilbert += (Math.log(3) * (up - down)) / Math.PI;
-  }
+  if (!physical)
+    for (const L of [3, 9, 27]) {
+      const up = (at(-L + 1) - at(-L - 1)) / 2,
+        down = (at(L + 1) - at(L - 1)) / 2;
+      hilbert += (Math.log(3) * (up - down)) / Math.PI;
+    }
   const stress = Math.min(3, Math.max(0, 1 + 3 * (hilbert + 0.3 * slope))),
     shelter = smoothstep(-0.36, -0.2, slope),
     profile = [at(2) - h0, at(4) - h0, at(6) - h0, at(8) - h0] as [number, number, number, number],
@@ -384,7 +410,7 @@ function site(
     gz = (height(x, z + 0.5) - height(x, z - 0.5)) / 1,
     m = mask ? Math.min(1, Math.max(0, mask(x, z))) : 1;
   return {
-    speedUp: Math.sqrt(stress) * shelter * m,
+    speedUp: physical ? m : Math.sqrt(stress) * shelter * m,
     profile,
     gradient: [gx, gz],
     brink: profile[3] < -1 && Math.max(...profile) < 0.3 && shelter > 0.5,
@@ -433,10 +459,23 @@ function heightOf(ground: BlownSandGround): (x: number, z: number) => number {
  * rule {@link BlownSand} emits by.
  */
 export function sandEmission(
-  options: Pick<BlownSandOptions, 'ground' | 'wind' | 'mask' | 'threshold' | 'grainSize' | 'windHeight'>,
+  options: Pick<
+    BlownSandOptions,
+    'ground' | 'wind' | 'mask' | 'threshold' | 'grainSize' | 'windHeight' | 'transport' | 'referenceMass'
+  >,
   x: number,
   z: number,
 ): { speedUp: number; flux: number; brink: boolean } {
+  if (options.transport) {
+    const motion = options.transport.sample(x, z);
+    if (!motion) return { speedUp: 1, flux: 0, brink: false };
+    const [vx, vz] = motion.velocity;
+    const speed = Math.hypot(vx, vz);
+    if (!(motion.mass > 0 && speed >= 1e-10 && Number.isFinite(speed))) return { speedUp: 1, flux: 0, brink: false };
+    const here = site(heightOf(options.ground), options.mask ?? null, x, z, vx / speed, vz / speed, true);
+    const reference = finite(options.referenceMass, 0.02, 'referenceMass', Number.MIN_VALUE, Number.MAX_VALUE);
+    return { speedUp: 1, flux: here.speedUp / (1 + reference / motion.mass), brink: here.brink };
+  }
   const w = windOf(options.wind),
     threshold = thresholdOf(options),
     here = site(heightOf(options.ground), options.mask ?? null, x, z, Math.sin(w.direction), Math.cos(w.direction));
@@ -493,20 +532,22 @@ fn profileAt(p:vec4f,s:f32)->f32 {
 }
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@location(0) a0:vec4f,@location(1) a1:vec4f,@location(2) a2:vec4f,@location(3) a3:vec4f)->Out {
   var o:Out;o.clip=vec4f(2.0,2.0,2.0,1.0);o.uv=vec2f(0.0);o.color=vec4f(0.0);o.viewDepth=0.0;o.kind=a2.y;
-  let d=frame.wind.xy;let t=frame.eye.w;let kind=a2.y;let id=u32(a2.z);let lod=a2.w;
+  let physical=frame.extra.z>0.0;let localSpeed=length(a3.zw);
+  let d=select(frame.wind.xy,a3.zw/max(localSpeed,1e-10),physical);
+  let t=frame.eye.w;let kind=a2.y;let id=u32(a2.z);let lod=a2.w;
   let r1=rnd(id,1u);let r2=rnd(id,2u);
-  let v0=select(select(0.5,0.45,kind==2.0),0.6,kind==1.0)*frame.wind.z*(0.8+0.4*r2);
+  let v0=select(select(select(0.5,0.45,kind==2.0),0.6,kind==1.0)*frame.wind.z*(0.8+0.4*r2),localSpeed,physical);
   let life=min(6.0,max(0.4,${TRAVEL.toFixed(1)}*(0.6+0.4*r1)/max(v0,0.5)));
   let c=t/life+a0.w;let n=floor(c);let age=(c-n)*life;let born=t-age;
   let cycle=u32(i32(n)+0x9e37);
   let j1=rnd(id^cycle,3u);let j2=rnd(id^cycle,4u);let h1=rnd(id^cycle,5u);
   let jx=j1*0.8;let jz=(j2-0.5)*0.8;
   let bx=a0.x+d.x*jx-d.y*jz;let bz=a0.z+d.y*jx+d.x*jz;
-  let g=gustAt(bx,bz,born);let v=v0*max(g,0.0);let s=v*age;let t01=age/life;
+  let g=select(gustAt(bx,bz,born),1.0,physical);let v=v0*max(g,0.0);let s=v*age;let t01=age/life;
   let wander=0.12*sin(age*2.7+r2*6.283)*min(1.0,s);
   let x=bx+d.x*s-d.y*wander;let z=bz+d.y*s+d.x*wander;
   let ground=a0.y+profileAt(a1,s+jx)+(a3.x*-d.y+a3.y*d.x)*jz;
-  let fl=flux(frame.wind.w*a2.x*g);
+  let fl=select(flux(frame.wind.w*a2.x*g),a2.x,physical);
   let H=frame.shape.y;let streak=frame.shape.x;
   var y:f32;var alpha:f32;var half:vec2f;
   if(kind==1.0){
@@ -518,11 +559,11 @@ fn profileAt(p:vec4f,s:f32)->f32 {
     let top=H*1.4*(0.7+0.6*h1);let here=gustAt(x,z,t);
     y=ground+top*0.4;
     half=vec2f((1.4+1.4*r2)*lod,top*0.6);
-    alpha=flux(frame.wind.w*a2.x*here)*smoothstep(0.0,0.25,t01)*(1.0-smoothstep(0.7,1.0,t01))*0.22;
+    alpha=select(flux(frame.wind.w*a2.x*here),fl,physical)*smoothstep(0.0,0.25,t01)*(1.0-smoothstep(0.7,1.0,t01))*0.22;
   }else{
     let hop=-(H*0.33)*log(1.0-0.95*h1);let width=0.05+0.2*r1;
     let along=x*d.x+z*d.y-0.5*frame.wind.z*t;let across=z*d.x-x*d.y;
-    let streamer=smoothstep(-0.15,0.45,noise(vec3f(along/2.5,across/0.45,t/1.3),u32(frame.gust.w)^0x2c1bu));
+    let streamer=select(smoothstep(-0.15,0.45,noise(vec3f(along/2.5,across/0.45,t/1.3),u32(frame.gust.w)^0x2c1bu)),1.0,physical);
     half=vec2f(streak*(0.35+0.3*r2)*lod,width*0.5*lod);
     y=ground+max(hop*smoothstep(0.0,0.15,t01),half.y*0.8);
     alpha=fl*streamer*smoothstep(0.0,0.1,t01)*(1.0-smoothstep(0.75,1.0,t01))*0.5;
@@ -625,6 +666,7 @@ export class BlownSand implements EnginePlugin {
   private height: (x: number, z: number) => number = () => 0;
   private groundSource: unknown = null;
   private maskSource: unknown = null;
+  private transportSource?: BlownSandTransport;
   private disposed = false;
   private skyEntries?: GPUBindGroupEntry[];
   private skyPipeline?: GPURenderPipeline;
@@ -668,7 +710,12 @@ export class BlownSand implements EnginePlugin {
       throw new TypeError('BlownSand mask must be a function (x, z) => 0..1 or null');
     if (o.sky != null && (typeof o.sky.pbr !== 'function' || typeof o.sky.bindings !== 'function'))
       throw new TypeError('BlownSand sky must have pbr(group) and bindings(), as a Sky from @margoengine/sky does');
-    const wind = windOf(o.wind),
+    const transport = o.transport;
+    if (transport && typeof transport.sample !== 'function')
+      throw new TypeError(
+        'BlownSand transport needs a sampler; pass an attached AeolianTransport or provide sample(x, z).',
+      );
+    const wind = windOf(o.wind ?? (transport ? { speed: 0 } : undefined)),
       threshold = thresholdOf(o),
       softness = finite(o.softness, 0, 'softness', 0, 100);
     if (softness > 0 && typeof o.depth !== 'function')
@@ -679,6 +726,8 @@ export class BlownSand implements EnginePlugin {
     if (!Number.isInteger(limit)) throw new RangeError(`BlownSand limit is ${limit}; pass a whole number`);
     return {
       wind,
+      transport,
+      referenceMass: finite(o.referenceMass, 0.02, 'referenceMass', Number.MIN_VALUE, Number.MAX_VALUE),
       threshold,
       softness,
       limit,
@@ -705,6 +754,7 @@ export class BlownSand implements EnginePlugin {
       seed: (s.seed >>> 0) & 0xffffff,
       height: s.height,
       streak: s.streak,
+      physical: !!s.transport,
     };
   }
   /** Particles of tile (tx, tz) at detail level `level` (2^-level of the templates), built once and cached. */
@@ -721,12 +771,18 @@ export class BlownSand implements EnginePlugin {
     for (let j = 0; j < keep; j++) {
       const id = pcg((seed ^ Math.imul(j + 1, 0x9e3779b1)) >>> 0) & 0xffffff,
         x = (tx + rand(id, 11)) * TILE,
-        z = (tz + rand(id, 12)) * TILE,
-        here = site(this.height, this.options.mask ?? null, x, z, f.dx, f.dz);
-      if (!(here.speedUp > 0)) continue;
+        z = (tz + rand(id, 12)) * TILE;
+      const motion = s.transport?.sample(x, z);
+      const [vx, vz] = motion?.velocity ?? [0, 0];
+      const speed = Math.hypot(vx, vz);
+      if (s.transport && !(motion && motion.mass > 0 && speed >= 1e-10 && Number.isFinite(speed))) continue;
+      const mask = this.options.mask ?? null;
+      const here = site(this.height, mask, x, z, motion ? vx / speed : f.dx, motion ? vz / speed : f.dz, f.physical);
+      const weight = motion ? here.speedUp / (1 + s.referenceMass / motion.mass) : here.speedUp;
+      if (!(weight > 0)) continue;
       const kind = j % 24 === 0 ? 2 : here.brink && rand(id, 13) < 0.7 ? 1 : 0;
       data.set(
-        [x, here.height, z, rand(id, 14), ...here.profile, here.speedUp, kind, id, lod, ...here.gradient, 0, 0],
+        [x, here.height, z, rand(id, 14), ...here.profile, weight, kind, id, lod, ...here.gradient, vx, vz],
         count++ * FLOATS,
       );
     }
@@ -746,19 +802,33 @@ export class BlownSand implements EnginePlugin {
     f: FrameValues,
   ): string {
     const o = this.options,
-      key = [s.seed, s.amount, f.dx.toFixed(4), f.dz.toFixed(4)].join('|');
-    if (key !== this.layoutKey || o.ground !== this.groundSource || (o.mask ?? null) !== this.maskSource)
+      key = [s.seed, s.amount, f.dx.toFixed(4), f.dz.toFixed(4), s.transport?.revision, s.referenceMass].join('|');
+    if (
+      key !== this.layoutKey ||
+      o.ground !== this.groundSource ||
+      (o.mask ?? null) !== this.maskSource ||
+      s.transport !== this.transportSource
+    ) {
       this.tiles.clear();
+      this.uploaded = '';
+    }
     this.layoutKey = key;
     this.groundSource = o.ground;
     this.maskSource = o.mask ?? null;
+    this.transportSource = s.transport;
     const r = s.range,
       cx = Math.floor(eye[0] / TILE),
       cz = Math.floor(eye[2] / TILE),
       n = Math.ceil(r / TILE) + 1,
-      found: { tx: number; tz: number; distance: number; level: number }[] = [];
+      found: { tx: number; tz: number; distance: number; level: number }[] = [],
+      bounds = s.transport?.bounds;
     for (let tz = cz - n; tz <= cz + n; tz++)
       for (let tx = cx - n; tx <= cx + n; tx++) {
+        if (
+          bounds &&
+          ((tx + 1) * TILE < bounds[0] || (tz + 1) * TILE < bounds[1] || tx * TILE > bounds[2] || tz * TILE > bounds[3])
+        )
+          continue;
         const mx = (tx + 0.5) * TILE,
           mz = (tz + 0.5) * TILE,
           horizontal = Math.hypot(mx - eye[0], mz - eye[2]);
@@ -898,7 +968,7 @@ export class BlownSand implements EnginePlugin {
       u.set([1, 1, 1, 0.15], 40);
       u.set([1, 1, 1, 0], 44);
     }
-    u.set([s.range, s.fog, 0, 0], 48);
+    u.set([s.range, s.fog, f.physical ? 1 : 0, 0], 48);
     this.uniform ??= device.createBuffer({
       size: UNIFORM_FLOATS * 4,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

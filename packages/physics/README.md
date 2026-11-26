@@ -3135,6 +3135,35 @@ scrape power times speed, rolling proxy power in W and rolling power times speed
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
 
+## Aeolian transport
+
+`AeolianTransport` lifts loose sand or snow, transports it across a `TerrainBed`, and deposits it when the wind
+falls below the impact threshold. Wind carries the grains downwind and steep faces relax toward repose. The
+solver publishes moving mass, dust emission and the opposing stress on the wind. Its optional Wasm assets load
+when `load()` is called. Length, velocity and mass use metres, m/s and kilograms.
+
+```ts
+import { AeolianTransport } from 'margoengine/physics/aeolian';
+import { TerrainBed } from 'margoengine/physics/earth';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const grid = { columns: 16, rows: 8, width: 16, depth: 8, centre: [0, 0] as const };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const terrain = new TerrainBed();
+const transport = await AeolianTransport.load();
+world.add(terrain, { ...grid, elevations: (x) => Math.max(0, 0.3 - 0.1 * Math.abs(x)) });
+world.add(transport, { grid, material: 'snow', frictionVelocity: [0.55, 0], open: { maxX: true } });
+world.advance(180);
+console.log(transport.sample(0, 0)?.mass, terrain.bed.sample(0, 0).elevation, transport.budget.outflow);
+```
+
+Use `wind` for a replayable `Wind` provider or declare a `frictionField` when loading the solver. For the latter,
+each vertex stores `[uStarX, uStarZ, airDensity]` in f64 or f32. Pass `erodibility` or `erodibleField` to model soil
+cover or wet areas. Start with `mobileDepth` matching the loose layer above bedrock (default 0.1 m). Vertex arrays
+for this solver have X increasing fastest. `motionField` yields `[kg/m², m/s, m/s]`; `dustField` yields kg/(m² s)
+and `windDragField` yields `[Pa on X, Pa on Z]`, all f64 layout 1. The optional `vfx/blown-sand` entry can use the
+same solver as its `transport`, with a ground sampler from `terrain.bed`.
+
 ## Groundwater and springs
 
 `@margoengine/physics/groundwater` evolves an unconfined water table with recharge, lateral Darcy flow, springs and

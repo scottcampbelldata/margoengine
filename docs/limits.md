@@ -9214,6 +9214,19 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
 
+### Dune and snow transport (EARTH-07)
+
+The solver resolves a single grain material and a mobile surface layer on the uniform `TerrainBed` grid.
+Set `mobileDepth` to the available layer above bedrock. Coarse grids describe dune evolution; resolve a seeded
+ripple with multiple vertices per wavelength. New ripple wavelength selection, suspension inside the air column,
+changes in snow cohesion and multi-grain sorting require additional models. In an explicit world the latest bed change
+may be in flight for one base step. Other contributors sharing the bed need to coordinate their erodible depths.
+
+Open sides export saltating grains and closed sides retain them. The mass ledger reports mobile bed, airborne grains,
+dust and open-boundary export. Snow uses a seasonal threshold and optional exposure. Wind stress and dust use exported
+surface fields. Atmosphere feedback needs an ATMO-01 momentum sink and ATMO-06 dust receiver on the matching grid.
+The rendering entry uses the current ground and transport field, and maps moving mass to opacity with `referenceMass`.
+
 ### Groundwater and springs (HYDRO-06)
 
 Use an unconfined aquifer with one active horizontal layer. Darcy conductance is integrated over the saturated

@@ -5530,6 +5530,14 @@ agree between 24 and 60 frame-per-second views of one world, and snapshots repro
 plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
 and modal sound example.
 
+### Resolved saltation and snow transport (EARTH-07)
+
+The surface model transfers mass conservatively between the loose bed, moving layer, dust and the open-boundary
+ledger. At a uniform interior vertex it reproduces the implicit saltation balance and Pomeroy–Gray's saturated
+snow flux, including exposure stress. A spaced slope settles toward repose while preserving its volume. Tests
+reproduce the quantities and exact clock and snapshot hashes in `packages/physics/tests/coupling/aeolian.test.js`.
+`packages/vfx/test/blown-sand-check.mjs` compares the simulated ridge plume and a mesh-only frame on both backends.
+
 ### Water-table and spring conservation (HYDRO-06)
 
 Fixed aquifer heads preserve the steady Dupuit profile and its discharge. Recharge entering from runoff adds the

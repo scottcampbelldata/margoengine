@@ -12,8 +12,8 @@ const context = await openBrowser({ startPath: '/packages/vfx/test/blown-sand-ch
   pageErrors = [];
 page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
-const shot = async (args) => {
-  const r = await page.evaluate((a) => window.step(a), args);
+const shot = async (args, snow = false) => {
+  const r = await page.evaluate(([a, physical]) => (physical ? window.snowStep(a) : window.step(a)), [args, snow]);
   assert.deepEqual(r.errors, [], JSON.stringify(args));
   return { ...r, image: await decodePNG(await page.locator('canvas').screenshot()) };
 };
@@ -46,6 +46,21 @@ try {
   const moved = differing(blowing.image, later.image);
   assert.ok(moved > total * 0.01, `0.4 s later the sand has moved: ${moved} pixels`);
   assert.equal(differing(none.image, calm.image), 0, 'below the threshold no sand moves');
+
+  const ridge = await shot({ frame: 0, time: 0, draw: true }, true);
+  const after = await shot({ frame: 180, time: 3, draw: true }, true);
+  const againAfter = await shot({ frame: 180, time: 3, draw: true }, true);
+  const noPlume = await shot({ frame: 180, time: 3, draw: false }, true);
+  const snowPixels = differing(after.image, noPlume.image);
+  console.log(`TREE-5 ridge plume changes ${snowPixels} pixels, ${after.particles} particles`);
+  assert.equal(ridge.particles, 0, 'the initially stationary snow gives the renderer no particles');
+  assert.ok(after.crest.mass > 0 && after.crest.velocity[1] > 0 && after.exposedHeight < ridge.exposedHeight);
+  assert.ok(snowPixels > 0, 'the transported snow appears on screen');
+  assert.equal(
+    differing(after.image, againAfter.image),
+    0,
+    'the same solver revision and clock produce the same pixels',
+  );
   assert.deepEqual(pageErrors, []);
   console.log('blown sand check passed');
 } finally {

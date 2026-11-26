@@ -50,6 +50,11 @@ there, add a line below with the solver ID and what is needed, and build against
   and ground wear. The optional entry uses the live `bed` field with configured geometry, publishes both
   versioned ports, and accepts an explicit initial cell meanwhile.
 
+- **EARTH-07:** Define the canonical boundary-layer momentum sink and dust inflow grid for ATMO-01 and ATMO-06.
+  The optional entry already emits vertex-centred layout-1 horizontal stress in Pa and dust in kg/(m² s).
+  It consumes the `Wind` contract or held friction fields. Registry fixtures exercise the outgoing ports
+  while the atmosphere solvers adopt those fields.
+
 - **LIFE-05:** Register slot 10 for the pedestrian SIMD kernel. Provide canonical per-body force
   and stance/position fields and an identity layout for LIFE-06 formations, DYN-07 body and foot
   hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads

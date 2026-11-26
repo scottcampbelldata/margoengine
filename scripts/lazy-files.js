@@ -31,6 +31,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/aeolian-kernel.wasm',
+    label: 'aeolian-kernel.wasm',
+    kind: 'Rust SIMD aeolian transport',
+    measure: 'file',
+    when: 'AeolianTransport.load() from the optional /aeolian entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/aeolian-kernel-shared.wasm',
+    label: 'aeolian-kernel-shared.wasm',
+    kind: 'Rust SIMD aeolian transport, shared world memory',
+    measure: 'file',
+    when: 'AeolianTransport.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/groundwater-kernel.wasm',
     label: 'groundwater-kernel.wasm',
     kind: 'Rust SIMD groundwater flow',

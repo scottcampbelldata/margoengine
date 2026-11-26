@@ -10111,6 +10111,16 @@ cover the analytic impulse and held-force convolution, resting contact, rolling 
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
 
+### Aeolian transport evidence (EARTH-07)
+
+`AeolianTransport` owns its arenas and writes conservative change through `TerrainBed`'s accumulation field.
+The native module imports the selected world memory and has an empty data section. The native-load regression
+checks every byte of a populated arena before and after each instance. `aeolian.test.js` checks the backward-Euler
+reaction, a Pomeroy–Gray snow equilibrium including cover, mass through open and closed edges, repose and world
+snapshot determinism with both memory variants. `blown-sand-check.mjs` renders an exposed ridge on native WebGPU
+and on the WebGL2 compatibility layer. ATMO-01 and ATMO-06 registry readers are covered by coupling fixtures until
+those solvers accept the physical fields. TREE-5 still needs a filmed-scene integration.
+
 ### Groundwater evidence (HYDRO-06)
 
 The optional Rust SIMD groundwater kernel imports world memory in both modes. It has an empty static data
