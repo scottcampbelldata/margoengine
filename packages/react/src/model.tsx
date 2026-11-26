@@ -304,7 +304,7 @@ export interface ModelParts<Node extends string = string, Material extends strin
 /**
  * The named nodes and materials of a model, as typed records: inside a `<Model>`'s children it reads that model, or pass
  * a `PBRModel` you loaded yourself. Name the keys for exact types: `useModelParts<'Wheel' | 'Body', 'Paint'>()`.
- * Unnamed nodes and materials are left out. Null until the model has loaded and after it is disposed; a new record
+ * Unnamed nodes and materials are left out; the records have no prototype, so any name (`__proto__` too) is an own key. Null until the model has loaded and after it is disposed; a new record
  * when the model changes. The nodes are the model's own live meshes: move them, attach children with `<MeshNode>` or
  * `<ScenePortal node>`, and the model draws the change.
  */
@@ -321,11 +321,13 @@ export function useModelParts<Node extends string = string, Material extends str
     );
   return useMemo(() => {
     if (!source || source.disposed) return null;
-    const nodes: Record<string, ModelNode> = {},
-      materials: Record<string, PBRMaterial> = {};
-    for (const node of [source.root, ...source.nodes]) if (node.name && !(node.name in nodes)) nodes[node.name] = node;
+    // Names are file data: records with no prototype, so a node named __proto__ or toString is an own entry like any other.
+    const nodes: Record<string, ModelNode> = Object.create(null),
+      materials: Record<string, PBRMaterial> = Object.create(null);
+    for (const node of [source.root, ...source.nodes])
+      if (node.name && !Object.hasOwn(nodes, node.name)) nodes[node.name] = node;
     for (const { material } of source.primitives)
-      if (material.name && !(material.name in materials)) materials[material.name] = material;
+      if (material.name && !Object.hasOwn(materials, material.name)) materials[material.name] = material;
     return { nodes, materials } as unknown as ModelParts<Node, Material>;
   }, [source]);
 }
