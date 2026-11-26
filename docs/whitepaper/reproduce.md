@@ -4540,6 +4540,11 @@ The force is the integral of normal hydrostatic traction over the film. The offs
 also checks its moment about the body centre. A 10 kg tray with its own gravity disabled
 responds to the mounted film through the real rigid force port. [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
+Run `node --test --test-name-pattern="off-centre impact|one impact pulse" packages/physics/tests/coupling/thin-film.test.js`.
+A separate tilted mount receives an off-centre normal impulse. The oracle uses the incoming
+drop momentum, the lever arm in world axes and the box's analytic moment of inertia.
+The test checks the live body's response, de-duplication of the pulse and exact replay.
+
 ### SEA-08 forward viscous roll damping
 
 Build Physics and run `node --test --test-name-pattern "forward speed roll" packages/physics/tests/coupling/seakeeping.test.js`. The case derives the prismatic roll stiffness from the waterplane moment, computes lift, eddy and friction with the ITTC equations, and checks their held moment through the coupled added-mass solve. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --forward-course` for the moving hull capture. Repeat with `MARGO_COMPAT=1`.

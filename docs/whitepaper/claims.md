@@ -6188,6 +6188,10 @@ contact location and speed. Its volume leaves flight once, enters the film once,
 its normal impulse reaches a live wake. A turning drop also registers when both end
 positions clear the surface. [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+An absorbed drop on a tilted mount sends its normal and angular impulse through the
+rigid body force port. A live box receives the predicted changes of velocity once.
+[Reproduce](reproduce.md#fluid-07-mounted-film-weight)
+
 ### FLUID-07 mounted film weight
 
 A mounted patch puts its integrated normal water weight and moment on the rigid body's

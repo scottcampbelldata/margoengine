@@ -4995,14 +4995,23 @@ For a wet circular sill outlet, open its edge and pass its physical rim radius. 
 its share of the discharge until a drop detaches.
 
 ```ts
-import { PhysicsWorld } from '@margoengine/physics/world';
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
 import { ThinFilmDropFlight, ThinFilmSolver } from '@margoengine/physics/thin-film';
 
+await Physics.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false) });
+const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+const mount = physics.addBody(null, {
+  gravityScale: 0,
+  colliders: { shape: 'box', halfExtents: [0.08, 0.01, 0.08], mass: 1 },
+});
 const spacing = 0.03;
 const film = await ThinFilmSolver.load({ drops: true });
 const flight = new ThinFilmDropFlight(film.dropsField);
-const tray = await ThinFilmSolver.load({ id: 'tray', impacts: flight.impactField });
-const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
+const tray = await ThinFilmSolver.load({ id: 'tray', rigid: true, impactRecoil: true, impacts: flight.impactField });
+world.add(new RigidSolver(), { physics });
+world.add(film, {
   cells: [1, 1],
   spacing,
   origin: [0, 0.07, 0],
@@ -5012,9 +5021,10 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
 }).add(flight, {
   receiver: { origin: [-0.04, 0.0002, 0.05], size: [0.12, 0.12] },
-}).add(tray, { origin: [-0.04, 0, 0.05], cells: [6, 6], spacing: 0.02, depth: 0.0002 });
+}).add(tray, { bodyRow: mount.row, origin: [-0.04, 0, 0.05], cells: [6, 6], spacing: 0.02, depth: 0.0002 });
+world.couple(['rigid', 'tray'], 'staggered');
 world.advance(420);
-console.log(film.heldDripVolume, flight.readDrops(), tray.budget.impacts);
+console.log(tray.budget.impacts, mount.linearVelocity[1]);
 ```
 
 `dropsField` publishes one timed record per rim in its origin cell. Read its end-of-tick XYZ, the rim's XYZ
@@ -5029,6 +5039,9 @@ airborne and departed volumes. By default each drop can stay in the flight domai
 For an absorbing tray, set `receiver` to its static free-surface plane and extent. Match its UV
 axes and put both solvers in the same world cell. Give the tray `flight.impactField` to receive
 the captured volume and normal speed. `depositedVolume` is the captured share of flight outflow.
+An absorbing film mounted on a rigid body can use `impactRecoil: true` to send each impulse and
+its torque to the mount. This is off by default. Use either the mount or a wake as the impact
+momentum receiver.
 
 To transfer the film's normal weight and moment to a mounted body, enable `hydrostaticLoad`
 and add the rigid solver before the film. Couple the two solvers with the staggered scheme.
