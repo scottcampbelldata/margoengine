@@ -10,8 +10,9 @@
 // turn times the farthest point of the shape from its centre, so advancing time by gap over that speed never passes
 // the first touch. The pose between the two ends is the centre moved in a straight line and the rotation turned through the
 // angle the step turned it, spin times the step: the whole of it, not the short arc to the end rotation, which reads a turn of
-// 2 pi minus a little as a little the other way and would let a fast spinner's tip pass through a thin wall unseen. A pair that already touches at the step's start is left to the contact
-// solver: a resting body must not be pinned at time 0.
+// 2 pi minus a little as a little the other way and would let a fast spinner's tip pass through a thin wall unseen. A pair that already touches at the step's start is swept against the
+// gap it began with, stopped only where it closes by more than the contact solver takes out in a step: a resting or sliding body
+// is not pinned at time 0, but a long body that swings its length into the face it touches is (KB-PHYSICS2D-CCD-SPIN1).
 //
 // With `Settings::max_ccd_substeps` above 1 an impact before the last is answered as the contact solver answers a contact: the normal
 // impulse that stops the approach, friction along the contact held to the grip that impulse gives, then the restitution impulse, from the
@@ -31,6 +32,11 @@ use crate::world::{
     ContactMod, EVENT_COLLISION, EVENT_CONTACT_FORCE, Event, EventKind, ForceEvent, HOOK_CONTACT, Kind, SPECULATIVE, World, bounds_of, groups_meet, pair_allowed,
 };
 
+
+/// How far a pair that already touches when a step begins may close past its starting gap before the sweep stops it, m: the
+/// penetration the contact solver takes out in a step (four times the linear slop), so resting and sliding contacts, whose gap
+/// barely moves, are left to it.
+const TOUCHING_ALLOWANCE: f32 = 4.0 * LINEAR_SLOP;
 
 /// Where a body was when the step began: its centre of mass (in doubles) and rotation.
 #[derive(Clone, Copy, Debug)]
@@ -186,10 +192,18 @@ impl World {
                             Ok(m.points[..m.count].iter().fold(f32::INFINITY, |least, p| least.min(p.separation)))
                         };
                         let first = gap_at(0.0)?;
-                        // A pair already touching at the start belongs to the contact solver; one with no points is out of reach.
-                        if !first.is_finite() || first <= 2.0 * LINEAR_SLOP {
+                        // One with no points is out of reach.
+                        if !first.is_finite() {
                             continue;
                         }
+                        // A pair apart at the start is swept to its touch. A pair already touching is swept too, but to where its gap has
+                        // closed by more than `TOUCHING_ALLOWANCE` past the gap it began with: a body resting on or sliding along a face
+                        // keeps that gap and is not stopped (it must not be pinned at time 0), while one whose turn drives its length into
+                        // the face is caught where it would go through, which the contact solver, seeing only the closest points at the
+                        // step's start, cannot do (KB-PHYSICS2D-CCD-SPIN1).
+                        let floor = if first <= 2.0 * LINEAR_SLOP { first - TOUCHING_ALLOWANCE } else { 0.0 };
+                        let gap_at = |t: f32| -> Result<f32, PhysicsError> { Ok(gap_at(t)? - floor) };
+                        let first = first - floor;
                         let (mut t, mut gap, mut found) = (0.0f32, first, None);
                         // No advances at all: the time reached is the step's start, before any touch.
                         if max_advances == 0 {

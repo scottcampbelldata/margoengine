@@ -6,6 +6,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: a long thin body that hit a wall hard and spinning swung through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
+
+- **Repro:** a 2 m by 0.1 m box with `ccd: true`, moving at 150 m/s and turning at 8 rad/s toward a 0.1 m thick wall,
+  in the own 2D kernel (`packages/physics2d/kernel`). `ccd` set it back to the first touch. On the next step the contact
+  turned it at about 112 rad/s about the touching end, and the step swept the rest of its length through the wall: its
+  centre ended beyond the wall at step 4.
+- **Cause:** continuous collision (`kernel/src/ccd.rs`) left a pair that already touched when a step began to the
+  contact solver alone, so that a body at rest is not pinned at time 0. The contact solver sees only the closest points
+  of the manifold at the step's start, and a turn of 1.9 rad inside one step is not covered by them.
+- **Fix:** a touching pair is swept too, by the same conservative advancement, against the gap it began with: it is
+  stopped only where that gap closes by more than four times the linear slop (`TOUCHING_ALLOWANCE`, the penetration the
+  contact solver takes out in a step). A body resting on or sliding along a face keeps its gap and is not stopped; a long
+  body whose turn drives its length into the face is caught where it would go through.
+- **Regression:** `packages/physics2d/kernel/tests/ccd.rs`
+  "a_long_bar_hitting_a_wall_hard_and_spinning_does_not_swing_through_it_after_the_first_touch" (spins 8, -8 and
+  20 rad/s, 60 steps), with "a_body_resting_on_the_floor_is_not_pinned_by_ccd" still passing.
+
 ### Fixed in part 2026-11-26: the voxel path tracer had no subsurface under a diffuse surface (KB1673, voxel-pathtracer)
 
 - **Repro (before):** a `media` material is a cloud: a ray that grazes its edge crosses little of it and sees through,
@@ -2462,19 +2479,6 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Repro:** `node --test packages/ragdoll/tests/balance.test.js`: on the kernel's cone joint the four "pushed ... it steps that way, catches itself and stands" tests ended in `fallen` after a 1.5 m/s push of the upper body; "motors alone sink" expected Rapier's ankles to roll over.
 - **Cause:** the A/B of `packages/ragdoll/scripts/balance-ab.mjs` showed the two solvers agree (the kernel with the ragdoll's earlier ball joint and limit projection recovers all four pushes as Rapier did). On Rapier the projection did not hold a cone under a planted foot: the stance ankle turned to a twist of -2.76 rad against a +-0.2 limit and a swing of 1.36 rad against 0.6, and the controller's recovery leaned on it. With limits that hold, three controller faults showed: the swing foot's target ignored the body's heading and the joint limits; a planted foot that a push lifted set its own target in the air, so the body had no support; and every step took the full `stepTime` while the capture point ran away from the stance foot as e^(omega t), so steps landed short.
 - **Fix:** both feet take a level target inside the ankle's cone, the swing foot heading with the hips (SIMBICON); a planted foot's target stays on the ground and a lifted foot steps next; each step's time follows the capture point, ln(reach / d) / omega, no less than 0.4 / omega (step timing adaptation, Khadiv et al. 2020). "Motors alone sink" is an accepted difference (`docs/limits.md`). The four push tests pass at their 1.5 m/s, and the acceptance sweep (`--sweep`) recovers all 120 cases. Regression: the four push tests and "a swing foot is sent a level target inside its ankle limits" in `packages/ragdoll/tests/balance.test.js`.
-
-### Open 2026-11-24: a long thin body that hits a wall hard and spinning swings through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
-
-- **Repro:** a 2 m by 0.1 m box with `ccd: true`, moving at 150 m/s and turning at 8 rad/s toward a 0.1 m thick wall,
-  in the own 2D kernel (`packages/physics2d/kernel`, the scene of `tests/ccd.rs` with a longer box): `ccd` sets it
-  back to the first touch, but on the next step the contact turns it at about 112 rad/s about the touching end, and the
-  step sweeps the rest of its length through the wall; its centre ends beyond the wall.
-- **Cause:** continuous collision (`kernel/src/ccd.rs`) leaves a pair that already touches when a step begins to the
-  contact solver, so that a body at rest is not pinned at time 0, and the contact solver only sees the closest points of
-  the manifold at the start of the step: a turn of 1.9 rad inside one step is not covered by them. A sweep that tells a
-  body sliding along a face from one swinging into it (a time-of-impact on the turning shapes with the touching pair's
-  closing speed as its bound) is the fix; the shorter and slower cases the tests cover are stopped.
-- **Needs:** a kernel change with a regression test; open until then (limits.md, "Own 2D continuous collision").
 
 ### Fixed 2026-11-20: ambient occlusion no longer darkened the dune coast's grass (KB-SCENES-DUNE-GTAO1, scatter)
 

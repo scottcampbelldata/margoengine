@@ -526,3 +526,22 @@ fn few_advances_and_a_long_least_advance_stop_the_ball_short_of_the_wall_and_nev
     // One shorter than the advances it needs changes nothing.
     assert!((stopped_ball(Settings { min_ccd_dt: 1.0e-9, ..Default::default() }) - 2.85).abs() < 0.01);
 }
+
+#[test]
+fn a_long_bar_hitting_a_wall_hard_and_spinning_does_not_swing_through_it_after_the_first_touch() {
+    // KB-PHYSICS2D-CCD-SPIN1: a 2 m by 0.1 m bar at 150 m/s, turning at 8 rad/s, hits a 0.1 m wall. Continuous collision set it
+    // back to the first touch, but a pair touching when a step began was left to the contact solver alone, which sees only the
+    // closest points at the step's start: the touch turned the bar about its touching end at about 112 rad/s and the next step
+    // swept its length through the wall. A touching pair is now swept too, against the gap it began with: a turn that drives it
+    // in is caught, while a body sliding along or resting on a face keeps its gap and is not stopped.
+    let bar = Core::rect(1.0, 0.05, V2::ZERO, 1.0, 0.0, 0.0).unwrap();
+    for spin in [8.0f32, -8.0, 20.0] {
+        let (mut w, b) = wall_and_bullet(true, 150.0, bar);
+        w.bodies[b as usize].angular_velocity = spin;
+        for step in 0..60 {
+            w.step(DT).unwrap();
+            let x = w.bodies[b as usize].xf.p.x;
+            assert!(x < 10.0, "spin {spin}: step {step}, the bar's centre at x {x} is through the wall");
+        }
+    }
+}
