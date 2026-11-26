@@ -10,7 +10,7 @@ export const CRACK_FRONT_SHIFT = 6;
 export const CRACK_FRONT_MASK = 63 << CRACK_FRONT_SHIFT;
 export const UNREPRESENTABLE_CELL = 1 << 12;
 
-/** A triangular weak patch in a single tetrahedron, opened by positive normal Green strain. */
+/** A triangular weak patch in a single tetrahedron with tensile and optional shear thresholds. */
 export interface SoftTensileSeam {
   /** The cell containing the patch, numbered in the order supplied to `setCells`. */
   readonly cell: number;
@@ -18,6 +18,10 @@ export interface SoftTensileSeam {
   readonly triangle: Triangle;
   /** Dimensionless normal Green strain that opens the patch. */
   readonly openingStrain: number;
+  /** Engineering shear strain perpendicular to the triangle's first edge. Omit to disable sliding failure. */
+  readonly slidingStrain?: number;
+  /** Engineering shear strain parallel to the triangle's first edge. Omit to disable tearing failure. */
+  readonly tearingStrain?: number;
 }
 
 export interface BoundTensileSeam {
@@ -25,6 +29,7 @@ export interface BoundTensileSeam {
   readonly corners: Tet;
   readonly coordinates: Triangle;
   readonly direction: Vec3;
+  readonly shear: readonly { direction: Vec3; threshold: number }[];
   readonly openingStrain: number;
   readonly orientation: number;
 }
@@ -37,7 +42,7 @@ const vectorAt = (origin: Vec3, edges: Edges, weights: Vec3): Vec3 =>
 const volumeMatrix = ([a, b, c]: Edges): Edges => [cross(b, c), cross(c, a), cross(a, b)];
 
 export function bindTensileSeam(
-  { cell, triangle, openingStrain }: SoftTensileSeam,
+  { cell, triangle, openingStrain, slidingStrain, tearingStrain }: SoftTensileSeam,
   particles: readonly number[],
   cells: readonly number[],
 ): BoundTensileSeam {
@@ -45,6 +50,12 @@ export function bindTensileSeam(
     throw new RangeError('A tensile seam needs a valid cell index. Choose a tetrahedron from setCells.');
   if (!Number.isFinite(openingStrain) || openingStrain <= 0)
     throw new RangeError('A tensile seam needs a finite strain above zero. Pass a dimensionless openingStrain.');
+  for (const limit of [slidingStrain, tearingStrain]) {
+    if (limit !== undefined && (!Number.isFinite(limit) || limit <= 0))
+      throw new RangeError(
+        'A seam shear limit needs a finite strain above zero. Pass a positive strain or omit the limit.',
+      );
+  }
   if (!Array.isArray(triangle) || triangle.length !== 3)
     throw new RangeError('A tensile seam is triangular. Pass three points in the tetrahedron in rest space.');
   for (const point of triangle) checkVec(point, 'Tensile seam point');
@@ -63,7 +74,8 @@ export function bindTensileSeam(
     return q;
   };
   const [p, q, r] = triangle;
-  const normal = cross(subtract(q, p), subtract(r, p));
+  const firstEdge = subtract(q, p);
+  const normal = cross(firstEdge, subtract(r, p));
   const length = Math.sqrt(dot(normal, normal));
   if (!(length > 0 && Number.isFinite(length)))
     throw new RangeError('The tensile seam has no finite area. Use three noncollinear rest-space points.');
@@ -71,11 +83,21 @@ export function bindTensileSeam(
   const onFace = (weight: number): boolean => Math.abs(weight) <= coordinateTolerance;
   if (axes.some((i) => points.every((v) => onFace(v[i]))) || points.every(([x, y, z]) => onFace(1 - x - y - z)))
     throw new RangeError('The tensile seam lies on a cell face. Move at least one point into the tetrahedron.');
+  const unitNormal = coordinates((i) => normal[i] / length);
+  const shear: { direction: Vec3; threshold: number }[] = [];
+  if (slidingStrain !== undefined || tearingStrain !== undefined) {
+    const edgeLength = Math.sqrt(dot(firstEdge, firstEdge));
+    const tangent = coordinates((i) => firstEdge[i] / edgeLength);
+    if (slidingStrain !== undefined)
+      shear.push({ direction: inCell(cross(tangent, unitNormal)), threshold: slidingStrain });
+    if (tearingStrain !== undefined) shear.push({ direction: inCell(tangent), threshold: tearingStrain });
+  }
   return {
     cell,
     corners: [a, b, c, d],
     coordinates: points,
-    direction: inCell(coordinates((i) => normal[i] / length)),
+    direction: inCell(unitNormal),
+    shear,
     openingStrain,
     orientation: Math.sign(determinant),
   };
@@ -86,8 +108,19 @@ export function openTensileSeam(seam: BoundTensileSeam, at: (particle: number) =
   const origin = at(a);
   const edges: Edges = [subtract(at(b), origin), subtract(at(c), origin), subtract(at(d), origin)];
   if (!(seam.orientation * dot(edges[0], cross(edges[1], edges[2])) > 0)) return null;
-  const stretched = vectorAt([0, 0, 0], edges, seam.direction);
-  if (!(0.5 * (dot(stretched, stretched) - 1) > seam.openingStrain)) return null;
+  const image = (direction: Vec3): Vec3 => vectorAt([0, 0, 0], edges, direction);
+  const stretched = image(seam.direction);
+  const opening = 0.5 * (dot(stretched, stretched) - 1);
+  if (!(opening > seam.openingStrain)) {
+    if (seam.shear.length === 0) return null;
+    const relativeOpening = Math.max(0, opening) / seam.openingStrain;
+    let used = relativeOpening * relativeOpening;
+    for (const { direction, threshold } of seam.shear) {
+      const relativeShear = dot(stretched, image(direction)) / threshold;
+      used += relativeShear * relativeShear;
+    }
+    if (!(used > 1)) return null;
+  }
   const [u, v, w] = seam.coordinates;
   return [vectorAt(origin, edges, u), vectorAt(origin, edges, v), vectorAt(origin, edges, w)];
 }

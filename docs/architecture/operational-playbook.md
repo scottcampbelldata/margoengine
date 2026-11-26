@@ -10068,6 +10068,8 @@ A tensile seam evaluates normal Green strain in its intact tetrahedron after nat
 The seam rides the cell in affine coordinates. When the prescribed positive opening is exceeded,
 the finite cut builds real separate lips, transfer preserves linear momentum, and the common
 tear event reports the source cell. An intact snapshot replays the same opening and state hash.
+Authored weak patches may set independent sliding and tearing limits. The material-frame
+normal and both shear terms share a quadratic strain envelope before geometry is opened.
 
 The unseeded option scans the existing native cell state after contact, bounds the maximum
 strain and diagonalizes the surviving symmetric tensors. The principal direction orients the

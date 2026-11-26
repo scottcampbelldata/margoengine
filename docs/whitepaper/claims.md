@@ -81,6 +81,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   rotated fixture, both lips have their analytically expected area. Restoring an intact snapshot
   repeats the opening and final hash. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Mixed-mode authored seams (SOFT-04, 2026-11-26). Two independent engineering shear limits
+  trigger an internal fracture in a rotated tetrahedron. Combined opening, sliding and tearing
+  advance at the predicted quadratic envelope even when the individual modes are subcritical.
+  Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Principal-strain tensile nucleation (SOFT-04, 2026-11-26). The unseeded option opens the
   principal strain plane inside a tetrahedron under a derived native tensile load. Closed
   fragment surfaces expose the analytically predicted area, and replay preserves the

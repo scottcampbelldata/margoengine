@@ -793,6 +793,9 @@ console.log(pieces[0]?.triangles().length); // one solid with the two new incisi
 tetrahedron. The triangle uses the descriptor's rest coordinates in metres. The patch moves
 with the material and opens when the strain normal to it exceeds the dimensionless
 `openingStrain`. There is no seam by default. Pass `null` to clear one on the descriptor.
+`slidingStrain` and `tearingStrain` add optional engineering shear limits. The first triangle
+edge gives the tearing direction. Sliding is across that edge, within the plane.
+The seam can open when the sum of squared strain ratios exceeds one.
 `soft.onTear` reports the original cell index and the live replacement pieces.
 
 ```ts
@@ -808,6 +811,8 @@ const solid = soft.create(new SoftBodyDesc([[0, 0, 0], [2, 0, 0], [0, 2, 0], [0,
     cell: 0,
     triangle: [[0.5, 0.2, 0.2], [0.5, 0.65, 0.2], [0.5, 0.2, 0.65]],
     openingStrain: 0.005,
+    slidingStrain: 0.006,
+    tearingStrain: 0.01,
   }));
 soft.onTear(({ pieces }) => console.log(pieces.length)); // one solid with an internal crack
 solid.setParticleKinematicTarget(1, [2.02, 0, 0]);

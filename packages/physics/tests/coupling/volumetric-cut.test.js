@@ -611,6 +611,76 @@ test('a tensile seam rejects points outside its material cell and purely face-al
     specimen(tetrahedron().setTensileSeam({ cell: 0, triangle: position.slice(0, 3), openingStrain: 0.01 })),
     /lies on a cell face/,
   );
+  await assert.rejects(
+    specimen(
+      tetrahedron().setTensileSeam({
+        cell: 0,
+        triangle: [
+          [0.5, 0.2, 0.2],
+          [0.5, 0.65, 0.2],
+          [0.5, 0.2, 0.65],
+        ],
+        openingStrain: 0.01,
+        slidingStrain: 0,
+      }),
+    ),
+    /positive strain or omit/,
+  );
+});
+
+test('an authored seam uses independent sliding and tearing limits with quadratic mode interaction', async () => {
+  const openingStrain = 0.02;
+  const slidingStrain = 0.03;
+  const tearingStrain = 0.05;
+  const fracture = {
+    cell: 0,
+    triangle: [
+      [0.5, 0.2, 0.2],
+      [0.5, 0.65, 0.2],
+      [0.5, 0.2, 0.65],
+    ],
+    openingStrain,
+    slidingStrain,
+    tearingStrain,
+  };
+  const cases = [
+    [
+      [0, 0.99, 0],
+      [0, 1.01, 0],
+    ],
+    [
+      [0, 0, -0.99],
+      [0, 0, -1.01],
+    ],
+    [
+      [0.5, 0.5, 0.5],
+      [0.6, 0.6, 0.6],
+    ],
+  ];
+  for (const [under, over] of cases) {
+    const { soft, body, world } = await specimen(
+      tetrahedron().setPinnedParticles([0, 1, 2, 3]).setTensileSeam(fracture),
+    );
+    const events = [];
+    soft.onTear((event) => events.push(event));
+    const strain = ([normal, slide, tear], frame) => {
+      const yShear = tear * tearingStrain;
+      const zShear = slide * slidingStrain;
+      // With first edge e_y and normal e_x, the engineering shears are F_x dot F_y and F_x dot F_z.
+      // Prescribe the exact normal Green strain independently of the two engineering shears.
+      const xStretch = Math.sqrt(1 + 2 * normal * openingStrain - yShear * yShear - zShear * zShear);
+      for (const [i, [x, y, z]] of position.entries())
+        body.setParticleKinematicTarget(i, [3 - y - yShear * x, 1 + xStretch * x, z + zShear * x]);
+      world.advance(frame);
+    };
+    strain([-0.1, 0, 0], 1);
+    strain(under, 2);
+    assert.equal(events.length, 0);
+    strain(over, 3);
+    assert.equal(events.length, 1);
+    assert.deepEqual(events[0].cells, [0]);
+    assert.equal(events[0].pieces.length, 1);
+  }
 });
 
 test('applied tensile force opens an authored or nucleated crack inside the tetrahedron', async () => {

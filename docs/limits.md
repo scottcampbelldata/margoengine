@@ -9659,9 +9659,11 @@ require their own state transfer.
 An optional tensile seam opens one authored triangle inside a cell. It samples the cell after
 the soft step, and consumes the seam when the topology changes. Use it with an unskinned tetrahedral
 solid without springs, clusters or other native fracture criteria. The intact body has the usual
-elasticity up to the strain threshold. Normal compression, inverted cells and pure rigid rotation
-cannot trigger the seam. Restore an intact snapshot into the same topology with the same authored
-seam to replay the event.
+elasticity up to the strain threshold. The authored option can combine tension, in-plane
+sliding and tearing along the first edge of the triangle. A shear term is inactive unless
+its limit is supplied. Normal compression contributes zero, pure rigid rotation preserves
+the strain and inverted cells wait until they recover. Restore an intact snapshot into the
+same topology with the same authored seam to replay the event.
 With tensile seams the optional entry is 138,830 B gzip, including 43,642 B in its base.
 
 Unseeded tensile nucleation scans the cells once after the soft step. It selects the largest

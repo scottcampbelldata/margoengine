@@ -191,6 +191,16 @@ Faraji (2016), Table 9.1, and the elastic outer-fiber strain `Mc/(EI)`.
 [Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates](https://www.cs.cmu.edu/~jrs/jrspapers.html)
 [Fundamentals of Structural Engineering](https://doi.org/10.1007/978-3-319-24331-3).
 
+Camanho and Dávila (2002), Eq. 27, combine the positive opening and two signed shear
+tractions in a quadratic failure envelope. The Abaqus cohesive-element reference gives
+the corresponding nominal-strain form. Margo uses the envelope with the rest-frame normal
+Green strain and engineering shears `2nᵀEt` and `2nᵀEe`, where `e` is the first edge of
+the authored triangle and `t` is perpendicular to it within the seam. Compression
+contributes zero to the normal term. The tests prescribe an affine deformation and
+independently verify both shear modes and their interaction with tensile opening.
+[Mixed-Mode Decohesion Finite Elements for the Simulation of Delamination in Composite Materials](https://ntrs.nasa.gov/api/citations/20020053651/downloads/20020053651.pdf)
+[Quadratic nominal strain criterion](https://docs.software.vt.edu/abaqusv2026/English/SIMACAEELMRefMap/simaelm-c-cohesivebehavior.htm).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
