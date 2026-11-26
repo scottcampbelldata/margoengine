@@ -299,7 +299,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | LANDED d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | LANDED 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
-| EARTH-10 | Lava flow | partial | Codex | BUILDING (codex/physics-lane-2) |
+| EARTH-10 | Lava flow | partial | Codex | LANDED eed6fb94dd |
 | ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | LANDED 7f5ad4a8d2 |
 | ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | LANDED 096242cb21 |
 | ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | LANDED 7dbf9e06ee |
