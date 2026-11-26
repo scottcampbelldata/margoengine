@@ -2,7 +2,7 @@
 // and the rebase finishes; a conflict in a source file stops it.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
@@ -18,8 +18,16 @@ const env = {
 };
 const SIZES = 'scripts/quality/baselines/sizes.json';
 const sizes = (items, history = []) =>
-  JSON.stringify({ gate: 'sizes', total: Object.values(items).reduce((a, b) => a + b, 0), history, items }, null, 2) +
-  '\n';
+  JSON.stringify(
+    {
+      gate: 'sizes',
+      total: Object.values(items).reduce((a, b) => a + b, 0),
+      history,
+      items,
+    },
+    null,
+    2,
+  ) + '\n';
 
 /** A clone with a `work` branch and an origin/main that moved on; `files` maps path to [base, upstream, work]. */
 function repository(t, files) {
@@ -56,7 +64,12 @@ function repository(t, files) {
   git(clone, 'checkout', '-q', 'work');
   const read = (path) => readFileSync(join(clone, path), 'utf8').replace(/\r\n/g, '\n');
   const rebase = (runEnv = env) =>
-    spawnSync(process.execPath, [script], { cwd: clone, env: runEnv, encoding: 'utf8', timeout: 120_000 });
+    spawnSync(process.execPath, [script], {
+      cwd: clone,
+      env: runEnv,
+      encoding: 'utf8',
+      timeout: 120_000,
+    });
   return { clone, git: (...args) => git(clone, ...args), read, rebase };
 }
 
@@ -101,30 +114,79 @@ test('a conflict in a source file stops the rebase, names it, and a second run f
   assert.equal(repo.read('site/llms.txt'), 'a both\nb\n');
 });
 
-test('a conflict in docs/api-surface.md takes upstream, regenerates the changed package and leaves one count line', (t) => {
-  // The stub rewrites only the first count line, as the real writer rewrites the one it finds; a union merge would
-  // leave two count lines behind and one of them stale.
-  const writer = Array(3).fill(
-    "import { readFileSync, writeFileSync } from 'node:fs';\n" +
-      "const text = readFileSync('docs/api-surface.md', 'utf8').replace(/^count \\d+$/m, 'count 3');\n" +
-      "writeFileSync('docs/api-surface.md', text + process.argv.slice(2).join(' ') + '\\n');\n",
-  );
+const surface = (total, rows) =>
+  [
+    '# Public API surface',
+    '',
+    total,
+    '',
+    '| Package | Exports per entry | Unexported | `any` | Gzip |',
+    '| --- | --- | ---: | ---: | ---: |',
+    ...rows,
+    '',
+  ].join('\n');
+const row = (name, entries, unexported = '') => `| ${name} | ${entries} | ${unexported} |  | 1,000 |`;
+// Each run of the stubbed API report leaves its arguments in the git directory: the work count.
+const generators = {
+  'docs/a.md': ['a\n', 'a\n', 'a\n'],
+  'docs/b.md': ['b\n', 'b\n', 'b\n'],
+  'site/llms.txt': ['a\nb\n', 'a\nb\n', 'a\nb\n'],
+  'scripts/api-report.js': Array(3).fill(
+    "import { appendFileSync } from 'node:fs';\n" +
+      "appendFileSync('.git/reports.log', process.argv.slice(2).join(' ') + '\\n');\n",
+  ),
+  'scripts/generate-all-entries.mjs': Array(3).fill('\n'),
+};
+const reports = (repo) => (existsSync(join(repo.clone, '.git/reports.log')) ? repo.read('.git/reports.log') : '');
+
+test('a branch that adds entries merges the api-surface rows and builds no report, re-export packages included', (t) => {
+  const post = row('@margoengine/post', '`.` 3, `./settings` 1', 2),
+    scene = row('@margoengine/scene', '`.` 5'),
+    sceneUpstream = row('@margoengine/scene', '`.` 6, `./up` 2'),
+    postBranch = row('@margoengine/post', '`.` 3, `./lut` 4, `./settings` 1', 5);
   const repo = repository(t, {
-    'docs/a.md': ['a\n', 'a\n', 'a\n'],
-    'docs/b.md': ['b\n', 'b\n', 'b\n'],
-    'docs/api-surface.md': ['count 1\nz\n', 'count 2\nupstream row\nz\n', 'count 2\nbranch row\nz\n'],
-    'packages/scene/package.json': ['{}\n', '{}\n', '{ }\n'],
-    'scripts/api-report.js': writer,
-    'scripts/generate-all-entries.mjs': Array(3).fill('\n'),
-    'site/llms.txt': ['a\nb\n', 'a\nb\n', 'a\nb\n'],
+    ...generators,
+    'docs/api-surface.md': [
+      surface('2 packages, 3 entries, 9 exported names.', [post, scene]),
+      surface('2 packages, 4 entries, 12 exported names.', [post, sceneUpstream]),
+      surface('2 packages, 4 entries, 13 exported names.', [postBranch, scene]),
+    ],
+    'api/post.lut.api.md': ['', '', 'lut\n'],
+    'api/scene.api.md': ['s\n', 's upstream\n', 's\n'],
+    'api/margoengine.api.md': ['m\n', 'm upstream\n', 'm\n'],
+    'packages/post/package.json': ['{}\n', '{}\n', '{ }\n'],
+    'packages/margoengine/package.json': ['{}\n', '{}\n', '{ }\n'],
   });
   const result = repo.rebase();
   assert.equal(result.status, 0, result.stderr);
-  const rows = repo.read('docs/api-surface.md').split('\n');
-  assert.equal(rows.filter((row) => /^count \d+$/.test(row)).length, 1, rows.join('|'));
-  assert.ok(rows.includes('upstream row'), "upstream's rows stay");
-  assert.ok(rows.includes('--update --package=scene'), 'the changed package is regenerated');
+  assert.equal(reports(repo), '', 'no API report runs');
+  assert.equal(
+    repo.read('docs/api-surface.md'),
+    surface('2 packages, 5 entries, 16 exported names.', [postBranch, sceneUpstream]),
+  );
+  assert.equal(repo.read('api/margoengine.api.md'), 'm upstream\n');
   assert.equal(repo.git('status', '--porcelain'), '');
+});
+
+test('both sides changing one api-surface row keep the entries of both', (t) => {
+  const post = (entries, unexported) => row('@margoengine/post', entries, unexported);
+  const repo = repository(t, {
+    ...generators,
+    'docs/api-surface.md': [
+      surface('1 packages, 2 entries, 4 exported names.', [post('`.` 3, `./settings` 1', 2)]),
+      surface('1 packages, 3 entries, 9 exported names.', [post('`.` 3, `./ssr` 5, `./settings` 1', 3)]),
+      surface('1 packages, 3 entries, 11 exported names.', [post('`.` 4, `./lut` 6, `./settings` 1', 6)]),
+    ],
+    'api/post.ssr.api.md': ['', 'ssr\n', ''],
+    'api/post.lut.api.md': ['', '', 'lut\n'],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(reports(repo), '');
+  assert.equal(
+    repo.read('docs/api-surface.md'),
+    surface('1 packages, 4 entries, 16 exported names.', [post('`.` 4, `./ssr` 5, `./lut` 6, `./settings` 1', 7)]),
+  );
 });
 
 test('a clean rebase runs no generator and adds no commit', (t) => {
@@ -146,22 +208,19 @@ test('a clean rebase runs no generator and adds no commit', (t) => {
   assert.equal(repo.git('log', '--format=%s').trim(), 'work\nupstream\nbase');
 });
 
-test('a conflict in a later generated-only commit regenerates only the package the branch changed', (t) => {
-  const stub = (body) =>
-    Array(3).fill(`import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';\n${body}\n`);
+test('a report both sides changed, in a later generated-only commit, is built for its package alone', (t) => {
   const repo = repository(t, {
-    'docs/a.md': ['a\n', 'a\n', 'a\n'],
-    'docs/b.md': ['b\n', 'b\n', 'b\n'],
-    'docs/api-surface.md': ['base\n', 'upstream\n', 'base\n'],
-    'packages/scene/package.json': ['{}\n', '{}\n', '{ }\n'],
-    'scripts/api-report.js': stub("appendFileSync('docs/api-surface.md', `${process.argv.slice(2).join(' ')}\\n`);"),
-    'scripts/generate-all-entries.mjs': stub(''),
-    'site/llms.txt': ['a\nb\n', 'a\nb\n', 'a\nb\n'],
+    ...generators,
+    'api/scene.api.md': ['base\n', 'upstream\n', 'base\n'],
+    'api/post.api.md': ['p\n', 'p\n', 'p work\n'],
+    'packages/scene/package.json': ['{}\n', '{}\n', '{}\n'],
+    'packages/post/package.json': ['{}\n', '{}\n', '{ }\n'],
   });
-  writeFileSync(join(repo.clone, 'docs/api-surface.md'), 'work\n');
+  writeFileSync(join(repo.clone, 'api/scene.api.md'), 'work\n');
   repo.git('commit', '-qam', 'generated');
   const result = repo.rebase();
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(repo.read('docs/api-surface.md'), 'upstream\n--update --package=scene\n');
+  assert.equal(reports(repo), '--update --package=scene\n');
+  assert.equal(repo.read('api/scene.api.md'), 'upstream\n');
   assert.equal(repo.git('status', '--porcelain'), '');
 });

@@ -69,6 +69,58 @@ export function mergeScopedApiSurface(current, replacement) {
   return lines.join('\n');
 }
 
+/**
+ * `ours` docs/api-surface.md with the rows a branch changed (`theirs` against `base`) merged in entry by entry, the
+ * totals line following the rows. scripts/rebase-main.mjs uses it in place of an API report run (KB-REBASE-SLOW1).
+ */
+export function mergeApiSurfaceRows(base, ours, theirs) {
+  const rows = (text) =>
+    new Map(
+      text
+        .replaceAll('\r\n', '\n')
+        .split('\n')
+        .filter((line) => /^\| (?:@margoengine\/|margoengine )/.test(line))
+        .map((line) => [packageName(line), line]),
+    );
+  const [b, o, t] = [base, ours, theirs].map(rows);
+  let merged = ours.replaceAll('\r\n', '\n');
+  for (const name of new Set([...b.keys(), ...t.keys()])) {
+    if (b.get(name) === t.get(name)) continue;
+    if (!t.has(name)) throw new Error(`${API_SURFACE}: the branch removed the ${name} row; run npm run api:update`);
+    const row = o.has(name) ? mergeRow(b.get(name), o.get(name), t.get(name)) : t.get(name);
+    merged = mergeScopedApiSurface(merged, { packageName: name, row, ...rowCounts(row) });
+  }
+  return merged;
+}
+
+/** One package row: the branch's entry changes applied to `ours`, its count changes added, a Gzip cell it set kept. */
+function mergeRow(base = '||||||', ours, theirs) {
+  const [b, o, t] = [base, ours, theirs].map((row) => row.split('|'));
+  const entries = (cell) => new Map([...cell.matchAll(/(`[^`]+`)\s+(\d+)/g)].map((match) => [match[1], match[2]]));
+  const [before, mine, branch] = [b, o, t].map((cells) => entries(cells[2]));
+  const list = [...mine].filter(([entry]) => branch.has(entry) || !before.has(entry));
+  const order = [...branch.keys()];
+  for (const [index, entry] of order.entries()) {
+    if (branch.get(entry) === before.get(entry)) continue;
+    const held = (name) => list.findIndex(([listed]) => listed === name);
+    if (held(entry) >= 0) list[held(entry)] = [entry, branch.get(entry)];
+    else {
+      // Where the branch has it: before the first of its following entries that the merged row holds.
+      const next = order
+        .slice(index + 1)
+        .map(held)
+        .find((position) => position >= 0);
+      list.splice(next ?? list.length, 0, [entry, branch.get(entry)]);
+    }
+  }
+  const sum = (column) => Number(o[column]) + Number(t[column]) - Number(b[column] ?? 0) || '';
+  o[2] = ` ${list.map(([entry, count]) => `${entry} ${count}`).join(', ')} `;
+  o[3] = ` ${sum(3)} `;
+  o[4] = ` ${sum(4)} `;
+  if (t[5] !== b[5]) o[5] = t[5];
+  return o.join('|');
+}
+
 // The Gzip column of docs/api-surface.md is the root entry's min+gzip bytes from the committed entry-sizes.json, not a
 // figure of its own. Bug (2026-11-10): a scoped report kept every old Gzip cell (its own row's too) and entry-sizes.mjs
 // rewrote the record without touching the column, so a lane that measured sizes after its api:check, or checked one
