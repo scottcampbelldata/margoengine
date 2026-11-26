@@ -44,7 +44,10 @@ window.runKernel = async ({ backend, module, rapier, box2d, rounds }) => {
     .createMesh()
     .setGeometry(box())
     .setMaterial(new PbrMaterial({ color: [1, 0.5, 0] }));
-  const { instance } = await WebAssembly.instantiateStreaming(fetch(module));
+  // The kernel times its steps through one import, `env.clock`, as the package's loader gives it (src/kernel.ts).
+  const { instance } = await WebAssembly.instantiateStreaming(fetch(module), {
+    env: { clock: () => performance.now() },
+  });
   const k = instance.exports,
     checks = [];
   for (let i = 0; i < k.checks(); i++) {
