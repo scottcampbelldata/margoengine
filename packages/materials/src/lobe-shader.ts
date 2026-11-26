@@ -4,7 +4,14 @@ import { coordinateExpression, coordinateWGSL } from './coordinates.js';
 import { iridescenceWGSL } from './iridescence.js';
 import { ggxNamed } from '../../shared/light-terms.js';
 import { sheenAlbedoWGSL, sheenBrdfWGSL, sheenHalfWGSL } from '../../shared/sheen.js';
-const materialGgx = /* @__PURE__ */ ggxNamed('materialA2', 'materialNH', 'materialNV', 'materialNL');
+const materialGgx = /* @__PURE__ */ ggxNamed(
+  'materialA2',
+  'materialNH',
+  'materialNV',
+  'materialNL',
+  's.n',
+  'materialH',
+);
 
 export interface LobeShaderConfig {
   /** [linear color RGB, roughness]. */

@@ -13,7 +13,7 @@ export const ggxDFloat: string;
 export const smithGCorrelated: string;
 /** {@link smithGCorrelated} with float literals. */
 export const smithGCorrelatedFloat: string;
-/** GGX distribution denominator (float literals) over the name nh (default 'nh'). */
-export function ggxDenominator(nh?: string): string;
-/** [ggxD, smithGCorrelated] over other names. */
-export function ggxNamed(a2: string, nh: string, nv: string, nl: string): [string, string];
+/** GGX distribution denominator `(max(|n x h|^2, step(nh, 0)) + a2 nh^2)` over vector names n and h (KB6016d). */
+export function ggxDenominatorOf(n: string, h: string, nh?: string, a2?: string): string;
+/** [ggxD, smithGCorrelated] over other names; n and h are the unit normal and half vector. */
+export function ggxNamed(a2: string, nh: string, nv: string, nl: string, n: string, h: string): [string, string];

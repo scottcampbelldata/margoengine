@@ -70,7 +70,7 @@ import {
   INSTANCE_WORDS,
   MODEL_WORDS,
 } from './layout.js';
-import { ggxDenominator } from '../../shared/light-terms.js';
+import { ggxDenominatorOf } from '../../shared/light-terms.js';
 
 /** Frame uniform shared by the trace and ids entry points (layout in layout.ts, FRAME_BYTES). */
 export const FRAME: string = /* wgsl */ `
@@ -135,7 +135,7 @@ fn basis(n:vec3f)->mat3x3f {
  let s=select(-1.0,1.0,n.z>=0.0);let a=-1.0/(s+n.z);let b=n.x*n.y*a;
  return mat3x3f(vec3f(1.0+s*n.x*n.x*a,s*b,-s*n.x),vec3f(b,s+n.y*n.y*a,-n.y),n);
 }
-fn ggxD(a2:f32,nh:f32)->f32 {let k=${/* @__PURE__ */ ggxDenominator()};return a2/(PI*k*k);}
+fn ggxD(a2:f32,n:vec3f,h:vec3f)->f32 {let nh=max(dot(n,h),0.0);let k=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};return a2/(PI*k*k);}
 fn lambdaG(a2:f32,c:f32)->f32 {let c2=max(c*c,1e-8);return 0.5*(sqrt(1.0+a2*(1.0-c2)/c2)-1.0);}
 fn fresnel(ci:f32,eta:f32)->f32 {
  let s2=eta*eta*max(0.0,1.0-ci*ci);
@@ -981,7 +981,7 @@ fn evalLobes(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
  e.pdf=pb*(1.0-pc)*ci*INV_PI;
  if((m.flags&SMOOTH)==0u){
   let h=normalize(wo+wi);let nh=dot(n,h);let vh=max(dot(wo,h),0.0);let a2=m.alpha*m.alpha;
-  let d=ggxD(a2,nh);let lo=lambdaG(a2,co);let g2=1.0/(1.0+lo+lambdaG(a2,ci));
+  let d=ggxD(a2,n,h);let lo=lambdaG(a2,co);let g2=1.0/(1.0+lo+lambdaG(a2,ci));
   let spec=d*g2/(4.0*co);
   let gloss=(mask&2u)!=0u;
   if(gloss){e.f+=(m.metal*schlick3(m.metalColor,vh)+pb*m.spec*schlick1(m.f0,vh))*spec;}

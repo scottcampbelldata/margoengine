@@ -1,4 +1,5 @@
 // Clean room from Tessendorf 1999-2004, equations 36-45, Hasselmann et al. 1973 and Cooley/Tukey 1965.
+import { ggxDenominatorOf } from '../../shared/light-terms.js';
 export function oceanCompute(resolution: number, cascades: number): string {
   return `
 const N=${resolution}u;
@@ -188,7 +189,7 @@ struct SurfaceVertex { @builtin(position) clip:vec4f, @location(0) world:vec3f, 
  let roughness=0.12;
  let alpha=roughness*roughness;
  let ndh=max(dot(normal,halfway),0.0);
- let denominator=ndh*ndh*(alpha*alpha-1.0)+1.0;
+ let denominator=${/* @__PURE__ */ ggxDenominatorOf('normal', 'halfway', 'ndh', '(alpha*alpha)')};
  let distribution=alpha*alpha/(3.14159265*max(denominator*denominator,0.000001));
  let ndl=max(dot(normal,direction),0.0);
  let glint=frame.radiance.rgb*frame.light.w*distribution*fresnel*ndl*0.25;

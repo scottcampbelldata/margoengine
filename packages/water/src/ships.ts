@@ -43,6 +43,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from 
 import type { Water } from './index.js';
 import { addSurfaceEffect, surfaceEffects } from './surface-effects.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
+import { ggxDenominatorOf } from '../../shared/light-terms.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -615,7 +616,7 @@ fn shipLamps(world:vec3f,n:vec3f,v:vec3f,waterRough:f32)->vec3f {
   let lamp=shipData.lamps[i*2u];let color=shipData.lamps[i*2u+1u].rgb;
   let toLamp=lamp.xyz-world;let dist2=max(dot(toLamp,toLamp),0.01);let l=toLamp*inverseSqrt(dist2);
   let nl=dot(n,l);if(nl<=0.0){continue;}
-  let h=normalize(l+v);let nh=max(dot(n,h),0.0);let q=nh*nh*(a2-1.0)+1.0;let dd=a2/(3.14159265*q*q);
+  let h=normalize(l+v);let nh=max(dot(n,h),0.0);let q=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};let dd=a2/(3.14159265*q*q);
   let fresnel=0.02+0.98*pow(1.0-max(dot(v,h),0.0),5.0);
   sum+=color*lamp.w*shipData.foam.w*dd*fresnel/(4.0*max(dot(n,v),0.05)*dist2)*nl;
  }

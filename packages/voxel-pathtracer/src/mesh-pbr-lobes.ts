@@ -36,7 +36,7 @@ fn pbrBaseEval(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
  let pick=pbrBasePick(m);e.pdf=(1.0-pick)*ci*INV_PI;
  if((mask&1u)!=0u){e.f=(1.0-m.metal)*(1.0-pbrPeak(fr))*m.color*ci*INV_PI;}
  if((m.flags&SMOOTH)==0u){
-  let a2=m.alpha*m.alpha;let d=ggxD(a2,max(dot(n,half),0.0));let lo=lambdaG(a2,co);
+  let a2=m.alpha*m.alpha;let d=ggxD(a2,n,half);let lo=lambdaG(a2,co);
   e.pdf+=pick*d/(4.0*co*(1.0+lo));
   if((mask&2u)!=0u){
    e.f+=fr*d/(4.0*co*(1.0+lo+lambdaG(a2,ci)));
@@ -66,7 +66,7 @@ fn pbrLayerEvalPrepared(m:Mat,n:vec3f,wo:vec3f,wi:vec3f,mask:u32)->Eval {
  e.f*=1.0-coat;
  let cc=dot(pbrLayer.coatN,wo);let cl=dot(pbrLayer.coatN,wi);
  if(cc>0.0&&cl>0.0&&pbrLayer.coatAlpha>0.0){
-  let a2=pbrLayer.coatAlpha*pbrLayer.coatAlpha;let d=ggxD(a2,max(dot(pbrLayer.coatN,half),0.0));let lo=lambdaG(a2,cc);
+  let a2=pbrLayer.coatAlpha*pbrLayer.coatAlpha;let d=ggxD(a2,pbrLayer.coatN,half);let lo=lambdaG(a2,cc);
   e.pdf+=weights.z*d/(4.0*cc*(1.0+lo));
   if((mask&2u)!=0u){e.f+=vec3f(coat*d/(4.0*cc*(1.0+lo+lambdaG(a2,cl))));}
  }

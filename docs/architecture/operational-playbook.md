@@ -1324,6 +1324,13 @@ user and scans every package's source for a separable product. Its guard is max(
 the denominator is never below 2 nl nv, and the old 1e-4 floor cut G2 to 0.02 of 0.71 on smooth grazing surfaces; the
 same test evaluates every G2 text down to nl = 1e-5, a2 = 1e-10. Core's copy takes the same 1e-30 floor since 2026-11-14 (`packages/core/tests/smith.test.js` checks its text at a2 = 1e-6, nl = nv = 0.001). Environment's split-sum DFG table
 integrates G2 too since KB6016b (2026-11-24; the batch 160 IBL picture moved +1.4 % against Mitsuba principled's separable G, an accepted difference in docs/limits.md, and 484,953 -> 447,308 against the exact G2 split-sum model). Missing: no multiple-scattering compensation in direct light.
+The GGX D is written |n x h|^2 + a2 nh^2 everywhere (KB6016c core and shared `ggxD`/`ggxDOf`; KB6016d,
+2026-11-26, the last seven sites: shared `ggxDenominatorOf(n, h)` and `ggxNamed(..., n, h)` for environment's probe and
+cube prefilters, voxel-pathtracer, materials' lobes and water's glints, ship lamps and FFT ocean), so float32 keeps D
+near the peak of a narrow lobe. Evidence: `tests/smith-shaders.test.js` scans every package and shared source for the
+cancelling nh^2 (a2 - 1) + 1, literal or templated, evaluates both forms in float32 at roughness 0.03 (scalar off by
+over 10 %, vector within 1e-5) and the new texts against the textbook D; core's own GPU check is
+`packages/core/tests/ggx-precision.browser.mjs`. Missing: no GPU-side precision readback for the seven sites.
 
 ### Section 5 evidence: dielectric Fresnel diffuse weight in core's direct light (2026-11-14)
 

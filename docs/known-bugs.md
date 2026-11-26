@@ -6,6 +6,42 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: ship lamp glints read the sea's roughness as GGX alpha, the sun glint as perceptual (KB-SHIPLAMP1, water)
+
+- **Repro:** packages/water/src/ships.ts `shipLamps` writes `a2 = max(rough^2, 1e-4)`, so its lobe has alpha = rough;
+  packages/water/src/index.ts `directionalGlint` writes alpha = rough^2, a2 = alpha^2 + the waves' slope variance
+  (`frame.foam.y`). With `lampRoughness: null` the lamps take the same `rough` as the sun glitter, so on one sea at
+  roughness 0.08 a lamp's lobe has alpha 0.08 and the sun's 0.0064 plus the variance. No test pins either width
+  (test/ships.browser.mjs checks only that a lamp adds a glint on the mirror line and a rougher sea spreads it).
+- **Cause:** two conventions for one roughness on one surface; the `lampRoughness` row (0.02 to 1) was written as an
+  alpha, while "null follows the Water's glitter" hands it the glitter's perceptual roughness.
+- **Plan:** the lamp lobe takes the sun glint's mapping and variance (one lobe per surface), with a GPU test comparing a
+  lamp's glint width with the sun glint's at equal roughness; the `lampRoughness` row's meaning follows the engine's
+  perceptual roughness. Found while fixing KB6016d.
+
+### Fixed 2026-11-26: seven GGX D sites still cancelled in float32 near a narrow lobe's peak (KB6016d)
+
+- **Repro (before):** the `nh^2 (a2 - 1) + 1` denominator in float32 at roughness 0.03 (a2 = 8.1e-7), with the half
+  vector 2e-5 to 8e-4 rad off the normal: D off by more than 10 % against f64 (tests/smith-shaders.test.js, "in float32
+  the vector GGX denominator keeps D"; KB6016c measured +28 % for core's copy on the GPU).
+- **Cause:** KB6016c moved core and the shared `ggxD` / `ggxDOf` to `|n x h|^2 + a2 nh^2`, but seven sites kept the
+  scalar form: shared `ggxDenominator(nh)` (environment probe prefilter, environment cube prefilter pdf, voxel-pathtracer
+  `ggxD`, water directional glints), shared `ggxNamed` (materials' lobes), and two written by hand (water ship lamp
+  glints, FFT ocean glint). Near the peak 1 - nh^2 is a few float32 steps of nh^2 while a2 is about 8e-7, so the
+  rounding of nh alone moved D.
+- **Fix:** shared `ggxDenominatorOf(n, h, nh, a2)` writes `max(|n x h|^2, step(nh, 0)) + a2 nh^2` over the vectors (the
+  scalar export is gone) and `ggxNamed` takes `n` and `h`; every site passes its vectors. The environment cube prefilter
+  passes its tangent-space sample (n = (0, 0, 1)), whose sin is computed without cancellation by `importanceGGX`; the
+  voxel-pathtracer's `ggxD(a2, n, h)` clamps n.h itself. Where n.h >= 0 the value is unchanged in exact arithmetic.
+- **Regression:** tests/smith-shaders.test.js: no package or shared source writes the cancelling form (literal or
+  template, which also fails on the parent's `${nh}*${nh}*(${a2}-1)+1`), the scalar export is gone, each former caller
+  passes n and h, `ggxDenominatorOf` and the `ggxNamed` D equal the textbook D (and a2 / pi where h faces away), and the
+  float32 evaluation of both forms. GPU: the test:gpu and browser chains of environment, materials, voxel-pathtracer and
+  water on WebGPU and the WebGL2 layer.
+- Sources: as KB6016c (Walter, Marschner, Li and Torrance 2007, eq. 33; Guy and Agopian, "Physically Based Rendering in
+  Filament", section 4.4.1; Goldberg 1991); Karis 2013, "Real Shading in Unreal Engine 4" (the GGX importance sample the
+  cube prefilter draws).
+
 ### Open 2026-11-26: an instanced caster keeps the cascades unfitted, so textured-instancing-gpu.mjs fails (KB-SHADOW-INSTFIT1, shadows)
 
 - **Repro:** `node examples/package-benchmarks/textured-instancing-gpu.mjs` (RTX A6000, Edge 158, WebGPU) fails
@@ -8153,8 +8189,8 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   core"; core 22,207 B -> 22,225 B, core + stage 24,808 B -> 24,825 B) and the shared `ggxD` / new `ggxDOf(n, h)` in
   packages/shared/light-terms.js, used by animation (VAT), clustered, gltf/pbr, lod imposters, materials (base, coat,
   eye, skin), post material decals, terrain, voxel and the WebGL2 preview. After the fix the worst error is 6e-5. Where the half vector faces away (dot(n, h) < 0, nh clamped to 0) the identity holds for the raw dot only: |n x h|^2 fell below 1 and reached 0 as h turned to -n, so D was unbounded on back-facing shading normals lit from the front (found by terrain's crest check on the WebGL2 layer, "weightedUncapped: 9 specks uncapped"); the term is max(|n x h|^2, step(nh, 0)), so D is a2 / pi there as before (+10 B, core 22,225 B).
-- **Still open (KB6016d):** the scalar `ggxDenominator(nh)` callers (environment prefilter and probes, water glints,
-  voxel-pathtracer) and materials' `ggxNamed` lobes keep the old form; they need the vectors passed in.
+- **Fixed since (KB6016d, 2026-11-26, above):** the scalar `ggxDenominator(nh)` callers (environment prefilter and probes, water glints,
+  voxel-pathtracer) and materials' `ggxNamed` lobes, and water's ship lamps and FFT ocean, kept the old form; they now pass the vectors.
 - **Regression:** packages/core/tests/ggx-precision.browser.mjs (core's own D statements on the GPU against f64, bound
   0.2 %, in core's test:gpu, native and WebGL2 layer, back-facing half vectors included); packages/core/tests/smith.test.js and
   tests/smith-shaders.test.js (D = a2 / pi where dot(n, h) < 0, for core and the shared ggxD, ggxDFloat, ggxDOf).

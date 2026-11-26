@@ -25,7 +25,7 @@ import { evaluateSH } from './sh.js';
 import { halfToFloat } from './half.js';
 import { common } from './shader-common.js';
 import { captureDevice } from './capture-device.js';
-import { ggxDenominator } from '../../shared/light-terms.js';
+import { ggxDenominatorOf } from '../../shared/light-terms.js';
 import { invertMatrix } from '@margoengine/math/mat4';
 import { unitLight } from '../../shared/unit-light.js';
 
@@ -547,7 +547,7 @@ var<workgroup> texelSum:array<vec4f,64>;
   var sum=vec4f(0);
   for(var j=0u;j<m*m;j++){
     let p=octDecode((vec2f(f32(j%m),f32(j/m))+0.5)/f32(m));let r=length(p);let l=p/r;let nl=dot(n,l);if(nl<=0.0){continue;}
-    let nh=dot(n,normalize(n+l));let q=${/* @__PURE__ */ ggxDenominator()};let w=a2/(q*q)*nl/(r*r*r);
+    let h=normalize(n+l);let nh=dot(n,h);let q=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};let w=a2/(q*q)*nl/(r*r*r);
     sum+=vec4f(probeTexel(bake.source+j)*w,w);
   }
   store(bake.offset+id.y*s+id.x,sum.rgb/max(sum.a,1e-20));

@@ -72,10 +72,20 @@ export const ggxDFloat = ggxD;
 export const smithGCorrelated = '2*nl*nv/max(nl*sqrt(a2+(1-a2)*nv*nv)+nv*sqrt(a2+(1-a2)*nl*nl),1e-30)';
 /** {@link smithGCorrelated} with float literals (core's WGSL and GLSL text). */
 export const smithGCorrelatedFloat = '2.0*nl*nv/max(nl*sqrt(a2+(1.0-a2)*nv*nv)+nv*sqrt(a2+(1.0-a2)*nl*nl),1e-30)';
-/** GGX distribution denominator `nh^2 (a2 - 1) + 1` (float literals) over the name `nh` (default 'nh'). */
-export const ggxDenominator = (nh = 'nh') => `${nh}*${nh}*(a2-1.0)+1.0`;
-/** {@link ggxD} and {@link smithGCorrelated} over other names, for shaders whose locals are prefixed. */
-export const ggxNamed = (a2, nh, nv, nl) => [
-  `${a2}/(3.14159265*pow(${nh}*${nh}*(${a2}-1)+1,2.0))`,
+/**
+ * GGX distribution denominator over the unit vectors `n` and `h` (WGSL names or expressions), the clamped cosine `nh`
+ * and the squared alpha `a2`: `(max(|n x h|^2, step(nh, 0)) + a2 nh^2)`, the same value as the textbook
+ * `nh^2 (a2 - 1) + 1` written so float32 does not cancel it near the peak of a narrow lobe (see {@link ggxDOf}, KB6016c).
+ * The scalar form needed only nh; a caller now passes the vectors (KB6016d: environment prefilter and probes, water
+ * glints, voxel-pathtracer and materials' lobes wrote the scalar form).
+ */
+export const ggxDenominatorOf = (n, h, nh = 'nh', a2 = 'a2') =>
+  `(max(dot(cross(${n},${h}),cross(${n},${h})),step(${nh},0.0))+${a2}*${nh}*${nh})`;
+/**
+ * {@link ggxD} and {@link smithGCorrelated} over other names, for shaders whose locals are prefixed: `n` and `h` are the
+ * unit normal and half vector the D denominator is written over ({@link ggxDenominatorOf}).
+ */
+export const ggxNamed = (a2, nh, nv, nl, n, h) => [
+  `${a2}/(3.14159265*pow(${ggxDenominatorOf(n, h, nh, a2)},2.0))`,
   `2*${nl}*${nv}/max(${nl}*sqrt(${a2}+(1-${a2})*${nv}*${nv})+${nv}*sqrt(${a2}+(1-${a2})*${nl}*${nl}),1e-30)`,
 ];

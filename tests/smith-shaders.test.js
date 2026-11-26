@@ -114,6 +114,96 @@ test('the shared GGX D is a2 / pi where the half vector faces away, and the text
   }
 });
 
+// Regression (KB6016d, 2026-11-26): KB6016c moved the shared GGX D to |n x h|^2 + a2 nh^2, but the scalar
+// `ggxDenominator(nh)` callers (environment prefilter and probes, water glints, voxel-pathtracer), water's ship lamps
+// and FFT ocean, and materials' `ggxNamed` lobes still wrote nh^2 (a2 - 1) + 1, which float32 cancels near the peak of
+// a narrow lobe. Every one now takes the vectors.
+const cancelling = [
+  /(\w+)\s*\*\s*\1\s*\*\s*\(\s*[\w.*]+\s*-\s*1(?:\.0)?\s*\)\s*\+\s*1/,
+  /1(?:\.0)?\s*\+\s*\(\s*[\w.*]+\s*-\s*1(?:\.0)?\s*\)\s*\*\s*(\w+)\s*\*\s*\1/,
+  // The same text built by a template (shared/light-terms.js wrote `${nh}*${nh}*(${a2}-1)+1`).
+  /\$\{(\w+)\}\s*\*\s*\$\{\1\}\s*\*\s*\(\s*(?:\$\{\w+\}|\w+)\s*-\s*1(?:\.0)?\s*\)\s*\+\s*1/,
+];
+const packageSources = () =>
+  readdirSync(new URL('packages', root))
+    .map((name) => `packages/${name}/src`)
+    .filter((dir) => {
+      try {
+        return statSync(new URL(dir, root)).isDirectory();
+      } catch {
+        return false;
+      }
+    })
+    .flatMap((dir) => [...sources(dir)]);
+
+test('no package source writes the cancelling GGX denominator nh^2 (a2 - 1) + 1', () => {
+  assert.equal('ggxDenominator' in terms, false, 'the scalar ggxDenominator export is gone');
+  const hits = {};
+  for (const file of [...packageSources(), ...sources('packages/shared')]) {
+    const lines = read(file)
+      .split('\n')
+      // Prose in comments may name the textbook form.
+      .filter((line) => !/^\s*(\/\/|\*|\/\*\*)/.test(line) && cancelling.some((re) => re.test(line)));
+    if (lines.length) hits[file] = lines.length;
+  }
+  assert.deepEqual(hits, {});
+  // Each former caller now writes the vector form.
+  for (const file of [
+    'packages/environment/src/probes.ts',
+    'packages/environment/src/shaders.ts',
+    'packages/voxel-pathtracer/src/shaders.ts',
+    'packages/water/src/index.ts',
+    'packages/water/src/ships.ts',
+    'packages/water/src/fft-shaders.ts',
+  ])
+    assert.match(read(file), /ggxDenominatorOf\('[^']+', '[^']+'/, `${file} passes n and h`);
+  assert.match(
+    read('packages/materials/src/lobe-shader.ts'),
+    /ggxNamed\('materialA2', 'materialNH', 'materialNV', 'materialNL', 's\.n', 'materialH'\)/,
+  );
+});
+
+test('ggxDenominatorOf and the ggxNamed D are the textbook GGX D, and a2 / pi where the half vector faces away', () => {
+  const den = shaderExpression(terms.ggxDenominatorOf('qn', 'qh', 'qc', 'q2'), ['qn', 'qh', 'qc', 'q2']),
+    named = shaderExpression(terms.ggxNamed('q2', 'qc', 'qv', 'ql', 'qn', 'qh')[0], ['qn', 'qh', 'qc', 'q2']),
+    n = [0, 0, 1];
+  for (const c of [-0.999, -0.5, -1e-6, 0.3, 0.9, 0.999, 1])
+    for (const roughness of [0.03, 0.2, 0.5, 1]) {
+      const a2 = roughness ** 4,
+        h = [Math.sqrt(1 - c * c), 0, c],
+        nh = Math.max(0, c),
+        want = nh * nh * (a2 - 1) + 1;
+      assert.ok(Math.abs(den(n, h, nh, a2) / want - 1) < 1e-9, `denominator at ${c}, ${roughness}`);
+      assert.ok(
+        Math.abs(named(n, h, nh, a2) / (a2 / (3.14159265 * want * want)) - 1) < 1e-9,
+        `ggxNamed D at ${c}, ${roughness}`,
+      );
+    }
+});
+
+// What the vector form buys, in float32 arithmetic as a GPU evaluates it: near the peak of a roughness 0.03 lobe the
+// scalar form's 1 - nh^2 is a few float32 steps, so D moves by tens of percent; the cross product keeps it.
+test('in float32 the vector GGX denominator keeps D near the peak of a narrow lobe; the scalar one does not', () => {
+  const f = Math.fround,
+    a2 = f(0.03 ** 4);
+  let scalarWorst = 0,
+    vectorWorst = 0;
+  for (let k = 1; k <= 40; k++) {
+    const angle = k * 2e-5,
+      h = [f(Math.sin(angle)), f(0), f(Math.cos(angle))],
+      nh = h[2],
+      exact = a2 / (Math.PI * (Math.sin(angle) ** 2 + a2 * Math.cos(angle) ** 2) ** 2),
+      scalar = f(f(f(nh * nh) * f(a2 - f(1))) + f(1)),
+      // cross((0, 0, 1), h) = (-h.y, h.x, 0)
+      vector = f(f(f(f(h[1] * h[1]) + f(h[0] * h[0])) + f(0)) + f(a2 * f(nh * nh))),
+      d = (q) => f(a2 / f(f(Math.PI) * f(q * q)));
+    scalarWorst = Math.max(scalarWorst, Math.abs(d(scalar) / exact - 1));
+    vectorWorst = Math.max(vectorWorst, Math.abs(d(vector) / exact - 1));
+  }
+  assert.ok(scalarWorst > 0.1, `the scalar form's float32 error ${scalarWorst}`);
+  assert.ok(vectorWorst < 1e-5, `the vector form's float32 error ${vectorWorst}`);
+});
+
 // Regression (KB-G2guard, 2026-11-11): the height-correlated G2 divided by max(den, 1e-4). On a smooth surface at
 // grazing angles den falls far below 1e-4 (a2 = 1e-6, nl = nv = 0.001: den 2.8e-6), so G2 came out 0.02 against 0.71
 // exact, darker than the separable G1 G1 (0.69) it replaced: the distant night water of visual:check voxel-night-high

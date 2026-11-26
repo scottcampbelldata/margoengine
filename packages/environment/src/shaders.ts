@@ -4,7 +4,7 @@
 // Equirect convention: u = 0.5 + atan2(d.x, -d.z) / 2PI (image center faces -Z, +X is right of center),
 // v = acos(d.y) / PI (row 0 is straight up, +Y). Standard latitude-longitude mapping; the orientation is Margo's choice.
 import { displayShader } from '../../shared/display.js';
-import { ggxDenominator, smithGCorrelatedFloat } from '../../shared/light-terms.js';
+import { ggxDenominatorOf, smithGCorrelatedFloat } from '../../shared/light-terms.js';
 import { common } from './shader-common.js';
 
 export { common } from './shader-common.js';
@@ -81,7 +81,7 @@ struct Params { roughness: f32, sourceSize: f32, samples: u32, lod0: f32, face: 
       let l = 2.0 * hl.z * h - n;
       let nl = dot(n, l);
       if (nl > 0.0) {
-        let q = ${/* @__PURE__ */ ggxDenominator('hl.z')};
+        let q = ${/* @__PURE__ */ ggxDenominatorOf('vec3f(0.0, 0.0, 1.0)', 'hl', 'hl.z')};
         let pdf = a2 / (PI * q * q) * 0.25;
         let sampleSolidAngle = 1.0 / (f32(params.samples) * pdf + 1e-6);
         let lod = max(0.5 * log2(sampleSolidAngle / texelSolidAngle) + 1.0, params.lod0);
