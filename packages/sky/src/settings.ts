@@ -922,8 +922,9 @@ export function skySettingDefaults(): Record<string, SkySettingValue> {
 const held = { 'sun.mode': 'angles', timeScale: 0, model: 'bruneton' } as const;
 /**
  * Named looks, each only values of {@link SKY_SETTINGS} (a name left out keeps its default), for any scene: pass one to
- * {@link applySkySettings}, or spread it under your own values. Each holds the clock, places the sun by angles and
- * draws with the `bruneton` model, so the sky's `Sky` needs that entry (the full `Sky` from `@margoengine/sky` has it).
+ * {@link applySkySettings}, or spread it under your own values. Each draws with the `bruneton` model, so the sky's `Sky`
+ * needs that entry (the full `Sky` from `@margoengine/sky` has it); each but `natural` and the `animatedFeature` family
+ * also holds the clock and places the sun by angles.
  */
 export const SKY_LOOKS = {
   /** Today's defaults: every row at its default, as the sky draws with no settings. */
@@ -1021,11 +1022,11 @@ export const SKY_LOOKS = {
   },
   /**
    * The animatedFeature family: a fuller zenith, a warm horizon tint, a larger sun disc, rounder cloud shapes (a wider
-   * repeat, more march steps), a warm key and a little more colour.
+   * repeat, more march steps), a warm key and a little more colour. A family is a picture style for any hour, so it
+   * holds no clock and no sun: the scene's time of day stays (KB-SCENES-NIGHTSUN1).
    */
   animatedFeature: {
-    ...held,
-    'sun.elevation': 42,
+    model: 'bruneton',
     'look.zenithStrength': 0.35,
     'look.horizonStrength': 0.3,
     'look.sunDiscSize': 2.2,

@@ -109,3 +109,17 @@ test('an unknown family throws before anything is written, and a part left out i
   applyLookFamily('animatedFeature', {});
   assert.equal('look' in sky.options, false);
 });
+
+test('KB-SCENES-NIGHTSUN1: a family keeps the scene sun and clock; it never moves the sun', () => {
+  for (const family of LOOK_FAMILIES) {
+    const night = [0.2, -0.6, -0.77],
+      sky = new Sky({ sunDirection: [...night], timeScale: 0 });
+    applyLookFamily(family, { sky: { sky } });
+    assert.deepEqual(sky.options.sunDirection, night, `${family}: the night sun stays below the horizon`);
+    assert.equal(sky.options.timeScale, 0, `${family}: the held clock stays held`);
+    const clock = new Sky({ hours: 22 });
+    applyLookFamily(family, { sky: { sky: clock } });
+    assert.equal(clock.options.hours, 22, `${family}: the clock's hour stays`);
+    assert.equal('sunDirection' in clock.options, false, `${family}: a clock sky is not given a sun direction`);
+  }
+});

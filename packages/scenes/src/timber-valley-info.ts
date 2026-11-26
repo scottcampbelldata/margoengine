@@ -13,6 +13,12 @@ export const timberValleyInfo: SceneInfo = {
     date: { default: '1910-08-20', about: 'calendar date, YYYY-MM-DD' },
     hour: { default: 16, range: [0, 24], unit: 'h', about: 'local solar time' },
     latitude: { default: 47.47, range: [-90, 90], unit: 'deg', about: 'latitude north (Wallace, Idaho)' },
+    longitude: {
+      default: -115.93,
+      range: [-180, 180],
+      unit: 'deg',
+      about: 'longitude east (Wallace, Idaho, is west, so negative): places the moon for the date and hour',
+    },
     look: { default: 'animatedFeature', options: ['animatedFeature', 'natural'], about: 'picture style family' },
     weather: {
       default: 'blowup',

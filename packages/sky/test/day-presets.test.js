@@ -98,3 +98,16 @@ test('applyDayPreset switches a running sky, dropping a cloud sheet the preset l
     sky.dispose();
   }
 });
+
+test('KB-SCENES-NIGHTSUN1: a preset with the sun below the horizon draws the night and lights by the moon', () => {
+  for (const name of dayPresetNames) {
+    const o = dayPreset(name);
+    assert.equal('night' in o, false, `${name}: the sun is up, no night`);
+    assert.equal('moon' in o.lighting, false, `${name}: no moonlight`);
+  }
+  const o = dayPreset({ ...DAY_PRESETS.noon, elevation: -20 });
+  assert.deepEqual(o.night, {}, 'stars and a phased moon at their defaults');
+  assert.deepEqual(o.lighting.moon, {}, "the sky's own moonlight");
+  assert.ok(o.sunDirection[1] < 0, 'the sun stays below the horizon');
+  assert.doesNotThrow(() => new Sky(o), 'the sky takes the night options');
+});

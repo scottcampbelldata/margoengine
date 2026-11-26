@@ -1891,6 +1891,9 @@ console.log(dayLight('noon').intensity); // the sun strength the sky drives into
   (`timeScale: 0`), `turbidity`, a cloud sheet when the preset has cloud, the backdrop `exposure`, and `lighting`
   with the direct sun strength overhead and a diffuse floor (`ambient.day`, and `[0.01, 0.015, 0.03]` by night). Use the
   root `Sky`, which has the clouds and lighting features these need. Pass a name or a `DayPreset` object.
+- A preset with the sun below the horizon (`elevation` under 0, as `sunPath` gives at night) also turns the night on:
+  `night: {}` (stars and a phased moon at their defaults) and `lighting.moon: {}` (the sky's own moonlight, which takes
+  over from the sun as it sets). The four presets keep the sun up, so they are unchanged.
 - `applyDayPreset(sky, name)` writes a preset into a running sky's `options` (read every frame), removes a cloud sheet
   the preset has none of and keeps the rest (fog, night, model).
 - `dayLight(name)` is the sun the sky drives on the first frame (`direction`, `color` with its largest channel 1,
@@ -1943,6 +1946,27 @@ throw `RangeError` before anything is attached; `set` after `dispose` throws `Ma
 | `goldenHour` | 10 km | 0.08, 1 | +1.5 | 1.05 | 7200 K (warmer) | 0.15 |
 | `overcast` | 2 km | 0.02, 1.5 | +2.3 | 0.95 | 6500 K | 0 |
 | `dawn` | 600 m (mist) | 0.06, 1 | +2.5 | 1 | 6000 K (cooler) | 0.15 |
+
+`sunScene(azimuth, elevation)` gives the scene preset for a sun where it is (degrees, as `sunPath` gives them):
+`noon`'s look with the sun 20 degrees up or more, `goldenHour`'s below that, and a moonlit night with the sun below the
+horizon. The night keeps the sun where it is, so the sky draws its stars and moon and the moon lights the scene, under
+`noon`'s fog and a night grade: exposure +2, contrast 1.05, white balance 5600 K (cooler), vignette 0.2, bloom 0.08
+over 1. The sky's moonlight puts moonlit ground about 4.5 stops under noon's at the same grade; the +2 leaves it about
+2.5 stops under, as a day-for-night shot is held, darker and bluer than day but legible (Jensen et al., "Night
+Rendering", 2000; Thompson, Shirley and Ferwerda, JGT 2002). Place the moon with the sky's `night` options
+(`moonDirection`, `moonPhase`, `moonLitBySun`), for example from `moonPosition` of `@margoengine/sky/astro`.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {PresetScene, sunScene} from 'margoengine/sky/scenes';
+import {degrees, sunPath} from 'margoengine/sky/sun';
+
+const canvas = document.querySelector<HTMLCanvasElement>('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu'});
+const sun = sunPath({latitude: degrees(47.5), dayOfYear: 232, hour: 22});
+const scene = PresetScene.attach(engine, sunScene(sun.azimuth.degrees, sun.elevation.degrees)); // a moonlit night
+engine.start();
+```
 
 The fog is exponential from the camera, density 3.912 / visibility (the distance where an object fades to 2%
 contrast); the exposure brings each scene's lit ground back near noon's on screen. The fog takes the clear sky's

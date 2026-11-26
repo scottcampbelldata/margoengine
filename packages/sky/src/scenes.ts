@@ -67,6 +67,44 @@ export const SCENE_PRESETS: Readonly<Record<ScenePresetName, ScenePreset>> = Obj
   }),
 });
 
+// Margo design values for the night (KB-SCENES-NIGHTSUN1). A moonlit scene is about 17 stops under a sunlit one (a
+// full moon gives about 0.3 lux against about 100,000 for the sun; the exposure-value tables, Kodak Professional
+// Photoguide, put a moonlit landscape near EV -3 against EV 15 in sun), more than a picture can show and still be read.
+// Film shows night darker and bluer than day but legible (H. W. Jensen, S. Premoze, P. Shirley, W. B. Thompson,
+// J. A. Ferwerda and M. M. Stark, "Night Rendering", University of Utah UUCS-00-016, 2000; W. B. Thompson, P. Shirley
+// and J. A. Ferwerda, "A Spatial Post-Processing Algorithm for Images of Night Scenes", JGT 7(1), 2002: a night
+// picture is darker, bluer and less saturated, and keeps its contrast). The sky's own moonlight (about 0.1 to 0.3 of a
+// light against the clear sun's 5) sets the moonlit ground about 4.5 stops under the noon ground at the same grade;
+// two stops of exposure leave it about 2.5 stops under, the 1.5 to 2.5 stops a day-for-night shot is held under day. The
+// white balance stays cool (5,600 K, as the snowNight kit) so moonlight reads blue and firelight orange, with the
+// golden hour's vignette and more bloom round the moon and any fire.
+const NIGHT_GRADE = Object.freeze({ exposure: 2, contrast: 1.05, temperature: 5600, vignette: 0.2 }),
+  NIGHT_BLOOM = Object.freeze({ strength: 0.08, threshold: 1 });
+
+/**
+ * The scene preset for a sun at `azimuth` and `elevation` (degrees, as `@margoengine/sky/sun`'s `sunPath` gives them),
+ * with the sun where it is: `noon`'s look with the sun 20 degrees up or more, `goldenHour`'s below that, and with the sun
+ * below the horizon a moonlit night: the sky draws its stars and moon and the moon lights the scene (`dayPreset` turns
+ * both on for a sun below the horizon), under a cooler, darker grade. A fresh frozen preset each call.
+ * @throws RangeError for an azimuth outside -360 to 360 or an elevation outside -90 to 90.
+ * @example
+ * const { azimuth, elevation } = sunPath({ latitude: degrees(47.5), dayOfYear: 232, hour: 22 });
+ * PresetScene.attach(engine, sunScene(azimuth.degrees, elevation.degrees));
+ */
+export function sunScene(azimuth: number, elevation: number): ScenePreset {
+  if (!(azimuth >= -360 && azimuth <= 360) || !(elevation >= -90 && elevation <= 90))
+    throw new RangeError(
+      'Invalid sunScene sun; give an azimuth from -360 to 360 and an elevation from -90 to 90 degrees.',
+    );
+  const base = elevation >= 20 ? SCENE_PRESETS.noon : SCENE_PRESETS.goldenHour,
+    night = elevation < 0;
+  return scene({
+    ...(night ? SCENE_PRESETS.noon : base),
+    day: Object.freeze({ ...(night ? DAY_PRESETS.noon : base.day), azimuth, elevation }),
+    ...(night ? { bloom: NIGHT_BLOOM, tonemap: NIGHT_GRADE } : {}),
+  });
+}
+
 /** A preset name or a {@link ScenePreset}. */
 export type ScenePresetInput = ScenePresetName | ScenePreset;
 

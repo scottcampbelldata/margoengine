@@ -461,3 +461,9 @@ test("the lightning rows write the weather's lightning option: defaults and null
   // Without a weather target the rows write nothing.
   applySkySettings({ sky }, { 'lightning.strength': 2 });
 });
+
+test('KB-SCENES-NIGHTSUN1: the animatedFeature family holds no clock and no sun, so a scene keeps its hour', () => {
+  for (const row of ['hours', 'timeScale', 'sun.mode', 'sun.azimuth', 'sun.elevation'])
+    assert.equal(row in SKY_LOOKS.animatedFeature, false, row);
+  assert.equal(SKY_LOOKS.animatedFeature.model, 'bruneton');
+});

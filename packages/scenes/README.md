@@ -193,7 +193,7 @@ is written through each package's settings. The handle gives `height`, `anchors`
 
 | Setting | Default | Range or values |
 | --- | --- | --- |
-| `date`, `hour`, `latitude` | `1910-08-20`, 16, 47.47 | the sun's place by `sunPath` |
+| `date`, `hour`, `latitude`, `longitude` | `1910-08-20`, 16, 47.47, -115.93 | the sun's place by `sunPath` and the moon's by `moonPosition`; with the sun below the horizon the sky is a moonlit night (`sunScene`) |
 | `look` | `animatedFeature` | `animatedFeature`, `natural` |
 | `weather` | `blowup` | `calm` (2 m/s), `redFlag` (9 m/s, 15 percent humidity, 32 C), `blowup` (20 m/s gusting, 12 percent, 30 C), `smoke` |
 | `windFrom` | 225 | 0 to 360 degrees, the compass direction the wind blows from |
@@ -351,6 +351,8 @@ every row at its default (each part draws as it does with no settings); `animate
 style: a fuller zenith and warm horizon, a larger sun disc and rounder clouds in the sky; clear blue-green water with wide
 soft foam; larger colour masses on the ground; air at 0.6 of the clear-air visibility; soft pale sand and smoke; one warm
 grade with the saturation up 12 percent, no grain and dither on; a gentle bloom, a 180 degree shutter and GTAO and SSGI on.
+A family is a picture style for any hour, never a time of day: the sky keeps the scene's clock (`hours`, `timeScale`)
+and sun direction, so a night scene stays night and an afternoon keeps its sun under either family.
 Both families live in each package's own table, `natural` (no rows: the defaults) beside `animatedFeature`
 (`SKY_LOOKS`, `WATER_LOOKS`, `TERRAIN_LOOKS`, `WEATHER_LOOKS`, `ENVIRONMENT_LOOKS`, `SAND_LOOKS`, `SMOKE_LOOKS`, `FLAME_LOOKS`
 (a `fire` target), `TONEMAP_LOOKS`, `POST_LOOKS` and the ground-material multipliers `BIOME_LOOKS`), so a page can also pick

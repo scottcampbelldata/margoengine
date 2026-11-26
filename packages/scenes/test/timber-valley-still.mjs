@@ -94,6 +94,27 @@ try {
   // The mesh registry draws a .gltf model by key on the GPU.
   const rocks = await still('creek', 'rock=/examples/assets/kaykit/adventurers/props/arrow_bow.gltf&fire=none');
   assert.ok(rocks.r.rockTriangles > 0, 'the registry model loaded');
+  // KB-SCENES-NIGHTSUN1: at 22:00 the sun is 24 degrees down: the sky is the night's (stars, the moon of that date, blue
+  // over the ridge, not the day's warm haze) and the moonlit town, with no fire, is far darker than the afternoon's.
+  const sky = (img) => {
+      let r = 0,
+        b = 0,
+        n = 0;
+      for (let y = 0; y < Math.floor(img.height * 0.15); y++)
+        for (let x = 0; x < img.width; x++, n++) {
+          r += img.data[(y * img.width + x) * 4];
+          b += img.data[(y * img.width + x) * 4 + 2];
+        }
+      return { r: r / n, b: b / n };
+    },
+    daySky = sky((await still('ridge', 'fire=none')).img),
+    nightSky = sky((await still('ridge', 'fire=none&hour=22')).img),
+    dayTown = spread((await still('town', 'fire=none')).img).mean,
+    nightTown = spread((await still('town', 'fire=none&hour=22')).img).mean;
+  console.log('sky over the ridge, day', JSON.stringify(daySky), 'night', JSON.stringify(nightSky));
+  console.log('town mean, day', dayTown.toFixed(1), 'night', nightTown.toFixed(1));
+  assert.ok(nightSky.b > nightSky.r && nightSky.b < daySky.b, 'the night sky is dark and blue');
+  assert.ok(nightTown < 0.5 * dayTown, `the night is far darker than the day: ${nightTown} against ${dayTown}`);
   assert.deepEqual(pageErrors, []);
   console.log('timber valley still check passed');
 } finally {

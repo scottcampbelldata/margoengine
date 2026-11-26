@@ -40,3 +40,24 @@ test('invalid presets throw before anything is attached', () => {
     /Invalid scene preset/,
   );
 });
+
+test('KB-SCENES-NIGHTSUN1: sunScene keeps the sun where it is and gives a night below the horizon', async () => {
+  const { sunScene } = await import('../dist/scenes.js');
+  const high = sunScene(200, 55),
+    low = sunScene(260, 8),
+    night = sunScene(330, -25);
+  assert.deepEqual([high.day.azimuth, high.day.elevation], [200, 55]);
+  assert.deepEqual(high.tonemap, SCENE_PRESETS.noon.tonemap, 'a high sun has the noon grade');
+  assert.deepEqual([low.day.azimuth, low.day.elevation], [260, 8]);
+  assert.deepEqual(low.tonemap, SCENE_PRESETS.goldenHour.tonemap, 'a low sun has the golden-hour grade');
+  assert.deepEqual(
+    [night.day.azimuth, night.day.elevation],
+    [330, -25],
+    'the night sun is not lifted above the horizon',
+  );
+  assert.ok(night.tonemap.temperature < SCENE_PRESETS.noon.tonemap.temperature, 'the night grade is cooler');
+  assert.ok(night.tonemap.exposure > 0, 'the night grade opens up to read the moonlit ground');
+  assert.ok(Object.isFrozen(night) && Object.isFrozen(night.day));
+  assert.throws(() => sunScene(0, 91), RangeError);
+  assert.throws(() => sunScene(Number.NaN, 0), RangeError);
+});

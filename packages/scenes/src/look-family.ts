@@ -49,11 +49,15 @@ export interface LookFamilyTargets {
 }
 
 const FAMILY_NAMES: readonly string[] = LOOK_FAMILIES;
+// The sky rows and options that place the sun: the scene's, never a family's.
+const TIME_ROWS = ['hours', 'timeScale', 'sun.mode', 'sun.azimuth', 'sun.elevation'] as const,
+  TIME_KEYS = ['hours', 'timeScale', 'sunDirection'] as const;
 
 /**
  * Applies the look family `name` to every part of the scene in `targets`: each part gets that family's entry of its own
  * package's LOOKS table (`natural` is every row at its default, so the part draws as it does with no settings), through
- * that package's apply function. A part left out is left alone. The weather part writes the family's state onto the
+ * that package's apply function. A part left out is left alone. The sky keeps the scene's time of day: its clock
+ * (`hours`, `timeScale`) and sun direction stay as the scene set them, so a family never moves the sun. The weather part writes the family's state onto the
  * weather target, so give it only when nothing else (a recorded storm, a drive) owns the weather.
  * @throws RangeError for a family not in {@link LOOK_FAMILIES}; whatever an apply function throws for a part that cannot
  * take the family's values (a post look that turns GTAO on needs a GTAO in `post`).
@@ -64,7 +68,19 @@ export function applyLookFamily(name: LookFamilyName, targets: LookFamilyTargets
     throw new RangeError(`Unknown look family ${String(name)}; use one of ${LOOK_FAMILIES.join(', ')}.`);
   // One family's values from a package's LOOKS table (every table holds both families), typed as the apply function's own values.
   const pick = <V>(table: object): V => (table as Record<string, V>)[name] as V;
-  if (targets.sky) applySkySettings(targets.sky, pick(SKY_LOOKS));
+  if (targets.sky) {
+    // A family is a picture style, not a time of day: the sky keeps the scene's clock and sun (KB-SCENES-NIGHTSUN1; the
+    // sky rows write every value, so the family's sun at 42 degrees, or the clock's noon under `natural`, lit every hour
+    // of a scene as day). The family's sun rows are left out and the scene's own clock and sun direction put back.
+    const o = targets.sky.sky.options as Record<string, unknown>,
+      kept = TIME_KEYS.map((key) => [key, o[key]] as const),
+      values = { ...pick<Record<string, unknown>>(SKY_LOOKS) };
+    for (const row of TIME_ROWS) delete values[row];
+    applySkySettings(targets.sky, values as never);
+    for (const [key, value] of kept)
+      if (value === undefined) delete o[key];
+      else o[key] = Array.isArray(value) ? [...value] : value;
+  }
   if (targets.water) applyWaterSettings(targets.water, pick(WATER_LOOKS));
   if (targets.terrain) applyTerrainSettings(targets.terrain, pick(TERRAIN_LOOKS));
   if (targets.weather) applyWeatherSettings(targets.weather, pick(WEATHER_LOOKS));

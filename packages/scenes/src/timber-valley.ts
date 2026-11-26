@@ -18,16 +18,16 @@ import { fuelMap, type FuelMap } from '@margoengine/biomes/fuel';
 import { layoutSettlements, type Settlements } from '@margoengine/biomes/settlements';
 import { pathExclusions } from '@margoengine/biomes/splines';
 import { BiomeView, type BiomeViewOptions } from '@margoengine/biomes/view';
-import { DAY_PRESETS } from '@margoengine/sky/day-presets';
-import { PresetScene, SCENE_PRESETS } from '@margoengine/sky/scenes';
+import { PresetScene, sunScene } from '@margoengine/sky/scenes';
 import { degrees, sunPath } from '@margoengine/sky/sun';
+import { moonPosition } from '@margoengine/sky/astro';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
-import { applySkySettings, SKY_SETTINGS } from '@margoengine/sky/settings';
+import { applySkySettings } from '@margoengine/sky/settings';
 import { WeatherMachine, WEATHER_PRESETS, type WeatherState } from '@margoengine/weather';
 import { WeatherDrive } from '@margoengine/weather/drive';
 import { applyWeatherSettings, WEATHER_LOOKS, WEATHER_SETTINGS } from '@margoengine/weather/settings';
 import { FireFront } from '@margoengine/vfx/fire-front';
-import { applyFireSettings, FIRE_SETTINGS } from '@margoengine/vfx/settings';
+import { applyFireSettings } from '@margoengine/vfx/settings';
 import { Shadows } from '@margoengine/shadows';
 import { GTAO } from '@margoengine/post/gtao';
 import { applyLookFamily, type LookFamilyName } from './look-family.js';
@@ -42,6 +42,11 @@ export interface TimberValleySettings {
   readonly hour?: number;
   /** Latitude, degrees north. Default 47.47 (Wallace, Idaho). */
   readonly latitude?: number;
+  /**
+   * Longitude, degrees east (negative west). With the date and `hour` it places the moon the night sky draws and that
+   * lights the scene once the sun has set. Default -115.93 (Wallace, Idaho).
+   */
+  readonly longitude?: number;
   /** Look family (`@margoengine/scenes/look-family`). Default `animatedFeature`. */
   readonly look?: LookFamilyName;
   /**
@@ -298,18 +303,26 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
   try {
     const plan = layout(w, s),
       height = (x: number, z: number) => w.heightAt(x, z);
-    // Sun for the date and hour; a clear late-summer sky (the weather drive thickens it with cloud and smoke).
+    // Sun for the date and hour, where it is: the sky's scene for that sun (noon, a low sun's golden hour, or with the
+    // sun below the horizon a moonlit night with stars), under the valley's 40 km haze; the weather drive thickens it
+    // with cloud and smoke.
     const sun = sunPath({ latitude: degrees(s.latitude), dayOfYear: dayOfYear(s.date), hour: s.hour }),
-      low = sun.elevation.degrees < 20,
       preset = PresetScene.attach(engine, {
-        ...(low ? SCENE_PRESETS.goldenHour : SCENE_PRESETS.noon),
-        day: {
-          ...(low ? DAY_PRESETS.goldenHour : DAY_PRESETS.noon),
-          azimuth: sun.azimuth.degrees,
-          elevation: Math.max(1, sun.elevation.degrees),
-        },
+        ...sunScene(sun.azimuth.degrees, sun.elevation.degrees),
         fog: 3.912 / 40000,
       });
+    // The moon of that night where it was (`moonPosition`, Meeus): its place and its phase, its lit limb toward the
+    // sun. `hour` is local solar time, so universal time is the hour less the longitude's 15 degrees an hour. On the
+    // night of the 1910 blowup it was a moon two days past full, 18 degrees up in the south-south-east at 22:00.
+    if (preset.sky.options.night) {
+      const ut = Date.parse(s.date + 'T00:00:00Z') + (s.hour - s.longitude / 15) * 3600000,
+        moon = moonPosition(new Date(ut), { latitude: degrees(s.latitude), longitude: degrees(s.longitude) });
+      preset.sky.options.night = {
+        moonDirection: [...moon.direction] as Vec3,
+        moonPhase: Math.max(-1, Math.min(1, 2 * moon.illumination - 1)),
+        moonLitBySun: true,
+      };
+    }
     disposers.push(() => preset.dispose());
     const occlusion = new GTAO({ radius: 2, slices: film ? 3 : 2, steps: film ? 8 : 6 });
     preset.post.addEffect(occlusion, 0);

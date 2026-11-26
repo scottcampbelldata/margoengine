@@ -144,6 +144,14 @@ export function dayPreset(input: DayPresetInput): SkyOptions {
     },
   };
   if (p.clouds > 0) options.clouds = { coverage: p.clouds };
+  // The sun below the horizon (KB-SCENES-NIGHTSUN1): the sky draws the night (stars and a phased moon, `night` with its
+  // defaults) and the moon lights the scene with the sky's own moonlight (`lighting.moon: {}`, Krisciunas and Schaefer
+  // 1991 lux with the night's blue shift), which takes over from the sun as it sets. With the sun up nothing changes,
+  // so no day preset's sky moves.
+  if (p.elevation < 0) {
+    options.night = {};
+    options.lighting!.moon = {};
+  }
   return options;
 }
 
