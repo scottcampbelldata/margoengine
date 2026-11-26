@@ -1055,6 +1055,47 @@ impl World {
         self.wake(body)
     }
 
+    /// Moves a shape on its body by `delta` (in the body's frame: each point p goes to `delta.q` p + `delta.p`), as when a
+    /// collider's offset or rotation on its parent changes (Rapier's `setTranslationWrtParent` and `setRotationWrtParent`).
+    /// A chain's segment takes its neighbours' far vertices with it; a voxel grid is refused. The body's mass and centre of
+    /// mass follow, the shape's broad-phase box is refitted, and its contacts keep their pairs but drop their points and
+    /// warm start. Wakes the body. A refused change leaves the shape as it was.
+    pub fn move_shape(&mut self, id: u32, delta: Xf) -> Result<(), PhysicsError> {
+        let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if shape.dead {
+            return Err(PhysicsError::InvalidHandle);
+        }
+        if shape.grid.is_some() {
+            return Err(PhysicsError::InvalidParameter);
+        }
+        if !(delta.p.x.is_finite() && delta.p.y.is_finite() && delta.q.c.is_finite() && delta.q.s.is_finite()) {
+            return Err(PhysicsError::NotFinite);
+        }
+        let body = shape.body;
+        let mut core = shape.core;
+        for i in 0..core.count {
+            core.vertices[i] = delta.apply(core.vertices[i]);
+            core.normals[i] = delta.q.apply(core.normals[i]);
+        }
+        let ghosts = shape.ghosts.map(|g| g.map(|v| delta.apply(v)));
+        let bounds = bounds_of(&core, self.bodies[body as usize].xf)?;
+        let (before_core, before_ghosts) = (shape.core, shape.ghosts);
+        (self.shapes[id as usize].core, self.shapes[id as usize].ghosts) = (core, ghosts);
+        if let Err(error) = self.update_mass(body) {
+            (self.shapes[id as usize].core, self.shapes[id as usize].ghosts) = (before_core, before_ghosts);
+            return Err(error);
+        }
+        self.broad.remove(id);
+        self.broad.place(id, &bounds.grown(self.shapes[id as usize].skin), BOX_MARGIN);
+        for contact in self.contacts.iter_mut().filter(|c| c.a == id || c.b == id) {
+            contact.manifold.count = 0;
+            contact.normal_impulse = [0.0; 2];
+            contact.tangent_impulse = [0.0; 2];
+            contact.primed = false;
+        }
+        self.wake(body)
+    }
+
     pub fn remove_shape(&mut self, id: u32) -> Result<(), PhysicsError> {
         let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
         if shape.dead { return Err(PhysicsError::InvalidHandle); }

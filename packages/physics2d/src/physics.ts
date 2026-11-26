@@ -906,6 +906,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const settings = Uint32Array.from(parts[0].settings);
     const collider = new Collider2D(this, body, ids, settings, options.offset ?? [0, 0], options.rotation ?? 0);
     collider.described = parts[0];
+    collider.options = options;
     for (const id of ids) this.byShape.set(id, collider);
     body.colliders.push(collider);
     return collider;

@@ -14395,9 +14395,10 @@ recording-to-laboratory clock relationship and finger growth remain outside the 
 
 `surfaceGeometry()` draws the cell-centred height field as a triangulated free surface in
 the backing's local frame. This geometry has the spatial resolution of the film grid.
-The exterior window fixture uses screen-space refraction and spherical drop geometry.
-It compares the same rigid pose with each liquid mesh hidden in turn. Full layered
-water–glass optics and complete production-cut review remain open.
+The window fixture uses screen-space refraction and spherical drop geometry. Its interior
+view captures the distant film before the glass to test both interfaces. The fixtures
+compare the same rigid pose with each liquid mesh hidden in turn. Complete production-cut
+review remains open.
 [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
 One-row and one-column strips use a direct banded pressure solve with optional advancing and
@@ -14411,7 +14412,12 @@ The strip retention check uses a derived force bracket. The circular cap force p
 measured SLIC water tilt to its reported degree on both grids. Direct dynamic onset
 qualification remains open.
 
-The optional thin-film entry is 15,175 B gzip with a 15,631 B ceiling. Both Wasm assets are 26,977 B raw and each is 10,362 B gzip.
+Suspended films use the full curvature of a height graph with gravity and pressure in the
+same wet-face flux. The held-out pendant-drop thinning check covers the attached drop at
+five minutes. The graph cannot represent an overhang or the topology change at pinch-off.
+[Reproduce](whitepaper/reproduce.md#fluid-07-suspended-film)
+
+The optional thin-film entry is 15,190 B gzip with a 15,631 B ceiling. Both Wasm assets are 30,756 B raw and each is 11,743 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

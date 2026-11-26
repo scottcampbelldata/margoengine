@@ -93,6 +93,8 @@ export class Collider2D {
   readonly shapes: number[];
   /** The shape as the kernel was given it, for the queries a character controller makes. @internal */
   described: Described | null = null;
+  /** The options it was made with (its shape and settings), to describe it again where it moves. @internal */
+  options: ColliderOptions2D | null = null;
   private removed = false;
   private enabled = true;
   private savedGroups = 0;
@@ -102,8 +104,8 @@ export class Collider2D {
     readonly body: Body2D,
     shapes: number[],
     private readonly settings: Uint32Array,
-    private readonly offset: readonly [number, number],
-    private readonly turn: number,
+    private offset: readonly [number, number],
+    private turn: number,
   ) {
     this.shapes = shapes;
   }
@@ -153,6 +155,7 @@ export class Collider2D {
     io.u.set(parts[0].geometry, 0);
     kernel.ok(kernel.exports.shape_set_core(handle, this.shapes[0], parts[0].kind));
     this.described = { ...parts[0], settings: this.settings };
+    if (this.options) this.options = { ...this.options, ...shape } as ColliderOptions2D;
   }
   isSensor(): boolean {
     return (this.settings[5] & (1 << 16)) !== 0;
@@ -298,6 +301,55 @@ export class Collider2D {
   /** The collider's rotation in radians, at the body's latest step. */
   rotation(): number {
     return this.body.rotation + this.turn;
+  }
+  /** Its position on its body, world units in the body's frame (Rapier's `translationWrtParent`). */
+  translationWrtParent(): [number, number] {
+    return [this.offset[0], this.offset[1]];
+  }
+  /** Its rotation on its body, radians (Rapier's `rotationWrtParent`). */
+  rotationWrtParent(): number {
+    return this.turn;
+  }
+  /** Moves it on its body to `offset`, world units in the body's frame (Rapier's `setTranslationWrtParent`). */
+  setTranslationWrtParent(offset: Vec2D): void {
+    this.place(offset, this.turn);
+  }
+  /** Turns it on its body to `angle` radians (Rapier's `setRotationWrtParent`). */
+  setRotationWrtParent(angle: number): void {
+    this.place(this.offset, angle);
+  }
+  /**
+   * Moves the collider's kernel shapes from where they are on the body to `offset` and `turn`: each turns by the
+   * difference of the angles and shifts by the new offset less the old one turned. The body's mass and centre of mass
+   * follow, and its contacts are built again from where it went.
+   */
+  private place(offset: Vec2D, turn: number): void {
+    if (this.removed)
+      throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
+    if (!(offset?.length === 2 && Number.isFinite(offset[0]) && Number.isFinite(offset[1]) && Number.isFinite(turn)))
+      throw new RangeError(
+        `A collider's place on its body is a finite [x, y] and angle (got ${String(offset)}, ${turn}); pass them.`,
+      );
+    const { kernel, handle, scale } = this.owner,
+      d = turn - this.turn,
+      c = Math.cos(d),
+      s = Math.sin(d),
+      [ox, oy] = this.offset,
+      tx = (offset[0] - (c * ox - s * oy)) * scale,
+      ty = (offset[1] - (s * ox + c * oy)) * scale;
+    for (const shape of this.shapes) {
+      const io = kernel.io(3);
+      io.f[0] = tx;
+      io.f[1] = ty;
+      io.f[2] = d;
+      kernel.ok(kernel.exports.shape_move(handle, shape));
+    }
+    this.offset = [offset[0], offset[1]];
+    this.turn = turn;
+    if (this.options) {
+      this.options = { ...this.options, offset: this.offset, rotation: turn };
+      this.described = { ...describeShapes(this.options, scale)[0], settings: this.settings };
+    }
   }
   /** Removes the collider from its body. */
   remove(): void {

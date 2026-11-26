@@ -510,6 +510,15 @@ pub extern "C" fn shape_set_core(handle: i32, shape: u32, kind: u32) -> i32 {
     })
 }
 
+/// io: the move, in the body's frame: x, y and the angle, so each point p goes to rotate(angle) p + (x, y).
+#[unsafe(no_mangle)]
+pub extern "C" fn shape_move(handle: i32, shape: u32) -> i32 {
+    with_world!(handle, |w| {
+        let delta = Xf { p: point(0), q: crate::math::Rot::from_angle(f(2)) };
+        w.move_shape(shape, delta).map(|()| 0)
+    })
+}
+
 /// The body of a shape, and in the buffer its settings words, whether it is a chain segment, and its contact skin.
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_read(handle: i32, shape: u32) -> i32 {

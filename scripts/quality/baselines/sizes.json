@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20577174,
+  "total": 20577578,
   "history": [
     {
       "date": "2026-10-24",
@@ -14017,6 +14017,18 @@
       "commit": "feat(physics2d) contact skin",
       "reason": "Collider2D contactSkin option, setContactSkin and contactSkin() (C2-13); 19,378 to 19,471 B gzip (this Mac). Collider methods on the one collider class; nothing to split.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics2d) collider place",
+      "reason": "Collider2D setTranslationWrtParent, setRotationWrtParent and their reads (C2-08); 19,471 to 19,729 B gzip (this Mac). Collider methods on the one collider class; nothing to split.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics2d) collider place",
+      "reason": "Collider2D setTranslationWrtParent, setRotationWrtParent and their reads (C2-08); the whole entry 21,245 to 21,391 B gzip (this Mac).",
+      "grew": 1
     }
   ],
   "items": {
@@ -14908,8 +14920,8 @@
     "@margoengine/physics/vortices": 5479,
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 17331,
-    "@margoengine/physics2d": 21245,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19471,
+    "@margoengine/physics2d": 21391,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19729,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

@@ -243,6 +243,21 @@ console.log(crate.colliders[0].contactSkin().toFixed(2)); // '0.05'
 physics.dispose();
 ```
 
+A collider moves on its body after it is made: `setTranslationWrtParent([x, y])` and `setRotationWrtParent(angle)`, in
+the body's frame, as Rapier's; the body's mass and centre of mass follow. `translationWrtParent()` and
+`rotationWrtParent()` read the place back.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1 });
+const door = physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', width: 2, height: 0.2 } });
+door.colliders[0].setRotationWrtParent(Math.PI / 2); // the bar now stands
+console.log(door.colliders[0].rotationWrtParent().toFixed(3)); // '1.571'
+physics.dispose();
+```
+
 ## Articulations
 
 `physics.addArticulation(root, links)` joins bodies into a tree of revolute and prismatic joints and gives it a joint space: positions, velocities, motors, limits, forward and inverse kinematics.
