@@ -614,7 +614,7 @@ test('turning grousers return a bounded share of the cut while locked grousers c
   close(oblique.bed.volume(), 0, 2048 * eps * oblique.soil.budget.removed);
 });
 
-test('cross-track banks keep mirror symmetry and settle after the wheel load ends', async () => {
+async function pavlovLockedSandBench({ shared, stop }) {
   const terrain = { columns: 128, rows: 240, width: 0.32, depth: 1.2, centre: [0, 0] };
   const wheel = { radius: 0.048, lugHeight: 0.005, skidExponent: 0, bermProfile: 'cross-track' };
   const slope = Math.tan((29 * Math.PI) / 180);
@@ -629,9 +629,14 @@ test('cross-track banks keep mirror symmetry and settle after the wheel load end
     compaction: 0.0576,
     reposeSlope: slope,
   };
-  const rig = { width: 0.05, length: 0.07, load: 9.78314, speed: 0.03, slip: -1, stop: 120 };
+  const rig = { width: 0.05, length: 0.07, load: 9.78314, speed: 0.03, slip: -1, shared, stop };
+  const bench = await rollingBench(terrain, material, wheel, rig);
+  return { ...bench, terrain };
+}
+
+test('cross-track banks keep mirror symmetry and settle after the wheel load ends', async () => {
   for (const shared of [false, true]) {
-    const { world, soil, bed } = await rollingBench(terrain, material, wheel, { ...rig, shared });
+    const { world, soil, bed, terrain } = await pavlovLockedSandBench({ shared, stop: 120 });
     world.advance(121);
     const initialCrest = bed.elevations().reduce((highest, value) => Math.max(highest, value), 0);
     const stopped = soil.budget;
@@ -653,6 +658,32 @@ test('cross-track banks keep mirror symmetry and settle after the wheel load end
     world.restoreSnapshot(snapshot.bytes);
     world.advance(240);
     assert.equal(world.hash(), hash);
+  }
+});
+
+test('the locked straight-moving wheel matches the bank-to-trough relief in the measured Pavlov scan', async () => {
+  const { world, soil, bed, terrain } = await pavlovLockedSandBench({ shared: true });
+  world.advance(600);
+  close(soil.read(0).sinkage, 0.015, 0.0006);
+  const elevations = bed.elevations();
+  // This central station is 15 cm behind the wheel and clear of the entrance and contact.
+  const cross = Array.from({ length: terrain.columns + 1 }, (_, x) => elevations[x * (terrain.rows + 1) + 118]);
+  const trough = -Math.min(...cross);
+  const leftCrest = Math.max(...cross.slice(0, terrain.columns / 2));
+  const rightCrest = Math.max(...cross.slice(terrain.columns / 2 + 1));
+  assert.ok(trough > 0 && leftCrest > 0 && rightCrest > 0);
+  // Raw Figure 4.5 image rows. Blue trace clearance uses the median visible near each extremum.
+  // Take the ratio on the same plot axis, so pixel scale cancels.
+  const base = [51, 53];
+  const low = [70, 74];
+  for (const [crest, high] of [
+    [leftCrest, [38, 41]],
+    [rightCrest, [36, 40]],
+  ]) {
+    const measuredMin = (base[0] - high[1]) / (low[1] - base[0]);
+    const measuredMax = (base[1] - high[0]) / (low[0] - base[1]);
+    const ratio = crest / trough;
+    assert.ok(ratio >= measuredMin && ratio <= measuredMax, `crest/trough ${ratio} outside scan envelope`);
   }
 });
 

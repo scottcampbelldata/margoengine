@@ -16969,7 +16969,8 @@ The steady drawbar and axle torque match the measured 60% tip-slip case; transie
 high-slip sinkage and measured berm geometry still need held-out measurements. The optional
 cross-track depositor conserves independent bank volumes from the actual cut.
 Grouser transport can backfill its solver-owned trench from earlier cuts or feed the opposite bank.
-A quantitative comparison to steady scanned trench profiles remains open.
+The straight locked condition matches both measured relative bank crests. Absolute scanned
+profiles at powered slip and oblique angles remain open.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
 brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
 opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.

@@ -9891,14 +9891,15 @@ The optional cross-track berm mode places the loose soil in separate triangular 
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
 [0, 1], rotating lugs fill the solver's cumulative rear depression or transfer loose soil between
-banks at large obliquity. For travel angles under 10°, partial backfill forms a flat bottom
-from the deepest part of the rear depression. Cross-track banks settle with one simultaneous sparse transfer pass
-per solver step. The solver stores eight history bytes per grid vertex and a second sparse bitset
+banks at large obliquity. At travel angles under 10°, partial backfill placed within the trench
+forms a flat bottom from the deepest part of the rear depression. Cross-track banks settle with
+one simultaneous sparse transfer pass per solver step. The solver stores eight history bytes per grid vertex and a second sparse bitset
 for affected vertices, approximately 0.26 bytes per vertex. Steep loose slopes can take more
 than one step to settle. The separate excavation maximum prevents counting a cut twice.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
-drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
+drawbar force and torque at 60% lug-tip slip for the reported wheel and sand and relative
+crest-to-trough relief at one straight locked-wheel condition. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 

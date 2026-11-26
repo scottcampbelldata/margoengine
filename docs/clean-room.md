@@ -274,7 +274,7 @@ the present net depression accumulated by this solver, including its earlier cut
 redistribution. The excavation maximum is a separate history. Returning earlier material
 therefore preserves the original cut ledger. A moving-carriage case checks two filled trailing
 stations against the same wheel without transport, net volume, zero export and snapshot replay
-in plain and shared memory. The measured scan profiles remain a separate comparison.
+in plain and shared memory.
 [Pavlov and Johnson (2019)](https://www.andrew.cmu.edu/user/amj1/papers/ICRA2019_Wheel.pdf).
 
 For straight travel, Pavlov's Eqs. 4.11 and 4.12 describe the same area balance for pointed and
@@ -295,6 +295,19 @@ case reached 21 mm of numerical left-right difference. The mirrored case now com
 full interior at roundoff, settles after unloading and preserves the volume ledger and replay.
 [Denlinger and Iverson, “Granular avalanches across irregular three-dimensional terrain,” §4](https://doi.org/10.1029/2003JF000085),
 [Mangeney-Castelnau et al., “Numerical modeling of avalanches based on Saint Venant equations using a kinetic scheme,” §3](https://doi.org/10.1029/2002JB002024).
+
+The measured locked-wheel check takes the nominal 48 mm wheel radius, 50 mm width, 5 mm
+grousers, 29° repose angle and 30 mm/s carriage travel from Pavlov's Table 4.2 and §4.3.
+A fixed normal load matches the requested 15 mm setup sinkage. The aggregate 5.76% lockup
+compaction from Table 4.3 supplies the single fixture's soil input. The held-out quantities
+are the two crest-to-trough ratios from the blue traces in the top left of Figure 4.5.
+In the embedded 1,500 × 562 RGB image, flat-ground row is 52 ± 1 from columns 100–140.
+The left crest spans rows 38–41 near column 176, the right rows 36–40 near column 284 and the
+trough rows 70–74 near column 232, allowing for the raster marks around the visible medians.
+The common vertical pixel scale cancels in the ratios. Both simulated crests are about 10.64 mm
+and the trough about 14.74 mm at the central station, giving 0.72 on each side within both measured
+envelopes. This check establishes relative locked-wheel relief at one condition. Absolute
+trench geometry across powered slip and obliquity remains open. [Pavlov (2023), Figure 4.5](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=49).
 
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement
 magnitudes in the shear law and projects the force in the direction of the local slip velocity
