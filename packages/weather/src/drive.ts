@@ -48,6 +48,11 @@ export interface DriveSource {
 }
 
 /** The sky (`Sky` from `@margoengine/sky`): its cloud sheet and its fog. */
+/** One engine light of a sky: direction XYZ and intensity in `direction`, RGB radiance in `radiance`. */
+export interface SkyLightTarget {
+  readonly direction: ArrayLike<number>;
+  readonly radiance: ArrayLike<number>;
+}
 export interface SkyTarget {
   readonly options: {
     clouds?: { coverage?: number; speed?: number; height?: number };
@@ -59,7 +64,18 @@ export interface SkyTarget {
      */
     atmosphere?: { sunColor?: readonly [number, number, number]; scatteredLight?: readonly [number, number, number] };
     look?: object;
+    /** The sky's engine lighting: its `intensity` is the noon sun's light the haze colours are referred to. Default 1. */
+    lighting?: { intensity?: number };
   };
+  /**
+   * The sky's day/night blend (`Sky.nightFactor`), 0 by day and 1 at night: the haze colour hands its sunlight over to
+   * the night's light by it, as the sky hands its own light to the moon and twilight. Unset: the sky's blend of its sun.
+   */
+  readonly nightFactor?: number;
+  /** The moon's engine light under the clouds (`Sky.moonUnderClouds`): direction XYZ and intensity, RGB radiance. */
+  readonly moonUnderClouds?: SkyLightTarget;
+  /** The twilight sky's engine light (`Sky.twilightLight`): direction XYZ and intensity, RGB radiance. */
+  readonly twilightLight?: SkyLightTarget;
   /** True when the sky takes `atmosphere` (`Sky.airControls`: it has the `look` feature, as the root `Sky` does). */
   readonly airControls?: boolean;
   /** The unit vector to the sun (`Sky.sun`): its y is the sine of the elevation the smoke's sun dimming reads. Zenith when absent. */
@@ -201,7 +217,8 @@ export interface DriveOptions {
   dustFromSand?: boolean;
   /**
    * Light on the dust haze: the sky fog's colour while dust makes up most of the air's extinction is `dustColor()` times
-   * this (a fog colour is a fixed linear value, so give less at dusk and none at night). Default 1.
+   * this, times the light on the haze, which falls as the sun sets and is the moon's and the twilight sky's at night
+   * (`airLight`). Default 1.
    */
   dustLight?: number;
   /**
@@ -651,7 +668,7 @@ export class WeatherDrive {
           state,
           s.extinction,
           [o.dustLight ?? 1, o.smokeLight ?? 1, o.ashLight ?? 1, o.sprayLight ?? 1],
-          sunElevation(skyTarget),
+          skyTarget,
         );
       }
       this.dimSun(skyTarget, state);
@@ -849,13 +866,15 @@ export class WeatherDrive {
   // Dust, smoke, ash and spray give the sky fog their colour while together they are at least half the air's extinction,
   // each by its share of their extinction (one alone gives its own colour exactly), lit by the light that still reaches
   // the air through the smoke, ash and spray (`hazeLight`), so a thick layer darkens the haze; the colour the fog had
-  // comes back when they are not. A colour a person set meanwhile is kept as the one to come back to.
+  // comes back when they are not. A colour a person set meanwhile is kept as the one to come back to. As the sun sets
+  // the haze's sunlight hands over to the night's light on the air by the sky's own blend (`airLight`,
+  // KB-WEATHER-NIGHTHAZE1), so the haze is moonlit at night, not the afternoon's.
   private tintFog(
     fog: { color?: readonly [number, number, number] },
     state: WeatherState,
     extinction: number,
     lights: readonly number[],
-    elevation: number,
+    sky: SkyTarget,
   ): void {
     if (heldFromWeather(fog, 'color')) return;
     const record = this.fogColors.get(fog),
@@ -876,10 +895,8 @@ export class WeatherDrive {
           lit = lights[k]!;
         for (let i = 0; i < 3; i++) color[i] += share === 1 ? c[i]! * lit : c[i]! * share * lit;
       }
-      if (state.smoke > 0 || state.ash > 0 || state.spray > 0) {
-        const light = hazeLight(state, elevation);
-        for (let i = 0; i < 3; i++) color[i] *= light[i]!;
-      }
+      const light = airLight(sky, state);
+      if (light) for (let i = 0; i < 3; i++) color[i] *= light[i]!;
       const original = record && fog.color === record.wrote ? record.original : fog.color;
       this.fogColors.set(fog, { original, wrote: color });
       fog.color = color;
@@ -1020,6 +1037,47 @@ export class WeatherDrive {
   [Symbol.dispose](): void {
     this.dispose();
   }
+}
+
+/**
+ * The share of the noon sun's light that lights the haze, red, green and blue, or undefined when it is all of it (a day
+ * sky with no smoke, ash or spray, so a dust haze keeps its colour bit for bit). By day it is the light that reaches the
+ * air through the load ({@link hazeLight} at the sun's elevation). The sky hands its light over from the sun to the
+ * night by its blend n (`Sky.nightFactor`: 0 with the sun 4.6 degrees up, 1 at 6.9 degrees down), and the haze does
+ * the same: (1 - n) times the day share, plus n times the night's light on the air, the moon under the clouds and the
+ * twilight sky (`Sky.moonUnderClouds`, `Sky.twilightLight`, each its intensity times its colour, through the load at its
+ * own elevation) over the sky's `lighting.intensity`, the noon sun the haze colours are referred to. Airlight is the
+ * haze's diffusion colour times the light on it (Koschmieder 1924; H. W. Jensen, F. Durand, M. M. Stark, S. Premoze,
+ * J. Dorsey and P. Shirley, "A Physically-Based Night Sky Model", SIGGRAPH 2001: the night's airlight is the moon's and
+ * the sky's light scattered by the same air), so a sky with no night lights gives a black haze at night.
+ */
+function airLight(sky: SkyTarget, state: WeatherState): [number, number, number] | undefined {
+  const loaded = state.smoke > 0 || state.ash > 0 || state.spray > 0,
+    night = nightBlend(sky),
+    day: [number, number, number] | undefined = loaded ? hazeLight(state, sunElevation(sky)) : undefined;
+  if (night === 0) return day;
+  const reference = sky.options.lighting?.intensity ?? 1,
+    light: [number, number, number] = [0, 0, 0];
+  for (const source of [sky.moonUnderClouds, sky.twilightLight]) {
+    const strength = source ? (source.direction[3] ?? 0) : 0;
+    if (!source || !(strength > 0)) continue;
+    const through = loaded
+      ? hazeLight(state, Math.asin(Math.min(1, Math.max(-1, source.direction[1] ?? 1))))
+      : undefined;
+    for (let i = 0; i < 3; i++)
+      light[i] += (strength * (source.radiance[i] ?? 0) * (through ? through[i]! : 1)) / reference;
+  }
+  for (let i = 0; i < 3; i++) light[i] = (1 - night) * (day ? day[i]! : 1) + night * (reference > 0 ? light[i]! : 0);
+  return light;
+}
+
+// The sky's own day/night blend: its nightFactor, else the same smoothstep of its sun (base.ts, (sun.y + 0.12) / 0.2).
+function nightBlend(sky: SkyTarget): number {
+  if (typeof sky.nightFactor === 'number' && Number.isFinite(sky.nightFactor))
+    return Math.min(1, Math.max(0, sky.nightFactor));
+  const y = sky.sun ? (sky.sun[1] ?? 1) : 1,
+    t = Math.max(0, Math.min(1, (y + 0.12) / 0.2));
+  return 1 - t * t * (3 - 2 * t);
 }
 
 /** The sun's elevation in radians over the horizon from the sky's sun direction (straight up when it has none). */

@@ -313,3 +313,58 @@ test('a fire front in the scene raises the weather smoke by its emission; none, 
   given.update(0);
   assert.ok(given.settings.smoke > 0.05);
 });
+
+test('the smoke haze hands its sunlight over to the moon and twilight at night, by the sky blend (KB-WEATHER-NIGHTHAZE1)', () => {
+  // A sky at night: the sun 20 degrees down (blend 1), the moon 18 degrees up at 0.25 of the noon sun's 5, bluish.
+  const up = deg(18),
+    moon = { direction: [0, Math.sin(up), Math.cos(up), 0.25], radiance: [0.8, 0.9, 1.1] },
+    twilight = { direction: [0, Math.SQRT1_2, Math.SQRT1_2, 0], radiance: [1, 1, 1] },
+    sky = {
+      name: 'sky',
+      options: { fog: { density: 0.01, falloff: 'exp' }, lighting: { intensity: 5 } },
+      sun: [0, -Math.sin(deg(20)), Math.cos(deg(20))],
+      nightFactor: 1,
+      moonUnderClouds: moon,
+      twilightLight: twilight,
+    },
+    machine = new WeatherMachine('clear', { seed: 8 }),
+    engine = engineOf(sky),
+    drive = WeatherDrive.attach(engine, { weather: machine, advance: false });
+  drive.setup(engine);
+  applyWeatherSettings(machine, { smoke: 0.5 });
+  drive.update(0);
+  const through = hazeLight({ smoke: 0.5 }, up),
+    night = sky.options.fog.color;
+  for (let i = 0; i < 3; i++) near(night[i], smokeColor()[i] * ((0.25 * moon.radiance[i]) / 5) * through[i], 1e-12);
+  // Far darker than the sunlit haze, and bluer: blue over red rises from the smoke's to the moon's.
+  const noon = smokeColor().map((c, i) => c * hazeLight({ smoke: 0.5 }, Math.PI / 2)[i]);
+  for (let i = 0; i < 3; i++) assert.ok(night[i] < noon[i] / 10, `${night[i]} vs ${noon[i]}`);
+  assert.ok(night[2] / night[0] > noon[2] / noon[0]);
+  // Half way through the handover: the mean of the two lights, with the sun's share at the sun's elevation.
+  sky.nightFactor = 0.5;
+  sky.sun = [0, Math.sin(deg(1)), Math.cos(deg(1))];
+  twilight.direction[3] = 0.02;
+  drive.update(0);
+  const day = hazeLight({ smoke: 0.5 }, deg(1)),
+    sideways = hazeLight({ smoke: 0.5 }, Math.PI / 4);
+  for (let i = 0; i < 3; i++)
+    near(
+      sky.options.fog.color[i],
+      smokeColor()[i] *
+        (0.5 * day[i] + (0.5 * (0.25 * moon.radiance[i] * through[i] + 0.02 * twilight.radiance[i] * sideways[i])) / 5),
+      1e-12,
+    );
+  // Without a nightFactor the sky's own smoothstep of its sun is taken: 20 degrees down is full night.
+  delete sky.nightFactor;
+  sky.sun = [0, -Math.sin(deg(20)), Math.cos(deg(20))];
+  twilight.direction[3] = 0;
+  drive.update(0);
+  for (let i = 0; i < 3; i++) near(sky.options.fog.color[i], night[i], 1e-12);
+  // A dust haze at night is moonlit too; by day it keeps the dust colour exactly.
+  applyWeatherSettings(machine, { smoke: 0, dust: 0.5 });
+  drive.update(0);
+  for (let i = 0; i < 3; i++) near(sky.options.fog.color[i], dustColor()[i] * ((0.25 * moon.radiance[i]) / 5), 1e-12);
+  sky.nightFactor = 0;
+  drive.update(0);
+  assert.deepEqual(sky.options.fog.color, dustColor());
+});

@@ -133,6 +133,11 @@ export interface SceneFogTarget {
     density: number;
 }
 
+export interface SkyLightTarget {
+    readonly direction: ArrayLike<number>;
+    readonly radiance: ArrayLike<number>;
+}
+
 export interface SkyTarget {
     readonly options: {
         clouds?: {
@@ -150,7 +155,13 @@ export interface SkyTarget {
             scatteredLight?: readonly [number, number, number];
         };
         look?: object;
+        lighting?: {
+            intensity?: number;
+        };
     };
+    readonly nightFactor?: number;
+    readonly moonUnderClouds?: SkyLightTarget;
+    readonly twilightLight?: SkyLightTarget;
     readonly airControls?: boolean;
     readonly sun?: ArrayLike<number>;
 }
