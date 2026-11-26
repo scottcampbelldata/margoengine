@@ -260,7 +260,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/input API](https://margoengine.com/llms/api/input.md): 11 entry points
 - [@margoengine/ui API](https://margoengine.com/llms/api/ui.md): 13 entry points
 - [@margoengine/viewcube API](https://margoengine.com/llms/api/viewcube.md): 5 entry points
-- [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 6 entry points
+- [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 7 entry points
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 16 entry points
 - [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 12 entry points
 - [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 27 entry points
