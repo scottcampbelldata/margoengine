@@ -27,7 +27,10 @@ export class Arena {
     readonly memory: WebAssembly.Memory;
     constructor(memory?: WebAssembly.Memory);
     get used(): number;
+    get freeBytes(): number;
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
+    free(region: Region): void;
+    resize(region: Region, byteLength: number): Region;
     words(region: Region): RegionWords;
 }
 
@@ -301,6 +304,8 @@ export interface SolverHost {
     readonly memory: WebAssembly.Memory;
     readonly gravity: readonly [number, number, number];
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
+    resize(region: Region, byteLength: number): Region;
+    free(region: Region): void;
     port(field: string): Port | undefined;
 }
 

@@ -1,7 +1,11 @@
 // The world's memory (docs/physics-framework.md, section 3): one WebAssembly.Memory that every solver module imports, and
-// a region allocator over it. Regions are handed out in allocation order, each aligned to 8 bytes and zeroed, and never
-// move, so a region's offset is fixed for the life of the world and a reader reads a port in place. The memory grows by
-// whole 64 KiB pages when a region does not fit; views over it are made afresh at each use, as growing replaces the buffer.
+// the one region allocator over it. A region is aligned to 8 bytes and zeroed, and it stays where it is until it is freed
+// or resized, so a reader reads a port in place. Freed regions become free blocks that merge with free neighbours, and a
+// new region takes the lowest free block it fits (address-ordered first fit: Wilson, Johnstone, Neely and Boles 1995;
+// Johnstone and Wilson 1998 measure it among the least fragmenting policies), else the top, where the memory grows by whole
+// 64 KiB pages. Which block a call takes depends on the calls made before it alone, so the same calls give the same offsets
+// on every run. Where regions lie is layout, not state: no state hash or snapshot reads it. Views over the memory are made
+// afresh at each use, as growing replaces the buffer.
 //
 // The memory's low part belongs to the solver modules (scripts/physics-modules.mjs holds the module table): the first page
 // is never used, then each module has a static window of one page at its slot, where its linker placed its read-only data
@@ -32,12 +36,32 @@ export const STACK_BYTES = 65536;
 /** The typed array of each element type. */
 export type RegionWords = Float64Array | Float32Array | Int32Array | Uint32Array | Uint8Array;
 
+/** A region's bytes in the arena: its length rounded up to 8. */
+const padded = (byteLength: number): number => Math.ceil(byteLength / 8) * 8;
+
+/** Refuses a region of an unknown type, a length that is not whole words, or a layout version that is not a whole number. */
+function checkRegion(name: string, byteLength: number, type: ElementType, layout: number): void {
+  const size = BYTES[type];
+  if (size === undefined) throw new RangeError(`Region "${name}" has type "${type}"; use f64, f32, i32, u32 or u8.`);
+  if (!Number.isSafeInteger(byteLength) || byteLength < 0 || byteLength % size !== 0)
+    throw new RangeError(
+      `Region "${name}" asks for ${byteLength} bytes, not a whole number of ${type} words; pass a multiple of ${size}.`,
+    );
+  if (!Number.isSafeInteger(layout) || layout < 0)
+    throw new RangeError(`Region "${name}" has layout version ${layout}; pass a whole number.`);
+}
+
 /** One memory and the regions allocated in it. */
 export class Arena {
   /** The memory every region lies in. */
   readonly memory: WebAssembly.Memory;
 
-  private next = DYNAMIC_BASE;
+  /** The first byte above every region: the memory from here up is free. */
+  private top = DYNAMIC_BASE;
+  /** The free blocks below `top`, as [start, bytes] by address, no two touching. */
+  private readonly holes: [number, number][] = [];
+  /** Each live region's block: its start to its bytes, a multiple of 8. A region of no bytes has no block. */
+  private readonly blocks = new Map<number, number>();
 
   /**
    * @param memory The memory to allocate in; by default {@link worldMemory}'s plain memory. It grows to hold the module
@@ -58,32 +82,153 @@ export class Arena {
     }
   }
 
-  /** Bytes allocated so far, padding included, counted from {@link DYNAMIC_BASE}. */
+  /** Bytes from {@link DYNAMIC_BASE} to the end of the highest region, padding and free blocks below it included. */
   get used(): number {
-    return this.next - DYNAMIC_BASE;
+    return this.top - DYNAMIC_BASE;
+  }
+
+  /** Bytes of the free blocks below the highest region, which the next regions that fit them take first. */
+  get freeBytes(): number {
+    let bytes = 0;
+    for (const hole of this.holes) bytes += hole[1];
+    return bytes;
   }
 
   /**
-   * A new region of `byteLength` bytes of `type` words, zeroed, aligned to 8 bytes.
+   * A new region of `byteLength` bytes of `type` words, zeroed, aligned to 8 bytes: in the lowest free block it fits, else
+   * at the top.
    * @throws RangeError for a length that is not a whole number of `type` words, a layout version that is not a whole number,
-   * or an unknown type.
+   * an unknown type, or when the memory cannot grow to hold it.
    */
   allocate(name: string, byteLength: number, type: ElementType, layout: number): Region {
-    const size = BYTES[type];
-    if (size === undefined) throw new RangeError(`Region "${name}" has type "${type}"; use f64, f32, i32, u32 or u8.`);
-    if (!Number.isSafeInteger(byteLength) || byteLength < 0 || byteLength % size !== 0)
-      throw new RangeError(
-        `Region "${name}" asks for ${byteLength} bytes, not a whole number of ${type} words; pass a multiple of ${size}.`,
-      );
-    if (!Number.isSafeInteger(layout) || layout < 0)
-      throw new RangeError(`Region "${name}" has layout version ${layout}; pass a whole number.`);
-    const byteOffset = this.next,
-      end = byteOffset + byteLength,
-      have = this.memory.buffer.byteLength;
-    if (end > have) this.memory.grow(Math.ceil((end - have) / PAGE));
-    new Uint8Array(this.memory.buffer, byteOffset, byteLength).fill(0);
-    this.next = Math.ceil(end / 8) * 8;
+    checkRegion(name, byteLength, type, layout);
+    const bytes = padded(byteLength),
+      byteOffset = this.take(bytes);
+    if (bytes > 0) {
+      new Uint8Array(this.memory.buffer, byteOffset, bytes).fill(0);
+      this.blocks.set(byteOffset, bytes);
+    }
     return { name, byteOffset, byteLength, type, layout };
+  }
+
+  /**
+   * Gives `region`'s bytes back: the next regions that fit them take them. A view over it reads what a later region writes.
+   * @throws RangeError for a region this arena did not hand out or that was freed or resized since.
+   */
+  free(region: Region): void {
+    const bytes = this.blockOf(region);
+    if (bytes === 0) return;
+    this.blocks.delete(region.byteOffset);
+    this.give(region.byteOffset, bytes);
+  }
+
+  /**
+   * `region` at `byteLength` bytes, its words kept up to the shorter length and the rest zeroed: in place when it shrinks, when
+   * it is the highest region, or when the free block after it holds the growth; else in a new place, with one copy, and its old
+   * bytes freed. The name, type and layout stay. Use the region it returns: the one passed in is gone.
+   * @throws RangeError as {@link Arena.allocate} and {@link Arena.free} do.
+   */
+  resize(region: Region, byteLength: number): Region {
+    const { name, type, layout } = region;
+    checkRegion(name, byteLength, type, layout);
+    const had = this.blockOf(region),
+      bytes = padded(byteLength),
+      at = region.byteOffset;
+    const kept = (): Region => {
+      if (bytes > 0) this.blocks.set(at, bytes);
+      else this.blocks.delete(at);
+      return { name, byteOffset: at, byteLength, type, layout };
+    };
+    if (bytes <= had) {
+      // The words past the new length read zero again, as a region's fresh words do.
+      new Uint8Array(this.memory.buffer, at + byteLength, had - byteLength).fill(0);
+      if (bytes < had) this.give(at + bytes, had - bytes);
+      return kept();
+    }
+    const end = at + had,
+      grow = bytes - had;
+    if (had > 0 && end === this.top) {
+      this.reach(at + bytes);
+      this.top = at + bytes;
+    } else if (had > 0 && this.takeAt(end, grow)) {
+      // The free block after the region held the growth.
+    } else {
+      const moved = this.allocate(name, byteLength, type, layout);
+      new Uint8Array(this.memory.buffer).copyWithin(moved.byteOffset, at, at + region.byteLength);
+      this.free(region);
+      return moved;
+    }
+    new Uint8Array(this.memory.buffer, at + region.byteLength, bytes - region.byteLength).fill(0);
+    return kept();
+  }
+
+  /** The block of a live region, or 0 for one of no bytes. */
+  private blockOf(region: Region): number {
+    if (region.byteLength === 0) return 0;
+    const bytes = this.blocks.get(region.byteOffset);
+    if (bytes === undefined || bytes !== padded(region.byteLength))
+      throw new RangeError(
+        `Region "${region.name}" at ${region.byteOffset} is not a live region of this arena; free or resize each region once, with the region allocate or resize returned.`,
+      );
+    return bytes;
+  }
+
+  /** The start of `bytes` bytes: the lowest free block that holds them, else the top. */
+  private take(bytes: number): number {
+    if (bytes === 0) return this.top;
+    for (let i = 0; i < this.holes.length; i++) {
+      const hole = this.holes[i]!;
+      if (hole[1] < bytes) continue;
+      const start = hole[0];
+      if (hole[1] === bytes) this.holes.splice(i, 1);
+      else {
+        hole[0] += bytes;
+        hole[1] -= bytes;
+      }
+      return start;
+    }
+    const start = this.top;
+    this.reach(start + bytes);
+    this.top = start + bytes;
+    return start;
+  }
+
+  /** Takes `bytes` from the free block that starts at `start`, if there is one that large. */
+  private takeAt(start: number, bytes: number): boolean {
+    const i = this.holes.findIndex((hole) => hole[0] === start);
+    const hole = this.holes[i];
+    if (!hole || hole[1] < bytes) return false;
+    if (hole[1] === bytes) this.holes.splice(i, 1);
+    else {
+      hole[0] += bytes;
+      hole[1] -= bytes;
+    }
+    return true;
+  }
+
+  /** Frees the block from `start` of `bytes`: merged with free neighbours, and given back to the top when it reaches it. */
+  private give(start: number, bytes: number): void {
+    let i = 0;
+    while (i < this.holes.length && this.holes[i]![0] < start) i++;
+    let end = start + bytes;
+    const before = this.holes[i - 1];
+    if (before && before[0] + before[1] === start) {
+      start = before[0];
+      this.holes.splice(--i, 1);
+    }
+    const after = this.holes[i];
+    if (after && after[0] === end) {
+      end = after[0] + after[1];
+      this.holes.splice(i, 1);
+    }
+    if (end === this.top) this.top = start;
+    else this.holes.splice(i, 0, [start, end - start]);
+  }
+
+  /** Grows the memory to hold `end` bytes. */
+  private reach(end: number): void {
+    const have = this.memory.buffer.byteLength;
+    if (end > have) this.memory.grow(Math.ceil((end - have) / PAGE));
   }
 
   /** The words of `region`, as the typed array of its element type, over the memory as it is now. */

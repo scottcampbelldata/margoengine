@@ -2263,6 +2263,15 @@ The memory's low part belongs to the modules: the first 64 KiB is never used, th
 above it. A module keeps no state in statics and has no allocator: its state and ports are regions the world gave it,
 so a snapshot of the world holds all of it. Each instance of a module, one per thread, runs on a stack region of its own.
 
+The `Arena` is the world's one region allocator. `allocate(name, byteLength, type, layout)` hands out a zeroed region,
+8-byte aligned, in the lowest free block it fits or else at the top, where the memory grows by whole pages.
+`free(region)` gives a region back, and its block merges with free neighbours. `resize(region, byteLength)` keeps the
+region's words up to the shorter length and zeroes the rest. It stays in place when the region shrinks, is the highest one,
+or has a free block after it that holds the growth; otherwise it moves with one copy. Use the region it returns. Freeing or
+resizing a region twice, or one from another arena, throws a `RangeError` and changes nothing. The same calls give the same
+offsets on every run, and `used` and `freeBytes` read how far the regions reach and how much of that is free. A solver gets
+the same three through its host (`host.allocate`, `host.resize`, `host.free`).
+
 `loadSolverModule(arena, {name, slot}, {shared, plain})` takes the build that fits the memory, checks in a scratch
 memory that its data lies inside its slot's window (a misplaced build is refused with `unsupported` before it writes a
 byte of the world's), then instantiates it with a stack region from the arena. `worldMemory()` makes a shared memory
@@ -2277,6 +2286,10 @@ import {Arena, DYNAMIC_BASE, loadSolverModule, worldMemory, type ModuleBuilds} f
 const arena = new Arena(worldMemory());
 const particles = arena.allocate('particles', 1000 * 24, 'f32', 1);
 console.log(particles.byteOffset >= DYNAMIC_BASE); // true: regions start above the module windows
+const more = arena.resize(particles, 2000 * 24); // the top region grows where it is
+console.log(more.byteOffset === particles.byteOffset); // true
+arena.free(more); // its bytes go back to the arena
+console.log(arena.used); // 0
 
 // A module built by scripts/physics-modules.mjs for slot 0, in its shared and plain builds.
 async function load(builds: ModuleBuilds) {

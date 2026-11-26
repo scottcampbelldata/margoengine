@@ -223,7 +223,7 @@ and every solver uses it:
 | linear solvers | preconditioned conjugate gradient, multigrid-preconditioned CG, banded Cholesky, fixed-order dot products |
 | FFT | for the spectral ocean and spectral turbulence |
 | transfers | APIC, conservative remap, mesh load transfer |
-| allocator | one region allocator over the shared memory (today there are three) |
+| allocator | one region allocator over the shared memory: the world's `Arena` allocates, frees and resizes regions (address-ordered first fit, freed blocks merged; 2026-11-26). The rigid, soft and 2D kernels still keep memories and heaps of their own until they move into world regions |
 
 ## 7. Determinism
 

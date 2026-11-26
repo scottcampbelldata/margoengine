@@ -151,6 +151,14 @@ export interface SolverHost {
    */
   allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
   /**
+   * The solver's region `region` at `byteLength` bytes, its words kept up to the shorter length and the rest zeroed, in place
+   * where it can be and else in a new place with one copy (the arena's `resize`). Use the region it returns, and list it in
+   * `stateRegions()` from then on. Growing may grow the world's memory, as {@link SolverHost.allocate} may.
+   */
+  resize(region: Region, byteLength: number): Region;
+  /** Gives back a region the solver no longer needs; a later region may take its bytes. */
+  free(region: Region): void;
+  /**
    * The port of field `field` at the current coupling tick: the owner's published data for a field the solver reads, and
    * the contributions summed in canonical order (by solver id, then element) for a field it owns and others accumulate into.
    * Undefined when nothing was published or accumulated.

@@ -11532,6 +11532,20 @@ Proof: `packages/physics/tests/world.test.js`.
 - The wavenumbers and band widths are the wave solver's own (`wavenumber`, `bandWidth` of `@margoengine/physics/waves`), so
   the sea and its spectrum agree on every wave.
 
+### The world's region allocator (`Arena` in `@margoengine/physics/world`, 2026-11-26)
+
+`allocate`, `free` and `resize` in `packages/physics/src/world/memory.ts` are written from the papers below; no allocator's
+code was read.
+
+- P. R. Wilson, M. S. Johnstone, M. Neely and D. Boles, "Dynamic Storage Allocation: A Survey and Critical Review",
+  International Workshop on Memory Management, LNCS 986, 1995, https://www.cs.hmc.edu/~oneill/gc-library/Wilson-Alloc-Survey-1995.pdf,
+  read for the policies (first fit, address-ordered first fit, best fit) and for immediate coalescing of freed neighbours.
+- M. S. Johnstone and P. R. Wilson, "The Memory Fragmentation Problem: Solved?", ISMM 1998,
+  https://sfkaplan.people.amherst.edu/courses/2016/fall/COSC-461/documents/Johnstone-Memory-fragmentation-problem.pdf,
+  read: in their traces address-ordered first fit and best fit are the two policies with the least fragmentation. Own
+  choices: a sorted list of free blocks (the arena holds few regions, so no tree), 8-byte granularity, a block reaching the
+  top lowering the top, and resize in place where the block grows into the top or into the free block after it.
+
 ### Solver modules on one memory (`@margoengine/physics/world`, `scripts/physics-modules.mjs`, 2026-11-25)
 
 The module table, the build check and the loader (`packages/physics/src/world/memory.ts`) are written from the linker's and

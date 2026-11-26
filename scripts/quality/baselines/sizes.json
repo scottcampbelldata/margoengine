@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19283550,
+  "total": 19290919,
   "history": [
     {
       "date": "2026-10-24",
@@ -12609,6 +12609,12 @@
       "commit": "6d77417bd",
       "reason": "selection-actions-entry",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "11fcc806f",
+      "reason": "@margoengine/physics/world 16988 to 17220 B gzip measured (+232; budget 17737 with the 3 percent allowance): Arena frees and resizes regions (address-ordered first fit, merged free blocks, resize in place or by one copy), the framework's one region allocator (K05). It is the entry every solver allocates through, so a separate entry would be loaded by all of them anyway.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13433,7 +13439,7 @@
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/waves": 8575,
-    "@margoengine/physics/world": 16988,
+    "@margoengine/physics/world": 17737,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

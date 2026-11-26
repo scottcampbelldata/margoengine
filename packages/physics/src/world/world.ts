@@ -390,7 +390,10 @@ export class PhysicsWorld {
    * rate, exact).
    */
   alpha(level: RateLevel): number {
-    if (!isRateLevel(level)) throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}); pass a level between 0 (60 Hz) and 7 (7,680 Hz).`);
+    if (!isRateLevel(level))
+      throw new RangeError(
+        `A rate level is a whole number from 0 to 7 (got ${level}); pass a level between 0 (60 Hz) and 7 (7,680 Hz).`,
+      );
     return this.clock.alpha(rateOf(level));
   }
 
@@ -642,6 +645,8 @@ export class PhysicsWorld {
       memory: arena.memory,
       gravity: this.gravity,
       allocate: (name, byteLength, type, layout) => arena.allocate(name, byteLength, type, layout),
+      resize: (region, byteLength) => arena.resize(region, byteLength),
+      free: (region) => arena.free(region),
       port: (field) => {
         const registered = this.fields.field(field);
         if (registered?.owner === id) return e.sums.get(field);
