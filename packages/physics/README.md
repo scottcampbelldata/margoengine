@@ -4771,6 +4771,13 @@ same descriptor from `soilWheelPhaseField()` as `wheelPhase` to both the rigid a
 solver. The adapter publishes each real wheel's spin angle. Resolve lug width on both the projected
 profile and the physical terrain grid.
 
+For an irregular wheel, give the same `rollingWheels` row a `treadMesh` with flat `positions` triples
+in metres (across, up, forward relative to the axle) and zero-based `indices` in triangle triples.
+Use `treadMesh` or `lugCount` per row and retain the `wheelPhase` binding. The solver projects the
+lowest rotating triangle at each sample and combines it with the rim profile. Set `columns` and
+`rows` to resolve the narrowest groove. They default to 17 across and 65 along travel. The
+[indexed tread example](tests/coupling/terramechanics.test.js) has a two-triangle wheel segment and both phase positions.
+
 ## Physical strand guides
 
 Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone

@@ -129,6 +129,18 @@ export interface SoilRollingWheel {
   readonly lugCount?: number;
   /** Lug width in the direction of travel, m. Required for phase-resolved lugs. */
   readonly lugWidth?: number;
+  /** Optional arbitrary moving tread triangles, rotated about the across axis. Use the wheel-phase field. */
+  readonly treadMesh?: SoilTreadMesh;
+}
+
+/** Indexed tread geometry centred on the axle. Coordinates are across, up and forward, in metres. */
+export interface SoilTreadMesh {
+  readonly positions: ArrayLike<number>;
+  readonly indices: ArrayLike<number>;
+  /** Profile vertices across travel. Default 17. */
+  readonly columns?: number;
+  /** Profile vertices along travel. Default 65. */
+  readonly rows?: number;
 }
 
 export interface TerramechanicsOptions {
@@ -250,8 +262,10 @@ export function wheelSoil(
 
 type Patch = readonly [number, number, number, number, number, number, number, number, number, number];
 type ProfileSlot = Pick<SoilContactProfile, 'columns' | 'rows' | 'area' | 'perimeter'> & { region: Region };
+type RollingParameters = Required<Omit<SoilRollingWheel, 'treadMesh'>>;
+type MeshSlot = { geometry: Region; profile: Region; columns: number; rows: number };
 
-function rollingWheel(wheel: SoilRollingWheel): Required<SoilRollingWheel> {
+function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
   const radius = positive(wheel.radius, 'wheel radius');
   const lugHeight = finite(wheel.lugHeight ?? 0, 'wheel lug height', 0);
   const lugCount = wheel.lugCount ?? 0;
@@ -265,6 +279,11 @@ function rollingWheel(wheel: SoilRollingWheel): Required<SoilRollingWheel> {
     throw new MargoError(
       'state',
       'The discrete wheel lugs cannot fit around the rim. Use positive height and width below their spacing.',
+    );
+  if (wheel.treadMesh && lugCount > 0)
+    throw new MargoError(
+      'state',
+      'Two sets of wheel treads are configured. Choose indexed triangles or evenly spaced lugs.',
     );
   const peakFraction = finite(
     wheel.peakFraction ?? 0.4,
@@ -328,7 +347,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
   private profiles: (ProfileSlot | null)[] = [];
-  private rolling: (Required<SoilRollingWheel> | null)[] = [];
+  private rolling: (RollingParameters | null)[] = [];
+  private meshes: (MeshSlot | null)[] = [];
   private inputRows = 0;
   private cell: Cell = CENTRE;
   private cellSize = 4096;
@@ -436,8 +456,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         'A rolling load has two footprint geometries. Choose a cylindrical wheel or a sampled profile for that row.',
       );
     this.rolling = rolling.map((wheel) => wheel && rollingWheel(wheel));
-    if (!this.phase && this.rolling.some((wheel) => wheel && wheel.lugCount > 0))
-      throw new MargoError('state', 'Discrete wheel lugs need a phase port. Provide a soil wheel phase reader.');
+    if (!this.phase && rolling.some((wheel) => wheel && (wheel.lugCount || wheel.treadMesh)))
+      throw new MargoError('state', 'Moving wheel treads need a phase port. Provide a soil wheel phase reader.');
     if (profiles.length && (!this.pressureField || profiles.length !== responses))
       throw new MargoError(
         'state',
@@ -458,7 +478,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 40);
+    this.nativePatch = allocate('soil-patch-scratch', 45);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -493,6 +513,36 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           'A soil profile has no contact. Provide a positive depth for part of the footprint.',
         );
       return { columns, rows, area, perimeter, region };
+    });
+    this.meshes = rolling.map((wheel, row) => {
+      if (!wheel?.treadMesh) return null;
+      const { positions, indices, columns = 17, rows = 65 } = wheel.treadMesh;
+      if (
+        ![columns, rows, columns * rows, positions.length, indices.length * 3].every(Number.isSafeInteger) ||
+        columns < 2 ||
+        rows < 2 ||
+        positions.length < 9 ||
+        indices.length < 3 ||
+        positions.length % 3 ||
+        indices.length % 3
+      )
+        throw new MargoError(
+          'state',
+          'Invalid wheel mesh dimensions. Provide indexed triangles and at least two profile vertices per axis.',
+        );
+      const geometry = allocate(`soil-tread-geometry-${row}`, indices.length * 3);
+      const profile = allocate(`soil-tread-profile-${row}`, columns * rows);
+      const data = this.words(geometry);
+      for (let i = 0; i < indices.length; i++) {
+        const vertex = indices[i]!;
+        if (!Number.isSafeInteger(vertex) || vertex < 0 || vertex >= positions.length / 3)
+          throw new MargoError(
+            'state',
+            'The tread triangle points outside the vertex array. Use zero-based vertex indices.',
+          );
+        for (let axis = 0; axis < 3; axis++) data[3 * i + axis] = finite(positions[3 * vertex + axis]!, 'tread vertex');
+      }
+      return { geometry, profile, columns, rows };
     });
     this.kernel = bindSoil(host, this.builds);
     this.words(this.areas).set(this.change.area);
@@ -567,6 +617,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     positive(width, 'contact width');
     const material = this.material;
     const rolling = this.rolling[row - this.fixed.length];
+    const mesh = this.meshes[row - this.fixed.length];
     const forward = [forwardX / direction, forwardZ / direction] as const;
     const drivingSlip = rolling ? Math.min(1, Math.max(0, -(shearX * forward[0] + shearZ * forward[1]) / length)) : 0;
     const exponent = positive(material.exponent + (rolling?.slipExponent ?? 0) * drivingSlip, 'effective exponent');
@@ -660,6 +711,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       rolling?.lugCount ?? 0,
       rolling?.lugWidth ?? 0,
       finite(phase, 'wheel phase'),
+      mesh?.geometry.byteOffset ?? 0,
+      (mesh?.geometry.byteLength ?? 0) / 72,
+      mesh?.profile.byteOffset ?? 0,
+      mesh?.columns ?? 0,
+      mesh?.rows ?? 0,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -850,6 +906,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.response,
       ...(this.floorGrid ? [this.floorGrid] : []),
       ...(this.thicknessGrid ? [this.thicknessGrid] : []),
+      ...this.meshes.flatMap((mesh) => (mesh ? [mesh.geometry] : [])),
       ...(this.pressure && this.workRegion ? [this.pressure, this.workRegion] : []),
     ];
   }

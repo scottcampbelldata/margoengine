@@ -427,7 +427,7 @@ test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and mode
   }
 });
 
-test('live spin phase cuts with a discrete grouser and repeats at one tooth pitch', async () => {
+test('live spin phase cuts with a discrete grouser and repeats at one tooth pitch', async (t) => {
   const terrain = { columns: 100, rows: 100, width: 0.2, depth: 0.2, centre: [0, 0] };
   const input = soilPatchField('grouser-load');
   const wheelPhase = soilWheelPhaseField('grouser-phase');
@@ -436,7 +436,7 @@ test('live spin phase cuts with a discrete grouser and repeats at one tooth pitc
   const lugCount = 4;
   const wheel = { radius, lugHeight, lugCount, lugWidth: 0.008 };
   const material = { cohesiveModulus: 0, frictionalModulus: 2_407_400, exponent: 0.84, compaction: 1 };
-  async function stamp(angle, shared) {
+  async function stamp(angle, shared, geometry = wheel) {
     let load, phase;
     const bench = {
       describe: () => ({
@@ -468,7 +468,7 @@ test('live spin phase cuts with a discrete grouser and repeats at one tooth pitc
     const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
       .add(bed, { ...terrain, elevations: () => 0 })
       .add(bench)
-      .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel] })
+      .add(soil, { terrain, material, inputRows: 1, rollingWheels: [geometry] })
       .couple(['grouser-rig', 'terramechanics', 'bed'], 'staggered');
     world.advance(1);
     const areas = bedVertexAreas(terrain);
@@ -490,6 +490,25 @@ test('live spin phase cuts with a discrete grouser and repeats at one tooth pitc
   assert.ok(down.pressure > 0 && gap.pressure === 0);
   assert.deepEqual(repeat.elevations, down.elevations);
   assert.equal(gap.rim, down.rim);
+
+  await t.test('an offset indexed tread intersects the bed only when it rotates down', async () => {
+    const y = -(radius + lugHeight);
+    const treadMesh = {
+      positions: [0.05, y, -0.004, 0.07, y, -0.004, 0.07, y, 0.004, 0.05, y, 0.004],
+      indices: [0, 1, 2, 0, 2, 3],
+    };
+    const geometry = { radius, lugHeight, treadMesh };
+    const down = await stamp(0, true, geometry);
+    const repeat = await stamp(0, false, geometry);
+    const sideways = await stamp(Math.PI / 2, false, geometry);
+    const atTread = 80 * 101 + 50;
+    const acrossFromTread = 20 * 101 + 50;
+    close(-down.elevations[atTread], down.rim + lugHeight, 1024 * eps);
+    assert.equal(down.elevations[acrossFromTread], 0);
+    assert.equal(sideways.elevations[atTread], 0);
+    assert.equal(down.rim, sideways.rim);
+    assert.deepEqual(down.elevations, repeat.elevations);
+  });
 });
 
 async function steps(kind, speed) {

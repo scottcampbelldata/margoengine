@@ -193,6 +193,16 @@ Its projected width is an authored strip. The phase fixture checks exact vertica
 an unloaded gap at half a pitch, and identical terrain after a full pitch across native memory variants.
 [Skonieczny et al.](https://publications.ri.cmu.edu/storage/publications/pub_files/2012/10/SkoniecznyIROS2012.pdf).
 
+Rainer Krenn and Gerd Hirzinger, “SCM – A Soil Contact Model for Multi-Body System Simulations”
+(2009), §3.2 and Fig. 6, use transformed polygon geometry and the lowest point at each soil-grid
+column. The indexed tread path rotates triangles about the axle by the live spin angle and solves
+two horizontal barycentric coordinates at each candidate profile sample. The weighted vertex
+heights give the contact depth, and the lowest intersecting triangle wins before the rim and tread
+pressures are normalized to the prescribed vertical load. The projection uses the local horizontal
+bearing plane. The test places a tread outside the rim width and checks its exact downwards cut,
+the unloaded opposite side and quarter-turn clearance in both native memory modes.
+[Krenn and Hirzinger](https://elib.dlr.de/60535/1/elib_ISTVS2009_KrennHirzinger.pdf).
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”

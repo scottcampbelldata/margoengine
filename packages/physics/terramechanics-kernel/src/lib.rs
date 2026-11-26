@@ -62,6 +62,11 @@ struct Patch {
     lug_count: f64,
     lug_width: f64,
     phase: f64,
+    mesh_geometry: f64,
+    mesh_triangles: f64,
+    mesh_profile: f64,
+    mesh_columns: f64,
+    mesh_rows: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -100,8 +105,9 @@ impl FaceQueue {
     unsafe fn add(&self, face: usize) {
         let mut path = [0; 7];
         path[0] = face / 32;
+        // A wasm32 grid needs at most seven levels: one bit per face and a factor of 32 per level.
         for level in 1..=self.top {
-            path[level] = path[level - 1] / 32;
+            *path.get_unchecked_mut(level) = *path.get_unchecked(level - 1) / 32;
         }
         for level in (1..=self.top).rev() {
             let parent = self.words.add(self.levels[level] + path[level]);
@@ -292,7 +298,105 @@ fn phase_offset(angle: f64, pitch: f64) -> f64 {
     if offset < 0.0 { offset + pitch } else { offset }
 }
 
-fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> Option<RollingCut> {
+fn rotate_tread(face: &[f64], sine: f64, cosine: f64) -> [[f64; 3]; 3] {
+    core::array::from_fn(|i| {
+        let [x, y, z] = [face[3 * i], face[3 * i + 1], face[3 * i + 2]];
+        [x, cosine * y - sine * z, sine * y + cosine * z]
+    })
+}
+
+fn enclose_tread(
+    mesh: &[f64],
+    spin: (f64, f64),
+    hub: f64,
+    across: &mut f64,
+    rear: &mut f64,
+    fore: &mut f64,
+    cap: &mut f64,
+) {
+    for face in mesh.chunks_exact(9) {
+        let vertices = rotate_tread(face, spin.0, spin.1);
+        for i in 0..3 {
+            let a = vertices[i];
+            let b = vertices[(i + 1) % 3];
+            if a[1] <= -hub {
+                *across = across.max(a[0].abs());
+                *rear = rear.min(a[2]);
+                *fore = fore.max(a[2]);
+                *cap = cap.max(-hub - a[1]);
+            }
+            if (a[1] < -hub) != (b[1] < -hub) {
+                let t = (-hub - a[1]) / (b[1] - a[1]);
+                let x = a[0] + t * (b[0] - a[0]);
+                let z = a[2] + t * (b[2] - a[2]);
+                *across = across.max(x.abs());
+                *rear = rear.min(z);
+                *fore = fore.max(z);
+            }
+        }
+    }
+}
+
+fn raster_tread(
+    mesh: &[f64],
+    spin: (f64, f64),
+    hub: f64,
+    across: f64,
+    rear: f64,
+    fore: f64,
+    cap: f64,
+    columns: usize,
+    rows: usize,
+    depth: &mut [f64],
+) {
+    let dx = 2.0 * across / (columns - 1) as f64;
+    let dz = (fore - rear) / (rows - 1) as f64;
+    for face in mesh.chunks_exact(9) {
+        let [a, b, c] = rotate_tread(face, spin.0, spin.1);
+        if a[1].min(b[1]).min(c[1]) >= -hub {
+            continue;
+        }
+        let ux = b[0] - a[0];
+        let uz = b[2] - a[2];
+        let vx = c[0] - a[0];
+        let vz = c[2] - a[2];
+        let det = ux * vz - uz * vx;
+        if det == 0.0 || !det.is_finite() {
+            continue;
+        }
+        let xmin = a[0].min(b[0]).min(c[0]);
+        let xmax = a[0].max(b[0]).max(c[0]);
+        let zmin = a[2].min(b[2]).min(c[2]);
+        let zmax = a[2].max(b[2]).max(c[2]);
+        let (start_x, end_x) = bounds(
+            0.5 * xmin + 0.5 * xmax,
+            0.5 * (xmax - xmin),
+            -across,
+            dx,
+            columns,
+        );
+        let (start_z, end_z) = bounds(0.5 * zmin + 0.5 * zmax, 0.5 * (zmax - zmin), rear, dz, rows);
+        for i in start_x..end_x {
+            let x = -across + i as f64 * dx - a[0];
+            for j in start_z..end_z {
+                let z = rear + j as f64 * dz - a[2];
+                let u = (x * vz - z * vx) / det;
+                let v = (ux * z - uz * x) / det;
+                let w = 1.0 - u - v;
+                // Include the shared edge even when its barycentric value rounded a few ulps below zero.
+                if u.min(v).min(w) >= -8.0 * f64::EPSILON {
+                    let y = w * a[1] + u * b[1] + v * c[1];
+                    let value = ((-hub - y) / cap).clamp(0.0, 1.0);
+                    // Each range is clipped to its grid dimension and the caller supplies the full grid.
+                    let sample = unsafe { depth.get_unchecked_mut(i * rows + j) };
+                    *sample = sample.max(value);
+                }
+            }
+        }
+    }
+}
+
+unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingCut> {
     let mut lo = 0.0;
     let mut hi = core::f64::consts::FRAC_PI_2;
     if rolling_load(p, hi) < p.load {
@@ -327,6 +431,24 @@ fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> Opti
     let mut phase = 0.0;
     let mut pitch = 0.0;
     let mut engaged = false;
+    let have_mesh = p.mesh_triangles > 0.0;
+    let mut across = p.half_width;
+    let (mesh, spin, columns, rows) = if have_mesh {
+        let mesh = core::slice::from_raw_parts(
+            (p.mesh_geometry as usize) as *const f64,
+            p.mesh_triangles as usize * 9,
+        );
+        let spin = (sin(p.phase), cos(p.phase));
+        enclose_tread(mesh, spin, hub, &mut across, &mut rear, &mut fore, &mut cap);
+        (mesh, spin, p.mesh_columns as usize, p.mesh_rows as usize)
+    } else {
+        (
+            &[][..],
+            (0.0, 1.0),
+            2,
+            if phased { ROLLING_ROWS } else { 33 },
+        )
+    };
     if phased {
         pitch = core::f64::consts::TAU / p.lug_count;
         phase = phase_offset(-p.phase, pitch);
@@ -345,8 +467,10 @@ fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> Opti
             cap = cap.max(tip * cos(nearest) - hub);
         }
     }
-    let rows = if phased { ROLLING_ROWS } else { 33 };
-    let first = usize::from(!phased);
+    if !((fore - rear).is_finite() && across.is_finite() && cap.is_finite()) {
+        return None;
+    }
+    let first = usize::from(!phased && !have_mesh);
     for i in first..rows - first {
         let position = rear + (fore - rear) * (i as f64 / (rows - 1) as f64);
         let mut profile = 0.0;
@@ -368,18 +492,34 @@ fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> Opti
                 0.0
             };
             (profile * rim_cut).max(lug) / cap
+        } else if have_mesh && cap > 0.0 {
+            profile * rim_cut / cap
         } else {
             profile
         };
-        depth[i] = value;
-        depth[i + rows] = value;
+        for column in 0..columns {
+            let cross = -across + 2.0 * across * (column as f64 / (columns - 1) as f64);
+            let rim_at_column = if cross.abs() <= p.half_width {
+                value
+            } else {
+                0.0
+            };
+            // The supplied grid contains exactly these column and row ranges.
+            *depth.get_unchecked_mut(i + column * rows) = rim_at_column;
+        }
+    }
+    if have_mesh && cap > 0.0 {
+        raster_tread(
+            mesh, spin, hub, across, rear, fore, cap, columns, rows, depth,
+        );
     }
     let shift = 0.5 * (rear + fore);
     p.x += shift * p.forward_x;
     p.z += shift * p.forward_z;
     p.half_length = 0.5 * (fore - rear);
+    p.half_width = across;
     p.profile = depth.as_ptr() as usize as f64;
-    p.profile_columns = 2.0;
+    p.profile_columns = columns as f64;
     p.profile_rows = rows as f64;
     p.projected_area = (fore - rear) * (2.0 * p.half_width);
     Some(RollingCut {
@@ -416,7 +556,15 @@ pub unsafe extern "C" fn stamp(
     let mut local = *source;
     let mut rolling_shape = [0.0; ROLLING_ROWS * 2];
     let rolling_depth = if local.wheel_radius > 0.0 {
-        let Some(depth) = rolling_footprint(&mut local, &mut rolling_shape) else {
+        let footprint = if local.mesh_triangles > 0.0 {
+            core::slice::from_raw_parts_mut(
+                (local.mesh_profile as usize) as *mut f64,
+                local.mesh_columns as usize * local.mesh_rows as usize,
+            )
+        } else {
+            &mut rolling_shape[..]
+        };
+        let Some(depth) = rolling_footprint(&mut local, footprint) else {
             return f64::NAN;
         };
         source.projected_area = local.projected_area;

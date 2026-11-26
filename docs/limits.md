@@ -9793,10 +9793,13 @@ with several grid vertices. Surface repose uses one ordered face sweep over the 
 The candidate set follows newly moved soil and can spread far when the specified repose slope approaches zero.
 The ground is a height field with peak indentation per vertex. Optional hardpan adds one subsurface pressure
 transition sampled at the footprint centre. Resolve changes in layer depth at the scale of the footprint.
-Shear and displaced material use the topsoil fit. Time-varying 3D tread contact, shared layer exchange,
-overhangs and accumulated subgrade fatigue remain open. The rolling
+Shear and displaced material use the topsoil fit. Shared layer exchange, overhangs and accumulated
+subgrade fatigue remain open. The rolling
 wheel option resolves the driven rim's average stress envelope below its axle. Evenly spaced lugs can stamp
-individual contact marks from live spin. Their projected strip uses 65 along-track stations. Transient digging
+individual contact marks from live spin. Their projected strip uses 65 along-track stations. Indexed tread
+triangles can instead intersect the local horizontal bearing plane at configurable resolution (17 by 65
+profile samples by default). Supply three finite coordinates per vertex and three zero-based indices per
+triangle. Wheel camber is outside that phase-only footprint model. Transient digging
 forces, braking-specific stress shapes and direct tyre torque exchange remain open. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.

@@ -10532,6 +10532,9 @@ snapshot state. Soil cuts reference the same floor data supplied to TerrainBed, 
 the compaction, berm or dust ledger.
 The optional wheel-phase field carries one angle per external row. The native rolling profile combines
 the steady rim bearing envelope with the live projected lug tips before normalizing the bed pressure.
+An indexed tread can extend beyond the rim. The native kernel intersects its rotated triangles with
+the local bearing plane and takes the lowest triangle at each occupied profile sample. Geometry lives
+in snapshot regions. The profile is temporary arena storage rebuilt each step.
 
 ### Divergence-free particle pressure
 
