@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20525840,
+  "total": 20530940,
   "history": [
     {
       "date": "2026-10-24",
@@ -13456,6 +13456,12 @@
       "commit": "SEA-10 breach outflow",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: the flooding step reports its sweeps and keeps its volume tables while the hull has not turned; measured gzip (Mac build) 23615 B, within its 23547 B budget before; both live in the flooding step. Budget (measured + max(3%, 256 B)): 23547 to 24323 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "03b4480686",
+      "grew": 1,
+      "reason": "SOFT-04 adds native paired-lip displacement correlation and independently authored mixed-mode toughness, moving the soft entry from 142266 to 145660 B gzip. @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 97921 to 103021 B ceiling (100020 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14324,7 +14330,7 @@
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 146534,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 46399,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 97921,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 103021,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
