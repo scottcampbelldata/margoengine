@@ -13,6 +13,7 @@ export {
 } from './wetted.js';
 export { type Hull, type HullParams, HullSolver, SEA_VISCOSITY } from './solver.js';
 export { type Deck, deckOf, stepDeck } from './deck.js';
+export { type SlamStation, slamSlope, slamStations } from './slamming.js';
 export { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 export {
   addedMassInfinite,

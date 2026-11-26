@@ -12656,6 +12656,32 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### A hull's slamming: Wagner's wetted width and the momentum of the water (`@margoengine/physics/seakeeping`, SEA-11, 2026-11-26)
+
+`packages/physics/src/seakeeping/slamming.ts` (`slamStations`, `slamSlope`) tabulates each station's added mass against
+its depth of entry, and `solver.ts` (`slamLoad`) applies the impact. Written from:
+- T. von Karman, "The impact on seaplane floats during landing", NACA TN 321, 1929: the force as the rate of the momentum
+  the water takes up, d(m V)/dt;
+- H. Wagner, "Uber Stoss- und Gleitvorgange an der Oberflache von Flussigkeiten", ZAMM 12, 1932, known through the
+  literature: the wetted half-breadth with the water's pile-up, from the mean of the section's height over c sin(theta)
+  equal to the depth (pi / 2 the still-water cut for a wedge), and the flat plate's added mass rho pi c^2 / 2;
+- R. Zhao, O. Faltinsen and J. Aarsnes, "Water entry of arbitrary two-dimensional sections with and without flow
+  separation", 21st Symposium on Naval Hydrodynamics, 1996 (https://www.nationalacademies.org/read/5870/chapter/29): the
+  comparison of Wagner, von Karman and the exact similarity solution (Wagner high at larger deadrise), and flow
+  separation at knuckles.
+
+These are this package's own:
+- **The sections' profiles from the mesh**: the half-breadth at a ladder of heights, Wagner's condition solved for c at
+  each by bisection over a 32-point mean.
+- **The impact (dm/dh) V^2 applied only while a section enters**, with V its depth's rate over the step (kept as state).
+- **No impact past the section's full breadth**: the flow leaves the hull.
+
+Checked (`packages/physics/tests/seakeeping.test.js`, `tests/coupling/seakeeping.test.js`): the wetted width and the slope
+against Wagner's wedge within 0.1 and 0.2 percent; a 30 degree wedge entering at a steady speed takes Wagner's force within
+0.02 percent until the chine is wet, and none past it. No constant is calibrated. Measured forces were not available to
+read (the drop tests' forces are in figures only), so the check is against Wagner's theory and the known bias of it is
+recorded in docs/limits.md.
+
 ### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the

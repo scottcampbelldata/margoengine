@@ -2,11 +2,13 @@
 // draft (Archimedes, to f64 rounding), heeled it rights itself by the wall-sided righting arm, and in a small regular wave the
 // load is the linear Froude-Krylov force of a box, all against closed forms.
 import assert from 'node:assert/strict';
-import { freeSection } from './coupling/sections.js';
+import { freeSection, vHull } from './coupling/sections.js';
 import test from 'node:test';
 import {
   addedMassInfinite,
   deckOf,
+  slamSlope,
+  slamStations,
   stepDeck,
   eddyRollCoefficient,
   frictionGirth,
@@ -412,4 +414,29 @@ test("the water on a deck: a dam breaks as Ritter's, a lake on a sloped deck sta
     deck.height.every((y) => Math.abs(y - 0.5) < 1e-12),
     'the deck is the top',
   );
+});
+
+test("a section's slamming table: Wagner's wetted width, the added mass's slope, and none past the chine", () => {
+  // Wagner (1932): a wedge of deadrise beta coming down h is wet to c = (pi / 2) h / tan(beta), and its added mass rho pi c^2
+  // / 2 rises at rho pi (pi / 2)^2 h / tan(beta)^2 a metre of h. Past the chine (c the full half-breadth, at h = 2 b
+  // tan(beta) / pi) the flow leaves the hull and the impact ends.
+  const beta = Math.PI / 6,
+    b = 1,
+    rho = 1025,
+    [station] = slamStations(vHull(beta, b, 4), rho, 8, 96).slice(3, 4);
+  for (const k of [10, 30, 60]) {
+    const h = station.heights[k],
+      wagner = (Math.PI / 2) * (h / Math.tan(beta));
+    assert.ok(
+      Math.abs(station.wetted[k] - wagner) <= 1e-3 * wagner,
+      `c ${station.wetted[k]} at ${h} m, Wagner ${wagner}`,
+    );
+    const slope = (rho * Math.PI * (Math.PI / 2) ** 2 * h) / Math.tan(beta) ** 2;
+    assert.ok(
+      Math.abs(slamSlope(station, h) - slope) <= 2e-3 * slope,
+      `dm/dh ${slamSlope(station, h)} against ${slope}`,
+    );
+  }
+  const chine = (2 * b * Math.tan(beta)) / Math.PI;
+  assert.equal(slamSlope(station, chine + 0.02), 0, 'past the chine, no impact');
 });

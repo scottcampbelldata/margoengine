@@ -62,6 +62,7 @@ export interface HullParams {
     readonly diffraction?: boolean;
     readonly drift?: boolean;
     readonly greenWater?: boolean;
+    readonly slamming?: boolean;
     readonly deckCells?: readonly [number, number];
     readonly rollDamping?: boolean;
     readonly viscosity?: number;
@@ -148,6 +149,15 @@ export interface Section {
     readonly centroid: number;
 }
 
+export interface SlamStation {
+    readonly x: number;
+    readonly width: number;
+    readonly keel: number;
+    readonly heights: Float64Array;
+    readonly wetted: Float64Array;
+    readonly slope: Float64Array;
+}
+
 export type Vec3 = readonly [number, number, number];
 
 export interface WettedLoads {
@@ -191,6 +201,10 @@ export function scatterSection(form: LewisForm, omega: number, pivot: number, mo
     readonly sway?: readonly [number, number];
     readonly roll?: readonly [number, number];
 }, gravity?: number, terms?: number, points?: number, density?: number): Scattering;
+
+export function slamSlope(station: SlamStation, h: number): number;
+
+export function slamStations(mesh: HullMesh, density: number, stations?: number, levels?: number): SlamStation[];
 
 export function stepDeck(deck: Deck, water: Float64Array, gravity: readonly [number, number, number], outside: (x: number, z: number, deckHeight: number) => readonly [number, number, number], dt: number, inflow?: number[]): number;
 

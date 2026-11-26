@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20145913,
+  "total": 20146710,
   "history": [
     {
       "date": "2026-10-24",
@@ -12855,6 +12855,12 @@
       "commit": "7a5fc90bc0",
       "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-11 slamming",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: slamming: each station's table from the mesh's sections (the half-breadth by height, Wagner's wetted width by bisection, the added mass's slope) and the impact while a section enters; measured gzip (Mac build) 17233 B, was 16459; without it a hull's bow takes no impact as it comes down into a wave, and a split would load one hull solve from two entries. Budget (measured + max(3%, 256 B)): 16953 to 17750 B."
     }
   ],
   "items": {
@@ -13694,7 +13700,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
-    "@margoengine/physics/seakeeping": 16953,
+    "@margoengine/physics/seakeeping": 17750,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
