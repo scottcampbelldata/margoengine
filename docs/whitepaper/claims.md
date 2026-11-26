@@ -6394,7 +6394,7 @@ In a beam wave of amplitude 0.15 m at 1.9 rad/s, a forward-course hull reaches 0
 
 ### SEA-08 incident load on a forward course
 
-Held-box head and following-wave fixtures recover the ordinary-strip incident heave and pitch correction within 2.5% of a direct section calculation. A tapered beam-wave case isolates the added-mass slope within 3.5%. The finite-window continuation stays continuous across zero encounter. The live wake perturbation remains available to the hull below the surface. The Wigley tank residuals leave physical qualification open.
+Held-box head and following-wave fixtures recover the ordinary-strip incident heave and pitch correction within 2.5% of a direct section calculation. A tapered hull in beam, head and following seas matches the independently integrated added-mass gradient and damping contribution within 3.5%. The finite-window continuation keeps the tapered hull load continuous across zero encounter. The live wake perturbation remains available to the hull below the surface. The Wigley tank residuals leave physical qualification open.
 
 ### SEA-08 wet bilge keel plate damping
 

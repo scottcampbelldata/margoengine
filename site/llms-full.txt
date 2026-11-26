@@ -15079,6 +15079,10 @@ New entry @margoengine/animation/deformed-points: 4,286 B gzip, ceiling 4,542 B.
 
 New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 B, of which the skinned crowd it extends is about 10 KB (an app that loads both entries loads that part once). `@margoengine/animation/instanced-skin` gains the layout parameter and stays inside its recorded 10,303 B ceiling. Core and stage gain zero bytes (24,892 B on this base).
 
+### Seakeeping encounter-scaled taper loads
+
+The incident-wave velocity and the longitudinal added-mass gradient use the same encounter scaling. The finite-memory continuation applies inside the first tabulated band. Tank qualification of the forward-motion amplitudes and near-stationary three-dimensional flow remain open. The seakeeping entry moved from 33,399 to 33,432 B gzip under its 33,698 B ceiling. Core and Stage gain zero bytes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

@@ -1830,7 +1830,8 @@ test('HullSolver forward encounter correction follows incident strip loads in he
         JSON.stringify({ heading, encounter, actual, expected }),
       );
   }
-  // A beam wave has no encounter shift on this course. Its correction is the integrated mass gradient alone.
+  // Independently integrate the term containing M'(x) by parts. For beam waves the endpoint
+  // contribution reduces to M(bow) - M(stern). Advancing into or along waves also scales it by ω/ωe.
   const taper = 0.28;
   const shape = {
     ...mesh,
@@ -1838,49 +1839,65 @@ test('HullSolver forward encounter correction follows incident strip loads in he
       i % 3 === 2 ? value * (1 + (taper * 2 * mesh.vertices[i - 2]) / length) : value,
     ),
   };
-  const beamSea = oneWave(0.05, omega, 3, 6);
-  const rows = new Float32Array(4);
-  beamSea.waveComponents(dt / 2, rows);
-  const waveNumber = Math.hypot(rows[0], rows[1]);
-  const frequency = Math.sqrt(GRAVITY * waveNumber);
-  const velocity = rows[2] * frequency * Math.exp(-waveNumber * draft) * Math.sin(rows[3]);
-  const sectionOf = (x) => {
-    const b = beam * (1 + (2 * taper * x) / length);
-    const f = lewisForm(b, draft, b * draft);
-    return {
-      mass: heaveSection(f, frequency, SEA_WATER, GRAVITY).addedMass,
-      infinite: heaveAddedMassInfinite(b, f, SEA_WATER),
+  for (const heading of [6, 12, 0]) {
+    const sea = oneWave(0.05, omega, 3, heading);
+    const rows = new Float32Array(4);
+    sea.waveComponents(dt / 2, rows);
+    const [kx, kz, amplitude, phase] = rows;
+    const k = Math.hypot(kx, kz);
+    const frequency = Math.sqrt(GRAVITY * k);
+    const encounter = frequency - kx * speed;
+    const orbital = amplitude * frequency * Math.exp(-k * draft);
+    const encounterRatio = frequency / encounter;
+    const sectionOf = (x) => {
+      const b = beam * (1 + (2 * taper * x) / length);
+      const form = lewisForm(b, draft, b * draft);
+      const { addedMass, damping } = heaveSection(form, encounter, SEA_WATER, GRAVITY);
+      return { addedMass, damping, infinite: heaveAddedMassInfinite(b, form, SEA_WATER) };
     };
-  };
-  const first = sectionOf(-length / 2).mass;
-  const last = sectionOf(length / 2).mass;
-  const slices = 100;
-  const ds = length / slices;
-  let massIntegral = 0;
-  let a00 = 0;
-  let a01 = 0;
-  let a11 = 0;
-  for (let i = 0; i < slices; i++) {
-    const x = -length / 2 + (i + 0.5) * ds;
-    const a = sectionOf(x);
-    massIntegral += ds * a.mass;
-    a00 += ds * a.infinite;
-    a01 += ds * a.infinite * x;
-    a11 += ds * a.infinite * x * x;
+    const left = -(length / 2);
+    const right = length / 2;
+    const first = sectionOf(left).addedMass * Math.sin(phase + kx * left);
+    const last = sectionOf(right).addedMass * Math.sin(phase + kx * right);
+    const slices = 100;
+    const ds = length / slices;
+    let gradientForce = last - first;
+    let gradientMoment = right * last - left * first;
+    let force = 0;
+    let moment = 0;
+    let a00 = 0;
+    let a01 = 0;
+    let a11 = 0;
+    for (let i = 0; i < slices; i++) {
+      const x = left + (i + 0.5) * ds;
+      const a = sectionOf(x);
+      const angle = phase + kx * x;
+      const sn = Math.sin(angle);
+      const cs = Math.cos(angle);
+      const excitation =
+        a.damping * (encounterRatio - 1) * sn - (a.addedMass - a.infinite) * (frequency - encounter) * cs;
+      gradientForce -= ds * a.addedMass * kx * cs;
+      gradientMoment -= ds * a.addedMass * (sn + x * kx * cs);
+      force += ds * excitation;
+      moment += ds * x * excitation;
+      a00 += ds * a.infinite;
+      a01 += ds * a.infinite * x;
+      a11 += ds * a.infinite * x * x;
+    }
+    force = orbital * (force - speed * encounterRatio * gradientForce);
+    moment = orbital * (moment - speed * encounterRatio * gradientMoment);
+    const determinant = (mass + a00) * (inertia + a11) - a01 * a01;
+    const expected = [
+      (mass * ((inertia + a11) * force - a01 * moment)) / determinant,
+      (inertia * ((mass + a00) * moment - a01 * force)) / determinant,
+    ];
+    const actual = difference(sea, speed, shape);
+    for (let axis = 0; axis < 2; axis++)
+      assert.ok(
+        Math.abs(actual[axis] - expected[axis]) <= 0.035 * Math.abs(expected[axis]),
+        JSON.stringify({ label: 'tapered hull wave excitation', heading, actual, expected }),
+      );
   }
-  const force = -speed * velocity * (last - first);
-  const moment = -speed * velocity * ((length / 2) * (first + last) - massIntegral);
-  const determinant = (mass + a00) * (inertia + a11) - a01 * a01;
-  const expected = [
-    (mass * ((inertia + a11) * force - a01 * moment)) / determinant,
-    (inertia * ((mass + a00) * moment - a01 * force)) / determinant,
-  ];
-  const actual = difference(beamSea, speed, shape);
-  for (let axis = 0; axis < 2; axis++)
-    assert.ok(
-      Math.abs(actual[axis] - expected[axis]) <= 0.035 * Math.abs(expected[axis]),
-      JSON.stringify({ label: 'spatial gradient in beam waves', actual, expected }),
-    );
 
   const matched = oneWave(0.05, 5, 3, 0);
   const c = (phaseSpeed * omega) / 5;
@@ -1890,6 +1907,19 @@ test('HullSolver forward encounter correction follows incident strip loads in he
     near[0].every((load, axis) => Math.abs(load - near[2][axis]) < 0.005 * Math.abs(near[1][axis])),
     JSON.stringify(near),
   );
+
+  // The tapered hull has the extra odd gradient term around stationary encounter. Its slope
+  // can be larger than the prism’s. The two one-sided differences must still meet continuously.
+  const taperNear = [c - 1e-4, c, c + 1e-4].map((u) => difference(matched, u, shape));
+  assert.ok(taperNear.flat().every(Number.isFinite));
+  for (let axis = 0; axis < 2; axis++) {
+    const before = taperNear[1][axis] - taperNear[0][axis];
+    const after = taperNear[2][axis] - taperNear[1][axis];
+    assert.ok(
+      Math.abs(before - after) <= 0.005 * Math.max(Math.abs(before), Math.abs(after)),
+      JSON.stringify({ axis, taperNear }),
+    );
+  }
 
   // The incident spectral correction is additive to the original live subsurface WakeSolver flow.
   const patch = (spectral) => {

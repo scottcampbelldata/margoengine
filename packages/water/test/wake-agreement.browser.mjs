@@ -125,6 +125,10 @@ try {
           0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3,
         ]),
       };
+      if (motion === 'incident')
+        for (let i = 0; i < mesh.vertices.length; i += 3) {
+          mesh.vertices[i + 2] *= 1 + mesh.vertices[i] * 0.125;
+        }
       world
         .add(new RigidSolver(), { physics })
         .add(hull, {

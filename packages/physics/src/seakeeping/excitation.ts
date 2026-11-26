@@ -87,7 +87,7 @@ function massGradient(strips: HullMemory['strips'], at: number, values: Float64A
 }
 
 /**
- * The ordinary-strip correction to the incident-wave heave and pitch excitation (Journée–Massie 8.47–8.48).
+ * The ordinary-strip correction to the incident-wave heave and pitch excitation (Journée–Massie 8.45–8.48).
  * Subtract only the spectral part already in the moving relative-motion convolution, retaining the live water field.
  */
 export function courseWaveCorrection(
@@ -121,6 +121,10 @@ export function courseWaveCorrection(
     const omega = Math.sqrt(gravity * k * shallow);
     const encounter = omega - kx * velocityX - kz * velocityZ;
     const band = encounterBand(frequencies, Math.abs(encounter));
+    // Ordinary-strip damping acts on the equivalent orbital velocity, integrated in encounter time.
+    // Use the first resolved band to continue its inverse frequency continuously through a stationary encounter.
+    const orbitalScale =
+      band.edge === 'low' ? ((omega * band.fraction) / frequencies[0]!) * Math.sign(encounter) : omega / encounter;
     retainedCoefficients(memory, band, encounter, omega, scratch);
     const phase = rows[wave + 3]! + kx * centre[0] + kz * centre[2];
     const along = kx * forward[0] + kz * forward[2];
@@ -133,7 +137,8 @@ export function courseWaveCorrection(
       const force =
         strip.width *
         orbital *
-        ((scratch[at + 1]! - speed * gradient) * sin(angle) - scratch[at + 2]! * (omega - encounter) * cos(angle));
+        ((scratch[at + 1]! - speed * orbitalScale * gradient) * sin(angle) -
+          scratch[at + 2]! * (omega - encounter) * cos(angle));
       heave += force;
       pitch += strip.x * force;
     }
