@@ -604,3 +604,46 @@ fn the_block_solver_holds_a_pile_of_thirty_rows_still_for_ninety_seconds() {
     // and 150 by 90 (KB-PHYS-BLOCK1).
     holds_still(30, 9.80665, true);
 }
+
+#[test]
+fn a_plate_rides_a_deck_turning_about_an_axis_far_away() {
+    // A deck 140 m long pitching 4 degrees at 9 s about an axis through its middle, driven to its pose each step, and a plate
+    // resting on it 60 m from the axis with friction of 0.5, five times what the pitch asks of it (0.1), for 36 s at the
+    // world's 8 substeps. The slide was tallied from the speeds at the step's levers, which miss how the turning deck
+    // carries the plate's anchor round (its w^2 r, always the same way): the plate slid 4 mm a pitch, 1.4 cm in 36 s. Tallied
+    // as the move of each anchor's material points, it rides. (Over minutes a deck driven to its pose at one speed a step still makes the plate slip at each
+    // step's change of speed, KB-PHYS-KINJUMP1, which a smooth path ends.)
+    let mut w = world(4);
+    let deck = w.add_body(KINEMATIC_POSITION).unwrap();
+    w.add_collider(deck, SHAPE_BOX, [70.0, 0.5, 8.0], [0.0; 3], IDENTITY, 0.0).unwrap();
+    // The deck's middle 60 m along x, the plate at the origin: 60 m from the axis, where its pose rounds to nothing that
+    // matters (KB-PHYS-POSEROUND1 is rounding far out, not this).
+    w.set_v(POSITION_X, deck as usize, v3(60.0, -0.5, 0.0));
+    let plate = block(&mut w, [0.12, 0.01, 0.12], v3(0.0, 0.01, 0.0), 600.0, false);
+    let (amplitude, omega) = (4.0f64.to_radians(), 2.0 * std::f64::consts::PI / 9.0);
+    // The deck's pose: turned by theta about z through (0, -0.5, 0)... its centre, so the centre stays put.
+    let pose = |t: f64| {
+        let theta = amplitude * (omega * t).sin();
+        Q { x: 0.0, y: 0.0, z: (theta / 2.0).sin() as f32, w: (theta / 2.0).cos() as f32 }
+    };
+    // Start the plate with the deck's motion at its place: theta' r across.
+    let spin = amplitude * omega;
+    w.set_v(ANGULAR_X, plate as usize, v3(0.0, 0.0, spin as f32));
+    w.set_v(LINEAR_X, plate as usize, v3(0.0, (-60.0 * spin) as f32, 0.0));
+    let local = |w: &World| {
+        let q = w.q(ROTATION_X, deck as usize);
+        q.conjugate().rotate(w.v(POSITION_X, plate as usize).sub(w.v(POSITION_X, deck as usize)))
+    };
+    let start = local(&w);
+    let mut worst = 0.0f32;
+    for i in 1..=(36 * 60) {
+        w.set_q(TARGET_ROTATION_X, deck as usize, pose(i as f64 / 60.0));
+        w.set_v(TARGET_X, deck as usize, v3(60.0, -0.5, 0.0));
+        w.step(DT);
+        let d = local(&w).sub(start);
+        worst = worst.max((d.x * d.x + d.z * d.z).sqrt());
+    }
+    // Held, the plate keeps to its contacts' softness, a part of a millimetre, where it slid 1.4 cm.
+    assert!(worst < 1e-3, "the plate slid {worst} m on the deck");
+    println!("the plate stayed within {worst:e} m of its place, 60 m from the pitch axis");
+}
