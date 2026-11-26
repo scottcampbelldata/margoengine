@@ -274,6 +274,26 @@ test('independent school instances share arena memory and retain separate scratc
   assert.equal(b.exportPorts(1)[0].field, 'reef-b-intent');
 });
 
+test('school validation tells the caller how to set invalid radii or repair the flow sample', async () => {
+  const rate = { num: 60, den: 1 };
+  const school = await SchoolSolver.load();
+  const members = [still(origin)];
+  assert.throws(
+    () => new PhysicsWorld({ rate }).add(school, { members, repulsionRadius: 3 }),
+    /Set .* radii in ascending order/i,
+  );
+  const world = new PhysicsWorld({ rate });
+  world.add(school, {
+    members,
+    flow: {
+      cell: origin,
+      medium: 'air',
+      sample: () => ({ velocity: [1, Number.NaN, 0], density: 1.225, temperature: 290 }),
+    },
+  });
+  assert.throws(() => world.advance(1), /Provide a finite velocity triple/i);
+});
+
 test('load honours an already-aborted signal', async () => {
   const reason = new Error('stop this school load');
   await assert.rejects(SchoolSolver.load({ signal: AbortSignal.abort(reason) }), (error) => error === reason);
