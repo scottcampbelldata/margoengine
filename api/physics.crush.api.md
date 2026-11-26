@@ -125,6 +125,65 @@ export interface CrushResult {
     readonly impulse: number;
 }
 
+export interface CrushShellBudget {
+    readonly kinetic: number;
+    readonly membrane: number;
+    readonly bending: number;
+    readonly hardening: number;
+    readonly plasticDissipation: number;
+    readonly appliedWork: number;
+}
+
+export interface CrushShellFace {
+    readonly stress: CrushVector;
+    readonly equivalentPlasticStrain: number;
+    readonly dissipatedDensity: number;
+}
+
+export interface CrushShellMaterial {
+    readonly thickness: number;
+    readonly density: number;
+    readonly youngModulus: number;
+    readonly poissonRatio: number;
+    readonly yieldStress: number;
+    readonly hardeningModulus?: number;
+}
+
+export interface CrushShellParams {
+    readonly positions: readonly CrushVector[];
+    readonly triangles: readonly Triangle[];
+    readonly material: CrushShellMaterial;
+    readonly pinned?: readonly number[];
+    readonly velocities?: readonly CrushVector[];
+    readonly resolution?: number;
+}
+
+export class CrushShellSolver implements Solver<CrushShellParams> {
+    readonly id: string;
+    readonly positionField: FieldDescriptor;
+    private constructor();
+    static load(options?: {
+        readonly id?: string;
+        readonly signal?: AbortSignal;
+    }): Promise<CrushShellSolver>;
+    describe(): SolverDescription;
+    init(host: SolverHost, params: CrushShellParams): void;
+    step(_context: StepContext, dt: number): void;
+    importPorts(_tick: number): void;
+    exportPorts(tick: number): readonly Port[];
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+    setForce(vertex: number, force: CrushVector): void;
+    readMesh(): {
+        positions: Float64Array;
+        velocities: Float64Array;
+        triangles: Uint32Array;
+    };
+    supportReaction(vertex: number): CrushVector;
+    readFace(face: number): CrushShellFace;
+    readBudget(): CrushShellBudget;
+}
+
 export class CrushSolver implements Solver<CrushParams> {
     readonly id: string;
     readonly damageField: FieldDescriptor;
@@ -325,4 +384,6 @@ interface StepContext {
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
 }
+
+type Triangle = readonly [number, number, number];
 ```

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20649690,
+  "total": 20652805,
   "history": [
     {
       "date": "2026-10-24",
@@ -13915,6 +13915,12 @@
       "commit": "SEA-15-wax-film",
       "grew": 1,
       "reason": "SEA-15's cohesive waxy oil radius and film probe move physics/tracers from 15704 to 16215 B gzip. The optional ceiling rises from 16126 to 16702 B. The waxy option reuses the slick slots, radius state, advection, and mass ledger. A separate entry would split spreading state from the solver that owns those parcels and duplicate its coupling."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "47baa9aabe",
+      "reason": "BREAK-03 distributed sheet advances the optional crush entry from 12996 to 16020 B gzip. The ceiling rises from 13386 to 16501 B. The solver adds checked membrane and hinge topology, arena layout and its live force, stress and mesh API. A separate entry would add another optional entry and public import for a scene that uses both reduced crush and the shell. Named imports are tree-shakable, and the compiled material and bending code is fetched by the shell loader.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14739,7 +14745,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 13386,
+    "@margoengine/physics/crush": 16501,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
