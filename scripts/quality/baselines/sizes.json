@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20483164,
+  "total": 20497014,
   "history": [
     {
       "date": "2026-10-24",
@@ -13275,6 +13275,12 @@
       "commit": "6034939ea2",
       "grew": 0,
       "reason": "SOFT-04 adds surviving authored rigid anchors through geometric cuts and existing face tears, moving the soft entry from 136910 to 137034 B gzip. . It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "filter-graph",
+      "reason": "New optional post entry, 0 to 13,446 B gzip: filter-graph (ImageFilterGraph, a graph of image filters run on images, video or a camera with no scene: the graph compiler and pass-fusing optimizer, about 30 built-in blocks in WGSL, and the runtime with its inputs and device restore). Its own entry, loaded only when imported; a saved graph may name any built-in block, so they ship with it. Budget (measured + max(3%, 256 B)): 13,850 B. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14195,6 +14201,7 @@
     "@margoengine/post/decals": 5995,
     "@margoengine/post/depth": 4763,
     "@margoengine/post/depth-downsample": 7026,
+    "@margoengine/post/filter-graph": 13850,
     "@margoengine/post/fxaa": 4890,
     "@margoengine/post/glitch": 7455,
     "@margoengine/post/gtao": 14241,

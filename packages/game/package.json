@@ -2643,6 +2643,10 @@
       "types": "./dist/post/upscale.d.ts",
       "import": "./dist/post/upscale.js"
     },
+    "./post/filter-graph": {
+      "types": "./dist/post/filter-graph.d.ts",
+      "import": "./dist/post/filter-graph.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"

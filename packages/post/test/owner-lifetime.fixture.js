@@ -109,5 +109,28 @@ export async function fixtures(load = (entry) => import(entry)) {
         };
       },
     });
+  // The runtime is no plugin: a plugin owns one here, as an app running it on an engine's device would.
+  const { ImageFilterGraph } = await load('../dist/filter-graph.js');
+  out.push({
+    name: 'ImageFilterGraph.create',
+    async create({ engine }) {
+      const filter = await ImageFilterGraph.create(
+        { nodes: [{ id: 'fill', type: 'solid-color' }], output: 'fill' },
+        { device: engine.gpu, size: [8, 8] },
+      );
+      const plugin = {
+        name: 'owner-lifetime:filter-graph',
+        setup() {},
+        onPreUpdate: () => filter.render(),
+        onDeviceRestored: (next) => filter.restore(next.gpu),
+        dispose: () => filter.dispose(),
+      };
+      const dispose = () => {
+        engine.sceneOf(plugin)?.removePlugin(plugin.name);
+        filter.dispose();
+      };
+      return { plugin, dispose };
+    },
+  });
   return out;
 }
