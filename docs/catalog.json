@@ -2052,6 +2052,7 @@
     "exports": [
       "BREAKER_GAMMA",
       "WATER_FAR_SAMPLES",
+      "WATER_FLOW_TICKS_PER_FRAME",
       "WATER_SEA_WAVES",
       "Water",
       "breakerDepth",

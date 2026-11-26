@@ -35,7 +35,14 @@ import {
   type WaterSkyEnvironment,
 } from './sky-radiance.js';
 export type { WaterSkyEnvironment } from './sky-radiance.js';
-declare const GPUBufferUsage: { VERTEX: number; INDEX: number; UNIFORM: number; COPY_DST: number; STORAGE: number };
+declare const GPUBufferUsage: {
+  VERTEX: number;
+  INDEX: number;
+  UNIFORM: number;
+  COPY_SRC: number;
+  COPY_DST: number;
+  STORAGE: number;
+};
 declare const GPUTextureUsage: {
   COPY_SRC: number;
   COPY_DST: number;
@@ -51,6 +58,13 @@ export interface WaterWind {
   fetch?: number;
   /** Direction the waves travel, XZ, nonzero. Default [1, 0.3]. */
   direction?: readonly [number, number];
+}
+/** A film clock Water steps on (`WaterOptions.clock`): `FilmClock` of `@margoengine/math/clock` is one. */
+export interface WaterClock {
+  /** Whole ticks of `rate` a second up to the clock's time. */
+  ticks(rate: number): number;
+  /** The clock's time, seconds. */
+  readonly time: number;
 }
 /**
  * A sea Water draws (`WaterOptions.sea`): its linear waves at time `t` seconds, written into `out` four numbers a wave
@@ -127,6 +141,17 @@ const FAR_AT = 144;
 const SEA_AT = FAR_AT + FAR_FLOATS;
 /** The most waves a {@link WaterSea} may give Water to draw. */
 export const WATER_SEA_WAVES = 896;
+/** The most flow ticks a frame runs with a film clock (`WaterOptions.clock`); `settle()` runs the rest. */
+export const WATER_FLOW_TICKS_PER_FRAME = 480;
+// One tick's slice of the frame uniform: everything before the sea's rows, which the flow and the spray read.
+const TICK_FLOATS = SEA_AT + 4;
+const TICK_BYTES = TICK_FLOATS * 4;
+/** The flow's tick rate for `substeps` substeps a frame: the dyadic rate 60 * 2^k Hz at or above 60 * substeps. */
+const flowRate = (substeps: number): number => {
+  let rate = 60;
+  for (let s = 1; s < substeps; s *= 2) rate *= 2;
+  return rate;
+};
 /**
  * The open sea past a flood's 'sea' sides (`Water.setFarField`; `water/flood` sets it every frame): a long wave
  * travelling on to the map from outside it, and the sim's own edge level carried out from the coastal grid.
@@ -179,6 +204,16 @@ export interface WaterOptions {
    * the camera sees. The wind still drives the ripples, glints and foam patterns. Default none: the swell trains.
    */
   sea?: WaterSea;
+  /**
+   * A film clock (`FilmClock` of `@margoengine/math/clock`). With one, the wave clock is the film clock's time, and the
+   * coastal or river flow and its spray step in fixed ticks of 60 * 2^k Hz (240 for the coast's three substeps, 480 for a
+   * river's eight), as many as the clock owes since the last frame and at most `WATER_FLOW_TICKS_PER_FRAME` a frame
+   * (`settle()` runs the rest): the same shot at 24, 30 or 60 fps flows the same water at the times it shares, a slow frame
+   * loses no time, and a seek is setting the clock (back too: the flow starts again and replays). Each tick's wave time
+   * and step are worked out on the CPU and reach the GPU in a ring of frame-uniform slices. Default none: the flow steps
+   * by the frame's delta, as before.
+   */
+  clock?: WaterClock;
   /** Shallow-water coupling with a terrain heightmap. Omitted: open water only. */
   terrain?: WaterTerrain;
   /**
@@ -900,6 +935,12 @@ export class Water implements EnginePlugin {
   private format = '';
   private seconds = 0;
   private readonly values = new Float32Array(SEA_AT + 4 + WATER_SEA_WAVES * 4);
+  /** Flow ticks run since the flow was built, with a film clock. */
+  private flowTicks = 0;
+  /** The ring of per-tick frame-uniform slices, with a film clock (made on first use). */
+  private ring?: GPUBuffer;
+  private ringData?: Float32Array;
+  private tickSlice?: Float32Array;
   /** The sea's rows of the frame uniform, a view made once (a frame makes no typed-array views). */
   private readonly seaRows = this.values.subarray(SEA_AT + 4);
   private fogSource: FogLike | null = null;
@@ -1373,6 +1414,83 @@ export class Water implements EnginePlugin {
    * reaches half white is thinner than the crest that passes (FOAM_Y, FOAM_Z, measured). Nothing but the waves' own numbers is
    * read, so the threshold follows the wind, the fetch and `setWaveHeight`, and the chop does not change it.
    */
+  /**
+   * Runs the flow ticks the film clock owes, at most `limit`, into `encoder`: each tick's slice of the frame uniform (its
+   * start time on the wave clock, its step) worked out here in doubles, written once to the ring, copied into the frame
+   * uniform before the tick's flow substep and spray step; the frame's own values copied back after the last. Returns how
+   * many ran.
+   */
+  private tickFlow(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    clock: WaterClock,
+    limit = WATER_FLOW_TICKS_PER_FRAME,
+  ): number {
+    const coastal = this.coastal as CoastalFlow,
+      substeps = coastal.substeps,
+      rate = flowRate(substeps),
+      target = clock.ticks(rate);
+    if (!Number.isSafeInteger(target) || target < 0)
+      throw new RangeError(`A Water clock gives whole ticks from 0; got ${target}. Pass a FilmClock.`);
+    if (!coastal.isSetUp) {
+      // The set-up (the surf's spin-up reads the wave clock) runs at the time of the flow's first tick, as a continuous
+      // run from that time sets it up, whatever frame builds it: the tick's slice goes into the frame uniform before the
+      // set-up's submissions and the frame's values back after them.
+      const slice = (this.tickSlice ??= new Float32Array(TICK_FLOATS));
+      for (let j = 0; j < TICK_FLOATS; j++) slice[j] = this.values[j]!;
+      slice[20] = this.flowTicks / rate;
+      slice[100] = substeps / (3 * rate);
+      slice[30] = 1 / rate;
+      device.queue.writeBuffer(this.uniform!, 0, slice as Float32Array<ArrayBuffer>);
+      coastal.ready();
+      device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>, 0, TICK_FLOATS);
+    }
+    const owed = Math.min(limit, target - this.flowTicks);
+    if (!(owed > 0)) return 0;
+    this.ring ??= device.createBuffer({
+      size: (WATER_FLOW_TICKS_PER_FRAME + 1) * TICK_BYTES,
+      usage: GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    });
+    const ring = (this.ringData ??= new Float32Array((WATER_FLOW_TICKS_PER_FRAME + 1) * TICK_FLOATS)),
+      values = this.values;
+    for (let i = 0; i <= owed; i++) {
+      const o = i * TICK_FLOATS;
+      for (let j = 0; j < TICK_FLOATS; j++) ring[o + j] = values[j]!;
+      if (i === owed) break; // the frame's own values, put back after the ticks
+      ring[o + 20] = (this.flowTicks + i) / rate;
+      ring[o + 100] = substeps / (3 * rate);
+      ring[o + 30] = 1 / rate;
+    }
+    device.queue.writeBuffer(this.ring, 0, ring as Float32Array<ArrayBuffer>, 0, (owed + 1) * TICK_FLOATS);
+    coastal.writeSources();
+    for (let i = 0; i < owed; i++) {
+      encoder.copyBufferToBuffer(this.ring, i * TICK_BYTES, this.uniform!, 0, TICK_BYTES);
+      coastal.tick(encoder);
+      this.spray?.step(encoder);
+    }
+    encoder.copyBufferToBuffer(this.ring, owed * TICK_BYTES, this.uniform!, 0, TICK_BYTES);
+    this.flowTicks += owed;
+    return owed;
+  }
+  /**
+   * Runs every flow tick the film clock owes now, `WATER_FLOW_TICKS_PER_FRAME` to a submission, and resolves when the GPU
+   * has finished them: after a seek far ahead the flow then holds what a continuous run holds. Nothing to do before the
+   * flow is built (the first frame with a terrain builds it) or without one.
+   * @throws MargoError `state` without `options.clock`.
+   */
+  async settle(): Promise<void> {
+    const clock = this.options.clock;
+    if (!clock) throw new MargoError('state', 'Water.settle needs a film clock; pass options.clock (a FilmClock).');
+    const device = this.engine?.gpu;
+    if (!(this.coastal instanceof CoastalFlow) || !this.uniform || !device) return;
+    for (;;) {
+      const encoder = device.createCommandEncoder(),
+        ran = this.tickFlow(device, encoder, clock);
+      device.queue.submit([encoder.finish()]);
+      if (ran < WATER_FLOW_TICKS_PER_FRAME) break;
+    }
+    await device.queue.onSubmittedWorkDone();
+  }
   /** The sea's waves at Water's time into the frame uniform: computed by the sea in doubles, rounded once to f32. */
   private writeSea(sea: WaterSea): void {
     const count = sea.waveComponents(this.seconds, this.seaRows);
@@ -1781,6 +1899,13 @@ export class Water implements EnginePlugin {
       this.values.copyWithin(112, 104, 108);
       this.values.copyWithin(116, 108, 111);
     }
+    // A film clock behind the flow (a seek back): the flow starts again and replays its ticks.
+    if (
+      this.options.clock &&
+      this.coastal instanceof CoastalFlow &&
+      this.options.clock.ticks(flowRate(this.coastal.substeps)) < this.flowTicks
+    )
+      this.coastalSource = undefined;
     if (this.options.terrain) {
       const terrain = this.options.terrain.heightmap();
       if (
@@ -1808,8 +1933,8 @@ export class Water implements EnginePlugin {
           'state',
           `Water terrain of ${terrain.width} x ${terrain.height} cells needs ${bytes} B in one storage binding, over this device's ${room} B; use larger cells`,
         );
-      // No recorded source (a new Water, resetTime) always builds a fresh flow: with no river and no solver, an unset
-      // record compared equal to the current pair and the old flow stayed.
+      // No recorded source (a new Water, resetTime, a seek back on the film clock) always builds a fresh flow: with no river
+      // and no solver, an unset record compared equal to the current pair and the old flow stayed.
       if (
         !this.coastalSource ||
         this.coastal?.terrain !== terrain ||
@@ -1820,6 +1945,7 @@ export class Water implements EnginePlugin {
         this.spray = undefined;
         this.coastal?.dispose();
         this.coastal = undefined;
+        this.flowTicks = 0;
         this.coastal = solver
           ? solver({ device: c.device, uniform: this.uniform!, terrain, fill: this.fillCells(terrain) })
           : new CoastalFlow(
@@ -1849,8 +1975,13 @@ export class Water implements EnginePlugin {
       0,
       SEA_AT + 4 + 4 * this.values[SEA_AT]!,
     );
-    this.coastal?.step(c.encoder);
-    this.spray?.step(c.encoder);
+    // A film clock steps Water's own flow in ticks; a solver on the bridge (water/flood) keeps its own clock.
+    if (this.options.clock && this.coastal instanceof CoastalFlow)
+      this.tickFlow(c.device, c.encoder, this.options.clock);
+    else {
+      this.coastal?.step(c.encoder);
+      this.spray?.step(c.encoder);
+    }
     if (this.sampledDepth !== depth) {
       this.sampledDepth = depth;
       this.built++;
@@ -2075,6 +2206,8 @@ export class Water implements EnginePlugin {
     this.indices?.destroy();
     this.fogBuffer?.destroy();
     this.fogBuffer = undefined;
+    this.ring?.destroy();
+    this.ring = undefined;
     this.views.clear();
     this.view = this.drawnView = undefined;
     this.built++;
@@ -2107,6 +2240,7 @@ export class Water implements EnginePlugin {
     this.view = undefined;
     // The next frame sees no flow built and builds it again, with its solver (water/flood) and spray.
     this.coastalSource = undefined;
+    this.flowTicks = 0;
   }
   /**
    * Moves the wave clock by `delta` seconds without drawing (a delta of 0 or less moves nothing). Each frame update
@@ -2114,7 +2248,9 @@ export class Water implements EnginePlugin {
    * moved the clock: hidden water stood still and two views in a frame moved it twice; now it keeps time either way.
    */
   advanceTime(delta: number): void {
-    if (delta > 0) this.seconds += delta;
+    // A film clock owns the time: the wave clock is its time, whatever the frame's delta.
+    if (this.options.clock) this.seconds = this.options.clock.time;
+    else if (delta > 0) this.seconds += delta;
   }
   /**
    * Sets the wave clock to `seconds` outright (0 to 1e9), as `FFTOcean.setTime` does; the next frame draws the waves

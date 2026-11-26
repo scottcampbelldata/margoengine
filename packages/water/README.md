@@ -1669,6 +1669,36 @@ console.log(water.time, rain.time);
   the Water's sea level back and starts a fresh solver at the next frame. Evidence: `test/reset-time.test.js` (state of
   a reset clock equals a fresh one's, before and after a seek, for all of them).
 
+### On a film clock: `clock`
+
+Give `Water` a film clock (`FilmClock` of `@margoengine/math/clock`) as `clock` and its time is the clock's: the wave
+clock reads `clock.time`, and the coastal or river flow and its spray step in fixed ticks of 60 * 2^k Hz (240 for the
+coast's three substeps a frame, 480 for a river's eight), as many as the clock owes since the last frame. Each tick's
+wave time and step are worked out on the CPU in doubles and reach the GPU once, in a ring of frame-uniform slices copied
+in before the tick's flow and spray passes. So the same beach drawn at 24, 30, 60 or 5 fps holds the same flow and spray,
+every byte, at the times those rates share; a slow frame loses no time; and a seek is setting the clock. A frame runs at
+most `WATER_FLOW_TICKS_PER_FRAME` (480) ticks; `await water.settle()` runs the rest at once (after a jump ahead). Setting
+the clock back starts the flow again and replays it to the earlier time. The flow's first set-up (the surf's spin-up)
+runs at its first tick's time, whatever frame builds it. `test/film-clock.browser.mjs` checks all of it on WebGPU and
+the WebGL2 layer, and that without a clock 24 and 60 fps flow differently. A flood on the bridge (`@margoengine/water/flood`)
+keeps its own film clock.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Water} from 'margoengine/water';
+import {FilmClock} from 'margoengine/math/clock';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const heightmap = engine.gpu.createTexture({size: [64, 64], format: 'r32float', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST});
+const heights = new Float32Array(64 * 64).map((_, i) => -3 + ((i % 64) / 63) * 4.5); // a beach rising to +x
+engine.gpu.queue.writeTexture({texture: heightmap}, heights, {bytesPerRow: 256}, [64, 64]);
+const clock = new FilmClock({fps: 24});
+const water = Water.attach(engine, {size: [64, 64], segments: 64, spray: true, terrain: {heightmap: () => heightmap, origin: [-32, -32], size: [64, 64]}, clock});
+clock.frame = 72; // the shot's first frame is 3 s in
+engine.render({delta: 1 / 24});
+await water.settle(); // the 720 ticks of 3 s, all of them
+console.log(water.time); // 3
+```
+
 ## Rain ripples
 
 `@margoengine/water/rain` puts rain drop rings on a `Water`. `WaterRain.attach(engine, { surface, weather })` follows a

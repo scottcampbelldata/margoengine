@@ -32,6 +32,8 @@ export interface TerrainHeights {
 
 export const WATER_FAR_SAMPLES = 64;
 
+export const WATER_FLOW_TICKS_PER_FRAME = 480;
+
 export const WATER_SEA_WAVES = 896;
 
 export class Water implements EnginePlugin {
@@ -56,6 +58,7 @@ export class Water implements EnginePlugin {
     setChop(amount: number): this;
     breakerLine(): [number, number][][];
     setWind(wind: number | WaterWind): this;
+    settle(): Promise<void>;
     setWaveHeight(height: number | null): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -78,6 +81,11 @@ export interface WaterCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+}
+
+export interface WaterClock {
+    ticks(rate: number): number;
+    readonly time: number;
 }
 
 export interface WaterFarField {
@@ -107,6 +115,7 @@ export interface WaterOptions {
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
     sea?: WaterSea;
+    clock?: WaterClock;
     terrain?: WaterTerrain;
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;

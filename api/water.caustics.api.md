@@ -128,6 +128,7 @@ class Water implements EnginePlugin {
     setChop(amount: number): this;
     breakerLine(): [number, number][][];
     setWind(wind: number | WaterWind): this;
+    settle(): Promise<void>;
     setWaveHeight(height: number | null): this;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -150,6 +151,11 @@ interface WaterCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+}
+
+interface WaterClock {
+    ticks(rate: number): number;
+    readonly time: number;
 }
 
 interface WaterFarField {
@@ -179,6 +185,7 @@ interface WaterOptions {
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
     sea?: WaterSea;
+    clock?: WaterClock;
     terrain?: WaterTerrain;
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;

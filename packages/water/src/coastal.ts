@@ -428,6 +428,30 @@ export class CoastalFlow {
       throw error;
     }
   }
+  /** Substeps a frame of the flow takes without a clock (3 for the coast, the river's own count for a river). */
+  get substeps(): number {
+    return this.river?.substeps ?? 3;
+  }
+  /** Whether the flow has been set up (its first step's set-up, the surf's spin-up included). */
+  get isSetUp(): boolean {
+    return this.initialized;
+  }
+  /** Sets the flow up (its first step's set-up) if it has not been. */
+  ready(): void {
+    if (!this.initialized) this.setUp(Math.ceil(this.terrain.width / 8), Math.ceil(this.terrain.height / 8));
+  }
+  /** Writes a river's sources for the ticks that follow (once a frame). */
+  writeSources(): void {
+    if (this.river) this.device.queue.writeBuffer(this.sources!, 0, this.river.sources as Float32Array<ArrayBuffer>);
+  }
+  /** One tick of a film clock: one substep in a pass of its own, on the tick's frame uniform (Water.tickFlow). */
+  tick(encoder: GPUCommandEncoder): void {
+    this.ready();
+    if (this.still) return;
+    const pass = encoder.beginComputePass(this.descriptor);
+    this.substep(() => pass, Math.ceil(this.terrain.width / 8), Math.ceil(this.terrain.height / 8));
+    pass.end();
+  }
   step(encoder: GPUCommandEncoder): void {
     if (this.still && this.initialized) return;
     const x = Math.ceil(this.terrain.width / 8),
