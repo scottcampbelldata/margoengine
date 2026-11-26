@@ -18,7 +18,16 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
-import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from '../crush/port.js';
+import {
+  CRUSH_DAMAGE_QUANTITY,
+  CRUSH_LAYOUT,
+  CRUSH_SEAL_LOSS_WORD,
+  CRUSH_WORDS,
+  GIRDER_SEAM_BROKEN_WORD,
+  GIRDER_SEAM_LAYOUT,
+  GIRDER_SEAM_QUANTITY,
+  GIRDER_SEAM_WORDS,
+} from '../crush/port.js';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import { atan2 } from '../ship/propeller.js';
 import { regionWords } from '../world/memory.js';
@@ -250,6 +259,7 @@ export class HullSolver implements Solver<HullParams> {
   private flood: Region | null = null;
   private breaches: Region | null = null;
   private lastCrushPatch = -1;
+  private lastGirderJoint = -1;
 
   /** The hull's signed volume source rows, named from the solver's id. Enabled with the wake option. */
   readonly wakeSourceField: FieldDescriptor;
@@ -257,11 +267,12 @@ export class HullSolver implements Solver<HullParams> {
   private readonly wakePlanes = new Map<Hull, { waterline: number; sections: readonly Section[] }>();
   private readonly wakeRadius: number | null;
 
-  /** Pass CrushSolver.damageField to enable crush-triggered compartment openings. */
+  /** Pass the crush damage or girder seam field to enable structural compartment openings. */
   constructor(
     readonly id = 'hull',
     wake?: HullWake,
     private readonly crushDamage?: FieldDescriptor,
+    private readonly girderSeams?: FieldDescriptor,
   ) {
     const radius = wake?.minimumRadius ?? 0;
     if (!(Number.isFinite(radius) && radius >= 0))
@@ -269,6 +280,8 @@ export class HullSolver implements Solver<HullParams> {
     this.wakeRadius = wake ? radius : null;
     if (crushDamage && (crushDamage.kind !== 'surfaceSampleSet' || crushDamage.quantity !== CRUSH_DAMAGE_QUANTITY))
       throw new MargoError('state', 'Pass CrushSolver.damageField to link structural seal damage to a hull.');
+    if (girderSeams && (girderSeams.kind !== 'surfaceSampleSet' || girderSeams.quantity !== GIRDER_SEAM_QUANTITY))
+      throw new MargoError('state', 'Pass GirderJointSolver.seamField to link a failed girder to a hull opening.');
     if (wake) this.loads.surfacePiercing = false;
     this.wakeSourceField = Object.freeze({
       name: id + '.wakeSources',
@@ -292,6 +305,7 @@ export class HullSolver implements Solver<HullParams> {
         { field: HULL_BREACHES_FIELD, access: 'write' },
         ...(this.wakeRadius !== null ? [{ field: this.wakeSourceField, access: 'write' as const }] : []),
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
+        ...(this.girderSeams ? [{ field: this.girderSeams, access: 'read' as const }] : []),
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -308,16 +322,26 @@ export class HullSolver implements Solver<HullParams> {
     if (!sea || typeof sea.elevation !== 'function')
       throw new TypeError('A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
     let lastCrushPatch = -1;
+    let lastGirderJoint = -1;
     for (const hull of hulls) {
       if (hull.bilgeKeels !== undefined) validateBilgeKeels(hull.bilgeKeels);
-      for (const { crushPatch } of hull.openings ?? []) {
-        if (crushPatch === undefined) continue;
-        if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
-          throw new MargoError(
-            'state',
-            'Pass CrushSolver.damageField and a nonnegative crushPatch index for the hull opening.',
-          );
-        lastCrushPatch = Math.max(lastCrushPatch, crushPatch);
+      for (const { crushPatch, girderJoint } of hull.openings ?? []) {
+        if (crushPatch !== undefined) {
+          if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
+            throw new MargoError(
+              'state',
+              'Pass CrushSolver.damageField and a nonnegative crushPatch index for the hull opening.',
+            );
+          lastCrushPatch = Math.max(lastCrushPatch, crushPatch);
+        }
+        if (girderJoint !== undefined) {
+          if (!this.girderSeams || !Number.isSafeInteger(girderJoint) || girderJoint < 0)
+            throw new MargoError(
+              'state',
+              'Pass GirderJointSolver.seamField and a nonnegative girderJoint index for the hull opening.',
+            );
+          lastGirderJoint = Math.max(lastGirderJoint, girderJoint);
+        }
       }
       if (!(Number.isInteger(hull.row) && hull.row >= 0))
         throw new RangeError(
@@ -365,6 +389,7 @@ export class HullSolver implements Solver<HullParams> {
       throw new RangeError(`A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
     this.host = host;
     this.lastCrushPatch = lastCrushPatch;
+    this.lastGirderJoint = lastGirderJoint;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     this.wakeSources = null;
     this.wakePlanes.clear();
@@ -556,6 +581,18 @@ export class HullSolver implements Solver<HullParams> {
     const damage = crush && (regionWords(crush.region.memory ?? host.memory, crush.region) as Float64Array);
     if (damage && this.lastCrushPatch * CRUSH_WORDS >= damage.length)
       throw new MargoError('state', 'Choose a hull opening crushPatch within the connected damage port.');
+    const girder = this.girderSeams && context.inputs.get(this.girderSeams.name);
+    const girderRowBytes = GIRDER_SEAM_WORDS * Float64Array.BYTES_PER_ELEMENT;
+    if (
+      girder &&
+      (girder.region.type !== 'f64' ||
+        girder.region.layout !== GIRDER_SEAM_LAYOUT ||
+        girder.region.byteLength % girderRowBytes !== 0)
+    )
+      throw new MargoError('state', 'Use the layout-1 f64 GirderJointSolver seam port to connect the hull.');
+    const seams = girder && (regionWords(girder.region.memory ?? host.memory, girder.region) as Float64Array);
+    if (seams && this.lastGirderJoint * GIRDER_SEAM_WORDS >= seams.length)
+      throw new MargoError('state', 'Choose a hull opening girderJoint within the connected seam port.');
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
@@ -641,6 +678,7 @@ export class HullSolver implements Solver<HullParams> {
           breaches,
           loads,
           damage,
+          seams,
         ),
         w = hull.row * FORCE_WORDS,
         held =
@@ -1290,18 +1328,21 @@ export class HullSolver implements Solver<HullParams> {
     breaches: Float64Array,
     loads: WettedLoads,
     damage: Float64Array | undefined,
+    seams: Float64Array | undefined,
   ): number[] {
     const entry = this.floods.get(hull);
     if (!entry || !this.flood) return [];
     const { flooding, at, record } = entry;
     const state = new Float64Array(this.host!.memory.buffer, this.flood.byteOffset + at * 8, flooding.words);
     const openings = hull.openings ?? [];
-    if (damage) {
+    if (damage || seams) {
       for (let k = 0; k < openings.length; k++) {
-        const patch = openings[k]!.crushPatch;
-        if (patch === undefined) continue;
-        const seal = patch * CRUSH_WORDS + CRUSH_SEAL_LOSS_WORD;
-        if (damage[seal]! >= 1) flooding.failOpening(state, k);
+        const { crushPatch, girderJoint } = openings[k]!;
+        const crushed =
+          damage && crushPatch !== undefined && damage[crushPatch * CRUSH_WORDS + CRUSH_SEAL_LOSS_WORD]! >= 1;
+        const broken =
+          seams && girderJoint !== undefined && seams[girderJoint * GIRDER_SEAM_WORDS + GIRDER_SEAM_BROKEN_WORD] === 1;
+        if (crushed || broken) flooding.failOpening(state, k);
       }
     }
     const density = this.sea!.density ?? SEA_WATER,

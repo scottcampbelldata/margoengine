@@ -13,6 +13,7 @@ import type {
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { girderTangent, resolveGirder, type GirderFiber } from './girder.js';
 import { positive } from './material.js';
+import { GIRDER_SEAM_BROKEN_WORD, GIRDER_SEAM_LAYOUT, GIRDER_SEAM_QUANTITY, GIRDER_SEAM_WORDS } from './port.js';
 import {
   add,
   angularAt,
@@ -32,8 +33,6 @@ import {
   type CrushVector,
 } from './rigid-contact.js';
 
-const WORDS = 6;
-const LAYOUT = 1;
 const BODIES_LAYOUT = 2;
 const AXES = [
   [1, 0, 0],
@@ -193,7 +192,7 @@ function bendJoint(
   const pointB = add(triple(bodies, rowB), rotateB(second.anchor));
   const gap = sub(pointB, pointA);
   state[at + 4] = hypot(...gap);
-  if (state[at + 5] === 1) return;
+  if (state[at + GIRDER_SEAM_BROKEN_WORD] === 1) return;
 
   const { gradient, halfSine } = sectionRotation(bodies, rowA, rowB, joint.axis);
   const curvature = (2 * halfSine) / joint.gaugeLength; // float division: circular curvature from the chord
@@ -204,7 +203,7 @@ function bendJoint(
     for (const { strain } of section.fibers) state[at + 3] = Math.max(state[at + 3]!, strain);
   }
   if (!section || state[at + 3]! >= joint.failureStrain) {
-    state[at + 5] = 1;
+    state[at + GIRDER_SEAM_BROKEN_WORD] = 1;
     return;
   }
 
@@ -245,7 +244,7 @@ export class GirderJointSolver implements Solver<GirderJointParams> {
     this.seamField = {
       name: `${id}:seams`,
       kind: 'surfaceSampleSet',
-      quantity: 'girderState',
+      quantity: GIRDER_SEAM_QUANTITY,
       unit: '1/m, N m, 1, 1, m, 1',
       centring: 'particle',
     };
@@ -273,8 +272,8 @@ export class GirderJointSolver implements Solver<GirderJointParams> {
       host,
       capacity,
       joints,
-      seam: host.allocate('girder-seams', joints.length * WORDS * F64, 'f64', LAYOUT),
-      reactions: host.allocate('girder-reactions', capacity * IMPULSE_WORDS * F64, 'f64', LAYOUT),
+      seam: host.allocate('girder-seams', joints.length * GIRDER_SEAM_WORDS * F64, 'f64', GIRDER_SEAM_LAYOUT),
+      reactions: host.allocate('girder-reactions', capacity * IMPULSE_WORDS * F64, 'f64', 1),
     };
   }
 
@@ -293,7 +292,7 @@ export class GirderJointSolver implements Solver<GirderJointParams> {
     const bodies = regionWords(input.region.memory ?? host.memory, input.region) as Float32Array;
     const values = regionWords(host.memory, seam) as Float64Array;
     for (let index = 0; index < joints.length; index++)
-      bendJoint(joints[index]!, bodies, out, values, index * WORDS, h);
+      bendJoint(joints[index]!, bodies, out, values, index * GIRDER_SEAM_WORDS, h);
   }
 
   importPorts(_tick: number): void {}
@@ -319,14 +318,14 @@ export class GirderJointSolver implements Solver<GirderJointParams> {
     const { host, joints, seam } = this.requireState();
     if (!Number.isSafeInteger(index) || index < 0 || index >= joints.length)
       throw new MargoError('state', 'Choose an index in the configured girder joints.');
-    const at = index * WORDS;
+    const at = index * GIRDER_SEAM_WORDS;
     const values = regionWords(host.memory, seam) as Float64Array;
     return {
       curvature: values[at]!,
       bendingMoment: values[at + 1]!,
       peakTension: values[at + 3]!,
       separation: values[at + 4]!,
-      broken: values[at + 5] === 1,
+      broken: values[at + GIRDER_SEAM_BROKEN_WORD] === 1,
     };
   }
 

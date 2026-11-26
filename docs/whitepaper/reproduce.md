@@ -32,6 +32,11 @@ and inertias. It checks reciprocal transfer in two orientations, differential-lo
 identical snapshot replay. The floating-model hammering and wave records in Iijima et al.
 remain independent validation targets. [Iijima et al. (2011)](https://doi.org/10.1007/s00773-011-0142-1)
 
+The same test file floats both rigid halves with `HullSolver`, breaks the girder seam by
+relative rotation and examines the SEA-10 aperture. It checks dry partial damage, first-tick
+Bernoulli/Boyle bounds and replay. The control uses the same two prebuilt bodies and fracture
+with its aperture shut.
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard

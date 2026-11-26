@@ -6,3 +6,9 @@ export const CRUSH_WORDS = 8;
 export const CRUSH_SEAL_LOSS_WORD = 6;
 /** Quantity used by the crush damage field. */
 export const CRUSH_DAMAGE_QUANTITY = 'crushDamage';
+
+/** Layout-1 f64 girder seam data, in joint order. */
+export const GIRDER_SEAM_LAYOUT = 1;
+export const GIRDER_SEAM_WORDS = 6;
+export const GIRDER_SEAM_BROKEN_WORD = 5;
+export const GIRDER_SEAM_QUANTITY = 'girderState';
