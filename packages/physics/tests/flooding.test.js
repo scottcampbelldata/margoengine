@@ -74,6 +74,8 @@ test('Flooding: a vented box filling through a hole in its bottom follows Torric
         if (Math.abs(t - 280) < 1e-9) last = -r.level[0] - exact(280);
         // Water comes in at the hole (out negative) and the air leaves by the vent.
         assert.ok(r.water[0] <= 0 && r.air[1] >= 0);
+        // Each step's water and air settle well inside the sweeps' limit (it says so when they do not).
+        assert.ok(r.sweeps[0] > 0 && r.sweeps[0] < 50 && r.sweeps[1] < 50, `sweeps ${r.sweeps[0]}, ${r.sweeps[1]}`);
       });
       return last;
     },

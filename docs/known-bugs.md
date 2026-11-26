@@ -254,6 +254,10 @@ regression test.
 - **SEA-10, the flooding solve can stop unconverged without a word.** **Cause:**
   `packages/physics/src/seakeeping/flooding.ts` ends its 200-sweep loop silently. Also, the iron-ore cargo default
   grain is 1e-4 m while the code's own comment gives about 0.012 m for taconite pellets.
+  **Fixed 2026-11-26:** each step reports the sweeps it took for the water and the air (`FloodResult.sweeps`, 200 when
+  it went on unsettled) and the docs say what that means; the grain comment now gives the default (the tracer
+  material's fines, 1e-4 m) and tells a taconite cargo to pass 0.012. **Regression:**
+  `packages/physics/tests/flooding.test.js`, "a vented box filling through a hole".
 - **SEA-12, floating bodies have no righting moment, and the buoyancy is not exact.** **Repro:** float a heeled box
   with `LoadSolver`; it does not right itself. **Cause:** `packages/physics/src/loads/solver.ts` applies buoyancy at
   the shape's centre and takes the submerged volume from an equivalent ellipsoid (a box prism is exact only upright),

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20523186,
+  "total": 20525840,
   "history": [
     {
       "date": "2026-10-24",
@@ -13438,6 +13438,24 @@
       "grew": 0,
       "added": 1,
       "reason": "EARTH-01 adds the optional sparse granular material-point interface (4066 B gzip). Both native builds load only with the optional solver. Splitting its interface would duplicate the same arena binder and clock checks. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-10 breach outflow",
+      "grew": 1,
+      "reason": "@margoengine/physics/foam: the air escaping damaged hulls under water: the integral round bubble plume (RK4 to the surface) and the Fannelop and Sjoen surface current that whitens its boil, read from the hullBreaches port; measured gzip (Mac build) 9095 B, was 8022; the plume is what the boil is painted from, so a separate entry would be imported by every foam that meets a hull. Budget (measured + max(3%, 256 B)): 8022 to 9368 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-10 breach outflow",
+      "grew": 1,
+      "reason": "@margoengine/physics/tracers: the cargo leaving damaged hulls: each breach releases its cargo as its tracer material from the hullBreaches port, with its remainder kept in the ledger; measured gzip (Mac build) 6148 B, was 5872; it shares the release loop of the ordinary sources. Budget (measured + max(3%, 256 B)): 5872 to 6404 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-10 breach outflow",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: the flooding step reports its sweeps and keeps its volume tables while the hull has not turned; measured gzip (Mac build) 23615 B, within its 23547 B budget before; both live in the flooding step. Budget (measured + max(3%, 256 B)): 23547 to 24323 B."
     }
   ],
   "items": {
@@ -14271,7 +14289,7 @@
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/flip": 11699,
-    "@margoengine/physics/foam": 8022,
+    "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/granular-mpm": 4322,
     "@margoengine/physics/groundwater": 4195,
@@ -14299,7 +14317,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
-    "@margoengine/physics/seakeeping": 23547,
+    "@margoengine/physics/seakeeping": 24323,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
@@ -14313,7 +14331,7 @@
     "@margoengine/physics/terramechanics": 15161,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
-    "@margoengine/physics/tracers": 5872,
+    "@margoengine/physics/tracers": 6404,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,

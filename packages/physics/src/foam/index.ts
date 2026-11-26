@@ -52,6 +52,9 @@ import {
 } from '../world/solver.js';
 import { ACTIVE_PERIODS, ACTIVE_SHARE, type BreakingStatistics, breakingStatistics, CREST_SHARE } from './breaking.js';
 import { bagBreakups, sprayFlux } from './spray.js';
+import { bubblePlume, surfaceCurrent } from './plume.js';
+import { HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
+import { MargoError } from '@margoengine/math/errors';
 
 export {
   ACTIVE_PERIODS,
@@ -63,6 +66,15 @@ export {
   WHITECAP_COEFFICIENT,
 } from './breaking.js';
 export { bagBreakups, sprayFlux, sprayPerWhitecap } from './spray.js';
+export {
+  BUBBLE_SLIP,
+  type BubblePlumeOptions,
+  bubblePlume,
+  PLUME_ENTRAINMENT,
+  SURFACE_ENTRAINMENT,
+  type SurfacingPlume,
+  surfaceCurrent,
+} from './plume.js';
 
 /** The registry field of the foam: per cell, the foam coverage and the active whitecap coverage (0 to 1), f32. */
 export const SEA_FOAM_FIELD: FieldDescriptor = {
@@ -144,6 +156,12 @@ export interface FoamParams {
   readonly windrows?: { readonly spacing?: number; readonly speed?: number; readonly spinUp?: number } | false;
   /** Ships laying wake foam. */
   readonly ships?: readonly FoamShip[];
+  /**
+   * Take the air escaping damaged hulls under water (`hullBreaches`, written by a `HullSolver` with compartments; default
+   * true): each breach's bubble plume rises to the surface (`bubblePlume`) and its boil whitens the water out to where
+   * its surface current (`surfaceCurrent`) falls under the wash's speed. The hull solver must step in the foam's cell.
+   */
+  readonly bubbles?: boolean;
   /** The wake foam's e-folding time, s (default 150). */
   readonly wakePersistence?: number;
   /** At most this many breakers alive at once (default 8192). */
@@ -176,6 +194,7 @@ export class FoamSolver implements Solver<FoamParams> {
   private rows: { spacing: number; speed: number; spinUp: number } | undefined;
   private ships: readonly FoamShip[] = [];
   private wakeRate = 1 / 150;
+  private bubbles = true;
   private capacity = 0;
   private level: RateLevel = 0;
   private random = new RandomStream(0, 0);
@@ -195,7 +214,11 @@ export class FoamSolver implements Solver<FoamParams> {
   describe(): SolverDescription {
     return {
       id: this.id,
-      fields: [{ field: SEA_FOAM_FIELD, access: 'write' }],
+      fields: [
+        { field: SEA_FOAM_FIELD, access: 'write' },
+        // The air leaving damaged hulls, when a hull solver writes it.
+        { field: HULL_BREACHES_FIELD, access: 'read', optional: true },
+      ],
       rate: this.level,
       stableRate: () => this.level,
     };
@@ -271,6 +294,7 @@ export class FoamSolver implements Solver<FoamParams> {
         `Wake foam's persistence is a finite number of seconds above 0 (got ${persistence}); pass one.`,
       );
     this.wakeRate = 1 / persistence;
+    this.bubbles = params.bubbles ?? true;
     const capacity = params.capacity ?? 8192;
     if (!(Number.isInteger(capacity) && capacity >= 1 && capacity <= 1 << 22))
       throw new RangeError(`A foam solver holds 1 to 4194304 breakers (got ${capacity}); pass a whole number.`);
@@ -322,6 +346,7 @@ export class FoamSolver implements Solver<FoamParams> {
     this.spawn(context.tick, dt);
     this.sweep(dt, foam, active);
     this.wakes(time, dt, foam);
+    if (this.bubbles) this.boils(context, foam);
     this.transport(time, dt, foam, ux, uz, u10, clock[1]!);
     this.fade(dt, foam);
     const p = regionWords(this.host.memory, this.published) as Float32Array;
@@ -494,6 +519,73 @@ export class FoamSolver implements Solver<FoamParams> {
           across = -px * dz + pz * dx;
         if (across < -half || across > half || along < back || along > front) continue;
         visit(i + nx * j, along);
+      }
+  }
+
+  /**
+   * The boils of the air escaping damaged hulls this step: each breach letting air out under the surface, its plume's
+   * surface current whitening the water as a propeller race's does (`WASH_SPEED`), out to where it is a twentieth of it.
+   */
+  private boils(context: StepContext, foam: Float64Array): void {
+    const port = context.inputs.get(HULL_BREACHES_FIELD.name);
+    if (!port) return;
+    const c = port.cell;
+    if (c[0] !== this.cell[0] || c[1] !== this.cell[1] || c[2] !== this.cell[2])
+      throw new MargoError(
+        'state',
+        `The hull breaches come from origin cell [${c.join(', ')}] and the foam steps in [${this.cell.join(', ')}]; step the hull solver and the foam in one cell.`,
+      );
+    const memory = port.region.memory ?? this.host.memory,
+      rec = new Float64Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 8),
+      count = Math.min(rec[0]!, Math.floor((rec.length - 1) / HULL_BREACH_WORDS));
+    for (let k = 0; k < count; k++) {
+      const r = 1 + k * HULL_BREACH_WORDS,
+        gas = rec[r + 11]!,
+        depth = rec[r + 14]!,
+        area = rec[r + 8]!;
+      if (!(gas > 0 && depth > 0 && area > 0)) continue;
+      const plume = bubblePlume(depth, gas, { source: Math.sqrt(area / Math.PI), g: this.g }),
+        whiteAt = (d: number) => Math.min(1, surfaceCurrent(plume, d).speed / WASH_SPEED);
+      if (!(whiteAt(0) > 0.05)) continue;
+      // Out to where the current is a twentieth of the wash's speed (it falls as 1 / r far out), by bisection.
+      let lo = 2 * plume.radius,
+        hi = lo;
+      while (whiteAt(hi) > 0.05 && hi < 1e4) hi *= 2;
+      for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (whiteAt(mid) > 0.05) lo = mid;
+        else hi = mid;
+      }
+      this.disk(foam, rec[r + 2]!, rec[r + 4]!, lo, whiteAt, this.wakeRate);
+    }
+  }
+
+  /** Paints a round patch of foam about (x, z) out to `radius`, its whiteness `shape(r)` at r from the centre. */
+  private disk(
+    foam: Float64Array,
+    x: number,
+    z: number,
+    radius: number,
+    shape: (r: number) => number,
+    rate: number,
+  ): void {
+    const { nx, nz, h } = this,
+      i0 = Math.max(0, Math.floor((x - radius - this.x0) / h)),
+      i1 = Math.min(nx - 1, Math.floor((x + radius - this.x0) / h)),
+      j0 = Math.max(0, Math.floor((z - radius - this.z0) / h)),
+      j1 = Math.min(nz - 1, Math.floor((z + radius - this.z0) / h));
+    for (let j = j0; j <= j1; j++)
+      for (let i = i0; i <= i1; i++) {
+        const px = this.x0 + (i + 0.5) * h - x,
+          pz = this.z0 + (j + 0.5) * h - z,
+          d = Math.sqrt(px * px + pz * pz);
+        if (d > radius) continue;
+        const white = shape(d),
+          k = i + nx * j;
+        if (white > foam[2 * k]!) {
+          foam[2 * k] = white;
+          foam[2 * k + 1] = white * rate;
+        }
       }
   }
 

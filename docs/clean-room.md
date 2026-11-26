@@ -13539,6 +13539,27 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### A damaged hull's bubble plume and its boil (`@margoengine/physics/foam` plume.ts, SEA-10 to SEA-13, 2026-11-26)
+
+Built from papers only; no other code was read.
+
+- The plume: the integral round plume of Morton, Taylor and Turner ("Turbulent gravitational convection from maintained
+  and instantaneous sources", Proc. R. Soc. A 234, 1956), top-hat, with the bubbles' buoyancy g Q_g / (u + u_s) of the
+  gas in a metre of plume (McDougall 1978; Milgram, "Mean flow in round bubble plumes", J. Fluid Mech. 133, 1983), as
+  Dissanayake, Gros and Socolofsky review it ("Integral models for bubble, droplet, and multiphase plume dynamics in
+  stratification and crossflow", Environ. Fluid Mech. 18, 2018): entrainment 0.055, Socolofsky, Bhaumik and Seol's
+  best fit for the inner plume of a bubble plume (2008), and the inner plume's start at a Froude number of 1.6; the
+  slip of millimetre air bubbles, 0.23 m/s (Wuest, Brooks and Imboden 1992, restated by Einarsrud and Brevik, "Kinetic
+  energy approach to dissolving axisymmetric multiphase plumes", arXiv:0804.2789).
+- The boil: Fannelop and Sjoen's surface flow ("Hydrodynamics of underwater blowouts", AIAA 1980) as Milgram and
+  Burgess restate and test it ("Measurements of the surface flow above round bubble plumes", Applied Ocean Research 6,
+  1984, eqs. 1-8): a Gaussian radial current that keeps its momentum flux and entrains beta V a unit area, started at
+  twice the plume's radius with the plume's mass and momentum fluxes; beta 0.061, their mean over four conditions.
+  V(r) and h(r) were derived here from the stated conservation laws (the printed equations are illegible in the scan);
+  they match its form.
+- Checked against: Morton, Taylor and Turner's exact far field of a pure plume (b = 6 alpha z / 5, u = (3 F / (4 pi
+  beta^2))^(1/3) z^(-1/3)) and the surface flow's own conservation of momentum and entrainment.
+
 ### A hull's flooding: compartments, Bernoulli's openings, Boyle's air and the cargo that leaves (`@margoengine/physics/seakeeping`, SEA-10, 2026-11-26)
 
 Built from papers and public procedures only; no other engine's or tool's code was read.

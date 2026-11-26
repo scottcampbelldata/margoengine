@@ -56,7 +56,10 @@ export interface CompartmentCargo {
   readonly mass: number;
   /** Its grains' or its liquid's density, kg/m^3 (default the material's: iron ore 5200, coal 1400, grain 1300, sand 2650). */
   readonly density?: number;
-  /** Its grains' diameter, m (default the material's; taconite pellets are about 0.012); 0 for a liquid. */
+  /**
+   * Its grains' diameter, m (default the tracer material's: iron ore fines 1e-4, sand 2.5e-4, coal 5e-4, grain 4e-3);
+   * pass about 0.012 for taconite pellets; 0 for a liquid.
+   */
   readonly diameter?: number;
   /** The share of the cargo's bulk its grains fill (default 0.6, random packing of spheres). */
   readonly packing?: number;
@@ -123,6 +126,11 @@ export interface FloodResult {
   /** Per compartment: its water level (world height) and its air's pressure (Pa). */
   readonly level: Float64Array;
   readonly pressure: Float64Array;
+  /**
+   * The sweeps the step took for the water and for the air: under the limit (200) it settled; at it, the step went on
+   * from the last sweep's levels unsettled (a network too stiff for the step: take a shorter step).
+   */
+  readonly sweeps: Float64Array;
 }
 
 /** A pose: the body's frame origin (world) and its rotation (unit quaternion x, y, z, w). */
@@ -344,6 +352,10 @@ export class Flooding {
   private readonly heights: Float64Array;
   private readonly lows: Float64Array;
   private readonly capacity: Float64Array;
+  /** The attitude (the world's up in the body's frame) and the height the tables were made for. */
+  private up: Vec3 = [Number.NaN, Number.NaN, Number.NaN];
+  private readonly relative: Float64Array;
+  private readonly relativeLows: Float64Array;
   readonly result: FloodResult;
 
   constructor(compartments: readonly Compartment[], openings: readonly Opening[]) {
@@ -436,6 +448,8 @@ export class Flooding {
     });
     this.tables = new Float64Array(n * LEVELS);
     this.heights = new Float64Array(n * LEVELS);
+    this.relative = new Float64Array(n * LEVELS);
+    this.relativeLows = new Float64Array(n);
     this.lows = new Float64Array(n);
     this.capacity = new Float64Array(n);
     const m = this.openings.length;
@@ -450,6 +464,7 @@ export class Flooding {
       lostCentre: new Float64Array(n * 3),
       level: new Float64Array(n),
       pressure: new Float64Array(n),
+      sweeps: new Float64Array(2),
     };
   }
 
@@ -479,8 +494,19 @@ export class Flooding {
     state.fill(0, this.compartments.length * COMPARTMENT_WORDS);
   }
 
-  /** Each compartment's volume table at this pose: its free volume below each of LEVELS heights along the world's up. */
+  /**
+   * Each compartment's volume table at this pose: its free volume below each of LEVELS heights along the world's up. The
+   * volumes depend on the hull's attitude alone, so they are made again only when it has turned; the heights follow
+   * the hull's height.
+   */
   private tabulate(u: Vec3, base: number): void {
+    const last = this.up;
+    if (last[0] === u[0] && last[1] === u[1] && last[2] === u[2]) {
+      for (let k = 0; k < this.heights.length; k++) this.heights[k] = base + this.relative[k]!;
+      for (let k = 0; k < this.lows.length; k++) this.lows[k] = base + this.relativeLows[k]!;
+      return;
+    }
+    this.up = [u[0], u[1], u[2]];
     this.compartments.forEach((c, i) => {
       const v = c.mesh.vertices;
       let lo = Infinity,
@@ -495,9 +521,11 @@ export class Flooding {
         const s = lo + ((hi - lo) * k) / (LEVELS - 1),
           volume = k === 0 ? 0 : Math.max(last, c.permeability * volumeBelow(c.mesh, u, s));
         this.tables[i * LEVELS + k] = volume;
+        this.relative[i * LEVELS + k] = s;
         this.heights[i * LEVELS + k] = base + s;
         last = volume;
       }
+      this.relativeLows[i] = lo;
       this.lows[i] = base + lo;
       this.capacity[i] = last;
     });
@@ -662,6 +690,7 @@ export class Flooding {
       }
       return best;
     };
+    r.sweeps[0] = SWEEPS;
     for (let sweep = 0; sweep < SWEEPS; sweep++) {
       let moved = 0;
       for (let i = 0; i < n; i++) {
@@ -701,7 +730,10 @@ export class Flooding {
         last[i] = pressed[i]!;
         v[i] = x;
       }
-      if (moved < SETTLED) break;
+      if (moved < SETTLED) {
+        r.sweeps[0] = sweep + 1;
+        break;
+      }
     }
     // The volumes are the solved ones and the flows those at the solved levels. (Moving the volumes by those flows instead
     // would trade the solve's last bits for the flows' sqrt(dh) of them where two levels meet: a level a step out of turn
@@ -715,6 +747,7 @@ export class Flooding {
       setSide(i, v[i]!, m0[i]!, pressed[i]);
       pressure[i] = vAir[i]! > 0 ? sides[i]!.p : ATMOSPHERE;
     }
+    r.sweeps[1] = SWEEPS;
     for (let sweep = 0; sweep < SWEEPS; sweep++) {
       let moved = 0;
       for (let i = 0; i < n; i++) {
@@ -740,7 +773,10 @@ export class Flooding {
         moved = Math.max(moved, Math.abs(p - pressure[i]!) / hi);
         pressure[i] = p;
       }
-      if (moved < SETTLED) break;
+      if (moved < SETTLED) {
+        r.sweeps[1] = sweep + 1;
+        break;
+      }
     }
     openings.forEach((_, k) => (r.air[k] = flow(k, true)));
     for (let i = 0; i < n; i++) {
