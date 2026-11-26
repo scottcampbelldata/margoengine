@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20613093,
+  "total": 20614950,
   "history": [
     {
       "date": "2026-10-24",
@@ -13795,6 +13795,12 @@
       "commit": "8b286039a1",
       "grew": 1,
       "reason": "SEA-15's wave-averaged Stokes transport moves physics/tracers from 11426 to 12184 B gzip. The optional ceiling rises from 11769 to 12550 B. Stokes transport shares the tracer point motion and existing spectral dispersion relation. A separate entry would require a second transport adapter for the same parcels."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e5a8d911a8",
+      "reason": "BREAK-03 breakable girder seam grows the optional crush entry from 7838 to 9435 B gzip. The ceiling rises from 7862 to 9719 B. Reciprocal section forces and bending couples share the existing Smith section, contact inertia and rigid port layout. A distinct entry would duplicate those dependencies for applications which use live plating and girder release together. Named imports still tree-shake.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14619,7 +14625,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 7862,
+    "@margoengine/physics/crush": 9719,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,

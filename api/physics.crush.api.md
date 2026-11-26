@@ -124,6 +124,48 @@ export interface GirderFiber {
     readonly curve: readonly GirderSample[];
 }
 
+export interface GirderJoint {
+    readonly first: GirderJointEnd;
+    readonly second: GirderJointEnd;
+    readonly axis: CrushVector;
+    readonly gaugeLength: number;
+    readonly anchorStiffness: number;
+    readonly failureStrain: number;
+    readonly fibers: readonly GirderFiber[];
+}
+
+export interface GirderJointEnd {
+    readonly body: number;
+    readonly anchor: CrushVector;
+}
+
+export interface GirderJointParams {
+    readonly bodyCapacity: number;
+    readonly joints: readonly GirderJoint[];
+}
+
+export class GirderJointSolver implements Solver<GirderJointParams> {
+    readonly id: string;
+    readonly seamField: FieldDescriptor;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: GirderJointParams): void;
+    step(context: StepContext, h: number): void;
+    importPorts(_tick: number): void;
+    exportPorts(tick: number): readonly Port[];
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+    read(index: number): GirderJointState;
+}
+
+export interface GirderJointState {
+    readonly curvature: number;
+    readonly bendingMoment: number;
+    readonly peakTension: number;
+    readonly separation: number;
+    readonly broken: boolean;
+}
+
 export interface GirderLoading {
     readonly axialForce?: number;
     readonly previousStrain?: number;
