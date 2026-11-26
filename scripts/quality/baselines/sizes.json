@@ -13377,6 +13377,12 @@
       "commit": "70351f3224",
       "grew": 1,
       "reason": "KB6016d: water's sun glint, ship lamps and FFT ocean write the GGX D denominator over n and h (|n x h|^2 + a2 nh^2) so float32 keeps a narrow lobe's peak; @margoengine/water 34733 to 34759 B gzip. The text is the shared ggxDenominatorOf, already inside the entry's shader strings; no split applies. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "18a13d3469",
+      "grew": 0,
+      "reason": "SOFT-04 adds inherited crack-front edges and native tensile advance through existing fracture geometry, moving the soft entry from 140526 to 141408 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
