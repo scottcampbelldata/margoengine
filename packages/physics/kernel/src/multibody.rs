@@ -68,7 +68,9 @@ const NO_AXIS: Axis = Axis { angular: false, axis: [0.0; 3], point: [0.0; 3], do
 const UNIT: [V3; 3] = [v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0)];
 
 // Where a link keeps its numbers, in doubles from the start of its joint's scratch: its subtree's inertia A, the right side r, the
-// joint's axes S (a column a row of six), the inverse of D = S^T A S, the count of axes, and the twist the pass found.
+// joint's axes S (a column a row of six), the inverse of D = S^T A S, the count of axes, and the twist the pass found. A joint
+// with a rotor on any free axis keeps, past the count, which of its six axes the free ones are: K_AT holds k + 8 mask, mask
+// bit j set for axis j, so the pass from the root can find each one's armature again.
 const A_AT: usize = 0;
 const R_AT: usize = 36;
 const S_AT: usize = 42;
@@ -629,6 +631,45 @@ impl World {
         self.mb_roots(|w, root| w.fk_tree(root, h));
     }
 
+    /// Reads the speed of every rotor of an awake multibody from its links, before the step lands the impulses given since the
+    /// last one: a rotor is held by its joint, not pushed by what pushes a link, so those impulses are resisted by its inertia
+    /// too. Each projection carries the speeds on from there.
+    pub fn spin_rotors(&mut self) {
+        for slot in 0..self.header().awake as usize {
+            let body = self.uu(AWAKE, slot) as usize;
+            if self.uu(MB_ROLE, body) == 0 || self.uu(MB_ROOT, body) as usize == body {
+                continue;
+            }
+            let joint = self.uu(MB_JOINT, body);
+            if joint == NONE || !self.has_rotor(joint as usize) {
+                continue;
+            }
+            let (joint, parent) = (joint as usize, self.uu(MB_PARENT, body) as usize);
+            let rotation = self.pose_rotation(parent);
+            let frame = rotation.mul(self.q(JOINT_FRAME_A_X, joint));
+            let point = self.pose_position(parent).add(rotation.rotate(self.v(JOINT_ANCHOR_A_X, joint)));
+            // The centres from the poses: a body set somewhere between steps has its centre found again only as the step begins.
+            let center = |w: &World, b: usize| w.pose_position(b).add(w.pose_rotation(b).rotate(w.v(LOCAL_CENTER_X, b)));
+            let (center_b, center_p) = (center(self, body), center(self, parent));
+            let anchor_b = self.pose_position(body).add(self.pose_rotation(body).rotate(self.v(JOINT_ANCHOR_B_X, joint)));
+            let along = self
+                .v(LINEAR_X, body)
+                .add(self.v(ANGULAR_X, body).cross(anchor_b.sub(center_b)))
+                .sub(self.v(LINEAR_X, parent).add(self.v(ANGULAR_X, parent).cross(point.sub(center_p))));
+            let spin = self.v(ANGULAR_X, body).sub(self.v(ANGULAR_X, parent));
+            for k in 0..3 {
+                let axis = frame.rotate(UNIT[k]);
+                self.set_s(JOINT_ROTOR_0 + k, joint, along.dot(axis));
+                self.set_s(JOINT_ROTOR_0 + 3 + k, joint, spin.dot(axis));
+            }
+        }
+    }
+
+    /// True when any axis of the joint carries a rotor.
+    fn has_rotor(&self, joint: usize) -> bool {
+        (0..6).any(|j| self.s(JOINT_ARMATURE_0 + j, joint) > 0.0)
+    }
+
     /// True when the axis stands at one of its limits and its speed runs into it.
     fn at_limit(&self, joint: usize, flags: u32, axis: usize, value: f32, rate: f32) -> bool {
         if flags & (JOINT_LIMIT << axis) == 0 {
@@ -804,6 +845,20 @@ impl World {
                     s_r[c] -= g[c];
                 }
             }
+            // A rotor on a free axis adds its inertia to the axis's diagonal and its momentum, at the speed it kept, to the right
+            // side: the cost of the joint speed qd gains 1/2 a (qd - rotor)^2 (Featherstone 2008, section 9.7).
+            let mut mask = 0usize;
+            if self.has_rotor(joint) {
+                for c in 0..k {
+                    let j = axes[c].dof;
+                    mask |= 1 << j;
+                    let a = self.s(JOINT_ARMATURE_0 + j, joint) as f64;
+                    if a > 0.0 {
+                        dm[c][c] += a;
+                        s_r[c] += a * self.s(JOINT_ROTOR_0 + j, joint) as f64;
+                    }
+                }
+            }
             symmetric(&mut dm, k);
             let dinv = if k > 0 { inverse(dm, k, whisper_of(&dm, k)) } else { [[0.0; 6]; 6] };
             let (mut hat_a, mut hat_r) = (a, r);
@@ -827,7 +882,7 @@ impl World {
                         *d.add(DINV_AT + 6 * c + i) = dinv[c][i];
                     }
                 }
-                *d.add(K_AT) = k as f64;
+                *d.add(K_AT) = (k + 8 * mask) as f64;
                 for c in 0..6 {
                     *d.add(G_AT + c) = g[c];
                 }
@@ -886,8 +941,10 @@ impl World {
             };
             let p = transport(sub(d3(self.pose_center(b)), d3(self.pose_center(parent))));
             let moved = apply6(&p, &up);
-            let k = unsafe { *d.add(K_AT) } as usize;
+            let code = unsafe { *d.add(K_AT) } as usize;
+            let (k, mask) = (code % 8, code / 8);
             let mut u = moved;
+            let (mut slots, mut speeds) = ([0usize; 6], [0.0f64; 6]);
             if k > 0 {
                 let (mut a, mut r, mut s, mut dinv) = ([[0.0; 6]; 6], [0.0; 6], [[0.0; 6]; 6], [[0.0; 6]; 6]);
                 unsafe {
@@ -908,14 +965,35 @@ impl World {
                     }
                     rhs[c] -= unsafe { *d.add(G_AT + c) };
                 }
+                // The rotors' momentum, axis by axis in the order the free axes were listed.
+                if mask != 0 {
+                    let mut c = 0;
+                    for j in 0..6 {
+                        if mask & (1 << j) != 0 {
+                            slots[c] = j;
+                            rhs[c] += self.s(JOINT_ARMATURE_0 + j, joint) as f64 * self.s(JOINT_ROTOR_0 + j, joint) as f64;
+                            c += 1;
+                        }
+                    }
+                }
                 for c in 0..k {
                     let mut q = 0.0;
                     for e in 0..k {
                         q += dinv[c][e] * rhs[e];
                     }
+                    speeds[c] = q;
                     for i in 0..6 {
                         u[i] += s[c][i] * q;
                     }
+                }
+            }
+            // Each rotor turns on at its axis's new speed; one held at a limit stops with it.
+            if self.has_rotor(joint) {
+                for j in 0..6 {
+                    self.set_s(JOINT_ROTOR_0 + j, joint, 0.0);
+                }
+                for c in 0..k {
+                    self.set_s(JOINT_ROTOR_0 + slots[c], joint, speeds[c] as f32);
                 }
             }
             unsafe {

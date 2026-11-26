@@ -574,6 +574,22 @@ columns! {
     // joint space, not the joint passes: a stiff chain of them (a rod, a cable) stays stable at any stiffness. Only on a link's
     // joint to its parent, while the tree holds (MB_HELD), and only a force-model motor with no cap on an axis with no limit.
     JOINT_ELASTIC u32 Joint,
+    // A multibody joint's rotor inertia on each axis, kg for a slide and kg m^2 for a turn (MuJoCo's armature, Featherstone 2008,
+    // section 9.7's reflected rotor inertia): it adds to its coordinate's diagonal of the tree's joint-space inertia. 0 adds none.
+    JOINT_ARMATURE_0 f32 Joint,
+    JOINT_ARMATURE_1 f32 Joint,
+    JOINT_ARMATURE_2 f32 Joint,
+    JOINT_ARMATURE_3 f32 Joint,
+    JOINT_ARMATURE_4 f32 Joint,
+    JOINT_ARMATURE_5 f32 Joint,
+    // The speed each axis's rotor turns at, read from the links at the start of a substep, before gravity: the projection holds
+    // the rotor to it, as a rotor that nothing in the substep pushes keeps its speed.
+    JOINT_ROTOR_0 f32 Joint,
+    JOINT_ROTOR_1 f32 Joint,
+    JOINT_ROTOR_2 f32 Joint,
+    JOINT_ROTOR_3 f32 Joint,
+    JOINT_ROTOR_4 f32 Joint,
+    JOINT_ROTOR_5 f32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
     SOLVE_JOINTS u32 JointList,
     // The joint whose scratch keeps the sums of this one's island, for the warm start; NONE with no body to move.
@@ -989,12 +1005,13 @@ pub const JOINT_DISABLED: u32 = 1 << 31;
 pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
-/// solves, the impacts it found, the islands it numbered, and the solving joints' scratch, which is indexed by place in
-/// their list. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 40] = [
+/// solves, the impacts it found, the islands it numbered, the solving joints' scratch, which is indexed by place in
+/// their list, and the rotor speeds read at each substep's start. `World::hash` leaves them out; `World::arena_hash` does not.
+pub const SCRATCH: [usize; 46] = [
     ISLAND_LEVEL, ISLAND_STAMP, MB_HELD,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,
     TILT_MASS, TILT_SUPPORTS, TILT_Y, TILT_G, TILT_A, TILT_BASE, TILT_TOP, TILT_TOPS, PAIR_TILT_GAIN, PAIR_TILT_UNHELD, TILT_PAIRS, TILT_TEMP,
+    JOINT_ROTOR_0, JOINT_ROTOR_1, JOINT_ROTOR_2, JOINT_ROTOR_3, JOINT_ROTOR_4, JOINT_ROTOR_5,
 ];

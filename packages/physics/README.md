@@ -2239,6 +2239,24 @@ console.log(Math.abs(Math.hypot(...arm[0].position) - 1) < 1e-3); // true
 physics.dispose();
 ```
 
+A joint's armature is the rotor of a motor and its gearbox as the joint feels it (the rotor's inertia times the gear ratio squared, MuJoCo's `armature`): `joint.setArmature(inertia, dof?)` puts it on a hinge or slider's axis, on all three turns of a ball joint, or on one named axis, in kg m² for a turn and kg for a slide (default 0). In a multibody it adds to its coordinate's diagonal of `massMatrix()`, so gravity, torques, contacts and impulses all move that joint as if it were that much heavier; `forwardDynamics` and `inverseDynamics` count it. `multibody.augmentedMassMatrix(h)` adds what an implicit step of `h` seconds adds for each force motor, `h * (c + h * k)` for its damping and stiffness (pass `physics.fixedTimestep / physics.kernel.substeps`, the length the kernel takes motors over), `inverseMassMatrix(h?)` inverts the plain or augmented matrix, and `dofInverseInertia(h?)` is its diagonal, each coordinate's inverse inertia with the other joints free.
+
+```ts
+import {Physics} from 'margoengine/physics';
+
+await Physics.load();
+const physics = new Physics(null, {gravity: [0, 0, 0]});
+const pivot = physics.addBody(null, {type: 'fixed', colliders: []});
+const wheel = physics.addBody(null, {colliders: {shape: 'cylinder', radius: 0.3, halfHeight: 0.05, mass: 2}});
+const drive = physics.addMultibody(pivot, [{body: wheel, joint: {type: 'revolute', axis: [0, 1, 0]}}]);
+drive.links[0].joint.setArmature(0.09); // the motor's rotor, as heavy as the wheel itself
+wheel.addTorque([0, 1.8, 0]); // held until resetTorques()
+for (let i = 0; i < 60; i++) physics.step();
+console.log(drive.velocities()[0].toFixed(2)); // '10.00': 1.8 N m over 0.09 + 0.09 kg m² for 1 s
+console.log(drive.dofInverseInertia()[0].toFixed(2)); // '5.56'
+physics.dispose();
+```
+
 ### Mesh files as colliders
 
 `@margoengine/physics/meshfiles` reads binary and ASCII STL files, Wavefront OBJ files and Collada (DAE) files (faces of any size are fanned, indices may be negative) with no other package: `parseSTL(file)`, `parseOBJ(file)` and `parseDAE(file)` (Collada 1.4: triangles, polylists and polygons, the nodes' matrices, `unit` and `up_axis` applied) give a welded `{vertices, indices}`, and `meshFileCollider(file, {format, shape})` gives collider options, a `trimesh` by default (for fixed bodies) or the `convexHull` of the points (for dynamic ones). `Physics.kernelBuild` is the hash of the kernel source the loaded solver was made from, to record beside a replay.
@@ -2347,6 +2365,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Spring model (acceleration or force), rope motor (a winch), pin-slot joint | `spring` `model`, `rope` `motor`, `type: 'pinSlot'` | full | `next-joint-kinds.test.js` |
 | Joint break on a force or torque threshold | `breakForce`, `breakTorque`, `jointbreak` | full | `next-joint-break.test.js` |
 | Multibody (reduced-coordinate) joints and inverse kinematics | `addMultibody`, `coordinates`, `setCoordinates`, `inverseKinematics` | full | `next-multibody.test.js`, `next-multibody-oracle.test.js` |
+| Joint armature, augmented mass and each coordinate's inverse inertia | `setArmature`, `augmentedMassMatrix`, `inverseMassMatrix`, `dofInverseInertia` | full | `multibody-armature.test.js` |
 | Multibody links and lookups, self contacts on and off | `root`, `links`, `numLinks`, `attachedBodies`, `linkIndex`, `bodyAt`, `jointBetween`, `selfContacts` | full | `next-multibody-api.test.js` |
 | Limits on two or three turning axes of one generic joint | `limits` on `angX`, `angY`, `angZ` | full | `next-joint-limits.test.js` |
 | Coupled axes of a generic joint, softness of a joint's locks, joint damping and friction | `coupled`, `setSoftness`, `setDamping`, `setFriction`, motor `frequency` | full | `next-joint-coupled.test.js`, `next-joint-softness.test.js`, `next-multibody-kinematics.test.js` |

@@ -2,7 +2,7 @@
 // This file builds and removes the tree and writes its columns; reading and setting its coordinates and the inverse
 // kinematics are in next/kinematics.ts.
 import { MargoError } from '@margoengine/math/errors';
-import { forwardDynamics, inverseDynamics, jacobian, massMatrix } from './dynamics.js';
+import { augmentedMassMatrix, forwardDynamics, inverseDynamics, inverseOf, jacobian, massMatrix } from './dynamics.js';
 import type { JointOptions } from './joints.js';
 import { JOINT_LOCK, type KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
@@ -174,12 +174,40 @@ export class Multibody {
   }
   /**
    * The mass matrix H in joint coordinates (`dof` by `dof`, symmetric positive definite): the kinetic energy of the tree is
-   * half of `velocities()` times H times `velocities()`. The root is the frame of the tree and is not a coordinate. Needs every
-   * link to carry mass and inertia.
+   * half of `velocities()` times H times `velocities()`, each joint's rotor (`joint.setArmature`) on its diagonal. The root is
+   * the frame of the tree and is not a coordinate. Needs every link to carry mass and inertia.
    */
   massMatrix(): number[][] {
     this.check();
     return massMatrix(this.owner.kernel, this);
+  }
+  /**
+   * The augmented mass matrix of an implicit step of `h` seconds (Rapier's `augmented_mass`): {@link Multibody.massMatrix}, armature
+   * included, plus `h * (c + h * k)` on the diagonal of each coordinate whose axis has a force motor of damping `c` and stiffness
+   * `k` (`joint.setDamping`, `setFriction` while under its cap, a `motor` with `model: 'force'`). The kernel takes motors implicitly
+   * over each substep, so pass the step over the substeps, `physics.fixedTimestep / physics.kernel.substeps`, to read the matrix
+   * a substep solves against.
+   * @throws RangeError for an `h` that is not a finite number above 0.
+   */
+  augmentedMassMatrix(h: number): number[][] {
+    this.check();
+    if (!(h > 0) || !Number.isFinite(h)) throw new RangeError(`A step must be finite and above 0 (got ${h} s).`);
+    return augmentedMassMatrix(this.owner.kernel, this, h);
+  }
+  /**
+   * The inverse of the mass matrix, or of the augmented one of a step of `h` seconds (Rapier's `inv_augmented_mass`): column `j` is
+   * the joint accelerations a unit torque on coordinate `j` gives, every other joint free.
+   */
+  inverseMassMatrix(h?: number): number[][] {
+    return inverseOf(h === undefined ? this.massMatrix() : this.augmentedMassMatrix(h));
+  }
+  /**
+   * Each coordinate's inverse inertia, the diagonal of {@link Multibody.inverseMassMatrix}: the acceleration of a joint under a unit
+   * torque on it with every other joint free to move, in 1/(kg m²) for a turn and 1/kg for a slide. A joint constraint's effective
+   * mass on that axis is its inverse.
+   */
+  dofInverseInertia(h?: number): number[] {
+    return this.inverseMassMatrix(h).map((row, i) => row[i]!);
   }
   /**
    * The Jacobian of a point of a link: six rows (the point's velocity along x, y, z, then the link's angular velocity) by

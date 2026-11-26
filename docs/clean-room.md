@@ -14107,6 +14107,23 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### Joint armature, the augmented mass and each coordinate's inverse inertia (`@margoengine/physics` multibodies, 2026-11-26)
+
+Built from texts only; no other code was read. Rapier's augmented mass and MuJoCo's armature were matched by name from their
+public documentation.
+
+- R. Featherstone, Rigid Body Dynamics Algorithms, Springer, 2008, section 9.7: a motor's rotor reflected through its gear
+  as an inertia on the joint coordinate, added to the joint-space inertia's diagonal (and to the articulated-body
+  algorithm's D = S^T I^A S).
+- E. Todorov, T. Erez and Y. Tassa, "MuJoCo: A physics engine for model-based control", IROS 2012, and the MuJoCo modelling
+  documentation: armature as that added diagonal inertia, which also steadies stiff joints.
+- D. Baraff and A. Witkin, "Large steps in cloth simulation", SIGGRAPH 1998, eq. 18: a spring and damper taken implicitly
+  over a step h add h c + h^2 k to the matrix the step solves against, which is what the augmented mass matrix reads.
+- Margo's own: the rotor in the kernel's velocity projection, held to the speed it had when the step began (read before the
+  step lands its impulses) through the cost 1/2 a (qd - rotor)^2, and carried on by each projection.
+- Checked against: a compound pendulum's period with the rotor's inertia, tau / (I + a) for a torque and an impulse, the
+  implicit damper's decay, and the inverse of the mass matrix.
+
 ### PID and PD controllers with split axes, caps and anti-windup (`@margoengine/physics` pid.ts, 2026-11-26)
 
 Built from texts only; no other code was read. Rapier's `PidController`, `PdController`, `PdErrors` and axes mask were

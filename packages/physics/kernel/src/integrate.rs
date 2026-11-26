@@ -194,6 +194,7 @@ impl World {
             self.timing[sub] = 0.0;
         }
         self.canonical_lists();
+        self.spin_rotors();
         self.begin_step(dt);
         lap(self, 1);
         self.broad_update(dt);
