@@ -116,13 +116,13 @@ export class SpectralSea implements SeaSurface {
     if (!waves || typeof waves !== 'object')
       throw new TypeError('A sea needs its waves: a WaveSpectrumField or a spectrum.');
     if (!(gravity > 0 && Number.isFinite(gravity)))
-      throw new RangeError(`Gravity is a finite number above 0 (got ${gravity}).`);
+      throw new RangeError(`Gravity is a finite number above 0 (got ${gravity}); pass m/s^2 such as 9.81, or leave it out for the world's gravity.`);
     if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
-      throw new RangeError(`A sea's seed is a whole number from 0 to 2^32 - 1 (got ${seed}).`);
+      throw new RangeError(`A sea's seed is a whole number from 0 to 2^32 - 1 (got ${seed}); pass an integer seed in that range.`);
     if (!(Number.isFinite(at?.[0]) && Number.isFinite(at?.[1])))
       throw new RangeError('A sea reads its spectrum at a finite [x, z]; pass `at`.');
     if (!(temperature > 0 && Number.isFinite(temperature)))
-      throw new RangeError(`A water temperature is finite kelvin above 0 (got ${temperature}).`);
+      throw new RangeError(`A water temperature is finite kelvin above 0 (got ${temperature}); pass kelvin such as 288.15 (15 C).`);
     if (current !== undefined && (typeof current.sample !== 'function' || current.medium !== 'water'))
       throw new TypeError('A current is a flow field of water (medium "water"); pass one, or none.');
     this.waves = waves;
