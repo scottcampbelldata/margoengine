@@ -241,6 +241,26 @@ export const entries = [
     fix: 'Pass a function as the listener, and a whole-number capacity of 1 or more (the default is 64). A listener that throws is not this error: it goes to the `onError` option of `new Emitter({ onError })`.',
   },
   {
+    id: 'lod-occluder-fade',
+    title: '@margoengine/lod/occluder-fade: dither out what hides a target',
+    kind: 'family',
+    messages: [
+      "Occluder fade pattern must be 'bayer' or 'blue'; see https://margoengine.com/errors#lod-occluder-fade",
+      'Occluder fade padding must be a world radius of 0 or more; see https://margoengine.com/errors#lod-occluder-fade',
+      'Occluder fade layers must be a mask in 0..0xffffffff; see https://margoengine.com/errors#lod-occluder-fade',
+      'Occluder fade filter must be a function or null; see https://margoengine.com/errors#lod-occluder-fade',
+      'Occluder fade targets are meshes, models, [x, y, z] or [x, y, z, radius], or functions returning those; see https://margoengine.com/errors#lod-occluder-fade',
+      'Occluder fade needs an eye position [x, y, z]; see https://margoengine.com/errors#lod-occluder-fade',
+      'Occluder fade fadeTime must be seconds of 0 or more; see https://margoengine.com/errors#lod-occluder-fade',
+      'Occluder fade minOpacity must be in 0..1; see https://margoengine.com/errors#lod-occluder-fade',
+      'OccluderFade is in use; make one per engine; see https://margoengine.com/errors#lod-occluder-fade',
+      'OccluderFade is on no engine; pass it to engine.use; see https://margoengine.com/errors#lod-occluder-fade',
+    ],
+    cause:
+      'An option of `OccluderFade` or `findOccluders` is out of range or of the wrong kind (a pattern other than bayer or blue, a negative padding or fadeTime, a minOpacity outside 0..1, a layers mask outside 32 bits, a filter that is not a function, a target that is not a mesh, a model, a point or sphere array or a function returning one, an eye that is not three finite numbers), one `OccluderFade` was given to two engines, or `update` ran before the plugin was attached or after `dispose()` (a MargoError with code state).',
+    fix: 'Pass `targets` as an array of meshes, models, `[x, y, z]` points or `[x, y, z, radius]` spheres, seconds of 0 or more as `fadeTime`, `minOpacity` from 0 to 1, a `padding` of 0 or more in world units and `pattern` as `bayer` or `blue`. Attach with `OccluderFade.attach(engine, options)` or `engine.use(new OccluderFade(options))`, one per engine, and make a new one after disposing it.',
+  },
+  {
     id: 'scene-helpers',
     title: '@margoengine/lines/scene-helpers: light probe and positional audio helpers',
     kind: 'family',
