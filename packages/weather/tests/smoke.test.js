@@ -5,6 +5,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  FIRE_LIGHT_COLOR,
+  NOON_IRRADIANCE,
+  fireHazeLight,
   hazeLight,
   SMOKE_ANGSTROM,
   SMOKE_AT_FULL,
@@ -367,4 +370,63 @@ test('the smoke haze hands its sunlight over to the moon and twilight at night, 
   sky.nightFactor = 0;
   drive.update(0);
   assert.deepEqual(sky.options.fog.color, dustColor());
+});
+
+test('fires light the smoke haze from below by their radiant power, so a burning valley glows at night (KB-WEATHER-FIREHAZE1)', () => {
+  // The box: half the radiant power upward, the share through a disc of the box's area at the layer's middle, over it.
+  const h = SMOKE_LAYER_DEPTH / 2,
+    rho = 2000 / Math.sqrt(Math.PI),
+    share = (0.5 * 1e10 * (1 - h / Math.hypot(h, rho))) / (2000 * 2000) / NOON_IRRADIANCE;
+  const light = fireHazeLight(1e10);
+  for (let i = 0; i < 3; i++) near(light[i], FIRE_LIGHT_COLOR[i] * share, 1e-12);
+  assert.ok(light[0] > light[1] && light[1] > light[2], 'the flames light it orange');
+  assert.deepEqual(fireHazeLight(0), [0, 0, 0]);
+  near(fireHazeLight(2e10)[0], 2 * light[0], 1e-12);
+  assert.ok(fireHazeLight(1e10, 8000)[0] < light[0] / 4, 'a wider box spreads the light thinner');
+  assert.throws(() => fireHazeLight(-1), RangeError);
+  assert.throws(() => fireHazeLight(1, 0), RangeError);
+  // A moonless night (no moon, no twilight): the haze over a fire that reports no light is black, as before the fix.
+  const sky = {
+      name: 'sky',
+      options: { fog: { density: 0.01, falloff: 'exp' }, lighting: { intensity: 5 } },
+      sun: [0, -Math.sin(deg(20)), Math.cos(deg(20))],
+      nightFactor: 1,
+    },
+    fire = { name: 'fire-front:1', options: {}, smokeEmission: 36000 },
+    machine = new WeatherMachine('clear', { seed: 8 });
+  applyWeatherSettings(machine, { wind: 5, gust: 0 });
+  const engine = engineOf(sky, fire),
+    drive = WeatherDrive.attach(engine, { weather: machine, advance: false });
+  drive.setup(engine);
+  drive.update(0);
+  assert.deepEqual(sky.options.fog.color, [0, 0, 0]);
+  // The same fire reporting its radiant power (the 0.3 of the release that made the smoke, FireFront.radiantPower):
+  // the haze is the smoke colour times the flames' light on it, orange and bright enough to see.
+  fire.radiantPower = (0.3 * 36000 * 18.622e6) / 15;
+  drive.update(0);
+  const glow = fireHazeLight(fire.radiantPower),
+    lit = sky.options.fog.color;
+  for (let i = 0; i < 3; i++) near(lit[i], smokeColor()[i] * glow[i], 1e-12);
+  assert.ok(lit[0] > 0.02, `a 45 GW blowup lights the haze to ${lit[0]} of the noon haze's white`);
+  assert.ok(lit[0] > 2 * lit[1] && lit[1] > 2 * lit[2], `orange: ${lit}`);
+  // fireLight scales it and 0 turns it off; moonlight adds to it.
+  const half = WeatherDrive.attach(engine, { weather: machine, advance: false, fireLight: 0.5 });
+  half.setup(engine);
+  half.update(0);
+  for (let i = 0; i < 3; i++) near(sky.options.fog.color[i], lit[i] / 2, 1e-12);
+  const off = WeatherDrive.attach(engine, { weather: machine, advance: false, fireLight: 0 });
+  off.setup(engine);
+  off.update(0);
+  assert.deepEqual(sky.options.fog.color, [0, 0, 0]);
+  assert.throws(() => WeatherDrive.attach(engine, { weather: machine, fireLight: -1 }), RangeError);
+  const up = deg(18);
+  sky.moonUnderClouds = { direction: [0, Math.sin(up), Math.cos(up), 0.25], radiance: [0.8, 0.9, 1.1] };
+  drive.update(0);
+  const through = hazeLight({ smoke: drive.settings.smoke }, up);
+  for (let i = 0; i < 3; i++)
+    near(
+      sky.options.fog.color[i],
+      smokeColor()[i] * ((0.25 * sky.moonUnderClouds.radiance[i] * through[i]) / 5 + glow[i]),
+      1e-12,
+    );
 });

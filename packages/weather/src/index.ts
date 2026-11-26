@@ -107,6 +107,9 @@ export {
   sprayFromWind,
   sunTransmittance,
   hazeLight,
+  fireHazeLight,
+  FIRE_LIGHT_COLOR,
+  NOON_IRRADIANCE,
   visibility,
   windProfile,
 } from './air.js';
