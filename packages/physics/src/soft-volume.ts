@@ -4,7 +4,10 @@
 // A triangle meets a box when no separating axis exists between them: the three box axes, the triangle's normal and the nine cross
 // products of box axes with triangle edges (Akenine-Moller, "Fast 3D Triangle-Box Overlap Testing", J. Graphics Tools 6(1), 2001,
 // is the reference for the axis list; the test below is the plain separating axis test of Gottschalk, Lin and Manocha, "OBBTree",
-// SIGGRAPH 1996). A point is inside a closed mesh when a ray from it crosses an odd number of triangles.
+// SIGGRAPH 1996). A point is inside a closed mesh when a ray from it crosses an odd number of triangles, counted watertight: each edge
+// is measured once, in one direction, for the triangles that share it (Woop, Benthin and Wald, "Watertight Ray/Triangle Intersection",
+// J. Computer Graphics Techniques 2(1), 2013), and a ray exactly on an edge is moved by a symbolic amount (Edelsbrunner and Muecke,
+// "Simulation of Simplicity", ACM Transactions on Graphics 9(1), 1990), so it is on one side of the edge and crosses the surface once.
 import type { Vec3 } from './math.js';
 
 type V = readonly [number, number, number];
@@ -57,24 +60,41 @@ export function triangleMeetsBox(tri: readonly [V, V, V], centre: V, half: numbe
   return true;
 }
 
-/** Whether `point` is inside a closed, outward mesh: a ray along +x crosses an odd number of triangles. */
+/**
+ * Which side of the edge a to b the point `p` lies on in the y-z plane, 1 or -1, never 0. The edge is measured in one canonical
+ * direction (its lower end first, by y then z), so the two triangles that share it get exactly opposite answers. A point on the
+ * edge's line is decided as if it were moved by (d, d squared) in (y, z) for a vanishing d, so it falls on one side of every
+ * edge it touches, and a ray through a shared edge or a vertex crosses the surface once, not twice or not at all.
+ */
+function side(a: V, b: V, p: V): number {
+  const flip = a[1] > b[1] || (a[1] === b[1] && a[2] > b[2]),
+    s = flip ? b : a,
+    e = flip ? a : b,
+    dy = e[1] - s[1],
+    dz = e[2] - s[2],
+    f = dz * (p[1] - s[1]) - dy * (p[2] - s[2]),
+    // The nudge changes f by dy d^2 - dz d, so on the line the sign is -dz, or dy when dz is 0.
+    tie = dz !== 0 ? -dz : dy,
+    result = f > 0 || (f === 0 && tie > 0) ? 1 : -1;
+  return flip ? -result : result;
+}
+
+/**
+ * Whether `point` is inside a closed, outward mesh: a ray along +x crosses an odd number of triangles. A triangle is crossed when
+ * the point, seen along x, is on the same side of all three of its edges ({@link side}), which counts a ray through an edge or
+ * a vertex once, so a box whose face diagonals run through the cube centres of a lattice is not hollowed along them.
+ */
 export function insideMesh(point: V, vertices: ArrayLike<number>, indices: ArrayLike<number>): boolean {
   let crossings = 0;
   for (let t = 0; t < indices.length / 3; t++) {
     const [p, q, r] = corners(vertices, indices, t),
-      e1 = sub(q, p),
-      e2 = sub(r, p),
-      dir: V = [1, 0, 0],
-      h = cross(dir, e2),
-      det = dot(e1, h);
-    if (Math.abs(det) < 1e-18) continue;
-    const s = sub(point, p),
-      u = dot(s, h) / det;
-    if (u < 0 || u > 1) continue;
-    const qv = cross(s, e1),
-      v = dot(dir, qv) / det;
-    if (v < 0 || u + v > 1) continue;
-    if (dot(e2, qv) / det > 0) crossings++;
+      n = cross(sub(q, p), sub(r, p));
+    // Seen along x the triangle has no area: the ray runs in its plane, and its neighbours cover the crossing.
+    if (n[0] === 0) continue;
+    const s0 = side(p, q, point);
+    if (s0 !== side(q, r, point) || s0 !== side(r, p, point)) continue;
+    // Where the ray meets the triangle's plane; only a hit ahead of the point counts.
+    if (p[0] - (n[1] * (point[1] - p[1]) + n[2] * (point[2] - p[2])) / n[0] > point[0]) crossings++;
   }
   return crossings % 2 === 1;
 }

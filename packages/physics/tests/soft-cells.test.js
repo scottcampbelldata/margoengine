@@ -1057,6 +1057,39 @@ test('the volume constraint and the skin go with the pieces of a body that is cu
   assert.equal(skinned, vertices.length / 3, 'every skin vertex went to a piece');
 });
 
+// KB-SOFT-HOLLOWBOX1: the inside test counted a ray through the diagonal two box faces share with their triangles twice, so every
+// lattice cell on a line of cube centres level with a face diagonal read as outside and the body had a tunnel through it. Its
+// surface then had an edge four triangles met at, and a volume body refused it.
+test('a box mesh is filled by every cube of its lattice, whichever way its faces are cut into triangles', async () => {
+  for (const flip of [false, true])
+    for (const [size, per] of [
+      [0.1, 4],
+      [0.05, 8],
+      [0.4 / 3, 3],
+    ]) {
+      const vertices = [],
+        indices = [];
+      for (const x of [0, 0.4]) for (const y of [0, 0.4]) for (const z of [0, 0.4]) vertices.push(x, y, z);
+      for (const [a, b, c, d] of [
+        [0, 1, 3, 2],
+        [4, 6, 7, 5],
+        [0, 4, 5, 1],
+        [2, 3, 7, 6],
+        [0, 2, 6, 4],
+        [1, 5, 7, 3],
+      ])
+        indices.push(...(flip ? [a, b, d, b, c, d] : [a, b, c, a, c, d]));
+      const desc = SoftBodyDesc.volumetric(vertices, indices, size);
+      // Six tetrahedra a cube, four indices each; the box surface is two triangles for each of the per * per squares of six faces.
+      assert.equal(
+        desc.cells.length,
+        per ** 3 * 6 * 4,
+        `a ${per} cube box (diagonals ${flip ? 'flipped' : 'as built'}) has no missing cube`,
+      );
+      assert.equal(desc.triangles.length / 3, per * per * 6 * 2, 'and a closed surface with no pinched edge');
+    }
+});
+
 test('a skin is drawn between steps by alpha, carried by the interpolated cells (PA-06)', async () => {
   const { physics, soft } = await create([0, -9.81, 0], 8, 4);
   const { vertices, indices } = boxMesh();
