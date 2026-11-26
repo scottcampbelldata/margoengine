@@ -2850,6 +2850,46 @@ world.advance(60);
 console.log(body.position);
 ```
 
+#### Hull motion drives a dispersive wake
+
+Set the second argument of `HullSolver` to enable signed waterplane sources, then give its `wakeSourceField` to `WakeSolver`. Both run at the world base rate in the same origin cell. The example starts with a downward initial velocity. Use a `minimumRadius` at least as large as half the wake cell diagonal so every source reaches the grid. Omit it for the geometric patch radius. Pass the wake to `SpectralSea.patches` to query its surface, and to `WaterWake` to draw it.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {HullSolver, SEA_WATER} from 'margoengine/physics/seakeeping';
+import {WakeSolver} from 'margoengine/physics/sea';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+using physics = new Physics(null, {fixedTimestep: 1 / 60});
+const body = physics.addBody(null, {
+  linearVelocity: [0, -0.25, 0],
+  colliders: {shape: 'box', halfExtents: [2, 0.25, 0.35], mass: SEA_WATER * 0.7},
+});
+const mesh = {
+  vertices: new Float64Array([
+    -2, -0.25, -0.35, 2, -0.25, -0.35, 2, 0.25, -0.35, -2, 0.25, -0.35,
+    -2, -0.25, 0.35, 2, -0.25, 0.35, 2, 0.25, 0.35, -2, 0.25, 0.35,
+  ]),
+  indices: new Uint32Array([
+    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
+    2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3,
+  ]),
+};
+const hull = new HullSolver('hull', {minimumRadius: 0.35});
+const wake = new WakeSolver('wake', hull.wakeSourceField);
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(hull, {
+    hulls: [{row: body.row, mesh}],
+    sea: {elevation: () => 0},
+  })
+  .add(wake, {cells: [48, 32], cellSize: 0.25, depth: 3, sponge: 4})
+  .couple(['hull', 'wake', 'rigid'], 'staggered');
+world.advance(15);
+console.log(wake.sample(2.5, 0).height);
+```
+
 ### Into the water and out of it (`EntrySolver`, `@margoengine/physics/entry`)
 
 `EntrySolver` is SEA-14: bodies striking the water, going under, breaking out and falling back, a cannonball, a diver, a

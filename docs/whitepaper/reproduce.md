@@ -4491,3 +4491,9 @@ the event times, water retained at the rim, total release, and snapshot replay. 
 volume oracle is Mori's equation. The separately observed 3.09 s cycle corresponds to 51.5 μL
 and supplies the documented model difference.
 [Mori (1990)](https://doi.org/10.1002/aic.690360819) · [Zhang and Basaran (1996), Figure 1](https://doi.org/10.1017/S0022112096008300)
+
+### SEA-08 hull-to-wake displacement
+
+Build Physics and run `node --test --test-name-pattern "HullSolver wake source" packages/physics/tests/coupling/seakeeping.test.js`. The rigid hull publishes motion at the world base rate and the actual WakeSolver advances it. The tests measure the waterplane volume, pitch and roll moments, a distant-height gauge and exact replay. Steady surge, fully dry and fully submerged controls check that no volume is injected.
+
+Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --hull-motion` for the renderer. Repeat with `MARGO_COMPAT=1`. The same height and normal error bounds used for the pressure-patch fixture apply to the live hull's volume sources.

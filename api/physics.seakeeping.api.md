@@ -145,7 +145,8 @@ export interface HullPose {
 
 export class HullSolver implements Solver<HullParams> {
     readonly id: string;
-    constructor(id?: string);
+    readonly wakeSourceField: FieldDescriptor;
+    constructor(id?: string, wake?: HullWake);
     describe(): SolverDescription;
     init(host: SolverHost, params: HullParams): void;
     step(context: StepContext, dt: number): void;
@@ -153,6 +154,10 @@ export class HullSolver implements Solver<HullParams> {
     importPorts(_tick: number): void;
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+}
+
+export interface HullWake {
+    readonly minimumRadius?: number;
 }
 
 export interface LateralSection {

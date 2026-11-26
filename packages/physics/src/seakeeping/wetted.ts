@@ -128,6 +128,7 @@ export function wettedLoads(
     world[3 * i + 2] = p[2] + pose.position[2];
     height[i] = world[3 * i + 1]! - sea.elevation(world[3 * i]!, world[3 * i + 2]!, t);
   }
+  if ('surfacePiercing' in loads) loads.surfacePiercing = height.some((h) => h < 0) && height.some((h) => h >= 0);
   const pressure = sea.pressure
     ? (x: number, y: number, z: number) => sea.pressure!(x, y, z, t)
     : (x: number, y: number, z: number) => {

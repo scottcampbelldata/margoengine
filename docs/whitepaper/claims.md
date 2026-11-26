@@ -6142,3 +6142,7 @@ The native optional solver conserves closed-grid mass, holds a stationary free s
 ### SEA-08 near-steady heave and pitch
 
 Forward-course heave and pitch amplitudes and phase agree with the ordinary-strip complex two-coordinate equations to 0.50% and 2.07% in the forced slender-box fixture at 2 m/s. An unchanged trimmed pose adds no radiation load at steady speed, including when water-relative and world speeds differ. This is analytical agreement. Independent Wigley towing-tank and film-shot qualification are pending. See `packages/physics/tests/coupling/seakeeping.test.js`.
+
+### SEA-08 hull motion launches waves in SEA-04
+
+Heave, pitch and roll publish signed volume to the dispersive wake. The rectangular hull fixture transfers 0.0333333333 m³ from the first heave tick and produces reciprocal roll and pitch dipoles with zero net volume. A wave reaches a gauge outside the hull footprint, with exact plain and shared replay. The WebGPU and WebGL2 captures agree with the same wake at 1,362 vertices. The largest height and normal errors are 0.038% and 0.029% of the established f32 bounds, and the distant gauge reads 12.956 mm. The closure is linearized about the mean draft. Physical amplitudes and production film placement remain pending. See `packages/physics/tests/coupling/seakeeping.test.js`.

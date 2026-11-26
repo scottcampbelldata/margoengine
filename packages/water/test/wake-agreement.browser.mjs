@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
+const hullMotion = process.argv.includes('--hull-motion');
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
 const { page, hardware } = browser,
   errors = [];
@@ -28,13 +29,13 @@ page.on('console', (m) => {
 });
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
-  const result = await page.evaluate(async () => {
+  const result = await page.evaluate(async (hullMotion) => {
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { WaterWake } = await import('/packages/water/dist/wake.js');
     const { WaveQuery } = await import('/packages/water/dist/query.js');
     const { SpectralSea, WakeSolver } = await import('/packages/physics/dist/sea.js');
-    const { PhysicsWorld } = await import('/packages/physics/dist/world.js');
+    const { PhysicsWorld, RigidSolver } = await import('/packages/physics/dist/world.js');
     const { jonswap } = await import('/packages/physics/dist/waves.js');
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:160px;height:128px';
@@ -55,20 +56,64 @@ try {
         density: 1025,
       };
     jonswap({ height: 1, period: 7, direction: 0.4 }, spectrum);
-    // A hull-sized pressure patch crossing a 64 m wake grid at 3 m/s for 8 s: a wake with its crests behind it.
-    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] }),
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] });
+    let wake;
+    let hash;
+    if (hullMotion) {
+      const { HullSolver } = await import('/packages/physics/dist/seakeeping.js');
+      const { Physics } = await import('/packages/physics/dist/index.js');
+      await Physics.load();
+      const hull = new HullSolver('hull', { minimumRadius: 0.35 });
+      wake = new WakeSolver('wake', hull.wakeSourceField);
+      const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
+      const body = physics.addBody(null, {
+        position: [0, 0.25, 0],
+        linearVelocity: [0, -0.5, 0],
+        angularVelocity: [0.1, 0, 0.125],
+        colliders: { shape: 'box', halfExtents: [2, 0.75, 1], mass: 4100 },
+      });
+      const mesh = {
+        vertices: new Float64Array([
+          -2, -0.75, -1, 2, -0.75, -1, 2, 0.75, -1, -2, 0.75, -1, -2, -0.75, 1, 2, -0.75, 1, 2, 0.75, 1, -2, 0.75, 1,
+        ]),
+        indices: new Uint32Array([
+          0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 2, 3, 7, 2, 7, 6, 1, 2, 6, 1, 6, 5, 0, 4, 7, 0, 7, 3,
+        ]),
+      };
+      world
+        .add(new RigidSolver(), { physics })
+        .add(hull, {
+          hulls: [{ row: body.row, mesh }],
+          sea: { elevation: () => 0 },
+          greenWater: false,
+          slamming: false,
+        })
+        .add(wake, { cells: [96, 96], cellSize: 0.25, depth: 3, sponge: 4 })
+        .couple(['hull', 'wake', 'rigid'], 'staggered');
+      world.advance(15);
+      const snapshot = world.takeSnapshot();
+      world.advance(45);
+      hash = world.hash();
+      world.restoreSnapshot(snapshot.bytes);
+      world.advance(45);
+      if (world.hash() !== hash)
+        throw new Error('Hull-and-wake replay drift. Inspect the source state and the wake FFT.');
+      physics[Symbol.dispose]();
+    } else {
+      // A hull-sized pressure patch crosses a 64 m wake grid at 3 m/s, leaving its crests behind it.
       wake = new WakeSolver();
-    world.add(wake, {
-      cells: [128, 128],
-      cellSize: 0.5,
-      sponge: 6,
-      sources: (t) => [{ x: -14 + 3 * t, z: 1, radius: 3, pressure: 1025 * 9.81 * 0.25, volume: 0 }],
-    });
-    world.advance(8 * 60);
+      world.add(wake, {
+        cells: [128, 128],
+        cellSize: 0.5,
+        sponge: 6,
+        sources: (t) => [{ x: -14 + 3 * t, z: 1, radius: 3, pressure: 1025 * 9.81 * 0.25, volume: 0 }],
+      });
+      world.advance(8 * 60);
+    }
     const sea = new SpectralSea({ waves: spectrum, seed: 5, patches: [wake] }),
       // 40 m on 256 segments inside the wake grid's 64 m: the farthest vertex and the cells either side of it stay
       // more than a cell and a half from the grid's edge.
-      water = Water.attach(engine, { size: [40, 40], segments: 256, sea }),
+      water = Water.attach(engine, { size: hullMotion ? [16, 16] : [40, 40], segments: 256, sea }),
       drawn = WaterWake.attach(engine, { surface: water, wake }),
       samples = [];
     const heights = wake.heights(),
@@ -114,6 +159,8 @@ try {
     const error = await engine.gpu.popErrorScope();
     return {
       samples,
+      hash,
+      radiated: hullMotion ? wake.sample(3.5, 0).height : null,
       waves: sea.waveCount,
       H,
       D,
@@ -121,8 +168,12 @@ try {
       origin,
       error: error?.message ?? null,
     };
-  });
+  }, hullMotion);
   assert.equal(result.error, null);
+  if (hullMotion) {
+    assert.ok(Math.abs(result.radiated) > 1e-4, 'the radiated wave reaches a distant gauge');
+    console.log('Hull-and-wake replay', result.hash, 'distant gauge', result.radiated);
+  }
   assert.ok(result.waves > 50, `a real sea: ${result.waves} waves`);
   assert.ok(result.H > 0.02, `a real wake: ${result.H} m at its highest`);
   const eps = 2 ** -24,

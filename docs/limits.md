@@ -10178,3 +10178,9 @@ The granular-flow entry is 5,965 B gzip under a 6,221 B ceiling. The plain SIMD 
 `Hull.course` adds 16 B per radiation lag and an 8 B count per configured solver hull. Change speed or heading slowly compared with the radiation window (20 s by default). The ordinary-strip model represents small vertical motion about a mean trim with a stern region where the section forces tend to zero. Use slender hulls. A runtime guard rejects speeds at which the finite-kernel static longitudinal stiffness reaches zero. A change to the incident wave diffraction, near-zero encounter qualification in following seas, nonlinear planing, forward corrections to roll, and physical tank validation are separate from these vertical radiation terms.
 
 The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and Stage gain zero bytes.
+
+### Ship motion on the wake grid
+
+`HullSolver` with the wake option publishes two five-word f64 records per reference waterplane station. The stamp uses one longitudinal midpoint and two transverse Gauss samples for a centreline-symmetric waterplane. Volume comes from small heave, pitch and roll about the reference draft. A wholly dry or submerged hull emits no waterplane flux. The model uses a signed surface-volume source. Its finite-depth wave propagation is handled by `WakeSolver`, and the hull's reaction still comes from its seakeeping solver. The projection has no three-dimensional radiation calibration or matched energy exchange with the wake grid.
+
+The wake-enabled seakeeping entry is 25,160 B gzip with a 25,254 B ceiling. The shared pressure integration leaves the optional water-entry bundle at 10,051 B gzip under 10,205 B. Core and Stage gain zero bytes.

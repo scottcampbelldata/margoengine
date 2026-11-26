@@ -18,7 +18,9 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
+import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import {
+  type FieldDescriptor,
   type Port,
   type RateLevel,
   type Region,
@@ -35,9 +37,9 @@ import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
-import { type HullMemory, hullMemory } from './memory.js';
+import { type HullMemory, hullMemory, stillWaterline } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
-import { addedMassInfinite, hullSections } from './strips.js';
+import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import {
   GRAVITY,
   type HullMesh,
@@ -63,6 +65,12 @@ export interface Hull {
   readonly compartments?: readonly Compartment[];
   /** Its openings between the compartments and to the outside: breaches, doors, hatches, vents. */
   readonly openings?: readonly Opening[];
+}
+
+/** Publish the hull's linearized waterplane displacement for a WakeSolver. */
+export interface HullWake {
+  /** Minimum radius of the surface patches in metres. Default 0, using their geometric size. */
+  readonly minimumRadius?: number;
 }
 
 /** What a {@link HullSolver} is made from. */
@@ -174,7 +182,11 @@ export class HullSolver implements Solver<HullParams> {
   private level: RateLevel = 0;
   private forces: Region | null = null;
   private capacity = 0;
-  private readonly loads: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
+  private readonly loads: WettedLoads & { surfacePiercing?: boolean } = {
+    force: [0, 0, 0],
+    torque: [0, 0, 0],
+    area: 0,
+  };
   private gravity: Vec3 = [0, -GRAVITY, 0];
   private addedMass = true;
   private stations = 24;
@@ -223,7 +235,29 @@ export class HullSolver implements Solver<HullParams> {
   private flood: Region | null = null;
   private breaches: Region | null = null;
 
-  constructor(readonly id = 'hull') {}
+  /** The hull's signed volume source rows, named from the solver's id. Enabled with the wake option. */
+  readonly wakeSourceField: FieldDescriptor;
+  private wakeSources: Region | null = null;
+  private readonly wakePlanes = new Map<Hull, { waterline: number; sections: readonly Section[] }>();
+  private readonly wakeRadius: number | null;
+
+  constructor(
+    readonly id = 'hull',
+    wake?: HullWake,
+  ) {
+    const radius = wake?.minimumRadius ?? 0;
+    if (!(Number.isFinite(radius) && radius >= 0))
+      throw new MargoError('state', 'Invalid hull wake patch radius. Use a finite nonnegative radius in metres.');
+    this.wakeRadius = wake ? radius : null;
+    if (wake) this.loads.surfacePiercing = false;
+    this.wakeSourceField = Object.freeze({
+      name: id + '.wakeSources',
+      kind: 'surfaceSampleSet',
+      quantity: 'seaSource',
+      unit: 'SI',
+      centring: 'particle',
+    });
+  }
 
   describe(): SolverDescription {
     const level = this.level;
@@ -235,6 +269,7 @@ export class HullSolver implements Solver<HullParams> {
         { field: DECK_INFLOW_FIELD, access: 'write' },
         { field: DECK_CLAIMS_FIELD, access: 'read', optional: true },
         { field: HULL_BREACHES_FIELD, access: 'write' },
+        ...(this.wakeRadius !== null ? [{ field: this.wakeSourceField, access: 'write' as const }] : []),
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -297,6 +332,18 @@ export class HullSolver implements Solver<HullParams> {
       throw new RangeError(`A hull's stations are ${this.stations}; pass a whole number of 2 or more.`);
     this.host = host;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
+    this.wakeSources = null;
+    this.wakePlanes.clear();
+    if (this.wakeRadius !== null) {
+      if (level !== 0)
+        throw new MargoError('state', 'Hull wake sources use the world base rate. Set the hull and wake to level 0.');
+      this.wakeSources = host.allocate(
+        'wakeSources',
+        hulls.length * this.stations * 2 * WAKE_SOURCE_WORDS * 8,
+        'f64',
+        WAKE_SOURCE_LAYOUT,
+      );
+    }
     this.radiation = params.radiation ?? true;
     this.rollDamping = params.rollDamping ?? true;
     this.viscosity = params.viscosity ?? SEA_VISCOSITY;
@@ -450,6 +497,10 @@ export class HullSolver implements Solver<HullParams> {
     records.fill(0);
     breaches.fill(0);
     out.fill(0);
+    const wake = this.wakeSources
+      ? new Float64Array(host.memory.buffer, this.wakeSources.byteOffset, this.wakeSources.byteLength / 8)
+      : null;
+    wake?.fill(0);
     const cell = (this.sea as Partial<SeaSurface>).cell;
     if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
       throw new MargoError(
@@ -462,8 +513,7 @@ export class HullSolver implements Solver<HullParams> {
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
       t = (context.tick + 0.5) / rateOf(context.level);
-    void dt;
-    for (const hull of this.hulls) {
+    for (const [index, hull] of this.hulls.entries()) {
       const at = hull.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
       // The pose a fraction of the step on (the body's velocity and spin carried over it), where a load held through the step
@@ -504,6 +554,8 @@ export class HullSolver implements Solver<HullParams> {
           this.loads,
           this.dragOf(hull, bodies[at + 16]!, v, spin, pose, centre, t),
         );
+      if (wake && this.loads.surfacePiercing && bodies[at + 16]! > 0)
+        this.displaceWake(hull, index, 1 / bodies[at + 16]!, pose, centre, v[1]!, spin, dt, wake);
       if (this.radiation)
         this.radiate(
           hull,
@@ -529,6 +581,44 @@ export class HullSolver implements Solver<HullParams> {
             ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads, points)
             : [...loads.force, ...loads.torque];
       for (let k = 0; k < 6; k++) out[w + k]! += held[k]!;
+    }
+  }
+
+  /** Project the wet boundary's vertical flux onto its still-water waterplane. */
+  private displaceWake(
+    hull: Hull,
+    index: number,
+    mass: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    heave: number,
+    spin: readonly number[],
+    dt: number,
+    rows: Float64Array,
+  ): void {
+    let plane = this.wakePlanes.get(hull);
+    if (!plane) {
+      const waterline = stillWaterline(hull.mesh, mass, this.sea!.density ?? SEA_WATER);
+      plane = { waterline, sections: hullSections(hull.mesh, waterline, this.stations) };
+      this.wakePlanes.set(hull, plane);
+    }
+    let at = index * this.stations * 2 * WAKE_SOURCE_WORDS;
+    const gauss = 1 / (2 * Math.sqrt(3));
+    for (const { x, width, breadth } of plane.sections) {
+      const radius = Math.max(this.wakeRadius!, 0.5 * hypot(width, 0.5 * breadth));
+      const area = 0.5 * width * breadth;
+      // Two Gauss points integrate the transverse first flux moment of a rectangular waterplane strip.
+      for (const side of [-1, 1]) {
+        const point = rotate(pose.rotation, [x, plane.waterline, side * gauss * breadth]);
+        const px = pose.position[0] + point[0];
+        const pz = pose.position[2] + point[2];
+        const vertical = heave + spin[2]! * (px - centre[0]) - spin[0]! * (pz - centre[2]);
+        rows[at] = px;
+        rows[at + 1] = pz;
+        rows[at + 2] = radius;
+        rows[at + 4] = -area * vertical * dt;
+        at += WAKE_SOURCE_WORDS;
+      }
     }
   }
 
@@ -1485,6 +1575,9 @@ export class HullSolver implements Solver<HullParams> {
       { field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] },
       { field: DECK_INFLOW_FIELD.name, region: this.inflow!, tick, cell: [0, 0, 0] },
       { field: HULL_BREACHES_FIELD.name, region: this.breaches!, tick, cell: [0, 0, 0] },
+      ...(this.wakeSources
+        ? [{ field: this.wakeSourceField.name, region: this.wakeSources, tick, cell: [0, 0, 0] as const }]
+        : []),
     ];
   }
 
@@ -1495,6 +1588,7 @@ export class HullSolver implements Solver<HullParams> {
     return [
       this.history,
       this.courseHistory,
+      this.wakeSources,
       this.radiated,
       this.waves,
       this.carry,

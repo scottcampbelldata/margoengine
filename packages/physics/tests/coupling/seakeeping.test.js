@@ -17,7 +17,7 @@ import {
   volumeBelow,
   wettedLoads,
 } from '../../dist/seakeeping.js';
-import { SpectralSea } from '../../dist/sea.js';
+import { SpectralSea, WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS, WakeSolver } from '../../dist/sea.js';
 import { SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { freeSection, vHull } from './sections.js';
 import {
@@ -555,6 +555,127 @@ test('HullSolver forward speed rejects a broad hull beyond its longitudinal rest
     })
     .couple(['hull', 'rigid'], 'staggered');
   assert.throws(() => world.advance(1), /ordinary-strip pitch stability range\. Use a speed below 1\.[0-9]+ m\/s/);
+});
+
+function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
+  const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });
+  const body = physics.addBody(null, {
+    position: [0, y, 0],
+    linearVelocity,
+    angularVelocity,
+    colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: SEA_WATER * L * B * T },
+  });
+  const hull = new HullSolver('hull', { minimumRadius: 0.35 });
+  const wake = new WakeSolver('wake', hull.wakeSourceField);
+  world
+    .add(new RigidSolver(), { physics })
+    .add(hull, {
+      hulls: [{ row: body.row, mesh: boxMesh([L, D, B]) }],
+      sea: { elevation: () => 0 },
+      radiation: false,
+      rollDamping: false,
+      drag: false,
+      greenWater: false,
+      slamming: false,
+    })
+    .add(wake, { cells: [48, 32], cellSize: 0.25, depth: 3, sponge: 0 })
+    .couple(['hull', 'wake', 'rigid'], 'staggered');
+  return { world, hull, wake, body, physics };
+}
+
+function readHullWake(world, hull) {
+  const { region } = hull.exportPorts(world.tick).find(({ field }) => field === hull.wakeSourceField.name);
+  assert.equal(region.layout, WAKE_SOURCE_LAYOUT);
+  const samples = new Float64Array(world.memory.buffer, region.byteOffset, region.byteLength / 8);
+  const rows = Array.from({ length: samples.length / WAKE_SOURCE_WORDS }, (_, i) => {
+    const [x, z, radius, pressure, volume] = samples.subarray(i * WAKE_SOURCE_WORDS, (i + 1) * WAKE_SOURCE_WORDS);
+    return { x, z, radius, pressure, volume };
+  });
+  return rows;
+}
+
+test('HullSolver wake source: vertical waterplane flux reaches the dispersive wake exactly', async () => {
+  await Physics.load({ threads: true });
+  const hashes = [];
+  for (const shared of [false, true]) {
+    const { world, hull, wake, physics } = radiatingBox([0, -0.25, 0], [0, 0, 0], worldMemory(shared));
+    using _rigid = physics;
+    world.advance(1);
+    const rows = readHullWake(world, hull);
+    assert.equal(rows.length, 48);
+    const expected = (L * B * 0.25) / 60;
+    assert.ok(rows.every(({ volume, pressure, radius }) => volume > 0 && pressure === 0 && radius > 0));
+    nearWake(
+      rows.reduce((sum, row) => sum + row.volume, 0),
+      expected,
+    );
+    nearWake(
+      wake.heights().reduce((sum, h) => sum + h * 0.25 ** 2, 0),
+      expected,
+    );
+    world.advance(30);
+    const saved = world.takeSnapshot();
+    world.advance(90);
+    const hash = world.hash();
+    assert.ok(Math.abs(wake.sample(3.5, 0).height) > 1e-4, 'radiated wave travels beyond the footprint');
+    world.restoreSnapshot(saved.bytes);
+    world.advance(90);
+    assert.equal(world.hash(), hash);
+    hashes.push(hash);
+  }
+  assert.equal(hashes[0], hashes[1]);
+});
+
+function nearWake(actual, expected) {
+  assert.ok(Math.abs(actual - expected) < 4096 * Number.EPSILON, String(actual) + ' compared with ' + expected);
+}
+
+test('HullSolver wake source: pitch and roll drive reciprocal dipoles while steady surge emits no vertical flux', () => {
+  const n = 24;
+  for (const [v, spin, expectedX, expectedZ] of [
+    [[1, 0, 0], [0, 0, 0], 0, 0],
+    [[0, 0, 0], [0, 0, 0.25], (-B * L ** 3 * (1 - 1 / n ** 2)) / (12 * 4 * 60), 0],
+    [[0, 0, 0], [0.25, 0, 0], 0, (L * B ** 3) / (12 * 4 * 60)],
+  ]) {
+    const { world, hull, wake, physics } = radiatingBox(v, spin);
+    using _rigid = physics;
+    world.advance(1);
+    const rows = readHullWake(world, hull);
+    nearWake(
+      rows.reduce((sum, row) => sum + row.volume, 0),
+      0,
+    );
+    nearWake(
+      rows.reduce((sum, row) => sum + row.x * row.volume, 0),
+      expectedX,
+    );
+    nearWake(
+      rows.reduce((sum, row) => sum + row.z * row.volume, 0),
+      expectedZ,
+    );
+    const heights = wake.heights();
+    nearWake(
+      heights.reduce((sum, h) => sum + h * 0.25 ** 2, 0),
+      0,
+    );
+    if (expectedX || expectedZ) {
+      assert.ok(heights.some((h) => h > 0));
+      assert.ok(heights.some((h) => h < 0));
+    } else {
+      assert.ok(heights.every((h) => h === 0));
+    }
+  }
+});
+
+test('HullSolver wake source ignores hulls wholly above or below the water surface', () => {
+  for (const y of [-3, 3]) {
+    const { world, hull, wake, physics } = radiatingBox([0, -0.25, 0], [0, 0, 0], undefined, y);
+    using _rigid = physics;
+    world.advance(1);
+    assert.ok(readHullWake(world, hull).every(({ volume }) => volume === 0));
+    assert.ok(wake.heights().every((h) => h === 0));
+  }
 });
 
 /** A box hull of `size` alone in still water of `density`, its body of `massProperties`, let go at `position` and `rotation`. */

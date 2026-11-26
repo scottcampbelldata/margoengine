@@ -10746,3 +10746,7 @@ The optional Rust SIMD kernel keeps depth, discharge and sampled bed in world-ow
 ### SEA-08 forward-course radiation history
 
 `HullSolver` can add the ordinary-strip longitudinal speed terms to its existing heave and pitch loads on the rigid-body port. It stores relative heave velocity and dynamic pitch in the world arena. Analytic forced-response, constant-trim, stability-range, and plain/shared snapshot tests exercise the new path. Measured head-sea response, following-sea and roll response, and live cabin props and sea feedback still need separate evidence.
+
+### SEA-08 to SEA-04 waterplane flux
+
+An opted-in `HullSolver` writes signed waterplane volume at the same world rate as `WakeSolver` can read it. The producer ignores a fully submerged or dry hull. Its optional layout-1 source rows reside in the world arena and retain the public state on replay. One-way volume transport, pitch and roll dipoles, and propagation beyond the hull footprint have direct coupling cases.
