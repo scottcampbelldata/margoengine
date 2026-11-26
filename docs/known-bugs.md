@@ -6,6 +6,36 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: the surf's rollers are long, even, pale bands (KB-WATER-SURFBANDS1, water)
+
+- **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, the dune coast, 6 m up looking out over the
+  surf): every breaking crest draws one unbroken grey band across the whole frame, the same width and tone along its
+  length, with straight smooth edges. Real surf breaks in short-crested sections: white water starts and stops along a
+  crest, its toe is ragged and its body has holes and streaks.
+- **Cause:** being traced in `packages/water/src/surf.ts` (the roller's share along a crest) and the water fragment's
+  roller gate in `packages/water/src/index.ts`.
+
+### Fixed 2026-11-26: the near seabed showed a contour maze through the water (KB-WATER-SEABEDMAZE1, water)
+
+- **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, 6 m up over about a metre of surf-zone water): the
+  bed under the near water was a maze of hard-edged rings in two tones, with a flat band along the foot of the frame.
+  `node packages/water/test/refraction-grazing.browser.mjs` on the previous shader: 61.1% of the water misses the bed.
+- **Cause:** Water's screen-space refraction (`packages/water/src/index.ts`), not the terrain and not caustics (the dune
+  coast draws none). Painting the fallback bottom red showed 36% of the s18 water drawing it. The bent ray's hit is
+  found by reprojecting it onto a texel's view-depth plane until it lands on the same texel; on a bed seen at a grazing
+  angle that plane crosses the bed at a shallow angle, so each guess overshoots the last and never settles. The crossing
+  search that follows bracketed the right crossing, then handed it back to the same reprojection, which failed again.
+  Every such pixel took the flat fallback bottom, and the rippled normals made the hit/miss boundary a maze of contour
+  rings. Where the bent ray left the frame (the near water at the foot of the frame) the search stopped, so the
+  fallback drew a hard band there.
+- **Fix:** a bisected crossing whose texel's view depth lies within the ray's own (5 cm or 2% of the distance, the
+  thickness test of McGuire and Mara 2014) is the hit; a silhouette, where the occluder stands metres in front, is
+  still refused. A ray that leaves the frame takes the crossing before the edge if it has one, else the last texel it
+  crosses on screen.
+- **Regression:** `packages/water/test/refraction-grazing.browser.mjs` (WebGPU and the WebGL2 layer): a bed painted
+  light then dark under a rippled sea seen from 6 m; 61.1% of the water missed the bed before, 0.00% after, and none
+  along the foot of the frame.
+
 ### Fixed 2026-11-26: the waterline of a flowing sea on a beach drew a sawtooth (KB-WATER-SHORESAW1, water)
 
 - **Repro:** the Kitty Hawk film's shot kh-establish (`examples/kitty-hawk`, the dune coast, looking south along the

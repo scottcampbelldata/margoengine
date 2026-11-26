@@ -7595,8 +7595,12 @@ With a borrowed scene color texture, Water traces up to 50 m along the
 refracted ray inside the active viewport. It refines the intersection in at
 most five depth-plane steps. If needed, it checks up to eight increasingly
 spaced intervals for depth crossings, bisecting each candidate up to ten
-times before validation. This bounded first-layer depth approximation cannot
-see hidden or offscreen geometry or resolve every narrow crossing. On an
+times before validation. A bisected crossing whose texel lies within 5 cm or
+2% of the ray's depth is the hit (KB-WATER-SEABEDMAZE1). A ray that leaves the
+viewport in front of the scene takes the last texel it crosses on screen, so
+the bed there is the one at the frame's edge, not the one the ray would reach.
+This bounded first-layer depth approximation cannot see hidden or offscreen
+geometry or resolve every narrow crossing. On an
 open-water miss the body uses the 50 m deep-water fallback. A terrain-coupled
 Water can use its modeled gap. The Water frame uniform is 576 B.
 
