@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20663009,
+  "total": 20667551,
   "history": [
     {
       "date": "2026-10-24",
@@ -13939,11 +13939,18 @@
       "commit": "fe947da87",
       "reason": "lod: new entry lod/occluder-fade (OccluderFade, findOccluders), measured 4422 B gzip (before 0). It loads the bvh root for its Raycaster, as the controls entries do; a copy of the ray and BVH code in lod would cost more than the shared import.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7db8e9d5b4",
+      "reason": "New optional entry @margoengine/animation/deformed-points: 0 to 4286 B gzip, ceiling 4542 B. One instanced quad strip per vertex of a skinned or morphed mesh, drawn from the deformation pass's own output buffer; it adds no skinning code. The animation root stays inside its ceiling. Core plus stage unchanged at 24846 B.",
+      "grew": 1
     }
   ],
   "items": {
     "@margoengine/animation": 26165,
     "@margoengine/animation/clip-utils": 5160,
+    "@margoengine/animation/deformed-points": 4542,
     "@margoengine/animation/discrete-tracks": 2536,
     "@margoengine/animation/dqs": 4772,
     "@margoengine/animation/geometry-cache": 5305,

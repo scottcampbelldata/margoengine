@@ -95,6 +95,10 @@
       "types": "./dist/animation/discrete-tracks.d.ts",
       "import": "./dist/animation/discrete-tracks.js"
     },
+    "./animation/deformed-points": {
+      "types": "./dist/animation/deformed-points.d.ts",
+      "import": "./dist/animation/deformed-points.js"
+    },
     "./bvh": {
       "types": "./dist/bvh.d.ts",
       "import": "./dist/bvh.js"
