@@ -3052,6 +3052,8 @@ WebGL 2.0 specification, query and sync objects (results become available only a
 https://registry.khronos.org/webgl/specs/latest/2.0/. Still missing: a run on ANGLE Metal and on an integrated GPU,
 and quiet-machine timings.
 
+**Direct3D 11 path tracer runs (KB6016e, KB6016f, accepted 2026-11-26, Scott).** ANGLE Direct3D 11 compiles each multiple-output program again at its first draw, one after another (`packages/webgl2-compat/test/d3d11-mrt-compile-repro.mjs`), so voxel-pathtracer's `test:gpu:compose-native` and staging's `test:gpu:materials` under `MARGO_COMPAT=1` on that back end are an accepted difference: they need not finish inside their limits. Native WebGPU and the ANGLE Vulkan layer stay gated; no limit changed.
+
 The CPU tier's `new Function` applies only to this opt-in compatibility path, and a strict policy sends it to the
 interpreter instead of refusing it. General claims that nothing builds code at run time must stay scoped to the native
 engine. Evidence: `packages/webgl2-compat/test/interpret.test.js` compares the two paths over the corpus, and

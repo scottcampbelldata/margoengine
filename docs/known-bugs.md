@@ -7213,8 +7213,19 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   pass) and its programs cheaper to compile (`hit` and `sample`, the largest), or share one reference between the WebGPU and compat legs, then rerun the repro. The tests, their samples and their limits stay as they are. A driver reset (nvlddmkm 153) at 06:03 local
   on 2026-11-15 came during the first of these runs.
 
-### Open: `MARGO_COMPAT=1 test:gpu:compose-native` cannot finish on ANGLE Direct3D 11; the serial compile is ANGLE's, proven 2026-11-25 (KB6016e)
+### Accepted 2026-11-26: the path tracers' WebGL2 layer runs over ANGLE Direct3D 11 cannot finish inside their limits (KB6016e, KB6016f; voxel-pathtracer, staging; browser)
 
+Release exception: ANGLE Direct3D 11 compiles each multiple-output program again at its first draw, one program after another (browser behaviour).
+
+- **Scott's ruling (2026-11-26):** an accepted difference. The Direct3D 11 layer runs of voxel-pathtracer's
+  `test:gpu:compose-native` and staging's `test:gpu:materials` under `MARGO_COMPAT=1` are not required to finish
+  inside their limits; the native WebGPU and ANGLE Vulkan legs stay. No test, limit or tolerance changed. Repro below
+  Margo: `packages/webgl2-compat/test/d3d11-mrt-compile-repro.mjs` (dcd85799aa), where small 7-output programs drawn
+  into 7 targets take 1.8 to 1.9 s each at their first draw.
+- **KB6016f (staging):** `MARGO_COMPAT=1` `pathtrace-materials-browser` on the dev PC missed its run time: a link of
+  360 s and a draw-time compile of 680 s on Direct3D 11 (2026-11-11), and `pathtrace-browser` and
+  `pathtrace-materials-browser` failed on time on 26cf6ccf44 (2026-11-15). The same compile is the cause the first
+  measurement names; staging was not remeasured after the 2026-11-25 proof.
 - **Repro:** `MARGO_COMPAT=1 node scripts/gpu-package-tests.mjs --no-build --select=voxel-pathtracer/test:gpu:compose-native`
   on the dev PC (RTX A6000, Edge 157, GPU shared). Under MARGO_COMPAT=1 the test's "native" leg runs on the WebGL2
   layer over ANGLE Direct3D 11, the Windows default. Seen 2026-11-11 on 62c01a47aa (L2: killed at the 720 s limit,
@@ -7285,11 +7296,9 @@ Release exception: Firefox WGSL to HLSL keeps name dx (browser defect).
   three 7-output programs drawn into 7 targets 5.6 s one after another, the same programs into 1 target or three
   1-output programs about 1.9 to 2.5 s side by side, and no difference on ANGLE Vulkan). KB-L5a-10 has the figures,
   the trace and the upstream design note. The 289 distinct programs of the 32 subsets each pay it once; the step's
-  scope or limit on Direct3D 11 stays Scott's decision (escalated 2026-11-21).
-- **Next:** cut the compile work per program further (`surface`, `hit`, `shadow`, `vertex`) and prove it with a
-  program-size or call-site count, then rerun the repro. The test and its limits stay as they are. A gap of about 7
-  times will not close by trimming alone, so changing the step's scope or limit on Direct3D 11 is a decision for
-  Scott (escalated 2026-11-21).
+  scope on Direct3D 11 was Scott's decision (escalated 2026-11-21, ruled 2026-11-26, above).
+- **Still worth doing:** smaller programs (`surface`, `hit`, `shadow`, `vertex`) shorten every compile on this back
+  end. A gap of about 7 times will not close by trimming alone.
 
 ### Fixed 2026-11-25: a package build that Windows could not start left only "npm error code 3221225794" (KB-FILM-HEADLESS1)
 
