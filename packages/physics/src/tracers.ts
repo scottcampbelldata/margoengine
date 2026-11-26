@@ -156,6 +156,8 @@ export interface TracerBedJets {
   grains?: TracerMaterial;
   /** Wall stress model. Default 'wall-jet', with 'footprint' for clearances below one jet diameter. */
   shear?: 'wall-jet' | 'footprint';
+  /** Resolve the developing turbulent wall layer for normal jet clearances of two to four diameters. Default false. */
+  turbulentTransition?: boolean;
   /** Half the bedform height or the equivalent roughness height, m. The fin-jet default and minimum are 1% of local water depth. */
   suspensionReferenceHeight?: number;
   /** Shields threshold for initiation of motion. Default: the Soulsby–Whitehouse curve for the selected grain. */
@@ -291,6 +293,7 @@ interface JetBed {
   dampingStress: number;
   limit: number;
   suspensionReferenceHeight: number;
+  turbulentTransition: boolean;
   rings?: Float64Array;
 }
 
@@ -554,6 +557,7 @@ export class TracerSolver implements Solver<TracerParams> {
         material = 'sand',
         grains: customGrains,
         shear = 'wall-jet',
+        turbulentTransition = false,
         suspensionReferenceHeight = 0,
         criticalShields,
         erodibility,
@@ -579,6 +583,10 @@ export class TracerSolver implements Solver<TracerParams> {
       if (!(suspensionReferenceHeight >= 0 && Number.isFinite(suspensionReferenceHeight)))
         throw new RangeError(
           'Invalid tracer bed reference height; pass a finite, nonnegative suspensionReferenceHeight in metres.',
+        );
+      if (typeof turbulentTransition !== 'boolean' || (turbulentTransition && shear !== 'wall-jet'))
+        throw new RangeError(
+          'Turbulent transition uses the radial wall jet; set turbulentTransition to a boolean and use wall-jet shear when enabled.',
         );
       if (
         typeof denseSand !== 'boolean' ||
@@ -612,6 +620,7 @@ export class TracerSolver implements Solver<TracerParams> {
         dampingStress: denseSand ? (grains.density - waterDensity) * this.g * diameter : Infinity,
         limit: availableMass,
         suspensionReferenceHeight,
+        turbulentTransition,
         rings:
           this.useBedJets && shear === 'wall-jet'
             ? new Float64Array(2 * (JET_CORE_RINGS + JET_OUTER_RINGS))
@@ -1404,16 +1413,20 @@ export class TracerSolver implements Solver<TracerParams> {
     const { waterDensity, viscosity } = this.params;
     // Match the delivered normal momentum to a top-hat circular jet at the source.
     const speed = Math.sqrt(force / (waterDensity * Math.PI * radius * radius));
-    const jet = wallJetProfile(height, 2 * radius, speed, waterDensity, viscosity);
+    const jet = wallJetProfile(height, 2 * radius, speed, waterDensity, viscosity, bed.turbulentTransition);
     const outer = Math.max(1, pow((jet.scale * jet.outer) / bed.threshold, 1 / 2.3));
     if (!Number.isFinite(outer)) return 0;
 
     let innerSquared = 0;
     let rate = 0;
     const stretch = pow(outer, 1 / JET_OUTER_RINGS);
+    // Keep the two samples of an annulus on the same side of the modelled shear jump.
+    const transitionRadius = jet.transition?.radius ?? 0;
+    const transitionRing = Math.round(transitionRadius * JET_CORE_RINGS);
     let wallRadius = 1;
     for (let i = 1; i <= JET_CORE_RINGS + JET_OUTER_RINGS; i++) {
-      const radial = i <= JET_CORE_RINGS ? i / JET_CORE_RINGS : (wallRadius *= stretch);
+      const nominalRadius = i <= JET_CORE_RINGS ? i / JET_CORE_RINGS : (wallRadius *= stretch);
+      const radial = i === transitionRing ? transitionRadius : nominalRadius;
       const outerSquared = height * radial * (height * radial);
       const widthSquared = outerSquared - innerSquared;
       // Integrate in squared radius, where the area element is constant, with two-point Gauss–Legendre quadrature.

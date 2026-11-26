@@ -20,6 +20,7 @@ export interface SubmergedJet {
     speed: number;
     density: number;
     viscosity: number;
+    turbulentTransition?: boolean;
 }
 
 export const TRACER_FIELD: FieldDescriptor;
@@ -67,6 +68,7 @@ export interface TracerBedJets {
     material?: 'sand' | 'silt';
     grains?: TracerMaterial;
     shear?: 'wall-jet' | 'footprint';
+    turbulentTransition?: boolean;
     suspensionReferenceHeight?: number;
     criticalShields?: number;
     erodibility?: number;

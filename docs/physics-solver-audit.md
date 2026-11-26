@@ -480,8 +480,10 @@ BB-7 now uses the Soulsby–Whitehouse grain-specific Shields curve and van Rijn
 pick-up rate by default. A manufactured bed-stress test runs through the real swimmer and checks both
 grain classes, below and above onset, against the published equations. The ray uses radial Phares wall
 shear and annular pickup where clearance reaches its nozzle diameter. Four independent electrochemical
-points check the downstream wall-stress law. Independent lifted mass, the short-gap jet and turbulent
-transition, and the original shot's plume and bed binding still need verification.
+points check the downstream wall-stress law. At two to four nozzle diameters, the optional developing wall layer
+adds the secondary shear rise. The 14 independent stress points give RMS log error 0.097, down from 0.127.
+The native ray lifts extra sand and the paired fixed-camera scene advects and settles it. Independent lifted mass,
+the short-gap jet and the original shot's plume and bed binding remain open.
 
 EF-11 can now release coarse taconite pellets and suspended ore fines through the same live hull opening.
 The two grain classes account for the hull's cargo flux separately, including fractional parcels, and the

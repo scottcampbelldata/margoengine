@@ -3586,12 +3586,16 @@ console.log(sediment.jetErosion > 0, seabed.volume(-0.5) < 0); // true true
 ```
 
 Use `submergedJetWallShear` to sample the steady flat-bed stress from a known nozzle. Its arguments use SI units.
+Set `turbulentTransition: true` on the nozzle probe or in `bedJets` to include the secondary shear rise at
+clearances between two and four nozzle diameters. The default keeps the core and outer wall-jet model.
 
 ```ts
 import { submergedJetWallShear } from 'margoengine/physics/tracers';
 
 const jet = { height: 0.2, diameter: 0.1, speed: 0.426, density: 1000, viscosity: 1e-6 };
 console.log(submergedJetWallShear(jet, 0), submergedJetWallShear(jet, 0.4) > 0); // 0 true
+const developed = submergedJetWallShear({ ...jet, turbulentTransition: true }, 0.185);
+console.log(developed > submergedJetWallShear(jet, 0.185)); // true
 ```
 
 ### Rivers, floods and dam breaks (`@margoengine/physics/hydro`)

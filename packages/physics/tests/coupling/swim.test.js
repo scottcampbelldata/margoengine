@@ -409,6 +409,37 @@ test('BB-7 the live pectoral wall jet integrates annular pickup and replays its 
   assert.equal(exposed.jetErosion, 0);
 });
 
+test('SEA-15 the native pectoral jet can lift sand in the secondary shear layer', async () => {
+  const ray = {
+    ...coast,
+    position: [0, -0.2, 0],
+    tail: noTail,
+    fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+    steering: [0, 1, 0],
+  };
+  const release = async (turbulentTransition) => {
+    const tracer = new TracerSolver('tracers', { bedJets: true });
+    const world = put(await SwimSolver.load(), [ray]).add(tracer, {
+      bed: 0.8,
+      bedJets: { turbulentTransition },
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+    });
+    world.advance(1);
+    const snapshot = world.takeSnapshot();
+    const mass = tracer.jetErosion;
+    assert.ok(mass > 0);
+    assert.equal(tracer.budget.water, mass);
+    world.advance(5);
+    const result = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(5);
+    assert.equal(world.hash(), result);
+    return mass;
+  };
+  assert.ok((await release(true)) > (await release(false)));
+});
+
 test('the sediment bed rejects viscosity too small to compute a finite pickup rate', () => {
   const world = new PhysicsWorld({ rate });
   const tracer = new TracerSolver('tracers', { bedJets: true });

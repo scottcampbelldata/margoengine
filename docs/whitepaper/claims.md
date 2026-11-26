@@ -345,6 +345,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   flow on a slope in a different origin cell. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js`
   after building Physics.
 
+- Secondary near-bed shear (SEA-15, 2026-11-26). The optional developing wall layer reduces pooled RMS log
+  error from 0.127 to 0.097 over 14 electrodiffusion observations at two and four nozzle diameters. The native ray
+  emits more suspended sand and replays exactly. Run `node --test --test-name-pattern='wall layer|secondary shear' packages/physics/tests/tracers.test.js packages/physics/tests/coupling/swim.test.js`
+  and `node packages/environment/tests/swim-sediment.browser.mjs --transition`, with `--compat` for WebGL2.
+  [Phares, Smedley and Flagan (2000), Figs. 4 and 10](https://authors.library.caltech.edu/records/spw2r-3pe55).
+
 - Bow thruster sediment pickup (SEA-15, 2026-11-26). The commanded tunnel direction and rigid pose drive the
   actual sediment advection and packed-bed debit. Reversing the command switches the outlet and preserves the
   previously saved jet on restore. The model's free-jet centreline ratio is 0.310 at 20 diameters, versus 0.275

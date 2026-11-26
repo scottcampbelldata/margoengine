@@ -74,6 +74,69 @@ test('submerged jet wall stress matches independent downstream electrochemical o
   assert.ok(wallStress(0.05) < peak && wallStress(0.18) < peak);
 });
 
+test('SEA-15 the developing wall layer recovers the secondary shear rise of submerged jets', (t) => {
+  // The half width and plateau come from Phares Eq. 2.12 and Fig. 4 (velocity). These are separate
+  // electrodiffusion stress observations by Alekseenko and Markovich in Fig. 10, triangles and plus signs.
+  const reynolds = 42600;
+  const diameter = 0.1;
+  const viscosity = 1e-6;
+  const density = 1000;
+  const speed = (reynolds * viscosity) / diameter;
+  const fromX = (x) => 10 ** (-2 + (3 * (x - 103)) / 735);
+  const fromY = (y) => 10 ** (2 - (3 * (y - 36)) / 824);
+  const cases = [
+    [
+      2,
+      [
+        [573, 486],
+        [584, 474],
+        [590, 482],
+        [602, 504],
+        [610, 512],
+        [617, 534],
+      ],
+    ],
+    [
+      4,
+      [
+        [482, 321],
+        [492, 322],
+        [501, 314],
+        [512, 313],
+        [521, 316],
+        [532, 320],
+        [541, 344],
+        [550, 366],
+      ],
+    ],
+  ];
+  let residual = 0;
+  let baselineResidual = 0;
+  let count = 0;
+  for (const [ratio, observations] of cases) {
+    const height = ratio * diameter;
+    const jet = { height, diameter, viscosity, density, speed };
+    const normalize = (Math.sqrt(reynolds) * ratio * ratio) / (density * speed * speed);
+    const sample = (x, turbulentTransition) =>
+      normalize * tracersEntry.submergedJetWallShear({ ...jet, turbulentTransition }, height * fromX(x));
+    for (const [x, y] of observations) {
+      // Apply the same plotted marker bounds as the downstream wall-jet test, including both axes.
+      const values = [sample(x - 8, true), sample(x, true), sample(x + 8, true)];
+      assert.ok(
+        Math.min(...values) <= fromY(y - 10) && Math.max(...values) >= fromY(y + 10),
+        `${ratio}D marker ${x}, ${y}`,
+      );
+      baselineResidual += Math.log(sample(x, false) / fromY(y)) ** 2;
+      residual += Math.log(values[1] / fromY(y)) ** 2;
+      count++;
+    }
+  }
+  const rms = Math.sqrt(residual / count);
+  const baselineRms = Math.sqrt(baselineResidual / count);
+  assert.ok(rms < baselineRms);
+  t.diagnostic(`RMS log shear error ${baselineRms.toFixed(3)} → ${rms.toFixed(3)} from ${count} observations.`);
+});
+
 test('a dye cloud spreads as the diffusion equation says: variance 2 K t on each axis', () => {
   const { solver, run } = tracers({
     sources: [burst('dye', [0, -15, 0])],

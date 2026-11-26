@@ -21,8 +21,11 @@
     import { Bloom } from '/packages/post/dist/bloom.js';
     import { heightfieldGeometry } from '/packages/terrain/dist/index.js';
 
+    const mode = new URLSearchParams(location.search);
+    const transition = mode.has('transition');
     const engine = await Engine.create(document.querySelector('canvas'), {
-      backend: 'webgpu', camera: { position: [0, -0.02, 1.38], target: [0.14, -0.32, 0], near: 0.015, far: 8 },
+      backend: 'webgpu', camera: { position: transition ? [0, -0.07, 1.6] : [0, -0.02, 1.38],
+        target: [0.14, transition ? -0.51 : -0.32, 0], near: 0.015, far: 8 },
     });
     engine.stop();
     Bloom.attach(engine, { strength: 0 });
@@ -35,7 +38,7 @@
       [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
       side < 0 ? [0, 2, 1, 0, 3, 2, 0, 4, 3] : [0, 1, 2, 0, 2, 3, 0, 3, 4],
     ));
-    const tunnel = new URLSearchParams(location.search).has('thruster');
+    const tunnel = mode.has('thruster');
     const left = tunnel ? null : wing(-1);
     const right = tunnel ? null : wing(1);
     const errors = [];
@@ -45,7 +48,7 @@
     const swim = tunnel ? null : await SwimSolver.load();
     const tracers = tunnel ? TracerSolver.withBedWash() : TracerSolver.withBedChange();
     const terrain = new TerrainBed();
-    const bedHeight = -0.5;
+    const bedHeight = transition ? -0.75 : -0.5;
     const layer = { thickness: 0.002, porosity: 0.4 };
     const groundGrid = { size: [8, 8], resolution: 80 };
     world.add(terrain, { columns: 80, rows: 80, width: 8, depth: 8,
@@ -88,7 +91,8 @@
       };
       world.add(tracers, {
         // Eq. 37 uses half the bedform height. Fredsøe et al. (1999) ran with 35 mm ripples.
-        bed, water, bedJets: { availableMass: 0.023, suspensionReferenceHeight: 0.035 / 2, mobileLayer: layer },
+        bed, water, bedJets: { availableMass: 0.023, suspensionReferenceHeight: 0.035 / 2, mobileLayer: layer,
+          turbulentTransition: transition },
         horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
       }).couple([swim.id, 'tracers', 'bed'], 'staggered');
     }

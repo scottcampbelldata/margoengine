@@ -4,8 +4,9 @@ import { openBrowser } from '../../../scripts/browser.js';
 import { decodePNG } from '../../../tests/support/png.js';
 
 const tunnel = process.argv.includes('--thruster');
+const transition = process.argv.includes('--transition');
 const { page, hardware, close } = await openBrowser({
-  startPath: `/packages/environment/tests/swim-sediment.html${tunnel ? '?thruster' : ''}`,
+  startPath: `/packages/environment/tests/swim-sediment.html${tunnel ? '?thruster' : transition ? '?transition' : ''}`,
   port: process.argv.includes('--compat') ? 5415 : 5414,
 });
 const uncaught = [];
@@ -42,8 +43,8 @@ try {
   const settled = await footprint(180);
   assert.equal(inactive.count, 0);
   assert.equal(inactive.eroded, 0);
-  assert.equal(inactive.minHeight, -0.5);
-  assert.equal(inactive.maxHeight, -0.5);
+  assert.equal(inactive.minHeight, transition ? -0.75 : -0.5);
+  assert.equal(inactive.maxHeight, inactive.minHeight);
   assert.ok(lifted.mass > 0 && lifted.count > 40);
   assert.ok(lifted.minHeight < inactive.minHeight);
   assert.ok(Math.abs(lifted.bedVolume * (2650 * 0.6) + lifted.mass) < 1e-9);
@@ -55,7 +56,7 @@ try {
   assert.ok(settled.minHeight < inactive.minHeight && settled.maxHeight > inactive.maxHeight);
   assert.ok(Math.abs(settled.bedVolume - inactive.bedVolume) < 1e-12);
   assert.deepEqual(uncaught, []);
-  if (!tunnel && process.argv.includes('--preview') && !hardware?.compat) {
+  if (!tunnel && !transition && process.argv.includes('--preview') && !hardware?.compat) {
     await writeFile('test-results/ray-sand-puff.png', lifted.bytes);
   }
   console.log(

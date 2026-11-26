@@ -13248,12 +13248,22 @@ The radial model reconstructs a uniform nozzle speed from normal impulse per ste
 Phares et al.'s Eq. 2.31 and the theoretical circular jet curves in Fig. 5b (clearance/diameter 1, 2, 4, 6 and 8),
 with the exact fully developed maximum from Eq. 2.33. Linear interpolation of the plotted curve nodes supplies
 the impingement-region shear. Beyond its peak, the Poreh et al. wall-jet law (Phares Eq. 2.37) limits the shear.
-The last tabulated core value carries through the join if the outer law is still above it. The turbulent
-transition jump is unresolved. Two-point Gauss–Legendre quadrature integrates the mass flux in squared radius,
+The last tabulated core value carries through the default join if the outer law is still above it.
+Two-point Gauss–Legendre quadrature integrates the mass flux in squared radius,
 with 32 core and 16 outer annuli. Four stratified parcels sample the mass-weighted radial distribution.
 The downstream stress test reads four submerged electrochemical observations of Alekseenko and Markovich
 (1994) from Phares Fig. 10 (H/D = 2, Re = 42,600), with both log axes bounded by the marker sizes.
 Those observations were separate from the Poreh law's calibration and the Fig. 5b theoretical samples.
+
+The optional developing wall layer uses Phares et al. Eq. 2.12 and Fig. 4 for the free-stream half width and
+velocity plateau. Using the plateau as constant edge speed, it integrates their axisymmetric Falkner momentum
+layer (Eqs. 2.34–2.36 with the inverse one-sixth shear dependence) analytically. The zero-gradient
+Pohlhausen quartic gives the upstream momentum thickness from the laminar shear via Eq. 2.27. The closure starts
+three half widths out, where the plotted inviscid speed reaches its plateau, and applies when the turbulent
+shear rises. One annulus ends at that radius. Poreh's Eq. 2.37 limits the outer transition. Fig. 10 supplies 14
+separate wall-shear observations at H/D 2 and 4. All inputs and constants come from theory and velocity data.
+The sampled RMS log stress error is 0.097 compared with 0.127 for the default. Strong adverse pressure gradients,
+transition timing within a fin stroke, and the short-gap jet remain outside this closure.
 
 Van Rijn's Part II Eq. 37 uses a suspension reference plane at half the bedform height, or at the equivalent
 roughness height if bedform measurements are unavailable, with a minimum of 1% of local water depth. The
