@@ -214,6 +214,32 @@ console.log(assets.toJSON());                    // the URL definitions, for sav
 
 - `AssetQueue({concurrency = 4, retries = 0, retryDelay = 250, fetch})`: `add(name, load, {retries, weight, onSuccess, onError})` and the helpers `addText`, `addJSON`, `addBinary` (progress from `Content-Length`) and `addImage`. Names are unique. A failing task is attempted again `retries` times with `retryDelay * 2^(n-1)` ms between attempts. `run(signal)` resolves with `{done, failed, cancelled, ok}` and never rejects for a task; aborting `signal` cancels what is running and what is pending. Events (`on` returns the unsubscribe function): `success` and `error` per task, `progress` (`{fraction, finished, total, task}`, weighted by `weight`) and `finish`. `retryFailed()` sets the failed and cancelled tasks back to pending and runs them.
 - `AssetRegistry({loadURL, dispose, onMissing})`: `define(key, urlOrFunction, type)`, `fromJSON(map)` and `toJSON()`, `load(key, signal)` (one load shared by every caller; the value is kept), `get`, `has`, `keys`, `subscribe(key, callback)` (called with the value now if loaded, and after every load, reload and swap: assign the value to a material's texture slot there and every material that uses the key follows a swap), `swap(key, source)`, `reload(key)`, `unload(key)` (drops the value, keeps the definition), `loadMap(objectOrURLOrBlob, {signal, fetch, allowedURLs, baseURL, maxBytes = 1 MiB})` (a JSON asset map from an object, a URL or a `File`; the shape is checked and a bad entry throws a coded `TypeError`; each entry resolves against the map's own URL, or `baseURL` for an object or file, and must stay in that directory or under `allowedURLs`, as in the glTF loaders; `data:` entries pass; a redirect out of the directory is refused; `fetch` is the same injectable fetch the loaders take, also the registry's default for URLs), `remove(key)` and `dispose()`. `swap` cancels a load in flight, loads the new source at once when the key is loaded or watched (otherwise the next `load` does), then calls `dispose` on the old value and `subscribe`rs with the new one. `onMissing(key, 'undefined' | 'failed', error)` may return a replacement source; the registry tries it once, and `load` rejects when it returns nothing. Without `loadURL` the registry fetches a URL and reads it as `type`: `'json'`, `'text'`, else bytes.
+- References, preload groups and templates (the same registry, nothing above changes): `acquire(key, signal?)` is `load` plus one reference, `release(key)` gives one back and at 0 disposes the value (the `dispose` option, else its `Symbol.dispose`) and unloads it, keeping the definition; `refCount(key)`. `defineGroup(name, keys)`, `preload(name, {signal, onProgress, concurrency, retries, retryDelay})` (an `AssetQueue` underneath: it resolves with `{done, failed, cancelled, ok}`, each loaded key holds one reference, a repeat call finishes only what is missing) and `releaseGroup(name)`. `defineTemplate(name, build, {needs, ownsRoot})` and `instantiate(name, overrides?, signal?)`: `build({assets, signal, instantiate})` makes the prototype tree once (after acquiring `needs`), and each instance is a `cloneSubtree` copy that shares geometry and materials; `overrides` is `{name, position, rotation, scale, visible, parent, material, userData, apply}`, applied to the copy only. `releaseTemplate(name)` disposes the prototype tree (unless `ownsRoot: false`) and releases `needs`; `removeTemplate(name)` also forgets it. Core keeps a geometry's GPU data while any mesh uses it, so instances outlive the prototype and the asset. A release past 0, an unknown key, group or template, and a template that reaches itself throw coded errors ([help](https://margoengine.com/errors#scene-registry)). Hide a prototype you do not want drawn (`root.visible = false`): instances copy `visible`.
+
+```ts
+import {box, Engine, PbrMaterial} from '@margoengine/core';
+import {AssetRegistry} from 'margoengine/scene/assets';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const registry = new AssetRegistry<{size: number}>();
+registry.define('crate-size', () => ({size: 1}));
+registry.defineGroup('level', ['crate-size']);
+registry.defineTemplate('crate', ({assets}) => {
+  const root = engine.createMesh().setGeometry(box(assets['crate-size'].size, 1, 1)).setMaterial(new PbrMaterial({color: '#a0703c'}));
+  root.visible = false; // the prototype itself is not drawn
+  return root;
+}, {needs: ['crate-size']});
+
+await registry.preload('level', {onProgress: ({finished, total}) => console.log(`${finished}/${total}`)});
+const one = await registry.instantiate('crate', {position: [0, 0, 0], visible: true});
+const two = await registry.instantiate('crate', {position: [2, 0, 0], visible: true, material: new PbrMaterial({color: '#c03030'})});
+console.log(registry.refCount('crate-size')); // 2: the group and the template
+two.dispose();
+registry.releaseTemplate('crate'); // `one` keeps drawing: it still uses the shared geometry
+registry.releaseGroup('level'); // 0 references: the asset is disposed
+engine.start();
+```
+- Sources: reference counting, Collins, "A method for overlapping and erasure of lists", Communications of the ACM 1960 (https://doi.org/10.1145/367487.367501); the asset-manager pattern with counted handles in Gregory, *Game Engine Architecture* (3rd ed., 2018), chapter 7, "Resources and the file system"; ECMAScript explicit resource management (`Symbol.dispose`, https://github.com/tc39/proposal-explicit-resource-management).
 - Not here: the visual loading screen (`@margoengine/ui` draws one from `progress`) and loading engine objects (use `loadContainer` above, or pass `(url, signal) => loadGLTF(...)` as a task).
 
 ## Typed events (`@margoengine/scene/emitter`)

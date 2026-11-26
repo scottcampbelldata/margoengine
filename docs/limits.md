@@ -9960,3 +9960,7 @@ rigging entry measures 1,991 B gzip with a 2,247 B ceiling.
 ## Typed events (scene/emitter)
 
 `Emitter` keeps listeners in subscription order and calls them synchronously; the unread buffer of an `events()` iterator holds `capacity` events (default 64, at least 1) and drops the oldest on overflow, counted in `dropped`. Ending an iterator (return, signal, dispose) discards its unread events. A throwing listener goes to `onError`; without one it is rethrown in a microtask. There is no wildcard type, no listener priority and no event bubbling. Size: see `npm run quality -- --gate=sizes` (`@margoengine/scene/emitter`).
+
+## Asset references and templates (scene/assets)
+
+A key has one reference count: `acquire`, preload groups and templates add one each, `release` removes one, and at 0 the value is disposed and unloaded. A plain `load` takes no reference, so a key used with both is unloaded when the references reach 0. Disposal is the `dispose` option or the value's `Symbol.dispose`; a prototype tree is disposed whole (core detaches children on dispose, it does not dispose them). A template build shares one loading signal between concurrent first callers. Instances copy the prototype with `cloneSubtree` (structured-cloneable `userData`, geometry and materials shared); the templates entry loads `clone` and the scene index on first use, so a registry without templates imports no engine code.

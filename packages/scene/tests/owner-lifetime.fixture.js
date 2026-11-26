@@ -16,6 +16,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { TransformWriter } = await load('../dist/bulk.js');
   const { cloneSubtree } = await load('../dist/clone.js');
   const { SceneEvents, tags, findByTag } = await load('../dist/tags.js');
+  const { AssetRegistry } = await load('../dist/assets.js');
   const { extendMeshes } = await load('../dist/mesh.js');
   extendMeshes();
   return [
@@ -155,6 +156,32 @@ export async function fixtures(load = (entry) => import(entry)) {
           leaf.dispose();
           root.dispose();
         });
+      },
+    },
+    {
+      // A registry holds references on its assets, a prototype mesh per template and the app's instances share geometry;
+      // disposal releases the assets (Symbol.dispose) and the prototype tree, and the instances go with the app's own release.
+      name: 'AssetRegistry',
+      async create({ scene }) {
+        const registry = new AssetRegistry();
+        let disposed = 0;
+        registry.define('payload', () => ({ [Symbol.dispose]: () => disposed++ }));
+        registry.defineTemplate('cube', () => scene.createMesh().setGeometry(box(1, 1, 1)), { needs: ['payload'] });
+        const copy = await registry.instantiate('cube');
+        if (registry.refCount('payload') !== 1) lifetimeFault('a template holds one reference on each asset it needs');
+        return ownedByEngine(
+          scene,
+          'AssetRegistry',
+          () => {
+            registry.dispose();
+            copy.dispose();
+          },
+          {
+            check({ phase }) {
+              if (phase === 'disposed' && disposed > 1) lifetimeFault('an asset is disposed once, at zero references');
+            },
+          },
+        );
       },
     },
     {
