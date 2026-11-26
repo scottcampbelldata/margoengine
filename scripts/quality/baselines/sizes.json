@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20282099,
+  "total": 20290103,
   "history": [
     {
       "date": "2026-10-24",
@@ -12999,6 +12999,12 @@
       "commit": "a870d4b33",
       "reason": "materials gains the portal entry (Portals): 29,788 B, most of it the Material and WgslMaterial code it reaches, as fake-shadows and batched",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "render-graph",
+      "reason": "New optional post entry, 0 to 7,748 B gzip: render-graph (RenderGraph, a data-driven serializable pass graph with validation, topological build, transient aliasing, history textures and post effect tasks). Its own entry, loaded only when imported. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13923,6 +13929,7 @@
     "@margoengine/post/outline": 7282,
     "@margoengine/post/overlays": 11210,
     "@margoengine/post/pixelate": 10491,
+    "@margoengine/post/render-graph": 8004,
     "@margoengine/post/rt-gi": 16063,
     "@margoengine/post/rt-reflections": 16677,
     "@margoengine/post/scene-fade": 3074,

@@ -211,6 +211,27 @@ export const entries = [
     fix: 'Pass `source: () => cascadeMap(shadows, k)` or `() => localShadows.shadowMap(kind, index, face)`, which return null until a map exists; keep `x`, `y` at 0 or more and `size` above 0. For a texture of your own give `projection`, `reversed` and, for a perspective map, `near` above 0 and `far` above it.',
   },
   {
+    id: 'render-graph',
+    title: '@margoengine/post/render-graph: a data-driven render graph',
+    kind: 'family',
+    messages: [
+      'RenderGraph description must be {version: 1, tasks: [...]}; see https://margoengine.com/errors#render-graph',
+      'RenderGraph every task needs a unique non-empty name and a type; see https://margoengine.com/errors#render-graph',
+      'RenderGraph task x has the unknown type y; register it in tasks; see https://margoengine.com/errors#render-graph',
+      'RenderGraph task x (copy) has no input y; see https://margoengine.com/errors#render-graph',
+      'RenderGraph task x input source reads y, which no task writes; see https://margoengine.com/errors#render-graph',
+      'RenderGraph texture x is written by two tasks; see https://margoengine.com/errors#render-graph',
+      'RenderGraph task x input source takes ldr, but y holds depth; see https://margoengine.com/errors#render-graph',
+      'RenderGraph task x draws at the canvas size; texture y must be canvas-sized; see https://margoengine.com/errors#render-graph',
+      'RenderGraph tasks form a cycle: x, y; see https://margoengine.com/errors#render-graph',
+      'RenderGraph a graph with a scene task must write the screen; see https://margoengine.com/errors#render-graph',
+      'RenderGraph clear color must be four finite numbers [r, g, b, a]; see https://margoengine.com/errors#render-graph',
+    ],
+    cause:
+      'RenderGraph refused a description. The TypeError carries `code`: `invalid-graph` (not {version: 1, tasks}, a task without a unique name and a type, a bad texture description or task params), `unknown-task` (a type that is not registered), `unknown-slot` (a slot the type does not have), `missing-input` (a slot left unbound, an input no task writes, `name@previous` of a texture that is not a history texture, a declared texture no task writes, or a scene graph that never writes the screen), `duplicate-writer` (two tasks write one texture, or two scene tasks), `type-mismatch` (a slot reads a texture of another kind, such as depth into a colour input, or HDR or depth written straight to the screen), `size-mismatch` (a post effect task bound to a texture that is not canvas-sized) or `cycle` (tasks that depend on each other in a loop).',
+    fix: 'Fix the description the message names. Register custom and post effect types in `tasks` (`effectTask(Bloom)` and the like), bind every slot, give a feedback loop a `history: true` texture and read it as `name@previous`, write the screen through `blit`, and keep post effect textures at the canvas size. `RenderGraph.validate(json)` checks a description without building it; a refused `load` keeps the running graph.',
+  },
+  {
     id: 'trail-texture',
     title: '@margoengine/post/trail: a fading trail texture painted by motion',
     kind: 'family',

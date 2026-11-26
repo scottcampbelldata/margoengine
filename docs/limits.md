@@ -9221,6 +9221,16 @@ the overlay blend modes. DepthDownsample: single-sample reversed-Z source, outpu
 `'representative'` is the median of at most 4 x 4 texels of the footprint; reading the stack's resolved depth needs an
 order after 30. GPU cost of none of them measured.
 
+### Render graph (`@margoengine/post/render-graph`, 2026-11-26)
+
+WebGPU and the WebGL2 layer. Description `version` 1 only. At most one `scene` task; a graph with one must write
+`'screen'`. One writer per texture; `'screen'` is an output only, never HDR or depth. Post effect tasks
+(`effectTask`) draw at the canvas size, so their textures must be canvas-sized, and one effect class runs once per
+graph (effects are plugins with fixed names). History textures swap once a frame, so with several views in a frame
+all views share one history. A `clear` of the screen in a later view of a multi-view frame loads instead. Transient
+textures share a GPU texture only with the same format and size. Not alongside a PostStack. Task order is
+topological with description order breaking ties; tasks whose outputs nobody reads still run. GPU cost not measured.
+
 ### Trail texture (`@margoengine/post/trail`, 2026-11-26)
 
 WebGPU and the WebGL2 layer. `size` 1 to the device's maxTextureDimension2D per side, fixed at construction;
