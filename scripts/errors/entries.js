@@ -214,7 +214,7 @@ export const entries = [
   },
   {
     id: 'scene-registry',
-    title: '@margoengine/scene/assets: asset references, preload groups and templates',
+    title: '@margoengine/scene/asset-pools: asset references, preload groups and templates',
     kind: 'family',
     messages: [
       'asset "key" is not defined; nothing to release; see https://margoengine.com/errors#scene-registry',

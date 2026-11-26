@@ -63,6 +63,10 @@
       "types": "./dist/assets.d.ts",
       "import": "./dist/assets.js"
     },
+    "./asset-pools": {
+      "types": "./dist/asset-pools.d.ts",
+      "import": "./dist/asset-pools.js"
+    },
     "./container": {
       "types": "./dist/container.d.ts",
       "import": "./dist/container.js"

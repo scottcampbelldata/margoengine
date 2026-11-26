@@ -1723,6 +1723,10 @@
       "types": "./dist/scene/assets.d.ts",
       "import": "./dist/scene/assets.js"
     },
+    "./scene/asset-pools": {
+      "types": "./dist/scene/asset-pools.d.ts",
+      "import": "./dist/scene/asset-pools.js"
+    },
     "./scene/container": {
       "types": "./dist/scene/container.d.ts",
       "import": "./dist/scene/container.js"

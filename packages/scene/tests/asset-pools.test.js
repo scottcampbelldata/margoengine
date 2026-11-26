@@ -1,9 +1,9 @@
-// AssetRegistry references, preload groups and templates: counts, disposal at zero, progress, shared geometry, overrides, cycles.
+// AssetPool references, preload groups and templates: counts, disposal at zero, progress, shared geometry, overrides, cycles.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Engine, TransformStore, box, PbrMaterial } from '@margoengine/core/extension';
 import { children, getWorldPosition, parent, userData } from '../dist/index.js';
-import { AssetRegistry } from '../dist/assets.js';
+import { AssetPool } from '../dist/asset-pools.js';
 
 const make = async (renderer = {}) =>
   new Engine({ width: 16, height: 16, clientWidth: 16, clientHeight: 16 }, await TransformStore.create(16), {
@@ -19,7 +19,7 @@ const resource = (log, name) => ({ name, [Symbol.dispose]: () => log.push(name) 
 test('acquire shares one load, counts references, and disposes at zero through Symbol.dispose', async () => {
   const log = [];
   let loads = 0;
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   registry.define('rock', () => (loads++, resource(log, 'rock')));
   const [a, b] = await Promise.all([registry.acquire('rock'), registry.acquire('rock')]);
   assert.equal(a, b);
@@ -39,7 +39,7 @@ test('acquire shares one load, counts references, and disposes at zero through S
 test('the dispose option wins over Symbol.dispose, and runs once', async () => {
   const log = [],
     seen = [];
-  const registry = new AssetRegistry({ dispose: (value, key) => seen.push(key) });
+  const registry = new AssetPool({ dispose: (value, key) => seen.push(key) });
   registry.define('a', () => resource(log, 'a'));
   await registry.acquire('a');
   registry.release('a');
@@ -48,7 +48,7 @@ test('the dispose option wins over Symbol.dispose, and runs once', async () => {
 });
 
 test('a release past zero and an unknown key are coded errors; a failed acquire takes no reference', async () => {
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   registry.define('x', () => ({}));
   registry.define('bad', () => Promise.reject(new Error('nope')));
   await registry.acquire('x');
@@ -61,7 +61,7 @@ test('a release past zero and an unknown key are coded errors; a failed acquire 
 });
 
 test('preload groups load through the queue with progress, hold references, and finish what failed on a repeat call', async () => {
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   let healed = false;
   registry.define('a', () => ({ a: 1 }));
   registry.define('b', () => ({ b: 1 }));
@@ -87,7 +87,7 @@ test('preload groups load through the queue with progress, hold references, and 
 });
 
 test('an aborted preload cancels what is pending and holds nothing', async () => {
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   registry.define('a', (key, signal) => new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason))));
   registry.defineGroup('g', ['a']);
   const controller = new AbortController();
@@ -100,7 +100,7 @@ test('an aborted preload cancels what is pending and holds nothing', async () =>
 
 test('templates: instances share geometry and materials, apply overrides, and leave the prototype alone', async () => {
   using e = await make();
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   const material = new PbrMaterial({ color: '#abc' }),
     geometry = box();
   registry.defineTemplate('crate', () => {
@@ -146,7 +146,7 @@ test('no shared geometry is freed while an instance still uses it, even after th
   const removed = [];
   using e = await make({ remove: (geometry) => removed.push(geometry) });
   const geometry = box();
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   const log = [];
   registry.define('tree', () => {
     const root = e.createMesh().setGeometry(geometry);
@@ -172,7 +172,7 @@ test('no shared geometry is freed while an instance still uses it, even after th
 
 test('a template that reaches itself, directly or through another, is a coded cycle error and holds nothing', async () => {
   using e = await make();
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   registry.define('a', () => ({}));
   registry.defineTemplate('self', async ({ instantiate }) => (await instantiate('self'), e.createMesh()), { needs: ['a'] });
   registry.defineTemplate('left', async ({ instantiate }) => instantiate('right'));
@@ -185,7 +185,7 @@ test('a template that reaches itself, directly or through another, is a coded cy
 
 test('a template can build from another template, and dispose releases everything', async () => {
   using e = await make();
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   const log = [];
   registry.define('res', () => resource(log, 'res'));
   registry.defineTemplate('leaf', () => e.createMesh().setGeometry(box()), { needs: ['res'] });
@@ -206,7 +206,7 @@ test('a template can build from another template, and dispose releases everythin
 
 test('userData overrides never reach a prototype: __proto__, constructor and prototype are refused, normal keys apply', async () => {
   using e = await make();
-  const registry = new AssetRegistry();
+  const registry = new AssetPool();
   registry.defineTemplate('t', () => e.createMesh());
   const before = [...e.meshes.values()].length;
   for (const key of ['__proto__', 'constructor', 'prototype']) {
@@ -218,4 +218,11 @@ test('userData overrides never reach a prototype: __proto__, constructor and pro
   const copy = await registry.instantiate('t', JSON.parse('{"userData":{"hp":3}}'));
   assert.equal(userData(copy).hp, 3);
   assert.equal(Object.getPrototypeOf(userData(copy)), Object.getPrototypeOf({}));
+});
+
+test('the base registry of scene/assets carries no pool method; AssetPool is an AssetRegistry', async () => {
+  const { AssetRegistry } = await import('../dist/assets.js');
+  for (const name of ['acquire', 'release', 'refCount', 'defineGroup', 'preload', 'releaseGroup', 'defineTemplate', 'instantiate', 'releaseTemplate', 'removeTemplate'])
+    assert.equal(name in AssetRegistry.prototype, false, name);
+  assert.ok(new AssetPool() instanceof AssetRegistry);
 });

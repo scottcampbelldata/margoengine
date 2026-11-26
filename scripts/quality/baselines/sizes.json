@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20582810,
+  "total": 20587118,
   "history": [
     {
       "date": "2026-10-24",
@@ -13651,6 +13651,12 @@
       "commit": "f76ddddf7",
       "grew": 14,
       "reason": "react gap rows: MeshNode (an existing engine mesh mounted in the tree) shares the Mesh binding, so every react entry that mounts meshes carries its existing-node branch (about +100 B gzip); /physics adds RigidBodyInstances, which bundles the Instances binding (+1,225 B budget); /xr adds TrackingOrigin (+531 B); /portals adds ScenePortal (+455 B); /gltf adds useModelParts (+22 B). Budgets before -> after: @margoengine/react/gltf 4108 -> 4130, @margoengine/react/text 4383 -> 4407, @margoengine/react/geometry 8198 -> 8303, @margoengine/react/physics 6721 -> 7946, @margoengine/react/xr 4415 -> 4946, @margoengine/react/helpers 6666 -> 6766, @margoengine/react/jsx-runtime 3272 -> 3276, @margoengine/react/jsx-dev-runtime 3272 -> 3284, @margoengine/react/lod 3020 -> 3161, @margoengine/react/instances 3671 -> 3724, @margoengine/react/portals 3977 -> 4432, @margoengine/react/effects-extra 9591 -> 9682, @margoengine/react/sampler 4377 -> 4424, @margoengine/react/clouds 3792 -> 3921. A split would put RigidBodyInstances and TrackingOrigin in entries of their own that re-bundle the same physics and XR bindings, costing more bytes overall."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "67bbc710d",
+      "reason": "scene/assets split (manager's ruling): reference counts, preload groups and templates (b37b55e0e, 6b1eb54d6) moved out of AssetRegistry into the new optional entry scene/asset-pools (AssetPool extends AssetRegistry). scene/assets: 7506 B measured (7762 B ceiling) to 4018 B measured (4274 B ceiling), its size before b37b55e0e. scene/asset-pools: new, 0 to 7540 B measured (7796 B ceiling); it bundles the base registry and queue it extends. A registry that only defines, loads and swaps pays nothing for pools.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14766,7 +14772,8 @@
     "@margoengine/scatter/tiles": 3606,
     "@margoengine/scatter/velocity": 3319,
     "@margoengine/scene": 1974,
-    "@margoengine/scene/assets": 7762,
+    "@margoengine/scene/asset-pools": 7796,
+    "@margoengine/scene/assets": 4274,
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
     "@margoengine/scene/container": 3975,
