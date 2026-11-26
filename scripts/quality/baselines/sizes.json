@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20507831,
+  "total": 20508708,
   "history": [
     {
       "date": "2026-10-24",
@@ -13317,6 +13317,12 @@
       "commit": "cfd800032",
       "reason": "New optional entry @margoengine/scene/emitter: a typed Emitter with signal, once, bounded async iteration and dispose; ceiling measured +256 B. The iterator buffer, the error hook and dispose share one listener table, so splitting would duplicate it. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5ffed9945",
+      "reason": "post/mesh-blend tags gltf/pbr models, materials meshes and terrain through the shared capture hook: 9,576 to 10,428 B gzip, ceiling 9864 to 10741. The hook, its WGSL and the model bookkeeping are the feature itself (rocks are usually models); a separate entry would split one tag API in two. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14250,7 +14256,7 @@
     "@margoengine/post/lut1d": 10009,
     "@margoengine/post/mask": 7322,
     "@margoengine/post/material-decals": 10327,
-    "@margoengine/post/mesh-blend": 9864,
+    "@margoengine/post/mesh-blend": 10741,
     "@margoengine/post/motion-blur": 9318,
     "@margoengine/post/mrt": 4647,
     "@margoengine/post/outline": 7282,

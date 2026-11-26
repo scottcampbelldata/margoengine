@@ -12,13 +12,14 @@ export class MeshBlend extends ScreenEffect {
     protected readonly kind = "hdr";
     constructor(options?: MeshBlendOptions);
     static attach(engine: EngineKernel, options?: MeshBlendOptions): MeshBlend;
-    tag(mesh: Mesh, radius: number): () => void;
-    untag(mesh: Mesh): boolean;
-    get tags(): ReadonlyMap<Mesh, number>;
+    tag(target: Mesh | SSRModel, radius: number): () => void;
+    untag(target: Mesh | SSRModel): boolean;
+    get tags(): ReadonlyMap<Mesh | SSRModel, number>;
     protected check(): void;
     registerPasses(graph: FrameGraph): void;
     protected frame(c: ScreenContext, input: GPUTextureView, output: StageOutput): void;
     protected release(): void;
+    dispose(): void;
 }
 
 export interface MeshBlendOptions {
@@ -47,6 +48,10 @@ type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
+type PostPassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
 class PostStack implements EnginePlugin {
     readonly name = "post:stack";
     constructor(effects?: readonly EnginePlugin[]);
@@ -63,6 +68,18 @@ class PostStack implements EnginePlugin {
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
+}
+
+interface SSRCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
+
+interface SSRModel {
+    setCapture(hook: SSRCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(context: PostPassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
 }
 
 class SceneTarget {
