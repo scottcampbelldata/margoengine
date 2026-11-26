@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20378000,
+  "total": 20384277,
   "history": [
     {
       "date": "2026-10-24",
@@ -13113,6 +13113,12 @@
       "commit": "9148ef6537",
       "grew": 0,
       "reason": "SOFT-04 adds directional reinforcement shared by both nonlinear modes, including snapshots and cuts, moving the soft entry from 121474 to 123786 B gzip. . It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "14a5956173",
+      "grew": 1,
+      "reason": "FLUID-02 adds the optional PBF liquid from zero to 6021 B gzip. Separate lazy SIMD assets handle the density constraint, sparse grid and two-way boundary impulses. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -13959,6 +13965,7 @@
     "@margoengine/physics/orbit": 4273,
     "@margoengine/physics/outdoor-sound": 4647,
     "@margoengine/physics/pack-ice": 5368,
+    "@margoengine/physics/pbf": 6277,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/rail": 9964,
     "@margoengine/physics/robots": 5127,

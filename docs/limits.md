@@ -9638,6 +9638,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 The dedicated PBF entry measures 6,021 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.
 
 
+
 The fast and precise presets apply four and twelve projections per advective substep. A closed box can keep or
 release each face. An open face leaves the particles in the native set with their existing mass and momentum.
 Resolution follows particle spacing and the available Wasm arena, including field publication buffers. The
