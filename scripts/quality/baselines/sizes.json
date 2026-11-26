@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20507831,
+  "total": 20507833,
   "history": [
     {
       "date": "2026-10-24",
@@ -13317,6 +13317,12 @@
       "commit": "cfd800032",
       "reason": "New optional entry @margoengine/scene/emitter: a typed Emitter with signal, once, bounded async iteration and dispose; ceiling measured +256 B. The iterator buffer, the error hook and dispose share one listener table, so splitting would duplicate it. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "237a751aab",
+      "reason": "materials/portal loads gltf/pbr-model and gltf/extended-materials through Material and WgslMaterial, as materials, batched and fake-shadows do: every mesh Portals.add takes comes from the materials root createMesh, which already loads both. Measured with every dependency bundled, min+gzip: createMesh + Material 110,802 B, plus Portals 116,380 B (5,578 B added, the same 19 gltf modules). A lazy import would need Portals.add or render to become async or draw a second-scene mask unshaded for the first frames, and would save a working page nothing",
+      "grew": 2
     }
   ],
   "items": {
@@ -15118,6 +15124,8 @@
     "leak @margoengine/materials/fake-shadows -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/materials/fur -> @margoengine/gltf/pbr-model": 1,
+    "leak @margoengine/materials/portal -> @margoengine/gltf/extended-materials": 1,
+    "leak @margoengine/materials/portal -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/serialization -> @margoengine/gltf/extended-materials": 1,
     "leak @margoengine/materials/serialization -> @margoengine/gltf/pbr-model": 1,
     "leak @margoengine/materials/stochastic -> @margoengine/gltf/extended-materials": 1,
