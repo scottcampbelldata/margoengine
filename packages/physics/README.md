@@ -2031,6 +2031,47 @@ const cell = plume.mass.findIndex((m) => m > 0);
 console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
 ```
 
+### Rivers, floods and dam breaks (`@margoengine/physics/hydro`)
+
+`ShallowWaterSolver` is the physics framework's water on the ground (HYDRO-01): conservative shallow water over the terrain bed. Water runs downhill over the world's terrain bed (or a bed of its own), wets and dries the ground as it goes, loses speed to Manning's bed friction, and takes in rivers, rain and the wind's drag; a dam breaks, a river finds its normal depth, a wave runs up a beach and leaves it dry again. The scheme is the one `@margoengine/water/flood` runs on the GPU, here on the CPU in f64: Chen and Noelle's hydrostatic reconstruction (a lake stays at rest over any bed, and depths stay at or above 0), the HLL flux with Kurganov and Petrova's speeds, WENO-Z where the water is deep and minmod at shorelines, two-stage SSP Runge-Kutta, and semi-implicit Manning friction, in as many substeps a tick as the Courant bound needs. Every face's flux leaves one cell and enters the next, so the water's volume changes only by what the inflows and rain add and the sides take: to rounding, as `budget` shows. Its settings:
+
+- `bed`: the ground, the world's terrain (`terrain.bed` of a `TerrainBed` added before it, the surface over the elevations it publishes) or a bed of its own (`bedSurface`), read every step, so ground that erosion or a crater changes changes the flood; the water's cells are the bed's, and a cell's bed is the mean over its two triangles, the surface colliders see;
+- the water at the start: a `level` (a height, or a function of (x, z): every cell whose bed is lower fills to it) or a `depth`, and a `velocity` function;
+- `roughness`: Manning's n in s/m^(1/3), a number or a function of (x, z) (default 0.03, a natural channel; 0.013 concrete, 0.05 to 0.1 floodplain with brush);
+- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth) or `{level}` (a sea or a lake held at a height in metres, or a function of time: a tide, a surge);
+- `buildings`: `{min: [x, z], max: [x, z], height}` boxes that raise the bed under them (Schubert and Sanders' building blocks), so a flood goes round a town's blocks and over them only when deeper than they are tall;
+- `inflows`: rivers and pipes, `{position: [x, z], discharge}` in m^3/s or a function of time (a flood hydrograph);
+- `rain`, a `Precipitation` field (`@margoengine/weather`'s `PrecipitationField`), falling on water and ground alike; `wind`, a framework `Wind`, whose stress rho_a C_D |U| U drags the water (Garratt's C_D);
+- `courant` (default 0.4, at most 0.5), `density` (default 1000), `rate` (its rate level, default the world's base rate).
+
+It publishes the field `surfaceWater`: per cell, the depth h in m and the discharges hu and hv in m^2/s, as f32, x fastest. `water.sample(x, z)` gives the depth, the surface height and the depth-averaged velocity there; `water.flow` is the water as a framework `FlowField` (for tracers, debris and bodies); `water.volume()` the volume, and `water.budget` what came in by the inflows and by rain and what left over the sides since the start, in m^3.
+
+```ts
+import {bedSurface} from 'margoengine/physics/earth';
+import {ShallowWaterSolver} from 'margoengine/physics/hydro';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// A valley 400 m long falling 1 in 100, a reservoir 3 m deep behind a dam at 100 m that has just failed.
+const columns = 80, rows = 20, width = 400, depth = 100;
+const elevations = new Float64Array((columns + 1) * (rows + 1));
+for (let c = 0; c <= columns; c++)
+  for (let r = 0; r <= rows; r++) {
+    const x = (width * c) / columns, z = (depth * r) / rows;
+    elevations[r + (rows + 1) * c] = 4 - 0.01 * x + 0.002 * (z - 50) ** 2; // a V-shaped valley
+  }
+const bed = bedSurface({columns, rows, width, depth, centre: [200, 50]}, elevations);
+const water = new ShallowWaterSolver();
+const world = new PhysicsWorld({rate: {num: 30, den: 1}}).add(water, {
+  bed,
+  level: (x) => (x < 100 ? 6 : -1), // the reservoir; dry below the dam
+  sides: {maxX: 'open'},
+});
+const start = water.volume();
+world.advance(30 * 60); // one minute
+console.log(water.sample(300, 50).depth > 0); // true: the flood has reached 300 m
+console.log(Math.abs(water.volume() + water.budget.out - start) < 1e-6 * start); // true: every cubic metre accounted for
+```
+
 ### Solver modules on one memory
 
 Every solver module of a world (a Rust crate built to WebAssembly) imports the world's one memory, so a solver reads

@@ -2171,6 +2171,10 @@
       "types": "./dist/physics/tracers.d.ts",
       "import": "./dist/physics/tracers.js"
     },
+    "./physics/hydro": {
+      "types": "./dist/physics/hydro.d.ts",
+      "import": "./dist/physics/hydro.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

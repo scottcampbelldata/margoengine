@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19158124,
+  "total": 19164691,
   "history": [
     {
       "date": "2026-10-24",
@@ -12471,6 +12471,12 @@
       "commit": "c495379bb2",
       "reason": "SPACE-02 adds the optional physics/celestial entry (9841 B gzip, budget 10137 B). The entry contains world-stepped astronomy, SPK interpolation, tide and insolation fields, and solar tracking. A separate split only moves the math and leaves the root users unchanged. Core and stage stay at 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "158d4cf95",
+      "reason": "physics/hydro is a new optional entry (HYDRO-01): ShallowWaterSolver, conservative shallow water on the terrain bed (hydrostatic reconstruction, HLL with Kurganov-Petrova speeds, WENO-Z and minmod, SSP Runge-Kutta 2, semi-implicit Manning friction, inflows, rain, wind, buildings, open and level sides); its own entry so scenes without a flood pay nothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14301,6 +14307,7 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577
+    "margoengine/web": 577,
+    "@margoengine/physics/hydro": 6567
   }
 }
