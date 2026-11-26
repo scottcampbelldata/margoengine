@@ -30,6 +30,7 @@ await build({
         pick: resolve(root, 'src/pick.ts'),
         trail: resolve(root, 'src/trail.ts'),
         flow: resolve(root, 'src/flow.ts'),
+        'infinite-grid': resolve(root, 'src/infinite-grid.ts'),
         batch: resolve(root, 'src/batch.ts'),
         hidden: resolve(root, 'src/hidden.ts'),
         stroke: resolve(root, 'src/stroke.ts'),

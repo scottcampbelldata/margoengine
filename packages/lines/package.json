@@ -74,6 +74,10 @@
     "./flow": {
       "types": "./dist/flow.d.ts",
       "import": "./dist/flow.js"
+    },
+    "./infinite-grid": {
+      "types": "./dist/infinite-grid.d.ts",
+      "import": "./dist/infinite-grid.js"
     }
   },
   "files": [

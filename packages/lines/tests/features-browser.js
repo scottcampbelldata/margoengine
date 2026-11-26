@@ -7,6 +7,7 @@ import { DebugLines, ArcLine } from '@margoengine/lines/debug';
 import { Stroke } from '@margoengine/lines/stroke';
 import { Trail } from '@margoengine/lines/trail';
 import { FlowPath } from '@margoengine/lines/flow';
+import { InfiniteGrid } from '@margoengine/lines/infinite-grid';
 import { Picking } from '../../selection/dist/index.js';
 import { LineBatch, LineBatches } from '@margoengine/lines/batch';
 import { EdgesHelper } from '@margoengine/lines/edges';
@@ -749,6 +750,34 @@ async function flowPath() {
   return 'Flow dashes move forward, seek exactly, fade out, and respect depth on the real GPU';
 }
 
+/** The infinite grid draws lines on the ground below the horizon and nothing above it, and `opacity: 0` removes them. */
+async function infiniteGrid() {
+  const { engine, frame, done } = await rig();
+  try {
+    const grid = InfiniteGrid.attach(engine, {
+      y: -2,
+      cellSize: 1,
+      sectionSize: 0,
+      cellThickness: 3,
+      cellColor: '#ffffff',
+    });
+    const drawn = await frame();
+    grid.opacity = 0;
+    const clear = await frame();
+    let below = 0,
+      above = 0;
+    for (let y = 0; y < 256; y++)
+      for (let x = 0; x < 256; x++)
+        if (drawn.at(x, y).some((value, i) => value !== clear.at(x, y)[i])) y > 128 ? below++ : above++;
+    assert(below > 200, `The grid draws pixels below the horizon, got ${below}`);
+    assert(above === 0, `The grid draws nothing above the horizon, got ${above}`);
+    grid.dispose();
+  } finally {
+    done();
+  }
+  return 'The infinite grid draws its lines on the ground only, and zero opacity draws none';
+}
+
 window.runLineFeatures = async () => {
   const checks = [];
   for (const check of [
@@ -757,6 +786,7 @@ window.runLineFeatures = async () => {
     picking,
     trail,
     flowPath,
+    infiniteGrid,
     ribbon,
     batch,
     hidden,

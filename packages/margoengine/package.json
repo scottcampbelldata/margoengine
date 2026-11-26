@@ -2267,6 +2267,10 @@
       "types": "./dist/lines/flow.d.ts",
       "import": "./dist/lines/flow.js"
     },
+    "./lines/infinite-grid": {
+      "types": "./dist/lines/infinite-grid.d.ts",
+      "import": "./dist/lines/infinite-grid.js"
+    },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
       "import": "./dist/loaders/ply.js"

@@ -1,5 +1,9 @@
 # Clean room
 
+### Infinite shader grid in Lines (2026-11-25)
+
+Eric Chan and Frédo Durand, [Fast Prefiltered Lines](https://developer.nvidia.com/gpugems/gpugems2/part-iii-high-quality-rendering/chapter-22-fast-prefiltered-lines), GPU Gems 2 chapter 22, 2005, give the antialiased line as a ramp over the distance to the line centre; David Ebert, F. Kenton Musgrave, Darwyn Peachey, Ken Perlin and Steven Worley, Texturing and Modeling: A Procedural Approach, 3rd ed., 2003, chapter 2, fade a procedural pattern out when its period falls below the sampling rate. `InfiniteGrid` (`@margoengine/lines/infinite-grid`) measures the distance to the nearest line in pixels with the screen-space derivative of the world coordinate, ramps one pixel around a line of the asked width, and fades both line sets out once a cell is under two pixels. The visible plane is a quad under the camera sized by the fade distance. drei's `Grid` and its option names (cell and section size, fade distance, follow camera) were taken from its public documentation only; no rival source was read.
+
 ### Offline music renders refill at suspend points (audio, KB5029b, 2026-11-25)
 
 Read Paul Adenot and Hongchan Choi (editors), W3C Web Audio API 1.0 (2021, https://www.w3.org/TR/webaudio/):

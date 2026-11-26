@@ -235,6 +235,34 @@ engine.dispose();
 
 `seek(seconds, gain = 1)` uses absolute time and a gain from 0 to 1. It does not rebuild path geometry. Gain zero hides both layers. Each visible path draws one dashed line and, if configured, its guide. `dispose()` or `using` unregisters both. The same API works on WebGPU and the WebGL2 compatibility layer.
 
+## Infinite grid
+
+`InfiniteGrid` from `@margoengine/lines/infinite-grid` is a ground grid with no edge: thin cell lines, thick section lines, analytic antialiasing, a smooth distance fade and a disc that follows the camera. The lines come from the fragment shader, so one draw of two triangles covers any `cellSize`; `GridHelper` stays the finite, geometry-based grid. Lines closer than two pixels fade out instead of turning to moire, and the grid is depth tested against the scene without writing depth. WebGPU only (the engine's WebGL2 compatibility layer is a WebGPU device, so it works there too).
+
+```ts
+import { Engine } from '@margoengine/core';
+import { InfiniteGrid } from '@margoengine/lines/infinite-grid';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const grid = InfiniteGrid.attach(engine, { cellSize: 0.5, sectionSize: 5, fadeDistance: 60 });
+grid.sectionColor = '#ff8800'; // Every field is live and checked each frame.
+engine.render();
+grid.dispose();
+engine.dispose();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `cellSize`, `sectionSize` | `1`, `10` | Distance between thin and thick lines in world units. `sectionSize` is 0 (no sections) or at least `cellSize`. |
+| `cellThickness`, `sectionThickness` | `1`, `1.5` | Line width in drawing-buffer pixels. |
+| `cellColor`, `sectionColor` | grey, lighter grey | Any `ColorInput`. |
+| `y` | `0` | Height of the grid plane. |
+| `fadeDistance` | `100` | Distance where the grid is gone, from the camera (or the origin). |
+| `followCamera` | `true` | `false` fixes the fading disc on the origin. |
+| `opacity`, `order`, `name` | `1`, `19`, `'infinite-grid'` | Overall opacity, frame graph order (just before `Lines`) and plugin name. |
+
+`gridCoverage(coord, size, thickness, pixel)` is the shader's per-axis coverage in plain JavaScript, for tests and CPU renderers. Sources: Eric Chan and Frédo Durand, [Fast Prefiltered Lines](https://developer.nvidia.com/gpugems/gpugems2/part-iii-high-quality-rendering/chapter-22-fast-prefiltered-lines) (GPU Gems 2, 2005), for the distance-to-line ramp that antialiases a line; David Ebert et al., Texturing and Modeling: A Procedural Approach (3rd ed., 2003), chapter 2, for fading a pattern out as its period drops below the sampling rate.
+
 ## Trails
 
 `Trail` from `margoengine/lines/trail` is a line that follows something and fades behind it: missiles, swords, cursors. It advances with the `Lines` plugin's frames, so there is nothing to call each frame. The fade clock (`trail.time`) moves in the frame update (`lines.advanceTime(delta)`), once a frame however many views draw, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the clock a continuous run reads; the points are the target's history, which a warm-up of `lifetime` seconds refills.

@@ -8,6 +8,12 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Infinite grid (`@margoengine/lines/infinite-grid`, 2026-11-25) is a plane at one height `y`, drawn as a quad of
+  the fade distance's half-width centred under the camera (or the origin), so nothing draws past `fadeDistance`;
+  lines under two pixels apart fade out instead of aliasing. It is a transparent overlay: it writes no depth, so
+  geometry lying exactly on its plane z-fights with it (raise `y` a little). WebGPU and the WebGL2 compatibility
+  layer; the small WebGL2 preview throws `unsupported`.
+
 - Horse fore fetlock (2026-11-23). The walking pose yields into stance and folds the fetlock locally in swing.
   A compound lower link holds the forehoof path and maintains segment lengths. The walking knee flexion uses
   eased angular velocity. This is a sagittal joint model with terrain slope handled by the live
