@@ -14197,7 +14197,14 @@ residual shapes use the station's authored force curve and the first-mode shape 
 fixture renders an 8.46 mm crest under load and 7.45 mm after release on both backends. Fully exhausted
 span exposes the stroke and seal state. Topology-changing breakup remains open.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 19069 B minified and 7838 B gzip under its 7862 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
+An authored girder seam can hold and release two adjacent dynamic rigid parts. It resolves
+one projected bending curvature with aligned rest frames and three-axis point-spring
+translation. The angular and point reactions are split within each step. The joint preserves
+its failure curvature and peak tensile strain after release. Use pre-separated meshes and
+body-local collider assets for each part. Distributed shell fracture, cyclic plastic history,
+automatic shell-part generation and the measured floating-tank breakup remain open.
+
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 24023 B minified and 9435 B gzip under its 9719 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14218,7 +14225,9 @@ The optional `wetting` model gives the film a finite equilibrium contact angle b
 Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
-water balance. Measured spreading remains open.
+water balance. The complete-wetting capillary limit matches the independently measured
+0.094–0.125 radius exponent on 40 × 40 and 80 × 80 grids. Absolute contact-line traces
+and measured partially wetting slip remain open.
 The optional backing angle map adds one f64 value per film cell. Its pressure and
 implicit stiffness both vary by cell, and the exact two-cell check covers conservative
 motion toward the more wettable side and snapshot replay.
@@ -14248,7 +14257,7 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 13,199 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 13,202 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
@@ -14888,6 +14897,12 @@ The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core a
 The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20. The pressure and added-inertia terms remain open.
 
 The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
+
+### Attached bilge keel hull pressure
+
+Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Added inertia, forces in the other degrees of freedom, phase lag, and physical measurements of hull-pressure amplitudes remain open.
+
+The bilge hull-pressure seakeeping entry is 29,592 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

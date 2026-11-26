@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20614950,
+  "total": 20616251,
   "history": [
     {
       "date": "2026-10-24",
@@ -13801,6 +13801,12 @@
       "commit": "e5a8d911a8",
       "reason": "BREAK-03 breakable girder seam grows the optional crush entry from 7838 to 9435 B gzip. The ceiling rises from 7862 to 9719 B. Reciprocal section forces and bending couples share the existing Smith section, contact inertia and rigid port layout. A distinct entry would duplicate those dependencies for applications which use live plating and girder release together. Named imports still tree-shake.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "858f37bcdd",
+      "grew": 1,
+      "reason": "SEA-08 the attached bilge keel pressure integration grows seakeeping from 28388 to 29592 B gzip. The mesh contour contributes to the same live roll damping force. A split would repeat hull, mesh and water pose registrations. Core plus Stage remains 24846 B."
     }
   ],
   "items": {
@@ -14663,7 +14669,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8539,
-    "@margoengine/physics/seakeeping": 29179,
+    "@margoengine/physics/seakeeping": 30480,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,

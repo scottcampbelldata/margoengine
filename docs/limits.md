@@ -10267,4 +10267,4 @@ The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. C
 
 Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Added inertia, forces in the other degrees of freedom, phase lag, and physical measurements of hull-pressure amplitudes remain open.
 
-The bilge hull-pressure seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.
+The bilge hull-pressure seakeeping entry is 29,592 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
