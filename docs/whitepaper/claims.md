@@ -13,6 +13,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   separated force and torque are independent of the attached profile coefficient. A mixed-flow fixture checks the
   attached share of area and zero attached circulation on separated panels. The original light flapping-wing case
   retains its stability bounds. Run `node --test packages/physics/tests/flight.test.js`.
+- Sustained ductile contact (BREAK-03, 2026-11-26). An already contacted patch carries continued compression
+  against a fixed support and between two real rigid bodies. Both equilibria match the discrete force balance.
+  The movable pair preserves total momentum. The prescribed 30 N force persists for six seconds, and snapshot
+  replay reproduces the state hash. Run `packages/physics/tests/coupling/crush.test.js`.
+
 - Large-strain rubber (SOFT-04, 2026-11-26). Finite-chain native vertex blocks predict 11 uniaxial and
   12 independent equibiaxial tension observations withheld from calibration. The test reads nominal traction
   from actual particle acceleration and separately checks the analytical traction limit. It exercises stretches

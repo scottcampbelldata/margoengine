@@ -68,6 +68,54 @@ test('two actual moving bodies transfer opposite impulse and lose exactly the me
   }
 });
 
+test('a pressed crush patch supports a sustained load and retains one impact history', async () => {
+  for (const two of [false, true]) {
+    const { world, physics, crush, vehicle, other } = await assemble({ initial: 0.05, two });
+    try {
+      // Start in the elastic support stage. The low-energy first contact establishes the active patch.
+      vehicle.setPosition([-0.3, 0, 0]);
+      world.advance(2);
+      const impact = crush.read(0);
+      assert.equal(impact.impacts, 1);
+      const load = 30;
+      vehicle.addForce([load, 0, 0]);
+      if (other) other.addForce([-load, 0, 0]);
+      world.advance(180);
+
+      const step = 1 / 60;
+      const inverseMass = 1 / 4 + (other ? 1 / 6 : 0);
+      const substeps = physics.kernel.substeps;
+      const damping = 2 * Math.sqrt(material.stiffness / inverseMass);
+      const impedance = damping + step * material.stiffness;
+      // At equilibrium J = Fh. Rigid substeps integrate a velocity ramp from the applied contact
+      // impulse to the frame's final velocity. Its mean is zero, so v_end = a h (s − 1)/(2s).
+      const terminal = (load * step * inverseMass * (substeps - 1)) / (2 * substeps);
+      const expected = (load * (1 + step * impedance * inverseMass) - impedance * terminal) / material.stiffness;
+      const depth = () => vehicle.position[0] - (other?.position[0] ?? 0) + 0.4 - impact.permanentStroke;
+      // At most two rounding operations per body substep, plus published f32 positions and velocities.
+      const rounding = 2 * 180 * (substeps + 2) * 2 ** -23;
+      close(depth(), expected, rounding * 0.4);
+      close(vehicle.linearVelocity[0] - (other?.linearVelocity[0] ?? 0), terminal, rounding * terminal);
+      assert.deepEqual(crush.read(0), impact);
+      if (other) {
+        const momentum = 4 * vehicle.linearVelocity[0] + 6 * other.linearVelocity[0];
+        close(momentum, 4 * 0.05, rounding * 0.2);
+      }
+
+      const saved = world.takeSnapshot();
+      world.advance(360);
+      close(depth(), expected, 2 * rounding * 0.4);
+      assert.deepEqual(crush.read(0), impact);
+      const continued = world.hash();
+      world.restoreSnapshot(saved.bytes);
+      world.advance(360);
+      assert.equal(world.hash(), continued);
+    } finally {
+      physics.dispose();
+    }
+  }
+});
+
 test('a fixed barrier receives the equivalent normal work, with a versioned deformation and seal output', async () => {
   const { world, physics, crush, vehicle } = await assemble({ two: false });
   try {

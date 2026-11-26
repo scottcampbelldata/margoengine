@@ -14985,6 +14985,20 @@ with or without shared memory. No companion code or external assets were used.
 
 For unit normal `n` and contact arm `r`, the point's inverse mass along `n` is `1/m + (r × n) · I⁻¹(r × n)`. Sum both sides and invert to obtain effective mass. The yield curve is `F = Fy + H p` for persistent stroke `p`. Solving `F = k(x − p)` concurrently gives the post-yield tangent `kH/(k+H)`. Integrate each linear branch with `ΔW = F0 Δx + 0.5 k Δx²` and invert at incident relative kinetic energy. The recoverable energy is triangular elastic work plus the loaded backing's elastic work when compacted. The rest is permanent work. Apply the equal and opposite impulse implied by incident and rebound speeds at a single contact point so the angular momenta balance as well. This reduced event model was written from the cited mechanics and equations.
 
+Continuing support uses the compression-only normal condition from David E. Stewart and Jeffrey C. Trinkle,
+“An implicit time-stepping scheme for rigid body dynamics with inelastic collisions and Coulomb friction”
+(1996). David Baraff and Andrew Witkin, “Large Steps in Cloth Simulation” (1998), Eq. 4 gives the implicit
+velocity update. For current compression `d`, inward speed `v`, effective inverse mass `w`, tick `h` and
+backing stiffness `k`, critical relative damping is `c = 2 sqrt(k/w)`. Evaluating the spring and dashpot
+at `d + h(v − Jw)` and `v − Jw` gives the nonnegative normal impulse
+`J = max(0, h[kd + (c+hk)v] / [1 + h(c+hk)w])`. Only positive compression and force produce sustained
+support. The same-point impulse is applied to the rigid pair. In the steady-load fixture a tick receives
+`J = Fh` and the rigid substeps integrate a velocity ramp with zero mean, so the end velocity is
+`Fhw(S−1)/(2S)` for `S` substeps. Substitution gives the tested compression. The proof uses two
+actual rigid bodies as well as a fixed support.
+[Stewart and Trinkle](https://www.cse.lehigh.edu/~trink/Papers/STicra00.pdf)
+[Baraff and Witkin](https://graphics.stanford.edu/courses/cs448b-00-winter/papers/baraff_98.pdf)
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

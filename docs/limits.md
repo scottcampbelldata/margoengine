@@ -9526,7 +9526,15 @@ The optional Physics entry measures 5,112 B gzip with a 5,368 B ceiling. Each la
 
 ### Crush response for civilian barriers (BREAK-03)
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and ignores shear and sustained contact. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8120 B minified and 3507 B gzip. Core and Stage gain zero bytes.
+An already contacted patch maintains a unilateral damped backing response while its geometric gap remains
+compressed inside the patch radius. A sustained 30 N load settles to 90.23 mm against a fixed support and
+95.11 mm between the movable specimens. Both match the discrete loaded equilibrium derived from the
+contact step and rigid substeps. The movable pair conserves total momentum with reciprocal inputs.
+The fixture preserves one material impact through six seconds of applied load and exact snapshot replay.
+The durable damage ledger records material work. The maintained contact is a normal patch with elastic
+and viscous support, and surface friction, distributed panel collapse and flooding remain open.
+
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and carries normal response only. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8428 B minified and 3625 B gzip. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 

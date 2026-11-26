@@ -474,9 +474,10 @@ test.
   it. **Cause:** `packages/physics/src/ice/model.ts` melts an above-freezing surface by running the quasi-steady Stefan
   growth law backwards through the ice and snow, so conduction through the slab throttles a surface melt that is set
   by the surface heat flux.
-- **BREAK-03, a latched crush contact lets bodies pass through.** **Repro:** keep pushing a body into a crush patch
-  after its first stroke with sensor colliders, as the README advises. **Cause:**
-  `packages/physics/src/crush/index.ts` ignores a latched contact until it clears.
+- **BREAK-03, sustained crush support fixed.** A pressed body with a sensor collider used to pass through an
+  already contacted patch because the latch suppressed all subsequent normal reactions. A unilateral, damped
+  backing step now carries the continuing load without creating a new damage event. The six-second fixed
+  and reciprocal movable-support regression is in `packages/physics/tests/coupling/crush.test.js`.
 - **ATMO-07, a lightning leader can stall with no flash and no error.** **Repro:** a domain where the leader runs out
   of candidate cells before it reaches ground or a target. **Cause:** `packages/physics/src/lightning/index.ts` ends
   growth silently.

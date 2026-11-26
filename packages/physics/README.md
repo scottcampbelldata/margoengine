@@ -4500,7 +4500,10 @@ const result = resolveCrush(curve, 4, 2);
 if (Math.abs(result.absorbedEnergy - 6) > 1e-12) throw new Error('Expected 6 J of permanent work');
 ```
 
-`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.
+`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
+impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
+normal mass. This contact carries reciprocal impulses without creating a new material event. The durable
+damage fields record the prior material event and accumulated crush work. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.
 
 ```ts
 import { Physics } from '@margoengine/physics';

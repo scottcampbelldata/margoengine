@@ -191,6 +191,17 @@ function fixedAnchor(support: CrushSupport, cell: Cell, size: number | undefined
   return add(support.point, scale(difference, size ?? 0));
 }
 
+function supportImpulse(depth: number, closing: number, inverseMass: number, stiffness: number, dt: number): number {
+  if (depth === 0 && closing <= 0) return 0;
+  const damping = 2 * Math.sqrt(stiffness / inverseMass); // float division: critical damping of the relative mass
+  const rate = damping + dt * stiffness;
+  // Backward Euler with end penetration d + h(v - Jw) and end inward speed v - Jw.
+  const impulse = Math.max(0, (dt * (stiffness * depth + rate * closing)) / (1 + dt * rate * inverseMass)); // float division
+  if (!Number.isFinite(impulse))
+    throw new MargoError('state', 'Choose representable crush support stiffness, mass and compression.');
+  return impulse;
+}
+
 function impact(
   state: State,
   patch: Patch,
@@ -215,26 +226,30 @@ function impact(
   const at = CRUSH_WORDS * index;
   const permanent = damage[at]!;
   const clearance = gap + permanent;
-  if (latched[index]) {
-    if (clearance > 0) latched[index] = 0;
-    else return;
-  }
+  if (clearance > 0) latched[index] = 0;
   const contact = add(anchor, scale(normal, 0.5 * gap));
   const a = atContact(bodies, out, body, contact, normal);
   const b = support.body === undefined ? undefined : atContact(bodies, out, support.body, contact, normal);
   const relative = sub(a.velocity, b?.velocity ?? ZERO);
   const closing = dot(relative, normal);
   const inverse = a.inverseMass + (b?.inverseMass ?? 0);
-  if (!(closing > 0 && inverse > 0) || clearance > dt * closing) return;
-  const delay = Math.max(0, clearance) / closing; // float division: time to the first normal contact
+  if (!(inverse > 0) || (!latched[index] && (!(closing > 0) || clearance > dt * closing))) return;
+  const delay = clearance > 0 ? clearance / closing : 0; // float division: time to the first normal contact
   const lateral = sub(separation, scale(normal, gap));
   const travel = sub(relative, scale(normal, closing));
   const offset = sub(lateral, scale(travel, delay));
-  if (dot(offset, offset) > patch.radius * patch.radius) return;
-  const result = crushPrepared(patch.material, 1 / inverse, closing, permanent); // float division: effective normal mass
-  const force = scale(normal, result.impulse);
-  impulseAt(out, body, scale(force, -1), a.arm);
-  if (b && support.body !== undefined) impulseAt(out, support.body, force, b.arm);
+  if (dot(offset, offset) > patch.radius * patch.radius) {
+    latched[index] = 0;
+    return;
+  }
+  const result = latched[index] ? undefined : crushPrepared(patch.material, 1 / inverse, closing, permanent); // float division
+  const normalImpulse =
+    result?.impulse ?? supportImpulse(-clearance, closing, inverse, patch.material.backingStiffness, dt);
+  if (normalImpulse === 0) return;
+  const impulse = scale(normal, normalImpulse);
+  impulseAt(out, body, scale(impulse, -1), a.arm);
+  if (b && support.body !== undefined) impulseAt(out, support.body, impulse, b.arm);
+  if (!result) return;
   damage.set(
     [
       result.permanentStroke,
