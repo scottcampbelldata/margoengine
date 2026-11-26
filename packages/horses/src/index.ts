@@ -399,7 +399,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     target = { speed: 0, heading: options.heading ?? 0, gait: 'auto' as Gait | 'auto' },
     pose: HorsePose = horsePose(skeleton, null, 0, 0),
     interruptedFrom: HorsePose | undefined,
-    outgoingDistance = 0;
+    outgoingCycles = 0;
   const commands: Command[] = [],
     tailActions: { at: number; value: TailAction }[] = [],
     listeners = new Set<{ step: (dt: number, horse: Horse) => void; reset?: () => void }>();
@@ -420,16 +420,19 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     const lowSpeedWeight = Math.min(1, motion.speed / (strides.get(st.gait)!.speed * 0.85));
     return horsePose(skeleton, st, phase - Math.floor(phase), at, lowSpeedWeight ** 2 * (3 - 2 * lowSpeedWeight));
   };
-  const gaitPose = (g: Gait | 'stand', distance: number, at: number): HorsePose => {
+  const gaitPose = (g: Gait | 'stand', cycles: number, at: number): HorsePose => {
     if (g === 'stand') return horsePose(skeleton, null, 0, at);
     const st = stride(body, Math.max(0.05, motion.speed), g);
-    const phase = motion.strideCyclesAt(distance) + (phaseOffsets.get(g) ?? 0);
+    const phase = cycles + (phaseOffsets.get(g) ?? 0);
     return movingPose(st, phase, at);
   };
   const retiringRate = (g: Gait | 'stand', speed: number): number =>
     g === 'stand' || speed === 0 ? 1 : Math.min(1, strides.get(g)!.speed / speed);
-  const carriedDistance = (distance: number) =>
-    outgoingDistance + (distance - motion.distance) * (1 - motion.fade) * retiringRate(motion.previous, motion.speed);
+  const carriedCycles = (distance: number) =>
+    outgoingCycles +
+    (motion.strideCyclesAt(distance) - motion.strideCyclesAt()) *
+      (1 - motion.fade) *
+      retiringRate(motion.previous, motion.speed);
   const supportAt = (distance: number) => {
     const retiring = motion.fade < 0.5 && !interruptedFrom;
     const gait = retiring ? motion.previous : motion.gait;
@@ -437,15 +440,18 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     const phase =
       gait === 'stand' || !stanceStride
         ? 0
-        : motion.strideCyclesAt(retiring ? carriedDistance(distance) : distance) + (phaseOffsets.get(gait) ?? 0);
-    return [0, 1, 2, 3].map((hoof) => Boolean(stanceStride && hoofPhase(stanceStride, hoof, phase).stance));
+        : (retiring ? carriedCycles(distance) : motion.strideCyclesAt(distance)) + (phaseOffsets.get(gait) ?? 0);
+    return {
+      feet: [0, 1, 2, 3].map((hoof) => Boolean(stanceStride && hoofPhase(stanceStride, hoof, phase).stance)),
+      swing: stanceStride ? (1 - stanceStride.duty) * stanceStride.duration : Math.max(fade, STEP),
+    };
   };
   const locomotionPose = (distance: number, at: number) => {
-    const now = gaitPose(motion.gait, distance, at);
+    const now = gaitPose(motion.gait, motion.strideCyclesAt(distance), at);
     if (motion.fade >= 1) return now;
     const t = motion.fade;
     const weight = t ** 3 * (10 + t * (-15 + 6 * t));
-    return blendPoses(interruptedFrom ?? gaitPose(motion.previous, carriedDistance(distance), at), now, weight);
+    return blendPoses(interruptedFrom ?? gaitPose(motion.previous, carriedCycles(distance), at), now, weight);
   };
   const computePose = (frame: ReturnType<typeof shown>, height: number) => {
     pose = locomotionPose(frame.distance, time);
@@ -525,21 +531,28 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       const after = changing
         ? locomotionPose(motion.distance + motion.speed * retiringRate(priorGait, motion.speed) * lead, start + lead)
         : undefined;
+      const priorCycles = motion.strideCyclesAt();
       motion.step(STEP, target);
-      const retiringDistance = (motion.distance - prev.distance) * retiringRate(motion.previous, motion.speed);
+      const retiringAdvance = (motion.strideCyclesAt() - priorCycles) * retiringRate(motion.previous, motion.speed);
       if (previousPose) {
-        outgoingDistance = prev.distance + retiringDistance * (1 - motion.fade / 2);
+        outgoingCycles = priorCycles + retiringAdvance * (1 - motion.fade / 2);
         interruptedFrom = interrupted ? previousPose : undefined;
         if (motion.gait !== 'stand') alignGait(motion.gait, previousPose, after!, start, lead);
       } else if (interrupted) {
         // Finish the old stride within its cadence while the new gait takes the load.
-        outgoingDistance += retiringDistance * (1 - (previousFade + motion.fade) / 2);
+        outgoingCycles += retiringAdvance * (1 - (previousFade + motion.fade) / 2);
       }
       ticks++;
-      if (options.ground || motion.bank !== 0)
-        grounding.advance(motion, ticks * STEP, supportAt(motion.distance), () =>
-          locomotionPose(motion.distance, ticks * STEP),
+      if (options.ground || motion.bank !== 0) {
+        const support = supportAt(motion.distance);
+        grounding.advance(
+          motion,
+          ticks * STEP,
+          support.feet,
+          () => locomotionPose(motion.distance, ticks * STEP),
+          support.swing,
         );
+      }
       if (listeners.size) {
         const keep = time;
         time = ticks * STEP;
@@ -656,7 +669,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
       tailActions.length = 0;
       grounding.reset();
       interruptedFrom = undefined;
-      outgoingDistance = 0;
+      outgoingCycles = 0;
       prev = { x: motion.x, z: motion.z, heading: motion.heading, distance: motion.distance };
       target = { speed: 0, heading: options.heading ?? 0, gait: 'auto' };
       for (const l of listeners) l.reset?.();
