@@ -3227,6 +3227,10 @@
       "types": "./dist/physics/ageing.d.ts",
       "import": "./dist/physics/ageing.js"
     },
+    "./physics/accretion": {
+      "types": "./dist/physics/accretion.d.ts",
+      "import": "./dist/physics/accretion.js"
+    },
     "./physics/room-sound": {
       "types": "./dist/physics/room-sound.d.ts",
       "import": "./dist/physics/room-sound.js"
