@@ -13863,6 +13863,26 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### PID and PD controllers with split axes, caps and anti-windup (`@margoengine/physics` pid.ts, 2026-11-26)
+
+Built from texts only; no other code was read. Rapier's `PidController`, `PdController`, `PdErrors` and axes mask were
+matched by name from its public API pages.
+
+- K. J. Astrom and R. M. Murray, Feedback Systems: An Introduction for Scientists and Engineers, Princeton, 2008
+  (https://fbswiki.org), ch. 10 (the parallel PID law, the derivative on the measured speed, feedforward of the
+  reference's speed) and sec. 5.3 (a second-order step response: overshoot exp(-pi zeta / sqrt(1 - zeta^2)) and peak
+  time pi / (wn sqrt(1 - zeta^2))).
+- K. J. Astrom and T. Hagglund, Advanced PID Control, ISA, 2006, sec. 3.5: integrator windup under actuator
+  saturation, and conditional integration (stop integrating while the output is saturated) against it.
+- A. Visioli, "Modified anti-windup scheme for PID controllers", IEE Proc. Control Theory Appl. 150 (1), 2003: the
+  conditional-integration and back-calculation schemes compared; conditional integration chosen here because it adds
+  no gain to tune.
+- Margo's own: the command as an acceleration landed as mass (or world inertia) times acceleration times the step, so
+  the loop is the unit-mass loop for every body; a cap on the length of the command vector, which keeps its direction;
+  the angular error as twice the vector part of the short turn.
+- Checked against: the second-order step response's overshoot and peak time, a ramp's zero lag with the reference's
+  speed fed forward and kd v / kp without it, and a capped move against the same PID capped outside it (which winds up).
+
 ### Soft bodies in water: Morison's loads on ropes and cloth (`@margoengine/physics/soft`, SOFT-01, 2026-11-27)
 
 Built from texts only; no other code was read.

@@ -2018,20 +2018,34 @@ physics.dispose();
 
 ### PID controller
 
-`PidController` drives a body toward a target pose. `linearCorrection(dt, body, target, targetVelocity?)` and `angularCorrection(dt, body, target, targetAngularVelocity?)` return the acceleration it asks for: `kp` times the error, plus `ki` times the error summed over time, plus `kd` times the speed error. `applyLinear` and `applyAngular` land it as an impulse of mass (or world inertia) times acceleration times `dt`, so a heavy body and a light one follow the same path. Call once a step with the step's length. `axes` masks the world axes it works on, `reset()` clears the integral, and gravity is not compensated: the integral takes it up. The angular error is twice the vector part of the short turn to the target, which is the angle in radians to 0.1 percent below 0.1 radian and a little under it beyond. Gains must be finite and at least 0; a step must be above 0.
+`PidController` drives a body toward a target pose. `linearCorrection(dt, body, target, targetVelocity?)` and `angularCorrection(dt, body, target, targetAngularVelocity?)` return the acceleration it asks for: `kp` times the error, plus `ki` times the error summed over time, plus `kd` times the speed error. `applyLinear` and `applyAngular` land it as an impulse of mass (or world inertia) times acceleration times `dt`, so a heavy body and a light one follow the same path, and `apply(dt, body, {position, rotation}, {linear, angular})` drives a whole pose. Call once a step with the step's length. Give the target's speed to follow a moving target with no lag; without it a PD lags by `kd * v / kp`. Gravity is not compensated: the integral takes it up.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `kp`, `ki`, `kd` | 1, 0, 0 | Gains, in 1/s², 1/s³ and 1/s. They are the linear gains (`pid.kp` and so on); finite and at least 0 |
+| `angular` | the linear gains | `{kp, ki, kd}` of the angular part (`pid.angularKp`, `angularKi`, `angularKd`) |
+| `axes` | all | One `[x, y, z]` mask of world axes for both parts, or `{linear, angular}` with one each; `setAxes` changes it and `pid.axes` reads it |
+| `maxLinear`, `maxAngular` | `Infinity` | The largest acceleration asked for, m/s² and rad/s². A longer command keeps its direction, and its integral holds while it is at the cap, so it does not wind up |
+
+`reset()` clears the integrals, and `linearIntegral` and `angularIntegral` read them. `PdController` is the same with no integral: `linearCorrection(body, target, targetVelocity?)` and the rest take no step until they land. `pdErrors(body, pose, velocity?)` reads how far a body is from a target, `{linear, angular, linearVelocity, angularVelocity}`, and `pd.correction(errors)` or `pid.correction(dt, errors)` turns errors into accelerations. The angular error is twice the vector part of the short turn to the target, which is the angle in radians to 0.1 percent below 0.1 radian and a little under it beyond.
 
 ```ts
-import {PidController, Physics} from 'margoengine/physics';
+import {PdController, PidController, Physics, pdErrors} from 'margoengine/physics';
 
 await Physics.load();
 const physics = new Physics(null);
 const body = physics.addBody(null, {colliders: {shape: 'sphere', radius: 0.25, density: 1000}});
-const pid = new PidController({kp: 60, ki: 400, kd: 16});
+const pid = new PidController({kp: 60, ki: 400, kd: 16, maxLinear: 40});
 for (let i = 0; i < 600; i++) {
   pid.applyLinear(1 / 60, body, [0, 2, 0]); // hold 2 m up against gravity
   physics.step();
 }
 console.log(body.position[1].toFixed(2)); // '2.00'
+
+// A PD on the linear x axis only, following a target that moves at 1 m/s.
+const pd = new PdController({kp: 16, kd: 8, axes: {linear: [true, false, false], angular: [false, false, false]}});
+const errors = pdErrors(body, {position: [1, 2, 0]}, {linear: [1, 0, 0]});
+console.log(pd.correction(errors).linear); // [ 24, 0, 0 ]
 physics.dispose();
 ```
 
@@ -2263,7 +2277,7 @@ Margo builds its own solver to replace Rapier, so every capability Rapier's publ
 | Body reads: damping, dominance, gyroscopic switch, velocity at a point, predicted poses, energies, effective masses, copy | see Reading a body | full | `next-body-reads.test.js` |
 | Cross-platform determinism | always on, there is no mode to switch: the kernel uses only + - * / sqrt, compares and integer operations, and `world.hash` is equal in Node, native code, Chromium and Firefox over 10,000 steps | full | `replay.test.js`, `kernel-step.test.js` |
 | Snapshot and restore of a world | `world.snapshot()`, `world.restore()` | full | `kernel-solver.test.js`, `next-joints.test.js`, `next-parameters.test.js` |
-| PID controller | `PidController` | full | `next-pid.test.js` |
+| PID and PD controllers | `PidController`, `PdController`, `pdErrors` | full | `next-pid.test.js` |
 | Debug-render data: colliders, joints, contacts, boxes | `debugRender` | full | `next-debug-render.test.js`, `next-debug-filter.test.js` |
 
 ### Features written over the kernel

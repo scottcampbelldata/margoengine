@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20623627,
+  "total": 20626455,
   "history": [
     {
       "date": "2026-10-24",
@@ -13813,6 +13813,12 @@
       "commit": "6d02861ab",
       "reason": "physics/surge new entry (SEA-07 tides and storm surge, 5,112 B built) and its umbrellas; physics/hydro 7,652 to 8,577 B built for the Coriolis force, the forcing potential the surge adds to the bed and the water's time scale with its work count; physics/world 17,737 to 18,021 B for the world's time-scale check (a field read at another time scale than its writer's is refused). Each is one feature in its owning entry; splitting the world check into a lazy entry would leave mismatched scales unchecked. Core and stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "C-PID-01-02",
+      "grew": 1,
+      "reason": "@margoengine/physics base measured 94,001 B gzip (the budget was 93,993): PidController gains split linear and angular axes and gains, a capped command with conditional integration against windup, a whole-pose apply and its integrals read back, and PdController and pdErrors join it (Rapier parity rows C-PID-01 and C-PID-02). The controllers are root exports, so a separate entry would move an existing root export and break the API. Budget (measured + max(3%, 256 B)): 93,993 to 96,821 B. Core plus stage unchanged."
     }
   ],
   "items": {
@@ -14628,7 +14634,7 @@
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 889499,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 93993,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 96821,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
     "@margoengine/physics/accretion": 6351,
     "@margoengine/physics/aeolian": 5889,
@@ -14685,6 +14691,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 107182,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
+    "@margoengine/physics/surge": 5368,
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
@@ -15755,7 +15762,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/surge": 5368
+    "margoengine/web": 577
   }
 }

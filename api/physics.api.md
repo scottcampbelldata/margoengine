@@ -1113,6 +1113,35 @@ export class PathJoint extends Mechanism {
     setMotor(speed: number, maxForce: number): this;
 }
 
+export class PdController extends PidControllerBase {
+    constructor(options?: PdOptions);
+    correction(errors: PdErrors): PidCorrection;
+    linearCorrection(body: PhysicsBody, target: Vec3, targetVelocity?: Vec3): [number, number, number];
+    angularCorrection(body: PhysicsBody, target: Quat, targetAngularVelocity?: Vec3): [number, number, number];
+    applyLinear(dt: number, body: PhysicsBody, target: Vec3, targetVelocity?: Vec3): this;
+    applyAngular(dt: number, body: PhysicsBody, target: Quat, targetAngularVelocity?: Vec3): this;
+    apply(dt: number, body: PhysicsBody, pose: PidPose, velocity?: PidVelocity): this;
+}
+
+export interface PdErrors {
+    linear: [number, number, number];
+    angular: [number, number, number];
+    linearVelocity: [number, number, number];
+    angularVelocity: [number, number, number];
+}
+
+export interface PdOptions {
+    kp?: number;
+    kd?: number;
+    angular?: {
+        kp?: number;
+        kd?: number;
+    };
+    axes?: PidAxisMask | PidAxes;
+    maxLinear?: number;
+    maxAngular?: number;
+}
+
 export class Physics implements EnginePlugin, BodyOwner {
     readonly name: string;
     fixedTimestep: number;
@@ -1628,23 +1657,71 @@ export interface PhysicsSnapshot {
     readonly joints: readonly number[];
 }
 
-export class PidController {
-    kp: number;
+export interface PidAxes {
+    linear?: PidAxisMask;
+    angular?: PidAxisMask;
+}
+
+export type PidAxisMask = readonly [boolean, boolean, boolean];
+
+export class PidController extends PidControllerBase {
     ki: number;
-    kd: number;
+    angularKi: number;
     constructor(options?: PidOptions);
     reset(): this;
+    get linearIntegral(): [number, number, number];
+    get angularIntegral(): [number, number, number];
+    correction(dt: number, errors: PdErrors): PidCorrection;
     linearCorrection(dt: number, body: PhysicsBody, target: Vec3, targetVelocity?: Vec3): [number, number, number];
     applyLinear(dt: number, body: PhysicsBody, target: Vec3, targetVelocity?: Vec3): this;
     angularCorrection(dt: number, body: PhysicsBody, target: Quat, targetAngularVelocity?: Vec3): [number, number, number];
     applyAngular(dt: number, body: PhysicsBody, target: Quat, targetAngularVelocity?: Vec3): this;
+    apply(dt: number, body: PhysicsBody, pose: PidPose, velocity?: PidVelocity): this;
 }
 
-export interface PidOptions {
+export abstract class PidControllerBase {
+    kp: number;
+    kd: number;
+    angularKp: number;
+    angularKd: number;
+    maxLinear: number;
+    maxAngular: number;
+    protected linearAxes: [boolean, boolean, boolean];
+    protected angularAxes: [boolean, boolean, boolean];
+    constructor(options: PdOptions);
+    get axes(): {
+        linear: [boolean, boolean, boolean];
+        angular: [boolean, boolean, boolean];
+    };
+    setAxes(axes: PidAxisMask | PidAxes): this;
+}
+
+export interface PidCorrection {
+    linear: [number, number, number];
+    angular: [number, number, number];
+}
+
+export interface PidGains {
     kp?: number;
     ki?: number;
     kd?: number;
-    axes?: readonly [boolean, boolean, boolean];
+}
+
+export interface PidOptions extends PidGains {
+    angular?: PidGains;
+    axes?: PidAxisMask | PidAxes;
+    maxLinear?: number;
+    maxAngular?: number;
+}
+
+export interface PidPose {
+    position?: Vec3;
+    rotation?: Quat;
+}
+
+export interface PidVelocity {
+    linear?: Vec3;
+    angular?: Vec3;
 }
 
 export interface PointProjection {
@@ -2168,6 +2245,8 @@ export function meshConnectedComponents(indices: ArrayLike<number>): {
 export function meshHalfEdges(indices: ArrayLike<number>): HalfEdgeTopology;
 
 export function pacejkaTyre(options?: PacejkaOptions): TyreModel;
+
+export function pdErrors(body: PhysicsBody, pose: PidPose, velocity?: PidVelocity): PdErrors;
 
 export function shearShare(displacement: number, modulus: number): number;
 

@@ -99,8 +99,18 @@ export { buildHull as convexHull } from './hull.js';
 export { Multibody } from './multibody.js';
 export type { MultibodyLink, MultibodyLinkOptions } from './multibody.js';
 export type { IkOptions, IkResult, IkTarget } from './kinematics.js';
-export { PidController } from './pid.js';
-export type { PidOptions } from './pid.js';
+export { PdController, PidController, PidControllerBase, pdErrors } from './pid.js';
+export type {
+  PdErrors,
+  PdOptions,
+  PidAxes,
+  PidAxisMask,
+  PidCorrection,
+  PidGains,
+  PidOptions,
+  PidPose,
+  PidVelocity,
+} from './pid.js';
 export type { DebugColor, DebugLines, DebugRenderOptions, DebugStyle } from './debug.js';
 export { cleanTrimesh } from './mesh-clean.js';
 export { convertMesh, meshConnectedComponents, meshHalfEdges, voxelizedMesh, voxelsFromPoints } from './mesh-tools.js';
