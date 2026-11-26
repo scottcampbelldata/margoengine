@@ -12543,6 +12543,12 @@
       "commit": "07be44b9c7",
       "reason": "LIFE-03: add the optional six-degree swimmer at 7286 B gzip with typed sea, school, contact and wake coupling. Keeps the controls and readback together. No bytes added to core or stage.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "gap-lane-d",
+      "reason": "Lane D: labels Hotspot and lines tube-painter sizes (see earlier entry).",
+      "grew": 2
     }
   ],
   "items": {
@@ -13089,7 +13095,7 @@
     "@margoengine/kit-react": 435,
     "@margoengine/kit-viz": 834,
     "@margoengine/kit-web": 577,
-    "@margoengine/labels": 6209,
+    "@margoengine/labels": 6471,
     "@margoengine/labels/callouts": 1603,
     "@margoengine/labels/callouts-route": 2706,
     "@margoengine/labels/cluster": 1771,
@@ -13125,6 +13131,7 @@
     "@margoengine/lines/texture": 7860,
     "@margoengine/lines/tiles": 1586,
     "@margoengine/lines/trail": 6523,
+    "@margoengine/lines/tube-painter": 1507,
     "@margoengine/loaders": 62425,
     "@margoengine/loaders dist/workers/usd.js": 9945,
     "@margoengine/loaders/3dm": 4094,
