@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20638178,
+  "total": 20640002,
   "history": [
     {
       "date": "2026-10-24",
@@ -13849,6 +13849,12 @@
       "commit": "FLUID-07-translating-receiver",
       "grew": 1,
       "reason": "FLUID-07 sweeps the receiving plane across rigid endpoint poses and reuses continuous drop contact and the existing recoil field. Thin-film rises from 13202 to 14185 B gzip; cap changes from 13395 to 14611 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "0fc03c638f",
+      "reason": "BREAK-03 terrain grounding grows the optional crush entry from 9430 to 11206 B gzip. The ceiling rises from 9719 to 11543 B. The terrain adapter reuses the same rigid impulses, wet-seal damage records and material solve. A second optional entry would duplicate the entire contact lifecycle and field wiring for hulls that mix ground and ordinary patches.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14673,7 +14679,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 9719,
+    "@margoengine/physics/crush": 11543,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
