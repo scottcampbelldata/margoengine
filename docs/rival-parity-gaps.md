@@ -4,7 +4,7 @@ What Margo still lacks against three.js r186 (core, add-ons and the examples gal
 and the three.js ecosystem libraries users expect (drei, pmndrs postprocessing, three-mesh-bvh, troika, model-viewer,
 Needle, Filament). Godot, Unity, Unreal and Blender are not the bar.
 
-Built from four audits on 2026-11-24 (a second pass on 2026-11-25 added the "Second-pass audit" blocks): the three.js examples gallery grouped into features, the Babylon.js docs, the
+Built from four audits on 2026-11-24 (a second pass on 2026-11-25 added the "Second-pass audit" blocks; a third pass on 2026-11-26 went through the three.js examples gallery name by name and added the "Third-pass audit" blocks): the three.js examples gallery grouped into features, the Babylon.js docs, the
 PlayCanvas manual plus the ecosystem libraries, and a code check of the 52 export-only rows of
 [threejs-parity.md](threejs-parity.md). Every MISSING row was grepped in `packages/*/src` before it was listed. Rival
 features come from documentation and example names only, never their source (clean room).
@@ -51,6 +51,16 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Single-frame spatial upscaler (FSR 1 style edge-adaptive upscale plus sharpen) for devices without history (`taa/src/upscale.ts` is temporal) | Babylon | DONE | S | 0b6b5df04 |
 | Mesh data debug view material (page read 2026-11-25): wireframe, vertex dots, both together, a checker on UV set 0 or 1 (colours, scale), vertex colours, a distinct colour per material id, plus a plain camera-lit shading mode. | - | DONE (`@margoengine/inspector/mesh-debug` `MeshDebugView`: wireframe, vertex dots, both, checker on UV set 0 or 1, vertex colours, material colours, camera-lit shading, over or in place of each picture) | S | a1c0d9476 |
 | Colour Enhance and channel mixer in the grade: shadows/highlights/midtones, vibrance, dehaze, 3x3 RGB mixer | - | DONE (`@margoengine/tonemap/enhance` `ColorEnhance`: shadows, midtones, highlights, vibrance, dehaze, 3x3 RGB mixer) | S | a1c0d9476 |
+
+### Third-pass audit (2026-11-26)
+
+From the three.js examples gallery, example by example (names only).
+
+| Gap | Rival | Status | Size | Landed |
+| --- | --- | --- | --- | --- |
+| Per-instance morph target weights on instanced meshes: `SkinnedCrowd` holds every instance at the model's current weights and `VATCrowd` plays baked morph clips; no live weights per instance | three.js examples (`webgl_instancing_morph`, `webgpu_instancing_morph`) | PARTIAL | M |  |
+| Batched mesh per-item frustum culling and LOD levels: `BatchedMesh` items carry a matrix, a colour and a visible flag only (`CulledModels` and `LODSystem` cover instanced models) | three.js examples (`webgl_batch_lod_bvh`) | PARTIAL | M |  |
+| Draw a skinned or morphed mesh as points that follow the deformation (glTF POINTS primitives are skinned and `vfx` emits from a skinned surface; no option draws a triangle mesh as its vertices) | three.js examples (`webgpu_skinning_points`) | PARTIAL | S |  |
 
 ## Lane B: particles, simulation and physics
 
@@ -111,6 +121,15 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | 861843398 |
 | `.babylon` scene import | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; the exporter was removed on 2026-11-26, Margo writes no rival format) | S to M | 8df1341a1 |
 
+### Third-pass audit (2026-11-26)
+
+From the three.js examples gallery, example by example (names only).
+
+| Gap | Rival | Status | Size | Landed |
+| --- | --- | --- | --- | --- |
+| COLLADA kinematics: joints with axes and limits bound to scene nodes, so a loaded model is posed by joint value (`parseDAE` reads geometry, skins, morphs and keyframes) | three.js examples (`webgl_loader_collada_kinematics`) | MISSING | S to M |  |
+| City generator: streets, blocks and lots filled with rule-built buildings in one call (`generateBuilding` and road graphs exist separately) | three.js examples (`webgpu_generator_city`) | PARTIAL | M |  |
+
 ## Lane D: tools, runtime and interaction
 
 | Gap | Rival | Status | Size | Landed |
@@ -162,6 +181,15 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Coroutines (page read 2026-11-25): a generator stepped once per frame; a bare `yield` waits one frame, yielding a promise waits for it, yielding another coroutine's promise waits for that coroutine; an async run form returns a promise that resolves on completion and rejects on cancel | Babylon | DONE (`Coroutines`, `@margoengine/ecs/coroutines`) | S | 3ddcd1643 |
 | Single-file / playable-ad publish: one inlined HTML with scripts, Wasm and assets, ad-network size budgets and MRAID hooks | PlayCanvas | DONE (`margo-convert playable`, `margo-convert/playable`, `margo-convert/playable-runtime`) | M | 48d01e498 |
 | Mobile app wrapper publish (Capacitor-style project from a built scene, safe area and orientation) | PlayCanvas | DONE (`margo-convert mobile`, `margo-convert/mobile`, `margo-convert/mobile-runtime`) | M | 1ec57ee7b |
+
+### Third-pass audit (2026-11-26)
+
+From the three.js examples gallery, example by example (names only).
+
+| Gap | Rival | Status | Size | Landed |
+| --- | --- | --- | --- | --- |
+| Occluder fade: find the meshes between the camera and a target and dither them out, then back in (the dither fade of `@margoengine/lod` and the selection x-ray exist; nothing finds the occluders) | three.js examples (`webgpu_tsl_occlusion_dither`) | PARTIAL | S |  |
+| Transform gizmo driven by an XR controller ray (`TransformControls` takes DOM pointer events and screen points only; XR has rays, grab and drag) | three.js examples (`webxr_xr_controls_transform`) | PARTIAL | S |  |
 
 ## Needs a maintainer decision or hardware first
 
