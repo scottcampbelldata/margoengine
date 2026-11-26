@@ -7,6 +7,50 @@ import { ladder, tensileLadder } from './volumetric-ladder.js';
 
 await Physics.load();
 
+function assertPairedCrackFronts(soft, piece) {
+  const particles = soft.columns();
+  const cells = soft.cellColumns();
+  const restPoint = (particle) => {
+    const row = piece.firstParticle + particle;
+    return `${particles.rx[row]},${particles.ry[row]},${particles.rz[row]}`;
+  };
+  const edgeKey = (a, b) => (a < b ? `${a},${b}` : `${b},${a}`);
+  const lips = new Map();
+  const boundary = piece.triangles();
+  for (let triangle = 0; triangle < boundary.length; triangle += 3) {
+    const ids = Array.from(boundary.subarray(triangle, triangle + 3));
+    const key = ids.map(restPoint).sort().join('|');
+    const faces = lips.get(key) ?? [];
+    faces.push(ids);
+    lips.set(key, faces);
+  }
+  const paired = new Set();
+  for (const faces of lips.values()) {
+    if (faces.length !== 2) continue;
+    // At the bonded edge the two material lips share the endpoints, but never the third particle.
+    const shared = faces[0].filter((id) => faces[1].includes(id));
+    if (shared.length === 2) paired.add(edgeKey(...shared));
+  }
+  const marked = new Set();
+  const corners = piece.cells();
+  const edges = [
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [1, 2],
+    [1, 3],
+    [2, 3],
+  ];
+  for (let i = 0; i < corners.length; i += 4) {
+    const flags = cells.flags[piece.cellRange.first + i / 4];
+    for (const [slot, [a, b]] of edges.entries()) {
+      if (flags & (1 << (6 + slot))) marked.add(edgeKey(corners[i + a], corners[i + b]));
+    }
+  }
+  for (const key of marked) assert.ok(paired.has(key), `marked edge ${key} must still bind the two real lips`);
+  return marked.size;
+}
+
 async function loadedRung(solver) {
   const mass = 35;
   const loaded = await ladder(undefined, { mass, solver });
@@ -96,9 +140,13 @@ test('LH-4: actual rigid contact opens a tensile crack while self-weight leaves 
   const strainFromBoot = (35 * 9.81 * length * toStrain) / 8;
   assert.ok(2 * strainFromOwnWeight < 0.015 && 0.015 < strainFromBoot);
   bare.world.advance(18);
+  let trackedEdges = 0;
+  loaded.soft.onTear(({ pieces }) => {
+    for (const piece of pieces) trackedEdges += assertPairedCrackFronts(loaded.soft, piece);
+  });
   loaded.world.advance(18);
   assert.equal(bare.cracks.length, 0);
-  assert.ok(loaded.cracks.length > 0);
+  assert.ok(loaded.cracks.length > 2 && trackedEdges > 0, 'the rigid load advances along real crack fronts');
   assert.ok(loaded.cracks[0].support > 0, 'the first crack opens on a step with actual boot reaction');
   assert.ok(loaded.boot.position.every(Number.isFinite));
 });

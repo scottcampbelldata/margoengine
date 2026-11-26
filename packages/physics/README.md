@@ -826,7 +826,7 @@ strain exceeds the threshold. The crack crosses the cell centroid perpendicular 
 current principal stretch. The cell's material can continue deforming after it breaks.
 The remesher splits just that cell and the neighboring faces and edges it touches.
 Under continued tension, an adjacent eligible cell can extend the crack from its current
-front edge.
+front edge. The old segment stops participating once its two lips separate.
 The fracture step chooses a cut that fits the native mesh's precision.
 Nucleation is off by default. Pass `null` to clear the option on the descriptor.
 

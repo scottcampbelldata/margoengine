@@ -178,7 +178,11 @@ For an existing material edge with unit tangent `e`, a candidate uses the projec
 `n − (n·e)e` of its current principal direction `n`. Its plane must cross the other two
 corners of the adjacent tetrahedron. The front is a set of edge slots in the native cell
 flags. A conforming midpoint on the previous edge gives the two advancing lips independent
-degrees of freedom. The published mixed-mode approach of Erdogan and Sih (1963) describes
+degrees of freedom. The released edge is removed from every incident child's front slots.
+This follows the separation of shared crack degrees of freedom in O'Brien and Hodgins §4.3.
+A loaded rung fixture independently pairs boundary faces in rest space and checks that
+each tracked edge still shares its endpoint particles between the real lips.
+The published mixed-mode approach of Erdogan and Sih (1963) describes
 crack direction under stress-intensity loading. The implemented rule uses tensile Green strain.
 [Graphical Modeling and Animation of Brittle Fracture](https://arxiv.org/pdf/2303.02934)
 [On the Crack Extension in Plates Under Plane Loading and Transverse Shear](https://doi.org/10.1115/1.3656897).

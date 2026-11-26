@@ -9673,7 +9673,8 @@ cells whose strain is too low. Other cells remain eligible after the topology ch
 remesher subdivides the selected tetrahedron and only the original neighbors that share its
 split faces or edges. An existing front advances through an eligible adjacent tetrahedron
 when its projected principal plane crosses the material. Front edge flags travel with
-their material through cuts and snapshots. General mixed-mode propagation remains open.
+their material through cuts and snapshots. The advancing front drops its released edge from
+all incident tetrahedra. General mixed-mode propagation remains open.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.

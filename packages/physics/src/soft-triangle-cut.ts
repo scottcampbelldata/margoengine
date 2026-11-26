@@ -258,9 +258,10 @@ export function planNucleatedCut(
   });
   const geometry = new IncisionGeometry(current, [{ origin, normal }]);
   const distances = cutDistances(current, origin, normal);
-  if (front) {
-    for (const k of front) distances[seed[k]!] = 0;
-    geometry.splitCrackEdge(seed[front[0]]!, seed[front[1]]!);
+  const releasedFront = front && ([seed[front[0]]!, seed[front[1]]!] as const);
+  if (releasedFront) {
+    for (const particle of releasedFront) distances[particle] = 0;
+    geometry.splitCrackEdge(...releasedFront);
   }
   const halves = SIGNS.map((side) =>
     FACES.map((face) => faceIntersection(seed, face, side, distances, (a, b) => geometry.sectionEdge(a, b))),
@@ -316,7 +317,12 @@ export function planNucleatedCut(
     following.add(b);
     crackFront.set(a, following);
   }
-  return { points: geometry.points, pieces: incisionPieces(children, geometry.points, severed), crackFront };
+  return {
+    points: geometry.points,
+    pieces: incisionPieces(children, geometry.points, severed),
+    crackFront,
+    releasedFront,
+  };
 }
 
 function addCones(

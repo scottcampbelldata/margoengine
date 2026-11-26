@@ -38,10 +38,15 @@ function childBasis(cell: SliceCell, state: Record<string, Float32Array>, row: n
 
 /** A front edge is material data: a cut can subdivide it without moving it off its original material endpoints. */
 function cutFrontFlags(plan: SlicePlan, cell: SliceCell, oldCells: Uint32Array, flags: number): number {
-  const { crackFront, points } = plan;
+  const { crackFront, points, releasedFront } = plan;
   if (!crackFront?.size && (flags & CRACK_FRONT_MASK) === 0) return 0;
-  const previousEdges = TETRA_EDGES.filter((_, i) => (flags & (1 << (CRACK_FRONT_SHIFT + i))) !== 0);
   const at = (corner: number): number => oldCells[4 * cell.parent + corner]!;
+  // Once the lips split this material edge, none of its incident cells has an active segment there.
+  const previousEdges = TETRA_EDGES.filter(
+    ([a, b], i) =>
+      (flags & (1 << (CRACK_FRONT_SHIFT + i))) !== 0 &&
+      !(releasedFront?.includes(at(a)) && releasedFront.includes(at(b))),
+  );
   const belongs = (point: SlicePoint, a: number, b: number): boolean => {
     const onEdge = (p: number): boolean => p === a || p === b;
     return point.vertices

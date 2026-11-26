@@ -105,7 +105,9 @@ first: each names its scope, its evidence file and how to reproduce it.
 
 - Load-driven tensile fracture (SOFT-04, 2026-11-26). A 35 kg rigid boot initiates a tensile
   crack on step 4 with a measured 122.86 N boot reaction. At step 18 the fixture has advanced
-  15 fracture events and both renderers replay state hash `9159834406f9cd35`. A low-threshold
+  15 fracture events and both renderers replay state hash `67aefc4a2ce1fed7`. Every marked
+  front edge in these advances still binds two matching material lips. Before the fix, the
+  rung retained 26 released edges in its tracked state at step 18. A low-threshold
   companion keeps advancing through candidate geometry below native precision. Run
   `node --test packages/physics/tests/coupling/volumetric-solids.test.js` and
   `node packages/physics/tests/volumetric-solids.browser.mjs`.
