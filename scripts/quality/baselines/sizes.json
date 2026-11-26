@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20428849,
+  "total": 20433613,
   "history": [
     {
       "date": "2026-10-24",
@@ -13185,6 +13185,12 @@
       "commit": "975bdd7f30",
       "grew": 1,
       "reason": "SOFT-04 adds through-element planar splitting, conservative particle-state transfer, and the native smoothed tear history needed for replay, moving the soft entry from 128798 to 131482 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 37225 to 40143 B ceiling (38973 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "1f99e19bf6403e4b66aba8c2e23c817bad80c59e",
+      "grew": 1,
+      "reason": "SOFT-03 adds the optional strands entry at 4508 B gzip (zero bytes before the entry existed). Its Cosserat and follow-the-leader tiers share one world layout, field sampler and loader. Splitting would duplicate that code and the state contract; core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -14052,6 +14058,7 @@
     "@margoengine/physics/soft": 132662,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 40143,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 94583,
+    "@margoengine/physics/strands": 4764,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 10388,

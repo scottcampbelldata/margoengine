@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,298 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,300 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12733,6 +12733,16 @@ Geoffrey Irving, Joseph Teran and Ronald Fedkiw described the inversion problem 
 The fourth-order determinant term here keeps the calibrated tangent at rest.
 [Invertible Finite Elements for Robust Simulation of Large Deformation](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf)
 
+`SoftBodies.cutPlane` handles complete planar sections of solids represented by their tetrahedra.
+Each fragment inherits the original material, pins and plastic rest basis. A child of a very close
+intersection still needs a rest basis and nodal mass representable in the native f32 state.
+The operation validates all pieces before replacing the body. It builds the edited topology once
+and uses the normal native solve for the fragments. The finite triangle blade in `SoftBodies.cut`
+continues to slice along existing faces. Embedded skins, separate spring or cluster constraints and
+live external bindings need a separate transfer when introducing new cutting vertices. Snapshots
+of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
+with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
+
 ### Gas-filled soft shells (SOFT-06)
 
 `@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber
@@ -12814,7 +12824,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 6,508 B gzip. Each lazy native asset measures 23,671 B raw and 9,364 B gzip.
+The DFSPH entry measures 6,649 B gzip. Each lazy native asset measures 28,814 B raw and 10,683 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -12825,9 +12835,11 @@ native loops.
 
 Closed planar walls integrate the cubic pressure kernel. Perpendicular-wall overlap is approximated.
 Rigid boxes, spheres and capsules use sampled boundaries and hold their last published pose during the
-fluid substeps. Contact audio represents an impulse on one selected modal track. Surface tension, bubble
-acoustics, shallow-water exchange and film production bindings are open. The narrow-channel surge is early
-against the cited experimental range.
+fluid substeps. Contact audio represents an impulse on one selected modal track. Capillarity uses one liquid and
+uniform material energies on its solids. The interface spans a three-spacing kernel neighbourhood.
+The capillary force runs before pressure and leaves out the paper's simultaneous nonlinear pressure and friction
+solve. The narrow-channel surge remains early. Bubble acoustics, shallow-water exchange and film production
+bindings are open.
 
 ### Position-based particle water (FLUID-02)
 
@@ -12885,6 +12897,21 @@ settings-table rows. One 80-byte uniform buffer, one more pipeline when added to
 not measured. Measured: new entry 1,282 B min+gzip; tonemap root, grade, hue, core and stage unchanged. GPU frames are
 within 0.5 of an 8-bit level of a CPU oracle on WebGPU and the WebGL2 layer (`tests/enhance-browser.mjs`). Margo's
 units are its own, so values from another engine's colour enhancement do not carry over one to one.
+
+### Physical strand guides (SOFT-03)
+
+The base native solver covers cylindrical elastic guides at 240 Hz by default. The follow tier
+keeps segment lengths and resolves a local bed plane. The rod tier resolves finite compliance
+and endpoint-sphere self contact using a sparse grid. Guide shear and twist use artist-supplied
+effective moduli where those have been measured. Sampled bodies are kinematic capsules and
+spheres with point contact. Separation between contacts depends on guide spacing and substep
+rate. Use enough points to resolve thin obstacles.
+
+The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
+changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
+native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,515 B gzip
+with a 4,771 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
+Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -29734,6 +29761,8 @@ climber and complete tower still need the DYN-07 contact and animation bindings.
 now runs with a full orthotropic tensor in native vertex blocks. The fracture threshold uses scalar
 cohesion. Grain-dependent timber fracture remains open.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
+Through-element plane cuts work on tetrahedral solids. A finite interior incision still needs
+embedded material geometry and the transfer of skin, spring, cluster and external binding state.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 
@@ -29773,12 +29802,12 @@ particle hand-off carrying both volume and horizontal momentum across the shallo
 
 ### Divergence-free narrow-channel surge and boundary exchange (FLUID-01, PA-22)
 
-After building Physics, run `node packages/physics/tests/dfsph-lab.mjs`. The interactive tier reaches the next
-Martin–Moyce Table 2 station in a normalized interval of about 0.397 against the original 0.71–1.14 trial span,
-with a measurement allowance of about 0.149. The simulated front contains early thin jets. The test geometry's
-planar pressure integral accounts for excluded volume, while the current model leaves out liquid-air surface
-tension and a viscous boundary layer on the planar walls. Their contributions to the measured discrepancy
-still need to be separated. The present real couplings are rigid reactions and the modal impact field.
+After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`. The interactive and accurate
+tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.458 and 0.467 against the
+original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
+measured liquid–air tension. The planar model includes excluded pressure volume and surface energy but has
+no resolved viscous wall layer. The original release diaphragm is also absent from the rectangular-domain
+model. The present real field couplings are rigid reactions and the modal impact field.
 
 ### Rail production shot and full track contact (DYN-05)
 
@@ -29789,6 +29818,15 @@ creep force. Profile-resolved rail-head and flange contact, free rigid-body impa
 of support, and a wired production render remain open. The contact wire uses fixed anchors and
 one loaded cable. Multi-wire hardware, moving switch point mechanisms and circuit-level arc
 measurements require separate models and evidence.
+
+### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
+
+The native guide solver receives time-sampled kinematic capsules, wind and a common terrain
+bed. Reciprocal rigid contact, segment-level continuous collision and inter-guide friction
+validation remain open. A point may pass a thin obstacle between substeps or slide past a
+capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
+solved guides. Horse tail and mane, the legacy spring-bone skin path and the named production
+shots remain open until their actual rigs receive the solved frames.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -14174,6 +14174,10 @@
       "./dfsph": {
         "raw": 16177,
         "gzip": 6649
+      },
+      "./strands": {
+        "raw": 10103,
+        "gzip": 4508
       }
     },
     "@margoengine/physics2d": {
@@ -18173,6 +18177,16 @@
       "raw": 28814,
       "gzip": 10683,
       "brotli": 9101
+    },
+    "packages/physics/dist/strand-kernel.wasm": {
+      "raw": 16163,
+      "gzip": 6444,
+      "brotli": 5585
+    },
+    "packages/physics/dist/strand-kernel-shared.wasm": {
+      "raw": 16163,
+      "gzip": 6444,
+      "brotli": 5610
     }
   },
   "splits": {

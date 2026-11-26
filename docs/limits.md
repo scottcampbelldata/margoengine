@@ -9778,6 +9778,6 @@ rate. Use enough points to resolve thin obstacles.
 
 The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
 changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,515 B gzip
-with a 4,771 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
+native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,508 B gzip
+with a 4,764 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
 Stage gain zero bytes.

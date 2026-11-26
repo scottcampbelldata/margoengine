@@ -2227,6 +2227,10 @@
       "types": "./dist/physics/lightning.d.ts",
       "import": "./dist/physics/lightning.js"
     },
+    "./physics/strands": {
+      "types": "./dist/physics/strands.d.ts",
+      "import": "./dist/physics/strands.js"
+    },
     "./physics/synoptic": {
       "types": "./dist/physics/synoptic.d.ts",
       "import": "./dist/physics/synoptic.js"
