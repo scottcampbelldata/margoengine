@@ -5218,6 +5218,53 @@ const energyAt100mm = loaded.absorbedEnergy + loaded.elasticEnergy;
 if (energyAt100mm < 900 || energyAt100mm > 1000) throw new Error('Expected progressive tube folding work');
 ```
 
+Pair `CrushSolver.withContactInertia(channel)` with `HullSolver.withContactInertia(channel)`
+to include the hull's instantaneous exterior added mass and carried water in station contact.
+Create the shared channel with `crushInertiaChannel()` (default name `wet-crush`). Tell
+the world to run hull, crush and rigid in that order in one staggered 60 Hz group. Use the
+rigid capacity for the crush solver. Unmapped bodies and bodies with locked angular axes
+use the ordinary rigid contact inertia.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver, crushInertiaChannel } from '@margoengine/physics/crush';
+import { HullSolver } from '@margoengine/physics/seakeeping';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const channel = crushInertiaChannel();
+const hull = HullSolver.withContactInertia(channel);
+const crush = CrushSolver.withContactInertia(channel);
+const vessel = physics.addBody(null, {
+  linearVelocity: [0, 2, 0],
+  colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 500, sensor: true },
+});
+const mesh = {
+  vertices: [-0.5,-0.5,-0.5, 0.5,-0.5,-0.5, 0.5,0.5,-0.5, -0.5,0.5,-0.5,
+    -0.5,-0.5,0.5, 0.5,-0.5,0.5, 0.5,0.5,0.5, -0.5,0.5,0.5],
+  indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,4,7, 0,7,3, 1,2,6, 1,6,5, 0,1,5, 0,5,4, 3,7,6, 3,6,2],
+};
+const bodyCapacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(hull, {
+  hulls: [{ row: vessel.row, mesh, compartments: [{ mesh, permeability: 1, water: 0.25 }] }],
+  sea: { density: 1000, elevation: () => 0, pressure: () => 0 }, gravity,
+  addedMass: false, radiation: false, rollDamping: false, drag: false, slamming: false,
+});
+world.add(crush, { bodyCapacity, patches: [{
+  body: vessel.row, anchor: [0, 0.5, 0], normal: [0, 1, 0], radius: 0.4,
+  support: { point: [0, 0.5, 0] }, material: { stiffness: 80e3, yieldForce: 1e9, stroke: 1 },
+}] });
+world.couple([hull.id, crush.id, 'rigid'], 'staggered');
+world.advance(1);
+if (Math.abs(crush.read(0).impulse - 3000) > 0.001) throw new Error('Expected elastic rebound with 250 kg of carried water');
+```
+
+[Wet contact method and checks](../../docs/whitepaper/reproduce.md#break-03-wet-contact-inertia)
+
 Use `resolveGirder` to bend a cross section made of plate strips and stiffeners. Give each strip its
 area, offset and stress–strain curve, including the unloaded origin. The solver finds the axial
 strain that balances the prescribed force. Pass the prior `referenceStrain` as `previousStrain` to

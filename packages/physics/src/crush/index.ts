@@ -15,6 +15,17 @@ import type {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { type CompressionStep, stepCompression } from './continuous.js';
+import {
+  type CrushInertiaChannel,
+  type WetContactStep,
+  WET_IMPULSE_WORDS,
+  WET_INERTIA_LAYOUT,
+  WET_INERTIA_WORDS,
+  wetInertiaWords,
+  wetPoint,
+  wetPush,
+  wetRow,
+} from './contact-inertia.js';
 import { traceGround } from './ground.js';
 import {
   CircularPlateIndentation,
@@ -44,6 +55,7 @@ import {
 } from './rigid-contact.js';
 
 export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
+export { type CrushInertiaChannel, crushInertiaChannel } from './contact-inertia.js';
 export { CircularPlateIndentation, type CircularPlateParams, type CircularPlateReading } from './indentation.js';
 export {
   GirderJointSolver,
@@ -195,6 +207,7 @@ interface State {
   readonly contacts: Region;
   readonly reactions: Region;
   readonly plateStrokes?: Region;
+  readonly wetReceipt?: Region;
 }
 
 function angularMass(
@@ -220,6 +233,7 @@ function frictionImpulse(
   b: AtContact | undefined,
   normal: CrushVector,
   limit: number,
+  wet: WetContactStep | undefined,
 ): CrushVector {
   const relative = sub(a.velocity, b?.velocity ?? ZERO);
   const tangent = sub(relative, scale(normal, dot(relative, normal)));
@@ -227,11 +241,23 @@ function frictionImpulse(
   if (speed === 0 || limit === 0) return ZERO;
   const first: CrushVector = [tangent[0] / speed, tangent[1] / speed, tangent[2] / speed]; // float division
   const second = cross(normal, first);
-  const [xx, xy, yy] = add(
-    angularMass(bodies, body, a.arm, first, second),
-    b && other !== undefined ? angularMass(bodies, other, b.arm, first, second) : ZERO,
-  );
-  const inverse = bodies[body * BODY_WORDS + 16]! + (other === undefined ? 0 : bodies[other * BODY_WORDS + 16]!);
+  const matched = wet && (wetRow(wet, body) || (other !== undefined && wetRow(wet, other)));
+  const pointMass = (row: number, arm: CrushVector): CrushVector => {
+    if (wet && wetRow(wet, row))
+      return [
+        wetPoint(wet, row, arm, first, first),
+        wetPoint(wet, row, arm, first, second),
+        wetPoint(wet, row, arm, second, second),
+      ];
+    const dry = angularMass(bodies, row, arm, first, second);
+    if (!matched) return dry;
+    const translation = bodies[row * BODY_WORDS + 16]!;
+    return [dry[0] + translation, dry[1], dry[2] + translation];
+  };
+  const [xx, xy, yy] = add(pointMass(body, a.arm), b && other !== undefined ? pointMass(other, b.arm) : ZERO);
+  const inverse = matched
+    ? 0
+    : bodies[body * BODY_WORDS + 16]! + (other === undefined ? 0 : bodies[other * BODY_WORDS + 16]!);
   // The first tangent points along the incoming slip, so the second component of the right side is zero.
   const opposing = (shift: number): readonly [number, number] => {
     const ratio = xy / (inverse + yy + shift); // float division: eliminate the second tangent component
@@ -259,6 +285,30 @@ function frictionImpulse(
     }
   }
   return add(scale(first, along), scale(second, across));
+}
+
+function contactState(
+  bodies: Float32Array,
+  out: Float64Array,
+  row: number,
+  point: CrushVector,
+  normal: CrushVector,
+  wet: WetContactStep | undefined,
+): AtContact {
+  const contact = atContact(bodies, out, row, point, normal);
+  if (!wet || !wetRow(wet, row)) return contact;
+  return { ...contact, inverseMass: wetPoint(wet, row, contact.arm, normal, normal) };
+}
+
+function applyContactImpulse(
+  out: Float64Array,
+  body: number,
+  arm: CrushVector,
+  impulse: CrushVector,
+  wet: WetContactStep | undefined,
+): void {
+  if (wet && wetRow(wet, body)) wetPush(wet, out, body, arm, impulse);
+  else impulseAt(out, body, impulse, arm);
 }
 
 function fixedAnchor(support: CrushSupport, cell: Cell, size: number | undefined): CrushVector {
@@ -323,10 +373,11 @@ function pushPair(
   b: AtContact | undefined,
   normalImpulse: number,
   friction: number,
+  wet: WetContactStep | undefined,
 ): void {
   const impulse = scale(normal, normalImpulse);
-  impulseAt(out, body, scale(impulse, -1), a.arm);
-  if (b && other !== undefined) impulseAt(out, other, impulse, b.arm);
+  applyContactImpulse(out, body, a.arm, scale(impulse, -1), wet);
+  if (b && other !== undefined) applyContactImpulse(out, other, b.arm, impulse, wet);
   if (friction > 0) {
     const slide = frictionImpulse(
       bodies,
@@ -336,9 +387,10 @@ function pushPair(
       other === undefined ? undefined : atContact(bodies, out, other, contact, normal),
       normal,
       friction * normalImpulse,
+      wet,
     );
-    impulseAt(out, body, slide, a.arm);
-    if (b && other !== undefined) impulseAt(out, other, scale(slide, -1), b.arm);
+    applyContactImpulse(out, body, a.arm, slide, wet);
+    if (b && other !== undefined) applyContactImpulse(out, other, b.arm, scale(slide, -1), wet);
   }
 }
 
@@ -354,6 +406,7 @@ function impact(
   plateStrokes: Float64Array | undefined,
   dt: number,
   terrain: Bed | undefined,
+  wet: WetContactStep | undefined,
 ): void {
   const { body } = patch;
   const support = 'support' in patch ? patch.support : undefined;
@@ -393,8 +446,8 @@ function impact(
   const continuous = !membrane && patch.response === 'continuous';
   if (!continuous && clearance > 0) latched[index] = 0;
   const contact = add(anchor, scale(normal, ground ? gap : 0.5 * gap));
-  const a = atContact(bodies, out, body, contact, normal);
-  const b = otherBody === undefined ? undefined : atContact(bodies, out, otherBody, contact, normal);
+  const a = contactState(bodies, out, body, contact, normal, wet);
+  const b = otherBody === undefined ? undefined : contactState(bodies, out, otherBody, contact, normal, wet);
   const relative = sub(a.velocity, b?.velocity ?? ZERO);
   const closing = dot(relative, normal);
   const inverse = a.inverseMass + (b?.inverseMass ?? 0);
@@ -427,7 +480,7 @@ function impact(
     }
     const turn = indentByImpulse(patch.indentation, previous, closing - inverse * held, inverse);
     const reaction = held + (turn?.impulse ?? 0);
-    if (reaction > 0) pushPair(bodies, out, body, otherBody, contact, normal, a, b, reaction, patch.friction);
+    if (reaction > 0) pushPair(bodies, out, body, otherBody, contact, normal, a, b, reaction, patch.friction, wet);
     if (turn) {
       damage.set(
         [
@@ -455,7 +508,7 @@ function impact(
     ? (step?.impulse ?? 0)
     : (result?.impulse ?? supportImpulse(-clearance, closing, inverse, patch.material.backingStiffness, dt));
   if (normalImpulse === 0) return;
-  pushPair(bodies, out, body, otherBody, contact, normal, a, b, normalImpulse, patch.friction);
+  pushPair(bodies, out, body, otherBody, contact, normal, a, b, normalImpulse, patch.friction, wet);
   if (step) {
     recordCompression(damage, at, step, patch.sealStroke, latched[index] !== 0);
     if (patch.plate && plateStrokes) plateStrokes[index] = step.totalStroke;
@@ -483,6 +536,7 @@ export class CrushSolver implements Solver<CrushParams> {
   readonly id: string;
   readonly damageField: FieldDescriptor;
   private readonly terrain: BedShape | undefined;
+  private wet?: CrushInertiaChannel;
   private state: State | undefined;
 
   constructor({ id = 'crush', terrain }: CrushOptions = {}) {
@@ -500,6 +554,13 @@ export class CrushSolver implements Solver<CrushParams> {
     };
   }
 
+  /** Resolves short contact impulses against the paired hull's effective mass. */
+  static withContactInertia(channel: CrushInertiaChannel, options?: CrushOptions): CrushSolver {
+    const solver = new CrushSolver(options);
+    solver.wet = channel;
+    return solver;
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
@@ -510,6 +571,12 @@ export class CrushSolver implements Solver<CrushParams> {
         { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
         { field: this.damageField, access: 'write' },
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
+        ...(this.wet
+          ? ([
+              { field: this.wet.mobility, access: 'read' },
+              { field: this.wet.receipt, access: 'write' },
+            ] as const)
+          : []),
       ],
     };
   }
@@ -592,6 +659,9 @@ export class CrushSolver implements Solver<CrushParams> {
       plateStrokes: patches.some((patch) => patch.plate)
         ? host.allocate('crush-plate-strokes', patches.length * F64, 'f64', CRUSH_LAYOUT)
         : undefined,
+      wetReceipt: this.wet
+        ? host.allocate('crush-wet-impulse', capacity * WET_IMPULSE_WORDS * F64, 'f64', WET_INERTIA_LAYOUT)
+        : undefined,
     };
   }
 
@@ -608,6 +678,18 @@ export class CrushSolver implements Solver<CrushParams> {
     )
       throw new MargoError('state', 'Set the crush body capacity to match the RigidSolver layout-2 bodies port.');
     const bodies = regionWords(state.host.memory, port.region) as Float32Array;
+    let wet: WetContactStep | undefined;
+    if (this.wet && state.wetReceipt) {
+      const input = context.inputs.get(this.wet.mobility.name);
+      if (!input || input.tick !== context.tick || port.tick !== context.tick - 1)
+        throw new MargoError('state', 'Place the hull before crush contact and rigid last in their same-rate group.');
+      const receipt = regionWords(state.host.memory, state.wetReceipt) as Float64Array;
+      receipt.fill(0);
+      wet = {
+        receipt,
+        mobility: wetInertiaWords(state.host.memory, input, state.capacity, WET_INERTIA_WORDS),
+      };
+    }
     const terrainPort = this.terrain && context.inputs.get(BED_FIELD.name);
     if (this.terrain && !terrainPort)
       throw new MargoError('state', 'Add TerrainBed to the PhysicsWorld and couple it with the crush ground patches.');
@@ -619,16 +701,17 @@ export class CrushSolver implements Solver<CrushParams> {
     const contacts = regionWords(state.host.memory, state.contacts) as Uint8Array;
     const plateStrokes = state.plateStrokes && (regionWords(state.host.memory, state.plateStrokes) as Float64Array);
     for (let i = 0; i < state.patches.length; i++)
-      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, plateStrokes, dt, terrain);
+      impact(state, state.patches[i]!, i, port, bodies, out, damage, contacts, plateStrokes, dt, terrain, wet);
   }
 
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
-    const { damage, reactions } = this.requireState();
+    const { damage, reactions, wetReceipt } = this.requireState();
     return [
       { field: this.damageField.name, region: damage, tick, cell: ZERO },
       { field: BODY_IMPULSES_FIELD.name, region: reactions, tick, cell: ZERO },
+      ...(this.wet && wetReceipt ? [{ field: this.wet.receipt.name, region: wetReceipt, tick, cell: ZERO }] : []),
     ];
   }
 
@@ -638,7 +721,8 @@ export class CrushSolver implements Solver<CrushParams> {
   }
 
   extraState(): readonly Region[] {
-    return [this.requireState().reactions];
+    const { reactions, wetReceipt } = this.requireState();
+    return wetReceipt ? [reactions, wetReceipt] : [reactions];
   }
 
   /** Copies the cumulative and most recent damage state for one configured contact patch. */

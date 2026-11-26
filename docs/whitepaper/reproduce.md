@@ -1,5 +1,30 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 wet contact inertia
+
+Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run
+`node --test packages/physics/tests/coupling/crush-contact-inertia.test.js`.
+The effective contact inertia combines the hull's dry generalized inertia `M` and the
+instantaneous water contribution `A`. The short event evaluates the contact response
+through `W = (M + A)^-1`. A direction `d` at arm `r` has generalized impulse coordinate
+`g = [d, r × d]`. The contact's point mobility is `gᵀ W g`. The dry rigid integrator receives
+`M W J` for the physical generalized impulse `J`, so it advances with the same velocity
+jump. At the next tick the hull subtracts this exact receipt from the inferred load.
+This applies the instantaneous mass term of W. E. Cummins, *The Impulse Response Function
+and Ship Motions* (1962), to the local impact formulation of P. T. Pedersen and S. Zhang,
+*On impact mechanics in ship collisions* (1998).
+[Cummins](https://dome.mit.edu/handle/1721.3/49049) · [Pedersen and Zhang](https://doi.org/10.1016/S0951-8339(99)00002-7)
+
+The exterior reference uses the two-dimensional half-submerged circular cylinder in
+J. M. J. Journée and W. W. Massie, *Offshore Hydromechanics* (2001), section 7.3.1.
+In the impulsive limit the heave dipole has zero potential on the waterline, so the
+immersed half has half the displaced-fluid inertia of the complete circle. For 0.5 m
+radius, 1.5 m strip length and 1000 kg/m³ water this gives 589.049 kg, compared to
+588.812 kg implied by the live collision. This reference is an analytical strip result.
+The floodwater tests check central recoil, independently derived off-axis motion,
+Coulomb sticking, dry fallback, schedule diagnostics, and exact snapshot replay.
+[Journée and Massie](https://ocw.tudelft.nl/wp-content/uploads/OffshoreHydromechanics_Journee_Massie.pdf)
+
 ## BREAK-03 measured square-tube compression
 
 Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run

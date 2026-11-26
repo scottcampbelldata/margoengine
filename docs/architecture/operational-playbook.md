@@ -10639,7 +10639,18 @@ restore. Continuous-sheet blocks and grounding are outside the current planar pa
 
 ### Civil impact work and rigid coupling (BREAK-03)
 
-`CrushSolver` reads the versioned `bodies` port and accumulates linear and angular impulses at the same point for both bodies. The published deformation and work ledger, contact latch, and pending impulse rows survive snapshot restore. Closed-form spring, perfectly plastic, hardening, and compacted backing references check energy and stroke. Two-body and fixed-barrier runs check momentum, offset torque, transverse misses, and persistent seal loss. A floating service craft uses the same rigid row for live seakeeping and a quay impact. Pending water ingress needs the SEA-10 compartment contract.
+`CrushSolver` reads the versioned `bodies` port and accumulates linear and angular impulses at the same point for both bodies. The published deformation and work ledger, contact latch, and pending impulse rows survive snapshot restore. Closed-form spring, perfectly plastic, hardening, and compacted backing references check energy and stroke. Two-body and fixed-barrier runs check momentum, offset torque, transverse misses, and persistent seal loss. A floating service craft uses the same rigid row for live seakeeping and a quay impact. A released seal or shell seam can open the matching SEA-10 compartment.
+
+`crushInertiaChannel` pairs a layout-1 hull mobility field with a crush impulse receipt.
+For each matching dynamic hull the mobility row stores a presence marker and the
+two world-frame matrices `(M + A)^-1` and `M (M + A)^-1` about the rigid centre of mass.
+The staggered schedule publishes mobility before the crush step and applies its mapped
+impulse in the same rigid tick. The hull reads that receipt on the following step so
+the ordinary external-load estimate excludes work the contact already resolved.
+Five focused tests cover live carried and exterior water inertia, cross-axis response,
+Coulomb sticking, and schedule and replay behaviour. The channel is local to the
+optional solvers.
+
 
 ### Thin films on rigid panes and open ground (FLUID-07)
 

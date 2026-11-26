@@ -19,6 +19,13 @@ import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, SeaSurface, SeaSurfaceSample, SeaWater } from '@margoengine/math/fields';
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
 import {
+  type CrushInertiaChannel,
+  WET_IMPULSE_WORDS,
+  WET_INERTIA_LAYOUT,
+  WET_INERTIA_WORDS,
+  wetInertiaWords,
+} from '../crush/contact-inertia.js';
+import {
   CRUSH_DAMAGE_QUANTITY,
   CRUSH_LAYOUT,
   CRUSH_SEAL_LOSS_WORD,
@@ -293,6 +300,8 @@ export class HullSolver implements Solver<HullParams> {
   private lastGirderJoint = -1;
   private lastShellSeam = -1;
   private shellApertures?: { readonly field: FieldDescriptor; readonly cellSize?: number };
+  private wetChannel?: CrushInertiaChannel;
+  private wetMobility: Region | null = null;
 
   /** The hull's signed volume source rows, named from the solver's id. Enabled with the wake option. */
   readonly wakeSourceField: FieldDescriptor;
@@ -348,6 +357,25 @@ export class HullSolver implements Solver<HullParams> {
     return hull;
   }
 
+  /** Supplies instantaneous added and carried-water inertia to the paired crush solver. */
+  static withContactInertia(
+    channel: CrushInertiaChannel,
+    options: {
+      readonly id?: string;
+      readonly wake?: HullWake;
+      readonly crushDamage?: FieldDescriptor;
+      readonly girderSeams?: FieldDescriptor;
+      readonly shell?: { readonly field: FieldDescriptor; readonly cellSize?: number };
+    } = {},
+  ): HullSolver {
+    const { id, wake, crushDamage, girderSeams, shell } = options;
+    const hull = shell
+      ? HullSolver.withShellApertures(shell.field, { id, wake, crushDamage, girderSeams, cellSize: shell.cellSize })
+      : new HullSolver(id, wake, crushDamage, girderSeams);
+    hull.wetChannel = channel;
+    return hull;
+  }
+
   describe(): SolverDescription {
     const level = this.level;
     return {
@@ -363,6 +391,12 @@ export class HullSolver implements Solver<HullParams> {
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
         ...(this.girderSeams ? [{ field: this.girderSeams, access: 'read' as const }] : []),
         ...(this.shellApertures ? [{ field: this.shellApertures.field, access: 'read' as const }] : []),
+        ...(this.wetChannel
+          ? ([
+              { field: this.wetChannel.mobility, access: 'write' },
+              { field: this.wetChannel.receipt, access: 'read' },
+            ] as const)
+          : []),
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -456,6 +490,8 @@ export class HullSolver implements Solver<HullParams> {
     this.lastGirderJoint = lastGirderJoint;
     this.lastShellSeam = lastShellSeam;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
+    if (this.wetChannel)
+      this.wetMobility = host.allocate('wet-mobility', capacity * WET_INERTIA_WORDS * 8, 'f64', WET_INERTIA_LAYOUT);
     this.wakeSources = null;
     this.wakePlanes.clear();
     this.reflectingWaterlines.clear();
@@ -695,6 +731,15 @@ export class HullSolver implements Solver<HullParams> {
         offset,
       };
     }
+    const wet = this.wetMobility && (regionWords(host.memory, this.wetMobility) as Float64Array);
+    wet?.fill(0);
+    let received: Float64Array | undefined;
+    if (this.wetChannel) {
+      const receipt = context.inputs.get(this.wetChannel.receipt.name);
+      if (!receipt || receipt.tick !== context.tick - 1 || port.tick !== context.tick - 1)
+        throw new MargoError('state', 'Use the solver order hull, crush and rigid at the same rate.');
+      received = wetInertiaWords(host.memory, receipt, this.capacity, WET_IMPULSE_WORDS);
+    }
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
@@ -797,7 +842,7 @@ export class HullSolver implements Solver<HullParams> {
         w = hull.row * FORCE_WORDS,
         held =
           this.addedMass || points.length > 0
-            ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads, points)
+            ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads, points, wet, received)
             : [...loads.force, ...loads.torque];
       for (let k = 0; k < 6; k++) out[w + k]! += held[k]!;
     }
@@ -1854,6 +1899,8 @@ export class HullSolver implements Solver<HullParams> {
     dt: number,
     loads: WettedLoads,
     points: readonly number[] = [],
+    wet: Float64Array | null = null,
+    received?: Float64Array,
   ): number[] {
     const inverseMass = bodies[at + 16]!,
       f = [...loads.force, ...loads.torque];
@@ -1944,6 +1991,7 @@ export class HullSolver implements Solver<HullParams> {
       system = new Float64Array(36),
       rhs = new Float64Array(6);
     for (let k = 0; k < 36; k++) system[k] = m[k]! + a[k]!;
+    if (wet && inertia[0]! > 0 && inertia[4]! > 0 && inertia[8]! > 0) writeWetMobility(wet, hull.row, m, system);
     // Every other load, from the last step: M (v - v_last) / dt - held_last - W.
     const index = this.hulls.indexOf(hull),
       last = new Float64Array(this.host!.memory.buffer, this.carry!.byteOffset + index * CARRY_WORDS * 8, CARRY_WORDS),
@@ -1961,7 +2009,8 @@ export class HullSolver implements Solver<HullParams> {
       for (let i = 0; i < 6; i++) {
         let sum = 0;
         for (let j = 0; j < 6; j++) sum += (m[i * 6 + j]! * (velocity[j]! - last[1 + j]!)) / dt;
-        seen[i] = sum - last[7 + i]! - weight[i]!;
+        const accounted = received ? received[hull.row * WET_IMPULSE_WORDS + i]! / dt : 0;
+        seen[i] = sum - last[7 + i]! - weight[i]! - accounted;
         // Carried on to this step's middle from the last two steps' (a straight line), or held where there is one.
         other[i] = last[0] >= 2 ? 2 * seen[i]! - last[13 + i]! : seen[i]!;
       }
@@ -1992,6 +2041,9 @@ export class HullSolver implements Solver<HullParams> {
       ...(this.wakeSources
         ? [{ field: this.wakeSourceField.name, region: this.wakeSources, tick, cell: [0, 0, 0] as const }]
         : []),
+      ...(this.wetMobility && this.wetChannel
+        ? [{ field: this.wetChannel.mobility.name, region: this.wetMobility, tick, cell: [0, 0, 0] as const }]
+        : []),
     ];
   }
 
@@ -2009,6 +2061,7 @@ export class HullSolver implements Solver<HullParams> {
       this.deckWater,
       this.slam,
       this.flood,
+      this.wetMobility,
     ].filter((r): r is Region => r !== null);
   }
 
@@ -2078,6 +2131,26 @@ function solve6(matrix: Float64Array, rhs: Float64Array): Float64Array {
     x[row] = a[row * n + row]! !== 0 ? sum / a[row * n + row]! : 0;
   }
   return x;
+}
+
+/** Publishes world twist mobility and its mapping to the dry kernel's impulse. */
+function writeWetMobility(out: Float64Array, row: number, dry: Float64Array, system: Float64Array): void {
+  const at = row * WET_INERTIA_WORDS;
+  const basis = new Float64Array(6);
+  for (let column = 0; column < 6; column++) {
+    basis[column] = 1;
+    const columnMobility = solve6(system, basis);
+    basis[column] = 0;
+    if (!(columnMobility[column]! > 0 && columnMobility.every(Number.isFinite)))
+      throw new MargoError('failed', 'Use a hull with finite positive effective rigid and water inertia.');
+    for (let i = 0; i < 6; i++) {
+      let mapped = 0;
+      for (let j = 0; j < 6; j++) mapped += dry[i * 6 + j]! * columnMobility[j]!;
+      out[at + 1 + i * 6 + column] = columnMobility[i]!;
+      out[at + 37 + i * 6 + column] = mapped;
+    }
+  }
+  out[at] = 1;
 }
 
 /** The rotation `q` turned by the angular velocity `w` (world axes) for `h` seconds: q + (h / 2) [w, 0] q, made a unit. */

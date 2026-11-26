@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Wet contact inertia (BREAK-03, 2026-11-26). A live hull carrying 250 kg of water
+  exchanges 3,000 N·s with a fixed contact and rebounds at its original speed. An off-axis
+  load and a sticking contact match the coupled linear and angular impulse calculation.
+  Exterior heave implies 588.812 kg of added inertia versus the 589.049 kg strip-theory
+  image solution. [Reproduce](reproduce.md#break-03-wet-contact-inertia)
 - Rolled-sheet plane-stress yield (BREAK-03, 2026-11-26). From independently measured
   uniaxial coupon properties, the native Hill model predicts 104.349 MPa in equal biaxial
   tension. Three held-out cruciform measurements range from 105.787 to 106.259 MPa.

@@ -139,7 +139,8 @@ there, add a line below with the solver ID and what is needed, and build against
 
 - **BREAK-03:** SEA-10 reads the versioned crush, girder and live shell aperture fields to move water into compartments
   and adds the carried water mass and inertia. The crush entry exchanges normal and angular impulse through the rigid ports.
-  Publish a shared effective-inertia port so short contact events can include resolved hydrodynamic added mass.
+  The optional hull and crush entries share versioned contact-mobility and impulse-receipt fields for short station events.
+  Those events now include instantaneous exterior added mass and carried water. Distributed shell contact still uses dry rigid inertia.
 
 - **BIO-03:** Register canonical x-fast cell fields for forest burn severity, fuel moisture, live canopy fuel,
   crown cover and root cohesion, and expose producer extents with their grid ports. The optional forest solver
