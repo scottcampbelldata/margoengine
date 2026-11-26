@@ -1194,3 +1194,39 @@ test('LightBounce bounces the lamps nearest the camera of a row of equal lamps',
   bounce.dispose?.();
   lights.dispose();
 });
+
+test('LightBounce.add gives a model the capture hook: albedo and eye distance in one target, removed on dispose', async () => {
+  const { LightBounce } = await import('../dist/bounce.js'),
+    { Clustered } = await import('../dist/index.js'),
+    bounce = new LightBounce({ lights: new Clustered() });
+  let hook,
+    restored = 0;
+  const model = {
+    setCapture(h) {
+      hook = h;
+      return () => restored++;
+    },
+    onDispose: () => () => {},
+    draw() {},
+  };
+  assert.throws(() => bounce.add({}), TypeError);
+  const remove = bounce.add(model);
+  assert.deepEqual(hook.targets, [{ format: 'rgba16float' }]);
+  // gltf/pbr's PBR Surface and Frame `f`: the base layer's diffuse albedo weighed by k, the distance to f.eye.
+  const pbr = hook.declarations('struct Surface {base:vec4f,n:vec3f}\n@group(0) @binding(0) var<uniform> f:Frame;');
+  assert.match(pbr, /var<private> margoPosition:vec3f;/);
+  assert.match(pbr, /struct MargoCapture \{@location\(0\) bounce:vec4f\}/);
+  assert.ok(pbr.includes('vec4f(s.base.rgb*(1.0-s.metal)*k,length(margoPosition-f.eye.xyz))'));
+  // Terrain's shader (no PBR Surface, Frame `frame`) gets margoSSR.
+  const terrain = hook.declarations('@group(0) @binding(0) var<uniform> frame:Frame;');
+  assert.ok(terrain.includes('fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR'));
+  assert.ok(terrain.includes('vec4f(base*(1.0-metal),length(margoPosition-frame.eye.xyz))'));
+  // A shader with no Frame it knows writes nothing (an empty texel), never a wrong distance.
+  assert.ok(hook.declarations('struct Surface {base:vec4f}').includes('MargoCapture(vec4f(0))'));
+  remove();
+  assert.equal(restored, 1);
+  bounce.add(model);
+  bounce.dispose();
+  assert.equal(restored, 2, 'dispose releases every added model');
+  assert.throws(() => bounce.add(model), { code: 'disposed' });
+});

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20169541,
+  "total": 20170056,
   "history": [
     {
       "date": "2026-10-24",
@@ -12879,6 +12879,12 @@
       "commit": "80679b25b4",
       "grew": 2,
       "reason": "ATMO-08 entry sizes, previous record to current: @margoengine/physics/drainage-fog 0→4666 B (ceiling 0→4922 B); @margoengine/environment/fog-volumes 1382→2243 B (ceiling 1638→2499 B). The drainage-fog entry integrates the registry and lazily loads the arena solver. The live renderer samples resolved optical columns using one storage binding and shares the existing volumetric pipeline. An additional entry would add a module for the same environment medium interface."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3ead56c312",
+      "reason": "KB-BOUNCE-CAPTURE1: clustered/bounce 14,967 to 15,419 B gzip: LightBounce.add draws gltf/pbr models and terrain into its captures through the shared capture hook (the hook, its WGSL tail and the 1x model pass); a separate entry would load the same LightBounce class twice. gltf/prepare 35,482 to 35,545 B: extendedPlan groups slots by colour space (shareOwner) and ownSlot picks the sRGB member, so packed specular colour decodes as sRGB; the rule is the plan itself, nothing to split",
+      "grew": 2
     }
   ],
   "items": {
@@ -13053,7 +13059,7 @@
     "@margoengine/clustered/area": 14883,
     "@margoengine/clustered/area-shapes": 13202,
     "@margoengine/clustered/area-texture": 4349,
-    "@margoengine/clustered/bounce": 14967,
+    "@margoengine/clustered/bounce": 15419,
     "@margoengine/clustered/budget": 723,
     "@margoengine/clustered/contact": 6713,
     "@margoengine/clustered/cube-projector": 4716,
@@ -13343,7 +13349,7 @@
     "@margoengine/gltf/pbr-instancing": 3448,
     "@margoengine/gltf/pbr-model": 71859,
     "@margoengine/gltf/physics": 10323,
-    "@margoengine/gltf/prepare": 35482,
+    "@margoengine/gltf/prepare": 35545,
     "@margoengine/gltf/progressive": 101363,
     "@margoengine/gltf/quantized": 1385,
     "@margoengine/gltf/report": 11799,
