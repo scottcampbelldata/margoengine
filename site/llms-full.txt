@@ -12287,6 +12287,26 @@ the overlay blend modes. DepthDownsample: single-sample reversed-Z source, outpu
 `'representative'` is the median of at most 4 x 4 texels of the footprint; reading the stack's resolved depth needs an
 order after 30. GPU cost of none of them measured.
 
+## Playground
+
+The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2026-11-26:
+
+- A share link's `#code=` holds at most 65,536 characters (`MAX_LINK_CHARS`) and expands to at most 262,144 bytes of
+  UTF-8 code (`MAX_CODE_BYTES`); longer code is refused with a message to download it instead. Browsers and servers
+  cap URL length separately; the hash never reaches the server.
+- The version history keeps the newest 30 snapshots (`MAX_SNAPSHOTS`) in this browser's `localStorage`. When storage
+  is full the oldest go first; where storage is blocked (some private windows) versions last only until the tab closes.
+- The console keeps the last 500 lines; each message is cut to 4,000 characters.
+- An error's line is read from the frame's stack (`about:srcdoc:<line>`) or the error event; an error thrown inside a
+  package, or one with no stack, shows no line.
+- One file per playground; no type hints in the editor; no embed mode (the next piece of the row).
+- On margoengine.com the page loads the import map of `margoengine@1.0.0` from jsDelivr, which works once the packages
+  are published on npm (they are not yet: the catalog lists 0 of 108 published). Until then, run it against a checkout
+  with `npm run playground` and `?packages=/node_modules/`.
+- Download HTML gives the same document the frame runs; it loads the packages from the same place as the page did, so
+  a file downloaded from a local run needs that local server.
+- The glTF template loads the Khronos Box sample from raw.githubusercontent.com, so it needs the network.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

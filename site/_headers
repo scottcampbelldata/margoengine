@@ -10,6 +10,13 @@
 /catalog/examples/*
   ! Content-Security-Policy
 
+# The playground runs the visitor's code inline in a sandboxed srcdoc frame (opaque origin, no allow-same-origin) and
+# loads the packages from jsDelivr. A srcdoc frame inherits its page's policy, so the playground has its own:
+# inline scripts, jsDelivr, and https: for the models and textures the code fetches (docs/playground.md).
+/playground/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: blob: data:; worker-src 'self' blob: https://cdn.jsdelivr.net; font-src 'self' https:; media-src 'self' https: blob: data:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'self'
+
 # Cache-Control: no-cache above: browsers check every file each visit (an unchanged file costs a 304, nothing is
 # re-downloaded), so a bad copy never sticks. It also overrides the zone's 4-hour Browser Cache TTL on margoengine.com.
 # Missing files get site/404.html with no-store; scripts/site-check.mjs checks all of this after each deploy.

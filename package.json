@@ -134,6 +134,7 @@
   "scripts": {
     "sciviz:compare": "node scripts/sciviz-compare.mjs",
     "catalog": "node scripts/serve-catalog.js",
+    "playground": "node scripts/serve-playground.mjs",
     "dev:examples": "node scripts/dev-examples.mjs",
     "dev:sandbox": "vite examples/gameplay-sandbox",
     "dev:voxel": "vite examples/voxel-sandbox",
@@ -239,6 +240,7 @@
     "test:all": "npm run build:packages && node --experimental-test-module-mocks --test --test-concurrency=4 tests/*.test.js packages/*/tests/*.test.js packages/*/tests/coupling/*.test.js packages/*/test/*.test.js",
     "test:modules:browser": "node scripts/margo-module-tests.js",
     "test:catalog:browser": "node --test tests/browser/catalog.test.js",
+    "test:playground:browser": "node --test tests/browser/playground.test.js",
     "test:lifecycle:browser": "node scripts/lifecycle-browser-tests.mjs",
     "test:composition:browser": "node scripts/composition-browser-tests.mjs",
     "test:python:browser": "node python/build-frontend.mjs && node python/tests/jupyter-browser.mjs",
