@@ -19,5 +19,6 @@ export {
   objectCSSTransform,
   cssPointToWorld,
   composeMatrix,
+  boxAnchorPoint,
 } from './projection.js';
-export type { Backend, Vec3 } from './projection.js';
+export type { Backend, Vec3, BoxAnchorSpec, BoxFace } from './projection.js';

@@ -9,6 +9,10 @@ import { ScreenPoint } from "@margoengine/math/mat4";
 
 export { Backend } from "@margoengine/math";
 
+export type BoxAnchorSpec = BoxFace | 'center' | readonly [number, number, number];
+
+export type BoxFace = 'left' | 'right' | 'bottom' | 'top' | 'back' | 'front';
+
 export class CSS3DObject extends Item {
     pixelScale: number;
     occlude: CSS3DOccludeHook | null;
@@ -140,6 +144,8 @@ export interface LayoutContext {
 export type OccludeHook = (label: Label, info: LabelInfo) => boolean;
 
 export type Vec3 = readonly [number, number, number];
+
+export function boxAnchorPoint(min: Vec3, max: Vec3, anchor?: BoxAnchorSpec, matrix?: ArrayLike<number>, out?: [number, number, number]): [number, number, number];
 
 export function cameraCSSTransform(view: ArrayLike<number>, perspective: number, width: number, height: number): string;
 

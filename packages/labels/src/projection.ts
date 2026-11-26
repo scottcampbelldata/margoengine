@@ -5,6 +5,7 @@
 // sixteen values column by column, the same order as Margo matrices. A transform list composes left to right by
 // post-multiplication and is applied about the element's transform-origin (its centre by default).
 import type { Backend } from '@margoengine/math/mat4';
+import { rangeError } from '../../shared/errors.js';
 export type { Backend };
 
 /** Three numbers [x, y, z] in world units. */
@@ -237,5 +238,74 @@ export function composeMatrix(
   out[13] = position[1];
   out[14] = position[2];
   out[15] = 1;
+  return out;
+}
+
+/** A face of a box: the anchor sits at the centre of that face. */
+export type BoxFace = 'left' | 'right' | 'bottom' | 'top' | 'back' | 'front';
+/**
+ * Where on a box to pin: a face name, 'center', or a `[x, y, z]` triple of -1 (the min side), 0 (the middle) and 1 (the
+ * max side) per axis. `[1, 1, 1]` is the max corner, `[0, 1, 0]` the middle of the top face, `[1, 1, 0]` a top edge.
+ */
+export type BoxAnchorSpec = BoxFace | 'center' | readonly [number, number, number];
+
+const FACES: Record<string, Vec3> = {
+  left: [-1, 0, 0],
+  right: [1, 0, 0],
+  bottom: [0, -1, 0],
+  top: [0, 1, 0],
+  back: [0, 0, -1],
+  front: [0, 0, 1],
+  center: [0, 0, 0],
+};
+
+/**
+ * World position of a corner, edge, face centre or the centre of a box, to pin a label or CSS 3D object to it
+ * (`label.setPosition(boxAnchorPoint(min, max, 'top'))`). Pass the box's world matrix (for example a mesh's) and the
+ * point follows a moved, rotated or scaled box, so a box fitted in local space stays pinned.
+ *
+ * @param min - Smallest corner of the box.
+ * @param max - Largest corner of the box.
+ * @param anchor - Face name, 'center' or a [-1|0|1, -1|0|1, -1|0|1] triple (default 'center').
+ * @param matrix - Optional column-major 4x4 matrix applied to the point (default identity).
+ * @param out - Destination, written and returned (default: a new array).
+ * @throws RangeError when a bound is not finite, `min` exceeds `max`, or the anchor is not a face name, 'center' or a triple of -1, 0 and 1.
+ */
+export function boxAnchorPoint(
+  min: Vec3,
+  max: Vec3,
+  anchor: BoxAnchorSpec = 'center',
+  matrix?: ArrayLike<number>,
+  out: [number, number, number] = [0, 0, 0],
+): [number, number, number] {
+  const a = typeof anchor === 'string' ? FACES[anchor] : anchor;
+  if (
+    !a ||
+    a.length !== 3 ||
+    !a.every((v) => v === -1 || v === 0 || v === 1) ||
+    ![...min, ...max].every(Number.isFinite) ||
+    min.length !== 3 ||
+    max.length !== 3 ||
+    min[0] > max[0] ||
+    min[1] > max[1] ||
+    min[2] > max[2]
+  )
+    throw rangeError(
+      'boxAnchorPoint needs finite min <= max and an anchor of a face name, center, or three numbers from -1, 0 and 1; fix the arguments',
+      'labels',
+    );
+  const x = (min[0] + max[0] + a[0] * (max[0] - min[0])) / 2,
+    y = (min[1] + max[1] + a[1] * (max[1] - min[1])) / 2,
+    z = (min[2] + max[2] + a[2] * (max[2] - min[2])) / 2;
+  if (!matrix) {
+    out[0] = x;
+    out[1] = y;
+    out[2] = z;
+    return out;
+  }
+  const w = matrix[3] * x + matrix[7] * y + matrix[11] * z + matrix[15] || 1;
+  out[0] = (matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12]) / w;
+  out[1] = (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) / w;
+  out[2] = (matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]) / w;
   return out;
 }

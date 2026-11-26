@@ -1833,6 +1833,7 @@ export const entries = [
       'width must be a finite number of CSS pixels, 0 or more',
       'dot must be a finite number of CSS pixels, 0 or more',
       'minLength must be a finite number of CSS pixels, 0 or more',
+      'boxAnchorPoint needs finite min <= max and an anchor of a face name, center, or three numbers from -1, 0 and 1; fix the arguments',
     ],
     cause:
       'A label or a label layout got a value it cannot use: a priority that is not a number, an anchor that is not two finite numbers, a `Declutter` padding, cell or position list out of range, a `screenOffset` that is not two finite numbers, or a `Callouts` width, dot or minLength below 0.',

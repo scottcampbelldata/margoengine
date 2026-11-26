@@ -79,6 +79,29 @@ engine.render();
 engine.dispose();
 ```
 
+## Pinning to a box: boxAnchorPoint
+
+`boxAnchorPoint(min, max, anchor, matrix?)` returns the world position of a box corner, edge, face centre or centre.
+`anchor` is a face name (`'left'`, `'right'`, `'bottom'`, `'top'`, `'back'`, `'front'`), `'center'` (the default) or a
+`[x, y, z]` triple of -1 (min side), 0 (middle) and 1 (max side), so `[1, 1, 1]` is the max corner. Pass the box's
+world matrix and the point follows a moved, rotated or scaled box. A bad box or anchor throws a RangeError that says
+how to fix it.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { LabelRenderer, boxAnchorPoint } from '@margoengine/labels';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const labels = LabelRenderer.attach(engine);
+const label = labels.add(document.createElement('span'));
+label.element.textContent = 'Roof';
+const min: [number, number, number] = [-1, 0, -1];
+const max: [number, number, number] = [1, 2, 1];
+label.setPosition(boxAnchorPoint(min, max, 'top'));
+engine.render();
+engine.dispose();
+```
+
 ## Scaled pages
 
 A CSS scale on an element around the canvas (a zoomed preview, a slide, a fitted dashboard tile) scales what the browser draws but not the `left` and `top` the overlay is placed with. Each update the renderer reads the overlay's drawn width against the width it gave it, converts its correction by that scale, and lands on the canvas content box in the same update at any scale. An overlay in another `parent`, outside the scaled element, is scaled itself (`transform: scale(k)`, origin at its corner) so a CSS pixel of the labels is a CSS pixel of the canvas.
