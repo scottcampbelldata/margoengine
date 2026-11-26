@@ -35,7 +35,7 @@ export function instanceMatrix(floats: ArrayLike<number>, f: number, align: numb
 
 export function poseFrame(values: ArrayLike<number>, windBefore: ArrayLike<number>, vertices: number): ArrayBuffer;
 
-export const poseKernel: (pose: (code: string, binding: number) => string) => string;
+export const poseKernel: (source: string, pose: (code: string, binding: number) => string) => string;
 
 export function readScatter(engine: EngineKernel, scatter: Scatter, { signal, pose }?: ScatterReadOptions): Promise<ScatterReadout>;
 
@@ -218,6 +218,7 @@ interface ScatterVariation {
 interface ScatterVelocityParts {
     readonly values: Float32Array;
     readonly windBefore: Float32Array;
+    readonly poseSource: string;
     readonly instances: readonly GPUBuffer[];
     readonly commands: GPUBuffer;
     readonly vertices: readonly GPUBuffer[];

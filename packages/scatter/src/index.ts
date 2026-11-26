@@ -80,6 +80,8 @@ export interface ScatterVelocityParts {
    * the last frame's own on the first frame and after `resetTime`. `@margoengine/scatter/read` poses the shutter's open with it.
    */
   readonly windBefore: Float32Array;
+  /** The unpatched WGSL pose functions (`windShader` and `poseShader`), which `pose` patches into a posing stage. */
+  readonly poseSource: string;
   readonly instances: readonly GPUBuffer[];
   readonly commands: GPUBuffer;
   readonly vertices: readonly GPUBuffer[];
@@ -1725,6 +1727,7 @@ export class Scatter implements EnginePlugin {
     return {
       values: this.values,
       windBefore: this.windBefore,
+      poseSource: windShader + poseShader,
       instances: this.colourInstances(),
       commands: this.colourCommands(),
       vertices: this.vertices,
