@@ -12794,10 +12794,10 @@ Unseeded tensile nucleation scans the cells once after the soft step. It selects
 principal elastic Green strain and opens the full centroid section of that cell. The scan skips
 inverted and previously nucleated material and uses an eigenvalue bound to avoid diagonalizing
 cells whose strain is too low. Other cells remain eligible after the topology changes. The
-remesher may also subdivide tetrahedra intersecting the supporting plane to preserve shared
-faces. Crack-front tracking and mixed-mode propagation remain open. Use tensile nucleation
+remesher subdivides the selected tetrahedron and only the original neighbors that share its
+split faces or edges. Crack-front tracking and mixed-mode propagation remain open. Use tensile nucleation
 as the fracture rule on unskinned cells without independent springs or clusters.
-The optional entry measures 140,330 B gzip including a 96,131 B lazy native kernel.
+With local remeshing the optional entry measures 140,526 B gzip including a 96,131 B lazy native kernel.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -12904,7 +12904,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 8,197 B gzip. The plain and shared native assets measure 36,161 and 36,155 B raw, and 14,635 and 14,634 B gzip.
+The DFSPH entry measures 8,373 B gzip. The plain and shared native assets measure 36,539 and 36,533 B raw, and 14,808 and 14,802 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -12951,6 +12951,9 @@ The integrated cubic-kernel colour energy equals the prescribed surface tension 
 The measured quadrupole period of a 20.10 mm free water drop is 0.885 s, compared with the
 0.742 s Rayleigh limit for the same density, tension and rest volume. The separated surface
 energy and pressure updates need more validation for shape frequencies.
+The optional layout-1 hard-contact impact record is 56 B per solver. It combines hard contacts
+within each tick at one energy-weighted position and substep arrival time. The value in joules is the
+dissipated mechanical energy. Bubble geometry, gas resonance and acoustic radiation are separate models.
 
 ### Position-based particle water (FLUID-02)
 
@@ -13006,15 +13009,16 @@ gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular e
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
-[0, 1], rotating lugs return up to the current rear cut capacity or transfer loose soil between
-banks at large obliquity. Previously filled and compacted tracks use the cumulative bed state.
+[0, 1], rotating lugs fill the solver's cumulative rear depression or transfer loose soil between
+banks at large obliquity. The optional history costs eight bytes per grid vertex and visits
+only the affected vertices. The separate excavation maximum prevents counting a cut twice.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 13,650 B gzip with a 13,728 B ceiling. Both Wasm assets are 33,712 B raw and 13,196 B gzip each.
+The optional entry is 13,706 B gzip with a 13,728 B ceiling. Both Wasm assets are 33,834 B raw and 13,384 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -30005,8 +30009,8 @@ Measured cross-slope camber forces remain open.
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements. The optional
 cross-track depositor conserves independent bank volumes from the actual cut.
-Grouser transport can backfill the newly cut ground or feed the opposite bank. A quantitative
-comparison to steady scanned trench profiles remains open.
+Grouser transport can backfill its solver-owned trench from earlier cuts or feed the opposite bank.
+A quantitative comparison to steady scanned trench profiles remains open.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
 brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
 opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
@@ -30083,6 +30087,7 @@ Run `node packages/physics/tests/dfsph-capillary-lab.mjs` after building Physics
 against the 0.742 s Rayleigh prediction. Planar energy normalization corrected the earlier 1.481 s result. This fixture starts an equal-volume ellipsoid from rest without
 gravity or a container impact. The period provides a separate accuracy check for the planned unified
 pressure and surface-energy solve at several resolutions.
+The 7,208-particle refined case reads 0.787 s against 0.735 s. Intermediate meshes show non-monotonic period error.
 
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
 using the interactive iteration limits, which reads 0.295 and 0.514 against the two original measurement
