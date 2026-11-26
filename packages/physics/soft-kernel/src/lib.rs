@@ -24,6 +24,7 @@ pub mod face;
 mod volume;
 pub mod fem;
 mod implicit;
+mod projective;
 mod vertex_block;
 mod fem_api;
 #[cfg(target_arch = "wasm32")]

@@ -579,6 +579,37 @@ world.advance(60);
 console.log(rung.solver, rung.particlePosition(49), world.hash());
 ```
 
+#### Projective Dynamics
+
+`setSolver('projective')` projects each tetrahedron onto a proper rotation and its original volume.
+A global position solve then balances those targets against the inertia, the pin positions and
+material damping. Use a `corotated` cell material. The Young's modulus and Poisson ratio keep their
+small-strain meaning, with the rotation projection carrying shear and the volume projection carrying
+bulk resistance. `soft.iterations` controls the number of local/global iterations per substep.
+The global solve also uses the existing `femLinearTolerance`, `femMaxLinearIterations` and
+`femMaxDenseDofs` settings.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const soft = await SoftBodies.attach(physics, { substeps: 4, iterations: 4 });
+const material = new CellMaterial();
+material.model = 'corotated';
+material.youngsModulus = 2e6;
+material.poissonRatio = 0.32;
+const bar = SoftBodyDesc.box([0, 1, 0], [0.8, 0.2, 0.2], [8, 2, 2], material);
+const pins: number[] = [];
+for (let i = 0; i < bar.particleCount; i++) {
+  if (bar.positions[3 * i] === 0) pins.push(i);
+}
+const body = soft.create(bar.setPinnedParticles(pins).setSolver('projective'));
+for (let frame = 0; frame < 60; frame++) physics.step();
+console.log(body.solver, body.volume());
+```
+
 Not in this entry yet: collision through a skin (see `docs/physics-collision-parity.md` for each row).
 
 - **Sails and flags in the wind (AERO-02).** `new SailForce(physics, cloth, {wind, grid: [nu, nv], chord = 'u', density, stall = 0.35, drag = 1.17})` loads a cloth made by `SoftBodyDesc.cloth` with a vortex lattice on its own grid, solved again every step from where its particles are: each cell carries a horseshoe vortex (bound on its quarter chord, trailing from the leech along the apparent wind), the circulations stop the air passing through the sail at every cell's three-quarter chord, and each cell takes the Kutta-Joukowski force of its circulation, shared by its four corners. A cell the air meets more steeply than `stall` radians has separated and takes the flat plate's normal force instead (the `WindForce` law). So a sail's camber, twist and angle to the wind decide its lift (a flat sail of aspect ratio 6 has the lift slope of a wing of that aspect ratio), a sail run square before the wind is pushed, and the load reaches whatever holds the cloth. `chord` names the grid direction from the leading edge to the trailing edge; `wind` is a vector, a function of the point and the time, or a flow field such as `@margoengine/weather`'s `BoundaryLayerWind`; `sail.force` is the last step's total (the load that went into the cloth over the step) and `sail.circulation` each cell's. The load leans on the cloth's own speed through the air, so each corner takes it damped implicitly (backward Euler), and a sail of real sailcloth weight stays steady at the world's step. It is quasi-steady (no wake memory) and one surface thick. While attached it supplies the cloth's air loads: the cloth's own flat-plate drag (`setAirDrag`) is off for that cloth until `remove()`. It loads the cloth's particles, never a rigid body directly, so in a world the `SoftSolver` steps the cloth with the sail's load in it to the same bits as alone, and the load reaches the boat through what holds the cloth (the soft solver's `bodyImpulses` and `bodyForces`).

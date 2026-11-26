@@ -430,3 +430,83 @@ fn each_vertex_block_sweep_reduces_the_same_implicit_energy() {
         last = energy;
     }
 }
+
+#[test]
+fn projective_global_step_matches_affine_extension_and_compression() {
+    use margoengine_soft_kernel::fem::{COROTATED, PROJECTIVE_TET};
+    let h = 1.0f32 / 30.0;
+    for (z, v, beta) in [(1.1f32, 0.7f32, 0.0f32), (0.8, -0.5, 0.06)] {
+        let mut w = World::new();
+        w.reserve(4, 0, 1, 0);
+        w.fem_reserve(1, 0, 0);
+        w.particles = 4;
+        w.bodies = 1;
+        w.x[1] = 1.0;
+        w.y[2] = 1.0;
+        w.z[3] = 1.0;
+        w.w[3] = 1.0 / 3.0;
+        assert!(w.set_tet(0, [0, 1, 2, 3], 250.0, 0.0, COROTATED));
+        w.fem.imp.reserve_particles(w.particles);
+        w.fem.flags[0] |= PROJECTIVE_TET;
+        w.fem.imp.beta[0] = beta;
+        w.z[3] = z;
+        w.vz[3] = v;
+        w.step(h, 1, 1, [0.0; 3]);
+        // R is the identity for F = diag(1,1,z) when z > 0. The objective is then a scalar quadratic.
+        let dt = f64::from(h);
+        let stiffness = 2.0 * 250.0 / 6.0;
+        let elastic = stiffness * dt * dt;
+        let damping = stiffness * f64::from(beta) * dt;
+        let expected = (3.0 * f64::from(z + h * v) + elastic + damping * f64::from(z)) / (3.0 + elastic + damping);
+        assert!((f64::from(w.z[3]) - expected).abs() < 8.0 * f64::from(f32::EPSILON), "{} vs {expected}", w.z[3]);
+        assert_eq!([w.x[3], w.y[3]], [0.0, 0.0]);
+        assert_eq!([w.x[1], w.y[2]], [1.0, 1.0]);
+        // A scalar backward Euler oscillator without external work loses, or at worst preserves, mechanical energy.
+        let energy = |w: &World| {
+            let strain = f64::from(w.z[3]) - 1.0;
+            let speed = f64::from(w.vz[3]);
+            0.5 * (3.0 * speed * speed + stiffness * strain * strain)
+        };
+        let mut old = energy(&w);
+        for _ in 0..24 {
+            w.step(h, 1, 1, [0.0; 3]);
+            let now = energy(&w);
+            assert!(now <= old + 32.0 * f64::from(f32::EPSILON) * old.max(1.0), "energy {now} after {old}");
+            old = now;
+        }
+    }
+}
+
+#[test]
+fn projective_global_step_preserves_rigid_rotations_and_recovers_a_nearly_inverted_cell() {
+    use margoengine_soft_kernel::fem::{COROTATED, PROJECTIVE_TET};
+    let scene = || {
+        let mut w = World::new();
+        w.reserve(4, 0, 1, 0);
+        w.fem_reserve(1, 0, 0);
+        w.particles = 4;
+        w.bodies = 1;
+        w.x[1] = 1.0;
+        w.y[2] = 1.0;
+        w.z[3] = 1.0;
+        w.w[3] = 2.0;
+        assert!(w.set_tet(0, [0, 1, 2, 3], 2_000.0, 15_000.0, COROTATED));
+        w.fem.imp.reserve_particles(w.particles);
+        w.fem.flags[0] |= PROJECTIVE_TET;
+        w
+    };
+    let mut rotated = scene();
+    rotated.x[1] = 0.0;
+    rotated.y[1] = 1.0;
+    rotated.x[2] = -1.0;
+    rotated.y[2] = 0.0;
+    rotated.step(1.0 / 60.0, 2, 4, [0.0; 3]);
+    assert_eq!([rotated.x[3], rotated.y[3], rotated.z[3]], [0.0, 0.0, 1.0]);
+    let mut inverted = scene();
+    inverted.z[3] = -0.02;
+    for _ in 0..12 {
+        inverted.step(1.0 / 60.0, 2, 6, [0.0; 3]);
+        assert!(inverted.z[3].is_finite());
+    }
+    assert!(inverted.z[3] > 0.5, "the projected volume recovered: {}", inverted.z[3]);
+}

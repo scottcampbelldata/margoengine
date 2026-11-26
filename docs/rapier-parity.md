@@ -439,7 +439,7 @@ Parity soft bodies run on the Wasm kernel. These rows add GPU paths and newer me
 | X-30 | Long range attachments (tethers) for inextensible cloth | Chaos cloth, PhysX (u) | Kim, Chentanez, Müller, "Long Range Attachments", SCA 2012 | GPU compute | Wasm | MISSING |
 | X-31 | Skinned cloth (capes and skirts tied to a skeleton with max distance) | Jolt, Chaos cloth | Müller et al., "Meshless Deformations Based on Shape Matching", SIGGRAPH 2005 | GPU compute | Wasm | MISSING: pinned particles and `setParticleKinematicTarget` exist; no skinned cloth or max-distance tie to a skeleton |
 | X-32 | Pressure soft bodies (balloons, inflatables) | Jolt, PhysX, Bullet | Matyka and Ollila, "Pressure Model of Soft Body Simulation", SIGRAD 2003 | Wasm | Wasm | Isothermal gas pressure, compliant shells and two-way rigid contacts in the optional soft kernel. The dedicated GPU compute path remains open. |
-| X-33 | Projective dynamics solver | research | Bouaziz, Martin, Liu, Kavan, Pauly, "Projective Dynamics", ACM TOG 33(4) 2014, doi 10.1145/2601097.2601116 | Wasm (global solve) | Wasm | MISSING |
+| X-33 | Projective dynamics solver | research | Bouaziz, Martin, Liu, Kavan, Pauly, "Projective Dynamics", ACM TOG 33(4) 2014, doi 10.1145/2601097.2601116 | Wasm (global solve) | Wasm | Local signed rotation and volume projections with native matrix-free global solve, two-way rigid contacts and replay in `@margoengine/physics/soft`. |
 | X-34 | Stable Neo-Hookean flesh | Chaos flesh (u), Bullet | Smith, de Goes, Kim, "Stable Neo-Hookean Flesh Simulation", ACM TOG 37(2) 2018 | GPU compute | Wasm | Exact native vertex block in `@margoengine/physics/soft` with rigid contacts and replay. Dedicated GPU compute remains open. |
 
 ## Buoyancy and water

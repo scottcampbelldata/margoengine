@@ -77,6 +77,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **SOFT-04** needs a same-tick handoff for GPU-resident positions and reciprocal rigid-contact impulses,
+  with an ordered snapshot readback after the tick commits. The current SoftSolver contract steps CPU
+  regions synchronously. Both native nonlinear modes run on that contract and use the existing rigid fields.
+
 - **EARTH-10:** Specify a registered extent and per-source basal heat acceptance on ICE-01 columns, plus a shared
   solid-deposit height/material input for EARTH-02. The existing lava entry publishes grid height and lava records,
   exchanges heat and phases with ICE-05, and emits registered layout-1 coastal displacement.

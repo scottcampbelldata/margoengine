@@ -5,8 +5,8 @@ use crate::World;
 use crate::col::Col;
 use crate::fem::{NONE, TORN_TET, VERTEX_BLOCK_TET};
 
-type Vec3 = [f64; 3];
-type Columns = [Vec3; 3];
+pub(crate) type Vec3 = [f64; 3];
+pub(crate) type Columns = [Vec3; 3];
 
 pub(crate) struct VertexBlock {
     pub head: Col<u32>,
@@ -19,15 +19,15 @@ impl VertexBlock {
     }
 }
 
-fn dot(a: Vec3, b: Vec3) -> f64 {
+pub(crate) fn dot(a: Vec3, b: Vec3) -> f64 {
     a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
-fn cross(a: Vec3, b: Vec3) -> Vec3 {
+pub(crate) fn cross(a: Vec3, b: Vec3) -> Vec3 {
     [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
 }
 
-fn transform(f: Columns, g: Vec3) -> Vec3 {
+pub(crate) fn transform(f: Columns, g: Vec3) -> Vec3 {
     [0, 1, 2].map(|i| f[0][i] * g[0] + f[1][i] * g[1] + f[2][i] * g[2])
 }
 

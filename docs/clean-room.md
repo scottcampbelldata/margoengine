@@ -14,7 +14,15 @@ from the start of the substep, scaled by the existing stiffness damping coeffici
 length. Its local Hessian has the same form. The VBD paper's §3.3 uses a block-local Rayleigh force.
 Sofien Bouaziz, Sebastian Martin, Tiantian Liu, Ladislav Kavan and Mark Pauly, “Projective Dynamics: Fusing
 Constraint Projections for Fast Simulation” (2014), §3.3, describes the alternating independent projections
-and global linear system of the X-33 method.
+and global linear system of the X-33 method. The implementation uses its Eq. 10, Eq. 15 and Appendix A
+for a second optional mode. A signed spectral basis puts inversion on the least singular axis and keeps
+the rotation proper. The volume projection solves `qᵢ(qᵢ − σᵢ) = −λₚ` with product one in the signed
+singular basis. Compression has a monotonic multiplier. Expansion checks the large roots and searches
+the smaller root of the least singular axis when it can be closer. The per-tet elastic weights are
+`2μ` and `3λ`. The latter follows because the squared distance to unit determinant is
+`(tr ε)²/3` to quadratic order near rest. A matrix-free preconditioned conjugate-gradient solve
+uses the same rest-gradient operator for each global iteration. Floating positions are stored as
+corrections to the inertial prediction in the solve.
 [Chen et al.](https://doi.org/10.1145/3658179),
 [Smith et al.](https://doi.org/10.1145/3180491),
 [Bouaziz et al.](https://doi.org/10.1145/2601097.2601116).

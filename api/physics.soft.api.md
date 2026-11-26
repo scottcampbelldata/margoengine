@@ -567,7 +567,7 @@ export interface SoftSoftness {
     dampingRatio: number;
 }
 
-export type SoftSolver = 'constraints' | 'fem' | 'vertex-block';
+export type SoftSolver = 'constraints' | 'fem' | 'vertex-block' | 'projective';
 
 export interface SoftSplit {
     pieces: SoftBody[];

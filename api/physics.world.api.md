@@ -2568,7 +2568,7 @@ interface SoftSoftness {
     dampingRatio: number;
 }
 
-type SoftSolver = 'constraints' | 'fem' | 'vertex-block';
+type SoftSolver = 'constraints' | 'fem' | 'vertex-block' | 'projective';
 
 interface SoftTearEvent {
     body: SoftBody;
