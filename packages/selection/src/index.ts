@@ -599,3 +599,5 @@ export class Selection implements EnginePlugin {
     this.dispose();
   }
 }
+export { CycleRaycast } from './cycle.js';
+export type { CycleRaycastOptions } from './cycle.js';

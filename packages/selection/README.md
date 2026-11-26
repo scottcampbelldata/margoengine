@@ -422,6 +422,43 @@ clientWidth/clientHeight supplies that axis's CSS size, otherwise width/height
 supplies its backing size. This also supports detached, headless and worker
 canvases without CSS layout; world rays never require moving the main camera.
 
+## Cycle through overlapping hits: CycleRaycast
+
+`CycleRaycast` answers the nearest hit on the first pick at a spot and the next
+one back on each repeat at the same spot, so a part hidden behind another can be
+picked without moving the pointer. Give it the depth-sorted hits of a ray, for
+example `Raycaster.intersectEngine` from `@margoengine/bvh`. A pointer that moves
+more than `tolerance` CSS pixels (default 3), or a different hit list, restarts
+at the nearest hit. `step(delta)` moves without a new pick; `wrap` (default true)
+loops at the ends. `handle(event)` steps on the `key` (default Tab, Shift goes
+back) and on the wheel while `wheelModifier` (default Alt) is held, and returns
+the hit now current, or undefined when the event does not cycle. A negative
+`tolerance` or a non-finite pointer throws a RangeError that names the fix.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { Raycaster } from '@margoengine/bvh';
+import { CycleRaycast } from '@margoengine/selection';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, { camera: { position: [0, 0, 6] } });
+const cube = box(1, 1, 1);
+engine.createMesh().setGeometry(cube);
+engine.createMesh().setGeometry(cube).setPosition([0, 0, -2]);
+engine.render();
+const cycle = new CycleRaycast();
+const x = canvas.clientWidth / 2, y = canvas.clientHeight / 2;
+const hits = () => new Raycaster().setFromEngine(engine, x, y).intersectEngine(engine);
+console.log(cycle.pick(x, y, hits())?.distance); // nearest box
+console.log(cycle.pick(x, y, hits())?.distance); // the box behind it
+window.addEventListener('keydown', (e) => cycle.handle(e) && e.preventDefault());
+// On teardown: engine.dispose(); canvas.remove();
+```
+
+Two lists are the same when their hits match one by one by `identity` (default:
+the hit's `mesh` when it has one, else the hit itself), so fresh `Raycaster`
+hits at a resting pointer still continue the cycle.
+
 ## Works with
 
 The [public CAD-format viewer](../../docs/integration-engineering.md) combines

@@ -2727,6 +2727,7 @@
     "install": "npm install @margoengine/core@1.0.0 @margoengine/selection@1.0.0",
     "imports": "import { Picking } from '@margoengine/selection';",
     "exports": [
+      "CycleRaycast",
       "HoverHighlight",
       "Picking",
       "Selection",

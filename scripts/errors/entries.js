@@ -646,6 +646,8 @@ export const entries = [
     title: 'Wrong argument types',
     kind: 'family',
     messages: [
+      'CycleRaycast tolerance must be a finite number of CSS pixels, 0 or more; pass a valid tolerance',
+      'CycleRaycast.pick needs a finite pointer x and y in CSS pixels; pass valid coordinates',
       'Expected canvas',
       'Unknown backend',
       'Invalid camera',
