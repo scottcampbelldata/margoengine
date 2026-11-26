@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20505651,
+  "total": 20506896,
   "history": [
     {
       "date": "2026-10-24",
@@ -13293,6 +13293,12 @@
       "commit": "e91dfca2b6",
       "grew": 2,
       "reason": "SOFT-04 adds an exact translational minimization before reciprocal rigid contact in vertex blocks, moving the soft entry from 137034 to 137827 B gzip. @margoengine/physics/soft: 137210 to 141962 B ceiling (137827 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 94583 to 97921 B ceiling (95068 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "cfd800032",
+      "reason": "New optional entry @margoengine/scene/emitter: a typed Emitter with signal, once, bounded async iteration and dispose; ceiling measured +256 B. The iterator buffer, the error hook and dispose share one listener table, so splitting would duplicate it. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14409,6 +14415,7 @@
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
     "@margoengine/scene/container": 3975,
+    "@margoengine/scene/emitter": 1245,
     "@margoengine/scene/graph": 2254,
     "@margoengine/scene/helpers": 2426,
     "@margoengine/scene/mesh": 2123,
