@@ -17,6 +17,7 @@ import {
   themes,
   type InventoryItem,
 } from '@margoengine/ui';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -26,6 +27,7 @@ declare global {
 
 const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!,
   status = document.querySelector<HTMLParagraphElement>('#status')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 window.addEventListener('pagehide', () => life.abort(), { once: true });
 
@@ -321,7 +323,7 @@ try {
 
   title();
   window.uiDemo = { ui, screen: () => screen, health: () => health };
-  canvas.dataset.ready = 'true';
+  page.ready();
 } catch (error) {
-  status.textContent = `Could not start: ${(error as Error).message}`;
+  page.error(`Could not start: ${(error as Error).message}`);
 }

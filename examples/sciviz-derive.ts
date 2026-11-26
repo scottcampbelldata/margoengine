@@ -1,7 +1,13 @@
 // Same hash-pinned NOAA daily winds as the other official wind examples; no synthetic velocity or height.
 import { Figure, type Layer } from '@margoengine/sciviz/spec';
 import { deriveFlowGPU, type GpuDerivedFlowFields } from '@margoengine/sciviz/derive';
-import { element, exportButton, fail, floats, signal } from './sciviz-demo.js';
+import { element, exportButton, fail as showFailure, floats, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 const nx = 49,
   ny = 19,
@@ -49,9 +55,9 @@ const main = async () => {
       fields?.dispose();
       fields = next;
       await figure.ready();
-      element('status').textContent =
-        `${field === 'q' ? 'Q rotation dominance' : field === 'lambda2' ? 'Lambda-2' : field === 'vorticity' ? 'Curl magnitude' : 'Divergence'}, ${field === 'q' || field === 'lambda2' ? '10^-10 s^-2' : '10^-5 s^-1'}. NOAA daily mean, January ${day + 1}, 2024. Drag to pan; scroll to zoom.`;
-      element('viewport').dataset.ready = 'true';
+      page.ready(
+        `${field === 'q' ? 'Q rotation dominance' : field === 'lambda2' ? 'Lambda-2' : field === 'vorticity' ? 'Curl magnitude' : 'Divergence'}, ${field === 'q' || field === 'lambda2' ? '10^-10 s^-2' : '10^-5 s^-1'}. NOAA daily mean, January ${day + 1}, 2024. Drag to pan; scroll to zoom.`,
+      );
     } catch (error) {
       next.dispose();
       throw error;

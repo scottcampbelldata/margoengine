@@ -8,6 +8,7 @@ import { coneGeometry, cylinderGeometry, toGeometry } from '@margoengine/geometr
 import { engineRuntime } from '@margoengine/core/extension';
 import { submitPrincipalScene, type PrincipalSceneReadiness } from '@margoengine/post/scene-fade';
 import { frameTime, pickOnClick, place, still, viewBox } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -26,6 +27,7 @@ const status = document.querySelector<HTMLParagraphElement>('#status')!,
   host = document.querySelector<HTMLDivElement>('#views')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!,
   headingUp = document.querySelector<HTMLInputElement>('#heading-up')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -78,7 +80,7 @@ try {
     autoStart: false,
     camera: { position: [0, 4, 10], target: [0, 1, 0], fov: 55, near: 0.1, far: 300 },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -264,9 +266,8 @@ try {
     },
     frameTime: (frames) => frameTime(engine, () => views, frames),
   };
-  canvas.dataset.ready = 'true';
-  status.textContent = 'Click a building in either view to name it.';
+  page.ready('Click a building in either view to name it.');
 } catch (error) {
   dispose();
-  if (!life.signal.aborted) status.textContent = `Unable to start: ${String(error)}`;
+  if (!life.signal.aborted) page.error(`Unable to start: ${String(error)}`);
 }

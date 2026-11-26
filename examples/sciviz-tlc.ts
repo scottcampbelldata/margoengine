@@ -1,8 +1,10 @@
 import { Figure } from '@margoengine/sciviz';
 import { createCompute } from '@margoengine/compute';
 import { loadTable, CrossFilter, bindTableAggregate } from '@margoengine/sciviz/table';
+import { demoStatus } from './demo-status.ts';
 
 const status = document.querySelector<HTMLElement>('#status')!;
+const page = demoStatus(status, status);
 export const table = await loadTable('/packages/sciviz/tests/fixtures/table/tlc-trips.parquet');
 export const filter = new CrossFilter(table),
   distance = filter.dimension('trip_distance');
@@ -30,10 +32,10 @@ document.querySelector<HTMLInputElement>('#range')!.addEventListener('change', (
   const value = Number((event.target as HTMLInputElement).value);
   document.querySelector<HTMLOutputElement>('#distance')!.value = String(value);
   void update(value).catch((error: unknown) => {
-    status.textContent = String(error);
+    page.error(error);
   });
 });
-status.dataset.ready = 'true';
+page.ready();
 addEventListener(
   'pagehide',
   () => {

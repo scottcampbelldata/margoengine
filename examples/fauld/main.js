@@ -4,6 +4,7 @@
 // library (URL root of the asset library, default /asset-library/). window.fauld drives it for tools/shot and stills.
 import { Engine } from '/packages/core/dist/index.js';
 import { attach } from '/packages/scenes/dist/fauld-tunnels.js';
+import { demoStatus } from '../demo-status.ts';
 
 const q = new URLSearchParams(location.search),
   viewport = document.querySelector('#viewport'),
@@ -12,6 +13,7 @@ const q = new URLSearchParams(location.search),
   w = Number(q.get('w') ?? innerWidth),
   h = Number(q.get('h') ?? innerHeight),
   errors = [];
+const page = demoStatus(viewport, status);
 canvas.width = w;
 canvas.height = h;
 canvas.style.width = `${w}px`;
@@ -19,8 +21,7 @@ canvas.style.height = `${h}px`;
 const fail = (e) => {
   const text = String(e?.message ?? e);
   errors.push(text);
-  status.textContent = text;
-  viewport.dataset.error = text;
+  page.error(text);
 };
 try {
   const shotId = q.get('shot') ?? 'fr003',
@@ -81,7 +82,7 @@ try {
   status.hidden = true;
   // The page's own loop: tools/shot's driver holds its frames and draws each on the shot clock.
   engine.start();
-  viewport.dataset.ready = 'true';
+  page.ready();
 } catch (e) {
   fail(e);
   throw e;

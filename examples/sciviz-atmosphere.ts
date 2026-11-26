@@ -2,7 +2,13 @@ import { Figure } from '@margoengine/sciviz/spec';
 import { globeAtmosphere } from '@margoengine/sciviz/atmosphere';
 import type { FlowGrid } from '@margoengine/sciviz/flow';
 import type { TriangleSet } from '@margoengine/sciviz/grids';
-import { element, floats, fail, exportButton } from './sciviz-demo.js';
+import { element, floats, fail as showFailure, exportButton } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 const lifetime = new AbortController(),
   signal = lifetime.signal;
 
@@ -98,8 +104,7 @@ try {
   });
   await figure.ready();
   Object.assign(globalThis, { atmosphereDemo: { particles, scalar, points } });
-  element('status').textContent = 'NOAA North Atlantic wind, January 1-8 2024. Drag to orbit, scroll to zoom.';
-  element('viewport').dataset.ready = 'true';
+  page.ready('NOAA North Atlantic wind, January 1-8 2024. Drag to orbit, scroll to zoom.');
 } catch (error) {
   fail(error);
 }

@@ -2,9 +2,11 @@ import { Figure } from '@margoengine/sciviz';
 import { ColumnarTable } from '@margoengine/sciviz/table';
 import { bindRasterAggregate, type RasterBinding } from '@margoengine/sciviz/aggregate';
 import { createCompute } from '@margoengine/compute';
+import { demoStatus } from './demo-status.ts';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#plot')!,
   status = document.querySelector<HTMLElement>('#status')!;
+const page = demoStatus(status, status);
 export const figure = await Figure.create(canvas, {
   mode: '2d',
   theme: 'light',
@@ -54,13 +56,14 @@ export async function show(name: keyof typeof tables): Promise<void> {
     shade: { transform: 'eq-hist' },
     name: name === 'tlc' ? 'Taxi pick-ups' : 'GBIF occurrences',
   });
-  status.textContent = `${tables[name].length.toLocaleString()} original rows. ${binding.result!.count.reduce((a, b) => a + b, 0).toLocaleString()} points in this view. GPU bins and exact numeric reductions.`;
-  status.dataset.ready = 'true';
+  page.ready(
+    `${tables[name].length.toLocaleString()} original rows. ${binding.result!.count.reduce((a, b) => a + b, 0).toLocaleString()} points in this view. GPU bins and exact numeric reductions.`,
+  );
 }
 await show('tlc');
 document.querySelector<HTMLSelectElement>('#dataset')!.addEventListener('change', (event) => {
   void show((event.target as HTMLSelectElement).value as keyof typeof tables).catch((cause) => {
-    status.textContent = String(cause);
+    page.error(cause);
   });
 });
 const shade = () =>

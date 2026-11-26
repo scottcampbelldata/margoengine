@@ -13,6 +13,9 @@ import { Environment, EnvironmentLighting, ColorBackground } from '@margoengine/
 import { OrbitControls } from '@margoengine/controls';
 import { Clustered } from '@margoengine/clustered';
 import { afterPresented } from '../packages/shared/demo-frame.js';
+// @ts-expect-error The JS check (tsconfig.js.json) does not allow .ts import paths; the dev server and bundler do.
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(document.body, document.querySelector('#caption'));
 
 // Extensions gltf/pbr renders or decodes (packages/gltf/src/asset.ts `supported` plus the decoder hooks passed
 // below). Any other extension in extensionsUsed is ignored by the loader and listed as a gap.
@@ -168,11 +171,10 @@ async function main() {
     );
     if (!only) model?.dispose();
   }
-  caption.textContent = only ? only : `${report.filter((r) => r.ok).length}/${report.length} models load`;
   if (only) engine.start();
-  document.body.dataset.ready = 'true';
+  page.ready(only ? only : `${report.filter((r) => r.ok).length}/${report.length} models load`);
 }
 main().catch((error) => {
   console.error(error);
-  document.querySelector('#caption').textContent = String(error);
+  page.error(error);
 });

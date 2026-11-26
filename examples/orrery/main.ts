@@ -33,10 +33,12 @@ import {
 } from '@margoengine/sky/ephemeris';
 import { designTrains, driveAngle, wheelAngles } from './gears.ts';
 import { PLANET_Z, planetLayouts } from './layout.ts';
+import { demoStatus } from '../demo-status.ts';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const status = $('status'),
   errorLine = $('error');
+const page = demoStatus($('viewport'), status, errorLine);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const params = new URLSearchParams(location.search);
 // ?ui=0 hides the controls (for a still), ?date=YYYY-MM-DD opens on that date.
@@ -84,7 +86,7 @@ async function start() {
   paceEngine(engine);
   engine.onError = (error) => {
     if (unsupported(error)) return console.info('An effect detached: this device cannot keep HDR.', error);
-    errorLine.textContent = String(error);
+    page.error(error);
   };
   const runtime = engineRuntime(engine);
   engine.scene.background = '#0d0b09';
@@ -399,8 +401,7 @@ async function start() {
     }
   });
   engine.start();
-  status.textContent = '';
-  viewport.dataset.ready = 'true';
+  page.ready('');
 
   const api = {
     engine,
@@ -432,6 +433,6 @@ async function start() {
 
 start().catch((error) => {
   status.textContent = 'Unable to wind the orrery';
-  errorLine.textContent = error instanceof Error ? error.message : String(error);
+  page.error(error);
   console.error(error);
 });

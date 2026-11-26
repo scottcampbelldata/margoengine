@@ -11,6 +11,8 @@ import {
   type SeriesMethod,
 } from '@margoengine/sciviz/series';
 import { createFigure, element } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('status'), element('status'));
 export const figure = await createFigure(element<HTMLCanvasElement>('viewport'), {
   mode: '2d',
   theme: 'light',
@@ -74,16 +76,15 @@ export async function load(): Promise<void> {
   await addSpectrogramView(spectrogramFigure, spectrogram);
   spectrumFigure.render();
   spectrogramFigure.render();
-  element('status').dataset.ready = 'true';
+  page.ready();
 }
 const failed = (cause: unknown) => {
   if (!(cause instanceof DOMException && cause.name === 'AbortError')) {
-    element('status').textContent = String(cause);
-    element('status').dataset.error = 'true';
+    page.error(cause);
   }
 };
 element('reload').onclick = () => {
-  element('status').dataset.ready = 'false';
+  page.pending();
   void load().catch(failed);
 };
 element('stop').onclick = () => operation.abort();

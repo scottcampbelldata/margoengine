@@ -33,6 +33,7 @@ import { WaterRain } from '@margoengine/water/rain';
 import { WaveQuery } from '@margoengine/water/query';
 import { applyQualityTier, paceEngine } from '@margoengine/quality';
 import { RawMesh, RawShaderMaterial, RawShaders } from '@margoengine/shader/raw';
+import { demoStatus } from '../demo-status.ts';
 
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
 type Vec3 = [number, number, number];
@@ -41,6 +42,7 @@ const status = document.querySelector<HTMLParagraphElement>('#status')!,
   error = document.querySelector<HTMLParagraphElement>('#error')!,
   slider = document.querySelector<HTMLInputElement>('#storm')!,
   force = document.querySelector<HTMLOutputElement>('#force')!;
+const page = demoStatus(document.querySelector<HTMLElement>('#viewport')!, status, error);
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const asked = new URLSearchParams(location.search).get('storm');
 if (asked !== null && Number(asked) >= 0 && Number(asked) <= 1) slider.value = asked;
@@ -62,7 +64,7 @@ const stage = await createStage('#viewport', {
   label: 'A lighthouse on a rocky headland at night in a storm, its beam sweeping through rain over a heaving sea',
   camera: { ...hero, fov: 46, near: 0.3, far: Number(new URLSearchParams(location.search).get('far') ?? 6000) },
   onError: (value) => {
-    error.textContent = String(value);
+    page.error(value);
   },
 });
 const engine = stage.engine,
@@ -154,7 +156,7 @@ const [land, boat] = await Promise.all([
   loadGLTF(engine, new URL('./assets/boat.glb', import.meta.url)),
 ]).catch((reason: unknown) => {
   status.textContent = 'Unable to light the lamp';
-  error.textContent = String(reason);
+  page.error(reason);
   throw reason;
 });
 shadows.add(land, { static: true });
@@ -458,7 +460,7 @@ function moveBoat(delta: number, time: number) {
       .catch((reason: unknown) => {
         // The hull holds its last pose rather than follow a stale sea, and the reason is shown.
         surface = undefined;
-        error.textContent = String(reason);
+        page.error(reason);
       })
       .finally(() => (capturing = false));
   }
@@ -637,10 +639,7 @@ stage.use({
     setLights();
     glow.uniforms.beam.value = beamAngle;
     streak.uniforms.time.value = time;
-    if (status.isConnected && ++frames > 30) {
-      status.remove();
-      document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
-    }
+    if (status.isConnected && ++frames > 30 && page.ready()) status.remove();
   },
   dispose: () => controls.dispose(),
 });

@@ -1,6 +1,7 @@
 import { Figure, type LineLayer } from '@margoengine/sciviz';
 import { ColumnarTable } from '@margoengine/sciviz/table';
 import { QuerySelection, Spreadsheet } from '@margoengine/sciviz/query';
+import { demoStatus } from './demo-status.ts';
 
 const source = (await (await fetch('/examples/assets/sciviz/stats/ghcn.json')).json()) as {
   date: string;
@@ -38,6 +39,7 @@ let layer: LineLayer | null = null;
 let pending = Promise.resolve();
 export const ready = () => pending;
 const status = document.querySelector<HTMLElement>('#status')!;
+const page = demoStatus(status, status);
 const update = () => {
   pending = pending.then(async () => {
     if (layer) figure.remove(layer);
@@ -51,7 +53,7 @@ document.querySelector<HTMLFormElement>('#query')!.addEventListener('submit', (e
   try {
     query.select(document.querySelector<HTMLInputElement>('input')!.value);
   } catch (error) {
-    status.textContent = String(error);
+    page.error(error);
   }
 });
 document.querySelector('#clear')!.addEventListener('click', () => query.selection.clear());
@@ -59,7 +61,7 @@ document.querySelector('#undo')!.addEventListener('click', () => query.selection
 query.select('tmax > 0.9 * max(tmax)');
 await ready();
 await Promise.all([figure.ready(), tmrFigure.ready()]);
-status.dataset.ready = 'true';
+page.ready();
 addEventListener(
   'pagehide',
   () => {

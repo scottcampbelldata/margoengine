@@ -1,6 +1,7 @@
 import { createFigure, element } from './sciviz-demo.js';
 import { attachAccessibility, HIGH_CONTRAST_THEME, type AccessibilityHandle } from '@margoengine/sciviz/a11y';
 import { THEMES } from '@margoengine/sciviz';
+import { demoStatus } from './demo-status.ts';
 const [text, days] = await Promise.all([
   fetch('./assets/sciviz/publication/GW150914-H1.txt', { signal: AbortSignal.timeout(60000) }).then((r) => {
     if (!r.ok) throw new Error(`LIGO HTTP ${r.status}`);
@@ -58,10 +59,11 @@ element('contrast').addEventListener('change', () => {
   });
 });
 element('motion').addEventListener('change', () => void attach());
-element('status').textContent =
-  `Ready: ${strain.length} LIGO samples and ${days.length} GHCN days. Each record remains reachable in its table.`;
-element('strain').dataset.ready = 'true';
-element('weather').dataset.ready = 'true';
+const readyText = `Ready: ${strain.length} LIGO samples and ${days.length} GHCN days. Each record remains reachable in its table.`;
+const strainPage = demoStatus(element('strain'), element('status'));
+const weatherPage = demoStatus(element('weather'));
+strainPage.ready(readyText);
+weatherPage.ready();
 window.addEventListener(
   'pagehide',
   () => {

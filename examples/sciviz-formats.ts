@@ -2,7 +2,13 @@ import { Figure, type VolumeLayer } from '@margoengine/sciviz/spec';
 import { openNetCDF } from '@margoengine/sciviz/netcdf';
 import { openVTK, parseVtk } from '@margoengine/sciviz/vtk';
 import { gridLayer, type MeshLayer } from '@margoengine/sciviz/grids';
-import { element, fail, exportButton } from './sciviz-demo.js';
+import { element, fail as showFailure, exportButton } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 export const figure = await Figure.create(element<HTMLCanvasElement>('viewport'), {
   limits: [0, 4, 0, 4, 0, 7],
@@ -39,8 +45,7 @@ export async function show(format: string): Promise<void> {
   if (current) figure.remove(current);
   current = next;
   await figure.ready();
-  element('status').textContent = `200 NOAA wind samples from ${format}; drag to orbit, scroll to zoom.`;
-  element('viewport').dataset.ready = format;
+  page.ready(`200 NOAA wind samples from ${format}; drag to orbit, scroll to zoom.`, format);
 }
 element('format').addEventListener('change', () => {
   void show(element<HTMLSelectElement>('format').value).catch(fail);

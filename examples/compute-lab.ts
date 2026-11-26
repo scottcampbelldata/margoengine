@@ -3,6 +3,7 @@
 // numeric runs in @margoengine/compute; the page only reads back the 256 bin counts and a few hundred CDF points.
 import { createCompute, type ComputeContext } from '@margoengine/compute';
 import { Random } from '@margoengine/compute/random';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -17,6 +18,7 @@ const canvas = $<HTMLCanvasElement>('viewport'),
   count = $<HTMLInputElement>('count'),
   mix = $<HTMLInputElement>('mix'),
   seed = $<HTMLInputElement>('seed');
+const page = demoStatus(canvas, status);
 const BINS = 256,
   CDF_POINTS = 512,
   RANGE: [number, number] = [-5, 7];
@@ -94,8 +96,7 @@ async function run(): Promise<void> {
       return li;
     }),
   );
-  status.textContent = `Drew ${n.toLocaleString('en')} samples, binned, sorted and summarised on the GPU.`;
-  canvas.dataset.ready = 'true';
+  page.ready(`Drew ${n.toLocaleString('en')} samples, binned, sorted and summarised on the GPU.`);
 }
 
 function draw(counts: Uint32Array, curve: Float32Array, n: number): void {
@@ -155,7 +156,7 @@ function draw(counts: Uint32Array, curve: Float32Array, n: number): void {
 const rerun = () => {
   label();
   run().catch((error: Error) => {
-    if (error.name !== 'AbortError') status.textContent = `Could not compute: ${error.message}`;
+    if (error.name !== 'AbortError') page.error(`Could not compute: ${error.message}`);
   });
 };
 for (const input of [count, mix, seed]) input.addEventListener('change', rerun);

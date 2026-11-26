@@ -45,12 +45,14 @@ import { VolumetricFog } from '@margoengine/environment/volumetric';
 import { Lines, Line, LineMaterial } from '@margoengine/lines';
 import { applyQualityTier, paceEngine } from '@margoengine/quality';
 import { fogDensityForVisibility, whiteout, whiteoutVisibility } from '@margoengine/sky/scene-kits';
+import { demoStatus } from '../demo-status.ts';
 
 type Vec3 = [number, number, number];
 const params = new URLSearchParams(location.search),
   on = (name: string) => params.get(name) !== '0',
   status = document.querySelector<HTMLParagraphElement>('#status')!,
   error = document.querySelector<HTMLParagraphElement>('#error')!;
+const page = demoStatus(document.querySelector<HTMLElement>('#viewport')!, status, error);
 const tier = applyQualityTier();
 const kit = whiteout();
 
@@ -70,7 +72,7 @@ const stage = await createStage('#viewport', {
   label: 'A blizzard at dusk on a mountain pass: snow streams sideways past a small log hut with one warm lit window',
   camera: { position: view.position, target: view.target, fov: view.fov, near: 0.05, far: 400 },
   onError: (value) => {
-    error.textContent = String(value);
+    page.error(value);
   },
 });
 const engine = stage.engine,
@@ -360,10 +362,7 @@ stage.use({
   setup() {},
   onPreUpdate() {
     drawArrows();
-    if (status.isConnected && ++frames > 30) {
-      status.remove();
-      document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
-    }
+    if (status.isConnected && ++frames > 30 && page.ready()) status.remove();
   },
   dispose() {
     stopFlicker();

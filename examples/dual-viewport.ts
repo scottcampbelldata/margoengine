@@ -6,6 +6,7 @@
 // Under prefers-reduced-motion the scene starts still (the "Turn the scene" box unchecked).
 import { createStage, type Mesh, type Stage } from 'margoengine';
 import { Shadows } from '@margoengine/shadows';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -26,6 +27,8 @@ const status = $<HTMLParagraphElement>('status'),
   layerCanvas = $<HTMLCanvasElement>('layer'),
   exact = $<HTMLInputElement>('exact'),
   spin = $<HTMLInputElement>('spin');
+const page = demoStatus(document.body, status),
+  viewportPage = demoStatus(document.querySelector<HTMLElement>('#viewport, #native') ?? document.body);
 spin.checked = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /** Wraps `gpu.requestAdapter` so the next device made from it is recorded (for `onSubmittedWorkDone`). */
@@ -95,7 +98,8 @@ async function makeSide(canvas: HTMLCanvasElement): Promise<Side> {
       camera,
       ...(exact.checked ? { exactSize: size(canvas) } : {}),
       onError: (error) => {
-        status.textContent = String(error);
+        page.error(error);
+        viewportPage.error(error);
       },
     });
     return { stage, shapes: build(stage), device: into.device, cpu: [], gpu: [] };
@@ -127,7 +131,7 @@ async function start(): Promise<void> {
     sides[1] = await makeSide(layerCanvas);
   }
   if (signal.aborted) return;
-  status.textContent = hasNative
+  const readyText = hasNative
     ? 'Both views run. Pixels are compared every second while the scene turns, and on demand.'
     : 'This browser has no WebGPU, so only the WebGL2 side runs and there is nothing to compare against.';
   let previous = performance.now(),
@@ -156,8 +160,8 @@ async function start(): Promise<void> {
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
-  document.querySelector('#viewport, #native')?.setAttribute('data-ready', 'true');
-  document.body.dataset.ready = 'true';
+  viewportPage.ready();
+  page.ready(readyText);
 }
 
 const push = (list: number[], value: number) => {
@@ -211,7 +215,9 @@ $('compare').addEventListener('click', () => {
 });
 exact.addEventListener('change', () => void start().catch(fail));
 const fail = (error: unknown) => {
-  status.textContent = `Could not start: ${error instanceof Error ? error.message : String(error)}`;
+  const text = `Could not start: ${error instanceof Error ? error.message : String(error)}`;
+  page.error(text);
+  viewportPage.error(text);
 };
 window.dualViewport = {
   get frames() {

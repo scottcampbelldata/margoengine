@@ -2,6 +2,7 @@ import { createCompute } from '@margoengine/compute';
 import { ColumnarTable } from '@margoengine/sciviz/table';
 import { SelectionStore } from '@margoengine/sciviz/link';
 import { parallelCoordinates, scatterMatrix } from '@margoengine/sciviz/parcoords';
+import { demoStatus } from './demo-status.ts';
 
 const source = (await (await fetch('/examples/assets/sciviz/stats/exoplanets.json')).json()) as {
   pl_name: string;
@@ -33,6 +34,7 @@ export const matrix = await scatterMatrix(document.querySelector<HTMLCanvasEleme
 export const controls = parallel.controls(document.querySelector<HTMLElement>('#controls')!);
 export const gpu = await createCompute({ device: parallel.figure.renderer.device! });
 const status = document.querySelector<HTMLElement>('#status')!;
+const page = demoStatus(status, status);
 const refresh = () => {
   status.textContent = `${selection.rowIds.length} of ${source.length} planets selected. Every cell uses the same physical column scale.`;
 };
@@ -43,7 +45,7 @@ document.querySelector<HTMLButtonElement>('#density')!.addEventListener('click',
   density = !density;
   if (density)
     void parallel.density({ gpu }).catch((error: unknown) => {
-      status.textContent = String(error);
+      page.error(error);
     });
   else parallel.lines();
   document.querySelector<HTMLButtonElement>('#density')!.textContent = density
@@ -53,7 +55,7 @@ document.querySelector<HTMLButtonElement>('#density')!.addEventListener('click',
 document.querySelector<HTMLButtonElement>('#clear')!.addEventListener('click', () => selection.clear());
 document.querySelector<HTMLButtonElement>('#undo')!.addEventListener('click', () => selection.undo());
 await Promise.all([parallel.ready(), matrix.ready()]);
-status.dataset.ready = 'true';
+page.ready();
 addEventListener(
   'pagehide',
   () => {

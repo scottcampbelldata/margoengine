@@ -11,6 +11,8 @@ import {
 } from '@margoengine/sciviz/tensor';
 import { meshLayer } from '@margoengine/sciviz/grids';
 import { element } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('ellipsoid'), element('status'));
 
 export const figures: Record<string, Figure> = {};
 export const glyphs: Record<string, TensorGlyphLayer> = {};
@@ -105,11 +107,11 @@ try {
   await tracked.ready();
   tracked.engine.render();
   tracked.engine.stop();
-  element('status').textContent =
-    `Ready. Ordinary linear least squares, ${image.frames} measurements, ${image.data.length} voxels. ${euler.length} Euler and ${fact.length} FACT fibres.`;
-  element<HTMLCanvasElement>('ellipsoid').dataset.ready = 'true';
+  page.ready(
+    `Ready. Ordinary linear least squares, ${image.frames} measurements, ${image.data.length} voxels. ${euler.length} Euler and ${fact.length} FACT fibres.`,
+  );
 } catch (error) {
-  element<HTMLCanvasElement>('ellipsoid').dataset.error = String(error);
+  page.error(error);
   throw error;
 }
 window.addEventListener(
