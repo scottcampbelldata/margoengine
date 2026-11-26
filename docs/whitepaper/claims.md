@@ -6320,7 +6320,9 @@ A stiff 10 μL cap redistributes on a level patch and then advances on an inclin
 contact-angle hysteresis. The previous diagonal-only pressure solve failed during the
 level advance. The new solve conserves liquid, keeps the film positive and reproduces its
 hash from a snapshot. A separate rectangular patch matches the exact discrete decay of
-an orthogonal Neumann mode product.
+an orthogonal Neumann mode product. At higher stiffness a 20 μL water cap now runs at
+level and with inclined contact-angle hysteresis, remaining positive and conserving
+volume through both cases.
 [Reproduce](reproduce.md#fluid-07-planar-pressure-convergence)
 
 ### FLUID-07 measured inclined film
