@@ -171,30 +171,39 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `packages/shadows/test/instanced-range.test.js` (fits like separate meshes; rows read again only
   after `needsUpdate`, `setMatrixAt` or `count`); real GPU: `examples/package-benchmarks/textured-instancing-gpu.mjs`.
 
-### Open 2026-11-26: a grid-particle plunging breaker's jet-to-crest speed does not converge with the grid (KB-FLIP-CREST1, physics, flip)
+### Open 2026-11-26: a grid-particle plunging breaker does not converge with the grid, and plunges only when taller than Erinin et al.'s (KB-FLIP-CREST1, physics, flip)
 
-- **Repro:** after `npm run build -w @margoengine/physics`, run `node packages/physics/scripts/check-breaker.mjs 0.55
-  0.0125 1.6`, then `... 0.55 0.0125 1.2` and `... 0.55 0.009 1.6` (steepness, cell size in m, start in s before the
-  focus). The printed "jet over crest" is 1.26, 1.46 and 1.72 (Apple M6). Erinin et al. (2023) measured the jet tip's
-  impact speed at 1.24 to 1.33 times the crest's speed at jet formation. The value moves with the start and grows as the
-  cells shrink, so it does not converge.
-- **Cause:** not yet established. A study is under way (refined grids, the measure, the depth, surface tension). The
-  candidates are:
-  - **The measure is not theirs.** The script takes the fastest particle's horizontal speed above the still level in
-    the 0.17 s after the crest's peak. Erinin et al. take the speed of the jet tip, a point on the profile, at impact,
-    from cubic fits to its path. A maximum over more particles grows as the cells shrink.
-  - **The water is shallower than theirs.** The box holds 0.6 m of water against their 0.91 m, and the sea is
-    deep-water linear theory. The packet's longest components (k h about 1.2 at 0.6 m) disperse differently, so where
-    and how hard the packet breaks moves with the start.
-  - **No surface tension.** At their scale a jet tip a few millimetres thick retracts at the Taylor-Culick speed
-    (0.2 to 0.4 m/s), and Margo's liquid has no surface tension.
-- **Status:** `docs/limits.md` ("Grid-particle liquids") states the scatter, and the README says the comparison is not
-  yet like-for-like. The study so far, with Erinin et al.'s own measures (the jet tip on the profile from cubic fits,
-  the crest's speed at jet formation, finite depth 0.91 m, a 5.6 m box), puts the ratio at 1.24 to 1.35. But the
-  breakers that plunge are higher than theirs (crest 147 to 158 mm against 108 to 112 mm), and crests of their height
-  spill at cells of 1.25 and 0.9 cm. The box's band also stirred the water (KB-FLIP-SEABAND1, fixed), so the study is
-  being run again. This entry closes when the measure is like-for-like and the ratio converges, or when the
-  difference that remains is explained.
+- **Repro:** after `npm run build -w @margoengine/physics`, run `node packages/physics/scripts/check-breaker.mjs 0.55 0.0125`,
+  then with cells of 0.009 and 0.0065 (steepness S, cell size in m; Erinin et al.'s packet, 0.91 m deep, a 5.6 m box,
+  their measures: the crest point's speed at jet formation and the jet tip's velocity at impact, both from cubic fits).
+  At S = 0.55, from 1.25 to 0.9 to 0.65 cm:
+  - the crest at its highest is 150, 168 and 182 mm (Erinin et al.: 107.8 to 111.5 mm);
+  - jet formation to impact takes 146, 183 and 208 ms (148.9 to 169.7);
+  - the tip travels 295, 384 and 477 mm (240.1 to 284.1);
+  - the crest moves at 1.71, 1.84 and 1.94 m/s (1.511 to 1.536);
+  - the tip strikes at 2.29, 2.10 and 2.76 m/s (1.904 to 2.010);
+  - jet tip over crest is 1.34, 1.14 and 1.42 (1.24 to 1.33).
+  At S = 0.46 the crest reaches 122, 127 and 132 mm and spills (at 0.65 cm a curl lasting 29 ms). Crests of Erinin
+  et al.'s height do not plunge at these grids.
+- **Cause:** the crest's overturning is not resolved, even at 0.65 cm (about 180 cells a wavelength). Ruled out or
+  fixed along the way:
+  - The measure: the old one (fastest particle over highest particle) was not theirs. It now follows their jet tip on
+    the profile.
+  - The depth: the box was 0.6 m of deep-water theory against their 0.91 m. It is now finite-depth linear theory at
+    their depth.
+  - The box's band: it stirred calm water, drained the box and ran waves ahead (KB-FLIP-SEABAND1, fixed). A 3 cm wave
+    now passes in phase, converging with the cells.
+  - Surface tension: by Taylor (1959) and Culick (1960), a jet tip 5 to 10 mm thick retracts at
+    sqrt(2 sigma / (rho e)) = 0.12 to 0.17 m/s. A liquid without it runs its tip 6 to 9 percent fast at lab scale,
+    against a gap of half again in height.
+  What is left grows with refinement: the focusing crest still gains height as the cells shrink, so the coarser grids'
+  numerical damping holds it down, and Margo plunges only crests 1.4 to 1.7 times Erinin et al.'s. Their crest stands
+  near the packet's linear focus height (about 103 mm at S = 0.55). Two of the solver's own limits work against
+  overturning: its first-order placement of the free surface, and two bodies of water joining about a cell before they
+  touch (docs/limits.md, "Grid-particle liquids").
+- **Status:** open. A converged plunger needs the crest refined well below a centimetre, a narrow band or adaptive grid
+  round the crest (Ferstl et al. 2016), and a sharper free surface. These are FLUID-03 tiers not yet built. Until then
+  `docs/limits.md` and the README give these figures, not a match.
 
 ### Open 2026-11-26: a scene's background colour comes out lighter once a post effect captures the scene (KB-CLEAR-CAPTURE1, core)
 

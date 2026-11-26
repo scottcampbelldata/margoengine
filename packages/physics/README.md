@@ -3011,10 +3011,10 @@ Crashing crests: give a box a `sea` (a `SpectralSea`, or anything with `elevatio
 `initial`, and it starts as that sea, its water moving as the sea's does. Its four sides then take the sea's own
 velocity, and a band of `blend` cells (6) inside them is held to the sea's motion and level (the hybrid of Chentanez,
 Muller and Kim 2014). Waves run in and out, and inside the box they are free to steepen, overturn and break. Checked:
-a linear wave passes through with its amplitude and phase, and a dispersively focused packet overturns and plunges, its
-jet outrunning its crest (`node scripts/check-breaker.mjs`, minutes a run). How much faster is not yet settled: 1.26 to
-1.72 times the crest speed across starts and grids, where Erinin et al. (2023) measured 1.24 to 1.33 (docs/limits.md
-says why). Cells of 2 cm do not resolve a 15 cm plunger's jet: give a breaking crest a dozen cells.
+a wave passes through in phase, converging with the cells, and a calm sea's box stays still. A dispersively focused
+packet in Erinin et al.'s tank overturns and plunges (`node scripts/check-breaker.mjs`, minutes a run, measured as they
+measure it), but not yet like theirs: it plunges only with a crest half again as tall as theirs, and its jet's speed
+and timing still change with the grid (docs/limits.md, KB-FLIP-CREST1). Give a breaking crest a dozen cells or more.
 
 Giving the sea its water: made with `new FlipSolver(id, {seaSource: true})`, the box publishes `${id}.seaSource`, rows a
 `WakeSolver` made with that field (`new WakeSolver('wake', liquid.seaSourceField)`) adds to its surface. The rows carry

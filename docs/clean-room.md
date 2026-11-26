@@ -14160,6 +14160,10 @@ Written from papers and notes read as text (no code, no companion repositories):
   d'Alembert, Euler, centrifugal and Coriolis accelerations, for the box riding a hull.
 - M. Roberts, "The unreasonable effectiveness of quasirandom sequences", 2018 (the R2 sequence of the plastic number):
   the inflow's particle places along a bulwark.
+- G. I. Taylor, "The dynamics of thin sheets of fluid. III. Disintegration of fluid sheets", Proc. R. Soc. A 253,
+  313-321, 1959, and F. E. C. Culick, "Comments on a ruptured soap film", J. Appl. Phys. 31, 1128-1129, 1960: a sheet's
+  rim retracts at sqrt(2 sigma / (rho e)), the estimate of what surface tension would take off a lab breaker's jet tip
+  (KB-FLIP-CREST1).
 - G. B. Deane and M. D. Stokes, "Scale dependence of bubble creation mechanisms in breaking waves", Nature 418,
   839-844, 2002: the cavity a plunging jet closes breaks up into the bubbles of a breaker (the box's `aeration()`, the air
   it closes over).
