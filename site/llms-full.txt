@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,144 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,148 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12233,6 +12233,27 @@ walkable route guidance with a height sampler. Injury, fall and ragdoll transiti
 consumers of the force/pose ports. Doorway and terrain fixtures use simulated actors and route geometry.
 The optional JavaScript entry is 4,590 B gzip. The plain and shared Wasm assets are 12,041 B and 12,129 B raw.
 
+### Landscape evolution (HYDRO-04)
+
+`LandscapeEvolution` uses one rectangular TerrainBed, a linear stream-power slope exponent and a fixed downhill
+graph within each step. Closed depressions trap incoming sediment. Route floodwater, lake overtopping and rapid
+flows with the shallow-water solver. Specified open edges supply fixed elevations and accept downhill export.
+
+The solver can estimate equilibrium Manning depth or consume a time-averaged shear field. Its independently
+transported size classes share one bed porosity. The model tracks changing loose material and parent fractions,
+with no hiding or exposure correction between grain classes. Thermal erosional transfer uses a parameterised
+repose slope and coefficient. Weathering rates and rooted cohesion vary by terrain and must be supplied for
+site predictions. The loose sediment field excludes material brought by external bed writers unless it is
+initially supplied.
+
+Bed changes are accrued in f64 and become TerrainBed elevations on the following tick. The geometry used to
+choose downhill directions comes from the shared f32 bed field. The biomes snapshot rounds the current terrain
+to millimetres and keeps the relief's authored river lines. Use fixed boundary elevations if a snapshot must join
+unchanged terrain outside the simulated rectangle.
+
+The optional Physics and Biomes landscape entries measure 4,347 B and 614 B min+gzip respectively. The
+plain and shared SIMD files are 12,166 B and 12,254 B before HTTP compression.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12243,6 +12264,38 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
+
+- **Repro:** `packages/voxel/tests/debris.test.js`, "with physics a piece is a dynamic body of its cells mass that falls onto
+  the voxel floor and comes to rest", with the block solver on: the L-shaped piece came to lie on the edge of the pillar's
+  stump and on one corner of its beam, and still moved at 0.03 to 0.16 m/s after 20 s, sinking 4 mm. The same rocking state
+  stepped on with the sweeps did not settle either.
+- **Cause:** the separating axis test kept last step's edge pair when it came within the face bias (1 mm) of the best face
+  (`sat_coherent`, the held-edge margin `-FACE_BIAS`). An edge pair gives one point. Where it ties a face, its two edges lie
+  near parallel along that face, so the closest points clamp to one end of the block's edge: the manifold held that end
+  alone, the other side fell until it struck, and the held point hopped to the other end. The geometry query, with no
+  history, chose the face and clipped both ends.
+- **Fix:** an edge pair must beat the face by the bias whether or not it was held, the rule Gregorius (GDC 2015) gives:
+  faces win ties. A held face still wins its own ties, so the reference face stays coherent. Over 1,734 poses of a plank on
+  a cube's edge (turns of -40 to 40 mrad in 5 mrad steps about its length and in the face's plane, its edge 0 to 30 cm past
+  the cube's), a held edge pair now gives the manifold a test with no history gives on every pose; before, 1,499 lost an end.
+- **Regression:** `packages/physics/kernel/tests/sat.rs` `a_face_resting_on_a_parallel_edge_keeps_both_ends_after_an_edge_pair`
+  (one point with the held edge pair before), and the voxel debris test above with the block solver.
+### Fixed 2026-11-25: the joint webs' energy ledger read a kinematic body's speed as energy gained (KB-PHYS-LEDGER1, physics kernel tests)
+
+- **Repro:** `packages/physics/kernel/tests/stability.rs` `the_energy_ledger_reads_the_same_in_a_moving_frame`: a kinematic
+  hub drags a 1 kg box on a spherical joint 0.2 m out of place. At rest the ledger reads no gain; with hub and box moving at
+  50 m/s it read -4,800 J. With the block solver, web seed 17 of `a_web_of_joints_stays_in_the_numbers` reached a state where
+  one step read 3.4 MJ of work as a gain against the 73 kJ its bodies gained (2.7 percent of the run's kinematic work, bound
+  one part in a million).
+- **Cause:** the native ledger `solver::DRIVEN` left out the work a kinematic body does through a joint's position-bias push
+  (the `BIASED` flag) but counted the relaxing pass's taking back of that push. A push p from a body at speed u is the work
+  p . u whatever it is for, so the ledger's "energy no force made" grew with the frame's speed.
+- **Fix:** every impulse a kinematic body hands on counts. A push taken back nets nothing, and one left behind still shows as
+  a gain of about p b / 2 (b the bias speed). All 60 web seeds gain nothing with either solver; the joint-drift proof
+  `a_joint_does_not_turn_its_drift_into_speed` measures speed directly and still fails on the drift bug it was made for. No
+  shipped code changes: the ledger is native only.
+- **Regression:** the moving-frame test above (-4,800 J before), within f32's rounding of the box's kinetic energy.
 ### Fixed 2026-11-25 Open-channel and flood models had no link to changing sediment beds (HYDRO-03)
 
 The shallow-water field now drives suspended load, bedload and bank exchange. The production TerrainBed
@@ -28323,8 +28376,6 @@ solver (KB-PHYS-LEDGER1), and a voxel debris piece on a block's edge rocked with
 web seeds gain nothing with either solver; web seed 23, which spiked through joint 19 with the block solver before
 a4a479f17, stays in its bounds.
 
-
-
 ## Open: a time-zero coupled snapshot predates its accumulator sum region (BIO-01)
 
 Add `PlantSway` and `PlantRigidSolver` to a `PhysicsWorld`, snapshot before the first `advance()`, advance
@@ -28358,6 +28409,14 @@ CITY-TO-STREET-2 still needs vehicle and rail actors. Run
 `node --test packages/physics/tests/coupling/pedestrians.test.js` after building Physics and NavMesh
 to reproduce the measured contact impulses, doorway release and real route grade.
 See LIFE-05 in [Framework requests](physics-work-queue.md#framework-requests).
+
+## Fixed: geological erosion lacked physical time and multidirectional routing (PA-39)
+
+Fractional passes through the original biome erosion tool routed each cell to one receiver and did not describe
+physical rainfall, duration, uplift or grain mobility. The physical path is `LandscapeEvolution` and the
+`evolveRelief` biome adapter. Reproduce the divergent catchment and two-grain threshold fixtures with
+`node --test packages/physics/tests/coupling/landscape.test.js` after building Physics. The legacy static relief
+operation still reproduces existing authored terrain.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
