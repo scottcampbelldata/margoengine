@@ -12731,6 +12731,16 @@ Lava uses a regular depth-averaged heightfield patch with closed edges. It resol
 
 The native microstep follows transport and thermal diffusion stability limits and closes the volume and enthalpy ledgers at each world interval. Mass and cooling rates from ICE-05 are received on its 60 Hz staggered interface. Matching grid geometry is supplied explicitly for terrain and deposit consumers. The optional lava entry is 6,304 B gzip with a 6,560 B ceiling. Both Wasm assets are 9,735 B raw and each is 4,127 B gzip. Core plus stage remains 24,820 B gzip.
 
+### Rail wheelsets and catenary (DYN-05)
+
+The reduced model covers two four-wheel bogies per car, one shared spin coordinate per wheelset,
+four local lateral contact evaluations, and one supplied surveyed route per car. Turns use its
+centreline curvature and cant. The field accepts separate rail height irregularities. A turnout
+is chosen before the world starts. Contact tracks the two tread reactions and a flange restoring
+load. Post-rail motion retains an arclength and independent spring and fall coordinates. The
+catenary uses a tensioned fixed-anchor contact wire with linear waves and a single sprung pickup
+per configured car. The powered separation event is for animation. The optional rail entry measures 23,282 B minified and 9,673 B gzip. The plain and shared wire kernels each measure 571 B raw. Core and Stage gain zero bytes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -29386,6 +29396,16 @@ summary combines unused top and bottom heat, so a live multilayer snowpack canno
 specifically from lava in the presence of other heat sources. A layout for separate basal heat feedback would
 close that ledger. EARTH-02 remains the future granular destination for the published solid deposit elevation.
 The marine test exercises the signed source on the same registry contract that water-entry sources use.
+
+### Rail production shot and full track contact (DYN-05)
+
+The Last Tram and City to Street shot sources are absent from the public checkout. The solver
+fixtures reproduce the specified motion and contact evidence, including the actual procedural
+running-stock render. The reduced wheel model uses a conical tread and a single resultant
+creep force. Profile-resolved rail-head and flange contact, free rigid-body impacts after loss
+of support, and a wired production render remain open. The contact wire uses fixed anchors and
+one loaded cable. Multi-wire hardware, moving switch point mechanisms and circuit-level arc
+measurements require separate models and evidence.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
