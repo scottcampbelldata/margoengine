@@ -9,6 +9,7 @@ import { parseTGA } from '@margoengine/decoders/tga';
 import { parseTIFF } from '@margoengine/decoders/tiff';
 import { parseKTX, uploadTexture } from '@margoengine/decoders/ktx';
 import { parseDDS } from '@margoengine/decoders/dds';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -18,6 +19,7 @@ declare global {
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -37,7 +39,7 @@ try {
     features: ['texture-compression-bc'],
     camera: { position: [0, 0, 4.2], target: [0, 0, 0] },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -73,8 +75,7 @@ try {
   });
   window.textureDemo = { formats: textures.map(([name]) => name) };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent = `Drawn from ${textures.map(([name]) => name).join(', ')} files.`;
-  canvas.dataset.ready = 'true';
+  page.ready(`Drawn from ${textures.map(([name]) => name).join(', ')} files.`);
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

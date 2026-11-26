@@ -69,6 +69,25 @@ The same server also serves the loader examples:
 | [webxr-orbit/](webxr-orbit/) | A WebXR session around a simple scene |
 | [xr-device-check/](xr-device-check/) | Runs WebXR on a real headset or phone and saves the record [docs/xr-device-runs](../docs/xr-device-runs/README.md) keeps |
 
+### Ready and error state
+
+Page checks wait for `data-ready` on one element of the page. Pages set it only through
+[demo-status.ts](demo-status.ts), so an error stays on screen and the page is never marked ready after it
+(`tests/demo-status.test.js` fails on a page that writes `data-ready` itself):
+
+```ts
+import { demoStatus } from './demo-status.ts';
+
+const canvas = document.querySelector('canvas')!,
+  page = demoStatus(canvas, document.querySelector<HTMLElement>('#status'));
+try {
+  // ... build the scene ...
+  page.ready('Scene ready.'); // data-ready="true", unless page.error ran first
+} catch (cause) {
+  page.error(cause); // shows the message, removes data-ready, sets data-error
+}
+```
+
 ## Projects
 
 These are separate npm workspaces with their own dev server.

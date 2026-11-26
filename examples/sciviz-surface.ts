@@ -4,6 +4,7 @@
 import { createCompute } from '@margoengine/compute';
 import { Figure, type ColormapName, type SurfaceLayer } from '@margoengine/sciviz/spec';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -15,6 +16,7 @@ const canvas = document.querySelector<HTMLCanvasElement>('#viewport')!,
   status = document.querySelector<HTMLParagraphElement>('#status')!,
   mapSelect = document.querySelector<HTMLSelectElement>('#map')!,
   animate = document.querySelector<HTMLInputElement>('#animate')!;
+const page = demoStatus(canvas, status);
 const N = 256,
   RANGE: [number, number] = [-1.6, 1.6];
 
@@ -82,7 +84,7 @@ try {
   window.addEventListener('pagehide', () => figure.dispose(), { once: true });
   status.textContent = `${(N * N).toLocaleString('en')} heights recomputed per frame on the GPU and drawn in place.`;
   await figure.ready();
-  canvas.dataset.ready = 'true';
+  page.ready();
 } catch (error) {
-  status.textContent = `Could not start: ${(error as Error).message}`;
+  page.error(`Could not start: ${(error as Error).message}`);
 }

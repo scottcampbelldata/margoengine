@@ -6,9 +6,11 @@ import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/quality
 applyQualityTier();
 import { engineRuntime } from '@margoengine/core/extension';
 import { submitPrincipalScene } from '../packages/shared/demo-frame.js';
+import { demoStatus } from './demo-status.ts';
 const status = document.querySelector<HTMLElement>('#status')!,
   error = document.querySelector<HTMLElement>('#error')!,
   robot = document.body.dataset.demo === 'robot';
+const page = demoStatus(document.querySelector<HTMLElement>('#viewport')!, status, error);
 const abort = new AbortController();
 /** A soft photo-studio environment (equirectangular, linear HDR): a bright key softbox, a dimmer fill and a gradient
  * from a light ceiling to a darker floor, so metals and glossy plastics show reflections and every side gets light. */
@@ -62,7 +64,7 @@ try {
     label: robot ? 'Animated robot with adjustable facial expressions' : 'Interactive flight helmet',
     camera: { position: robot ? [2, 1.5, 7] : [3, 2, 5], target: [0, 0, 0], near: 0.01, far: 500 },
     onError: (reason) => {
-      error.textContent = String(reason);
+      page.error(reason);
     },
   });
   dispose = () => stage.dispose();
@@ -285,7 +287,7 @@ try {
         model.dispose();
         model = full;
         demo.quality = 'full';
-        status.textContent = 'Ready';
+        page.ready('Ready');
       };
   }
   if (robot)
@@ -295,19 +297,18 @@ try {
   else stage.engine.render();
   stage.engine.start();
   watchQuality();
-  document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
-  status.textContent = upgrade ? 'Ready. Full detail is loading.' : 'Ready';
+  page.ready(upgrade ? 'Ready. Full detail is loading.' : 'Ready');
   if (upgrade)
     void upgrade().catch((reason) => {
       if (!abort.signal.aborted) {
         status.textContent = 'Ready. Full detail could not load.';
-        error.textContent = String(reason);
+        page.error(reason);
       }
     });
 } catch (reason) {
   dispose?.();
   if (!abort.signal.aborted) {
     status.textContent = 'Unable to load scene';
-    error.textContent = String(reason);
+    page.error(reason);
   }
 }

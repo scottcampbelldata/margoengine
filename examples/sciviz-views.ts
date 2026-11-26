@@ -2,6 +2,8 @@ import { VolumeQuad, ComparativeGrid } from '@margoengine/sciviz/views';
 import type { PipelineJSON, PipelineRegistry } from '@margoengine/sciviz/pipeline';
 import { loadNRRD, nrrdGrid } from '@margoengine/sciviz/nrrd';
 import { createFigure, element, floats, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('status'), element('status'));
 export const t1Data = nrrdGrid(await loadNRRD(new URL('./assets/sciviz/head.nrrd', import.meta.url), { signal }));
 export const quad = await VolumeQuad.create(element('quad'), t1Data, {
   height: 300,
@@ -100,5 +102,4 @@ window.addEventListener(
   },
   { once: true },
 );
-element('status').textContent = 'OpenNeuro T1 quad view and four NOAA wind comparisons loaded.';
-element('status').dataset.ready = 'true';
+page.ready('OpenNeuro T1 quad view and four NOAA wind comparisons loaded.');

@@ -18,6 +18,7 @@ import {
   type WeatherPresetName,
 } from '@margoengine/weather';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -28,6 +29,7 @@ declare global {
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!,
   bar = document.querySelector<HTMLDivElement>('#presets')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -57,7 +59,7 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 2.4, 9], target: [0, 1.4, 0], near: 0.1, far: 400 },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -144,7 +146,7 @@ try {
       try {
         stage.engine.render({ delta: 0 });
       } catch (error) {
-        status.textContent = String(error);
+        page.error(error);
         return;
       }
       requestAnimationFrame(frame);
@@ -153,7 +155,7 @@ try {
   }
   window.weatherDemo = { machine, weather: sky, hail };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  canvas.dataset.ready = 'true';
+  page.ready();
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

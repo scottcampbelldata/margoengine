@@ -73,12 +73,14 @@ import { Lines, Line, LineMaterial } from '@margoengine/lines';
 import { applyQualityTier, paceEngine } from '@margoengine/quality';
 import { snowNight } from '@margoengine/sky/scene-kits';
 import { Fire } from '@margoengine/vfx/fire';
+import { demoStatus } from '../demo-status.ts';
 
 type Vec3 = [number, number, number];
 const params = new URLSearchParams(location.search),
   on = (name: string) => params.get(name) !== '0',
   status = document.querySelector<HTMLParagraphElement>('#status')!,
   error = document.querySelector<HTMLParagraphElement>('#error')!;
+const page = demoStatus(document.querySelector<HTMLElement>('#viewport')!, status, error);
 const tier = applyQualityTier();
 // The moon stands to the front right of the cabin, over the outside views' right shoulder, so it lights the log walls,
 // the chimney and the snow in front. At the kit's default, low behind the cabin, it backlit every outside view: the
@@ -134,7 +136,7 @@ const stage = await createStage('#viewport', {
     'A snowbound log cabin at night: snow falls past one warm lit window; inside, a fire burns in a stone hearth and a kettle steams',
   camera: { ...view, fov: params.get('view') === 'hearth' ? 55 : 40, near: 0.05, far: 600 },
   onError: (value) => {
-    error.textContent = String(value);
+    page.error(value);
   },
 });
 const engine = stage.engine,
@@ -526,10 +528,7 @@ stage.use({
   name: 'cabin-hearth',
   setup() {},
   onPreUpdate() {
-    if (status.isConnected && ++frames > 30) {
-      status.remove();
-      document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
-    }
+    if (status.isConnected && ++frames > 30 && page.ready()) status.remove();
   },
   dispose() {
     stopFlicker();

@@ -3,6 +3,7 @@ import { pointcloud, type PointCloudColour, type PointCloudPick } from '@margoen
 import { SelectionStore } from '@margoengine/sciviz/link';
 import { parseLAS } from '@margoengine/points/las';
 import type { OctreeNode, OctreeSource } from '@margoengine/points/octree';
+import { demoStatus } from './demo-status.ts';
 
 const canvas = document.querySelector('canvas')!;
 const base = '/examples/assets/sciviz/pointcloud/';
@@ -76,6 +77,7 @@ const colours: Record<string, PointCloudColour> = {
   intensity: { attribute: 'intensity', range: [0, 65535], colormap: 'gray' },
   classification: { attribute: 'classification', range: [0, 18], colormap: 'viridis' },
 };
+const page = demoStatus(canvas, document.querySelector('#status'));
 function status() {
   document.querySelector('#status')!.textContent =
     `${layer.stats.drawn.toLocaleString()} points visible; ${layer.stats.loaded.toLocaleString()} resident; ${reads} tile reads; ${layer.stats.attributeBytes.toLocaleString()} attribute bytes; ${selection.rowIds.length.toLocaleString()} selected.`;
@@ -104,4 +106,4 @@ selection.subscribe(status);
 await layer.ready({ signal: AbortSignal.timeout(30000) });
 await figure.ready();
 status();
-canvas.dataset.ready = 'true';
+page.ready();

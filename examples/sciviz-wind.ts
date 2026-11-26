@@ -1,6 +1,12 @@
 // NOAA NCEP-NCAR Reanalysis 1. Native daily u/v samples, no synthetic flow.
 import type { Figure, LineLayer } from '@margoengine/sciviz';
-import { createFigure, element, exportButton, fail, floats } from './sciviz-demo.js';
+import { createFigure, element, exportButton, fail as showFailure, floats } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 const nx = 49,
   ny = 19,
@@ -152,7 +158,7 @@ try {
         }
       })();
     });
-  element('viewport').dataset.ready = 'true';
+  page.ready();
 } catch (error) {
   fail(error);
 }

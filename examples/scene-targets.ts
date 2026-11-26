@@ -7,6 +7,7 @@ import { Material, createMesh } from '@margoengine/materials';
 import { SceneTargets } from '@margoengine/post/mrt';
 import type { FrameGraph, PassContext } from '@margoengine/core/extension';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -16,6 +17,7 @@ declare global {
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -47,7 +49,7 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 4, 9], target: [0, 0.6, 0] },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -127,8 +129,7 @@ try {
     });
   window.targetsDemo = { targets };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent = 'Albedo, world normal, camera distance and a custom output, from one pass.';
-  canvas.dataset.ready = 'true';
+  page.ready('Albedo, world normal, camera distance and a custom output, from one pass.');
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

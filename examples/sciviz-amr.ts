@@ -12,6 +12,8 @@ import {
 } from '@margoengine/sciviz/amr';
 import { meshLayer } from '@margoengine/sciviz/grids';
 import { element } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('volume'), element('status'));
 
 export const figures: Record<string, Figure> = {};
 export let volume: AMRVolume;
@@ -81,11 +83,11 @@ try {
   await contour.ready();
   contour.engine.render();
   contour.engine.stop();
-  element('status').textContent =
-    `Ready. ${licensed.blocks.length} licensed AMReX blocks, ${licensed.nodes.length} k-d nodes; ${native.blocks.length} Nyx blocks.`;
-  element<HTMLCanvasElement>('volume').dataset.ready = 'true';
+  page.ready(
+    `Ready. ${licensed.blocks.length} licensed AMReX blocks, ${licensed.nodes.length} k-d nodes; ${native.blocks.length} Nyx blocks.`,
+  );
 } catch (error) {
-  element<HTMLCanvasElement>('volume').dataset.error = String(error);
+  page.error(error);
   throw error;
 }
 window.addEventListener(

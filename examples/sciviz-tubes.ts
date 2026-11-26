@@ -2,7 +2,13 @@ import { Figure } from '@margoengine/sciviz/spec';
 import { streamline, sampleField } from '@margoengine/sciviz/maths';
 import { meshLayer, type MeshLayer } from '@margoengine/sciviz/grids';
 import { streamTubeGeometry, streamRibbonGeometry, streamMeshTriangles } from '@margoengine/sciviz/tubes';
-import { element, exportButton, fail, floats } from './sciviz-demo.js';
+import { element, exportButton, fail as showFailure, floats } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 const nx = 49,
   ny = 19,
@@ -85,7 +91,7 @@ try {
       void work.catch(fail);
     });
   exportButton(figure, 'north-atlantic-wind-paths');
-  element('viewport').dataset.ready = 'true';
+  page.ready();
 } catch (error) {
   fail(error);
 }

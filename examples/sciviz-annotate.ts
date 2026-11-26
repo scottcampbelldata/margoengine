@@ -2,6 +2,8 @@ import { annotate, type Annotation, type AnnotationPoint } from '@margoengine/sc
 import { loadNRRD, nrrdGrid } from '@margoengine/sciviz/nrrd';
 import { decodeFigureValue, type FigureSpec } from '@margoengine/sciviz/spec';
 import { createFigure, element, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('status'), element('status'));
 const fetchAsset = async (name: string) => {
   const r = await fetch(new URL('./assets/sciviz/' + name, import.meta.url), { signal });
   if (!r.ok) throw new Error(`Data HTTP ${r.status}`);
@@ -118,6 +120,6 @@ window.addEventListener(
   },
   { once: true },
 );
-element('status').textContent =
-  'CT and T1 loaded. Rulers, angles, paths, scale bars, arrows, shapes and editable ROIs share PNG, SVG and saved figure state.';
-element('status').dataset.ready = 'true';
+page.ready(
+  'CT and T1 loaded. Rulers, angles, paths, scale bars, arrows, shapes and editable ROIs share PNG, SVG and saved figure state.',
+);

@@ -18,6 +18,7 @@ import {
 } from '@margoengine/shader/black-hole';
 import { Tonemap } from '@margoengine/tonemap';
 import { createStage } from 'margoengine';
+import { demoStatus } from '../demo-status.ts';
 
 const params = new URLSearchParams(location.search);
 const ui = params.get('ui') !== '0';
@@ -34,6 +35,11 @@ const VIEWS: View[] = [
   { pos: [-2.1, 0.52, 6.4], target: [-0.35, 0, 0] }, // skimming the inner rim
 ];
 
+const page = demoStatus(
+  document.querySelector<HTMLElement>('#viewport')!,
+  document.querySelector<HTMLElement>('#status'),
+  document.querySelector<HTMLElement>('#error'),
+);
 const stage = await createStage('#viewport', {
   backend: 'webgpu',
   controls: false,
@@ -41,7 +47,7 @@ const stage = await createStage('#viewport', {
   label: 'Event Horizon: a spinning black hole',
   camera: { position: VIEWS[0].pos, target: VIEWS[0].target, fov: 38, near: 0.05, far: 1000 },
   onError: (value) => {
-    document.querySelector('#error')!.textContent = String(value);
+    page.error(value);
   },
 });
 paceEngine(stage.engine);
@@ -178,8 +184,12 @@ stage.use({
       if (Math.hypot(...f.pos.map((v, i) => v - cam.position[i])) < 0.01) flight = null;
     }
     controls?.update(dt);
-    if (hole.raw.stats.drawCalls > 0 && hole.raw.stats.pending === 0 && viewport.dataset.ready !== 'true') {
-      viewport.dataset.ready = 'true';
+    if (
+      hole.raw.stats.drawCalls > 0 &&
+      hole.raw.stats.pending === 0 &&
+      viewport.dataset.ready !== 'true' &&
+      page.ready()
+    ) {
       document.querySelector('#status')?.remove();
     }
   },

@@ -3,11 +3,15 @@ import { molecule, type MoleculeLayer, type MoleculeStyle } from '@margoengine/s
 import { parsePDB } from '@margoengine/loaders/pdb';
 import { parseMMCIF } from '@margoengine/loaders/mmcif';
 import { element } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
 
 export const figures: Record<string, Figure> = {},
   layers: Record<string, MoleculeLayer> = {};
 export let atomCount = 0,
   bondCount = 0;
+const pages = Object.fromEntries(
+  ['ball', 'space', 'licorice'].map((id) => [id, demoStatus(element(id), element('status'))]),
+);
 const signal = AbortSignal.timeout(180000),
   root = new URL('../packages/sciviz/tests/fixtures/molecule/source.json', import.meta.url);
 try {
@@ -48,7 +52,7 @@ try {
     layers[id] = molecule(f, structures[index], { style: style as MoleculeStyle });
     await f.ready();
     f.engine.render();
-    canvas.dataset.ready = 'true';
+    pages[id].ready();
     canvas.addEventListener('click', (event) => {
       const hit = layers[id].pick(event.offsetX, event.offsetY);
       element('picked').textContent = hit
@@ -59,7 +63,6 @@ try {
   element('status').textContent =
     `${atomCount} atoms, ${bondCount} bonds, ${layers.ball.residues.length} residues. PDB and mmCIF coordinates agree.`;
 } catch (error) {
-  element('ball').dataset.error = String(error);
-  element('status').textContent = String(error);
+  for (const page of Object.values(pages)) page.error(error);
   throw error;
 }

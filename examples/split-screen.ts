@@ -6,6 +6,7 @@ import { capsuleGeometry, coneGeometry, cylinderGeometry, toGeometry } from '@ma
 import { engineRuntime } from '@margoengine/core/extension';
 import { submitPrincipalScene, type PrincipalSceneReadiness } from '@margoengine/post/scene-fade';
 import { frameTime, pickOnClick, place, still, viewBox } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -23,6 +24,7 @@ declare global {
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   host = document.querySelector<HTMLDivElement>('#views')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -40,7 +42,7 @@ try {
     autoStart: false,
     camera: { position: [0, 30, 30], target: [0, 0, 0] },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -234,11 +236,12 @@ try {
     },
     frameTime: (frames) => frameTime(engine, () => views, frames),
   };
-  canvas.dataset.ready = 'true';
-  status.textContent = still
-    ? 'Reduced motion: players hold still until you steer them.'
-    : 'Players drive on their own until you steer them.';
+  page.ready(
+    still
+      ? 'Reduced motion: players hold still until you steer them.'
+      : 'Players drive on their own until you steer them.',
+  );
 } catch (error) {
   dispose();
-  if (!life.signal.aborted) status.textContent = `Unable to start: ${String(error)}`;
+  if (!life.signal.aborted) page.error(`Unable to start: ${String(error)}`);
 }

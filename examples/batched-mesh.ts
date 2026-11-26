@@ -15,6 +15,7 @@ import { BatchedMesh } from '@margoengine/materials/batched';
 import { Shadows } from '@margoengine/shadows';
 import { engineRuntime } from '@margoengine/core/extension';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -24,6 +25,7 @@ declare global {
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -39,7 +41,7 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 26, 40], target: [0, 0, 0] },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -113,8 +115,7 @@ try {
     });
   window.batchedDemo = { batch, drawCalls: () => engine.stats.drawCalls };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent = `${batch.count.toLocaleString()} items of ${shapes.length} shapes in one batched mesh.`;
-  canvas.dataset.ready = 'true';
+  page.ready(`${batch.count.toLocaleString()} items of ${shapes.length} shapes in one batched mesh.`);
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

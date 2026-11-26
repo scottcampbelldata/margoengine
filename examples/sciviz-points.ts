@@ -4,6 +4,7 @@
 import { createCompute } from '@margoengine/compute';
 import { Random } from '@margoengine/compute/random';
 import { Figure } from '@margoengine/sciviz/spec';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -14,6 +15,7 @@ declare global {
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('viewport'),
   status = $<HTMLParagraphElement>('status');
+const page = demoStatus(canvas, status);
 // Cluster centres and spreads in data units.
 const CLUSTERS = [
   [0, 0, 0, 1.0],
@@ -60,13 +62,13 @@ async function build(): Promise<void> {
     status.textContent = `${summary} Selected ${selected.toLocaleString('en')}.`;
   });
   await fig.ready();
-  canvas.dataset.ready = 'true';
+  page.ready();
 }
 
 for (const id of ['count', 'budget', 'edl']) $(id).addEventListener('change', () => void build().catch(fail));
 $('drag').addEventListener('change', () => {
   if (figure) figure.dragMode = $<HTMLSelectElement>('drag').value as 'orbit' | 'box' | 'lasso';
 });
-const fail = (error: Error) => (status.textContent = `Could not start: ${error.message}`);
+const fail = (error: Error) => page.error(`Could not start: ${error.message}`);
 window.addEventListener('pagehide', () => figure?.dispose(), { once: true });
 build().catch(fail);

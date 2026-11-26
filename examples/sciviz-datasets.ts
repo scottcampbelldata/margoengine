@@ -1,7 +1,13 @@
 import { Figure } from '@margoengine/sciviz';
 import { openDataSet, type DataSet } from '@margoengine/sciviz/datasets';
 import { meshLayer, type MeshLayer, type TriangleSet } from '@margoengine/sciviz/grids';
-import { element, fail, signal } from './sciviz-demo.js';
+import { element, fail as showFailure, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 export const figure = await Figure.create(element<HTMLCanvasElement>('viewport'), { axes: false, controls: false });
 figure.engine.stop();
@@ -59,9 +65,7 @@ export async function show(format: string): Promise<void> {
   else layer = meshLayer(figure, triangles, { range: [-0.5, 2], colormap: 'viridis' });
   await figure.ready();
   figure.engine.render();
-  element('status').textContent =
-    `${format}: ${grid.points.length / 3} points, ${grid.types.length} cells; ${dataset.kind}.`;
-  element<HTMLCanvasElement>('viewport').dataset.ready = format;
+  page.ready(`${format}: ${grid.points.length / 3} points, ${grid.types.length} cells; ${dataset.kind}.`, format);
 }
 let pending = Promise.resolve();
 element('format').addEventListener('change', () => {

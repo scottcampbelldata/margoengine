@@ -14,6 +14,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** the hull solver's loads model a floating hull (the waves it makes, its roll's bilge eddies); nothing takes
   the form drag of a hull moving through the water once it is under, which sets a sinking hull's speed.
 
+### Fixed 2026-11-26: a demo page marked ready after it had shown an error (KB-DEMO-STATUS1, examples)
+
+- **Repro:** `tests/demo-status.test.js`: 56 example pages wrote `data-ready` and their status text themselves. An
+  error shown by `onError` (a lost device, an uncaptured GPU error) was overwritten a moment later by the ready line,
+  with `data-ready` still set, so a page check passed a page that had failed.
+- **Cause:** no shared helper: each page set the flag and the text on its own path, and the ready path never asked
+  whether an error had been shown.
+- **Fix:** `examples/demo-status.ts` (`demoStatus`) is the one place that marks a page ready, loading or failed; after
+  an error `ready` changes nothing, the error text stays, `data-ready` is removed and `data-error` holds the message.
+  Every page uses it.
+- **Regression:** `tests/demo-status.test.js` (the helper's behaviour, and a scan that fails on any example that writes
+  `data-ready` itself).
+
 ### Fixed 2026-11-26: visual vortices supplied neither full wind nor loads (PA-31)
 
 - **Repro:** Sample the eyewall of a 150 hPa hurricane or put a rigid object and a water grid under a moving vortex.

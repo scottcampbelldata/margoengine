@@ -9,6 +9,7 @@ import {
   type SliceLayer,
   type VolumeLayer,
 } from '@margoengine/sciviz/spec';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -19,6 +20,7 @@ declare global {
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('viewport'),
   status = $<HTMLParagraphElement>('status');
+const page = demoStatus(canvas, status);
 const N = 160;
 
 try {
@@ -137,7 +139,7 @@ try {
   window.addEventListener('pagehide', () => figure.dispose(), { once: true });
   status.textContent = `${(N ** 3).toLocaleString('en')} voxels generated and ray-marched on the GPU.`;
   await figure.ready();
-  canvas.dataset.ready = 'true';
+  page.ready();
 } catch (error) {
-  status.textContent = `Could not start: ${(error as Error).message}`;
+  page.error(`Could not start: ${(error as Error).message}`);
 }

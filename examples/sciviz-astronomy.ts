@@ -3,6 +3,8 @@ import { readFITS } from '@margoengine/sciviz/fits';
 import { readMRC } from '@margoengine/sciviz/mrc';
 import { readOMETIFF } from '@margoengine/sciviz/ometiff';
 import { element, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('sdss'), element('status'));
 
 const root = new URL('../packages/sciviz/tests/fixtures/astronomy/expected.json', import.meta.url);
 export const figures: Record<string, Figure> = {};
@@ -60,11 +62,9 @@ try {
   microscopy.engine.render();
   microscopy.engine.stop();
   samples.idr = plane.length;
-  element('status').textContent =
-    `Decoded ${samples.sdss} SDSS pixels, ${samples.emdb} EMDB voxels and ${samples.idr} IDR pixels.`;
-  element<HTMLCanvasElement>('sdss').dataset.ready = 'true';
+  page.ready(`Decoded ${samples.sdss} SDSS pixels, ${samples.emdb} EMDB voxels and ${samples.idr} IDR pixels.`);
 } catch (error) {
-  element<HTMLCanvasElement>('sdss').dataset.error = String(error);
+  page.error(error);
   throw error;
 }
 window.addEventListener(

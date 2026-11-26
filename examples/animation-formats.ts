@@ -10,6 +10,7 @@ import { pointerChannels } from '@margoengine/animation/pointer';
 import { loadGLTF } from '@margoengine/gltf/pbr';
 import { Material, createMesh, loadTexture } from '@margoengine/materials';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -19,6 +20,7 @@ declare global {
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -34,7 +36,7 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 2.6, 9.5], target: [0, 1.1, 0] },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -103,9 +105,7 @@ try {
     warnings: [...dae.warnings, ...manDAE.warnings, ...animation.warnings, ...coloursAnimation.warnings],
   };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent =
-    'Collada skins (ours and Cesium Man) and KHR_animation_pointer glTFs (AnimatedColorsCube and ours).';
-  canvas.dataset.ready = 'true';
+  page.ready('Collada skins (ours and Cesium Man) and KHR_animation_pointer glTFs (AnimatedColorsCube and ours).');
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

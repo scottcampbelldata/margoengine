@@ -5,6 +5,7 @@ import { createStage } from 'margoengine';
 import { Texture, WgslMaterial, createMesh } from '@margoengine/materials';
 import { DepthTexture } from '@margoengine/post/depth';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -14,6 +15,7 @@ declare global {
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {},
   failed = false;
@@ -43,7 +45,7 @@ try {
     camera: { position: [0, 5, 9], target: [0, 0, 0] },
     onError: (error) => {
       failed = true;
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -90,9 +92,8 @@ try {
   // A frame that failed keeps its error on screen and the page never reports ready (KB-DEPTHTEX-BLACK1: the ready line
   // replaced the error and the visual check took the black canvas as the picture).
   if (!failed) {
-    status.textContent = 'The water material samples the scene depth: foam where rocks meet the surface.';
-    canvas.dataset.ready = 'true';
+    page.ready('The water material samples the scene depth: foam where rocks meet the surface.');
   }
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

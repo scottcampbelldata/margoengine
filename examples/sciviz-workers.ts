@@ -2,7 +2,13 @@ import { Figure } from '@margoengine/sciviz/spec';
 import { readInWorker, type ReaderSession } from '@margoengine/sciviz/workers';
 import { gridLayer } from '@margoengine/sciviz/grids';
 import type { VolumeGrid } from '@margoengine/sciviz/formats';
-import { element, fail, exportButton } from './sciviz-demo.js';
+import { element, fail as showFailure, exportButton } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 export let figure = await Figure.create(element<HTMLCanvasElement>('viewport'), { limits: [0, 4, 0, 4, 0, 7] });
 let session: ReaderSession<unknown> | undefined;
@@ -95,9 +101,7 @@ export async function show(format: string): Promise<void> {
     }
   }
   await figure.ready();
-  element('status').textContent =
-    `${format}: worker decoded the file and transferred the samples. Drag to orbit, scroll to zoom.`;
-  element('viewport').dataset.ready = format;
+  page.ready(`${format}: worker decoded the file and transferred the samples. Drag to orbit, scroll to zoom.`, format);
 }
 element('format').addEventListener('change', () => {
   void show(element<HTMLSelectElement>('format').value).catch(fail);

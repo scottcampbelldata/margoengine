@@ -7,7 +7,13 @@ import {
   type FlowParticles,
   type FlowSeeding,
 } from '@margoengine/sciviz/flow';
-import { element, exportButton, fail, floats, signal } from './sciviz-demo.js';
+import { element, exportButton, fail as showFailure, floats, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 const nx = 49,
   ny = 19,
@@ -163,9 +169,9 @@ try {
   });
   exportButton(figure, 'moving-north-atlantic-wind');
   date();
-  element('status').textContent =
-    'GPU particles through daily means. Drag to orbit; scroll to zoom. Gold pathline and pink streakline are fixed Jan 3 references.';
-  element('viewport').dataset.ready = 'true';
+  page.ready(
+    'GPU particles through daily means. Drag to orbit; scroll to zoom. Gold pathline and pink streakline are fixed Jan 3 references.',
+  );
 } catch (error) {
   fail(error);
 }

@@ -3,7 +3,13 @@ import { readCGNS } from '@margoengine/sciviz/cgns';
 import { readExodus } from '@margoengine/sciviz/exodus';
 import { gridSurface, meshLayer, type MeshLayer } from '@margoengine/sciviz/grids';
 import type { DataSet } from '@margoengine/sciviz/datasets';
-import { element, fail, signal } from './sciviz-demo.js';
+import { element, fail as showFailure, signal } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 export const figure = await Figure.create(element<HTMLCanvasElement>('viewport'), { axes: false, controls: false });
 figure.engine.stop();
@@ -47,9 +53,10 @@ export async function show(format: string): Promise<void> {
   layer = meshLayer(figure, triangles, { range: [lo, hi], colormap: 'viridis' });
   await figure.ready();
   figure.engine.render();
-  element('status').textContent =
-    `${format}: ${grid.points.length / 3} points, ${grid.types.length} cells, ${triangles.cells.length} surface triangles.`;
-  element<HTMLCanvasElement>('viewport').dataset.ready = format;
+  page.ready(
+    `${format}: ${grid.points.length / 3} points, ${grid.types.length} cells, ${triangles.cells.length} surface triangles.`,
+    format,
+  );
 }
 let pending = Promise.resolve();
 element('format').addEventListener('change', () => {

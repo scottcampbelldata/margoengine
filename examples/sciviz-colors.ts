@@ -5,7 +5,15 @@ import {
   encodingLegend,
   type ColormapName,
 } from '@margoengine/sciviz/colormaps';
-import { createFigure, element, floats, fail, exportButton } from './sciviz-demo.js';
+import { createFigure, element, floats, fail as showFailure, exportButton } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const oceanPage = demoStatus(element('ocean'), element('status')),
+  starsPage = demoStatus(element('stars'), element('status'));
+const fail = (error: unknown) => {
+  oceanPage.error(error);
+  starsPage.error(error);
+  showFailure(error);
+};
 
 export const ocean = await createFigure(element<HTMLCanvasElement>('ocean'), {
   mode: '2d',
@@ -104,8 +112,8 @@ for (const control of [select, scale])
   });
 // The shared export helper uses id=export and keeps the full colour legend.
 exportButton(ocean, 'oisst-colour-encoding');
-element('ocean').dataset.ready = 'true';
-element('stars').dataset.ready = 'true';
+oceanPage.ready();
+starsPage.ready();
 window.addEventListener(
   'pagehide',
   () => {

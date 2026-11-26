@@ -16,6 +16,7 @@ import { Lines, Line, LineMaterial } from '@margoengine/lines';
 import { PointsPlugin, PointCloud } from '@margoengine/points';
 import { engineRuntime } from '@margoengine/core/extension';
 import { still } from './multi-view.js';
+import { demoStatus } from './demo-status.ts';
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ declare global {
 
 const status = document.querySelector<HTMLParagraphElement>('#status')!,
   canvas = document.querySelector<HTMLCanvasElement>('#viewport')!;
+const page = demoStatus(canvas, status);
 const life = new AbortController();
 let dispose = () => {};
 window.addEventListener(
@@ -40,7 +42,7 @@ try {
     backend: 'webgpu',
     camera: { position: [0, 5.5, 11], target: [0, 0.8, 0] },
     onError: (error) => {
-      if (!life.signal.aborted) status.textContent = String(error);
+      if (!life.signal.aborted) page.error(error);
     },
   });
   dispose = () => stage.dispose();
@@ -125,8 +127,7 @@ try {
     });
   window.clippingDemo = { materials, line: lineMaterial, cloud };
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  status.textContent = 'Five materials, a line and a point cloud, each clipped by its own planes.';
-  canvas.dataset.ready = 'true';
+  page.ready('Five materials, a line and a point cloud, each clipped by its own planes.');
 } catch (error) {
-  if (!life.signal.aborted) status.textContent = String(error);
+  if (!life.signal.aborted) page.error(error);
 }

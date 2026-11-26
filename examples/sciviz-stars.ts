@@ -1,6 +1,12 @@
 import type { RectsLayer, ScatterLayer } from '@margoengine/sciviz';
 import { SelectionStore, bindSelection, type SelectionBinding } from '@margoengine/sciviz/link';
-import { createFigure, element, exportButton, fail, floats } from './sciviz-demo.js';
+import { createFigure, element, exportButton, fail as showFailure, floats } from './sciviz-demo.js';
+import { demoStatus } from './demo-status.ts';
+const page = demoStatus(element('viewport'), element('status'));
+const fail = (error: unknown) => {
+  page.error(error);
+  showFailure(error);
+};
 
 // Public-domain 2MASS sample; exact provenance and query in assets/sciviz/stars.json.
 export const figure = await createFigure(element<HTMLCanvasElement>('viewport'), {
@@ -96,7 +102,7 @@ try {
   element('undo').addEventListener('click', () => selection.undo());
   exportButton(figure, '2mass-star-catalogue');
   await Promise.all([histogram.ready(), heatmap.ready()]);
-  element('viewport').dataset.ready = 'true';
+  page.ready();
 } catch (error) {
   fail(error);
 }

@@ -10,10 +10,12 @@ import { clouds } from '@margoengine/sky/clouds';
 import { lighting } from '@margoengine/sky/lighting';
 import { sceneSamples } from '../packages/shared/quality.js';
 import { applyQualityTier, paceEngine, redrawAfterRestore, watchQuality } from '@margoengine/quality';
+import { demoStatus } from './demo-status.ts';
 const qualityTier = applyQualityTier();
 
 const error = document.querySelector<HTMLElement>('#error')!,
   status = document.querySelector<HTMLElement>('#status')!;
+const page = demoStatus(document.querySelector<HTMLElement>('#viewport')!, status, error);
 const abort = new AbortController();
 let dispose = () => abort.abort();
 window.addEventListener('pagehide', () => dispose(), { once: true });
@@ -25,7 +27,7 @@ try {
     label: 'Wind-blown meadow with adjustable daylight, clouds and floating seeds',
     camera: { position: [18, 4, 22], target: [0, 1.2, 0], far: 300 },
     onError: (value) => {
-      error.textContent = String(value);
+      page.error(value);
     },
   });
   dispose = () => stage.dispose();
@@ -230,12 +232,12 @@ try {
     },
   });
   motion();
-  document.querySelector<HTMLElement>('#viewport')!.dataset.ready = 'true';
+  page.ready();
 } catch (value) {
   const leaving = abort.signal.aborted;
   dispose();
   if (!leaving) {
     status.textContent = 'Unable to start the meadow';
-    error.textContent = String(value);
+    page.error(value);
   }
 }

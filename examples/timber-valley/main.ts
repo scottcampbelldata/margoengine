@@ -4,11 +4,13 @@
 // frames and exposes `window.timberValley = {engine, scene}`.
 import { Engine } from '@margoengine/core';
 import { attach, info } from '@margoengine/scenes/timber-valley';
+import { demoStatus } from '../demo-status.ts';
 
 const query = new URLSearchParams(location.search),
   viewport = document.querySelector<HTMLElement>('#viewport')!,
   error = document.querySelector<HTMLElement>('#error')!,
   status = document.querySelector<HTMLElement>('#status');
+const page = demoStatus(viewport, status, error);
 const settings: Record<string, unknown> = {};
 for (const [key, spec] of Object.entries(info.settings)) {
   const value = query.get(key);
@@ -34,13 +36,12 @@ try {
     setup() {},
     onPreUpdate() {
       if (++frames === 30) {
-        status?.remove();
-        viewport.dataset.ready = 'true';
+        if (page.ready()) status?.remove();
       }
     },
   });
   (window as unknown as Record<string, unknown>).timberValley = { engine, scene };
   addEventListener('pagehide', () => scene.dispose(), { once: true });
 } catch (cause) {
-  error.textContent = String(cause);
+  page.error(cause);
 }

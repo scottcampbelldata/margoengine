@@ -8,8 +8,10 @@ import {
   type GraphBundles,
   type GraphForceModel,
 } from '@margoengine/sciviz/graph-gpu';
+import { demoStatus } from './demo-status.ts';
 const canvas = document.querySelector<HTMLCanvasElement>('#plot')!,
   status = document.querySelector<HTMLElement>('#status')!;
+const page = demoStatus(status, status);
 export const works: { id: string; title: string; year: number; references: string[] }[] = await (
   await fetch('/packages/sciviz/tests/fixtures/graph-gpu/openalex.json')
 ).json();
@@ -51,7 +53,7 @@ export async function advance(iterations = 20): Promise<void> {
     status.textContent = `${graph.nodes} nodes, ${edges.length / 2} citations. ${work.iterations} GPU iterations.`;
   await layer.refreshLabels();
   figure.render();
-  status.dataset.ready = 'true';
+  page.ready();
 }
 export async function reset(model: GraphForceModel = 'forceatlas2'): Promise<void> {
   layer?.dispose();
@@ -76,7 +78,7 @@ const action = (run: () => Promise<void>) => async () => {
   try {
     await run();
   } catch (error) {
-    status.textContent = String(error);
+    page.error(error);
     throw error;
   } finally {
     pending = false;

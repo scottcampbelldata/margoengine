@@ -49,6 +49,7 @@ import { Autofocus } from '@margoengine/dof/autofocus';
 import { TAA } from '@margoengine/taa';
 import { Grade, type GradeOptions } from '@margoengine/tonemap/grade';
 import { VolumetricClouds, type VolumetricCloudOptions } from '@margoengine/sky/volumetric-clouds';
+import { demoStatus } from '../demo-status.ts';
 
 const q = new URLSearchParams(location.search);
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
@@ -510,4 +511,4 @@ function apply(_state: unknown, { time }: { time: number }) {
   people: { ...people, watchers },
 };
 engine.start();
-document.body.dataset.ready = 'true';
+demoStatus(document.body).ready();

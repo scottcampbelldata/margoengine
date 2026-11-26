@@ -1,8 +1,10 @@
 import { Figure } from '@margoengine/sciviz';
 import { brickedVolume, type BrickRequest, type BrickedVolumeLayer } from '@margoengine/sciviz/bricks';
 import { openOMEZarr, openN5, openPrecomputed, type CloudRange } from '@margoengine/sciviz/omezarr';
+import { demoStatus } from './demo-status.ts';
 
 const canvas = document.querySelector('canvas')!;
+const page = demoStatus(canvas, document.querySelector('#status'));
 export const figure = await Figure.create(canvas, { axes: true, controls: false });
 let layer: BrickedVolumeLayer | undefined;
 const readers = { 'idr-lightsheet': openOMEZarr, openorganelle: openN5, hemibrain: openPrecomputed };
@@ -10,7 +12,7 @@ type Sample = keyof typeof readers;
 
 /** Draws an original compressed cloud sample through its bricked source, retaining bounded chunk reads. */
 export async function showCloud(name: Sample): Promise<void> {
-  canvas.dataset.ready = '';
+  page.pending();
   if (layer) figure.remove(layer);
   const base = `/packages/sciviz/tests/fixtures/cloud-volumes/${name}/`;
   const manifest = await fetch(`${base}manifest.json`).then((r) => r.json());
@@ -55,8 +57,7 @@ export async function showCloud(name: Sample): Promise<void> {
     colormap: 'viridis',
   });
   await layer.ready({ signal: AbortSignal.timeout(30000) });
-  document.querySelector('#status')!.textContent =
-    `${volume.format}: stored resolution ${selected.path}; ${size.join(' x ')} region at voxel ${origin.join(', ')}. ${layer.stats.resident} resident bricks, ${layer.stats.memoryBytes.toLocaleString()} GPU bytes.`;
+  const readyText = `${volume.format}: stored resolution ${selected.path}; ${size.join(' x ')} region at voxel ${origin.join(', ')}. ${layer.stats.resident} resident bricks, ${layer.stats.memoryBytes.toLocaleString()} GPU bytes.`;
   document.querySelector('#caption')!.textContent = volume.caption;
   const credit = document.querySelector('#credit')!;
   credit.replaceChildren(document.createTextNode(`${manifest.attribution}. ${manifest.license}. `));
@@ -64,7 +65,7 @@ export async function showCloud(name: Sample): Promise<void> {
   link.href = manifest.base;
   link.textContent = 'Original cloud source';
   credit.append(link);
-  canvas.dataset.ready = name;
+  page.ready(readyText, name);
 }
 document.querySelector('select')!.addEventListener('change', (event) => {
   void showCloud((event.target as HTMLSelectElement).value as Sample);
