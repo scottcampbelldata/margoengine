@@ -6257,6 +6257,13 @@ fit values of 227.1, 246.8 and 268.2 mm. Inputs come from the gate geometry, rel
 and separately measured viscosity. The calculation uses the bulk radial mass moment in the
 shallow, gravity-dominated phase. [Reproduce](reproduce.md#fluid-07-measured-horizontal-spreading)
 
+### FLUID-07 stiff capillary strips
+
+A 128-cell strip at 20 μm spacing conserves liquid and reproduces the discrete damping of
+three capillary modes in either grid direction. Plain and shared Wasm return identical depths.
+The former iterative strip solve failed to converge on its first step in this case.
+[Reproduce](reproduce.md#fluid-07-stiff-capillary-strips)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings

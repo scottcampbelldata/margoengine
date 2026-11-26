@@ -15503,6 +15503,12 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   simulated radii. The release starts from the gate geometry without a similarity profile.
   The gravity-only approximation omits the experimental surface-tension effects near the front.
   [Journal](https://doi.org/10.1017/S0022112082001797)
+- Gene H. Golub and Charles F. Van Loan, “Matrix Computations”, fourth edition (2013), §4.3.
+  A strip's face gradient times its transpose has diagonals `−1, 2, −1`. Its square gives the
+  curvature term's five bands. The film pressure solve factors that symmetric positive definite
+  band directly, using scratch already owned by the solver. The modal regression checks the same
+  discrete equation with three independent Neumann cosine modes.
+  [Publisher](https://doi.org/10.1137/1.9781421407944)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
   Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to
   pressure. Equation 10 brackets the stationary contact front by the advancing and receding

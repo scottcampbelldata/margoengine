@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ThinFilmSolver } from '../dist/thin-film.js';
-import { PhysicsWorld } from '../dist/world.js';
+import { PhysicsWorld, worldMemory } from '../dist/world.js';
 
 const rate = { num: 60, den: 1 };
 const dt = 1 / rate.num;
@@ -92,6 +92,50 @@ test('ThinFilmSolver: hydrostatic plus capillary damping matches the closed-form
   close(film.budget.stored, film.budget.initial, frames * n * 8 * Number.EPSILON * film.budget.initial);
   assert.ok(amplitude > 0 && amplitude < epsilon);
   assert.equal(film.budget.substeps, 1);
+});
+
+test('ThinFilmSolver: a micrometre strip resolves all three stiff capillary modes in either axis', async () => {
+  const n = 128;
+  const spacing = 20e-6;
+  const h = 120e-6;
+  const amplitude = 1e-10;
+  const viscosity = 1.92;
+  const surfaceTension = 0.0198;
+  const mobility = h ** 3 / (3 * viscosity);
+  const modes = [2, 3, 5].map((mode) => {
+    const wavenumber = (mode * Math.PI) / n;
+    const eigenvalue = 4 * (Math.sin(wavenumber / 2) / spacing) ** 2;
+    const shape = Array.from({ length: n }, (_, i) => Math.cos(wavenumber * (i + 0.5)));
+    return { shape, damping: 1 / (1 + dt * mobility * surfaceTension * eigenvalue ** 2) };
+  });
+  const depthAt = (i, evolved) =>
+    h + amplitude * modes.reduce((sum, mode) => sum + mode.shape[i] * (evolved ? mode.damping : 1), 0);
+  const initial = Array.from({ length: n }, (_, i) => depthAt(i, false));
+  // Bound the quadratic mobility correction and the roundoff in the measured depth.
+  const tolerance = (64 * amplitude ** 2) / h + 32 * Number.EPSILON * h;
+  for (const cells of [
+    [n, 1],
+    [1, n],
+  ]) {
+    let plain;
+    for (const shared of [false, true]) {
+      const film = await ThinFilmSolver.load();
+      const world = new PhysicsWorld({ rate, gravity: [0, 0, 0], memory: worldMemory(shared) }).add(film, {
+        cells,
+        spacing,
+        depth: initial,
+        viscosity,
+        surfaceTension,
+      });
+      world.advance(1);
+      const evolved = film.depths();
+      assert.equal(film.budget.substeps, 1);
+      for (const [i, depth] of evolved.entries()) close(depth, depthAt(i, true), tolerance);
+      close(film.budget.stored, film.budget.initial, 32 * Number.EPSILON * film.budget.initial);
+      if (shared) assert.deepEqual(evolved, plain);
+      else plain = evolved;
+    }
+  }
 });
 
 test('ThinFilmSolver: the precursor contact-angle pressure has its derived linear decay rate', async () => {

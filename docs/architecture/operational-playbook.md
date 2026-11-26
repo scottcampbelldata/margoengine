@@ -10621,6 +10621,9 @@ transactional during a step. The solver consumes the live rigid body record and 
 turns physical precipitation into intercepted water, and sends independently held impact pressure to
 the optional WakeSolver. Depth, capillary redistribution, drying and edge drainage have independent
 closed-form or volume checks. Plain/shared builds, frame cadence and restore agree bit for bit.
+For a strip with one row or column and no contact-angle hysteresis, the pressure operator has five
+bands. A direct Cholesky solve reuses the face scratch arrays. Its three-mode regression exercises
+20 μm cells in each axis, matching the discrete damping in both Wasm memory modes.
 
 ### Environmental airborne batch (ATMO-06)
 

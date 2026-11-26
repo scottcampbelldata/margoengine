@@ -4589,6 +4589,15 @@ test checks water conservation and agreement within one refined cell. The measur
 no simulation input. The sharp front shape and surface-tension-dominated spreading are outside
 this check. [Huppert (1982), Table 1(a) and Figure 6](https://doi.org/10.1017/S0022112082001797)
 
+### FLUID-07 stiff capillary strips
+
+Run `node --test --test-name-pattern="micrometre strip" packages/physics/tests/thin-film.test.js`
+from a built physics entry. Start a 120 μm film with a superposition of modes 2, 3 and 5 on a
+128-cell no-flux strip at 20 μm spacing. Each mode's linear damping factor is
+`1 / (1 + dt M σ λ²)`, with `M = h³/(3μ)` and `λ` its discrete Neumann Laplacian eigenvalue.
+The test checks the depths after one tick in both grid directions and both Wasm memory modes.
+[Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
+
 ### FLUID-07 measured inclined film
 
 Run `node --test --test-name-pattern="calibrated inlet" packages/physics/tests/coupling/thin-film.test.js`

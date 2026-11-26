@@ -9708,7 +9708,11 @@ It compares the same rigid pose with each liquid mesh hidden in turn. Full layer
 water–glass optics and complete production-cut review remain open.
 [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-The optional thin-film entry is 16,381 B gzip with a 16,873 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+One-row or one-column strips without advancing and receding contact-angle hysteresis use a
+direct banded pressure solve. The capillary regression covers a 128-cell strip at 20 μm spacing.
+The multidimensional pressure solve and hysteresis use their existing iterative operators.
+
+The optional thin-film entry is 16,381 B gzip with a 16,873 B ceiling. Both Wasm assets are 16,188 B raw and each is 6,794 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
