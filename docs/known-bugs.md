@@ -6,6 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: a scene's background colour comes out lighter once a post effect captures the scene (KB-CLEAR-CAPTURE1, core)
+
+- **Repro:** `engine.scene.background = '#808080'` draws 128,128,128. With `Tonemap.attach(engine)`,
+  `Bloom.attach(engine)` or `PostStack.attach(engine, [new Tonemap()])` it draws 181,181,181; `'#07090f'` becomes
+  15,29,53 (Intel Arc 140V, Chromium WebGPU). `ColorBackground` of `@margoengine/environment` under the same `Tonemap`
+  draws 116,116,116, the tone-mapped linear colour.
+- **Cause:** core clears with the colour's sRGB bytes as given (`clearColorValue`, `packages/shared/clear-color.js`,
+  used by `packages/core/src/renderer.ts`), also when the colour target is a post effect's linear HDR capture, so the
+  display transform encodes them a second time. A fix that converts the clear colour for a linear target belongs where
+  the clear is written (core), or in every capture that redirects it. Needs a maintainer decision (frozen core). Use
+  `ColorBackground` meanwhile.
+
+### Open 2026-11-26: `@margoengine/animation/mixer` is not in the package README (KB-ANIM-MIXERDOC1, animation)
+
+- **Repro:** `packages/animation/README.md` names `AnimationMixer` only in its film-time paragraph: no import path, no
+  example and no list of the action calls, although the entry is public.
+- **Cause:** the entry landed without its README section.
+
 ### Fixed 2026-11-26: the moving look evidence read distances from an 8-bit depth mask (KB-SHOT-DEPTH8BIT1, tools/shot)
 
 - **Repro:** a shot with `shot.moving` at `depthScale` 2000 (the timber-valley shots) with ground within a few metres
@@ -537,7 +555,6 @@ test.
   `WASM_RUSTFLAGS` of scripts/support/wasm-kernel.mjs, so check:rust-kernels no longer checks the build that ships.
 - **Fix to make:** take each kernel's shipped flags from its build script (the blueprint's `RUSTFLAGS` for the 3D
   kernel, the 2D kernel's own variant flags) in check:rust-kernels and in the test, owned by the physics kernel work.
-
 
 ### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
 

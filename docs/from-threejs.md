@@ -2,7 +2,8 @@
 
 A side-by-side guide for three.js developers. Each section shows the three.js code you already write, then the Margo
 code that does the same job. Where Margo has no equivalent yet, the section says so; the full list is in
-[Not yet](#not-yet).
+[Not yet](#not-yet). To look one class up, go to [Name by name](#name-by-name); to see whole scenes running, to
+[Side-by-side examples](#side-by-side-examples).
 
 <!-- Every ```ts block in this file is type-checked against the built packages by tests/from-threejs-snippets.test.js.
      ```js blocks are three.js and are not checked. Snippets may use the ambient names engine, canvas, mesh and model. -->
@@ -10,6 +11,8 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 ## Contents
 
 - [What is different](#what-is-different)
+- [Concepts](#concepts)
+- [Units, handedness and colour](#units-handedness-and-colour)
 - [Install only what you import](#install-only-what-you-import)
 - [Renderer, scene, camera and resize](#renderer-scene-camera-and-resize)
 - [Meshes and geometry](#meshes-and-geometry)
@@ -31,15 +34,19 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 - [Render loop and frame pacing](#render-loop-and-frame-pacing)
 - [Debugging a frame](#debugging-a-frame)
 - [Disposal](#disposal)
+- [Pitfalls](#pitfalls)
+- [Side-by-side examples](#side-by-side-examples)
+- [Name by name](#name-by-name)
 - [Not yet](#not-yet)
 
 ## What is different
 
-- **WebGPU first.** Core renders with WebGPU. The WebGL2 fallback is the optional `@margoengine/webgl2-compat/preview` package and
-  draws core meshes only (flat PBR, one light, no textures or effects). Most optional packages need WebGPU.
-- **No `Scene` object.** One `Engine` owns one canvas, one camera and one implicit scene. Meshes are created by the
-  engine (`engine.createMesh()`), and features (shadows, lights, post effects, controls) are plugins you attach with
-  one form, `X.attach(engine, options)` (async ones such as `Environment.attach` return a Promise). A loaded model
+- **WebGPU first.** Core renders with WebGPU. Where it is missing, `await install()` from `@margoengine/webgl2-compat`
+  runs the same scene, optional packages included, on WebGL2 (still in development). The much smaller
+  `@margoengine/webgl2-compat/preview` draws core meshes only (flat PBR, one light, no textures or effects).
+- **The engine is the scene.** One `Engine` owns one canvas, one camera and a default scene (`engine.scene`; more with
+  `engine.createScene()`). Meshes are created by the engine (`engine.createMesh()`), and features (shadows, lights,
+  post effects, controls) are plugins you attach with one form, `X.attach(engine, options)` (async ones such as `Environment.attach` return a Promise). A loaded model
   joins a feature with `feature.add(model)`. Everything disposable has `dispose()`, and every package object also has
   `[Symbol.dispose]` for `using` (core's `Engine` and meshes and the stage facade have `dispose()` only).
 - **Small core, optional packages.** Core plus the `margoengine` stage facade is about 21 kB gzip (`npm run measure:size` prints the exact figure;
@@ -60,6 +67,36 @@ code that does the same job. Where Margo has no equivalent yet, the section says
   automatically. Textured meshes and loaded glTF models are drawn by `@margoengine/gltf/pbr` (through
   `@margoengine/materials` for meshes you build). Shadows, clustered lights and SSAO light core meshes automatically
   and need `add(model)` for gltf/pbr models.
+
+## Concepts
+
+| In three.js | In Margo |
+| --- | --- |
+| A renderer you create, size and call each frame | `Engine`: the canvas, the GPU device and the frame loop. It sizes itself. |
+| A `Scene` you build and pass to `render` | `engine.scene` exists from the start; `engine.createMesh()` puts a mesh in it. |
+| `Object3D`, `Mesh`, `Group` | One kind of mesh. Without geometry it is a transform node. |
+| Any material on any mesh | Core meshes take core's constant `PbrMaterial`. Textures and the other shading models are `@margoengine/materials`, whose `createMesh` returns an object you move through its `root`. |
+| A loader returns an object that you add to the scene | A loaded model is drawn as soon as the promise resolves. `model.root` moves it, `model.dispose()` removes it. |
+| Add-ons you construct and update in the render loop | Plugins: `X.attach(engine, options)`. The engine updates, restores and disposes them. |
+| A flag on an object (`castShadow`) or on the scene (`environment`) | Each feature has `add(meshOrModel)` for what it should affect. |
+| `needsUpdate` | Live properties and setters; textures drawn from a canvas take `texture.update()`. |
+
+## Units, handedness and colour
+
+| Subject | Margo | Compared with three.js |
+| --- | --- | --- |
+| Axes | Right-handed, +Y up. A camera looks from `position` to `target`. | Same axes. |
+| Length | One unit is one metre in glTF, physics, sky and the light units. A file authored in centimetres is 100 times too large: scale `model.root`. | Same convention. |
+| Rotation | Radians. `mesh.rotation` is Euler XYZ (X, then Y, then Z about the turned axes); `setQuaternion([x, y, z, w])`. | Same as the default `'XYZ'` order. |
+| Field of view | Degrees, vertical. | Same. |
+| Light cones | `innerAngle`, `outerAngle` or `angle` with `penumbra`, in radians. | Same `angle` and `penumbra`. |
+| Matrices | 16 numbers, column-major. | Same as `Matrix4.elements`. |
+| Time | Seconds. The loop clamps a long frame to `engine.maxDelta` (0.1). | `Clock` does not clamp. |
+| Pointer positions | Canvas CSS pixels (`engine.pick`, `Raycaster.setFromEngine`). | No conversion to -1 to 1. |
+| Colour strings | `'#rrggbb'` is sRGB, converted to linear. | Same. |
+| Colour arrays | `[r, g, b]` is linear. | Same as `Color.setRGB` in the working space. |
+| Depth buffer (WebGPU) | Reversed: near is 1, far is 0. | Reverse the comparisons in your own shaders. |
+| Light intensity | glTF's `KHR_lights_punctual` units: candela for point and spot lights, lux for directional ones, nits for area lights (`@margoengine/clustered/units`). The core sun's strength is `lighting.direction[3]` (default 3) and the ambient strength `lighting.radiance[3]` (default 0.15). | Set the numbers by comparing frames, not by copying them. |
 
 ## Install only what you import
 
@@ -86,7 +123,7 @@ npm install @margoengine/geometry @margoengine/materials @margoengine/gltf/pbr @
 | You use in three.js | Margo package |
 | --- | --- |
 | `WebGLRenderer`, `PerspectiveCamera`, `Mesh`, `MeshStandardMaterial` (colour only) | `@margoengine/core` |
-| WebGL fallback | `@margoengine/webgl2-compat/preview` |
+| WebGL fallback | `@margoengine/webgl2-compat` (every package), `@margoengine/webgl2-compat/preview` (core meshes) |
 | `BoxGeometry`, `SphereGeometry`, `ExtrudeGeometry`, `BufferGeometryUtils` | `@margoengine/geometry` |
 | `TextureLoader`, `MeshStandardMaterial` with maps and the other mesh materials | `@margoengine/materials` |
 | `GLTFLoader` (textured, extensions) | `@margoengine/gltf/pbr` (+ `@margoengine/decoders` for Draco, meshopt, KTX2) |
@@ -173,9 +210,9 @@ app.box({size: [1, 1, 1], color: '#84d6bd'});
 - `engine.backend` is `'webgpu'` or `'webgl2'`; `engine.fallbackReason` says why WebGPU was not used.
 - `capacity` (default 1,024) is the initial number of meshes and transform nodes an engine holds; `createMesh` doubles it
   when full, up to 8,388,608. Set it for big scenes to skip the doublings: `Engine.create(canvas, {capacity: 50_000})`.
-- Each engine owns one implicit scene. `engine.render({camera})` supports sequential alternate-camera captures, and
-  `core/extension` exposes per-core-draw viewport/scissor rectangles. Optional native passes and picking do not inherit
-  those rectangles.
+- `engine.views` draws several cameras, scenes or rectangles in one frame (`ArrayCamera`, `setViewport`), and
+  `engine.render({camera})` draws one alternate-camera frame. `engine.createScene()` makes further scenes, each with its
+  own meshes, lighting and plugins; a view names the one it draws.
 
 A transparent canvas over HTML and CSS, like `new THREE.WebGLRenderer({alpha: true})` with `setClearColor(0x000000, 0)`:
 
@@ -203,8 +240,9 @@ Tonemap.attach(engine, {curve: 'neutral'}); // highlights above white and colour
 console.log(output.gamut, output.hdr); // what the canvas really is ('srgb' and false on an sRGB/SDR display)
 ```
 
-sRGB content looks the same on the P3 canvas (as three.js converts sRGB colours for a P3 output). There is no
-ColorManagement API: colours and textures are sRGB (environment README, "Display P3 and HDR output").
+sRGB content looks the same on the P3 canvas (as three.js converts sRGB colours for a P3 output). There is no global
+`ColorManagement` switch: colours and textures are sRGB, and `convertColor` of `@margoengine/math` converts between
+named spaces (environment README, "Display P3 and HDR output").
 
 ## Meshes and geometry
 
@@ -397,12 +435,13 @@ oit.add(pane);  // and oit.add(model) for a loaded glTF's BLEND primitives
 - `ShaderMaterial` / `onBeforeCompile`: `WgslMaterial` runs your WGSL `fn shade(i: Out, s: Surface) -> Surface`
   (and optionally `fn displace(i: Input) -> vec3f`) inside the PBR shader, with live `uniforms` and `textures`; the
   chosen `shading` still lights it. Node graphs: `NodeMaterial` (`@margoengine/shader`), below.
-- Not available: arbitrary named vertex attributes on your own meshes.
+- Arbitrary named vertex attributes need `RawShaderMaterial` (`@margoengine/shader/raw`); your own per-instance values
+  on a built-in material are `instanceAttributes` (`@margoengine/materials/instance-attributes`), read by a material
+  plugin.
 
 ## Lights and shadows
 
-Core has one directional light plus a constant ambient term. They live on the engine's runtime object, reached through
-the explicit `@margoengine/core/extension` entry.
+Core has one directional light plus a constant ambient term, both on `engine.lighting`.
 
 ```js
 const sun = new THREE.DirectionalLight('#fff4e5', 3);
@@ -417,11 +456,10 @@ scene.add(lamp);
 ```
 
 ```ts
-import {engineRuntime} from '@margoengine/core/extension';
 import {Shadows} from '@margoengine/shadows';
 import {Clustered} from '@margoengine/clustered';
 
-const {lighting} = engineRuntime(engine);
+const {lighting} = engine;
 lighting.direction.set([3, 5, 4, 3]);        // xyz: direction toward the light, w: intensity
 lighting.radiance.set([1, 0.96, 0.9, 0.15]); // rgb: light colour (linear), w: ambient intensity
 
@@ -439,8 +477,10 @@ lights.add(model);                           // core meshes are lit automaticall
 
 - Shadows are four cascades with PCSS soft edges; `shadows.add(mesh, {static: true})` caches casters that never move.
 - `setLights` replaces the whole list; call it again to animate lights.
-- One directional light per engine. No hemisphere or IES lights (glTF models get a fixed sky/ground ambient fill); rect
-  area lights are below. For image-based ambient light use the next section.
+- More directional lights are `DirectionalLights` (`@margoengine/clustered/directional`), `HemisphereLight` and
+  `AmbientLight` are in `@margoengine/environment` (without them glTF models get a fixed sky/ground ambient fill),
+  and IES profiles are `@margoengine/clustered/ies`. Rect area lights are below; image-based ambient light is the next
+  section.
 
 Point and spot light shadows (three.js `lamp.castShadow = true`) are the optional `@margoengine/clustered/shadows` entry.
 Flag the lights, attach `LocalShadows` to the clustered lights and add the casters (core meshes included, unlike
@@ -622,7 +662,7 @@ const scan = createMeshes(engine, parsePLY(await (await fetch('/scan.ply')).arra
 ```
 
 The stage facade frames what it loads: `await addGLTF(app, '/model.glb')` (`margoengine/stage/gltf`) handles glTF with constant colours. `@margoengine/loaders` also parses 3MF, PCD, XYZ, OFF and legacy VTK. Textured OBJ with its MTL loads in one call with `loadOBJ` from `@margoengine/loaders/mtl`; Collada reads geometry,
-materials and the hierarchy (`parseDAE`).
+materials, the hierarchy, skins, morph targets and animation (`parseDAE`).
 
 ### Caching and offline (`THREE.Cache`)
 
@@ -669,6 +709,21 @@ const animator = Animator.attach(animation, {
   transitions: [{from: 'move', to: 'jump', when: p => p.jump > 0, duration: 0.2}],
 });
 animator.parameters.speed = 2;
+```
+
+Code written around three.js actions keeps its shape with `AnimationMixer` (`@margoengine/animation/mixer`), which
+blends several clips at once. Attached to the engine it is advanced for you; there is no `mixer.update` call:
+
+```ts
+import {AnimationMixer, LoopOnce} from '@margoengine/animation/mixer';
+
+const mixer = AnimationMixer.attach(engine, model);
+const idle = mixer.clipAction('Idle').play();
+const wave = mixer.clipAction('Wave').setLoop(LoopOnce);
+wave.clampWhenFinished = true;
+wave.play();
+idle.crossFadeTo(wave, 0.3);
+mixer.timeScale = 0.5;
 ```
 
 Crowds with vertex animation textures (three.js has no built-in): bake clips once, then draw thousands of animated
@@ -755,7 +810,8 @@ ViewCube.attach(engine, {...BLENDER.viewCube});               // clicking the cu
 - Without an engine, pass a camera and an element and call `update(delta)` yourself:
   `new FlyControls(engine.camera, canvas)`.
 - `ViewCube.attach(engine)` from `@margoengine/viewcube` replaces `ViewHelper` (click a face to turn the view).
-- No `ArcballControls`. Controls do not roll the camera.
+- `ArcballControls` (`@margoengine/controls/arcball`) rolls the camera and goes over the poles; the other controls do
+  not roll it.
 
 ## Raycasting and picking
 
@@ -790,8 +846,10 @@ canvas.addEventListener('click', async event => {
 });
 ```
 
-`raycaster.intersectObjects(engine, [mesh, model])` tests a list. Rays hit skinned models in their bind pose (use GPU
-picking for posed hits). Lines are not hit; points have `pointsPlugin.pick(x, y)`.
+`raycaster.intersectObjects(engine, [mesh, model])` tests a list. Once a model is skinned or morphing, the
+synchronous calls throw rather than test its bind pose: `await raycaster.intersectModel(model)` hits the posed surface,
+as does GPU picking. Lines are picked by `intersectLines` (`@margoengine/bvh/lines`), or on the GPU after
+`LinePicking.attach(picking, lines)` (`@margoengine/lines/pick`); points have `pointsPlugin.pick(x, y)`.
 
 ## Instancing
 
@@ -858,7 +916,9 @@ for (let i = 0; i < 500; i++) forest.setMatrixAt(i, [1, 0, 0, 0, 0, 1, 0, 0, 0, 
 for (const primitive of tree.primitives) primitive.instances = forest;
 ```
 
-Not per instance: frustum culling and sorting of transparent instances. `BatchedMesh` has no equivalent.
+Not per instance: frustum culling and sorting of transparent instances (`MeshletMesh` of
+`@margoengine/culling/meshlets` culls instances on the GPU). `BatchedMesh`, many different geometries in one draw, is
+`BatchedMesh.attach(engine, material, options)` from `@margoengine/materials/batched`.
 
 ## LOD and imposters
 
@@ -968,7 +1028,8 @@ ssr.enabled = false;                        // toggles without recompiling; SSR.
   no `composer.render()`.
 - A single effect can also be attached alone, for example `Bloom.attach(engine, {strength: 0.8})`.
 - Custom full-screen effects are `NodePass`es from `@margoengine/shader` (next section).
-- `Tonemap` curves are `'agx'`, `'acescg'` and `'neutral'`, with exposure in stops and `.cube` LUTs (`setLUT`).
+- `Tonemap` curves are `'agx'`, `'acescg'`, `'neutral'`, `'reinhard'`, `'cineon'` and `'linear'`, with exposure in
+  stops and `.cube` LUTs (`setLUT`).
 - `AsciiEffect` is `ASCII` in `@margoengine/post/ascii`: `resolution` becomes `cellSize` in pixels, `block` is
   `background: 'scene'`, and `await ascii.text()` gives the characters.
 - SMAA (`@margoengine/post/smaa`), GTAO, motion blur, glitch (`/glitch`) and afterimage (`/afterimage`) are in post;
@@ -1011,8 +1072,9 @@ PostStack.attach(engine, [new Tonemap(), vignette]);
 
 Most TSL names are the same. Differences: `If`/`Else` is `select(cond, a, b)`; `Loop` is
 `loop(count, init, (i, acc) => next)`; `Discard(cond)` is `discard(cond, value)`; compute is
-`ComputePass.attach(engine, count, i => buffer.store(i, value))` over `storage(array, 'vec4f')`. The package README
-has the full TSL table. Output is WGSL only; there are no light, shadow or noise nodes and no statement-level `If`.
+`ComputePass.attach(engine, count, i => buffer.store(i, value))` over `storage(array, 'vec4f')`. Statement-level `If` and `Loop`,
+lighting nodes (`@margoengine/shader/lighting`), noise (`@margoengine/shader/noise`) and GLSL functions as nodes
+(`@margoengine/shader/glsl`) are there too. The package README has the full TSL table. Output on WebGPU is WGSL.
 
 ## Orthographic cameras and top-down views
 
@@ -1098,7 +1160,8 @@ element.textContent = 'Pump 3';
 labels.add(element, {mesh, offset: [0, 0.8, 0]});
 ```
 
-Lines, points and text are WebGPU only. Lines are not pickable. `labels.add3D(element, {mesh})` replaces
+Lines, points and text need WebGPU or the `@margoengine/webgl2-compat` layer. Lines are picked as in
+[Raycasting and picking](#raycasting-and-picking). `labels.add3D(element, {mesh})` replaces
 `CSS3DObject`. Extruded 3D text comes from TrueType fonts through `textGeometry` in `@margoengine/loaders/font` (typeface JSON
 fonts are not read).
 
@@ -1141,6 +1204,9 @@ engine.stop();
 stop();                                       // unsubscribes the callback
 engine.render({delta: 1 / 60});               // one frame by hand, e.g. render on demand
 ```
+
+`onFrame` callbacks run from the loop that `start()` runs. `render()` draws one frame and advances the attached plugins
+(controls, animation) by `delta`, but calls no `onFrame` callback; in a loop of your own, call your update yourself.
 
 Quality tiers and pacing (`@margoengine/quality`):
 
@@ -1200,6 +1266,315 @@ is wrapped per frame until `capture()`; an engine that never imports `@margoengi
 `engine.removePlugin(plugin.name)` removes one feature while the engine keeps running. After a GPU device loss the
 engine recreates the device and every plugin rebuilds its GPU state; no reload is needed.
 
+## Pitfalls
+
+What most often goes wrong in a port, with the fix.
+
+| You expect, from three.js | What happens in Margo | Do this |
+| --- | --- | --- |
+| A new standard material is white, rough and front-sided | Core's `PbrMaterial` defaults to colour `#4f46e5`, roughness 0.5, metalness 0 and `doubleSided: true` | Write the values, or use `PbrMaterial` of `@margoengine/materials`, which has three.js's defaults. |
+| One material class for every mesh | There are two `PbrMaterial`s. Core's mesh takes core's; a textured mesh is made by materials' `createMesh` | Import both names from the package whose mesh you build. |
+| `mesh.position` on a textured mesh | `createMesh` returns an object, not a core mesh | Move it with `result.root.setPosition(...)`. |
+| `color: 0xff0000` | Core takes `'#rrggbb'` or a linear `[r, g, b]`; hex numbers are a materials feature | Write the string for core. |
+| `camera.lookAt(p)` | The camera is a position and a target | `engine.camera.target = p`. |
+| A flag turns on shadows or environment light | Shadow casters, and non-core receivers, join each feature | `shadows.add(mesh)`, `lighting.add(model)`, `fog.add(model)`, `ssao.add(model)`. |
+| Everything attaches at once | `Environment.attach` is asynchronous | `await` it before `EnvironmentLighting.attach`. |
+| `render()` runs your frame code | `onFrame` callbacks run only from the started loop | Call `engine.start()`, or run your update before `render`. |
+| `scene.background` looks the same under post effects | With a post effect attached the colour comes out lighter: it is treated as linear light and encoded again ([known bugs](known-bugs.md), KB-CLEAR-CAPTURE1) | Use `ColorBackground` of `@margoengine/environment`, which stores linear light. |
+| A raycast on an animated character | Synchronous BVH rays throw on a deforming model | `await raycaster.intersectModel(model)` or GPU picking. |
+| `mixer.update(delta)` in your loop | An attached mixer is already advanced by the engine; calling it too doubles the speed | Delete the call. |
+| A depth shader with `less` comparisons | WebGPU depth is reversed (near 1, far 0) | Use `greater`, or `DepthTexture`'s `distance`. |
+| `new WebGLRenderer` runs anywhere with WebGL 2 | Core needs WebGPU | `await install()` from `@margoengine/webgl2-compat` first when `navigator.gpu` gives no adapter. |
+| A canvas made for you | `Engine.create` takes your canvas and sizes its buffer from its CSS size | Give the canvas a CSS size, or use `createStage` with a container. |
+
+## Side-by-side examples
+
+[`examples/from-threejs/`](../examples/from-threejs/) holds complete scenes. Each file starts by saying how the same
+scene is put together in three.js, then is the Margo code. Run `npm run build:packages` and `npm run dev:examples`, then
+open `http://127.0.0.1:5173/examples/from-threejs/index.html`. `npm run test:from-threejs` runs every one in a browser
+and checks the frame and the behaviour (`-- --compat` on the WebGL2 layer).
+
+| Example | The scene |
+| --- | --- |
+| [typical-scene.ts](../examples/from-threejs/typical-scene.ts) | A glTF model walking on a ground: HDR environment light, a shadowed sun, ambient occlusion and bloom, orbit controls, click to outline |
+| [basics.ts](../examples/from-threejs/basics.ts) | A spinning box on a floor, core only |
+| [model-animation.ts](../examples/from-threejs/model-animation.ts) | A glTF model, cross-fading between two clips |
+| [instancing-picking.ts](../examples/from-threejs/instancing-picking.ts) | One draw of many boxes, picked by ray and by GPU |
+| [post-processing.ts](../examples/from-threejs/post-processing.ts) | Bloom, tone mapping and FXAA |
+
+## Name by name
+
+The public names of three.js's core and common add-ons, and what does the same job in Margo. Every name in the Margo
+column is checked against the committed API reports (`api/*.api.md`) by `tests/from-threejs-snippets.test.js`, so a
+rename or removal fails that test. `Name.member` is a member of that export, and the third column is the package that
+exports it. A row says where the job lives, not that signatures match; the sections above show the calls, and the
+[parity matrix](threejs-parity.md) records limits row by row. `none` means there is no counterpart.
+
+### Renderer, scene graph and loop
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `WebGLRenderer`, `WebGPURenderer` | `Engine.create` | `@margoengine/core` | One engine per canvas. |
+| `renderer.render` | `EngineKernel.render` | `@margoengine/core` | One frame by hand. |
+| `renderer.setAnimationLoop` | `EngineKernel.start`, `EngineKernel.stop`, `EngineKernel.onFrame` | `@margoengine/core` | `onFrame` callbacks run from the started loop. |
+| `Clock`, `Timer` | `EngineKernel.onFrame` | `@margoengine/core` | The callback receives the step in seconds. |
+| `renderer.setSize`, `setPixelRatio` | `EngineOptions.exactSize` | `@margoengine/core` | Automatic from the canvas's CSS size; the option fixes a size. |
+| `renderer.setViewport`, `setScissor`, `ArrayCamera` | `RenderView`, `EngineKernel.views` | `@margoengine/core` | Fractions of the canvas, or pixels. |
+| `renderer.dispose`, `forceContextRestore` | `EngineKernel.dispose`, `EngineKernel.rebootDevice` | `@margoengine/core` | A lost device is rebuilt automatically. |
+| `renderer.info` | `FrameDebugger` | `@margoengine/inspector/frame` | Per pass, for a captured frame. |
+| Stats, GPU timer queries | `Stats`, `GPUProfiler` | `@margoengine/stats` | |
+| `Scene` | `Scene`, `EngineKernel.scene`, `EngineKernel.createScene` | `@margoengine/core` | |
+| `scene.background` (color) | `Scene.background` | `@margoengine/core` | See [Pitfalls](#pitfalls) before combining it with post effects. |
+| `Object3D`, `Group`, `Mesh` | `EngineKernel.createMesh`, `Mesh.setParent` | `@margoengine/core` | A mesh without geometry is a group. |
+| `position`, `rotation`, `quaternion`, `scale`, `visible`, `name` | `Mesh.position`, `Mesh.rotation`, `Mesh.setQuaternion`, `Mesh.scale`, `Mesh.visible`, `Mesh.name` | `@margoengine/core` | |
+| `Layers` | `setRenderLayers`, `setCameraLayers` | `@margoengine/cameras/layers` | 32-bit masks. |
+| `EventDispatcher` | `EventDispatcher` | `@margoengine/controls` | |
+| `WebGLRenderTarget` | `HDRRenderTarget` | `@margoengine/creative/targets` | |
+| `WebGLCubeRenderTarget`, `WebGLArrayRenderTarget`, `WebGL3DRenderTarget` | `TextureRenderTarget` | `@margoengine/creative/targets` | `kind`: cube, array or 3d. |
+| Multiple render targets | `SceneTargets` | `@margoengine/post/mrt` | |
+| `renderer.domElement.toDataURL`, `readRenderTargetPixels` for stills | `capture` | `@margoengine/exporters/capture` | |
+| Rendering on an `OffscreenCanvas` in a worker | `transferCanvas`, `WorkerCanvas` | `@margoengine/worker` | |
+| The WebGL 2 backend | `install` | `@margoengine/webgl2-compat` | Await it before `Engine.create`; still in development. |
+| `renderer.xr`, `VRButton`, `ARButton` | `XR.requestSession` | `@margoengine/xr` | Untested on a headset. |
+| `XRControllerModelFactory`, `XRHandModelFactory` | `XRModels` | `@margoengine/xr/models` | |
+
+### Cameras
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `PerspectiveCamera` | `Camera`, `CameraOptions` | `@margoengine/core` | `fov` in degrees; aspect follows the canvas. |
+| `camera.lookAt` | `Camera.target` | `@margoengine/core` | Assign the point to look at. |
+| `camera.up` | `Camera.up` | `@margoengine/core` | |
+| Framing a box | `Camera.fitToBoundingBox` | `@margoengine/core` | |
+| `OrthographicCamera` | `CameraProjection` | `@margoengine/cameras` | |
+| `CubeCamera` | `CubeCamera` | `@margoengine/environment/cube-camera` | |
+| `StereoCamera`, `AnaglyphEffect`, `ParallaxBarrierEffect` | `StereoRig` | `@margoengine/cameras/stereo` | |
+
+### Geometry and curves
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `BufferGeometry` (position and normal) | `Geometry` | `@margoengine/core` | |
+| `BufferGeometry` (UVs, colours, tangents, groups) | `MeshGeometry` | `@margoengine/materials` | Plain typed arrays. |
+| Handing generated arrays to core | `toGeometry` | `@margoengine/geometry` | |
+| `BoxGeometry`, `SphereGeometry`, `PlaneGeometry`, `CircleGeometry`, `RingGeometry` | `boxGeometry`, `sphereGeometry`, `planeGeometry`, `circleGeometry`, `ringGeometry` | `@margoengine/geometry` | |
+| `CylinderGeometry`, `ConeGeometry`, `CapsuleGeometry`, `TorusGeometry`, `TorusKnotGeometry` | `cylinderGeometry`, `coneGeometry`, `capsuleGeometry`, `torusGeometry`, `torusKnotGeometry` | `@margoengine/geometry` | |
+| `PolyhedronGeometry`, `TetrahedronGeometry`, `OctahedronGeometry`, `IcosahedronGeometry`, `DodecahedronGeometry` | `polyhedronGeometry`, `tetrahedronGeometry`, `octahedronGeometry`, `icosahedronGeometry`, `dodecahedronGeometry` | `@margoengine/geometry` | |
+| `LatheGeometry`, `TubeGeometry`, `ExtrudeGeometry`, `ShapeGeometry`, `EdgesGeometry` | `latheGeometry`, `tubeGeometry`, `extrudeGeometry`, `shapeGeometry`, `edgesGeometry` | `@margoengine/geometry` | |
+| `Shape`, `Path` | `Shape`, `Path` | `@margoengine/geometry` | |
+| `CatmullRomCurve3`, `CubicBezierCurve3`, `QuadraticBezierCurve3`, `LineCurve3`, `CurvePath` | `CatmullRomCurve3`, `CubicBezierCurve3`, `QuadraticBezierCurve3`, `LineCurve3`, `CurvePath` | `@margoengine/geometry` | |
+| `EllipseCurve`, `SplineCurve` | `EllipseCurve`, `SplineCurve` | `@margoengine/geometry` | |
+| `RoundedBoxGeometry`, `ConvexGeometry`, `DecalGeometry`, `ParametricGeometry` | `roundedBoxGeometry`, `convexGeometry`, `decalGeometry`, `parametricGeometry` | `@margoengine/geometry/extras` | |
+| `TeapotGeometry` | `teapotGeometry` | `@margoengine/geometry/teapot` | |
+| `TextGeometry`, `FontLoader`, `TTFLoader` | `textGeometry` | `@margoengine/loaders/font` | TrueType and OpenType fonts; typeface JSON is not read. |
+| `BufferGeometryUtils.mergeGeometries`, `mergeVertices` | `mergeGeometries`, `mergeVertices` | `@margoengine/geometry` | |
+| `computeVertexNormals`, `computeTangents` | `computeVertexNormals`, `computeTangents` | `@margoengine/geometry` | |
+| `TessellateModifier` | `tessellateGeometry` | `@margoengine/geometry/tessellate` | |
+| `SimplifyModifier` | `simplifyMesh` | `@margoengine/mesh-edit/modeling` | |
+| `MeshSurfaceSampler` | `MeshSurfaceSampler` | `@margoengine/geometry/sample` | |
+
+### Materials and textures
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `MeshStandardMaterial` (colour, roughness, metalness) | `PbrMaterial` | `@margoengine/core` | Other defaults: see [Pitfalls](#pitfalls). |
+| `MeshStandardMaterial`, `MeshPhysicalMaterial` | `PbrMaterial` | `@margoengine/materials` | |
+| `MeshBasicMaterial`, `MeshLambertMaterial`, `MeshPhongMaterial`, `MeshToonMaterial` | `UnlitMaterial`, `LambertMaterial`, `PhongMaterial`, `ToonMaterial` | `@margoengine/materials` | |
+| `MeshNormalMaterial`, `MeshMatcapMaterial`, `MeshDepthMaterial`, `MeshDistanceMaterial`, `ShadowMaterial` | `NormalMaterial`, `MatcapMaterial`, `DepthMaterial`, `DistanceMaterial`, `ShadowCatcherMaterial` | `@margoengine/materials` | |
+| `ShaderMaterial`, `onBeforeCompile` | `WgslMaterial` | `@margoengine/materials` | WGSL, inside the engine's lighting. |
+| `RawShaderMaterial` | `RawShaderMaterial`, `RawMesh` | `@margoengine/shader/raw` | Any named attributes. |
+| Node materials, TSL `uniform` | `NodeMaterial`, `uniform` | `@margoengine/shader` | |
+| `Mesh` with a textured material | `createMesh` | `@margoengine/materials` | |
+| `Texture`, `CanvasTexture`, `VideoTexture`, `DataTexture`, `DataArrayTexture`, `Data3DTexture` | `Texture` | `@margoengine/materials` | One class; the source decides. |
+| `FrontSide`, `BackSide`, `DoubleSide` | `MaterialOptions.side` | `@margoengine/materials` | `'front'`, `'back'`, `'double'`. |
+| `NormalBlending`, `AdditiveBlending`, `MultiplyBlending`, `NoBlending` | `MaterialOptions.blending` | `@margoengine/materials` | `'normal'`, `'additive'`, `'multiply'`, `'none'`. |
+| `RepeatWrapping`, `NearestFilter`, `anisotropy`, `flipY`, `colorSpace` | `TextureOptions.wrapS`, `TextureOptions.magFilter`, `TextureOptions.anisotropy`, `TextureOptions.flipY`, `TextureOptions.colorSpace` | `@margoengine/materials` | Strings: `'repeat'`, `'nearest'`. |
+| `InstancedBufferAttribute` for your own per-instance values | `instanceAttributes` | `@margoengine/materials/instance-attributes` | Read by a material plugin. |
+| `TextureLoader`, `ImageBitmapLoader` | `loadTexture` | `@margoengine/materials` | |
+| `CubeTexture`, `CubeTextureLoader` | `CubeTexture`, `loadCubeTexture` | `@margoengine/materials` | |
+| `CompressedTexture`, `KTX2Loader` on a material | `loadKTX2Texture` | `@margoengine/materials` | |
+| `DepthTexture` | `DepthTexture` | `@margoengine/post/depth` | Reversed depth. |
+| `texture.mipmaps` of your own | `mipTexture`, `loadMipTexture` | `@margoengine/materials/mips` | |
+| `StorageTexture` | `StorageTexture`, `PingPongTexture` | `@margoengine/shader/compute-texture` | |
+| `GPUComputationRenderer`, TSL compute | `ComputePass`, `storage` | `@margoengine/shader` | |
+| Order-independent transparency | `OIT` | `@margoengine/oit` | |
+
+### Lights and shadows
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `DirectionalLight` (the sun) | `Scene.lighting`, `EngineKernel.lighting` | `@margoengine/core` | `direction`, `radiance`. |
+| More `DirectionalLight`s | `DirectionalLights` | `@margoengine/clustered/directional` | |
+| `AmbientLight`, `HemisphereLight` | `AmbientLight`, `HemisphereLight` | `@margoengine/environment` | |
+| `PointLight`, `SpotLight` | `Clustered.setLights` | `@margoengine/clustered` | |
+| `RectAreaLight`, `RectAreaLightUniformsLib` | `AreaLights` | `@margoengine/clustered/area` | |
+| `IESLoader`, `IESSpotLight` | `parseIES`, `IESLights` | `@margoengine/clustered/ies` | |
+| `ProjectorLight`, `SpotLight.map` | `ProjectorLights` | `@margoengine/clustered/projector` | |
+| `LightProbe`, light probe volumes | `LightProbes` | `@margoengine/environment/probes` | |
+| `renderer.shadowMap`, `castShadow`, `receiveShadow`, CSM | `Shadows.attach`, `Shadows.add` | `@margoengine/shadows` | `add` takes `castShadow` and `receiveShadow`. |
+| Point and spot light shadows | `LocalShadows` | `@margoengine/clustered/shadows` | |
+| ContactShadows example | `ContactShadows` | `@margoengine/studio` | |
+
+### Environment, sky, water and effects in the scene
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `RGBELoader`, `HDRLoader`, `EXRLoader`, `UltraHDRLoader` | `loadEnvironmentImage`, `parseHDR`, `parseEXR`, `decodeUltraHDR` | `@margoengine/environment` | |
+| `PMREMGenerator`, `scene.environment` | `Environment.attach`, `EnvironmentLighting.attach` | `@margoengine/environment` | |
+| `scene.background` (texture, blurriness, colour in linear light) | `EnvironmentBackground`, `ColorBackground` | `@margoengine/environment` | |
+| `Fog`, `FogExp2` | `Fog` | `@margoengine/environment` | |
+| Volumetric lighting | `VolumetricFog` | `@margoengine/environment/volumetric` | |
+| `Sky` | `Sky` | `@margoengine/sky` | |
+| `Reflector` | `Reflector` | `@margoengine/environment/reflector` | |
+| `Refractor` | `Refractor` | `@margoengine/environment/refractor` | |
+| `Water`, `Water2` | `Water` | `@margoengine/water` | |
+| `Lensflare` | `LensFlare` | `@margoengine/post/lens-flare` | |
+| Decals as a screen pass | `Decals` | `@margoengine/post/decals` | |
+| `MarchingCubes` | `marchingCubes` | `@margoengine/procedural` | |
+| `ImprovedNoise`, `SimplexNoise` | `Noise` | `@margoengine/procedural` | |
+
+### Loaders
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `GLTFLoader` | `loadGLTF`, `parseGLTF` | `@margoengine/gltf/pbr` | Constant-colour files also load with `@margoengine/gltf`. |
+| Progressive glTF loading | `loadGLTFProgressive` | `@margoengine/gltf/progressive` | |
+| `DRACOLoader`, `MeshoptDecoder`, `KTX2Loader` for glTF | `DracoDecoder`, `MeshoptDecoder`, `KTX2Decoder` | `@margoengine/decoders` | Pass them as `decoders`. |
+| `FBXLoader` | `loadFBX` | `@margoengine/fbx` | |
+| `USDZLoader`, `USDLoader` | `loadUSDZ` | `@margoengine/usdz` | |
+| `OBJLoader`, `MTLLoader` | `parseOBJ`, `parseMTL` | `@margoengine/loaders` | |
+| `OBJLoader` with its materials, drawn | `loadOBJ` | `@margoengine/loaders/mtl` | |
+| `STLLoader`, `PLYLoader`, `PCDLoader`, `XYZLoader`, `VTKLoader` | `parseSTL`, `parsePLY`, `parsePCD`, `parseXYZ`, `parseVTK` | `@margoengine/loaders` | |
+| `ColladaLoader`, `3MFLoader` | `parseDAE`, `parse3MF` | `@margoengine/loaders` | |
+| `SVGLoader` | `parseSVG` | `@margoengine/loaders/svg` | |
+| `BVHLoader` | `parseBVH` | `@margoengine/loaders/mocap` | |
+| `MMDLoader` | `parseMMD` | `@margoengine/loaders/mmd` | Rigid bodies are data only. |
+| `Rhino3dmLoader` | `parse3DM` | `@margoengine/loaders/3dm` | |
+| `TDSLoader` | `parse3DS` | `@margoengine/loaders/3ds` | |
+| `AMFLoader` | `parseAMF` | `@margoengine/loaders/amf` | |
+| `GCodeLoader` | `parseGCode` | `@margoengine/loaders/gcode` | |
+| `KMZLoader` | `parseKMZ` | `@margoengine/loaders/kmz` | |
+| `LDrawLoader` | `parseLDraw` | `@margoengine/loaders/ldraw` | |
+| `LWOLoader` | `parseLWO` | `@margoengine/loaders/lwo` | |
+| `MD2Loader` | `parseMD2` | `@margoengine/loaders/md2` | |
+| `PDBLoader` | `parsePDB` | `@margoengine/loaders/pdb` | |
+| `VRMLLoader` | `parseVRML` | `@margoengine/loaders/vrml` | |
+| `NRRDLoader` | `parseNRRD` | `@margoengine/loaders/nrrd` | |
+| `VOXLoader` | `parseVox` | `@margoengine/voxel/vox` | |
+| `TGALoader` | `parseTGA` | `@margoengine/decoders/tga` | |
+| `DDSLoader` | `parseDDS` | `@margoengine/decoders/dds` | |
+| `KTXLoader` | `parseKTX` | `@margoengine/decoders/ktx` | |
+| `TIFFLoader` | `parseTIFF` | `@margoengine/decoders/tiff` | |
+| `PVRLoader` | `parsePVR` | `@margoengine/decoders/pvr` | |
+| `LUTCubeLoader` | `parseCube` | `@margoengine/tonemap` | |
+| `LoadingManager` | `LoadingManager` | `@margoengine/cache/manager` | |
+| `Cache` | `AssetCache` | `@margoengine/cache` | |
+| `AudioLoader` | `loadAudioBuffer` | `@margoengine/audio` | |
+| `ObjectLoader`, `scene.toJSON` | none | | Save a scene as glTF, or with `@margoengine/save`. |
+
+### Exporters
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `GLTFExporter` | `exportModel`, `exportGLB`, `exportGLTF` | `@margoengine/exporters` | |
+| `OBJExporter`, `STLExporter`, `PLYExporter` | `exportOBJ`, `exportSTL`, `exportPLY` | `@margoengine/exporters` | |
+| `USDZExporter` | `exportUSDZ` | `@margoengine/exporters/usdz` | |
+| `DRACOExporter` | `compressDraco` | `@margoengine/exporters/draco` | Writes it into a GLB. |
+| `KTX2Exporter` | `encodeKTX2` | `@margoengine/exporters/ktx2` | |
+| `EXRExporter` | `encodeEXR` | `@margoengine/environment/exr-write` | |
+
+### Animation
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| One playing clip, `SkinnedMesh`, morph targets | `Animation.attach`, `Animation.play`, `Animation.setMorph` | `@margoengine/animation` | |
+| `AnimationMixer`, `AnimationAction` | `AnimationMixer.clipAction`, `AnimationAction.crossFadeTo`, `AnimationAction.setLoop` | `@margoengine/animation/mixer` | |
+| `LoopOnce`, `LoopRepeat`, `LoopPingPong` | `LoopOnce`, `LoopRepeat`, `LoopPingPong` | `@margoengine/animation/mixer` | |
+| State machines and blend trees (not in three.js) | `Animator` | `@margoengine/animator` | |
+| `AnimationClip`, `KeyframeTrack` authored in code | `createKeyframeClip` | `@margoengine/animation` | |
+| `AnimationObjectGroup` | `AnimationGroup` | `@margoengine/animation` | |
+| `Skeleton`, `Bone` | `Skeleton`, `Skin` | `@margoengine/animation` | |
+| `SkeletonUtils.clone`, retargeting | `cloneModel`, `Retarget` | `@margoengine/animation/skeleton-utils` | |
+| `CCDIKSolver` | `CCDSolver` | `@margoengine/animator` | |
+| Instanced animated crowds | `bakeVAT`, `VATCrowd` | `@margoengine/animation/vat` | |
+
+### Post-processing
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `EffectComposer`, `RenderPass`, `addPass` | `PostStack.attach`, `PostStack.addEffect`, `PostStack.removeEffect` | `@margoengine/post/stack` | The scene capture is built in. |
+| `ShaderPass` | `NodePass` | `@margoengine/shader` | |
+| `OutputPass`, `renderer.toneMapping` | `Tonemap` | `@margoengine/tonemap` | |
+| `ACESFilmicToneMapping`, `AgXToneMapping`, `NeutralToneMapping`, `ReinhardToneMapping`, `CineonToneMapping`, `LinearToneMapping` | `TonemapOptions.curve`, `TonemapOptions.exposure` | `@margoengine/tonemap` | `'acescg'`, `'agx'`, `'neutral'`, `'reinhard'`, `'cineon'`, `'linear'`; exposure is in stops. |
+| `LUTPass` | `Tonemap.setLUT` | `@margoengine/tonemap` | |
+| `UnrealBloomPass`, `BloomPass` | `Bloom` | `@margoengine/post/bloom` | |
+| `SSAOPass`, `SAOPass` | `SSAO` | `@margoengine/post/ssao` | |
+| `GTAOPass` | `GTAO` | `@margoengine/post/gtao` | |
+| `SSRPass` | `SSR` | `@margoengine/post/ssr` | |
+| Screen-space global illumination | `SSGI` | `@margoengine/post/ssgi` | |
+| `FXAAPass` | `FXAA` | `@margoengine/post/fxaa` | |
+| `SMAAPass` | `SMAA` | `@margoengine/post/smaa` | |
+| `TAARenderPass` | `TAA` | `@margoengine/taa` | Wraps the stack; not a stack entry. |
+| `SSAARenderPass` | `supersample` | `@margoengine/quality/ssaa` | |
+| `BokehPass` | `DOF` | `@margoengine/dof` | |
+| `OutlinePass` | `Selection` | `@margoengine/selection` | |
+| `FilmPass` | `PostProcessing` | `@margoengine/creative/post` | Its `grain` option. |
+| `GlitchPass` | `Glitch` | `@margoengine/post/glitch` | |
+| `AfterimagePass` | `Afterimage` | `@margoengine/post/afterimage` | |
+| `AsciiEffect` | `ASCII` | `@margoengine/post/ascii` | |
+| Vignette, RGB shift, pixelation, halftone, dot screen, Sobel, sepia | `vignette`, `rgbShift`, `pixelate`, `halftone`, `dotScreen`, `sobel`, `sepia` | `@margoengine/shader/effects` | |
+
+### Controls and helpers
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `OrbitControls`, `MapControls` | `OrbitControls`, `MapControls` | `@margoengine/controls/orbit` | |
+| `TrackballControls`, `ArcballControls` | `TrackballControls`, `ArcballControls` | `@margoengine/controls` | |
+| `FlyControls`, `FirstPersonControls`, `PointerLockControls` | `FlyControls`, `FirstPersonControls`, `PointerLockControls` | `@margoengine/controls` | |
+| `TransformControls`, `DragControls` | `TransformControls`, `DragControls` | `@margoengine/controls` | |
+| `ViewHelper` | `ViewCube` | `@margoengine/viewcube` | |
+| `GridHelper`, `PolarGridHelper`, `AxesHelper`, `ArrowHelper` | `GridHelper`, `PolarGridHelper`, `AxesHelper`, `ArrowHelper` | `@margoengine/lines` | |
+| `BoxHelper`, `Box3Helper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper`, `SkeletonHelper` | `BoxHelper`, `Box3Helper`, `CameraHelper`, `PlaneHelper`, `VertexNormalsHelper`, `SkeletonHelper` | `@margoengine/lines` | |
+| `DirectionalLightHelper`, `PointLightHelper`, `SpotLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper` | `DirectionalLightHelper`, `PointLightHelper`, `SpotLightHelper`, `HemisphereLightHelper`, `RectAreaLightHelper` | `@margoengine/lines` | |
+
+### Picking and special objects
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `Raycaster` | `Raycaster.setFromEngine`, `Raycaster.setFromCamera`, `Raycaster.intersectObjects`, `Raycaster.intersectEngine` | `@margoengine/bvh` | |
+| three-mesh-bvh | `MeshBVH` | `@margoengine/bvh` | |
+| GPU picking | `Picking.attach`, `Picking.pick` | `@margoengine/selection` | The drawn surface, posed models included. |
+| GPU picking of core meshes | `EngineKernel.pick` | `@margoengine/core` | |
+| `InstancedMesh` | `createInstancedMesh` | `@margoengine/materials` | |
+| Instanced glTF primitives | `PBRInstances` | `@margoengine/gltf/pbr-instancing` | |
+| `BatchedMesh` | `BatchedMesh` | `@margoengine/materials/batched` | |
+| `LOD` | `LODSystem` | `@margoengine/lod` | |
+| `Points`, `PointsMaterial` | `PointCloud`, `PointsMaterial`, `PointsPlugin` | `@margoengine/points` | |
+| `Sprite`, `SpriteMaterial` | `SpriteBatch`, `SpriteMaterial` | `@margoengine/points` | |
+| `Line`, `LineSegments`, `LineLoop`, `Line2`, `LineMaterial` | `Lines`, `Line`, `LineMaterial` | `@margoengine/lines` | |
+| Picking lines on the GPU | `LinePicking` | `@margoengine/lines/pick` | |
+| `CSS2DRenderer`, `CSS3DRenderer` | `LabelRenderer`, `CSS3DObject` | `@margoengine/labels` | |
+| troika-three-text | `TextRenderer`, `Text` | `@margoengine/text` | |
+
+### Math
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `Vector2`, `Vector3`, `Vector4`, `Matrix3`, `Matrix4`, `Quaternion`, `Euler` | `Vector2`, `Vector3`, `Vector4`, `Matrix3`, `Matrix4`, `Quaternion`, `Euler` | `@margoengine/math` | |
+| `Box3`, `Sphere`, `Ray`, `Plane`, `Frustum`, `Line3`, `Triangle` | `Box3`, `Sphere`, `Ray`, `Plane`, `Frustum`, `Line3`, `Triangle` | `@margoengine/math` | |
+| `Color`, `MathUtils`, `Spherical`, `Cylindrical`, `SphericalHarmonics3` | `Color`, `MathUtils`, `Spherical`, `Cylindrical`, `SH3` | `@margoengine/math` | |
+| `ColorManagement.convert` | `convertColor` | `@margoengine/math` | |
+| `SRGBColorSpace`, `LinearSRGBColorSpace`, `DisplayP3ColorSpace` | `SRGBColorSpace`, `LinearSRGBColorSpace`, `DisplayP3ColorSpace` | `@margoengine/math` | |
+| `Capsule`, `OBB` | `Capsule`, `OBB` | `@margoengine/math` | |
+| `vector.project`, `vector.unproject` | `projectPoint`, `unprojectPoint`, `worldToScreen` | `@margoengine/math` | |
+| `Interpolant`, `LinearInterpolant`, `DiscreteInterpolant` | `Interpolant`, `LinearInterpolant`, `DiscreteInterpolant` | `@margoengine/math/curve` | |
+
+### Audio
+
+| three.js | Margo | Import from | Notes |
+| --- | --- | --- | --- |
+| `AudioListener`, `Audio`, `PositionalAudio`, `AudioAnalyser` | `AudioListener`, `Audio`, `PositionalAudio`, `AudioAnalyser` | `@margoengine/audio` | |
+
 ## Not yet
 
 Remaining gaps and documented limits from [`docs/threejs-parity.md`](threejs-parity.md). The optional-package backlog
@@ -1216,13 +1591,11 @@ features add no core or stage functionality.
 | WebXR reflection cube maps (AR light) | Missing. The WebXR Lighting Estimation draft defines it for WebGL only; `@margoengine/xr/ar` gives the room's light as spherical harmonics instead. |
 | WebXR VR and AR | PARTIAL: untested on a headset or AR device. AR occlusion from CPU or GPU depth is `AROcclusion` (`@margoengine/xr/occlusion`). |
 | WebGL2 for every package | PARTIAL: `@margoengine/webgl2-compat`, still in development. |
-| Cloth and soft bodies | PARTIAL: `@margoengine/physics/soft` simulates them; no render bridge draws them yet. |
-| Particle fluids | PARTIAL: `ParticleLiquid` (`@margoengine/water`) draws fluid particles; there is no fluid solver. |
-| Triangle-mesh path tracing: instancing, skinning, emissive-triangle lights, glTF BLEND alpha | PARTIAL: `@margoengine/voxel-pathtracer/mesh` and `/mesh-pbr`. |
-| Real-time caustics for arbitrary scene glass | PARTIAL: water surfaces, studio product meshes and lightmaps have caustics. |
-| Deferred shading pipeline, SVG output, voxel cone-traced global illumination, G-code writer | NOT PLANNED, by decision (see the rows in [threejs-parity.md](threejs-parity.md); the G-code writer is noted under KTX2Exporter). |
+| Deferred shading pipeline, SVG output, voxel cone-traced global illumination | NOT PLANNED, by decision (see the rows in [threejs-parity.md](threejs-parity.md)). |
 
 Everything else on the earlier list is COVERED now, each in its row of [threejs-parity.md](threejs-parity.md): rendering in a
 worker, layers, cube, array and 3D render targets, compute writing textures, environment blending, KTX2 arrays and cubes,
 subsurface blur, shadows from alpha cut-outs, `alphaHash`, object-space normal maps, your own mip levels, picking fat lines,
-soft particles, Draco and KTX2 read and write, the long-tail loaders, and stereo on a flat screen.
+soft particles, Draco and KTX2 read and write, the long-tail loaders, stereo on a flat screen, triangle-mesh path
+tracing, caustics, G-code writing, drawing soft bodies (`@margoengine/gltf/soft-mesh`) and particle liquids
+(`@margoengine/physics/dfsph` solves them, `ParticleLiquid` draws them).
