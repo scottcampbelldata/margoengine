@@ -118,6 +118,7 @@ interface WaterOptions {
     color?: readonly [number, number, number];
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
+    sea?: WaterSea;
     terrain?: WaterTerrain;
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;
@@ -131,6 +132,10 @@ interface WaterOptions {
     shadows?: WaterShadowSource;
     whitecaps?: number;
     chop?: number;
+}
+
+interface WaterSea {
+    waveComponents(t: number, out: Float32Array): number;
 }
 
 interface WaterShadowSource {

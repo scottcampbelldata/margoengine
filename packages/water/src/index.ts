@@ -52,6 +52,14 @@ export interface WaterWind {
   /** Direction the waves travel, XZ, nonzero. Default [1, 0.3]. */
   direction?: readonly [number, number];
 }
+/**
+ * A sea Water draws (`WaterOptions.sea`): its linear waves at time `t` seconds, written into `out` four numbers a wave
+ * (kx, kz in rad/m, amplitude in m, phase in rad at `t`, so a wave's height at (x, z) is amplitude cos(kx x + kz z +
+ * phase)); returns how many. `SpectralSea` of `@margoengine/physics/sea` is one.
+ */
+export interface WaterSea {
+  waveComponents(t: number, out: Float32Array): number;
+}
 /** One swell train: three Gerstner components around this direction and wavelength. Invalid values throw RangeError. */
 export interface Wave {
   /** Travel direction in the XZ plane (any nonzero length). */
@@ -112,6 +120,13 @@ export const WATER_FAR_SAMPLES = 64;
 const FAR_FLOATS = 8 + WATER_FAR_SAMPLES;
 // The far field's first value in the frame uniform: after the viewport row (140..143).
 const FAR_AT = 144;
+// The sea's waves in the frame uniform (`WaterOptions.sea`): a header row (the count) after the far field, then one row
+// (kx, kz, amplitude, phase at the frame's time) per wave. 896 rows keep the whole uniform under the 16 KiB a uniform
+// block may hold on WebGL2 (GL_MAX_UNIFORM_BLOCK_SIZE is at least 16,384 bytes) and hold every bin of the wave solver's
+// default 34 x 24 spectrum.
+const SEA_AT = FAR_AT + FAR_FLOATS;
+/** The most waves a {@link WaterSea} may give Water to draw. */
+export const WATER_SEA_WAVES = 896;
 /**
  * The open sea past a flood's 'sea' sides (`Water.setFarField`; `water/flood` sets it every frame): a long wave
  * travelling on to the map from outside it, and the sim's own edge level carried out from the coastal grid.
@@ -158,6 +173,12 @@ export interface WaterOptions {
   foamDistance?: number;
   /** Scene depth provider; pass `() => effect.depthTexture` when Bloom, SSAO or DOF owns the capture. Default: Water's own. */
   depth?: () => GPUTexture | undefined;
+  /**
+   * The physics sea to draw (`SpectralSea` of `@margoengine/physics/sea`, or anything with `waveComponents`): its waves
+   * replace the swell trains, as the linear waves the sea's own query sums, at Water's time, so a hull floats on the waves
+   * the camera sees. The wind still drives the ripples, glints and foam patterns. Default none: the swell trains.
+   */
+  sea?: WaterSea;
   /** Shallow-water coupling with a terrain heightmap. Omitted: open water only. */
   terrain?: WaterTerrain;
   /**
@@ -359,6 +380,14 @@ fn surface(xz:vec2f,sampleWidth:f32)->Surface {
    tangent+=derivative*wave.gradient.x;binormal+=derivative*wave.gradient.y;
    crest=max(crest,smoothstep(0.75,0.98,s)*smoothstep(0.14,0.32,a*length(wave.gradient)));
   }
+ }
+ // The physics sea's linear waves (WaterOptions.sea), as its own query sums them: height a cos(theta) with no sideways
+ // displacement, theta brought into [-pi, pi] where WGSL bounds sin and cos to 2^-11, each faded out where the mesh
+ // samples it fewer than twice a wavelength (the swell's filter).
+ for(var n=0u;n<u32(frame.sea.x);n++){
+  let w=frame.seaWaves[n];let theta=w.x*xz.x+w.y*xz.y+w.w;let r=theta-6.2831853*round(theta*0.15915494);
+  let a=w.z*swellFilter(length(w.xy),sampleWidth);let s=sin(r);
+  p.y+=a*cos(r);tangent.y-=a*w.x*s;binormal.y-=a*w.y*s;
  }
  if(inCoast(xz)){
   // p = mix(p, base + offset, w) = p (1 - w) + w base + A with A = w offset. The surf's offset and weight both change
@@ -870,7 +899,9 @@ export class Water implements EnginePlugin {
   private pipeline?: GPURenderPipeline;
   private format = '';
   private seconds = 0;
-  private readonly values = new Float32Array(FAR_AT + FAR_FLOATS);
+  private readonly values = new Float32Array(SEA_AT + 4 + WATER_SEA_WAVES * 4);
+  /** The sea's rows of the frame uniform, a view made once (a frame makes no typed-array views). */
+  private readonly seaRows = this.values.subarray(SEA_AT + 4);
   private fogSource: FogLike | null = null;
   private fogBuffer?: GPUBuffer;
   private readonly fogData = new Float32Array(12);
@@ -919,7 +950,11 @@ export class Water implements EnginePlugin {
       throw new RangeError(
         'Invalid water options; use size and segments above 0, finite color and height, 1 to 8 waves and a depth function',
       );
-    this.values.set([0, height, foamDistance, waves.length], 20);
+    if (options.sea !== undefined && typeof options.sea?.waveComponents !== 'function')
+      throw new TypeError('Water sea needs waveComponents(t, out); pass a SpectralSea from @margoengine/physics/sea.');
+    // A sea's own waves replace the swell trains on the surface (their count is 0); the trains keep the wind's direction
+    // for the ripples and foam patterns that read it.
+    this.values.set([0, height, foamDistance, options.sea ? 0 : waves.length], 20);
     this.values.set(color, 24);
     this.values[135] = 0.12;
     this.values.set([0, 0.28, 0.3], 136);
@@ -1338,6 +1373,15 @@ export class Water implements EnginePlugin {
    * reaches half white is thinner than the crest that passes (FOAM_Y, FOAM_Z, measured). Nothing but the waves' own numbers is
    * read, so the threshold follows the wind, the fetch and `setWaveHeight`, and the chop does not change it.
    */
+  /** The sea's waves at Water's time into the frame uniform: computed by the sea in doubles, rounded once to f32. */
+  private writeSea(sea: WaterSea): void {
+    const count = sea.waveComponents(this.seconds, this.seaRows);
+    if (!Number.isInteger(count) || count < 0 || count > WATER_SEA_WAVES)
+      throw new RangeError(
+        `Water draws 0 to ${WATER_SEA_WAVES} sea waves; the sea gave ${count}. Give the wave spectrum fewer frequencies or directions.`,
+      );
+    this.values[SEA_AT] = count;
+  }
   private followWind(): void {
     if (!this.windSea) return;
     let slopes = 0;
@@ -1709,6 +1753,7 @@ export class Water implements EnginePlugin {
       this.values[129] = Math.round(c.camera.position[2] / z) * z;
     }
     this.values[20] = this.seconds;
+    if (this.options.sea) this.writeSea(this.options.sea);
     this.values[28] = c.camera.near;
     this.values[29] = c.camera.far;
     this.values[30] = c.delta;
@@ -1793,7 +1838,14 @@ export class Water implements EnginePlugin {
       this.values[100] = Math.min(Math.max(c.delta, 0), 1 / 15) / 3;
     }
     writeSkySampling(source, this.values, 119, 127, 0);
-    c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
+    // Up to the sea's last row: the header row always (a count of 0 without a sea), the rows only as many as it gave.
+    c.device.queue.writeBuffer(
+      this.uniform!,
+      0,
+      this.values as Float32Array<ArrayBuffer>,
+      0,
+      SEA_AT + 4 + 4 * this.values[SEA_AT]!,
+    );
     this.coastal?.step(c.encoder);
     this.spray?.step(c.encoder);
     if (this.sampledDepth !== depth) {

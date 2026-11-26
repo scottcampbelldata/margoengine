@@ -188,6 +188,27 @@ export class SpectralSea implements SeaSurface {
   }
 
   /**
+   * The waves at time `t` s for a renderer (`WaterSea` of `@margoengine/water`): four numbers a wave into `out` (kx, kz in
+   * rad/m, amplitude in m, and the phase at `t` in rad, so a wave's height at (x, z) is amplitude cos(kx x + kz z +
+   * phase)); returns how many. The phase is worked out in doubles and brought into [0, 2 pi) before it is rounded to the
+   * f32 of `out`, so a GPU summing these draws the surface `sample` gives, to f32 precision, at any time.
+   * @throws RangeError when `out` is shorter than four numbers a wave.
+   */
+  waveComponents(t: number, out: Float32Array): number {
+    const n = this.count;
+    if (!(out.length >= 4 * n))
+      throw new RangeError(`waveComponents writes ${4 * n} numbers (${n} waves); pass a Float32Array that long.`);
+    for (let i = 0; i < n; i++) {
+      const phase = this.phase[i]! - this.omega[i]! * t;
+      out[4 * i] = this.kx[i]!;
+      out[4 * i + 1] = this.kz[i]!;
+      out[4 * i + 2] = this.amp[i]!;
+      out[4 * i + 3] = phase - TWO_PI * Math.floor(phase / TWO_PI);
+    }
+    return n;
+  }
+
+  /**
    * Reads the spectrum again (the wave solver moves it on with the world clock) and sets the waves' amplitudes from it. A
    * wave keeps its phase, so the sea changes smoothly as its spectrum grows or decays.
    * @throws RangeError for a spectrum whose energy does not match its frequencies and directions.

@@ -14,6 +14,7 @@ export class SpectralSea implements SeaSurface {
     get density(): number;
     elevation(x: number, z: number, t: number): number;
     pressure(x: number, y: number, z: number, t: number): number;
+    waveComponents(t: number, out: Float32Array): number;
     refresh(): this;
     sample(x: number, z: number, t: number, out?: SeaSurfaceSample): SeaSurfaceSample;
 }

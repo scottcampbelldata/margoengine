@@ -100,11 +100,12 @@ test('water: the family reaches the Water and natural gives back the uniform byt
     harnesses.set(water, h);
     return water;
   };
-  // The frame's 864 B uniform; index 20 is the wave clock, which every frame advances.
+  // The frame's 15,216 B uniform (the sea's rows after the 864 B of values); index 20 is the wave clock, which every frame
+  // advances.
   const state = (water) => {
     const h = harnesses.get(water);
     h.frame();
-    const v = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 864).data).slice();
+    const v = new Float32Array(h.resources.find((r) => !r.destroyed && r.size === 15216).data).slice();
     v[20] = 0;
     return Buffer.from(v.buffer).toString('hex');
   };

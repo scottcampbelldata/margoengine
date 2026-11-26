@@ -2051,6 +2051,7 @@
     "exports": [
       "BREAKER_GAMMA",
       "WATER_FAR_SAMPLES",
+      "WATER_SEA_WAVES",
       "Water",
       "breakerDepth",
       "contourSegments"

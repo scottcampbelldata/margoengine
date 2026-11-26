@@ -32,6 +32,8 @@ export interface TerrainHeights {
 
 export const WATER_FAR_SAMPLES = 64;
 
+export const WATER_SEA_WAVES = 896;
+
 export class Water implements EnginePlugin {
     readonly options: WaterOptions;
     readonly name: string;
@@ -104,6 +106,7 @@ export interface WaterOptions {
     color?: readonly [number, number, number];
     foamDistance?: number;
     depth?: () => GPUTexture | undefined;
+    sea?: WaterSea;
     terrain?: WaterTerrain;
     fill?: (x: number, z: number) => number | undefined;
     still?: boolean;
@@ -117,6 +120,10 @@ export interface WaterOptions {
     shadows?: WaterShadowSource;
     whitecaps?: number;
     chop?: number;
+}
+
+export interface WaterSea {
+    waveComponents(t: number, out: Float32Array): number;
 }
 
 export interface WaterShadowSource {

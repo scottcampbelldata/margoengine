@@ -258,3 +258,29 @@ test("lane B's hull floats on the sea as it is: a still sea gives Archimedes' bu
   );
   assert.deepEqual(a, b);
 });
+
+test('waveComponents gives a renderer the waves at a time: their f32 sum is the height sample gives', () => {
+  const sea = new SpectralSea({ waves: jonswap({ height: 2, period: 8, direction: 0.3 }, grid(20), G), seed: 9 }),
+    rows = new Float32Array(4 * sea.waveCount);
+  assert.throws(() => sea.waveComponents(0, new Float32Array(3)), RangeError);
+  for (const [x, z, t] of [
+    [0, 0, 0],
+    [15, -8, 12.5],
+    [-200, 340, 86400.25],
+  ]) {
+    assert.equal(sea.waveComponents(t, rows), sea.waveCount);
+    let h = 0,
+      bound = 0;
+    for (let n = 0; n < sea.waveCount; n++) {
+      const [kx, kz, a, phase] = rows.subarray(4 * n, 4 * n + 4);
+      assert.ok(phase >= 0 && phase <= 2 * Math.PI, 'the phase is brought into [0, 2 pi]');
+      h += a * Math.cos(kx * x + kz * z + phase);
+      // Each number was rounded once to f32: a phase error of eps (|kx x| + |kz z| + 2 pi) and an amplitude error of eps a.
+      bound += a * 2 ** -24 * (2 + Math.abs(kx * x) + Math.abs(kz * z) + 2 * Math.PI);
+    }
+    assert.ok(
+      Math.abs(h - sea.sample(x, z, t).height) <= bound,
+      `at (${x}, ${z}, ${t}): ${h} against ${sea.sample(x, z, t).height}`,
+    );
+  }
+});

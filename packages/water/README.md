@@ -408,6 +408,41 @@ mirrors: a Water with no options under a night's low ambient is not brighter tha
 fully developed, the whitecap coverage `3.84e-6 U^3.41` (1% at 10 m/s, 22% at 25) and the `waves` for `WaterOptions.waves`.
 Sources: Hasselmann et al. (JONSWAP) 1973; Pierson and Moskowitz 1964; Horvath, DigiPro 2015; Monahan and O'Muircheartaigh 1980.
 
+### The physics sea, drawn: `sea`
+
+Pass a physics sea (`SpectralSea` of `@margoengine/physics/sea`, or anything with `waveComponents(t, out)`) as `sea` and
+Water draws its waves in place of the swell trains: the same linear waves, the same spectrum, phases and seed, at
+Water's time (`setTime`, or the frame clock), so a hull floating on `sea.sample` rides the waves the camera sees. Each
+frame the sea works out every wave's phase at that time in doubles and Water uploads them once as f32 (at most
+`WATER_SEA_WAVES`, 896, which holds every bin of the wave solver's default spectrum); the shader sums them as the
+physics does, height `a cos(theta)` with no sideways displacement. Waves shorter than two of the mesh's samples fade out
+of the drawn surface, as the swell's do. The wind still drives what is only seen: the shading ripples, the glints and the
+foam patterns, which are not part of the surface a query reads. `test/sea-agreement.browser.mjs` captures the drawn surface
+at 2,000 vertices over three times (to an hour) and checks height and normal against `sea.sample` inside the bound in
+`docs/limits.md` ("Drawn sea"), on WebGPU and the WebGL2 layer: on an Apple M6 the largest height difference is 0.002 mm.
+
+```ts
+import {Water} from 'margoengine/water';
+import {Engine} from 'margoengine/core';
+import {SpectralSea} from 'margoengine/physics/sea';
+import {jonswap} from 'margoengine/physics/waves';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const spectrum = {
+  frequencies: Float64Array.from({length: 34}, (_, i) => 0.04 * 25 ** (i / 33)),
+  directions: Float64Array.from({length: 24}, (_, j) => (2 * Math.PI * j) / 24),
+  energy: new Float64Array(34 * 24),
+  depth: 40,
+  density: 1025,
+};
+jonswap({height: 2, period: 8, direction: 0}, spectrum);
+const sea = new SpectralSea({waves: spectrum, seed: 1});
+const water = Water.attach(engine, {size: [400, 400], segments: 512, sea});
+water.setTime(12);
+engine.render({delta: 0});
+console.log(sea.sample(0, 0, 12).height.toFixed(2)); // the height the camera sees at the origin
+```
+
 ### Sliders for every control: settings
 
 `@margoengine/water/settings` lists every live Water control as one table for panels and tools, and names eleven looks made
