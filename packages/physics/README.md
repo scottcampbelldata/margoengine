@@ -4761,6 +4761,21 @@ const bent = resolveGirder(section, 0.001);
 if (!bent || Math.abs(bent.bendingMoment - 1e6) > 1e-6) throw new Error('Expected the elastic section moment');
 ```
 
+Use `resolvePlateBuckling` for the first elastic mode of a simply supported rectangular plate.
+Specify dimensions, Young's modulus, Poisson's ratio (default `0.3`) and a signed initial crest
+(default `0`, in metres). Pass the end shortening in metres. Optional rest-plane XY pairs
+produce deformed XYZ positions and unit normals for the existing mesh indices.
+
+```ts
+import { resolvePlateBuckling } from '@margoengine/physics/crush';
+
+const plate = { length: 0.6, width: 0.3, thickness: 0.003, young: 200e9 };
+const loaded = resolvePlateBuckling(plate, 0.0014, [0, 0.15, 0.15, 0.15, 0.3, 0.15]);
+if (loaded.halfWaves !== 2 || !loaded.surface || loaded.surface.positions[5] <= 0) {
+  throw new Error('Expected a nonzero elastic plate buckle');
+}
+```
+
 `CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable

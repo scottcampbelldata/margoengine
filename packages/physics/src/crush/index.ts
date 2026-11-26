@@ -16,6 +16,7 @@ import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './ma
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
 
 export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
+export { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse, type CrushPlateSurface } from './plate.js';
 export {
   resolveGirder,
   type GirderFiber,

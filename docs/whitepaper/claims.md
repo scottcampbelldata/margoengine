@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Elastic plate buckling (BREAK-03, 2026-11-26). The first supported-plate mode predicts three held-out
+  early postbuckling loads within 0.02 on Stein’s normalized load axis. The 8.48 mm crest and its normals
+  produce stable raster changes at fixed in-plane positions on WebGPU and the WebGL2 layer.
+  [Reproduce](reproduce.md#break-03-measured-plate-buckling) [Measurements](https://ntrs.nasa.gov/citations/19980235521)
 - Girder section balance (BREAK-03, 2026-11-26). Plate and stiffener curves balance net axial force at imposed
   curvature and follow either stable branch when compression softens. The model predicts 153.6 MN·m² in
   elastic bending of the mild-steel N200 box section, within its held-out 140–160 MN·m² reloading band.
