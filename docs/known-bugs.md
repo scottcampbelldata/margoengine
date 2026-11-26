@@ -381,9 +381,27 @@ test.
   logs `AbortError: The device was lost before the buffer mapped; map it again on the restored device`, and the shot
   tool fails on that page error (`tools/shot/render.mjs`, the console handler). `moving-check.mjs` and
   `look-masks-check.mjs` did not run after it. On WebGPU, `npm run test:shot` passes.
-- **Cause:** not found yet. The compatibility layer reports a device loss while a readback buffer is waiting to map.
-  The page then rejects that map, as the loss contract asks. What makes the layer lose its device on this shot is
-  unknown: it is the third page the same browser opens in that check, and the first without a sky.
+- **Cause:** half found. The line is a `console.error` of an uncaught DOMException, and the orrery's `start()` prints
+  its rejection exactly so (examples/orrery/main.ts). The readback that waits is the light probe bake's copy back
+  (`LightProbes.copyOnce`, after `await probes.bake({ bounces: 3 })` while the page loads): it turned an aborted map
+  into the coded "bake interrupted" error only once the device was restored, so a map cut off by a loss before the
+  restore left `bake()` as the raw DOMException. The layer also gave the device-loss text when only the buffer had been
+  destroyed during its map. What loses the context on ANGLE Metal is still not known. "Third page in the same browser"
+  does not hold: `shoot()` opens a fresh browser for each shot (tools/shot/render.mjs), and a page holds 3 WebGL2
+  contexts (adapter probe, its lost probe and the device), far under Chrome's cap.
+- **Fixed (2026-11-26):** the layer names the cause that aborted a map ("The buffer was destroyed before it mapped" or
+  the device loss), and a bake whose readback map aborts rejects with the coded `state` "Light probe bake interrupted"
+  error. Regressions: `packages/webgl2-compat/test/task-polling.test.js` ("a map aborted by its own buffer destroy names
+  the destroy...") and `packages/environment/tests/probes.test.js` ("a device lost during the bake readback rejects
+  with the coded interruption..."); both fail on the old code. A loss during the bake still fails the orrery's load.
+- **Laptop runs (Intel Arc 140V, Chrome, 2026-11-26):** no loss on ANGLE Direct3D 11 or ANGLE Vulkan. Vulkan
+  (`BROWSER_ARGS='["--use-angle=vulkan"]'`) passes the whole sky-coverage check; orrery-dolly alone passes on
+  Direct3D 11. On Direct3D 11 the three shots in a row failed differently: orrery-dolly never asked for its first frame
+  within `PAGE_TIMEOUT_MS` (180 s, `untilQueued`). Alone it took 133 to 185 s from page open to its first kept frame
+  (Vulkan: 41 s); a CPU profile of the load has 28.5 % in `getProgramParameter` (program links waited on
+  synchronously from pipeline variants), 10.8 % in `getError` and 8 % in the layer's CPU compute runtime. Still open:
+  the ANGLE Metal loss (rerun on the Mac with the new texts to see whether it is a loss or a destroy) and the orrery's
+  Direct3D 11 load time on the layer against the shot tool's 180 s wait.
 - **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
 
 ### Fixed 2026-11-26: GitHub CI's lint failed every pull request, and quality checked less there (KB-CI-MERGEBASE1, .github/workflows/ci.yml)

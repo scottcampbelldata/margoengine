@@ -1520,8 +1520,11 @@ export class LightProbes extends ShaderEffect {
       try {
         await read.mapAsync(GPUMapMode.READ);
       } catch (error) {
-        // Disposal or a device restore destroys the read buffer, which aborts the map: report that, not the abort.
-        if (this.disposed || this.gpu !== device) throw interrupted(this.disposed);
+        // Disposal or a device restore destroys the read buffer, which aborts the map: report that, not the abort. A
+        // device lost before its restore aborts it too (WebGPU rejects a map only with AbortError when a destroy, an
+        // unmap or a loss cut it off): the raw DOMException reached the page (KB-SHOT-COMPATLOST1).
+        if (this.disposed || this.gpu !== device || (error as DOMException)?.name === 'AbortError')
+          throw interrupted(this.disposed);
         throw error;
       }
       mapped = true;

@@ -422,12 +422,18 @@ export class CompatBuffer {
       // Occlusion results arrive a task after the GPU finishes: wait for every write this buffer still expects.
       while (!this.destroyed && !this.device.destroyed && this.mapState === 'pending' && !this.settle(false))
         await nextGPUTask();
-      if (this.destroyed || this.device.destroyed) {
+      // A lost device and a buffer destroyed during its map are two causes: name the one that happened, so a page that
+      // destroyed its own buffer is not sent looking for a device loss (KB-SHOT-COMPATLOST1).
+      if (this.device.destroyed) {
         this.mapState = 'unmapped';
         throw new DOMException(
           'The device was lost before the buffer mapped; map it again on the restored device',
           'AbortError',
         );
+      }
+      if (this.destroyed) {
+        this.mapState = 'unmapped';
+        throw new DOMException('The buffer was destroyed before it mapped', 'AbortError');
       }
       if (this.mapState !== 'pending')
         throw new DOMException(
