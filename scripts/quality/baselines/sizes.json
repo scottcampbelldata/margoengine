@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20585993,
+  "total": 20586767,
   "history": [
     {
       "date": "2026-10-24",
@@ -14095,6 +14095,12 @@
       "commit": "14c38f2af5",
       "grew": 1,
       "reason": "SEA-15 oil emulsification moves physics/tracers from 15886 to 16474 B gzip. The optional ceiling rises from 16373 to 16969 B. The water state shares the existing parcel mass, evaporation, droplet and replay paths. A separate solver would require another field for every slick's component transfer and duplicate oil ownership."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ebdaad09c9",
+      "reason": "BREAK-03 native shell work counts advances @margoengine/physics/crush from 21214 to 21350 B gzip. Ceiling 21217 to 21991 B. Work counts come from the same native force passes and survive shell snapshots. A separate entry would require a second copy of the same native interface.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14923,7 +14929,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 5981,
-    "@margoengine/physics/crush": 21217,
+    "@margoengine/physics/crush": 21991,
     "@margoengine/physics/decomposition": 11103,
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 4523,
