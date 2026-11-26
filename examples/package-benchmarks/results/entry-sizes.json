@@ -1,5 +1,5 @@
 {
-  "commit": "f163e69f1f",
+  "commit": "779b932f50",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14142,6 +14142,10 @@
       "./vortices": {
         "raw": 15229,
         "gzip": 6113
+      },
+      "./accretion": {
+        "raw": 14440,
+        "gzip": 6095
       }
     },
     "@margoengine/physics2d": {
@@ -18057,6 +18061,16 @@
       "raw": 13850,
       "gzip": 6294,
       "brotli": 5677
+    },
+    "packages/physics/dist/accretion-kernel.wasm": {
+      "raw": 1657,
+      "gzip": 919,
+      "brotli": 857
+    },
+    "packages/physics/dist/accretion-kernel-shared.wasm": {
+      "raw": 1657,
+      "gzip": 919,
+      "brotli": 851
     }
   },
   "splits": {
