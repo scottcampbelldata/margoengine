@@ -148,7 +148,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | --- | --- | --- | --- | --- |
 | Webcam face tracking driving morph targets (landmarks to ARKit-style blendshapes, webcam driver) | three.js, drei `FaceControls`/`FaceLandmarker` | MISSING | L |  |
 | Webcam hand and pose landmarks from a camera stream outside WebXR, for AR and body overlays | drei, MediaPipe examples | MISSING | L |  |
-| Tube painter for freehand 3D strokes (pointer or XR controller paint) | three.js | DONE (`TubePainter`, `@margoengine/lines/tube-painter`) | S | a857a045d |
+| Tube painter for freehand 3D strokes (pointer or XR controller paint) | three.js | DONE (`TubePainter`, `@margoengine/lines/tube-painter`) | S | 3b1a571bb |
 | Infinite shader grid with cell and section sizes and distance fade (`GridHelper` is finite) | drei `Grid` | DONE (`@margoengine/lines/infinite-grid`) | S | f144ef66b |
 | Shadow map viewer: debug view of cascade, spot and point shadow maps | three.js | MISSING | S |  |
 | Light probe helper and positional-audio cone helper | three.js | MISSING | S |  |
@@ -159,7 +159,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Playground as a tool: live code editor beside a running canvas, save and share by link, templates, versions | Babylon Playground | MISSING | L |  |
 | Declarative action manager: triggers on a node (pick, long pick, pointer over/out, intersect enter/exit, every frame, keys) with chained actions | Babylon ActionManager | PARTIAL | S to M |  |
 | Orbit camera behaviours: elastic bounce at radius limits, idle auto-rotation, animated framing of a mesh | Babylon camera behaviors | DONE (`OrbitBehaviors`, `@margoengine/controls/behaviors`) | S | 05ced2d88 |
-| Hotspot on a deformed mesh: a fixed point inside a triangle of a skinned or morphed mesh, projected to screen | Babylon Hotspot | DONE (`Hotspot`, `@margoengine/labels`) | S | af4d1d4a5 |
+| Hotspot on a deformed mesh: a fixed point inside a triangle of a skinned or morphed mesh, projected to screen | Babylon Hotspot | DONE (`Hotspot`, `@margoengine/labels`) | S | 9d2ff0cb9 |
 | Coroutines (page read 2026-11-25): a generator stepped once per frame; a bare `yield` waits one frame, yielding a promise waits for it, yielding another coroutine's promise waits for that coroutine; an async run form returns a promise that resolves on completion and rejects on cancel | Babylon | DONE (`Coroutines`, `@margoengine/ecs/coroutines`) | S | 3ddcd1643 |
 | Single-file / playable-ad publish: one inlined HTML with scripts, Wasm and assets, ad-network size budgets and MRAID hooks | PlayCanvas | MISSING | M |  |
 | Mobile app wrapper publish (Capacitor-style project from a built scene, safe area and orientation) | PlayCanvas | MISSING | M |  |
