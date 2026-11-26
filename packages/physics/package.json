@@ -34,7 +34,7 @@
     "test:browser:synoptic": "cd ../.. && node packages/physics/tests/synoptic.browser.mjs",
     "test:browser:seismic": "cd ../.. && node packages/physics/tests/seismic.browser.mjs",
     "test:browser:tissue": "cd ../.. && node packages/physics/tests/tissue.browser.mjs && node packages/physics/tests/tissue.browser.mjs --compat",
-    "test:browser:volumetric-solids": "cd ../.. && node packages/physics/tests/volumetric-solids.browser.mjs",
+    "test:browser:volumetric-solids": "cd ../.. && node packages/physics/tests/volumetric-solids.browser.mjs && node packages/physics/tests/volumetric-solids.browser.mjs --compat",
     "build:airborne": "node scripts/build-airborne-kernel.mjs",
     "build:accretion": "node scripts/build-accretion-kernel.mjs",
     "build:room-sound": "node scripts/build-room-sound-kernel.mjs",

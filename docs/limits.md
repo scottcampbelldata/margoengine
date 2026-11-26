@@ -9613,6 +9613,11 @@ changes the loaded surface on WebGPU and WebGL2, with an exact same-backend repl
 
 ### Volumetric vertex blocks (SOFT-04)
 
+When a soft surface is torn or cut, its new query colliders retain the live contact and event
+settings. The rigid shape's density is carried when the original collider supplied volume mass and the
+new, outward-wound collision mesh still encloses positive volume. Open cloth pieces keep their
+triangle colliders without volumetric mass. Soft-particle masses transfer separately.
+
 `@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean
 tetrahedra. Each sweep solves the local elastic and inertial energy exactly to working precision.
 An entire body still needs enough sweeps for load to propagate through its mesh. Linear tetrahedra

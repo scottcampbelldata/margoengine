@@ -27,6 +27,14 @@ corrections to the inertial prediction in the solve.
 [Smith et al.](https://doi.org/10.1145/3180491),
 [Bouaziz et al.](https://doi.org/10.1145/2601097.2601116).
 
+Brian Mirtich, “Fast and Accurate Computation of Polyhedral Mass Properties” (1996), formulates rigid
+mass as a volume integral over a solid bounded by its surface. Molino, Bao and Fedkiw (2004) distinguish
+the split material from its collision geometry. Rebuilding a fragment keeps an existing volumetric
+collider's density only when the new collision mesh remains a closed and outward-wound volume.
+A query-only parent and an open fragment use triangular surfaces without volume mass.
+[Mirtich](https://people.eecs.berkeley.edu/~jfc/mirtich/massProps.html)
+[Molino et al.](https://physbam.stanford.edu/papers/stanford2004-01.pdf)
+
 Senalik and Farber, “Mechanical Properties of Wood” (USDA Forest Products Laboratory, 2021),
 Table 5–1, gives different longitudinal, radial and tangential moduli. The directional regression
 uses the printed Douglas-fir tangential/longitudinal ratio 0.050. Hernandez et al., “Anisotropic

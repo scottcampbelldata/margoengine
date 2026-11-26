@@ -28,6 +28,26 @@ export function tetDeterminant(p: ArrayLike<number>, a: number, b: number, c: nu
   return ux * (vy * wz - vz * wy) - uy * (vx * wz - vz * wx) + uz * (vx * wy - vy * wx);
 }
 
+/** The volume a closed triangle surface encloses, in cubic metres (positive when it faces outward). */
+export function meshVolume(positions: ArrayLike<number>, triangles: ArrayLike<number>): number {
+  let v = 0;
+  for (let t = 0; t < triangles.length; t += 3) {
+    const [a, b, c] = [triangles[t]! * 3, triangles[t + 1]! * 3, triangles[t + 2]! * 3] as [number, number, number],
+      p = positions;
+    const ax = p[a]! - p[0]!,
+      ay = p[a + 1]! - p[1]!,
+      az = p[a + 2]! - p[2]!,
+      bx = p[b]! - p[0]!,
+      by = p[b + 1]! - p[1]!,
+      bz = p[b + 2]! - p[2]!,
+      cx = p[c]! - p[0]!,
+      cy = p[c + 1]! - p[1]!,
+      cz = p[c + 2]! - p[2]!;
+    v += (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6;
+  }
+  return v;
+}
+
 const sub = (a: V, b: V): [number, number, number] => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: V, b: V): [number, number, number] => [
   a[1] * b[2] - a[2] * b[1],

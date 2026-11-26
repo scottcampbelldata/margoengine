@@ -16,11 +16,12 @@ import {
   bindSkin,
   boundaryTriangles,
   boundsOf,
+  closedSurface,
+  meshVolume,
   MIN_TET_DETERMINANT,
   reaches,
   type Skin,
   tetDeterminant,
-  closedSurface,
 } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 import {
@@ -3213,7 +3214,7 @@ export class SoftBodies implements PhysicsAttachment {
     if (particles === 0) throw new RangeError('A soft body has at least one particle.');
     // A body that holds its volume needs a closed surface whose triangles face outward.
     const hasVolume = desc.volumeFactor !== null || desc.gas !== null,
-      restVolume = hasVolume ? this.meshVolume(desc.positions, desc.triangles) : 0;
+      restVolume = hasVolume ? meshVolume(desc.positions, desc.triangles) : 0;
     if (hasVolume && (!(restVolume > 0) || !closedSurface(desc.triangles)))
       throw new RangeError('A body that holds its volume needs a closed surface whose triangles face outward.');
     const gas = desc.gas ? checkedGas(desc.gas) : null,
@@ -3474,26 +3475,6 @@ export class SoftBodies implements PhysicsAttachment {
   setVolumeFactorOf(body: SoftBody, factor: number): void {
     this.syncVolume();
     this.setVolume(body, factor);
-  }
-
-  /** @internal The volume a closed triangle surface encloses, in cubic metres (positive when it faces outward). */
-  private meshVolume(positions: readonly number[], triangles: readonly number[]): number {
-    let v = 0;
-    for (let t = 0; t < triangles.length; t += 3) {
-      const [a, b, c] = [triangles[t]! * 3, triangles[t + 1]! * 3, triangles[t + 2]! * 3] as [number, number, number],
-        p = positions;
-      const ax = p[a]! - p[0]!,
-        ay = p[a + 1]! - p[1]!,
-        az = p[a + 2]! - p[2]!,
-        bx = p[b]! - p[0]!,
-        by = p[b + 1]! - p[1]!,
-        bz = p[b + 2]! - p[2]!,
-        cx = p[c]! - p[0]!,
-        cy = p[c + 1]! - p[1]!,
-        cz = p[c + 2]! - p[2]!;
-      v += (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6;
-    }
-    return v;
   }
 
   /** @internal The current volume of a body's closed surface. */

@@ -16,7 +16,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   Found by the SOFT-04 verification in [physics-solver-audit.md](physics-solver-audit.md).
 - **Fix:** the density is carried only when the mesh the surface collider is made from (the skin when there is one,
   else the triangles) is closed, tested with `closedSurface` (moved to `soft-volume.ts`). An open piece gets its surface
-  with no density, as before ef1a72d01.
+  with no density, as before ef1a72d01. The follow-up preserves query-only mode even for a closed fragment.
+  An inherited volume collider requires positive signed volume on the current mesh.
 - **Regression:** the test above, and "a piece keeps its surface density when its mesh is closed and has none when the cut
   or tear left it open" in the same file (fails on the previous code for the skinned cut).
 

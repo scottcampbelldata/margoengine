@@ -733,6 +733,7 @@ test('volumetric cuts rebuild query colliders at the moving fracture surfaces', 
     const [before] = hits();
     assert.ok(before);
     bound(before.distance, 1.05, 2);
+    assert.equal(before.collider.volume(), 0, 'the query parent has no authored volume mass');
     before.collider.setFriction(0.625).setRestitution(0.25).setCollisionGroups(0x0001ffff);
     before.collider.setActiveEvents({ collision: false, contactForce: true });
     const result = cut(soft, body);
@@ -743,6 +744,7 @@ test('volumetric cuts rebuild query colliders at the moving fracture surfaces', 
     for (const { collider, distance } of after) {
       bound(distance, 0.15, 2, 'a query reaches the new cut before either body has stepped');
       assert.equal(collider.userData, label);
+      assert.equal(collider.volume(), 0, 'a query fragment keeps its parent volume-mass mode');
       assert.equal(collider.friction(), 0.625);
       assert.equal(collider.restitution(), 0.25);
       assert.equal(collider.collisionGroups(), 0x0001ffff);
@@ -773,7 +775,7 @@ test('a face tear carries live query settings from a surface collider to both pi
   const desc = new SoftBodyDesc([...position, [0, 0, -2]])
     .setCells([0, 1, 2, 3, 0, 2, 1, 4])
     .setSurface()
-    .setSurfaceCollider({ restitution: 0.625, sensor: true });
+    .setSurfaceCollider({ restitution: 0.625, sensor: true, density: 412 });
   const { soft, body, physics } = await specimen(desc);
   const ray = () => physics.raycastAll([0.3, 0.3, -3], [0, 0, 1], { solid: false });
   const [before] = ray();
@@ -781,15 +783,30 @@ test('a face tear carries live query settings from a surface collider to both pi
   const tag = { grain: 'radial' };
   before.collider.userData = tag;
   before.collider.setContactForceEventThreshold(42);
+  const volume = before.collider.volume();
+  assert.ok(volume > 0);
+  before.collider.setDensity(500);
   const split = soft.tear(body, { cells: [0] });
   assert.equal(split.pieces.length, 2);
   assert.equal(before.collider.valid, false);
   const after = ray();
   assert.equal(after.length, 2);
+  bound(
+    after.reduce((total, hit) => total + hit.collider.volume(), 0),
+    volume,
+    volume,
+  );
+  bound(
+    after.reduce((total, hit) => total + hit.collider.mass(), 0),
+    500 * volume,
+    500 * volume,
+  );
   for (const { collider } of after) {
     assert.equal(collider.userData, tag);
     assert.equal(collider.restitution(), 0.625);
     assert.equal(collider.contactForceEventThreshold(), 42);
+    assert.equal(collider.density(), 500);
+    assert.ok(collider.volume() > 0);
     assert.equal(collider.isSensor(), true);
   }
 });
