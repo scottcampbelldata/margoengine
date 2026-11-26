@@ -1,5 +1,5 @@
 {
-  "commit": "5829e2a5fc",
+  "commit": "c82d68bf98",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14022,6 +14022,10 @@
       "./life": {
         "raw": 17208,
         "gzip": 7286
+      },
+      "./falling": {
+        "raw": 14435,
+        "gzip": 6259
       }
     },
     "@margoengine/physics2d": {
@@ -16988,8 +16992,8 @@
         "gzip": 8506
       },
       "./hail": {
-        "raw": 11139,
-        "gzip": 4901
+        "raw": 12618,
+        "gzip": 5443
       },
       "./puddles": {
         "raw": 8605,
@@ -17066,6 +17070,10 @@
       "./settings": {
         "raw": 25293,
         "gzip": 9205
+      },
+      "./hail-physics": {
+        "raw": 2367,
+        "gzip": 1056
       }
     },
     "@margoengine/webgl2-compat": {
@@ -17709,6 +17717,16 @@
       "raw": 7402,
       "gzip": 3177,
       "brotli": 2847
+    },
+    "packages/physics/dist/falling-kernel.wasm": {
+      "raw": 10109,
+      "gzip": 4273,
+      "brotli": 3824
+    },
+    "packages/physics/dist/falling-kernel-shared.wasm": {
+      "raw": 10109,
+      "gzip": 4273,
+      "brotli": 3824
     }
   },
   "splits": {

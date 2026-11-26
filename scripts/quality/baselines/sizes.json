@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19211769,
+  "total": 19228224,
   "history": [
     {
       "date": "2026-10-24",
@@ -12555,6 +12555,12 @@
       "commit": "lane-d-helpers",
       "reason": "Optional lines/tree-helpers: BVHHelper, OctreeHelper and RaycasterHelper, box-edge Lines drawn from structural tree shapes; a new entry, absent before (ceiling 6296 B, measured min+gzip about 6040 B). A page that does not import it pays 0 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c82d68bf98",
+      "reason": "AERO-05, @margoengine/physics/falling 0 to 6259 B gzip, @margoengine/weather/hail 4901 to 5443 B gzip, @margoengine/weather/hail-physics 0 to 1056 B gzip. The falling solver shares one Wasm loader across plates, seeds and spheres. Hail shares one WebGPU overlay and compatible lighting for both trajectory sources. Splitting the source renderer would duplicate the draw and its ownership. Core and stage gain zero bytes.",
+      "grew": 3
     }
   ],
   "items": {
@@ -13354,6 +13360,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
+    "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/hydro": 6980,
     "@margoengine/physics/ice": 4099,
@@ -14117,7 +14124,8 @@
     "@margoengine/weather/drive": 7289,
     "@margoengine/weather/eruption": 10430,
     "@margoengine/weather/gltf": 5981,
-    "@margoengine/weather/hail": 5136,
+    "@margoengine/weather/hail": 5699,
+    "@margoengine/weather/hail-physics": 1312,
     "@margoengine/weather/lava": 12346,
     "@margoengine/weather/lava-settings": 4046,
     "@margoengine/weather/lens": 4125,
