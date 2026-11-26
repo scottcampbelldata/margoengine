@@ -1476,6 +1476,49 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
 5. Record work counts for the shell kernel scaling, and add film direction inputs for seeded placed breakups.
 6. Update `docs/limits.md`, which has no BREAK-03 limits entry, and the README sensor advice.
 
+## Pass 4, 2026-11-26 (`main` at 2d5d7fa8c)
+
+VERIFIED 0, REOPENED 1. SOFT-02 was set LANDED (marked in cde856e2c); it is judged directly against the standard and its catalog row, as a first landing. No other row was set LANDED.
+
+### SOFT-02 rods, ropes, cables, chains (`@margoengine/physics/rod` with `segmentLoads` in `@margoengine/physics/loads`, commit 7bcfb11e3; d53e71328 named in the queue only regenerates `docs/api-surface.md`), owner Claude: REOPENED
+
+**Checked.** The diff of `src/rod/index.ts` (599 lines), `src/loads/segments.ts`, `morison.ts`, `water.ts` and `solver.ts`, the README section and the `docs/limits.md` entry. `tests/rod.test.js` and `tests/loads-segments.test.js`: 13 pass, 0 fail (18 s, under `scripts/run-with-timeout.mjs`, on packages built from 2d5d7fa8c). No coupling test and no browser test exist for the rod.
+
+**Validation.** Exact solutions, each with a stated bound:
+- a clamped rod in a steady current against its own discrete springs (0.2%) and the Euler–Bernoulli cantilever (1%, with 1/n² convergence stated);
+- a slack line between pins against the chain of its links and the catenary;
+- a taut cable's first frequency against the beam-string closed form (0.5%).
+
+The strumming test checks lock-in qualitatively: frequency within 15% of the cable's own frequency, amplitude between 0.3 and 1.2 diameters. Khalak and Williamson (1999) and the wake oscillator's tuning are cited, but the bounds are not derived from either. The segment-load tests check closed forms: buoyancy, wetted length, drag damping, and White's drag fit against DNV.
+
+No test compares the rod with a measurement: a towed or current-loaded cable, a flexible riser's vortex-induced vibration (Chaplin et al. 2005), or a mooring line's tension.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7, and the floor.
+
+**Against the catalog row** ("bend and twist, wrapping, friction, anchor chains, rigging, vines"; Discrete Elastic Rods, Kugelstadt and Schömer, Sueda et al.). The builder's own catalog state says "partial", with wrapping, Discrete Elastic Rods, X-54 and X-55 open.
+
+**To do before it can be VERIFIED:**
+1. **Floor.** `Rod` is not a framework solver. It lives on the rigid `Physics` world, not the `Solver` contract (`describe`, `init`, `step`, ports, state regions), and no coupling harness test runs it (frame-rate independence, seek equals continuous run). Make it a framework solver, or give it the contract through the rigid world's solver, and add the coupling tests that `npm run check:coupling` asks of a framework solver.
+2. **Twist.** It is built (`GJ / l` springs, `twistStiffness`) but no test asserts it. Add a torsion test against the closed form (twist angle `T L / (G J)`) and a coupled bend-twist case, such as the buckling of a twisted rod into a plectoneme (Bergou et al. 2008, section 7).
+3. **Wrapping and friction.** Missing: a rope over a peg, bollard or pulley, with the capstan law `T2 = T1 e^(mu theta)` as its validation (Sueda, Kaufman and Pai 2008; X-53). Rope-on-rope contact with friction is missing too.
+4. **Anchor chains and mooring.** Missing:
+   - seabed contact with axial and lateral friction;
+   - chains that take no compression;
+   - clump weights, snap loads and breaking at a rated load.
+
+   Validate against a published mooring-line tension record or the MoorDyn and OrcaFlex benchmark cases (Hall and Goupee 2015).
+5. **Model breadth.** Missing:
+   - Discrete Elastic Rods (Bergou et al. 2008) as the high-fidelity tier beside the capsule-chain tier, behind one API;
+   - extensible Cosserat rods with shear (Kugelstadt and Schömer 2016) for soft cables and vines;
+   - plasticity or a set curl for vines and wire.
+
+   Rivals: PhysX articulations and ropes; MoorDyn and OrcaFlex for mooring lines (seabed friction, line types, snap loads).
+6. **Measured validation.** At least one measured case with a bound derived from its scatter:
+   - a flexible cylinder's vortex-induced vibration amplitude and frequency against Chaplin et al. (2005) or Trim et al. (2005), replacing the 0.3–1.2 diameter band;
+   - a cantilever or cable in a towing tank.
+7. **Coded errors.** `src/rod/index.ts` lines 137, 191, 194, 198, 212, 215, 222, 227, 400, 431, 456, 547 and 550, and `src/loads/segments.ts` lines 236 to 271, throw bare `RangeError` or `TypeError`. Use a coded `MargoError` that names the fix, as the rod's `state` errors already do.
+8. **Scale and film.** Record work counts for a long rod (the 4,096-link limit) and many rods (a kelp forest, a ship's rigging). Add direction inputs: a target shape or pose to blend toward, wind on rods in air (ATMO wind field), and a seeded sway.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
