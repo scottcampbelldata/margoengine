@@ -27,6 +27,26 @@ corrections to the inertial prediction in the solve.
 [Smith et al.](https://doi.org/10.1145/3180491),
 [Bouaziz et al.](https://doi.org/10.1145/2601097.2601116).
 
+### Soil pressure, shear and permanent footprints (EARTH-05)
+
+M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
+`p = (kc/b + kphi) z^n`, verified against J. Y. Wong, *Theory of Ground Vehicles*, 3rd ed. (2001), Eq. 2.47.
+J. Y. Wong and A. R. Reece, “Prediction of rigid wheel performance based on the analysis of soil-wheel stresses”
+(1967), integrates normal and tangential stresses around a wheel. Margo applies the uniform-pressure version to a
+measured contact patch and uses DYN-04's suspension. Z. Janosi and B. Hanamoto, “The Analytical Determination of
+Drawbar Pull as a Function of Slip for Tracked Vehicles in Deformable Soils” (1961), gives
+`τ = (c + p tan φ)(1 − exp(−j/K))`, verified against Wong Eq. 2.56.
+[Bekker](https://books.google.com/books?id=N694AAAAIAAJ),
+[Wong](https://courses.minia.edu.eg/Attach/9775Theory%20of%20Ground%20Vehicles%20-%20J.%20Y.%20Wong%203rd%20Ed.pdf),
+[Wong and Reece](https://doi.org/10.1016/0022-4898(67)90105-X),
+[NASA report with the Janosi and Hanamoto proceedings citation](https://ntrs.nasa.gov/api/citations/20170010706/downloads/20170010706.pdf).
+
+R. W. Sumner, J. F. O'Brien and J. K. Hodgins, “Animating Sand, Mud, and Snow” (1999), models compression and
+redistribution into the first unoccupied ring. Margo integrates volume with the exact nodal areas of the existing
+height-field triangles and weights the berm in the direction of mobilized shear. The ledger separates compacted
+volume, dry mineral fines and loose soil that leaves the modeled patch. Native state retains the peak indentation.
+[Sumner et al.](https://www.ri.cmu.edu/pub_files/pub4/sumner_robert_1999_1/sumner_robert_1999_1.pdf).
+
 ### Atmospheric lightning (ATMO-07)
 
 Luciano Niemeyer, Luciano Pietronero and Hans J. Wiesmann, “Fractal Dimension of Dielectric Breakdown”

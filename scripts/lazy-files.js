@@ -111,6 +111,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/terramechanics-kernel.wasm',
+    label: 'terramechanics-kernel.wasm',
+    kind: 'Rust SIMD soil footprint and conservative redistribution',
+    measure: 'file',
+    when: 'Terramechanics.load() from the optional /terramechanics entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/terramechanics-kernel-shared.wasm',
+    label: 'terramechanics-kernel-shared.wasm',
+    kind: 'Rust SIMD soil footprint and conservative redistribution, shared world memory',
+    measure: 'file',
+    when: 'Terramechanics.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/lava-kernel.wasm',
     label: 'lava-kernel.wasm',
     kind: 'Rust SIMD thermo-viscoplastic lava advance and cooling',

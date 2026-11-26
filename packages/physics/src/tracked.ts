@@ -225,6 +225,47 @@ export class TrackedVehicle implements PhysicsAttachment {
     };
   }
 
+  /** The number of f64 words required to retain belt speeds, contact samples and soil shear history. */
+  get motionStateWords(): number {
+    return this.tracks.reduce((count, track) => count + 2 + 5 * track.count, 0);
+  }
+
+  /** Save belt acceleration state for a clocked simulation's snapshot. */
+  writeMotionState(out: Float64Array): void {
+    if (out.length !== this.motionStateWords)
+      throw new RangeError('Provide motionStateWords for a tracked attachment snapshot.');
+    let offset = 0;
+    for (const track of this.tracks) {
+      out[offset++] = track.speed;
+      out[offset++] = track.target;
+      for (let wheel = 0; wheel < track.count; wheel++) {
+        out[offset++] = track.lengths[wheel]!;
+        out[offset++] = track.loads[wheel]!;
+        out[offset++] = Number(track.contacts[wheel]);
+        out[offset++] = track.alongShear[wheel]!;
+        out[offset++] = track.acrossShear[wheel]!;
+      }
+    }
+  }
+
+  /** Restore the state of an attachment with the same tracks. */
+  readMotionState(source: Float64Array): void {
+    if (source.length !== this.motionStateWords || !source.every(Number.isFinite))
+      throw new RangeError('Use finite motion state produced by an attachment with the same tracks.');
+    let offset = 0;
+    for (const track of this.tracks) {
+      track.speed = source[offset++]!;
+      track.target = source[offset++]!;
+      for (let wheel = 0; wheel < track.count; wheel++) {
+        track.lengths[wheel] = source[offset++]!;
+        track.loads[wheel] = source[offset++]!;
+        track.contacts[wheel] = source[offset++] === 1;
+        track.alongShear[wheel] = source[offset++]!;
+        track.acrossShear[wheel] = source[offset++]!;
+      }
+    }
+  }
+
   /** @internal Casts the road wheels, holds the chassis up on the springs and pushes the ground with the belts. */
   beforeStep(dt: number): void {
     if (this.disposed || !this.chassis.valid) return;
