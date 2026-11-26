@@ -29944,6 +29944,10 @@ Both pressure and physical wall viscosity are included. The original release dia
 explicit model for a like-for-like comparison. The parcel contract conserves volume and all momentum components against a closed fixture.
 The SEA-04 and HYDRO-01 production endpoints remain open.
 
+The deep-fill standing wave meets the analytic one-frame tolerance. Set the fixture's `ny` to 5 for a
+shallower fill that reproduces a period near 1.448 s versus the 1.326 s linear reference. This smaller
+depth uses five rows and remains sensitive to the near-surface discretization.
+
 ### Rail production shot and full track contact (DYN-05)
 
 The Last Tram and City to Street shot sources are absent from the public checkout. The solver
