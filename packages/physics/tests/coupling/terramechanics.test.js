@@ -656,6 +656,51 @@ test('cross-track banks keep mirror symmetry and settle after the wheel load end
   }
 });
 
+test('partial straight grouser backfill forms a flat bottom with the independent swept volume', async () => {
+  const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
+  const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', skidExponent: 0 };
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 800_000,
+    compaction: 0,
+    dustFraction: 0,
+    reposeSlope: 0.55,
+  };
+  const rig = { width: 0.1, length: 0.16, load: 100, speed: 0.03, slip: 0 };
+  const dry = await rollingBench(terrain, material, wheel, rig);
+  dry.world.advance(1);
+  const before = dry.bed.elevations();
+  const nodeArea = (terrain.width / terrain.columns) * (terrain.depth / terrain.rows);
+  for (const [grouserFill, shared] of [
+    [0.03, false],
+    [0.09, true],
+    [0.3, true],
+  ]) {
+    const filled = await rollingBench(terrain, material, { ...wheel, grouserFill }, { ...rig, shared });
+    filled.world.advance(1);
+    const after = filled.bed.elevations();
+    let level;
+    let volume = 0;
+    let count = 0;
+    for (let i = 0; i < before.length; i++) {
+      if (before[i] >= 0 || after[i] <= before[i]) continue;
+      count++;
+      level ??= after[i];
+      close(after[i], level, 32 * eps * Math.abs(level));
+      volume += (after[i] - before[i]) * nodeArea;
+    }
+    assert.ok(count > 1);
+    // Pavlov Eq. 4.3 at s=0, where angular speed times the effective radius equals travel speed.
+    const rimRatio = wheel.radius / (wheel.radius + 0.5 * wheel.lugHeight);
+    const sweptArea = rimRatio * rig.width * wheel.lugHeight * grouserFill;
+    const cutArea = rig.width * dry.soil.read(0).sinkage;
+    const expected = dry.soil.budget.removed * (sweptArea / cutArea);
+    close(volume, expected, 512 * eps * expected);
+    assert.equal(filled.soil.budget.removed, dry.soil.budget.removed);
+    assert.equal(filled.soil.budget.exported, 0);
+  }
+});
+
 test('rolling grousers reuse older trailing cut capacity without excavating it twice', async () => {
   const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
   const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', skidExponent: 0 };

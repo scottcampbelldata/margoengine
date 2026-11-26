@@ -269,6 +269,14 @@ stations against the same wheel without transport, net volume, zero export and s
 in plain and shared memory. The measured scan profiles remain a separate comparison.
 [Pavlov and Johnson (2019)](https://www.andrew.cmu.edu/user/amj1/papers/ICRA2019_Wheel.pdf).
 
+For straight travel, Pavlov's Eqs. 4.11 and 4.12 describe the same area balance for pointed and
+flat-bottomed trenches. The native raster uses their common volume condition directly. It
+raises the deepest available rear vertices up to one elevation and integrates
+`max(0, elevation - old height) × vertex area`. The volume is piecewise linear in the new
+bottom. A bounded Newton solve removes vertices as they become dry, then distributes the
+requested volume over the resulting profile. The fixture checks three partial fill amounts and
+independently computes the swept area from Eq. 4.3. [Pavlov (2023), Chapter 4](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=45).
+
 The cross-track banks settle with a conservative face flux from a common elevation state.
 The dry granular finite-volume treatments by Roger P. Denlinger and Richard M. Iverson (2004)
 and A. Mangeney-Castelnau et al. (2003) motivated equal and opposite transfers that stop at a
