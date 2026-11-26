@@ -72,13 +72,17 @@ test('poseFrame lays out the pose kernel uniform from the frame values, with no 
     frame = poseFrame(values, before, 24),
     f = new Float32Array(frame),
     u = new Uint32Array(frame);
-  assert.equal(frame.byteLength, 96);
+  assert.equal(frame.byteLength, 128);
   assert.deepEqual([...f.subarray(0, 4)], [16.5, 17.5, 18.5, 0], 'eye, pixel footprint 0');
   assert.deepEqual([...f.subarray(4, 8)], [68.5, 69.5, 70.5, 71.5], 'the wind now');
   assert.deepEqual([...f.subarray(8, 12)], before.map(Math.fround), 'the wind before');
   assert.deepEqual([...f.subarray(12, 16)], [72.5, 73.5, 74.5, 75.5], 'ground fit');
   assert.deepEqual([...f.subarray(16, 20)], [76.5, 0, 78.5, 79.5], 'blades, widening 0');
   assert.deepEqual([u[20], u[21], u[22], u[23]], [0, 24, 6, 0], 'counts: per chunk, vertices, floats a vertex, first');
+  assert.deepEqual([...f.subarray(24, 28)], [84.5, 85.5, 86.5, 87.5], 'the sway now');
+  assert.deepEqual([...f.subarray(28, 32)], [84.5, 85.5, 86.5, 87.5], 'the sway before defaults to the sway now');
+  const swayed = new Float32Array(poseFrame(values, before, 24, [2, 1.2, 0.5, 3]));
+  assert.deepEqual([...swayed.subarray(28, 32)], [2, 1.2, 0.5, 3].map(Math.fround), 'the sway before');
 });
 
 test('poseKernel calls the scatter pose twice and takes every pose patch the scatter applies', () => {

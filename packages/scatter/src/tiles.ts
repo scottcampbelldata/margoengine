@@ -192,6 +192,16 @@ export class ScatterTiles extends Scatter {
     const reach = this.#followers.reduce((r, f) => Math.max(r, f.reach), this.reach);
     this.values[35] = reach * (this.options.wind || this.#followers.some((f) => f.options.wind) ? 2 : 1);
   }
+  /**
+   * A mesh and the one it shares are one plant (a canopy over its trunk), so both sway with the same top: the largest
+   * among them (`sway.height`, or each one's meshes' top), as `applyReach` takes the largest radius.
+   */
+  protected override applySway(): void {
+    super.applySway();
+    const leader = this.#leader ?? this,
+      top = (s: ScatterTiles) => s.options.sway?.height ?? s.meshTop;
+    this.values[84] = leader.#followers.reduce((t, f) => Math.max(t, top(f)), top(leader));
+  }
   protected override reachChanged(): void {
     this.applyReach();
     this.#leader?.applyReach();

@@ -7,7 +7,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { windShader, validateWind, type ScatterWind } from './wind.js';
+import { windShader, validateSway, validateWind, type ScatterSway, type ScatterWind } from './wind.js';
 import { translucencyShader } from './translucency.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
 import { MargoError } from '@margoengine/math/errors';
@@ -35,6 +35,12 @@ export interface ScatterBatch {
   /** Branch/foliage ripple, 0-1, layered over rooted wind. Defaults to 0. */
   windDetail?: number;
   /**
+   * How the batch's plants sway (as `ScatterOptions.sway`): `stiffness` 0.1 to 10 divides the 1.2 m reach, `height` is
+   * the plant's top in mesh units (default the batch's highest vertex); each instance's top is that times its
+   * transform's Y-axis length.
+   */
+  sway?: ScatterSway;
+  /**
    * Sunlight seen through thin foliage, 0-1 (default 0): wrapped back-light translucency after Barre-Brisebois and
    * Bouchard (GDC 2011). Leaves facing away from the sun glow when the camera looks toward it, scaled by the vertex
    * occlusion (alpha) so outer leaves glow and a canopy's core does not. 1 matches the albedo's front-lit diffuse.
@@ -57,12 +63,13 @@ const vertexLayouts: GPUVertexBufferLayout[] = [
     ],
   },
   {
-    arrayStride: 128,
+    arrayStride: 144,
     stepMode: 'instance',
     attributes: [
       ...Array.from({ length: 6 }, (_, i) => ({ shaderLocation: i + 2, offset: i * 16, format: 'float32x4' as const })),
       { shaderLocation: 9, offset: 96, format: 'float32x3' },
       { shaderLocation: 10, offset: 112, format: 'float32x4' },
+      { shaderLocation: 11, offset: 128, format: 'float32x4' },
     ],
   },
 ];
@@ -105,8 +112,8 @@ const shadowShader =
   `
 struct ShadowFrame {camera:mat4x4f,time:vec4f}
 @group(0) @binding(0) var<uniform> frame:ShadowFrame;
-struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(10) wind:vec4f}
-@vertex fn vertex(i:Input)->@builtin(position) @invariant vec4f {var p=mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);let bend=windDeformation(p.xyz,i.d.xyz,vec4f(i.wind.xyz,frame.time.x),i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);return frame.camera*p;}
+struct Input {@location(0) p:vec3f,@location(2) a:vec4f,@location(3) b:vec4f,@location(4) c:vec4f,@location(5) d:vec4f,@location(10) wind:vec4f,@location(11) sway:vec4f}
+@vertex fn vertex(i:Input)->@builtin(position) @invariant vec4f {var p=mat4x4f(i.a,i.b,i.c,i.d)*vec4f(i.p,1);let bend=windDeformation(p.xyz,i.d.xyz,vec4f(i.wind.xyz,frame.time.x),i.wind.w,vec4f(i.sway.xy,frame.time.x,1.0));p=vec4f(p.x+bend.offset.x,p.y-bend.drop.x,p.z+bend.offset.y,1);return frame.camera*p;}
 `;
 let serial = 0;
 
@@ -215,7 +222,10 @@ export class ScatterInstances implements EnginePlugin {
         )
           throw new RangeError('Invalid scatter wind detail; set a wind on the batch and windDetail between 0 and 1.');
         const wind = b.wind ? [b.wind[0] / windLength, b.wind[1] / windLength, b.wind[2]] : undefined;
-        const packed = new Float32Array(instances * 32);
+        const reach = validateSway(b.sway);
+        let top = b.sway?.height ?? 0;
+        if (!b.sway?.height) for (let v = 1; v < b.vertices.length; v += 20) top = Math.max(top, b.vertices[v]);
+        const packed = new Float32Array(instances * 36);
         for (let i = 0; i < instances; i++) {
           const m = b.transforms.subarray(i * 16, i * 16 + 16);
           const det =
@@ -224,13 +234,16 @@ export class ScatterInstances implements EnginePlugin {
             m[8] * (m[1] * m[6] - m[2] * m[5]);
           if (m[3] || m[7] || m[11] || m[15] !== 1 || !Number.isFinite(det) || !det)
             throw new RangeError('Expected nonsingular affine instance transforms');
-          packed.set(m, i * 32);
-          packed.set(b.material.data, i * 32 + 16);
-          packed[i * 32 + 23] = -1; // Fixed batches have no core mesh ID.
-          if (b.emissive) packed.set(b.emissive, i * 32 + 24);
-          packed[i * 32 + 27] = b.translucency ?? 0;
-          if (wind) packed.set(wind, i * 32 + 28);
-          packed[i * 32 + 31] = b.windDetail ?? 0;
+          packed.set(m, i * 36);
+          packed.set(b.material.data, i * 36 + 16);
+          packed[i * 36 + 23] = -1; // Fixed batches have no core mesh ID.
+          if (b.emissive) packed.set(b.emissive, i * 36 + 24);
+          packed[i * 36 + 27] = b.translucency ?? 0;
+          if (wind) packed.set(wind, i * 36 + 28);
+          packed[i * 36 + 31] = b.windDetail ?? 0;
+          // The plant's top in metres (the mesh top along the transform's Y axis) and the reach.
+          packed[i * 36 + 32] = top * Math.hypot(m[4], m[5], m[6]);
+          packed[i * 36 + 33] = reach;
         }
         const buffers: GPUBuffer[] = [];
         try {
@@ -311,7 +324,7 @@ export class ScatterInstances implements EnginePlugin {
           .replace(/struct Input \{[^}]+\}/, (input) =>
             input.replace(
               '}',
-              `,@location(8) vertexColor:vec4f,@location(9) emissive:${lucent ? 'vec4f' : 'vec3f'},@location(10) wind:vec4f }`,
+              `,@location(8) vertexColor:vec4f,@location(9) emissive:${lucent ? 'vec4f' : 'vec3f'},@location(10) wind:vec4f,@location(11) sway:vec4f }`,
             ),
           )
           .replace(/struct Output \{[^}]+\}/, (output) => {
@@ -327,7 +340,7 @@ export class ScatterInstances implements EnginePlugin {
           })
           .replace(
             'let p=model*vec4f(i.position,1);',
-            'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind.xyz,frame.windTime.x);let bend=windDeformation(p.xyz,i.m3.xyz,wind,i.wind.w);p=vec4f(p.x+bend.offset.x,p.y,p.z+bend.offset.y,1);',
+            'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind.xyz,frame.windTime.x);let bend=windDeformation(p.xyz,i.m3.xyz,wind,i.wind.w,vec4f(i.sway.xy,frame.windTime.x,1.0));p=vec4f(p.x+bend.offset.x,p.y-bend.drop.x,p.z+bend.offset.y,1);',
           )
           .replace(
             'o.color=i.color.rgb;',

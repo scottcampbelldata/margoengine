@@ -94,7 +94,7 @@ test('grassPoseCode: wraps scatterPose once with the shape compiled in', () => {
   assert.match(code, /let w=0\.05;/);
   // KB-SCATTER-SUBPIXEL1: the pose takes the camera's pixel footprint and floors the blade's width at it, keeping
   // w^2 / (w^2 + p^2) of the blades (w / 2p under a pixel) so the field's area stays the same.
-  assert.match(code, /pixel:f32\)->ScatterPose \{/);
+  assert.match(code, /pixel:f32,sway:vec4f\)->ScatterPose \{/);
   assert.match(code, /grassVertex\(p,position,wide,d\*pixel\/\(wide\*position\.w\),view\)/);
   assert.match(code, /let foot=1\.5\*pix;/);
   // The floor and the kept share use the width the eye sees (seen at least 0.25; under a pixel edge on, left out).

@@ -16,7 +16,7 @@ export {
   type GroundPath,
   type Placement,
 } from './placement.js';
-import { windShader, validateWind, windClockRate, type ScatterWind } from './wind.js';
+import { windShader, validateWind, validateSway, windClockRate, type ScatterSway, type ScatterWind } from './wind.js';
 import {
   checkTextures,
   chainsOf,
@@ -34,9 +34,9 @@ import { translucencyShader } from './translucency.js';
 import { fadeCode, pixelFootprint, poseShader } from './pose.js';
 import { outsideLod } from './lod.js';
 import { sameBindings, snapshotBindings } from './bindings.js';
-export type { ScatterWind } from './wind.js';
+export type { ScatterSway, ScatterWind } from './wind.js';
 export type { ScatterCapture } from './capture.js';
-export { WIND_THRASH_FROM, windClockRate } from './wind.js';
+export { SWAY_REACH, WIND_THRASH_FROM, swayFrequency, swayTip, windClockRate } from './wind.js';
 import { pathSegments, validateExclusions, type GroundBounds, type GroundPath } from './placement.js';
 import {
   engineRuntime,
@@ -75,13 +75,15 @@ const heightFormats = ['r32float', 'r16float', 'rgba32float', 'rgba16float', 'r8
  * is drawn. Internal plumbing between the two entries; its shape may change with the package.
  */
 export interface ScatterVelocityParts {
-  /** The frame values: camera 0-15, eye 16-18, wind 68-71, ground fit 72-75, blades 76-79, pixel footprint 80. */
+  /** The frame values: camera 0-15, eye 16-18, wind 68-71, ground fit 72-75, blades 76-79, pixel footprint 80, sway 84-87. */
   readonly values: Float32Array;
   /**
    * The wind (frame values 68-71: direction, strength, wind clock) of the last frame drawn with an earlier wind clock;
    * the last frame's own on the first frame and after `resetTime`. `@margoengine/scatter/read` poses the shutter's open with it.
    */
   readonly windBefore: Float32Array;
+  /** The sway (frame values 84-87: plant top, reach, calm clock, wind clock rate) of the same frame as `windBefore`. */
+  readonly swayBefore: Float32Array;
   /** The unpatched WGSL pose functions (`windShader` and `poseShader`), which `pose` patches into a posing stage. */
   readonly poseSource: string;
   readonly instances: readonly GPUBuffer[];
@@ -189,6 +191,13 @@ export interface ScatterOptions {
    */
   wind?: ScatterWind;
   /**
+   * How the plants sway in the wind: `stiffness` 0.1 to 10 (default 1) divides the reach, the most a tall plant's top
+   * moves at full wind strength (1.2 m at stiffness 1), and `height` is the plant's top in mesh units (default the
+   * meshes' highest vertex). A plant's sway is bounded by min(0.354 H, reach) x strength, H its top times the instance's
+   * scale, and a trunk sways at its own frequency (2.55 H^-0.59 Hz, `swayFrequency`) however hard the wind blows.
+   */
+  sway?: ScatterSway;
+  /**
    * How far each instance's up axis tilts from world +Y toward the ground normal, 0-1 (default 0, upright). 1 lays
    * stones and debris along the slope; grass and trees usually stay upright.
    */
@@ -268,7 +277,7 @@ export interface ScatterStateSource {
   update(context: { device: GPUDevice; encoder: GPUCommandEncoder }): void;
 }
 const frame = `
-struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f,pixel:vec4f}
+struct Frame {camera:mat4x4f,eye:vec4f,area:vec4f,rules:vec4f,scale:vec4f,lod:vec4f,ids:vec4u,color:vec4f,planes:array<vec4f,6>,wind:vec4f,ground:vec4f,blade:vec4f,pixel:vec4f,sway:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 `;
@@ -329,7 +338,7 @@ const renderCode =
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
 struct Output {@builtin(position) clip:vec4f,@location(0) normal:vec3f,@location(1) @interpolate(flat) lodFade:vec2f,@location(2) ${centroid} ground:vec4f,@location(3) ${centroid} shade:f32}
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output{
- let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.pixel.x);
+ let data=instances[index];let pose=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.pixel.x,frame.sway);
  return Output(frame.camera*vec4f(pose.world,1),pose.normal,data.rotation.zw,pose.ground,pose.shade);
 }
 ${displayShader}
@@ -375,26 +384,26 @@ const pbrVertex = (fade: boolean, blades: boolean, tint = false, clusters = fals
   `
 struct ScatterInstance {position:vec4f,rotation:vec4f}
 @group(1) @binding(0) var<storage,read> instances:array<ScatterInstance>;
-@group(1) @binding(1) var<uniform> material:array<vec4f,6>;
+@group(1) @binding(1) var<uniform> material:array<vec4f,7>;
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output {
- let data=instances[index];${tint ? lookCode(clusters) : ''}let pose=scatterPose(p,${clusters ? 'bent' : 'n'},data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2],material[5].y);
+ let data=instances[index];${tint ? lookCode(clusters) : ''}let pose=scatterPose(p,${clusters ? 'bent' : 'n'},data.position,data.rotation,material[3],material[4],frame.eye.xyz,material[2],material[5].y,material[6]);
  var o:Output;o.position=pose.world;o.clip=frame.camera*vec4f(o.position,1);o.normal=pose.normal;
  o.color=${tint ? 'tint' : 'material[0].rgb'}${blades ? '*pose.shade' : ''};o.material=vec4f(material[1].xyz,1);${fade ? 'o.lodFade=data.rotation.zw;' : ''}${blades ? 'o.ground=pose.ground;' : ''}${translucent ? 'o.transl=material[5].x;' : ''}return o;
 }
 `;
-// Depth only, for one shadow cascade: the colour pass's pose and wind (frame values 16-19 and 68-79), the light's
+// Depth only, for one shadow cascade: the colour pass's pose and wind (frame values 16-19, 68-79 and 84-87), the light's
 // matrix in place of the camera's. Each LOD ring's culled instances are drawn with that ring's mesh.
 const shadowCode =
   windShader +
   poseShader +
   `
-struct ShadowFrame {light:mat4x4f,eye:vec4f,wind:vec4f,ground:vec4f,blade:vec4f}
+struct ShadowFrame {light:mat4x4f,eye:vec4f,wind:vec4f,ground:vec4f,blade:vec4f,sway:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:ShadowFrame;
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->@builtin(position) @invariant vec4f {
  let data=instances[index];
- return frame.light*vec4f(scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.eye.w).world,1);
+ return frame.light*vec4f(scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.eye.w,frame.sway).world,1);
 }
 `;
 // The same, drawing only the instances the cascade's list names (see `shadowCullCode`).
@@ -488,7 +497,7 @@ const PLANES = ' for(var j=0u;j<6u;j++){if(dot(frame.planes[j].xyz,p)+frame.plan
 
 function optionShader(o: ScatterOptions): string {
   if (!extended(o)) return cull;
-  let code = cull.replace('pixel:vec4f}', 'pixel:vec4f,offset:vec4f,bounds:vec4f}');
+  let code = cull.replace('sway:vec4f}', 'sway:vec4f,offset:vec4f,bounds:vec4f}');
   if (o.follow)
     // Random numbers from the world cell (grid cell plus the camera's cell offset), not the instance index.
     code = code
@@ -559,11 +568,15 @@ export class Scatter implements EnginePlugin {
     return this.#disposed;
   }
   readonly count: number;
-  private readonly materialValues = new Float32Array(24);
+  /** The meshes' highest vertex in mesh units: the plant top `sway.height` defaults to. */
+  protected meshTop = 0;
+  private readonly materialValues = new Float32Array(28);
   private seconds = 0;
   private windClock = 0;
   /** The wind values (68-71) of the frame before the last drawn one, and whether a frame has been drawn since a reset. */
   private readonly windBefore = new Float32Array(4);
+  /** The sway values (84-87) of the same frame as `windBefore`. */
+  private readonly swayBefore = new Float32Array(4);
   private windDrawn = false;
   protected terrain?: GPUTexture;
   protected computeGroup?: GPUBindGroup;
@@ -604,7 +617,7 @@ export class Scatter implements EnginePlugin {
   /** Per cascade: its uniform (light matrix and pose values) and one bind group per LOD ring. */
   private shadowUniforms: GPUBuffer[] = [];
   private readonly shadowGroups: GPUBindGroup[][] = [];
-  private readonly shadowValues = new Float32Array(32);
+  private readonly shadowValues = new Float32Array(36);
   /**
    * Per-cascade culling (`prepareShadow`): the ring buffers and cascade count its lists were made for, the lists and
    * indirect draws (none when too large to bind), the draw bind groups, and the frame's encoder once it culled.
@@ -639,8 +652,8 @@ export class Scatter implements EnginePlugin {
   constructor(geometry: Geometry | readonly [Geometry, Geometry, Geometry], input: ScatterOptions = {}) {
     this.options = preset('scatter', input);
     const options = this.options;
-    // The world-rectangle options extend the frame by two vec4s (follow offsets, bounds) after the pixel footprint (80).
-    this.values = new Float32Array(extended(options) ? 92 : 84);
+    // The world-rectangle options extend the frame by two vec4s (follow offsets, bounds) after the sway (84).
+    this.values = new Float32Array(extended(options) ? 96 : 88);
     this.meta = new Uint32Array(this.values.buffer);
     this.geometries = geometry instanceof Geometry ? [geometry, geometry, geometry] : [...geometry];
     const {
@@ -726,8 +739,11 @@ export class Scatter implements EnginePlugin {
       throw new RangeError('Scatter inner must be a distance from 0 up to below the last lod, innerFade 0 or more');
     if (options.wind) validateWind(options.wind);
     validateWorld(options);
-    if (options.bounds) this.values.set(options.bounds, 88);
-    if (inner) this.values.set([inner, innerFade], 86);
+    if (options.bounds) this.values.set(options.bounds, 92);
+    if (inner) this.values.set([inner, innerFade], 90);
+    validateSway(options.sway);
+    for (const g of this.geometries)
+      for (let i = 1; i < g.vertices.length; i += 6) this.meshTop = Math.max(this.meshTop, g.vertices[i]);
     const exclusions = options.exclusions ?? [],
       segments = pathSegments(options.paths ?? []);
     validateExclusions(exclusions);
@@ -861,7 +877,7 @@ export class Scatter implements EnginePlugin {
     d.queue.writeBuffer(this.exclusionBuffer, 0, this.exclusionValues as Float32Array<ArrayBuffer>);
     if (this.options.material) {
       this.pbrUniform = d.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.materialUniform = d.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.materialUniform = d.createBuffer({ size: 112, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
       this.materialValues.set(this.options.material.data);
     }
     // Readable (COPY_SRC) so a test or tool can read how many instances each ring drew.
@@ -953,6 +969,14 @@ export class Scatter implements EnginePlugin {
   protected applyReach(): void {
     this.values[35] = this.reach * (this.options.wind ? 2 : 1);
   }
+  /**
+   * Writes the sway values read every frame: the plant top in mesh units (`sway.height`, or the meshes' top) and the
+   * reach, 1.2 m / `sway.stiffness`. A Scatter whose instances share another's (a canopy over its trunk) takes the larger top.
+   */
+  protected applySway(): void {
+    this.values[84] = this.options.sway?.height ?? this.meshTop;
+    this.values[85] = validateSway(this.options.sway);
+  }
   /** Called when this Scatter's own reach changed (a blade `widen`); a Scatter that shares its culling updates the sharer too. */
   protected reachChanged(): void {
     this.applyReach();
@@ -985,6 +1009,17 @@ export class Scatter implements EnginePlugin {
     if (value !== undefined) validateWind(value);
     this.options.wind =
       value && (value.length === 4 ? [value[0], value[1], value[2], value[3]] : [value[0], value[1], value[2]]);
+  }
+  /**
+   * How the plants sway: `{ stiffness, height }` (see `ScatterOptions.sway`), or undefined for the defaults; read every
+   * frame, so a settings slider keys it.
+   */
+  get sway(): ScatterSway | undefined {
+    return this.options.sway;
+  }
+  set sway(value: ScatterSway | undefined) {
+    validateSway(value);
+    this.options.sway = value && { ...value };
   }
   /** Albedo lost at the blade root, 0-1 (`blades.rootShade`); read every frame. Throws when built without `blades`. */
   get rootShade(): number {
@@ -1126,8 +1161,12 @@ export class Scatter implements EnginePlugin {
             'Scatter needs a sampleable floating-height texture; return one from options.heightmap',
           );
         this.applyReach();
+        this.applySway();
         // A second view of the same frame (the clock has not moved) keeps the frame before's wind.
-        if (this.windDrawn && this.values[71] !== this.windClock) this.windBefore.set(this.values.subarray(68, 72));
+        if (this.windDrawn && this.values[71] !== this.windClock) {
+          this.windBefore.set(this.values.subarray(68, 72));
+          this.swayBefore.set(this.values.subarray(84, 88));
+        }
         this.values.fill(0, 68, 71);
         if (this.options.wind) {
           const wind = this.options.wind,
@@ -1137,7 +1176,12 @@ export class Scatter implements EnginePlugin {
           this.values[70] = wind[2];
         }
         this.values[71] = this.windClock;
-        if (!this.windDrawn) this.windBefore.set(this.values.subarray(68, 72));
+        this.values[86] = this.seconds;
+        this.values[87] = this.options.wind?.length === 4 ? windClockRate(this.options.wind[3]) : 1;
+        if (!this.windDrawn) {
+          this.windBefore.set(this.values.subarray(68, 72));
+          this.swayBefore.set(this.values.subarray(84, 88));
+        }
         this.windDrawn = true;
         if (this.options.follow) this.followCamera(c.camera.position);
         this.options.states?.update(c);
@@ -1256,8 +1300,8 @@ export class Scatter implements EnginePlugin {
       oz = Math.floor(eye[2] / cellZ) - Math.floor(rows / 2);
     this.values[22] = (ox + columns / 2) * cellX;
     this.values[23] = (oz + rows / 2) * cellZ;
-    this.values[84] = ox;
-    this.values[85] = oz;
+    this.values[88] = ox;
+    this.values[89] = oz;
   }
 
   /**
@@ -1439,6 +1483,7 @@ export class Scatter implements EnginePlugin {
     this.materialValues.set(this.values.subarray(68, 80), 8); // wind, ground fit, blades, clusters
     this.materialValues[20] = this.translucency; // read by the translucent shader only
     this.materialValues[21] = this.values[80]; // the pixel footprint, material[5].y
+    this.materialValues.set(this.values.subarray(84, 88), 24); // the sway, material[6]
     device.queue.writeBuffer(this.materialUniform!, 0, this.materialValues as Float32Array<ArrayBuffer>);
   }
   /** Core's frame uniform (camera, eye, unit light, radiance, ambient) for `camera` into `values`. */
@@ -1794,7 +1839,7 @@ export class Scatter implements EnginePlugin {
         : (this.shadowPipeline ??= shadowDepth(d, this.poseCode(this.shadowText(shadowCode), 0, 2), !!this.uvs));
     // One uniform per cascade: every cascade's pass is recorded before the queue writes reach the GPU.
     const uniform = (this.shadowUniforms[cascade] ??= d.createBuffer({
-      size: 128,
+      size: 144,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     }));
     const o = this.listOffsets,
@@ -1815,6 +1860,7 @@ export class Scatter implements EnginePlugin {
     values.set(this.values.subarray(16, 20), 16); // the eye: blades widen with camera distance, as drawn
     values[19] = this.values[80]; // eye.w: the camera's pixel footprint, so blades floor their width as drawn
     values.set(this.values.subarray(68, 80), 20); // wind and time, ground fit, blades
+    values.set(this.values.subarray(84, 88), 32); // sway
     d.queue.writeBuffer(uniform, 0, values as Float32Array<ArrayBuffer>);
     pass.setPipeline(pipeline);
     if (this.maps && this.cut > 0) pass.setBindGroup(1, this.mapGroup(d, pipeline, 1, 1));
@@ -1917,6 +1963,7 @@ export class Scatter implements EnginePlugin {
     return {
       values: this.values,
       windBefore: this.windBefore,
+      swayBefore: this.swayBefore,
       poseSource: windShader + poseShader,
       instances: this.colourInstances(),
       commands: this.colourCommands(),

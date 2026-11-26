@@ -1,7 +1,10 @@
 // Real-GPU proof of the Beaufort thrash (`ScatterWind` speed, `windClockRate`), on WebGPU and, with MARGO_COMPAT=1, the
 // WebGL2 compatibility layer: a field of 6,000 thin blocks in a full bend, one frame drawn after one clock step.
-// - A gale's speed (17.2 m/s, Beaufort 8) moves the sway as far in 1 s as 17.2 / 5.4 s of a wind with no speed: the two
-//   frames are the same in every channel of every pixel, and the colour pass and the shadow cascades both read it.
+// - A gale's speed (17.2 m/s, Beaufort 8) runs the wind clock 17.2 / 5.4 times as fast. Until KB-LOOK-TV-SHIMMER1 this
+//   test also required the gale's 1 s to draw the same pixels as 17.2 / 5.4 s of a wind with no speed: that equality was
+//   the defect (one clock for the whole sway, trunks included). A plant now follows the gusts only as fast as its own
+//   frequency lets it, so the two frames differ slightly; sway.browser.mjs checks numerically that a short plant still
+//   thrashes with the wind clock (within 1 percent of its reach) and that a tall one keeps its own sway.
 // - The same second without the speed draws a different frame (the plants are elsewhere in their sway).
 // - A breeze below force 4 (4 m/s) keeps the plants' own sway: its frame equals the frame with no speed.
 // Run from the repository root after building packages, through scripts/run-with-timeout.mjs.
@@ -79,12 +82,14 @@ try {
     breeze = await show([1, 0, 1, 4], 1);
   assert.equal(gale.windTime, 17.2 / 5.4);
   assert.equal(gale.time, 1);
-  assert.equal(diff(gale.png, slow.png), 0, 'a gale moves the sway 3.2 times as far in a second');
+  const near = diff(gale.png, slow.png);
   const moved = diff(gale.png, same.png);
   assert.ok(moved > 200, `without the speed the plants are elsewhere in their sway (${moved} pixels)`);
   assert.equal(diff(breeze.png, same.png), 0, 'a breeze below force 4 keeps their own sway');
   assert.deepEqual(errors, []);
-  console.log(`wind-speed: gale against the same second without speed: ${moved} pixels differ`);
+  console.log(
+    `wind-speed: gale against the same second without speed: ${moved} pixels differ; against the same wind clock: ${near}`,
+  );
 } finally {
   await closeAll({ browser });
 }

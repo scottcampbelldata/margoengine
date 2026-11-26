@@ -449,6 +449,22 @@ one warning over two frames; exactly the need or no limit: traced, no warning; a
 copy per level runs in order; at the full level no copy). Missing: a run on a real OpenGL ES or Direct3D 11 class
 device.
 
+### Section 5 evidence: bounded wind sway of scattered plants (scatter, KB-LOOK-TV-SHIMMER1, 2026-11-26)
+
+GPU maths change in `packages/scatter/src/wind.ts` (`windBend`, `windNormal`, `windDeformation`, `windDetailNormal`), used
+by every scatter pass (colour, lit, shadow, capture, velocity, read, `ScatterInstances` and its shadow). The bend now
+takes `sway` = (plant top H in metres, reach, calm clock, wind clock rate), frame values 84-87 (the world-rectangle
+values moved to 88-95), `material[6]` in the lit stage and a vec4 at the end of the shadow, velocity and read frames;
+`ScatterInstances` carries (H, reach) per instance at location 11 (144-byte records). Bound by construction: the top
+moves at most strength x min(0.354 H, reach); the stem keeps its length to second order and its normal is the exact
+inverse transpose of the bend's Jacobian (shear plus the length correction's vertical scale). Evidence:
+`packages/scatter/test/sway.browser.mjs` (RTX A6000, WebGPU and `--compat`, the pose source a drawn Scatter compiles):
+a 25 m top within 1.10 m and 2.27 m/s, strongest sway 0.1 to 1 Hz at 0 to 40 m/s; a 0.3 m blade within 0.065 m and
+still on the wind clock; lengths within 1 percent. `tests/nature.browser.mjs` (both backends) checks the bound over
+0 to 100 m plants and the normals against finite-difference tangents including the drop; its cloud probe had stopped
+compiling (the cloud stage calls the base sky's `daySky`) and now links a stand-in. Missing: a rerun of the
+timber-valley rail-line `shimmerMoving` (docs/known-bugs.md), per-branch modes, impostor sway.
+
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 
 New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object

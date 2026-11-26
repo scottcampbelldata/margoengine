@@ -53,7 +53,7 @@ test('fixed PBR scatter uploads once, uses flat transforms and indirect draws in
   h.engine.frameGraph.execute(h.context);
   assert.deepEqual([...frame.subarray(28, 32)], [1, 1, 1, 0]);
   assert.deepEqual(scatter.batches, [{ name: 'cedar', vertices: 3, indices: 3, instances: 1 }]);
-  const instance = h.resources.find((r) => r.size === 128 && r.usage === 40),
+  const instance = h.resources.find((r) => r.size === 144 && r.usage === 40),
     values = new Float32Array(instance.data);
   assert.deepEqual(Array.from(values.subarray(12, 16)), [3, 4, 5, 1]);
   assert.equal(values[20], Math.fround(0.85));
@@ -112,7 +112,7 @@ test('foliage translucency adds wrapped back-light only when a batch asks for it
     h.engine.use(scatter);
     h.engine.frameGraph.execute(h.context);
     const render = h.pipelines.find((p) => p.fragment),
-      uploads = h.resources.filter((r) => !r.destroyed && r.size === 128 && r.usage === 40);
+      uploads = h.resources.filter((r) => !r.destroyed && r.size === 144 && r.usage === 40);
     return { h, scatter, render, code: render.vertex.module.code, uploads };
   };
   const plain = build([batch()]);
@@ -133,7 +133,7 @@ test('foliage translucency adds wrapped back-light only when a batch asks for it
     'added outside the shadowed direct term, before emission',
   );
   assert.equal(lit.render.vertex.buffers[1].attributes.find((a) => a.shaderLocation === 9).format, 'float32x4');
-  assert.equal(lit.render.vertex.buffers[1].arrayStride, 128, 'packed into the unused emissive.w slot');
+  assert.equal(lit.render.vertex.buffers[1].arrayStride, 144, 'packed into the unused emissive.w slot');
   assert.deepEqual(
     lit.uploads.map((u) => new Float32Array(u.data)[27]),
     [0, Math.fround(0.8)],
@@ -188,7 +188,7 @@ test('HDR batch emission survives occlusion, direct shadows and device restorati
   const scatter = new ScatterInstances(() => [b, batch()]);
   h.engine.use(scatter);
   h.engine.frameGraph.execute(h.context);
-  const uploads = () => h.resources.filter((r) => !r.destroyed && r.size === 128 && r.usage === 40);
+  const uploads = () => h.resources.filter((r) => !r.destroyed && r.size === 144 && r.usage === 40);
   assert.deepEqual(Array.from(new Float32Array(uploads()[0].data).subarray(24, 27)), b.emissive.map(Math.fround));
   assert.deepEqual(Array.from(new Float32Array(uploads()[1].data).subarray(24, 27)), [0, 0, 0]);
   const render = h.pipelines.find((p) => p.fragment),
@@ -196,7 +196,7 @@ test('HDR batch emission survives occlusion, direct shadows and device restorati
   assert.match(code, /let linear=direct\*0\.25\*[^;]+\+i.emissive;/);
   assert.match(code, /o.emissive=i.emissive/);
   assert.match(code, /@location\(4\) emissive:vec3f/);
-  assert.equal(render.vertex.buffers[1].arrayStride, 128);
+  assert.equal(render.vertex.buffers[1].arrayStride, 144);
   scatter.onDeviceRestored(h.engine);
   assert.deepEqual(Array.from(new Float32Array(uploads()[0].data).subarray(24, 27)), b.emissive.map(Math.fround));
   scatter.dispose();
@@ -238,7 +238,7 @@ test('emission fades each render without replacing batch data and survives resto
   assert.equal(h.counts.buffers, created.buffers);
   assert.equal(h.counts.groups, created.groups);
   assert.deepEqual(
-    Array.from(new Float32Array(h.resources.find((r) => r.size === 128 && r.usage === 40).data).subarray(24, 27)),
+    Array.from(new Float32Array(h.resources.find((r) => r.size === 144 && r.usage === 40).data).subarray(24, 27)),
     b.emissive.map(Math.fround),
   );
   assert.match(h.pipelines.find((p) => p.fragment).vertex.module.code, /o.emissive=i.emissive\*frame.windTime.y/);
@@ -265,7 +265,7 @@ test('wind uploads a single clock to the color pass and every shadow cascade, wi
   const scatter = new ScatterInstances(() => [b]);
   h.engine.use(scatter);
   h.frame();
-  const instance = h.resources.find((r) => r.size === 128 && r.usage === 40);
+  const instance = h.resources.find((r) => r.size === 144 && r.usage === 40);
   assert.deepEqual(
     Array.from(new Float32Array(instance.data).subarray(28, 31)),
     [1 / Math.hypot(1, 0.35), 0.35 / Math.hypot(1, 0.35), 0.1].map(Math.fround),

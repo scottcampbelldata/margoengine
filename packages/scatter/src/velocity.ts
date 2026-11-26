@@ -37,7 +37,8 @@ export interface ScatterVelocityFrame {
 
 // Frame values: current and previous view-projection (0-31), size (32: width, height, history, 0), the eye now and
 // before with each frame's pixel footprint in w (36, 40), the wind now and before (44, 48), the ground fit (52) and the
-// blades (56): the colour pass's frame values 68-80 for each frame.
+// blades (56), the sway now and before (60, 64: plant top, reach, calm clock, clock rate): the colour pass's frame
+// values 68-80 and 84-87 for each frame.
 // `cover` draws a ring's coverage-depth stage: the pose's coverage in `scatterCover`, kept above its threshold w.
 const code = (split: boolean, cover: boolean) =>
   (split ? splitDeclaration : '') +
@@ -45,15 +46,15 @@ const code = (split: boolean, cover: boolean) =>
   windShader +
   poseShader +
   `
-struct VelocityFrame {current:mat4x4f,previous:mat4x4f,size:vec4f,eye:vec4f,before:vec4f,wind:vec4f,windBefore:vec4f,ground:vec4f,blade:vec4f}
+struct VelocityFrame {current:mat4x4f,previous:mat4x4f,size:vec4f,eye:vec4f,before:vec4f,wind:vec4f,windBefore:vec4f,ground:vec4f,blade:vec4f,sway:vec4f,swayBefore:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> frame:VelocityFrame;
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
 struct Output {@builtin(position) @invariant clip:vec4f,@location(0) current:vec4f,@location(1) previous:vec4f${cover ? ',@location(2) cover:vec4f' : ''}}
 @vertex fn vertex(@location(0) p:vec3f,@location(1) n:vec3f,@builtin(instance_index) index:u32)->Output {
  let data=instances[index];
- let then=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.before.xyz,frame.windBefore,frame.before.w).world;
- let now=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.eye.w).world;
+ let then=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.before.xyz,frame.windBefore,frame.before.w,frame.swayBefore).world;
+ let now=scatterPose(p,n,data.position,data.rotation,frame.ground,frame.blade,frame.eye.xyz,frame.wind,frame.eye.w,frame.sway).world;
  var o:Output;o.clip=frame.current*vec4f(now,1);o.current=o.clip;o.previous=frame.previous*vec4f(then,1);${cover ? 'o.cover=scatterCover;' : ''}
  if(frame.size.z<=0.0){o.previous.w=-1.0;}
  return o;
@@ -68,7 +69,7 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
 
 interface View {
   uniform: GPUBuffer;
-  /** The last frame's eye and footprint, and wind, once drawn. */
+  /** The last frame's eye and footprint, wind and sway, once drawn. */
   last?: Float32Array;
   groups: Map<GPURenderPipeline, GPUBindGroup[]>;
 }
@@ -94,7 +95,7 @@ interface View {
 export class ScatterVelocity {
   private readonly views = new Map<object, View>();
   private readonly pipelines = new Map<string, GPURenderPipeline>();
-  private readonly values = new Float32Array(60);
+  private readonly values = new Float32Array(68);
   private device?: GPUDevice;
   #disposed = false;
   constructor(readonly scatter: Scatter) {
@@ -115,7 +116,7 @@ export class ScatterVelocity {
     let view = this.views.get(frame.key);
     if (!view) {
       view = {
-        uniform: device.createBuffer({ size: 240, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+        uniform: device.createBuffer({ size: 272, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
         groups: new Map(),
       };
       this.views.set(frame.key, view);
@@ -127,13 +128,16 @@ export class ScatterVelocity {
     v[39] = p[80];
     v.set(p.subarray(68, 72), 44);
     v.set(p.subarray(72, 80), 52);
+    v.set(p.subarray(84, 88), 60);
     // The last frame's pose; on the first frame of a view, this frame's (no wind motion, the camera's alone).
     const last = view.last ?? v.subarray(36, 40).slice();
     v.set(last.subarray(0, 4), 40);
     v.set(view.last ? last.subarray(4, 8) : v.subarray(44, 48), 48);
+    v.set(view.last ? last.subarray(8, 12) : v.subarray(60, 64), 64);
     device.queue.writeBuffer(view.uniform, 0, v as Float32Array<ArrayBuffer>);
-    (view.last ??= new Float32Array(8)).set(v.subarray(36, 40));
+    (view.last ??= new Float32Array(12)).set(v.subarray(36, 40));
     view.last.set(v.subarray(44, 48), 4);
+    view.last.set(v.subarray(60, 64), 8);
     // The colour pass's depth-writing stages of each ring (the pose this frame is posed last, so `scatterCover` is
     // this frame's): an opaque ring; a split ring's core and its tips' coverage depth; a covered ring's coverage depth.
     for (let ring = 0; ring < 3; ring++) {

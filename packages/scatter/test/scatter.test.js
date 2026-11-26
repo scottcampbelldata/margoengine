@@ -69,16 +69,16 @@ test('alignToGround and sink fit instances to the ground in the cull and both ve
     assert.match(
       render,
       lit
-        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[4\],frame\.eye\.xyz,material\[2\],material\[5\]\.y\)/
-        : /frame\.ground,frame\.blade,frame\.eye\.xyz,frame\.wind,frame\.pixel\.x\)/,
+        ? /scatterPose\(p,n,data\.position,data\.rotation,material\[3\],material\[4\],frame\.eye\.xyz,material\[2\],material\[5\]\.y,material\[6\]\)/
+        : /frame\.ground,frame\.blade,frame\.eye\.xyz,frame\.wind,frame\.pixel\.x,frame\.sway\)/,
     );
     // KB-SCATTER-SUBPIXEL1: the drawing camera's pixel footprint per metre, 2 tan(fov / 2) / height, reaches every
     // pose (frame slot 80; material[5].y in the lit stage), so GrassScatter can floor its blades at a pixel.
     const footprint = (2 * Math.tan((h.context.camera.fov * Math.PI) / 360)) / h.context.height;
     assert.ok(Math.abs(effect.values[80] / footprint - 1) < 1e-5, `${effect.values[80]} against ${footprint}`);
     if (lit) {
-      assert.match(render, /var<uniform> material:array<vec4f,6>/);
-      assert.equal(effect.materialUniform.size, 96);
+      assert.match(render, /var<uniform> material:array<vec4f,7>/);
+      assert.equal(effect.materialUniform.size, 112);
       assert.equal(new Float32Array(effect.materialUniform.data)[21], effect.values[80]);
       assert.deepEqual(Array.from(new Float32Array(effect.materialUniform.data).subarray(12, 14)), [
         0.5,
@@ -164,7 +164,7 @@ test('blades shade grass from root to tip and bend lit normals toward the ground
     assert.match(lit.code, /@location\(2\) @interpolate\(perspective,centroid\) color:vec3f/);
     assert.match(lit.code, /o\.color=material\[0\]\.rgb\*pose\.shade;/);
     assert.match(lit.code, /o\.ground=pose\.ground;/);
-    assert.match(lit.code, /var<uniform> material:array<vec4f,6>/);
+    assert.match(lit.code, /var<uniform> material:array<vec4f,7>/);
     assert.equal(lit.code.includes('lodVisible'), lodFade > 0);
     assert.deepEqual(lit.material.slice(16, 20), [0.5, 1 / 120, 2, 1 / 120].map(Math.fround));
     const off = build({ lodFade, material: new PbrMaterial({ doubleSided: true }) });
@@ -207,7 +207,7 @@ test('translucent blades add the sun seen through them, and translucency 0 leave
   );
   assert.match(lucent, /@location\(\d+\) @interpolate\(flat\) transl:f32/);
   assert.match(lucent, /o\.transl=material\[5\]\.x;/);
-  assert.match(lucent, /var<uniform> material:array<vec4f,6>/);
+  assert.match(lucent, /var<uniform> material:array<vec4f,7>/);
   const plain = build({}),
     zero = build({ translucency: 0 });
   // material[5].y is the pixel footprint every lit pose reads; the translucency slot material[5].x stays unread.

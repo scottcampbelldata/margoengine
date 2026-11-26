@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20649327,
+  "total": 20651497,
   "history": [
     {
       "date": "2026-10-24",
@@ -14143,6 +14143,12 @@
       "commit": "6e77101bc2",
       "grew": 1,
       "reason": "SEA-12 incident mesh pressure and held-out oscillatory member loads grow physics/loads from 11387 to 12619 B gzip. The optional ceiling moves from 11729 to 12998 B. The two in-line models share the member force integration and shipping them as separate entries would duplicate that integration."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "aaece31fb7",
+      "reason": "KB-LOOK-TV-SHIMMER1 bounded wind sway: scatter root 28233 to 28480 B gzip (ceiling 29335), velocity 3319 to 3871 B (ceiling 4127), settings 2444 to 2448 B (ceiling 2704). Every scatter pose gains the beam shape, the length correction and the damped gust response in WGSL, and the velocity entry poses twice; the maths is shared by every pass, so a split would duplicate it. Core plus stage unchanged.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15248,7 +15254,7 @@
     "@margoengine/save/scene-state": 1267,
     "@margoengine/save/signed": 2837,
     "@margoengine/save/slots": 6151,
-    "@margoengine/scatter": 28233,
+    "@margoengine/scatter": 29335,
     "@margoengine/scatter/attributes": 2319,
     "@margoengine/scatter/grass": 2855,
     "@margoengine/scatter/imposter": 2968,
@@ -15258,13 +15264,13 @@
     "@margoengine/scatter/pick": 3793,
     "@margoengine/scatter/plant-motion": 2454,
     "@margoengine/scatter/read": 3155,
-    "@margoengine/scatter/settings": 2444,
+    "@margoengine/scatter/settings": 2704,
     "@margoengine/scatter/simplify": 1643,
     "@margoengine/scatter/states": 8223,
     "@margoengine/scatter/surface": 1515,
     "@margoengine/scatter/textured": 1719,
     "@margoengine/scatter/tiles": 3606,
-    "@margoengine/scatter/velocity": 3319,
+    "@margoengine/scatter/velocity": 4127,
     "@margoengine/scene": 1974,
     "@margoengine/scene/asset-pools": 7796,
     "@margoengine/scene/assets": 4274,

@@ -29,7 +29,8 @@ export interface PlantMotionOptions {
   readonly states?: PlantStateSource;
 }
 
-const BEND = 'let bend=windBend(world.y-position.y,position.xz,wind);world+=vec3f(bend.x,0,bend.y);';
+const BEND =
+  'let bend=windBend(world.y-position.y,position.xz,wind,vec4f(sway.x*position.w,sway.yzw));world+=vec3f(bend.x,-bend.w,bend.y);';
 const NORMAL = 'windNormal(scatterTurn(n,c,s,up),bend,wind)';
 const STRIDE = 13;
 const RECORD = 8;
@@ -160,8 +161,8 @@ export class PlantMotion implements ScatterStateSource, Disposable {
         plantDelta=plantShape(plant,world.y-position.y);
       }
       let activeWind=select(wind,vec4f(0.0),plantIndex>=0);
-      let bend=windBend(world.y-position.y,position.xz,activeWind);
-      world+=vec3f(bend.x+plantDelta.x,0.0,bend.y+plantDelta.y);`,
+      let bend=windBend(world.y-position.y,position.xz,activeWind,vec4f(sway.x*position.w,sway.yzw));
+      world+=vec3f(bend.x+plantDelta.x,-bend.w,bend.y+plantDelta.y);`,
         )
         .replace(NORMAL, 'plantNormal(windNormal(scatterTurn(n,c,s,up),bend,activeWind),plantDelta.zw)')
     );

@@ -21,7 +21,9 @@ window.check={async show({reference=false,samples=1,edited=false,restore=false,c
  engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));engine.onError=e=>errors.push(String(e));engine.lighting.direction.set([-1,1,0.3,3]);
  engine.createMesh().setGeometry(box(8,0.05,8)).setMaterial(new PbrMaterial({color:'#999999',roughness:1})).setPosition([0,-0.25,0]);
  const colours=edited?[[0.15,0.8,0.2],[0.7,0.3,0.15]]:[[0.6,0.25,0.2],[0.2,0.4,0.8]],offsets=edited?[[0,0.3,0],[0,0.15,0]]:[[0,0,0],[0,0,0]],wet=edited?[0.5,0.25]:[0,0];
- const make=(x,v=vertices,color=[1,1,1])=>({name:'teapot',vertices:v,indices:shape.indices,transforms:new Float32Array(matrix(x)),material:new PbrMaterial({color,roughness:0.7,doubleSided:true}),wind:[1,0,0.06],windDetail:0.1,translucency:0.2});
+ // The plant's top is the unmoved mesh's in both: the reference's moved copies are the same plant (KB-LOOK-TV-SHIMMER1).
+ let top=0;for(let k=1;k<vertices.length;k+=20)top=Math.max(top,vertices[k]);
+ const make=(x,v=vertices,color=[1,1,1])=>({name:'teapot',vertices:v,indices:shape.indices,transforms:new Float32Array(matrix(x)),material:new PbrMaterial({color,roughness:0.7,doubleSided:true}),wind:[1,0,0.06],windDetail:0.1,translucency:0.2,sway:{height:top}});
  if(reference){scatter=ScatterInstances.attach(engine,()=>colours.map((color,i)=>{const v=vertices.slice();if(custom)for(let k=0;k<v.length;k+=20)for(let j=0;j<3;j++)v[k+j]+=offsets[i][j];return make(i===0?-0.65:0.65,v,[color[0],color[1]*(custom?1-wet[i]:1),color[2]]);}));}
  else{
   const generate=()=>{const b=make(0);b.transforms=new Float32Array([...matrix(-0.65),...matrix(0.65)]);return multi?[make(-0.65),make(0.65)]:[b];};

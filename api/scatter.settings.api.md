@@ -39,6 +39,10 @@ export interface ScatterSettingTarget {
     density: number;
     color: readonly [number, number, number];
     wind: readonly [number, number, number] | readonly [number, number, number, number] | undefined;
+    sway: {
+        readonly stiffness?: number;
+        readonly height?: number;
+    } | undefined;
     rootShade: number;
     widen: number;
     translucencyAmount: number;

@@ -113,6 +113,7 @@ export async function readScatter(
   // This frame's values, copied before the wait: a frame drawn meanwhile must not change the pose.
   const values = parts.values.slice(),
     windBefore = parts.windBefore.slice(),
+    swayBefore = parts.swayBefore.slice(),
     { instances, commands } = parts.cull,
     sizes = instances.map((b) => b.size),
     total = 64 + sizes.reduce((a, b) => a + b, 0),
@@ -160,7 +161,7 @@ export async function readScatter(
       const slots = kept[ring],
         geometry = rings[ring].geometry;
       if (!slots.length || !geometry.indices.length) continue;
-      const posed = await poseRing(device, parts, values, windBefore, ring, slots, geometry, signal);
+      const posed = await poseRing(device, parts, values, windBefore, swayBefore, ring, slots, geometry, signal);
       rings[ring] = { ...rings[ring], posed };
     }
   const material = scatter.options.material?.data;
@@ -188,7 +189,7 @@ export const poseKernel = (source: string, pose: (code: string, binding: number)
   pose(
     source +
       `
-struct ReadFrame {eye:vec4f,wind:vec4f,windBefore:vec4f,ground:vec4f,blade:vec4f,counts:vec4u}
+struct ReadFrame {eye:vec4f,wind:vec4f,windBefore:vec4f,ground:vec4f,blade:vec4f,counts:vec4u,sway:vec4f,swayBefore:vec4f}
 struct Instance {position:vec4f,rotation:vec4f}
 @group(0) @binding(0) var<uniform> readFrame:ReadFrame;
 @group(0) @binding(1) var<storage,read> instances:array<Instance>;
@@ -198,8 +199,8 @@ struct Instance {position:vec4f,rotation:vec4f}
  let f=readFrame;let vertices=f.counts.y;let i=id.x+id.y*${ROW * GROUP}u;if(i>=f.counts.x*vertices){return;}
  let data=instances[f.counts.w+i/vertices];let m=(i%vertices)*f.counts.z;
  let p=vec3f(readMesh[m],readMesh[m+1u],readMesh[m+2u]);let n=vec3f(readMesh[m+3u],readMesh[m+4u],readMesh[m+5u]);
- let now=scatterPose(p,n,data.position,data.rotation,f.ground,f.blade,f.eye.xyz,f.wind,f.eye.w);
- let then=scatterPose(p,n,data.position,data.rotation,f.ground,f.blade,f.eye.xyz,f.windBefore,f.eye.w).world;
+ let now=scatterPose(p,n,data.position,data.rotation,f.ground,f.blade,f.eye.xyz,f.wind,f.eye.w,f.sway);
+ let then=scatterPose(p,n,data.position,data.rotation,f.ground,f.blade,f.eye.xyz,f.windBefore,f.eye.w,f.swayBefore).world;
  let normal=select(vec3f(0,1,0),normalize(now.normal),dot(now.normal,now.normal)>1e-30);let o=i*${POSED}u;
  readPosed[o]=now.world.x;readPosed[o+1u]=now.world.y;readPosed[o+2u]=now.world.z;
  readPosed[o+3u]=normal.x;readPosed[o+4u]=normal.y;readPosed[o+5u]=normal.z;
@@ -209,12 +210,18 @@ struct Instance {position:vec4f,rotation:vec4f}
   );
 
 /**
- * The kernel's frame uniform (96 bytes): eye with no pixel floor, the wind now and before, the ground fit, the blades
- * with no widening, then the counts (instances, vertices, floats a vertex, first slot), from the colour pass's frame
- * values (eye 16-18, wind 68-71, ground fit 72-75, blades 76-79).
+ * The kernel's frame uniform (128 bytes): eye with no pixel floor, the wind now and before, the ground fit, the blades
+ * with no widening, the counts (instances, vertices, floats a vertex, first slot), then the sway now and before, from
+ * the colour pass's frame values (eye 16-18, wind 68-71, ground fit 72-75, blades 76-79, sway 84-87). `swayBefore`
+ * defaults to the sway now.
  */
-export function poseFrame(values: ArrayLike<number>, windBefore: ArrayLike<number>, vertices: number): ArrayBuffer {
-  const frame = new ArrayBuffer(96),
+export function poseFrame(
+  values: ArrayLike<number>,
+  windBefore: ArrayLike<number>,
+  vertices: number,
+  swayBefore: ArrayLike<number> = [values[84], values[85], values[86], values[87]],
+): ArrayBuffer {
+  const frame = new ArrayBuffer(128),
     f = new Float32Array(frame),
     u = new Uint32Array(frame);
   for (let i = 0; i < 3; i++) f[i] = values[16 + i];
@@ -223,6 +230,8 @@ export function poseFrame(values: ArrayLike<number>, windBefore: ArrayLike<numbe
     f[8 + i] = windBefore[i];
     f[12 + i] = values[72 + i];
     f[16 + i] = values[76 + i];
+    f[24 + i] = values[84 + i];
+    f[28 + i] = swayBefore[i];
   }
   f[3] = 0; // the pixel footprint: no floor, blades at their true width
   f[17] = 0; // blade.y, widen / far: no widening with distance
@@ -239,6 +248,7 @@ async function poseRing(
   parts: ScatterVelocityParts,
   values: Float32Array,
   windBefore: Float32Array,
+  swayBefore: Float32Array,
   ring: number,
   slots: readonly number[],
   geometry: Geometry,
@@ -275,13 +285,13 @@ async function poseRing(
         Math.floor((ROW * GROUP * device.limits.maxComputeWorkgroupsPerDimension) / vertices),
       ),
     ),
-    frame = poseFrame(values, windBefore, vertices),
+    frame = poseFrame(values, windBefore, vertices, swayBefore),
     counts = new Uint32Array(frame),
     mesh = device.createBuffer({
       size: Math.max(16, geometry.vertices.byteLength),
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     }),
-    uniform = device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
+    uniform = device.createBuffer({ size: 128, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }),
     out = device.createBuffer({
       size: chunk * bytesPerInstance,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,

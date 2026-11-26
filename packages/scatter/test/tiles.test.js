@@ -12,9 +12,10 @@ import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 const sha = (s) => createHash('sha256').update(s).digest('hex');
 // SHA-256 of the distribute shader with no world-rectangle option: main at 0765a2c1, plus the pixel footprint slot that
 // joined the frame for the grass pixel floor (KB-SCATTER-SUBPIXEL1).
-const ORIGINAL = '6abe44ec2a5dfb535e4243ccafb105868338e0aae336e35e1e2aa7bf0544073f';
+// KB-LOOK-TV-SHIMMER1: the frame gained its sway vec4 (84-87); with ',sway:vec4f' removed both texts hash as before.
+const ORIGINAL = 'cda1c8afb4e12d6dddcbc4bf53ee897e10d043264e439601ac182c39226fac93';
 // SHA-256 of the kernel WebGPU compiles from it: the candidate kernel of the ordered cull (src/order.ts), no atomics.
-const ORDERED = 'f54ee0bcf10466b0019c6b3c5398a343c154ec85536869de8ff41dffc851b00e';
+const ORDERED = '88ee896960fe818ef0a0424e47d19ee5f04e1d2c3a323dd04672dfb468d1778b';
 
 test('off path: without bounds, densityMap and follow the distribute shader and frame are as before', () => {
   assert.equal(sha(scatterCullShader({})), ORIGINAL);
@@ -26,9 +27,9 @@ test('off path: without bounds, densityMap and follow the distribute shader and 
   assert.equal(sha(code), ORDERED);
   assert.doesNotMatch(code, /atomic/);
   assert.equal(
-    h.resources.filter((r) => r.size === 336).length >= 1,
+    h.resources.filter((r) => r.size === 352).length >= 1,
     true,
-    'an 84-float frame (80 before the pixel footprint)',
+    'an 88-float frame (the pixel footprint at 80, the sway at 84)',
   );
   effect.dispose();
 });
@@ -48,9 +49,9 @@ test('inner: only its own shader part, on an extended frame, and off at 0', () =
   h.engine.use(effect);
   h.frame();
   assert.equal(
-    h.resources.filter((r) => r.size === 368).length >= 1,
+    h.resources.filter((r) => r.size === 384).length >= 1,
     true,
-    'a 92-float frame (the pixel footprint before the follow offsets and bounds)',
+    'a 96-float frame (the pixel footprint and sway before the follow offsets and bounds)',
   );
   effect.dispose();
   for (const bad of [{ inner: -1 }, { inner: 120 }, { inner: Number.NaN }, { inner: 10, innerFade: -1 }])
@@ -83,7 +84,7 @@ test('follow moves the grid in whole cells and keys each instance by its world c
   h.frame();
   const values = effect.values;
   // 10 x 10 grid of 1 m cells around the camera: offset is the camera cell minus 5, centre on a cell corner.
-  assert.deepEqual([values[84], values[85]], [18, -13]);
+  assert.deepEqual([values[88], values[89]], [18, -13]);
   assert.deepEqual([values[22], values[23]], [23, -8]);
   effect.dispose();
 });
@@ -119,7 +120,11 @@ test('ScatterTiles packs held records, filters a palette index, frees tiles and 
   h.frame();
   const code = h.pipelines.find((p) => p.compute).compute.module.code;
   // The candidate kernel of the tiles shader: the rings' capacities bound the compaction, not an atomic slot.
-  assert.equal(sha(code), '484f90f3c399f74c050a2244f46ac590b50d02820f580412fd56da662288ac86');
+  assert.equal(sha(code), '579d9da6a43cc7c405a20c4ecbe5bc102bacb5ded2e9e73dafabe2ebf434174b');
+  assert.equal(
+    sha(code.replace(',sway:vec4f', '')),
+    '484f90f3c399f74c050a2244f46ac590b50d02820f580412fd56da662288ac86',
+  );
   assert.match(code, /var<storage,read> records:array<vec2u>/);
   assert.doesNotMatch(code, /atomic/);
   assert.doesNotMatch(tilesCullShader(), /atomicSub/);

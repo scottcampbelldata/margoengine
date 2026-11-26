@@ -206,8 +206,9 @@ weather's wind): the cull reach doubles for it from the next frame, as for a win
 A fourth number, the mean wind speed in m/s at 10 m, makes plants thrash with the Beaufort force: `wind: [x, z, strength,
 speed]`. Up to 5.4 m/s (the top of Beaufort 3, gentle breeze) the plants keep their own sway; past it the sway and leaf
 flutter run `speed / 5.4` times as fast (`windClockRate(speed)`: 2 in a force 6 strong breeze, 3.2 in a force 8 gale,
-6.1 at hurricane force), because the gusts a canopy feels come at a frequency in proportion to the mean speed. The
-strength still sets how far they bend. `scatter.windTime` is the clock the shaders read (it equals `time` with no speed
+6.1 at hurricane force), because the gusts a canopy feels come at a frequency in proportion to the mean speed. A plant
+follows those gusts only as fast as its own sway lets it (below), so grass thrashes with them while a tree keeps its own
+slow sway. The strength still sets how far they bend. `scatter.windTime` is the clock the shaders read (it equals `time` with no speed
 or a light one); `WeatherDrive` of `@margoengine/weather/drive` writes the speed with the strength, so a storm's grass
 and trees thrash by themselves:
 
@@ -219,6 +220,29 @@ const engine = await Engine.create(document.querySelector('canvas')!);
 // A force 8 gale (17.2 m/s) from the west: full bend, sway 3.2 times as fast as in a breeze.
 const grass = Scatter.attach(engine, box(0.05, 0.6, 0.05), { count: 20000, area: [30, 30], material: new PbrMaterial({ color: [0.2, 0.4, 0.1] }), wind: [1, 0, 1, 17.2] });
 console.log(windClockRate(17.2), grass.wind);
+engine.start();
+```
+
+How far a plant sways depends on its own height H (its mesh top times the instance's scale): its top moves at most
+strength x `swayTip(H)` = H^2 / (1 + H + H^2 / reach), never more than 0.354 H, with reach = 1.2 m / `sway.stiffness`.
+A 0.3 m blade bends 0.066 m as before; a 5 m sapling's top moves up to 0.93 m and a 25 m conifer's up to 1.14 m (it moved
+24 m before KB-LOOK-TV-SHIMMER1). The stem bows as a tapered beam (0.74 x^2 + 0.26 x^4 of the tip offset at a fraction
+x of its height) and sinks a little so it keeps its length. Each plant is a damped oscillator at its own frequency
+`swayFrequency(H)` = 2.55 H^-0.59 Hz (0.38 Hz for 25 m, 5.2 Hz for a 0.3 m blade): gusts faster than that pass to it
+weakly and the rest of its sway runs at its own frequency on the real clock, so a 25 m tree's top moves at most about
+2.3 m/s in a 20 m/s gale. `sway: { stiffness, height }` (stiffness 0.1 to 10, default 1; height in mesh units, default
+the meshes' top) sets it on `ScatterOptions` and `ScatterBatch`; `scatter.sway` is live and the `wind.stiffness`
+settings row writes it. A `ScatterTiles` mesh that shares another (a canopy over its trunk) sways with the larger top.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { Scatter, swayFrequency, swayTip } from '@margoengine/scatter';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+// 25 m conifers (a 1 m box scaled 25 times would do the same): the tops sway about a metre at 0.38 Hz in a gale.
+const forest = Scatter.attach(engine, box(1, 50, 1), { count: 400, area: [200, 200], wind: [1, 0, 1, 20] });
+forest.sway = { stiffness: 1.5 }; // stiffer trunks: the reach is 0.8 m
+console.log(swayTip(25, 1.5), swayFrequency(25), forest.sway);
 engine.start();
 ```
 
@@ -262,7 +286,7 @@ intended ambient-only effect. The factory runs at initialization and device rest
 Geometry and transforms are uploaded and not retained on the JavaScript heap;
 the factory must regenerate them instead of closing over large arrays. Each
 material batch uses one indexed indirect draw, including in every shadow cascade.
-The internal instance stream is 128 bytes, including HDR emission and wind data.
+The internal instance stream is 144 bytes, including HDR emission, wind and sway data.
 This fixed path renders all instances; use the existing GPU LOD path for large
 distance-culled populations. The gameplay sandbox demonstrates both paths.
 

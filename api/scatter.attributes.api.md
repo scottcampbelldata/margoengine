@@ -41,6 +41,7 @@ interface ScatterBatch {
     emissive?: readonly [number, number, number];
     wind?: ScatterWind;
     windDetail?: number;
+    sway?: ScatterSway;
     translucency?: number;
 }
 
@@ -80,6 +81,11 @@ class ScatterInstances implements EnginePlugin {
 type ScatterPassContext = Extract<PassContext, {
     backend: 'webgpu';
 }>;
+
+interface ScatterSway {
+    stiffness?: number;
+    height?: number;
+}
 
 type ScatterWind = readonly [number, number, number] | readonly [number, number, number, number];
 ```

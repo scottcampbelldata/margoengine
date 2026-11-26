@@ -150,7 +150,7 @@ export class ScatterRoute {
   private plainPipeline?: GPURenderPipeline;
   private readonly uniforms: GPUBuffer[] = [];
   private readonly groups = new Map<string, GPUBindGroup>();
-  private readonly shadowValues = new Float32Array(32);
+  private readonly shadowValues = new Float32Array(36);
   constructor(private readonly host: RouteHost) {
     const d = (this.device = host.device),
       n = host.count,
@@ -291,12 +291,13 @@ export class ScatterRoute {
             d,
             countedVertex(h.shadowCode, 'let data=instances[index];', 0, 3, noPosition),
           ));
-    const uniform = (this.uniforms[cascade] ??= this.make(128, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST));
+    const uniform = (this.uniforms[cascade] ??= this.make(144, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST));
     const v = this.shadowValues;
     v.set(matrix);
     v.set(h.values.subarray(16, 20), 16);
     v.set(h.values.subarray(68, 80), 20);
     v[19] = h.values[80]; // eye.w: the camera's pixel footprint
+    v.set(h.values.subarray(84, 88), 32); // the sway
     d.queue.writeBuffer(uniform, 0, v as Float32Array<ArrayBuffer>);
     pass.setPipeline(p);
     for (let ring = 0; ring < RINGS; ring++) {

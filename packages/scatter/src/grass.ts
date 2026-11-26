@@ -199,11 +199,11 @@ ${
  let normal=normalize(cross(right,tangent));
  return GrassVertex(at,normalize(normal+right*(side*${f(s.round)})));
 }
-fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:vec4f,eye:vec3f,wind:vec4f,pixel:f32)->ScatterPose {
+fn scatterPose(p:vec3f,n:vec3f,position:vec4f,rotation:vec4f,ground:vec4f,blade:vec4f,eye:vec3f,wind:vec4f,pixel:f32,sway:vec4f)->ScatterPose {
  let d=distance(position.xyz,eye);let wide=1.0+d*blade.y;let c=cos(rotation.x);let s=sin(rotation.x);
  let look=(position.xyz-eye)/max(d,1e-6);let view=vec3f(c*look.x-s*look.z,look.y,s*look.x+c*look.z);
  let g=grassVertex(p,position,wide,d*pixel/(wide*position.w),view);
- return scatterPoseBase(g.p,g.n,position,rotation,ground,blade,eye,wind,pixel);
+ return scatterPoseBase(g.p,g.n,position,rotation,ground,blade,eye,wind,pixel,sway);
 }
 `
   );

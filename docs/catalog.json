@@ -2095,6 +2095,7 @@
     "imports": "import { PlacementLayout } from '@margoengine/scatter';",
     "exports": [
       "PlacementLayout",
+      "SWAY_REACH",
       "Scatter",
       "ScatterInstances",
       "WIND_THRASH_FROM",
@@ -2109,6 +2110,8 @@
       "scatterCullShader",
       "spacePlacements",
       "splitDeclaration",
+      "swayFrequency",
+      "swayTip",
       "windClockRate"
     ],
     "category": "World and effects"

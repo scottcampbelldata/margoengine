@@ -54,6 +54,7 @@ class Scatter implements EnginePlugin {
     protected readonly geometries: readonly Geometry[];
     get disposed(): boolean;
     readonly count: number;
+    protected meshTop: number;
     protected terrain?: GPUTexture;
     protected computeGroup?: GPUBindGroup;
     readonly options: ScatterOptions;
@@ -61,6 +62,7 @@ class Scatter implements EnginePlugin {
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
     protected applyReach(): void;
+    protected applySway(): void;
     protected reachChanged(): void;
     get density(): number;
     set density(value: number);
@@ -68,6 +70,8 @@ class Scatter implements EnginePlugin {
     set color(value: readonly [number, number, number]);
     get wind(): ScatterWind | undefined;
     set wind(value: ScatterWind | undefined);
+    get sway(): ScatterSway | undefined;
+    set sway(value: ScatterSway | undefined);
     get rootShade(): number;
     set rootShade(value: number);
     get widen(): number;
@@ -164,6 +168,7 @@ interface ScatterOptions {
     paths?: readonly GroundPath[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;
+    sway?: ScatterSway;
     alignToGround?: number;
     sink?: number;
     edgeShrink?: number;
@@ -193,6 +198,11 @@ interface ScatterStateSource {
     }): void;
 }
 
+interface ScatterSway {
+    stiffness?: number;
+    height?: number;
+}
+
 interface ScatterTextures {
     readonly uvs: ArrayLike<number> | readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>];
     readonly baseColor?: ScatterImage;
@@ -209,6 +219,7 @@ interface ScatterVariation {
 interface ScatterVelocityParts {
     readonly values: Float32Array;
     readonly windBefore: Float32Array;
+    readonly swayBefore: Float32Array;
     readonly poseSource: string;
     readonly instances: readonly GPUBuffer[];
     readonly commands: GPUBuffer;

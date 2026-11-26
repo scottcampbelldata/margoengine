@@ -25,6 +25,8 @@ export class PlacementLayout {
     place(candidates: readonly GroundPlacement[], radius: number): GroundPlacement[];
 }
 
+export const SWAY_REACH = 1.2;
+
 export class Scatter implements EnginePlugin {
     readonly name: string;
     protected engine?: Engine;
@@ -39,6 +41,7 @@ export class Scatter implements EnginePlugin {
     protected readonly geometries: readonly Geometry[];
     get disposed(): boolean;
     readonly count: number;
+    protected meshTop: number;
     protected terrain?: GPUTexture;
     protected computeGroup?: GPUBindGroup;
     readonly options: ScatterOptions;
@@ -46,6 +49,7 @@ export class Scatter implements EnginePlugin {
     static attach(engine: EngineKernel, geometry: Geometry | readonly [Geometry, Geometry, Geometry], options?: ScatterOptions): Scatter;
     setup(engine: Engine): void;
     protected applyReach(): void;
+    protected applySway(): void;
     protected reachChanged(): void;
     get density(): number;
     set density(value: number);
@@ -53,6 +57,8 @@ export class Scatter implements EnginePlugin {
     set color(value: readonly [number, number, number]);
     get wind(): ScatterWind | undefined;
     set wind(value: ScatterWind | undefined);
+    get sway(): ScatterSway | undefined;
+    set sway(value: ScatterSway | undefined);
     get rootShade(): number;
     set rootShade(value: number);
     get widen(): number;
@@ -121,6 +127,7 @@ export interface ScatterBatch {
     emissive?: readonly [number, number, number];
     wind?: ScatterWind;
     windDetail?: number;
+    sway?: ScatterSway;
     translucency?: number;
 }
 
@@ -194,6 +201,7 @@ export interface ScatterOptions {
     paths?: readonly GroundPath[];
     heightmap?: () => GPUTexture | undefined;
     wind?: ScatterWind;
+    sway?: ScatterSway;
     alignToGround?: number;
     sink?: number;
     edgeShrink?: number;
@@ -219,6 +227,11 @@ export interface ScatterStateSource {
     }): void;
 }
 
+export interface ScatterSway {
+    stiffness?: number;
+    height?: number;
+}
+
 export interface ScatterTextures {
     readonly uvs: ArrayLike<number> | readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>];
     readonly baseColor?: ScatterImage;
@@ -235,6 +248,7 @@ export interface ScatterVariation {
 export interface ScatterVelocityParts {
     readonly values: Float32Array;
     readonly windBefore: Float32Array;
+    readonly swayBefore: Float32Array;
     readonly poseSource: string;
     readonly instances: readonly GPUBuffer[];
     readonly commands: GPUBuffer;
@@ -284,6 +298,10 @@ export function scatterCullShader(o: ScatterOptions): string;
 export function spacePlacements(candidates: readonly GroundPlacement[], radius: number, gap?: number): GroundPlacement[];
 
 export const splitDeclaration = "const scatterSplit=true;\n";
+
+export function swayFrequency(height: number): number;
+
+export function swayTip(height: number, stiffness?: number): number;
 
 export function windClockRate(speed: number): number;
 

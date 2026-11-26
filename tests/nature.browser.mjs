@@ -5,7 +5,10 @@ import { windShader } from '../packages/scatter/src/wind.ts';
 import { clouds } from '../packages/sky/src/clouds.ts';
 import { celestialShader } from '../packages/sky/src/celestial.ts';
 import { head as atmosphere } from '../packages/sky/src/atmosphere.ts';
-const cloudShader = clouds.wgsl;
+// The cloud stage calls the base sky's daySky for its overcast deck's clear-sky level (clearSkyLevel). The probe frame
+// has no deck (moonColor.w 0), so overcastLight returns before it; this stands in so the probe compiles, as the sky's
+// own shader always provides daySky. Without it every probe in this file stopped at a WGSL compile error.
+const cloudShader = clouds.wgsl + '\nfn daySky(direction:vec3f)->vec3f {return vec3f(0);}\n';
 import { wgsl } from '../packages/core/src/shaders.ts';
 import { ScatterInstances } from '../packages/scatter/dist/index.js';
 import { PbrMaterial } from '../packages/core/dist/index.js';
@@ -100,11 +103,12 @@ try {
    @group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
    @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){
     if(id.x>=8u){return;}let height=select(0.0,4.0,id.x>0u);let time=select(0.0,1.0,id.x==2u);let root=select(vec2f(0),vec2f(11,7),id.x==3u);
-    let wind=vec4f(settings.xyz,time);let bend=windBend(height,root,wind);var value=vec4f(bend,1);
-    if(id.x==4u){let derivative=(windBend(4.001,vec2f(0),vec4f(settings.xyz,1)).xy-windBend(3.999,vec2f(0),vec4f(settings.xyz,1)).xy)/0.002;value=vec4f(derivative,0,1);}
-    if(id.x==5u){let b=windBend(4.0,vec2f(0),vec4f(settings.xyz,1));let n=windNormal(vec3f(1,0,0),b,vec4f(settings.xyz,1));value=vec4f(n,1);}
-    if(id.x==6u){value=vec4f(windBend(4.0,vec2f(0),vec4f(0,0,0,1)),1);}
-    if(id.x==7u){value=vec4f(windBend(4.0,vec2f(0),vec4f(settings.xyz,1)),1);}
+    let sway=vec4f(6.0,1.2,time,1.0);let one=vec4f(6.0,1.2,1.0,1.0);
+    let wind=vec4f(settings.xyz,time);let bend=windBend(height,root,wind,sway);var value=bend;
+    if(id.x==4u){let a=windBend(4.001,vec2f(0),vec4f(settings.xyz,1),one);let b=windBend(3.999,vec2f(0),vec4f(settings.xyz,1),one);value=vec4f((a.xy-b.xy)/0.002,1.0-(a.w-b.w)/0.002,1);}
+    if(id.x==5u){let b=windBend(4.0,vec2f(0),vec4f(settings.xyz,1),one);let n=windNormal(vec3f(1,0,0),b,vec4f(settings.xyz,1));value=vec4f(n,1);}
+    if(id.x==6u){value=windBend(4.0,vec2f(0),vec4f(0,0,0,1),one);}
+    if(id.x==7u){value=windBend(4.0,vec2f(0),vec4f(settings.xyz,1),one);}
     result[id.x]=value;
    }`,
         new Float32Array([1, 0.35, 0.1, 0]),
@@ -114,14 +118,15 @@ try {
         windShader +
           `
    @group(0) @binding(0) var<uniform> settings:vec4f;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
-   fn displaced(p:vec3f)->vec3f{let b=windDeformation(p,vec3f(0),settings,1.0);return p+vec3f(b.offset.x,0,b.offset.y);}
-   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=8u){return;}let p=vec3f(1,4,2);var b=windDeformation(p,vec3f(0),settings,1.0);var value=vec4f(b.offset,b.gradient.y,1);
-    if(id.x==0u){b=windDeformation(vec3f(0),vec3f(0),settings,1.0);value=vec4f(b.offset,b.gradient.y,1);}
-    if(id.x==2u){b=windDeformation(p,vec3f(0),settings,0.0);value=vec4f(b.offset,b.gradient.y,1);}
+   const sway=vec4f(6.0,1.2,1.0,1.0);
+   fn displaced(p:vec3f)->vec3f{let b=windDeformation(p,vec3f(0),settings,1.0,sway);return p+vec3f(b.offset.x,-b.drop.x,b.offset.y);}
+   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=8u){return;}let p=vec3f(1,4,2);var b=windDeformation(p,vec3f(0),settings,1.0,sway);var value=vec4f(b.offset,b.gradient.y,1);
+    if(id.x==0u){b=windDeformation(vec3f(0),vec3f(0),settings,1.0,sway);value=vec4f(b.offset,b.gradient.y,1);}
+    if(id.x==2u){b=windDeformation(p,vec3f(0),settings,0.0,sway);value=vec4f(b.offset,b.gradient.y,1);}
     if(id.x==3u){value=vec4f(windDetailNormal(vec3f(1,0,0),b,settings),1);}
     if(id.x==4u){value=vec4f((displaced(p+vec3f(0,0.001,0))-displaced(p-vec3f(0,0.001,0)))/0.002,1);}
     if(id.x==5u){value=vec4f((displaced(p+vec3f(0,0,0.001))-displaced(p-vec3f(0,0,0.001)))/0.002,1);}
-    if(id.x==6u){b=windDeformation(p,vec3f(0),vec4f(0,0,0,settings.w),1.0);value=vec4f(b.offset,b.gradient.y,1);}
+    if(id.x==6u){b=windDeformation(p,vec3f(0),vec4f(0,0,0,settings.w),1.0,sway);value=vec4f(b.offset,b.gradient.y,1);}
     if(id.x==7u){value=vec4f(b.gradient,1);}
     result[id.x]=value;}`,
         new Float32Array([1, 0.35, 0.1, 1]),
@@ -131,9 +136,9 @@ try {
         windShader +
           `
    @group(0) @binding(0) var<uniform> settings:vec4f;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;
-   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=256u){return;}let angle=f32(id.x)*2.399963;let r=f32(id.x%16u)*0.3;let h=f32(id.x%9u);let wind=vec4f(settings.xyz,f32(id.x)*0.31);let b=windDeformation(vec3f(sin(angle)*r,h,cos(angle)*r),vec3f(0),wind,1.0);let direction=vec3f(wind.x,0,wind.y)/length(wind.xy);result[id.x]=vec4f(length(b.offset),h,1.0+dot(b.gradient,direction),1);}`,
+   @compute @workgroup_size(64) fn probe(@builtin(global_invocation_id) id:vec3u){if(id.x>=1024u){return;}let angle=f32(id.x)*2.399963;let r=f32(id.x%16u)*0.3;let top=f32(id.x%41u)*2.5;let h=top*f32(id.x%5u)*0.25+f32(id.x%3u)*0.4;let t=f32(id.x)*0.31;let wind=vec4f(settings.xyz,t*3.7);let sway=vec4f(top,1.2,t,3.7);let b=windDeformation(vec3f(sin(angle)*r,h,cos(angle)*r),vec3f(0),wind,1.0,sway);let direction=vec3f(wind.x,0,wind.y)/length(wind.xy);result[id.x]=vec4f(length(b.offset),top,1.0+dot(b.gradient,direction),length(windBend(h,vec2f(0),wind,sway).xy));}`,
         new Float32Array([1, 0.35, 1, 0]),
-        256,
+        1024,
       );
       // The fragment entry's parameter is i, or varyings once positiveColor clamps the colour (scatter instances.ts).
       const fragmentEntry =
@@ -263,10 +268,11 @@ try {
   assert.notDeepEqual(result.wind.slice(4, 7), result.wind.slice(8, 11));
   assert.notDeepEqual(result.wind.slice(4, 7), result.wind.slice(12, 15));
   assert.deepEqual(result.wind.slice(24, 27), [0, 0, 0]);
-  const derivative = result.wind.slice(16, 18),
+  // The tangent up the bowed stem: the offsets' derivatives and 1 less the length correction's drop (KB-LOOK-TV-SHIMMER1).
+  const derivative = result.wind.slice(16, 19),
     normal = result.wind.slice(20, 23);
   assert.ok(
-    Math.abs(normal[0] * derivative[0] + normal[1] + normal[2] * derivative[1]) < 0.0001,
+    Math.abs(normal[0] * derivative[0] + normal[1] * derivative[2] + normal[2] * derivative[1]) < 0.0001,
     'Wind normals disagree with the deformed tangent',
   );
   assert.deepEqual(result.detail.slice(0, 3), [0, 0, 0]);
@@ -277,8 +283,12 @@ try {
       Math.abs(result.detail.slice(12, 15).reduce((sum, n, k) => sum + n * result.detail[tangent + k], 0)) < 0.0003,
       'Detail normals disagree with the deformed surface',
     );
+  // A plant H tall moves at most min(0.354 H, reach) x strength under the rooted wind, and the ripple at most half that
+  // again (KB-LOOK-TV-SHIMMER1: before, the offset was bounded only by the vertex's height, 24 m for a 25 m tree).
   for (let i = 0; i < result.bounds.length; i += 4) {
-    assert.ok(result.bounds[i] <= result.bounds[i + 1] + 1e-6, 'Wind exceeded its conservative bound');
+    const bound = Math.min(0.3541 * result.bounds[i + 1], 1.2);
+    assert.ok(result.bounds[i + 3] <= bound + 1e-5, 'Wind exceeded its bound');
+    assert.ok(result.bounds[i] <= 1.5 * bound + 1e-5, 'Wind detail exceeded its bound');
     assert.ok(result.bounds[i + 2] > 0.15, 'Detail deformation folded');
   }
   assert.deepEqual(result.directAO.slice(0, 3), result.directAO.slice(4, 7), 'AO darkened direct lighting');

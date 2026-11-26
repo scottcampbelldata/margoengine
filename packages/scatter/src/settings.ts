@@ -33,6 +33,7 @@ export interface ScatterSettingTarget {
   density: number;
   color: readonly [number, number, number];
   wind: readonly [number, number, number] | readonly [number, number, number, number] | undefined;
+  sway: { readonly stiffness?: number; readonly height?: number } | undefined;
   /** Needs a Scatter built with `blades`. */
   rootShade: number;
   /** Need a Scatter built with `blades`. */
@@ -106,6 +107,16 @@ export const SCATTER_SETTINGS: readonly ScatterSetting[] = [
     0.1,
     'm/s',
     'Mean wind at 10 m: from 5.4 m/s (the top of Beaufort 3) the sway and leaf flutter run speed / 5.4 times faster, so a gale (17.2 m/s, force 8) thrashes the plants 3.2 times as fast. 0 keeps their own sway.',
+  ),
+  n(
+    'wind.stiffness',
+    'wind',
+    1,
+    0.1,
+    10,
+    0.1,
+    '',
+    "How stiff the plants are: the most a tall plant's top moves at full strength is 1.2 m / stiffness. Short plants bend as before; a trunk keeps its own sway frequency whatever the stiffness.",
   ),
   n(
     'blades.rootShade',
@@ -206,7 +217,8 @@ export function applyScatterSettings(scatter: ScatterSettingTarget, values: Scat
   const x = v('wind.directionX') as number,
     z = v('wind.directionZ') as number,
     strength = v('wind.strength') as number,
-    speed = v('wind.speed') as number;
+    speed = v('wind.speed') as number,
+    stiffness = v('wind.stiffness') as number;
   if (strength > 0 && !Math.hypot(x, z))
     throw new RangeError(
       'Invalid scatter setting wind.directionX; use a direction other than 0 and 0 while wind.strength is above 0',
@@ -236,6 +248,7 @@ export function applyScatterSettings(scatter: ScatterSettingTarget, values: Scat
   scatter.density = v('scatter.density') as number;
   scatter.color = v('scatter.color') as ScatterSettingColor;
   scatter.wind = strength > 0 ? (speed > 0 ? [x, z, strength, speed] : [x, z, strength]) : undefined;
+  scatter.sway = { ...scatter.sway, stiffness };
   if (bladed) {
     scatter.rootShade = shade;
     scatter.widen = widen;
