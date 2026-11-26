@@ -72,6 +72,13 @@ export class CrushSolver implements Solver<CrushParams> {
     read(index: number): CrushPatchState;
 }
 
+export interface CrushStrokeResult {
+    readonly force: number;
+    readonly permanentStroke: number;
+    readonly absorbedEnergy: number;
+    readonly elasticEnergy: number;
+}
+
 export interface CrushSupport {
     readonly body?: number;
     readonly point: CrushVector;
@@ -80,7 +87,20 @@ export interface CrushSupport {
 
 export type CrushVector = readonly [number, number, number];
 
+export interface SquareCrushTube {
+    readonly width: number;
+    readonly thickness: number;
+    readonly length: number;
+    readonly young: number;
+    readonly yieldStress: number;
+    readonly tensileStrength: number;
+}
+
 export function resolveCrush(material: CrushMaterial, effectiveMass: number, closingSpeed: number, permanentStroke?: number): CrushResult;
+
+export function resolveCrushStroke(material: CrushMaterial, totalStroke: number, permanentStroke?: number): CrushStrokeResult;
+
+export function squareTubeCrushMaterial(tube: SquareCrushTube): Required<CrushMaterial>;
 
 // Not exported from this entry, but used by the exports above:
 

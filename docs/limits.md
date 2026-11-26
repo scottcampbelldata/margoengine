@@ -9537,6 +9537,12 @@ for sticking and sliding, with a circular limit from the current normal impulse.
 first, and the friction solve includes its change to the velocity at the same contact point. Coupled
 contact evolution is resolved on successive ticks. Distributed panel collapse and flooding remain open.
 
+The short hollow square-tube curve predicts 940.1 J at 100 mm axial compression from geometry and
+independent AA6063-T5 tensile properties. The five measured Yob et al. specimens absorbed 897.4–1048.77 J.
+This is mean progressive folding work for that tube and loading range. Initial peak load, force
+oscillations, global buckling and material rate dependence need higher-fidelity constitutive and geometry
+models. The same envelope transfers work to the tube in a separately tested rigid-sled simulation.
+
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 9257 B minified and 3977 B gzip, with a 4233 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)

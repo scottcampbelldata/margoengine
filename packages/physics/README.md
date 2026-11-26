@@ -4569,6 +4569,24 @@ const result = resolveCrush(curve, 4, 2);
 if (Math.abs(result.absorbedEnergy - 6) > 1e-12) throw new Error('Expected 6 J of permanent work');
 ```
 
+For a short square tube designed to fold under axial compression, `squareTubeCrushMaterial` builds a
+mean load curve from the outer width, thickness, length, Young's modulus, proof stress and ultimate
+tensile strength. Use the returned material in a patch or evaluate it at a displacement with
+`resolveCrushStroke`. The optional prior permanent stroke starts a subsequent load without repeating its
+permanent work. The curve represents the mean folding force over successive folds.
+
+```ts
+import { resolveCrushStroke, squareTubeCrushMaterial } from '@margoengine/physics/crush';
+
+const tube = squareTubeCrushMaterial({
+  width: 0.0381, thickness: 0.00159, length: 0.2032,
+  young: 69e9, yieldStress: 118e6, tensileStrength: 152e6,
+});
+const loaded = resolveCrushStroke(tube, 0.1);
+const energyAt100mm = loaded.absorbedEnergy + loaded.elasticEnergy;
+if (energyAt100mm < 900 || energyAt100mm > 1000) throw new Error('Expected progressive tube folding work');
+```
+
 `CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable

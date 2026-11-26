@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { HullSolver } from '../../dist/seakeeping.js';
-import { CRUSH_LAYOUT, CRUSH_WORDS, CrushSolver, resolveCrush } from '../../dist/crush.js';
+import { CRUSH_LAYOUT, CRUSH_WORDS, CrushSolver, resolveCrush, squareTubeCrushMaterial } from '../../dist/crush.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -25,6 +25,7 @@ function withBodies({
   friction,
   halfA = [0.2, 0.2, 0.2],
   halfB = halfA,
+  curve = material,
 } = {}) {
   const world = new PhysicsWorld({ rate: frameRate, gravity: zero, memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: 1 / 60 });
@@ -47,7 +48,7 @@ function withBodies({
         anchor: [0.2, offset, 0],
         normal: [1, 0, 0],
         radius: 0.12,
-        material,
+        material: curve,
         friction,
         support: { body: other?.row, point: other ? [-0.2, offset, 0] : [-0.2, y + offset, 0] },
       },
@@ -235,6 +236,32 @@ test('a fixed barrier receives the equivalent normal work, with a versioned defo
       damage.sealLoss,
       damage.impacts,
     ]);
+  } finally {
+    physics.dispose();
+  }
+});
+
+test('a rigid sled transfers its energy into hollow-tube collapse predicted from wall and tensile inputs', async () => {
+  const curve = squareTubeCrushMaterial({
+    width: 0.0381,
+    thickness: 0.00159,
+    length: 0.2032,
+    young: 69e9,
+    yieldStress: 118e6,
+    tensileStrength: 152e6,
+  });
+  const speed = 20;
+  const { world, physics, crush, vehicle } = await assemble({ initial: speed, two: false, gap: 0.3, curve });
+  try {
+    world.advance(5);
+    const state = crush.read(0);
+    assert.equal(state.impacts, 1);
+    const workFromSled = 0.5 * 4 * (speed ** 2 - vehicle.linearVelocity[0] ** 2);
+    close(state.absorbedEnergy, workFromSled, 4 * 2 ** -23 * speed ** 2);
+    assert.ok(state.permanentStroke > 0 && state.permanentStroke < curve.stroke);
+    const load = state.absorbedEnergy / state.permanentStroke;
+    // Yob et al. 2016, Table 4 measured mean load across five independent guided square-tube compressions.
+    assert.ok(load > 8970 && load < 10490);
   } finally {
     physics.dispose();
   }

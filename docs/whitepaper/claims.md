@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Square-tube folding work (BREAK-03, 2026-11-26). A curve from tube geometry and tensile properties predicts
+  940.1 J of work over 100 mm. Five independent guided AA6063-T5 compressions absorbed 897.4–1048.77 J.
+  An additional rigid-sled test checks work transfer through the world port. Run
+  `node --test packages/physics/tests/crush.test.js packages/physics/tests/coupling/crush.test.js`.
+  [Reproduce](reproduce.md#break-03-measured-square-tube-compression)
+  [Measurements](https://doi.org/10.5539/mas.v10n1p34)
 - Dry friction at a crush station (BREAK-03, 2026-11-26). Two movable rectangular bodies exchange equal and
   opposite momentum. The sliding impulse saturates the circular friction bound, while a higher coefficient
   brings the relative slip to zero. Both dissipate kinetic energy. A fixed shoe also slows sliding under a

@@ -1,5 +1,17 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 measured square-tube compression
+
+Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run
+`node --test packages/physics/tests/crush.test.js packages/physics/tests/coupling/crush.test.js`.
+The stroke test reads the five measured energies from Yob et al. (2016), Table 4, specimens S1–S5.
+The model takes the dimensions and tensile properties from Tables 1 and 3 and the prescribed
+100 mm travel from section 2. It predicts 940.1 J, within both the observed range and one
+observed sample standard deviation of the mean. The numerical sled test separately checks energy
+transfer in an ideal normal impact. [Yob et al. (2016)](https://doi.org/10.5539/mas.v10n1p34)
+
+## Package evidence
+
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard
   ([batch-170-vfx.md](batch-170-vfx.md)).
 

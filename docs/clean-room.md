@@ -15029,6 +15029,28 @@ dissipates energy. The fixture infers the impulses from the actual motions of un
 rigid bodies and derives the effective mass from the box dimensions.
 [Preclik, Eibl and Rüde](https://arxiv.org/abs/1706.00221)
 
+Tomasz Wierzbicki and Włodzimierz Abramowicz, “On the Crushing Mechanics of Thin-Walled
+Structures” (1983), Eq. 7.4 gives `9.56 σ₀ t^(5/3) b^(1/3)` for mean progressive square-tube
+folding, with thickness `t` and outside width `b`. The elastic spring starts at `EA/L`, where
+`A = 4t(b − t)` is the cross-sectional area. The input flow stress is the mean of tensile proof
+and ultimate strengths. Włodzimierz Abramowicz and Norman Jones, “Dynamic Progressive Buckling
+of Circular and Square Tubes” (1986) supplies the effective shortening ratio `0.73` for the
+reserve before backing engages. This combines the original mean folding law with a separate
+finite-stroke limit. It leaves the initial peak, oscillatory folds and global buckling outside the
+envelope. At imposed shortening `x`, the trial increase of plastic stroke is
+`max(0, x − p − (Fy + Hp)/k) k/(k+H)` truncated at the available stroke. Integrate the flow stress
+over that increment for permanent work, and the unloading and backing branches for stored energy.
+[Wierzbicki and Abramowicz (1983)](https://doi.org/10.1115/1.3167137)
+[Abramowicz and Jones (1986)](https://doi.org/10.1016/0734-743X(86)90017-5)
+
+The held-out compression work is from Mohd Yob, Khairul Ismail, M. A. Rojan, Mohd Othman and Ahmad
+Ahmad Zaidi, “Quasi Static Axial Compression of Thin
+Walled Aluminum Tubes: Analysis of Flow Stress in the Analytical Models” (2016), Table 4 S1–S5.
+Tables 1 and 3 separately supply the dimensions and tensile data. The independent test machine's
+100 mm travel is the prescribed loading input. Its observed work and mean force never determine a
+constant in the solver. The numerical sled uses the same geometry/tensile model and checks work
+transfer through the live rigid coupling. [Yob et al. (2016)](https://doi.org/10.5539/mas.v10n1p34)
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { hypot } from '@margoengine/math/pinned';
+import { hypot, pow } from '@margoengine/math/pinned';
 
 /** Measured loading-curve data for a civilian energy-absorbing member. */
 export interface CrushMaterial {
@@ -35,6 +35,34 @@ export interface CrushResult {
   readonly impulse: number;
 }
 
+/** Properties of a short square tube loaded axially in its progressive-folding regime. */
+export interface SquareCrushTube {
+  /** Width across the outside flats, m. */
+  readonly width: number;
+  /** Wall thickness, m. */
+  readonly thickness: number;
+  /** Length between the supports, m. */
+  readonly length: number;
+  /** Young's modulus of the wall material, Pa. */
+  readonly young: number;
+  /** Tensile proof stress of the wall material, Pa. */
+  readonly yieldStress: number;
+  /** Ultimate tensile strength of the wall material, Pa. */
+  readonly tensileStrength: number;
+}
+
+/** Loading-envelope state after imposing a normal stroke. */
+export interface CrushStrokeResult {
+  /** Compressive force, N. */
+  readonly force: number;
+  /** Permanent stroke retained after release, m. */
+  readonly permanentStroke: number;
+  /** Incremental permanent work, J. */
+  readonly absorbedEnergy: number;
+  /** Recoverable elastic energy at the supplied stroke, J. */
+  readonly elasticEnergy: number;
+}
+
 export function positive(value: number, name: string, minimum = Number.MIN_VALUE, maximum = Infinity): number {
   if (!(Number.isFinite(value) && value >= minimum && value <= maximum))
     throw new MargoError('state', `Choose crush ${name} as a finite value in [${minimum}, ${maximum}].`);
@@ -55,6 +83,53 @@ export function crushMaterial(input: CrushMaterial): Required<CrushMaterial> {
   if (!Number.isFinite(stiffness + material.hardening + capacityForce * compliance))
     throw new MargoError('state', 'Choose smaller crush material values so their force and work remain representable.');
   return material;
+}
+
+/** Builds a reduced mean folding curve for a short square hollow tube from geometry and tensile data. */
+export function squareTubeCrushMaterial(tube: SquareCrushTube): Required<CrushMaterial> {
+  const width = positive(tube.width, 'tube width');
+  const thickness = positive(tube.thickness, 'tube wall thickness');
+  if (!(2 * thickness < width))
+    throw new MargoError('state', 'Choose a wall thickness below half the square tube width.');
+  const length = positive(tube.length, 'tube free length');
+  const young = positive(tube.young, 'tube Young’s modulus');
+  const yieldStress = positive(tube.yieldStress, 'tube proof stress');
+  const tensile = positive(tube.tensileStrength, 'tube tensile strength', yieldStress);
+  const flow = 0.5 * yieldStress + 0.5 * tensile;
+  const area = 4 * thickness * (width - thickness);
+  const stiffness = (young * area) / length; // float division: axial stiffness EA/L
+  // Wierzbicki–Abramowicz (1983), equation 7.4. The factor has no units.
+  const yieldForce = 9.56 * flow * thickness * pow(thickness, 2 / 3) * pow(width, 1 / 3); // float division
+  return crushMaterial({ stiffness, yieldForce, stroke: 0.73 * length });
+}
+
+/** Evaluates incremental work and load at an imposed total normal stroke, measured from the undeformed shape. */
+export function resolveCrushStroke(
+  material: CrushMaterial,
+  totalStroke: number,
+  permanentStroke = 0,
+): CrushStrokeResult {
+  const { stiffness: k, yieldForce, hardening, stroke, backingStiffness } = crushMaterial(material);
+  const position = positive(totalStroke, 'total stroke', 0);
+  const prior = positive(permanentStroke, 'prior permanent stroke', 0, stroke);
+  const loading = Math.max(0, position - prior);
+  const priorForce = yieldForce + hardening * prior;
+  const yieldOffset = priorForce / k; // float division: recoverable stroke at yield
+  const trial = Math.max(0, loading - yieldOffset) * (k / (k + hardening)); // float division: plastic share
+  const permanent = Math.min(stroke, prior + trial);
+  const plastic = permanent - prior;
+  const flow = priorForce + hardening * plastic;
+  const elastic = loading - plastic;
+  const cap = flow / k; // float division: recoverable stroke at the end of plastic flow
+  const past = permanent === stroke ? Math.max(0, elastic - cap) : 0;
+  const spring = past > 0 ? cap : elastic;
+  const direct = plastic > 0 ? flow : k * spring;
+  const force = direct + backingStiffness * past;
+  const stored = 0.5 * direct * spring + past * (direct + 0.5 * backingStiffness * past);
+  const work = (priorForce + 0.5 * hardening * plastic) * plastic;
+  if (!Number.isFinite(force + stored + work))
+    throw new MargoError('state', 'Choose a representable combination of crush stroke and material stiffness.');
+  return { force, permanentStroke: permanent, absorbedEnergy: work, elasticEnergy: stored };
 }
 
 function distance(energy: number, force: number, stiffness: number): number {

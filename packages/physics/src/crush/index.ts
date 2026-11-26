@@ -14,7 +14,15 @@ import type {
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
 import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
 
-export { resolveCrush, type CrushMaterial, type CrushResult } from './material.js';
+export {
+  resolveCrush,
+  resolveCrushStroke,
+  squareTubeCrushMaterial,
+  type CrushMaterial,
+  type CrushResult,
+  type CrushStrokeResult,
+  type SquareCrushTube,
+} from './material.js';
 
 /** Read-only Cartesian coordinates in X/Y/Z. */
 export type CrushVector = readonly [number, number, number];
