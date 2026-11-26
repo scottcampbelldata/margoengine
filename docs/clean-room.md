@@ -13590,6 +13590,24 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### Soft bodies in water: Morison's loads on ropes and cloth (`@margoengine/physics/soft`, SOFT-01, 2026-11-27)
+
+Built from texts only; no other code was read.
+
+- J. R. Morison, M. P. O'Brien, J. W. Johnson and S. A. Schaaf, "The force exerted by surface waves on piles", Petroleum
+  Transactions AIME 189, 1950: the load on a body in an oscillating flow as an inertia term (the water's acceleration on
+  the displaced volume and on the added mass) plus a quadratic drag on the relative velocity.
+- S. F. Hoerner, Fluid-Dynamic Drag, 1965: a circular cylinder's drag across the flow below the drag crisis, 1.2, and a
+  flat plate's normal force, 1.17 (already the cloth's air drag).
+- Added mass: a circular cylinder's across the flow is its displaced volume's (C_a = 1, potential flow); a disk's normal
+  to itself (8/3) rho a^3 (H. Lamb, Hydrodynamics, 6th ed., 1932, section 108), taken for the whole sheet and shared by
+  area.
+- Margo's own: the carried water taken implicitly, by setting a submerged particle's inverse mass to 1 / (m + m_a) and
+  its gravity to m g / (m + m_a) less the buoyancy, the steady accelerations applied in each substep with gravity's (a
+  jump at the step's start drifted a neutral rope); a segment's volume as each end particle's shared among its segments.
+- Checked against: neutral buoyancy, a rope's and a tarp's terminal speeds, a pendulum's period in water, and a neutral
+  rope riding an oscillating current.
+
 ### A damaged hull's bubble plume and its boil (`@margoengine/physics/foam` plume.ts, SEA-10 to SEA-13, 2026-11-26)
 
 Built from papers only; no other code was read.

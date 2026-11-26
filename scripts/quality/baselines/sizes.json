@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20558061,
+  "total": 20564517,
   "history": [
     {
       "date": "2026-10-24",
@@ -13585,6 +13585,18 @@
       "commit": "1d1d91857",
       "reason": "physics/ship ceiling 11538 to 14,951 B (built 11,202 to 14,516 B): any hull's manoeuvring from its dimensions (Kijima 1990, Yoshimura and Masumoto 2011, Clarke and Brix added masses) and the resolved race (swirl, tip and hub vortices, the rudder jet, vortex cavitation with hysteresis, aeration sources). In the ship entry because a ship's solver needs its hull model and its race; a split would load with every ship scene.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "SOFT-01 water medium",
+      "grew": 1,
+      "reason": "@margoengine/physics/soft: soft bodies in water: Morison loads per particle (buoyancy from the body density, the water acceleration, the carried water inertia taken implicitly, quadratic drag on rope segments as cylinders and cloth faces as plates); measured gzip (Mac build) 147547 B; it runs in the soft step with the air drag it sits beside, so a separate entry would split one step. Budget (measured + max(3%, 256 B)): 146534 to 151973 B."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "SOFT-01 water medium",
+      "grew": 1,
+      "reason": "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): soft bodies in water: Morison loads per particle (buoyancy from the body density, the water acceleration, the carried water inertia taken implicitly, quadratic drag on rope segments as cylinders and cloth faces as plates); measured gzip (Mac build) 47429 B; it runs in the soft step with the air drag it sits beside, so a separate entry would split one step. Budget (measured + max(3%, 256 B)): 46399 to 48852 B."
     }
   ],
   "items": {
@@ -14452,8 +14464,8 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 146534,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 47835,
+    "@margoengine/physics/soft": 151973,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 103021,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
