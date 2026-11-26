@@ -75,6 +75,12 @@ export interface TracerBedJets {
     };
 }
 
+export interface TracerBreakerExposure {
+    energy: number;
+    turnover: number;
+    height: number;
+}
+
 export interface TracerDiffusionKnot {
     depth: number;
     diffusivity: number;
@@ -95,6 +101,14 @@ export interface TracerMaterial {
     colour: readonly [number, number, number];
 }
 
+export interface TracerOilDispersion {
+    entrainmentCoefficient: number;
+    minimumDiameter?: number;
+    maximumDiameter: number;
+    classes?: number;
+    breaking: TracerBreakerExposure | ((x: number, z: number, time: number) => TracerBreakerExposure);
+}
+
 export interface TracerOilEvaporation {
     temperature: number;
     initialBoilingPoint: number;
@@ -110,6 +124,7 @@ export interface TracerOilSpill {
     material?: TracerMaterial;
     parcels?: number;
     evaporation?: TracerOilEvaporation;
+    dispersion?: TracerOilDispersion;
 }
 
 export interface TracerParams {

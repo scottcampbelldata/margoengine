@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20635602,
+  "total": 20636962,
   "history": [
     {
       "date": "2026-10-24",
@@ -13837,6 +13837,12 @@
       "commit": "035d96a473",
       "reason": "KB-LOOK-MASKOCCLUDE1: lit Scatter material capture (setCapture, its own capture pipelines per effect, the shared lit stage) adds 1051 B gzip to the scatter root (26359 to 27410 measured); BiomeObjects and BiomeView forward one capture hook to their parts: biomes/objects 5494 to 5831 B, biomes/view 15565 to 15985 B. A lazy import would miss plants on the first frames (shots must be deterministic) and a wrapper entry needs the private lit stage. Core and stage add 0 B.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f557d21525",
+      "grew": 1,
+      "reason": "SEA-15's breaker-driven oil droplet transfer moves physics/tracers from 12662 to 13982 B gzip. The optional ceiling rises from 13042 to 14402 B. Droplet entrainment shares the existing Fay profile, vapour, particle motion and snapshot mass accounting. A separate entry would need a second parcel store and a conservative transfer contract."
     }
   ],
   "items": {
@@ -14716,7 +14722,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 13395,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 13042,
+    "@margoengine/physics/tracers": 14402,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
