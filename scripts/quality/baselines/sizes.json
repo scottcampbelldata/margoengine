@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20562916,
+  "total": 20564938,
   "history": [
     {
       "date": "2026-10-24",
@@ -13975,6 +13975,18 @@
       "commit": "6949e5f75",
       "reason": "horses/crowd 12,397 to 12,522 B gzip: the horses lane's traction and support grade, live stride, stance-duty trunk excursion, hoof release and gait continuity changes since 2026-11-20 grew the shared model chunk that the crowd entry loads; a split would load the same model code twice",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f1e1145dac",
+      "reason": "BREAK-03 wet contact inertia changes @margoengine/physics/crush from 17866 to 18559 B gzip. Ceiling 18402 to 19116 B. Station contacts share the hull effective inertia and receipt the mapped rigid impulse. A separate entry would repeat the paired hull and crush setup.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f1e1145dac",
+      "reason": "BREAK-03 wet contact inertia changes @margoengine/physics/seakeeping from 33432 to 33986 B gzip. Ceiling 33698 to 35006 B. Station contacts share the hull effective inertia and receipt the mapped rigid impulse. A separate entry would repeat the paired hull and crush setup.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14802,7 +14814,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 5981,
-    "@margoengine/physics/crush": 18402,
+    "@margoengine/physics/crush": 19116,
     "@margoengine/physics/decomposition": 11103,
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 4523,
@@ -14841,7 +14853,7 @@
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 6661,
-    "@margoengine/physics/seakeeping": 33698,
+    "@margoengine/physics/seakeeping": 35006,
     "@margoengine/physics/sediment": 4669,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 14644,

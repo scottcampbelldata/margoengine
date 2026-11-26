@@ -166,6 +166,16 @@ export class HullSolver implements Solver<HullParams> {
         readonly crushDamage?: FieldDescriptor;
         readonly girderSeams?: FieldDescriptor;
     }): HullSolver;
+    static withContactInertia(channel: CrushInertiaChannel, options?: {
+        readonly id?: string;
+        readonly wake?: HullWake;
+        readonly crushDamage?: FieldDescriptor;
+        readonly girderSeams?: FieldDescriptor;
+        readonly shell?: {
+            readonly field: FieldDescriptor;
+            readonly cellSize?: number;
+        };
+    }): HullSolver;
     describe(): SolverDescription;
     init(host: SolverHost, params: HullParams): void;
     step(context: StepContext, dt: number): void;
@@ -350,6 +360,11 @@ interface CompartmentShape {
     readonly packing: number;
     readonly water: number;
     readonly free: number;
+}
+
+interface CrushInertiaChannel {
+    readonly mobility: FieldDescriptor;
+    readonly receipt: FieldDescriptor;
 }
 
 type CrushVector = readonly [number, number, number];

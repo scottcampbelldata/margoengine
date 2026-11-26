@@ -41,6 +41,11 @@ export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | '
     readonly indentation: CircularPlateParams;
 };
 
+export interface CrushInertiaChannel {
+    readonly mobility: FieldDescriptor;
+    readonly receipt: FieldDescriptor;
+}
+
 export interface CrushMaterial {
     readonly stiffness: number;
     readonly yieldForce: number;
@@ -242,6 +247,7 @@ export class CrushSolver implements Solver<CrushParams> {
     readonly id: string;
     readonly damageField: FieldDescriptor;
     constructor({ id, terrain }?: CrushOptions);
+    static withContactInertia(channel: CrushInertiaChannel, options?: CrushOptions): CrushSolver;
     describe(): SolverDescription;
     init(host: SolverHost, params: CrushParams): void;
     step(context: StepContext, dt: number): void;
@@ -348,6 +354,8 @@ export interface SquareCrushTube {
     readonly yieldStress: number;
     readonly tensileStrength: number;
 }
+
+export function crushInertiaChannel(id?: string): CrushInertiaChannel;
 
 export function resolveCrush(material: CrushMaterial, effectiveMass: number, closingSpeed: number, permanentStroke?: number): CrushResult;
 
