@@ -224,7 +224,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
 | SOUND-02 | Enclosed and urban acoustics | partial | Open | OPEN |
-| SOUND-03 | Underwater acoustics | none | Codex | BUILDING (codex/physics-lane-2) |
+| SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
 | SOUND-04 | Contact and modal sound | none | Open | OPEN |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
 | BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
