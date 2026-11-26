@@ -37,7 +37,10 @@ export function instantiateThermalKernel(host: SolverHost, builds: ThermalKernel
   const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
   const pointer = exports.__stack_pointer;
   if (!(pointer instanceof WebAssembly.Global))
-    throw new MargoError('failed', 'The thermal kernel has no stack pointer. Rebuild the thermal Wasm assets.');
+    throw new MargoError(
+      'failed',
+      'The thermal kernel has no stack pointer. Run the thermal kernel build to restore its Wasm assets.',
+    );
   pointer.value = stack.byteOffset + stack.byteLength;
   return exports;
 }
