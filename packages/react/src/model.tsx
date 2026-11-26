@@ -1,7 +1,7 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { EngineKernel, Mesh as MeshHandle } from '@margoengine/core';
 import type { Vec3 } from '@margoengine/core/extension';
-import type { PBRModel, PBRMaterial } from '@margoengine/gltf/pbr';
+import type { PBRModel, PBRMaterial, ModelNode } from '@margoengine/gltf/pbr';
 import { useBakedShadows } from './bake-shadows.js';
 import { casters } from './casters.js';
 import {
@@ -19,7 +19,7 @@ import { liveHandlers } from './events.js';
 import { retainAsset, type ModelFormat } from './assets.js';
 import { instantiateModel, modelAsset, preloadModel, type FormatLoader } from './model-assets.js';
 import { modelPicking } from './picking.js';
-import { rangeError, typeError } from '../../shared/errors.js';
+import { fault, rangeError, typeError } from '../../shared/errors.js';
 interface Loading {
   src: string;
   pending: boolean;
@@ -293,3 +293,39 @@ export const Model = /* @__PURE__ */ Object.assign(
     preload: (src: string): Promise<void> => preloadModel(src),
   },
 );
+
+/** The named parts of a loaded model: its glTF nodes and materials by name. */
+export interface ModelParts<Node extends string = string, Material extends string = string> {
+  /** Each named glTF node (an engine mesh), the first in file order where two share a name. */
+  readonly nodes: Readonly<Record<Node, ModelNode>>;
+  /** Each named material the model draws with, the first in primitive order where two share a name. */
+  readonly materials: Readonly<Record<Material, PBRMaterial>>;
+}
+/**
+ * The named nodes and materials of a model, as typed records: inside a `<Model>`'s children it reads that model, or pass
+ * a `PBRModel` you loaded yourself. Name the keys for exact types: `useModelParts<'Wheel' | 'Body', 'Paint'>()`.
+ * Unnamed nodes and materials are left out. Null until the model has loaded and after it is disposed; a new record
+ * when the model changes. The nodes are the model's own live meshes: move them, attach children with `<MeshNode>` or
+ * `<ScenePortal node>`, and the model draws the change.
+ */
+export function useModelParts<Node extends string = string, Material extends string = string>(
+  model?: PBRModel | null,
+): ModelParts<Node, Material> | null {
+  const context = useContext(ModelContext),
+    source = model === undefined ? context : model;
+  if (source === undefined)
+    throw fault(
+      'state',
+      'useModelParts requires a model; call it inside <Model> children or pass a loaded PBRModel',
+      'react-usage',
+    );
+  return useMemo(() => {
+    if (!source || source.disposed) return null;
+    const nodes: Record<string, ModelNode> = {},
+      materials: Record<string, PBRMaterial> = {};
+    for (const node of [source.root, ...source.nodes]) if (node.name && !(node.name in nodes)) nodes[node.name] = node;
+    for (const { material } of source.primitives)
+      if (material.name && !(material.name in materials)) materials[material.name] = material;
+    return { nodes, materials } as unknown as ModelParts<Node, Material>;
+  }, [source]);
+}

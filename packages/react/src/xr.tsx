@@ -12,7 +12,7 @@ import type {
 import { Mesh, type MeshProps } from './components.js';
 import { splitPointerHandlers } from './events.js';
 import { useScene, useResourceEffect } from './internal.js';
-import { setWorldPose } from './scene-transform.js';
+import { setWorldPose, worldPose } from './scene-transform.js';
 import { advanceFrames, frameTakeover, xrFrameScope } from './frame-priority.js';
 import { fault } from '../../shared/errors.js';
 
@@ -98,7 +98,9 @@ export function XR({ children, ...props }: XRProps) {
       enter(mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession> {
         const instance = current.current;
         if (!instance)
-          return Promise.reject(fault('state', 'XR is not ready; wait for useXR().ready before requesting a session', 'react-usage'));
+          return Promise.reject(
+            fault('state', 'XR is not ready; wait for useXR().ready before requesting a session', 'react-usage'),
+          );
         const requested = { ...latest.current.options, ...options },
           onFrame = requested.onFrame,
           sessionMode = mode ?? latest.current.mode ?? 'immersive-vr';
@@ -113,13 +115,17 @@ export function XR({ children, ...props }: XRProps) {
                 latest.current.onFrame?.(state);
                 return external;
               }
-              return xrFrameScope(sceneFrames, () => instance.renderFrame(), () => {
-                advanceFrames(sceneFrames, engine, state.delta);
-                for (const update of frames) update(state);
-                const external: unknown = onFrame?.(state);
-                latest.current.onFrame?.(state);
-                return frameTakeover(sceneFrames) ? false : external;
-              });
+              return xrFrameScope(
+                sceneFrames,
+                () => instance.renderFrame(),
+                () => {
+                  advanceFrames(sceneFrames, engine, state.delta);
+                  for (const update of frames) update(state);
+                  const external: unknown = onFrame?.(state);
+                  latest.current.onFrame?.(state);
+                  return frameTakeover(sceneFrames) ? false : external;
+                },
+              );
             },
           })
           .then((value) => {
@@ -189,13 +195,7 @@ export interface ControllerProps extends MeshProps {
   onSqueezeEnd?: (event: ControllerEvent) => void;
 }
 /** The controller component. */
-export function Controller({
-  children,
-  position,
-  rotation,
-  scale,
-  ...all
-}: ControllerProps) {
+export function Controller({ children, position, rotation, scale, ...all }: ControllerProps) {
   const [events, props] = splitPointerHandlers(all);
   return (
     <Mesh position={position} rotation={rotation} scale={scale} {...events}>
@@ -269,6 +269,73 @@ function ControllerBinding(props: Omit<ControllerProps, keyof MeshProps>) {
       if (active) latest.current.onDisconnected?.(active);
     };
   }, [engine, registry, context.frames, context.session]);
+  return null;
+}
+/** Props of `<TrackingOrigin>`: the `<Mesh>` props of the node the tracked space hangs from. */
+export type TrackingOriginProps = MeshProps;
+type Space = Parameters<XRManager['useReferenceSpace']>[0];
+/**
+ * The node the XR tracking origin is fixed to: the headset camera and every `<Controller>` are posed in its space, so
+ * moving, turning or parenting it (a vehicle seat, a teleport target, a moving platform) moves the player, and its
+ * children ride along. Its world position and rotation become the session's reference space through WebXR
+ * `getOffsetReferenceSpace` (scale is ignored: tracked metres stay metres). A move applies from the next XR frame.
+ * Unmounting it, or putting it back at the world origin, gives the session its own space again. One per `<XR>`.
+ */
+export function TrackingOrigin({ children, ...props }: TrackingOriginProps) {
+  return (
+    <Mesh {...props}>
+      <OriginBinding />
+      {children}
+    </Mesh>
+  );
+}
+const identity = '0,0,0,0,0,0,1';
+function OriginBinding() {
+  const context = useContext(Context);
+  if (!context) throw fault('state', 'TrackingOrigin requires <XR>; render it inside one', 'react-usage');
+  const { engine, registry } = useScene(),
+    { manager, session } = context;
+  useResourceEffect(() => {
+    if (!manager || !session) return;
+    // The session's own space, before any offset: each pose of the origin offsets it afresh.
+    const base = manager.referenceSpace as (Space & { getOffsetReferenceSpace(transform: unknown): Space }) | undefined;
+    let applied = identity;
+    const use = (space: Space, key: string) => {
+      if (manager.session !== session) return;
+      manager.useReferenceSpace(space);
+      applied = key;
+    };
+    const update = () => {
+      const mesh = registry?.current;
+      if (!base || !mesh || engine.meshes.get(mesh.id) !== mesh) return;
+      const { position: p, rotation: q } = worldPose(mesh),
+        key = [...p, ...q].join();
+      if (key === applied) return;
+      if (key === identity) return use(base, key);
+      const Rigid = (globalThis as { XRRigidTransform?: new (p: object, o: object) => unknown }).XRRigidTransform;
+      if (!Rigid)
+        throw fault(
+          'unsupported',
+          'TrackingOrigin needs XRRigidTransform; run it inside a WebXR browser',
+          'react-usage',
+        );
+      // Poses in the offset space are t^-1 times poses in the base, so t is the inverse of the origin's pose: orientation
+      // q^-1 and position -(q^-1 p), where q^-1 p = p - 2w(v x p) + 2 v x (v x p) for a unit q = (v, w).
+      const [x, y, z, w] = q,
+        cx = y * p[2] - z * p[1],
+        cy = z * p[0] - x * p[2],
+        cz = x * p[1] - y * p[0],
+        rx = p[0] - 2 * w * cx + 2 * (y * cz - z * cy),
+        ry = p[1] - 2 * w * cy + 2 * (z * cx - x * cz),
+        rz = p[2] - 2 * w * cz + 2 * (x * cy - y * cx);
+      use(base.getOffsetReferenceSpace(new Rigid({ x: -rx, y: -ry, z: -rz, w: 1 }, { x: -x, y: -y, z: -z, w })), key);
+    };
+    context.frames.add(update);
+    return () => {
+      context.frames.delete(update);
+      if (base && applied !== identity) use(base, identity);
+    };
+  }, [engine, registry, manager, session, context.frames]);
   return null;
 }
 export type { XRMode, XRSessionOptions, XRNativeSession, XRFrameState, XRInputPose } from '@margoengine/xr';

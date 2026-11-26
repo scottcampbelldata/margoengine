@@ -705,6 +705,39 @@ try {
 }
 ```
 
+### Meshes made outside React: MeshNode
+
+`<MeshNode node={mesh}>` mounts an engine mesh you made yourself (`engine.createMesh()`, a model's node) into the tree.
+Its children attach under it and the `<Mesh>` props apply to it: pointer handlers, `layers`, `castShadow` and
+`receiveShadow`, and `position`, `rotation` and `scale` only when passed (left out, the mesh keeps its own transform). A
+mesh with no parent goes under the nearest `<Mesh>` and is unparented again on unmount; a mesh that already has a parent,
+such as a model's node, stays where it is. `dispose` defaults to false, so the caller keeps owning the mesh; pass
+`dispose` to free it on unmount. The ref is the mesh itself. The mesh must be live and in the scene the element sits in.
+
+```tsx
+import { useEffect, useState } from 'react';
+import { Canvas, Mesh, MeshNode, BoxGeometry, useEngine, type MeshRef } from '@margoengine/react';
+
+function Marker() {
+  const engine = useEngine();
+  const [node, setNode] = useState<MeshRef | null>(null);
+  useEffect(() => {
+    const made = engine.createMesh();
+    setNode(made);
+    return () => made.dispose();
+  }, [engine]);
+  return node && <MeshNode node={node} position={[0, 1, 0]} onClick={() => console.log('marker')}>
+    <Mesh><BoxGeometry /></Mesh>
+  </MeshNode>;
+}
+
+export function App() {
+  return <Canvas style={{ height: 300 }}>
+    <Mesh position={[2, 0, 0]}><Marker /></Mesh>
+  </Canvas>;
+}
+```
+
 ## Models and environment
 
 A model, its lighting and the orbit controls, directly under the canvas:
@@ -728,6 +761,35 @@ export default function App() {
 ```
 
 `Model` loads glTF/GLB through `@margoengine/gltf/pbr`. Position, Euler rotation (radians), scale and named material overrides update the existing model; removing an override restores the loaded material. Supported shallow overrides are `baseColor` (linear RGB or RGBA), `roughness`, `metalness`, `emissive`, `normalScale`, `occlusionStrength`, `alphaCutoff` and `doubleSided`. `onLoad(mesh)` receives the model's root mesh after initial props have been applied. Only changing `src` selects another asset. Unmount unregisters lighting and shadows and disposes the instance's PBR plugin, meshes, textures and buffers.
+
+`useModelParts()` (from `/gltf`) returns the named glTF nodes and materials of the enclosing `<Model>` as records,
+`{ nodes, materials }`, or null while it loads; pass a `PBRModel` you loaded yourself to read that one instead. Name the
+keys for exact types, `useModelParts<'Wheel' | 'Body', 'Paint'>()`. Where two share a name the first in file order wins,
+and unnamed ones are left out. The nodes are the model's live meshes: move them, or attach children with `<MeshNode>`.
+
+```tsx
+import { Suspense } from 'react';
+import { Canvas, Mesh, MeshNode, BoxGeometry } from '@margoengine/react';
+import { Model, useModelParts } from '@margoengine/react/gltf';
+
+function NodeTags() {
+  const parts = useModelParts();
+  if (!parts) return null;
+  return Object.entries(parts.nodes).map(([name, node]) => (
+    <MeshNode key={name} node={node}>
+      <Mesh scale={[0.05, 0.05, 0.05]}><BoxGeometry /></Mesh>
+    </MeshNode>
+  ));
+}
+
+export function Tagged() {
+  return <Canvas style={{ height: 400 }}>
+    <Suspense fallback={null}>
+      <Model src="/model.glb"><NodeTags /></Model>
+    </Suspense>
+  </Canvas>;
+}
+```
 
 Wrap `Model` and file-backed `Environment` components in React `Suspense` to show a fallback while loading. Loads begin after the first commit so unmount cleanup can abort an unfinished load. The canvas caches pending promises and resolved CPU source data by URL; concurrent mounts and remounts reuse that source while owning independent model transforms, materials and disposable GPU resources. The last pending consumer unmount aborts its request. Canvas teardown releases the cache. Load failures reach the component's optional `onError` and the canvas's `onError`/accessible alert.
 
@@ -1244,10 +1306,73 @@ Physics is a separate entry, so an app without it never loads a solver. Import i
 it. A complete example is in the [cookbook](../../docs/react-cookbook.md#physics). `usePhysics` works only inside
 `<Physics>`.
 
+`RigidBodyInstances` draws many bodies as one instanced mesh: each entry of `instances` is a `RigidBody` whose body
+drives one instance of `<Instances>`, so the whole pile is one draw call. The other props are `RigidBody` props shared
+by every body, and an entry overrides any of them for its own body, plus `color` (the instance tint, default white) and
+`key` (default its index). The children are the shared geometry and material. Colliders fit the shared geometry per
+body, as `RigidBody`'s do (default `'cuboid'`). `limit` defaults to `instances.length`. `onReady(body, index)` is called
+once per body. Adding an entry adds a body, removing one removes its body, and changing an entry's pose rebuilds it.
+
+```tsx
+import { Canvas, BoxGeometry } from '@margoengine/react';
+import { Physics, RigidBody, RigidBodyInstances, CuboidCollider, type RigidBodyInstance } from '@margoengine/react/physics';
+
+const crates: RigidBodyInstance[] = Array.from({ length: 100 }, (_, i) => ({
+  key: i,
+  position: [(i % 10) - 4.5, 1 + Math.floor(i / 10) * 1.1, 0],
+  color: i % 2 ? '#c08a4a' : '#8a6038',
+}));
+
+export function Crates() {
+  return <Canvas style={{ height: 400 }}>
+    <Physics>
+      <RigidBody type="fixed" colliders={false}>
+        <CuboidCollider args={[20, 0.5, 20]} position={[0, -0.5, 0]} />
+      </RigidBody>
+      <RigidBodyInstances instances={crates} onReady={(body, index) => index === 0 && body.applyImpulse([0, 5, 0])}>
+        <BoxGeometry />
+      </RigidBodyInstances>
+    </Physics>
+  </Canvas>;
+}
+```
+
 ## XR
 
-`XR`, `Controller` and `useXR` come from `@margoengine/react/xr` (and `margoengine/react`). `useXR` works only inside
+`XR`, `Controller`, `TrackingOrigin` and `useXR` come from `@margoengine/react/xr` (and `margoengine/react`). `useXR`
+works only inside `<XR>`.
+
+`<TrackingOrigin>` is the node the headset's tracked space hangs from: the XR camera and every `<Controller>` are posed
+relative to it, so moving, turning or parenting it (a vehicle seat, a moving platform, a teleport target) moves the
+player, and its children ride along. It takes the `<Mesh>` props. Its world position and rotation become the session's
+reference space through WebXR `getOffsetReferenceSpace`; scale is ignored, so tracked metres stay metres. A move applies
+from the next XR frame. At the world origin, and after it unmounts, the session uses its own space again. Use one per
 `<XR>`.
+
+```tsx
+import { useState } from 'react';
+import { Canvas, Mesh, BoxGeometry } from '@margoengine/react';
+import { Html } from '@margoengine/react/html';
+import { XR, Controller, TrackingOrigin, useXR } from '@margoengine/react/xr';
+
+function EnterButton() {
+  const xr = useXR();
+  return <Html><button disabled={!xr.ready} onClick={() => void xr.enter('immersive-vr')}>Enter VR</button></Html>;
+}
+
+export function Platform() {
+  const [x, setX] = useState(0);
+  return <Canvas style={{ height: 400 }}>
+    <XR>
+      <EnterButton />
+      <TrackingOrigin position={[x, 0, 3]}>
+        <Mesh position={[0, -0.05, 0]} scale={[2, 0.1, 2]}><BoxGeometry /></Mesh>
+        <Controller handedness="right" onSelect={() => setX((value) => value + 1)} />
+      </TrackingOrigin>
+    </XR>
+  </Canvas>;
+}
+```
 
 ## Next.js
 
@@ -2151,7 +2276,7 @@ export function Tour() {
 
 ## Render textures and HUDs
 
-`/portals` exports `RenderTexture` and `Hud`. RenderTexture requires the optional materials peer and
+`/portals` exports `RenderTexture`, `Hud` and `ScenePortal`. RenderTexture requires the optional materials peer and
 an engine with a WebGPU device, native or compatibility. The legacy WebGL2 renderer without a compatibility
 device cannot create these targets. HUDs and render textures own isolated Scenes and cameras; children see
 their local camera through hooks. A supplied `camera` is borrowed; otherwise `cameraOptions` defaults to
@@ -2184,6 +2309,35 @@ new texture on creation, resize and device restoration, then null on cleanup. Th
 Hud defaults to `renderPriority=1` (must be positive), drawing after the main view with fresh depth and
 without clearing its colour. React 18/19 StrictMode replay creates fresh owners and releases old targets,
 views and Scenes; refs and callbacks refer to the current owner.
+
+### ScenePortal
+
+`<ScenePortal>` renders its children into another engine scene, or under an existing mesh, while they stay in this
+React tree with its context and state. `scene` is the `name` of a `<Scene>` in the Canvas or a core scene
+(`engine.createScene(...)`, `engine.scene`); default the scene of `node`, else the Canvas's default scene. `node` is an
+existing engine mesh the children attach under, as under a `<Mesh>`; default none. A named `<Scene>` and the default
+scene share their shadows and lights with the portal; a core scene made outside React gets shadows of its own when a
+`<Shadows>` inside asks. It renders nothing until a named `<Scene>` mounts, and its children are disposed on unmount;
+the target scene and node are not. A scene is drawn only by a view that names it, such as `<RenderView scene>`.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, Scene, RenderView } from '@margoengine/react';
+import { ScenePortal } from '@margoengine/react/portals';
+
+export function Inset() {
+  return <Canvas style={{ height: 300 }}>
+    <Scene name="inset" background="#202830" />
+    <RenderView />
+    <RenderView scene="inset" viewport={[0.7, 0, 0.3, 0.3]} order={1} />
+    <Mesh>
+      <BoxGeometry />
+      <ScenePortal scene="inset">
+        <Mesh position={[0, 0, -3]}><BoxGeometry /></Mesh>
+      </ScenePortal>
+    </Mesh>
+  </Canvas>;
+}
+```
 
 ### useFBO
 

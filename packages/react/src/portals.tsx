@@ -1,6 +1,6 @@
-import { forwardRef, useMemo, useRef, useState, type ReactNode } from 'react';
+import { forwardRef, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { Camera, type CameraOptions } from '@margoengine/core';
+import { Camera, type CameraOptions, type Mesh as MeshHandle } from '@margoengine/core';
 import type { RenderView as View } from '@margoengine/core/extension';
 import type { Texture } from '@margoengine/materials';
 import {
@@ -10,13 +10,17 @@ import {
   useCreated,
   useResourceEffect,
   useScene,
+  sceneContexts,
+  type Registry,
   type Scene,
   type Views,
   type World,
 } from './internal.js';
+import { useSceneShadows } from './scene-shadows.js';
 import { useFrame } from './components.js';
 import { optionalPeer } from './optional.js';
 import { fault, rangeError } from '../../shared/errors.js';
+import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 
 let serial = 0;
 const mains = new WeakMap<Views, { owners: Set<object>; key: object }>();
@@ -351,4 +355,92 @@ export function useDepthBuffer({ size = 256, frames = Infinity, onError }: Depth
     syncMain(scene);
   }, -99);
   return fbo?.target.depth ?? null;
+}
+
+/** Props of `<ScenePortal>`; every prop is optional. */
+export interface ScenePortalProps {
+  /**
+   * The engine scene the children are built in: the `name` of a `<Scene>` in this Canvas, or a core scene
+   * (`engine.createScene(...)`, `engine.scene`). Default: the scene of `node`, else the Canvas's default scene.
+   */
+  scene?: string | World;
+  /**
+   * An existing engine mesh the children attach under, as they would under a `<Mesh>` (a loaded model's node, a mesh
+   * from `engine.createMesh()`). Default none: the children sit at the top level of the scene.
+   */
+  node?: MeshHandle;
+  children?: ReactNode;
+}
+/**
+ * Renders its children into another engine scene or under an existing mesh while they stay in this React tree (its
+ * context, state and events). Meshes, models and scene bindings inside are built in the target scene; a named
+ * `<Scene>` or the default scene shares its shadows and lights, and a core scene made outside React gets shadows of its
+ * own when a `<Shadows>` inside asks. Renders nothing until a named `<Scene>` mounts. Nothing is drawn unless a view
+ * draws the target scene (a `<RenderView scene>` for a `<Scene>`).
+ */
+export function ScenePortal({ scene, node, children }: ScenePortalProps) {
+  const parent = useScene(),
+    { engine, views } = parent;
+  useSyncExternalStore(
+    (listener) => {
+      views.listeners.add(listener);
+      return () => views.listeners.delete(listener);
+    },
+    () => views.revision,
+    () => 0,
+  );
+  const mesh = node as unknown as EngineMesh | undefined;
+  if (mesh && engine.meshes.get(mesh.id) !== mesh)
+    throw fault('attached', 'ScenePortal node is disposed or from another engine; pass a live mesh', 'react-usage');
+  const target =
+    typeof scene === 'string' ? views.scenes.get(scene) : (scene ?? (mesh ? (mesh.scene as World) : engine.scene));
+  if (mesh && target && mesh.scene !== target)
+    throw fault('attached', 'ScenePortal node is in another scene than `scene`; pass only one of them', 'react-usage');
+  const known = target && sceneContexts.get(target),
+    own = useSceneShadows(engine, target && !known ? target : null);
+  useCommit(() => {
+    if (typeof scene !== 'string' || target) return;
+    // Its <Scene> may mount later in this commit; a name still missing afterwards is a mistake.
+    queueMicrotask(() => {
+      if (!views.scenes.has(scene) && !engine.disposed)
+        engine.onError(
+          fault(
+            'state',
+            `<ScenePortal scene="${scene}"> names no <Scene name="${scene}">; add that <Scene>`,
+            'react-usage',
+          ),
+        );
+    });
+  }, [scene, target, views, engine]);
+  const registry = useMemo<Registry | null>(
+    () =>
+      mesh
+        ? {
+            current: mesh,
+            children: new Set(),
+            attachments: new Set(),
+            register(child) {
+              this.children.add(child);
+              child.setParent(mesh);
+            },
+            unregister(child) {
+              this.children.delete(child);
+              if (!engine.disposed && engine.meshes.get(child.id) === child) child.setParent(null);
+            },
+          }
+        : null,
+    [engine, mesh],
+  );
+  const value = useMemo<Scene | null>(
+    () =>
+      target
+        ? {
+            ...(known || { ...parent, shadows: own.shadows, requestShadows: own.requestShadows }),
+            world: target === engine.scene ? null : target,
+            registry,
+          }
+        : null,
+    [parent, known, target, registry, own.shadows, own.requestShadows, engine],
+  );
+  return value ? <Context.Provider value={value}>{children}</Context.Provider> : null;
 }
