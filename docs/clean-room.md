@@ -13075,3 +13075,28 @@ Research compared:
   https://doi.org/10.1145/1276377.1276497 (what a low-resolution depth guides). The median choice of the representative
   mode is Margo's: the median is one of the samples, unchanged by the nonlinear depth encoding, and lies on the surface
   covering most of the footprint.
+
+## Contact and modal sound (SOUND-04)
+
+- Kees van den Doel and Dinesh K. Pai, [*The Sounds of Physical Shapes*](https://www.persianney.com/kvdoelcsubc/publications/sound-shapes.pdf)
+  (1998), derives material- and geometry-dependent frequencies and damping by separating linear vibration modes.
+  A force excites each mode through its projection on the mode shape. The runtime uses modal data measured or
+  authored for its tracks.
+- Kees van den Doel, Paul G. Kry and Dinesh K. Pai, [*FoleyAutomatic: Physically-based Sound Effects for
+  Interactive Simulation and Animation*](https://persianney.com/kvdoelcsubc/publications/foleyautomatic.pdf)
+  (2001), §§2, 4.2 and 4.3. Equation 1 is the sum of damped sine impulses. The complex state
+  `z = q + i y` advances by multiplication with `exp((-d - i omega) dt)`. An impulse of magnitude `J`
+  adds `i gain J`. Integrating this exponential over a sample gives the exact affine update for a
+  held force. The scoped test compares every output sample against the direct analytic integral.
+  Sliding uses Coulomb power `mu F_n v_slip`, so its force amplitude scales with the square root of
+  power. Contact speed plays a seed-phased spatial profile. A longer-wavelength rolling profile
+  accounts for the smaller slopes felt by a rolling patch. The four spatial bands and their weights
+  are an authored profile and the taper near Nyquist is an audio sampling choice.
+- Changxi Zheng and Doug L. James, [*Rigid-Body Fracture Sound with Precomputed Soundbanks*](https://www.cs.cornell.edu/projects/FractureSound/files/fractureSound_comp.pdf)
+  (2010), §3.3, uses released strain energy to excite the modes of debris. In its scalar special case
+  with one mass starting from rest, `J² / (2 m) = eta E`. Joint fracture provides a real event source
+  for this path until a brittle-fracture producer supplies finer crack and debris loads.
+
+The implementation uses separately built plain and shared SIMD Wasm against the world arena. Hardware
+sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
+integer sample carry and PCM history survive a snapshot.

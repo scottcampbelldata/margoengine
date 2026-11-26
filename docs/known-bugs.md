@@ -16190,3 +16190,11 @@ physical rainfall, duration, uplift or grain mobility. The physical path is `Lan
 `evolveRelief` biome adapter. Reproduce the divergent catchment and two-grain threshold fixtures with
 `node --test packages/physics/tests/coupling/landscape.test.js` after building Physics. The legacy static relief
 operation still reproduces existing authored terrain.
+
+## Fixed: solved contacts excite audio without hand-timed triggers (PA-65)
+
+Previously, dropping a body onto a surface produced no audio unless a caller assigned a sound for
+the event by hand. A physics world with `ModalContactRigidSolver` and `ModalSoundSolver` now publishes
+an impulse, rolling or scraping excitation, with sound and damping set by the contacted materials.
+The drop, silent resting support, rolling/sliding and joint-break cases live in
+`packages/physics/tests/coupling/modal-sound.test.js`.

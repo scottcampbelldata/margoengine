@@ -4279,3 +4279,12 @@ on the pinned toolchain.
 From packages/physics, run `node scripts/test-browser.js --pedestrian-only`. Add `--compat`
 for the WebGL2 compatibility configuration. Both modes check lazy WebAssembly fetch and
 momentum in a physical contact.
+
+### SOUND-04 contact and modal sound
+
+Build Physics with `node packages/physics/scripts/build.js`. Run
+`node --test packages/physics/tests/coupling/modal-sound.test.js` for the independent analytic,
+timing, contact, fracture and replay fixtures. Run
+`node scripts/wasm-blueprints.mjs --rebuild --compare --only=modal-sound-kernel,modal-sound-kernel-shared`
+to rebuild the plain and shared audio kernels using the pinned Rust target. The Physics README's
+contact and modal sound block checks the dry signal through an offline browser audio context.

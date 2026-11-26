@@ -162,6 +162,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'modal-sound-kernel',
+    crate: 'packages/physics/modal-sound-kernel',
+    blueprint: 'packages/physics/src/modal-sound/modal-sound-kernel.wasm',
+    script: 'packages/physics/scripts/build-modal-sound-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'modal-sound-kernel-shared',
+    crate: 'packages/physics/modal-sound-kernel',
+    blueprint: 'packages/physics/src/modal-sound/modal-sound-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-modal-sound-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'falling-kernel',
     crate: 'packages/physics/falling-kernel',
     blueprint: 'packages/physics/src/falling/falling-kernel.wasm',

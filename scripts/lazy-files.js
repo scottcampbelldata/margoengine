@@ -31,6 +31,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/modal-sound-kernel.wasm',
+    label: 'modal-sound-kernel.wasm',
+    kind: 'Rust SIMD modal audio synthesis',
+    measure: 'file',
+    when: 'ModalSoundSolver.load() from the optional /modal-sound entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/modal-sound-kernel-shared.wasm',
+    label: 'modal-sound-kernel-shared.wasm',
+    kind: 'Rust SIMD modal audio synthesis, shared world memory',
+    measure: 'file',
+    when: 'ModalSoundSolver.load() from the optional /modal-sound entry with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/falling-kernel.wasm',
     label: 'falling-kernel.wasm',
     kind: 'Rust SIMD plate and grain dynamics',

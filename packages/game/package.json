@@ -2163,6 +2163,10 @@
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
     },
+    "./physics/modal-sound": {
+      "types": "./dist/physics/modal-sound.d.ts",
+      "import": "./dist/physics/modal-sound.js"
+    },
     "./physics/falling": {
       "types": "./dist/physics/falling.d.ts",
       "import": "./dist/physics/falling.js"

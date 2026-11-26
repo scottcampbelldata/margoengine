@@ -2947,3 +2947,80 @@ Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic f
 `id` (default `landscape`) and `signal`. Discharge, gross incision and sediment flux are layout-1 f64 vertex
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
+
+## Contact and modal sound
+
+Use @margoengine/physics/modal-sound with a PhysicsWorld to turn collision, scrape, roll and fracture
+loads into mono audio tracks. A material supplies resonant frequencies, damping rates and gains.
+The example records one second at 24 frames per second and plays it through Web Audio's offline renderer.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { ModalContactRigidSolver, ModalSoundSolver } from '@margoengine/physics/modal-sound';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+physics.addBody(null, {
+  type: 'fixed',
+  position: [0, -0.1, 0],
+  colliders: { shape: 'box', halfExtents: [4, 0.1, 4] },
+});
+const bell = physics.addBody(null, {
+  position: [0, 1, 0],
+  colliders: { shape: 'sphere', radius: 0.25, mass: 0.6 },
+});
+const sound = await ModalSoundSolver.load();
+const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
+world.add(new ModalContactRigidSolver(sound), { physics, emitters: [bell] });
+world.add(sound, { tracks: [{ material: 'bell' }] });
+
+const pcm = new Float32Array(48000);
+let cursor = 0;
+for (let frame = 1; frame <= 24; frame++) {
+  world.advance(frame);
+  const block = sound.copySince(cursor);
+  if (!block) continue;
+  pcm.set(block.samples, block.firstSample);
+  cursor += block.samples.length;
+}
+
+const context = new window.OfflineAudioContext(1, pcm.length, 48000);
+const buffer = context.createBuffer(1, pcm.length, 48000);
+buffer.copyToChannel(pcm, 0);
+const source = context.createBufferSource();
+source.buffer = buffer;
+source.connect(context.destination);
+source.start();
+const printed = (await context.startRendering()).getChannelData(0);
+if (cursor !== 48000 || printed[0] !== 0 || !printed.some((sample) => Math.abs(sample) > 0.05)) {
+  throw new Error('Modal audio is incomplete or silent. Keep the two solvers and the dropped body in the example.');
+}
+physics.dispose();
+```
+
+The wood, metal, glass and bell presets provide authored examples. Call `modalPreset(name)` for a fresh material
+you can customize, or supply the damped frequencies in Hz, amplitude decays in 1/s and signed PCM gains per
+N s from measured objects. Each mode can have its own scrape, roll and fracture gain multipliers. Default
+scrape and rolling roughness are 0.4 and 0.2 N/√W. Their feature spacing defaults to 0.006 m and 0.024 m.
+Set the rigid emitter list in track order. A null emitter leaves its track free for fracture input.
+Rigid approach speed must exceed `impactSpeed` (default 0.25 m/s) to excite an impact. `rollingResistance`
+defaults to 0.025.
+
+Use `ModalSoundSolver.load({ id, rate, inputs, signal })` to set the field prefix, dyadic rate, declared input
+owners and load cancellation. Defaults are `modalSound`, level 0 (60 Hz) and `contacts`. Match the rigid
+fixed timestep to this rate. Select `both` to include fractures, then map joints in the rigid solver's
+`jointBreaks` setup or add a separate fracture producer. Each joint mapping provides its track, released
+strain energy in J, effective mass in kg and optional fraction of that joint's energy (default 1).
+`modalFractureImpulse` converts those values to an equivalent impulse for a fragment starting at rest.
+
+The default sample rate is 48 kHz. Use `copyBlock(track)` for the latest world step or `copySince(cursor, track)`
+to collect every retained sample after an advance. Keep one cursor per track. The default history is 0.25 s
+and can be set with `historySeconds`. The cursor and sample rate let an offline mixer place blocks exactly
+on its time line. The track data is a dry mono signal. Route audio buffers through Web Audio or
+`@margoengine/audio` to apply gain, panning, occlusion and room effects.
+
+The layout-1 f64 contact field has five words per track: normal impact impulse in N s, scrape power in W,
+scrape power times speed, rolling proxy power in W and rolling power times speed. The layout-1 fracture field
+has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
+Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.

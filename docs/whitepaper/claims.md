@@ -5518,3 +5518,13 @@ leave according to their Shields threshold and travel length. The evolved bed ch
 and its world replays bit-for-bit across 24, 30 and 60 fps in both memory modes.
 Proof in [the landscape coupling tests](../../packages/physics/tests/coupling/landscape.test.js) and
 [the relief snapshot test](../../packages/biomes/tests/landscape.test.js).
+
+### Rigid-contact modal excitation on the world clock (SOUND-04)
+
+A solved contact can produce audio without a manually scheduled cue. The acoustic impulse response
+and force convolution are checked against closed forms. Four material presets ring differently on the
+same rigid impact. Motionless support stays silent, and sliding and rolling activate their own
+excitation paths. A real rigid joint rupture drives the fragment's mode once. Sample counts and PCM
+agree between 24 and 60 frame-per-second views of one world, and snapshots reproduce the state in
+plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
+and modal sound example.

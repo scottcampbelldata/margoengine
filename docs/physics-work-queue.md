@@ -49,6 +49,11 @@ there, add a line below with the solver ID and what is needed, and build against
   hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads
   and reads versioned intent and force ports in the optional package until the shared fields are ready.
 
+- **SOUND-04:** Publish full-step rigid point impulses with substep timing, tangential slip and rolling
+  kinematics. A canonical fracture-energy or fragment impulse field would let BREAK-01 drive the same
+  acoustic tracks. The optional rigid adapter uses existing impulse totals, final manifolds and joint
+  ruptures meanwhile. Its versioned contact and fracture descriptors also accept external producers.
+  Register the modal audio kernel in module slot 11 when the framework module table adds production entries.
 
 - **LIFE-03:** Register swim kernel slot 5 in the module table alongside the other production families.
   Promote the school's kinematics and intent layouts when the shared fields owner is ready. The swimmer

@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -50,6 +50,7 @@ await build({
         earth: resolve(root, 'src/earth/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
         falling: resolve(root, 'src/falling.ts'),
+        'modal-sound': resolve(root, 'src/modal-sound.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
         sea: resolve(root, 'src/sea/index.ts'),
@@ -108,6 +109,9 @@ await copyFile(resolve(root, 'src/vegetation-kernel-shared.wasm'), resolve(dist,
 
 for (const name of ['falling-kernel.wasm', 'falling-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/falling', name), resolve(dist, name));
+
+for (const name of ['modal-sound-kernel.wasm', 'modal-sound-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/modal-sound', name), resolve(dist, name));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

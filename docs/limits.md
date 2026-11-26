@@ -9177,3 +9177,19 @@ The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2
 - Download HTML gives the same document the frame runs; it loads the packages from the same place as the page did, so
   a file downloaded from a local run needs that local server.
 - The glTF template loads the Khronos Box sample from raw.githubusercontent.com, so it needs the network.
+
+## Contact and modal sound (SOUND-04)
+
+Modal material presets contain authored resonances for a wood object, metal object, glass object and bell.
+Use measured modes and gains for a specific object. Each rigid radiator uses one bank with effective
+point-independent gain. The mono output is dry normalized PCM with linear superposition. Use a listener
+for spatial transfer and a mixer for headroom. The snapshot includes the retained sample history.
+
+Rigid contacts use the total normal impulse for a step, the last manifold's point weights, and relative
+motion at those points. Impacts use the pre-step approach speed. A contact that forms and disappears
+between published rigid steps may lack point data. With the current rigid interface, transients are
+placed at the first sample of the observed range. Source timing is bounded by one rigid step on a matched
+clock. The scrape and roll spectra use effective roughness profiles. Acoustic microcontact feedback, exact
+geometry-dependent roughness, and elastic radiation into the room require additional field models.
+The optional joint route computes equivalent scalar fracture excitation from supplied energy and mass.
+A brittle-fracture producer can publish per-track excitation in the same field layout.

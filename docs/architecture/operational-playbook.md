@@ -10081,3 +10081,13 @@ Evidence: `packages/post/test/utility-passes-browser.mjs` on WebGPU and the WebG
 (blur spread and monotone edge, split-screen isolation, pixel-exact formulas for ColorAverage and LUT1D within one level,
 DepthDownsample texels and normals equal to a CPU reduction in all four modes for 2 x 2 and uneven footprints), and
 `utility-passes.test.js`. Missing: GPU timings, and a visual comparison of the blur against a large Gaussian.
+
+## Contact sound evidence (SOUND-04)
+
+The optional Physics modal kernel converts per-track mechanical excitation to audio-rate sample ranges.
+The contact adapter owns the rigid kernel step and publishes contact loads. A separate solver reads
+the contact and fracture fields and owns the acoustic state, on the world clock. Native plain and
+shared kernels import the same arena layout and keep no evolving state in static memory. CPU regressions
+cover the analytic impulse and held-force convolution, resting contact, rolling versus sliding,
+rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
+an actual browser audio destination to verify the rendered signal.
