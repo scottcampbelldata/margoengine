@@ -565,6 +565,9 @@ export function texturedTintPBR(code: string): string {
 }
 /** `code` with a tint draw that reads the whole surface: the same bindings as the lit draw, the base colour and transmission maps included. The tint lanes hold optical depth (-1 for an opaque channel). */
 export function surfaceTintPBR(code: string): string {
+  // In the WGSL below, thicknessTexture.g (margoThickness) scales the optical depth (Beer-Lambert is linear in it); an
+  // opaque channel (-1) stays opaque where the map leaves any thickness, and a texel of 0 is a thin wall that attenuates
+  // nothing. The note lives here, outside the shader text, so no comment ships (KB-WGSL1).
   let out = (
     texturedTintPBR(code) +
     // A shader without a thickness map (slot 20, extendedShader) reads the thickness factor alone.
@@ -579,8 +582,6 @@ fn margoVolumeTint(i:Out,s:Surface,m:mat3x3f)->vec3f {
   let determinant=abs(dot(m[0],c0));
   let normal=normalize(vec3f(dot(m[0],i.normal),dot(m[1],i.normal),dot(m[2],i.normal)));
   let projected=abs(dot(vec3f(dot(c0,ray),dot(c1,ray),dot(c2,ray)),normal));
-  // thicknessTexture.g scales the optical depth (Beer-Lambert is linear in it); an opaque channel (-1) stays opaque where
-  // the map leaves any thickness, and a texel of 0 is a thin wall that attenuates nothing.
   let raw=vec3f(f.coordsB.zw,f.ext.z); let scale=margoThickness(i);
   let depth=select(vec3f(0),select(raw*scale,vec3f(-1),raw<vec3f(0)),scale>0.0);
   if(projected==0.0){return select(vec3f(0),vec3f(1),depth==vec3f(0));}
