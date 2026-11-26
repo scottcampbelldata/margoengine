@@ -1369,6 +1369,14 @@ A and specular A + colour RGB, packed as the extensions suggest, bind 5 extensio
 (linear) and sheen colour (sRGB) in one texture keep two views. Nothing to set: the same glTF file draws with fewer
 texture units.
 
+If a physical or extended material still composes a shader past the device's limit (WebGPU's sampled textures or
+samplers per stage, or the texture units the WebGL2 compatibility layer counts before linking), its five base maps
+pack into one texture array, four texture units fewer, and the shader is composed again. The choice is made per
+material and device at its first pipeline and kept; a material that fits keeps its separate base maps, and the array
+is made only when a packed pipeline first binds it. A material past the limit even packed still gets the existing
+`RangeError` (WebGPU) or the layer's coded `unsupported` ([errors#texture-units](https://margoengine.com/errors#texture-units)).
+Nothing to set: the same `loadGLTF` call draws on a 16-unit device where it would have been refused.
+
 The existing loadGLTF examples apply unchanged. Run scripts/stage-viewer-gpu-check.js with --compat
 for the licensed FlightHelmet integration regression, including cascaded
 shadows, IBL, visible product, turntable radius, failed-load rollback and disposal. No speed claim.

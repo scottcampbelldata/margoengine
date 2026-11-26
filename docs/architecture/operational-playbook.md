@@ -1,3 +1,18 @@
+### Section 5 evidence: texture units counted before linking, glTF base maps packed by the limit (2026-11-26)
+
+The WebGL2 layer counts a render pipeline's texture units per stage from its GLSL before linking (render.ts
+`programUnits`: texture and sampler pairs a stage reads, a pair both stages read counted once in the combined count,
+plus storage data textures; a texture that is only size-queried takes none) against MAX_TEXTURE_IMAGE_UNITS,
+MAX_VERTEX_TEXTURE_IMAGE_UNITS and MAX_COMBINED_TEXTURE_IMAGE_UNITS, and `createRenderPipeline` refuses past a limit
+with code `unsupported` (errors#texture-units) instead of a link failure. `device.textureUnits(descriptor)` returns the
+same count and keeps the translation for the next pipeline from that descriptor. gltf marks a material on a device
+when its composed shader passes WebGPU's per-stage counts or the layer's count, and composes it with its five base
+maps in one array (four units fewer); materials that fit are unchanged. Evidence: CPU checks (glsl.test.js
+`stageUnits`; device.test.js refusal before link per stage; materials-ext.test.js no pack at 16, pack at a 12 limit)
+and scripts/compat-units-gpu-check.js on native WebGPU and ANGLE Direct3D 11 (all 13 maps, the peak and shared maps),
+RTX A6000. Missing: a GPU scene that needs packing on a real 16-unit device (the check's scenes fit after the shared
+bindings); other GPUs not run.
+
 ### Section 5 evidence: shadow map viewer, WebGPU and the WebGL2 layer (2026-11-25)
 
 `ShadowMapViewer` (`@margoengine/shadows/viewer`) is a debug overlay: it loads the chosen depth layer with `textureLoad`

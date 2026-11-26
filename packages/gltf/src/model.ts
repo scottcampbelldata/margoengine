@@ -277,14 +277,22 @@ const planOf = (m: PBRMaterial, x: GLTFExtendedMaterials): ExtendedPlan => {
 };
 // An extended Frame: 104 floats, two UV rows per map slot (at least 21 slots), then 36 physical and extended floats.
 const extendedFloats = (m: PBRMaterial) => 140 + 8 * Math.max(21, m.maps.length);
-const needsPackedBase = (m: PBRMaterial, hooks: GLTFExtendedMaterials | undefined, source: PBRPrimitive['extension']) =>
-  !!(
-    !m.shading?.replacesTextures &&
-    !source?.replacesPhysical &&
-    (m.extended
-      ? hooks && planOf(m, hooks).packedBase
-      : m.physical && !m.shading && !source && m.maps.length > 5 && m.maps.slice(5, 13).filter(Boolean).length >= 6)
-  );
+// Packed base maps (base-textures.ts): a material reads its five base maps from one array, four texture units fewer,
+// once a draw of it on that device composed a shader past the per-stage limit (`derive`); a pipeline made from a packed
+// shader binds the array (`textureGroup`). The mark stays for the material on that device.
+const packedMaterials = new WeakMap<GPUDevice, WeakSet<PBRMaterial>>(),
+  packedPipelines = new WeakSet<GPURenderPipeline>(),
+  packedPlans = new WeakMap<ExtendedPlan, ExtendedPlan>(),
+  markPacked = (device: GPUDevice, m: PBRMaterial) => {
+    let marked = packedMaterials.get(device);
+    if (!marked) packedMaterials.set(device, (marked = new WeakSet()));
+    marked.add(m);
+  },
+  packedPlanOf = (plan: ExtendedPlan): ExtendedPlan => {
+    let packed = packedPlans.get(plan);
+    if (!packed) packedPlans.set(plan, (packed = { ...plan, packedBase: true }));
+    return packed;
+  };
 // Map slot i of resource material m gets its own texture and sampler: base slots always; extension slots of extended
 // materials only when bound, once per shared glTF texture.
 const ownSlot = (m: PBRMaterial, i: number, x?: GLTFExtendedMaterials) => {
@@ -338,17 +346,22 @@ const separable = (m: PBRMaterial) => m.settings[0] === 2 && !m.tint && !m.rende
 // Names the material + effects combination instead of an invalid pipeline when the shader declares more sampled textures or
 // samplers than the device allows per stage (WebGPU's default and guaranteed minimum is 16 of each; README "Texture bindings").
 // ponytail: counts declarations, not per-stage use, so a texture read only in the vertex stage still counts.
-function checkLimits(device: GPUDevice, code: string, combination: () => string[]): void {
+function limitExcess(device: GPUDevice, code: string): { kind: string; count: number; limit: number } | undefined {
   for (const [kind, pattern, limit] of [
     ['sampled textures', /var\s*\w+\s*:\s*texture_(?!storage)/g, device.limits?.maxSampledTexturesPerShaderStage ?? 16],
     ['samplers', /var\s*\w+\s*:\s*sampler/g, device.limits?.maxSamplersPerShaderStage ?? 16],
   ] as const) {
     const count = code.match(pattern)?.length ?? 0;
-    if (count > limit)
-      throw new RangeError(
-        `gltf/pbr: ${combination().join(' + ')} needs ${count} ${kind} per shader stage; this device allows ${limit}`,
-      );
+    if (count > limit) return { kind, count, limit };
   }
+  return undefined;
+}
+function checkLimits(device: GPUDevice, code: string, combination: () => string[]): void {
+  const excess = limitExcess(device, code);
+  if (excess)
+    throw new RangeError(
+      `gltf/pbr: ${combination().join(' + ')} needs ${excess.count} ${excess.kind} per shader stage; this device allows ${excess.limit}`,
+    );
 }
 import type { GLTFSplatCloud } from './asset.js';
 export type {
@@ -359,6 +372,7 @@ export type {
   GLTFSplatReader,
 } from './asset.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { compatTextureUnits } from '../../shared/compat.js';
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number; RENDER_ATTACHMENT: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 /** A caller-owned, already-open eye pass (`createRenderer`); `pass` is the one open after the draw. */
@@ -1628,7 +1642,7 @@ function textureGroup(
   m: PBRMaterial,
   hooks: GLTFExtendedMaterials | undefined,
 ): GPUBindGroup {
-  const packed = needsPackedBase(m, hooks, r.primitive.extension ?? m.extension);
+  const packed = packedPipelines.has(pipeline);
   if (packed && !r.packedBase) r.packedBase = packBaseTextures(device, r.baseSources!);
   return pipelineGroup(device, pipeline, 1, [
     ...(packed
@@ -3318,10 +3332,8 @@ export class PBRModel implements EnginePlugin {
       if (!sampler) samplers.set(samplerKey, (sampler = device.createSampler(state)));
       r.samplers.push(sampler);
     }
+    // The packed array is made by the first bind group of a packed pipeline (`textureGroup`).
     r.baseSources = baseSources;
-    const hooks = this.asset.hooks.materials || undefined;
-    if (needsPackedBase(m, hooks, r.primitive.extension ?? m.extension))
-      r.packedBase = packBaseTextures(device, baseSources);
   }
   registerPasses(graph: FrameGraph): void {
     let models = modelGraphs.get(graph);
@@ -5109,18 +5121,24 @@ export class PBRModel implements EnginePlugin {
     // Physical materials listing only the five core maps (materials built in code) draw the factor-only variant;
     // transmission draws its transmissive form, extended materials the shader of decoders.materials.
     const x = this.asset.hooks.materials || undefined,
+      // Base maps pack only where a composed shader of this material passed the device's limit (below).
+      packable =
+        !compact &&
+        !m.shading?.replacesTextures &&
+        (m.extended ? !!x : !!m.physical && m.maps.length > 5 && !shading && !source),
+      pack = packable && !!packedMaterials.get(c.device)?.has(m),
       physical = compact
         ? pbrShader
         : m.physical
           ? m.maps.length > 5
             ? !shading && !source
-              ? sparsePhysicalShader(m.maps)
+              ? sparsePhysicalShader(m.maps, pack)
               : physicalShader()
             : factorPhysicalShader()
           : extendedPBRShader;
     let code =
         !compact && m.extended
-          ? x!.shader(planOf(m, x!))
+          ? x!.shader(pack ? packedPlanOf(planOf(m, x!)) : planOf(m, x!))
           : !compact && m.tint
             ? transmissiveShader(physical)
             : physical,
@@ -5322,6 +5340,11 @@ export class PBRModel implements EnginePlugin {
     // A draw that may join an instanced batch derives without building its own pipeline or calling the lighting
     // bindings: the batch draws with its instanced variant (see `build`).
     if (!pipeline && build) {
+      if (packable && !pack && limitExcess(c.device, code)) {
+        // Over the limit with separate base maps: mark the material on this device and compose it packed.
+        markPacked(c.device, m);
+        return this.derive(d, frame, draws, c, mode, scratch, r, topology, wireframe, sign, external, inst, build);
+      }
       checkDrawLimits(c.device, code, m, transmission, this.lighting);
       const inputs = vertexInputs(code, white),
         module = c.device.createShaderModule({
@@ -5405,11 +5428,19 @@ export class PBRModel implements EnginePlugin {
             (mode === 'beauty' || through || capture ? 'greater-equal' : 'equal'),
         },
       };
+      // The WebGL2 layer counts units its own way (a map compared and loaded is two, storage takes data textures):
+      // past its limit too, the base maps pack.
+      if (packable && !pack && compatTextureUnits(c.device, descriptor)?.over) {
+        markPacked(c.device, m);
+        return this.derive(d, frame, draws, c, mode, scratch, r, topology, wireframe, sign, external, inst, build);
+      }
       const view = code.includes('margoView.'),
+        packedCode = code.includes('var margoBaseMaps:'),
         hold = (name: string, made: GPURenderPipeline) => {
           if (draws.pipelines.size >= 4096) draws.pipelines.clear();
           draws.pipelines.set(name, made);
           if (view) viewPipelines.add(made);
+          if (packedCode) packedPipelines.add(made);
           return made;
         },
         // Off the frame (`compile`): a draw that reached this key first keeps its own pipeline.

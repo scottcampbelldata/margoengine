@@ -46,9 +46,10 @@ const features = { iridescence: true, anisotropy: true, diffuseTransmission: tru
 // A recorded writeBuffer's hex bytes as floats (copied: Buffer.from may hand out a slice of a shared pool).
 const floatsOf = (hex) => new Float32Array(Uint8Array.from(Buffer.from(hex, 'hex')).buffer);
 
-test('all physical map bindings survive base-layer packing and model cleanup', async () => {
+// All 13 maps of a physical material, each its own texture, on a device allowing `limit` sampled textures per stage.
+function allMaps(limit) {
   const map = (index) => ({ index });
-  const { gpu, engine, model, view } = await scene(
+  return scene(
     [
       {
         pbrMetallicRoughness: { baseColorTexture: map(0), metallicRoughnessTexture: map(1) },
@@ -74,17 +75,46 @@ test('all physical map bindings survive base-layer packing and model cleanup', a
         images: Array.from({ length: 13 }, () => ({})),
       },
       images: Array.from({ length: 13 }, () => ({ width: 1, height: 1, close() {} })),
+      configureGPU(gpu) {
+        if (limit !== undefined) gpu.device.limits.maxSampledTexturesPerShaderStage = limit;
+      },
     },
   );
+}
+
+test('base maps stay separate textures while the composed shader fits the device limit', async () => {
+  const { gpu, engine, model, view } = await allMaps();
   try {
-    const r = model['resources'][0];
-    assert.equal(r.packedBase.texture.format, 'rgba32float');
-    assert.equal(r.packedBase.texture.depthOrArrayLayers, 5);
-    assert.equal(r.packedBase.params.size, 160);
     const log = gpu.record(() => {
       view.begin(0);
       model.draw(view.c, 'beauty', view.c.color, view.c.depth);
     });
+    const group = log.find((e) => e[0] === 'group' && e[2].entries.some((entry) => entry.binding === 25));
+    assert.deepEqual(
+      group[2].entries.map((e) => e.binding),
+      Array.from({ length: 26 }, (_, i) => i),
+      '13 maps of 16: hardware filtering for every map',
+    );
+    assert.equal(model['resources'][0].packedBase, undefined, 'no float array made');
+    assert.ok(!log.some((e) => e[0] === 'module' && e[2].code.includes('margoBaseMaps')));
+  } finally {
+    model.dispose();
+    engine.dispose();
+  }
+});
+
+test('all physical map bindings survive base-layer packing and model cleanup', async () => {
+  // 13 sampled textures on a 12-texture device: the base maps pack (1 + 8 = 9).
+  const { gpu, engine, model, view } = await allMaps(12);
+  try {
+    const r = model['resources'][0];
+    const log = gpu.record(() => {
+      view.begin(0);
+      model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+    });
+    assert.equal(r.packedBase.texture.format, 'rgba32float');
+    assert.equal(r.packedBase.texture.depthOrArrayLayers, 5);
+    assert.equal(r.packedBase.params.size, 160);
     const group = log.find((e) => e[0] === 'group' && e[2].entries.some((entry) => entry.binding === 25));
     assert.deepEqual(
       group[2].entries.map((e) => e.binding),
@@ -374,9 +404,10 @@ test('binding plan: shared glTF textures bind once, at most 8 extension textures
     'extension slots beyond the limit use their defaults',
   );
   assert.equal(extendedTextureLimit, 8);
-  const code = extendedShader(distinct);
+  assert.equal(distinct.packedBase, undefined, 'gltf/pbr packs the base maps only past the device limit');
+  assert.equal(textures(extendedShader(distinct)), 5 + 8);
+  const code = extendedShader({ ...distinct, packedBase: true });
   assert.equal(textures(code), 1 + 8);
-  assert.equal(distinct.packedBase, true);
   for (let slot = 0; slot < 5; slot++) assert.match(code, new RegExp('margoBaseSample\\(' + slot + ','));
   for (let binding = 0; binding < 8; binding++) assert.ok(code.includes('var margoMap' + binding + ':texture_2d<f32>'));
   assert.match(
@@ -389,7 +420,7 @@ test('binding plan: shared glTF textures bind once, at most 8 extension textures
     /margoAnisotropy\(s\.n,t,b,vec4f\(1,0\.5,1,1\)\.xyz\)/,
     'anisotropy default texel (1, 0.5, 1): +X direction, full strength',
   );
-  assert.equal(extendedShader(distinct), code, 'cached per plan');
+  assert.equal(extendedShader({ ...distinct, packedBase: true }), code, 'cached per plan');
 });
 
 test('extended shaders: hook points once, only used features compiled, worst case 12 sampled textures reserves units for compatibility storage and shadow aliases', async () => {
@@ -440,12 +471,13 @@ test('extended shaders: hook points once, only used features compiled, worst cas
     paramsBuffer: {},
     restore: () => Promise.resolve(),
   });
-  const worst = extendedShader(
-    extendedPlan(
+  // gltf/pbr composes the worst case packed: unpacked it needs 16 with this lighting, packed 12.
+  const plan = extendedPlan(
       Array.from({ length: 18 }, (_, k) => ({ index: k })),
       features,
     ),
-  );
+    worst = extendedShader({ ...plan, packedBase: true });
+  assert.equal(textures([shadows.pbr(2), clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, extendedShader(plan))), 16);
   const lit = [shadows.pbr(2), clustered.pbr(2), ibl.pbr(2)].reduce(lightPBR, worst);
   assert.equal(textures(lit), 12, 'worst case: 9 material + shadow cascades + IBL cube + local shadow atlas');
   assert.equal(
