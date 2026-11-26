@@ -2200,8 +2200,8 @@ const fish = school.read(0);
 console.log(fish.position, fish.velocity, fish.intent);
 ```
 
-- `SchoolSolver.load({ id, level, mode, readPredators, fields, signal })` loads the SIMD kernel on demand.
-  Defaults are id `school`, level 0 (60 Hz), mode `point-mass`, and `readPredators: false`. Use `fields.intent`,
+- `SchoolSolver.load({ id, level, mode, readPredators, fields, signal })` loads the SIMD kernel on demand. The solver supports
+  plain and shared world memory. A browser without cross-origin isolation loads the plain build. Defaults are id `school`, level 0 (60 Hz), mode `point-mass`, and `readPredators: false`. Use `fields.intent`,
   `fields.kinematics`, or `fields.predators` to give a group its own registry names. The default names are
   `schoolIntent`, `schoolKinematics`, and `schoolPredators`.
 - `repulsionRadius`, `orientationRadius`, and `attractionRadius` default to 0.5, 2, and 6 m. `visionDot`

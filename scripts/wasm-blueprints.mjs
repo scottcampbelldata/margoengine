@@ -82,6 +82,14 @@ export const BLUEPRINTS = [
     crate: 'packages/physics/school-kernel',
     blueprint: 'packages/physics/src/schooling/school-kernel.wasm',
     script: 'packages/physics/scripts/build-school-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'school-kernel-shared',
+    crate: 'packages/physics/school-kernel',
+    blueprint: 'packages/physics/src/schooling/school-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-school-kernel.mjs',
+    args: ['shared'],
   },
   {
     name: 'physics2d-kernel',

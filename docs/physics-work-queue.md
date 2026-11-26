@@ -48,7 +48,8 @@ there, add a line below with the solver ID and what is needed, and build against
 - **LIFE-04 / LIFE-03 / AERO-03:** Move the versioned `schoolIntent` and `schoolKinematics` descriptors and f64 row
   layouts into `@margoengine/math/fields` once the owning body solvers adopt the ports. A shared `SolverHost.cellSize`
   would also let port and flow readers convert cells without duplicating `world.cellSize` in their parameters. LIFE-04
-  ships the optional entry's descriptors and explicit cell size in the interim.
+  ships the optional entry's descriptors and explicit cell size in the interim. The school kernel uses static window slot 4.
+  A caller-owned neighbour-grid workspace in K06 would let the kernel import only the world's memory.
 
 - RESOLVED (2026-11-25, see the commit that adds this note): The framework owners are needed for the API diagnostic quality gate for FIRE-06. On public main c62096b0a4, the API gate reports 12 missing repair instructions in `packages/physics/src/world/scheduler.ts`, one in `snapshot.ts`, and two in `world.ts`. Please give callers an actionable remedy for invalid accelerator and rate options, a corrupt snapshot, and incomplete implicit-pressure coupling declarations. The protected framework paths remain owner-managed.
   Every framework throw in `scheduler.ts`, `snapshot.ts` and `world.ts` now names its fix.

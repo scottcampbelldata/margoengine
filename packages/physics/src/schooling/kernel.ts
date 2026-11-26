@@ -1,13 +1,12 @@
 import { MargoError } from '@margoengine/math/errors';
+import { canShareMemory, isShared, STACK_BYTES } from '../world/memory.js';
 import type { Region, SolverHost } from '../world/solver.js';
 
-// Static data, a per-instance downward-growing stack and a step-local heap occupy one arena lease.
-const STATIC_BYTES = 4096;
-const STACK_BYTES = 65536;
+// A per-instance downward-growing stack and a step-local workspace occupy one arena lease.
 const ALIGNMENT = 16;
 
 type KernelExports = WebAssembly.Exports & {
-  __wasm_apply_data_relocs?(): void;
+  __stack_pointer: WebAssembly.Global;
   school_intent(
     bodies: number,
     count: number,
@@ -25,9 +24,24 @@ type KernelExports = WebAssembly.Exports & {
   ): number;
 };
 
-export async function loadSchoolKernel(signal?: AbortSignal): Promise<WebAssembly.Module> {
+export interface SchoolKernelBuilds {
+  readonly plain: WebAssembly.Module;
+  readonly shared?: WebAssembly.Module;
+}
+
+export async function loadSchoolKernel(signal?: AbortSignal): Promise<SchoolKernelBuilds> {
   signal?.throwIfAborted();
-  const url = new URL(/* @vite-ignore */ './school-kernel.wasm?no-inline', import.meta.url);
+  const plainUrl = new URL(/* @vite-ignore */ './school-kernel.wasm?no-inline', import.meta.url);
+  const [plain, shared] = await Promise.all([
+    compile(plainUrl, signal),
+    canShareMemory()
+      ? compile(new URL(/* @vite-ignore */ './school-kernel-shared.wasm?no-inline', import.meta.url), signal)
+      : undefined,
+  ]);
+  return { plain, shared };
+}
+
+async function compile(url: URL, signal?: AbortSignal): Promise<WebAssembly.Module> {
   try {
     if (url.protocol === 'file:') {
       url.search = '';
@@ -54,27 +68,29 @@ export async function loadSchoolKernel(signal?: AbortSignal): Promise<WebAssembl
 }
 
 export function schoolKernel(
-  module: WebAssembly.Module,
+  builds: SchoolKernelBuilds,
   host: SolverHost,
   memberCount: number,
 ): KernelExports['school_intent'] {
   // Geometric Vec growth leaves less than four items allocated per live item in each growing
   // buffer. A point is 12 B, two key–id pairs 64 B, a key 16 B, two counters 8 B and a ranking
   // entry 16 B. 512 B/member also covers reserve rounding and alignment inside the kernel.
-  const bytes = STATIC_BYTES + STACK_BYTES + ALIGNMENT + 512 * memberCount;
+  const module = isShared(host.memory) ? builds.shared : builds.plain;
+  if (!module)
+    throw new MargoError(
+      'unsupported',
+      'The shared school kernel is unavailable. Use plain world memory on this host.',
+    );
+  const bytes = STACK_BYTES + ALIGNMENT + 512 * memberCount;
   const lease: Region = host.allocate('school-kernel-scratch', bytes, 'u8', 1);
   const base = Math.ceil(lease.byteOffset / ALIGNMENT) * ALIGNMENT;
-  const stackTop = base + STATIC_BYTES + STACK_BYTES;
+  const stackTop = base + STACK_BYTES;
   const limit = lease.byteOffset + lease.byteLength;
-  const stack = new WebAssembly.Global({ value: 'i32', mutable: true }, stackTop);
   let cursor = stackTop;
 
   const instance = new WebAssembly.Instance(module, {
     env: {
       memory: host.memory,
-      __memory_base: base,
-      __table_base: 0,
-      __stack_pointer: stack,
       school_alloc: (size: number, alignment: number) => {
         const offset = Math.ceil(cursor / alignment) * alignment;
         const end = offset + (size >>> 0);
@@ -89,7 +105,9 @@ export function schoolKernel(
     },
   });
   const kernel = instance.exports as KernelExports;
-  kernel.__wasm_apply_data_relocs?.();
+  const stack = kernel.__stack_pointer;
+  if (!(stack instanceof WebAssembly.Global))
+    throw new MargoError('failed', 'The school kernel has no stack pointer. Run the schooling package build.');
   return (...args) => {
     cursor = stackTop;
     stack.value = stackTop;

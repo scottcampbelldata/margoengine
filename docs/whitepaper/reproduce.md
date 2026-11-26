@@ -4248,6 +4248,6 @@ scene is one lit box on the default background; no external assets.
 
 Build with `npm run build:packages`. Run `node --test packages/physics/tests/coupling/schooling.test.js` for
 the analytical cases, predictive escape, cross-cell ports and replay hashes. Run
-`node scripts/wasm-blueprints.mjs --rebuild --compare --only=school-kernel` with the pinned Rust toolchain
+`node scripts/wasm-blueprints.mjs --rebuild --compare --only=school-kernel,school-kernel-shared` with the pinned Rust toolchain
 to check the Wasm bytes. The optional JavaScript and separately fetched Wasm sizes are recorded by
 `node examples/package-benchmarks/entry-sizes.mjs`.

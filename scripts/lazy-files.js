@@ -662,6 +662,14 @@ export const LAZY_FILES = [
     measure: 'file',
     when: '`await SchoolSolver.load()` (`@margoengine/physics/schooling`), on demand',
   },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/school-kernel-shared.wasm',
+    label: 'school-kernel-shared.wasm',
+    kind: 'Collective animal motion neighbour kernel for shared memory (Rust, SIMD)',
+    measure: 'file',
+    when: 'SchoolSolver.load() in a runtime that supports shared world memory',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics2d',

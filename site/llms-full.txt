@@ -4644,6 +4644,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Smart objects (`@margoengine/behavior/smart-objects`, 2026-11-07) | Enforced: object ids are unique, use names are unique on an object, a use with `slots` has one, `attenuation` is 0 or more, needs and advertised amounts are finite. By method: `distance` is straight, not a walk; `offers` looks at every object, with no spatial index; a claim holds its place until released, so an agent that dies must release it; `run` is called wherever the agent is, and walking there is yours to do; `available` is checked when offered and when claimed, not while a claim runs; the object's `state` and an agent's `needs` are not saved. Not measured on a real level or at a real crowd size. | `distance` is straight, `offers` looks at every object, and `run` is called wherever the agent is. | A claim holds its place until released, and `available` is not checked while a claim runs. | Call `claim.release()` (or use `using`) when an agent dies. Pass `radius` to `offers` to cut the list to nearby objects, and walk to `claim.position()` yourself. |
 | Flow fields (`@margoengine/behavior/flowfield`, 2026-11-07) | Enforced: size and stamp sizes are whole numbers of 1 or more, `cell` above 0, costs whole numbers from 1 to 255, goals three finite numbers, `steer` count, speed and delta 0 or more. | The field is one flat grid built in one call, so cost follows the whole map. | By method: one flat grid, with no sectors, portals or tile cache, so memory and build time grow with the whole map; one field per goal and movement type; every change rebuilds the whole field in one synchronous call; no clearance, so a gap of one cell passes a unit of any size; the ground is flat, and height is ignored; line of sight flags are built for a single goal only and can miss a few cells at the edge of a shadow; first order fast marching reads over the true distance on the diagonal, by 21% one cell from the goal, under 11% past 5 cells and under 3% past 40; units do not avoid each other. Cost is per cell, so `integration` is in cells, not world units. Stand-in proof: generated grids only, and no build or steer time measured. | Build the field over only the area units use (`min` and `size`), and use a larger `cell` where a coarser grid will do. |
 | Task network planner (`@margoengine/behavior/htn`, 2026-11-07) | Enforced: task names are unique, a compound task has a method, every subtask exists, symbols are booleans, strings or finite numbers and none is called `__proto__`, `maxSteps` is 1 or more. By method: total order only, with no parallel or partly ordered tasks; no costs, so the plan is the first by method order, not the cheapest; tasks take no parameters, so `NavigateTo(x)` needs a task per place or a symbol; a recursion that never ends returns `null` at `maxSteps` (10,000), the same as no plan; function conditions and effects must not touch anything but the state given, or backtracking cannot undo them; a sensor change is found by comparing the state as JSON once per update; a running task's own preconditions are not rechecked; no automatic split into partial plans. Not measured on a real game domain. | The planner is total order only, with no costs and no task parameters. | A recursion that never ends returns `null` at `maxSteps` (10,000), the same as no plan. | Use a task per place or a symbol for something like `NavigateTo(x)`. |
+| Physical point-mass steering (`@margoengine/behavior/steering`) | `locomotion` accepts a positive finite mass, nonnegative quadratic drag and turn limits, and a finite fluid velocity. The method splits propulsive acceleration and exact drag over each tick. Limits apply to motion relative to the fluid. | Newton's force law, quadratic coasting and the local curvature limit are covered by the steering tests. | Each member is a point mass. The method leaves body attitude, shape, lift, contact and thrust production to other solvers. | Set `dragFactor` to half the density times drag coefficient times area. The measured steering entry grew from 3,871 to 4,736 B gzip and the root from 8,891 to 9,791 B. A separate physical entry would duplicate the steering integration path or add another public import to configure one option. |
 | Context steering (`@margoengine/behavior/context`, 2026-11-07) | Enforced: `resolution` is a whole number of 4 or more, `blur` a whole number of 0 or more, `memory` 0 or more and below 1, `slack` 0 or more, `chase` `range` above 0 and `spread` 0 or more, `avoid` `clearance` above 0 and `radius` 0 or more. | A behaviour sees only what it is given and steers locally. | By method: headings lie on the ground plane; the racing lane mode of the chapter is left out; a behaviour sees only what it is given, with no navmesh or walls, so it steers locally and can sit in a dead end; a gap narrower than a slot can be missed at a low `resolution`; `strength` caps at 1; `memory` is a plain blend, so two pulls that swap places every update with equal averages still swap, by a smaller margin. Not measured on a real level or at a real crowd size. | Raise `resolution` so a narrow gap is not missed. For dead ends, add a behaviour of your own (a `ContextBehavior`) that writes the direction of a `FlowField` or a path into `interest`. |
 | View cube drag to orbit (`drag` on `ViewCube`, 2026-11-08) | Proved with real mouse events in Chromium on a Radeon 680M (LIM-579). By method: turntable azimuth and elevation, two radians per cube width; elevation stops at the poles. | The angles are measured from where the press went down, so the pointer always maps to the same view; a wheel zoom during a drag keeps its new distance. | Under 3 px of movement a press is a click; a drag stops wherever it is released, not on a named view. | `cube.drag = false`; click a face, edge or corner for an exact view. |
 | View cube home view (`home` and `setHome` on `ViewCube`, 2026-11-08) | Proved with a real mouse click in Chromium on a Radeon 680M (LIM-580). Enforced: a home is a position and a target, three finite numbers each and apart. | The target and distance move with the eased view angles in one animation; any other camera move during it cancels it. | Only position and target are kept: the field of view, the projection and any zoom of an orthographic camera stay as they are. | Set the projection and field of view yourself after `cube.home()`, or call `camera.fitToBoundingBox` to frame a model. |
@@ -12045,6 +12046,25 @@ and opaque depth. The effect samples the displaced colour inside the frame. Off-
 and light paths that require large-angle or multiple refraction are outside this screen-space model. The heat-haze entry grows from 11,008 B to 13,299 B gzip for volume upload, ray integration and lifetime management.
 
 The shared sparse solver for stiff heat grids and the original kiln and turbofan scene integrations remain open.
+
+
+## Collective animal motion
+
+`@margoengine/physics/schooling` uses a deterministic grid over local coordinates, with f64 distance and
+field rows. A rank limit applies only to neighbours within the outer radius and the visible sector. The
+model assumes a predator holds velocity over the prediction horizon. Dense groups or very large sensing
+radii increase the number of candidates. The kernel uses world memory and a private per-instance arena region
+for its stack, static data, and grid work. Its capacity grows with the number of configured members.
+Membership and port layout stay fixed for a solver's lifetime. Use a fresh world setup for a different row layout.
+
+The point-mass model represents inertial mass, thrust and quadratic drag. Its local curvature bound concerns
+propulsive acceleration relative to the medium. A spatially varying current can also bend the trajectory.
+Body bending, contact, wing lift, flap power and tail propulsion belong to the body solver. The intent
+fixture verifies the field hand-off and a bank derived from lateral acceleration. The original film shots
+still need playback checks.
+
+The optional entry is 4,998 B gzip. The plain SIMD kernel is 4,464 B gzip (8,622 B raw). The shared variant is 4,523 B gzip (8,710 B raw).
+That budget covers the field adapter and the point-mass mode in one import. Core and stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -22446,6 +22466,16 @@ available in this lane; the new pointer GPU checks are desktop evidence only.
   Linux result yet. The text failure of the same run is the colour emoji entry below.
 - **Needed to close:** those three suites run to the end on Linux, on a machine that stays cool under a long GPU
   run, and the results recorded here.
+
+### Fixed: steering could turn without a mass, drag or curvature constraint (PA-83, LIFE-04)
+
+- **Repro.** In the old steering point update, the same force moved unequal masses alike. Turning demand could
+  rotate the velocity without a lateral or radius constraint. A member coasting in a medium kept its speed.
+- **Cause.** The update treated steering as an acceleration and only bounded total speed. The physical update
+  applies force to mass, bounds the normal acceleration, and solves drag in the medium frame.
+- **Regression.** `packages/behavior/tests/steering.test.js` and
+  `packages/physics/tests/coupling/schooling.test.js` check force, curvature, relative coasting, and a school
+  responding to a moving predator. BB-4, BB-6 and AVIARY-3 still have open shot checks in the demo review.
 
 ## Open defects
 
