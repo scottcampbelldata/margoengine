@@ -75,6 +75,11 @@ export interface TracerBedJets {
     };
 }
 
+export interface TracerDiffusionKnot {
+    depth: number;
+    diffusivity: number;
+}
+
 export interface TracerMaterial {
     density: number;
     diameter?: number;
@@ -114,6 +119,7 @@ export interface TracerParams {
     viscosity?: number;
     horizontalDiffusivity?: number;
     verticalDiffusivity?: number;
+    verticalDiffusivityProfile?: readonly TracerDiffusionKnot[];
     particleMass?: number;
     capacity?: number;
     breaches?: number;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20611876,
+  "total": 20612312,
   "history": [
     {
       "date": "2026-10-24",
@@ -13783,6 +13783,12 @@
       "commit": "dbe79b009c",
       "grew": 1,
       "reason": "SEA-08 wet bilge keel normal drag and forward lift grows seakeeping from 27343 to 28329 B gzip. It shares the hull roll impulse and live immersion sampler. A split would require a second hull force and pose connection. Core plus Stage remains 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "583b62b7ec",
+      "grew": 1,
+      "reason": "SEA-15's depth-dependent vertical mixing moves physics/tracers from 11002 to 11426 B gzip. The optional ceiling rises from 11333 to 11769 B. The profile supplies vertical variance and drift inside existing parcel integration. A separate entry would duplicate that integrator or call across it for each water parcel."
     }
   ],
   "items": {
@@ -14660,7 +14666,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 13395,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 11333,
+    "@margoengine/physics/tracers": 11769,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
