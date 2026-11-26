@@ -9636,7 +9636,7 @@ fixed stratification, upper and lower pressure levels, and a vertically integrat
 vertical momentum, explicit ice microphysics, latent heating feedback and data assimilation require separate models.
 Forecasts and film-length time acceleration use different clock scales. Keep coupled physical budgets on the same scale.
 
-The optional Physics entry measures 7,237 B gzip within a 7,493 B ceiling. The Weather adapter measures 940 B gzip
+The optional Physics entry measures 7,241 B gzip within a 7,497 B ceiling. The Weather adapter measures 940 B gzip
 within a 1,196 B ceiling. Both optional native assets are 22,154 B raw and 7,388 B gzip.
 These entries leave Core, Stage, Physics World and the Weather root unchanged.
 

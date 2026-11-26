@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20384777,
+  "total": 20386107,
   "history": [
     {
       "date": "2026-10-24",
@@ -13125,6 +13125,12 @@
       "commit": "d1c604eb12",
       "grew": 1,
       "reason": "EARTH-05 resolved pressure fields, geometric contact widths and native repose take the optional entry from 9206 to 9692 B gzip. Both modes share the existing coupling and native loader inside that tree-shakable entry, a split would duplicate both. Core plus Stage stays 24820 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d19267aa1e",
+      "grew": 1,
+      "reason": "ATMO-10's optional synoptic entry increases from 5911 to 7241 B gzip with two-layer baroclinic growth, hypsometric temperature, altitude-dependent winds and measured ocean stress. A split would duplicate the regional grid, native loader and field outputs."
     }
   ],
   "items": {
@@ -13989,7 +13995,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
     "@margoengine/physics/surf": 9345,
-    "@margoengine/physics/synoptic": 6167,
+    "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 9983,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,

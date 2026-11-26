@@ -392,7 +392,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FLUID-02 | Position based fluids (fast mode) | none | Codex | LANDED 14a5956173 |
 | FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
 | HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed db1950c88f |
-| ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | BUILDING (codex/physics-synoptic) |
+| ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | LANDED d19267aa1e |
 | EARTH-01 | MPM continuum | stand-in | Open | OPEN |
 | EARTH-02 | Depth-averaged granular flow | partial | Open | OPEN |
 | EARTH-04 | Discrete-element rubble and boulders | partial | Open | OPEN |

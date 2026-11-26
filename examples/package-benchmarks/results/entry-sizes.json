@@ -14164,8 +14164,8 @@
         "gzip": 9692
       },
       "./synoptic": {
-        "raw": 13632,
-        "gzip": 5911
+        "raw": 17285,
+        "gzip": 7241
       },
       "./pbf": {
         "raw": 14209,
@@ -18141,14 +18141,14 @@
       "brotli": 2532
     },
     "packages/physics/dist/synoptic-kernel.wasm": {
-      "raw": 13821,
-      "gzip": 5419,
-      "brotli": 4764
+      "raw": 22154,
+      "gzip": 7388,
+      "brotli": 6371
     },
     "packages/physics/dist/synoptic-kernel-shared.wasm": {
-      "raw": 13821,
-      "gzip": 5420,
-      "brotli": 4765
+      "raw": 22154,
+      "gzip": 7388,
+      "brotli": 6371
     },
     "packages/physics/dist/pbf-kernel.wasm": {
       "raw": 17854,
