@@ -6,6 +6,14 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
+
+- **Repro:** Send a brief sound from 3 km away. Its old positional path pans and attenuates the sound as soon as it plays.
+- **Cause:** Panning and Doppler act on the source's current pose. The graph carried no travel time or air absorption.
+- **Fix:** `OutdoorSound` solves the acoustic path and `OutdoorAudio` applies its delay and broad spectral response.
+- **Regression:** `packages/physics/tests/coupling/outdoor-sound.test.js` checks air, diffraction and reflection.
+  `packages/audio/tests/outdoor-sound.browser.mjs` measures the added arrival delay in real PCM.
+
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in

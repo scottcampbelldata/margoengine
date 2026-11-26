@@ -8,6 +8,14 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Outdoor sound (SOUND-01, 2026-11-26). The solver traces one weakly refracted path or one dominant terrain edge
+  per link. It estimates ground interference with one locally horizontal reflecting plane. It uses the current
+  wind profile for the path, with no caustics, atmospheric ducts, turbulence scattering, or multiple-edge
+  diffraction. ISO 9613-1 reports ±10% absorption accuracy for its ordinary weather range. The solver publishes
+  eight octave gains, while the realtime playback approximates the response with two shelves and a centre gain.
+  Maximum configured realtime delay is 180 s (Web Audio DelayNode), with a 30 s default.
+  The optional physics and audio entries are 4,391 and 1,191 bytes gzip.
+
 - Webcam face to morph targets (`@margoengine/input/face`, 2026-11-26): no detector shipped; the app supplies one.
   Landmarks alone give 15 of the 52 ARKit shapes (blinks, wide eyes, jaw, smiles, frowns, pucker, brows); the others
   need the detector's blendshape scores. Landmark weights are distance ratios against a neutral face, so they read

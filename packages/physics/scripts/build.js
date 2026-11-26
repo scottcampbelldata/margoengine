@@ -53,6 +53,7 @@ await build({
         falling: resolve(root, 'src/falling.ts'),
         ageing: resolve(root, 'src/ageing.ts'),
         'modal-sound': resolve(root, 'src/modal-sound.ts'),
+        'outdoor-sound': resolve(root, 'src/outdoor-sound/index.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
         entry: resolve(root, 'src/entry/index.ts'),

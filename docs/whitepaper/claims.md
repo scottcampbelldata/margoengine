@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Outdoor sound (SOUND-01, 2026-11-26). Terrain ridge diffraction, Weather wind, the round-trip ground image
+  and the ISO 9613-1 coefficient are checked against independent reference values. Web Audio delays a 3 km
+  pulse by 8.74044 s at 48 kHz relative to its otherwise identical undelayed filter chain. Reproduce with
+  `node --test packages/physics/tests/coupling/outdoor-sound.test.js` and
+  `node packages/audio/tests/outdoor-sound.browser.mjs` after building Physics and Audio.
+
 - Ray fin and seabed coupling (BB-7, 2026-11-26). The live swimming port entrains sand from the near bed
   and leaves a distant bed or still fins clear. The mass ledger closes as the plume settles. The rendered
   fixture moves 14.1 pixels downstream on WebGPU and the WebGL2 compatibility backend before clearing.

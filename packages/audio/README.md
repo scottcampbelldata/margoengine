@@ -202,6 +202,38 @@ Node tests use stand-in rendering and audio graphs. The browser test measures ge
 in real OfflineAudioContext renders beside real WebGPU, WebGL2 and compatibility engines.
 Real recordings, listening quality, other browsers and speed are unmeasured.
 
+## Outdoor propagation
+
+`OutdoorAudio` applies a solved outdoor path to a `PositionalAudio`. It uses a delay line, the 1 kHz gain,
+and shelves driven by the 63 Hz and 8 kHz gains. The path model handles distance attenuation while the sound
+continues to pan and use its authored volume and filters. `maxDelay` defaults to 30 seconds and accepts
+values above zero through 180 seconds. Moving paths smooth with the listener's time constant unless you
+pass `smoothing`. Use one time-of-flight controller per sound. The controller removes its nodes on disposal
+and restores the sound's distance rolloff.
+
+```ts
+import { AudioListener, PositionalAudio } from 'margoengine/audio';
+import { OutdoorAudio } from 'margoengine/audio/outdoor';
+import { OutdoorSound } from 'margoengine/physics/outdoor-sound';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const paths = new OutdoorSound();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(paths, {
+  links: [{ source: [0, 0, -34.3], listener: [0, 0, 0] }],
+});
+world.advance(1);
+const audio = new OfflineAudioContext(2, 12000, 48000);
+using listener = new AudioListener({ context: audio, smoothing: 0 });
+using sound = new PositionalAudio(listener, { panningModel: 'equalpower' });
+sound.setPosition(0, 0, -34.3);
+using outdoor = new OutdoorAudio(sound, () => paths.read());
+const pulse = audio.createBuffer(1, 64, 48000);
+pulse.getChannelData(0)[0] = 1;
+sound.setBuffer(pulse).play();
+const pcm = (await audio.startRendering()).getChannelData(0);
+console.log(pcm.findIndex((value) => Math.abs(value) > 1e-9) / 48000);
+```
+
 ## Doppler
 
 `@margoengine/audio/doppler` shifts buffer pitch from source and listener world motion.

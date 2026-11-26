@@ -3199,6 +3199,32 @@ Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic f
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
 
+## Outdoor sound
+
+`@margoengine/physics/outdoor-sound` gives each source–listener link its travel time and eight octave gains.
+Set `air` to a Weather wind field for advection and vertical refraction, and `bed` to a TerrainBed for
+diffraction. An explicit `groundY` adds a plane reflection. The reflected pressure defaults to full strength
+and `groundReflection: 0` turns it off. With still air, temperature defaults to 293.15 K, pressure to
+101,325 Pa, and relative humidity to 0.5. Call `read` after advancing the world. Callbacks for moving links
+take world seconds and return metres relative to the solver cell. For a nonstandard world cell size, pass the
+same `cellSize` to the solver. The default is 4,096 m per cell.
+
+```ts
+import { OutdoorSound } from 'margoengine/physics/outdoor-sound';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const paths = new OutdoorSound();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(paths, {
+  links: [{ source: [0, 3, 0], listener: [3000, 3, 0] }],
+});
+world.advance(1);
+console.log(paths.read().delaySeconds.toFixed(2)); // 8.74
+```
+
+`read` also provides the band losses before summing spreading, air, terrain, and interference. Use
+`aviationNWave` for a prescribed far-field civil aviation signature. For a playback delay, pass the reading
+to the optional `OutdoorAudio` controller.
+
 ## Contact and modal sound
 
 Use @margoengine/physics/modal-sound with a PhysicsWorld to turn collision, scrape, roll and fracture

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Outdoor sound time of flight</title></head>
+<body>
+  <script type="module">
+    import { AudioListener, PositionalAudio } from '/packages/audio/dist/index.js';
+    import { OutdoorAudio } from '/packages/audio/dist/outdoor.js';
+    import { OutdoorSound } from '/packages/physics/dist/outdoor-sound.js';
+    import { PhysicsWorld } from '/packages/physics/dist/world.js';
+
+    window.measureOutdoorSound = async (delayEnabled) => {
+      const rate = 48000;
+      const context = new OfflineAudioContext(2, 9 * rate, rate);
+      const listener = new AudioListener({ context, smoothing: 0, autoResume: false });
+      const sound = new PositionalAudio(listener, { panningModel: 'equalpower', rolloffFactor: 1.25 });
+      sound.setPosition(0, 0, -3000);
+      const solver = new OutdoorSound();
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(solver, {
+        links: [{ source: [0, 0, -3000], listener: [0, 0, 0] }],
+      });
+      world.advance(1);
+      const dryFilter = context.createGain();
+      sound.setFilters([dryFilter]);
+      const propagation = new OutdoorAudio(sound, () => {
+        const path = solver.read();
+        return delayEnabled ? path : { ...path, delaySeconds: 0 };
+      }, { maxDelay: 9 });
+      const installed = sound.getFilters().length === 5 && sound.rolloffFactor === 0;
+      const pulse = context.createBuffer(1, 128, rate);
+      pulse.getChannelData(0)[0] = 1;
+      sound.setBuffer(pulse).play();
+      const pcm = (await context.startRendering()).getChannelData(0);
+      const first = pcm.findIndex((value) => Math.abs(value) > 1e-10);
+      const stable = pcm.every(Number.isFinite);
+      const expected = solver.read().delaySeconds * rate;
+      propagation.dispose();
+      const restored = sound.getFilters().length === 1 && sound.getFilters()[0] === dryFilter && sound.rolloffFactor === 1.25;
+      listener.dispose();
+      return { first, expected, rate, installed, restored, stable };
+    };
+  </script>
+</body>
+</html>

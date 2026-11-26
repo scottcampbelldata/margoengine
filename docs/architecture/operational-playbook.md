@@ -4265,6 +4265,13 @@ reader receives the same pressure and travel time on the 60 Hz world clock as th
 Tests compare complete world hashes across frame rates and after seek. The scope is a depth-dependent
 column and high-frequency paraxial beams. See the [clean-room record](../clean-room.md#underwater-acoustics-sound-03).
 
+### Outdoor acoustics (SOUND-01)
+
+The world path region publishes delay, clearance and octave gains at 60 Hz. TerrainBed supplies the ridge geometry
+and Weather supplies the boundary layer through the shared Wind contract. Frame-rate and seek cases compare world
+hashes. Chromium's OfflineAudioContext measures the physical delay with the same panner and filters in a control
+render. For the 3 km still-air check, the delayed waveform starts 419,541 samples later at 48 kHz.
+
 ### Ice thermodynamics (ICE-05)
 
 The world coupling test applies heat through the registry and verifies the phase budget, liquid and vapour mass,

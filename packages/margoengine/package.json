@@ -187,6 +187,10 @@
       "types": "./dist/audio/doppler.d.ts",
       "import": "./dist/audio/doppler.js"
     },
+    "./audio/outdoor": {
+      "types": "./dist/audio/outdoor.d.ts",
+      "import": "./dist/audio/outdoor.js"
+    },
     "./audio/events": {
       "types": "./dist/audio/events.d.ts",
       "import": "./dist/audio/events.js"
@@ -3222,6 +3226,10 @@
     "./physics/modal-sound": {
       "types": "./dist/physics/modal-sound.d.ts",
       "import": "./dist/physics/modal-sound.js"
+    },
+    "./physics/outdoor-sound": {
+      "types": "./dist/physics/outdoor-sound.d.ts",
+      "import": "./dist/physics/outdoor-sound.js"
     },
     "./physics/falling": {
       "types": "./dist/physics/falling.d.ts",

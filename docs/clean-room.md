@@ -1,5 +1,34 @@
 # Clean room
 
+### Outdoor sound propagation (SOUND-01)
+
+The absolute air losses implement ISO 9613-1:1993 equations (3)–(5) and the Annex B humidity conversion.
+Table 1(e) provides an independent rounded check for 1 kHz at 0 °C and 50% relative humidity.
+ISO 9613-2:2024 defines the outdoor engineering terms for divergence, atmosphere, ground and screening.
+<https://www.iso.org/standard/17426.html> and <https://www.iso.org/standard/74047.html>.
+
+Erik Salomons, *Computational Atmospheric Acoustics* (2001), and Kenneth Gilbert and Michael White,
+“Application of the parabolic equation to sound propagation in a refracting atmosphere” (1989), cover
+the effects of the effective sound-speed gradient and reflecting ground. Plovsing and Kragh,
+*Nord2000 Comprehensive Outdoor Sound Propagation Model, Part 2* (2001), §§2–4, uses a linear effective
+sound-speed profile for curved rays. Margo keeps the first-order paraxial term with both endpoints fixed
+and integrates the resolved path length and effective sound speed by midpoint quadrature.
+<https://doi.org/10.1007/978-94-010-0660-6>.
+[Gilbert and White](https://doi.org/10.1121/1.397587).
+[Nord2000](https://forcetechnology.com/-/media/force-technology-media/pdf-files/projects/nord2000/nord2000-comprehensive-outdoor-sound-propagation-model---part-2-propagation-in-an-atmosphere-with-re.pdf).
+
+ITU-R P.526-16 (2025), §4.1 and equations (26)–(31), supplies scalar Fresnel knife-edge loss. The solver
+uses the dominant terrain edge, replacing wavelength with the acoustic wavelength. An unobstructed
+path adds a coherent image source from one local horizontal plane.
+<https://www.itu.int/rec/R-REC-P.526-16-202511-I/en>.
+
+NASA/TM-20250003228 (2025), §3 and Fig. 3-1, gives the front, expansion and rear of the far-field civil
+aviation N-wave. The helper samples a prescribed symmetric waveform with optional linear rise.
+Laakso, Välimäki, Karjalainen and Laine (1996) describe band-limited fractional-delay methods. Playback
+uses the Web Audio DelayNode and tests its sample arrival against the same undelayed chain.
+<https://ntrs.nasa.gov/citations/20250003228>, <https://doi.org/10.1109/79.482137>,
+and <https://www.w3.org/TR/webaudio/#DelayNode>.
+
 ### Webcam hands and body to a skeleton in Input (2026-11-26)
 
 Michael Gleicher, Retargetting Motion to New Characters (SIGGRAPH 1998, https://doi.org/10.1145/280814.280820), and Jean-Sebastien Monzani, Paolo Baerlocher, Ronan Boulic and Daniel Thalmann, Using an Intermediate Skeleton and Inverse Kinematics for Motion Retargeting (Computer Graphics Forum 19(3), 2000, https://doi.org/10.1111/1467-8659.00393), for retargeting through an intermediate humanoid: `BodyDriver` maps the landmarks onto VRM humanoid bones (VRM 1.0 humanoid specification, https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm-1.0/humanoid.md) and rotates each bone so its rest direction (toward its child, from the skeleton or a calibration T-pose or A-pose) lies along the landmark direction: the shortest-arc quaternion for one direction, the change of orthonormal frame for a direction plus a side direction (hips, chest, hands). Joint limits clamp the turn from the rest rotation relative to the parent (a cone about the rest pose, the joint constraint of Andreas Aristidou and Joan Lasenby, FABRIK: A fast, iterative solver for the Inverse Kinematics problem, Graphical Models 73(5), 2011, https://doi.org/10.1016/j.gmod.2011.05.003). Point orders are the Pose Landmarker (Bazarevsky et al., BlazePose, 2020, https://arxiv.org/abs/2006.10204) and Hand Landmarker (Zhang et al., MediaPipe Hands, 2020, https://arxiv.org/abs/2006.10214) maps. Smoothing is the one-euro filter on each landmark direction. No detector, model or weights are shipped or fetched; no rival source was read.

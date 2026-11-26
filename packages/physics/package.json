@@ -77,6 +77,10 @@
       "types": "./dist/modal-sound.d.ts",
       "import": "./dist/modal-sound.js"
     },
+    "./outdoor-sound": {
+      "types": "./dist/outdoor-sound/index.d.ts",
+      "import": "./dist/outdoor-sound.js"
+    },
     "./falling": {
       "types": "./dist/falling.d.ts",
       "import": "./dist/falling.js"
