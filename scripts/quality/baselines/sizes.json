@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20681529,
+  "total": 20681584,
   "history": [
     {
       "date": "2026-10-24",
@@ -13963,6 +13963,12 @@
       "commit": "d6d292747f",
       "reason": "New optional entry @margoengine/animation/instanced-morph: 0 to 11416 B gzip, ceiling 11759 B. Live morph weights per member of a bone-texture crowd; about 10 KB of it is the skinned crowd it extends, shared with instanced-skin when an app loads both, so a separate copy of the crowd would cost more. instanced-skin stays inside its ceiling. Core plus stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "eec7eb93d",
+      "reason": "KB-LOD-FADECOMBO1 lod/fade grows from 2542 to 2597 B gzip: LODFade tells lod/occluder-fade which mesh, model or ghost now draws in place of the outgoing level, so a faded occluder stays faded through a cross-fade. The call must sit where the switch starts; a lazy split would add an await to a synchronous level switch for 55 B. Core plus stage stays 24892 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14611,7 +14617,7 @@
     "@margoengine/lod": 14236,
     "@margoengine/lod/auto": 9863,
     "@margoengine/lod/clusters": 3680,
-    "@margoengine/lod/fade": 2542,
+    "@margoengine/lod/fade": 2597,
     "@margoengine/lod/msft": 2266,
     "@margoengine/lod/occluder-fade": 4678,
     "@margoengine/lod/stream": 1778,

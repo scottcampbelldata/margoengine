@@ -6,6 +6,32 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: a faded occluder turned solid for the length of a level cross-fade (KB-LOD-FADECOMBO1, lod)
+
+- **Repro:** `LODFade` and `OccluderFade` (`@margoengine/lod/fade`, `@margoengine/lod/occluder-fade`) on one engine; a
+  wall with two mesh levels stands between the camera and a target and is faded to `minOpacity` 0.25. Switch its level:
+  halfway through the cross-fade the incoming level drew every pixel of its share, so the target was hidden again
+  behind 422 of the 1,024 pixels of a 32 by 32 block (`node packages/lod/test/fade-combo-check.mjs`, "both fades", on
+  WebGPU), and after the switch the new level took `fadeTime` to fade out again. With Geometry levels the ghost that
+  keeps the old geometry on screen drew solid the same way. Each fade alone was exact.
+- **Cause:** the two discards themselves combine as intended: a pixel draws when the occluder tile keeps it AND the
+  level's noise threshold keeps it, and the levels' thresholds are complementary. But `OccluderFade` keeps its fade per
+  mesh (or model) and finds meshes by rays, which pass hidden meshes: the incoming level was hidden until the switch,
+  and a ghost is a pooled mesh, so each started at opacity 1 when `LODFade` showed it.
+- **Fix:** in lod. `LODFade.begin` (`packages/lod/src/fade.ts`) announces what now draws in place of the outgoing
+  level (the incoming mesh or model, and the ghost of a Geometry level) through `standIn` of the shared
+  `packages/lod/src/fade-pattern.ts`; `OccluderFade` listens (`onStandIn`) and gives it the outgoing level's fade as it
+  stands, in the same call, before a frame draws. From there each is stepped on its own sight lines. No public export
+  changed.
+- **Regression:** `packages/lod/test/fade-combo-check.mjs` (in the package's `test:gpu`): every pixel of the block
+  against `occluderKeeps` and `fadeKeeps`, for core meshes, materials meshes and Geometry levels, each fade alone and
+  both together, at the end of the occluder fade, on its way out and on its way back, 0 differing pixels on WebGPU and
+  on the WebGL2 compatibility layer; and `packages/lod/test/occluder-fade.test.js`, "a level that cross-fades in, and
+  the ghost of a swapped geometry, take the occluder fade at once", on the CPU.
+- **Still:** `OccluderFade` dithers core meshes, models and materials meshes; an `Imposter` or `ImposterFrames` level
+  is drawn by the LOD system's own shader, which the occluder fade does not patch, so it stays solid in a sight line
+  and a switch to or from one hands nothing over (docs/limits.md, occluder fade).
+
 ### Fixed 2026-11-26: the waterline of a flowing sea on a beach drew a sawtooth (KB-WATER-SHORESAW1, water)
 
 - **Repro:** the Kitty Hawk film's shot kh-establish (`examples/kitty-hawk`, the dune coast, looking south along the

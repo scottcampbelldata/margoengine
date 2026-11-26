@@ -8,7 +8,7 @@ import { meshRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@m
 import type { PBRModel } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import type { LOD, LODObject, LODSystem } from './index.js';
-import { fadeTest } from './fade-pattern.js';
+import { fadeTest, standIn } from './fade-pattern.js';
 export { fadeTest } from './fade-pattern.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 
@@ -250,10 +250,10 @@ export class LODFade implements EnginePlugin {
     const anchor = lod.anchor,
       steps: Fader[] = [],
       leaving: (() => void)[] = [];
-    let outgoing: Fader | undefined, incoming: Fader | undefined;
+    let outgoing: Fader | undefined, incoming: Fader | undefined, ghostOf: Mesh | undefined;
     if (a instanceof Geometry) {
       // The anchor takes the new geometry or none; a ghost at the same place keeps drawing the old one.
-      const ghost = this.ghosts.pop() ?? e.createMesh();
+      const ghost = (ghostOf = this.ghosts.pop() ?? e.createMesh());
       ghost.setParent(anchor).setGeometry(a).setMaterial(anchor.material);
       ghost.visible = true;
       outgoing = this.coreFader(ghost);
@@ -280,6 +280,16 @@ export class LODFade implements EnginePlugin {
       }
     }
     for (const fader of [outgoing, incoming]) if (fader) steps.push(fader);
+    // What now draws beside or in place of the outgoing level takes on its other fades (lod/occluder-fade), so a faded
+    // occluder does not turn solid for the length of its cross-fade (KB-LOD-FADECOMBO1).
+    const key = (object: LODObject) =>
+        object instanceof Geometry ? anchor : object && (owner(object) ?? target(object as Mesh)),
+      old = impA ? null : key(a),
+      next = impB ? null : key(b);
+    if (old) {
+      if (ghostOf) standIn(e, old, ghostOf);
+      if (next && next !== old) standIn(e, old, next);
+    }
     const fade: Active = {
       lod,
       time: 0,
