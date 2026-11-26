@@ -80,7 +80,7 @@ test('a moving instance points at its interval and its TLAS leaf bounds the whol
   }
 });
 
-test("'trs' packs the rotation the shader slerps; a moving emitter is left to path hits", async () => {
+test("'trs' packs the rotation the shader slerps; a moving emitter gets light records", async () => {
   const c = Math.SQRT1_2,
     turned = [c, c, 0, 0, -c, c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1];
   const h = fakeEngine(),
@@ -104,10 +104,11 @@ test("'trs' packs the rotation the shader slerps; a moving emitter is left to pa
     assert.ok(Math.abs(f32(w, block + 16 + 3) - 1) < 1e-6);
     assert.ok(Math.abs(f32(w, block + 20 + 2) - Math.sin(Math.PI / 8)) < 1e-6);
     assert.ok(Math.abs(f32(w, block + 16 + 11) - Math.PI / 8) < 1e-5);
-    // The light table: the still instance's two triangles are lights, the spinning one's are not.
+    // The light table: both instances' triangles are lights; the spinning one's are sampled at the path's time
+    // (FG-17-EMITTERS; before it, a moving emitter had no lookup and was left to path hits).
     assert.notEqual(w[records + 30], 0, 'the still emitter has a light lookup');
-    assert.equal(w[records + 32 + 30], 0, 'the moving emitter has none, so its path hits keep full weight');
-    assert.equal(w[w[12]], 2, 'two light records');
+    assert.notEqual(w[records + 32 + 30], 0, 'the moving emitter has one');
+    assert.equal(w[w[12]], 4, 'four light records');
   } finally {
     t.dispose();
   }

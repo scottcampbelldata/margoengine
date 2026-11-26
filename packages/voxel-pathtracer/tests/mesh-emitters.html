@@ -1,0 +1,185 @@
+<!doctype html><html><meta charset="utf-8"><title>Moving and deforming mesh emitters</title><canvas width="16" height="16"></canvas><script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {engineRuntime} from '/packages/core/dist/extension.js';
+import {ComposedVoxelPathTracer} from '/packages/voxel-pathtracer/dist/compose.js';
+import {meshPBR} from '/packages/voxel-pathtracer/dist/mesh-pbr.js';
+import {Camera} from '/packages/core/dist/index.js';
+import {MeshPathTracer,triangleMeshes} from '/packages/voxel-pathtracer/dist/mesh.js';
+// FG-17-EMITTERS. baseline(): float-image hashes of scenes whose emitters stay still (a still emitter over a Lambert
+// floor; the same beside a moving non-emitter at shutter 1), taken on main before the light-packet change and again
+// after it: they must not change (plan T2, evidence for the PR).
+const quad=(id,y,material,half,up=true)=>({id,material,
+ positions:new Float32Array([-half,y,-half,half,y,-half,half,y,half,-half,y,half]),
+ indices:up?new Uint32Array([0,2,1,0,3,2]):new Uint32Array([0,1,2,0,2,3])});
+const cube=(id,material,h)=>{const p=[],idx=[];for(const s of [-1,1])for(const a of [0,1,2]){const b=(a+1)%3,c=(a+2)%3,base=p.length/3;
+ for(const [u,v] of [[-1,-1],[1,-1],[1,1],[-1,1]]){const q=[0,0,0];q[a]=s*h;q[b]=u*h;q[c]=v*h;p.push(...q);}
+ idx.push(...(s>0?[base,base+1,base+2,base,base+2,base+3]:[base,base+2,base+1,base,base+3,base+2]));}
+ return {id,material,positions:new Float32Array(p),indices:new Uint32Array(idx)};};
+const fnv=(f)=>{const u=new Uint32Array(f.buffer,f.byteOffset,f.length);let h=0x811c9dc5;for(const w of u){h=Math.imul(h^w,0x01000193)>>>0;}return h.toString(16).padStart(8,'0');};
+window.baseline=async(compat=false)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,3,4],target:[0,0,0],fov:50}});
+ const device=engineRuntime(engine).gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));engine.render();
+ const materials=[{id:1,type:'diffuse',color:[0.8,0.8,0.8]},{id:2,type:'emit',color:[0,0,0],emissionColor:[6,5,4]},{id:3,type:'diffuse',color:[0.3,0.5,0.7]}];
+ const env={ground:false,skyIntensity:0,sunIntensity:0};
+ const still={revision:1,models:[],instances:[],materials,environment:env,
+  meshes:[quad('floor',0,1,3),quad('lamp',1.5,2,0.4,false)],meshInstances:[{id:'floor',mesh:'floor'},{id:'lamp',mesh:'lamp'}]};
+ const mover={...still,meshes:[...still.meshes,cube('box',3,0.3)],meshInstances:[...still.meshInstances,
+  {id:'box',mesh:'box',transform:[1,0,0,0,0,1,0,0,0,0,1,0,0.9,0.3,0.2,1],previousTransform:[1,0,0,0,0,1,0,0,0,0,1,0,-0.9,0.3,0.2,1]}]};
+ const out={errors};
+ for(const [name,scene,shutter] of [['still',still,0],['still-shutter',still,1],['mover',mover,1]])
+  for(const pbr of [false,true]){
+   const pbrScene={...scene,pbrMaterials:[{id:1,baseColorFactor:[0.8,0.8,0.8,1],roughnessFactor:1,metallicFactor:0},{id:2,baseColorFactor:[0,0,0,1],emissiveFactor:[1,0.8333,0.6667],emissiveStrength:6},{id:3,baseColorFactor:[0.3,0.5,0.7,1],roughnessFactor:1,metallicFactor:0}]};
+   const t=pbr?await ComposedVoxelPathTracer.create(engine,{scene:pbrScene,features:[meshPBR()],denoise:false,maxBounces:2,shutter}):await MeshPathTracer.create(engine,{scene,denoise:false,maxBounces:2,shutter});
+   try{await t.ready;const image=await t.renderImage({width:32,height:24,samples:16,jitter:false,seed:1234,signal:AbortSignal.timeout(120000)});
+    let mean=0;for(let i=0;i<image.color.length;i+=4)mean+=image.color[i]+image.color[i+1]+image.color[i+2];
+    out[`${name}${pbr?'-pbr':''}`]={hash:fnv(image.color),mean:mean/(image.color.length/4)};}finally{t.dispose();}
+  }
+ engine.dispose();return out;
+};// T1 to T4 (FG-17-EMITTERS). A Lambert floor at y=0 seen from below the lamp (every camera ray points down, so the
+// lamp is out of frame and occludes nothing it lights); no sky or sun. The oracle is Lambert's polygon irradiance
+// formula (Baum, Rushmeier and Winget 1989) at the lamp's pose t, 64-point Gauss-Legendre over t, times albedo / pi,
+// in float64 from the API's transforms and positions.
+const W=32,H=24,FLOOR=6,ALBEDO=0.5,LE=4,CAM={position:[0,0.9,1.6],target:[0,0,-0.2],fov:50};
+const rows4=(m)=>[0,1,2].map(a=>[m[a],m[4+a],m[8+a],m[12+a]]);
+const lerpA=(a,b,t)=>a.map((v,i)=>v*(1-t)+b[i]*t);
+const sub3=(a,b)=>a.map((v,i)=>v-b[i]),dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross3=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=(a)=>{const l=Math.hypot(...a);return a.map(v=>v/l);};
+const translate=(x,y,z)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1];
+function trs(q,s,t){const [x,y,z,w]=q;const r=[[1-2*(y*y+z*z),2*(x*y-z*w),2*(x*z+y*w)],[2*(x*y+z*w),1-2*(x*x+z*z),2*(y*z-x*w)],[2*(x*z-y*w),2*(y*z+x*w),1-2*(x*x+y*y)]];
+ return [0,1,2].flatMap(c=>[r[0][c]*s[c],r[1][c]*s[c],r[2][c]*s[c],0]).concat([...t,1]);}
+const axisAngle=(axis,angle)=>{const l=Math.hypot(...axis);return [...axis.map(a=>a/l*Math.sin(angle/2)),Math.cos(angle/2)];};
+function slerp(a,b,t){let d=a.reduce((s,v,i)=>s+v*b[i],0);const q=d<0?b.map(v=>-v):b;d=Math.abs(d);if(d>0.9995)return norm(lerpA(a,q,t));
+ const g=Math.acos(d),k=1/Math.sin(g);return a.map((v,i)=>v*Math.sin((1-t)*g)*k+q[i]*Math.sin(t*g)*k);}
+const apply=(r,p)=>r.map(row=>row[0]*p[0]+row[1]*p[1]+row[2]*p[2]+row[3]);
+// 64-point Gauss-Legendre on [0,1] (Newton on the Legendre recurrence).
+const GL=(()=>{const n=64,out=[];for(let i=1;i<=n;i++){let x=Math.cos(Math.PI*(i-0.25)/(n+0.5)),dp=1;
+ for(let it=0;it<100;it++){let p0=1,p1=x;for(let k=2;k<=n;k++){const p=((2*k-1)*x*p1-(k-1)*p0)/k;p0=p1;p1=p;}dp=n*(x*p1-p0)/(x*x-1);const dx=p1/dp;x-=dx;if(Math.abs(dx)<1e-16)break;}
+ out.push([(x+1)/2,1/((1-x*x)*dp*dp)]);}return out;})();
+// The lamp: a square of half 0.25 in its object xz plane; a deforming lamp opens at half 0.125 (area x4 over the shutter).
+const square=(h)=>[-h,0,-h,h,0,-h,h,0,h,-h,0,h];
+const MOVE=[translate(-0.6,1.2,-0.3),translate(0.6,1.2,0.1)];
+const TAXIS=[0.3,1,0.2];
+const TRS=[[axisAngle(TAXIS,0),[1,1,1],[0,1.2,0]],[axisAngle(TAXIS,1.2),[1.5,1,0.8],[0.3,1.3,-0.2]]];
+const trsRows=(P,t,shift=[0,0,0])=>rows4(trs(slerp(P[0][0],P[1][0],t),lerpA(P[0][1],P[1][1],t),lerpA(P[0][2],P[1][2],t).map((v,i)=>v+shift[i])));
+const matrixRows=(M,t)=>{const a=rows4(M[0]),b=rows4(M[1]);return a.map((r,i)=>lerpA(r,b[i],t));};
+const CASES={
+ matrix:{instance:{transform:MOVE[1],previousTransform:MOVE[0]},world:t=>matrixRows(MOVE,t)},
+ trs:{instance:{transform:trs(...TRS[1]),previousTransform:trs(...TRS[0]),motionInterpolation:'trs'},world:t=>trsRows(TRS,t)},
+ deforming:{open:square(0.125),instance:{transform:translate(0,1.2,0)},world:()=>rows4(translate(0,1.2,0))},
+ 'deforming and moving':{open:square(0.125),instance:{transform:MOVE[1],previousTransform:MOVE[0]},world:t=>matrixRows(MOVE,t)},
+};
+const shifted=(cam,at)=>({...cam,position:cam.position.map((v,i)=>v+at[i]),target:cam.target.map((v,i)=>v+at[i])});
+function invert4(m){const a=[0,1,2,3].map(r=>[0,1,2,3].map(c=>m[c*4+r]).concat([0,1,2,3].map(c=>c===r?1:0)));
+ for(let i=0;i<4;i++){let p=i;for(let r=i+1;r<4;r++)if(Math.abs(a[r][i])>Math.abs(a[p][i]))p=r;[a[i],a[p]]=[a[p],a[i]];
+  const d=a[i][i];for(let c=0;c<8;c++)a[i][c]/=d;for(let r=0;r<4;r++)if(r!==i){const f=a[r][i];for(let c=0;c<8;c++)a[r][c]-=f*a[i][c];}}
+ const out=new Array(16);for(let r=0;r<4;r++)for(let c=0;c<4;c++)out[c*4+r]=a[r][4+c];return out;}
+// Pixel-centre rays as the tracer forms them (tracer.ts #pose: corner rays from the inverse view-projection).
+function pixelRays(cam){
+ const c=new Camera(cam);c.update(W/H,true);const inv=invert4([...c.matrix]);
+ const un=(x,y,z)=>{const w=inv[3]*x+inv[7]*y+inv[11]*z+inv[15];return [0,1,2].map(r=>(inv[r]*x+inv[4+r]*y+inv[8+r]*z+inv[12+r])/w);};
+ const rays=[];for(let py=0;py<H;py++)for(let px=0;px<W;px++){const x=2*(px+0.5)/W-1,y=1-2*(py+0.5)/H;const a=un(x,y,1),b=un(x,y,0.5);rays.push([a,sub3(b,a)]);}
+ return rays;
+}
+// Outgoing radiance of the floor point each pixel sees, averaged over the shutter.
+function oracle(c,cam,at=[0,0,0]){
+ const close=square(0.25),open=c.open??close;
+ return pixelRays(cam).map(([o,d])=>{
+  if(d[1]>=0)return 0;const s=-o[1]/d[1],x=[o[0]+s*d[0],0,o[2]+s*d[2]];
+  if(Math.abs(x[0]-at[0])>FLOOR||Math.abs(x[2]-at[2])>FLOOR)return 0;
+  let e=0;for(const [t,w] of GL){const m=c.world(t),corners=[0,1,2,3].map(k=>apply(m,lerpA(open.slice(k*3,k*3+3),close.slice(k*3,k*3+3),t)));
+   let sum=0;for(let k=0;k<4;k++){const a=norm(sub3(corners[k],x)),b=norm(sub3(corners[(k+1)%4],x)),g=cross3(a,b),l=Math.hypot(...g);
+    if(l>0)sum+=Math.atan2(l,dot3(a,b))*g[1]/l;}
+   e+=w*0.5*Math.abs(sum);}
+  return ALBEDO/Math.PI*LE*e;
+ });
+}
+// Linear RGB, 3 floats a pixel, rows from the top.
+const lum=(img,i)=>(img[i*3]+img[i*3+1]+img[i*3+2])/3;
+// Per 4x4 block: the mean over seeds against the oracle, in standard errors over seeds; and the lit image mean.
+function stats(images,expect){
+ const n=images.length,z=[];
+ for(let by=0;by<H/4;by++)for(let bx=0;bx<W/4;bx++){const idx=[];for(let y=0;y<4;y++)for(let x=0;x<4;x++)idx.push((by*4+y)*W+bx*4+x);
+  if(idx.some(i=>expect[i]<=0))continue;
+  const per=images.map(img=>idx.reduce((s,i)=>s+lum(img,i),0)/16),mean=per.reduce((a,b)=>a+b)/n;
+  const se=Math.sqrt(per.reduce((s,v)=>s+(v-mean)**2,0)/(n-1)/n),want=idx.reduce((s,i)=>s+expect[i],0)/16;z.push((mean-want)/se);}
+ const lit=expect.map((v,i)=>v>0?i:-1).filter(i=>i>=0),per=images.map(img=>lit.reduce((s,i)=>s+lum(img,i),0)/lit.length);
+ const mean=per.reduce((a,b)=>a+b)/n,se=Math.sqrt(per.reduce((s,v)=>s+(v-mean)**2,0)/(n-1)/n),want=lit.reduce((s,i)=>s+expect[i],0)/lit.length;
+ return {blocks:z.length,zMax:Math.max(...z.map(Math.abs)),zRms:Math.sqrt(z.reduce((s,v)=>s+v*v,0)/z.length),zMean:(mean-want)/se,mean,want,
+  finite:images.every(img=>img.every(Number.isFinite))};
+}
+// A path-only reference with no API: the mesh feature with its light table emptied (no records, every lookup 0), so
+// moving faces are found by path hits alone, at full weight.
+const pathOnly=()=>({...triangleMeshes(),geometry:()=>{const base=triangleMeshes().geometry();return {
+ get motionError(){return base.motionError;},
+ async build(scene,signal){const p=await base.build(scene,signal);const h=p[12];if(h){p[h]=0;for(let i=0;i<p[4];i++)p[p[5]+i*32+30]=0;}return p;},
+ dispose(){base.dispose?.();}};}});
+const LAMBERT={id:1,type:'diffuse',color:[ALBEDO,ALBEDO,ALBEDO]};
+// still: the same lamp at its close pose with no previous fields; equal: previous fields equal to the current ones.
+function sceneOf(c,{floor=LAMBERT,at=[0,0,0],still=false,equal=false,scale}={}){
+ const positions=square(0.25),open=still?undefined:equal?positions:c.open;
+ const move=(m)=>{const r=[...m];r[12]+=at[0];r[13]+=at[1];r[14]+=at[2];return r;};
+ const inst={id:'lamp',mesh:'lamp',transform:move(c.instance.transform)};
+ if(!still&&c.instance.previousTransform)inst.previousTransform=equal?inst.transform:move(c.instance.previousTransform);
+ if(!still&&!equal&&c.instance.motionInterpolation)inst.motionInterpolation=c.instance.motionInterpolation;
+ return {revision:1,models:[],instances:[],environment:{ground:false,skyIntensity:0,sunIntensity:0},
+  materials:[floor,{id:2,type:'emit',color:[0,0,0],emissionColor:[LE,LE,LE]}],
+  meshes:[{id:'floor',material:1,positions:new Float32Array(square(FLOOR).map((v,i)=>v+at[i%3])),indices:new Uint32Array([0,2,1,0,3,2])},
+   {id:'lamp',material:2,positions:new Float32Array(positions),indices:new Uint32Array([0,1,2,0,2,3]),uvs:new Float32Array([0,0,1,0,1,1,0,1]),
+    ...(open&&{previousPositions:new Float32Array(open)})}],
+  meshInstances:[{id:'floor',mesh:'floor'},inst]};
+}
+const fnvAll=(images)=>images.map(fnv).join(',');
+window.run=async(compat=false,only)=>{
+ if(compat){const {install}=await import('/packages/webgl2-compat/dist/index.js');await install({force:true});}
+ const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:CAM});
+ const device=engineRuntime(engine).gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));engine.render();
+ const look=(cam)=>{engine.camera.position=[...cam.position];engine.camera.target=[...cam.target];engine.camera.fov=cam.fov;};
+ const make=(kind,scene,shutter)=>{const o={scene,denoise:false,maxBounces:2,shutter};
+  return kind==='mesh'?MeshPathTracer.create(engine,o):ComposedVoxelPathTracer.create(engine,{...o,features:[kind==='path'?pathOnly():kind==='pbr'?meshPBR():triangleMeshes()]});};
+ const render=async(kind,scene,shutter,seeds,samples)=>{const t=await make(kind,scene,shutter);try{await t.ready;const out=[];
+  for(const seed of seeds)out.push((await t.renderImage({width:W,height:H,samples,jitter:false,seed,signal:AbortSignal.timeout(120000)})).color);return out;}finally{t.dispose();}};
+ const seeds=(n,base)=>[...Array(n).keys()].map(i=>base+i*7919);
+ const result={errors,t1:[],t2:[],t3:[],t4:[]};const want=(k)=>!only||only.includes(k);
+ look(CAM);
+ if(want('t1'))for(const [name,c] of Object.entries(CASES)){
+  const expect=oracle(c,CAM);
+  for(const kind of ['mesh','composed'])result.t1.push({name,kind,...stats(await render(kind,sceneOf(c),1,seeds(16,11),64),expect)});
+ }
+ // T2: shutter 0 equals the still twin bit for bit, and so do previous fields equal to the current ones at shutter 1.
+ if(want('t2'))for(const [name,c] of Object.entries(CASES))for(const kind of ['mesh','composed','pbr']){
+  const pbr=(s)=>kind==='pbr'?{...s,pbrMaterials:[{id:1,baseColorFactor:[ALBEDO,ALBEDO,ALBEDO,1],roughnessFactor:1,metallicFactor:0},
+   {id:2,baseColorFactor:[0,0,0,1],emissiveFactor:[1,1,1],emissiveStrength:LE,emissiveTexture:{width:2,height:1,data:new Uint8Array([255,128,0,255,0,128,255,255])}}]}:s;
+  const still0=fnvAll(await render(kind,pbr(sceneOf(c,{still:true})),0,[5],16)),still1=fnvAll(await render(kind,pbr(sceneOf(c,{still:true})),1,[5],16));
+  result.t2.push({name,kind,shutter0:fnvAll(await render(kind,pbr(sceneOf(c)),0,[5],16))===still0,
+   equalFields:fnvAll(await render(kind,pbr(sceneOf(c,{equal:true})),1,[5],16))===still1,
+   lit:(await render(kind,pbr(sceneOf(c)),1,[5],16))[0].some(v=>v>0)});
+ }
+ // T3: energy against the path-only reference, and variance by work count (NEE at 16 spp, path-only at 32).
+ if(want('t3'))for(const name of ['trs','deforming'])for(const [floorName,floor] of [['lambert',LAMBERT],['rough metal',{id:1,type:'metal',color:[0.8,0.8,0.8],roughness:0.2}]]){
+  const scene=sceneOf(CASES[name],{floor});
+  const nee=await render('composed',scene,1,seeds(32,101),16),path=await render('path',scene,1,seeds(32,103),32);
+  const pix=[...Array(W*H).keys()],mv=(imgs)=>{const m=pix.map(i=>imgs.reduce((s,img)=>s+lum(img,i),0)/imgs.length);
+   const v=pix.map((i,k)=>imgs.reduce((s,img)=>s+(lum(img,i)-m[k])**2,0)/(imgs.length-1));
+   const means=imgs.map(img=>pix.reduce((s,i)=>s+lum(img,i),0)/pix.length),mean=means.reduce((a,b)=>a+b)/means.length;
+   return {variance:v.reduce((a,b)=>a+b)/v.length,mean,se:Math.sqrt(means.reduce((s,x)=>s+(x-mean)**2,0)/(means.length-1)/means.length)};};
+  const a=mv(nee),b=mv(path);
+  result.t3.push({name,floor:floorName,meanNEE:a.mean,meanPath:b.mean,z:(a.mean-b.mean)/Math.hypot(a.se,b.se),varianceRatio:a.variance/b.variance});
+ }
+ // T4: 1,000 units from the origin (a 50:1 lamp under 'trs'): no self-shadow; and a face that flips mid-shutter.
+ if(want('t4')){
+  const far=[1000,0,0],S=[2.5,1,0.05];
+  const farCase={instance:{transform:trs(TRS[1][0],S,TRS[1][2]),previousTransform:trs(TRS[0][0],S,TRS[0][2]),motionInterpolation:'trs'},
+   world:t=>rows4(trs(slerp(TRS[0][0],TRS[1][0],t),S,lerpA(TRS[0][2],TRS[1][2],t).map((v,i)=>v+far[i])))};
+  look(shifted(CAM,far));
+  const expect=oracle(farCase,shifted(CAM,far),far);
+  for(const kind of ['mesh','composed'])result.t4.push({name:'far origin',kind,...stats(await render(kind,sceneOf(farCase,{at:far}),1,seeds(16,31),64),expect)});
+  look(CAM);
+  const flip={open:square(0.25).map((v,i)=>i%3===0?-v:v),instance:{transform:translate(0,1.2,0)}};
+  for(const kind of ['mesh','composed'])result.t4.push({name:'flips mid-shutter',kind,finite:(await render(kind,sceneOf(flip),1,seeds(4,41),16)).every(img=>img.every(Number.isFinite))});
+ }
+ engine.dispose();return result;
+};
+window.ready=true;
+</script></html>

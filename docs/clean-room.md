@@ -12852,6 +12852,31 @@ Multi-Segment Motion Blur", HPG 2017, https://doi.org/10.1145/3105762.3105779, s
 by the union of its key-frame boxes; the per-node two-box form of their paper is for piece 4b). The rotation blend is the
 existing voxel 'trs' path (shortest-arc slerp, Ken Shoemake, "Animating Rotation with Quaternion Curves", SIGGRAPH 1985,
 https://doi.org/10.1145/325165.325242). Written from these papers; no renderer's code was read.
+
+### Moving and deforming mesh emitters in the path tracer (FG-17-EMITTERS, 2026-11-26)
+
+`packages/voxel-pathtracer/mesh-kernel/src/lib.rs` (`light_packet`) and `src/mesh-light-shader.ts`. Emissive triangles
+on a moving or deforming mesh are sampled by next-event estimation at the path's own time, the one time per path of
+distributed ray tracing (Robert L. Cook, Thomas Porter and Loren Carpenter, "Distributed Ray Tracing", SIGGRAPH 1984,
+https://doi.org/10.1145/964965.808590), so the light point, its occluders and its shadow ray share one instant. The
+pick is by world area times power and the point uniform on the triangle by the square-root barycentric map, with the
+area-measure pdf turned into solid angle at the shading point (Peter Shirley, Changyaw Wang and Kurt Zimmerman, "Monte
+Carlo Techniques for Direct Lighting Calculations", ACM TOG 15(1), 1996, https://doi.org/10.1145/226150.226151). The
+area at the path's time comes from the cofactor identity for a transformed cross product, so no second inverse is
+built. Light samples and path hits are combined by the power heuristic with one pdf formula on both sides (Eric Veach
+and Leonidas J. Guibas, "Optimally Combining Sampling Techniques for Monte Carlo Rendering", SIGGRAPH 1995,
+https://doi.org/10.1145/218380.218498; Eric Veach, "Robust Monte Carlo Methods for Light Transport Simulation", PhD
+thesis, Stanford, 1997, https://graphics.stanford.edu/papers/veach_thesis/). The moving point's shadow ray stops short
+by a bound scaled to its coordinates (Carsten Wachter and Nikolaus Binder, "A Fast and Robust Method for Avoiding
+Self-Intersection", Ray Tracing Gems, 2019, https://doi.org/10.1007/978-1-4842-4427-2_6). The GPU test's oracle is
+Lambert's polygon irradiance formula as given by Daniel R. Baum, Holly E. Rushmeier and James M. Winget, "Improving
+Radiosity Solutions Through the Use of Analytically Determined Form-Factors", SIGGRAPH 1989,
+https://doi.org/10.1145/74333.74367. Read and set aside: a light tree with swept bounds and cones (Alejandro Conty
+Estevez and Christopher Kulla, "Importance Sampling of Many Lights with Adaptive Tree Splitting", HPG 2018,
+https://doi.org/10.1145/3233305; Pierre Moreau, Matt Pharr and Petrik Clarberg, "Dynamic Many-Light Sampling for
+Real-Time Ray Tracing", HPG 2019, https://doi.org/10.2312/hpg.20191191) and spherical-triangle sampling (James Arvo,
+"Stratified Sampling of Spherical Triangles", SIGGRAPH 1995, https://doi.org/10.1145/218380.218500): each would change
+the still path's samples. Written from these papers; no renderer's code was read.
 ### A hull on the sea: wetted-surface loads (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/wetted.ts` integrates the water's pressure over the part of a hull mesh under the sea's

@@ -7868,6 +7868,10 @@ Release exception: ANGLE Direct3D 11 compiles each multiple-output program again
   scope on Direct3D 11 was Scott's decision (escalated 2026-11-21, ruled 2026-11-26, above).
 - **Still worth doing:** smaller programs (`surface`, `hit`, `shadow`, `vertex`) shorten every compile on this back
   end. A gap of about 7 times will not close by trimming alone.
+- **2026-11-26 (FG-17-EMITTERS):** the mesh emitter proposal builds a moving light point's model transform once, one
+  more motion rotation copy in `sample` (`tests/compat-staged.test.js` counts it). Its text grew from 87,426 to
+  88,167 B (mesh), from 105,603 to 106,344 B (mesh-pbr), from 95,262 to 95,367 B (compose, every feature); the
+  staged pages stayed 8 and 9, and the compose route's dropped from 9 to 8 (two private words went).
 
 ### Fixed 2026-11-25: a package build that Windows could not start left only "npm error code 3221225794" (KB-FILM-HEADLESS1)
 

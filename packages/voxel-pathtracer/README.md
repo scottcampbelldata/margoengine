@@ -1394,8 +1394,10 @@ engine.dispose();
 - An interval that becomes singular half way (a mirror blended into its unmirrored self), or that has shear or flips
   handedness under `'trs'`, is refused with a `RangeError` naming `previousTransform`, but only while the shutter is
   open: `create`, `setScene` and `setOptions({shutter})` refuse it then, as for voxel instances' `previousMatrix`.
-- A moving emissive instance is left out of next-event estimation (its light records would sit at one pose), so its
-  light reaches surfaces only by path hits: unbiased, but noisier than a still emitter's light (`docs/limits.md`).
+- A moving emissive instance is a light source as a still one is: next-event estimation picks its triangles by their
+  close-pose area times power and takes the light point at the path's own time (the time its shadow ray and occluders
+  use), with the exact area at that time in the pdf, so it converges like a still emitter (see "Moving and deforming
+  emitters" below).
 - `traceFrames` (`/sequence`) fills `previousTransform` from each instance's last-frame `transform`, and
   `previousPositions` from each mesh's last-frame `positions` (see "Deforming meshes").
 - Evidence: `tests/mesh-motion.test.js` (packet, refusals, sequence fill) and `tests/mesh-motion-browser.mjs` (`npm run
@@ -1442,8 +1444,8 @@ engine.dispose();
   (picking ordinals unchanged), so `stats.meshInstances` counts them.
 - The geometric normal follows the blended triangle; shading `normals`, `uvs` and tangents stay at `positions`
   (`docs/limits.md`). A triangle is skipped only when it has zero area at both shutter ends.
-- A deforming emissive mesh is left out of next-event estimation as a moving instance is; its light arrives by path
-  hits only.
+- A deforming emissive mesh is a light source as a moving instance is: its light point is taken on the blended
+  triangle at the path's time (see "Moving and deforming emitters" below).
 - `traceFrames` (`/sequence`) fills `previousPositions` from a mesh's last-frame `positions` (by id, when the vertex
   count is unchanged), copying them, so an update may rewrite one array in place.
 - Evidence: `tests/mesh-deform.test.js` (section layout, root bounds at 17 times, the lone placement, emitters,
@@ -1451,6 +1453,65 @@ engine.dispose();
   `tests/mesh-deform-browser.mjs` (`npm run test:gpu:mesh-deform`: a growing quad, a quad sheared across its shared
   diagonal and a growing quad on a moving instance, each pixel within 5 binomial sigma of the closed-form time coverage,
   energy within 1 %, both tracer entries, WebGPU and the WebGL2 layer).
+
+### Moving and deforming emitters
+
+Emissive triangles on a moving instance (`previousTransform`) or a deforming mesh (`previousPositions`) are sampled by
+next-event estimation at each path's own time, so a moving lamp lights a scene as quietly as a still one. Nothing to
+set: give the lamp its previous pose and open the shutter.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { MeshPathTracer } from 'margoengine/voxel-pathtracer/mesh';
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 0.9, 1.6], target: [0, 0, -0.2]},
+});
+
+const square = [-0.25, 0, -0.25, 0.25, 0, -0.25, 0.25, 0, 0.25, -0.25, 0, 0.25];
+const tracer = await MeshPathTracer.create(engine, {
+  shutter: 1,
+  scene: {
+    revision: 1,
+    models: [],
+    instances: [],
+    materials: [
+      { id: 1, type: 'diffuse', color: [0.5, 0.5, 0.5] },
+      { id: 2, type: 'emit', color: [0, 0, 0], emissionColor: [4, 4, 4] },
+    ],
+    meshes: [
+      { id: 'floor', material: 1, positions: new Float32Array(square.map((v) => v * 24)), indices: new Uint32Array([0, 2, 1, 0, 3, 2]) },
+      { id: 'lamp', material: 2, positions: new Float32Array(square), indices: new Uint32Array([0, 1, 2, 0, 2, 3]) },
+    ],
+    meshInstances: [
+      { id: 'floor', mesh: 'floor' },
+      // The lamp slides 1.2 units over the shutter, 1.2 units above the floor.
+      { id: 'lamp', mesh: 'lamp', previousTransform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -0.6, 1.2, 0, 1],
+        transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.6, 1.2, 0, 1] },
+    ],
+  },
+});
+await tracer.ready;
+const image = await tracer.renderImage({ width: 64, height: 48, samples: 16 });
+console.log(image.color.length); // 9216
+tracer.dispose();
+engine.dispose();
+```
+
+- The pick table holds every emissive triangle once, by close-pose world area times power. A triangle with zero area
+  at close and some at open is picked by its open-pose area. The light point is taken at the path's time, on the
+  blended corners through the instance transform at that time. Its pdf divides by the exact area at that time, so the
+  estimate is unbiased whatever pose weighted the pick. A path that later hits the same face weighs it with the same
+  pdf (power heuristic, Veach 1997), so the two weights sum to 1.
+- With `shutter` 0, or previous fields equal to the current ones, the scene renders as the still scene, bit for bit.
+  A scene with no moving or deforming emitter renders as before this feature.
+- The pick is not position-aware: many small fast emitters stay noisier than a light tree would make them
+  (`docs/limits.md`).
+- Evidence: `tests/mesh-emitters.test.js` (the light packet, and the sampler run on the CPU against a float64 mirror
+  of the face for 'matrix', 'trs', deforming, and deforming on a moving instance, with the hit weight on the same
+  face), the `light_tests` kernel tests (a still packet pinned to its hash before this change) and
+  `tests/mesh-emitters-browser.mjs` (`npm run test:gpu:mesh-emitters`: a polygon-irradiance oracle over the shutter,
+  bit-identical shutter 0, energy and variance against a path-only reference, a lamp 1,000 units out, both tracer
+  entries, WebGPU and the WebGL2 layer).
 
 Native WebGPU and WebGL2 compatibility execute the same geometry path. Plain WebGL2 returns
 `unsupported` with [setup help](https://margoengine.com/errors#voxel-pathtracer). Generated GPU tests

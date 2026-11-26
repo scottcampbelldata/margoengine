@@ -456,10 +456,16 @@ for (const [name, attach] of cases)
         assert.ok((c.get('guideBox') ?? 0) <= 1, `${name} ${label}: ${c.get('guideBox')} guideBox copies`);
       }
       if (name.startsWith('compose')) {
-        // Each triangle walk holds one more: meshClosest builds its moving instance's model transform once (FG-17 4a).
+        // Each triangle walk holds one more: meshClosest builds its moving instance's model transform once (FG-17 4a),
+        // and so does the mesh emitter proposal for a moving light point (FG-17-EMITTERS).
         const sample = copies('sample');
         assert.equal(sample.get('meshClosest'), 1, `${name} sample: ${sample.get('meshClosest')} triangle walks`);
-        assert.equal(sample.get('motionRotation'), 4 + sample.get('meshClosest'));
+        assert.equal(
+          sample.get('sampleMeshEmitter'),
+          1,
+          `${name} sample: ${sample.get('sampleMeshEmitter')} emitter proposals`,
+        );
+        assert.equal(sample.get('motionRotation'), 4 + sample.get('meshClosest') + sample.get('sampleMeshEmitter'));
         assert.equal(copies('post').get('motionRotation'), 1);
       }
     } finally {

@@ -314,6 +314,27 @@ the closed-form time coverage (worst 3.5 sigma), energy within 0.04 %; shutter 0
 bit for bit. CPU: `tests/mesh-deform.test.js` and the `deforming_mesh_blends_boxes_that_hold_its_blended_vertices`
 kernel test (blended vertices inside blended boxes at 17 times). Missing: blended shading normals and a cost figure for
 large deformations.
+FG-17-EMITTERS (2026-11-26): moving and deforming mesh emitters are sampled by next-event estimation. The Rust light
+packet gives moving (record word 31) and deforming (word 27) instances close-pose records and lookup tables like still
+ones; a face with zero area at close and some at open is picked by its open-pose area and stores area and normal 0.
+sampleMeshEmitter(o) takes the light point at the path's own time (no new random number, Cook, Porter and Carpenter
+1984): the blended object corners through meshLocal at that time (its one new call site), the area by the cofactor
+identity 0.5 |L^T c| / |det L|, pdf pmf / area(t); meshEmitterWeight uses the same area and the hit's normal, so the
+power-heuristic weights sum to 1 (Veach 1997). The proposal resolves its radiance itself, which removed two private
+words (the staged compose route dropped from 9 to 8 pages); a moving point's shadow ray stops 8 Float32 ulps short
+(a still point 1). At motion 1 the still branch runs the same statements, so shutter 0 and every scene without a moving
+emitter render as before. Evidence: `tests/mesh-emitters-browser.mjs` (RTX A6000, WebGPU and the WebGL2 layer on ANGLE
+Vulkan, MeshPathTracer and composed): for 'matrix', 'trs', deforming and deforming on a moving instance, image means
+within 1.8 standard errors of a float64 polygon-irradiance oracle over the shutter (Baum, Rushmeier and Winget 1989),
+worst 4x4 block 2.98, block rms 1.17 at most; 1,000 units out with a 50:1 lamp within 1.8; shutter 0 and equal previous
+fields bit for bit equal to the still scene, plain, composed and textured mesh-pbr; energy within 1.1 standard errors
+of a path-only reference, whose per-pixel variance NEE at 16 spp undercuts at 32 spp by 0.004 to 0.006 on a Lambert
+floor and 0.84 to 0.89 on roughness-0.2 metal (a lobe narrower than the lamp). The still-emitter scenes of the baseline
+page hash as on main, both routes (12 of 12). CPU: `tests/mesh-emitters.test.js` (the sampler run on the CPU against a
+float64 mirror, 4 motion kinds x 3 entries x 3 times x 3 seeds, the hit weight on the same face) and the `light_tests`
+kernel tests (a still packet pinned to its hash on main). Staged sample text: mesh 87,426 to 88,167 B, mesh-pbr
+105,603 to 106,344 B, compose (every feature) 95,262 to 95,367 B (one more motionRotation copy, KB-L5a-10). Missing: a
+position-aware pick (a light tree with swept bounds) for many small fast emitters.
 
 Piece 6a (same day): `@margoengine/bvh/gpu-scene` (`GPUSceneBVH`, `sceneBvhWGSL`), the scene tree real-time ray
 tracing builds on. Two levels (Wald, Benthin and Slusallek 2003): each distinct MeshBVH is one bottom tree in a shared

@@ -87,7 +87,7 @@ test('a deforming mesh points at its shutter-open section and its leaf bounds bo
   }
 });
 
-test('a lone deforming mesh is placed once, and its emitters are left to path hits', async () => {
+test('a lone deforming mesh is placed once, and its emitters get light records', async () => {
   const h = fakeEngine(),
     t = await MeshPathTracer.create(h.engine, {
       scene: scene([quad(OPEN), quad(undefined, 'still')], undefined, {
@@ -104,9 +104,10 @@ test('a lone deforming mesh is placed once, and its emitters are left to path hi
       records = w[5];
     assert.equal(w[4], 2, 'one identity placement a mesh');
     assert.notEqual(w[records + 27], 0, 'the deforming mesh has a section');
-    assert.equal(w[records + 30], 0, 'and no light lookup, so its path hits keep full weight');
+    // Sampled at the path's time (FG-17-EMITTERS; before it, a deforming emitter had no lookup).
+    assert.notEqual(w[records + 30], 0, 'and a light lookup');
     assert.notEqual(w[records + 32 + 30], 0, 'the still emitter has one');
-    assert.equal(w[w[12]], 2, 'two light records');
+    assert.equal(w[w[12]], 4, 'four light records');
   } finally {
     t.dispose();
   }

@@ -894,6 +894,19 @@ mod tests {
     }
 }
 
+// The three corners at `corners` (4 words apart) through the world rows at `rows`, in float64.
+fn world_corners(g:&[u32],rows:usize,corners:usize)->[[f64;3];3] {
+    std::array::from_fn(|v|std::array::from_fn(|a| {
+        let row=rows+a*4;
+        (0..3).map(|b|f32::from_bits(g[row+b]) as f64*f32::from_bits(g[corners+v*4+b]) as f64).sum::<f64>()+f32::from_bits(g[row+3]) as f64
+    }))
+}
+fn corner_area(points:&[[f64;3];3])->f32 {
+    let edge=|v:usize|std::array::from_fn::<_,3,_>(|a|points[v][a]-points[0][a]);
+    let a=edge(1);let b=edge(2);
+    let cross=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+    (cross.iter().map(|v|v*v).sum::<f64>().sqrt()*0.5) as f32
+}
 // World-area emitter table for the existing two-level packet. All offsets remain
 // relative to the geometry root; per-placement lookup matches reordered BLAS faces.
 fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
@@ -906,9 +919,8 @@ fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
     let mut lights:Vec<[u32;24]>=Vec::new();let mut lookups=Vec::new();let mut total=0.0f64;
     for i in 0..g[4] as usize {
         let instance=g[5] as usize+i*32;
-        // A moving instance's light records would sit at one pose of its interval: its emission is found by path hits.
-        // A deforming mesh's emitters likewise (record word 27 points at its shutter-open section, FG-17 piece 4b).
-        if g[instance+31]!=0 || g[instance+27]!=0 {continue;}
+        // Moving (record word 31) and deforming (word 27, FG-17 piece 4b) instances get records at the close pose too:
+        // the tracer moves a sampled point to the path's own time (FG-17-EMITTERS); the pick weight is the close area.
         let head=g[instance+24] as usize;let start=head+g[head+1] as usize;
         let count=g[head+2] as usize;let table=out.len();out.resize(table+count,0);out[instance+30]=table as u32;
         for j in 0..count {
@@ -922,21 +934,26 @@ fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
             };
             let power=rgb[0]*0.2126+rgb[1]*0.7152+rgb[2]*0.0722;
             if power<=0.0 {continue;}
-            let points: [[f64;3];3]=std::array::from_fn(|v|std::array::from_fn(|a| {
-                let row=instance+a*4;
-                (0..3).map(|b|f32::from_bits(g[row+b]) as f64*f32::from_bits(g[tri+v*4+b]) as f64).sum::<f64>()+f32::from_bits(g[row+3]) as f64
-            }));
-            let edge=|v:usize|std::array::from_fn::<_,3,_>(|a|points[v][a]-points[0][a]);
-            let a=edge(1);let b=edge(2);
-            let cross=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-            let length=cross.iter().map(|v|v*v).sum::<f64>().sqrt();let area=(length*0.5) as f32;
-            if area==0.0 {continue;}
+            let points=world_corners(g,instance,tri);
+            let area=corner_area(&points);
+            let mut weight=area;
+            if area==0.0 {
+                // A face that collapses at the close pose but not at the open one is picked by its open-pose area. Its
+                // stored area and normal stay 0: the still sampler skips it, a path time where it has area samples it.
+                let motion=g[instance+31] as usize;let section=g[instance+27] as usize;
+                if motion==0&&section==0 {continue;}
+                let corners=if section!=0 {head+section+g[head] as usize*8+j*12} else {tri};
+                weight=corner_area(&world_corners(g,if motion!=0 {motion+4} else {instance},corners));
+                if weight==0.0 {continue;}
+            }
             let mut record=[0;24];for v in 0..3 {for a in 0..3 {record[v*4+a]=(points[v][a] as f32).to_bits();}}
-            let normal: [f64;3]=std::array::from_fn(|a|(0..3).map(|b|f32::from_bits(g[instance+12+b*4+a]) as f64*f32::from_bits(g[tri+12+b]) as f64).sum());
-            let norm=normal.iter().map(|v|v*v).sum::<f64>().sqrt();
-            for a in 0..3 {record[12+a]=((normal[a]/norm) as f32).to_bits();}
+            if area!=0.0 {
+                let normal: [f64;3]=std::array::from_fn(|a|(0..3).map(|b|f32::from_bits(g[instance+12+b*4+a]) as f64*f32::from_bits(g[tri+12+b]) as f64).sum());
+                let norm=normal.iter().map(|v|v*v).sum::<f64>().sqrt();
+                for a in 0..3 {record[12+a]=((normal[a]/norm) as f32).to_bits();}
+            }
             record[7]=area.to_bits();record[15]=u32::from(two_sided);record[16]=tri as u32;record[17]=head as u32;record[18]=instance as u32;record[19]=material as u32;
-            total+=area as f64*power;
+            total+=weight as f64*power;
             if !total.is_finite() {return Err(2);}
             lights.push(record);lookups.push((table+j,total));
         }
@@ -957,5 +974,132 @@ fn light_packet(input: &[u32]) -> Result<Vec<u32>, u32> {
 pub unsafe extern "C" fn build_lights(ptr:*const u32,len:usize)->u32 {
     match light_packet(unsafe {std::slice::from_raw_parts(ptr,len)}) {
         Ok(words)=>{OUTPUT.with(|out|*out.borrow_mut()=words);0},Err(code)=>code
+    }
+}
+#[cfg(test)]
+mod light_tests {
+    use super::light_packet;
+    type Tri = [[f32; 3]; 3];
+    const IDENTITY: [f32; 12] = [1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0.];
+    struct Placement { world: [f32; 12], model: [f32; 12], open: Option<[f32; 12]>, material: u32 }
+    fn still(world: [f32; 12], model: [f32; 12], material: u32) -> Placement { Placement { world, model, open: None, material } }
+    fn normal(t: &Tri) -> [f32; 3] {
+        let e = |v: usize| std::array::from_fn::<f64, 3, _>(|a| t[v][a] as f64 - t[0][a] as f64);
+        let (a, b) = (e(1), e(2));
+        let c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+        let l = c.iter().map(|v| v * v).sum::<f64>().sqrt();
+        if l == 0. { [0.; 3] } else { c.map(|v| (v / l) as f32) }
+    }
+    // One BLAS shared by every placement (one node, triangles retained in order), an optional shutter-open section
+    // (record word 27) and an optional open-pose world block (record word 31) per placement, as the tracer packs them.
+    fn packet(close: &[Tri], open: Option<&[Tri]>, placements: &[Placement], emission: &[(u32, [f32; 3])]) -> Vec<u32> {
+        let records = 16; let blocks = records + placements.len() * 32;
+        let head = blocks + placements.len() * 32;
+        let nodes = 1; let triangles = 4 + nodes * 8; let section = triangles + close.len() * 16;
+        let mut g = vec![0u32; head + section + nodes * 8 + close.len() * 12];
+        g[0] = 1; g[4] = placements.len() as u32; g[5] = records as u32; g[9] = 0x4d494e53;
+        g[head] = nodes as u32; g[head + 1] = triangles as u32; g[head + 2] = close.len() as u32;
+        for (j, t) in close.iter().enumerate() {
+            let at = head + triangles + j * 16;
+            for v in 0..3 { for a in 0..3 { g[at + v * 4 + a] = t[v][a].to_bits(); } }
+            g[at + 3] = placements.iter().map(|p| p.material).next().unwrap_or(0);
+            let n = normal(t); for a in 0..3 { g[at + 12 + a] = n[a].to_bits(); }
+        }
+        if let Some(open) = open {
+            for (j, t) in open.iter().enumerate() {
+                let at = head + section + nodes * 8 + j * 12;
+                for v in 0..3 { for a in 0..3 { g[at + v * 4 + a] = t[v][a].to_bits(); } }
+            }
+        }
+        for (i, p) in placements.iter().enumerate() {
+            let r = records + i * 32;
+            for k in 0..12 { g[r + k] = p.world[k].to_bits(); g[r + 12 + k] = p.model[k].to_bits(); }
+            g[r + 24] = head as u32;
+            if open.is_some() { g[r + 27] = section as u32; }
+            if let Some(rows) = p.open {
+                let b = blocks + i * 32; g[r + 31] = b as u32;
+                for k in 0..12 { g[b + 4 + k] = rows[k].to_bits(); }
+            }
+        }
+        let mut input = vec![g.len() as u32]; input.extend(vec![0u32; 1024]);
+        for &(m, rgb) in emission { for a in 0..3 { input[1 + m as usize * 4 + a] = rgb[a].to_bits(); } }
+        input.extend(g); input
+    }
+    fn fl(v: &[u32], i: usize) -> f32 { f32::from_bits(v[i]) }
+    fn lights(out: &[u32]) -> (usize, usize) { let h = out[12] as usize; (out[h] as usize, out[h + 1] as usize) }
+    fn hash(v: &[u32]) -> u64 { v.iter().fold(0xcbf29ce484222325u64, |h, w| (h ^ *w as u64).wrapping_mul(0x100000001b3)) }
+    const QUAD: [Tri; 2] = [[[0., 0., 0.], [1., 0., 0.], [1., 1., 0.]], [[0., 0., 0.], [1., 1., 0.], [0., 1., 0.]]];
+    const SCALED: [f32; 12] = [2., 0., 0., 1., 0., 3., 0., -2., 0., 0., 1., 4.];
+    const SCALED_MODEL: [f32; 12] = [0.5, 0., 0., -0.5, 0., 1. / 3., 0., 2. / 3., 0., 0., 1., -4.];
+    #[test]
+    fn still_packet_is_unchanged() {
+        // Captured from main's kernel (be51f15878) before FG-17-EMITTERS: a scene with no mover packs as before.
+        let input = packet(&QUAD, None, &[still(SCALED, SCALED_MODEL, 1), still(IDENTITY, IDENTITY, 2)], &[(1, [2., 1., 0.5]), (2, [0., 0., 0.])]);
+        let out = light_packet(&input).unwrap();
+        assert_eq!(lights(&out).0, 4);
+        assert_eq!((out.len(), hash(&out)), (STILL_LEN, STILL_HASH));
+    }
+    const STILL_LEN: usize = 328; const STILL_HASH: u64 = 12604359644678197407;
+    fn record_of(out: &[u32], placement: usize, j: usize) -> usize {
+        let lookup = out[16 + placement * 32 + 30] as usize; assert_ne!(lookup, 0); out[lookup + j] as usize
+    }
+    #[test]
+    fn movers_and_deformers_get_close_pose_records() {
+        let open = [[[0., 0., 0.], [2., 0., 0.], [2., 2., 0.]], [[0., 0., 0.], [2., 2., 0.], [0., 2., 0.]]];
+        let moved = [1., 0., 0., 5., 0., 1., 0., 0., 0., 0., 1., 0.];
+        for (placement, section) in [(Placement { open: Some(moved), ..still(SCALED, SCALED_MODEL, 1) }, None), (still(SCALED, SCALED_MODEL, 1), Some(&open[..]))] {
+            let deforming = section.is_some();
+            let out = light_packet(&packet(&QUAD, section, &[placement], &[(1, [1., 1., 1.])])).unwrap();
+            let (count, records) = lights(&out);
+            assert_eq!(count, 2, "deforming {deforming}");
+            let mut cdf = 0.;
+            for j in 0..2 {
+                let r = record_of(&out, 0, j);
+                assert_eq!(r, records + j * 24);
+                // Close-pose world corners, area (scale 2 x 3, half of a unit square) and the triangle's identity.
+                assert_eq!([fl(&out, r), fl(&out, r + 1), fl(&out, r + 2)], [1., -2., 4.]);
+                assert_eq!(fl(&out, r + 7), 3.);
+                assert_eq!([fl(&out, r + 12), fl(&out, r + 13), fl(&out, r + 14)], [0., 0., 1.]);
+                assert!(fl(&out, r + 20) > 0.);
+                cdf += fl(&out, r + 20);
+                assert_eq!(out[r + 18], 16);
+            }
+            assert_eq!(fl(&out, records + 24 + 3), 1.);
+            assert!((cdf - 1.).abs() < 1e-6);
+        }
+    }
+    #[test]
+    fn a_face_degenerate_at_close_is_picked_by_its_open_area() {
+        // Triangle 0 collapses to a line at close; it opens to area 2 (world, scale 2 x 3 on a 2/3 x 1/1 right triangle).
+        let close: [Tri; 2] = [[[0., 0., 0.], [1., 0., 0.], [2., 0., 0.]], QUAD[1]];
+        let open: [Tri; 2] = [[[0., 0., 0.], [2. / 3., 0., 0.], [0., 2. / 3., 0.]], QUAD[1]];
+        let out = light_packet(&packet(&close, Some(&open), &[still(SCALED, SCALED_MODEL, 1)], &[(1, [1., 1., 1.])])).unwrap();
+        assert_eq!(lights(&out).0, 2);
+        let r = record_of(&out, 0, 0);
+        assert_eq!(fl(&out, r + 7), 0.);
+        assert_eq!([out[r + 12], out[r + 13], out[r + 14]], [0, 0, 0]);
+        // Weights: open area 4/3 for the collapsed face against close area 3 for the other.
+        let pmf = fl(&out, r + 20);
+        assert!((pmf - (4. / 3.) / (4. / 3. + 3.)).abs() < 1e-6, "{pmf}");
+        // The same collapsed face on a still placement, or collapsed at both ends, is left out as before.
+        let still_out = light_packet(&packet(&close, None, &[still(SCALED, SCALED_MODEL, 1)], &[(1, [1., 1., 1.])])).unwrap();
+        assert_eq!(lights(&still_out).0, 1);
+        let both = light_packet(&packet(&close, Some(&close), &[still(SCALED, SCALED_MODEL, 1)], &[(1, [1., 1., 1.])])).unwrap();
+        assert_eq!(lights(&both).0, 1);
+        // A moving placement whose open rows give the collapsed face area also falls back to them.
+        let flat = [Placement { open: Some(SCALED), ..still([2., 0., 0., 1., 0., 0., 0., -2., 0., 0., 1., 4.], SCALED_MODEL, 1) }];
+        let moved = light_packet(&packet(&QUAD, None, &flat, &[(1, [1., 1., 1.])])).unwrap();
+        assert_eq!(lights(&moved).0, 2);
+        assert_eq!(fl(&moved, record_of(&moved, 0, 0) + 7), 0.);
+        assert!((fl(&moved, record_of(&moved, 0, 0) + 20) - 0.5).abs() < 1e-6);
+    }
+    #[test]
+    fn a_moving_dark_placement_gets_a_zero_lookup_table() {
+        let placements = [Placement { open: Some(SCALED), ..still(IDENTITY, IDENTITY, 2) }];
+        let out = light_packet(&packet(&QUAD, None, &placements, &[(1, [1., 1., 1.])])).unwrap();
+        assert_eq!(lights(&out).0, 0);
+        let lookup = out[16 + 30] as usize;
+        assert_ne!(lookup, 0);
+        assert_eq!(&out[lookup..lookup + 2], &[0, 0]);
     }
 }
