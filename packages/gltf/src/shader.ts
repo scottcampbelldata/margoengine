@@ -337,8 +337,9 @@ export function transparentTintPBR(code: string): string {
  * MASK primitives (not BLEND, transmission or unlit) into `begin()`'s pass with these `targets`, depth tested
  * (greater-equal) and written. The shader is the lit beauty shader, its lighting in a dead block (every binding stays,
  * nothing is lit), with an entry point `capture` returning `margoCapture(s, v, k)`: `s` the Surface, `v` toward the eye,
- * `k` the share of the base layer's light left after clearcoat and sheen (vec3f(1) for standard materials). Declarations
- * holding `var<private> margoBeauty:vec4f` turn the block on: the entry point stores the beauty colour there first.
+ * `k` the share of the base layer's light left after clearcoat and sheen, a material extension's coat included
+ * (vec3f(1) for standard materials). Declarations holding `var<private> margoBeauty:vec4f` turn the block on: the entry
+ * point stores the beauty colour there first.
  */
 export interface PBRCapture {
   /** Module-scope WGSL for the lit shader `code`: `struct MargoCapture` (one output per target) and `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture`. Return the same string for the same code. */
@@ -350,19 +351,23 @@ export interface PBRCapture {
 }
 const captured = new Map<string, Map<string, string>>();
 /** `code` (the lit PBR shader) with a `capture` entry point returning `margoCapture(s,v,k)`; the beauty fragment becomes a dead `margoShade` call. */
-export function capturePBR(code: string, declarations: string): string {
+export function capturePBR(code: string, declarations: string, keep?: string): string {
+  const key = keep ? `${keep}
+${code}` : code;
   let cache = captured.get(declarations),
-    out = cache?.get(code);
+    out = cache?.get(key);
   if (out !== undefined) return out;
   if (code.split(head).length !== 2)
     throw margoError(
       'failed',
       'PBR capture hook point missing or used twice; keep exactly one hook marker in the shader source',
     );
-  // Clearcoat and sheen scale the base layer (ambient included) affinely: k = layers(1) - layers(0).
-  const k = code.includes('fn layers(')
-    ? 'layers(s,v,f.light.xyz,vec3f(1))-layers(s,v,f.light.xyz,vec3f(0))'
-    : 'vec3f(1)';
+  // Clearcoat and sheen scale the base layer (ambient included) affinely: k = layers(1) - layers(0). A material
+  // extension's coat (MaterialExtension.coat, `@margoengine/materials` clearcoat()) leaves the share `keep` of it too.
+  const layered = code.includes('fn layers(')
+      ? 'layers(s,v,f.light.xyz,vec3f(1))-layers(s,v,f.light.xyz,vec3f(0))'
+      : 'vec3f(1)',
+    k = keep ? `(${layered})*(${keep})` : layered;
   out =
     declarations +
     code.replace(head, 'fn margoShade(i:Out,front:bool)->vec4f {') +
@@ -372,7 +377,7 @@ export function capturePBR(code: string, declarations: string): string {
     captured.set(declarations, (cache = new Map()));
   }
   if (cache.size >= 64) cache.clear();
-  cache.set(code, out);
+  cache.set(key, out);
   return out;
 }
 // Material map slots 5-12, in PBRModel order. Sheen and specular colors are sRGB.

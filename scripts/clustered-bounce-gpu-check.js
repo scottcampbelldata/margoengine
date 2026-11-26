@@ -137,6 +137,46 @@ try {
     );
   });
 
+  // KB-BOUNCE-CAPTURE2: the patch drawn by @margoengine/materials (createMesh with a standard Material) reflects as the
+  // glTF quad does, and a clearcoat of 1, from materials (`clearcoat: 1`) or from KHR_materials_clearcoat drawn by
+  // `materials.install`, keeps the base layer's 1 - F_coat(n.v) of it (KHR_materials_clearcoat, "Layering"): the spot
+  // and the capture's eye sit 100 m straight over the patch, so n.v is 1 to within 2e-4 and F_coat the coat's F0 0.04,
+  // and the bounce is 0.96 of the core patch's (within 1%). The JS twin over the data the GPU reads within 2%.
+  results.layered = {};
+  for (const [kind, weight] of [
+    ['materials', 1],
+    ['coated', 0.96],
+    ['installed', 0.96],
+  ]) {
+    await call('scene', { ...patchScene({}), meshes: ['patchWall'], patchModel: kind });
+    const settledKind = await call('settle', 30),
+      kindOn = await call('probe', points, wall),
+      rows = (results.layered[kind] = { stats: settledKind.stats, weight, rows: [] });
+    check(
+      `the ${kind} patch is captured and reduced to virtual point lights`,
+      settledKind.stats.sources === 1 && settledKind.stats.vpls >= 24 && settledKind.stats.vpls <= 32,
+      settledKind.stats,
+    );
+    heights.forEach((c, i) => {
+      const gpu = kindOn[i][0] - off[i][0],
+        core = on[i][0] - off[i][0],
+        twin =
+          (0.5 / Math.PI) *
+          bounceIrradiance(new Float32Array(settledKind.data), points[i].slice(0, 3), points[i].slice(3))[0];
+      rows.rows.push({ c, gpu, core, twin, ratio: gpu / core, errorTwin: gpu / twin - 1 });
+      check(
+        `c ${c}: the ${kind} patch bounces ${gpu.toFixed(5)}, ${weight} of the core patch's ${core.toFixed(5)} within 1%`,
+        Math.abs(gpu / (weight * core) - 1) < 0.01,
+        { gpu, core, weight },
+      );
+      check(
+        `c ${c}: the ${kind} patch bounce ${gpu.toFixed(5)} within 2% of the JS twin's ${twin.toFixed(5)}`,
+        Math.abs(gpu / twin - 1) < 0.02,
+        { gpu, twin },
+      );
+    });
+  }
+
   // KB-BOUNCE-TERMS1: the same spot projecting a red | blue image (linear) bounces the colours it casts. Its direct light
   // on the floor is red on +x and blue on -x (the image's u runs along the spot camera's x, here -x); the bounce at a
   // wall point on either side follows it, red and blue sum to the plain spot's bounce there (the halves are
