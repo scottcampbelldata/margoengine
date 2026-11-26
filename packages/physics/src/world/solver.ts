@@ -164,6 +164,15 @@ export interface SolverHost {
   /** Gives back a region the solver no longer needs; a later region may take its bytes. */
   free(region: Region): void;
   /**
+   * The world's body rows: how many records every body-set field holds (`bodies`, `bodyImpulses`, `bodyForces`,
+   * `deckClaims`, one a kernel body row), the same for every solver that writes or adds to one. The world's `bodyRows`
+   * option sets them; else the first solver that passes `atLeast` (the rigid solver, its kernel's capacity) fixes them. A solver
+   * sizes its body-set regions by them, never by its own rows.
+   * @throws MargoError `state` when they are not fixed yet and `atLeast` is not given (add the rigid solver first, or make
+   * the world with `bodyRows`), or when they are fewer than `atLeast`.
+   */
+  bodyRows(atLeast?: number): number;
+  /**
    * The port of field `field` at the current coupling tick: the owner's published data for a field the solver reads, and
    * the contributions summed in canonical order (by solver id, then element) for a field it owns and others accumulate into.
    * Undefined when nothing was published or accumulated.

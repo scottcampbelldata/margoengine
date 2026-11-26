@@ -31,7 +31,7 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
 import { type PropellerRace, raceVelocity, thrusterThrust } from './propeller.js';
 import { squat } from './squat.js';
@@ -75,7 +75,10 @@ export interface ShipParams {
   readonly walls?: readonly ShipWall[];
   /** The water's density, kg/m^3 (default 1025). */
   readonly density?: number;
-  /** Body rows its `bodyForces` port covers (default one past the highest ship row). */
+  /**
+   * Body rows its `bodyForces` port covers: the world's (`PhysicsWorld.bodyRows`, the rigid world's capacity), which it reads;
+   * given, it must be the same.
+   */
   readonly capacity?: number;
   /** Its rate level (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
@@ -221,9 +224,12 @@ export class ShipSolver implements Solver<ShipParams> {
         },
       };
     });
-    this.capacity = params.capacity ?? top + 1;
-    if (!(this.capacity > top))
-      throw new RangeError(`Its capacity (${this.capacity}) covers every ship row; pass more than ${top}.`);
+    this.capacity = bodyRowsOf(
+      host,
+      'A ShipSolver',
+      ships.map((s) => s.row),
+      params.capacity,
+    );
     this.rudders = host.allocate('rudders', ships.length * 8, 'f64', SHIP_LAYOUT);
     this.forces = host.allocate('forces', this.capacity * FORCE_WORDS * 8, 'f64', SHIP_LAYOUT);
   }
@@ -528,9 +534,7 @@ export class ShipSolver implements Solver<ShipParams> {
    * Where each race boils up to the surface, for a `FoamSolver` ship's `wash`: from where its spreading jet's e-folding
    * radius reaches the shaft's depth, along the race, with the race's speed there.
    */
-  wash(
-    _t: number,
-  ): readonly {
+  wash(_t: number): readonly {
     position: [number, number];
     direction: [number, number];
     reach: number;

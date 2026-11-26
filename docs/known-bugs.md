@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: solvers that push on bodies could not share a world (KB-PHYS-BODYROWS1, physics framework)
+
+- **Repro:** a world with a `SoftSolver` (a curtain on a hull) and a `HullSolver`: the first step threw "Contributors
+  "hull" and "soft" add different lengths to field "bodyForces"". The same held for any of the hull, ship, entry and
+  deck-water solvers with the soft, air or rigid solver's own pushes.
+- **Cause:** each solver sized its body-set contributions by its own convention: the rigid, soft and air solvers by the
+  kernel's capacity, the hull, ship, entry and deck-water solvers one past their highest row; the field's sum refuses
+  contributions of different lengths.
+- **Fix:** the world fixes its body rows once (its `bodyRows` option, or the rigid solver's kernel capacity), and every
+  solver that pushes on bodies sizes by them (`SolverHost.bodyRows`, `bodyRowsOf`), refused with the fix when they are not
+  fixed yet or its rows do not fit (docs/physics-framework.md, section 5).
+- **Regression:** `packages/physics/tests/coupling/body-rows.test.js` (a hull, its ship model, a curtain and its deck
+  water in one world; the refusals) and "a curtain in a barge that lists as it floods hangs plumb" in
+  `packages/physics/tests/coupling/seakeeping.test.js`.
+
 ### Open 2026-11-26: defects found by the physics solver audit, Claude solvers (KB-PHYS-AUDIT2, physics, weather)
 
 Found by the audit in [physics-solver-audit.md](physics-solver-audit.md); each is fixed by the row's owner with a

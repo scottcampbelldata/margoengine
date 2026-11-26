@@ -166,6 +166,7 @@ interface SolverHost {
     allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
     resize(region: Region, byteLength: number): Region;
     free(region: Region): void;
+    bodyRows(atLeast?: number): number;
     port(field: string): Port | undefined;
 }
 

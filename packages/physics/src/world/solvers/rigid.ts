@@ -99,6 +99,27 @@ function columnTableVersion(columns: Record<string, Float32Array | Uint32Array>)
  * The rate level whose step is `step` seconds.
  * @throws RangeError for a step no level has, naming the nearest levels.
  */
+/**
+ * The world's body rows for solver `who` pushing on bodies at kernel rows `rows` (`SolverHost.bodyRows`), checked: every row
+ * inside them, and a `capacity` given equal to them. A solver sizes its body-set regions by what this returns.
+ * @throws MargoError `state` when the world has not fixed its body rows or a row is past them; RangeError for a `capacity`
+ * that is not the world's.
+ */
+export function bodyRowsOf(host: SolverHost, who: string, rows: readonly number[], capacity?: number): number {
+  const n = host.bodyRows();
+  if (capacity !== undefined && capacity !== n)
+    throw new RangeError(
+      `${who}'s capacity of ${capacity} body rows is not the world's ${n}; leave it out: a solver that pushes on bodies covers the world's body rows.`,
+    );
+  for (const row of rows)
+    if (!(row < n))
+      throw new MargoError(
+        'state',
+        `${who} pushes on body row ${row} and the world has ${n} body rows; make the world with {bodyRows: ${row + 1}} or more.`,
+      );
+  return n;
+}
+
 export function rateLevelOf(step: number): RateLevel {
   for (let level = 0; level < RATE_LEVELS; level++)
     if (rateOf(level as RateLevel) * step === 1) return level as RateLevel;
@@ -155,9 +176,11 @@ export class RigidSolver implements Solver<RigidSolverParams> {
     this.physics = physics;
     this.host = host;
     this.layout = columnTableVersion(physics.kernel.columns);
-    const capacity = params.capacity ?? physics.kernel.capacity;
-    if (!(Number.isInteger(capacity) && capacity > 0))
-      throw new RangeError(`A RigidSolver's capacity is a whole number of body rows above 0; got ${capacity}.`);
+    const wanted = params.capacity ?? physics.kernel.capacity;
+    if (!(Number.isInteger(wanted) && wanted > 0))
+      throw new RangeError(`A RigidSolver's capacity is a whole number of body rows above 0; got ${wanted}.`);
+    // The world's body rows: fixed by this solver (its kernel's capacity, or the capacity given) unless already set.
+    const capacity = host.bodyRows(wanted);
     this.capacity = capacity;
     this.bodies = host.allocate('bodies', capacity * BODY_WORDS * 4, 'f32', BODIES_LAYOUT);
     this.clock = host.allocate('stepCount', 8, 'f64', 1);

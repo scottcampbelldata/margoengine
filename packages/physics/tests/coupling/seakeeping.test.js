@@ -18,6 +18,7 @@ import {
   wettedLoads,
 } from '../../dist/seakeeping.js';
 import { SpectralSea } from '../../dist/sea.js';
+import { SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { freeSection, vHull } from './sections.js';
 import {
   BODY_FORCES_FIELD,
@@ -27,6 +28,7 @@ import {
   FORCE_WORDS,
   PhysicsWorld,
   RigidSolver,
+  SoftSolver,
 } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -127,7 +129,8 @@ function driver(row, f0, w, axis = 1, ramp = 0) {
     }),
     init(h) {
       host = h;
-      region = h.allocate('drive', (row + 1) * FORCE_WORDS * 8, 'f64', 1);
+      // The world's body rows, as every solver that pushes on bodies covers.
+      region = h.allocate('drive', h.bodyRows() * FORCE_WORDS * 8, 'f64', 1);
     },
     step(context) {
       const words = new Float64Array(host.memory.buffer, region.byteOffset, region.byteLength / 8);
@@ -944,6 +947,7 @@ function floodedBarge(rate = { num: 60, den: 1 }) {
     body = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [10, 2, 4], mass } }),
     hull = new HullSolver(),
     world = new PhysicsWorld({ rate })
+      .add(new RigidSolver(), { physics })
       .add(hull, {
         hulls: [
           {
@@ -959,7 +963,6 @@ function floodedBarge(rate = { num: 60, den: 1 }) {
         sea: { density: SEA_WATER, elevation: () => 0 },
         greenWater: false,
       })
-      .add(new RigidSolver(), { physics })
       .couple(['hull', 'rigid'], 'staggered');
   return Object.assign(world, { body, hull, mass });
 }
@@ -1055,6 +1058,7 @@ test('HullSolver: a box going down under the sea falls at the speed its form dra
         });
       body.enabledRotations = [false, false, false];
       const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(new RigidSolver(), { physics })
         .add(new HullSolver(), {
           hulls: [{ row: body.row, mesh: boxMesh(size) }],
           sea: { density: SEA_WATER, elevation: () => 0 },
@@ -1062,7 +1066,6 @@ test('HullSolver: a box going down under the sea falls at the speed its form dra
           radiation: false,
           drag,
         })
-        .add(new RigidSolver(), { physics })
         .couple(['hull', 'rigid'], 'staggered');
       for (let f = 1; f <= 30 * 60; f++) world.advance(f);
       return -body.linearVelocity[1];
@@ -1071,4 +1074,57 @@ test('HullSolver: a box going down under the sea falls at the speed its form dra
   const v = run(true);
   assert.ok(Math.abs(v - terminal) < 1e-3 * terminal, `falls at ${v} m/s against ${terminal}`);
   assert.ok(run(false) > 10 * terminal, 'without it, ever faster');
+});
+
+test('HullSolver with cloth: a curtain in a barge that lists as it floods hangs plumb', async () => {
+  // The holed barge of the test above, its hull a sensor so the cloth inside it meets nothing, a 1 by 1.5 m curtain hung
+  // from its deckhead by its top row (attached to the hull's body). The hull, the soft and the rigid solver share the
+  // world, each covering the world's body rows (the hull's covered only up to its own row before, and the world refused
+  // the two). As the barge lists to 13.7 degrees the curtain swings and, its air drag damping it, comes to hang along
+  // gravity: leaning from the cabin's walls by the list. Measured 0.014 degrees from plumb at 90 s: a bound of 0.05.
+  const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
+    mass = SEA_WATER * 20 * 8 * 2,
+    body = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [10, 2, 4], mass, sensor: true } }),
+    soft = await SoftBodies.attach(physics),
+    [nu, nv, height] = [6, 21, 1.5],
+    curtain = soft.create(
+      SoftBodyDesc.cloth([-0.5, 1.8, -2], [1 / (nu - 1), 0, 0], [0, -height / (nv - 1), 0], nu, nv).setParticleMass(
+        0.005,
+      ),
+    );
+  for (let i = 0; i < nu; i++) curtain.attachParticle(i * nv, body);
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+    .add(new RigidSolver(), { physics })
+    .add(new HullSolver(), {
+      hulls: [
+        {
+          row: body.row,
+          mesh: boxMesh([20, 4, 8]),
+          compartments: [{ mesh: boxMesh([10, 4, 1.5], [0, 0, 3.25]) }],
+          openings: [
+            { from: 0, to: 'outside', centre: [0, -1.5, 4], normal: [0, 0, 1], width: 2, height: 0.5 },
+            { from: 0, to: 'outside', centre: [0, 2, 3.25], normal: [0, 1, 0], width: 0.3, height: 0.3 },
+          ],
+        },
+      ],
+      sea: { density: SEA_WATER, elevation: () => 0 },
+      greenWater: false,
+    })
+    .add(new SoftSolver(), { soft })
+    .couple(['hull', 'soft', 'rigid'], 'staggered');
+  for (let f = 1; f <= 90 * 60; f++) world.advance(f);
+  const mean = (j) => {
+      const m = [0, 0, 0];
+      for (let i = 0; i < nu; i++) {
+        const p = curtain.particlePosition(i * nv + j);
+        for (let k = 0; k < 3; k++) m[k] += p[k] / nu;
+      }
+      return m;
+    },
+    top = mean(0),
+    bottom = mean(nv - 1),
+    lean = (Math.atan2(Math.hypot(bottom[0] - top[0], bottom[2] - top[2]), top[1] - bottom[1]) * 180) / Math.PI,
+    heel = (2 * Math.asin(body.rotation[0]) * 180) / Math.PI;
+  assert.ok(heel > 13 && heel < 14.5, `the barge lists ${heel} degrees`);
+  assert.ok(lean < 0.05, `the curtain hangs ${lean} degrees from plumb`);
 });

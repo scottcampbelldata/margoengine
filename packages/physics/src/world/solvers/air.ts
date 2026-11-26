@@ -62,9 +62,10 @@ export class AirSolver implements Solver<AirSolverParams> {
       throw new TypeError('An AirSolver steps the air loads of a Physics: world.add(new AirSolver(), {physics}).');
     this.level = rateLevelOf(physics.fixedTimestep);
     this.step0 = physics.fixedTimestep;
-    const capacity = params.capacity ?? physics.kernel.capacity;
-    if (!(Number.isInteger(capacity) && capacity > 0))
-      throw new RangeError(`An AirSolver's capacity is a whole number of body rows above 0; got ${capacity}.`);
+    const wanted = params.capacity ?? physics.kernel.capacity;
+    if (!(Number.isInteger(wanted) && wanted > 0))
+      throw new RangeError(`An AirSolver's capacity is a whole number of body rows above 0; got ${wanted}.`);
+    const capacity = host.bodyRows(wanted);
     this.capacity = capacity;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', AIR_LAYOUT);
     this.host = host;

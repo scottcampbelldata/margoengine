@@ -69,6 +69,11 @@ export interface PhysicsWorldOptions {
   cellSize?: number;
   /** The memory to put every region in (default a new one, growing as solvers allocate). */
   memory?: WebAssembly.Memory;
+  /**
+   * The world's body rows, the records of every body-set field (default the rigid solver's: its kernel's capacity, fixed
+   * when it is added). Set it for a world whose solvers push on bodies before the rigid solver is added, or with none.
+   */
+  bodyRows?: number;
 }
 
 const WORLD_ID = '';
@@ -121,6 +126,9 @@ export class PhysicsWorld {
   readonly seed: number;
   readonly gravity: readonly [number, number, number];
   readonly cellSize: number;
+  /** The world's body rows (SolverHost.bodyRows), once fixed, and the solver that fixed them. */
+  private rows: number | undefined;
+  private rowsBy: string | undefined;
   /** The memory every region lies in, and its allocator. */
   readonly arena: Arena;
   /** The fields between the solvers. */
@@ -137,7 +145,7 @@ export class PhysicsWorld {
   private units: Unit[] = [];
 
   constructor(options: PhysicsWorldOptions = {}) {
-    const { rate, clock, seed = 1, gravity = [0, -9.80665, 0], cellSize = 4096, memory } = options;
+    const { rate, clock, seed = 1, gravity = [0, -9.80665, 0], cellSize = 4096, memory, bodyRows } = options;
     // Checked by its shape: physics bundles its own copy of @margoengine/math, so the app's FilmClock is another class object.
     if (clock !== undefined && !(typeof clock?.ticks === 'function' && typeof clock.alpha === 'function' && clock.fps))
       throw new TypeError(
@@ -153,6 +161,11 @@ export class PhysicsWorld {
       throw new RangeError('Gravity is three finite numbers in m/s^2; pass [0, -9.80665, 0] for Earth.');
     if (!(cellSize >= 1 && cellSize <= 1048576 && Number.isInteger(cellSize) && (cellSize & (cellSize - 1)) === 0))
       throw new RangeError(`A cell size is a power of two of metres from 1 to 2^20 (got ${cellSize}); pass 4096.`);
+    if (bodyRows !== undefined && !(Number.isInteger(bodyRows) && bodyRows > 0))
+      throw new RangeError(
+        `A world's body rows are a whole number above 0 (got ${bodyRows}); pass physics.kernel.capacity.`,
+      );
+    this.rows = bodyRows;
     this.clock = clock ?? new FilmClock({ fps: rate ?? 24 });
     this.seed = seed;
     this.gravity = [gravity[0], gravity[1], gravity[2]];
@@ -245,12 +258,21 @@ export class PhysicsWorld {
       this.reorder();
       this.publish(entry, ran / (1 << (TOP - level)) - 1);
     } catch (error) {
+      if (this.rowsBy === id) this.rows = this.rowsBy = undefined;
       this.entries = this.entries.filter((e) => e !== entry);
       this.fields.remove(id);
       this.reorder();
       throw error;
     }
     return this;
+  }
+
+  /**
+   * The world's body rows: the records of every body-set field (`bodies`, `bodyImpulses`, `bodyForces`, `deckClaims`), set
+   * by the `bodyRows` option or the rigid solver; undefined until one of them fixes them.
+   */
+  get bodyRows(): number | undefined {
+    return this.rows;
   }
 
   /** Takes solver `id` out; false when there is none. Its regions stay allocated (the memory only grows). */
@@ -651,6 +673,24 @@ export class PhysicsWorld {
         const registered = this.fields.field(field);
         if (registered?.owner === id) return e.sums.get(field);
         return registered?.current?.port;
+      },
+      bodyRows: (atLeast) => {
+        if (atLeast !== undefined && !(Number.isInteger(atLeast) && atLeast > 0))
+          throw new RangeError(`Body rows are a whole number above 0 (got ${atLeast}).`);
+        if (this.rows === undefined) {
+          if (atLeast === undefined)
+            throw new MargoError(
+              'state',
+              `Solver "${id}" pushes on bodies before the world knows how many it has; add the RigidSolver first (its kernel's capacity fixes them), or make the world with {bodyRows: physics.kernel.capacity}.`,
+            );
+          this.rows = atLeast;
+          this.rowsBy = id;
+        } else if (atLeast !== undefined && this.rows < atLeast)
+          throw new MargoError(
+            'state',
+            `The world has ${this.rows} body rows and solver "${id}" needs ${atLeast}; make the world with {bodyRows: ${atLeast}} or more.`,
+          );
+        return this.rows;
       },
     };
   }
