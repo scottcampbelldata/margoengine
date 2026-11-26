@@ -364,7 +364,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-08 | Ship seakeeping | stand-in | Claude | LANDED d865c4c8f |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | CLAIMED |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Claude | CLAIMED |
-| SEA-11 | Wave impact: slamming, green water | stand-in | Claude | CLAIMED |
+| SEA-11 | Wave impact: slamming, green water | stand-in | Claude | LANDED d90933a42 (green water d865c4c8f) |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | CLAIMED |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | LANDED e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Claude | LANDED 12b84154b |
