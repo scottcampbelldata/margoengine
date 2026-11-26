@@ -95,6 +95,41 @@ test('generated files are regenerated or merged by key and the rebase finishes',
   assert.equal(repo.git('log', '--format=%s').trim(), 'chore: generated files after the rebase\nwork\nupstream\nbase');
 });
 
+test('sizes.json history merges by identity: no row twice, none lost (KB-REBASE-HISTORYDUP1)', async (t) => {
+  const { droppedHistory, historyRepeated } = await import('../scripts/quality/ratchet.js');
+  const row = (commit, reason) => ({ date: '2026-11-26', commit, reason, grew: 1 });
+  const [old, main, work] = [row('aaa', 'base'), row('bbb', 'upstream'), row('ccc', 'work')];
+  // The same row as main's with its keys in another order, as two tools write it.
+  const again = { date: main.date, commit: main.commit, grew: 1, reason: main.reason };
+  const docs = {
+    'docs/a.md': ['a\n', 'a\n', 'a\n'],
+    'docs/b.md': ['b\n', 'b\n', 'b\n'],
+    'site/llms.txt': ['a\nb\n', 'a\nb\n', 'a\nb\n'],
+  };
+  const base = sizes({ 'a/.': 10, 'b/.': 20 }, [old]);
+  const upstream = sizes({ 'a/.': 12, 'b/.': 20 }, [old, main]);
+  const settled = (branch) => {
+    const repo = repository(t, { ...docs, [SIZES]: [base, upstream, branch] });
+    const result = repo.rebase();
+    assert.equal(result.status, 0, result.stderr);
+    const merged = JSON.parse(repo.read(SIZES));
+    assert.deepEqual(historyRepeated(merged.history), []);
+    assert.deepEqual(merged.items, { 'a/.': 12, 'b/.': 25 });
+    assert.equal(merged.total, 37);
+    return { repo, merged };
+  };
+  // Each side appended its own row: main's rows first, then the branch's.
+  assert.deepEqual(settled(sizes({ 'a/.': 10, 'b/.': 25 }, [old, work])).merged.history, [old, main, work]);
+  // The branch carries main's row too (the same commit landed twice): it stays once.
+  assert.deepEqual(settled(sizes({ 'a/.': 10, 'b/.': 25 }, [old, again, work])).merged.history, [old, main, work]);
+  assert.deepEqual(settled(sizes({ 'a/.': 10, 'b/.': 25 }, [old, main])).merged.history, [old, main]);
+  // The branch dropped a row main has: it is kept, and the ratchet's reader still reports one that goes missing.
+  const { repo, merged } = settled(sizes({ 'a/.': 10, 'b/.': 25 }, [work]));
+  assert.deepEqual(merged.history, [old, main, work]);
+  assert.deepEqual(droppedHistory(repo.clone, 'sizes', merged), []);
+  assert.deepEqual(droppedHistory(repo.clone, 'sizes', { ...merged, history: [old, work] }), [main]);
+});
+
 test('a conflict in a source file stops the rebase, names it, and a second run finishes it', (t) => {
   const repo = repository(t, {
     'docs/a.md': ['a\n', 'a upstream\n', 'a work\n'],

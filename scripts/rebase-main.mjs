@@ -17,6 +17,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { mergeApiSurfaceRows } from './api-report-scope.mjs';
+import { historyMissing, historyRepeated } from './quality/ratchet.js';
 import { conflictMarkers } from './support/conflict-markers.mjs';
 
 const SIZES = 'scripts/quality/baselines/sizes.json';
@@ -68,8 +69,11 @@ function mergeSizes(...texts) {
     if (theirs.items[key] === undefined) delete items[key];
     else items[key] = theirs.items[key];
   }
-  const known = new Set((base.history ?? []).map((entry) => JSON.stringify(entry)));
-  const added = (theirs.history ?? []).filter((entry) => !known.has(JSON.stringify(entry)));
+  // By identity, and against upstream too: a row the commit carries that upstream already has (the same change landed
+  // twice, or a commit made on a file taken from main) came back a second time (KB-REBASE-HISTORYDUP1).
+  const fresh = historyMissing(theirs.history ?? [], [...(base.history ?? []), ...(ours.history ?? [])]);
+  const twice = new Set(historyRepeated(fresh));
+  const added = fresh.filter((entry) => !twice.has(entry));
   const sorted = Object.fromEntries(
     Object.keys(items)
       .sort()
