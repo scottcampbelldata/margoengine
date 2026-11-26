@@ -29,6 +29,8 @@ export interface HullMemory {
     readonly dt: number;
     readonly rollEddy: number;
     readonly rollFriction: number;
+    readonly strips: readonly DiffractionStrip[];
+    readonly stripForms: readonly DiffractionForm[];
 }
 
 export interface HullMesh {
@@ -46,6 +48,7 @@ export interface HullParams {
     readonly stations?: number;
     readonly radiation?: boolean;
     readonly memory?: number;
+    readonly diffraction?: boolean;
     readonly rollDamping?: boolean;
     readonly viscosity?: number;
 }
@@ -120,6 +123,7 @@ export interface Section {
     readonly breadth: number;
     readonly draft: number;
     readonly area: number;
+    readonly centroid: number;
 }
 
 export type Vec3 = readonly [number, number, number];
@@ -166,6 +170,23 @@ export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: nu
 type Cell = readonly [number, number, number];
 
 type Centring = 'cell' | 'face' | 'vertex' | 'particle';
+
+interface DiffractionForm {
+    readonly a33: number;
+    readonly a22: number;
+    readonly a24: number;
+    readonly k33: Float64Array;
+    readonly k22: Float64Array;
+    readonly k24: Float64Array;
+}
+
+interface DiffractionStrip {
+    readonly x: number;
+    readonly width: number;
+    readonly heaveDepth: number;
+    readonly swayDepth: number;
+    readonly form: number;
+}
 
 type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
 

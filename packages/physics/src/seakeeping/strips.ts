@@ -14,13 +14,17 @@
 // zero speed). Each section's breadth, draft and area come from the mesh cut by the plane of the station (Green's theorem
 // over the cut's segments under the waterline).
 
-/** A hull section: its station along the body's x, its width along x, and its breadth, draft and area under the waterline. */
+/**
+ * A hull section: its station along the body's x, its width along x, its breadth, draft and area under the waterline, and
+ * the depth of its area's centroid under the waterline.
+ */
 export interface Section {
   readonly x: number;
   readonly width: number;
   readonly breadth: number;
   readonly draft: number;
   readonly area: number;
+  readonly centroid: number;
 }
 
 /** A Lewis form: the scale M and the coefficients a1, a3 of z = M (zeta + a1 / zeta + a3 / zeta^3). */
@@ -53,6 +57,7 @@ export function hullSections(
   for (let s = 0; s < count; s++) {
     const x = lo + (s + 0.5) * width;
     let area = 0,
+      moment = 0,
       zmin = Infinity,
       zmax = -Infinity,
       ymin = Infinity;
@@ -87,6 +92,8 @@ export function hullSections(
       }
       // Green: the area is the integral of z dy round the section (the waterline adds nothing, dy being 0 along it).
       area += 0.5 * (z0 + z1) * (y1 - y0);
+      // and its first moment about y = 0, the integral of y z dy (z linear along the segment).
+      moment += ((y1 - y0) * (z0 * (2 * y0 + y1) + z1 * (y0 + 2 * y1))) / 6;
       ymin = Math.min(ymin, y0, y1);
       for (const [y, z] of [
         [y0, z0],
@@ -98,7 +105,14 @@ export function hullSections(
         }
     }
     const draft = ymin < waterline ? waterline - ymin : 0;
-    out.push({ x, width, breadth: zmax > zmin ? zmax - zmin : 0, draft, area: Math.abs(area) });
+    out.push({
+      x,
+      width,
+      breadth: zmax > zmin ? zmax - zmin : 0,
+      draft,
+      area: Math.abs(area),
+      centroid: area !== 0 ? waterline - moment / area : 0,
+    });
   }
   return out;
 }

@@ -524,11 +524,12 @@ test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measure
 test("HullSolver: on a SpectralSea's long swell, a box rides up and down as its frequency-domain response says", () => {
   // The framework's sea (SpectralSea, @margoengine/physics/sea) as the hull's: one wave of 0.3 m at about 0.049 Hz (a
   // 20.6 s swell, 650 m long), from a spectrum with all its energy in one bin. In waves this long the box's heave is
-  // X = C e^(-k T) E / (C - (m + A(w)) w^2 + i w B(w)), E the surface's own motion over the box (fitted from the sea), C
-  // the waterplane's stiffness, e^(-k T) the waves' pressure at the keel (Froude-Krylov, Smith's correction) and A, B the
-  // box's heave added mass and damping (Ursell-Tasai): diffraction is under 0.1 percent at k B = 0.02, and a box 4 m long
-  // in a 650 m wave takes the wave's pressure as one (sinc(k L / 2) = 1 - 6e-5); the surface is taken over the box as it
-  // moves. Measured 0.04 percent: a bound of 1 percent.
+  // X = (C - w^2 A(w) + i w B(w)) e^(-k T) E / (C - (m + A(w)) w^2 + i w B(w)), E the surface's own motion over the box
+  // (fitted from the sea), C the waterplane's stiffness, e^(-k T) the waves' pressure at the keel (Froude-Krylov, Smith's
+  // correction) and A, B the box's heave added mass and damping (Ursell-Tasai), which the relative motion principle also
+  // gives the diffraction (a two-dimensional section's added mass grows as the frequency falls, so even this swell's
+  // diffraction is 4 percent of its load); a box 4 m long in a 650 m wave takes the wave as one (sinc(k L / 2) =
+  // 1 - 6e-5); the surface is taken over the box as it moves. Measured 0.04 percent: a bound of 1 percent.
   const nf = 34,
     nd = 24,
     frequencies = Float64Array.from({ length: nf }, (_, i) => 0.04 * (1 / 0.04) ** (i / (nf - 1))),
@@ -565,7 +566,11 @@ test("HullSolver: on a SpectralSea's long swell, a box rides up and down as its 
       [0, 0],
       [0, 0],
       [1, 0],
-      [C * Math.exp(-k * T), 0],
+      // Froude-Krylov and the diffraction of the relative motion principle, eq. 8.47 (along = L sinc(k L / 2)).
+      [
+        (C - w * w * s.addedMass * L) * Math.exp(-k * T) * ((2 / (k * L)) * Math.sin((k * L) / 2)),
+        w * s.damping * L * Math.exp(-k * T) * ((2 / (k * L)) * Math.sin((k * L) / 2)),
+      ],
       [0, 0],
     )[0],
     want = [h[0] * E[0] - h[1] * E[1], h[0] * E[1] + h[1] * E[0]];
@@ -577,4 +582,144 @@ test("HullSolver: on a SpectralSea's long swell, a box rides up and down as its 
     () => far.world.advance(1),
     (error) => error.code === 'state' && /make the sea in the hull's cell/.test(error.message),
   );
+});
+
+/** A SpectralSea of one wave of amplitude `a` and angular frequency near `w` along x (the spectrum's bin nearest), deep. */
+function oneWave(a, w, seed = 3, direction = 0) {
+  const nf = 34,
+    nd = 24,
+    lo = Math.log(0.04),
+    // A grid whose bin `i` sits exactly at w / 2 pi, the rest log-spaced around it.
+    f = w / (2 * Math.PI),
+    i = 17,
+    step = (Math.log(f) - lo) / i,
+    frequencies = Float64Array.from({ length: nf }, (_, n) => Math.exp(lo + n * step)),
+    directions = Float64Array.from({ length: nd }, (_, j) => (2 * Math.PI * j) / nd),
+    energy = new Float64Array(nf * nd),
+    df = (frequencies[i + 1] - frequencies[i - 1]) / 2;
+  energy[i * nd + direction] = (a * a) / (2 * df * ((2 * Math.PI) / nd));
+  return new SpectralSea({
+    waves: { frequencies, directions, energy, depth: Infinity, density: SEA_WATER },
+    seed,
+    gravity: GRAVITY,
+  });
+}
+
+test("HullSolver: in head seas a box heaves as strip theory's relative motion principle says, diffraction with it", () => {
+  // Journee and Massie eqs. 8.45-8.47: each section takes the Froude-Krylov load (from the pressure over the wetted surface)
+  // and the diffraction load M33'(w) z*'' + N33'(w) z*', z* the wave's motion at the depth of the section's mean wave
+  // pressure (for a box section in head seas exactly its draft, z* = e^(-k T) z). Its heave is then
+  //   X = int (rho g B - w^2 a33' + i w b33') e^(-k T) E e^(-i k x) dx / (C - (m + A33) w^2 + i w B33),
+  // E the wave over the box's centre (fitted from the sea), heave and pitch apart for a box even fore and aft. The
+  // equations' box is free in heave and pitch alone, and so is this one (a floating box would drift through the wave's
+  // phase). Measured 0.5, 0.6 and 1.0 percent off at 60 steps a second, and 82 to 267 percent without the diffraction: a
+  // bound of 3 percent.
+  for (const w of [2.5, 3, 3.5]) {
+    const sea = oneWave(0.05, w),
+      k = (w * w) / GRAVITY,
+      run = (options) => {
+        const { world, box } = single({ sea, ...options }),
+          rest = D / 2 - T,
+          heave = [],
+          surface = [];
+        // Free in heave and pitch alone, as the equations are: nothing holds a floating box along the wave, which would
+        // drift it through the wave's phase.
+        box.enabledTranslations = [false, true, false];
+        box.enabledRotations = [false, false, true];
+        for (let f = 1; f <= 40 * 60; f++) {
+          world.advance(f);
+          heave.push(box.position[1] - rest);
+          surface.push(sea.elevation(box.position[0], box.position[2], f / 60));
+        }
+        return amplitudes([heave, surface], w, 20 * 60);
+      },
+      [X, E] = run({}),
+      [Y] = run({ diffraction: false }),
+      s = heaveSection(lewisForm(B, T, B * T), w, SEA_WATER, GRAVITY),
+      m = SEA_WATER * L * B * T,
+      C = SEA_WATER * GRAVITY * L * B,
+      along = (2 / k) * Math.sin((k * L) / 2),
+      force = [
+        (SEA_WATER * GRAVITY * B - w * w * s.addedMass) * Math.exp(-k * T) * along,
+        w * s.damping * Math.exp(-k * T) * along,
+      ],
+      F = [force[0] * E[0] - force[1] * E[1], force[0] * E[1] + force[1] * E[0]],
+      [want] = solve2([C - (m + s.addedMass * L) * w * w, w * s.damping * L], [0, 0], [0, 0], [1, 0], F, [0, 0]),
+      off = (got) => Math.hypot(got[0] - want[0], got[1] - want[1]) / Math.hypot(...want);
+    assert.ok(Math.abs(Math.hypot(...E) - 0.05) <= 1e-3 * 0.05, `the sea's wave: ${Math.hypot(...E)} m`);
+    assert.ok(off(X) <= 0.03, `at ${w} rad/s, heave ${X} against ${want}`);
+    assert.ok(off(Y) > 0.5, `without diffraction the heave is far off: ${Y}`);
+  }
+});
+
+test('HullSolver: held in beam seas a box takes the Froude-Krylov and diffraction loads in sway and roll', () => {
+  // The waves along z (beam on). Held still, the hull's load is the Froude-Krylov force and moment (the pressure over the
+  // wetted surface) and the diffraction of each section, (i w a(w) + b(w)) U in sway and in the sway-roll coupling, U the
+  // water's horizontal velocity at the section's centroid depth: the load the solver hands the rigid solver must be that
+  // (the added-mass fold off, the body held by its locks). The motions these loads drive are the driven test's; a box free
+  // in sway is not compared, as the waves' mean drift (second order, from the pressure over the moving wetted surface)
+  // pushes it away, and one held by locks the solver does not know of is not the equations' body. Measured 0.1 to 1.5
+  // percent off, and 50 to 390 percent without the diffraction: a bound of 3 percent.
+  const rho = SEA_WATER,
+    m = rho * L * B * T,
+    form = lewisForm(B, T, B * T),
+    pivot = T - D / 2,
+    rest = D / 2 - T,
+    mesh = boxMesh([L, D, B]);
+  for (const w of [2.5, 3.5]) {
+    const sea = oneWave(0.05, w, 5, 6),
+      run = (seconds) => {
+        const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
+          box = physics.addBody(null, {
+            position: [0, rest, 0],
+            colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: m },
+          }),
+          hull = new HullSolver(),
+          world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+            .add(new RigidSolver(), { physics })
+            .add(hull, { hulls: [{ row: box.row, mesh }], sea, rollDamping: false, addedMass: false })
+            .couple(['hull', 'rigid'], 'staggered');
+        box.enabledTranslations = [false, false, false];
+        box.enabledRotations = [false, false, false];
+        const [fz, mx] = [[], []];
+        for (let f = 1; f <= seconds * 60; f++) {
+          world.advance(f);
+          const { region } = hull.exportPorts(0)[0],
+            held = new Float64Array(world.memory.buffer, region.byteOffset + box.row * FORCE_WORDS * 8, FORCE_WORDS);
+          fz.push(held[2]);
+          mx.push(held[3]);
+        }
+        return { fz, mx };
+      },
+      s = lateralSection(form, w, rho, pivot, GRAVITY),
+      a24 = (s.rollOfSway.addedMass + s.swayOfRoll.addedMass) / 2,
+      b24 = (s.rollOfSway.damping + s.swayOfRoll.damping) / 2,
+      times = (c, z) => [c[0] * z[0] - c[1] * z[1], c[0] * z[1] + c[1] * z[0]],
+      add = (a, b) => [a[0] + b[0], a[1] + b[1]],
+      off = (got, want) => Math.hypot(got[0] - want[0], got[1] - want[1]) / Math.hypot(...want),
+      // The Froude-Krylov load on the box at rest and the water's velocity at its centroid depth, at the steps' middles.
+      [fk2, fk4, u] = [[], [], []];
+    for (let f = 1; f <= 40 * 60; f++) {
+      const t = (f - 0.5) / 60,
+        loads = wettedLoads(mesh, { position: [0, rest, 0], rotation: [0, 0, 0, 1] }, sea, t, [0, rest, 0]);
+      fk2.push(loads.force[2]);
+      fk4.push(loads.torque[0]);
+      u.push(sea.water.sample(0, -T / 2, 0, t).velocity[2]);
+    }
+    const fitHalf = (signals, from) =>
+        amplitudes(signals, w, from).map(([c, d]) => {
+          // amplitudes() takes sample f at f / 60; these are at (f - 1/2) / 60: turn the phase back by w / 120.
+          const r = [Math.cos(w / 120), -Math.sin(w / 120)];
+          return times([c, d], r);
+        }),
+      [F2, M4, U] = fitHalf([fk2, fk4, u], 20 * 60),
+      want2 = add(F2, times([s.sway.damping * L, w * s.sway.addedMass * L], U)),
+      want4 = add(M4, times([b24 * L, w * a24 * L], U)),
+      held = run(40),
+      // The solver takes the sea at each step's middle: the held load is fitted at those times too.
+      [G2, G4] = fitHalf([held.fz, held.mx], 20 * 60);
+    assert.ok(off(G2, want2) <= 0.03, `at ${w} rad/s, sway force ${G2} against ${want2}`);
+    assert.ok(off(G4, want4) <= 0.03, `at ${w} rad/s, roll moment ${G4} against ${want4}`);
+    assert.ok(off(F2, want2) > 0.3 && off(M4, want4) > 0.3, 'without the diffraction the loads are far off');
+  }
 });

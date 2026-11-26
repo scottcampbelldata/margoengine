@@ -16,7 +16,7 @@
 // save work, which a later change may do.
 import { cos, pow } from '@margoengine/math/pinned';
 import { heaveSection, lateralSection } from './radiation.js';
-import { hullSections, type LewisForm, lewisForm, type Section } from './strips.js';
+import { heaveAddedMassInfinite, hullSections, type LewisForm, lewisForm, type Section } from './strips.js';
 import { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 import { GRAVITY, type HullMesh, wettedLoads } from './wetted.js';
 
@@ -28,6 +28,34 @@ export interface RadiationPair {
   readonly damping: Float64Array;
   /** K_ij(n dt) for n = 0 .. length - 1. */
   readonly kernel: Float64Array;
+}
+
+/**
+ * A section as the waves' diffraction loads it (Journee and Massie eqs. 8.19 and 8.45-8.47, the relative motion principle):
+ * where it is along the hull from the centre of mass, its width, the depths at which the water's motion stands for the
+ * section's (heave: its mean draft, area over breadth, the long-wave limit of the depth T3* of its mean wave pressure, eq.
+ * 8.44; sway: the depth of its area's centroid, where the water's mean horizontal motion over the section is in long
+ * waves), and its form's index in `stripForms`.
+ */
+export interface DiffractionStrip {
+  readonly x: number;
+  readonly width: number;
+  readonly heaveDepth: number;
+  readonly swayDepth: number;
+  readonly form: number;
+}
+
+/**
+ * A section form's coefficients per metre for the diffraction loads: its added mass at infinite frequency in heave, sway
+ * and sway-roll (roll about the centre of mass), and the kernels of its damping in the same, sampled at the step.
+ */
+export interface DiffractionForm {
+  readonly a33: number;
+  readonly a22: number;
+  readonly a24: number;
+  readonly k33: Float64Array;
+  readonly k22: Float64Array;
+  readonly k24: Float64Array;
 }
 
 /** A hull's radiation at its still-water draft: its damping B(w), the kernels K(t) sampled at the step, and its lateral A_inf. */
@@ -49,6 +77,9 @@ export interface HullMemory {
   readonly rollEddy: number;
   /** Its skin friction in roll at frequency w is rollFriction sqrt(2 pi nu w) (N m s), nu the water's kinematic viscosity. */
   readonly rollFriction: number;
+  /** Its sections for the diffraction loads, and their forms. */
+  readonly strips: readonly DiffractionStrip[];
+  readonly stripForms: readonly DiffractionForm[];
 }
 
 /** The still-water waterline in the body's frame at which `mesh` (upright) displaces `mass` of water of `density`. */
@@ -120,6 +151,8 @@ export function hullMemory(
       dt,
       rollEddy: 0,
       rollFriction: 0,
+      strips: [],
+      stripForms: [],
     };
   let widest = 0,
     narrowest = Infinity;
@@ -218,7 +251,37 @@ export function hullMemory(
     rollEddy += 0.5 * density * d2 * d2 * eddyRollCoefficient(form, s.breadth, s.draft, pivot) * s.width;
     rollFriction += FRICTION * density * frictionGirth(form, pivot) * s.width;
   });
-  return { waterline, frequencies, pairs: tables, lateralInfinite, dt, rollEddy, rollFriction };
+  // The diffraction loads' sections and their forms, each form's kernels taken once.
+  const formIndex = new Map<string, number>(),
+    stripForms: DiffractionForm[] = [],
+    strips: DiffractionStrip[] = sections.map((s, k) => {
+      const form = forms[k]!,
+        id = key(form);
+      let index = formIndex.get(id);
+      if (index === undefined) {
+        const list = solved.get(id)!,
+          { a22, a24 } = limits.get(id)!,
+          table = (of: (d: SectionDamping) => number) => kernelOf(frequencies, Float64Array.from(list, of), dt, window);
+        index = stripForms.length;
+        formIndex.set(id, index);
+        stripForms.push({
+          a33: heaveAddedMassInfinite(s.breadth, form, density),
+          a22,
+          a24,
+          k33: table((d) => d.b33),
+          k22: table((d) => d.b22),
+          k24: table((d) => (d.b24 + d.b42) / 2),
+        });
+      }
+      return {
+        x: s.x - centre[0],
+        width: s.width,
+        heaveDepth: s.area / s.breadth,
+        swayDepth: s.centroid,
+        form: index,
+      };
+    });
+  return { waterline, frequencies, pairs: tables, lateralInfinite, dt, rollEddy, rollFriction, strips, stripForms };
 }
 
 /**

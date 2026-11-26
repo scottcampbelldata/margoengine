@@ -16,7 +16,7 @@
 // State: the hulls' motion histories (the radiation's memory). Each step's load and added mass otherwise come from where
 // the bodies are and the sea at that time.
 import { MargoError } from '@margoengine/math/errors';
-import type { SeaSurface } from '@margoengine/math/fields';
+import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields';
 import { cos, sin } from '@margoengine/math/pinned';
 import {
   type Port,
@@ -75,6 +75,13 @@ export interface HullParams {
   /** Seconds of a hull's motion its radiation remembers (default 20). */
   readonly memory?: number;
   /**
+   * Take the waves' diffraction (default true, when the sea gives the water's motion, as a `SeaSurface`'s `water` does): the
+   * relative motion principle of strip theory (Journee and Massie eqs. 8.19 and 8.45-8.47), each section loaded by its added
+   * mass times the water's acceleration and its radiation memory convolved with the water's velocity, at the depths that
+   * stand for the section's motion. The Froude-Krylov part comes from the pressure over the wetted surface.
+   */
+  readonly diffraction?: boolean;
+  /**
    * Damp a hull's roll by its bilge eddies and its skin friction (default true): Ikeda's component method (viscous.ts), the
    * viscous part of roll damping that potential flow leaves out and that damps a real hull's roll most near its resonance.
    */
@@ -108,6 +115,10 @@ export class HullSolver implements Solver<HullParams> {
   private history: Region | null = null;
   /** Per hull: 1 once it has radiated, then the radiation force of its last step (body frame, force then moment). */
   private radiated: Region | null = null;
+  /** Per hull and station: the water's heave and sway velocity at the section, in the body's frame, each of the last `lags` steps. */
+  private waves: Region | null = null;
+  private diffraction = true;
+  private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
   private carry: Region | null = null;
   private readonly memories = new Map<Hull, HullMemory>();
@@ -187,6 +198,15 @@ export class HullSolver implements Solver<HullParams> {
       this.radiated = host.allocate('radiated', hulls.length * 7 * 8, 'f64', HULL_LAYOUT);
     }
     if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
+    this.diffraction = (params.diffraction ?? true) && this.waterOf() !== null;
+    if (this.diffraction)
+      this.waves = host.allocate('waves', hulls.length * this.stations * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
+  }
+
+  /** The water under the sea's surface, when the sea gives it. */
+  private waterOf(): SeaWater | null {
+    const water = (this.sea as Partial<SeaSurface>).water;
+    return water && typeof water.sample === 'function' ? water : null;
   }
 
   step(context: StepContext, dt: number): void {
@@ -254,6 +274,8 @@ export class HullSolver implements Solver<HullParams> {
           loads,
         );
       if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, 1 / rateOf(context.level), loads);
+      if (this.diffraction)
+        this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), loads);
       const w = hull.row * FORCE_WORDS,
         held = this.addedMass
           ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads)
@@ -275,6 +297,91 @@ export class HullSolver implements Solver<HullParams> {
       this.memories.set(hull, memory);
     }
     return memory;
+  }
+
+  /**
+   * Adds the waves' diffraction loads to `loads` (the relative motion principle): each section takes its added mass at
+   * infinite frequency times the water's acceleration plus its damping kernel convolved with the water's velocity, in heave
+   * at its mean draft and in sway and roll at its centroid's depth, under the still-water level at the section's station.
+   * The velocities at time t go into the history at this tick; the accelerations are their central differences over the
+   * step. Integrated along the hull in the body's axes: heave and pitch from the heave loads, sway, roll and yaw from the
+   * sway loads.
+   */
+  private diffract(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    tick: number,
+    t: number,
+    dt: number,
+    loads: WettedLoads,
+  ): void {
+    const q = pose.rotation,
+      conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
+      local = rotate(conjugate, [
+        centre[0] - pose.position[0],
+        centre[1] - pose.position[1],
+        centre[2] - pose.position[2],
+      ]),
+      memory = this.memoryOf(hull, bodies, at, local, dt),
+      water = this.waterOf();
+    if (!memory || !water || memory.strips.length === 0) return;
+    const lags = this.lags,
+      stations = this.stations,
+      index = this.hulls.indexOf(hull),
+      ring = new Float64Array(
+        this.host!.memory.buffer,
+        this.waves!.byteOffset + index * stations * lags * 2 * 8,
+        stations * lags * 2,
+      ),
+      slot = tick % lags,
+      flow = this.flow,
+      // The water's velocity in the body's axes at body point (x, 0, z) on the still-water plane, `depth` under it.
+      motion = (x: number, depth: number, time: number) => {
+        const p = rotate(q, [x, 0, local[2]]);
+        water.sample(pose.position[0] + p[0], -depth, pose.position[2] + p[2], time, flow);
+        return rotate(conjugate, flow.velocity);
+      },
+      body = [0, 0, 0, 0, 0, 0];
+    memory.strips.forEach((strip, s) => {
+      const form = memory.stripForms[strip.form]!,
+        x = local[0] + strip.x,
+        heave = motion(x, strip.heaveDepth, t)[1],
+        sway = motion(x, strip.swayDepth, t)[2],
+        heaveRate = (motion(x, strip.heaveDepth, t + dt / 2)[1] - motion(x, strip.heaveDepth, t - dt / 2)[1]) / dt,
+        swayRate = (motion(x, strip.swayDepth, t + dt / 2)[2] - motion(x, strip.swayDepth, t - dt / 2)[2]) / dt,
+        base = s * lags * 2;
+      ring[base + 2 * slot] = heave;
+      ring[base + 2 * slot + 1] = sway;
+      let k33 = 0,
+        k22 = 0,
+        k24 = 0;
+      const n = Math.min(lags, form.k33.length);
+      for (let lag = 0; lag < n; lag++) {
+        const r = base + 2 * ((slot - lag + lags) % lags),
+          weight = lag === 0 ? 0.5 : 1;
+        k33 += weight * form.k33[lag]! * ring[r]!;
+        k22 += weight * form.k22[lag]! * ring[r + 1]!;
+        k24 += weight * form.k24[lag]! * ring[r + 1]!;
+      }
+      const w = strip.width,
+        f3 = w * (form.a33 * heaveRate + k33 * dt),
+        f2 = w * (form.a22 * swayRate + k22 * dt),
+        m4 = w * (form.a24 * swayRate + k24 * dt);
+      body[1]! += f3;
+      body[5]! += strip.x * f3;
+      body[2]! += f2;
+      body[3]! += m4;
+      body[4]! -= strip.x * f2;
+    });
+    const f = rotate(q, [body[0]!, body[1]!, body[2]!]),
+      m = rotate(q, [body[3]!, body[4]!, body[5]!]);
+    for (let k = 0; k < 3; k++) {
+      loads.force[k]! += f[k]!;
+      loads.torque[k]! += m[k]!;
+    }
   }
 
   /**
@@ -537,7 +644,7 @@ export class HullSolver implements Solver<HullParams> {
 
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [this.history, this.radiated, this.carry].filter((r): r is Region => r !== null);
+    return [this.history, this.radiated, this.waves, this.carry].filter((r): r is Region => r !== null);
   }
 
   extraState(): readonly Region[] {

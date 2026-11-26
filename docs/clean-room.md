@@ -12476,6 +12476,32 @@ The kiln test reads the temperature registry port and passes each value into the
 
 The Rust stencil, SIMD enthalpy inversion, TypeScript bridge and shader implementation were written from the published methods. No companion code was used.
 
+### A hull's diffraction: the relative motion principle (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-26)
+
+`packages/physics/src/seakeeping/solver.ts` (`diffract`) and `memory.ts` (`DiffractionStrip`, `DiffractionForm`) load each
+section with the waves' diffraction. Written from J. M. J. Journee and W. W. Massie, *Offshore Hydromechanics*, TU Delft,
+2001 (https://ocw.tudelft.nl/wp-content/uploads/Part_2.pdf), read for this job:
+- the relative motion principle (section 6.3.3, eq. 6.62, and section 8.3, eqs. 8.17-8.20): the wave load on a
+  restrained section is its potential mass times the water's equivalent acceleration plus its potential damping times the
+  water's equivalent velocity, plus the Froude-Krylov load;
+- the equivalent motions from the Froude-Krylov load (eqs. 8.38-8.45): in heave the water's motion at the depth T3* of
+  the section's mean wave pressure, whose long-wave limit (eqs. 8.42-8.44) is the section's area over its breadth;
+- the strip integrals for heave and pitch (eqs. 8.47-8.48), and for sway, roll and yaw in the same way.
+
+These are this package's own:
+- **The time domain.** The potential mass and damping at the waves' frequency become the section's added mass at infinite
+  frequency times the water's acceleration plus its radiation kernel convolved with the water's velocity over the
+  memory (Cummins), as for the hull's own motion, so a sea of many frequencies takes each its own coefficients.
+- **The sway's depth.** The section's centroid, where the water's mean horizontal motion over the section is in long
+  waves (the sway Froude-Krylov force over the section's area).
+- **The accelerations** as central differences of the sea's velocities over the step.
+- **The roll** from the sections' sway-roll coupling about the centre of mass.
+
+Proof: `packages/physics/tests/coupling/seakeeping.test.js`. In head seas a box heaves within 1 percent of eq. 8.47's
+frequency-domain answer at 2.5, 3 and 3.5 rad/s (a box section's mean-pressure depth is exactly its draft in head seas),
+82 to 267 percent off without the diffraction. Held in beam seas, its sway force and roll moment are within 1.5 percent of
+the Froude-Krylov load plus (i w a(w) + b(w)) U, 50 to 390 percent off without. No constant is calibrated.
+
 ### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the
