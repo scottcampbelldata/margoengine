@@ -14155,7 +14155,15 @@ The optional Physics entry measures 5,112 B gzip with a 5,368 B ceiling. Each la
 
 ### Crush response for civilian barriers (BREAK-03)
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and ignores shear and sustained contact. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8120 B minified and 3507 B gzip. Core and Stage gain zero bytes.
+An already contacted patch maintains a unilateral damped backing response while its geometric gap remains
+compressed inside the patch radius. A sustained 30 N load settles to 90.23 mm against a fixed support and
+95.11 mm between the movable specimens. Both match the discrete loaded equilibrium derived from the
+contact step and rigid substeps. The movable pair conserves total momentum with reciprocal inputs.
+The fixture preserves one material impact through six seconds of applied load and exact snapshot replay.
+The durable damage ledger records material work. The maintained contact is a normal patch with elastic
+and viscous support, and surface friction, distributed panel collapse and flooding remain open.
+
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and carries normal response only. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8428 B minified and 3625 B gzip. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14786,6 +14794,30 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: one terrain or water in two capture effects draws the first effect's outputs (KB-CAPTURE-TWOEFFECTS1, terrain, water)
+
+- **Repro:** add one `Terrain` to SSR and to `SceneTargets` (`ssr.add(terrain); targets.add(terrain)`): the second
+  effect's capture stage carries SSR's three-output `MargoSSR` under its own two to seven targets, a pipeline error
+  on the GPU. Water with two effects of the same target formats drew the first effect's stage for both, and with
+  different formats rebuilt its capture pipeline and bind groups on every draw.
+- **Cause:** a model takes one hook, shared by every effect through `shareCapture` (`packages/shared/capture.js`),
+  which forwards `declarations()` to the effect drawing now. Terrain cached its capture stage by the lit shader alone
+  (`captureCode`), and water kept one capture pipeline keyed without the declarations.
+- **Fix:** both key the stage and pipeline by the declarations this draw's effect returns; water keeps one pipeline
+  (and its bind groups per view) per key. Regression: `packages/terrain/test/capture.test.js` and
+  `packages/water/test/capture.test.js` ("in two effects").
+
+### Open 2026-11-26: water added to SceneTargets or MeshBlend builds an invalid capture stage (KB-WATER-TARGETS1, water)
+
+- **Repro:** `targets.add(water)` on a `SceneTargets` whose outputs are not exactly three, or `meshBlend.add(water)`:
+  the water capture fragment returns `MargoSSR(specular, weight, normal)` while that effect's `MargoSSR` has one field
+  per output, so the shader does not compile.
+- **Cause:** water's capture (`captureShader` in `packages/water/src/index.ts`) writes SSR's three fields itself (the
+  sky reflection SSR replaces) instead of calling the hook's `margoSSR(n, v, base, metal, rough)`, and
+  `SceneTargets.add`/`MeshBlend.add` accept any model with `setCapture`.
+- **Owed:** water calls `margoSSR` for an effect that is not SSR (its normal, body colour and roughness), with a
+  test that adds one water to SSR and to SceneTargets.
+
 ### Fixed 2026-11-26: water beside a solid box ran faster than beside the liquid box's own sides (KB-FLIP-SOLIDSLIP1, physics, flip)
 
 - **Repro:** Martin and Moyce's dam break (`packages/physics/tests/flip.test.js`) on a floor of two solid rows instead of
@@ -15254,9 +15286,10 @@ test.
   it. **Cause:** `packages/physics/src/ice/model.ts` melts an above-freezing surface by running the quasi-steady Stefan
   growth law backwards through the ice and snow, so conduction through the slab throttles a surface melt that is set
   by the surface heat flux.
-- **BREAK-03, a latched crush contact lets bodies pass through.** **Repro:** keep pushing a body into a crush patch
-  after its first stroke with sensor colliders, as the README advises. **Cause:**
-  `packages/physics/src/crush/index.ts` ignores a latched contact until it clears.
+- **BREAK-03, sustained crush support fixed.** A pressed body with a sensor collider used to pass through an
+  already contacted patch because the latch suppressed all subsequent normal reactions. A unilateral, damped
+  backing step now carries the continuing load without creating a new damage event. The six-second fixed
+  and reciprocal movable-support regression is in `packages/physics/tests/coupling/crush.test.js`.
 - **ATMO-07, a lightning leader can stall with no flash and no error.** **Repro:** a domain where the leader runs out
   of candidate cells before it reaches ground or a target. **Cause:** `packages/physics/src/lightning/index.ts` ends
   growth silently.
