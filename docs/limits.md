@@ -9207,3 +9207,5 @@ Specify a physical groundwater time scale appropriate to the rate at which the s
 
 Detailed unsaturated pressure and moisture profiles, multiple aquifer layers and surface-water backflow through
 spring openings are outside this model. HYDRO-02 calculates recharge through the active soil.
+
+The optional JavaScript entry measures 3,939 B min+gzip. Both Wasm variants are 11,142 B before HTTP compression.

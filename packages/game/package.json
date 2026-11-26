@@ -2235,6 +2235,10 @@
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/groundwater": {
+      "types": "./dist/physics/groundwater.d.ts",
+      "import": "./dist/physics/groundwater.js"
+    },
     "./physics/landscape": {
       "types": "./dist/physics/landscape.d.ts",
       "import": "./dist/physics/landscape.js"
