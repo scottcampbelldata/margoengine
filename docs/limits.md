@@ -10247,3 +10247,9 @@ The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Cor
 `Hull.bilgeKeels` terms apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Plate added inertia, hull pressure, skegs and large-angle decay measurements remain open.
 
 The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
+
+### Very small bilge keel excursions
+
+The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20. The pressure and added-inertia terms remain open.
+
+The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.

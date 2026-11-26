@@ -14883,6 +14883,12 @@ The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Cor
 
 The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
 
+### Very small bilge keel excursions
+
+The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20. The pressure and added-inertia terms remain open.
+
+The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

@@ -624,7 +624,7 @@ test('HullSolver forward speed roll follows the ITTC lift, friction and eddy ter
   }
 });
 
-test('HullSolver bilge keel damping follows the ITTC normal force, wet span and forward lift', () => {
+test('HullSolver bilge keel damping follows measured-range drag, wet span and forward lift', () => {
   const dt = 1 / 60;
   const mesh = boxMesh([L, D, B]);
   const mass = SEA_WATER * L * B * T;
@@ -672,8 +672,11 @@ test('HullSolver bilge keel damping follows the ITTC normal force, wet span and 
     return forces[body.row * FORCE_WORDS + 3];
   };
   for (const [y, rate, fraction, speed = 0] of [
+    [D / 2 - T, 0.001, 1],
     [D / 2 - T, 0.125, 1],
     [D / 2 - T, -0.125, 1],
+    [D / 2 - T, 0.28, 1],
+    [D / 2 - T, 0.4, 1],
     [0.5, 0.125, 1 / 6],
     [2, 0.125, 0],
     [D / 2 - T, 0.125, 1, 1],
@@ -682,7 +685,14 @@ test('HullSolver bilge keel damping follows the ITTC normal force, wet span and 
     const effectiveWidth = breadth * fraction;
     const amplitude = Math.abs(rate) / frequency;
     const kc = (Math.PI * arm * amplitude * f) / effectiveWidth;
-    const cd = 22.5 / kc + 2.4;
+    // The experimental fit bounds the force coefficient below Ikeda's range. Evaluate the published polynomial
+    // with host math in this reference. Only the transition interval mixes the two independently evaluated forces.
+    const logKc = Math.log(Math.max(kc, 0.3));
+    const wassermann = 0.47 * logKc ** 2 - 4.94 * logKc + 13.75;
+    const ikeda = 22.5 / kc + 2.4;
+    const transition = Math.max(0, Math.min(1, kc - 3));
+    const weight = 3 * transition ** 2 - 2 * transition ** 3;
+    const cd = kc >= 4 ? ikeda : (1 - weight) * wassermann + weight * ikeda;
     const cDrag = SEA_WATER * length * effectiveWidth * f * f * arm ** 3 * cd * Math.abs(rate);
     const liftArm = arm + breadth / 2;
     const transverse = liftArm * Math.abs(rate);

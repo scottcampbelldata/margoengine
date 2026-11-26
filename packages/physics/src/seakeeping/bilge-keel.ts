@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { exp, hypot } from '@margoengine/math/pinned';
+import { exp, hypot, ln } from '@margoengine/math/pinned';
 import { atan2 } from '../ship/propeller.js';
 import type { HullMemory } from './memory.js';
 import type { Vec3 } from './wetted.js';
@@ -65,6 +65,17 @@ function wetInterval(rootDepth: number, tipDepth: number): readonly [number, num
   return rootDepth > 0 ? [0, intersection] : [intersection, 1];
 }
 
+function normalDrag(kc: number): number {
+  if (kc >= 4) return 22.5 / kc + 2.4;
+  // Wassermann et al. (2016), Eq. 12. Below the measured range retain its value at the low endpoint.
+  const log = ln(Math.max(0.3, kc));
+  const small = (0.47 * log - 4.94) * log + 13.75;
+  if (kc <= 3) return small;
+  // Match Ikeda without a jump in drag or its slope at the start of his applicable range.
+  const s = kc - 3;
+  return small + s * s * (3 - 2 * s) * (22.5 / kc + 2.4 - small);
+}
+
 /**
  * Ikeda's bilge-keel normal force and Jones's forward lift (ITTC 2024, 48, 50–51 and 58–59).
  * The coefficient multiplies roll rate, for the same held implicit drag impulse as the hull's other viscous terms.
@@ -95,7 +106,7 @@ export function bilgeKeelDamping(
       );
       const wetBreadth = breadth * (finish - start);
       if (wetBreadth === 0) continue;
-      const cd = 2.4 + (excursion > 0 ? (22.5 * wetBreadth) / excursion : 0);
+      const cd = normalDrag(excursion / wetBreadth);
       const flow = velocityFactor * arm;
       damping += 0.25 * density * length * wetBreadth * cd * flow * flow * arm * speed;
       if (courseSpeed > 0) {
