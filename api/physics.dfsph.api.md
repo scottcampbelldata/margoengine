@@ -8,6 +8,10 @@ import { Quat } from "@margoengine/math";
 
 export const DFSPH_LAYOUT = 1;
 
+export const DFSPH_PARCEL_LAYOUT = 1;
+
+export const DFSPH_PARCEL_WORDS = 9;
+
 export const DFSPH_PARTICLE_WORDS = 8;
 
 export { PbfBoundary as DfsphBoundary };
@@ -28,6 +32,7 @@ export interface DfsphOptions {
     readonly rigid?: boolean;
     readonly rate?: RateLevel;
     readonly modalContactField?: FieldDescriptor;
+    readonly parcelCapacity?: number;
     readonly signal?: AbortSignal;
 }
 
@@ -58,6 +63,11 @@ export interface DfsphParams {
     readonly cellSize?: number;
 }
 
+export interface DfsphParcelFields {
+    readonly requests: FieldDescriptor;
+    readonly receipts: FieldDescriptor;
+}
+
 export interface DfsphPoint {
     readonly position: Vec3;
     readonly velocity?: Vec3;
@@ -73,6 +83,7 @@ export interface DfsphReading {
 export class DfsphSolver implements Solver<DfsphParams> {
     readonly id: string;
     readonly particleField: FieldDescriptor;
+    readonly parcelFields?: DfsphParcelFields;
     private constructor();
     static load(memory: WebAssembly.Memory, options?: DfsphOptions): Promise<DfsphSolver>;
     describe(): {
@@ -89,6 +100,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     get statistics(): DfsphStatistics;
+    get particleVolume(): number;
     get mass(): number;
     sample(index: number): DfsphReading;
     positions(out?: Float32Array): Float32Array;

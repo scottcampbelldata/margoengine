@@ -77,12 +77,12 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
-- **FLUID-01:** Define one bidirectional particle/surface water ledger for SEA-04 and HYDRO-01.
-  It needs tick/cell identity, available and accepted volume (m³), signed x/z momentum (kg m/s),
-  and acknowledgement before either representation debits its storage. The runoff and wake inputs
-  carry volume but have no paired horizontal momentum or acceptance. Define a separate SOUND-05
-  liquid/bubble event record carrying position, energy and a clock on the same world contract.
-  The FLUID-01 entry already drives SOUND-04's existing modal contact field.
+- **FLUID-01:** Connect SEA-04 and HYDRO-01 to the optional DFSPH layout-1 parcel requests and receipts.
+  Each half needs to reserve whole-particle volume, apply the acknowledged signed volume and x/z momentum,
+  and account for vertical momentum separately from depth-averaged motion. The optional FLUID-01 endpoint
+  and conservative fixture already use those fields. The current runoff and wake inputs carry volume and
+  have no paired horizontal momentum or acceptance. SOUND-05 still needs a mapped liquid/bubble event record
+  with position, energy and a clock. SOUND-04's existing modal contact field has a real impact producer.
 
 - **SOFT-04** needs a same-tick handoff for GPU-resident positions and reciprocal rigid-contact impulses,
   with an ordered snapshot readback after the tick commits. The current SoftSolver contract steps CPU

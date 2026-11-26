@@ -9693,7 +9693,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 6,649 B gzip. Each lazy native asset measures 28,814 B raw and 10,683 B gzip.
+The DFSPH entry measures 7,863 B gzip. Each lazy native asset measures 28,814 B raw and 10,683 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -9709,6 +9709,11 @@ uniform material energies on its solids. The interface spans a three-spacing ker
 The capillary force runs before pressure and leaves out the paper's simultaneous nonlinear pressure and friction
 solve. The narrow-channel surge remains early. Bubble acoustics, shallow-water exchange and film production
 bindings are open.
+
+The parcel interface moves one particle rest-volume per ticket. Fractions remain with the sender.
+It reports all momentum components and resolves origin-cell offsets. Shallow-water and crest adapters
+need to apply the receipts to their own conserved state. The checked second endpoint is a closed test
+reservoir, including capacity refusal, retransmission and replay.
 
 ### Position-based particle water (FLUID-02)
 

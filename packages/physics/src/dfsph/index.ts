@@ -23,8 +23,17 @@ import {
   vec,
   writeBoundaries,
 } from '../pbf/boundary.js';
+import {
+  DFSPH_PARCEL_LAYOUT,
+  DFSPH_PARCEL_WORDS,
+  type DfsphParcelFields,
+  exchangeParcels,
+  getParcels,
+  parcelFields,
+} from './exchange.js';
 import { bindDfsphKernel, loadDfsphKernel } from './kernel.js';
 
+export { DFSPH_PARCEL_LAYOUT, DFSPH_PARCEL_WORDS, type DfsphParcelFields } from './exchange.js';
 export type { PbfBoundary as DfsphBoundary } from '../pbf/boundary.js';
 
 /** The versioned f64 particle record. */
@@ -80,6 +89,8 @@ export interface DfsphOptions {
   readonly rate?: RateLevel;
   /** Optional one-track contactField of a ModalSoundSolver on the same world rate. */
   readonly modalContactField?: FieldDescriptor;
+  /** Whole-particle parcel requests this clock step. Default zero disables the exchange fields. */
+  readonly parcelCapacity?: number;
   readonly signal?: AbortSignal;
 }
 
@@ -143,6 +154,7 @@ type State = {
   readonly stats: Region;
   readonly settings: Region;
   readonly modal?: Region;
+  readonly parcels?: { readonly receipts: Region; readonly clock: Region };
   readonly buckets: Region;
   readonly next: Region;
   readonly used: Region;
@@ -157,6 +169,7 @@ type State = {
   readonly bucketCount: number;
   readonly capacity: number;
   readonly mass: number;
+  readonly volume: number;
   readonly cellSize: number;
 };
 
@@ -187,6 +200,8 @@ const xyz = (values: Float64Array, at: number): Vec3 => [values[at]!, values[at 
 /** Clocked, native divergence-free SPH with independent density and velocity-divergence pressure. */
 export class DfsphSolver implements Solver<DfsphParams> {
   readonly particleField: FieldDescriptor;
+  /** Present when parcelCapacity is positive. Install the other endpoint at the same dyadic rate. */
+  readonly parcelFields?: DfsphParcelFields;
   private state?: State;
   private cell: Cell = ZERO;
 
@@ -196,8 +211,10 @@ export class DfsphSolver implements Solver<DfsphParams> {
     private readonly memory: WebAssembly.Memory,
     private readonly rigid: boolean,
     private readonly preferredRate: RateLevel,
+    private readonly parcelCapacity: number,
     private readonly modalContactField?: FieldDescriptor,
   ) {
+    if (parcelCapacity) this.parcelFields = parcelFields(id);
     this.particleField = {
       name: `${id}:particles`,
       kind: 'particleSet',
@@ -228,6 +245,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       memory,
       options.rigid ?? false,
       rate as RateLevel,
+      whole(options.parcelCapacity ?? 0, 0, 'DFSPH parcel capacity'),
       modal ? Object.freeze({ ...modal }) : undefined,
     );
   }
@@ -237,6 +255,11 @@ export class DfsphSolver implements Solver<DfsphParams> {
     if (this.rigid)
       fields.push({ field: BODIES_FIELD, access: 'read' }, { field: BODY_IMPULSES_FIELD, access: 'accumulate' });
     if (this.modalContactField) fields.push({ field: this.modalContactField, access: 'write' });
+    if (this.parcelFields)
+      fields.push(
+        { field: this.parcelFields.requests, access: 'read' },
+        { field: this.parcelFields.receipts, access: 'write' },
+      );
     return { id: this.id, rate: this.preferredRate, stableRate: () => this.preferredRate, fields };
   }
 
@@ -307,7 +330,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
           (BOUNDARY_WORDS + Number(capillary)) * sampleCount +
           SOLID_WORDS * surfaces.length +
           2 * IMPULSE_WORDS * bodyCapacity) +
-      4 * (bucketCount * BUCKET_WORDS + 2 * (capacity + sampleCount));
+      4 * (bucketCount * BUCKET_WORDS + 2 * (capacity + sampleCount)) +
+      this.parcelCapacity * DFSPH_PARCEL_WORDS * 8;
     if (bytes >= MAX_MEMORY_PAGES * 65536)
       throw new RangeError(
         'DFSPH grid and state exceed the wasm32 arena. Reserve fewer points or use coarser boundary sampling.',
@@ -343,6 +367,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       bucketCount,
       surfaces,
       mass,
+      volume: positive(mass / density, 'DFSPH particle volume'),
       cellSize: positive(params.cellSize ?? 4096, 'DFSPH cell size'),
       kernel: bindDfsphKernel(host, this.module, this.memory),
       points: f64('dfsph-particles', words * DFSPH_PARTICLE_WORDS),
@@ -350,6 +375,10 @@ export class DfsphSolver implements Solver<DfsphParams> {
       settings: f64('dfsph-settings', SETTINGS_WORDS),
       stats: f64('dfsph-statistics', STATS_WORDS),
       modal: this.modalContactField && f64('dfsph-modal-impact', MODAL_WORDS),
+      parcels: this.parcelFields && {
+        clock: f64('dfsph-parcel-request-clock', 2),
+        receipts: f64('dfsph-parcel-receipts', this.parcelCapacity * DFSPH_PARCEL_WORDS),
+      },
       buckets: host.allocate('dfsph-neighbour-buckets', bucketCount * BUCKET_WORDS * 4, 'u32', DFSPH_LAYOUT),
       next: host.allocate('dfsph-neighbour-links', Math.max(1, words + sampleCount) * 4, 'u32', DFSPH_LAYOUT),
       used: host.allocate('dfsph-occupied-buckets', Math.max(1, words + sampleCount) * 4, 'u32', DFSPH_LAYOUT),
@@ -360,6 +389,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       pressureImpulses: f64('dfsph-pressure-impulses', bodyCapacity * IMPULSE_WORDS),
     };
     this.state = state;
+    if (state.parcels) numbers(state, state.parcels.clock)[0] = -1;
     numbers(state, state.settings).set(settings);
     this.emit(particles);
     this.updateBoundaries(host.port(BODIES_FIELD.name));
@@ -418,7 +448,6 @@ export class DfsphSolver implements Solver<DfsphParams> {
   private run(dt: number): void {
     const state = this.ready();
     const count = numbers(state, state.stats)[0]!;
-    if (!count) return;
     const error = state.kernel(
       state.points.byteOffset,
       count,
@@ -446,8 +475,49 @@ export class DfsphSolver implements Solver<DfsphParams> {
       );
   }
 
+  private applyParcels(input: Port | undefined): void {
+    const state = this.ready();
+    if (!state.parcels || !input) return;
+    const { region, tick, cell } = input;
+    const clock = numbers(state, state.parcels.clock);
+    if (tick <= clock[0]!) return;
+    if (
+      region.layout !== DFSPH_PARCEL_LAYOUT ||
+      region.type !== 'f64' ||
+      region.byteLength !== this.parcelCapacity * DFSPH_PARCEL_WORDS * 8
+    )
+      throw new MargoError(
+        'state',
+        'Incompatible DFSPH parcel requests. Provide the configured number of layout-1 f64 parcel rows.',
+      );
+    const shift: Cell = [
+      (cell[0] - this.cell[0]) * state.cellSize,
+      (cell[1] - this.cell[1]) * state.cellSize,
+      (cell[2] - this.cell[2]) * state.cellSize,
+    ];
+    const requests = getParcels(numbers(state, region), state.volume, state.mass, shift, clock[1]!);
+    if (requests.length) {
+      const receipts = numbers(state, state.parcels.receipts);
+      const stats = numbers(state, state.stats);
+      stats[0] = exchangeParcels(
+        numbers(state, state.points),
+        numbers(state, state.scratch),
+        stats[0]!,
+        state.capacity,
+        DFSPH_PARTICLE_WORDS,
+        WORK_WORDS,
+        state.mass,
+        requests,
+        receipts,
+      );
+      clock[1] = requests.at(-1)!.ticket;
+    }
+    clock[0] = tick;
+  }
+
   step(context: StepContext, dt: number): void {
     this.cell = context.cell;
+    if (this.parcelFields) this.applyParcels(context.inputs.get(this.parcelFields.requests.name));
     this.updateBoundaries(context.inputs.get(BODIES_FIELD.name));
     this.run(dt);
     const state = this.ready();
@@ -462,6 +532,8 @@ export class DfsphSolver implements Solver<DfsphParams> {
     if (this.rigid) ports.push({ field: BODY_IMPULSES_FIELD.name, region: state.impulses, tick, cell: this.cell });
     if (state.modal && this.modalContactField)
       ports.push({ field: this.modalContactField.name, region: state.modal, tick, cell: this.cell });
+    if (this.parcelFields && state.parcels)
+      ports.push({ field: this.parcelFields.receipts.name, region: state.parcels.receipts, tick, cell: this.cell });
     return ports;
   }
 
@@ -469,6 +541,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
     const state = this.ready();
     const regions = [state.points, state.stats, state.impulses];
     if (state.modal) regions.push(state.modal);
+    if (state.parcels) regions.push(state.parcels.clock, state.parcels.receipts);
     return regions;
   }
 
@@ -490,6 +563,11 @@ export class DfsphSolver implements Solver<DfsphParams> {
       divergence: s[7]!,
       viscosityIterations: s[8]!,
     };
+  }
+
+  /** The rest volume of one accepted particle parcel in m³. */
+  get particleVolume(): number {
+    return this.ready().volume;
   }
 
   get mass(): number {

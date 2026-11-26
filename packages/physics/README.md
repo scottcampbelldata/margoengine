@@ -4541,6 +4541,16 @@ exchange, load with `rigid: true`, set the boundary's `body` row and use
 `world.couple(['rigid', water.id], 'staggered')`. Pass a one-track `ModalSoundSolver.contactField` as
 `modalContactField` to excite resonances from hard liquid impacts. Run both at the same world rate.
 
+Use `parcelCapacity` when a second world solver owns a liquid volume and momentum ledger. Register
+`parcelFields.requests` as its output and `parcelFields.receipts` as its input on the same dyadic rate,
+then place both endpoints in a staggered group. Publish exactly `parcelCapacity` layout-1 f64 rows of
+`[ticket, particleRow, x, y, z, volume, px, py, pz]`. Assign increasing positive integer tickets.
+A positive `particleVolume` and row `-1` emit a particle with the supplied position and momentum.
+A negative volume of the same magnitude withdraws the indicated row and returns its actual position and
+opposite momentum. Receipts use a zero volume when the requested row or capacity is unavailable.
+The other endpoint reserves each transfer and settles it once from the matching receipt. Outgoing transfers
+may change other particle row indices. Read the current particle field before requesting another batch.
+
 ### Rail running gear and contact wire
 
 Import `@margoengine/physics/rail` for railway rolling stock with two sprung bogies, four wheelsets,

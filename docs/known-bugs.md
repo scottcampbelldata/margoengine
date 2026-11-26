@@ -16890,7 +16890,8 @@ tiers reach the next Martin–Moyce Table 2 station in normalized intervals of a
 original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
 measured liquid–air tension. The planar model includes excluded pressure volume and surface energy but has
 no resolved viscous wall layer. The original release diaphragm is also absent from the rectangular-domain
-model. The present real field couplings are rigid reactions and the modal impact field.
+model. The parcel contract conserves volume and all momentum components against a closed fixture.
+The SEA-04 and HYDRO-01 production endpoints remain open.
 
 ### Rail production shot and full track contact (DYN-05)
 

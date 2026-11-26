@@ -231,6 +231,13 @@ Columns on a Rigid Horizontal Plane*, section 3 and Table 2. The measured spread
 diaphragm release time. The early narrow-channel surge remains reproducible with `--capillary`.
 [Martin and Moyce](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf).
 
+Nils Thürey, Matthias Müller-Fischer, Simon Schirm and Markus Gross (2007), *Real-time Breaking Waves for
+Shallow Water Simulations*, sections 5–7, describes creating overturning liquid from a height field and
+absorbing it on return. The optional parcel fields implement the exchange side of this division with
+signed whole-particle volume and a three-component momentum receipt. The second endpoint applies the
+conserved quantities only after a clocked acceptance.
+[Thürey et al.](https://matthias-research.github.io/pages/publications/breakingWaves.pdf).
+
 ### Position-based particle liquids (FLUID-02)
 
 Miles Macklin and Matthias Müller (2013), *Position Based Fluids*, equations 1–14 and 15–17, supplies the

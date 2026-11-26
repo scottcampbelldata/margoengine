@@ -4364,3 +4364,9 @@ The browser proof is `node packages/physics/tests/strands.browser.mjs`. Run once
 again with `MARGO_COMPAT=1` to exercise WebGL2. The script compares the same animated fixture with
 and without the boundary-layer wind, tests both native variants and verifies exact replay from a
 snapshot. It reports changed pixels, tip movement and the state hash.
+
+### FLUID-01 parcel receipts
+
+Run `node --test packages/physics/tests/coupling/dfsph.test.js` for the two-way parcel ledger. The fixture
+debits and credits known volume and all three momentum components, puts liquid and reservoir in different
+world cells, rejects a full-capacity arrival, and replays a retried receipt through a snapshot.

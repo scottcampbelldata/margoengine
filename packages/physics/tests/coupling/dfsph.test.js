@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { DFSPH_LAYOUT, DFSPH_PARTICLE_WORDS, DfsphSolver } from '../../dist/dfsph.js';
+import {
+  DFSPH_LAYOUT,
+  DFSPH_PARTICLE_WORDS,
+  DFSPH_PARCEL_WORDS,
+  DFSPH_PARCEL_LAYOUT,
+  DfsphSolver,
+} from '../../dist/dfsph.js';
 import { Physics } from '../../dist/index.js';
 import { ModalSoundSolver } from '../../dist/modal-sound.js';
 import { BODY_IMPULSES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
@@ -413,4 +419,169 @@ test('wet capillarity and warm pressure restore in the middle of a native step s
     if (other !== undefined) assert.equal(hash, other);
     other = hash;
   }
+});
+
+class ParcelPool {
+  id = 'shallow-pool-stand-in';
+  cell = [1, 0, 0];
+  constructor(fields, volume, commands) {
+    this.fields = fields;
+    this.volume = volume;
+    this.commands = commands;
+  }
+  describe() {
+    return {
+      id: this.id,
+      rate: 0,
+      stableRate: () => 0,
+      fields: [
+        { field: this.fields.requests, access: 'write' },
+        { field: this.fields.receipts, access: 'read' },
+      ],
+    };
+  }
+  init(host) {
+    this.host = host;
+    this.request = host.allocate('parcels', 2 * DFSPH_PARCEL_WORDS * 8, 'f64', DFSPH_PARCEL_LAYOUT);
+    this.ledger = host.allocate('ledger', 6 * 8, 'f64', DFSPH_PARCEL_LAYOUT);
+    // The donor keeps funds reserved until the recipient reports the actual transfer.
+    this.read(this.ledger).set([0, 0, this.volume, 35, 15, -20]);
+  }
+  read(region) {
+    return regionWords(this.host.memory, region);
+  }
+  step(context) {
+    const ledger = this.read(this.ledger);
+    const ack = context.inputs.get(this.fields.receipts.name);
+    if (ack) {
+      const receipts = this.read(ack.region);
+      for (let i = 0; i < receipts.length; i += DFSPH_PARCEL_WORDS) {
+        const ticket = receipts[i];
+        if (ticket <= ledger[1]) continue;
+        ledger[1] = ticket;
+        ledger[2] -= receipts[i + 5];
+        for (let axis = 0; axis < 3; axis++) ledger[3 + axis] -= receipts[i + 6 + axis];
+      }
+    }
+    const request = this.read(this.request);
+    request.fill(0);
+    for (const [i, row] of (this.commands[ledger[0]] ?? []).entries()) request.set(row, i * DFSPH_PARCEL_WORDS);
+    ledger[0]++;
+  }
+  importPorts() {}
+  exportPorts(tick) {
+    return [{ field: this.fields.requests.name, region: this.request, tick, cell: this.cell }];
+  }
+  stateRegions() {
+    return [this.request, this.ledger];
+  }
+  extraState() {
+    return [];
+  }
+}
+
+test('whole parcel requests conserve the surface and fluid volume and momentum in both directions', async () => {
+  const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(false) });
+  const liquid = await DfsphSolver.load(world.memory, { parcelCapacity: 2 });
+  const particleVolume = 0.125;
+  const particleMass = particleVolume * 1000;
+  const firstVelocity = [0.1, 0.2, 0.3];
+  const pool = new ParcelPool(liquid.parcelFields, particleVolume, [
+    [[1, -1, -14, 0, 0, particleVolume, 35, 15, -20]],
+    [],
+    [
+      [2, 0, 0, 0, 0, -particleVolume, 0, 0, 0],
+      [3, 99, 0, 0, 0, -particleVolume, 0, 0, 0],
+    ],
+  ]);
+  world.add(pool, {}, pool.cell);
+  world.add(liquid, {
+    capacity: 2,
+    spacing: 0.5,
+    bounds: wide,
+    viscosity: 0,
+    cellSize: 16,
+    particles: [{ position: [-2, 0, 0], velocity: firstVelocity }],
+  });
+  world.couple([pool.id, liquid.id], 'staggered');
+  assert.equal(liquid.particleVolume, particleVolume);
+  world.advance(2);
+  assert.equal(liquid.mass, 2 * particleMass);
+  assert.ok(liquid.sample(1).position[0] > 2 && liquid.sample(1).position[0] < 2.1);
+  const snapshot = world.takeSnapshot();
+  world.advance(6);
+  assert.equal(liquid.mass, particleMass);
+  const { region } = world.fields.port(liquid.parcelFields.receipts.name);
+  const [frame, ticket, volume, px, py, pz] = pool.read(pool.ledger);
+  assert.ok(frame >= 6);
+  assert.equal(ticket, 3);
+  assert.equal(volume + liquid.mass / 1000, 2 * particleVolume);
+  const final = liquid.sample(0);
+  for (const [axis, retained] of [px, py, pz].entries())
+    near(retained + final.velocity[axis] * final.mass, firstVelocity[axis] * particleMass + [35, 15, -20][axis]);
+  assert.ok(region.byteLength > 0);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(6);
+  assert.equal(world.hash(), hash);
+});
+
+test('an over-capacity parcel is declined and consumes no mass or pressure state', async () => {
+  const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(true) });
+  const liquid = await DfsphSolver.load(world.memory, { parcelCapacity: 2 });
+  const volume = 0.125;
+  const pool = new ParcelPool(liquid.parcelFields, volume, [[[1, -1, -14, 0, 0, volume, 35, 15, -20]]]);
+  world.add(pool, {}, pool.cell);
+  world.add(liquid, { capacity: 0, spacing: 0.5, bounds: wide, viscosity: 0, cellSize: 16 });
+  world.couple([pool.id, liquid.id], 'staggered');
+  world.advance(5);
+  assert.equal(liquid.mass, 0);
+  assert.deepEqual([...pool.read(pool.ledger).slice(1)], [1, volume, 35, 15, -20]);
+  assert.equal(liquid.statistics.pairEvaluations, 0);
+});
+
+test('a final outgoing parcel clears the old hard-contact strike from the modal field', async () => {
+  const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(false) });
+  const sound = await ModalSoundSolver.load();
+  const liquid = await DfsphSolver.load(world.memory, { parcelCapacity: 2, modalContactField: sound.contactField });
+  const volume = 0.125;
+  const pool = new ParcelPool(liquid.parcelFields, volume, [[], [[1, 0, 0, 0, 0, -volume, 0, 0, 0]]]);
+  world.add(pool, {}, pool.cell);
+  world.add(liquid, {
+    viscosity: 0,
+    wallPressure: false,
+    spacing: 0.5,
+    particles: [{ position: [0.5, 0.26, 0.5], velocity: [0, -0.8, 0] }],
+  });
+  world.add(sound, { tracks: [{ material: 'glass' }] });
+  world.couple([pool.id, liquid.id], 'staggered');
+  const amplitude = () => {
+    const { region } = world.fields.port(sound.contactField.name);
+    return regionWords(world.memory, region)[0];
+  };
+  world.advance(1);
+  assert.ok(amplitude() > 0);
+  world.advance(3);
+  assert.equal(liquid.mass, 0);
+  assert.equal(amplitude(), 0);
+});
+
+test('a retransmitted parcel ticket is acknowledged once through later clock ticks and restore', async () => {
+  const world = new PhysicsWorld({ rate: RATE, gravity: ZERO });
+  const liquid = await DfsphSolver.load(world.memory, { parcelCapacity: 2 });
+  const volume = 0.125;
+  const batch = [[1, -1, -14, 0, 0, volume, 35, 15, -20]];
+  const pool = new ParcelPool(liquid.parcelFields, volume, [batch, batch, batch]);
+  world.add(pool, {}, pool.cell);
+  world.add(liquid, { capacity: 3, spacing: 0.5, bounds: wide, viscosity: 0, cellSize: 16 });
+  world.couple([pool.id, liquid.id], 'staggered');
+  world.advance(1);
+  const snapshot = world.takeSnapshot();
+  world.advance(6);
+  const hash = world.hash();
+  assert.equal(liquid.statistics.particles, 1);
+  assert.deepEqual([...pool.read(pool.ledger).slice(1)], [1, 0, 0, 0, 0]);
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(6);
+  assert.equal(world.hash(), hash);
 });
