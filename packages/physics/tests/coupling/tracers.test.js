@@ -464,3 +464,95 @@ test('SEA-15 wave-averaged tracers follow the directional Stokes transport in de
     assert.equal(world.hash(), hash);
   }
 });
+
+function radialVariance(particles) {
+  const n = particles.length;
+  const cx = particles.reduce((sum, p) => sum + p.position[0], 0) / n;
+  const cz = particles.reduce((sum, p) => sum + p.position[2], 0) / n;
+  return particles.reduce((sum, p) => sum + (p.position[0] - cx) ** 2 + (p.position[2] - cz) ** 2, 0) / (n - 1);
+}
+
+test('SEA-15 a Richardson cloud grows cubically from each release time and replays its age state', () => {
+  const n = 4096;
+  const dt = 1 / 60;
+  const delayedStop = 61 / 60;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+    capacity: 2 * n,
+    horizontalDiffusivity: 0.75,
+    horizontalDispersion: { referenceScale: 3 },
+    verticalDiffusivity: 0,
+    sources: [
+      { material: 'dye', position: [0, -1, 0], rate: n / dt, start: 0, stop: dt },
+      { material: 'dye', position: [50, -1, 0], rate: n / (delayedStop - 1), start: 1, stop: delayedStop },
+    ],
+  });
+  world.advance(60);
+  const initial = [...tracer.particlesOf()];
+  assert.equal(initial.length, n);
+  // With K_ref=3/4 m²/s at 3 m, the radial variance satisfies q′=3q^(2/3) and q=t³ from a point.
+  const fractionalSE = 1 / Math.sqrt(n - 1);
+  assert.ok(Math.abs(radialVariance(initial) - 1) < 6 * fractionalSE);
+  const snapshot = world.takeSnapshot();
+  world.advance(120);
+  const particles = [...tracer.particlesOf()];
+  assert.equal(particles.length, 2 * n);
+  for (const [cohort, want] of [
+    [particles.slice(0, n), 8],
+    [particles.slice(n), 1],
+  ]) {
+    const variance = radialVariance(cohort);
+    assert.ok(Math.abs(variance - want) < 6 * want * fractionalSE, `${variance} vs ${want} m²`);
+  }
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(120);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 Poje drifter calibration improves nine held-out Cape Kennedy dye extents', (context) => {
+  // Poje et al. (2014) Fig. 6 black squares: apparent K_a = 37.6 m²/s at 30 km from the log fit.
+  // A four-thirds scale law gives q ∝ t³, so instantaneous K at that scale is 3 K_a.
+  const inputDiffusivity = 112.9;
+  // Okubo (1971) Table 1, all nine open-water Cape Kennedy observations from releases 3–6. No fit uses these rows.
+  const observations = [
+    [76, 1200],
+    [112, 2400],
+    [185, 5010],
+    [197, 8580],
+    [256, 3150],
+    [266, 8970],
+    [269, 4650],
+    [284, 3870],
+    [356, 5040],
+  ];
+  const n = 4096;
+  const dt = 1 / 60;
+  const errors = [];
+  for (const horizontalDispersion of [undefined, { referenceScale: 30_000 }]) {
+    const tracer = new TracerSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+      capacity: n,
+      // Still-water similarity: each tick represents 1,000 s, with K rescaled to preserve K dt.
+      horizontalDiffusivity: (inputDiffusivity * 1000) / dt,
+      horizontalDispersion,
+      verticalDiffusivity: 0,
+      sources: [{ material: 'dye', position: [0, -1, 0], rate: n / dt, stop: dt }],
+    });
+    errors.push(
+      observations.map(([tick, observed]) => {
+        world.advance(tick);
+        const scale = 3 * Math.sqrt(radialVariance([...tracer.particlesOf()]));
+        return Math.abs(Math.log(scale / observed));
+      }),
+    );
+    assert.equal(tracer.budget.water, n);
+  }
+  const [constant, scaled] = errors;
+  for (const [i, error] of scaled.entries())
+    assert.ok(error < constant[i], `${observations[i][0]} ks: log error ${error} vs fixed-K ${constant[i]}`);
+  const rms = (values) => Math.sqrt(values.reduce((sum, error) => sum + error ** 2, 0) / values.length);
+  context.diagnostic(
+    `RMS log extent error ${rms(constant).toFixed(3)} fixed, ${rms(scaled).toFixed(3)} scaled. Worst scale-law ratio ${Math.exp(Math.max(...scaled)).toFixed(2)}.`,
+  );
+});
