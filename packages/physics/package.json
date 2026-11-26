@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:browser:seismic": "cd ../.. && node packages/physics/tests/seismic.browser.mjs",
     "build:airborne": "node scripts/build-airborne-kernel.mjs",
     "build:room-sound": "node scripts/build-room-sound-kernel.mjs",
     "build": "node scripts/build.js",
