@@ -40,7 +40,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| Pepper's ghost hologram effect (four-view layout) | three.js | MISSING | S |  |
+| Pepper's ghost hologram effect (four-view layout) | three.js | DONE (`@margoengine/cameras/hologram` `HologramOutput`) | S | 5d44c6f88 |
 | Trail texture: pointer or object motion painted into a fading texture for displacement and reveal effects | drei | MISSING | S |  |
 | Kawase / dual-filter blur, 1D LUT, colour-average and depth-downsampling utility passes (`post/src/blur.ts` has one blur kind) | pmndrs postprocessing | DONE (`@margoengine/post/kawase-blur`, `/lut1d`, `/color-average`, `/depth-downsample`) | S each | 69b31fd94 |
 | Custom per-instance attributes and bulk buffers: register extra per-instance data read by a material, set per instance or as a whole buffer, update in place (instances expose matrix, colour and UV transform only) | troika, Babylon thin instances | PARTIAL | S to M |  |
