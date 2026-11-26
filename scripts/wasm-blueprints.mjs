@@ -92,6 +92,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'snowpack-kernel',
+    crate: 'packages/physics/snowpack-kernel',
+    blueprint: 'packages/physics/src/snowpack/snowpack-kernel.wasm',
+    script: 'packages/physics/scripts/build-snowpack-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'snowpack-kernel-shared',
+    crate: 'packages/physics/snowpack-kernel',
+    blueprint: 'packages/physics/src/snowpack/snowpack-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-snowpack-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'aeolian-kernel',
     crate: 'packages/physics/aeolian-kernel',
     blueprint: 'packages/physics/src/aeolian/aeolian-kernel.wasm',

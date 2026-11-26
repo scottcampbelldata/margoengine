@@ -52,7 +52,7 @@ const AIR = 1.2;
 const ICE = 917;
 const THIN = 1e-4;
 
-/** A snow cover to slide from: a `SnowDrift` of `margoengine/weather/snow-drift`, read once at the release. */
+/** Snow cover from `SnowDrift` or `Snowpack`, sampled when the slab releases. */
 export interface AvalancheSnow {
   readonly width: number;
   readonly depth: number;
@@ -88,8 +88,12 @@ export interface AvalancheOptions {
   readonly origin?: readonly [number, number];
   /** Ground heights (`width * depth`, row by row along x). Default the `snow`'s ground, else flat 0. Fixed. */
   readonly ground?: ArrayLike<number>;
-  /** A `SnowDrift`: the cover, its ground and, with `release` 'unstable', the slab come from it at time 0. */
+  /** The cover, ground and, with `release` 'unstable', the slab at release. Accepts SnowDrift or Snowpack. */
   readonly snow?: AvalancheSnow;
+  /** Per-cell 0 or 1 footprint of impermeable buildings. Flow reflects on the boundary of a blocked cell. */
+  readonly blocked?: ArrayLike<number>;
+  /** Frontal area times half the obstacle drag coefficient per volume, m^-1. Scalar or one value per cell. Default 0. */
+  readonly obstacleDrag?: number | ArrayLike<number>;
   /** Snow cover depth on the ground without `snow`, metres, 0 to 50 (a number, or one per sample). Default 1. */
   readonly cover?: number | ArrayLike<number>;
   /** The slab: a rectangle on the slope, or 'unstable' (every sample of `snow` with a stability index under 1). Default 'unstable' with `snow`. */
@@ -221,6 +225,7 @@ const FIXED = [
   'origin',
   'ground',
   'snow',
+  'blocked',
   'cover',
   'release',
   'releaseDepth',
@@ -267,13 +272,34 @@ export function validateAvalanche(o: AvalancheOptions): void {
   }
   const s = o.snow;
   if (s !== undefined && (typeof s?.fieldData !== 'function' || typeof s.slide !== 'function'))
-    throw new TypeError('Avalanche snow needs a SnowDrift (fieldData and slide)');
+    throw new TypeError('Avalanche snow needs fieldData and slide; provide a SnowDrift or Snowpack.');
   const W = o.width ?? s?.width,
     D = o.depth ?? s?.depth;
   if (!Number.isInteger(W) || !Number.isInteger(D) || W! < 3 || D! < 3 || W! > 2048 || D! > 2048 || W! * D! > 4194304)
     throw new RangeError('Avalanche width and depth must be whole numbers from 3 to 2048 (at most 4,194,304 samples)');
   if (o.ground !== undefined && o.ground.length !== W! * D!)
     throw new RangeError(`Avalanche ground needs ${W! * D!} heights`);
+  const count = W! * D!;
+  const blocked = o.blocked,
+    drag = o.obstacleDrag;
+  if (blocked !== undefined && (!blocked || blocked.length !== count))
+    throw new RangeError(`Invalid avalanche obstacle footprint; provide ${count} entries of zero or one.`);
+  if (
+    typeof drag === 'number'
+      ? !(Number.isFinite(drag) && drag >= 0)
+      : drag !== undefined && (!drag || drag.length !== count)
+  )
+    throw new RangeError(
+      `Invalid avalanche obstacle drag; supply one nonnegative coefficient or ${count} coefficients in m^-1.`,
+    );
+  for (let i = 0; i < count && (blocked || typeof drag === 'object'); i++) {
+    if (blocked && blocked[i] !== 0 && blocked[i] !== 1)
+      throw new RangeError(
+        'Invalid avalanche obstacle footprint; fill the grid with zero for open and one for blocked.',
+      );
+    if (typeof drag === 'object' && !(Number.isFinite(drag[i]) && drag[i]! >= 0))
+      throw new RangeError('Invalid avalanche obstacle drag; supply finite nonnegative values in m^-1.');
+  }
   if (
     typeof o.cover === 'number' ? !(o.cover >= 0 && o.cover <= 50) : o.cover !== undefined && o.cover.length !== W! * D!
   )
@@ -476,6 +502,13 @@ export class Avalanche implements SnowFieldSource {
     let slabDepth: ArrayLike<number> | undefined,
       slabMass: ArrayLike<number> | undefined,
       index: ArrayLike<number> | undefined;
+    if (o.snow) {
+      const surface = o.snow.fieldData();
+      for (let k = 0; k < this.n; k++) {
+        if (!o.ground) this.ground[k] = surface[2 * k]!;
+        if (o.cover === undefined) this.cover[k] = surface[2 * k + 1]!;
+      }
+    }
     if (r === 'unstable') ({ slabDepth, slabMass, index } = o.snow!.slide());
     const rhoC = o.coverDensity ?? 200,
       dA = this.cellSize * this.cellSize;
@@ -483,6 +516,7 @@ export class Avalanche implements SnowFieldSource {
     for (let j = 0; j < this.depth; j++)
       for (let i = 0; i < this.width; i++) {
         const k = j * this.width + i;
+        if (o.blocked?.[k]) continue;
         let d = 0,
           m = 0;
         if (r === 'unstable') {
@@ -588,6 +622,8 @@ export class Avalanche implements SnowFieldSource {
     const W = this.width,
       D = this.depth,
       dx = this.cellSize,
+      blocked = this.options.blocked,
+      drag = this.options.obstacleDrag,
       h = this.flow,
       qx = this.qx,
       qz = this.qz,
@@ -609,6 +645,21 @@ export class Avalanche implements SnowFieldSource {
       const ha = h[a]!,
         hb = h[b]!;
       if (ha <= THIN && hb <= THIN) return;
+      if (blocked?.[a] || blocked?.[b]) {
+        const leftWall = !!blocked[a],
+          cell = leftWall ? b : a;
+        const depth = h[cell]!;
+        if (depth > THIN) {
+          const sign = leftWall ? 1 : -1;
+          const q = normalX ? qx : qz,
+            target = normalX ? nqx : nqz;
+          const speed = q[cell]! / depth;
+          const wave = Math.abs(speed) + Math.sqrt(k0 * G * cos2[cell]! * depth);
+          // Reflection uses the opposite normal velocity in the ghost cell and zero mass flux through the wall.
+          target[cell]! += (dt / dx) * depth * speed * (sign * speed - wave);
+        }
+        return;
+      }
       const ca = cos2[a]!,
         cb = cos2[b]!,
         ua = ha > THIN ? (normalX ? qx[a]! : qz[a]!) / ha : 0,
@@ -669,7 +720,8 @@ export class Avalanche implements SnowFieldSource {
         }
         let next = speed - coulomb;
         // Turbulent: g U^2 / (xi h_n) with U = gamma |u| and h_n = d / gamma, horizontal part g gamma^2 |u|^2 / (xi d), implicit.
-        next = next / (1 + (dt * G * gamma * gamma * next) / (xi * d));
+        const obstacle = typeof drag === 'number' ? drag : (drag?.[k] ?? 0);
+        next = next / (1 + (dt * G * gamma * gamma * next) / (xi * d) + dt * next * obstacle * gamma);
         const f = next / speed;
         mx *= f;
         mz *= f;

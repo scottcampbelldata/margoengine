@@ -16293,6 +16293,13 @@ an impulse, rolling or scraping excitation, with sound and damping set by the co
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
 
+## Fixed: snow lacked melt energy and dense slides ignored obstacles (ICE-01, PA-33)
+
+The visual snow layer could stay in place after warming. The older avalanche modeled plant damage without taking
+momentum from the dense flow. Bind Weather's snow cover to `Snowpack` and give `Avalanche` the live pack,
+obstacle drag or building footprints. Reproduce the former faults with `packages/physics/tests/coupling/snowpack.test.js`,
+`packages/weather/tests/snowpack-check.mjs` and `packages/weather/tests/avalanche.test.js`.
+
 ## Fixed: dune and snow rendering lacked a moving surface layer (EARTH-07, PA-46 and PA-63)
 
 A static height seed and a separately prescribed plume could not move terrain or represent an exposed ridge losing

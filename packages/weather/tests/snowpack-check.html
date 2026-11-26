@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Snowpack and surface melt check</title>
+  <style>body { margin: 0; } canvas { display: block; }</style>
+</head>
+<body>
+  <canvas width="256" height="192"></canvas>
+  <script type="module">
+    import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+    import { Snowpack } from '/packages/physics/dist/snowpack.js';
+    import { PhysicsWorld } from '/packages/physics/dist/world.js';
+    import { Snow } from '/packages/weather/dist/snow.js';
+
+    const engine = await Engine.create(document.querySelector('canvas'), {
+      backend: 'webgpu', camera: { position: [4, 5, 8], target: [0, 0, 0], near: 0.1, far: 100 },
+    });
+    engine.stop();
+    engine.scene.background = '#263043';
+    engine.createMesh().setGeometry(box(12, 0.2, 12)).setPosition([0, -0.1, 0])
+      .setMaterial(new PbrMaterial({ color: '#31562e', roughness: 0.9 }));
+    const errors = [];
+    engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+    const pack = await Snowpack.load();
+    world.add(pack, {
+      width: 15, depth: 15, cellSize: 1, origin: [-7, -7],
+      layers: [{ mass: 40, density: 200, temperature: 273.15 }], retention: 0, topHeat: 6660000,
+    });
+    const snow = Snow.attach(engine, { cover: 0, depth: 0, variation: 0, field: pack });
+
+    window.take = async (frame) => {
+      world.advance(frame);
+      engine.render({ delta: 0 });
+      await engine.gpu.queue.onSubmittedWorkDone();
+      return { mass: pack.read(7, 7).mass, version: pack.version, errors: errors.splice(0) };
+    };
+    window.dispose = () => snow.dispose();
+    window.ready = true;
+  </script>
+</body>
+</html>
