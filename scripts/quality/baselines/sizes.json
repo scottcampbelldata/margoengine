@@ -13293,6 +13293,12 @@
       "commit": "e91dfca2b6",
       "grew": 2,
       "reason": "SOFT-04 adds an exact translational minimization before reciprocal rigid contact in vertex blocks, moving the soft entry from 137034 to 137827 B gzip. @margoengine/physics/soft: 137210 to 141962 B ceiling (137827 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 94583 to 97921 B ceiling (95068 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ef1a72d01a",
+      "grew": 0,
+      "reason": "SOFT-04 adds preserved deformable query surfaces and live contact settings through geometric cuts, moving the soft entry from 137827 to 137978 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {

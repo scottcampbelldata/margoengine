@@ -9661,7 +9661,8 @@ at the same point in the rigid frame for every surviving copy of the attached ve
 skins, separate spring or cluster constraints and separately bound meshes need a separate transfer.
 The built-in surface collider is rebuilt from each piece's boundary, including open incision faces.
 Its contact, sensor, filtering and event settings carry over. Each collider has a new identity
-and derives its mass properties from its boundary and copied density. Snapshots
+and derives its mass properties from its boundary and copied density. This brings the optional
+soft entry to 137,978 B gzip. Snapshots
 of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
 with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
 
