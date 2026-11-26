@@ -17,7 +17,7 @@ export type {
   GLSLUniform,
   GLSLVarying,
 } from './glsl/emit.js';
-export { encodeName as glslName, floatLiteral as glslFloat } from './glsl/emit.js';
+export { encodeName as glslName, floatLiteral as glslFloat, stageUnits } from './glsl/emit.js';
 export {
   INVERSE_TRIG_IMPLAUSIBLE,
   INVERSE_TRIG_PROBE,

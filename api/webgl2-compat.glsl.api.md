@@ -162,6 +162,7 @@ export interface GLSLTexture {
     };
     readonly type: TextureType;
     readonly glslType: string;
+    readonly sampled?: boolean;
 }
 
 export interface GLSLUniform {
@@ -650,6 +651,13 @@ export function inverseTrigError(results: ArrayLike<number>, count?: number): nu
 export function inverseTrigVerdict(results: ArrayLike<number>): boolean;
 
 export function parseWGSL(source: string): ModuleAst;
+
+export function stageUnits(stage: GLSLStage): {
+    units: number;
+    pairs: number;
+    storage: number;
+    bindings: [number, number][];
+};
 
 export function translateStage(stage: TranslateStage, kind: 'vertex' | 'fragment', options?: Pick<TranslateOptions, 'clipControl' | 'points'>): GLSLStage;
 

@@ -3,7 +3,7 @@
 // them against a cache of GL state. Rendering is flipped in y so that row 0 of every target is its top, as in WebGPU
 // (the vertex shader negates y and front faces swap), and only the canvas present flips back.
 import { fault } from '../../../shared/errors.js';
-import { translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
+import { stageUnits, translateWGSL, type GLSLProgram, type GLSLStage } from '../glsl.js';
 import type { IREntryPoint, IRGlobalVar, IRModule } from '../wgsl/ir.js';
 import type { TextureType } from '../wgsl/types.js';
 import { type FormatInfo, glTexelBytes, hasDepth, hasStencil, VERTEX_FORMATS } from './formats.js';
@@ -576,31 +576,7 @@ export class CompatRenderPipeline {
       return;
     }
     try {
-      this.glsl =
-        prebuilt ??
-        translateWGSL({
-          vertex: {
-            module: vertexModule.ir as never,
-            entryPoint: descriptor.vertex.entryPoint,
-            constants: descriptor.vertex.constants as Record<string, number>,
-          },
-          fragment: descriptor.fragment && {
-            module: fragmentModule?.ir as never,
-            entryPoint: descriptor.fragment.entryPoint,
-            constants: descriptor.fragment.constants as Record<string, number>,
-          },
-          clipControl: !!device.ext.clipControl,
-          points: prim.topology === 'point-list',
-          // Storage bindings without a dynamic offset share their bind group's data texture: one unit per group.
-          sharedStorage: (group, binding) =>
-            !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
-          uniformBlockSize: device.adapter.capabilities.limits.MAX_UNIFORM_BLOCK_SIZE,
-          textureUnits: {
-            vertex: device.adapter.capabilities.limits.MAX_VERTEX_TEXTURE_IMAGE_UNITS,
-            fragment: device.adapter.capabilities.limits.MAX_TEXTURE_IMAGE_UNITS,
-          },
-          accurateInverseTrig: device.adapter.accurateInverseTrig,
-        });
+      this.glsl = prebuilt ?? translatePipeline(device, descriptor);
     } catch (error) {
       if ((error as { code?: string }).code === 'unsupported') throw error;
       this.failure = `createRenderPipeline${this.label ? ` '${this.label}'` : ''}: ${(error as Error).message}`;
@@ -620,6 +596,11 @@ export class CompatRenderPipeline {
           ),
         },
       };
+    }
+    // Each stage's texture units, counted from the translation before anything links (KB-BOUNCE-COMPATUNITS1 step 3).
+    if (!prebuilt) {
+      const over = programUnits(this.glsl, device.adapter.capabilities.limits).over;
+      if (over) throw unitsError(device, over);
     }
     // The checked entry points name every resource each stage statically uses, phony assignments included (KB-COMPAT-PHONY1).
     const reached: [IREntryPoint | undefined, number][] = prebuilt
@@ -731,6 +712,110 @@ export class CompatRenderPipeline {
   getBindGroupLayout(index: number): CompatBindGroupLayout {
     return this.layouts[index] ?? new CompatBindGroupLayout({ entries: [] });
   }
+}
+
+/** One stage's (or both stages' together) texture units against its GL limit (`stageUnits`). */
+export interface StageUnits {
+  readonly stage: 'vertex' | 'fragment' | 'combined';
+  /** Units the stage takes: texture and sampler pairs it reads plus its storage data textures. */
+  readonly units: number;
+  readonly pairs: number;
+  readonly storage: number;
+  /** MAX_TEXTURE_IMAGE_UNITS (fragment), MAX_VERTEX_TEXTURE_IMAGE_UNITS or MAX_COMBINED_TEXTURE_IMAGE_UNITS. */
+  readonly limit: number;
+  /** (group, binding) of each unit; a bind group's shared storage data texture is binding -1. */
+  readonly bindings: readonly (readonly [number, number])[];
+}
+/** The texture units of a render pipeline on the WebGL2 layer, per stage, and the first one past its limit. */
+export interface PipelineUnits {
+  readonly vertex: StageUnits;
+  readonly fragment: StageUnits;
+  readonly combined: StageUnits;
+  /** The fragment stage, the vertex stage, then both together: the first over its limit, or undefined. */
+  readonly over?: StageUnits;
+}
+/** The GLSL of a render pipeline descriptor, translated as the pipeline translates it (throws as translateWGSL does). */
+export function translatePipeline(device: CompatDevice, descriptor: GPURenderPipelineDescriptor): GLSLProgram {
+  const kept = device.translations.get(descriptor);
+  if (
+    kept &&
+    kept.vertex === descriptor.vertex.module &&
+    kept.fragment === descriptor.fragment?.module &&
+    kept.entries === `${descriptor.vertex.entryPoint}|${descriptor.fragment?.entryPoint}`
+  ) {
+    device.translations.delete(descriptor);
+    return kept.glsl;
+  }
+  const vertexModule = descriptor.vertex.module as unknown as CompatShaderModule,
+    fragmentModule = descriptor.fragment?.module as unknown as CompatShaderModule | undefined,
+    explicit = descriptor.layout !== 'auto' ? (descriptor.layout as unknown as CompatPipelineLayout) : null,
+    limits = device.adapter.capabilities.limits;
+  return translateWGSL({
+    vertex: {
+      module: vertexModule.ir as never,
+      entryPoint: descriptor.vertex.entryPoint,
+      constants: descriptor.vertex.constants as Record<string, number>,
+    },
+    fragment: descriptor.fragment && {
+      module: fragmentModule?.ir as never,
+      entryPoint: descriptor.fragment.entryPoint,
+      constants: descriptor.fragment.constants as Record<string, number>,
+    },
+    clipControl: !!device.ext.clipControl,
+    points: descriptor.primitive?.topology === 'point-list',
+    // Storage bindings without a dynamic offset share their bind group's data texture: one unit per group.
+    sharedStorage: (group, binding) =>
+      !explicit?.bindGroupLayouts[group]?.entries.find((e) => e.binding === binding)?.buffer?.hasDynamicOffset,
+    uniformBlockSize: limits.MAX_UNIFORM_BLOCK_SIZE,
+    textureUnits: { vertex: limits.MAX_VERTEX_TEXTURE_IMAGE_UNITS, fragment: limits.MAX_TEXTURE_IMAGE_UNITS },
+    accurateInverseTrig: device.adapter.accurateInverseTrig,
+  });
+}
+/**
+ * Counts `glsl`'s texture units per stage against the GL limits (OpenGL ES 3.0: MAX_TEXTURE_IMAGE_UNITS for the
+ * fragment stage, MAX_VERTEX_TEXTURE_IMAGE_UNITS, and MAX_COMBINED_TEXTURE_IMAGE_UNITS for both, where a pair both
+ * stages read is one unit), so vertex-only storage costs the fragment stage nothing.
+ */
+export function programUnits(glsl: GLSLProgram, limits: Record<string, number>): PipelineUnits {
+  const stage = (s: GLSLStage, name: 'vertex' | 'fragment', limit: number): StageUnits => ({
+      stage: name,
+      ...stageUnits(s),
+      limit,
+    }),
+    vertex = stage(glsl.vertex, 'vertex', limits.MAX_VERTEX_TEXTURE_IMAGE_UNITS ?? 16),
+    fragment = stage(glsl.fragment, 'fragment', limits.MAX_TEXTURE_IMAGE_UNITS ?? 16),
+    pairs = new Map<string, [number, number]>(),
+    storage = new Map<string, [number, number]>();
+  for (const s of [glsl.vertex, glsl.fragment]) {
+    for (const t of s.textures)
+      if (t.sampled)
+        pairs.set(
+          `${t.group}:${t.binding}|${t.sampler ? `${t.sampler.group}:${t.sampler.binding}` : ''}|${t.gather ? `${t.gather.group}:${t.gather.binding}` : ''}`,
+          [t.group, t.binding],
+        );
+    for (const b of s.storage)
+      storage.set(b.shared ? `g${b.group}` : `${b.group}:${b.binding}`, [b.group, b.shared ? -1 : b.binding]);
+  }
+  const combined: StageUnits = {
+    stage: 'combined',
+    units: pairs.size + storage.size,
+    pairs: pairs.size,
+    storage: storage.size,
+    limit: limits.MAX_COMBINED_TEXTURE_IMAGE_UNITS ?? 32,
+    bindings: [...pairs.values(), ...storage.values()],
+  };
+  return { vertex, fragment, combined, over: [fragment, vertex, combined].find((s) => s.units > s.limit) };
+}
+/** The coded error of a pipeline whose `over` stage passes its texture units (help: errors#texture-units). */
+function unitsError(device: CompatDevice, over: StageUnits): Error {
+  const where = over.stage === 'combined' ? 'its two stages together take' : `its ${over.stage} stage takes`;
+  return Object.assign(
+    device.unsupported(
+      `a render pipeline whose ${where} ${over.units} texture units (${over.pairs} texture and sampler pairs, ${over.storage} storage data textures; this WebGL2 has ${over.limit}): ${over.bindings.map(([g, b]) => (b < 0 ? `group ${g} storage` : `group ${g} binding ${b}`)).join(', ')}`,
+      'texture-units',
+    ),
+    { units: over },
+  );
 }
 
 /** The entry point of a stage the translation used (the named one, or the stage's only one). */

@@ -2024,6 +2024,16 @@ export const entries = [
     fix: 'On a browser with WebGPU, do not install the layer (install() leaves WebGPU alone unless `force` is set). Without WebGPU, keep the feature off on compatibility devices (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), or use the `@margoengine/webgl2-compat/preview` preview below the full tier. For the work budget, make the dispatch smaller or raise `cpuWorkBudget` in `install()` or on the device. Report any other `failed` error with the shader that caused it.',
   },
   {
+    id: 'texture-units',
+    title:
+      'texture-units: a render pipeline takes more texture units than this WebGL2 has (@margoengine/webgl2-compat)',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A MargoError with code `unsupported` from `createRenderPipeline` on the WebGL2 compatibility layer. WebGL2 has no separate samplers: each texture and sampler pair a stage reads takes one texture unit, a texture read with two samplers (a compare sampler and a plain one) takes two, and storage buffers take data textures (one per bind group, one per binding with a dynamic offset). The layer counts the units of each stage from its translation before linking, against MAX_TEXTURE_IMAGE_UNITS (fragment), MAX_VERTEX_TEXTURE_IMAGE_UNITS (vertex) and MAX_COMBINED_TEXTURE_IMAGE_UNITS (both together, a pair both stages read counted once). The message names the stage, the count, the limit and every (group, binding) that takes a unit; `error.units` holds the same numbers. A shader within the 16 sampled textures and 16 samplers WebGPU allows per stage can still pass a WebGL2 limit of 16 units.',
+    fix: 'Ask first: on a layer device (`isCompatDevice(engine.gpu)` from `@margoengine/webgl2-compat/device`), `device.textureUnits(descriptor)` returns the units per stage and `over`, the first stage past its limit, without linking anything (the translation is kept for the pipeline made next from the same descriptor). Then bind fewer textures in that stage: pack textures into an array (as `@margoengine/gltf` does with its five base maps), share one texture between slots, read one sampler per texture, or move storage reads into fewer bind groups. `@margoengine/gltf` materials do this by themselves.',
+  },
+  {
     id: 'wgsl-syntax',
     title: 'wgsl-syntax: the text is not WGSL (@margoengine/webgl2-compat/wgsl)',
     kind: 'family',
