@@ -295,3 +295,15 @@ test("a baseline that lost history entries origin/main has is caught (3bcef614ed
   assert.deepEqual(historyMissing([cone, msdf], [weather]), [cone, msdf]);
   assert.deepEqual(historyMissing([cone, msdf], [cone, msdf, weather]), []);
 });
+
+test('no baseline holds a history entry twice, whatever the order of its keys (KB-REBASE-HISTORYDUP1)', async () => {
+  const { historyRepeated } = await import('../scripts/quality/ratchet.js');
+  const cone = { date: '2026-11-25', commit: '519453f01', reason: 'reflection cone', grew: 4 },
+    again = { date: '2026-11-25', commit: '519453f01', grew: 4, reason: 'reflection cone' },
+    other = { date: '2026-11-25', commit: '519453f01', reason: 'another entry of that commit', grew: 1 };
+  assert.deepEqual(historyRepeated([cone, other, again]), [again]);
+  assert.deepEqual(historyRepeated([cone, other]), []);
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  for (const file of readdirSync(join(root, BASELINES)).filter((n) => n.endsWith('.json')))
+    assert.deepEqual(historyRepeated(readBaseline(root, file.slice(0, -5)).history ?? []), [], file);
+});

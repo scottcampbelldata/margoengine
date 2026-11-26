@@ -23,7 +23,15 @@ import { apiGate } from './quality/api.js';
 import { cleanRoomGate } from './quality/clean-room.js';
 import { duplicatesGate } from './quality/duplicates.js';
 import { packageList, repoFiles } from './quality/packages.js';
-import { compare, droppedHistory, frozenItems, readBaseline, staleTotal, updateBaseline } from './quality/ratchet.js';
+import {
+  compare,
+  droppedHistory,
+  frozenItems,
+  historyRepeated,
+  readBaseline,
+  staleTotal,
+  updateBaseline,
+} from './quality/ratchet.js';
 import { shaderCommentsGate } from './quality/shader-comments.js';
 import { sizesGate } from './quality/sizes.js';
 import { testsGate } from './quality/tests-floor.js';
@@ -132,6 +140,13 @@ async function runGates() {
       failed++;
       console.error(
         `quality ${gate}: FAIL, the baseline lost ${dropped.length} history entr${dropped.length === 1 ? 'y' : 'ies'} that origin/main has (a merge took one side's whole file): ${dropped.map((h) => h.commit).join(', ')}. Fix: put those entries and the budgets they raised back.`,
+      );
+    }
+    const repeated = historyRepeated(baseline.history ?? []);
+    if (repeated.length) {
+      failed++;
+      console.error(
+        `quality ${gate}: FAIL, the baseline holds ${repeated.length} history entr${repeated.length === 1 ? 'y' : 'ies'} twice (a merge appended a row both sides had): ${repeated.map((h) => h.commit).join(', ')}. Fix: remove the second copy of each.`,
       );
     }
     if (worse.length) {
