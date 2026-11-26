@@ -869,7 +869,10 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
       res = this.visibility,
       occluders = this.occlusion
         ? sampleSurfaces(
-            [...occluderMeshes(batches), ...[...this.models.keys()].flatMap((m) => bounceModelMeshes(m, this.engine?.store))],
+            [
+              ...occluderMeshes(batches),
+              ...[...this.models.keys()].flatMap((m) => bounceModelMeshes(m, this.engine?.store)),
+            ],
             vpls,
             { resolution: res },
           )

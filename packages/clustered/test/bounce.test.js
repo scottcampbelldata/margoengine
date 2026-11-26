@@ -792,7 +792,8 @@ test("an added model's primitives occlude as core meshes do: a glTF wall no sour
     primitive = (r, extra = {}) => {
       const core = asMesh(r),
         vertices = new Float32Array(80);
-      for (let i = 0; i < 4; i++) vertices.set([core.vertices[i * 6] - 2, ...core.vertices.subarray(i * 6 + 1, i * 6 + 6)], i * 20);
+      for (let i = 0; i < 4; i++)
+        vertices.set([core.vertices[i * 6] - 2, ...core.vertices.subarray(i * 6 + 1, i * 6 + 6)], i * 20);
       const data = new Float32Array(48);
       data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1]);
       // A second, hidden-by-count row far away.
@@ -845,7 +846,11 @@ test("an added model's primitives occlude as core meshes do: a glTF wall no sour
   store.hidden[1] = 0;
   assert.equal(bounceModelMeshes({ primitives: [primitive(one)] }, store).length, 1, 'shown again');
   assert.equal(
-    bounceModelMeshes({ primitives: [primitive(one, { material: { settings: [0, 0, 0], tint: [1, 1, 1], extension: { replacesPhysical: true } } })] }).length,
+    bounceModelMeshes({
+      primitives: [
+        primitive(one, { material: { settings: [0, 0, 0], tint: [1, 1, 1], extension: { replacesPhysical: true } } }),
+      ],
+    }).length,
     1,
     'a tint an extension replaces is drawn opaque',
   );
