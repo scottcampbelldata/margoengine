@@ -14241,6 +14241,11 @@ changes the loaded surface on WebGPU and WebGL2, with an exact same-backend repl
 
 ### Volumetric vertex blocks (SOFT-04)
 
+When a soft surface is torn or cut, its new query colliders retain the live contact and event
+settings. The rigid shape's density is carried when the original collider supplied volume mass and the
+new, outward-wound collision mesh still encloses positive volume. Open cloth pieces keep their
+triangle colliders without volumetric mass. Soft-particle masses transfer separately.
+
 `@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean
 tetrahedra. Each sweep solves the local elastic and inertial energy exactly to working precision.
 An entire body still needs enough sweeps for load to propagate through its mesh. Linear tetrahedra
@@ -14511,7 +14516,7 @@ dissipated mechanical energy. Bubble geometry, gas resonance and acoustic radiat
 
 ### Position-based particle water (FLUID-02)
 
-The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.
+The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,926 B raw and 7,175 B gzip.
 
 
 
@@ -14524,6 +14529,8 @@ The model uses one rest density and only corrects compression by default. The op
 apparent cohesion without a measured water–air tension law. The higher-iteration preset
 usefully reduces residual compression but retains the same explicit rigid exchange. Automatic shallow-water
 handoff, generic mesh contacts, and physical surface tension are tracked separately.
+The `tensile` coefficient is referenced to 60 Hz. Its position increment scales with the squared substep,
+and free-water pairs outside the active density constraints receive zero artificial pressure.
 
 ### Rail wheelsets and catenary (DYN-05)
 
@@ -14747,7 +14754,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   Found by the SOFT-04 verification in [physics-solver-audit.md](physics-solver-audit.md).
 - **Fix:** the density is carried only when the mesh the surface collider is made from (the skin when there is one,
   else the triangles) is closed, tested with `closedSurface` (moved to `soft-volume.ts`). An open piece gets its surface
-  with no density, as before ef1a72d01.
+  with no density, as before ef1a72d01. The follow-up preserves query-only mode even for a closed fragment.
+  An inherited volume collider requires positive signed volume on the current mesh.
 - **Regression:** the test above, and "a piece keeps its surface density when its mesh is closed and has none when the cut
   or tear left it open" in the same file (fails on the previous code for the skinned cut).
 
@@ -14758,6 +14766,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `packages/physics/pbf-kernel/src/lib.rs` rescales every particle's velocity to a global energy budget
   and shrinks every correction when any one is large, instead of substepping; the clamps hold the energy test while
   the column compresses. Found by the FLUID-02 verification in [physics-solver-audit.md](physics-solver-audit.md).
+- **Progress:** The artificial-pressure increment now scales with the substep squared and preserves rest for
+  an underfilled free-water pair. The global correction scales and the column compression remain open.
 
 ### Fixed 2026-11-26: Picking attached to a scene of more than 4096 gltf/pbr models stopped every frame (KB-PICK-BUDGET1, selection)
 
@@ -31936,6 +31946,7 @@ the transported air. A browser fixture applies the fields to Sky on both rendere
 production scenes still need bindings to the solved fields. SEA-07's surge port needs an adapter once its input
 layout is available. The published solver applies the corresponding inputs to shallow water today. The audit
 also tracks independent rainfall and IVT evidence, combined-layer moisture flux and measured drag validation.
+The staggered same-clock runoff check closes the liquid handoff volume on both ledgers.
 
 ### Continuous lightning weather and calibrated thunder (ATMO-07)
 
