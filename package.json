@@ -267,6 +267,7 @@
     "dev:ik": "vite --host 127.0.0.1 --port 5191 --strictPort",
     "build:boulder": "npm run build:packages && node scripts/build-boulder.mjs",
     "test:orrery": "node scripts/orrery-browser-test.mjs",
+    "test:from-threejs": "node scripts/from-threejs-browser-test.mjs",
     "test:storm-light": "node scripts/storm-light-browser-test.mjs",
     "test:cabin-hearth": "node scripts/cabin-hearth-browser-test.mjs",
     "test:shot": "node tools/shot/test/determinism-check.mjs && node tools/shot/test/sky-coverage-check.mjs && node tools/shot/test/moving-check.mjs && node tools/shot/test/look-masks-check.mjs",

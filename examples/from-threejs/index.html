@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Migration examples · Margo Engine</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#10141c;color:#edf2fa;font:15px/1.5 system-ui,sans-serif;height:100svh;display:grid;grid-template-rows:auto minmax(0,1fr) auto}
+    nav{display:flex;flex-wrap:wrap;gap:16px;padding:10px 16px}
+    a{color:#a8d9ff}
+    a[aria-current]{color:#edf2fa;font-weight:600}
+    main{min-height:0}
+    canvas{display:block;width:100%;height:100%;touch-action:none}
+    p{margin:0;padding:8px 16px;min-height:40px}
+    :focus-visible{outline:3px solid #ffd885;outline-offset:2px}
+  </style>
+</head>
+<body>
+  <nav aria-label="Examples">
+    <a href="?name=typical-scene">Typical scene</a>
+    <a href="?name=basics">Basics</a>
+    <a href="?name=model-animation">Model and animation</a>
+    <a href="?name=instancing-picking">Instancing and picking</a>
+    <a href="?name=post-processing">Post-processing</a>
+  </nav>
+  <main><canvas id="viewport" aria-label="3D scene of the selected example"></canvas></main>
+  <p id="status" data-webgpu-status role="status">Loading…</p>
+  <script type="module">
+    import { needsWebGPU } from '../needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./main.ts'));
+  </script>
+</body>
+</html>

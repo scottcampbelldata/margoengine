@@ -21,6 +21,7 @@
     "timber-valley/*.ts",
     "event-horizon/*.ts",
     "from-playcanvas/*.ts",
+    "from-threejs/*.ts",
     "gallery/*.ts",
     "kitty-hawk/*.ts",
     "molten-words/*.ts",

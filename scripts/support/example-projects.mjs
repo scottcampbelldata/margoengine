@@ -27,6 +27,7 @@ export const EXAMPLE_FOLDERS = [
   'dune-coast',
   'event-horizon',
   'from-playcanvas',
+  'from-threejs',
   'gallery',
   'kitty-hawk',
   'molten-words',

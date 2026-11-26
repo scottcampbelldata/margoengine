@@ -80,6 +80,8 @@ export const ROOT = {
     'the Orrery example: production build, a picture, arms and wheels at the computed angles, fly-in, play, phone, missing model',
   'test:cabin-hearth':
     'the Cabin Hearth example by its pixels: firelit hearthstone falling off, flames over the logs, moonlit wall, lantern patch',
+  'test:from-threejs':
+    'the side-by-side migration examples: each draws, moves, picks and post-processes as it says, with no errors',
   'test:storm-light':
     'the Storm Light example: production build, a lit night first frame, the Storm slider, reduced motion, phone, missing model',
   'test:shot':

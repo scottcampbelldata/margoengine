@@ -1,3 +1,11 @@
+### Section 5 evidence: whole migration scenes in a browser (2026-11-26)
+
+A new root browser suite (the migration examples in the `ROOT` list of `scripts/gpu-package-tests.mjs`) composes glTF
+PBR, an HDR environment, sun shadows, an action mixer, orbit controls, SSAO, bloom, tone mapping, FXAA, GPU picking and
+outline selection in one scene, beside four smaller ones, and checks pixels and behaviour. Evidence: passed on native
+WebGPU and on the WebGL2 layer (ANGLE Direct3D 11), Intel Arc 140V. Missing: other GPUs and browsers not run; the
+defect it found (KB-CLEAR-CAPTURE1) is open.
+
 ### Section 5 evidence: texture units counted before linking, glTF base maps packed by the limit (2026-11-26)
 
 The WebGL2 layer counts a render pipeline's texture units per stage from its GLSL before linking (render.ts
