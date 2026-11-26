@@ -14,6 +14,9 @@ import type { StageOutput } from '../../shared/stack.js';
 import { fullscreen, meshVertex } from '../../shared/gpu.js';
 import { displayFor, displayShader } from '../../shared/display.js';
 import { orthographic } from '../../shared/projection.js';
+import { margoError } from '../../shared/errors.js';
+import { captureModel, drawCapture } from '../../shared/capture.js';
+import type { SSRCapture, SSRModel } from './ssr.js';
 import { ScreenEffect, type ScreenContext } from './screen-effect.js';
 import { PostStack } from './stack.js';
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; COPY_DST: number };
@@ -92,7 +95,8 @@ const tagFragment = `@group(0) @binding(1) var radii:texture_2d<f32>;
 // untagged mesh, terrain, a glTF model) hides its tag. The scene's resolved depth holds the nearest of a pixel's
 // samples while the 1x tag pass holds its centre: a silhouette pixel mostly covered by the sky can carry a mesh's depth
 // with no surface of the tag pass matching at its centre. Such a pixel, and only such a pixel, takes a neighbour's tag
-// whose depth matches within 1% and two spans.
+// whose depth matches its own within 0.2% and that neighbour's own depth span: a silhouette pixel lies on the mesh's
+// face, while ground meeting the mesh (drawn or not by the tag pass) lies a pixel of its own slope away.
 // u.z: distance from reversed-Z depth as (x + y d) / (z + w d). u.p: world size of a pixel at distance 1 (or always,
 // orthographic), orthographic flag, maxPixels, depthTolerance. u.q: strength, samples, largest tagged radius, on.
 const common = `struct U {z:vec4f,p:vec4f,q:vec4f}
@@ -109,21 +113,36 @@ fn tagAt(q:vec2i,w:f32,slack:f32)->vec4f {
  return vec4f(0,0,0,-1);
 }
 fn at(q:vec2i)->f32 {return away(textureLoad(depth,clamp(q,vec2i(0),vec2i(textureDimensions(depth))-1),0));}
+fn spanAt(p:vec2i)->f32 {let w=at(p);return min(abs(w-at(p-vec2i(1,0))),abs(at(p+vec2i(1,0))-w))+min(abs(w-at(p-vec2i(0,1))),abs(at(p+vec2i(0,1))-w));}
 @fragment fn fragment(@builtin(position) pos:vec4f)->@location(0) vec4f {
  let p=vec2i(pos.xy);let d=textureLoad(depth,p,0);
  if(d<=0){return vec4f(0,0,0,-1);}
  let w=away(d);
- let span=min(abs(w-at(p-vec2i(1,0))),abs(at(p+vec2i(1,0))-w))+min(abs(w-at(p-vec2i(0,1))),abs(at(p+vec2i(0,1))-w));
+ let span=spanAt(p);
  let own=tagAt(p,w,w*0.002+span+1e-5);
  if(own.a>=0){return own;}
  for(var i=0;i<9;i++){
-  let k=tagAt(p+vec2i(i%3-1,i/3-1),w,w*0.01+2*span+1e-5);
+  let q=p+vec2i(i%3-1,i/3-1);let k=tagAt(q,w,w*0.002+spanAt(q)+1e-5);
   if(i!=4&&k.a>0){return k;}
  }
  return vec4f(0);
 }`;
 // key(q): x -2 off screen, -1 sky, 0 an untagged surface, above 0 a tagged mesh's key; y its world radius; z its view
 // distance.
+// A tagged gltf/pbr model or terrain draws through the capture hook SceneTargets and SSR use: its own material and
+// depth, with one constant output, its radius and key (keys counted down from the top of the range, so they never meet
+// a core mesh's entity id + 1).
+const KEY_TOP = 2048 * 2048 - 1;
+const terrainFrame = /struct Frame \{camera:mat4x4f,eye:vec4f,light:vec4f,/;
+const captureCode = (code: string, value: string): string => {
+  if (code.includes('struct Surface'))
+    return `struct MargoCapture {@location(0) o0:vec4f}\nfn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=s.n;_=v;_=k;return MargoCapture(${value});}\n`;
+  if (terrainFrame.test(code))
+    return `struct MargoSSR {@location(0) o0:vec4f}\nfn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {_=n;_=v;_=base;_=metal;_=rough;return MargoSSR(${value});}\n`;
+  throw margoError('unsupported', 'MeshBlend tags core meshes, gltf/pbr models, materials meshes and terrain only');
+};
+type Tagged = { radius: number; hook: SSRCapture; release: () => void };
+
 const shader = (encode: boolean) => `${fullscreen}${encode ? displayShader : ''}${common}
 @group(0) @binding(2) var scene:texture_2d<f32>;
 @group(0) @binding(3) var keys:texture_2d<f32>;
@@ -180,7 +199,7 @@ fn weight(s:f32,r:f32,gap:f32,tol:f32)->f32 {
  * set into terrain, by mixing in the colour mirrored across the seam within the mesh's blend radius. `tag(mesh,
  * radius)` picks the meshes and their radius in world units; seams between untagged surfaces stay sharp, and a seam
  * whose depth jumps (a silhouette against far ground or the sky) is rejected. Place it before Tonemap. Core meshes are
- * tagged (a tag on a parent covers its child meshes); terrain and glTF models take part as the untagged side.
+ * tagged (a tag on a parent covers its child meshes), and so are gltf/pbr models, materials meshes and terrain.
  * ```ts
  * const blend = MeshBlend.attach(engine);
  * blend.tag(rock, 0.3);
@@ -193,6 +212,11 @@ export class MeshBlend extends ScreenEffect {
   readonly name = 'mesh-blend';
   protected readonly kind = 'hdr';
   private readonly tagged = new Map<Mesh, number>();
+  private readonly models = new Map<SSRModel, Tagged>();
+  private readonly captures = new Map<SSRModel, () => void>();
+  private serial = 0;
+  private context?: ScreenContext;
+  private pass?: GPURenderPassEncoder;
   private readonly values = new Float32Array(12);
   private tagTexture?: GPUTexture;
   private tagView?: GPUTextureView;
@@ -227,26 +251,72 @@ export class MeshBlend extends ScreenEffect {
   }
 
   /**
-   * Blends the seams of `mesh` (and its child meshes) within `radius` world units, above 0; tagging again changes the
-   * radius. Returns a remover. Two tagged meshes that touch blend with the larger radius.
+   * Blends the seams of `target` within `radius` world units, above 0: a core mesh (and its child meshes), or a gltf/pbr
+   * model, materials mesh or terrain (drawn with its own material through the capture hook). Tagging again changes
+   * the radius. Returns a remover. Two tagged surfaces that touch blend with the larger radius.
    */
-  tag(mesh: Mesh, radius: number): () => void {
-    if (!mesh || typeof mesh !== 'object')
-      throw new TypeError('MeshBlend.tag needs a core mesh; pass engine.createMesh()');
+  tag(target: Mesh | SSRModel, radius: number): () => void {
+    if (!target || typeof target !== 'object')
+      throw new TypeError('MeshBlend.tag needs a core mesh, gltf/pbr model, materials mesh or terrain');
     if (!(Number.isFinite(radius) && radius > 0 && radius <= 65504))
       throw new RangeError('MeshBlend.tag radius must be finite, above 0 and at most 65504 world units');
-    this.tagged.set(mesh, radius);
-    return () => this.untag(mesh);
+    if (typeof (target as SSRModel).setCapture !== 'function') {
+      this.tagged.set(target as Mesh, radius);
+      return () => this.untag(target);
+    }
+    const model = target as SSRModel;
+    this.untag(model);
+    const key = KEY_TOP - (this.serial++ % 65536),
+      value = `vec4f(${radius},${key % 2048}.0,${Math.floor(key / 2048)}.0,1.0)`,
+      cache = new Map<string, string>(),
+      hook: SSRCapture = {
+        targets: [{ format: 'rgba16float' }],
+        declarations: (code) => {
+          let out = cache.get(code);
+          if (out === undefined) {
+            if (cache.size >= 64) cache.clear();
+            cache.set(code, (out = captureCode(code, value)));
+          }
+          return out;
+        },
+        begin: () => this.begin(),
+      };
+    const release = captureModel(this.captures, model, hook);
+    this.models.set(model, { radius, hook, release });
+    return () => this.untag(model);
   }
 
-  /** Stops blending the seams of `mesh`; true when it was tagged. */
-  untag(mesh: Mesh): boolean {
-    return this.tagged.delete(mesh);
+  /** Stops blending the seams of `target`; true when it was tagged. */
+  untag(target: Mesh | SSRModel): boolean {
+    const model = this.models.get(target as SSRModel);
+    if (!model) return this.tagged.delete(target as Mesh);
+    this.models.delete(target as SSRModel);
+    model.release();
+    return true;
   }
 
-  /** The tagged meshes and their radii (a copy). */
-  get tags(): ReadonlyMap<Mesh, number> {
-    return new Map(this.tagged);
+  /** The tagged meshes and models and their radii (a copy). */
+  get tags(): ReadonlyMap<Mesh | SSRModel, number> {
+    const out = new Map<Mesh | SSRModel, number>(this.tagged);
+    for (const [model, { radius }] of this.models) out.set(model, radius);
+    return out;
+  }
+
+  /** The tag pass for models, opened on the first model's draw and ended after the last. */
+  private begin(): GPURenderPassEncoder {
+    if (this.pass) return this.pass;
+    const c = this.context!,
+      pass = (this.pass = c.encoder.beginRenderPass({
+        colorAttachments: [{ view: this.tagView!, loadOp: 'load', storeOp: 'store' }],
+        depthStencilAttachment: { view: this.tagDepthView!, depthLoadOp: 'load', depthStoreOp: 'store' },
+      })),
+      rect = c.view?.viewport;
+    if (rect) {
+      pass.setViewport(rect[0], rect[1], rect[2], rect[3], 0, 1);
+      const scissor = c.view!.scissor ?? rect;
+      pass.setScissorRect(scissor[0], scissor[1], scissor[2], scissor[3]);
+    }
+    return pass;
   }
 
   protected check(): void {
@@ -340,7 +410,10 @@ export class MeshBlend extends ScreenEffect {
         },
       })
       .end();
-    this.largest = this.options.enabled === false ? 0 : this.fillRadii(c);
+    let largest = this.options.enabled === false ? 0 : this.fillRadii(c);
+    if (this.options.enabled !== false)
+      for (const { radius } of this.models.values()) largest = Math.max(largest, radius);
+    this.largest = largest;
     if (!this.largest) return;
     if (this.tagDescriptor !== c.descriptor || !this.tagPipeline) {
       this.tagDescriptor = c.descriptor;
@@ -368,7 +441,11 @@ export class MeshBlend extends ScreenEffect {
         clearDepth: false,
         bindings: [{ binding: 1, resource: this.radiiView! }],
       });
+      this.context = c;
+      for (const [model, { hook }] of this.models) drawCapture(model, hook, c);
     } finally {
+      this.pass?.end();
+      this.pass = this.context = undefined;
       Object.assign(c, { color, depth, descriptor });
     }
   }
@@ -418,5 +495,11 @@ export class MeshBlend extends ScreenEffect {
     this.depthSource = this.depthView = undefined;
     this.table = new Float32Array(0);
     this.largest = 0;
+  }
+
+  override dispose(): void {
+    for (const { release } of this.models.values()) release();
+    this.models.clear();
+    super.dispose();
   }
 }
