@@ -6277,9 +6277,17 @@ shallow, gravity-dominated phase. [Reproduce](reproduce.md#fluid-07-measured-hor
 ### FLUID-07 stiff capillary strips
 
 A 128-cell strip at 20 μm spacing conserves liquid and reproduces the discrete damping of
-three capillary modes in either grid direction. Plain and shared Wasm return identical depths.
-The former iterative strip solve failed to converge on its first step in this case.
+three capillary modes in either grid direction. Plain and shared Wasm return identical depths,
+including with a nonzero contact-angle interval. The former contact iteration failed to
+converge on its first step in this case.
 [Reproduce](reproduce.md#fluid-07-stiff-capillary-strips)
+
+### FLUID-07 cylindrical cap retention
+
+A shallow cap on a spanwise-uniform strip settles at 80% of its derived Furmidge force and
+continues translating at 140%, with conserved volume on 64 and 128 cells. Disabling the
+contact-angle interval at 80% restores translation. This is a force-bracket check.
+[Reproduce](reproduce.md#fluid-07-cylindrical-cap-retention)
 
 ### FLUID-07 measured inclined film
 

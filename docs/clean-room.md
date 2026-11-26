@@ -15560,6 +15560,16 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   residuals must both converge. Cell scaling uses the diagonal approximation of the face
   solve's inverse to account for capillary and wetting stiffness.
   [Author PDF](https://stanford.edu/~boyd/papers/pdf/admm_distr_stats.pdf)
+  On one-row or one-column strips the cell diagonal from the augmented term changes only the
+  nearest face coupling and leaves five bands. The solution without the augmented term sets
+  the initial wet-area rate. The augmented factor is reused while its right hand side changes.
+- C. G. L. Furmidge, “Studies at phase interfaces. I. The sliding of liquid drops on solid
+  surfaces and a theory for spray retention” (1962). The downslope component of weight balances
+  capillary retention. For a spanwise-uniform cap the work of a rigid translation uses unit
+  transverse width. Multiplying each advancing and receding area cost by the smooth footprint
+  change gives the force per unit width `σ(cos θ_r − cos θ_a)χ(h_peak)`. This brackets the
+  numerical onset on two grids.
+  [Journal](https://doi.org/10.1016/0095-8522(62)90011-9)
 - L. Zhornitskaya and A. L. Bertozzi, “Positivity-Preserving Numerical Schemes for
   Lubrication-Type Equations” (2000). The fourth-order equation lacks the second-order maximum
   principle. Here each shared face uses one single flux limited by the donor's total outgoing

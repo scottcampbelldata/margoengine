@@ -14960,8 +14960,8 @@
         "gzip": 5162
       },
       "./thin-film": {
-        "raw": 41940,
-        "gzip": 16381
+        "raw": 39012,
+        "gzip": 15175
       },
       "./viscoplastic": {
         "raw": 11755,
@@ -18401,14 +18401,14 @@
       "brotli": 2332
     },
     "packages/physics/dist/thin-film-kernel.wasm": {
-      "raw": 16188,
-      "gzip": 6794,
-      "brotli": 5920
+      "raw": 16711,
+      "gzip": 6969,
+      "brotli": 6042
     },
     "packages/physics/dist/thin-film-kernel-shared.wasm": {
-      "raw": 16188,
-      "gzip": 6794,
-      "brotli": 5922
+      "raw": 16711,
+      "gzip": 6969,
+      "brotli": 6042
     },
     "packages/physics/dist/viscoplastic-kernel.wasm": {
       "raw": 16986,

@@ -94,7 +94,7 @@ test('ThinFilmSolver: hydrostatic plus capillary damping matches the closed-form
   assert.equal(film.budget.substeps, 1);
 });
 
-test('ThinFilmSolver: a micrometre strip resolves all three stiff capillary modes in either axis', async () => {
+test('ThinFilmSolver: a micrometre strip resolves stiff capillary modes with or without contact-angle hysteresis', async () => {
   const n = 128;
   const spacing = 20e-6;
   const h = 120e-6;
@@ -117,23 +117,91 @@ test('ThinFilmSolver: a micrometre strip resolves all three stiff capillary mode
     [n, 1],
     [1, n],
   ]) {
-    let plain;
-    for (const shared of [false, true]) {
+    for (const contact of [
+      {},
+      { wetting: { precursorDepth: h / 2, contactAngle: 1e-9 }, contactAngleHysteresis: [0, 2e-9] },
+    ]) {
+      let plain;
+      for (const shared of [false, true]) {
+        const film = await ThinFilmSolver.load();
+        const world = new PhysicsWorld({ rate, gravity: [0, 0, 0], memory: worldMemory(shared) }).add(film, {
+          cells,
+          spacing,
+          depth: initial,
+          viscosity,
+          surfaceTension,
+          // The nonzero interval exercises the contact solve with sub-roundoff wetting pressure.
+          ...contact,
+        });
+        world.advance(1);
+        const evolved = film.depths();
+        assert.equal(film.budget.substeps, 1);
+        for (const [i, depth] of evolved.entries()) close(depth, depthAt(i, true), tolerance);
+        close(film.budget.stored, film.budget.initial, 32 * Number.EPSILON * film.budget.initial);
+        if (shared) assert.deepEqual(evolved, plain);
+        else plain = evolved;
+      }
+    }
+  }
+});
+
+test('ThinFilmSolver: a shallow strip retains or slides under a bracket of the Furmidge force', async () => {
+  const radius = 0.0018;
+  const density = 998;
+  const surfaceTension = 0.05;
+  const precursorDepth = 24e-6;
+  const angle = 0.26;
+  const angleLimits = [0.22, 0.3];
+  const normalGravity = 9.80665;
+  for (const count of [64, 128]) {
+    const spacing = (4 * radius) / count;
+    const x = (i) => (i + 0.5 - count / 2) * spacing;
+    const initial = Array.from({ length: count }, (_, i) => {
+      return precursorDepth + 0.5 * angle * radius * Math.max(0, 1 - (x(i) / radius) ** 2);
+    });
+    async function strip(depth, acceleration, hysteresis) {
       const film = await ThinFilmSolver.load();
-      const world = new PhysicsWorld({ rate, gravity: [0, 0, 0], memory: worldMemory(shared) }).add(film, {
-        cells,
-        spacing,
-        depth: initial,
-        viscosity,
-        surfaceTension,
-      });
-      world.advance(1);
-      const evolved = film.depths();
-      assert.equal(film.budget.substeps, 1);
-      for (const [i, depth] of evolved.entries()) close(depth, depthAt(i, true), tolerance);
-      close(film.budget.stored, film.budget.initial, 32 * Number.EPSILON * film.budget.initial);
-      if (shared) assert.deepEqual(evolved, plain);
-      else plain = evolved;
+      const world = new PhysicsWorld({ rate: { num: 30, den: 1 }, gravity: [acceleration, -normalGravity, 0] }).add(
+        film,
+        {
+          cells: [count, 1],
+          spacing,
+          depth,
+          density,
+          viscosity: 0.06,
+          surfaceTension,
+          wetting: { precursorDepth, contactAngle: angle },
+          contactAngleHysteresis: hysteresis ? angleLimits : undefined,
+        },
+      );
+      return { film, world };
+    }
+
+    const level = await strip(initial, 0, false);
+    level.world.advance(100);
+    const depth = level.film.depths();
+    const dropArea = depth.reduce((sum, h) => sum + (h - precursorDepth) * spacing, 0);
+    const centroid = (values) =>
+      values.reduce((sum, h, i) => sum + (h - precursorDepth) * x(i) * spacing, 0) / dropArea;
+    // The work of translating a cap per unit width is σ(cos θR − cos θA)
+    // times the wet-area fraction at the cap's peak, for a finite precursor.
+    const coveredPeak = (1 - precursorDepth / Math.max(...depth)) ** 2;
+    const retention = surfaceTension * (Math.cos(angleLimits[0]) - Math.cos(angleLimits[1])) * coveredPeak;
+    const releaseAcceleration = retention / (density * dropArea);
+    for (const [factor, hysteresis] of [
+      [0.8, true],
+      [0.8, false],
+      [1.4, true],
+    ]) {
+      const { film, world } = await strip(depth, factor * releaseAcceleration, hysteresis);
+      world.advance(90);
+      const earlier = centroid(film.depths());
+      world.advance(120);
+      const later = centroid(film.depths());
+      assert.ok(later > 0 && later < radius);
+      if (factor < 1 && hysteresis) assert.ok(later - earlier < 0.002 * radius, `late creep: ${later - earlier}`);
+      else assert.ok(later - earlier > 0.02 * radius, `late translation: ${later - earlier}`);
+      close(film.budget.stored, film.budget.initial, 128 * Number.EPSILON * film.budget.initial);
     }
   }
 });

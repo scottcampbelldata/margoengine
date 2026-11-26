@@ -328,14 +328,12 @@ impl Film {
         }
         if let Some(contact) = self.contact.as_ref() {
             self.contact_solution(contact, k, dt)
-        } else if grid.cols == 1 || grid.rows == 1 {
-            self.solve_strip(k, dt)
         } else {
             self.solve_faces(k, dt, core::ptr::null(), false)
         }
     }
 
-    unsafe fn solve_strip(&self, k: f64, dt: f64) -> bool {
+    unsafe fn factor_strip(&self, k: f64, dt: f64, contact_norm: *const f64) -> bool {
         let grid = self.grid;
         let work = &self.work;
         let axis = usize::from(grid.cols == 1);
@@ -345,25 +343,14 @@ impl Film {
         // The strip gradient times its transpose is the tridiagonal (−1, 2, −1).
         // Squaring it for curvature gives −4 and 1 on the two off-diagonals.
         // Keep just those bands of the Cholesky factor in the unused PCG workspace.
-        let len = 2 * grid.n;
-        let rhs2 = dot(work.residual, work.residual, len);
-        if !rhs2.is_finite() {
-            return false;
-        }
-        zero(work.solution, len);
-        if rhs2 == 0.0 {
-            return true;
-        }
         for i in 0..faces {
             let f = 2 * i + axis;
             let weight = *work.weight.add(f);
             let mut lower_two = 0.0;
             let mut lower_one = 0.0;
-            let mut rhs = *work.residual.add(f);
             if i > 1 {
                 lower_two =
                     dt * dx2 * capillary * weight * *work.weight.add(f - 4) / *work.z.add(f - 4);
-                rhs -= lower_two * *work.solution.add(f - 4);
             }
             if i > 0 {
                 let wetting = if self.wetting_map.is_null() {
@@ -371,11 +358,18 @@ impl Film {
                 } else {
                     *self.wetting_map.add(i)
                 };
-                let subdiagonal =
-                    -dt * dx2 * (k + wetting + 4.0 * capillary) * weight * *work.weight.add(f - 2);
+                let contact = if contact_norm.is_null() {
+                    0.0
+                } else {
+                    let scale = *contact_norm.add(i);
+                    scale * scale
+                };
+                let subdiagonal = -dx2
+                    * (dt * (k + wetting + 4.0 * capillary) + contact)
+                    * weight
+                    * *work.weight.add(f - 2);
                 lower_one =
                     (subdiagonal - lower_two * *work.direction.add(f - 2)) / *work.z.add(f - 2);
-                rhs -= lower_one * *work.solution.add(f - 2);
             }
             let diagonal =
                 1.0 / *work.diagonal.add(f) - lower_one * lower_one - lower_two * lower_two;
@@ -386,7 +380,25 @@ impl Film {
             work.z.add(f).write(root);
             work.direction.add(f).write(lower_one);
             work.result.add(f).write(lower_two);
-            work.solution.add(f).write(rhs / root);
+        }
+        true
+    }
+
+    unsafe fn substitute_strip(&self) {
+        let work = &self.work;
+        let axis = usize::from(self.grid.cols == 1);
+        let faces = self.grid.n - 1;
+        zero(work.solution, 2 * self.grid.n);
+        for i in 0..faces {
+            let f = 2 * i + axis;
+            let mut rhs = *work.residual.add(f);
+            if i > 0 {
+                rhs -= *work.direction.add(f) * *work.solution.add(f - 2);
+            }
+            if i > 1 {
+                rhs -= *work.result.add(f) * *work.solution.add(f - 4);
+            }
+            work.solution.add(f).write(rhs / *work.z.add(f));
         }
         for i in (0..faces).rev() {
             let f = 2 * i + axis;
@@ -399,7 +411,6 @@ impl Film {
             }
             work.solution.add(f).write(rhs / *work.z.add(f));
         }
-        true
     }
 
     #[inline(never)]
@@ -412,6 +423,14 @@ impl Film {
         }
         if rhs2 == 0.0 {
             zero(work.solution, len);
+            return true;
+        }
+        if self.grid.cols == 1 || self.grid.rows == 1 {
+            // The hysteresis split changes only the right hand side within the ADMM loop.
+            if !warm && !self.factor_strip(k, dt, contact_norm) {
+                return false;
+            }
+            self.substitute_strip();
             return true;
         }
         let tolerance2 = rhs2 * 1e-22;
@@ -517,6 +536,17 @@ impl Film {
         }
         if !resist {
             return self.solve_faces(k, dt, core::ptr::null(), false);
+        }
+        if grid.cols == 1 || grid.rows == 1 {
+            // The free strip solve gives a feasible starting wet-area rate. At
+            // weak pinning it is already close to the constrained solution.
+            if !self.solve_faces(k, dt, core::ptr::null(), false) {
+                return false;
+            }
+            grid.gradient_transpose(w.solution, w.weight, w.transpose);
+            for i in 0..n {
+                *target.add(i) = *norm.add(i) * *w.transpose.add(i);
+            }
         }
         for i in 0..n {
             for axis in 0..2 {

@@ -4642,7 +4642,21 @@ Run `node --test --test-name-pattern="micrometre strip" packages/physics/tests/t
 from a built physics entry. Start a 120 μm film with a superposition of modes 2, 3 and 5 on a
 128-cell no-flux strip at 20 μm spacing. Each mode's linear damping factor is
 `1 / (1 + dt M σ λ²)`, with `M = h³/(3μ)` and `λ` its discrete Neumann Laplacian eigenvalue.
-The test checks the depths after one tick in both grid directions and both Wasm memory modes.
+The test checks depths after one tick in both grid directions and both Wasm memory modes,
+with and without a nonzero contact-angle interval. The narrow interval keeps its pressure
+below the modal depth tolerance while exercising the hysteresis solve.
+[Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
+
+### FLUID-07 cylindrical cap retention
+
+Run `node --test --test-name-pattern="Furmidge force" packages/physics/tests/thin-film.test.js`
+from a built physics entry. Relax a cylindrical cap on a horizontal strip, then impose a
+uniform tangential acceleration with the normal gravity fixed. The Furmidge force per unit
+width equals `σ(cos θ_r − cos θ_a)` times the fraction of the cap covered at its peak.
+Use the excess cross-sectional liquid mass to convert this force to acceleration. On 64 and
+128 cells compare centroid motion from 3 to 4 s at 80% and 140% of that acceleration. The
+80% no-hysteresis control keeps moving, as does the 140% case. These are prescribed loads
+about a derived force, independent of the moving solutions. A measured tilt threshold remains open.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
 ### FLUID-07 measured inclined film
