@@ -4383,3 +4383,37 @@ Words 32–55 hold the four wheelsets with angle, angular speed, heave, heave sp
 rail loads. `wireField` holds interleaved lateral/vertical displacement and velocity columns,
 followed by seven head words each. World snapshots preserve the commands, spring and axle state,
 wire motion and arc pulse.
+
+## Soil tracks, footprints and airborne fines
+
+Use `@margoengine/physics/terramechanics` to apply a measured wheel, belt, shoe or hoof load to a live
+`TerrainBed`. The solver distributes the displaced material into compaction, berms and dry mineral fines.
+
+```ts
+import { TerrainBed } from '@margoengine/physics/earth';
+import { Terramechanics } from '@margoengine/physics/terramechanics';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] as const };
+const bed = new TerrainBed();
+const soil = await Terramechanics.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(bed, { ...terrain, elevations: () => 0 })
+  .add(soil, { terrain, patches: [{ x: 0, z: 0, length: 0.25, width: 0.12, load: 500 }] })
+  .couple(['terramechanics', 'bed'], 'staggered');
+world.advance(30);
+console.log(soil.read(0).sinkage, soil.budget.removed, bed.elevations()[312]);
+```
+
+For a vehicle, use `soilPatchField()` for the matching `Terramechanics.load({ input })` and
+`SoilContactRigidSolver(input, { terrain })`. Give the rigid adapter its running attachments, per-wheel or
+per-belt footprint sizes and `{ ground: new BedCollider(physics, bed.bed) }`. Couple `rigid`,
+`terramechanics` and `bed` in that staggered order. Pass `wheelSoil(width, length, material)` in a vehicle's
+ground material to use the same stress fit in suspension. Set `inputRows` to the number of wheels and belts.
+For legged bodies, load with `{ legged: true }`, configure the foot rows and place `legged-locomotion` first.
+`AirborneParticles.load({ terrain: true, dustField: soil.dustField })` reads the live layout-1 mineral flux.
+
+The default dry material has `kc = 1,000`, `kphi = 400,000` and `n = 1` in the SI Bekker fit. It uses 500 Pa
+cohesion, 0.6 internal friction, 25 mm shear length, 20% compaction, 0.05% fines from uncompacted volume and
+1,600 kg/m³ dry bulk density. Replace these coefficients with a measured material for the footprint and moisture.
+The optional `floor` is the same uniform bedrock elevation used on TerrainBed. Both solvers must share their cell.

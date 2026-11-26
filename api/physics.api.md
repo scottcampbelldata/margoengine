@@ -1894,6 +1894,9 @@ export class TrackedVehicle implements PhysicsAttachment {
         inContact: number;
         load: number;
     };
+    get motionStateWords(): number;
+    writeMotionState(out: Float64Array): void;
+    readMotionState(source: Float64Array): void;
     beforeStep(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     dispose(): void;

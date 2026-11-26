@@ -5746,3 +5746,12 @@ ATMO-09 braking cases are in `packages/physics/tests/coupling/rail.test.js`. The
 a moving pantograph exciting both cable axes, deterministic snapshot restore and shared/plain
 arena equality. Two Chromium render paths measure four metres of travel over one second from
 the actual procedural wagon and more than 36,000 changed frame pixels.
+
+### Pressure-sinkage and persistent relief (EARTH-05)
+
+The soil contact cases verify the independent Bekker and Janosi–Hanamoto laws, the bedrock bound and the
+triangulated volume ledger. Existing wheel and belt attachments produce measured inputs to the changing rigid
+collider. Real LIFE-01 walk, trot and biped stance supply mineral fines to ATMO-06. The isolated browser loads
+both native variants lazily and replays the same coupled bed and dust state. After building Physics, run
+`node --test packages/physics/tests/coupling/terramechanics.test.js` and
+`node packages/physics/tests/terramechanics.browser.mjs`.

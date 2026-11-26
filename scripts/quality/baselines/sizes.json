@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20358020,
+  "total": 20367503,
   "history": [
     {
       "date": "2026-10-24",
@@ -13065,6 +13065,12 @@
       "commit": "feat(physics) crests from the sea",
       "reason": "physics/flip 10,188 to 11,232 B gzip (this Mac): FlipSolver takes a sea (seeded from it, its sides on the sea's velocity, a band held to its motion and level; the density projection keeps those sides), so waves run in and break inside the box. It is the same solver's boundary; a separate entry would carry the whole solver again.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "290aba7e27",
+      "grew": 1,
+      "reason": "EARTH-05 adds optional soil footprint and native pixel-grid redistribution at 9206 B gzip. The Physics root goes from 865782 to 865981 B for the owning tracked attachment's motion snapshot, including belt shear. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -13928,6 +13934,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
     "@margoengine/physics/surf": 9345,
+    "@margoengine/physics/terramechanics": 9483,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,

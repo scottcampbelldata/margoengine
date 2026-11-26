@@ -176,6 +176,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'terramechanics-kernel',
+    crate: 'packages/physics/terramechanics-kernel',
+    blueprint: 'packages/physics/src/terramechanics/terramechanics-kernel.wasm',
+    script: 'packages/physics/scripts/build-terramechanics-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'terramechanics-kernel-shared',
+    crate: 'packages/physics/terramechanics-kernel',
+    blueprint: 'packages/physics/src/terramechanics/terramechanics-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-terramechanics-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'lava-kernel',
     crate: 'packages/physics/lava-kernel',
     blueprint: 'packages/physics/src/lava/lava-kernel.wasm',
