@@ -34,6 +34,121 @@ const make = (rate = { num: 24, den: 1 }) =>
 test('TracerSolver: the same plume at 24, 30 and 60 frames a second', () => frameRateIndependent(make));
 test('TracerSolver: a seek equals a continuous run', () => seekEqualsContinuous(() => make()));
 
+test('SEA-15 a finite waxy film thins to the Bingham yield level and conserves its oil', () => {
+  const tracer = new TracerSolver();
+  const volume = 0.004;
+  const density = 894;
+  const waterDensity = 1025;
+  const viscosity = 1e-6;
+  const yieldStress = 0.36;
+  const mass = volume * density;
+  const material = { density, floats: true, colour: [0.05, 0.03, 0.01] };
+  const world = new PhysicsWorld({ rate: { num: 20, den: 1 } }).add(tracer, {
+    waterDensity,
+    viscosity,
+    horizontalDiffusivity: 0,
+    oilSpills: [{ mass, material, position: [0, 0], spreadingCoefficient: 0, yieldStress, parcels: 256 }],
+  });
+  assert.equal(tracer.oilFilm(0), undefined);
+  const reducedGravity = 9.80665 * ((waterDensity - density) / waterDensity);
+  const terminalThickness = (2 * Math.sqrt(3) * yieldStress) / (density * reducedGravity);
+  const terminalRadius = Math.sqrt((3 * volume) / (2 * Math.PI * terminalThickness));
+  // Independently integrate the differential equation for R⁴, with two different RK4 refinements.
+  const dragScale = 1.45 ** 4 * ((reducedGravity * volume ** 2) / Math.sqrt(viscosity)) ** (2 / 3);
+  const derivative = (areaSquared) =>
+    dragScale * Math.max(0, 1 - Math.sqrt(areaSquared) / terminalRadius ** 2) ** (2 / 3);
+  function reference(duration, count) {
+    const dt = duration / count;
+    let state = 0;
+    for (let i = 0; i < count; i++) {
+      const a = derivative(state);
+      const b = derivative(state + (dt * a) / 2);
+      const c = derivative(state + (dt * b) / 2);
+      const d = derivative(state + dt * c);
+      state += (dt * (a + 2 * b + 2 * c + d)) / 6;
+    }
+    return state ** 0.25;
+  }
+  world.advance(400);
+  const fine = reference(20, 8192);
+  const coarse = reference(20, 4096);
+  const film = tracer.oilFilm(0);
+  assert.ok(
+    Math.abs(film.radius - fine) <= Math.abs(coarse - fine),
+    `${film.radius} vs RK4 ${fine} (${coarse} coarse)`,
+  );
+  assert.ok(film.centreThickness > terminalThickness);
+  assert.ok(Math.max(...film.centre.map(Math.abs)) < 1e-15);
+  assert.ok(Math.abs(film.meanThickness * Math.PI * film.radius ** 2 - volume) <= 8 * Number.EPSILON * volume);
+  const moment = [...tracer.particlesOf()].reduce((sum, { position, mass }) => {
+    return sum + mass * (position[0] ** 2 + position[2] ** 2);
+  }, 0);
+  // The analytic radial moment is 2R²/5. Midpoint quantiles on a monotone function bound error by one stratum.
+  assert.ok(Math.abs(moment / (mass * film.radius ** 2) - 0.4) <= 1 / 128);
+  const snapshot = world.takeSnapshot();
+  world.advance(1800);
+  assert.ok(Math.abs(tracer.oilFilm(0).radius - terminalRadius) < 8 * Number.EPSILON * terminalRadius);
+  assert.ok(Math.abs(tracer.oilFilm(0).centreThickness - terminalThickness) < 8 * Number.EPSILON * terminalThickness);
+  assert.deepEqual(tracer.budget, { released: mass, water: 0, surface: mass, bed: 0 });
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(1800);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 yield resistance improves held-out terminal slick radii in the wax tank', (t) => {
+  // Brönner et al. Tables 1–2. Densities and oscillatory rheometer readings drive the model.
+  // The equivalent terminal radii are separately inferred from the film images and ultrasound.
+  const observations = [
+    [894, 0.36, 1.28, 1.27],
+    [894.1, 1.25, 1.21, 0.77],
+    [893.7, 0.46, 1.15],
+    [893.1, 1.65, 0.71, 0.79],
+    [892.4, 13.6, 0.77, 1.22],
+  ];
+  const volume = 0.004;
+  const tracer = new TracerSolver();
+  const oilSpills = observations.flatMap(([density, shear], group) =>
+    [0, shear].map((yieldStress) => ({
+      mass: volume * density,
+      material: { density, floats: true, colour: [0.05, 0.03, 0.01] },
+      position: [group * 8, yieldStress > 0 ? 0 : 8],
+      spreadingCoefficient: 0,
+      yieldStress,
+      parcels: 8,
+    })),
+  );
+  const world = new PhysicsWorld({ rate: { num: 2, den: 1 } }).add(tracer, { oilSpills, horizontalDiffusivity: 0 });
+  world.advance(480);
+  let baseline = 0;
+  let corrected = 0;
+  let count = 0;
+  let worst = 1;
+  for (const [group, [, , ...radii]] of observations.entries()) {
+    const unyielded = tracer.oilFilm(2 * group).radius;
+    const waxy = tracer.oilFilm(2 * group + 1).radius;
+    for (const measured of radii) {
+      baseline += Math.log(unyielded / measured) ** 2;
+      corrected += Math.log(waxy / measured) ** 2;
+      worst = Math.max(worst, measured / waxy, waxy / measured);
+      count++;
+    }
+  }
+  assert.ok(corrected < baseline, 'yield should reduce the RMS log radius error across all tank observations');
+  t.diagnostic(
+    `RMS log radius error ${Math.sqrt(baseline / count).toFixed(3)} → ${Math.sqrt(corrected / count).toFixed(3)}. Worst ratio ${worst.toFixed(2)}.`,
+  );
+});
+
+test('SEA-15 the coherent wax law rejects negative yield stress and incompatible forcing', () => {
+  const release = { mass: 1, position: [0, 0], spreadingCoefficient: 0 };
+  const add = (settings) => new PhysicsWorld().add(new TracerSolver(), { oilSpills: [{ ...release, ...settings }] });
+  assert.throws(() => add({ yieldStress: -1 }), /nonnegative shear yield stress/);
+  assert.throws(() => add({ yieldStress: 1, spreadingCoefficient: 0.001 }), /fixed-volume gravity-spreading/);
+  assert.throws(() => add({ yieldStress: 1, evaporation: {} }), /fixed-volume gravity-spreading/);
+  assert.throws(() => add({ yieldStress: 1, dispersion: {} }), /fixed-volume gravity-spreading/);
+});
+
 test('SEA-15 a slick rides live wave height while dye follows submerged orbital flow across an origin cell', () => {
   const frequencies = new Float64Array([0.2, 0.4, 0.6]);
   const directions = new Float64Array([0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]);

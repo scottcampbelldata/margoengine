@@ -145,6 +145,7 @@ export interface TracerOilSpill {
     position: readonly [number, number];
     start?: number;
     spreadingCoefficient: number;
+    yieldStress?: number;
     material?: TracerMaterial;
     parcels?: number;
     evaporation?: TracerOilEvaporation;
@@ -196,6 +197,12 @@ export class TracerSolver implements Solver<TracerParams> {
         bed: number;
     };
     get evaporatedMass(): number;
+    oilFilm(index: number): {
+        centre: readonly [number, number];
+        radius: number;
+        meanThickness: number;
+        centreThickness: number;
+    } | undefined;
     get jetErosion(): number;
     particlesOf(): Generator<{
         position: [number, number, number];

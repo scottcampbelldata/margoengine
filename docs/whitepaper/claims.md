@@ -269,6 +269,10 @@ first: each names its scope, its evidence file and how to reproduce it.
   snapshot. A delayed release shares a world with an ordinary dye source and moves with the given current.
   Stiver–Mackay vapour loss at 30 and 60 steps/s agrees within 2 × 10⁻¹⁰ kg with quadrature across the
   three radius regimes. The liquid and vapour ledger balance within 10⁻¹⁵ kg, with exact snapshot replay.
+  With yield resistance enabled, the mass-conserving fixed-volume film reaches its analytic stopping thickness.
+  Against nine independent terminal tank radii, the RMS log radius error falls from 1.127 to 0.749. The largest
+  discrepancy, a factor of 5.69 for the 30% waxy blend, remains open. The comparison covers final extent of a coherent film.
+  [Brönner et al., Tables 1–2](https://doi.org/10.1016/j.marpolbul.2018.02.021).
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
 - Vertical dye diffusion (SEA-15, 2026-11-26). The solver recovers the drift and midpoint variance in a linear

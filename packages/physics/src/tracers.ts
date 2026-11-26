@@ -68,6 +68,7 @@ import {
 } from './tracer-oil-dispersion.js';
 import { stokesAt, type StokesProfile, stokesProfile } from './tracer-stokes.js';
 import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
+import { WAX_FILM_MEAN, waxLimit, waxMassRadius, waxRadius } from './tracer-wax.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
 import { regionWords } from './world/memory.js';
 import type {
@@ -185,6 +186,8 @@ export interface TracerOilSpill {
   start?: number;
   /** Air–water tension minus oil–air and oil–water tensions, N/m. Use zero for gravity-only spreading. */
   spreadingCoefficient: number;
+  /** Shear yield stress in Pa for a coherent waxy film (default 0). Positive values require gravity-only, fixed-volume spreading. */
+  yieldStress?: number;
   /** Initial floating oil (default the `oil` preset). */
   material?: TracerMaterial;
   /** Slots reserved for this release (default 128, at least two). Counts against `capacity`. */
@@ -298,6 +301,7 @@ interface OilSpillState {
   position: readonly [number, number];
   start: number;
   profile: FayCoefficients;
+  waxStoppingRadius?: number;
   evaporation?: EvaporationRates;
   drops?: { first: number; law: OilDispersionLaw; materials: readonly number[] };
 }
@@ -666,7 +670,15 @@ export class TracerSolver implements Solver<TracerParams> {
     const { waterDensity, viscosity } = this.params;
     let first = capacity;
     for (const spill of spills) {
-      const { mass, position, spreadingCoefficient, start = 0, parcels = 128, material = TRACER_MATERIALS.oil } = spill;
+      const {
+        mass,
+        position,
+        spreadingCoefficient,
+        yieldStress = 0,
+        start = 0,
+        parcels = 128,
+        material = TRACER_MATERIALS.oil,
+      } = spill;
       if (!(Number.isInteger(parcels) && parcels >= 2 && parcels <= first))
         throw new MargoError(
           'unsupported',
@@ -692,13 +704,15 @@ export class TracerSolver implements Solver<TracerParams> {
           'Oil spreading needs finite mass, position, time and tension with oil lighter than the water; pass positive mass, nonnegative time and tension, and a floating material.',
         );
       const volume = mass / material.density;
-      const profile = fayCoefficients(
-        volume,
-        this.g * (1 - material.density / waterDensity),
-        waterDensity,
-        viscosity,
-        spreadingCoefficient,
-      );
+      const reducedGravity = this.g * (1 - material.density / waterDensity);
+      if (!(yieldStress >= 0 && Number.isFinite(yieldStress)))
+        throw new RangeError('Invalid oil yield stress; pass a finite, nonnegative shear yield stress in Pa.');
+      if (yieldStress > 0 && (spreadingCoefficient || spill.evaporation || spill.dispersion))
+        throw new MargoError(
+          'unsupported',
+          'Waxy oil uses a fixed-volume gravity-spreading law; use zero spreading coefficient and omit evaporation and dispersion.',
+        );
+      const profile = fayCoefficients(volume, reducedGravity, waterDensity, viscosity, spreadingCoefficient);
       if (!profile.every(Number.isFinite) || !(fayRadius(profile, 1) > 0))
         throw new MargoError(
           'unsupported',
@@ -716,6 +730,8 @@ export class TracerSolver implements Solver<TracerParams> {
         mass,
         start,
         profile,
+        waxStoppingRadius:
+          yieldStress > 0 ? waxLimit(volume, material.density, reducedGravity, yieldStress) : undefined,
         evaporation: spill.evaporation && evaporationRates(spill.evaporation, volume),
         drops,
       });
@@ -869,7 +885,11 @@ export class TracerSolver implements Solver<TracerParams> {
       const spill = this.oilSpills[i]!;
       const age = time - spill.start;
       if (!(age > 0) || vapour?.[i] === spill.mass) continue;
-      const radius = fayRadius(spill.profile, age);
+      let radius = fayRadius(spill.profile, age);
+      if (spill.waxStoppingRadius) {
+        const viscous = spill.profile[1] * Math.sqrt(Math.sqrt(age));
+        radius = Math.min(radius, waxRadius(spill.waxStoppingRadius, viscous));
+      }
       if (!(radius > 0 && Number.isFinite(radius)))
         throw new MargoError(
           'unsupported',
@@ -880,7 +900,7 @@ export class TracerSolver implements Solver<TracerParams> {
         this.seedOil(spill, radius, words);
         book[0]! += spill.mass;
         book[2]! += spill.mass;
-      } else {
+      } else if (radius !== previous) {
         this.expandOil(spill, radius / previous, words, waves?.[i]?.centre ?? this.oilCentre(spill, words));
       }
       radii[i] = radius;
@@ -997,7 +1017,11 @@ export class TracerSolver implements Solver<TracerParams> {
     for (let i = 0; i < count; i++) {
       const pair = Math.floor(i / 2);
       const angle = pair * GOLDEN_ANGLE;
-      const signedRadius = pair === pairs ? 0 : (i % 2 === 0 ? 1 : -1) * radius * Math.sqrt((pair + 0.5) / pairs);
+      const fraction = (pair + 0.5) / pairs;
+      const signedRadius =
+        pair === pairs
+          ? 0
+          : (i % 2 === 0 ? 1 : -1) * radius * (spill.waxStoppingRadius ? waxMassRadius(fraction) : Math.sqrt(fraction));
       const p = (first + i) * STRIDE;
       words[p] = position[0] + signedRadius * cos(angle);
       words[p + 1] = this.params.waterLevel;
@@ -1405,6 +1429,28 @@ export class TracerSolver implements Solver<TracerParams> {
     if (!this.spillVapour) return 0;
     const vapour = regionWords(this.host.memory, this.spillVapour) as Float64Array;
     return vapour.reduce((total, mass) => total + mass, 0);
+  }
+
+  /** Nominal axisymmetric film at a finite release's centre in cell-local metres. Thickness is in metres. */
+  oilFilm(
+    index: number,
+  ): { centre: readonly [number, number]; radius: number; meanThickness: number; centreThickness: number } | undefined {
+    const spill = this.oilSpills[index];
+    if (!spill || !this.spillRadii) return undefined;
+    const radius = (regionWords(this.host.memory, this.spillRadii) as Float64Array)[index]!;
+    if (!(radius > 0)) return undefined;
+    const words = this.words();
+    const mass =
+      words[spill.first * STRIDE + 3]! * (spill.count - 1) + words[(spill.first + spill.count - 1) * STRIDE + 3]!;
+    if (!(mass > 0)) return undefined;
+    const volume = mass / this.materials[spill.material]!.density;
+    const meanThickness = volume / radius / radius / Math.PI;
+    return {
+      centre: this.oilCentre(spill, words),
+      radius,
+      meanThickness,
+      centreThickness: spill.waxStoppingRadius ? meanThickness / WAX_FILM_MEAN : meanThickness,
+    };
   }
 
   /** Cumulative kg lifted out of the erodible layer by water jets. Included in `budget.released`. */

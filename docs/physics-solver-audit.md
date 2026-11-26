@@ -502,7 +502,10 @@ confirms submerged dye follows the analytical potential gradient through `Spectr
 Finite instantaneous oil releases now use Fay's three radial laws, with mass conservation, current transport and
 snapshot replay checked separately. Stiver–Mackay evaporation uses the integrated Fay area and preserves a separate
 vapour ledger. The integrated exposure matches an independent quadrature of the radius laws at two simulation rates.
-The remaining oil work includes film thickness and independent measured slick-extent and evaporation validation.
+A fixed-volume waxy film now reports its thickness and follows the Brönner Bingham yield force. Nine independent
+tank terminal radii lower the RMS log radius error from 1.127 to 0.749 compared with Fay's unyielded radius. The 30%
+blend that fractured under-spreads by a factor of 5.69 in the worst run. Continuous sources, fracture, unyielded oil
+extent and independent evaporation validation remain open.
 
 Vertical tracers now accept a depth profile and include the diffusivity-gradient drift and midpoint variance from
 Visser (1997). For Coastal Mixing and Optics Experiment 4, the independent EPSONDE microstructure samples drive

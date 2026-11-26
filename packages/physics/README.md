@@ -3325,6 +3325,26 @@ world.advance(60);
 console.log(oil.budget.surface, [...oil.particlesOf()].length); // 0.025 64
 ```
 
+Set `yieldStress`, in Pa, for a coherent waxy film. The default is 0. A positive value uses the fixed-volume
+gravity-spreading model from Brönner et al. with zero `spreadingCoefficient` and no evaporation or breaking-wave
+dispersion. The film approaches a finite radius. Read `oilFilm(index)` for the cell-local centre, nominal radius and
+mean and central thicknesses in metres. `index` is the zero-based position in `oilSpills`. Before release or once
+surface oil is gone, `oilFilm` returns `undefined`. Local mixing and shear can distort the actual parcel cloud.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const wax = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wax, {
+  oilSpills: [{ mass: 3.48, position: [0, 0], spreadingCoefficient: 0, yieldStress: 0.36 }],
+  horizontalDiffusivity: 0,
+});
+world.advance(60);
+const film = wax.oilFilm(0);
+console.log(film?.radius, film?.centreThickness);
+```
+
 Set `evaporation` for a release with a modified distillation curve. Supply slick temperature and initial boiling
 point in kelvin, the slope in kelvin per distilled volume fraction, and air-side transfer in m/s. All four inputs
 stay constant for the release. `evaporatedMass` is cumulative vapour mass in kilograms. Add it to the water,

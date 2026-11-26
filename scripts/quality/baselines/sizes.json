@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20649114,
+  "total": 20649690,
   "history": [
     {
       "date": "2026-10-24",
@@ -13909,6 +13909,12 @@
       "commit": "FLUID-07-surface-geometry",
       "grew": 1,
       "reason": "FLUID-07 exports the wet height field as renderer geometry with local normals, complete patch bounds and dry masking. Thin-film rises from 15912 to 16381 B gzip; cap changes from 16084 to 16873 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-15-wax-film",
+      "grew": 1,
+      "reason": "SEA-15's cohesive waxy oil radius and film probe move physics/tracers from 15704 to 16215 B gzip. The optional ceiling rises from 16126 to 16702 B. The waxy option reuses the slick slots, radius state, advection, and mass ledger. A separate entry would split spreading state from the solver that owns those parcels and duplicate its coupling."
     }
   ],
   "items": {
@@ -14788,7 +14794,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 16873,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 16126,
+    "@margoengine/physics/tracers": 16702,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,

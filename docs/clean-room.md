@@ -13282,6 +13282,20 @@ transitions. Antipodal equal-area parcels give the initial patch; each step expa
 and applies the usual surface advection and diffusion. The closed-form check uses all three regimes and exact
 mass and snapshot replay. Independent field validation of oil extent remains open.
 
+The waxy film uses U. Brönner, Ø. Johansen, F. Leirvik, T. Nordam, and K. R. Sørheim,
+[“Spreading of waxy oils on calm water” (2018)](https://doi.org/10.1016/j.marpolbul.2018.02.021),
+equations A7–A8. The shear yield stress supplies the stopping thickness through the paper's factor of √3.
+We use the fixed-volume Nihoul profile recounted in that appendix, `h/h₀=√(1−(r/R)²)`, with area mean `2h₀/3`.
+The coefficient in the viscous force balance follows the zero-yield Fay radius. The implementation does not fit
+Brönner's tank results. With fixed volume, multiply A8 by `3R^(8/3)` to obtain an equation for `R⁴`, with rate given
+by the zero-yield Fay `R⁴` rate times `max(1−(R/R∞)²,0)^(2/3)`. Inverting its separable integral avoids a singular
+initial radius. The early inertial envelope is Fay's. Antipodal parcels use the radial mass quantile of the profile.
+Independent terminal radius estimates from Brönner's tank use optical thickness contours and ultrasound. The solver
+inputs are the separate oscillatory rheometer stress, oil density, 4 L final volume and nominal seawater properties.
+Across all nine reported terminal radii, the RMS log error drops from 1.127 to 0.749. The worst error is a factor of 5.69
+for the 30% blend that fractured in one of the runs. The coherent-film law omits breakup and the comparison is at the
+end of the tank's continuous release, when the final volume is fixed.
+
 Oil evaporation follows W. Stiver and D. Mackay, [“Evaporation rate of spills of hydrocarbons and petroleum mixtures” (1984)](https://doi.org/10.1021/es00129a006).
 The [Environment Canada catalogue (1990), §3.1](https://publications.gc.ca/collections/collection_2020/eccc/en84/En84-183-1990-eng.pdf)
 gives the working equation `F = ln(1 + C θ exp(A − B T₀/T))/C`, with `A = 6.3`, `B = 10.3`,
