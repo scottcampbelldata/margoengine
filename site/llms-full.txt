@@ -12358,6 +12358,21 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
 
+### Radiation fog and cold-air pooling (ATMO-08)
+
+The cold-air layer resolves one vertical bulk temperature, velocity and droplet population per ground column.
+It models near-surface nocturnal radiation fog, valley pooling and exchange with overlying air. Its pressure and
+ambient weather inputs are held per coupling step. The grey longwave boundary does not resolve spectral radiation.
+The bulk fall speed uses small spherical liquid droplets. Multiple radiative strata, aerosol activation, supercooled
+phase changes and synoptic weather require their own field models. Open edges export the layer. Sealed edges retain
+it while settling and external surface inputs exchange water with the ground.
+
+The visual grid interpolates extinction horizontally and uses the bulk column thickness vertically. Its storage is
+16 bytes per column plus the 48-byte header, limited by the device's storage binding and buffer sizes. Analytic fog
+volumes and the live grid each work as an optional `VolumetricFog` medium.
+The optional solver is 4,666 bytes gzip with an 8,955-byte lazy Wasm asset per memory mode. The optional
+fog renderer is 2,243 bytes gzip.
+
 ### Layered snowpack (ICE-01)
 
 The model resolves a vertical column for each sample, with a fresh surface layer and the configured initial layers.
@@ -28870,6 +28885,13 @@ the event by hand. A physics world with `ModalContactRigidSolver` and `ModalSoun
 an impulse, rolling or scraping excitation, with sound and damping set by the contacted materials.
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
+
+## Fixed: valley fog lacked transported extinction (ATMO-08, PA-34 fog)
+
+A stationary fog box could vary noise without transporting moisture, so it did not resolve a plume carried
+against a slope or across a valley. Bind `FogGrid` to `DrainageFog` as the volumetric medium. Its physics and
+rendered movement are covered by `packages/physics/tests/coupling/drainage-fog.test.js` and
+`packages/environment/tests/drainage-fog.browser.mjs`. PA-34 retains the separate cloud path.
 
 ## Fixed: snow lacked melt energy and dense slides ignored obstacles (ICE-01, PA-33)
 
