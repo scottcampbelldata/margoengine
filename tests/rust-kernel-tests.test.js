@@ -20,7 +20,7 @@ import {
   wasmBuildArgs,
   wasmModule,
 } from '../scripts/rust-kernel-tests.mjs';
-import { RUSTFLAGS as PHYSICS_RUSTFLAGS } from '../packages/physics/scripts/build-kernel.mjs';
+import { LINK_RUSTFLAGS, RUSTFLAGS as PHYSICS_RUSTFLAGS } from '../packages/physics/scripts/build-kernel.mjs';
 import { loadWorkspaces } from '../scripts/support/affected-gpu.mjs';
 
 const root = resolve(import.meta.dirname, '..');
@@ -125,7 +125,13 @@ test('changedKernelDirs and selectKernels: changed names map to directories; an 
 test('every kernel that ships as Wasm is built for wasm32 with the shipped flags, the 2D one checked in Wasm too', () => {
   for (const dir of ['packages/physics', 'packages/physics2d'])
     assert.ok(kernels.find((k) => k.dir === dir).wasm, `${dir} ships as Wasm`);
-  assert.equal(WASM_RUSTFLAGS, PHYSICS_RUSTFLAGS, 'the flags of the 3D kernel blueprint');
+  // The 3D blueprint generates code with the kernels' shared flags and adds only the link arguments that place it in the
+  // world's memory (its module slot, an imported memory, no stack of its own).
+  assert.equal(PHYSICS_RUSTFLAGS, `${WASM_RUSTFLAGS} ${LINK_RUSTFLAGS}`, 'the flags of the 3D kernel blueprint');
+  assert.ok(
+    LINK_RUSTFLAGS.split(' -C ').every((flag) => !/simd128|opt-level|lto/.test(flag)),
+    LINK_RUSTFLAGS,
+  );
   assert.deepEqual(wasmBuildArgs('k/Cargo.toml'), [
     'build',
     '--locked',

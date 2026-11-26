@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import { committedBlueprint } from '../../../scripts/committed-blueprint.mjs';
 import { KERNEL_SLOTS, rustFlags } from '../../../scripts/physics-modules.mjs';
+import { WASM_RUSTFLAGS } from '../../../scripts/support/wasm-kernel.mjs';
 import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -25,8 +26,12 @@ export const LINK_RUSTFLAGS = rustFlags(
   KERNEL_SLOTS.find((entry) => entry.name === 'rigid'),
   false,
 );
-/** The flags the blueprint is built with; a change to them is a change to the blueprint. */
-export const RUSTFLAGS = `-C target-feature=+simd128 ${LINK_RUSTFLAGS}`;
+/**
+ * The flags the blueprint is built with; a change to them is a change to the blueprint. Its code generation is every Wasm
+ * kernel's (`WASM_RUSTFLAGS`, which check:rust-kernels builds each kernel with); the link arguments place it in the world's
+ * memory and are the blueprint's own.
+ */
+export const RUSTFLAGS = `${WASM_RUSTFLAGS} ${LINK_RUSTFLAGS}`;
 /** The scalar variant's flags: no instruction of Wasm SIMD is made, so a browser without it can compile the module. */
 export const SCALAR_RUSTFLAGS = LINK_RUSTFLAGS;
 /** The variants of the kernel: the default with SIMD, the scalar one for browsers without Wasm SIMD, and the threaded one. */
