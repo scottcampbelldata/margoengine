@@ -14884,8 +14884,8 @@
         "gzip": 7745
       },
       "./seakeeping": {
-        "raw": 91434,
-        "gzip": 35043
+        "raw": 98463,
+        "gzip": 37493
       },
       "./celestial": {
         "raw": 21275,
@@ -19169,6 +19169,11 @@
       "raw": 18799,
       "gzip": 8743,
       "brotli": 7600
+    },
+    "packages/physics/dist/hull-panel-kernel.wasm": {
+      "raw": 50232,
+      "gzip": 22012,
+      "brotli": 19191
     }
   },
   "splits": {

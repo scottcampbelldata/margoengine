@@ -4387,6 +4387,14 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+The optional SEA-08 panel bake uses one standalone Rust Wasm asset. Its
+six-axis radiation coefficients and heading-dependent diffraction pass the
+Hulme and Haskind hemisphere checks. The finite-depth kernel satisfies the
+surface and bed conditions across three frequencies. The world uses the
+coefficients through its existing hull force and history regions. Water's
+renderer reads the resulting wake on WebGPU and WebGL2. The measured Wigley
+and S175 motion comparisons and forward lateral terms remain open.
+
 The native ATMO-10 phase change uses the moving temperature in each moisture
 column. Exact tests cover subsaturated and saturated ascent, intermediate
 saturation crossing, and normal-stratification terrain waves. The regional
