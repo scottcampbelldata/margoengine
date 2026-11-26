@@ -39,6 +39,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./gcode": {
+      "types": "./dist/gcode.d.ts",
+      "import": "./dist/gcode.js"
+    },
     "./usdz": {
       "types": "./dist/usdz.d.ts",
       "import": "./dist/usdz.js"

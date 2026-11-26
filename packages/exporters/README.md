@@ -1300,6 +1300,38 @@ Tracks are sampled at `fps`, as USD stores them, and the viewer blends between f
 
 A joint under nodes that are not joints takes their motion, and a joint scaled to zero, as a clip that makes a character appear does, keeps its rotation. What cannot be held is refused: a shear in the nodes above a joint, since a joint is a translation, rotation and scale. A mirrored node draws a reflected shape as in `exportUSDZ`, chosen at frame 0, so a clip that turns a scale negative part way keeps the winding it started with.
 
+## G-code for 3D printers (`@margoengine/exporters/gcode`)
+
+`exportGCode(source, options)` slices a scene's meshes into layers and writes RepRap-flavour G-code (the dialect `parseGCode` of `@margoengine/loaders/gcode` reads): every layer prints its outlines, then rectilinear infill at `infill` density, the scanlines turning 90 degrees from layer to layer. A layer is sliced at its middle height; vertices on the cutting plane count as above it. Extrusion is the line's cross section, `layerHeight x lineWidth`, over the filament's, times `extrusionMultiplier`. `exportGCodePaths(paths, options)` instead prints polylines (`[x, y, z, ...]`, scene units) as they are, so a 3D line becomes a non-planar print path. Both return `{text, layers, filament, length, min, max}` (millimetres).
+
+```ts
+import { exportGCode } from '@margoengine/exporters/gcode';
+
+// A 20 mm cube, outlines and 20 percent infill, at 0.2 mm layers: 100 layers.
+const positions = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1].map((v) => v * 0.02);
+const indices = [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7];
+const { text, layers, filament } = exportGCode({ nodes: [{ geometry: { positions, indices } }] }, { upAxis: 'z', center: [100, 100] });
+console.log(layers, filament.toFixed(0), text.split('\n').length);
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `scale` | 1000 | Millimetres per scene unit (the scene is in metres) |
+| `upAxis` | `'y'` | The scene's up axis; G-code is Z up, so `'y'` is turned to stand on the bed |
+| `layerHeight`, `firstLayerHeight` | 0.2, the layer height | In mm |
+| `lineWidth`, `filamentDiameter`, `extrusionMultiplier` | 0.4, 1.75, 1 | The extrusion maths |
+| `infill` | 0.2 | Rectilinear density, 0 (outlines only) to 1 |
+| `nozzleTemperature`, `bedTemperature` | 200, 60 | Degrees C; 0 omits the commands |
+| `printSpeed`, `travelSpeed`, `firstLayerSpeed` | 50, 120, 20 | mm/s |
+| `retract`, `retractMinTravel` | 1, 2 | Retraction length and the shortest travel that retracts, mm; `retract: 0` turns it off |
+| `relativeExtrusion` | true | M83 (default) or absolute E with M82 |
+| `fan` | 255 | M106 speed from the second layer; 0 for none |
+| `startCode`, `endCode` | home; heaters and motors off | Replace the default start and end lines |
+| `center` | none | A mesh: bounding box centre to this X, Y, lowest point to Z 0. Paths: added to X and Y |
+| The collector's options | as `exportGLB` | What the scene collects |
+
+Not generated: perimeters beyond the first, solid top and bottom skins, supports, brims and travel avoidance. A mesh that is not closed prints its open loops as open lines. A slicer is still the tool for a production print; this is for scenes and procedural geometry to reach a printer or a plotter without leaving the engine.
+
 ## 3MF for 3D printing (`@margoengine/exporters/threemf`)
 
 `export3MF(source, options)` writes a scene or GLB bytes as a 3MF file, which slicers prefer over STL because it holds its unit and its colours.
