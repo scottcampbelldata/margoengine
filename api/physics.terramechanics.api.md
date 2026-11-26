@@ -29,6 +29,14 @@ export interface SoilBudget {
     readonly exported: number;
 }
 
+export interface SoilContactProfile {
+    readonly columns: number;
+    readonly rows: number;
+    readonly depth: ArrayLike<number>;
+    readonly area: number;
+    readonly perimeter: number;
+}
+
 export interface SoilContactRigidOptions {
     readonly id?: string;
     readonly terrain?: BedShape;
@@ -138,6 +146,7 @@ export interface TerramechanicsParams {
     readonly patches?: readonly SoilPatch[];
     readonly inputRows?: number;
     readonly feet?: readonly LeggedSoilPatch[];
+    readonly profiles?: readonly (SoilContactProfile | null)[];
     readonly floor?: number;
     readonly cellSize?: number;
 }

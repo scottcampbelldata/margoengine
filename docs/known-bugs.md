@@ -16739,8 +16739,9 @@ Vehicles sink into a calibrated yielding surface and feel the resulting suspensi
 real wheel and belt loads to TerrainBed and refits the same collider before the next rigid step. Live hoof and biped
 pressures produce persistent relief and loft mineral dust. Varying bedrock and subsurface layers need a shared
 profile contract. The original city, deck, horse and courier shots still need the production bindings. The mean
-and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. Arbitrary shoe and tread contact
-geometry and validation against measured moving-footprint and berm profiles remain EARTH-05 work.
+and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
+sampled projected shoe and tread contours. Live 3D tread intersection and validation against measured
+moving-footprint and berm profiles remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

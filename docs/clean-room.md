@@ -67,6 +67,12 @@ For an ellipse it is one minus the squared normalized radius. The per-vertex are
 area. The local repose pass conservatively transfers only the current step's new loose material.
 [Krenn and Hirzinger](https://elib.dlr.de/60535/1/elib_ISTVS2009_KrennHirzinger.pdf).
 
+Krenn and Hirzinger's Fig. 9 gives a discontinuous projected footprint. The resolved tier accepts projected
+depth sampled from a shape. It rotates the sample grid with the contact and bilinearly interpolates local depth
+before applying the force integral. Supplied area and perimeter retain the geometry's effective width when
+the model is rotated or the bed is resampled. The two-lug fixture uses independently calculated depth
+and verifies that its gap stays unloaded.
+
 M. Apfelbeck, S. Kuß, B. Rebele and B. Schäfer, “A systematic approach to reliably characterize soils based on
 bevameter testing” (2011), gives fits for circular plates in Table 5 and observed square profiles in Fig. 8.
 Both tiers reproduce the held-out square-plate sinkage for the dry quartz sand at 41.21 kPa (18.6–21.2 mm)

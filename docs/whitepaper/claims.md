@@ -5785,3 +5785,5 @@ packages/physics/tests/coupling/terramechanics.test.js` and
 The browser fixture feeds the live TerrainBed sampler directly into Terrain's render geometry. WebGPU and WebGL2
 each recorded 3,906 changed pixels between the flat bed and the loaded footprint, using the same material,
 camera and lighting. The measured center elevation fell 72 mm in that render fixture.
+The discrete two-lug test rotates a tread through 90°, preserves zero pressure between its components and
+matches the independently integrated peak depth for both orientations.

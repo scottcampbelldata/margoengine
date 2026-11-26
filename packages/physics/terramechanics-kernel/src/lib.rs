@@ -39,6 +39,9 @@ struct Patch {
     load: f64,
     stiffness: f64,
     exponent: f64,
+    profile: f64,
+    profile_columns: f64,
+    profile_rows: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -55,9 +58,41 @@ fn bounds(centre: f64, radius: f64, origin: f64, spacing: f64, size: usize) -> (
 }
 
 #[inline]
-fn raster(patch: &Patch, halo: f64, dx: f64, dz: f64) -> (f64, f64, f64) {
+unsafe fn depth_at(patch: &Patch, side: f64, station: f64) -> f64 {
+    if side.abs() > 1.0 || station.abs() > 1.0 {
+        return 0.0;
+    }
+    let columns = patch.profile_columns as usize;
+    let rows = patch.profile_rows as usize;
+    let values = (patch.profile as usize) as *const f64;
+    let x = (side + 1.0) * 0.5 * (columns - 1) as f64;
+    let z = (station + 1.0) * 0.5 * (rows - 1) as f64;
+    let a = (x as usize).min(columns - 2);
+    let b = (z as usize).min(rows - 2);
+    let tx = x - a as f64;
+    let tz = z - b as f64;
+    let left = *values.add(a * rows + b) * (1.0 - tz) + *values.add(a * rows + b + 1) * tz;
+    let right =
+        *values.add((a + 1) * rows + b) * (1.0 - tz) + *values.add((a + 1) * rows + b + 1) * tz;
+    left * (1.0 - tx) + right * tx
+}
+
+#[inline]
+unsafe fn raster(patch: &Patch, halo: f64, dx: f64, dz: f64) -> (f64, f64, f64) {
     let station = (dx * patch.forward_x + dz * patch.forward_z) / patch.half_length;
     let side = (dx * patch.forward_z - dz * patch.forward_x) / patch.half_width;
+    if patch.profile_columns != 0.0 {
+        let depth = depth_at(patch, side, station);
+        if depth > 0.0 {
+            return (1.0, depth, 0.0);
+        }
+        let reach = 2.0 * halo;
+        let ring = depth_at(patch, side - reach, station)
+            .max(depth_at(patch, side + reach, station))
+            .max(depth_at(patch, side, station - reach))
+            .max(depth_at(patch, side, station + reach));
+        return (0.0, 0.0, ring);
+    }
     let flags = patch.shape_flags as u8;
     let radius = if flags & 1 != 0 {
         length(station, side)
@@ -70,7 +105,8 @@ fn raster(patch: &Patch, halo: f64, dx: f64, dz: f64) -> (f64, f64, f64) {
     } else {
         1.0
     };
-    (radius, coverage, profile)
+    let ring = ((1.0 + 3.0 * halo - radius) / (2.0 * halo)).clamp(0.0, 1.0);
+    (coverage, profile, ring)
 }
 
 /// Rasterizes one moving soil contact into pending bed deltas, using exact nodal areas for the mass ledger.
@@ -116,7 +152,7 @@ pub unsafe extern "C" fn stamp(
             let rx = origin_x + x as f64 * dx - p.x;
             for z in z_start..z_end {
                 let rz = origin_z + z as f64 * dz - p.z;
-                let (_, coverage, profile) = raster(p, halo, rx, rz);
+                let (coverage, profile, _) = raster(p, halo, rx, rz);
                 contact_area += *areas.add(x * nz + z) * coverage * pow(profile, p.exponent);
             }
         }
@@ -136,7 +172,7 @@ pub unsafe extern "C" fn stamp(
         let rx = origin_x + x as f64 * dx - p.x;
         for z in z_start..z_end {
             let rz = origin_z + z as f64 * dz - p.z;
-            let (radius, coverage, profile) = raster(p, halo, rx, rz);
+            let (coverage, profile, ring) = raster(p, halo, rx, rz);
             let i = x * nz + z;
             let area = *areas.add(i);
             let depth_shape = if resolved { profile } else { 1.0 };
@@ -161,7 +197,6 @@ pub unsafe extern "C" fn stamp(
             } else {
                 0.0
             };
-            let ring = ((outer - radius) / (2.0 * halo)).clamp(0.0, 1.0);
             let weight = if coverage == 0.0 {
                 ring * (1.0 + p.shear_share * normal)
             } else {

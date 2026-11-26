@@ -16,11 +16,16 @@ const eps = Number.EPSILON;
 const close = (actual, expected, error) =>
   assert.ok(Math.abs(actual - expected) <= error, `${actual} vs ${expected}, bound ${error}`);
 
-function planted(soil, terrain, material, { playback = rate, shared = false, floor, patches = [patch] } = {}) {
+function planted(
+  soil,
+  terrain,
+  material,
+  { playback = rate, shared = false, floor, patches = [patch], profiles } = {},
+) {
   const bed = new TerrainBed();
   const world = new PhysicsWorld({ rate: playback, memory: worldMemory(shared) })
     .add(bed, { ...terrain, elevations: () => 0, bedrock: floor === undefined ? undefined : () => floor })
-    .add(soil, { terrain, material, patches, floor });
+    .add(soil, { terrain, material, patches, floor, profiles });
   world.couple(['terramechanics', 'bed'], 'staggered');
   return { world, bed };
 }
@@ -124,6 +129,50 @@ test('resolved rounded footprints integrate the independent square-profile solut
   world.restoreSnapshot(mark.bytes);
   world.advance(15);
   assert.equal(world.hash(), hash);
+});
+
+test('a projected tread rotates two unequal lugs while their gap stays unloaded', async () => {
+  const terrain = { columns: 64, rows: 64, width: 2, depth: 2, centre: [0, 0] };
+  const profile = {
+    columns: 9,
+    rows: 2,
+    depth: [0, 1, 1, 0, 0, 0, 0.5, 0.5, 0].flatMap((depth) => [depth, depth]),
+    area: 0.75,
+    perimeter: 5.5,
+  };
+  const areas = bedVertexAreas(terrain);
+  const load = 900;
+  // There are 33 along rows and the two linear trapezoids integrate to 3/8 m across.
+  const nodalArea = (33 / 32) * (3 / 8);
+  const crest = load / nodalArea;
+  const stiffness = coefficient + 12_000 / ((2 * 0.75) / 5.5);
+  for (const [forward, points] of [
+    [[0, 1], [-0.25, 0, 0.25].map((x) => [x, 0])],
+    [[1, 0], [-0.25, 0, 0.25].map((x) => [0, -x])],
+  ]) {
+    const soil = await Terramechanics.load({ tier: 'resolved' });
+    const { world, bed } = planted(
+      soil,
+      terrain,
+      { cohesiveModulus: 12_000, frictionalModulus: coefficient, compaction: 1 },
+      { patches: [{ x: 0, z: 0, length: 1, width: 1, load, forward }], profiles: [profile] },
+    );
+    world.advance(1);
+    const pressure = regionWords(world.memory, world.fields.port(soil.pressureField.name).region);
+    const normal = pressure.reduce((sum, value, i) => sum + value * areas[i], 0);
+    close(normal, load, 1024 * eps * load);
+    const elevations = bed.elevations();
+    const heights = points.map(([x, z]) => elevations[(32 + 32 * x) * 65 + 32 + 32 * z]);
+    close(heights[0], -crest / stiffness, 512 * eps);
+    assert.equal(heights[1], 0);
+    close(heights[2], -crest / (2 * stiffness), 512 * eps);
+    const saved = world.takeSnapshot();
+    world.advance(20);
+    const hash = world.hash();
+    world.restoreSnapshot(saved.bytes);
+    world.advance(20);
+    assert.equal(world.hash(), hash);
+  }
 });
 
 async function steps(kind, speed) {
@@ -238,7 +287,19 @@ async function coupledVehicles(tier) {
     wheels: [{ vehicle, patches: wheels.map(() => wheelShape), ground: floor.collider }],
     tracks: [{ vehicle: tracked, patches: beltPatches }],
   });
-  world.add(soil, { terrain, inputRows: 6, material: { dustFraction: 0 } });
+  const lug = {
+    columns: 5,
+    rows: 2,
+    depth: [1, 1, 0, 0, 1, 1, 0, 0, 1, 1],
+    area: 0.21,
+    perimeter: 2.18,
+  };
+  world.add(soil, {
+    terrain,
+    inputRows: 6,
+    material: { dustFraction: 0 },
+    profiles: tier === 'resolved' ? [null, null, null, null, lug, lug] : undefined,
+  });
   world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
   world.advance(7);
   assert.ok(soil.read(0).normalForce > 0 && soil.read(4).normalForce > 0);

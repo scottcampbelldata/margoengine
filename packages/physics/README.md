@@ -4519,3 +4519,9 @@ pass `{ rounded: true }` as the fifth argument to `wheelSoil` to opt in to the s
 `pressureField` in pascals on the bed vertices and reports raster visits, repose faces and moved volume through
 `soil.work`. `reposeSlope` controls how far newly displaced loose soil can transfer across adjacent faces. It
 defaults to the internal-friction tangent. The default `'mean'` tier uses uniform pressure and one berm ring.
+
+For a tread, sole or hoof with disconnected contact, pass `profiles` when adding the resolved solver. Supply
+one entry for each fixed patch, then each external wheel or belt row, then each configured foot. Use `null`
+for the built-in shape. Each profile contains `columns` across the footprint, `rows` along its forward direction,
+and normalized vertex `depth` values in across-major order. A zero-depth gap carries no pressure. Use the
+projected `area` in m² and total contact `perimeter` in metres measured on that shape.

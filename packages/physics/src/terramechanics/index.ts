@@ -76,6 +76,19 @@ export interface LeggedSoilPatch {
 /** Mean pressure or force-normalized nodal stress and berm redistribution. */
 export type SoilContactTier = 'mean' | 'resolved';
 
+/** Projected contact geometry for the resolved tier. Zero depth leaves a gap between tread lugs. */
+export interface SoilContactProfile {
+  /** Vertex samples across the patch and along its forward direction, both including the two edges. */
+  readonly columns: number;
+  readonly rows: number;
+  /** Relative depth [0, 1], stored by across column, then forward row. */
+  readonly depth: ArrayLike<number>;
+  /** Total projected contact area inside the patch, m². */
+  readonly area: number;
+  /** Total outline length of the contacting components, m. */
+  readonly perimeter: number;
+}
+
 export interface TerramechanicsOptions {
   readonly id?: string;
   /** Read an external SOIL_LAYOUT F64 patch field, e.g. one returned by `soilPatchField`. */
@@ -96,6 +109,8 @@ export interface TerramechanicsParams {
   readonly inputRows?: number;
   /** Exact contact rows to reproduce as feet. Skip the torso rows. */
   readonly feet?: readonly LeggedSoilPatch[];
+  /** Optional shape for each response row in fixed, external, then foot order. Null uses its built-in shape. */
+  readonly profiles?: readonly (SoilContactProfile | null)[];
   /** Minimum elevation to excavate, m in the bed cell. Default no floor. Set the same uniform floor as TerrainBed. */
   readonly floor?: number;
   /** Distance between floating-origin cells, m. Default 4,096. */
@@ -177,6 +192,7 @@ export function wheelSoil(
 }
 
 type Patch = readonly [number, number, number, number, number, number, number, number, number, number];
+type ProfileSlot = Pick<SoilContactProfile, 'columns' | 'rows' | 'area' | 'perimeter'> & { region: Region };
 
 function packed(p: SoilPatch): Patch {
   return [
@@ -217,6 +233,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private response!: Region;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
+  private profiles: (ProfileSlot | null)[] = [];
   private inputRows = 0;
   private cell: Cell = CENTRE;
   private cellSize = 4096;
@@ -298,12 +315,18 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         'The legged contact options disagree. Enable legged input and provide zero-based contact rows together.',
       );
     const responses = this.fixed.length + this.inputRows + this.feet.length;
+    const profiles = parameters.profiles ?? [];
+    if (profiles.length && (!this.pressureField || profiles.length !== responses))
+      throw new MargoError(
+        'state',
+        'Soil profiles conflict with the solver layout. Use the resolved tier and supply one entry per response row.',
+      );
     this.change = new BedChange(host, this.terrain, 'soil-bed-change');
     const allocate = (name: string, words: number) => host.allocate(name, words * 8, 'f64', SOIL_LAYOUT);
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 18);
+    this.nativePatch = allocate('soil-patch-scratch', 21);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -311,6 +334,27 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.pressure = allocate('soil-pressure', count);
       this.workRegion = allocate('soil-work', 3);
     }
+    this.profiles = profiles.map((profile, row) => {
+      if (!profile) return null;
+      const { columns, rows, area, perimeter, depth } = profile;
+      const words = columns * rows;
+      if (![columns, rows, words].every(Number.isSafeInteger) || columns < 2 || rows < 2 || depth.length !== words)
+        throw new MargoError(
+          'state',
+          'Invalid soil profile grid. Provide at least two vertices per axis with matching depth data.',
+        );
+      positive(area, 'profile area');
+      positive(perimeter, 'profile perimeter');
+      const region = allocate(`soil-profile-${row}`, words);
+      const field = this.words(region);
+      for (let i = 0; i < words; i++) field[i] = finite(depth[i]!, 'profile depth', 0, 1);
+      if (!field.some((value) => value > 0))
+        throw new MargoError(
+          'state',
+          'A soil profile has no contact. Provide a positive depth for part of the footprint.',
+        );
+      return { columns, rows, area, perimeter, region };
+    });
     this.kernel = bindSoil(host, this.builds);
     this.words(this.areas).set(this.change.area);
   }
@@ -343,10 +387,19 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const material = this.material;
     const resolved = Boolean(this.pressure);
     const ellipse = Boolean(flags & 1);
-    const area = positive(width * length * (ellipse ? Math.PI / 4 : 1), 'contact area');
+    const profile = this.profiles[row];
+    if (profile && profile.area > length * width)
+      throw new MargoError(
+        'state',
+        'The profile area exceeds the contact bounds. Use its projected area in square metres inside the footprint.',
+      );
+    const area = positive(profile?.area ?? width * length * (ellipse ? Math.PI / 4 : 1), 'contact area');
     const pressure = positive(load / area, 'contact pressure');
+    const effectiveWidth = profile
+      ? (2 * profile.area) / profile.perimeter
+      : bearingWidth(length, width, ellipse, resolved);
     const stiffness = positive(
-      material.cohesiveModulus / bearingWidth(length, width, ellipse, resolved) + material.frictionalModulus,
+      material.cohesiveModulus / effectiveWidth + material.frictionalModulus,
       'effective stiffness at this footprint width',
     );
     const depth = finite(pow(pressure / stiffness, 1 / material.exponent), 'settlement', 0);
@@ -374,6 +427,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       load,
       stiffness,
       material.exponent,
+      profile?.region.byteOffset ?? 0,
+      profile?.columns ?? 0,
+      profile?.rows ?? 0,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -414,7 +470,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       const fz = -data[at + 8]!;
       const load = data[at + 7]!;
       const ellipse = foot.elliptical ? 1 : 0;
-      const area = foot.width * foot.length * (ellipse ? Math.PI / 4 : 1);
+      const area = this.profiles[start + i]?.area ?? foot.width * foot.length * (ellipse ? Math.PI / 4 : 1);
       const tangential = hypot(fx, fz);
       const maximum = this.material.cohesion * area + load * this.material.friction;
       const fraction = maximum > 0 ? Math.min(tangential / maximum, 1 - Number.EPSILON) : 0;
