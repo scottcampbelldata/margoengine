@@ -60,6 +60,11 @@ interface XRAnchor {
     delete(): void;
 }
 
+interface XRBodyLike {
+    readonly size: number;
+    get(joint: string): XRSpace | undefined;
+}
+
 class XRController {
     readonly source: XRInputSource;
     targetRay: XRPose | null;
@@ -117,6 +122,7 @@ interface XRNativeFrame {
     getViewerPose(space: XRSpace): XRViewerPose | null;
     getPose(space: XRSpace, relativeTo: XRSpace): XRPose | null;
     getJointPose?(space: XRSpace, relativeTo: XRSpace): XRPose | null;
+    readonly body?: XRBodyLike | null;
     getHitTestResults?(source: XRHitTestSource): readonly XRHitTestResult[];
     getHitTestResultsForTransientInput?(source: XRTransientInputHitTestSource): readonly XRTransientInputHitTestResult[];
 }

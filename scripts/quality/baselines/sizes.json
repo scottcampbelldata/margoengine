@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19356379,
+  "total": 19358136,
   "history": [
     {
       "date": "2026-10-24",
@@ -12639,6 +12639,12 @@
       "commit": "chore(sizes) water film clock",
       "reason": "Water on a film clock (WaterOptions.clock: tickFlow, settle, the ring of frame-uniform slices) and Ripples on it (each drop born at its due tick, the dyadic tick rate, the config buffers for later steps): water 34,601 to 34,733 and water/ripples 3,940 to 4,307, measured before and after on this Mac. The clock path is Water's own stepping and Ripples' own field, so it has nowhere smaller to live; the size rows were left out of the two commits that grew them.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7a5fc90bc",
+      "reason": "New optional entry @margoengine/xr/body (BodyTracking, 83 WebXR body joints, soft feature detection, humanoid bone mapping); no core change",
+      "grew": 1
     }
   ],
   "items": {
@@ -14264,6 +14270,7 @@
     "@margoengine/xr": 10245,
     "@margoengine/xr/ar": 2828,
     "@margoengine/xr/ar-extra": 3289,
+    "@margoengine/xr/body": 1757,
     "@margoengine/xr/device-check": 2344,
     "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,

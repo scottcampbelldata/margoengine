@@ -39,10 +39,17 @@ export interface XRNativeFrame {
   getViewerPose(space: XRSpace): XRViewerPose | null;
   getPose(space: XRSpace, relativeTo: XRSpace): XRPose | null;
   getJointPose?(space: XRSpace, relativeTo: XRSpace): XRPose | null;
+  /** WebXR Body Tracking Module (session feature 'body-tracking'): the tracked body, or null/absent without it. */
+  readonly body?: XRBodyLike | null;
   /** WebXR Hit Test Module: this frame's results for a hit test source, nearest first. */
   getHitTestResults?(source: XRHitTestSource): readonly XRHitTestResult[];
   /** WebXR Hit Test Module: this frame's results for a transient-input source, one entry per input source. */
   getHitTestResultsForTransientInput?(source: XRTransientInputHitTestSource): readonly XRTransientInputHitTestResult[];
+}
+/** WebXR Body Tracking Module: an XRBody, one tracked space per joint. */
+export interface XRBodyLike {
+  readonly size: number;
+  get(joint: string): XRSpace | undefined;
 }
 /** WebXR Hit Test Module: what the real world a ray is tested against. */
 export type XRHitTestTrackableType = 'point' | 'plane' | 'mesh';

@@ -194,6 +194,7 @@ export interface XRNativeFrame {
     getViewerPose(space: XRSpace): XRViewerPose | null;
     getPose(space: XRSpace, relativeTo: XRSpace): XRPose | null;
     getJointPose?(space: XRSpace, relativeTo: XRSpace): XRPose | null;
+    readonly body?: XRBodyLike | null;
     getHitTestResults?(source: XRHitTestSource): readonly XRHitTestResult[];
     getHitTestResultsForTransientInput?(source: XRTransientInputHitTestSource): readonly XRTransientInputHitTestResult[];
 }
@@ -323,6 +324,11 @@ export function createXREngine(canvas: HTMLCanvasElement, options?: Omit<EngineO
 export function useXRSession(manager: XR, mode?: XRMode, options?: XRSessionOptions): Promise<XRNativeSession>;
 
 // Not exported from this entry, but used by the exports above:
+
+interface XRBodyLike {
+    readonly size: number;
+    get(joint: string): XRSpace | undefined;
+}
 
 interface XREyeSceneDepth {
     readonly texture: GPUTexture;

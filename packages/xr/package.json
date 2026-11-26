@@ -96,6 +96,10 @@
       "types": "./dist/ar-extra.d.ts",
       "import": "./dist/ar-extra.js"
     },
+    "./body": {
+      "types": "./dist/body.d.ts",
+      "import": "./dist/body.js"
+    },
     "./performance": {
       "types": "./dist/performance.d.ts",
       "import": "./dist/performance.js"

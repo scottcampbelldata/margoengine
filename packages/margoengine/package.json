@@ -6363,6 +6363,10 @@
       "types": "./dist/xr/ar-extra.d.ts",
       "import": "./dist/xr/ar-extra.js"
     },
+    "./xr/body": {
+      "types": "./dist/xr/body.d.ts",
+      "import": "./dist/xr/body.js"
+    },
     "./xr/performance": {
       "types": "./dist/xr/performance.d.ts",
       "import": "./dist/xr/performance.js"

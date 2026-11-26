@@ -49,6 +49,11 @@ interface XRBinding {
     getReflectionCubeMap?(probe: object): GPUTexture | null;
 }
 
+interface XRBodyLike {
+    readonly size: number;
+    get(joint: string): XRSpace | undefined;
+}
+
 interface XREyeSceneDepth {
     readonly texture: GPUTexture;
     readonly projection: ArrayLike<number>;
@@ -124,6 +129,7 @@ interface XRNativeFrame {
     getViewerPose(space: XRSpace): XRViewerPose | null;
     getPose(space: XRSpace, relativeTo: XRSpace): XRPose | null;
     getJointPose?(space: XRSpace, relativeTo: XRSpace): XRPose | null;
+    readonly body?: XRBodyLike | null;
     getHitTestResults?(source: XRHitTestSource): readonly XRHitTestResult[];
     getHitTestResultsForTransientInput?(source: XRTransientInputHitTestSource): readonly XRTransientInputHitTestResult[];
 }

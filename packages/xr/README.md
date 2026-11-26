@@ -93,6 +93,36 @@ await xr.requestSession('immersive-ar', {
 hits = await HitTest.create(xr, { from: 'viewer' });
 ```
 
+## Body tracking
+
+`BodyTracking` from `@margoengine/xr/body` reads the W3C WebXR Body Tracking Module: all 83 `XRBodyJoint` poses (hips,
+spine, arms, hands, legs) in the session's reference space, every frame. Ask for the `'body-tracking'` feature as an
+optional feature; few devices have it. Without it, `BodyTracking.create` does not throw: `available` is `false` and
+`read` returns `null`. Pass `{ required: true }` for a MargoError `'unsupported'` instead. `read(frame)` also returns
+`null` while tracking is lost, as the spec reports every joint or none. `humanoidPose(pose)` maps the joints to the
+humanoid bone names of `@margoengine/rigging` (`hips`, `leftUpperArm`, `rightHand`, ...) for retargeting. Not yet tried on
+a device; tested against the specification's interfaces.
+
+```ts
+import { Engine } from 'margoengine/core';
+import { XR } from 'margoengine/xr';
+import { BodyTracking, humanoidPose } from 'margoengine/xr/body';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { backend: 'webgpu' });
+const xr = await XR.create(engine);
+let body: BodyTracking | undefined;
+await xr.requestSession('immersive-vr', {
+  optionalFeatures: ['body-tracking'],
+  onFrame({ frame }) {
+    const pose = body?.read(frame);
+    if (pose) console.log('head', pose.position('head'), 'bones', humanoidPose(pose).size);
+  },
+});
+body = BodyTracking.create(xr);
+if (!body.available) console.log('This device has no body tracking');
+```
+
 ## Device runs
 
 `runDeviceCheck` from `@margoengine/xr/device-check` runs one session and gives back what happened: frames, poses, views, frame times, inputs, granted features and failures. `examples/xr-device-check` is the page to open on a headset or phone; [docs/xr-device-runs](../../docs/xr-device-runs/README.md) keeps the records, and `npm run check:xr-runs` prints which routes a real device has proven. No real device has run yet: all four routes read NOT RUN. A run whose `navigator.xr` is a JavaScript stand-in has `native: false` and proves nothing.
