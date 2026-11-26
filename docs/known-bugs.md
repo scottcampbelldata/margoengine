@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
+
+- **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in
+  a shuffled order (as if its bodies had woken in that order); their bodies differed after 45 steps.
+- **Cause:** a step works through its lists in the order they were filled: the awake list in wake order (which numbered the
+  islands and ordered each island's bodies), the active pairs in the order they were found and swapped out. Gauss-Seidel
+  passes give different bits in a different order, so history the world does not hold as state decided its path, against
+  rule 4 of docs/physics-framework.md section 7 (iteration order never depends on allocation order).
+- **Fix:** at the start of every step and again after the island build's wake-ups, the awake list is put in body order and
+  the active pairs in the order of their colliders and parts (`canonical_lists`, a stable bottom-up merge sort through
+  scratch columns). Islands are numbered by their lowest body, and bodies, pairs and events come in row and collider order.
+- **Regression:** the test above (600 steps, three wake orders shuffled again every 50 steps, and a snapshot restored at step
+  300, bit for bit). The joint web's seed 1 now takes another path, on which its drivers do 1.7e12 J of work and a body
+  reaches 172 km/s with no energy gained; `a_web_of_joints_stays_in_the_numbers` bounded speeds at 1e5 m/s, a figure with
+  no derivation, and now bounds them by the range a step refuses past (RANGE), the energy ledger holding the physics.
 ### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
 - **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh

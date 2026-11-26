@@ -193,6 +193,7 @@ impl World {
         for sub in 8..self.timing.len() {
             self.timing[sub] = 0.0;
         }
+        self.canonical_lists();
         self.begin_step(dt);
         lap(self, 1);
         self.broad_update(dt);

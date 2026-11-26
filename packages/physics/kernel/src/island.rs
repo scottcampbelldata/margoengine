@@ -79,6 +79,61 @@ impl World {
         self.header_mut().awake = last;
     }
 
+    /// Sorts the first `count` entries of list column `list` by `less`, stably (a bottom-up merge sort through the scratch column
+    /// `temp`, which must hold `count` entries), and writes each entry's new place into its row of `slot`.
+    fn sort_list(&mut self, list: usize, slot: usize, temp: usize, count: usize, less: impl Fn(&World, u32, u32) -> bool) {
+        let (mut from, mut to) = (list, temp);
+        let mut width = 1;
+        while width < count {
+            let mut start = 0;
+            while start < count {
+                let middle = (start + width).min(count);
+                let end = (start + 2 * width).min(count);
+                let (mut i, mut j, mut k) = (start, middle, start);
+                while k < end {
+                    // Stable: the left run's entry goes first unless the right one is strictly less.
+                    let take_right = i >= middle || (j < end && less(self, self.uu(from, j), self.uu(from, i)));
+                    let entry = if take_right {
+                        j += 1;
+                        self.uu(from, j - 1)
+                    } else {
+                        i += 1;
+                        self.uu(from, i - 1)
+                    };
+                    self.set_u(to, k, entry);
+                    k += 1;
+                }
+                start = end;
+            }
+            core::mem::swap(&mut from, &mut to);
+            width *= 2;
+        }
+        if from != list {
+            for k in 0..count {
+                self.set_u(list, k, self.uu(from, k));
+            }
+        }
+        for k in 0..count {
+            self.set_u(slot, self.uu(list, k) as usize, k as u32);
+        }
+    }
+
+    /// Puts the awake list in body order and the active pairs in the order of their colliders and parts, so what a step does
+    /// in list order (finding pairs, numbering islands, solving, reporting events) depends on the world and not on the order in
+    /// which bodies woke and pairs were found. Islands are then numbered by their lowest body, and each island's bodies and
+    /// pairs come in row and collider order.
+    pub fn canonical_lists(&mut self) {
+        let awake = self.header().awake as usize;
+        // ISLAND_BODIES is free between the island builds; IMPACTS between the steps' substeps.
+        self.sort_list(AWAKE, AWAKE_SLOT, ISLAND_BODIES, awake, |_, a, b| a < b);
+        let pairs = self.header().active_pairs as usize;
+        let key = |w: &World, row: u32| {
+            let r = row as usize;
+            [w.uu(PAIR_A, r), w.uu(PAIR_B, r), w.uu(PAIR_PART, r), w.uu(PAIR_SUB, r), w.uu(PAIR_THIRD, r)]
+        };
+        self.sort_list(ACTIVE_PAIRS, PAIR_SLOT, IMPACTS, pairs, |w, a, b| key(w, a) < key(w, b));
+    }
+
     /// Puts a pair on the list of pairs a step looks at, with its parts.
     pub fn activate_pair(&mut self, row: u32) {
         self.list_pair(row);
@@ -301,6 +356,7 @@ impl World {
         }
         self.wake_across_joints();
         self.wake_across_couplings();
+        self.canonical_lists();
         let awake = self.header().awake as usize;
         for i in 0..awake {
             let body = self.uu(AWAKE, i);

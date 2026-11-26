@@ -245,7 +245,7 @@ Every solver must follow these rules. They are checked by tests, not by review a
    touches the same data (Blelloch et al. 2012).
 3. Reductions use fixed partitions that do not depend on the thread count, combined in a fixed tree order (Demmel and
    Nguyen 2015; Ahrens, Demmel and Nguyen 2020).
-4. Iteration order never depends on hashes, pointers or allocation order. Sorts are stable with total-order keys.
+4. Iteration order never depends on hashes, pointers or allocation order. Sorts are stable with total-order keys. (The rigid kernel puts its awake list and active pairs in row and collider order every step, 2026-11-26.)
 5. Random numbers are counter-based.
 6. Adaptive steps and iteration counts are functions of state.
 7. Threads: a static schedule over islands, colours or fixed chunks. Results are bit-identical at 0, 1, 2, 4 and 8
