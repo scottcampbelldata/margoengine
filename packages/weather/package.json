@@ -35,6 +35,10 @@
       "types": "./dist/hail.d.ts",
       "import": "./dist/hail.js"
     },
+    "./hail-physics": {
+      "types": "./dist/hail-physics.d.ts",
+      "import": "./dist/hail-physics.js"
+    },
     "./puddles": {
       "types": "./dist/puddles.d.ts",
       "import": "./dist/puddles.js"

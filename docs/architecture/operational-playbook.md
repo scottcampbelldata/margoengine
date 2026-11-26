@@ -9989,3 +9989,13 @@ a physical bank, a centreline with conserved transverse mass centroid, pectoral 
 ballast and a breach. It exercises the actual SEA-02 surface, actual LIFE-04 intent and kinematics, and
 identical replay across frame rates, snapshots and plain/shared memory. Wake and contact consumers use
 documented stand-ins while production sediment, wake and articulated contacts are still being integrated.
+
+### Section 5 evidence for light-bodies aerodynamics (AERO-05)
+
+The falling-body Wasm module integrates fixed-axis plates, fixed-axis blade strips and rounded grains in
+world-owned memory. The two kernel builds are layout-equivalent in slot 7 and use only arena state, local
+scratch and pinned math. The coupling suite checks closed-form trajectories and torque, APW motion regimes,
+mirrored winged-seed rotation, arbitrary fixed colliders, frame-rate independence, plain/shared equality and
+snapshots. Weather's PA-32 check follows measured hail speeds for two diameters. Its WebGPU fixture checks
+position-driven changes and pixel-identical replay of the physics source. The camera-centred render path also
+passes its existing hail assertions.

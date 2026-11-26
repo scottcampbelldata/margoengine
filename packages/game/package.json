@@ -2147,6 +2147,10 @@
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
     },
+    "./physics/falling": {
+      "types": "./dist/physics/falling.d.ts",
+      "import": "./dist/physics/falling.js"
+    },
     "./physics/flight": {
       "types": "./dist/physics/flight.d.ts",
       "import": "./dist/physics/flight.js"
@@ -2166,6 +2170,10 @@
     "./physics/celestial": {
       "types": "./dist/physics/celestial.d.ts",
       "import": "./dist/physics/celestial.js"
+    },
+    "./physics/life": {
+      "types": "./dist/physics/life.d.ts",
+      "import": "./dist/physics/life.js"
     },
     "./physics/schooling": {
       "types": "./dist/physics/schooling.d.ts",
@@ -3822,6 +3830,10 @@
     "./weather/hail": {
       "types": "./dist/weather/hail.d.ts",
       "import": "./dist/weather/hail.js"
+    },
+    "./weather/hail-physics": {
+      "types": "./dist/weather/hail-physics.d.ts",
+      "import": "./dist/weather/hail-physics.js"
     },
     "./weather/puddles": {
       "types": "./dist/weather/puddles.d.ts",

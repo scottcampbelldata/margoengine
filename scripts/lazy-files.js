@@ -15,6 +15,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/falling-kernel.wasm',
+    label: 'falling-kernel.wasm',
+    kind: 'Rust SIMD plate and grain dynamics',
+    measure: 'file',
+    when: 'FallingSolver.load() from the optional /falling entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/falling-kernel-shared.wasm',
+    label: 'falling-kernel-shared.wasm',
+    kind: 'Rust SIMD plate and grain dynamics, shared world memory',
+    measure: 'file',
+    when: 'FallingSolver.load() from the optional /falling entry with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/runoff-kernel.wasm',
     label: 'runoff-kernel.wasm',
     kind: 'Rust SIMD catchment runoff',

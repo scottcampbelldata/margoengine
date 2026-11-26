@@ -33,6 +33,9 @@ const checks = {
     assert.ok(r.lowCeiling > 0, 'a low ceiling still draws stones');
     assert.equal(r.zero, 0, 'intensity 0 draws nothing');
     assert.equal(r.afterDispose, 0, 'a disposed Hail leaves no trace');
+    assert.ok(r.physicalHail > 8, `world-stepped ice produces ${r.physicalHail} visible pixels`);
+    assert.ok(r.physicalMotion > 8, `the draw follows the world step in ${r.physicalMotion} pixels`);
+    assert.equal(r.physicalReplay, 0, 'restoring the world replays the same hail pixels');
     assert.ok(
       r.surface.cases >= 200 && r.surface.worst < 2e-5,
       `WGSL surface functions differ from JavaScript by ${r.surface.worst}`,

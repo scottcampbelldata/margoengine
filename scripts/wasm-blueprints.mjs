@@ -106,6 +106,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'falling-kernel',
+    crate: 'packages/physics/falling-kernel',
+    blueprint: 'packages/physics/src/falling/falling-kernel.wasm',
+    script: 'packages/physics/scripts/build-falling-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'falling-kernel-shared',
+    crate: 'packages/physics/falling-kernel',
+    blueprint: 'packages/physics/src/falling/falling-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-falling-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'school-kernel',
     crate: 'packages/physics/school-kernel',
     blueprint: 'packages/physics/src/schooling/school-kernel.wasm',

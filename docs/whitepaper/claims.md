@@ -5469,3 +5469,17 @@ before the hit. Plant sway displaces real pixels in regular and tiled scatter on
 Proof in [the coupling tests](../../packages/physics/tests/coupling/vegetation.test.js) and
 [the scatter browser test](../../packages/scatter/test/states.browser.mjs). See the [research record](../clean-room.md#rooted-plants-in-wind-and-water-margoenginephysicsvegetation-bio-01)
 and [engine limits](../limits.md#rooted-plant-mechanics-bio-01).
+
+### Flutter, tumbling and autorotation from aerodynamic loads (AERO-05)
+
+Plates reach the analytic broadside and edge-on speeds and reproduce the distinct flutter and tumble regimes
+of the Andersen–Pesavento–Wang Figure 3 parameter sweep. Winged seeds spin from release, and reversing blade
+pitch reverses their spin. Opposed strips match the exact quadratic spin-damping integral. Hailstones of
+different diameters have distinct terminal speeds and rebound from fixed rigid colliders. The world replays
+its state exactly, and restoring a snapshot reproduces the Hail source's WebGPU pixels.
+
+Proof in [the coupling fixtures](../../packages/physics/tests/coupling/falling.test.js),
+[the terminal hail fixture](../../packages/weather/tests/hail-physics.test.js), and
+[the hail browser fixture](../../packages/weather/tests/browser-check.mjs). Model scope is in
+[engine limits](../limits.md#falling-plates-winged-seeds-and-hail-aero-05) and the
+[clean-room record](../clean-room.md#falling-plates-winged-seeds-and-hail-aero-05).

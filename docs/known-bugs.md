@@ -16075,3 +16075,11 @@ that consumes the tail impulse. Reproduce the available source with
 `node --test packages/physics/tests/coupling/swim.test.js` after building Physics. The bed fixture reads the
 actual impulse using an analytic disk stand-in. The anemone fixture uses a contact wrench stand-in for BB-3.
 A rendered shot check remains open for each row in [physics-demo-review.md](physics-demo-review.md).
+
+## Fixed: world-stepped hail uses particle size and scene geometry (PA-32)
+
+Hail drawn by its camera-centred cycle used one fall speed and bounced from `groundY` regardless of the stone's
+size or surrounding geometry. `hailSphere` now converts the measured diameter and local-air terminal law to drag
+for each body, and `Hail` can draw poses from a falling-body solver. `fallingBoundaryFromPhysics` sweeps each sphere
+against fixed colliders. The two-diameter equilibrium fixture is in `packages/weather/tests/hail-physics.test.js`.
+The swept wall and raised platform fixtures are in `packages/physics/tests/coupling/falling.test.js`.

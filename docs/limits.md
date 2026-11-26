@@ -9031,3 +9031,26 @@ supply the true skin area if it differs materially from the ellipsoid. Skin defo
 ellipsoid-weighted centreline with a separate contact field for articulated segment loads.
 The optional JavaScript entry measures 7,286 B gzip. The plain and shared Wasm assets measure 6,410 B and 6,501 B raw. Shared memory and
 browser use require a runtime with Wasm SIMD. The ordinary page path loads plain Wasm.
+
+## Falling plates, winged seeds and hail (AERO-05)
+
+The plate model uses the 2005 Andersen, Pesavento and Wang quasi-steady coefficients for the intermediate-Re
+measurements (about 100–1,000). It represents an elliptical cross section, a fixed rotation axis and a separate
+spanwise drag term. The autorotating wing model resolves three translation axes and spin about a fixed axis.
+The authored wing strips have rigid pitch and coning is zero. Airflow is sampled once per body per world tick at
+the predicted midpoint. The fluid is prescribed and neither model reconstructs the shed wake.
+
+Sphere contact is one-way against fixed, nonsensor geometry. The swept chord approximates the curved path over
+one world tick, and contact applies normal restitution without a tangential friction law. Plates and seeds are
+airborne models. Shape casts and Hail drawing use float32 in their respective coordinate frames. The physics
+solver has f64 state and uses local dyadic RK4 substeps with a relative/absolute defect target of 1e-8.
+The kernel requires Wasm SIMD. Its plain and shared variants occupy static window slot 7, with per-instance stacks.
+
+The optional Hail source reads one 32-byte vertex-storage record per visible stone on WebGPU. The batch is
+created at setup. Supply a world-scale placement and advance the world before rendering. Camera-wrapped
+emission, chip splashes and collision-driven emission are independent effects. The world-stepped draw uses
+the supplied diameter, positions and velocities.
+
+The optional falling entry measures 6,259 B min+gzip. Each lazy Wasm build is 10,109 B,
+4,273 B gzip. The Hail overlay measures 5,443 B and its optional world adapter 1,056 B min+gzip.
+Core and stage remain at 24,820 B min+gzip combined.

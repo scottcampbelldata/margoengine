@@ -15,7 +15,7 @@ import { ParticleOverlay } from '../../shared/particle-overlay.js';
 import { viewSize } from '../../shared/view-rect.js';
 import { unitLight } from '../../shared/unit-light.js';
 
-declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
+declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type HailPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 
 /** Seconds an ice chip of a splash flies. */
@@ -23,6 +23,14 @@ export const SPLASH_SECONDS = 0.35;
 
 /** Gravity in metres per second squared, used for the bounces. */
 export const GRAVITY = 9.81;
+
+/** World-stepped hail for rendering, such as hailFromFalling from the hail-physics entry. */
+export interface HailSource {
+  /** Number of stones available in stable draw order. */
+  readonly count: number;
+  /** Writes each requested [x,y,z,radius,vx,vy,vz,0] row in rendering world coordinates. */
+  write(out: Float32Array): void;
+}
 
 /** Settings of a {@link Hail}, read every frame from `hail.options`. A value out of range throws RangeError, a wrong type TypeError. */
 export interface HailOptions {
@@ -40,6 +48,8 @@ export interface HailOptions {
   height?: number;
   /** Stones at intensity 1, 0..200,000. Default 6,000. */
   particles?: number;
+  /** World-stepped stones. Uses their positions, sizes and velocities in place of the camera-centred cycle and chips. */
+  source?: HailSource;
   /** Fall speed in metres per second, 5..60. Default 18. */
   fallSpeed?: number;
   /** Share of the speed kept after a bounce, 0..0.9. Default 0.2. */
@@ -63,7 +73,7 @@ export interface HailOptions {
   splashes?: number;
 }
 
-const shader = /* wgsl */ `
+const shaderHeader = /* wgsl */ `
 struct Hail {
  camera:mat4x4f, eye:vec4f, volume:vec4f, motion:vec4f, colour:vec4f, screen:vec4f, params:vec4f, extra:vec4f,
  light:vec4f, radiance:vec4f, ambient:vec4f, splash:vec4f,
@@ -83,6 +93,9 @@ fn place(start:vec2f,drift:f32)->vec3f {
 }
 @vertex fn vertex(@builtin(vertex_index) vi:u32,@builtin(instance_index) index:u32)->Out {
  let corner=corners[vi];
+`;
+
+const cameraTrajectories = /* wgsl */ `
  let size=h.volume.xyz;
  let ground=h.volume.w;
  let fall=h.motion.y;
@@ -143,6 +156,9 @@ fn place(start:vec2f,drift:f32)->vec3f {
   velocity=vec3f(h.motion.x*moving,vy,h.motion.z*moving);
   radius=h.screen.w*(0.6+0.8*rnd(ii,0u,3u));
  }
+`;
+
+const shaderTail = /* wgsl */ `
  let nearDistance=length(q-h.eye.xyz);
  let fade=(1.0-smoothstep(0.7,1.0,edge*2.0))*smoothstep(0.5,2.5,nearDistance)*life;
  let tail=q-velocity*h.extra.x;
@@ -190,6 +206,23 @@ fn place(start:vec2f,drift:f32)->vec3f {
  return vec4f(h.colour.rgb*shade,a);
 }`;
 
+const sourceHeader = /* wgsl */ `
+struct Stone {centre:vec4f,velocity:vec4f}
+@group(0) @binding(1) var<storage,read> stones:array<Stone>;
+`;
+const sourceTrajectories = /* wgsl */ `
+ let ii=index;
+ let p=stones[index];
+ let q=p.centre.xyz;
+ let radius=p.centre.w;
+ let velocity=p.velocity.xyz;
+ let edge=0.0;
+ let life=1.0;
+`;
+const shader = shaderHeader + cameraTrajectories + shaderTail;
+const sourceShader = sourceHeader + shaderHeader + sourceTrajectories + shaderTail;
+const STONE_WORDS = 8;
+
 const number = (value: unknown, name: string, min: number, max: number): void => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max)
     throw new RangeError(`Hail ${name} must be a number from ${min} to ${max}; pass a finite value in range`);
@@ -204,6 +237,10 @@ export function validateHail(o: HailOptions): void {
   if (o.groundY !== undefined) number(o.groundY, 'groundY', -1e6, 1e6);
   if (o.radius !== undefined) number(o.radius, 'radius', 2, 200);
   if (o.height !== undefined) number(o.height, 'height', 2, 200);
+  if (o.source !== undefined) {
+    if (typeof o.source?.write !== 'function' || !Number.isSafeInteger(o.source.count) || o.source.count < 0)
+      throw new TypeError('Invalid hail source. Provide a nonnegative integer count and a pose-buffer writer.');
+  }
   if (o.particles !== undefined) number(o.particles, 'particles', 0, 200000);
   if (o.fallSpeed !== undefined) number(o.fallSpeed, 'fallSpeed', 5, 60);
   if (o.restitution !== undefined) number(o.restitution, 'restitution', 0, 0.9);
@@ -273,6 +310,9 @@ export class Hail implements EnginePlugin {
   private readonly overlay = new ParticleOverlay();
   private engine?: Engine;
   private uniform?: GPUBuffer;
+  private stones?: GPUBuffer;
+  private stoneValues = new Float32Array(0);
+  private stoneBinding?: readonly { binding: number; resource: { buffer: GPUBuffer } }[];
   private readonly values = new Float32Array(60);
   private disposed = false;
   private clock = 0;
@@ -300,7 +340,7 @@ export class Hail implements EnginePlugin {
   }
   /** Stones drawn at the current amount. */
   get count(): number {
-    return Math.ceil((this.options.particles ?? 6000) * this.level);
+    return Math.ceil((this.options.source?.count ?? this.options.particles ?? 6000) * this.level);
   }
 
   /** Advances time and the amount by `delta` seconds (the engine calls this each frame). */
@@ -409,7 +449,8 @@ export class Hail implements EnginePlugin {
     v[43] = (o.lit ?? true) ? 1 : 0;
     // Lit stones take the scene's light: core's sun direction and strength, its colour, the ambient strength and colour.
     const light = this.engine?.lighting,
-      chips = o.splashes ?? 4;
+      source = o.source,
+      chips = source ? 0 : (o.splashes ?? 4);
     unitLight(v, 44, light?.direction ?? [3, 5, 4, 3]);
     v.set(light?.radiance ?? [1, 1, 1, 0.15], 48);
     v.set(light?.ambient ?? [1, 1, 1], 52);
@@ -418,12 +459,44 @@ export class Hail implements EnginePlugin {
     v[57] = chips;
     v[58] = SPLASH_SECONDS;
     v[59] = 0;
-    this.overlay.draw(c, shader, this.uniform!, v as Float32Array<ArrayBuffer>, count * (1 + chips));
+    if (source) {
+      this.uploadStones(c.device, source, count);
+      this.overlay.draw(c, sourceShader, this.uniform!, v, count, this.stoneBinding);
+    } else this.overlay.draw(c, shader, this.uniform!, v, count * (1 + chips));
+  }
+
+  private uploadStones(device: GPUDevice, source: HailSource, count: number): void {
+    const length = source.count * STONE_WORDS;
+    const bytes = length * Float32Array.BYTES_PER_ELEMENT;
+    if (bytes > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize))
+      throw new MargoError(
+        'unsupported',
+        'The hail source exceeds the GPU storage limit. Reduce the number of simulated stones.',
+      );
+    if (!this.stones || this.stoneValues.length < length) {
+      const values = new Float32Array(length);
+      const buffer = device.createBuffer({ size: bytes, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+      const previous = this.stones;
+      if (previous) {
+        const destroy = () => previous.destroy();
+        void device.queue.onSubmittedWorkDone().then(destroy, destroy);
+      }
+      this.stones = buffer;
+      this.stoneValues = values;
+      this.stoneBinding = [{ binding: 1, resource: { buffer } }];
+    }
+    const active = this.stoneValues.subarray(0, count * STONE_WORDS);
+    source.write(active);
+    device.queue.writeBuffer(this.stones, 0, active);
   }
 
   private release(): void {
     this.uniform?.destroy();
     this.uniform = undefined;
+    this.stones?.destroy();
+    this.stones = undefined;
+    this.stoneValues = new Float32Array(0);
+    this.stoneBinding = undefined;
     this.overlay.release();
   }
 

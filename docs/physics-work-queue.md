@@ -80,6 +80,10 @@ there, add a line below with the solver ID and what is needed, and build against
   drainage and steam (kg/s), and absorbed heat (W). ICE-05 publishes its current layouts through
   `@margoengine/physics/ice`. A staggered test uses the same layout for EARTH-10 forcing and feedback.
 
+- **AERO-05.** Reserve static module slot 7. Expose a canonical swept-shape boundary query with
+  moving-surface velocity and corresponding rigid impulse points. Expose the world's cell size through
+  SolverHost. The falling entry uses a pure, fixed-scene swept-sphere adapter and an explicit cell size.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.

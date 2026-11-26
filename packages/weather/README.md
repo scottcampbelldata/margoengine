@@ -873,6 +873,47 @@ console.log(grassWind([0, 10])); // { windDirection: [0, 1], windStrength: 0.5, 
 
 Stones are lit (`lit`, default true) as small ice balls by the engine's light (`engine.lighting`: the sun's direction, strength and colour, and the ambient light): Lambert diffuse on the side toward the sun, a glint of it, and the far side in the stone's own shadow, lit only by the ambient; `lit: false` keeps the flat `color`. Where a stone first lands, `splashes` ice chips (4, at most 8) burst out at 0.6 to 1.8 m/s and 1 to 2.5 m/s upward and fall back under gravity, fading over `SPLASH_SECONDS` (0.35 s); like the stones they are a closed-form function of time, drawn in the same instanced draw. `stoneState(tau, options)` is the same height and speed formula in JavaScript. Without an engine, `new Hail(options)` and `update(delta)` still ease `amount`.
 
+### Hail from a physics world
+
+Set `Hail`'s `source` to draw world-stepped stones. `hailSphere` supplies the measured size-dependent
+fall law for the local air. Add the scene's fixed colliders to the same coordinate frame as the
+solver, then use `fallingBoundaryFromPhysics` to make the stones sweep and rebound off that geometry.
+`hailFromFalling` supplies the positions, velocities and actual radii to the WebGPU draw. The world
+owns the time, so seeking restores the stones. The world-stepped path draws a fixed batch without
+camera-centred recycling or procedural splash chips.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { FallingSolver, fallingBoundaryFromPhysics } from '@margoengine/physics/falling';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Hail } from '@margoengine/weather/hail';
+import { hailFromFalling, hailSphere } from '@margoengine/weather/hail-physics';
+
+await Physics.load();
+using scene = new Physics(null);
+scene.addBody(null, {
+  type: 'fixed', position: [0, 0.5, 0],
+  colliders: { shape: 'box', halfExtents: [1, 0.5, 1] },
+});
+const falling = await FallingSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(falling, {
+  bodies: [
+    hailSphere({ diameter: 0.012, position: [-0.2, 3, 0] }),
+    hailSphere({ diameter: 0.046, position: [0.2, 3, 0] }),
+  ],
+  boundary: fallingBoundaryFromPhysics(scene),
+});
+const source = hailFromFalling(falling);
+using hail = new Hail({ source, intensity: 1, fadeSeconds: 0 });
+world.advance(60);
+hail.update(0);
+console.log(hail.count, falling.pose(0).position);
+```
+
+On a WebGPU engine, use `Hail.attach(engine, { source })` with that source. Advance the world to the
+desired film frame before rendering.
+
 ## Rain on the lens
 
 `LensDrops.attach(engine, options)` (from `margoengine/weather/lens`, WebGPU or the WebGL2 compatibility layer, needs `@margoengine/post`) refracts drops and downward streaks over the finished picture as a stage of the scene's `PostStack`. A scene that already has a `PostStack` (bloom, water, a camera effect) gets the lens as one more HDR stage, after its last HDR effect; a scene without one gets a stack that goes when the lens does. `lens.dispose()` takes the lens out of the stack. Options: `wetness` (0 to 1, default 0.6), `radius`, `speed`, `distortion`, `streaks`, `seed`, `enabled` and `time`.

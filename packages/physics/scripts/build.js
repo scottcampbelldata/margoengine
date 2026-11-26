@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -49,6 +49,7 @@ await build({
         world: resolve(root, 'src/world/index.ts'),
         earth: resolve(root, 'src/earth/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
+        falling: resolve(root, 'src/falling.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
         sea: resolve(root, 'src/sea/index.ts'),
@@ -87,6 +88,9 @@ await copyFile(resolve(root, 'src/runoff/runoff-kernel.wasm'), resolve(dist, 'ru
 await copyFile(resolve(root, 'src/runoff/runoff-kernel-shared.wasm'), resolve(dist, 'runoff-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/vegetation-kernel.wasm'), resolve(dist, 'vegetation-kernel.wasm'));
 await copyFile(resolve(root, 'src/vegetation-kernel-shared.wasm'), resolve(dist, 'vegetation-kernel-shared.wasm'));
+
+for (const name of ['falling-kernel.wasm', 'falling-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/falling', name), resolve(dist, name));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

@@ -5,6 +5,9 @@
 import {Engine,PbrMaterial,box} from '/packages/core/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
 import {Hail} from '/packages/weather/dist/hail.js';
+import {hailFromFalling,hailSphere} from '/packages/weather/dist/hail-physics.js';
+import {FallingSolver} from '/packages/physics/dist/falling.js';
+import {PhysicsWorld} from '/packages/physics/dist/world.js';
 import {surfaceResponse,surfaceWGSL} from '/packages/weather/dist/index.js';
 const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,3,12],target:[0,1,-20],near:0.1,far:400}}),device=engine.gpu,errors=[];
 device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
@@ -68,6 +71,22 @@ window.check={
   let nearGround=0;const W=post.sceneTexture.width;for(let p=0;p<plain.length;p+=4)if(Math.abs(plain[p]-chips[p])+Math.abs(plain[p+1]-chips[p+1])+Math.abs(plain[p+2]-chips[p+2])>1e-4&&Math.floor(p/4/W)>post.sceneTexture.height*0.45)nearGround++;
   out.splashLow=nearGround;
   hail.dispose();await shot();out.afterDispose=changed(clear,await shot());
+  const fall=await FallingSolver.load(),world=new PhysicsWorld({rate:{num:60,den:1}});
+  const stones=Array.from({length:12},(_,i)=>hailSphere({
+   diameter:0.03+0.004*i, position:[(i-5.5)*0.12,2+i%3*0.18,8], velocity:[0.6,0,0],
+  }));
+  world.add(fall,{bodies:stones});
+  const simulated=Hail.attach(engine,{source:hailFromFalling(fall),intensity:1,fadeSeconds:0,brightness:3});
+  const initial=world.takeSnapshot(),first=await shot(0);
+  world.advance(12);
+  const moved=await shot(0);
+  world.restoreSnapshot(initial.bytes);
+  const replay=await shot(0);
+  simulated.dispose();
+  const cleared=await shot(0);
+  out.physicalHail=changed(cleared,first);
+  out.physicalMotion=changed(first,moved);
+  out.physicalReplay=changed(first,replay);
   out.surface=await surface();
   const error=await device.popErrorScope();
   out.validation=error?.message??null;out.errors=errors.splice(0);

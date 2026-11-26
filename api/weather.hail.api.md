@@ -36,6 +36,7 @@ export interface HailOptions {
     radius?: number;
     height?: number;
     particles?: number;
+    source?: HailSource;
     fallSpeed?: number;
     restitution?: number;
     stoneRadius?: number;
@@ -45,6 +46,11 @@ export interface HailOptions {
     seed?: number;
     lit?: boolean;
     splashes?: number;
+}
+
+export interface HailSource {
+    readonly count: number;
+    write(out: Float32Array): void;
 }
 
 export const SPLASH_SECONDS = 0.35;

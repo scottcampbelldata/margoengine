@@ -12644,3 +12644,61 @@ The kernel uses Rust SIMD for vector products and square roots, a unit-quaternio
 world-owned f64 rows. Wasm exports the exact opposite of the propulsive and fin impulses to the wake port.
 The kernel and bindings were written from the cited equations. The sampling and memory contract come from
 Margo Engine's own field and solver specifications.
+
+## Falling plates, winged seeds and hail (AERO-05)
+
+- Anders Andersen, Umberto Pesavento and Z. Jane Wang, *Analysis of transitions between fluttering,
+  tumbling and steady descent of falling cards* (2005), [doi:10.1017/S0022112005005847](https://doi.org/10.1017/S0022112005005847).
+  Equations 3.1–3.9 give the elliptical plate's mass, added mass and moment of inertia, buoyant
+  weight, Kirchhoff cross terms, translational and rotational circulation, drag and dissipative pitch
+  moment. Transform the equations to the fixed flight plane. Its acceleration has the difference
+  of the two added masses in the rotating-basis terms. The defaults are the paper's §5.2 coefficients
+  for its Figure 3 sweep. Along the span a separate drag term acts on the cross-sectional area.
+- Anders Andersen, Umberto Pesavento and Z. Jane Wang, *Unsteady aerodynamics of fluttering and
+  tumbling plates* (2005), [doi:10.1017/S002211200500594X](https://doi.org/10.1017/S002211200500594X).
+  Its measurements motivate a circulation term proportional to angular velocity. Andrew Belmonte,
+  Hagai Eisenberg and Elisha Moses, *From Flutter to Tumble: Inertial Drag and Froude Similarity
+  in Falling Paper* (1998), [doi:10.1103/PhysRevLett.81.345](https://doi.org/10.1103/PhysRevLett.81.345),
+  gives a separate falling-paper experiment. The observed transition depends on the geometry and
+  setup. The solver advances the equations for every plate throughout its fall.
+- David Lentink, William B. Dickson, Johan L. van Leeuwen and Michael H. Dickinson, *Leading-Edge
+  Vortices Elevate Lift of Autorotating Plant Seeds* (2009),
+  [doi:10.1126/science.1174196](https://doi.org/10.1126/science.1174196), observed the attached
+  vortex of rotating seeds. Djamel Rezgui, Ignacio Hernández Arroyo and Raf Theunissen,
+  *Model for Sectional Leading-Edge Vortex Lift for the Prediction of Rotating Samara Seeds
+  Performance* (2020), [doi:10.1017/aer.2020.25](https://doi.org/10.1017/aer.2020.25), Eqs. 7, 11–18
+  and 20–23 and Table 1, supply the velocity triangles, polar, literature coefficients, elemental
+  thrust and torque. Project body motion onto each strip's tangent and the spin axis. The signed
+  extension of the polar uses absolute sine and cosine inside the normal coefficient and a signed
+  `sin(alpha) cos(alpha)` multiplier. Its pressure drag cancels the cosine in `CL tan(alpha)`.
+  The kernel sums the strip forces and axial moments and advances the body's velocity and spin.
+  Jonathan McConnell and Tuhin Das, *Reduced Order Modeling of an Autorotating Samara for
+  Steady-State and Dynamic Analysis* (2022), [doi:10.1016/j.ifacol.2022.11.163](https://doi.org/10.1016/j.ifacol.2022.11.163),
+  discusses time integration of blade torques and lift and the effect of degrees of freedom removed.
+- Frank W. J. Olver et al., NIST DLMF [§3.5(v)](https://dlmf.nist.gov/3.5.v) gives Gauss–Legendre
+  quadrature. Three nodes exactly integrate the cubic radius moment in the opposed-blade
+  test. Ernst Hairer, Syvert P. Nørsett and Gerhard Wanner, *Solving Ordinary Differential
+  Equations I*, 2nd ed. (1993), [doi:10.1007/978-3-540-78862-1](https://doi.org/10.1007/978-3-540-78862-1),
+  describes explicit Runge–Kutta methods and extrapolation. RK4 step doubling uses a local
+  error estimate of the full/half step difference divided by 15. Both accepted half steps advance
+  the state. World and inner subdivisions are dyadic.
+- Wouter Terra, Andrea Sciacchitano and Fulvio Scarano,
+  *Aerodynamic drag of a transiting sphere by large-scale tomographic-PIV* (2017),
+  [doi:10.1007/s00348-017-2331-0](https://doi.org/10.1007/s00348-017-2331-0), report `Cd=0.47` for
+  their sphere at `Re≈10,000`. It is a rounded-grain default. Andrew Heymsfield and Robert Wright,
+  *Graupel and Hail Terminal Velocities: Does a “Supercritical” Reynolds Number Apply?* (2014),
+  [doi:10.1175/JAS-D-14-0034.1](https://doi.org/10.1175/JAS-D-14-0034.1), Eqs. 5 and 6,
+  supply precipitation's local air and size law. Equating quadratic drag to buoyant weight
+  at that terminal speed gives `Cd = 4 D (rhoIce - rhoAir) g / (3 rhoAir Vt²)`.
+- Gino van den Bergen, *Ray Casting against General Convex Objects with Application to Continuous
+  Collision Detection* (2004), [author presentation references](https://media.gdcvault.com/gdc2012/slides/Programming%20Track/Vincent_ROBERT_Track_ADifferentApproach.pdf), gives the conservative advancement underlying the rigid scene's
+  sweep. A contact against fixed geometry reverses the inward normal component by the
+  restitution coefficient, leaving the tangent component unchanged. Rigid geometry is queried
+  through an adapter. The solver also accepts a pure swept-sphere boundary for analytic tests.
+- W3C GPU Working Group, [*WebGPU Shading Language*, storage buffers](https://www.w3.org/TR/WGSL/#storage-address-space).
+  The Hail vertex shader reads two f32 vectors per rendered stone. Their pose comes from the world
+  clock. The existing ribbon lighting and depth tests apply at the actual position.
+
+The solver and its tests were written from equations and specifications. The APW flutter/tumble
+pair, exact grain and plate solutions, cubic blade moment, rigid wall and platform contacts,
+frame-rate and snapshot equality, and physical hail GPU replay are exercised by focused fixtures.

@@ -2583,3 +2583,45 @@ the published step. Use `fields` to name separate ports for different groups.
 `SwimSolver.load({ id, level, signal })` accepts a solver id (default `swim`), preferred level (default 0)
 and load cancellation. The world raises the rate to resolve the stroke or angular motion. The entry loads its
 own Wasm on demand and uses either plain or shared world memory.
+
+## Falling light bodies
+
+Use `@margoengine/physics/falling` for rigid paper, dry leaves, ash flakes, plate-like snow and feathers,
+autorotating seeds, and round grains. Each body advances at the same world time, with adaptive dyadic Runge–Kutta
+substeps inside each tick. Densities and velocities are in SI units.
+
+```js
+import { FallingSolver } from '@margoengine/physics/falling';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const falling = await FallingSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(falling, {
+  bodies: [
+    { kind: 'plate', mass: 0.006, chord: 0.1, span: 0.25, position: [0, 4, 0], angle: 0.18 },
+    {
+      kind: 'samara', mass: 0.0001, spinInertia: 1.35e-8, position: [1, 4, 0],
+      sections: [{ start: 0, end: 0.0368, chord: 0.0084 }],
+    },
+  ],
+});
+world.advance(60);
+console.log(falling.pose(0), falling.pose(1));
+```
+
+Plates have a fixed pitch-axis direction (default +Z). A tilted release allows the pressure and torque
+to develop flutter or tumble. Specify chord, span, mass and thickness, and optionally override the
+elliptical-section pitch inertia and the published lift and drag coefficients. Samaras orbit their
+fixed spin axis with loads integrated over their radial strips. Each strip has an inner and outer
+radius, chord, pitch and azimuth. The default pitch is −7°. The spin axis defaults to opposite gravity.
+A rounded body specifies a diameter, mass and drag coefficient or local drag law. Supply a
+`FallingBoundary` to give rounded bodies static scene contact. `fallingBoundaryFromPhysics` adapts a
+scene's fixed, nonsensor colliders.
+
+Pass a `Wind` and use `cellSize: world.cellSize` with a custom world cell size. With no wind source,
+the solver uses motionless standard sea-level air. A wind with zero density gives a vacuum.
+`FallingSolver.load({ id, rate, signal })` loads the Wasm on demand. Rate 2 (240 Hz) is the default.
+`falling.poseField` publishes layout-1 f64 rows in input order, in the solver's origin cell.
+Each row holds position xyz, quaternion xyzw, linear velocity xyz and angular velocity xyz.
+`falling.pose(index)` copies a row. `writeSpheres` writes the positions, radii and velocities of rounded
+bodies to a supplied f32 draw buffer in their original order.
