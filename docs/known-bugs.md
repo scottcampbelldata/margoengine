@@ -17322,7 +17322,7 @@ and airborne secondary-drop transport are separate atmosphere and surface-wave w
 The thin-film precursor model supplies an equilibrium contact angle and advancing and receding
 thresholds. Independent measurements of partially wetting slip and absolute radius history
 remain open. A translating or turning tray absorbs drops and receives their normal recoil.
-Tray-edge contact and secondary splash drops remain open.
+The optional edge sweep catches contact on the wet boundary. Secondary splash drops remain open.
 The reversed-gravity film test reproduces the growth of a long underside disturbance.
 A configured circular sill now publishes timed detached drops. Finite depth columns still require
 a separate free-surface representation to pinch off a drop away from a rim.

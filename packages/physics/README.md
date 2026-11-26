@@ -5529,6 +5529,9 @@ layout-2 f64 rows. After the five ordinary impact words come the contact normal 
 world-space contact lever arm XYZ from the rigid centre. The receiving film uses those values
 to apply normal recoil and its moment at the instant of contact. Keep the flight and receiving
 film in the same origin cell for their patch-local records.
+Set `captureEdges: true` on a swept receiver to catch a sphere that reaches a wet edge
+or corner while its centre stays outside the UV rectangle. Deposition uses the nearest
+wet point, and recoil follows the radial contact normal. The default sweeps the face.
 An absorbing film mounted on a rigid body can use `impactRecoil: true` to send each impulse and
 its torque to the mount. This is off by default. Use either the mount or a wake as the impact
 momentum receiver.

@@ -15503,6 +15503,12 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   poses. The receiver transforms the hit back into its UV coordinates and publishes the
   relative inward speed for the normal recoil. Save the prior rigid pose in the flight
   snapshot to replay a sweep including fractional births.
+  Section 5.5.6 motivates the rounded collision region of a bounded wet surface. For
+  optional edge capture, calculate the closest point on the local rectangle and find
+  the zero of squared distance minus sphere radius squared. Its derivative is continuous
+  across the face–edge and edge–corner transitions. Bound its curvature using the
+  sphere's body-relative speed and acceleration over the interval. Use the closest wet
+  point for deposition and the radial contact normal for recoil on the liquid side.
   [Publisher](https://shop.elsevier.com/books/real-time-collision-detection/ericson/978-1-55860-732-3)
 - Joan Solà, “Quaternion kinematics for the error-state Kalman filter” (2017), Eq. 203.
   Interpolate the two orientations with the normalized shortest chord and use

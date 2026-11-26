@@ -26,6 +26,8 @@ export interface ThinFilmDropReceiver {
   readonly bodyRow?: number;
   /** Follow the mount's orientation and publish layout-2 impacts. Defaults to false. */
   readonly followRotation?: boolean;
+  /** Include the rectangle's wet edges and corners in the sphere sweep. Requires followRotation. Defaults to false. */
+  readonly captureEdges?: boolean;
 }
 
 /** An impact row, f64: u, v, footprint radius, water volume, inward normal speed. Zero volume marks an unused row. */
@@ -44,6 +46,7 @@ interface PreparedReceiver {
   readonly cell: V3;
   readonly bodyRow?: number;
   readonly followsRotation: boolean;
+  readonly capturesEdges: boolean;
 }
 
 export interface ReceiverSweep {
@@ -90,6 +93,8 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
     throw new RangeError('Invalid mounted drop receiver. Use a live body row and omit the plane origin cell.');
   if (opts.followRotation && bodyRow === undefined)
     throw new RangeError('Rotating drop receiver has no mount. Supply the receiving film body row.');
+  if (opts.captureEdges && !opts.followRotation)
+    throw new RangeError('Wet edge capture needs a swept contact frame. Enable followRotation on the receiver.');
   return {
     origin: [...opts.origin],
     size: [opts.size[0]!, opts.size[1]!],
@@ -99,6 +104,7 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
     cell: [cell[0]!, cell[1]!, cell[2]!],
     bodyRow,
     followsRotation: opts.followRotation ?? false,
+    capturesEdges: opts.captureEdges ?? false,
   };
 }
 

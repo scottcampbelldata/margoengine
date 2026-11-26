@@ -9659,8 +9659,8 @@ follows the linear translation between consecutive rigid poses and sends relativ
 momentum to its mounted film. The default holds orientation fixed. `followRotation` uses
 the normalized shortest chord of the sampled orientations and sends the contact normal
 and lever arm. The endpoint poses represent at most a half-turn of rotation between samples.
-Contact covers the liquid face inside its UV bounds. Tray edges, splashing, rebound, satellite
-breakup and free pinch-off away from a configured outlet remain open.
+`captureEdges` includes the wet rectangle's edges and corners on its liquid side.
+Splashing, rebound, satellite breakup and free pinch-off away from a configured outlet remain open.
 [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
 The optional `hydrostaticLoad` adds the film's normal gravitational force and moment to
 its rigid mount. The coupled test checks both a supported tray and an off-centre underside
@@ -9677,7 +9677,7 @@ uses spherical drop geometry. It compares the same rigid pose with each liquid m
 hidden in turn. Interior camera attachment, full layered water–glass optics and production
 shot review remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-The optional thin-film entry is 15,615 B gzip with a 16,084 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 15,912 B gzip with a 16,084 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

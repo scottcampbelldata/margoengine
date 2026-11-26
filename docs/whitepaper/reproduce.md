@@ -4585,6 +4585,12 @@ tray. The registered normal and lever arm determine all six recoil components, a
 world replays the pulse after restore. A separate rigid swing catches a turning drop while
 both endpoints are clear, and an independent vacuum trajectory verifies its UV location.
 
+Run `node --test --test-name-pattern="bounded wet tray" packages/physics/tests/coupling/thin-film.test.js`.
+The closed-form edge and corner normal components come from a sphere radius and the
+horizontal offset from the nearest wet point. The body receives their radial impulses
+with the corresponding wet points receiving the conserved volumes. Separate drops pass
+outside the swept radius and approach from the back side.
+
 ### FLUID-07 moving window render
 
 With the packages built, run `npm run test:browser:thin-film -w @margoengine/physics`.

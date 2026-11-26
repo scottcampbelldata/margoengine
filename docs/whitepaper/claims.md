@@ -6262,6 +6262,11 @@ force and torque components use the normal and lever arm there. A separate accel
 drop crosses and clears the turning plane between step endpoints. The true first contact
 still deposits its volume once. [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+A bounded wet tray catches a sphere on its edge and another on its corner. Their
+centres remain outside the UV rectangle. The published normal and rigid recoil
+agree with the exact radial contact, and the outside and back-side controls remain in flight.
+[Reproduce](reproduce.md#fluid-07-circular-sill-drops)
+
 ### FLUID-07 mounted film weight
 
 A mounted patch puts its integrated normal water weight and moment on the rigid body's

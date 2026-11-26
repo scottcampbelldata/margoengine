@@ -87,6 +87,7 @@ export interface ThinFilmDropReceiver {
     readonly cell?: readonly [number, number, number];
     readonly bodyRow?: number;
     readonly followRotation?: boolean;
+    readonly captureEdges?: boolean;
 }
 
 export interface ThinFilmFlyingDrop {

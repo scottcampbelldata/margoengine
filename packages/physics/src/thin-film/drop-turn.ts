@@ -24,6 +24,7 @@ interface LocalPlane {
   readonly n: Vec3;
   readonly cell: Vec3;
   readonly size: readonly [number, number];
+  readonly capturesEdges: boolean;
 }
 
 interface Clearance {
@@ -33,6 +34,23 @@ interface Clearance {
   readonly normal: Vec3;
   readonly relative: Vec3;
   readonly orientation: Orientation;
+  readonly edge?: RectangleContact;
+}
+
+interface RectangleContact {
+  readonly u: number;
+  readonly v: number;
+  readonly lever: Vec3;
+  readonly separation: Vec3;
+  readonly front: boolean;
+}
+
+function rectangleContact(plane: LocalPlane, relative: Vec3, orientation: Orientation): RectangleContact {
+  const local = sub(rotateByQuaternion(relative, conjugateQuaternion(orientation)), plane.origin);
+  const u = Math.min(plane.size[0], Math.max(0, dot(local, plane.u)));
+  const v = Math.min(plane.size[1], Math.max(0, dot(local, plane.v)));
+  const lever = rotateByQuaternion(add(add(plane.origin, scale(plane.u, u)), scale(plane.v, v)), orientation);
+  return { u, v, lever, separation: sub(relative, lever), front: dot(local, plane.n) >= 0 };
 }
 
 /** The shortest normalized chord between unit endpoint quaternions. */
@@ -137,8 +155,19 @@ export function turningImpact(
   const accelerationBound =
     Math.abs(dot(initialNormal, acceleration)) +
     Math.min(2 * normalSwing, normalSpeed * turn.step) * hypot(...cross(axis, acceleration));
-  const curvatureBound = accelerationBound + 2 * normalSpeed * lateralSpeed + normalAcceleration * lateralDisplacement;
-  if (!Number.isFinite(curvatureBound + displacement))
+  let curvatureBound = accelerationBound + 2 * normalSpeed * lateralSpeed + normalAcceleration * lateralDisplacement;
+  let roundoffScale = displacement + Math.abs(offset);
+  if (plane.capturesEdges) {
+    // Distance to a fixed rectangle is 1-Lipschitz in its local frame. The squared distance has a
+    // continuous derivative where the closest point crosses from face to edge or from edge to corner.
+    const relativeSpeed = velocityBound + spin * lateralDisplacement;
+    const relativeAcceleration =
+      hypot(...acceleration) + 2 * spin * lateralSpeed + (turn.accelerationBound + spin * spin) * lateralDisplacement;
+    const rectangleDistance = displacement + receiverReach;
+    curvatureBound = 2 * (relativeSpeed * relativeSpeed + rectangleDistance * relativeAcceleration);
+    roundoffScale = rectangleDistance * rectangleDistance;
+  }
+  if (!Number.isFinite(curvatureBound + roundoffScale))
     throw new RangeError('The turning film sweep exceeds numeric range. Use finite scales and relative speeds.');
   function read(time: number): Clearance {
     const phase = (elapsed + time) / turn.step;
@@ -154,10 +183,23 @@ export function turningImpact(
     const omega = scale(turn.rateVector, 1 / normSquared);
     const [, i1, i2] = dragIntegrals(drag, time);
     const relative = add(add(position, scale(velocity, time)), scale(acceleration, i2));
-    const speed = dot(normal, sub(add(velocity, scale(acceleration, i1)), cross(omega, relative)));
+    const relativeVelocity = sub(add(velocity, scale(acceleration, i1)), cross(omega, relative));
+    if (plane.capturesEdges) {
+      const edge = rectangleContact(plane, relative, orientation);
+      const height = dot(edge.separation, edge.separation) - radius * radius;
+      const speed = 2 * dot(edge.separation, relativeVelocity);
+      return { time, height, speed, normal, relative, orientation, edge };
+    }
+    const speed = dot(normal, relativeVelocity);
     return { time, height: dot(normal, relative) - offset, speed, normal, relative, orientation };
   }
-  return approach(read, interval, curvatureBound, displacement + Math.abs(offset), (hit) => {
+  return approach(read, interval, curvatureBound, roundoffScale, (hit) => {
+    if (hit.edge) {
+      const { u, v, lever, separation, front } = hit.edge;
+      const length = hypot(...separation);
+      if (!front || length === 0) return undefined;
+      return [u, v, radius, drop[at + 6]!, -hit.speed / (2 * length), ...scale(separation, 1 / length), ...lever];
+    }
     const lever = sub(hit.relative, scale(hit.normal, radius));
     const local = sub(rotateByQuaternion(lever, conjugateQuaternion(hit.orientation)), plane.origin);
     const u = dot(plane.u, local);
