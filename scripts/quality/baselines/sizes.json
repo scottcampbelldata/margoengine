@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20317716,
+  "total": 20327680,
   "history": [
     {
       "date": "2026-10-24",
@@ -13035,6 +13035,12 @@
       "commit": "959964ae8",
       "reason": "physics/loads is a new optional entry (SEA-12): LoadSolver (buoyancy, Froude-Krylov, implicit added mass, Morison members with vortex shedding, drag and windage on compact bodies, current, race and flood loads), the DNV-RP-C205 coefficients, Lamb's ellipsoid added masses and the quay wall's pressures, run-up and wash; 8,086 B gzip, its own entry so scenes without bodies in the water pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f8a84364e8",
+      "reason": "DYN-05 adds 9673 B gzip from zero for optional rail contacts, sprung bogies, couplers and catenary. The separate plain and shared 571 B Rust SIMD wire kernels fetch on demand. Core and Stage add zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13874,6 +13880,7 @@
     "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/lightning": 6117,
+    "@margoengine/physics/loads": 8342,
     "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
@@ -13881,6 +13888,7 @@
     "@margoengine/physics/outdoor-sound": 4647,
     "@margoengine/physics/pack-ice": 5368,
     "@margoengine/physics/pedestrians": 4846,
+    "@margoengine/physics/rail": 9964,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/rogue": 7930,
     "@margoengine/physics/room-sound": 6014,
@@ -14951,7 +14959,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/loads": 8342
+    "margoengine/web": 577
   }
 }

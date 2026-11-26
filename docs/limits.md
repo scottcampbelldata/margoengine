@@ -9608,5 +9608,4 @@ centreline curvature and cant. The field accepts separate rail height irregulari
 is chosen before the world starts. Contact tracks the two tread reactions and a flange restoring
 load. Post-rail motion retains an arclength and independent spring and fall coordinates. The
 catenary uses a tensioned fixed-anchor contact wire with linear waves and a single sprung pickup
-per configured car. The powered separation event is for animation. The optional rail package
-entry and the two independently measured kernels are recorded in the size report.
+per configured car. The powered separation event is for animation. The optional rail entry measures 23,282 B minified and 9,673 B gzip. The plain and shared wire kernels each measure 571 B raw. Core and Stage gain zero bytes.

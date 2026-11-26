@@ -14154,6 +14154,10 @@
       "./lava": {
         "raw": 14845,
         "gzip": 6304
+      },
+      "./rail": {
+        "raw": 23282,
+        "gzip": 9673
       }
     },
     "@margoengine/physics2d": {
@@ -18099,6 +18103,16 @@
       "raw": 9735,
       "gzip": 4127,
       "brotli": 3804
+    },
+    "packages/physics/dist/rail-kernel.wasm": {
+      "raw": 571,
+      "gzip": 391,
+      "brotli": 356
+    },
+    "packages/physics/dist/rail-kernel-shared.wasm": {
+      "raw": 571,
+      "gzip": 391,
+      "brotli": 357
     }
   },
   "splits": {
