@@ -94,7 +94,8 @@ export interface ShadowOptions {
   /**
    * Farthest shadowed distance from the camera, world units, > 0. Default 500, or 20 times the camera's distance to its
    * target when that is farther. When unset and every caster is a core mesh, a model or mesh with no skin, morph
-   * targets, instances or displacement, or a node that draws nothing, cascades tighten to the casters' bounds.
+   * targets or displacement (an instanced one by the union of its instances' boxes), or a node that draws nothing,
+   * cascades tighten to the casters' bounds.
    */
   distance?: number;
   /** Cascade split blend, 0 (uniform) to 1 (logarithmic). Default 0.5. */
@@ -393,16 +394,28 @@ interface Motion {
   still: number;
   moving: boolean;
 }
+/** Instance rows a primitive draws (gltf/pbr `PBRInstances`): `count` rows of 24 floats, a node-space matrix first. */
+type InstanceRows = { readonly count: number; readonly data: Float32Array; readonly version?: number };
+const rowsOf = (p: object): InstanceRows | undefined => (p as { instances?: InstanceRows | null }).instances ?? undefined;
+/** Primitive `i`'s rows unless an earlier primitive of the list draws the same rows. */
+const firstRows = (primitives: readonly object[], i: number): InstanceRows | undefined => {
+  const rows = rowsOf(primitives[i]);
+  for (let j = 0; rows && j < i; j++) if (rowsOf(primitives[j]) === rows) return undefined;
+  return rows;
+};
 /**
- * A primitive whose bounds hold still: range() made once, not a closure per caster per frame. A material's `shading`
- * (materials' createMesh gives every mesh one) changes colour only: the depth pass draws the vertices as they are, and
- * a shading that moves them names its `displacement`.
+ * A primitive whose bounds are known on the CPU: range() made once, not a closure per caster per frame. A material's
+ * `shading` (materials' createMesh gives every mesh one) changes colour only: the depth pass draws the vertices as they
+ * are, and a shading that moves them names its `displacement`. Instances count when their rows are readable
+ * (`nodeBounds`).
  */
-const staticPrimitive = (p: MeshSource['primitives'][number]): boolean =>
-  !p.deformed && !('instances' in p && p.instances) && !p.material.displacement;
+const staticPrimitive = (p: MeshSource['primitives'][number]): boolean => {
+  const rows = rowsOf(p);
+  return !p.deformed && !p.material.displacement && (!rows || ArrayBuffer.isView(rows.data));
+};
 /**
- * A node whose bounds hold still: a core mesh, a node that draws nothing (a glTF group), or a gltf/pbr node with no
- * skin, morph targets, instances or displacement.
+ * A node whose bounds are known: a core mesh, a node that draws nothing (a glTF group), or a gltf/pbr node with no
+ * skin, morph targets or displacement.
  */
 const stillNode = (node: Mesh): boolean => {
   if (node.geometry) return true;
@@ -422,6 +435,66 @@ const localBounds = (source: MeshSource | undefined): Float32Array | undefined =
   boundsCache.set(source, { vertices: primitives.map((p) => p.vertices), bounds });
   return bounds;
 };
+/**
+ * A gltf/pbr node's node-space box: its local box, or for an instanced node the union of that box moved by each drawn
+ * instance's matrix (the rows its draw uploads), plus the local box itself when one of its primitives draws without
+ * instances. Min above max when nothing is drawn. Kept while the local box and each row set's `version` and `count`
+ * stay, so still instances are read once; rows without a `version` are read every call. A matrix moves the box by its
+ * centre and absolute-valued extents (Arvo, "Transforming Axis-Aligned Bounding Boxes", Graphics Gems, 1990).
+ */
+const instancedCache = new WeakMap<MeshSource, { local: Float32Array; keys: unknown[]; box: Float64Array }>();
+const nodeBounds = (source: MeshSource | undefined): ArrayLike<number> | undefined => {
+  const local = localBounds(source);
+  if (!local) return local;
+  const primitives = source!.primitives;
+  let plain = false,
+    instanced = false;
+  for (let i = 0; i < primitives.length; i++) {
+    if (rowsOf(primitives[i])) instanced = true;
+    else plain = true;
+  }
+  if (!instanced) return local;
+  // keys: plain, then the rows, version and count of each distinct row set in primitive order.
+  const cached = instancedCache.get(source!);
+  let same = !!cached && cached.local === local && cached.keys[0] === plain,
+    at = 1;
+  for (let i = 0; same && i < primitives.length; i++) {
+    const rows = firstRows(primitives, i);
+    if (!rows) continue;
+    const k = cached!.keys;
+    same = k[at] === rows && rows.version !== undefined && k[at + 1] === rows.version && k[at + 2] === rows.count;
+    at += 3;
+  }
+  if (same && at === cached!.keys.length) return cached!.box;
+  const keys: unknown[] = [plain],
+    box = cached?.box ?? new Float64Array(6),
+    cx = (local[0] + local[3]) / 2,
+    cy = (local[1] + local[4]) / 2,
+    cz = (local[2] + local[5]) / 2,
+    ex = (local[3] - local[0]) / 2,
+    ey = (local[4] - local[1]) / 2,
+    ez = (local[5] - local[2]) / 2;
+  box.fill(Infinity, 0, 3).fill(-Infinity, 3);
+  if (plain) box.set(local);
+  for (let i = 0; i < primitives.length; i++) {
+    const rows = firstRows(primitives, i);
+    if (!rows) continue;
+    keys.push(rows, rows.version, rows.count);
+    const d = rows.data;
+    for (let k = 0, o = 0; k < rows.count; k++, o += 24)
+      for (let a = 0; a < 3; a++) {
+        const c = d[o + a] * cx + d[o + 4 + a] * cy + d[o + 8 + a] * cz + d[o + 12 + a],
+          e = Math.abs(d[o + a]) * ex + Math.abs(d[o + 4 + a]) * ey + Math.abs(d[o + 8 + a]) * ez;
+        if (c - e < box[a]) box[a] = c - e;
+        if (c + e > box[a + 3]) box[a + 3] = c + e;
+      }
+  }
+  instancedCache.set(source!, { local, keys, box });
+  return box;
+};
+/** True when caster `p` draws no instances or rows of its node's gltf/pbr primitives, which `nodeBounds` reads. */
+const ownRows = (p: ShadowPrimitive): boolean =>
+  !p.instances || !!meshSource(p.node)?.primitives.some((q) => rowsOf(q) === (p.instances as unknown));
 const validTint = (tint: unknown): tint is readonly number[] =>
   Array.isArray(tint) && tint.length === 3 && tint.every((v) => v >= 0 && v <= 1);
 /** A shader cache key: filter, bind group and anisotropy as one number (bit 1 is left for the receive patch). */
@@ -1203,7 +1276,7 @@ export class Shadows implements EnginePlugin {
         const primitives = this.casters(record, this.primitiveDepth);
         for (let j = 0; core && j < primitives.length; j++) {
           const primitive = primitives[j];
-          core = !primitive.instances && !primitive.displacement && stillNode(primitive.node);
+          core = !primitive.displacement && ownRows(primitive) && stillNode(primitive.node);
         }
       }
     }
@@ -1235,7 +1308,7 @@ export class Shadows implements EnginePlugin {
     return fit;
   }
   /** The world bounding sphere of core mesh `id` (centre, radius) into `this.sphere`, from its local one. */
-  private worldSphere(id: number): Float64Array {
+  private worldSphere(id: number): Float64Array | undefined {
     const store = this.engine!.store,
       m = store.matrices,
       s = store.bounds,
@@ -1244,7 +1317,9 @@ export class Shadows implements EnginePlugin {
       b = id * 4,
       mesh = this.engine!.meshes.get(id),
       // A core mesh reads core's bounds directly: meshTriangles builds an object on every call (twice a caster a frame).
-      bounds = mesh?.geometry ? undefined : localBounds(meshSource(mesh));
+      bounds = mesh?.geometry ? undefined : nodeBounds(meshSource(mesh));
+    // An instanced node that draws no instance adds nothing.
+    if (bounds && !(bounds[0] <= bounds[3])) return undefined;
     const x = bounds ? (bounds[0] + bounds[3]) / 2 : s[b],
       y = bounds ? (bounds[1] + bounds[4]) / 2 : s[b + 1],
       z = bounds ? (bounds[2] + bounds[5]) / 2 : s[b + 2],
@@ -1263,6 +1338,7 @@ export class Shadows implements EnginePlugin {
     if (!mesh.geometry && !meshSource(mesh)) return;
     const w = this.worldSphere(id),
       box = this.rangeBox;
+    if (!w) return;
     // Math.min and Math.max exactly, NaN and the sign of zero included.
     for (let k = 0; k < 3; k++) {
       const low = w[k] - w[3],
@@ -1277,6 +1353,7 @@ export class Shadows implements EnginePlugin {
     if (!mesh.geometry && !meshSource(mesh)) return;
     const w = this.worldSphere(id),
       c = this.rangeCenter;
+    if (!w) return;
     const h = hypotTerms;
     h[0] = w[0] - c[0];
     h[1] = w[1] - c[1];

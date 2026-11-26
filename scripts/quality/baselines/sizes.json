@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20537496,
+  "total": 20537542,
   "history": [
     {
       "date": "2026-10-24",
@@ -13493,6 +13493,12 @@
       "commit": "b33cf08098",
       "grew": 1,
       "reason": "EARTH-02 grows the optional granular-flow entry from 3378 to 4206 B gzip (ceiling 4462 B) for measured start-stop friction and a terrain-relative Froude number. Both closures share conservative transport and the live bed, which a split would duplicate. Core plus Stage stay 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d-shadow-instfit",
+      "grew": 1,
+      "reason": "KB-SHADOW-INSTFIT1: shadows fits its cascades to an instanced caster's drawn instances (the union of its local box under each instance matrix, cached on PBRInstances.version), so instanced and separate meshes get the same shadow texels. @margoengine/shadows root 22060 to 22106 B gzip (measured). The fit runs each frame in range() beside the existing caster bounds, so it cannot move behind a lazy import."
     }
   ],
   "items": {
@@ -14739,7 +14745,7 @@
     "@margoengine/shader/subgroups": 3517,
     "@margoengine/shader/texture-array": 3442,
     "@margoengine/shader/utils": 7295,
-    "@margoengine/shadows": 22060,
+    "@margoengine/shadows": 22106,
     "@margoengine/shadows/distance": 2421,
     "@margoengine/shadows/ibl": 10887,
     "@margoengine/shadows/light-function": 2533,

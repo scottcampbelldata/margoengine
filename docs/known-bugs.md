@@ -6,6 +6,33 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: Picking attached to a scene of more than 4096 gltf/pbr models stops every frame (KB-PICK-BUDGET1, selection)
+
+- **Repro:** `node examples/package-benchmarks/textured-instancing-gpu.mjs` (RTX A6000, Edge, WebGPU and the WebGL2
+  layer): after the pick checks attach `Picking`, the timing leg builds 5,000 materials `createMesh` meshes and
+  `engine.render()` throws `RangeError: Picking source budget exceeded; register at most 4096 sources.` from
+  `PickingPrimitives.discover` (Picking's capture pass). The frame comparisons and picks before it pass.
+- **Cause:** `discover` (packages/selection/src/picking-primitives.ts) counts each discovered model against the
+  4096-source budget meant for `add`, and throws inside the render graph, so a large scene fails every frame instead of
+  picking within the budget or reporting once. Found while fixing KB-SHADOW-INSTFIT1; not fixed there.
+
+### Fixed 2026-11-26: an instanced caster kept the cascades unfitted, so textured-instancing-gpu.mjs failed (KB-SHADOW-INSTFIT1, shadows)
+
+- **Repro (before):** `node examples/package-benchmarks/textured-instancing-gpu.mjs` (RTX A6000, Edge 158, WebGPU)
+  failed `instanced matches meshes`: mean difference 0.148 of 255 and 0.35% of pixels over 8 (bars 0.5 and 0.2%);
+  with shadows alone, mean 0.86 and at most 109, softer edges on the instanced form.
+- **Cause:** without `distance`, `Shadows` tightens its cascades to the casters only when every caster has CPU bounds
+  (`range()` in `packages/shadows/src/index.ts`, d0695c5fc). `staticPrimitive` and the model loop rejected any
+  primitive with `instances`, and `worldSphere` would have read only the node's single local box, so the same boxes
+  drawn as one instanced mesh got cascades from the near plane to 500 and coarser texels than as separate meshes.
+- **Fix:** an instanced gltf/pbr or materials caster counts as bounded: `nodeBounds` takes the union of the node's
+  local box moved by each drawn instance's matrix (the rows the draw uploads; centre and absolute extents, Arvo 1990),
+  cached per node until the rows' new `PBRInstances.version` or `count` changes. A node drawing no instance adds
+  nothing; displacement still keeps the safe range. Both frame comparisons now match exactly (mean 0, at most 1) on
+  WebGPU and the WebGL2 layer.
+- **Regression:** `packages/shadows/test/instanced-range.test.js` (fits like separate meshes; rows read again only
+  after `needsUpdate`, `setMatrixAt` or `count`); real GPU: `examples/package-benchmarks/textured-instancing-gpu.mjs`.
+
 ### Open 2026-11-26: a grid-particle plunging breaker's jet-to-crest speed does not converge with the grid (KB-FLIP-CREST1, physics, flip)
 
 - **Repro:** after `npm run build -w @margoengine/physics`, run `node packages/physics/scripts/check-breaker.mjs 0.55
@@ -175,21 +202,6 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - Sources: as KB6016c (Walter, Marschner, Li and Torrance 2007, eq. 33; Guy and Agopian, "Physically Based Rendering in
   Filament", section 4.4.1; Goldberg 1991); Karis 2013, "Real Shading in Unreal Engine 4" (the GGX importance sample the
   cube prefilter draws).
-
-### Open 2026-11-26: an instanced caster keeps the cascades unfitted, so textured-instancing-gpu.mjs fails (KB-SHADOW-INSTFIT1, shadows)
-
-- **Repro:** `node examples/package-benchmarks/textured-instancing-gpu.mjs` (RTX A6000, Edge 158, WebGPU) fails
-  `instanced matches meshes`: mean difference 0.148 of 255 and 0.35% of pixels over 8 (the check's bars are 0.5 and
-  0.2%). With shadows alone: mean 0.86, at most 109, softer edges on the instanced form. Every other effect of the page
-  alone matches within 1, and with `Shadows.attach(engine, {distance: 40})` on the same page all effects together
-  match within 1.
-- **Cause:** without `distance`, `Shadows` tightens its cascades to the casters only when every caster has still
-  bounds (`range()` in `packages/shadows/src/index.ts`, d0695c5fc, 2026-11-11). An instanced primitive has none, so
-  the same boxes drawn as one instanced mesh get cascades from the near plane to `distance` and coarser shadow
-  texels than as separate meshes. The shadows README and docs/limits.md describe the rule; the check was written
-  before it and runs only in the opt-in `features` suite.
-- **Fix wanted:** shadows takes world bounds for an instanced caster whose instances hold still (from its matrices
-  and the geometry bounds), so both forms fit the same cascades.
 
 ### Fixed 2026-11-26: rebase:main ran the checkout and commit hooks for every commit, so main moved before it ended (KB-REBASE-HOOKS1, scripts)
 

@@ -882,6 +882,7 @@ class PBRInstances {
     constructor(capacity: number);
     get count(): number;
     set count(n: number);
+    get version(): number;
     get needsUpdate(): boolean;
     set needsUpdate(v: boolean);
     setMatrixAt(i: number, m: ArrayLike<number>): this;
