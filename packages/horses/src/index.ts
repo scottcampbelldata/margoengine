@@ -77,6 +77,9 @@ export interface HorseOptions extends HorseModelOptions {
   occlusion?: HorseReceiver | false;
 }
 
+/** Terrain and carried-load controls for a standalone HorseMotion. */
+export type HorseSupportOptions = Pick<HorseOptions, 'ground' | 'grip' | 'loadMass'>;
+
 /** The horse's place and rider seat in world space at the current time. */
 export interface HorseFrame {
   readonly position: readonly [number, number, number];
@@ -190,6 +193,7 @@ export class HorseMotion {
   /** Bank of the trunk about its forward axis, radians. */
   bank = 0;
   private cycleTravel = 0;
+  private support: HorseSupportOptions = {};
   /** Fade from `previous` to `gait`, 0 to 1. */
   fade = 1;
   /** Odometer reading where each gait's phase is 0. */
@@ -202,17 +206,12 @@ export class HorseMotion {
       acceleration?: number;
       turnRate?: number;
       fade?: number;
-      ground?: (x: number, z: number) => number;
-      grip?: number;
-      loadMass?: number;
     } = {},
   ) {
     this.x = options.position?.[0] ?? 0;
     this.z = options.position?.[1] ?? 0;
     this.heading = options.heading ?? 0;
     for (const [name, value] of [
-      ['grip', options.grip ?? 0.6],
-      ['carried mass', options.loadMass ?? 0],
       ['acceleration', options.acceleration ?? 3],
       ['turn rate', options.turnRate ?? 1.2],
     ] as const) {
@@ -221,22 +220,37 @@ export class HorseMotion {
     }
   }
 
+  /** Configure terrain, hoof grip and carried kilograms for subsequent steps. */
+  setSupport(options: HorseSupportOptions): this {
+    if (options.ground && typeof options.ground !== 'function')
+      throw new RangeError('Pass a ground function that returns a finite height in metres.');
+    for (const [name, value] of [
+      ['grip', options.grip ?? 0.6],
+      ['carried mass', options.loadMass ?? 0],
+    ] as const) {
+      if (!(value >= 0) || !Number.isFinite(value))
+        throw new RangeError('Pass a finite nonnegative horse ' + name + '.');
+    }
+    this.support = { ...options };
+    return this;
+  }
+
   /** Four independently sampled hoof support elevations summarized at this body frame. */
   supportHeight(x = this.x, z = this.z, heading = this.heading): number {
-    return horseSurface(this.body, this.options.ground, x, z, heading).height;
+    return horseSurface(this.body, this.support.ground, x, z, heading).height;
   }
 
   private driven(dt: number, target: { speed: number; heading: number }) {
     if (!(dt > 0) || !Number.isFinite(dt)) throw new RangeError('Pass a finite positive horse step in seconds.');
-    const surface = horseSurface(this.body, this.options.ground, this.x, this.z, this.heading);
+    const surface = horseSurface(this.body, this.support.ground, this.x, this.z, this.heading);
     return advanceHorseDrive(
       this,
       target,
       surface,
       {
         strength: this.body.mass * (this.options.acceleration ?? 3),
-        mass: this.body.mass + (this.options.loadMass ?? 0),
-        grip: this.options.grip ?? 0.6,
+        mass: this.body.mass + (this.support.loadMass ?? 0),
+        grip: this.support.grip ?? 0.6,
         turnRate: this.options.turnRate ?? 1.2,
       },
       dt,
@@ -385,11 +399,14 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     acceleration,
     turnRate,
     fade,
-    ground: options.ground,
-    grip: options.grip,
-    loadMass: options.loadMass,
   };
-  let motion = new HorseMotion(body, motionOptions),
+  const makeMotion = () =>
+    new HorseMotion(body, motionOptions).setSupport({
+      ground: options.ground,
+      grip: options.grip,
+      loadMass: options.loadMass,
+    });
+  let motion = makeMotion(),
     // Film time asked for, and whole fixed steps simulated: the motion lives on the grid ticks x STEP and is shown
     // carried forward to the film time, so a film time always shows the same thing however time was advanced.
     time = 0,
@@ -661,7 +678,7 @@ export async function addHorse(engine: Engine, options: HorseOptions = {}): Prom
     },
     seek(at: number) {
       if (!(at >= 0 && at < Infinity)) throw new RangeError('seek needs a finite film time in seconds, 0 or more');
-      motion = new HorseMotion(body, motionOptions);
+      motion = makeMotion();
       phaseOffsets.clear();
       time = 0;
       ticks = 0;

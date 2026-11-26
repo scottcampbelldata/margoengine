@@ -233,7 +233,7 @@ function input(host: SolverHost, port: Port | undefined, count: number, width: n
     port.region.layout !== LEGGED_LAYOUT ||
     port.region.byteLength !== count * width * 8
   )
-    throw new RangeError('Publish matching f64 legged rows in the documented layout.');
+    throw new RangeError('Provide matching f64 legged rows in the documented layout.');
   return new Float64Array((port.region.memory ?? host.memory).buffer, port.region.byteOffset, count * width);
 }
 
@@ -378,6 +378,26 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
       throw new MargoError('state', 'Add the legged locomotion solver to a PhysicsWorld before stepping.');
     const deck = this.deck;
     if (deck) deck.refresh(host, context.inputs.get(BODIES_FIELD.name), context.cell);
+    this.configure(context, host, commands, gait, nextGait);
+    this.ground.step(context, dt);
+    const published = words(host, nextGait);
+    const reactions = this.reactions && words(host, this.reactions);
+    reactions?.fill(0);
+    for (const [i, row] of rows.entries()) {
+      const feet = row.biped ? 2 : 4;
+      const torso = this.ground.readContact(i, feet, this.contact);
+      published[i * GAIT_WORDS + 4] = torso.stance ? 1 : 0;
+      if (deck && reactions) {
+        deck.react(reactions, torso, dt);
+        for (let foot = 0; foot < feet; foot++)
+          deck.react(reactions, this.ground.readContact(i, foot, this.contact), dt);
+      }
+    }
+    words(host, gait).set(published);
+  }
+
+  private configure(context: StepContext, host: SolverHost, commands: Region, gait: Region, nextGait: Region): void {
+    const { deck, rows } = this;
     const controls =
       input(host, context.inputs.get(LEGGED_INTENT_FIELD.name), rows.length, TARGET_WORDS) ?? words(host, commands);
     const loads = input(host, context.inputs.get(LEGGED_LOAD_FIELD.name), rows.length, FORCE_WORDS);
@@ -433,21 +453,6 @@ export class LeggedLocomotion implements Solver<LeggedParams> {
       });
       prospective.set([gaitCode, frequency, stride, duty], at);
     }
-    this.ground.step(context, dt);
-    const published = words(host, nextGait);
-    const reactions = this.reactions && words(host, this.reactions);
-    reactions?.fill(0);
-    for (const [i, row] of rows.entries()) {
-      const feet = row.biped ? 2 : 4;
-      const torso = this.ground.readContact(i, feet, this.contact);
-      published[i * GAIT_WORDS + 4] = torso.stance ? 1 : 0;
-      if (deck && reactions) {
-        deck.react(reactions, torso, dt);
-        for (let foot = 0; foot < feet; foot++)
-          deck.react(reactions, this.ground.readContact(i, foot, this.contact), dt);
-      }
-    }
-    words(host, gait).set(published);
   }
 
   exportPorts(tick: number): readonly Port[] {

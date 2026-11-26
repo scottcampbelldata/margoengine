@@ -298,7 +298,7 @@ costs work per metre, so the same command gives a shorter, slower stride and can
 import { HorseMotion } from '@margoengine/horses';
 import { horseBody } from '@margoengine/horses/anatomy';
 
-const motion = new HorseMotion(horseBody(), {
+const motion = new HorseMotion(horseBody()).setSupport({
   ground: (_x, z) => 0.08 * z,
   grip: 0.6,
   loadMass: 65,
