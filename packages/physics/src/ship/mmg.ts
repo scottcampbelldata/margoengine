@@ -34,6 +34,11 @@ export interface ManoeuvringModel {
   readonly sway: readonly [number, number, number, number, number, number];
   /** N'v, N'r, N'vvv, N'vvr, N'vrr, N'rrr. */
   readonly yaw: readonly [number, number, number, number, number, number];
+  /**
+   * How the hull's nonlinear terms read (default 'cubic', MMG's v'^3 and r'^3): 'kijima' takes the third and sixth of `sway`
+   * and `yaw` as Kijima's (1990) v'|v'| and r'|r'| terms, evaluated as they were fitted.
+   */
+  readonly form?: 'cubic' | 'kijima';
   /** The propeller: diameter, m, its curves, its position x'_P, thrust deduction t_P, straight-run wake w_P0, wake constants C1, C2 (beta_P > 0), C2 (beta_P < 0). */
   readonly propeller: {
     readonly diameter: number;
@@ -141,6 +146,8 @@ export interface ManoeuvringForces {
   /** The race's far-wake speed relative to the propeller, m/s, and the propeller's inflow speed, m/s. */
   race: number;
   inflow: number;
+  /** The propeller's torque, N m. */
+  torque: number;
 }
 
 /**
@@ -216,6 +223,7 @@ export class Manoeuvring {
         kt: 0,
         race: 0,
         inflow: 0,
+        torque: 0,
       },
       M = this.model,
       rho = this.density,
@@ -235,12 +243,12 @@ export class Manoeuvring {
         [nv, nr, nvvv, nvvr, nvrr, nrrr] = M.yaw,
         q = 0.5 * rho * L * d * U * U;
       XH = q * (-M.resistance + xvv * vp * vp + xvr * vp * rp + xrr * rp * rp + xvvvv * vp * vp * vp * vp);
-      YH =
-        q * (yv * vp + yr * rp + yvvv * vp * vp * vp + yvvr * vp * vp * rp + yvrr * vp * rp * rp + yrrr * rp * rp * rp);
-      NH =
-        q *
-        L *
-        (nv * vp + nr * rp + nvvv * vp * vp * vp + nvvr * vp * vp * rp + nvrr * vp * rp * rp + nrrr * rp * rp * rp);
+      // Kijima's form: v'|v'| and r'|r'| in place of v'^3 and r'^3.
+      const kijima = M.form === 'kijima',
+        vOdd = kijima ? vp * Math.abs(vp) : vp * vp * vp,
+        rOdd = kijima ? rp * Math.abs(rp) : rp * rp * rp;
+      YH = q * (yv * vp + yr * rp + yvvv * vOdd + yvvr * vp * vp * rp + yvrr * vp * rp * rp + yrrr * rOdd);
+      NH = q * L * (nv * vp + nr * rp + nvvv * vOdd + nvvr * vp * vp * rp + nvrr * vp * rp * rp + nrrr * rOdd);
     }
     // The propeller (eqs. 8 to 16): the wake it works in changes with its geometrical inflow angle beta_P.
     const P = M.propeller,
@@ -290,6 +298,7 @@ export class Manoeuvring {
     o.kt = load.kt;
     o.race = load.race;
     o.inflow = inflow;
+    o.torque = load.torque;
     return o;
   }
 

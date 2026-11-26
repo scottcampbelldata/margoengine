@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20554648,
+  "total": 20558061,
   "history": [
     {
       "date": "2026-10-24",
@@ -13579,6 +13579,12 @@
       "commit": "ee0546999",
       "reason": "scene/assets: AssetRegistry gained reference counts, preload groups and templates (b37b55e0e), instance userData guard (6b1eb54d6): 4274 to 7762 B baseline (7506 measured) B gzip. The bytes are the feature; splitting refs/groups/templates into a second entry would force every registry user to import both and duplicate the registry's entry map.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "1d1d91857",
+      "reason": "physics/ship ceiling 11538 to 14,951 B (built 11,202 to 14,516 B): any hull's manoeuvring from its dimensions (Kijima 1990, Yoshimura and Masumoto 2011, Clarke and Brix added masses) and the resolved race (swirl, tip and hub vortices, the rudder jet, vortex cavitation with hysteresis, aeration sources). In the ship entry because a ship's solver needs its hull model and its race; a split would load with every ship scene.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14444,7 +14450,7 @@
     "@margoengine/physics/seakeeping": 24323,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
-    "@margoengine/physics/ship": 11538,
+    "@margoengine/physics/ship": 14951,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 146534,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 47835,

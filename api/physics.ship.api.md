@@ -7,6 +7,37 @@ import { FlowField, SeaSource, SeaSurface } from "@margoengine/math/fields";
 
 export const ESTABLISHMENT_LENGTH = 3.25;
 
+export interface EmpiricalHull {
+    readonly length: number;
+    readonly beam: number;
+    readonly draught: number;
+    readonly block: number;
+    readonly trim?: number;
+    readonly centre?: number;
+    readonly midship?: number;
+    readonly lcb?: number;
+    readonly propeller: {
+        readonly diameter: number;
+        readonly curves?: PropellerCurves;
+        readonly position?: number;
+    };
+    readonly rudder: {
+        readonly area: number;
+        readonly span: number;
+    };
+    readonly family?: 'auto' | 'full' | 'fine';
+    readonly speed?: number;
+    readonly density?: number;
+    readonly viscosity?: number;
+    readonly gravity?: number;
+}
+
+export interface EmpiricalRange {
+    kijima: boolean;
+    yoshimura: boolean;
+    outside: string[];
+}
+
 export interface HoltropHull {
     readonly length: number;
     readonly beam: number;
@@ -98,6 +129,7 @@ export interface ManoeuvringForces {
     kt: number;
     race: number;
     inflow: number;
+    torque: number;
 }
 
 export interface ManoeuvringModel {
@@ -112,6 +144,7 @@ export interface ManoeuvringModel {
     readonly surge: readonly [number, number, number, number];
     readonly sway: readonly [number, number, number, number, number, number];
     readonly yaw: readonly [number, number, number, number, number, number];
+    readonly form?: 'cubic' | 'kijima';
     readonly propeller: {
         readonly diameter: number;
         readonly curves: PropellerCurves;
@@ -178,6 +211,29 @@ export interface PropellerRace {
     readonly hub?: number;
 }
 
+export interface RaceNumbers {
+    circulation: number;
+    contraction: number;
+    pitch: number;
+    disc: number;
+    turn: number;
+}
+
+export interface ResolvedRace extends PropellerRace {
+    readonly blades: number;
+    readonly revolutions: number;
+    readonly torque: number;
+    readonly thrust: number;
+    readonly inflow: number;
+    readonly up?: readonly [number, number, number];
+    readonly core?: number;
+    readonly rudder?: {
+        readonly distance: number;
+        readonly force: readonly [number, number, number];
+    };
+    readonly density?: number;
+}
+
 export const SEA_WATER_DENSITY = 1025;
 
 export const SEA_WATER_VISCOSITY = 0.0000011883;
@@ -195,6 +251,8 @@ export interface Ship {
     };
     readonly block?: number;
     readonly addedMass?: boolean;
+    readonly blades?: number;
+    readonly gas?: number;
     readonly rudderRate?: number;
 }
 
@@ -234,6 +292,11 @@ export class ShipSolver implements Solver<ShipParams> {
         speed: number;
         radius: number;
     }[];
+    aeration(_t: number): readonly {
+        position: [number, number, number];
+        radius: number;
+        rate: number;
+    }[];
     importPorts(_tick: number): void;
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
@@ -254,7 +317,13 @@ export interface ShipStatus {
     midship: Vec3;
     forward: Vec3;
     starboard: Vec3;
-    race: PropellerRace | undefined;
+    race: ResolvedRace | undefined;
+    cavity: {
+        cavitating: boolean;
+        radius: number;
+        sigma: number;
+        inception: number;
+    };
 }
 
 export interface ShipWall {
@@ -285,7 +354,29 @@ export interface SquatCase {
 
 export const THRUSTER_MERIT = 0.55;
 
+export const TIP_VORTEX_GONE = 1.5;
+
+export const TIP_VORTEX_STABLE = 0.8;
+
+export const VAPOUR_PRESSURE = 1705;
+
+export class VortexCavity {
+    constructor(gas?: number);
+    update(sigma: number, inception: number): boolean;
+    get cavitating(): boolean;
+}
+
 export function atan2(y: number, x: number): number;
+
+export function cavityRadius(circulation: number, core: number, ambient: number, vapour?: number, density?: number): number;
+
+export function collapseTime(radius: number, difference: number, density?: number): number;
+
+export function coreDeficit(circulation: number, core: number, density?: number): number;
+
+export function empiricalModel(hull: EmpiricalHull): ManoeuvringModel & {
+    readonly range: EmpiricalRange;
+};
 
 export function holtropMennen(hull: HoltropHull, speed: number, options?: HoltropOptions): HoltropResistance;
 
@@ -293,9 +384,15 @@ export function huuska(c: SquatCase, area: number, k1?: number): number;
 
 export function icorels(c: SquatCase, cs?: number): number;
 
+export function inceptionIndex(circulation: number, core: number, speed: number): number;
+
 export function ittc1957(reynolds: number): number;
 
+export function raceNumbers(race: ResolvedRace): RaceNumbers;
+
 export function raceVelocity(race: PropellerRace, point: readonly [number, number, number], out?: [number, number, number]): [number, number, number];
+
+export function resolvedRace(race: ResolvedRace, point: readonly [number, number, number], out?: [number, number, number]): [number, number, number];
 
 export function rudderLiftSlope(aspect: number): number;
 

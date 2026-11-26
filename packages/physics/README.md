@@ -3131,6 +3131,22 @@ What it gives the rest of the engine:
 - The bow thruster: its ideal thrust (4 rho A)^(1/3) P^(2/3) times 0.55, falling to half near a speed of 0.4 of the jet's and recovering beyond.
 - Suction toward a quay or bank alongside: the return flow squeezed through the gap.
 
+Any hull, not only KVLCC2: `empiricalModel({length, beam, draught, block, trim, centre, propeller: {diameter}, rudder: {area, span}})` builds the MMG model from the hull's dimensions:
+- Kijima's (1990) linear derivatives, and for a full hull (C_B 0.7 and above) his nonlinear ones in their own v'|v'| form;
+- Yoshimura and Masumoto's (2011) cubic terms for a fine hull, with their surge terms, trim corrections and rudder interaction set;
+- Clarke's and Brix's added masses, and R'_0 by the ITTC-1957 line with Holtrop's form factor.
+
+`range` says where the hull lies against the regressions' databases. A Great Lakes freighter at L/B 9.5 lies outside them, and is an extrapolation.
+
+The race is resolved: `water` gives the axial jet together with:
+- the swirl the torque puts into it (Kelvin's circulation on the stream surfaces, falling as x^-2 in the established jet);
+- the helical tip vortices with Lamb-Oseen cores, holding to 0.8 D and gone by 1.5 D, and the hub vortex;
+- the rudder jet, turned by the rudder's side force over the race's momentum flux.
+
+`status(i).cavity` says whether the tip vortices cavitate: the tip's cavitation number against the core's inception index, with hysteresis (a cavity formed in gassy water holds until desinence, `gas` per ship), and its radius. `aeration(t)` gives the air the cavities carry off where the vortices break down, for the bubbles and the foam. Pass `blades` per ship (default 4).
+
+On their own: `resolvedRace(race, point)`, `raceNumbers`, `inceptionIndex`, `cavityRadius`, `coreDeficit`, `VortexCavity` and `collapseTime`.
+
 The parts work on their own too:
 - `Manoeuvring`: the MMG ship stepped by Runge-Kutta, with `selfPropulsion(speed)`.
 - `Propeller`: open-water K_T and K_Q, four quadrants by Healey's lift and drag fitted to the curves, and the race's far-wake speed. `raceVelocity(race, point)` is the jet's velocity at a point.

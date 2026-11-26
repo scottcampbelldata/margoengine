@@ -10,6 +10,14 @@ import { Physics } from '../dist/index.js';
 import { WakeSolver } from '../dist/sea.js';
 import { HullSolver } from '../dist/seakeeping.js';
 import {
+  VortexCavity,
+  cavityRadius,
+  collapseTime,
+  coreDeficit,
+  empiricalModel,
+  inceptionIndex,
+  raceNumbers,
+  resolvedRace,
   KVLCC2_L7,
   KVLCC2_PROPELLER,
   Manoeuvring,
@@ -343,6 +351,198 @@ test('in shallow water the hull sinks by its squat through the HullSolver on the
   assert.ok(s.sinkage > 0.003, `${s.sinkage}`);
   assert.ok(Math.abs(sunk / s.sinkage - 1) < 0.15, `sank ${sunk} for a squat of ${s.sinkage}`);
   assert.ok(Math.abs(ships.drawdown(s.midship[0], s.midship[2]) - s.sinkage) < 1e-12);
+});
+
+test("the resolved race: its circulation from the torque, Pennings's propeller within 6 percent, and momentum theory's contraction", () => {
+  // Pennings (2016): 2 blades, D 0.15 m, n 38 Hz, J 0.56, K_T 0.18, K_Q 0.027; a boundary-element mean circulation of 0.1287.
+  const rho = 1000,
+    D = 0.15,
+    n = 38,
+    V = 0.56 * n * D,
+    CT = (8 * 0.18) / (Math.PI * 0.56 * 0.56),
+    efflux = V * (Math.sqrt(1 + CT) - 1),
+    race = {
+      position: [0, -1, 0],
+      direction: [-1, 0, 0],
+      diameter: D,
+      pitch: 1,
+      efflux,
+      hub: 0.2 * D,
+      blades: 2,
+      revolutions: n,
+      torque: rho * n * n * D ** 5 * 0.027,
+      thrust: rho * n * n * D ** 4 * 0.18,
+      inflow: V,
+      density: rho,
+    },
+    numbers = raceNumbers(race);
+  assert.ok(Math.abs(numbers.circulation / 0.1287 - 1) < 0.06, `${numbers.circulation}`);
+  // Contraction (R_w / R)^2 = (V + u_a) / (V + 2 u_a); at bollard pull 1 / sqrt 2.
+  assert.ok(Math.abs(numbers.contraction ** 2 - (V + efflux / 2) / (V + efflux)) < 1e-12);
+  assert.ok(Math.abs(raceNumbers({ ...race, inflow: 0 }).contraction - Math.SQRT1_2) < 1e-12);
+  // The water turns with the blades: a right-handed screw ahead turns its race clockwise seen from astern, so a point above
+  // the shaft moves to port (+z when the race leaves along -x and starboard is -z... here: up x direction gives the sense).
+  const above = resolvedRace(race, [-0.5 * D, -1 + 0.3 * D, 0]),
+    below = resolvedRace(race, [-0.5 * D, -1 - 0.3 * D, 0]);
+  assert.ok(above[2] * below[2] < 0, 'it swirls about the shaft');
+  const reversed = resolvedRace({ ...race, revolutions: -n }, [-0.5 * D, -1 + 0.3 * D, 0]);
+  assert.ok(reversed[2] * above[2] < 0, 'astern it swirls the other way');
+  // The swirl falls as x^-2 in the established jet.
+  const swirlAt = (x) => Math.abs(resolvedRace(race, [-x * D, -1 + 0.1 * x * D, 0])[2]);
+  assert.ok(swirlAt(8) < 0.3 * swirlAt(4) && swirlAt(4) > 0);
+});
+
+test("a rudder turns the race by its side force over the race's momentum flux, tan phi = F / (rho A_w V_w^2)", () => {
+  const race = {
+      position: [0, -3, 0],
+      direction: [-1, 0, 0],
+      diameter: 2,
+      pitch: 1,
+      efflux: 4,
+      blades: 4,
+      revolutions: 3,
+      torque: 0,
+      thrust: 1e5,
+      inflow: 0,
+      density: 1025,
+    },
+    momentum = 1025 * Math.PI * (Math.SQRT1_2 * 1) ** 2 * 16,
+    force = 0.3 * momentum,
+    turned = { ...race, rudder: { distance: 1, force: [0, 0, force] } },
+    { turn } = raceNumbers(turned);
+  assert.ok(Math.abs(Math.tan(turn) - 0.3) < 1e-9);
+  // In the established jet 16 m aft (its profile peaked on its axis), the axis has moved off the shaft toward -z, the water
+  // pushed opposite the rudder's force, by 15 m tan phi past the rudder.
+  let best = -1,
+    at = 0;
+  for (let z = -8; z <= 8; z += 0.02) {
+    const v = resolvedRace(turned, [-16, -3, z]),
+      u = Math.hypot(v[0], v[2]);
+    if (u > best) [best, at] = [u, z];
+  }
+  assert.ok(Math.abs(at - -15 * Math.sin(turn)) < 0.3, `axis at ${at} against ${-15 * Math.sin(turn)}`);
+});
+
+test("vortex cavitation: a Lamb-Oseen core's deficit, Pennings's wing inception at 2.97, and Amini's hysteresis", () => {
+  // The core deficit's integral is ln 2.
+  assert.ok(Math.abs(coreDeficit(1, 1, 1) * 4 * Math.PI ** 2 - Math.LN2) < 1e-12);
+  // Pennings's wing: circulation 0.10 m^2/s, peak-velocity radius 1.7 mm (a = 1.7 / 1.1209 mm), W 7.17 m/s: 2.97.
+  assert.ok(Math.abs(inceptionIndex(0.1, 1.7e-3 / 1.1209, 7.17) - 2.97) < 0.005);
+  // The cavity grows as the pressure falls, inside the potential vortex's bound Gamma / (2 pi W sqrt(sigma)).
+  const a = 1.7e-3 / 1.1209,
+    at = (sigma) => cavityRadius(0.1, a, 1705 + sigma * 0.5 * 1000 * 7.17 ** 2, 1705, 1000);
+  assert.ok(at(1.07) > at(1.55) && at(1.55) > at(2.0) && at(2.0) > 0);
+  for (const sigma of [1.07, 1.55, 2.0]) assert.ok(at(sigma) < 0.1 / (2 * Math.PI * 7.17 * Math.sqrt(sigma)));
+  assert.equal(at(4), 0, 'no cavity above inception');
+  // Amini et al. (2019): in air-saturated water a cavity forms at 1.7 and holds to 4.0; in degassed water it goes at 1.7.
+  const gassy = new VortexCavity(1),
+    clean = new VortexCavity(0);
+  for (const [sigma, want] of [
+    [2.5, false],
+    [1.6, true],
+    [3.5, true],
+    [4.1, false],
+  ])
+    assert.equal(gassy.update(sigma, 1.7), want, `gassy at ${sigma}`);
+  assert.equal(clean.update(1.6, 1.7), true);
+  assert.equal(clean.update(1.8, 1.7), false);
+  // Rayleigh: a 5 mm bubble under 100 kPa collapses in 0.458 ms.
+  assert.ok(Math.abs(collapseTime(5e-3, 1e5, 1000) - 4.575e-4) < 2e-6);
+});
+
+test("a hull's manoeuvring from its dimensions: Kijima's KVLCC2 to his formulas, and its turns against MARIN's free-running tests", () => {
+  const kvlcc2 = empiricalModel({
+    length: 320,
+    beam: 58,
+    draught: 20.8,
+    block: 0.81,
+    lcb: 3.48,
+    propeller: { diameter: 9.86 },
+    rudder: { area: 112.5, span: 15.8 },
+    speed: 15.5 * 0.514444,
+  });
+  // Kijima (1990) in MMG's v' form, KVLCC2 at G = midship: the research's hand-checked values.
+  for (const [got, want] of [
+    [kvlcc2.sway[0], -0.4097],
+    [kvlcc2.sway[1] - kvlcc2.addedMass[0], 0.0734],
+    [kvlcc2.yaw[0], -0.13],
+    [kvlcc2.yaw[1], -0.0533],
+    [kvlcc2.sway[2], -0.6703],
+    [kvlcc2.sway[5], 0.0296],
+    [kvlcc2.sway[3], -0.2143],
+    [kvlcc2.sway[4], -0.4054],
+    [kvlcc2.yaw[2], -0.0006],
+    [kvlcc2.yaw[5], -0.0166],
+    [kvlcc2.yaw[3], -0.138],
+    [kvlcc2.yaw[4], 0.0952],
+  ])
+    assert.ok(Math.abs(got - want) < 1e-4, `${got} against ${want}`);
+  assert.equal(kvlcc2.form, 'kijima');
+  assert.ok(kvlcc2.range.kijima && kvlcc2.range.outside.length === 0);
+  // Clarke's added masses and Holtrop's thrust deduction against the captive data: 0.223, 0.011, 0.220.
+  assert.ok(Math.abs(kvlcc2.addedMass[1] / 0.223 - 1) < 0.1 && Math.abs(kvlcc2.addedMass[2] / 0.011 - 1) < 0.15);
+  assert.ok(Math.abs(kvlcc2.propeller.thrustDeduction - 0.22) < 0.01);
+  // Fully empirical, it turns within 30 percent of MARIN's free-running KVLCC2 (advance 3.25 L, tactical diameter 3.34 L).
+  const speed = 15.5 * 0.514444,
+    s = new Manoeuvring(kvlcc2, { u: speed }, { rudderRate: 1.76 * DEG });
+  s.revolutions = s.selfPropulsion(speed);
+  s.order = 35 * DEG;
+  let advance;
+  while (Math.abs(s.state.heading) < Math.PI) {
+    s.step(0.2);
+    if (advance === undefined && Math.abs(s.state.heading) >= Math.PI / 2) advance = s.state.x / 320;
+  }
+  const diameter = Math.abs(s.state.z) / 320;
+  assert.ok(near(advance, 3.25, 0.3) && near(diameter, 3.34, 0.3), `${advance} ${diameter}`);
+  // A Great Lakes freighter (222 m, L/B 9.5, C_B 0.88) lies outside Kijima's hulls, and says so.
+  const laker = empiricalModel({
+    length: 222,
+    beam: 23.4,
+    draught: 8.2,
+    block: 0.88,
+    propeller: { diameter: 6 },
+    rudder: { area: 30, span: 7 },
+  });
+  assert.ok(!laker.range.kijima && laker.range.outside.some((t) => t.startsWith('L/B')));
+  assert.throws(
+    () =>
+      empiricalModel({
+        length: 100,
+        beam: 10,
+        draught: 5,
+        block: 0.8,
+        trim: -1,
+        propeller: { diameter: 3 },
+        rudder: { area: 5, span: 3 },
+      }),
+    /trim/,
+  );
+});
+
+test('a heavily loaded screw near the surface cavitates and releases its cavities as air where its tip vortices break down', () => {
+  const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+    M = KVLCC2_L7,
+    body = physics.addBody(null, {
+      position: [0, 0, 0],
+      colliders: { shape: 'box', halfExtents: [M.length / 2, M.draught, M.beam / 2], mass: 1025 * M.volume },
+    }),
+    ships = new ShipSolver(),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(ships, { ships: [{ row: body.row, model: { ...M, centre: 0 } }] })
+      .couple(['ship', 'rigid'], 'staggered');
+  // Gently: no cavity. At a model's racing revolutions the tip speed outruns the core's pressure.
+  ships.control(0).revolutions = 5;
+  world.advance(30);
+  assert.equal(ships.status(0).cavity.cavitating, false);
+  assert.equal(ships.aeration(0).length, 0);
+  ships.control(0).revolutions = 60;
+  world.advance(60);
+  const c = ships.status(0).cavity;
+  assert.ok(c.cavitating && c.radius > 0 && c.sigma <= c.inception * (4 / 1.7), JSON.stringify(c));
+  const air = ships.aeration(0);
+  assert.equal(air.length, 1);
+  assert.ok(air[0].rate > 0 && air[0].position[0] < body.position[0]);
 });
 
 test('the ship solver refuses what it cannot be made from, naming the fix', () => {

@@ -18,7 +18,7 @@
 // State: each ship's rudder angle. Its controls (revolutions, rudder order, thruster) are inputs, set with `control()`.
 import type { FlowField, FlowSample, SeaSource, SeaSurface } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
-import { exp } from '@margoengine/math/pinned';
+import { cos, exp } from '@margoengine/math/pinned';
 import type { SeaQuery } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
@@ -33,7 +33,17 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { Manoeuvring, type ManoeuvringForces, type ManoeuvringModel } from './mmg.js';
-import { type PropellerRace, raceVelocity, thrusterThrust } from './propeller.js';
+import { raceVelocity, thrusterThrust } from './propeller.js';
+import {
+  cavityRadius,
+  inceptionIndex,
+  type ResolvedRace,
+  raceNumbers,
+  resolvedRace,
+  TIP_VORTEX_GONE,
+  VAPOUR_PRESSURE,
+  VortexCavity,
+} from './race.js';
 import { squat } from './squat.js';
 
 type Vec3 = [number, number, number];
@@ -56,6 +66,9 @@ export interface Ship {
   readonly block?: number;
   /** Hold the added masses and their coupling (default true; false when a HullSolver already carries them). */
   readonly addedMass?: boolean;
+  /** The propeller's blades (default 4) and the water's gas saturation, 0 to 1, for its cavities' hysteresis (default 1). */
+  readonly blades?: number;
+  readonly gas?: number;
   /** How fast the rudder turns, rad/s (default 2.32 degrees a second, the IMO's 35 to 30 degrees on the other side in 28 s). */
   readonly rudderRate?: number;
 }
@@ -113,10 +126,13 @@ export interface ShipStatus {
   forward: Vec3;
   starboard: Vec3;
   /** The propeller's race. */
-  race: PropellerRace | undefined;
+  race: ResolvedRace | undefined;
+  /** The tip vortices' cavitation: whether a cavity stands, its radius, m, the tip's cavitation number and the inception index. */
+  cavity: { cavitating: boolean; radius: number; sigma: number; inception: number };
 }
 
 interface Runtime {
+  readonly cavity: VortexCavity;
   readonly ship: Ship;
   readonly mmg: Manoeuvring;
   readonly control: ShipControl;
@@ -203,6 +219,7 @@ export class ShipSolver implements Solver<ShipParams> {
         { density, rudderRate: ship.rudderRate ?? (65 / 28) * (Math.PI / 180) },
       );
       return {
+        cavity: new VortexCavity(ship.gas ?? 1),
         ship,
         mmg,
         control: { revolutions: 0, rudder: 0, thruster: 0 },
@@ -221,6 +238,7 @@ export class ShipSolver implements Solver<ShipParams> {
           forward: [1, 0, 0],
           starboard: [0, 0, 1],
           race: undefined,
+          cavity: { cavitating: false, radius: 0, sigma: Number.POSITIVE_INFINITY, inception: 0 },
         },
       };
     });
@@ -379,6 +397,10 @@ export class ShipSolver implements Solver<ShipParams> {
         prop = add(add(mid, scale(f, P.position * L)), scale(up, -shaftDepth)),
         // The race's own speed over the water it came from: the far wake less the inflow (momentum theory).
         induced = Math.max(0, forces.race - Math.max(0, forces.thrust > 0 ? forces.inflow : -forces.inflow));
+      // The rudder behind it pushes the race aside: the side force the rudder takes, on the world's starboard.
+      const rudderSide = -forces.rudderNormal * cos(rudders[index]!),
+        // The rudder's distance aft of the propeller, at least half a diameter.
+        rudderAft = Math.max(0.5 * P.diameter, (P.position - (M.rudder.position ?? -0.5)) * L);
       status.race =
         forces.thrust !== 0 && induced > 0
           ? {
@@ -387,8 +409,38 @@ export class ShipSolver implements Solver<ShipParams> {
               diameter: P.diameter,
               pitch: P.curves.pitch,
               efflux: induced,
+              blades: ship.blades ?? 4,
+              revolutions: mmg.revolutions,
+              torque: forces.torque,
+              thrust: forces.thrust,
+              inflow: Math.abs(forces.inflow),
+              up,
+              density: this.density,
+              rudder: forces.thrust > 0 ? { distance: rudderAft, force: scale(s, rudderSide) } : undefined,
             }
           : undefined;
+      // Cavitation in the tip vortices: the tip's cavitation number at the shaft's depth against the Lamb-Oseen core's
+      // inception index, with the cavity's hysteresis.
+      const cavity = rt.cavity;
+      if (status.race) {
+        const n = Math.abs(mmg.revolutions),
+          tip = Math.sqrt(forces.inflow * forces.inflow + Math.PI * n * P.diameter * (Math.PI * n * P.diameter)),
+          ambient = 101325 + this.density * this.g * shaftDepth,
+          numbers = raceNumbers(status.race),
+          core = 0.02 * P.diameter,
+          sigma = tip > 0 ? (ambient - VAPOUR_PRESSURE) / (0.5 * this.density * tip * tip) : Number.POSITIVE_INFINITY,
+          inception = tip > 0 ? inceptionIndex(numbers.circulation, core, tip) : 0,
+          on = cavity.update(sigma, inception);
+        status.cavity = {
+          cavitating: on,
+          // A gas-filled cavity held past inception keeps the size the core's vapour cavity had at inception's edge.
+          radius: on
+            ? Math.max(cavityRadius(numbers.circulation, core, ambient, VAPOUR_PRESSURE, this.density), 0.25 * core)
+            : 0,
+          sigma,
+          inception,
+        };
+      } else status.cavity = { cavitating: false, radius: 0, sigma: Number.POSITIVE_INFINITY, inception: 0 };
       status.speed = speed;
       status.u = u;
       status.v = v;
@@ -454,7 +506,7 @@ export class ShipSolver implements Solver<ShipParams> {
     o.velocity[0] = o.velocity[1] = o.velocity[2] = 0;
     for (const { status } of this.runtime) {
       if (!status.race) continue;
-      raceVelocity(status.race, p, v);
+      resolvedRace(status.race, p, v);
       o.velocity[0] += v[0];
       o.velocity[1] += v[1];
       o.velocity[2] += v[2];
@@ -570,6 +622,32 @@ export class ShipSolver implements Solver<ShipParams> {
         reach: 10 * race.diameter,
         speed,
         radius: depth,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Where the races release air for the bubbles (SEA-15) and the foam (SEA-13): each cavitating propeller's tip-vortex
+   * cavities, carried off where the vortices break down (1.5 diameters aft), at the gas volume they hold, Z pi r_c^2 times the
+   * race's speed through the disc, m^3/s, on a ring of the slipstream's radius.
+   */
+  aeration(_t: number): readonly { position: [number, number, number]; radius: number; rate: number }[] {
+    const out: { position: [number, number, number]; radius: number; rate: number }[] = [];
+    for (const { status } of this.runtime) {
+      const race = status.race;
+      if (!race || !status.cavity.cavitating) continue;
+      const numbers = raceNumbers(race),
+        x = TIP_VORTEX_GONE * race.diameter,
+        r = status.cavity.radius;
+      out.push({
+        position: [
+          race.position[0] + race.direction[0] * x,
+          race.position[1] + race.direction[1] * x,
+          race.position[2] + race.direction[2] * x,
+        ],
+        radius: (numbers.contraction * race.diameter) / 2,
+        rate: race.blades * Math.PI * r * r * numbers.disc,
       });
     }
     return out;

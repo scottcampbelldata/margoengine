@@ -12784,6 +12784,27 @@ ship-design tool, CFD code or companion code was opened):
   half the thrust at a speed of 0.4 of the jet's, Karlikov and Sholomovich as a TU Delft thesis restates them) are
   calibrations, recorded in docs/limits.md.
 
+Added on 2026-11-26 (`ship/empirical.ts`, `ship/race.ts`):
+- K. Kijima, T. Katsuno, Y. Nakiri and Y. Furukawa, "On the manoeuvring performance of a ship with the parameter of loading
+  condition", J. Soc. Naval Architects of Japan 168, 141-148, 1990, https://www.jstage.jst.go.jp/article/jjasnaoe1968/1990/168/1990_168_141/_article
+  (eqs. 1 to 15 and table 1, read): the regression set, its database's ranges and the wake 0.5 C_B - 0.05. Restatements with
+  sign errors were found and not used (Y'rr in Lotovskyi et al. 2025; Y'vrr's +0.11 in Taimuri et al. 2020).
+- Y. Yoshimura and Y. Masumoto, "Hydrodynamic database and manoeuvring prediction method with medium high-speed merchant ships
+  and fishing vessels", J. JASNAOE 14, 63-73, 2011, https://www.jstage.jst.go.jp/article/jjasnaoe/14/0/14_0_63/_article
+  (eqs. 4.1 to 4.7, read): cubic, surge and trim terms and the rudder interaction set; N'brr with the sign of their figure 3.2.
+- R. Lotovskyi et al., 2025 (read), for X'vr's conversion and the hull-swap error spread; Taimuri et al., 2020 (read), restating
+  Clarke, Gedling and Hine (1983) and Brix (1993) added masses, Clarke's yaw term taken as -0.33 B/L, which KVLCC2's captive
+  J'z supports; Kim and Kim (2020) (read) for MARIN's free-running KVLCC2 turning.
+- J. Pennings, "Dynamics of vortex cavitation", PhD thesis, TU Delft, 2016 (read): its propeller's circulation, the vortex
+  models and pressure, the cavity's radius, its wing case; P. Kumar and K. Mahesh, "Large eddy simulation of propeller wake
+  instabilities", J. Fluid Mech. 814, 361-396, 2017 (read): tip vortices unstable from 0.8 D and gone by 1.5 D, the far wake a
+  swirling column; A. Amini et al., "On the physical mechanism of tip vortex cavitation hysteresis", Exp. Fluids 60, 2019 (read):
+  inception at 1.7 and desinence near 4.0 in air-saturated water; W. H. Lam et al. (2010, 2012, abstracts read): peak swirl 76
+  to 82 percent of peak axial at efflux, a band check.
+The swirl's free-vortex profile with a viscous hub core, the tip vortices' nearest-core field, their fade between 0.8 and 1.5
+D, the rudder jet's turn as a rotation of the race about the rudder, the hysteresis's desinence scaled by the gas saturation
+and the aeration rate as the cavities' volume carried at the disc speed are this package's own arrangement.
+
 The rigid body held to the MMG equations (eq. 3's forces on its own mass, its yaw inertia from the bodies port), squat as a
 sea drawn down along the hull for the HullSolver to float on, the race's induced speed as its far wake less its inflow, the
 quay's pull from a one-dimensional continuity estimate of the gap flow, the hull's draught as wake sources and the race's
