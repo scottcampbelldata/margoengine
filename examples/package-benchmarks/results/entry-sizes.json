@@ -13968,8 +13968,8 @@
         "gzip": 10901
       },
       "./soft": {
-        "raw": 221469,
-        "gzip": 121474
+        "raw": 225321,
+        "gzip": 123786
       },
       "./meshfiles": {
         "raw": 6444,
@@ -18282,13 +18282,13 @@
     "@margoengine/physics/soft": {
       "entry": "./soft",
       "base": {
-        "raw": 107039,
-        "gzip": 34706
+        "raw": 108575,
+        "gzip": 35266
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",
-        "raw": 114429,
-        "gzip": 85937,
+        "raw": 116745,
+        "gzip": 87703,
         "loadedBy": "`await SoftBodies.attach(physics)`, once per app (import() in soft.ts); the Wasm is inflated and compiled from it, with no file of its own"
       }
     },

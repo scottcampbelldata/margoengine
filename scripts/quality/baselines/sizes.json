@@ -13107,6 +13107,12 @@
       "commit": "3ef5862954",
       "grew": 2,
       "reason": "ATMO-10 adds optional physics/synoptic (5911 B gzip from zero) and weather/synoptic (940 B from zero). The regional atmosphere, optional SIMD allocation and film bindings remain outside World and Weather roots."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f3c4875b1b",
+      "grew": 0,
+      "reason": "SOFT-04 adds directional reinforcement shared by both nonlinear modes, including snapshots and cuts, moving the soft entry from 121474 to 123786 B gzip. . It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
