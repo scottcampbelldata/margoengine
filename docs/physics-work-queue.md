@@ -348,7 +348,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
 | DYN-08 | Large-scale GPU rigid dynamics | none | Open | OPEN |
-| SOFT-04 | Volumetric solids (FEM) | native FEM and Projective Dynamics with validated elastic materials, reciprocal contact, cutting and fracture | Codex | LANDED (a0de32ed1b) |
+| SOFT-04 | Volumetric solids (FEM) | native FEM and Projective Dynamics with validated elastic materials, reciprocal contact, cutting and fracture | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a0de32ed1b |
 | SOFT-06 | Pressure bodies | physics/soft with sealed gas and rigid contact | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a82ff99eb9 |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
@@ -372,7 +372,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
-| EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | LANDED (5032e1a3b4) |
+| EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5032e1a3b4 |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
@@ -400,7 +400,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 0c11fd27f7 |
 | DYN-04 | Wheeled vehicles on roads | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c |
 | DYN-05 | Rail vehicle dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed fa79b04868 |
-| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | native rods, fast guides and physical skin bindings | Codex | LANDED (c53e60dc12) |
+| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | native rods, fast guides and physical skin bindings | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c53e60dc12 |
 | SOFT-05 | Muscle, fat and skin soft tissue | none | Codex | BUILDING (codex/physics-soft-tissue) |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
@@ -411,10 +411,10 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 561885e7a1 |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Codex | BUILDING (codex/physics-dfsph) |
-| FLUID-02 | Position based fluids (fast mode) | none | Codex | LANDED 14a5956173 |
+| FLUID-02 | Position based fluids (fast mode) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 14a5956173 |
 | FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
 | HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed db1950c88f |
-| ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | LANDED d19267aa1e |
+| ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d19267aa1e |
 | EARTH-01 | MPM continuum | stand-in | Codex | BUILDING (codex/physics-granular-mpm) |
 | EARTH-02 | Depth-averaged granular flow | partial | Codex | BUILDING (codex/physics-depth-granular) |
 | EARTH-04 | Discrete-element rubble and boulders | partial | Open | OPEN |
