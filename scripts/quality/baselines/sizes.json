@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19483202,
+  "total": 19486939,
   "history": [
     {
       "date": "2026-10-24",
@@ -12753,6 +12753,12 @@
       "commit": "52421d6d09",
       "reason": "LIFE-02: 6419 B gzip for the optional limbless and legged locomotion entry and its terrain and contact ports. Core and stage add zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d",
+      "reason": "New optional entry @margoengine/input/face, 0 to 3,481 B gzip measured (budget 3,737): the face-to-ARKit-blendshape driver with landmark measures, head rotation and smoothing. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13268,6 +13274,7 @@
     "@margoengine/ifc/worker": 1828,
     "@margoengine/ifc/write": 10300,
     "@margoengine/input": 5722,
+    "@margoengine/input/face": 3737,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
     "@margoengine/input/landmarks": 2334,

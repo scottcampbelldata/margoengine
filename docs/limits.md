@@ -8,6 +8,11 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Webcam face to morph targets (`@margoengine/input/face`, 2026-11-26): no detector shipped; the app supplies one.
+  Landmarks alone give 15 of the 52 ARKit shapes (blinks, wide eyes, jaw, smiles, frowns, pucker, brows); the others
+  need the detector's blendshape scores. Landmark weights are distance ratios against a neutral face, so they read
+  best after `calibrate` on the person; the head rotation from landmarks has no translation.
+
 - Webcam landmarks (`@margoengine/input/landmarks`, 2026-11-26): no detector shipped; the app supplies one. Margo
   bundles no trained weights and never downloads a model; frames come from the app's own detector (MediaPipe Tasks
   results plug in through `fromMediaPipe`). A stream keeps only the newest `buffer` frames (default 1) for a slow reader.

@@ -290,6 +290,38 @@ for await (const frame of source) {
 - `webcamLandmarks({detect, buffer, ...webcam})` is both together: the source the drivers read. A detector that throws stops the camera and its error comes out of the next read.
 - `OneEuroFilter({minCutoff = 1, beta = 0.007, dCutoff = 1})` is the one-euro filter (Casiez, Roussel and Vogel, CHI 2012): `filter(value, seconds)` smooths one number, cutting jitter at rest and lag in motion; raise `beta` for less lag, lower `minCutoff` for less jitter. `reset()` forgets the history.
 
+## Webcam face to morph targets
+
+`@margoengine/input/face` drives ARKit-named morph targets (the 52 names face rigs commonly use) and gives the head rotation from face frames. It takes a detector's blendshape scores when they are there (MediaPipe's FaceLandmarker with `outputFaceBlendshapes`) and otherwise measures the face mesh: the eye aspect ratio for blinks, the lip gap for the jaw, mouth width and corners for smiles, frowns and puckers, and brow height.
+
+```ts
+import {FaceDriver} from 'margoengine/input/face';
+import {fromMediaPipe} from 'margoengine/input/landmarks';
+
+// Any model with named morph targets: a loaded glTF model's primitives fit.
+const model = {primitives: [{targetNames: ['jawOpen', 'eyeBlinkLeft', 'Smile_L'], weights: [0, 0, 0]}]};
+using face = new FaceDriver({names: {mouthSmileLeft: 'Smile_L'}});
+
+// Two recorded FaceLandmarker results: a resting face (to calibrate on), then a smile with the jaw open.
+const result = (jaw: number, smile: number) => ({
+  faceLandmarks: [[]],
+  faceBlendshapes: [{categories: [{categoryName: 'jawOpen', score: jaw}, {categoryName: 'mouthSmileLeft', score: smile}]}],
+  facialTransformationMatrixes: [{data: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -40, 1]}],
+});
+face.calibrate(fromMediaPipe({face: result(0.05, 0)}, 0));
+for (let time = 33; time <= 330; time += 33) face.update(fromMediaPipe({face: result(0.6, 0.8)}, time));
+face.apply(model);
+console.log(model.primitives[0].weights, face.state.rotation);
+// From a webcam: await face.drive(await webcamLandmarks({detect}), model, {signal}).
+```
+
+- `update(frame or face, time?)` reads the frame's first face and returns `{weights, rotation, tracked, time}`; `apply(model or models)` writes each weight to the targets named after it (case-insensitive, through `names`), leaving other targets alone. `drive(source, model, {signal, onUpdate})` does both for every frame of a `LandmarkSource`.
+- `calibrate(frame)`: take a relaxed face looking at the camera as neutral. Scores are rescaled from the person's resting value, landmark measures are taken against their own face, and the head rotation is measured from that pose.
+- Options: `names` (ARKit name to morph name, default the ARKit names), `source` (`'auto'` scores when given else landmarks, `'blendshapes'`, `'landmarks'`), `minScore` (0.5: a weaker face holds the last good values), `hold` (0.5 s, then back to neutral), `smoothing` (one-euro `{minCutoff: 1.5, beta: 0.5}`, or false), `mirror` (false; swaps left and right for a selfie picture) and `aspect` (1; the frame's width over height, for landmark measures).
+- Landmarks alone give `LANDMARK_BLENDSHAPES` (blinks, wide eyes, jaw, smiles, frowns, pucker and brows); scores give all 52. `measureFace`, `faceWeightsFromLandmarks` and `headRotation` are the measures on their own. The head rotation is in a y-up frame looking along +z with the face's left at +x; with a face transform from the detector it is that transform's rotation.
+
+ARKit is a trademark of Apple Inc.; only its published blendshape names are used.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/input

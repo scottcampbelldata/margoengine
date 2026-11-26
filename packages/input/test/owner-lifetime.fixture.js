@@ -17,6 +17,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { XRBindings } = await load('../dist/xr.js');
   const { VectorInput, wasd } = await load('../dist/vector.js');
   const { landmarkStream } = await load('../dist/landmarks.js');
+  const { FaceDriver } = await load('../dist/face.js');
   const entries = [];
   const input = () => new Input(actions, { target: new EventTarget(), gamepads: () => [] });
   // `make` returns { release, cleanup? } and runs, like the release, with timers watched.
@@ -141,6 +142,18 @@ export async function fixtures(load = (entry) => import(entry)) {
         reading.then((r) => {
           if (!r.done) throw new Error('a disposed landmarkStream left its reader waiting');
         }),
+    };
+  });
+  own('FaceDriver', () => {
+    const face = new FaceDriver(),
+      source = landmarkStream();
+    const driving = face.drive(source, { primitives: [] });
+    return {
+      release: () => {
+        face.dispose();
+        source.dispose();
+      },
+      cleanup: () => driving,
     };
   });
   return entries;

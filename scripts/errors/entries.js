@@ -8,6 +8,24 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'face-driver',
+    title: '@margoengine/input/face: webcam face to morph targets',
+    kind: 'family',
+    messages: [
+      'Face landmarks need the 468 or 478 points of the Face Landmarker topology; see https://margoengine.com/errors#face-driver',
+      'Face source unknown must be auto, blendshapes or landmarks; see https://margoengine.com/errors#face-driver',
+      'Face minScore must be in 0..1; see https://margoengine.com/errors#face-driver',
+      'Face hold must be seconds >= 0; see https://margoengine.com/errors#face-driver',
+      'Face aspect must be a finite width / height above 0; see https://margoengine.com/errors#face-driver',
+      'The face driver is disposed; create a new FaceDriver; see https://margoengine.com/errors#face-driver',
+      'Calibrate on a frame with a face in it; see https://margoengine.com/errors#face-driver',
+      'The face has no detector blendshape scores; enable them in the detector or use source landmarks; see https://margoengine.com/errors#face-driver',
+    ],
+    cause:
+      'The face driver was given a face mesh with fewer than the 468 Face Landmarker points, an unknown source, a minScore outside 0..1, a negative hold or an aspect that is not above 0, was asked for detector scores the face does not have, calibrated on a frame without a face, or used after dispose (a MargoError with code disposed).',
+    fix: "Pass the full face mesh (MediaPipe FaceLandmarker gives 478 points) or detector blendshape scores, turn on `outputFaceBlendshapes` in the detector or use `source: 'landmarks'`, keep minScore in 0..1, hold at 0 or more and aspect as the video width over height, calibrate on a frame that shows the face, and create a new FaceDriver after dispose.",
+  },
+  {
     id: 'webcam-landmarks',
     title: '@margoengine/input/landmarks: webcam and detector landmark frames',
     kind: 'family',

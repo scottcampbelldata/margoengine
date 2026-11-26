@@ -69,6 +69,10 @@
     "./landmarks": {
       "types": "./dist/landmarks.d.ts",
       "import": "./dist/landmarks.js"
+    },
+    "./face": {
+      "types": "./dist/face.d.ts",
+      "import": "./dist/face.js"
     }
   },
   "files": [
