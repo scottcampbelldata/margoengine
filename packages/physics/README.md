@@ -5212,13 +5212,13 @@ world.add(ray, {
 });
 world.add(sand, {
   points: Array.from({ length: 100 }, (_, i) => ({
-    position: [(i % 10 - 4.5) * 0.04, -0.52, (Math.floor(i / 10) - 4.5) * 0.04],
+    position: [(i % 10 - 4.5) * 0.04, -0.52, (Math.floor(i / 10) - 4.5) * 0.04] as [number, number, number],
     volume: 0.000064,
   })),
   floor: -0.56,
   bedSurface: surface.bed,
 });
-world.couple([ray.id, sand.id, surface.id], 'staggered');
+world.couple([ray.describe().id, sand.id, surface.describe().id], 'staggered');
 world.advance(20);
 console.log(sand.wakeImpulse, surface.bed.elevations);
 ```
@@ -5341,7 +5341,7 @@ Use `depositToTerrain: true` at load time to also move arrested layers into the 
 import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const grid = { columns: 65, rows: 3, width: 0.65, depth: 0.03, centre: [0, 0] };
+const grid = { columns: 65, rows: 3, width: 0.65, depth: 0.03, centre: [0, 0] as const };
 const angle = 23.3 * Math.PI / 180;
 const flow = await GranularFlowSolver.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(flow, {
@@ -5360,7 +5360,7 @@ import { TerrainBed } from '@margoengine/physics/earth';
 import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const grid = { columns: 3, rows: 2, width: 3, depth: 4, centre: [0, 0] };
+const grid = { columns: 3, rows: 2, width: 3, depth: 4, centre: [0, 0] as const };
 const bed = new TerrainBed();
 const flow = await GranularFlowSolver.load({ depositToTerrain: true });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
