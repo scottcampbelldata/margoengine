@@ -972,7 +972,7 @@ import { createLayeredTissue } from '@margoengine/physics/tissue';
 await Physics.load();
 const physics = new Physics(null);
 const soft = await SoftBodies.attach(physics);
-const material = (density, youngsModulus) =>
+const material = (density: number, youngsModulus: number) =>
   Object.assign(new CellMaterial(), { density, youngsModulus });
 const desc = new SoftBodyDesc([
   [0, 0, 0], [0.1, 0, 0], [0, 0.1, 0], [-0.1, 0, 0], [0, -0.1, 0], [0, 0, 0.1],
@@ -5218,7 +5218,7 @@ const [ray, sand] = await Promise.all([
 ]);
 const surface = new TerrainBed();
 const world = new PhysicsWorld();
-world.add(surface, { rows: 4, columns: 4, width: 1, depth: 1, centre: [0, 0], elevations: () => -0.48 });
+world.add(surface, { rows: 4, columns: 4, width: 1, depth: 1, centre: [0, 0] as const, elevations: () => -0.48 });
 world.add(ray, {
   bodies: [{
     position: [0, -0.2, 0], mass: 21.47, length: 1, width: 0.2, height: 0.2,
@@ -5394,7 +5394,7 @@ import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
 import { TsunamiSolver } from '@margoengine/physics/tsunami';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const grid = { columns: 28, rows: 3, width: 28, depth: 3, centre: [14, 1.5] };
+const grid = { columns: 28, rows: 3, width: 28, depth: 3, centre: [14, 1.5] as const };
 const bed = Float64Array.from({ length: 84 }, (_, i) => Math.max(-1.25, 0.4375 - (i % 28) * 0.125));
 const flow = await GranularFlowSolver.load({ marineDisplacement: true });
 const sea = await TsunamiSolver.load({ sources: [flow.seaSourceField] });
@@ -5417,7 +5417,7 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 
 const ground = await SeismicGround.load();
 const flow = await GranularFlowSolver.load({ groundField: ground.groundField });
-const grid = { columns: 39, rows: 3, width: 39, depth: 3, centre: [19.5, 0] };
+const grid = { columns: 39, rows: 3, width: 39, depth: 3, centre: [19.5, 0] as const };
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
   .add(ground, {
     width: 39, depth: 18, spacing: [1, 1],
