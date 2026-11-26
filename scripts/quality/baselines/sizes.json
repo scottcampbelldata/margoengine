@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20201260,
+  "total": 20207274,
   "history": [
     {
       "date": "2026-10-24",
@@ -12927,6 +12927,12 @@
       "commit": "0b41b70120",
       "grew": 1,
       "reason": "KB-BOUNCE-CAPTURE2 clustered/bounce grows from 15,419 to 15,427 B gzip: LightBounce.add documents and names the materials mesh it now takes (its TypeError lists it). Words only, no code; no split could hold them."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d019fa752d",
+      "reason": "SOUND-02 adds the optional 5758 B gzip enclosed acoustics entry. Early path analysis, pressure-driven audio and the wave grid share the room API. Splitting them would duplicate validation and consumer setup. Core plus stage gains 0 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13770,6 +13776,7 @@
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/rogue": 7930,
+    "@margoengine/physics/room-sound": 6014,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
