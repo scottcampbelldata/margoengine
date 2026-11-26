@@ -12220,16 +12220,19 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Regression:** `tests/node-apis.test.js` (the build script and everything it imports pass the Node 22.12 API scan).
   Not run on Node 22.12 here; CI's 22.12.0 jobs are that proof.
 
-### Open 2026-11-25: a world's restore does not rewind `Physics.stepCount` (KB-PHYS-STEPCOUNTSEEK1, physics world, rigid solver)
+### Fixed 2026-11-26: a world's restore did not rewind `Physics.stepCount` (KB-PHYS-STEPCOUNTSEEK1, physics world, rigid solver)
 
-- **Repro:** a `PhysicsWorld` with a `RigidSolver`; advance 12 ticks, `takeSnapshot()`, advance 48, `restoreSnapshot()`:
-  `physics.stepCount` is 60, not 12. Anything inside the Physics that reads its clock as `stepCount * fixedTimestep` then
-  reads the wrong time after a seek: a `SailForce` whose wind is a function of time, `Physics.advance(frame, fps)`.
-- **Cause:** the rigid solver's state is the kernel's columns; `stepCount` is a field of the Physics object, not in a region,
-  so a restore leaves it where the run had reached.
-- **Done so far:** the air's loads on bodies (`WindForce`, `WingForce`, `RotorForce`) take the world's tick from the
-  `AirSolver` in a world, so they seek bit for bit (`packages/physics/tests/coupling/air.test.js`). The rigid solver's own
-  fix (its step count as state, read back each step) is open with the rigid solver's owner.
+- **Repro:** `packages/physics/tests/world-rigid-solver.test.js`, "a seek by restore rewinds the Physics's step count". A
+  `PhysicsWorld` with a `RigidSolver`; advance 12 ticks, `takeSnapshot()`, advance 60, `restoreSnapshot()`:
+  `physics.stepCount` stayed 72, so anything inside the Physics that reads its clock as `stepCount * fixedTimestep` (a
+  `SailForce` whose wind is a function of time, a load clocked by it, `Physics.advance(frame, fps)`) read the wrong time
+  after a seek.
+- **Cause:** the rigid solver's state was the kernel's columns; `stepCount` is a field of the Physics object, not in a
+  region, so a restore left it where the run had reached.
+- **Fixed:** the rigid solver keeps the count in a region of its own (`stepCount`, one f64, extra state), written after
+  every step; a restore that changed it is put back into the Physics before the next step. The air's loads in a world
+  already took the world's tick from the `AirSolver` (`packages/physics/tests/coupling/air.test.js`). Regression: the test
+  above (positions, velocities, the step count and the world's hash equal a continuous run's).
 
 ### Fixed 2026-11-25: an air load left a stray force on a body when it stopped (KB-AERO-FORCERESIDUE1, physics fields and flight)
 

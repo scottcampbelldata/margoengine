@@ -242,3 +242,35 @@ test('a Physics stepped 240 times a second steps at level 2 in a world, and to t
   assert.equal(inWorld.stepCount, 120, 'four rigid steps a frame');
   assert.equal(inWorld.kernel.hash, alone.kernel.hash);
 });
+
+test("a seek by restore rewinds the Physics's step count, so a load clocked by it and advance() go on as a continuous run", () => {
+  // KB-PHYS-STEPCOUNTSEEK1: the step count lives on the Physics, outside the kernel's columns, so a restore left it where
+  // the run had reached and everything clocked by stepCount * fixedTimestep read the wrong time after a seek. The box is
+  // pushed by a gust that is a function of that time, as a wind or a sail's is.
+  const clocked = () => {
+    const made = scene(),
+      { physics, box } = made;
+    physics.on('beforestep', () => {
+      const time = physics.stepCount * physics.fixedTimestep;
+      box.applyImpulse([0.02 * Math.sin(5 * time), 0, 0.01 * Math.cos(3 * time)]);
+    });
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics });
+    return { world, physics, box };
+  };
+  const straight = clocked();
+  straight.world.advance(90);
+  const seek = clocked();
+  seek.world.advance(12);
+  const saved = seek.world.takeSnapshot();
+  seek.world.advance(60);
+  seek.world.restoreSnapshot(saved.bytes);
+  // The world went back to frame 12: the next advance runs frames 13 to 90 again.
+  seek.world.advance(90);
+  assert.equal(seek.physics.stepCount, straight.physics.stepCount);
+  assert.equal(seek.physics.stepCount, 90);
+  assert.deepEqual(seek.box.position, straight.box.position);
+  assert.deepEqual(seek.box.linearVelocity, straight.box.linearVelocity);
+  assert.equal(seek.world.hash(), straight.world.hash());
+  straight.physics.dispose();
+  seek.physics.dispose();
+});

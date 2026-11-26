@@ -116,6 +116,13 @@ export class RigidSolver implements Solver<RigidSolverParams> {
   private host: SolverHost | null = null;
   private level: RateLevel = 0;
   private bodies: Region | null = null;
+  /**
+   * The Physics's step count, one f64, kept as extra state so a snapshot, a restore and the hash carry it: anything clocked
+   * by `stepCount * fixedTimestep` (a wind, a sail's gusts, `Physics.advance`) reads the restored time after a seek.
+   */
+  private clock: Region | null = null;
+  /** The count the solver last wrote to `clock`: a restore that changed it is put back into the Physics. */
+  private written = 0;
   private capacity = 0;
   private layout = 0;
   /** The forces and torques `importPorts` added for this tick's step, taken off after it (`FORCE_WORDS` a body row). */
@@ -152,6 +159,8 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       throw new RangeError(`A RigidSolver's capacity is a whole number of body rows above 0; got ${capacity}.`);
     this.capacity = capacity;
     this.bodies = host.allocate('bodies', capacity * BODY_WORDS * 4, 'f32', BODIES_LAYOUT);
+    this.clock = host.allocate('stepCount', 8, 'f64', 1);
+    this.writeClock(physics.stepCount);
   }
 
   private live(): Physics {
@@ -167,8 +176,21 @@ export class RigidSolver implements Solver<RigidSolverParams> {
         'state',
         `RigidSolver steps ${physics.fixedTimestep} s, and the world asked for ${dt} s; keep the Physics's fixedTimestep as it was added.`,
       );
+    // A restore since the last step put another count in the clock: the Physics goes on from it.
+    const clock = this.clockWords();
+    if (clock[0] !== this.written) physics.stepCount = clock[0]!;
     physics.step();
+    this.writeClock(physics.stepCount);
     this.letGo();
+  }
+
+  private clockWords(): Float64Array {
+    return new Float64Array(this.host!.memory.buffer, this.clock!.byteOffset, 1);
+  }
+
+  private writeClock(count: number): void {
+    this.clockWords()[0] = count;
+    this.written = count;
   }
 
   /** Takes the forces of `bodyForces` off the bodies again: they hold for one step. */
@@ -316,7 +338,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
 
   /**
    * What the kernel carries from one step into the next beyond its state: its scratch columns (the island lists a step leaves
-   * and the next starts from) and the multibody walk stamp. Left out of the kernel's own hash, they are still history a
+   * and the next starts from), the multibody walk stamp and the Physics's step count. Left out of the kernel's own hash, they are still history a
    * restored run needs to go on bit for bit (docs/physics-framework.md, section 8), so they are snapshotted as extra state.
    */
   extraState(): readonly Region[] {
@@ -324,7 +346,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       memory = kernel.memory,
       ranges = kernel.stateRanges(),
       covered = new Set(ranges.map((range) => range.byteOffset)),
-      out: Region[] = [];
+      out: Region[] = this.clock ? [this.clock] : [];
     // The stamp is the one word between the header's two state ranges.
     const [first] = ranges;
     if (first)
