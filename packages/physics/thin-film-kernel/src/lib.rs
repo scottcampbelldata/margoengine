@@ -523,77 +523,215 @@ impl Film {
         }
     }
 
-    unsafe fn sweep_face_axes(
-        &self,
-        rhs: *const f64,
-        out: *mut f64,
-        k: f64,
-        dt: f64,
-        contact_norm: *const f64,
-        first: usize,
-    ) {
+    unsafe fn precondition_planar(&self, rhs: *const f64, out: *mut f64, lines: bool) {
         let w = &self.work;
         let n = self.grid.n;
-        let second = 1 - first;
-        for i in 0..n {
-            out.add(2 * i + first).write(*rhs.add(2 * i + first));
-            out.add(2 * i + second).write(0.0);
-        }
-        self.substitute_face_axis(out, first);
-        self.matrix(out, w.result, k, dt, contact_norm);
-        for i in 0..n {
-            let face = 2 * i + second;
-            out.add(face).write(*rhs.add(face) - *w.result.add(face));
-        }
-        self.substitute_face_axis(out, second);
-        for i in 0..n {
-            let face = 2 * i + first;
-            w.donor.add(i).write(*out.add(face));
-            out.add(face).write(0.0);
-        }
-        self.matrix(out, w.result, k, dt, contact_norm);
-        for i in 0..n {
-            let face = 2 * i + first;
-            out.add(face).write(-*w.result.add(face));
-        }
-        self.substitute_face_axis(out, first);
-        for i in 0..n {
-            *out.add(2 * i + first) += *w.donor.add(i);
-        }
-    }
-
-    unsafe fn precondition_planar(
-        &self,
-        rhs: *const f64,
-        out: *mut f64,
-        k: f64,
-        dt: f64,
-        contact_norm: *const f64,
-        lines: bool,
-        coupled: bool,
-    ) {
-        let w = &self.work;
-        let n = self.grid.n;
-        if !lines {
-            for i in 0..2 * n {
-                out.add(i).write(*rhs.add(i) * *w.diagonal.add(i));
-            }
-        } else if !coupled {
+        if lines {
             out.copy_from_nonoverlapping(rhs, 2 * n);
             self.substitute_face_axis(out, 0);
             self.substitute_face_axis(out, 1);
         } else {
-            self.sweep_face_axes(rhs, out, k, dt, contact_norm, 0);
-            for i in 0..n {
-                w.pressure.add(i).write(*out.add(2 * i));
-                w.trial.add(i).write(*out.add(2 * i + 1));
-            }
-            self.sweep_face_axes(rhs, out, k, dt, contact_norm, 1);
-            for i in 0..n {
-                *out.add(2 * i) = 0.5 * (*out.add(2 * i) + *w.pressure.add(i));
-                *out.add(2 * i + 1) = 0.5 * (*out.add(2 * i + 1) + *w.trial.add(i));
+            for i in 0..2 * n {
+                out.add(i).write(*rhs.add(i) * *w.diagonal.add(i));
             }
         }
+    }
+
+    #[inline(never)]
+    unsafe fn stiffness_product(
+        &self,
+        x: *const f64,
+        out: *mut f64,
+        k: f64,
+        dt: f64,
+        contact_norm: *const f64,
+    ) {
+        self.hydraulic_pressure(x, k, out);
+        for i in 0..self.grid.n {
+            let height = *x.add(i);
+            let wetting = if self.wetting_map.is_null() {
+                0.0
+            } else {
+                *self.wetting_map.add(i)
+            };
+            let contact = if contact_norm.is_null() {
+                0.0
+            } else {
+                *contact_norm.add(i)
+            };
+            *out.add(i) = dt * (*out.add(i) + wetting * height) + contact * contact * height;
+        }
+    }
+
+    #[inline(never)]
+    unsafe fn mobility_laplacian(&self, x: *const f64, out: *mut f64) {
+        let grid = self.grid;
+        zero(out, grid.n);
+        for i in 0..grid.n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let weight = *self.work.weight.add(2 * i + axis) * grid.inv_dx;
+                    let exchange = weight * weight * (*x.add(j) - *x.add(i));
+                    *out.add(i) -= exchange;
+                    *out.add(j) += exchange;
+                }
+            }
+        }
+    }
+
+    #[inline(never)]
+    unsafe fn pressure_drop_norm(&self, p: *const f64) -> f64 {
+        let grid = self.grid;
+        let mut norm = 0.0;
+        for i in 0..grid.n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let weight = *self.work.weight.add(2 * i + axis) * grid.inv_dx;
+                    let drop = weight * (*p.add(j) - *p.add(i));
+                    norm += drop * drop;
+                }
+            }
+        }
+        norm
+    }
+
+    #[inline(never)]
+    unsafe fn solve_refined_pressure(
+        &self,
+        k: f64,
+        dt: f64,
+        contact_norm: *const f64,
+        tolerance2: f64,
+    ) -> bool {
+        let grid = self.grid;
+        let n = grid.n;
+        let w = &self.work;
+        let mobility = w.edges;
+        let inverse = mobility.add(n);
+        let height = w.trial;
+        let residual = w.z;
+        let preconditioned = w.z.add(n);
+        let direction = w.direction;
+        let product = w.direction.add(n);
+        let pressure = w.pressure;
+        let face_error = w.result;
+        let sigma = (*self.model).surface_tension;
+        let capillary = sigma * grid.inv_dx * grid.inv_dx;
+        zero(mobility, n);
+        for i in 0..n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let weight = *w.weight.add(2 * i + axis) * grid.inv_dx;
+                    let m = weight * weight;
+                    *mobility.add(i) += m;
+                    *mobility.add(j) += m;
+                }
+            }
+        }
+        for i in 0..n {
+            let wetting = if self.wetting_map.is_null() {
+                0.0
+            } else {
+                *self.wetting_map.add(i)
+            };
+            let contact = if contact_norm.is_null() {
+                0.0
+            } else {
+                *contact_norm.add(i)
+            };
+            let stiffness = dt * (k + wetting + capillary * grid.degree(i)) + contact * contact;
+            inverse
+                .add(i)
+                .write(1.0 / (1.0 + *mobility.add(i) * stiffness));
+        }
+        let precondition = || {
+            for i in 0..n {
+                preconditioned
+                    .add(i)
+                    .write(*inverse.add(i) * *residual.add(i));
+            }
+            for _ in 0..3 {
+                self.stiffness_product(preconditioned, pressure, k, dt, contact_norm);
+                for i in 0..n {
+                    let error = *residual.add(i)
+                        - *preconditioned.add(i)
+                        - *mobility.add(i) * *pressure.add(i);
+                    *preconditioned.add(i) += *inverse.add(i) * error;
+                }
+            }
+            self.stiffness_product(preconditioned, pressure, k, dt, contact_norm);
+        };
+        let inner = |a: *const f64, b: *const f64| {
+            dot(a, b, n)
+                + if n % 2 == 0 {
+                    0.0
+                } else {
+                    *a.add(n - 1) * *b.add(n - 1)
+                }
+        };
+        // Eliminate face flux in the correction, leaving (I + D^T D K) delta_h.
+        // Its inner product is weighted by the positive stiffness K.
+        for refinement in 0..3 {
+            self.matrix(w.solution, face_error, k, dt, contact_norm);
+            for f in 0..2 * n {
+                *face_error.add(f) = *w.residual.add(f) - *face_error.add(f);
+            }
+            if dot(face_error, face_error, 2 * n) <= tolerance2 {
+                return true;
+            }
+            if refinement == 2 {
+                return false;
+            }
+            grid.gradient_transpose(face_error, w.weight, residual);
+            zero(height, n);
+            self.stiffness_product(residual, pressure, k, dt, contact_norm);
+            let correction_tolerance2 = tolerance2 / 16.0;
+            if self.pressure_drop_norm(pressure) > correction_tolerance2 {
+                precondition();
+                direction.copy_from_nonoverlapping(preconditioned, n);
+                let mut rz = inner(residual, pressure);
+                for _ in 0..2 * n {
+                    self.stiffness_product(direction, pressure, k, dt, contact_norm);
+                    self.mobility_laplacian(pressure, product);
+                    for i in 0..n {
+                        *product.add(i) += *direction.add(i);
+                    }
+                    let denominator = inner(pressure, product);
+                    if !(denominator > 0.0 && denominator.is_finite() && rz > 0.0 && rz.is_finite())
+                    {
+                        return false;
+                    }
+                    let step = rz / denominator;
+                    for i in 0..n {
+                        *height.add(i) += step * *direction.add(i);
+                        *residual.add(i) -= step * *product.add(i);
+                    }
+                    self.stiffness_product(residual, pressure, k, dt, contact_norm);
+                    if self.pressure_drop_norm(pressure) <= correction_tolerance2 {
+                        break;
+                    }
+                    precondition();
+                    let conjugacy = inner(pressure, product) / denominator;
+                    rz = inner(residual, pressure);
+                    for i in 0..n {
+                        *direction.add(i) = *preconditioned.add(i) - conjugacy * *direction.add(i);
+                    }
+                }
+            }
+            self.stiffness_product(height, pressure, k, dt, contact_norm);
+            // Compute the true residual again after adding the reconstructed flux correction.
+            for i in 0..n {
+                for axis in 0..2 {
+                    if let Some(j) = grid.neighbor(i, axis) {
+                        let f = 2 * i + axis;
+                        let weight = *w.weight.add(f) * grid.inv_dx;
+                        *w.solution.add(f) +=
+                            *face_error.add(f) - weight * (*pressure.add(j) - *pressure.add(i));
+                    }
+                }
+            }
+        }
+        false
     }
 
     #[inline(never)]
@@ -624,6 +762,14 @@ impl Film {
             return true;
         }
         let tolerance2 = rhs2 * 1e-22;
+        // Beyond this diagonal scale, the assembled face correction needs a true residual.
+        let refined = lines && (0..len).any(|i| *work.diagonal.add(i) < f64::EPSILON * 1e11);
+        if refined {
+            if !warm {
+                zero(work.solution, len);
+            }
+            return self.solve_refined_pressure(k, dt, contact_norm, tolerance2);
+        }
         if warm {
             self.matrix(work.solution, work.result, k, dt, contact_norm);
             for i in 0..len {
@@ -638,17 +784,7 @@ impl Film {
         if lines && !warm && !self.factor_planar_lines(k, dt, contact_norm) {
             return false;
         }
-        // At this stiffness the diagonal scale times roundoff reaches the pressure residual target.
-        let coupled = lines && (0..len).any(|i| *work.diagonal.add(i) < f64::EPSILON * 1e11);
-        self.precondition_planar(
-            work.residual,
-            work.direction,
-            k,
-            dt,
-            contact_norm,
-            lines,
-            coupled,
-        );
+        self.precondition_planar(work.residual, work.direction, lines);
         // PCG on the original face operator with a block for each row or column.
         let mut rz = dot(work.residual, work.direction, len);
         for _ in 0..len {
@@ -665,7 +801,7 @@ impl Film {
             if dot(work.residual, work.residual, len) <= tolerance2 {
                 return true;
             }
-            self.precondition_planar(work.residual, work.z, k, dt, contact_norm, lines, coupled);
+            self.precondition_planar(work.residual, work.z, lines);
             let next_rz = dot(work.residual, work.z, len);
             let beta = next_rz / rz;
             rz = next_rz;
@@ -791,7 +927,9 @@ impl Film {
             let mut primal2 = 0.0;
             for i in 0..n {
                 let rate = *norm.add(i) * *w.transpose.add(i);
-                let trial = rate + *multiplier.add(i);
+                // Over-relax the split update and measure convergence on the actual rate.
+                let relaxed = 1.6 * rate - 0.6 * *target.add(i);
+                let trial = relaxed + *multiplier.add(i);
                 let friction = trial.max(-*receding.add(i)).min(*advancing.add(i));
                 let next = trial - friction;
                 let error = rate - next;

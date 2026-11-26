@@ -15592,11 +15592,23 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   principal five-band blocks along each grid axis with Cholesky factorization. The
   capillary contribution coupling consecutive faces contains the shared cell's grid
   degree plus two, and their second-neighbour coupling comes from one Laplacian edge.
-  The remaining couplings are applied by the full operator at every iteration. For strong
-  stiffness, two opposite symmetric block Gauss–Seidel sweeps include the perpendicular
-  coupling inside the preconditioner as well. Each sweep is a positive factorization of
-  an approximate block matrix. Their mean remains positive and weights both axes equally.
+  The remaining couplings are applied by the full operator at every iteration.
   [Author preprint](https://arxiv.org/abs/1307.2036)
+- Yvan Notay, “Flexible Conjugate Gradients” (2000), section 2, gives explicit
+  orthogonalization of the search directions for an approximate preconditioner.
+  At high stiffness Margo eliminates the face correction from
+  `(I + D K Dᵀ) δx = r`, giving `(I + DᵀD K) δh = Dᵀr`.
+  Here `D` is the mobility-weighted gradient and `K` contains the time-scaled height
+  stiffness and, when enabled, the contact diagonal. The cell operator is symmetric
+  in the `K` inner product. Four Jacobi sweeps use the cell mobility diagonal, and
+  conjugate directions are orthogonalized against the previous step.
+  [Journal](https://doi.org/10.1137/S1064827599362314)
+- James Demmel, Yozo Hida, William Kahan, Xiaoye S. Li, Sonil Mukherjee and E. Jason Riedy,
+  “Error Bounds from Extra Precise Iterative Refinement” (2006), Algorithm 1. Only the
+  residual-correction identity is used here. The film computes in f64 and evaluates
+  the original face operator after each reconstructed correction. Only the true face
+  residual can satisfy the original pressure threshold.
+  [Author PDF](https://people.eecs.berkeley.edu/~wkahan/itref.pdf)
 - Shuo Zhang and Jinchao Xu, “Optimal solvers for fourth-order PDEs discretized on
   unstructured grids” (2014), section 2. Their analysis distinguishes the eigenvalue
   distribution from the worst-case condition number in fourth-order solves. The film
@@ -15628,6 +15640,8 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   On one-row or one-column strips the cell diagonal from the augmented term changes only the
   nearest face coupling and leaves five bands. The solution without the augmented term sets
   the initial wet-area rate. The augmented factor is reused while its right hand side changes.
+  Section 3.4.3's over-relaxation uses 1.6 in the wet-area proximal step and leaves the
+  convergence checks on the original rates.
 - C. G. L. Furmidge, “Studies at phase interfaces. I. The sliding of liquid drops on solid
   surfaces and a theory for spray retention” (1962). The downslope component of weight balances
   capillary retention. For a spanwise-uniform cap the work of a rigid translation uses unit
@@ -15635,6 +15649,18 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   change gives the force per unit width `σ(cos θ_r − cos θ_a)χ(h_peak)`. This brackets the
   numerical onset on two grids.
   [Journal](https://doi.org/10.1016/0095-8522(62)90011-9)
+- Joël De Coninck, François Dunlop and Thierry Huillet, “Contact angles of a drop pinned
+  on an incline” (2017), equations 15–17. In the small-tilt circular limit, the azimuthal
+  integral multiplies Furmidge's diameter by π/4. The level thin film supplies the
+  smooth footprint's projected width. The model infers a quasi-static release angle
+  from the separately measured angles and volume.
+  [Journal](https://doi.org/10.1103/PhysRevE.95.052805)
+- Sravanthi Vallabhuneni, “Designing Non-Textured, All-Solid, Slippery Hydrophilic Surfaces”
+  (doctoral thesis, 2023), chapter 4. Section 4.4 supplies advancing and receding
+  angles of 39° and 36° for water on PEG-coated silicon. The 72 mN/m water case in
+  Table 4.3 separately reports the measured 20 μL slide threshold of 3°. Only that
+  measured column is used for comparison with the small-tilt force integral.
+  [Author thesis](https://repository.lib.ncsu.edu/server/api/core/bitstreams/2f887b7a-5e67-4945-9782-8fde454cb016/content)
 - L. Zhornitskaya and A. L. Bertozzi, “Positivity-Preserving Numerical Schemes for
   Lubrication-Type Equations” (2000). The fourth-order equation lacks the second-order maximum
   principle. Here each shared face uses one single flux limited by the donor's total outgoing

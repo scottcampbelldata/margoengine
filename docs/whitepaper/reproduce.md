@@ -4727,6 +4727,20 @@ contact-angle hysteresis for two ticks each. Test finite positive depth, volume,
 and the direction of the first moment. This exercises the full solver at its normal physics tick.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
+### FLUID-07 independently measured cap retention
+
+Run `node --test --test-name-pattern="SLIC retention" packages/physics/tests/thin-film.test.js`
+from a built physics entry. Hold a 20 μL water cap level for eight solver ticks on 16 and
+32 cells per side. The independent contact-angle range is 36° to 39°. The initial radius
+3.483 mm follows from integrating the radial gravity-capillary `I0` profile at the midpoint
+angle and given volume. For each row, subtract the minimum from the maximum of
+`χ = max(0, 1 − h*/h)^2` and integrate those differences across rows. This is the projected
+wet width in the small-tilt force estimate `F = π σ width (cos θr − cos θa) / 4`.
+Convert that force to a slope using the known excess liquid weight. Both predictions
+round to the separately measured 3° in Vallabhuneni's Table 4.3. The comparison uses
+a quasi-static force estimate from the level geometry.
+[Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
+
 ### FLUID-07 measured inclined film
 
 Run `node --test --test-name-pattern="calibrated inlet" packages/physics/tests/coupling/thin-film.test.js`

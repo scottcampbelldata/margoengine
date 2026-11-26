@@ -6330,6 +6330,14 @@ level and with inclined contact-angle hysteresis, remaining positive and conserv
 volume through both cases.
 [Reproduce](reproduce.md#fluid-07-planar-pressure-convergence)
 
+### FLUID-07 independently measured cap retention
+
+The level 20 μL water cap predicts a quasi-static release tilt of 3.40° and 3.38° on
+two grids, compared with the independently measured 3° for PEG-coated silicon.
+The contact angles come from separate tests. The circular force integral uses the
+solver's projected wet width. Dynamic onset timing remains open.
+[Reproduce](reproduce.md#fluid-07-independently-measured-cap-retention)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings

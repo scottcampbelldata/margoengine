@@ -347,6 +347,45 @@ test('ThinFilmSolver: strongly coupled pressure converges on a water cap over a 
   }
 });
 
+test('ThinFilmSolver: level cap width predicts the independently measured SLIC retention angle', async () => {
+  const density = 998.2;
+  const gravity = 9.80665;
+  const surfaceTension = 0.072;
+  const volume = 20e-9;
+  const precursorDepth = 20e-6;
+  // Radius from the level gravity-capillary profile at the prescribed volume and contact angle.
+  const radius = 0.0034827349076;
+  const [receding, advancing] = [36, 39].map((degrees) => (degrees * Math.PI) / 180);
+  const contactAngle = (receding + advancing) / 2;
+  for (const count of [16, 32]) {
+    const spacing = (3.2 * radius) / count;
+    const depth = shallowCapDepth({ count, radius, spacing, density, gravity, surfaceTension, volume, precursorDepth });
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate, gravity: [0, -gravity, 0] }).add(film, {
+      cells: [count, count],
+      spacing,
+      depth,
+      density,
+      viscosity: 0.001002,
+      surfaceTension,
+      wetting: { precursorDepth, contactAngle },
+    });
+    world.advance(8);
+    const heights = film.depths();
+    let width = 0;
+    for (let j = 0; j < count; j++) {
+      const cover = heights.subarray(j * count, (j + 1) * count).map((h) => Math.max(0, 1 - precursorDepth / h) ** 2);
+      width += spacing * (Math.max(...cover) - Math.min(...cover));
+    }
+    // Integrate the dipole of cos(contact angle) around a nearly circular footprint.
+    const force = (Math.PI / 4) * surfaceTension * width * (Math.cos(receding) - Math.cos(advancing));
+    const tiltDegrees = (180 / Math.PI) * Math.asin(force / (density * gravity * volume));
+    // Vallabhuneni (2023), Table 4.3, reports the separate 20 μL tilt result to a whole degree.
+    assert.equal(Math.round(tiltDegrees), 3, `predicted release tilt: ${tiltDegrees} degrees`);
+    close(film.budget.stored, film.budget.initial, 128 * Number.EPSILON * film.budget.initial);
+  }
+});
+
 test('ThinFilmSolver: the precursor contact-angle pressure has its derived linear decay rate', async () => {
   const n = 16;
   const dx = 0.002;
