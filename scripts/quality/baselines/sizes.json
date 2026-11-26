@@ -12960,7 +12960,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "7280680bcf",
+      "commit": "35f1040045",
       "reason": "SEA-06 adds physics/tsunami at 6538 B gzip (cap 6794 B). Long-wave finite volumes, passive shoreline history and the two independent numerical queries are optional and load stateless native assets. Core plus stage is 24820 B.",
       "grew": 1
     }
