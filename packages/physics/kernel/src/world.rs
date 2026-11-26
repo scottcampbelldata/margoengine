@@ -413,6 +413,8 @@ impl World {
             *self.u(FIRST_JOINT).add(at) = NONE;
             *self.u(AWAKE_SLOT).add(at) = NONE;
             *self.u(ISLAND_NEXT).add(at) = NONE;
+            // No island holds a new body until the next island build names it; a zeroed row would read as island 0.
+            *self.u(ISLAND_ID).add(at) = NONE;
         }
         if kind & KIND != FIXED {
             self.list_awake(row);
