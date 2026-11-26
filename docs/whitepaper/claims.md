@@ -5825,6 +5825,9 @@ memory modes. It checks the exact cut outside the rim, clearance 90° later and 
 Rolling reactions reproduce the closed-form drag of a symmetric, shear-free wheel. At powered slip 1,
 the fixture checks axle torque and drawbar force with the analytic cohesion integrals and a derived
 quadrature error bound. Seek reproduces both reactions and the coupled bed state.
+The live powered wheel fixture checks independent chassis and axle impulses against the previous
+resolved reaction. It verifies kinetic energy decreases, rejects a force sample with no source of
+work and reproduces the complete coupled hash after restoration.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

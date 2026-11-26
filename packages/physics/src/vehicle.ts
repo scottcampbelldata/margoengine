@@ -93,6 +93,17 @@ export interface WheelGroundMaterial {
   };
 }
 
+/** Step-local longitudinal soil reaction from an independently resolved wheel contact. */
+export interface WheelGroundTraction {
+  readonly collider: PhysicsCollider;
+  /** Positive normal force at the sampled contact, N. */
+  readonly load: number;
+  /** Signed chassis force along the rolling direction, N. */
+  readonly drawbar: number;
+  /** Nonnegative moment resisting forward spin, N·m. */
+  readonly axleTorque: number;
+}
+
 /** The surface effect used by one wheel in its last step. */
 export interface WheelGroundState {
   /** Applied bound on the combined coefficient, or null when the wheel uses its legacy material. */
@@ -231,6 +242,7 @@ interface WheelSetup {
   torque: number;
   groundGrip: number | null;
   sinkage: number;
+  traction?: WheelGroundTraction;
 }
 
 type V = [number, number, number];
@@ -291,6 +303,51 @@ function groundInverse(body: PhysicsBody, point: V, direction: V): number {
   return (
     body.inverseMass + dot(principal, [principal[0] * inverse[0], principal[1] * inverse[1], principal[2] * inverse[2]])
   );
+}
+
+function contactVelocity(chassis: PhysicsBody, support: PhysicsBody | undefined, point: V): V {
+  const speed = chassis.velocityAtPoint(point);
+  if (!support) return speed;
+  const other = support.velocityAtPoint(point);
+  return [speed[0] - other[0], speed[1] - other[1], speed[2] - other[2]];
+}
+
+function tractionInverse(body: PhysicsBody, point: V, forward: V): number {
+  if (body.type !== 'dynamic') return 0;
+  const centre = body.worldCenterOfMass;
+  const [a, b, c] = cross([point[0] - centre[0], point[1] - centre[1], point[2] - centre[2]], forward);
+  const m = body.effectiveInverseMass;
+  const I = body.effectiveWorldInverseInertia;
+  return (
+    dot(forward, [m[0] * forward[0], m[1] * forward[1], m[2] * forward[2]]) +
+    a * (I[0]! * a + I[1]! * b + I[2]! * c) +
+    b * (I[3]! * a + I[4]! * b + I[5]! * c) +
+    c * (I[6]! * a + I[7]! * b + I[8]! * c)
+  );
+}
+
+function passiveTraction(
+  traction: WheelGroundTraction,
+  wheel: WheelSetup,
+  travel: number,
+  inverse: number,
+  dt: number,
+): [forward: number, axle: number] {
+  const load = Math.min(1, wheel.force / traction.load);
+  const forceCap = (wheel.groundGrip ?? Infinity) * wheel.force;
+  const impulse = Math.max(-forceCap, Math.min(forceCap, traction.drawbar)) * load * dt;
+  const moment = -traction.axleTorque * load * dt;
+  const spin = wheel.omega;
+  const work = impulse * travel + moment * spin;
+  const compliance = 0.5 * (impulse * impulse * inverse + (moment * moment) / wheel.inertia);
+  // Scale both components together so the sampled pair cannot add kinetic energy or reverse travel or spin.
+  const scale = Math.min(
+    1,
+    compliance > 0 ? Math.max(0, -work / compliance) : 0,
+    impulse < 0 && inverse > 0 ? -travel / (impulse * inverse) : 1,
+    moment < 0 ? (-spin * wheel.inertia) / moment : 1,
+  );
+  return [impulse * scale, moment * scale];
 }
 
 function groundYield(
@@ -511,6 +568,31 @@ export class Vehicle implements PhysicsAttachment {
     const v = this.chassis.linearVelocity,
       f = rotate(this.chassis.rotation, this.facing);
     return v[0] * f[0] + v[1] * f[1] + v[2] * f[2];
+  }
+
+  /** Replace forward tyre traction for the next step on this collider. The tyre still handles lateral slip. */
+  setWheelGroundTraction(index: number, traction: WheelGroundTraction): void {
+    this.checkWheel(index);
+    const wheel = this.wheels[index]!;
+    if (!wheel.tyre)
+      throw new MargoError(
+        'state',
+        'A wheel needs its own spin for ground traction. Configure a tyre model on the wheel.',
+      );
+    if (
+      !(
+        Number.isFinite(Math.fround(traction.load)) &&
+        traction.load > 0 &&
+        Number.isFinite(Math.fround(traction.drawbar)) &&
+        Number.isFinite(Math.fround(traction.axleTorque)) &&
+        traction.axleTorque >= 0
+      )
+    )
+      throw new MargoError(
+        'state',
+        'The wheel ground traction is invalid. Provide positive load, finite force and nonnegative torque.',
+      );
+    wheel.traction = { ...traction };
   }
 
   /** State of wheel `index` after the last step. */
@@ -813,6 +895,8 @@ export class Vehicle implements PhysicsAttachment {
     // step, its grip clipped, and a car at rest would not drive at full force. The wheels share it instead.
     const grounded = this.wheels.filter((wheel) => wheel.contact).length;
     for (const wheel of this.wheels) {
+      const traction = wheel.traction;
+      wheel.traction = undefined;
       if (!wheel.contact) {
         if (wheel.tyre) {
           this.driveBrake(wheel, dt);
@@ -866,9 +950,30 @@ export class Vehicle implements PhysicsAttachment {
         // force that rises as the slip falls, taken over a few sweeps for the two that act together). A stiff tyre at low speed then
         // brings the slip to rest, where a force found at the slip the step began with would ring.
         this.driveBrake(wheel, dt);
+        let soilImpulse: number | undefined;
+        let contactSpeed = pv;
+        if (traction?.collider === wheel.ground && wheel.force > 0 && !(wheel.brake && this.brake > 0)) {
+          const support = this.groundReaction ? traction.collider.body : undefined;
+          const current = contactVelocity(chassis, support, wheel.point);
+          const travel = dot(forward, current);
+          if (travel >= 0 && wheel.omega * wheel.radius >= travel) {
+            const inverse =
+              tractionInverse(chassis, wheel.point, forward) +
+              (support ? tractionInverse(support, wheel.point, forward) : 0);
+            const [impulse, axle] = passiveTraction(traction, wheel, travel, inverse, dt);
+            soilImpulse = impulse;
+            wheel.omega += axle / wheel.inertia;
+            pushWheel(
+              wheel,
+              [forward[0] * soilImpulse, forward[1] * soilImpulse, forward[2] * soilImpulse],
+              wheel.point,
+            );
+            contactSpeed = contactVelocity(chassis, support, wheel.point);
+          }
+        }
         const radius = wheel.radius,
-          forwardSpeed = dot(forward, pv),
-          sideSpeed = dot(side, pv),
+          forwardSpeed = dot(forward, contactSpeed),
+          sideSpeed = dot(side, contactSpeed),
           surface = wheel.omega * radius - forwardSpeed,
           reference = Math.max(Math.abs(forwardSpeed), 1),
           floorSpeed = Math.max(Math.abs(forwardSpeed), 0.5),
@@ -877,6 +982,7 @@ export class Vehicle implements PhysicsAttachment {
           rolling = Math.sign(surface) || 1,
           sliding = Math.sign(sideSpeed) || 1,
           tyre = wheel.tyre;
+        const soilForce = Math.abs(soilImpulse ?? 0) / dt;
         let fx = 0,
           fy = 0;
         const slips = (f: number, g: number): [number, number] => [
@@ -885,6 +991,7 @@ export class Vehicle implements PhysicsAttachment {
         ];
         for (let sweep = 0; sweep < 3; sweep++) {
           for (const which of [0, 1] as const) {
+            if (which === 0 && soilImpulse !== undefined) continue;
             let low = 0,
               high = which === 0 ? Math.abs(surface) / gainForward : Math.abs(sideSpeed) / gainSide;
             if (!(high > 0)) continue;
@@ -892,7 +999,10 @@ export class Vehicle implements PhysicsAttachment {
               const mid = (low + high) / 2,
                 [kappa, alpha] = which === 0 ? slips(mid, fy) : slips(fx, mid),
                 model = tyre.forces({ slipRatio: kappa, slipAngle: alpha, load: wheel.force }),
-                total = wheel.groundGrip === null ? 0 : hypot(model.longitudinal, model.lateral),
+                total =
+                  wheel.groundGrip === null
+                    ? 0
+                    : hypot(soilImpulse === undefined ? model.longitudinal : soilForce, model.lateral),
                 limit =
                   wheel.groundGrip === null ? 1 : total > 0 ? Math.min(1, (wheel.groundGrip * wheel.force) / total) : 1,
                 wanted = limit * (which === 0 ? rolling * model.longitudinal : sliding * model.lateral);
@@ -906,7 +1016,9 @@ export class Vehicle implements PhysicsAttachment {
         if (wheel.groundGrip !== null) {
           const force = hypot(fx, fy);
           const available = wheel.groundGrip * wheel.force;
-          if (force > available) {
+          if (soilImpulse !== undefined) {
+            fy = Math.min(fy, Math.sqrt(Math.max(0, (available - soilForce) * (available + soilForce))));
+          } else if (force > available) {
             const scale = available / force; // float division: exact combined contact limit
             fx *= scale;
             fy *= scale;
@@ -917,13 +1029,14 @@ export class Vehicle implements PhysicsAttachment {
           lateral = sliding * fy;
         wheel.omega -= (longitudinal * radius * dt) / wheel.inertia;
         wheel.rotation += wheel.omega * dt;
-        wheel.forwardImpulse = longitudinal * dt;
+        wheel.forwardImpulse = soilImpulse ?? longitudinal * dt;
         wheel.sideImpulse = -lateral * dt;
-        pushWheel(
-          wheel,
-          [forward[0] * wheel.forwardImpulse, forward[1] * wheel.forwardImpulse, forward[2] * wheel.forwardImpulse],
-          wheel.point,
-        );
+        if (soilImpulse === undefined)
+          pushWheel(
+            wheel,
+            [forward[0] * wheel.forwardImpulse, forward[1] * wheel.forwardImpulse, forward[2] * wheel.forwardImpulse],
+            wheel.point,
+          );
         pushWheel(
           wheel,
           [side[0] * wheel.sideImpulse, side[1] * wheel.sideImpulse, side[2] * wheel.sideImpulse],

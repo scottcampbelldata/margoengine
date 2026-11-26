@@ -160,6 +160,16 @@ At full slip with constant cohesion and zero internal friction, the shear expone
 axle moment and sine/cosine force integrals, which the tests compare to the native midpoint error bound.
 [Ding et al. (2009)](https://vigir.missouri.edu/~gdesouza/Research/Conference_CDs/IEEE_IROS_2009/papers/0739.pdf).
 
+Blake Hannaford and Jee-Hwan Ryu, “Time-Domain Passivity Control of Haptic Interfaces” (2002),
+Eq. 12, motivates accounting for work across all ports in a sampled coupling. For longitudinal
+contact impulse `J`, signed axle impulse `L`, tangential relative speed `v`, angular speed `w`,
+contact inverse mass `M` and spin inertia `I`, the exact rigid kinetic-energy change is
+`s (Jv + Lw) + (s²/2)(MJ² + L²/I)`. The application chooses the largest scale `s` up to one
+that keeps this change nonpositive and does not reverse speed. Both impulses retain the same
+scale after the measured load and optional grip bounds. The fixture checks actual shaft and
+chassis impulse with the changed collider normal, and an active force sample is refused.
+[Hannaford and Ryu (2002)](https://cim.mcgill.ca/~hayward/Teach/papers/Part-II/Hannaford-Ryu-02.pdf).
+
 Krenn and Hirzinger's Fig. 9 gives a discontinuous projected footprint. The resolved tier accepts projected
 depth sampled from a shape. It rotates the sample grid with the contact and bilinearly interpolates local depth
 before applying the force integral. Supplied area and perimeter retain the geometry's effective width when

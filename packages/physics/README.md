@@ -4805,7 +4805,23 @@ Pass `wheelReaction: soilWheelReactionField()` to `Terramechanics.load` to publi
 load record per external row. `SOIL_WHEEL_REACTION_WORDS` is the number of f64 values in each
 layout-1 record: vertical force in N, drawbar force in N along the wheel's forward direction and
 resisting axle torque in N·m. Rows without a loaded rolling wheel contain zeros. The reaction uses
-the published forward driven-wheel arc. This output does not replace the rigid tyre model.
+the published forward driven-wheel arc. Pass the same field as `wheelReaction` to
+`SoilContactRigidSolver` to apply both components on its registered `BedCollider`. Configure a tyre
+model on those wheels to give them independent spin. On powered forward contact, the drawbar impulse
+acts on the chassis and the axle moment slows the wheel. The tyre supplies lateral grip and contacts
+outside this model's range. A lower current load scales the previous reaction before application.
+The [reciprocal wheel example](tests/coupling/terramechanics.test.js) constructs the matching fields and wheel.
+
+```ts
+import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
+
+const terrain = { columns: 64, rows: 64, width: 4, depth: 4, centre: [0, 0] as const };
+const input = soilPatchField();
+const wheelReaction = soilWheelReactionField();
+const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction });
+const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction });
+console.log(rigid.describe().id, soil.describe().id);
+```
 
 ## Physical strand guides
 

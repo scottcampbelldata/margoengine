@@ -74,6 +74,7 @@ export type {
   WheelGroundContact,
   WheelGroundMaterial,
   WheelGroundState,
+  WheelGroundTraction,
 } from './vehicle.js';
 export { explosion, WindField, WindForce } from './fields.js';
 export type { ExplosionOptions, WindOptions } from './fields.js';

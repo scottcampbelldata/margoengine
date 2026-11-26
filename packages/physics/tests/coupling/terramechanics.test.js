@@ -735,3 +735,78 @@ for (const tier of ['mean', 'resolved']) {
   test(`${tier}: real wheel and belt loads change the registered collider and survive seek`, () =>
     coupledVehicles(tier));
 }
+
+test('a powered wheel consumes the native drawbar force and axle moment without adding kinetic energy', async () => {
+  await Physics.load({ threads: true });
+  const terrain = { columns: 72, rows: 96, width: 1.8, depth: 2.4, centre: [0, 0] };
+  const input = soilPatchField();
+  const wheelReaction = soilWheelReactionField();
+  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction });
+  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction });
+  const world = new PhysicsWorld({ rate, memory: worldMemory(true) });
+  const bed = new TerrainBed();
+  world.add(bed, { ...terrain, elevations: () => 0 });
+  using physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+  const ground = new BedCollider(physics, bed.bed);
+  const mass = 60;
+  const radius = 0.16;
+  const inertia = 0.6;
+  const chassis = physics.addBody(null, {
+    type: 'dynamic',
+    position: [0, 0.28, 0],
+    lockRotations: true,
+    enabledTranslations: [false, false, true],
+    colliders: { shape: 'box', halfExtents: [0.1, 0.05, 0.1], mass },
+  });
+  chassis.setLinearVelocity([0, 0, 0.2]);
+  using vehicle = new Vehicle(physics, chassis, {
+    wheels: [{ position: [0, 0, 0], radius, inertia, suspensionRestLength: 0.3, suspensionStiffness: 8 }],
+    tyre: { forces: () => ({ longitudinal: 0, lateral: 0 }) },
+  });
+  const seed = new Float64Array(vehicle.motionStateWords);
+  vehicle.writeMotionState(seed);
+  seed[3] = 10; // First wheel's spin after the three recorded driver controls.
+  vehicle.readMotionState(seed);
+  world.add(rigid, { physics, ground, wheels: [{ vehicle, patches: [{ width: 0.165, length: 0.16 }] }] });
+  world.add(soil, {
+    terrain,
+    inputRows: 1,
+    material: { cohesion: 6000, friction: 0.7, compaction: 1 },
+    rollingWheels: [{ radius }],
+  });
+  world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
+  world.advance(1);
+  const energy = () => 0.5 * (mass * vehicle.speed ** 2 + inertia * vehicle.wheel(0).spin ** 2);
+  const before = energy();
+  const spin = vehicle.wheel(0).spin;
+  const speed = vehicle.speed;
+  const [normal, drawbar, torque] = regionWords(world.memory, world.fields.port(wheelReaction.name).region);
+  assert.ok(normal > 0 && drawbar > 0 && torque > 0);
+  assert.ok(Math.abs(vehicle.wheel(0).forwardImpulse) <= (mass * Math.abs(10 * radius - 0.2)) / 2 ** 15);
+  world.advance(2);
+  const wheel = vehicle.wheel(0);
+  assert.ok(
+    wheel.forwardImpulse > 0 && wheel.spin < spin,
+    `traction: ${wheel.forwardImpulse} N·s, spin ${spin} → ${wheel.spin} rad/s, load ${wheel.load} N`,
+  );
+  const scale = (60 * wheel.forwardImpulse) / drawbar;
+  close(wheel.spin - spin, -(torque * scale) / (60 * inertia), 2048 * eps * spin);
+  const [nx, ny, nz] = wheel.contactNormal;
+  const tangent = Math.hypot(ny, nz);
+  const normalImpulse = (wheel.load * nz) / 60;
+  const tyreImpulse = (wheel.forwardImpulse * ny + wheel.sideImpulse * nx * nz) / tangent;
+  close(vehicle.speed - speed, (normalImpulse + tyreImpulse) / mass, 2 ** -23 * vehicle.speed);
+  assert.ok(energy() < before);
+  const mark = world.takeSnapshot();
+  world.advance(14);
+  const hash = world.hash();
+  world.restoreSnapshot(mark.bytes);
+  world.advance(14);
+  assert.equal(world.hash(), hash);
+  vehicle.readMotionState(seed);
+  chassis.setLinearVelocity([0, 0, 0.2]);
+  vehicle.setWheelGroundTraction(0, { collider: ground.collider, load: 100, drawbar: 250, axleTorque: 0 });
+  physics.step();
+  assert.equal(vehicle.wheel(0).forwardImpulse, 0, 'force with no driving work is rejected by the discrete bound');
+  assert.equal(vehicle.wheel(0).spin, 10);
+});

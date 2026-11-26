@@ -10543,6 +10543,10 @@ in snapshot regions. The profile is temporary arena storage rebuilt each step.
 The opt-in wheel reaction port adds one snapshot record per external row. The native kernel
 integrates net drawbar and axle torque once after finding the loaded arc. The root finder still
 integrates only the vertical force required for its bracket. Unloaded rows are cleared before export.
+In a staggered rigid–soil–bed group, the rigid wheel consumes the previous reaction on the same
+collider. The chassis receives a tangential impulse and the wheel's separate spin state receives
+the axle impulse. A coupled work bound uses the current point velocity, enabled axes and inertia.
+Tyre state, reaction samples and the paired terrain state all participate in seek.
 
 ### Divergence-free particle pressure
 
