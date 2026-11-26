@@ -5317,6 +5317,7 @@ if (crush.read(0).permanentStroke <= 0.025) throw new Error('Expected to fold be
 ```
 
 [Full-scale rail compression comparison](../../docs/whitepaper/reproduce.md#break-03-staged-rail-crush)
+[Independent NCAP road-car pulse](../../docs/whitepaper/reproduce.md#break-03-independent-ncap-road-car-pulse)
 
 Pair `CrushSolver.withContactInertia(channel)` with `HullSolver.withContactInertia(channel)`
 to include the hull's instantaneous exterior added mass and carried water in station contact.

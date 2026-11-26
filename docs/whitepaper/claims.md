@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Independent NCAP road-car pulse (BREAK-03, 2026-11-26). A staged envelope derived
+  from 2013 Accord sedan test 8035 predicts the separately crashed 2013 Accord coupe
+  test 8104 at 55.65 km/h. At 1920 and 3840 Hz, velocity RMS error is 0.376/0.377 m/s
+  and acceleration RMS error is 4.272/4.246 g. Dynamic strokes are 0.7080/0.7109 m
+  versus 0.7168 m inferred from the held-out rear sills, and the rebound is 0.42–0.44 m/s
+  too fast. [Reproduce](reproduce.md#break-03-independent-ncap-road-car-pulse)
 - Staged passenger-rail crush (BREAK-03, 2026-11-26). The pretest design envelope
   predicts the independent full-scale coach's loading velocity with 1.10 mph RMS
   error at 960 and 1920 Hz. Peak longitudinal strokes are 3.196 and 3.205 ft
