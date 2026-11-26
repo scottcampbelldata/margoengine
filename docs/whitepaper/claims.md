@@ -5395,6 +5395,13 @@ predecessor). Against the tree before the sync (ff88a70e7~1) the new record diff
 FG-06: 288 zero bytes after each frame write, the uniform's size (576 to 864 B) and farSea in the shader text, with the
 same 545, 27,675 and 593 calls. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-25, the drawn sea): the water-ssr --current proof advances to 4514375c8, whose Water frame uniform
+carries the physics sea's waves (`WaterOptions.sea`: a header row and up to 896 rows of kx, kz, amplitude and phase, 864
+B to 15,216 B) and whose surface shader sums them. With no sea the count is 0, so the stories draw the same sea; the call
+logs differ in the uniform buffer's size, the length of its frame writes (880 B: the header row, a count of 0, after the
+864 B before it) and the shader module text. packages/water/test/sea-agreement.browser.mjs shows the drawn sea's change.
+Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.

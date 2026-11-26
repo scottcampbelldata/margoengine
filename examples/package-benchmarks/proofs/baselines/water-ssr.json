@@ -1,13 +1,13 @@
 {
  "proof": "water-ssr",
- "ref": "caf466b4cc",
- "revision": "caf466b4ccb8f186713544d5c6b4b59b91386354",
- "capturedAt": "c94feb3da068a10f4e9a7aa542bc5aec38f3ee62",
- "capturedOn": "Node v26.12.0 (V8 14.6.202.34-node.39) win32-x64",
+ "ref": "4514375c8",
+ "revision": "4514375c83705a784274d686982d37e029b2cc02",
+ "capturedAt": "9cfe1b4c9cf1199d13b7d7933979504ae345e71d",
+ "capturedOn": "Node v26.13.0 (V8 14.6.202.34-node.40) darwin-arm64",
  "facts": {},
  "outputs": {
-  "{}": "96c6a74ac93d445ccbf53acdb712ace69591bbab07611f88db2371719c2987d6",
-  "{\"terrain\":true}": "6a48edc872b54668db23629e6101c0ae33fcd7ce576dcff8da927b13d6ddbc47",
-  "{\"reflection\":true,\"shadows\":true}": "e29784e446ce9888af07c89f9c36d74e27d5789f60574e6105a2e2e7303d5adf"
+  "{}": "505b70b2fbdd3c31c02d1fbf27ea985d7187171d1a81a01cd8e38dc34e04da9d",
+  "{\"terrain\":true}": "b325e6065e41bc9c0b444590c380e0c04c85a21fc922775577c24199bbc7d28d",
+  "{\"reflection\":true,\"shadows\":true}": "d94468f59be967cb012e08dc3593960f3ef8a20df44c49055c5a7086d7584d0d"
  }
 }
