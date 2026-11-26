@@ -253,6 +253,25 @@ Every solver must follow these rules. They are checked by tests, not by review a
 8. The state hash covers simulation state, not scratch or memory layout. Golden hashes are checked natively, in Node,
    in both the SIMD and the scalar builds, and in a browser.
 
+**Canonical order and the shared broad phase (decided 2026-11-26).** The rigid kernel meets rule 4 in three steps:
+
+1. **Canonical order on today's structures.** Body rows are the public handles and a snapshot stores them, so a different
+   body creation order is a different scene, as in Rapier. Around fixed body rows, nothing else may change a result: collider
+   and joint creation order, the order pairs are found, the order bodies wake and the order islands are numbered. Pairs are
+   kept in the order of their bodies and colliders, joints in the order of their bodies, and islands are numbered by their
+   lowest body. The test shuffles each of these and also frees and reuses body rows (bodies removed, new ones added into the
+   freed rows, a snapshot taken and restored), and the run goes on bit for bit with one played straight through, so the free
+   list is part of the state. The awake list and active pairs are already sorted every step (`canonical_lists`, 2026-11-26).
+2. **One set of broad-phase and island structures.** The 3D kernel's structures, kept in arena columns (the three-axis
+   endpoint sweep, the dynamic tree with its build strategies and rotations, pair rows with their table and parts, and the
+   union-find), become kernel-common's, generic over storage as slices in the arena. There is no heap in a solver's region: a
+   heap would lie outside the snapshot, the hash and the shared-memory layout. The 2D kernel moves onto them. The Vec-backed
+   versions stay only where another user of kernel-common still needs them, and each is tested against the arena version
+   for identical output.
+3. **Derived state.** The broad-phase structures are rebuilt from the bodies and colliders on restore and are left out of the
+   hash and the snapshot. That also takes pair rows, which a free list hands out, out of the state hash. True history stays
+   in the arena: manifolds, warm starts and sleep counters.
+
 **GPU solvers** (today the flood and the effects particles) are deterministic per device, not across devices, because
 GPU arithmetic is not specified to the bit. A film bake on one machine replays exactly. For cross-machine re-renders
 every GPU solver gets a CPU reference path behind the same interface, and until it has one, its row states the
