@@ -3163,6 +3163,14 @@
       "types": "./dist/physics/celestial.d.ts",
       "import": "./dist/physics/celestial.js"
     },
+    "./physics/schooling": {
+      "types": "./dist/physics/schooling.d.ts",
+      "import": "./dist/physics/schooling.js"
+    },
+    "./physics/vegetation": {
+      "types": "./dist/physics/vegetation.d.ts",
+      "import": "./dist/physics/vegetation.js"
+    },
     "./physics/tracers": {
       "types": "./dist/physics/tracers.d.ts",
       "import": "./dist/physics/tracers.js"
@@ -3170,6 +3178,10 @@
     "./physics/hydro": {
       "types": "./dist/physics/hydro.d.ts",
       "import": "./dist/physics/hydro.js"
+    },
+    "./physics/ice": {
+      "types": "./dist/physics/ice.d.ts",
+      "import": "./dist/physics/ice.js"
     },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
@@ -3966,6 +3978,10 @@
     "./scatter/states": {
       "types": "./dist/scatter/states.d.ts",
       "import": "./dist/scatter/states.js"
+    },
+    "./scatter/plant-motion": {
+      "types": "./dist/scatter/plant-motion.d.ts",
+      "import": "./dist/scatter/plant-motion.js"
     },
     "./scatter/interact": {
       "types": "./dist/scatter/interact.d.ts",

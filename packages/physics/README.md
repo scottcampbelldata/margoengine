@@ -2199,6 +2199,56 @@ const row = trackSolarRow(sun.direction, {groundCoverageRatio: 0.5, stowAt: 15, 
 console.log(sun.horizontal > 0, Number.isFinite(tide.potential), row.mode); // true true track
 ```
 
+### Ice thermodynamics (`margoengine/physics/ice`)
+
+`IceSolver` advances lake, river and sea ice, frost and dripping icicles at 60 Hz on a `PhysicsWorld`. Pass one
+site per column, frost patch or icicle. `sample(index)` returns thickness (or icicle radius), icicle length,
+liquid drainage and steam in kg/s, and externally absorbed heat in watts.
+
+```ts
+import { IceSolver } from 'margoengine/physics/ice';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const ice = new IceSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(ice, {
+  sites: [
+    { kind: 'sheet', temperature: 263.15, salinity: 35, snowThickness: 0.04 },
+    { kind: 'frost', temperature: 248.15 },
+    { kind: 'icicle', waterSupply: 0.0001 },
+  ],
+});
+world.advance(60);
+console.log(ice.sample(0).thickness > 0, ice.sample(1).thickness > 0, ice.sample(2).length > 0); // true true true
+```
+
+Site temperatures are kelvin and default to 268.15 K. Sheet ice starts at zero thickness, in fresh water with no
+snow or basal heat. Set `thickness` and `snowThickness` in metres, `salinity` on the practical salinity scale,
+`conductivity` (default 2.03) and `snowConductivity` (default 0.31) in W/(m K), and `waterHeatFlux` (default 0)
+in W/m², positive into the ice. The water remains at its salinity-adjusted freezing point through phase change.
+Frost starts at zero thickness with density 100 kg/m³, ambient vapour pressure 400 Pa, air temperature 273.15 K,
+mass transfer coefficient 0.002 m/s and thaw heat transfer coefficient 10 W/(m² K). Icicles have an initial
+attachment radius of 0.005 m, zero length, water supply 0.00001 kg/s, and separate side and tip heat transfer
+coefficients of 10 W/(m² K). `area` is the footprint that absorbs external heat, default 1 m² for sheets and
+frost or π times the squared attachment radius for an icicle. Each default can be overridden per site.
+
+For world-driven forcing, turn on `readHeat`, `readTemperature` and/or `readVapour` on the solver and provide a
+writer for each enabled field. All ports are layout-1 `f64` in the site's array order.
+
+| Descriptor | Field | Words per site |
+| --- | --- | --- |
+| `ICE_HEAT_FIELD` | `iceSurfaceHeat` | Positive incident flux in W/m² |
+| `ICE_TEMPERATURE_FIELD` | `iceBoundaryTemperature` | Boundary temperature in K |
+| `ICE_VAPOUR_FIELD` | `iceVapourPressure` | Vapour partial pressure in Pa |
+| `ICE_GEOMETRY_FIELD` | `iceGeometry` | Thickness and zero, or icicle radius and length, all in metres |
+| `ICE_MELTWATER_FIELD` | `iceMeltwater` | Liquid drainage, including unfrozen icicle feed, in kg/s |
+| `ICE_STEAM_FIELD` | `iceSteam` | Steam in kg/s for heat-source or atmospheric feedback |
+| `ICE_HEAT_ABSORPTION_FIELD` | `iceHeatAbsorption` | Absorbed power in W for heat-source cooling |
+
+The three readers default to off. With an upstream source that also consumes returned cooling or steam, call
+`world.couple([sourceId, 'ice-thermodynamics'], 'staggered')` for same-tick heating and returned rates on the next
+source tick. A solver instance owns the four output fields in its world. Its ID defaults to
+`'ice-thermodynamics'`.
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

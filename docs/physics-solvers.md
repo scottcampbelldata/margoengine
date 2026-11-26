@@ -176,7 +176,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | ICE-02 | Glacier and ice-sheet flow | Shallow-ice flow, calving, crevasses, icefalls | none | none | Greve and Blatter, *Dynamics of Ice Sheets and Glaciers* (2009). van der Veen, crevasse fracture mechanics (1998). Benn, Warren and Mottram (2007). | K12 K21 |
 | ICE-03 | Iceberg rigid-body dynamics and calving | Capsize, roll, melt, impulse waves | water/src/ice.ts (static equilibrium) | stand-in: PA-15 | Burton et al., "Laboratory investigations of iceberg capsize dynamics" (2012). Wagner et al. (2017). | K09 K11 K22 |
 | ICE-04 | Pack ice and floes | Discrete-element floes, rafting, ridging, ship-ice resistance | water/src/ice.ts (`SeaIce`) | stand-in: PA-15, 35 | Hibler (1979). Hopkins (2004). Herman (2016). Lindqvist (1989). | K06 K09 |
-| ICE-05 | Ice thermodynamics | Freezing and melting of lake, river and sea ice, icicles, frost | none | none | Stefan (1891). Maykut and Untersteiner (1971). | K27 |
+| ICE-05 | Ice thermodynamics | Freezing and melting of lake, river and sea ice, icicles, frost | physics/src/ice/model.ts and index.ts | built: snow-insulated slab, frost diffusion, water-limited side and tip growth, heat and drainage ports | Stefan (1891). Maykut and Untersteiner (1971). Semtner (1976). Makkonen (1988). Murphy and Koop (2005). | K27 |
 
 ### Family FIRE: explosions, fire and heat (7)
 

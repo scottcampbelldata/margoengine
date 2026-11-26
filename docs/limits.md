@@ -8642,6 +8642,22 @@ clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.
 Near a capture edge, the filter and distortion determine the width of the transition.
 Reflected objects beyond the captured extent are unavailable to the planar adapter.
 
+## Ice thermodynamics (ICE-05)
+
+Ice sites are independent vertical columns, porous frost layers or axisymmetric icicles. The ice slab and
+prescribed snow are quasi-steady and omit lateral conduction, internal heat storage, brine redistribution,
+and snow accumulation or ablation. Specify conductivity and snow depth for the represented layer. The surface
+freezing-point formula is measured at practical salinity 4 to 40 and extends to the fresh-water point at 0.
+Frost uses the Murphy–Koop ice curve above 110 K and through 273.15 K. The area and transfer coefficient describe
+the resolved layer. Icicle cells approximate the side and tip areas by a cylinder with a fixed-radius attachment
+when no ice remains. The solver updates heat rates and phase changes at 60 Hz, holds each boundary field for the
+tick and applies basal and prescribed heat after conductive growth or thaw. The steam calculation uses an
+atmospheric-pressure water pool that contains the current tick's melt, with a constant liquid heat capacity.
+Unfrozen feed and meltwater drain at the end of that step. Returned rates follow the layout-1 site order.
+
+Each site uses 144 bytes of world state and scratch, plus registry copies for the four output fields. The
+optional entry measures 3,843 B gzip against a 4,099 B budget on the workstation.
+
 ## Celestial ephemeris and rotation (SPACE-02)
 
 The built-in analytic orbital elements are fitted to 1800–2050. For other dates or higher accuracy, provide a complete NASA/JPL SPK planetary/lunar kernel with J2000-frame type 2 or type 3 coverage, including the Sun's retarded epoch. The reader supports both IEEE byte orders. With SPK, the solar/lunar angles include geocentric stellar aberration and light time. Site rotation uses the ellipsoid and geometric horizon, with uniform discs for eclipse flux and the Danjon lunar-shadow enlargement. Atmosphere, solar limb darkening, observer-motion aberration and lunar limb relief are outside this geometric model. Tide values are direct astronomical forcing in Earth-fixed coordinates. Bathymetry, ocean response and solid-Earth compliance are supplied by their own models. Tracker shading is for adjacent parallel rows with equal widths and a shared rotation, and accepts the local row's slope and rotation offset.

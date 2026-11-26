@@ -14002,6 +14002,10 @@
       "./vegetation": {
         "raw": 23538,
         "gzip": 9402
+      },
+      "./ice": {
+        "raw": 7973,
+        "gzip": 3843
       }
     },
     "@margoengine/physics2d": {

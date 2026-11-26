@@ -24,6 +24,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   tightens after it passes. Reproduce with `node --test packages/physics/tests/coupling/schooling.test.js`
   after building packages. The field and point dynamics were tested with synthetic geometry.
 
+- ICE-05 ice thermodynamics (2026-11-25) uses a closed-form slab update and gives the analytic bare and snow-covered
+  Stefan trajectories, tracks water through growth and thaw of an icicle and closes imposed heating's fusion,
+  sensible and vaporisation budget. Reproduce with
+  `node --test packages/physics/tests/ice.test.js packages/physics/tests/coupling/ice.test.js`. The coupling test
+  uses a layout-compatible source and reader and compares the repeat hashes over display rates and after restore.
+
 - Own physics implicit soft solids (2026-11-24): a cantilever 1 m long, 0.25 m square, E = 3 MPa, on the `'fem'` solver (one
   linear solve a substep, conjugate gradient) sags at its free end to the same 88 percent of the Euler-Bernoulli deflection
   with one substep of one pass as with eight of four (within 3 percent of each other), where the constraints at one pass sag

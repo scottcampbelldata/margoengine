@@ -70,6 +70,10 @@ there, add a line below with the solver ID and what is needed, and build against
   in m/s² at a Cartesian point) and insolation (W/m² and solar direction at a WGS 84 site) for SEA-07 and ATMO-09.
   The celestial solver publishes both as layout-1 registry ports and supplies readers and test stand-ins.
 
+- ICE-05 requests canonical layout-1 fields for ice boundary heat (W/m²), temperature (K), vapour (Pa),
+  drainage and steam (kg/s), and absorbed heat (W). ICE-05 publishes its current layouts through
+  `@margoengine/physics/ice`. A staggered test uses the same layout for EARTH-10 forcing and feedback.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.

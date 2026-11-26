@@ -12,6 +12,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause** The demo needs the complete rainfall-runoff and flood-depth chain from HYDRO-02 and HYDRO-01. The ATMO-09
   regression verifies the ground wetness, material response and local runoff flux in isolation. The scene review
   remains open until the surface output is consumed and flood depth appears in the shot.
+### Fixed 2026-11-25: fixed ice geometry could not respond to world-clock heating (ICE-05)
+
+The prior ice render shapes had no phase-change state. A pulse delivering fusion, sensible and vaporisation
+energy to a thin sheet could neither melt it nor return the resulting drainage and steam in the world.
+`packages/physics/tests/coupling/ice.test.js` reproduces that forcing and checks the returned mass and absorbed
+power. EARTH-10 can connect using the layouts requested in the [work queue](physics-work-queue.md#framework-requests).
+
 ### Fixed 2026-11-25: missing time-varying celestial forcing and tracker backtracking (SPACE-02)
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).

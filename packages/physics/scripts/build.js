@@ -59,6 +59,7 @@ await build({
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
+        ice: resolve(root, 'src/ice/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

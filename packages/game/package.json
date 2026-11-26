@@ -2167,6 +2167,14 @@
       "types": "./dist/physics/celestial.d.ts",
       "import": "./dist/physics/celestial.js"
     },
+    "./physics/schooling": {
+      "types": "./dist/physics/schooling.d.ts",
+      "import": "./dist/physics/schooling.js"
+    },
+    "./physics/vegetation": {
+      "types": "./dist/physics/vegetation.d.ts",
+      "import": "./dist/physics/vegetation.js"
+    },
     "./physics/tracers": {
       "types": "./dist/physics/tracers.d.ts",
       "import": "./dist/physics/tracers.js"
@@ -2174,6 +2182,10 @@
     "./physics/hydro": {
       "types": "./dist/physics/hydro.d.ts",
       "import": "./dist/physics/hydro.js"
+    },
+    "./physics/ice": {
+      "types": "./dist/physics/ice.d.ts",
+      "import": "./dist/physics/ice.js"
     },
     "./pixel": {
       "types": "./dist/pixel.d.ts",

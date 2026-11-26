@@ -12325,6 +12325,44 @@ The load point in the step is this package's own: a restoring load -k x taken at
 step of s symplectic-Euler substeps, has the update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), so
 theta = (s - 1) / (2 s) neither feeds nor drains the motion; the radiation force is carried there linearly.
 
+## Ice thermodynamics (ICE-05)
+
+- Josef Stefan, [Über die Theorie der Eisbildung](https://www.zobodat.at/pdf/SBAWW_98_2a_0965-0983.pdf),
+  presented 1889 and [published in Annalen der Physik](https://doi.org/10.1002/andp.18912780206) (1891).
+  For a vertical quasi-steady ice column, the outgoing conductive flux is conductivity times the difference
+  between the freezing point and the boundary temperature divided by the ice thickness. Fusion converts
+  that flux into the change in solid ice thickness. Integrating the bare column gives square-root growth in time.
+- Gary A. Maykut and Norbert Untersteiner, [Some results from a time-dependent thermodynamic model of sea ice](https://doi.org/10.1029/JC076i006p01550)
+  (1971), Fig. 1 and the governing boundary heat balances. Albert J. Semtner Jr.,
+  [A Model for the Thermodynamic Growth of Sea Ice in Numerical Investigations of Climate](https://frouingroup.ucsd.edu/Most_recent_figs/Refs/semtner-1976.pdf)
+  (1976), Appendix. Their zero-layer approximation treats the two layers as thermal resistances in series.
+  Multiplying the snow thermal resistance by the ice conductivity gives an effective ice thickness
+  `s = kIce * snowThickness / kSnow`. The closed update adds
+  `2 * kIce * (Tfreeze - Tboundary) * dt / (density * latentHeat)` to `(thickness + s)^2`, limited by the zero-ice
+  boundary. Underwater and imposed heating subsequently consume latent heat at the amount delivered by the source.
+- N. P. Fofonoff and R. C. Millard Jr., [Algorithms for Computation of Fundamental Properties of Seawater](https://www.jodc.go.jp/info/ioc_doc120810/UNESCO_tech/059832eb.pdf)
+  (UNESCO, 1983), freezing point chapter. The tested surface value uses the atmospheric-pressure polynomial with
+  PSS-78 salinity. Fresh water uses 273.15 K. In between 0 and the lower measured salinity 4, the expression smoothly
+  approaches the fresh-water endpoint.
+- Daniel M. Murphy and Thomas Koop, [Review of the vapour pressures of ice and supercooled water for atmospheric applications](https://doi.org/10.1256/qj.04.94)
+  (2005), Eq. 7. The ice saturation pressure uses that equation in kelvin and pascals. Dividing vapour pressure by
+  the gas constant of water vapour and the local gas temperature gives density. A steady film of specified mass
+  conductance transfers mass in proportion to the density difference across it. The surface deposition or sublimation
+  mass is converted to porous frost thickness with the specified bulk density.
+- Lasse Makkonen, [A Model of Icicle Growth](https://doi.org/10.3189/S0022143000009072) (1988), equations and
+  discussion for ice growth on the sides and at the tip. Margo integrates each area as one axisymmetric cylinder.
+  Heat removed sets the amount frozen and the remaining supply reaches the tip. Cylindrical volume then gives
+  the new radius and length. The converse heat input melts both surfaces. Excess feed drains.
+- US Army Corps of Engineers, [Mechanical and Electrical Design for Lock and Dam Operating Equipment](https://www.publications.usace.army.mil/Portals/76/Publications/EngineerManuals/EM%201110-2-2610_FINAL_18Mar2025.pdf)
+  (2025), section on mechanical ice control, and IAPWS, [Revised Release on the Equation of State 2006 for H₂O Ice Ih](https://www.teos-10.org/pubs/IAPWS-06-Revised_2009.pdf)
+  (2009). Near-freezing density and fusion energy use conventional rounded values. After the solid is exhausted,
+  externally supplied heat warms the meltwater to 373.15 K using a constant liquid-water heat capacity before it
+  pays the latent heat of vaporisation. Available mass bounds the resulting steam.
+
+`tests/ice.test.js` checks the independent slab solution, the UNESCO S = 35 table value, vapour-film mass,
+and side/tip mass conservation. `tests/coupling/ice.test.js` exchanges layout-1 fields, closes the mass and energy
+budgets, then compares exact hashes across display rates, snapshot/restore and seek.
+
 ## Celestial ephemeris and rotation (SPACE-02)
 
 The optional physics/celestial entry uses the world tick and independent TT, UT1 and TDB epoch offsets. An Earth-fixed position is obtained by an IAU 2006 celestial-pole rotation, ERA and optional measured polar motion. The solar and tidal field ports depend on little fixed-size f64 regions with documented layouts. For a complete planetary SPK file, position and velocity are evaluated from its actual polynomial records, and the Sun and Moon's apparent directions include one-way light time and stellar aberration.

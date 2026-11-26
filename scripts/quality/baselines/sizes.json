@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19187542,
+  "total": 19191641,
   "history": [
     {
       "date": "2026-10-24",
@@ -12507,6 +12507,12 @@
       "commit": "5829e2a5fc",
       "reason": "BIO-01 adds optional vegetation (9402 B gzip) and scatter posing (2248 B gzip). Core and stage require no additional bytes.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "85735e10c0",
+      "reason": "ICE-05 adds its optional physics/ice entry at 3843 B gzip (budget 4099 B) for slab, frost and icicle phase change and layout-1 water, steam and heat exchange. Core and stage do not load it.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13305,6 +13311,7 @@
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/hydro": 6567,
+    "@margoengine/physics/ice": 4099,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/schooling": 5254,

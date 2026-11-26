@@ -4191,6 +4191,14 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+### Ice thermodynamics (ICE-05)
+
+The world coupling test applies heat through the registry and verifies the phase budget, liquid and vapour mass,
+absorbed watts and next-tick feedback. The same coupled inputs replay bit for bit at 24, 30 and 60 fps and after
+snapshot restoration. The bare and insulated sheets follow the integrated Stefan equation. Frost saturation and
+icicle mass conservation have independent unit checks. The future lava and water implementations can use the
+field layout in the work queue. See the [clean-room record](../clean-room.md#ice-thermodynamics-ice-05).
+
 ### Celestial ephemeris and rotation (SPACE-02)
 
 The coupling harness covers tide and solar-irradiance queries through the world ports, reproducibility across frame
