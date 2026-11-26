@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20085632,
+  "total": 20090335,
   "history": [
     {
       "date": "2026-10-24",
@@ -12807,6 +12807,12 @@
       "commit": "lane-d",
       "reason": "New optional entry @margoengine/input/body, 0 to 3,533 B gzip measured (budget 3,789): the hand and pose landmark to humanoid skeleton driver with joint limits and smoothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "8d00b3f47",
+      "reason": "vfx node-system: new optional entry (4,703 B gzip), a block-graph particle system compiled into VFX options with versioned JSON, coded errors and a clock that chains systems; the root VFX is imported, not bundled, and no existing entry grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -14270,6 +14276,7 @@
     "@margoengine/vfx/json": 2860,
     "@margoengine/vfx/lit": 2369,
     "@margoengine/vfx/mesh": 3449,
+    "@margoengine/vfx/node-system": 4959,
     "@margoengine/vfx/nodes": 3349,
     "@margoengine/vfx/obstacles": 1311,
     "@margoengine/vfx/over-life": 1831,
