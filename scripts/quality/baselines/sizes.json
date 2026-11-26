@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20604874,
+  "total": 20605808,
   "history": [
     {
       "date": "2026-10-24",
@@ -13747,6 +13747,12 @@
       "commit": "fa058693de",
       "reason": "BREAK-03 plate buckling and sampled mesh positions and normals grows the optional crush entry from 6094 to 7159 B gzip. The ceiling rises from 6350 to 7415 B. The new plate query and mesh coordinates share material validation and remain tree-shakable named exports. A separate entry would require another import for the same structural profile and repeat the numerical preparation.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c4575331ab",
+      "grew": 1,
+      "reason": "SEA-15's finite Fay oil spills move physics/tracers from 9469 to 10376 B gzip. The optional ceiling rises from 9754 to 10688 B. The existing surface advection, live sea binding, parcel storage and snapshot ledger all serve the spreading patch, so a split would duplicate those paths or require a second parcel entry point."
     }
   ],
   "items": {
@@ -14624,7 +14630,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 9434,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 9754,
+    "@margoengine/physics/tracers": 10688,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,

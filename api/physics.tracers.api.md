@@ -84,8 +84,18 @@ export interface TracerMaterial {
     colour: readonly [number, number, number];
 }
 
+export interface TracerOilSpill {
+    mass: number;
+    position: readonly [number, number];
+    start?: number;
+    spreadingCoefficient: number;
+    material?: TracerMaterial;
+    parcels?: number;
+}
+
 export interface TracerParams {
     sources?: readonly TracerSource[];
+    oilSpills?: readonly TracerOilSpill[];
     sea?: SeaSurface;
     water?: FlowField;
     cellSize?: number;
