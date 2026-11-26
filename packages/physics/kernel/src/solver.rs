@@ -515,23 +515,38 @@ impl World {
         }
     }
 
-    /// Each substep, once the poses have moved: adds to each point's drift how far its two surfaces slid, from the speeds
-    /// the poses moved with. Tallied in the relaxing pass instead, each point would see the speeds as the points before it
-    /// in that pass left them, a slide no pose made, and a resting block would keep a twist in its anchors that eats its
-    /// friction (`a_block_slides_only_above_tan_t_equal_to_mu`).
+    /// Each substep, once the poses have moved: adds to each point's drift how far its two surfaces slid, across the normal.
+    /// Each anchor's material point moved by its centre's step, the speed it moved with times h, and by its turn: the arm
+    /// from the centre now less that arm turned back by the substep's spin, w h (the pose update turns a body by that).
+    /// Tallied in the relaxing pass instead, each point would see the speeds as the points before it in that pass left
+    /// them, a slide no pose made, and a resting block would keep a twist in its anchors that eats its friction
+    /// (`a_block_slides_only_above_tan_t_equal_to_mu`). Tallied as speed times the step's lever, it missed how a turning body
+    /// carries its anchor round, the centripetal w^2 r of a lever r, always the same way: a plate 60 m from a deck's pitch axis
+    /// slid 4 mm a pitch through friction three times what it needed (`a_plate_rides_a_deck_turning_about_an_axis_far_away`).
+    /// Read off the poses instead, it took in their f32 rounding, a unit of their last place where a resting box moves a
+    /// fiftieth of one in a substep, and the anchors' pull on that noise made a pile's top boxes jitter; the turn is a series
+    /// in the substep's spin for the same reason.
     pub fn tally_drift(&mut self, h: f32) {
         for i in self.window.pairs.0..self.window.pairs.1 {
             let row = self.uu(SOLVE_PAIRS, i) as usize;
             let (a, b) = self.pair_bodies(row as u32);
             let (linear_a, angular_a) = (self.v(LINEAR_X, a), self.v(ANGULAR_X, a));
             let (linear_b, angular_b) = (self.v(LINEAR_X, b), self.v(ANGULAR_X, b));
+            let (rotation_a, rotation_b) = (self.pose_rotation(a), self.pose_rotation(b));
+            let (turn_a, turn_b) = (angular_a.scale(h), angular_b.scale(h));
+            // The arm's move over a turn t, arm - R(-t) arm = t x arm - (t x (t x arm)) / 2 to second order, written so (the
+            // turn of a resting body is a few hundred-millionths of a radian, and an arm less its turned self in f32 is its
+            // rounding, three times the move).
+            let chord = |t: V3, arm: V3| t.cross(arm).sub(t.cross(t.cross(arm)).scale(0.5));
             let normal = self.v(PAIR_NORMAL_X, row);
             for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
                 let at = row * MANIFOLD + k;
-                let (arm_a, arm_b) = (self.v(CONTACT_ARM_A_X, at), self.v(CONTACT_ARM_B_X, at));
-                let relative = linear_b.add(angular_b.cross(arm_b)).sub(linear_a.add(angular_a.cross(arm_a)));
-                let slide = relative.sub(normal.scale(relative.dot(normal)));
-                self.set_v(CONTACT_DRIFT_X, at, self.v(CONTACT_DRIFT_X, at).add(slide.scale(h)));
+                let (arm_a, arm_b) = (rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)), rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+                let moved_a = linear_a.scale(h).add(chord(turn_a, arm_a));
+                let moved_b = linear_b.scale(h).add(chord(turn_b, arm_b));
+                let moved = moved_b.sub(moved_a);
+                let slide = moved.sub(normal.scale(moved.dot(normal)));
+                self.set_v(CONTACT_DRIFT_X, at, self.v(CONTACT_DRIFT_X, at).add(slide));
             }
         }
     }
