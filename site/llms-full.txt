@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,136 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,140 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -4124,6 +4124,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | float32 coordinates | Measured on the GPU ([large-coordinates-gpu.json](../examples/package-benchmarks/results/large-coordinates-gpu.json), 10 mm part, camera 50 mm away): core alone jitters 0.38 px at 1 km and 42 px at 100 km; at 6,000 km the part is not drawn. Per-stage CPU breakdown in [large-coordinates.md](large-coordinates.md). | Core and its kernel store positions and matrices in float32: half the memory and bandwidth of float64, and the format GPUs consume. | No error. Parts shake while the camera moves, small features collapse, specular shifts (2.8° at 100 km), and far enough out geometry disappears. | `FloatingOrigin` in `@margoengine/cameras/origin` (1,258 B gzip, 0 core bytes): 0.019 px jitter at every distance up to 6,000 km, and `engine.pick` hits the part at every distance ([large-coordinates.md](large-coordinates.md#the-plugin)). Vertices or child offsets that are already kilometres from their root inside one asset must be re-centred at export. |
 | Transparency | Default: transparent materials and gltf/pbr `BLEND` primitives are sorted back to front per mesh; core meshes are opaque. Measured ([oit-gpu.json](../examples/package-benchmarks/results/oit-gpu.json), a 50 % housing over gears orbited 360 × 1°): 13 steps with more than 1 % of covered pixels popping. | Sorting is exact for separate objects and needs no extra targets. | Popping where transparent parts interpenetrate or nest, as the camera moves. | `@margoengine/oit` (2,210 B gzip): 0 popping steps on the same orbit. Weighted blended OIT is an approximation: colour error against exact blending 0.5 / 4.6 / 8.7 (0-255) for 1 / 2 / 4 layers; on the batch 168 five-pane scene MAE 1.568 where `PeelOIT`, `ExactOIT` and the per-mesh sort measure 0.048, the same as Babylon.js dual depth peeling (accepted difference KB3148a: the weighted average is the method; use `PeelOIT` or `ExactOIT` for the exact over operator, `packages/oit/test/gpu/reference-check.mjs`). Transmission and custom blending keep the sorted path unless `blending` is set; limits in its [README](../packages/oit/README.md#limits-the-wboit-approximation). |
 | Screen-space reflections | Enforced by method: only what is on screen reflects. Core meshes and models passed to `ssr.add(model)` (gltf/pbr, materials, terrain, water) show reflections; other custom shaders are reflected but do not reflect. Cost measured on a worst-case glossy floor ([ssr-gpu.json](../examples/package-benchmarks/results/ssr-gpu.json), quiet-gated): 2.2-2.3 ms at 1280×720, 5.8-5.9 ms at 1920×1080. | Reusing depth and colour that are already rendered avoids a second scene pass. Each custom pipeline needs its own capture into SSR's targets. | Reflections fade at screen edges and miss off-screen objects (reflection probes fill in where attached); water and terrain not added keep their own sky reflection. | `@margoengine/post/ssr` (9,068 B gzip) is itself the opt-in. Off-screen reflections: reflection probes in `@margoengine/environment/probes`; SSR removes the probes' own specular only where its ray hits on screen and keeps the probe's reflection elsewhere ([probes-gpu.json](../examples/package-benchmarks/results/probes-gpu.json): off screen the floor equals the frame without SSR, 95th percentile 0/255). Limits in the [post README](../packages/post/README.md). |
+| Ray-traced reflections (`RTReflections` in `@margoengine/post/rt-reflections`, FG-17 piece 6b, 2026-11-25) | Enforced: `scene` a `GPUSceneBVH`, `shadows` a boolean, `bias` finite and at least 0, plus every SSR option. By method: where SSR's march leaves a share of the ray, one ray per pixel through the scene BVH; traced hits are lit by core's BRDF, the engine sun with a shadow ray, core's flat ambient and the instance's emissive, with one material record per instance and the triangle's flat normal; a disposed scene or one from a lost device runs as SSR. Checked on real frames ([rt-reflections-browser.mjs](../packages/post/test/rt-reflections-browser.mjs), WebGPU and the WebGL2 layer). GPU cost not measured (build phase). | Tracing only the share the screen misses keeps the march's cost and look wherever the screen has the answer; one material record per instance keeps the trace to one storage read per hit. | Off-screen things, things behind the camera and things hidden behind the depth buffer reflect; traced hits show no textures, IBL, probes, clustered lights or shadow maps, and curved meshes reflect faceted. | Put every reflected mesh in the scene with a material record close to its look; keep reflection probes for environment light at traced hits. |
 | Rough reflections with contact hardening (`contactHardening` on environment's Reflector, Refractor, PBRReflector and water's WaterReflection; SSR's blur, 2026-11-25) | By method: the blur is the capture's 2x2 box mip chain read trilinearly, at most 8 levels on planar captures (footprints over 128 capture texels stop growing) and 5 half-resolution levels in SSR (over 64 pixels). Isotropic: no stretching of the reflection along the view as a GGX lobe has at grazing angles. The cone of roughness r is capped at 1.4 rad, reached near r = 0.76. Checked on real frames ([contact-hardening-browser.mjs](../packages/environment/tests/contact-hardening-browser.mjs), [reflector-cone.browser.mjs](../packages/water/test/reflector-cone.browser.mjs), [ssr-cone-browser.mjs](../packages/post/test/ssr-cone-browser.mjs)). | A mip read per pixel keeps the cost at one 2x2 depth read and one texture read, with no sampling noise or history. | The level steps where depth jumps (an object's edge against a far background); a normal-map distortion moves the lookup but not the distance; the streaks of wet roads are not reproduced. | MeshReflector keeps drei's `depthScale` blur; SSR's `stochastic` path samples the GGX lobe itself. |
 | Volumetric fog | Enforced by design: one froxel grid (default 160 × 90 × 64) whatever the screen size, so shadow edges in the fog are about one froxel wide (8 × 8 px at 1280 × 720). Effects measured in [volumetric-gpu.json](../examples/package-benchmarks/results/volumetric-gpu.json). | A froxel volume makes light shafts follow real shadows at a fixed cost per frame. On the WebGL2 compatibility layer each froxel integrates its own column (steps 0 to its slice, one store) so the layer runs it on the GPU: (slices + 1) / 2 times the native steps (2,080 instead of 64 per column at the default grid), no CPU work (KB5663a, 2026-11-11). Clustered lights are integrated over each slice's depth, not sampled at points (KB-FOG-BEAM1, 2026-11-15), so a thin spot beam is one shaft; a beam much thinner than a froxel row still ripples across the screen on one frame (each column 0.762 to 1.186 of its true light for a beam 0.2 m across in froxels 0.4 m wide and 1.3 m tall, `npm run test:fog-beam-continuity:browser`), which the temporal jitter averages out. | Particles, VFX, splats and transparent surfaces are fogged only when added with `fog.add` (additive, multiply and transmission surfaces never); past `range` the fog is the smooth medium in closed form (the height fog integral along each opaque pixel's ray, lit by the horizon sky with a Sky), without shafts, noise, local lights or `volumes`, and an added transparent past `range` takes the same far air (KB-FOG-FAR-TRANSPARENT, fixed 2026-11-17); with no `depth` option the composite reads the depth a `Water` drew this frame (its surface is not in the capture's depth, KB-FOG-WATERDEPTH1), and with several `Water` surfaces in one view it reads the last one drawn, so the sea of an earlier one ends its rays at the sea bed or the sky; the default is clear air, 23 km visibility with a 1.2 km scale height (`density: 0.02` gives the fog before 2026-11-16); local fog volumes only from `/fog-volumes`; multiple scattering (`multipleScattering`) is a per-froxel estimate: it follows the froxel's own sun shadow, clustered lights add none, and f is capped at 0.95. The froxel pass keeps every binding of the lights' hooks it does not read (bounce, IES, projector, shapes, layers) statically used, so its automatic layout matches the lights' bind group (KB-FOG-HOOK-BINDINGS1, 2026-11-16; before, any such hook stopped the fog every frame). Errors: `RangeError: Volumetric grid exceeds device limit`; `VolumetricFog replaces environment Fog '<name>': set its enabled = false or remove it`; `VolumetricFog needs scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first or pass options.depth`. Errors: `RangeError: Volumetric grid exceeds device limit`; `VolumetricFog replaces environment Fog '<name>': set its enabled = false or remove it`; `VolumetricFog needs scene depth: attach a post capture (Tonemap, Bloom, PostStack, SSAO, TAA) first or pass options.depth`. | `@margoengine/environment/volumetric` (13,323 B gzip) is itself the opt-in: a finer `grid` sharpens edges at a higher cost; `fog.texture` lets custom shaders (particles) sample the fog. Limits in the [environment README](../packages/environment/README.md). |
 | Light probes (indirect light) | Enforced ([probes.ts](../packages/environment/src/probes.ts), [probes.test.js](../packages/environment/tests/probes.test.js)): one irradiance volume of at most 4,096 L1/L2 probes (64 per axis) and at most 16 box-projected reflection probes per `LightProbes`. The volume is baked; reflection probes are baked or captured live a few cube faces per frame (`setLive`; a moved box shows in a 128 px probe 7-11 frames later at one face per frame, capture GPU time per frame 0.066 ms or less and a median 0.20 ms on the prefilter frame, RTX A6000, [probes-live-gpu.json](../examples/package-benchmarks/results/probes-live-gpu.json)). Measured bake of 8 volume probes and one 128 px reflection probe 114-121 ms (diagnostic: other jobs running; [probes-gpu.json](../examples/package-benchmarks/results/probes-gpu.json)). Accuracy in the same file: volume SH within 1.7% of DC against an analytic room. | Baking turns the scene's light into lookups (no ray tracing per frame) and keeps them in one storage buffer, so no texture binding is spent. | Volume light stays as baked until `bake()` runs again; live reflection probes lag the scene by up to (probes + 1) refreshes of 6 / `facesPerFrame` frames and see only what the frame draws (render with `culling: false`); light leaks through walls thinner than the probe spacing without the volume's `visibility`; with `sky` (2026-11-17, KB-SCENES-SKYOCC1) the sky lights the scene outside the volume exactly as alone and the inside only through what the probes see of it (a 4 m shed with a door and two windows under the overcast preset: floor 0.093 of the open sand, 0.017 shut; [sky-occlusion-browser.js](../packages/environment/tests/sky-occlusion-browser.js)), so each room or shed needs its own volume box and a re-bake when the sky changes; mirror-sharp reflections show texel-sized steps near wall edges at the default 128 px. Errors: `RangeError: Invalid irradiance volume: min < max, 1-64 probes per axis (4,096 in total), sh 1 or 2, blend >= 0`, `RangeError: Expected at most 16 reflection probes`, `RangeError: Light probe buffer exceeds device limit`, `light-probes replaces EnvironmentLighting: pass {environment} to LightProbes instead of attaching both`. `TypeError: LightProbes takes environment or sky as the light outside the probes, not both; pass one`. | `@margoengine/environment/probes` (14,984 B gzip) is itself the opt-in: re-bake on demand or capture reflections live, one volume box per room against leaks, a finer `resolution` for sharper reflections. Dynamic GI: none yet. |
@@ -12186,6 +12187,18 @@ The optional falling entry measures 6,259 B min+gzip. Each lazy Wasm build is 10
 4,273 B gzip. The Hail overlay measures 5,443 B and its optional world adapter 1,056 B min+gzip.
 Core and stage remain at 24,820 B min+gzip combined.
 
+### Sediment transport and bed change (HYDRO-03, 2026-11-25)
+
+`@margoengine/physics/sediment` works on one co-located rectangular TerrainBed and shallow-water grid. It uses a
+representative bed diameter and a representative suspended diameter for dilute transport. The bank model uses
+local near-bank velocity relative to the wet reach mean with user-supplied erodibility and optional root stress.
+The vertex reserve covers the mobile layer the caller declares. Set it to the bedrock clearance when TerrainBed
+has a floor. Fluid momentum and bed evolution exchange one field update per world tick. An open boundary exports
+sediment; external inflow at that edge carries clear water. Use the source grid's same rectangle for Flood tint.
+
+The optional sediment entry measures 5,256 B min+gzip. The plain and shared SIMD Wasm files are 12,483 B and
+12,571 B before HTTP compression. The Flood entry measures 14,457 B min+gzip with the concentration upload.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12195,6 +12208,14 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-25 Open-channel and flood models had no link to changing sediment beds (HYDRO-03)
+
+The shallow-water field now drives suspended load, bedload and bank exchange. The production TerrainBed
+receives conservative elevation changes, and the same concentration controls the Flood tint.
+`packages/physics/tests/coupling/sediment.test.js` compares a moving and a fixed bed and verifies solid
+mass. `packages/water/test/sediment-source.browser.mjs` verifies the rendering link. Flood-body
+feedback, debris impact and dam breach still have their own work-queue rows.
 
 ### Open 2026-11-25 RITS-10 atmospheric-river scene still needs its watershed inputs wired
 
@@ -34355,29 +34376,36 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
-## Rainfall runoff and channel inflow
+## Sediment transport and bed change
 
-`@margoengine/physics/runoff` turns rain and snowmelt into soil water, groundwater recharge and routed
-discharge. It integrates the Green-Ampt wetting front, handles saturation on a wetness-index grid, and
-routes excess water downstream using the implicit kinematic-wave balance.
+`@margoengine/physics/sediment` reads shallow-water depth and discharge and routes suspended and bedload sediment.
+It contributes the Exner elevation change to the same TerrainBed. Water then runs over the updated surface.
 
 ```ts
-import { bedSurface } from '@margoengine/physics/earth';
+import { TerrainBed } from '@margoengine/physics/earth';
 import { ShallowWaterSolver } from '@margoengine/physics/hydro';
-import { RainfallRunoff } from '@margoengine/physics/runoff';
+import { SedimentTransport } from '@margoengine/physics/sediment';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const runoff = await RainfallRunoff.load();
-const flood = new ShallowWaterSolver('valley', {
-  field: runoff.outletField,
-  outlets: [{ sourceCell: 2, position: [5, 5] }],
-});
-const bed = bedSurface({ columns: 2, rows: 1, width: 20, depth: 10, centre: [10, 5] }, new Float64Array(6));
+const grid = { columns: 4, rows: 2, width: 16, depth: 8, centre: [8, 4] as const };
+const terrain = new TerrainBed();
+const sediment = await SedimentTransport.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-world.add(runoff, { nx: 3, nz: 1, dx: 10, downstream: [1, 2, -1], rainRate: 0.0001 });
-world.add(flood, { bed });
+world.add(terrain, { ...grid, elevations: () => 0 });
+world.add(new ShallowWaterSolver(), {
+  bed: terrain.bed,
+  depth: 1,
+  velocity: () => [1, 0],
+  sides: { maxX: 'open' },
+});
+world.add(sediment, {
+  grid,
+  mobileDepth: 0.1,
+  grainDiameter: 0.0003,
+  open: { maxX: true },
+});
 world.advance(120);
-console.log(runoff.read(2, 0).outflow, runoff.budget, flood.budget.inflow);
+console.log(sediment.read(1, 0), sediment.budget, terrain.volume());
 ```
 
 [README continues: https://margoengine.com/llms/packages/physics.md]
