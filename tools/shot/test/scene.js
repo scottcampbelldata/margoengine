@@ -85,7 +85,7 @@ const targets = aov
   ? SceneTargets.attach(engine, {
       outputs: {
         geometry: { wgsl: 'vec4f(1, 0, 0, 1)', format: 'r8unorm' },
-        depth: { wgsl: 'vec4f(exp(-distance(t.eye, t.position) / 20.0), 0, 0, 1)', format: 'r8unorm' },
+        depth: { wgsl: 'vec4f(exp(-distance(t.eye, t.position) / 20.0), 0, 0, 1)', format: 'r32float' },
         ...(look ? lookMasks : {}),
       },
     })

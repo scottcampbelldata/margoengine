@@ -43,6 +43,21 @@ let sum = 0;
 for (let i = 0; i < data.length; i += 2) sum += Math.hypot(data[i], data[i + 1]);
 const mean = sum / (data.length / 2);
 assert.ok(mean > 5, `the camera moves the world by ${mean.toFixed(2)} px on average`);
+// The depth mask's floats (KB-SHOT-DEPTH8BIT1): the same surfaces as the geometry the mask drew, each with a distance.
+const depth = await decodePNG(readFileSync(join(out, probe.aovs.depth))),
+  raw = readFileSync(join(out, 'probes', 'open.depth.f32')),
+  nearness = new Float32Array(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
+assert.equal(nearness.length, frame.width * frame.height, 'one float per pixel');
+let drawn = 0,
+  worst = 0;
+for (let i = 0; i < nearness.length; i++) {
+  assert.ok(nearness[i] >= 0 && nearness[i] <= 1, `nearness ${nearness[i]} at ${i}`);
+  if (nearness[i] > 0) drawn++;
+  worst = Math.max(worst, Math.abs(nearness[i] * 255 - depth.data[i * 4]));
+}
+assert.ok(drawn > 0, 'the floats hold surfaces');
+// At supersample 1 the PNG is the same floats rounded to 8 bits.
+assert.ok(worst <= 0.5 + 1e-3, `the PNG differs from the floats by ${worst} codes`);
 const motion = (values) => ({ width: frame.width, height: frame.height, data: values }),
   warped = shimmerMoving(frame, { next, motion: motion(data) }),
   still = shimmerMoving(frame, { next, motion: motion(new Float32Array(data.length)) });

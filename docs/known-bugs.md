@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: the moving look evidence read distances from an 8-bit depth mask (KB-SHOT-DEPTH8BIT1, tools/shot)
+
+- **Repro:** a shot with `shot.moving` at `depthScale` 2000 (the timber-valley shots) with ground within a few metres
+  of the camera: those pixels read 255 in `probes/<name>.depth.png`, `distanceFromNearness` gave them 0, and their
+  motion was that of a sky 5,000 m away; ground farther off moved in steps of metres. CPU proof: at that scale 3 m
+  reads as no distance.
+- **Cause:** the pages wrote exp(-distance / depthScale) into an `r8unorm` target and the tool rounded every mask to
+  8 bits again; the area filter then mixed silhouette pixels with the background, which is no distance of either.
+- **Fix:** storm-light, timber-valley-shot.html and the shot test scene draw the mask as `r32float`; on moving probes
+  the tool keeps the floats (`probes/<name>.depth.f32`), taking the nearest surface of each pixel's footprint, and
+  `writeMoving` reads them. The PNG masks are unchanged in meaning. A coarser mask format warns.
+- **Regression:** `tests/shot-motion.test.js` (3 m and 500 m at scale 2000: 8 bits fail, floats within 0.1%, and
+  the motion from the `.f32` file), `tests/shot-capture.test.js` (`resampleNearness`); real GPU:
+  `tools/shot/test/moving-check.mjs` (the floats are written and round to the PNG).
+
 ### Open 2026-11-26: ship lamp glints read the sea's roughness as GGX alpha, the sun glint as perceptual (KB-SHIPLAMP1, water)
 
 - **Repro:** packages/water/src/ships.ts `shipLamps` writes `a2 = max(rough^2, 1e-4)`, so its lobe has alpha = rough;

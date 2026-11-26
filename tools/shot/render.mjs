@@ -436,7 +436,13 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
         png: write && !skip && !pass,
         expectHash: !skip && !pass && kept !== null ? expect?.[kept] : undefined,
         thumbnail: skip || pass ? undefined : sheet.get(kept),
-        masks: skip || pass || kept === null ? null : masks,
+        // A moving probe's depth mask also comes as floats: 8 bits cannot hold the distances its motion needs.
+        masks:
+          skip || pass || kept === null || !masks
+            ? null
+            : write && shot.moving && probes.has(kept)
+              ? { ...masks, exact: ['depth'] }
+              : masks,
         viewProjection: write && !skip && !pass && (probes.has(kept) || nextProbes.has(kept)),
         skyCoverage: recordSky && !skip && !pass && probes.has(kept),
       });
@@ -457,6 +463,13 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
           mkdirSync(join(out, 'aovs', name), { recursive: true });
           record.aovs[name].file = `aovs/${name}/${frameName(kept)}`;
           writeFileSync(join(out, record.aovs[name].file), Buffer.from(mask.png, 'base64'));
+          if (!mask.exact) continue;
+          record.aovs[name].exact = record.aovs[name].file.replace(/png$/, 'f32');
+          writeFileSync(join(out, record.aovs[name].exact), Buffer.from(mask.exact, 'base64'));
+          if (!mask.format.includes('32float'))
+            log(
+              `warning: the page's ${name} mask is ${mask.format}; make it r32float, or near ground has no distance in the moving evidence`,
+            );
         }
       }
       if (write) {
@@ -567,6 +580,11 @@ export async function shoot(file, { out, output, source, runs = 2, check = 'ever
             names.map((aov) => {
               const copy = `probes/${name}.${aov}.png`;
               writeFileSync(join(out, copy), readFileSync(join(out, 'aovs', aov, frameName(index))));
+              // The depth mask's floats, which the moving evidence reads; an earlier render's must not stay behind.
+              const floats = join(out, 'probes', `${name}.${aov}.f32`),
+                exact = record.aovs[aov].exact;
+              rmSync(floats, { force: true });
+              if (exact) writeFileSync(floats, readFileSync(join(out, exact)));
               return [aov, copy];
             }),
           ),

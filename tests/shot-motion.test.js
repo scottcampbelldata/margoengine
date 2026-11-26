@@ -80,6 +80,59 @@ test('writeMoving writes the next frame and the camera motion of a still world b
   }
 });
 
+// KB-SHOT-DEPTH8BIT1: at a 2,000 m scale one 8-bit step of exp(-distance / scale) is 8 m near the eye.
+const NEAR_AND_FAR = [3, 500],
+  nearness = (metres) => Math.exp(-metres / 2000);
+
+test('the depth floats give near and far ground its distance, which 8-bit nearness cannot', () => {
+  const bytes = distanceFromNearness(
+      grey(2, 1, (i) => Math.round(255 * nearness(NEAR_AND_FAR[i]))),
+      2000,
+    ),
+    floats = distanceFromNearness({ width: 2, height: 1, value: Float32Array.from(NEAR_AND_FAR, nearness) }, 2000);
+  assert.equal(bytes[0], 0, '3 m rounds to 255: no distance, so the motion took it for sky');
+  assert.ok(Math.abs(bytes[1] - 500) > 1, `500 m reads as ${bytes[1]}`);
+  for (const [i, metres] of NEAR_AND_FAR.entries())
+    assert.ok(Math.abs(floats[i] - metres) < 1e-3 * metres, `${metres} m reads as ${floats[i]}`);
+  const none = distanceFromNearness({ width: 2, height: 1, value: Float32Array.of(0, 1) }, 2000);
+  assert.deepEqual([...none], [0, 0], 'nothing drawn and the eye itself have no distance');
+});
+
+test('writeMoving takes the distances from probes/<name>.depth.f32 and refuses one of another size', async () => {
+  const out = mkdtempSync(join(tmpdir(), 'margo-moving-f32-')),
+    width = 33,
+    height = 17;
+  try {
+    mkdirSync(join(out, 'probes'));
+    mkdirSync(join(out, 'frames'));
+    // The PNG says nothing the motion can use (every pixel rounds to 255); the floats say 3 m.
+    writeFileSync(join(out, 'probes', 'low.depth.png'), await encodePNG(grey(width, height, 255)));
+    writeFileSync(join(out, 'frames', 'frame_0016.png'), await encodePNG(grey(width, height, 90)));
+    const floats = new Float32Array(width * height).fill(nearness(3));
+    writeFileSync(join(out, 'probes', 'low.depth.f32'), Buffer.from(floats.buffer));
+    const projection = perspective(1, width / height, 0.1, 5000),
+      options = {
+        out,
+        name: 'low',
+        nextFile: 'frames/frame_0016.png',
+        eye: [0, 0, 0],
+        viewProjection: projection,
+        nextViewProjection: moved(projection, 0.05),
+        shot: { moving: { depthScale: 2000 }, horizon: null, aovs: ['depth'] },
+      },
+      entry = await writeMoving(options),
+      bytes = readFileSync(join(out, entry.motion)),
+      motion = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+      centre = 8 * width + 16,
+      expected = ((-0.05 * (1 / Math.tan(0.5))) / (width / height) / 3) * (width / 2);
+    assert.ok(Math.abs(motion[centre * 2] - expected) < 0.01, `x ${motion[centre * 2]} against ${expected}`);
+    writeFileSync(join(out, 'probes', 'low.depth.f32'), Buffer.from(floats.buffer, 0, 8));
+    await assert.rejects(writeMoving(options), { name: 'RangeError' });
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
+
 const header = (extra = {}) => ({
   format: 'margo-cutscene',
   version: 1,

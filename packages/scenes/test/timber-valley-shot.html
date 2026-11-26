@@ -22,7 +22,7 @@ const scene=await attach(engine,settings);
 scene.view(scene.views[0],45);
 const targets=SceneTargets.attach(engine,{outputs:{
   geometry:{wgsl:'vec4f(1, 0, 0, 1)',format:'r8unorm'},
-  depth:{wgsl:'vec4f(exp(-distance(t.eye, t.position) / 2000.0), 0, 0, 1)',format:'r8unorm'},
+  depth:{wgsl:'vec4f(exp(-distance(t.eye, t.position) / 2000.0), 0, 0, 1)',format:'r32float'},
   penumbra:'penumbra',subject:'subject',lit:'litGround',shadow:'shadedGround'}});
 targets.add(scene.parts.view.terrain);
 

@@ -645,14 +645,14 @@ stage.use({
 });
 setLights();
 // The shot tool's masks (tools/shot, docs/shots.md) with `?aovs=1`: `geometry`, 1 on the headland, lighthouse and
-// boat above the sea (rock under the sea counts as water), and `depth`, their nearness exp(-distance / 200); the tool
-// works out `sky` and `water` from them with the sea level as its horizon.
+// boat above the sea (rock under the sea counts as water), and `depth`, their nearness exp(-distance / 200) as
+// floats; the tool works out `sky` and `water` from them with the sea level as its horizon.
 const masks =
   params.get('aovs') === '1'
     ? SceneTargets.attach(engine, {
         outputs: {
           geometry: { wgsl: 'vec4f(select(0.0, 1.0, t.position.y >= 0.0), 0, 0, 1)', format: 'r8unorm' },
-          depth: { wgsl: 'vec4f(exp(-distance(t.eye, t.position) / 200.0), 0, 0, 1)', format: 'r8unorm' },
+          depth: { wgsl: 'vec4f(exp(-distance(t.eye, t.position) / 200.0), 0, 0, 1)', format: 'r32float' },
         },
       })
     : undefined;

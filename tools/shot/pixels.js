@@ -155,6 +155,29 @@ export function resampleMask({ grey, width, height, outWidth, outHeight }) {
 }
 
 /**
+ * A nearness mask (a larger value is a nearer surface, 0 is nothing drawn) from `width` x `height` to `outWidth` x
+ * `outHeight`: each output pixel takes the largest value its footprint covers, so a silhouette pixel holds the nearest
+ * surface's own distance and never a mix with the background's, which is no distance at all.
+ */
+export function resampleNearness({ value, width, height, outWidth, outHeight }) {
+  if (width === outWidth && height === outHeight) return value;
+  const across = areaWeights(width, outWidth),
+    down = areaWeights(height, outHeight),
+    out = new Float32Array(outWidth * outHeight);
+  for (let i = 0; i < outHeight; i++)
+    for (let j = 0; j < outWidth; j++) {
+      let v = 0;
+      for (let a = 0; a < down.count[i]; a++)
+        for (let b = 0; b < across.count[j]; b++) {
+          const read = value[(down.first[i] + a) * width + across.first[j] + b];
+          if (read > v) v = read;
+        }
+      out[i * outWidth + j] = v;
+    }
+  return out;
+}
+
+/**
  * A `size` x `size` blue-noise dither array by the void-and-cluster method (Ulichney 1993): ranks 0 to size^2 - 1, each
  * once, so a threshold at any level gives an even scatter with no clumps. Toroidal Gaussian energy of `sigma` pixels;
  * the starting pattern is seeded (mulberry32), so the array is the same on every machine.

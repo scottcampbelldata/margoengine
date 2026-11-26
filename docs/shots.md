@@ -37,7 +37,7 @@ evaluated state goes to the page's `apply` hook when it has one.
 | `probeLookBounds` | `{}` | A probe's own bounds, probe name: {check name: bound}; on that probe they replace `lookBounds` for the checks they name (see Bounds) |
 | `aovs` | `[]` | Masks written beside every frame (see Masks): names the page gives through `page.aovs`, and `sky` and `water`, which the tool works out |
 | `horizon` | `null` | `{y}`: the world height of the water plane that splits `sky` from `water`; needed for either |
-| `moving` | `null` | `{depthScale}`: each probe also writes the frame after it and the camera's motion to it (see Moving evidence); `depthScale` is the metres of the page's `depth` mask, which holds exp(-distance / depthScale); needs `depth` in `aovs`, a camera track and probes before the last frame |
+| `moving` | `null` | `{depthScale}`: each probe also writes the frame after it and the camera's motion to it (see Moving evidence); `depthScale` is the metres of the page's `depth` mask, which holds exp(-distance / depthScale) in an `r32float` texture; needs `depth` in `aovs`, a camera track and probes before the last frame |
 | `subject` | `null` | `{target: [x, y, z], size}` in world metres: the point the shot is about and how big it is across, for a film pipeline's camera checks (framing, focus, the subject at a cut); `cameraFrames` and `--cameras` hand it on |
 | `kit`, `grade`, `endCard` | `null` | Carried in the manifest for the steps that use them: scene kits (P5), the grade (P3) and the end card (P6) |
 | `page.path` | required | The page to render, from the top of the repository (served by the repository's Vite dev server) |
@@ -118,14 +118,21 @@ reads 1, the canvas is twice the size, every sub-frame lands on its clock time a
 `"moving": {"depthScale": 200}` each probe writes `probes/<name>.next.png` (the next kept frame, already rendered, so
 nothing is drawn twice) and `probes/<name>.motion.f32` (little-endian float32, x then y per pixel, the frame's size), and
 the manifest probe gets `moving: {next, motion}`, which `checkShot` reads. The motion is the camera's alone, the world
-held still: the page's `depth` mask (8-bit grey, exp(-distance / depthScale), 0 where nothing is drawn) gives each pixel's
+held still: the page's `depth` mask (exp(-distance / depthScale), 0 where nothing is drawn) gives each pixel's
 distance, `depthFromDistance` walks it along the pixel's ray from the probe's eye (the last sub-frame's camera) to a
 world point and projects it, and `reprojectionMotion` takes that point through the next frame's view-projection. A pixel
 with no geometry that the `water` mask marks takes the distance to the sea plane (`horizon.y`); any other is a sky
 5,000 m away. Rain, sea and cloud change between two frames on their own, so the check keeps a residue there:
 `tools/shot/test/moving-check.mjs` (in `npm run test:shot`) renders the Storm Light tour at 270 x 480 with a fast camera
-(12.7 px mean motion) and finds 11.2 % of pixels off by over 6 codes warped against 36.1 % unwarped. The depth mask is
-8-bit and area filtered with the frame, so a pixel on a silhouette edge mixes its distance with the background's.
+(12.7 px mean motion) and finds 11.4 % of pixels off by over 6 codes warped against 36.9 % unwarped.
+
+The page draws the mask as `r32float` (a `SceneTargets` output `{wgsl, format: 'r32float'}`). On each probe the tool
+also keeps the floats, `aovs/depth/frame_NNNN.f32` and `probes/<name>.depth.f32` (little-endian float32, one per
+pixel), and the motion reads those. At the frame's size each pixel takes the nearest surface its footprint covers (the
+largest nearness), so a silhouette pixel never mixes its distance with the background's. The 8-bit PNG mask cannot
+carry the distances: at a 2,000 m scale one code is 8 m near the eye, and ground within 4 m rounds to 255, which is no
+distance, so the motion took it for sky (KB-SHOT-DEPTH8BIT1). A page that still draws the mask coarser than 32-bit
+float renders, and the tool warns.
 
 ## Look masks (penumbra, subject, lit, shadow)
 

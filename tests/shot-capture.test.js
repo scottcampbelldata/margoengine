@@ -13,6 +13,7 @@ import {
   blueNoise,
   linearToSrgb,
   resampleMask,
+  resampleNearness,
   resolveFrame,
   srgbToLinear,
 } from '../tools/shot/pixels.js';
@@ -176,6 +177,21 @@ test('masks downsample by coverage', () => {
   // Output pixel (0, 0) covers 1.5 x 1.5 input pixels: 1 + 0.5 + 0.5 full and 0.25 of an empty one, 2 of 2.25; pixel
   // (1, 0) covers 1.5 full of 2.25; pixel (1, 1) covers only empty ones.
   assert.deepEqual([...resampleMask({ grey, width: 3, height: 3, outWidth: 2, outHeight: 2 })], [227, 170, 170, 0]);
+});
+
+// KB-SHOT-DEPTH8BIT1: an area mean of a silhouette pixel is a distance of neither surface.
+test('resampleNearness keeps the nearest value of each footprint', () => {
+  const value = Float32Array.of(0.25, 0, 0, 0, 0.75, 0, 0, 0, 0.5);
+  assert.equal(resampleNearness({ value, width: 3, height: 3, outWidth: 3, outHeight: 3 }), value);
+  assert.deepEqual(
+    [...resampleNearness({ value, width: 3, height: 3, outWidth: 2, outHeight: 2 })],
+    [0.75, 0.75, 0.75, 0.75],
+  );
+  const row = Float32Array.of(0.9, 0.1, 0, 0);
+  assert.deepEqual(
+    [...resampleNearness({ value: row, width: 4, height: 1, outWidth: 2, outHeight: 1 })],
+    [Math.fround(0.9), 0],
+  );
 });
 
 test('the page script holds every pixels.js function, working with nothing of the module around it', () => {

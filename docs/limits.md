@@ -8668,8 +8668,9 @@ The dune-coast scene loads `@margoengine/vfx/blown-sand` by `import()` only when
 silhouette and silhouetteShape, T6 bounce and shadowTint, T7 colourEdges and the two night checks, T8 motionBlur), the
 motion reprojection and the look family table, which share the luma, mask, Lab and bound helpers; splitting them into
 a second entry would repeat those helpers and give `checkProbe` an async import. The shot tool reads `lookFamily` and, with `shot.moving`, writes the `moving` inputs (the next frame and the camera's
-motion from the page's depth mask, so `shimmerMoving` and `motionBlur` run on real probes; the depth mask is 8-bit, area
-filtered, and the motion is the camera's alone, so rain, sea and cloud leave a residue). The `penumbra`, `subject`, `lit` and
+motion from the page's depth mask, so `shimmerMoving` and `motionBlur` run on real probes; the motion reads the mask's floats, so the page draws it as
+`r32float`, a silhouette pixel takes its nearest surface's distance, and the motion is the camera's alone, so rain,
+sea and cloud leave a residue). The `penumbra`, `subject`, `lit` and
 `shadow` masks are page masks drawn by `SceneTargets` from the sun's shadow visibility (`penumbra`, `subject`,
 `litGround` and `shadedGround` values, 2026-11-17, KB-LOOK-SHADOWMASK1), so `penumbra`, `silhouette*`, `bounce` and
 `shadowTint` run on real shots (`tools/shot/test/look-masks-check.mjs`). Limits of those masks: the visibility is the

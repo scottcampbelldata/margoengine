@@ -242,8 +242,11 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     readers.set(device, found);
     return found;
   };
-  /** A texture's first channel as 8-bit grey, row 0 at the top: 0 to 1 maps to 0 to 255, NaN and below 0 to 0. */
-  const readMask = async (device, name, texture) => {
+  /**
+   * A texture's first channel as 8-bit grey, row 0 at the top: 0 to 1 maps to 0 to 255, NaN and below 0 to 0. With
+   * `exact` also the values themselves as floats (`value`, NaN and below 0 as 0) and the texture's `format`.
+   */
+  const readMask = async (device, name, texture, exact) => {
     if (!texture || typeof texture.createView !== 'function')
       throw new Error(`the page gave no texture for the ${name} mask`);
     if (texture.sampleCount > 1 || texture.dimension !== '2d')
@@ -285,16 +288,18 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     await buffer.mapAsync(1);
     const data = new Float32Array(buffer.getMappedRange()),
       grey = new Uint8Array(width * height),
+      value = exact ? new Float32Array(width * height) : null,
       stride = bytesPerRow / 4;
     for (let y = 0; y < height; y++)
       for (let x = 0; x < width; x++) {
         const v = data[y * stride + x];
         grey[y * width + x] = v > 0 ? (v >= 1 ? 255 : Math.round(v * 255)) : 0;
+        if (value) value[y * width + x] = v > 0 ? v : 0;
       }
     buffer.unmap();
     buffer.destroy();
     target.destroy();
-    return { width, height, grey };
+    return value ? { width, height, grey, value, format: texture.format } : { width, height, grey };
   };
   /**
    * Sky and water from the geometry mask: a pixel with no geometry (below 128) is water when its view ray through the
@@ -332,9 +337,18 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) =>
       byte.toString(16).padStart(2, '0'),
     ).join('');
+  // In pieces: one call with millions of arguments overflows the stack.
+  const base64 = (bytes) => {
+    let text = '';
+    for (let i = 0; i < bytes.length; i += 0x8000)
+      text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(text);
+  };
   // The masks after a frame, name to {width, height, grey} at the canvas size, taken to the frame's size: a
   // supersampled render's masks are area filtered, so an edge pixel holds the share of it each mask covers. Resolves
-  // name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`}.
+  // name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`}. A mask read exactly (a depth mask) also
+  // gives `exact`, its floats at the frame's size in base64 (the largest value of each pixel's footprint), and its
+  // texture's `format`.
   const pack = async (read, png) => {
     const result = {};
     for (const name of Object.keys(read)) {
@@ -344,6 +358,15 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
       let sum = 0;
       for (let i = 0; i < grey.length; i++) sum += grey[i];
       result[name] = { sha256: await hex(grey), mean: sum / (255 * grey.length) };
+      if (read[name].value) {
+        const value = globalThis.__margoShotPixels.resampleNearness({
+          ...read[name],
+          outWidth: width,
+          outHeight: height,
+        });
+        result[name].exact = base64(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+        result[name].format = read[name].format;
+      }
       if (png) {
         if (maskCanvas.width !== width || maskCanvas.height !== height) {
           maskCanvas.width = width;
@@ -496,9 +519,10 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
     /**
      * The shot's masks after a frame: `hook` (a page function) gives {device, textures: {name: GPUTexture}} for the
      * masks the page draws; `derived` names sky and water, worked out from `geometry` and the engine's camera with
-     * the plane y = `horizon.y`. Resolves name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`}.
+     * the plane y = `horizon.y`. Resolves name: {sha256 of the grey bytes, mean 0 to 1, png in base64 when `png`};
+     * a page mask named in `exact` also has `exact` (its floats in base64) and `format`.
      */
-    async masks({ hook, names, derived, horizon, engine, png }) {
+    async masks({ hook, names, derived, horizon, engine, png, exact = [] }) {
       const give = get(hook);
       if (typeof give !== 'function') throw new Error(`${hook} is not a function in the page`);
       const given = await give({ names: names.filter((name) => !derived.includes(name)) });
@@ -506,7 +530,8 @@ export function installShotDriver({ seed, start, epoch, cell, cells, out, msaa, 
         throw new Error(`${hook} must return {device, textures: {name: GPUTexture}}`);
       const read = {};
       for (const name of names)
-        if (!derived.includes(name)) read[name] = await readMask(given.device, name, given.textures[name]);
+        if (!derived.includes(name))
+          read[name] = await readMask(given.device, name, given.textures[name], exact.includes(name));
       if (derived.length) {
         const camera = get(engine)?.camera;
         if (!camera) throw new Error(`no engine camera at ${engine} for the sky and water masks`);
