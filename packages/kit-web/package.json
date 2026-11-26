@@ -1591,6 +1591,10 @@
       "types": "./dist/post/trail.d.ts",
       "import": "./dist/post/trail.js"
     },
+    "./post/render-graph": {
+      "types": "./dist/post/render-graph.d.ts",
+      "import": "./dist/post/render-graph.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"

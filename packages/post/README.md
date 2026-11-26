@@ -1829,6 +1829,72 @@ also with several views. `TrailTexture` is disposable (`using trail = ...`). Lim
 [docs/limits.md](../../docs/limits.md#trail-texture-margoenginepostrail-2026-11-26); sources in
 [docs/clean-room.md](../../docs/clean-room.md#trail-texture-2026-11-26).
 
+## Render graph: `RenderGraph`
+
+`@margoengine/post/render-graph` (7,748 B min+gzip, its own entry) runs a frame pipeline described as JSON: a list
+of tasks, each a registered type whose typed input and output slots name textures. Building checks the description
+and refuses an unknown type or slot, an input no task writes, a texture with two writers, a slot of the wrong kind
+(depth into colour, HDR straight to the screen) or a cycle, each a TypeError with a `code`. It then orders the tasks by
+their dependencies and lets transient textures whose lifetimes do not overlap share one GPU texture. Each frame the
+tasks run once, in that order, on core's frame graph. `history: true` textures ping-pong: a task reads last frame's
+value as `name@previous`, so feedback effects need no cycle. `toJSON()` gives the description back and `load(json)`
+rebuilds; a resize only makes the textures again.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {RenderGraph, effectTask, type RenderGraphJSON} from 'margoengine/post/render-graph';
+import {Pixelate} from 'margoengine/post/pixelate';
+const engine = await Engine.create(document.querySelector('canvas')!);
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#d08040'}));
+const description: RenderGraphJSON = {
+  version: 1,
+  textures: {ldr: {format: 'rgba8unorm'}},
+  tasks: [
+    {name: 'scene', type: 'scene', outputs: {color: 'hdr', depth: 'depth'}},
+    {name: 'tonemap', type: 'blit', inputs: {source: 'hdr'}, outputs: {target: 'ldr'}},
+    {name: 'pixels', type: 'pixelate', params: {pixelSize: 6}, inputs: {source: 'ldr'}, outputs: {target: 'screen'}},
+  ],
+};
+const tasks = {pixelate: effectTask(Pixelate)};
+RenderGraph.validate(description, {tasks}); // throws with a code, builds nothing
+const graph = RenderGraph.attach(engine, description, {tasks});
+console.log(graph.order, graph.textureCount); // ['scene', 'tonemap', 'pixels'] 1
+const saved = JSON.stringify(graph.toJSON()); // store it, send it, load it again
+graph.load(JSON.parse(saved));
+engine.render();
+graph.dispose();
+```
+
+Built-in task types (`renderGraphTasks`):
+
+| Type | Inputs | Outputs | Params |
+| --- | --- | --- | --- |
+| `scene` | none | `color` (HDR, or display with `hdr: false`), `depth` | `hdr` (default `true`). The main pass draws into the graph's capture; a graph with a scene must write `'screen'`. At most one |
+| `clear` | none | `target` (any colour) | `color`: linear `[r, g, b, a]`, default `[0, 0, 0, 1]` |
+| `copy` | `source` (any colour) | `target` (any colour) | Bilinear, any size and format, values unchanged |
+| `blit` | `source` (any colour) | `target` (display colour, `'screen'` included) | HDR sources get the display transform, as a PostStack's last HDR effect does |
+
+`effectTask(EffectClass)` turns any effect of this package that joins a PostStack (Bloom, SSAO, KawaseBlur, Tonemap,
+FXAA, Pixelate, ...) into a task type: `params` are its options, input `source`, output `target`, canvas-sized
+textures only. A custom type is `{create(params) {return {inputs, outputs, execute(context, io)}}}`: slot types are
+`'hdr'`, `'ldr'`, `'color'` (either) or `'depth'`; `io.input(slot)` and `io.output(slot)` give `{view, format, width,
+height, multisample, screen}`.
+
+| Texture field | Default | Meaning |
+| --- | --- | --- |
+| `format` | from the writing slot | `'rgba16float'` for HDR or any colour, `'rgba8unorm'` for display colour |
+| `scale` | `1` | Fraction of the canvas size, (0, 1] |
+| `size` | none | Fixed `[width, height]` in texels instead of `scale` |
+| `persistent` | `false` | Kept across frames, never shared |
+| `history` | `false` | Two textures that swap each frame; read last frame's as `name@previous` (black at first) |
+
+`'screen'` is the canvas, an output only. Without a `scene` task the graph runs after the main pass, over its picture.
+A RenderGraph replaces the PostStack: attaching one next to a PostStack throws MargoError `'attached'`. `RenderGraph`
+is disposable (`using graph = ...`). Error codes are listed at
+[margoengine.com/errors#render-graph](https://margoengine.com/errors#render-graph); limits in
+[docs/limits.md](../../docs/limits.md#render-graph-margoenginepostrender-graph-2026-11-26); sources in
+[docs/clean-room.md](../../docs/clean-room.md#render-graph-2026-11-26). The visual editor is not built yet.
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for

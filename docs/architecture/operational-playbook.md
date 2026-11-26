@@ -10163,6 +10163,17 @@ Evidence: `packages/post/test/utility-passes-browser.mjs` on WebGPU and the WebG
 DepthDownsample texels and normals equal to a CPU reduction in all four modes for 2 x 2 and uneven footprints), and
 `utility-passes.test.js`. Missing: GPU timings, and a visual comparison of the blur against a large Gaussian.
 
+## Render graph (section 5 evidence, 2026-11-26)
+
+`RenderGraph` (`@margoengine/post/render-graph`) is an optional post entry built on core's frame graph: two passes,
+a capture at order -65 (the same SceneTarget capture and linear shader swap a PostStack uses) and the tasks at order
+30; core and stage unchanged. Build: validation with coded errors, Kahn's topological order, transient textures
+assigned to physical slots by lifetime. Evidence: `packages/post/test/render-graph-browser.mjs` on WebGPU and the
+WebGL2 layer (scene then blit equals a PostStack HDR capture within 2/255, clear and copy reach the screen, a history
+feedback loop accumulates 0.25 a frame, a Pixelate effect task), and `render-graph.test.js` (order, aliasing to 2
+textures for 3, steady frames allocate nothing, resize, every error code, history swap once a frame, effect tasks
+attach and detach on rebuild). Missing: GPU timings, the visual editor.
+
 ## Trail texture (section 5 evidence, 2026-11-26)
 
 `TrailTexture` (`@margoengine/post/trail`) is an optional post entry; core and stage unchanged. One frame-graph pass
