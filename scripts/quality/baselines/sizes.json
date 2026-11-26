@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20623627,
+  "total": 20628915,
   "history": [
     {
       "date": "2026-10-24",
@@ -13813,6 +13813,12 @@
       "commit": "6d02861ab",
       "reason": "physics/surge new entry (SEA-07 tides and storm surge, 5,112 B built) and its umbrellas; physics/hydro 7,652 to 8,577 B built for the Coriolis force, the forcing potential the surge adds to the bed and the water's time scale with its work count; physics/world 17,737 to 18,021 B for the world's time-scale check (a field read at another time scale than its writer's is refused). Each is one feature in its owning entry; splitting the world check into a lazy entry would leave mismatched scales unchecked. Core and stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "rod",
+      "reason": "New optional entry @margoengine/physics/rod (3,934 B gzip): elastic rods on a multibody, their water loads taken from the loads entry. @margoengine/physics/loads grows 8,342 to 9,696 B for segmentLoads (the per-segment loads a rod solves implicitly), the shared water sampler and wake step, and Reynolds drag below the drag crisis: one copy of the member physics for LoadSolver and rods. A separate entry would duplicate the coefficients and the wake oscillator or make LoadSolver import from it for the same bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14659,7 +14665,7 @@
     "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/lightning": 6117,
-    "@margoengine/physics/loads": 8342,
+    "@margoengine/physics/loads": 9696,
     "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
@@ -14670,6 +14676,7 @@
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/rail": 9964,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/rod": 3934,
     "@margoengine/physics/rogue": 9251,
     "@margoengine/physics/room-sound": 6014,
     "@margoengine/physics/runoff": 4162,
@@ -14685,6 +14692,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 107182,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
+    "@margoengine/physics/surge": 5368,
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
@@ -15755,7 +15763,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/surge": 5368
+    "margoengine/web": 577
   }
 }

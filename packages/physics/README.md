@@ -315,6 +315,74 @@ physics.dispose();
 
 A `TrackedVehicle` has tracks (a `position` where each is mounted, a `length`, `roadWheels` that each cast a ray and carry the hull on a spring): the belts are driven at `maxSpeed` times the throttle (`trackAcceleration` limits how fast a belt speeds up), the side a `steer` turns toward slower, so a steer with no throttle spins the hull on the spot, and the ground is pushed by how far each belt slips against it, with Wong's shear, `1 - exp(-j / shearDisplacement)` of the friction the load allows, `j` the displacement of the ground under the wheel (the slip speed added up while the belt is on it, renewed as the belt carries new surface in; `shearShare(j, K)` is the curve), the friction along the belt (`longitudinalFriction`) larger than across it (`lateralFriction`, the skid-steering resistance). A `Motorcycle` is a two-wheeled `Vehicle` (`motorcycle.vehicle`, on Magic Formula tyres) with a rider: it steers into the fall (`balanceGain`, `balanceDamping`), and a `steer` input is a turn it asks for (`maxLateralAcceleration`), which becomes the lean `atan(a / g)` that balances it and so is started by steering the other way, the counter-steer; `lean` and `leanTarget` read the angle, and `balance: false` lets the rider go.
 
+## Elastic rods
+
+`@margoengine/physics/rod` makes cables, mooring lines, hoses, tentacles, hair and grass blades that bend, twist and
+stretch: `new Rod(physics, {points, radius, youngModulus})`. A rod is a chain of capsule links held to reduced coordinates
+as one multibody. Its elasticity is springs on the joints between links, solved inside the tree's direct solve by backward
+Euler, so a stiff rod of hundreds of links is stable at any step:
+- bending EI / l about the link's two cross axes and twisting GJ / l about it, each link the Cosserat rod's energy over its
+  length (Kugelstadt and Schömer 2016; Deul et al. 2018);
+- stretching EA / l along it.
+
+The material sets them from `youngModulus` and `shearModulus` with a round section. `bendStiffness`, `twistStiffness` and
+`axialStiffness` override them; `axialStiffness: Infinity` makes the rod inextensible. A braided rope bends and twists far
+more easily than a solid rod of its fibre, so give a rope its own small `bendStiffness`.
+
+Rest shape and ends:
+- The centre line you pass is the rest shape, so a curled `points` line gives a tentacle its curl.
+- `attachStart` and `attachEnd` pin an end to a body or to a fixed point (`'fixed'`).
+- `clamp` makes an end hold its direction too.
+- `rod.release('end')` casts an end off, as a line is let go from a hull.
+
+Pins are held in the tree's solve with the rod's springs. A cable pulled taut between two pins stays closed at both, and
+each pinned end stretches by its half link.
+
+`loads` puts the rod in water: `segmentLoads(sea)` from `@margoengine/physics/loads`, where `sea` is a `SpectralSea` or
+anything with `water.sample`, `elevation` and `density`. Below the surface each link then feels:
+- its buoyancy, on the wetted part of its length;
+- Morison's drag across it (DNV's coefficients by roughness and Keulegan-Carpenter number, and below the drag crisis the
+  drag of its Reynolds number) and Eames's drag along it, on the water's velocity relative to the link. Both are taken
+  into the tree's solve as a damping toward the flow, so a light link in a hard flow stays stable;
+- the water's own acceleration with DNV's added mass;
+- across a flow, the lift of its shed vortices from a wake oscillator driven by the link's own motion (Facchinetti, de
+  Langre and Biolley 2004), so a taut cable strums at its own frequency through lock-in.
+
+Any other provider of `SegmentLoads` can push the links instead.
+
+Contact goes through the rigid solver: fish, divers and hulls push the links aside. `rod.points()` and `rod.frames()`
+read the centre line and each link's turn for drawing. `rod.takeState()` and `rod.restoreState()` keep the wake
+oscillators beside `physics.takeSnapshot()`.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {Rod} from 'margoengine/physics/rod';
+import {SpectralSea} from 'margoengine/physics/sea';
+import {segmentLoads} from 'margoengine/physics/loads';
+
+await Physics.load();
+const physics = new Physics(null);
+// One wave of 1 m amplitude with a 10 s period over deep water.
+const frequencies = Float64Array.from({length: 34}, (_, i) => 0.04 * 25 ** (i / 33));
+const directions = Float64Array.from({length: 24}, (_, j) => (2 * Math.PI * j) / 24);
+const energy = new Float64Array(34 * 24);
+const bin = frequencies.findIndex((f) => f >= 0.1);
+energy[bin * 24] = 1 / 2 / (((frequencies[bin + 1] - frequencies[bin - 1]) / 2) * ((2 * Math.PI) / 24));
+const sea = new SpectralSea({waves: {frequencies, directions, energy, depth: Infinity, density: 1025}});
+
+// An anemone's tentacle: 30 cm, curled, soft as rubber, clamped to the rock 5 m down.
+const points = Array.from({length: 9}, (_, k) => [0.05 * Math.sin(k / 3), -5 + 0.0375 * k, 0] as [number, number, number]);
+const tentacle = new Rod(physics, {points, radius: 0.004, density: 1050, youngModulus: 2e5, attachStart: 'fixed', clamp: 'start', loads: segmentLoads(sea, {period: 10})});
+
+// A diver's hose: 10 m, pinned to a fixed point at the surface and to the diver's tank (here a fixed point too).
+const hose = new Rod(physics, {start: [2, -0.2, 0], end: [8, -6, 0], segments: 40, radius: 0.012, density: 1100,
+  youngModulus: 5e7, attachStart: 'fixed', attachEnd: 'fixed', loads: segmentLoads(sea, {period: 10})});
+
+for (let i = 0; i < 120; i++) physics.step();
+console.log(tentacle.points().length, hose.held('end')); // 75 true
+hose.release('end'); // the hose is let go at the tank
+```
+
 ## Drag joint
 
 `new DragJoint(physics, body, point, {frequency = 5, damping = 0.7, maxForce})` grabs a dynamic body at a world point and pulls that point toward a target, as a mouse joint does (the soft constraint of Catto, GDC 2011, as a frequency and a damping ratio, so a light body and a heavy one follow the pointer alike). Move the target with `setTarget(point)`, read the grabbed point with `gripPoint()`, and let go with `remove()` (removing the body lets go too). `maxForce` caps the pull in newtons so a far target cannot hurl a body.
@@ -2126,6 +2194,16 @@ physics.dispose();
 
 A multibody reads where one link would be with `forwardKinematics(body, coordinates?)`, a point's Jacobian with `bodyJacobian(body, point?)`, the joints to a body with `kinematicBranch(body)`, and moves its coordinates by `applyDisplacements(deltas)`; a `kinematicPosition` body in `links` is a kinematic link that `setCoordinates` drives, `coupleDofs(physics, multibody, linkA, linkB, {ratio})` holds one link's coordinate (a hinge's angle or a slider's offset, at any depth) plus `ratio` times another's, on a row of the two links and their parents, and `inverseKinematics` takes `constrain: {position, rotation}` masks for the world axes that count, and keeps every hinge and slider inside its limits and a ball joint (a generic joint with `coupled: ['angY', 'angZ']`) inside its swing cone and its twist range. It reads its tree with `numLinks`, `attachedBodies()`, `linkIndex(body)`, `bodyAt(index)` and `jointBetween(a, b)`, and `multibody.selfContacts = false` makes no two bodies of the tree touch (the default, true, leaves each joint's own `contactsEnabled` to decide for the pair it holds).
 
+Two kinds of joint can be solved inside the tree's own direct solve instead of the joint passes:
+- `multibody.setImplicitMotors(link)` puts the motors of a link's joint there as implicit springs and dampers: force
+  model, no `maxForce`, no limit on their axis. Each is stepped by backward Euler with every other link's, so a long, stiff
+  chain of motor springs stays stable. A joint at a time, the joint passes let a 32-link chain of 7.7 N m² run away.
+- `multibody.pinJoint(joint, true, give?)` holds a joint from a tree body to a body outside the tree as a stiff spring
+  between its anchors. The outside body gets the pull back. `give` lets the pin stretch along its link as a spring, the
+  half link at a rod's pinned end.
+
+Rods are built on both (`@margoengine/physics/rod`).
+
 `multibody.coordinates()` lists the joint coordinates link by link (an offset in metres for each free linear axis, an angle in radians for a hinge counted past a whole turn, the rotation vector for a ball), `setCoordinates(values)` poses the tree from the root's pose, and `velocities()` reads each coordinate's speed. `multibody.inverseKinematics(link, {position, rotation}, options)` is Rapier's multibody inverse kinematics: damped least squares of the Jacobian over the joints between the root and the link (Buss 2004), with hinge and slider limits kept and a step bound (Buss and Kim 2005). It returns `{converged, iterations, positionError, rotationError}`. The dynamics of the tree in those coordinates: `multibody.massMatrix()` (`dof` by `dof`, symmetric positive definite: half the speeds times it times the speeds is the kinetic energy), `multibody.jacobian(link, point)` (six rows, the point's velocity then the link's spin, by `dof` columns, so the point moves at the Jacobian times `velocities()`), `multibody.inverseDynamics(accelerations, {gravity})` (the recursive Newton-Euler method of Walker and Orin 1982: the torque of each coordinate, in newtons for a slide and newton metres for a turn, that gives those accelerations; with none it is the bias, what holds the tree against gravity and the speeds' Coriolis and centrifugal terms) and `multibody.forwardDynamics(torques, {gravity})` (the accelerations torques give: H qdd = tau minus the bias). The root is the frame of the tree and does not accelerate; gravity defaults to 9.81 down y. Rapier poses a multibody from its joint coordinates and ignores a body's speed or pose at the time the joint is made; here the bodies' poses are read as given, so `setCoordinates` or `inverseKinematics` is how you place a tree.
 
 ```ts
@@ -3688,6 +3766,38 @@ The coefficients stand alone:
 - `cylinderCoefficients(KC, k/D)`, `steadyDrag`, `wakeAmplification` and `cylinderAddedMass`;
 - `morison`, `tangentialDrag`, `sphereDrag`, `sheddingFrequency` and `liftMagnification`;
 - `ellipsoidAddedMass`, `ellipsoidAlphas` and `equivalentEllipsoid(mesh)`.
+- `reynoldsDrag(Re, k/D)`: a cylinder's steady drag below the drag crisis (White's fit) and DNV's above it; with a Reynolds
+  number, `cylinderCoefficients` takes it.
+
+A moving slender structure (a `Rod`'s links, a hose, a mooring line) takes its loads from `segmentLoads(sea, options)`
+before each step. It uses the members' physics: DNV's coefficients by roughness and KC, Reynolds drag below the crisis,
+Eames's drag along, and the wake oscillator, here driven by the segment's own acceleration so a free cable locks in. It hands
+each segment:
+- a force and a moment held for the step (buoyancy of the wetted length, the Froude-Krylov force, the added mass's share
+  of the water's acceleration, vortex lift);
+- its added mass;
+- its drag as a damping toward the flow, which the structure solves implicitly.
+
+Options:
+- `period`: the waves' period for KC (default 8), or `Infinity` for a steady current;
+- `roughness`, `drag`, `addedMass`, `vortex` (or `false`), `flows` and `viscosity`.
+
+`takeState()` and `restoreState()` keep its wake oscillators beside a world snapshot. Any structure can call it:
+`loads.apply(segments, {time, dt, gravity}, out)`, each segment `{position, tangent, velocity, angularVelocity, diameter,
+length}`.
+
+```ts
+import {segmentLoads} from 'margoengine/physics/loads';
+
+const still = {density: 1025, elevation: () => 0, water: {medium: 'water' as const, cell: [0, 0, 0] as const,
+  sample: (x: number, y: number, z: number, t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0}) =>
+    Object.assign(out, {velocity: [0.5, 0, 0], density: 1025, temperature: 288})}};
+const loads = segmentLoads(still, {period: Infinity});
+const out = [{force: [0, 0, 0], moment: [0, 0, 0], drag: {across: 0, along: 0, flow: [0, 0, 0], at: [0, 0, 0]}, addedMass: 0, addedInertia: 0}] as Parameters<typeof loads.apply>[2];
+loads.apply([{position: [0, -3, 0], tangent: [0, 1, 0], velocity: [0, 0, 0], angularVelocity: [0, 0, 0], diameter: 0.05, length: 1}],
+  {time: 0, dt: 1 / 60, gravity: [0, -9.81, 0]}, out);
+console.log(out[0].force[1] > 0, out[0].drag.across > 0); // true true: it floats a little and the current drags it
+```
 
 At a quay:
 - `standingWave`, `sainflou` and `goda` give the wall's pressures and run-up for a wave;

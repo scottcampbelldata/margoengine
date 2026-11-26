@@ -3235,6 +3235,10 @@
       "types": "./dist/physics/world.d.ts",
       "import": "./dist/physics/world.js"
     },
+    "./physics/rod": {
+      "types": "./dist/physics/rod.d.ts",
+      "import": "./dist/physics/rod.js"
+    },
     "./physics/earth": {
       "types": "./dist/physics/earth.d.ts",
       "import": "./dist/physics/earth.js"
