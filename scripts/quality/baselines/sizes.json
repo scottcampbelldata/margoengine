@@ -13230,7 +13230,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "5ffed99450",
+      "commit": "9c589476da",
       "grew": 1,
       "reason": "EARTH-05 phase-resolved wheel lugs take the optional entry from 11340 to 11837 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24820 B."
     }

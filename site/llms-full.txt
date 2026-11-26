@@ -12847,7 +12847,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 7,914 B gzip. Each lazy native asset measures 30,394 B raw and 11,399 B gzip.
+The DFSPH entry measures 7,914 B gzip. Each lazy native asset measures 33,256 B raw and 12,480 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -12860,6 +12860,8 @@ Closed planar walls sample the outside volume of the cubic pressure kernel on a 
 spacing fits each axis of the domain and every exterior site belongs to the union of closed faces.
 For a support wider than four fitted spacings, the analytical half-space integral controls work. The same
 integral is available explicitly and uses an overlap approximation at perpendicular walls.
+The same lattice contributes zero-velocity exterior samples to implicit viscosity. In analytic mode, angular
+cone moments and five-point radial quadrature give the planar viscous tensor. Its overlaps add at corners.
 Rigid boxes, spheres and capsules use sampled boundaries and hold their last published pose during the
 fluid substeps. Contact audio represents an impulse on one selected modal track. Capillarity uses one liquid and
 uniform material energies on its solids. The interface spans a three-spacing kernel neighbourhood.
@@ -29887,12 +29889,11 @@ particle hand-off carrying both volume and horizontal momentum across the shallo
 ### Divergence-free narrow-channel surge and boundary exchange (FLUID-01, PA-22)
 
 After building Physics, run `node packages/physics/tests/dfsph-lab.mjs --capillary`. The interactive and accurate
-tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.399 and 0.510 against the
+tiers reach the next Martin–Moyce Table 2 station in normalized intervals of about 0.399 and 0.508 against the
 original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets arrive early even with the
 measured liquid–air tension. The discrete wall correction restores an exact motionless initial lattice.
-The planar boundary includes excluded pressure volume and surface energy but has
-no resolved viscous wall layer. The original release diaphragm is also absent from the rectangular-domain
-model. The parcel contract conserves volume and all momentum components against a closed fixture.
+Both pressure and physical wall viscosity are included. The original release diaphragm still needs an
+explicit model for a like-for-like comparison. The parcel contract conserves volume and all momentum components against a closed fixture.
 The SEA-04 and HYDRO-01 production endpoints remain open.
 
 ### Rail production shot and full track contact (DYN-05)
