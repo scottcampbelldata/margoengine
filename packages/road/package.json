@@ -30,6 +30,10 @@
       "types": "./dist/junctions.d.ts",
       "import": "./dist/junctions.js"
     },
+    "./driving": {
+      "types": "./dist/driving.d.ts",
+      "import": "./dist/driving.js"
+    },
     "./banking": {
       "types": "./dist/banking.d.ts",
       "import": "./dist/banking.js"
@@ -76,6 +80,7 @@
     "access": "public"
   },
   "dependencies": {
+    "@margoengine/math": "^1.0.0",
     "@margoengine/splines": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
     "@margoengine/bvh": "^1.0.0",
@@ -83,7 +88,13 @@
     "@margoengine/compute": "^1.0.0"
   },
   "peerDependencies": {
-    "@margoengine/core": "^1.0.0"
+    "@margoengine/core": "^1.0.0",
+    "@margoengine/physics": "^1.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@margoengine/physics": {
+      "optional": true
+    }
   },
   "scripts": {
     "build": "node ../../scripts/build-optional.js road",

@@ -1,5 +1,6 @@
 /// <reference lib="esnext.disposable" preserve="true" />
 import { MargoError } from '@margoengine/math/errors';
+import { hypot, pow } from '@margoengine/math/pinned';
 import type { Mesh } from '@margoengine/core';
 import type { PhysicsCollider } from './collider.js';
 import type { PhysicsBody } from './body.js';
@@ -68,6 +69,38 @@ export interface WheelOptions {
   mesh?: Mesh;
 }
 
+/** Contact region sampled after the wheel's swept or ray query. */
+export interface WheelGroundContact {
+  readonly collider: PhysicsCollider;
+  readonly point: Vec3;
+  readonly normal: Vec3;
+  readonly radius: number;
+  readonly width: number;
+}
+
+/** One measured running surface. Omit the sample to keep the vehicle's existing tyre settings. */
+export interface WheelGroundMaterial {
+  /** Upper bound on the combined traction coefficient; dry and wet surfaces may supply different values. */
+  readonly grip: number;
+  /** Optional Bekker pressure–sinkage relation p = stiffness * z^exponent using the measured tyre footprint. */
+  readonly soil?: {
+    /** Effective plate stiffness, Pa/m^exponent. */
+    readonly stiffness: number;
+    /** Positive pressure–sinkage exponent. */
+    readonly exponent: number;
+    /** Effective loaded patch area, m². */
+    readonly area: number;
+  };
+}
+
+/** The surface effect used by one wheel in its last step. */
+export interface WheelGroundState {
+  /** Applied bound on the combined coefficient, or null when the wheel uses its legacy material. */
+  readonly grip: number | null;
+  /** Vertical displacement into yielding ground along the local surface normal, m. */
+  readonly sinkage: number;
+}
+
 /** Options of `new Vehicle(physics, chassis, options)`. Every field but `wheels` has a default. */
 export interface VehicleOptions {
   /** The wheels, at least one. */
@@ -101,6 +134,10 @@ export interface VehicleOptions {
   groups?: number;
   /** Return false to make the wheels ignore a collider (the chassis's own colliders are always ignored). */
   predicate?: (collider: PhysicsCollider) => boolean;
+  /** Optional deterministic material sample for the actual wheel contact, after the query. */
+  groundMaterial?: (contact: WheelGroundContact) => WheelGroundMaterial | undefined;
+  /** Follow the hit body's surface velocity and apply equal and opposite wheel impulses. Default false. */
+  groundReaction?: boolean;
   /**
    * The direction the chassis faces, in its own frame (default [0, 0, 1], +Z), Rapier's `index_forward_axis`: `speed` is the
    * velocity along it. A chassis that faces another way also gives its wheels an `axle` (the axle is the cross product of up
@@ -192,6 +229,8 @@ interface WheelSetup {
   kappa: number;
   alpha: number;
   torque: number;
+  groundGrip: number | null;
+  sinkage: number;
 }
 
 type V = [number, number, number];
@@ -243,6 +282,41 @@ const clamp = (value: number | undefined, min: number, max: number, label: strin
   return Math.min(max, Math.max(min, v));
 };
 
+function groundInverse(body: PhysicsBody, point: V, direction: V): number {
+  if (body.type !== 'dynamic') return 0;
+  const centre = body.worldCenterOfMass;
+  const r: V = [point[0] - centre[0], point[1] - centre[1], point[2] - centre[2]];
+  const principal = rotate(conjugate(multiply(body.rotation, body.inertiaFrame)), cross(r, direction));
+  const inverse = body.inversePrincipalInertia;
+  return (
+    body.inverseMass + dot(principal, [principal[0] * inverse[0], principal[1] * inverse[1], principal[2] * inverse[2]])
+  );
+}
+
+function groundYield(
+  soil: NonNullable<WheelGroundMaterial['soil']>,
+  load: number,
+  spring: number,
+  travel: number,
+  capacity: number,
+): { depth: number; force: number } {
+  const stiffness = positive(soil.stiffness, 'Soil pressure stiffness') * positive(soil.area, 'Soil footprint area');
+  const exponent = positive(soil.exponent, 'Soil pressure exponent');
+  const support = (depth: number) => stiffness * (exponent === 1 ? depth : pow(depth, exponent));
+  const springLoad = (depth: number) => Math.min(capacity, Math.max(0, load - spring * depth));
+  let low = 0;
+  let high = travel;
+  if (support(high) <= springLoad(high)) return { depth: high, force: support(high) };
+  // Pressure increases with depth; available spring load decreases. The bracket contracts by 2^-22.
+  for (let i = 0; i < 22; i++) {
+    const mid = 0.5 * (low + high);
+    if (support(mid) < springLoad(mid)) low = mid;
+    else high = mid;
+  }
+  const depth = 0.5 * (low + high);
+  return { depth, force: springLoad(depth) };
+}
+
 /**
  * A ray-cast vehicle on a dynamic chassis body. Each wheel casts its suspension ray every fixed step and pushes the
  * chassis with a spring and damper along the contact normal, drive and brake force along its rolling direction and a
@@ -271,6 +345,8 @@ export class Vehicle implements PhysicsAttachment {
   private readonly groups?: number;
   private readonly facing: [number, number, number];
   private readonly predicate?: (collider: PhysicsCollider) => boolean;
+  private readonly groundMaterial?: VehicleOptions['groundMaterial'];
+  private readonly groundReaction: boolean;
   private disposed = false;
   private readonly position = [0, 0, 0];
   private readonly quaternion = [0, 0, 0, 1];
@@ -344,6 +420,8 @@ export class Vehicle implements PhysicsAttachment {
         kappa: 0,
         alpha: 0,
         torque: 0,
+        groundGrip: null,
+        sinkage: 0,
       });
       const made = this.wheels[this.wheels.length - 1]!;
       if (made.cast !== 'ray' && made.cast !== 'shape')
@@ -366,6 +444,8 @@ export class Vehicle implements PhysicsAttachment {
         throw new RangeError(`Vehicle ${label} must be a finite number of at least 0`);
     this.groups = options.groups;
     this.predicate = options.predicate;
+    this.groundMaterial = options.groundMaterial;
+    this.groundReaction = options.groundReaction ?? false;
     this.drivetrain = options.drivetrain ?? null;
     if (this.drivetrain) {
       for (const index of this.drivenIndexes()) {
@@ -456,6 +536,13 @@ export class Vehicle implements PhysicsAttachment {
     };
   }
 
+  /** Current traction bound and sinkage from the last contact of the specified wheel. */
+  wheelGround(index: number): WheelGroundState {
+    this.checkWheel(index);
+    const { groundGrip, sinkage } = this.wheels[index]!;
+    return { grip: groundGrip, sinkage };
+  }
+
   /**
    * Wheel `index`'s hub pose in the chassis frame: position on the suspension, then steering around the chassis up
    * axis and spin around the axle. Writes into `position` and `quaternion` when given.
@@ -524,6 +611,20 @@ export class Vehicle implements PhysicsAttachment {
       const rd = cross(r, d);
       return 1 / mass + dot(cross(invInertia(rd), r), d);
     };
+    const pushWheel = (wheel: WheelSetup, impulse: V, at: V): void => {
+      chassis.applyImpulse(impulse, at, false);
+      const support = this.groundReaction ? wheel.ground?.body : undefined;
+      if (support?.type === 'dynamic' && impulse.some((value) => value !== 0))
+        support.applyImpulse([-impulse[0], -impulse[1], -impulse[2]], at);
+    };
+    const relativeVelocity = (wheel: WheelSetup, arm: V): V => {
+      const v = pointVelocity(arm);
+      if (!this.groundReaction || !wheel.ground) return v;
+      const other = wheel.ground.body.velocityAtPoint(wheel.point);
+      return [v[0] - other[0], v[1] - other[1], v[2] - other[2]];
+    };
+    const contactInverse = (wheel: WheelSetup, arm: V, at: V, axis: V): number =>
+      inverseMass(arm, axis) + (this.groundReaction && wheel.ground ? groundInverse(wheel.ground.body, at, axis) : 0);
     const own = this.physics;
     const predicate =
       this.predicate && ((_body: PhysicsBody, collider: PhysicsCollider): boolean => this.predicate!(collider));
@@ -591,6 +692,8 @@ export class Vehicle implements PhysicsAttachment {
         });
       wheel.hard = origin;
       wheel.forwardImpulse = wheel.sideImpulse = 0;
+      wheel.groundGrip = null;
+      wheel.sinkage = 0;
       if (!hit) {
         wheel.ground = null;
         wheel.contact = false;
@@ -602,13 +705,25 @@ export class Vehicle implements PhysicsAttachment {
       wheel.ground = hit.collider;
       wheel.point = hit.point;
       wheel.normal = hit.normal;
+      const material = this.groundMaterial?.({
+        collider: hit.collider,
+        point: hit.point,
+        normal: hit.normal,
+        radius: wheel.radius,
+        width: wheel.width,
+      });
+      if (material) {
+        if (!(Number.isFinite(material.grip) && material.grip >= 0))
+          throw new MargoError('state', 'Provide a finite nonnegative wheel-ground grip coefficient.');
+        wheel.groundGrip = material.grip;
+      }
       const minimum = Math.max(0, wheel.rest - wheel.travel),
         length = Math.min(wheel.rest, Math.max(minimum, hit.distance - wheel.radius));
       wheel.length = length;
       const normal = hit.normal,
         r: V = [hit.point[0] - centreWorld[0], hit.point[1] - centreWorld[1], hit.point[2] - centreWorld[2]],
         cosine = -dot(normal, down),
-        pv = pointVelocity(r);
+        pv = relativeVelocity(wheel, r);
       let inverse = 10,
         relative = 0;
       if (cosine > 0.1) {
@@ -617,9 +732,28 @@ export class Vehicle implements PhysicsAttachment {
       }
       let force = wheel.stiffness * (wheel.rest - length) * inverse;
       force -= (relative < 0 ? wheel.compression : wheel.relaxation) * relative;
-      force = Math.min(wheel.maxForce, Math.max(0, force * mass));
+      force *= mass;
+      if (material?.soil && force > 0) {
+        const projection = 1 / inverse;
+        const result = groundYield(
+          material.soil,
+          force,
+          wheel.stiffness * inverse * inverse * mass,
+          (wheel.rest - length) * projection,
+          wheel.maxForce,
+        );
+        wheel.sinkage = result.depth;
+        wheel.length += result.depth * inverse;
+        wheel.point = [
+          hit.point[0] - normal[0] * result.depth,
+          hit.point[1] - normal[1] * result.depth,
+          hit.point[2] - normal[2] * result.depth,
+        ];
+        force = result.force;
+      }
+      force = Math.min(wheel.maxForce, Math.max(0, force));
       wheel.force = force;
-      chassis.applyImpulse([normal[0] * force * dt, normal[1] * force * dt, normal[2] * force * dt], hit.point, false);
+      pushWheel(wheel, [normal[0] * force * dt, normal[1] * force * dt, normal[2] * force * dt], wheel.point);
     }
     // Anti-roll bars: a force on each end of a bar that follows the difference of its two wheels' compression, up where the wheel is more
     // compressed and down where it is less, so the chassis is resisted in leaning over.
@@ -636,7 +770,7 @@ export class Vehicle implements PhysicsAttachment {
             ? wheel.normal
             : (rotate(rotation, [-wheel.direction[0], -wheel.direction[1], -wheel.direction[2]]) as V),
           at = wheel.contact ? wheel.point : wheel.hard;
-        chassis.applyImpulse([up[0] * force * sign, up[1] * force * sign, up[2] * force * sign], at, false);
+        pushWheel(wheel, [up[0] * force * sign, up[1] * force * sign, up[2] * force * sign], at);
       }
     }
     // Then drive, brake and grip. Every wheel sees the same chassis, so a wheel that cancelled all of a slide or a roll by
@@ -654,8 +788,8 @@ export class Vehicle implements PhysicsAttachment {
       }
       const normal = wheel.normal,
         r: V = [wheel.point[0] - centreWorld[0], wheel.point[1] - centreWorld[1], wheel.point[2] - centreWorld[2]],
-        pv = pointVelocity(r),
-        grip = wheel.slip * wheel.force * dt;
+        pv = relativeVelocity(wheel, r),
+        grip = Math.min(wheel.slip, wheel.groundGrip ?? Infinity) * wheel.force * dt;
       // The wheel's rolling direction: the surface normal crossed with the steered axle, on the ground plane.
       const axle = wheel.steer
           ? rotate(
@@ -674,10 +808,11 @@ export class Vehicle implements PhysicsAttachment {
       if (flat < 1e-6) continue;
       forward = [forward[0] / flat, forward[1] / flat, forward[2] / flat];
       const side = cross(forward, normal);
+      const forwardInverse = contactInverse(wheel, r, wheel.point, forward);
       let drive = wheel.drive ? this.engineForce * dt : 0;
       const rolling = dot(forward, pv);
       if (wheel.brake && this.brake > 0) {
-        const stop = -rolling / inverseMass(r, forward) / grounded,
+        const stop = -rolling / forwardInverse / grounded,
           limit = this.brake * dt;
         drive += Math.max(-limit, Math.min(limit, stop));
       }
@@ -686,7 +821,9 @@ export class Vehicle implements PhysicsAttachment {
       const up = rotate(rotation, [-wheel.direction[0], -wheel.direction[1], -wheel.direction[2]]),
         height = dot(r, up) * (1 - wheel.roll),
         lifted: V = [r[0] - up[0] * height, r[1] - up[1] * height, r[2] - up[2] * height],
-        slide = ((-dot(side, pv) / inverseMass(lifted, side)) * wheel.side) / grounded;
+        elevated: V = [centreWorld[0] + lifted[0], centreWorld[1] + lifted[1], centreWorld[2] + lifted[2]],
+        sideInverse = contactInverse(wheel, lifted, elevated, side),
+        slide = ((-dot(side, pv) / sideInverse) * wheel.side) / grounded;
       if (wheel.tyre) {
         // A tyre model: the wheel keeps its own spin, and the model turns the slips and the load into forces. The forces are those the
         // step ends with, found implicitly: a force changes the wheel's surface speed and the chassis's speed at the contact, which
@@ -700,8 +837,8 @@ export class Vehicle implements PhysicsAttachment {
           surface = wheel.omega * radius - forwardSpeed,
           reference = Math.max(Math.abs(forwardSpeed), 1),
           floorSpeed = Math.max(Math.abs(forwardSpeed), 0.5),
-          gainForward = dt * ((radius * radius) / wheel.inertia + inverseMass(r, forward) * grounded),
-          gainSide = dt * inverseMass(lifted, side) * grounded,
+          gainForward = dt * ((radius * radius) / wheel.inertia + forwardInverse * grounded),
+          gainSide = dt * sideInverse * grounded,
           rolling = Math.sign(surface) || 1,
           sliding = Math.sign(sideSpeed) || 1,
           tyre = wheel.tyre;
@@ -720,12 +857,24 @@ export class Vehicle implements PhysicsAttachment {
               const mid = (low + high) / 2,
                 [kappa, alpha] = which === 0 ? slips(mid, fy) : slips(fx, mid),
                 model = tyre.forces({ slipRatio: kappa, slipAngle: alpha, load: wheel.force }),
-                wanted = which === 0 ? rolling * model.longitudinal : sliding * model.lateral;
+                total = wheel.groundGrip === null ? 0 : hypot(model.longitudinal, model.lateral),
+                limit =
+                  wheel.groundGrip === null ? 1 : total > 0 ? Math.min(1, (wheel.groundGrip * wheel.force) / total) : 1,
+                wanted = limit * (which === 0 ? rolling * model.longitudinal : sliding * model.lateral);
               if (mid < wanted) low = mid;
               else high = mid;
             }
             if (which === 0) fx = (low + high) / 2;
             else fy = (low + high) / 2;
+          }
+        }
+        if (wheel.groundGrip !== null) {
+          const force = hypot(fx, fy);
+          const available = wheel.groundGrip * wheel.force;
+          if (force > available) {
+            const scale = available / force; // float division: exact combined contact limit
+            fx *= scale;
+            fy *= scale;
           }
         }
         [wheel.kappa, wheel.alpha] = slips(fx, fy);
@@ -735,15 +884,15 @@ export class Vehicle implements PhysicsAttachment {
         wheel.rotation += wheel.omega * dt;
         wheel.forwardImpulse = longitudinal * dt;
         wheel.sideImpulse = -lateral * dt;
-        chassis.applyImpulse(
+        pushWheel(
+          wheel,
           [forward[0] * wheel.forwardImpulse, forward[1] * wheel.forwardImpulse, forward[2] * wheel.forwardImpulse],
           wheel.point,
-          false,
         );
-        chassis.applyImpulse(
+        pushWheel(
+          wheel,
           [side[0] * wheel.sideImpulse, side[1] * wheel.sideImpulse, side[2] * wheel.sideImpulse],
-          [centreWorld[0] + lifted[0], centreWorld[1] + lifted[1], centreWorld[2] + lifted[2]],
-          false,
+          elevated,
         );
         continue;
       }
@@ -757,12 +906,8 @@ export class Vehicle implements PhysicsAttachment {
       }
       wheel.forwardImpulse = along;
       wheel.sideImpulse = across;
-      chassis.applyImpulse([forward[0] * along, forward[1] * along, forward[2] * along], wheel.point, false);
-      chassis.applyImpulse(
-        [side[0] * across, side[1] * across, side[2] * across],
-        [centreWorld[0] + lifted[0], centreWorld[1] + lifted[1], centreWorld[2] + lifted[2]],
-        false,
-      );
+      pushWheel(wheel, [forward[0] * along, forward[1] * along, forward[2] * along], wheel.point);
+      pushWheel(wheel, [side[0] * across, side[1] * across, side[2] * across], elevated);
       wheel.rotation += (rolling / wheel.radius) * dt;
     }
   }
