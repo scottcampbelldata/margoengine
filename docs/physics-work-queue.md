@@ -389,7 +389,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | DYN-04 | Wheeled vehicles on roads | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c |
 | DYN-05 | Rail vehicle dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed fa79b04868 |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | native rods, fast guides and physical skin bindings | Codex | LANDED (c53e60dc12) |
-| SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |
+| SOFT-05 | Muscle, fat and skin soft tissue | none | Codex | BUILDING (codex/physics-soft-tissue) |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed cf8fb29389 |
