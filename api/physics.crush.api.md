@@ -15,6 +15,7 @@ export class CircularPlateIndentation {
     readonly fractureWork: number;
     constructor(params: CircularPlateParams);
     read(stroke: number, rest?: ArrayLike<number>): CircularPlateReading;
+    strokeForWork(work: number): number;
 }
 
 export interface CircularPlateParams {
@@ -36,6 +37,10 @@ export interface CircularPlateReading {
 
 export type CrushGroundPatch = Omit<CrushPatch, 'support' | 'radius'>;
 
+export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | 'plate' | 'sealStroke'> & {
+    readonly indentation: CircularPlateParams;
+};
+
 export interface CrushMaterial {
     readonly stiffness: number;
     readonly yieldForce: number;
@@ -54,6 +59,7 @@ export interface CrushParams {
     readonly cellSize?: number;
     readonly patches: readonly CrushPatch[];
     readonly groundPatches?: readonly CrushGroundPatch[];
+    readonly indentationPatches?: readonly CrushIndentationPatch[];
 }
 
 export interface CrushPatch {
@@ -132,6 +138,7 @@ export class CrushSolver implements Solver<CrushParams> {
     extraState(): readonly Region[];
     read(index: number): CrushPatchState;
     readPlate(index: number, rest?: ArrayLike<number>): CrushPlateState;
+    readIndentation(index: number, rest?: ArrayLike<number>): CircularPlateReading;
 }
 
 export interface CrushStrokeResult {

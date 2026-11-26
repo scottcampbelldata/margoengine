@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20646479,
+  "total": 20647062,
   "history": [
     {
       "date": "2026-10-24",
@@ -13885,6 +13885,12 @@
       "commit": "59c7854b6c",
       "grew": 1,
       "reason": "SEA-15's cohesive floc kinetics moves physics/tracers from 14915 to 15656 B gzip. The optional ceiling rises from 15363 to 16126 B. Floc kinetics shares the existing sediment parcels, position integration and dry-mass ledger. A separate entry would need a second parcel store or per-particle coupling adapter."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "168006e3ce",
+      "reason": "BREAK-03 native circular rupture grows the optional crush entry from 12430 to 12996 B gzip. The ceiling rises from 12803 to 13386 B. The native membrane uses the same impulse transfer, seal layout and shape registry as the existing crush contacts. A second entry would duplicate that lifecycle in scenes that mix plate rupture with frame or ground contacts. Named imports remain tree-shakable.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14709,7 +14715,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 12803,
+    "@margoengine/physics/crush": 13386,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
