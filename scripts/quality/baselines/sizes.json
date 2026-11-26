@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20543297,
+  "total": 20549304,
   "history": [
     {
       "date": "2026-10-24",
@@ -13554,6 +13554,13 @@
       "commit": "77cfb3b5f3",
       "grew": 1,
       "reason": "EARTH-02 grows the optional granular-flow entry from 4943 to 5545 B gzip (ceiling 5801 B) for signed submerged volume, common deposit history and the SEA-06 port. Splitting the coastal path would duplicate the conservative grid and its terrain binding. Core plus Stage stay 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "bdb1a3b3f8a2c6d5e88f6426af82d2978db143fe",
+      "grew": 0,
+      "added": 1,
+      "reason": "EARTH-01 adds a 5751 B gzip optional voxel bridge; root changes from 6044 to 6048 B gzip to share the atomic change notification path. A separate root copy would duplicate the voxel world class and break shared identity. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -15157,6 +15164,7 @@
     "@margoengine/voxel/generate": 4426,
     "@margoengine/voxel/gi": 5024,
     "@margoengine/voxel/gpu-mesher": 13271,
+    "@margoengine/voxel/granular-mpm": 6007,
     "@margoengine/voxel/light": 8638,
     "@margoengine/voxel/light-rgb": 10978,
     "@margoengine/voxel/light-worker": 6341,
