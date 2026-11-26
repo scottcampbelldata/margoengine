@@ -42,6 +42,7 @@ export interface SoilContactProfile {
 export interface SoilContactRigidOptions {
     readonly id?: string;
     readonly wheelPhase?: FieldDescriptor;
+    readonly wheelReaction?: FieldDescriptor;
     readonly terrain?: BedShape;
 }
 
@@ -2201,6 +2202,7 @@ class Vehicle implements PhysicsAttachment {
     get valid(): boolean;
     setInput(input: VehicleInput): this;
     get speed(): number;
+    setWheelGroundTraction(index: number, traction: WheelGroundTraction): void;
     wheel(index: number): WheelState;
     get motionStateWords(): number;
     writeMotionState(output: Float64Array): void;
@@ -2263,6 +2265,13 @@ interface WheelGroundMaterial {
 interface WheelGroundState {
     readonly grip: number | null;
     readonly sinkage: number;
+}
+
+interface WheelGroundTraction {
+    readonly collider: PhysicsCollider;
+    readonly load: number;
+    readonly drawbar: number;
+    readonly axleTorque: number;
 }
 
 interface WheelOptions {

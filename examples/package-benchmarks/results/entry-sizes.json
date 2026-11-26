@@ -13964,8 +13964,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1340452,
-        "gzip": 865981
+        "raw": 1342144,
+        "gzip": 866709
       },
       "./decomposition": {
         "raw": 26661,
@@ -14164,8 +14164,8 @@
         "gzip": 9673
       },
       "./terramechanics": {
-        "raw": 34214,
-        "gzip": 12367
+        "raw": 35218,
+        "gzip": 12631
       },
       "./synoptic": {
         "raw": 17285,
