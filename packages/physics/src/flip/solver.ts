@@ -241,7 +241,8 @@ export class FlipSolver implements Solver<FlipParams> {
       if (s > fastest) fastest = s;
     }
     // Gravity adds up to g dt over the step; take it into the bound.
-    const g = Math.sqrt(this.gravity[0] ** 2 + this.gravity[1] ** 2 + this.gravity[2] ** 2),
+    const [gx, gy, gz] = this.gravity,
+      g = Math.sqrt(gx * gx + gy * gy + gz * gz),
       bound = Math.sqrt(fastest) + g * dt,
       substeps = Math.max(1, Math.ceil((bound * dt) / this.grid.h));
     if (substeps > this.maxSubsteps)

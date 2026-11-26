@@ -150,7 +150,11 @@ export class DeckWaterSolver extends FlipSolver {
       rows = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       at = this.row * BODY_WORDS;
     // A row holds a body (moving or fixed) when its rotation is a unit quaternion; an empty row's is all zeros.
-    const qn = rows[at + 3]! ** 2 + rows[at + 4]! ** 2 + rows[at + 5]! ** 2 + rows[at + 6]! ** 2;
+    const qx = rows[at + 3]!,
+      qy = rows[at + 4]!,
+      qz = rows[at + 5]!,
+      qw = rows[at + 6]!,
+      qn = qx * qx + qy * qy + qz * qz + qw * qw;
     if (at + BODY_WORDS > rows.length || !(qn > 0.5))
       throw new MargoError('state', `Deck water's hull row ${this.row} holds no body; add the hull before stepping.`);
     this.q = [rows[at + 3]!, rows[at + 4]!, rows[at + 5]!, rows[at + 6]!];
