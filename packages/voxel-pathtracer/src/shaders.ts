@@ -241,6 +241,18 @@ const GUIDE_WEIGHT = /* wgsl */ `fn guideWeight(s:Bounce,alpha:f32,n:vec3f,wo:ve
  return vec3f(min(select(e/0.05,e,(f.config.z&NO_COMPENSATION)!=0u),1.0));
 }`;
 
+// Subsurface under a diffuse surface (the SUBSURFACE flag; Chiang, Kutz and Burley 2016, "Practical and Controllable
+// Subsurface Scattering for Production Path Tracing", a diffuse interface). These notes sit here, not in the shader
+// text, so no comment ships (KB-WGSL1):
+// - WALK is the most steps one walk under a surface may take.
+// - A subsurface volume blocks shadow rays: its diffuse surface is where light enters it.
+// - Entering through the surface is a diffuse event that turns the path into a cosine lobe about the inward normal;
+//   the walk inside samples no light (`skinIn`), it gathers light only where it leaves.
+// - A step of the walk is counted by the subsurface cap alone (at most WALK), not by maxBounces; the path loop's own
+//   limit ends a walk too.
+// - Leaving into empty space or a plain medium (`skinOut`) meets the diffuse surface from inside: the far side is a
+//   white cosine lobe (the walk has carried the colour), light is sampled there and the path leaves about the outward
+//   normal. The direction is mirrored in the surface, so the lobe sees it arrive from outside.
 export const TRACE: string = /* wgsl */ `${FRAME}${COMMON}${SPECTRUM}${preciseMathWgsl(['preciseSin', 'preciseCos', 'preciseAsin', 'preciseAtan'])}
 const INF=3.0e38;
 const NONE=0xffffffffu;
@@ -272,7 +284,6 @@ const ADDITIVE=${ADDITIVE}u;
 const UNTINTED=${UNTINTED}u;
 const SUNLIT=${SUNLIT}u;
 const SUBSURFACE=${SUBSURFACE}u;
-// Steps of one walk under a diffuse surface at most.
 const WALK=256u;
 const VOXELWISE=${VOXELWISE}u;
 const CONTACT=${CONTACT}u;
@@ -544,8 +555,7 @@ fn march(model:u32,o:vec3f,d:vec3f,tMin:f32,tMax:f32,want:u32,h:ptr<function,Hit
 // Extinction of a see-through cell for shadow rays, -1 when the cell blocks light (only media let it through; with
 // opaque shadows none, except the sun-lit volume the shadow ray starts in, or only its start cell for a sun ray from a
 // walk that entered the volume through a face turned from the sun: as in MagicaVoxel's subsurface, light reaches a
-// point in it through that volume alone, mostly from its faces toward the light). A subsurface volume blocks light: its
-// diffuse surface is where light enters it.
+// point in it through that volume alone, mostly from its faces toward the light).
 fn extinction(v:u32,own:bool)->f32 {
  let x=mat(v*MV+3u);let fl=u32(x.w);
  return select(-1.0,x.x,(fl&MEDIA)!=0u&&(fl&SUBSURFACE)==0u&&((f.config.z&OPAQUE_SHADOWS)==0u||((fl&SUNLIT)!=0u&&own)));
@@ -1595,8 +1605,6 @@ fn radiance(px:vec2u)->Path {
      thr*=exp(-md.absorb*ts)*md.albedo;
      p=o+d*ts;
      if(feature){feature=false;res.albedo=tint*md.albedo;res.normal=-d;res.primary=select(0.0,1.0,bounces==0u);}
-     // A step of the walk under a diffuse surface: counted by the subsurface cap alone (at most WALK), not by maxBounces
-     // (the path loop's own limit ends a walk too).
      // Sun-lit media: each diffuse event before takes 4 from the subsurface cap (MagicaVoxel's neighbours of subsurface
      // blocks under diffuse caps 2 and 4).
      let mf=material(medium).flags;
@@ -1648,7 +1656,6 @@ fn radiance(px:vec2u)->Path {
     // back inside off the blend's other lobes (a diffuse event). Without metal that is the glass share itself; with it,
     // MagicaVoxel lets more light out than the share its metal leaves (B boards: half metal, half glass over white).
     var inner=false;
-    // Leaving a subsurface volume into empty space or a plain medium: its diffuse surface, seen from inside.
     let other=h.value==0u||(material(h.value).flags&(MEDIA|SUBSURFACE))==MEDIA;
     skinOut=other&&medium!=0u&&(material(medium).flags&SUBSURFACE)!=0u;
     if(h.value==0u&&medium!=0u){let mc=material(medium);if((mc.flags&CONTACT)!=0u&&rand()>=mc.glass/max(1e-6,1.0-0.4*mc.metal)){inner=true;}}
@@ -1679,9 +1686,6 @@ fn radiance(px:vec2u)->Path {
     }
     m=material(h.value);
     if(skinOut){
-     // The far side of the surface is a white cosine lobe (the walk has carried the colour): light is sampled there and
-     // the path leaves about the outward normal (Chiang, Kutz and Burley 2016, a diffuse interface). The direction is
-     // mirrored in the surface, so the lobe sees it arrive from outside.
      m=lineMat(vec3f(1.0));n=-n;off=-off;d=reflect(d,n);
      medium=h.value;mInst=select(NONE,h.inst,h.value!=0u);
     }
@@ -1690,8 +1694,6 @@ fn radiance(px:vec2u)->Path {
      if(medium!=0u&&(material(medium).flags&MEDIA)==0u){chainOk=false;}
      sunFace=dot(n,f.sun.xyz)>0.0;
      if((m.flags&SUBSURFACE)!=0u&&(medium==0u||(material(medium).flags&SUBSURFACE)==0u)){
-      // Into a subsurface volume through its diffuse surface: a diffuse event that turns the path into a cosine lobe
-      // about the inward normal; the walk inside gathers no light until it leaves.
       if(nd>=f.limits.x||bounces>=f.config.x){break;}
       if(feature){feature=false;res.albedo=tint*m.color;res.normal=n;res.primary=select(0.0,1.0,bounces==0u);}
       nd++;bounces++;diffuse=true;
@@ -1722,7 +1724,6 @@ fn radiance(px:vec2u)->Path {
   // event too many, and only the light-sampled MIS share of that longer path, since the same limit cuts its BSDF share
   // below. A medium vertex checks its count where it scatters.
   // Light sampled at a glossy metal seen from a diffuse vertex is a caustic too (light focused by the metal).
-  // Inside a subsurface volume no light is sampled: it arrives through the surface, where the walk leaves.
   let skinIn=medium!=0u&&(material(medium).flags&SUBSURFACE)!=0u&&!skinOut;
   if(soft&&!skinIn&&(scatter||bounces<f.config.x)){
    var walk:Walk;
