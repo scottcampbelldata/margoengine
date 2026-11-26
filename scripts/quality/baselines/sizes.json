@@ -13338,7 +13338,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "b08ae325c9",
+      "commit": "4b7980c174",
       "grew": 1,
       "reason": "SOFT-04 adds material-coordinate tensile strain sampling and automatically opened cut geometry, moving the soft entry from 137978 to 138830 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 43627 to 44952 B ceiling (43642 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
