@@ -43,8 +43,12 @@ if (import.meta.url !== pathToFileURL(process.argv[1]).href) {
     console.error(
       `typecheck: ${missing.length} packages have no built declarations (${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}); run npm run build:packages first`,
     );
-    process.exit(1);
-  }
+    process.exitCode = 1;
+  } else await checkAll();
+}
+
+/** Strict-checks every package that has a tsconfig.json. */
+async function checkAll() {
   for (const entry of await readdir(resolve(repository, 'packages'), { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
     const config = resolve(repository, 'packages', entry.name, 'tsconfig.json');
