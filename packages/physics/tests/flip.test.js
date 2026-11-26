@@ -394,6 +394,45 @@ test('a particle carried into a solid comes back out at the face it went in by, 
   assert.equal(wrong, 0, `${wrong} of ${entered} left in the block or out the wrong side`);
 });
 
+test('air the liquid closes over is taken in once, at its middle, as a bubble source; water in the air is spray', () => {
+  // A pool 0.4 m deep with a pocket of air 0.1 m square at its middle (cells of 2 cm): the first step takes in the
+  // pocket, 25 cells of air, at its centre; the steps after take in none (the pocket only shrinks, its air already
+  // counted). Three drops held above the pool fall as spray, at the speed gravity gives them.
+  // The pocket's air is the water missing there, so phi's surface, a fraction of a cell inside the water, does not
+  // shrink it (counted by phi's air cells it read 16 cells, not 25).
+  const h = 0.02,
+    liquid = new FlipSolver(),
+    world = new PhysicsWorld({ rate: { num: 120, den: 1 }, gravity: [0, -G, 0] }).add(liquid, {
+      cells: [30, 40, 1],
+      cellSize: h,
+      rate: 1,
+      initial: (x, y) =>
+        (y < 0.4 && !(Math.abs(x - 0.3) < 0.05 && Math.abs(y - 0.2) < 0.05)) ||
+        (y > 0.7 && y < 0.71 && [0.105, 0.305, 0.505].some((c) => Math.abs(x - c) < 0.004)),
+    });
+  // The world runs at 120 frames a second and the air is gathered over its 60 Hz base step: read it every second frame.
+  world.advance(2);
+  const [first] = liquid.aeration();
+  assert.ok(first, 'the pocket is taken in');
+  // The rate is over the world's base step, 1/60 s (this liquid takes two steps of it).
+  assert.ok(Math.abs(first.rate / 60 - 25 * h * h * h) < 1e-12, `${first.rate / 60} m^3`);
+  assert.ok(Math.abs(first.position[0] - 0.3) < 1e-9 && Math.abs(first.position[1] - 0.2) < 1e-9, `${first.position}`);
+  for (let f = 3; f <= 6; f++) {
+    world.advance(f);
+    if (f % 2 === 0) assert.equal(liquid.aeration().length, 0, `frame ${f} takes no new air`);
+  }
+  // Spray is all the water in the air (the pocket's walls falling in are too); the drops are the six particles high up.
+  const spray = liquid.spray(),
+    drops = [];
+  for (let i = 0; i < spray.length; i += 6) if (spray[i + 1] > 0.6) drops.push(spray[i + 4]);
+  assert.equal(drops.length, 6, 'the three drops, two particles each, are in the air');
+  for (const v of drops) assert.ok(Math.abs(v + G * (6 / 120)) < 0.02 * G * (6 / 120), `falling at ${v} m/s`);
+  assert.throws(
+    () => new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new FlipSolver(), { cells: [4, 4, 1], foam: {} }),
+    TypeError,
+  );
+});
+
 test('bad boxes are refused, each naming its fix', () => {
   const w = new PhysicsWorld({ rate: { num: 60, den: 1 } });
   assert.throws(() => w.add(new FlipSolver('a'), { cells: [0, 4, 4] }), RangeError);

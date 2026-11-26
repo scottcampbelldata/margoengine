@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20601975,
+  "total": 20603809,
   "history": [
     {
       "date": "2026-10-24",
@@ -13735,6 +13735,12 @@
       "commit": "0ee0b54faa",
       "grew": 1,
       "reason": "SEA-08 incident-wave encounter correction grows seakeeping from 26195 to 27343 B gzip. It reuses the existing section solves and retains the live water convolution. A split would duplicate strip tables or add a second hull load connection. Core plus Stage remains 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) flip air and spray",
+      "reason": "FlipSolver aeration, foam and spray for SEA-13: a per-step search for the air the liquid closes over (flood fill and the missing water round it, a running maximum in state), aeration() as bubble sources gathered over the base step, foam over cavities, spray(); 12,863 to 14,697 B gzip (this Mac). The search runs inside the solver step on its own grid and particles, so a split entry would have to reach its internals.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14567,7 +14573,7 @@
     "@margoengine/physics/entry": 10205,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 12863,
+    "@margoengine/physics/flip": 14697,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/granular-flow": 6221,

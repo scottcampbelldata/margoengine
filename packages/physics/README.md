@@ -3023,6 +3023,30 @@ to hold the sea's level, in tiles of `seaTile` m. The box and the wake keep thei
 the sea's `water`, with the wake made with `waterBelow`, carries the wake's waves into the box. Waves made inside the box
 still end at its band: their water goes to the wake there, but not yet as the waves they were (docs/limits.md).
 
+Air and spray for the foam and bubbles (SEA-13): `aeration()` is the air the liquid closed over in the world's last
+base step, the cavity a plunging crest traps, measured by the water missing there, as a source a `BubbleSolver` takes
+(`sources: () => liquid.aeration()`); `foam` (a `FoamSolver`) whitens the surface over each cavity; `spray()` lists the
+water in the air, drops and sheets thinner than a cell, with its velocity.
+
+```ts
+import {BubbleSolver} from 'margoengine/physics/bubbles';
+import {FlipSolver} from 'margoengine/physics/flip';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const liquid = new FlipSolver('liquid');
+const bubbles = new BubbleSolver('bubbles');
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(liquid, {
+    cells: [40, 40, 1],
+    cellSize: 0.02,
+    initial: (x, y) => y < 0.2 || (Math.abs(x - 0.4) < 0.08 && y > 0.45 && y < 0.6), // a block over a pool
+  })
+  .add(bubbles, {sources: () => liquid.aeration()})
+  .couple(['liquid', 'bubbles'], 'staggered');
+world.advance(45);
+console.log(bubbles.ledger().taken > 0); // true: the splash trapped air and the bubbles took it in
+```
+
 ```ts
 import {FlipSolver} from 'margoengine/physics/flip';
 import {WakeSolver} from 'margoengine/physics/sea';

@@ -43,6 +43,7 @@ export interface FlipParams {
     readonly sea?: LiquidSea;
     readonly blend?: number;
     readonly seaTile?: number;
+    readonly foam?: LiquidFoam;
 }
 
 export class FlipSolver implements Solver<FlipParams> {
@@ -104,6 +105,8 @@ export class FlipSolver implements Solver<FlipParams> {
     exportPorts(tick: number): readonly Port[];
     importPorts(): void;
     stateRegions(): readonly Region[];
+    aeration(): LiquidAeration[];
+    spray(): Float64Array;
     extraState(): readonly Region[];
 }
 
@@ -178,6 +181,17 @@ interface FieldUse {
 
 interface FlipOptions {
     readonly seaSource?: boolean;
+}
+
+interface LiquidAeration {
+    readonly position: readonly [number, number, number];
+    readonly width: number;
+    readonly depth: number;
+    readonly rate: number;
+}
+
+interface LiquidFoam {
+    addFoam(min: readonly [number, number], max: readonly [number, number], whiteness?: number): void;
 }
 
 interface Port {

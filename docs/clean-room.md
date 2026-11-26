@@ -14139,6 +14139,9 @@ Written from papers and notes read as text (no code, no companion repositories):
   d'Alembert, Euler, centrifugal and Coriolis accelerations, for the box riding a hull.
 - M. Roberts, "The unreasonable effectiveness of quasirandom sequences", 2018 (the R2 sequence of the plastic number):
   the inflow's particle places along a bulwark.
+- G. B. Deane and M. D. Stokes, "Scale dependence of bubble creation mechanisms in breaking waves", Nature 418,
+  839-844, 2002: the cavity a plunging jet closes breaks up into the bubbles of a breaker (the box's `aeration()`, the air
+  it closes over).
 - J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns on a rigid horizontal plane",
   Phil. Trans. R. Soc. A 244, 312-324, 1952, table 2 (the check).
 

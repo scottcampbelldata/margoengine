@@ -7,6 +7,7 @@
 // on a rigid horizontal plane", Phil. Trans. R. Soc. A 244, 312-324, 1952 (their table 2, n^2 = 2: the front's position
 // against time), and against still water's hydrostatic pressure.
 import { MargoError } from '@margoengine/math/errors';
+import { pow } from '@margoengine/math/pinned';
 import {
   type FieldDescriptor,
   type Port,
@@ -70,6 +71,27 @@ export interface FlipParams {
    * for a solver made with `seaSource`.
    */
   readonly seaTile?: number;
+  /**
+   * Foam it lays where it closes over air, a plunging crest's cavity (a FoamSolver of `@margoengine/physics/foam`, or
+   * anything with `addFoam`): a white patch over the cavity, as the foam solver's own active breakers are (default none).
+   */
+  readonly foam?: LiquidFoam;
+}
+
+/** Something that takes foam over a box: a FoamSolver of `@margoengine/physics/foam`. */
+export interface LiquidFoam {
+  addFoam(min: readonly [number, number], max: readonly [number, number], whiteness?: number): void;
+}
+
+/** Air the liquid took in this step, as a BubbleSolver of `@margoengine/physics/bubbles` takes it in its `sources`. */
+export interface LiquidAeration {
+  /** The middle of the air the liquid closed over, m from the world's cell. */
+  readonly position: readonly [number, number, number];
+  /** Its spread across and down, m. */
+  readonly width: number;
+  readonly depth: number;
+  /** The air, m^3/s over the step. */
+  readonly rate: number;
 }
 
 /** Options fixed when a {@link FlipSolver} is made, because they shape the fields it declares. */
@@ -146,6 +168,10 @@ export class FlipSolver implements Solver<FlipParams> {
   /** The field its sea sources go out on, with `seaSource`. */
   readonly seaSourceField: FieldDescriptor | undefined;
   private seaRegion: Region | null = null;
+  /** The air the liquid has closed over: its volume and middle, m^3 and m from the box's corner (state). */
+  private airRegion: Region | null = null;
+  private newAir: LiquidAeration | null = null;
+  private foam: LiquidFoam | null = null;
   private seaTile = 0;
   private seaTiles: [number, number] = [0, 0];
 
@@ -195,7 +221,13 @@ export class FlipSolver implements Solver<FlipParams> {
       sea,
       blend = 6,
       seaTile = 8 * (params.cellSize ?? 0.1),
+      foam,
     } = params;
+    if (foam !== undefined && typeof foam?.addFoam !== 'function')
+      throw new TypeError(
+        'A liquid lays foam with a FoamSolver (anything with addFoam(min, max, whiteness)); pass one or none.',
+      );
+    this.foam = foam ?? null;
     if (sea !== undefined && (typeof sea?.elevation !== 'function' || typeof sea?.water?.sample !== 'function'))
       throw new TypeError(
         'A liquid sits in a sea with elevation(x, z, t) and water.sample(x, y, z, t); pass a SpectralSea or none.',
@@ -279,6 +311,7 @@ export class FlipSolver implements Solver<FlipParams> {
     this.mass = this.vel.map((a) => new Float64Array(a.length));
     this.particleRegion = host.allocate(`${this.id}:particles`, capacity * PARTICLE_WORDS * 8, 'f64', FLIP_LAYOUT);
     this.countRegion = host.allocate(`${this.id}:count`, 8, 'f64', FLIP_LAYOUT);
+    this.airRegion = host.allocate(`${this.id}:air`, 4 * 8, 'f64', FLIP_LAYOUT);
     this.pressureRegion = host.allocate(`${this.id}:pressure`, n * 8, 'f64', FLIP_LAYOUT);
     if (this.seaSourceField) {
       if (rate !== 0)
@@ -377,6 +410,9 @@ export class FlipSolver implements Solver<FlipParams> {
     this.lastSubsteps = substeps;
     this.afterStep(context, dt);
     if (this.seaRegion) this.writeSeaSources();
+    // The air taken in is gathered over the world's base step (one or more of this solver's), so a reader at the base
+    // rate takes all of it once.
+    this.trapAir(context.tick % (rateOf(context.level) / rateOf(0)) === 0, 1 / rateOf(0));
   }
 
   /**
@@ -1037,7 +1073,195 @@ export class FlipSolver implements Solver<FlipParams> {
   importPorts(): void {}
 
   stateRegions(): readonly Region[] {
-    return [this.countRegion, this.particleRegion, this.pressureRegion].filter((r): r is Region => r !== null);
+    return [this.countRegion, this.particleRegion, this.pressureRegion, this.airRegion].filter(
+      (r): r is Region => r !== null,
+    );
+  }
+
+  /**
+   * The air the liquid has closed over: its cells that are not liquid and that the open air cannot reach (from the box's
+   * top and its other sides, through cells that are not liquid or solid), measured by the water missing from them and
+   * the cells round them. More than they have held since there were none is air newly taken in, the
+   * cavity a plunging jet closes when it lands, which breaks up into bubbles (G. B. Deane and M. D. Stokes, Nature 418,
+   * 839-844, 2002); it is this step's aeration, at the cavity's middle.
+   */
+  private trapAir(first: boolean, baseDt: number): void {
+    const g = this.grid,
+      { nx, ny, nz, h } = g,
+      n = nx * ny * nz,
+      open = new Uint8Array(n),
+      stack: number[] = [],
+      free = (c: number) => this.kind[c] !== LIQUID && this.kind[c] !== SOLID;
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const edge = i === 0 || i === nx - 1 || j === ny - 1 || (nz > 1 && (k === 0 || k === nz - 1));
+          const c = cell(g, i, j, k);
+          if (edge && free(c)) {
+            open[c] = 1;
+            stack.push(c);
+          }
+        }
+    while (stack.length > 0) {
+      const c = stack.pop()!,
+        i = c % nx,
+        j = Math.floor(c / nx) % ny,
+        k = Math.floor(c / (nx * ny));
+      for (const [di, dj, dk] of [
+        [1, 0, 0],
+        [-1, 0, 0],
+        [0, 1, 0],
+        [0, -1, 0],
+        [0, 0, 1],
+        [0, 0, -1],
+      ] as const) {
+        const ii = i + di,
+          jj = j + dj,
+          kk = k + dk;
+        if (ii < 0 || jj < 0 || kk < 0 || ii >= nx || jj >= ny || kk >= nz) continue;
+        const o = cell(g, ii, jj, kk);
+        if (open[o] || !free(o)) continue;
+        open[o] = 1;
+        stack.push(o);
+      }
+    }
+    // The cavity's air: over its cells and the ring of cells round them, the cells' volume less the water their
+    // particles stand for (an eighth of a cell each), so the air is counted where the particles are missing rather than
+    // where phi, a fraction of a cell inside the water, puts the surface.
+    const { p, count } = this.state(),
+      held = new Uint8Array(n),
+      near = new Uint8Array(n);
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        c = cell(
+          g,
+          Math.min(nx - 1, Math.floor(p[o]! / h)),
+          Math.min(ny - 1, Math.floor(p[o + 1]! / h)),
+          Math.min(nz - 1, Math.floor(p[o + 2]! / h)),
+        );
+      if (held[c]! < 255) held[c]!++;
+    }
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const c = cell(g, i, j, k);
+          if (open[c] || !free(c)) continue;
+          for (let dk = nz > 1 ? -1 : 0; dk <= (nz > 1 ? 1 : 0); dk++)
+            for (let dj = -1; dj <= 1; dj++)
+              for (let di = -1; di <= 1; di++) {
+                const ii = i + di,
+                  jj = j + dj,
+                  kk = k + dk;
+                if (ii < 0 || jj < 0 || kk < 0 || ii >= nx || jj >= ny || kk >= nz) continue;
+                const o = cell(g, ii, jj, kk);
+                if (!open[o] && this.kind[o] !== SOLID) near[o] = 1;
+              }
+        }
+    let volume = 0,
+      sx = 0,
+      sy = 0,
+      sz = 0,
+      lo: V3 = [Infinity, Infinity, Infinity],
+      hi: V3 = [-Infinity, -Infinity, -Infinity];
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          const c = cell(g, i, j, k);
+          if (!near[c]) continue;
+          const v = (Math.max(0, 8 - held[c]!) * h * h * h) / 8;
+          if (v === 0) continue;
+          const x = (i + 0.5) * h,
+            y = (j + 0.5) * h,
+            z = (k + 0.5) * h;
+          volume += v;
+          sx += v * x;
+          sy += v * y;
+          sz += v * z;
+          lo = [Math.min(lo[0], x), Math.min(lo[1], y), Math.min(lo[2], z)];
+          hi = [Math.max(hi[0], x), Math.max(hi[1], y), Math.max(hi[2], z)];
+        }
+    const cells = volume > 0 ? 1 : 0;
+    const air = this.words(this.airRegion),
+      taken = volume - air[0]!;
+    if (first) this.newAir = null;
+    if (cells > 0 && taken > 0) {
+      const w = this.toWorld(sx / volume, sy / volume, sz / volume),
+        was = this.newAir,
+        width = Math.max(h, hi[0] - lo[0] + h, hi[2] - lo[2] + h),
+        depth = Math.max(h, hi[1] - lo[1] + h, pow(volume, 1 / 3)),
+        rate = taken / baseDt;
+      // Air taken in over earlier steps of this base step joins it, at the middle of the two weighted by their air.
+      this.newAir = was
+        ? {
+            position: [0, 1, 2].map((a) => (was.position[a]! * was.rate + w[a]! * rate) / (was.rate + rate)) as V3,
+            width: Math.max(was.width, width),
+            depth: Math.max(was.depth, depth),
+            rate: was.rate + rate,
+          }
+        : { position: w, width, depth, rate };
+      // The surface over the cavity whitens, as the foam solver's active breakers do.
+      this.foam?.addFoam(
+        [this.origin[0] + lo[0] - h / 2, this.origin[2] + lo[2] - h / 2],
+        [this.origin[0] + hi[0] + h / 2, this.origin[2] + hi[2] + h / 2],
+        1,
+      );
+    }
+    // The air held: the most the cavities have held since there were none. A cavity's walls falling in spread its missing
+    // water over more cells and a fraction more of it reads as air, which is not air taken in.
+    air[0] = cells > 0 ? Math.max(air[0]!, volume) : 0;
+    air[1] = cells > 0 ? sx / volume : 0;
+    air[2] = cells > 0 ? sy / volume : 0;
+    air[3] = cells > 0 ? sz / volume : 0;
+  }
+
+  /**
+   * The air the liquid closed over in the world's last base step (60 Hz; one or more of this solver's steps), as a source
+   * for a BubbleSolver of `@margoengine/physics/bubbles` stepping at the base rate (`sources: () => liquid.aeration()`):
+   * the cavity a plunging jet traps, which breaks up into bubbles. Empty when no new air was taken in. Air carried down under a cell's size (by drops, or a jet's rim) is not seen.
+   */
+  aeration(): LiquidAeration[] {
+    return this.newAir ? [this.newAir] : [];
+  }
+
+  /**
+   * The water in the air now, spray, drops and sheets thinner than the grid resolves: x, y, z (m from the world's cell)
+   * and velocity (m/s) of each particle in a cell that is not liquid or in a liquid cell with no liquid beside it (a drop
+   * of a cell or less), six numbers a particle. Each is an eighth of a cell of water.
+   */
+  spray(): Float64Array {
+    const { p, count } = this.state(),
+      g = this.grid,
+      { nx, ny, nz, h } = g,
+      out: number[] = [],
+      // A liquid cell with no liquid beside it is a drop, a cell of water on its own.
+      lone = (c: number): boolean => {
+        const i = c % nx,
+          j = Math.floor(c / nx) % ny,
+          k = Math.floor(c / (nx * ny)),
+          liquid = (ii: number, jj: number, kk: number) =>
+            ii >= 0 && jj >= 0 && kk >= 0 && ii < nx && jj < ny && kk < nz && this.kind[cell(g, ii, jj, kk)] === LIQUID;
+        return !(
+          liquid(i - 1, j, k) ||
+          liquid(i + 1, j, k) ||
+          liquid(i, j - 1, k) ||
+          liquid(i, j + 1, k) ||
+          liquid(i, j, k - 1) ||
+          liquid(i, j, k + 1)
+        );
+      };
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        c = cell(
+          g,
+          Math.min(nx - 1, Math.floor(p[o]! / h)),
+          Math.min(ny - 1, Math.floor(p[o + 1]! / h)),
+          Math.min(nz - 1, Math.floor(p[o + 2]! / h)),
+        );
+      if (this.kind[c] === SOLID || (this.kind[c] === LIQUID && !lone(c))) continue;
+      const w = this.toWorld(p[o]!, p[o + 1]!, p[o + 2]!);
+      out.push(w[0], w[1], w[2], p[o + 3]!, p[o + 4]!, p[o + 5]!);
+    }
+    return Float64Array.from(out);
   }
 
   extraState(): readonly Region[] {

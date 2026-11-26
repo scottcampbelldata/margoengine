@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { DeckWaterSolver, FlipSolver } from '../../dist/flip.js';
+import { airDensity, BUBBLE_RADII, BubbleSolver, spectrumShares } from '../../dist/bubbles.js';
 import { WakeSolver } from '../../dist/sea.js';
 import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
@@ -140,4 +141,37 @@ test('FlipSolver with seaSource refuses a rate above the base and tiles under a 
     () => w.add(new FlipSolver('b', { seaSource: true }), { cells: [4, 4, 4], cellSize: 0.1, seaTile: 0.05 }),
     /at least a cell/,
   );
+});
+
+test('FlipSolver: a block dropped in a pool traps air, which a BubbleSolver takes in as bubbles, and whitens the surface', () => {
+  const liquid = new FlipSolver('liquid'),
+    bubbles = new BubbleSolver('bubbles'),
+    patches = [],
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -9.81, 0] })
+      .add(liquid, {
+        cells: [40, 40, 1],
+        cellSize: 0.02,
+        rate: 1,
+        foam: { addFoam: (min, max, w) => patches.push([min, max, w]) },
+        initial: (x, y) => y < 0.2 || (Math.abs(x - 0.4) < 0.08 && y > 0.45 && y < 0.6),
+      })
+      .add(bubbles, { sources: () => liquid.aeration() })
+      .couple(['liquid', 'bubbles'], 'staggered');
+  let taken = 0;
+  for (let f = 1; f <= 45; f++) {
+    world.advance(f);
+    for (const a of liquid.aeration()) taken += a.rate / 60;
+  }
+  assert.ok(taken > 0, 'the splash traps air');
+  // The bubbles take in all of it, whatever the liquid's own rate: the ledger is the air's mass, the volume over the
+  // radii by the spectrum's shares at each radius's density at the surface.
+  const shares = spectrumShares(BUBBLE_RADII),
+    perVolume = BUBBLE_RADII.reduce((a, r, i) => a + shares[i] * airDensity(r, 0), 0),
+    ledger = bubbles.ledger();
+  assert.ok(
+    Math.abs(ledger.taken - taken * perVolume) <= 1e-9 * ledger.taken,
+    `${ledger.taken} kg against ${taken} m^3`,
+  );
+  assert.ok(ledger.surfaced > 0, 'they rise and surface');
+  assert.ok(patches.length > 0 && patches.every(([, , w]) => w === 1), 'foam over the cavities');
 });
