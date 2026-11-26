@@ -9303,3 +9303,5 @@ Physical exfoliation and freeze-thaw are separate effects. The appearance result
 diffuse layer transport for the metal colors and a coverage mix for the aggregate fouling.
 The material consumes linear PBR values. Multi-spectral gloss, grain, individual corrosion
 pits and run-off streak geometry require authored patch variation or other algorithms.
+
+The optional Physics ageing entry measures 4,922 bytes gzip.
