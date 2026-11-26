@@ -1,16 +1,21 @@
 // Rebases the current branch onto origin/main and settles conflicts in generated files, which every concurrent landing
 // otherwise hits. While the rebase runs, each such file takes the upstream copy (sizes.json is merged by key: the
 // replayed commit's budget changes go onto upstream's) and no generator runs, since a half-rebased tree gives wrong
-// figures. On the finished tree the generators run once and their output is committed on its own. Any other conflict
+// figures. On the finished tree the generators run once and their output is committed on its own. An API report run
+// costs minutes, so it is only for a report both sides changed; every other report replays as it is, and
+// docs/api-surface.md is merged row by row (KB-REBASE-SLOW1: reports for every touched package took 7 to 9 minutes,
+// main moved meanwhile and push:main refused every round). api:check after the rebase stays the check. Any other conflict
 // stops with the file names and leaves the rebase for you; run the script again after resolving it. It also resumes a
 // rebase already in progress. It writes no git config.
 //   npm run rebase:main
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { mergeApiSurfaceRows } from './api-report-scope.mjs';
 import { conflictMarkers } from './support/conflict-markers.mjs';
 
 const SIZES = 'scripts/quality/baselines/sizes.json';
+const SURFACE = 'docs/api-surface.md';
 const API = /^(api\/[^/]+\.api\.md|docs\/api-surface\.md|examples\/all-entries\/.+)$/;
 const GENERATED = [
   API,
@@ -75,16 +80,14 @@ function mergeSizes() {
 
 // What to regenerate, kept in the git directory so a run stopped by your own conflict still knows it afterwards.
 const ledger = () => gitPath('rebase-main.json');
-const owed = () => (existsSync(ledger()) ? JSON.parse(readFileSync(ledger(), 'utf8')) : []);
+const owed = () => ({ conflicts: [], ...(existsSync(ledger()) ? JSON.parse(readFileSync(ledger(), 'utf8')) : {}) });
 
 function settle(conflicts) {
   const unmerged = lines(['ls-files', '-u']);
-  // Every file the branch changes, not just this commit's: a generated-only commit must still name its packages.
   const [onto, head] = ['onto', 'orig-head'].map((name) =>
     readFileSync(gitPath(`rebase-merge/${name}`), 'utf8').trim(),
   );
-  const changed = lines(['diff', '--name-only', `${onto}...${head}`]);
-  writeFileSync(ledger(), JSON.stringify([...new Set([...owed(), ...conflicts, ...changed])]));
+  writeFileSync(ledger(), JSON.stringify({ onto, head, conflicts: [...new Set([...owed().conflicts, ...conflicts])] }));
   for (const file of conflicts) {
     const stages = new Set(unmerged.filter((l) => l.endsWith(`\t${file}`)).map((l) => l.split(/\s+/)[2]));
     if (file === SIZES && stages.size === 3) mergeSizes();
@@ -96,25 +99,32 @@ function settle(conflicts) {
 }
 
 function regenerate() {
-  const touched = owed();
+  const { onto, head, conflicts } = owed();
+  // What each side changed since they parted, not just the conflicted files.
+  const branch = onto ? lines(['diff', '--name-only', `${onto}...${head}`]) : [];
+  const upstream = new Set(onto ? lines(['diff', '--name-only', `${head}...${onto}`]) : []);
+  const touched = [...conflicts, ...branch];
   const hit = (pattern) => touched.some((file) => pattern.test(file) && GENERATED.some((g) => g.test(file)));
   if (hit(/^package-lock\.json$/))
     run('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'], {
       shell: process.platform === 'win32',
     });
   if (hit(/^docs\/guides\/imports\.md$/)) script('scripts/umbrella.mjs');
-  if (hit(API)) {
-    // Only the packages the branch touches, never the whole tree: a full api:update takes 8 to 13 minutes here and
-    // loses the push race (Scott's lanes, 2026-11-25). Upstream's reports for every other package stay as they are.
-    const packages = new Set(
-      touched
-        .map((file) => /^(?:packages\/([^/]+)\/|api\/([^./]+)\.)/.exec(file))
-        .map((match) => match?.[1] ?? match?.[2])
-        .filter((name) => name && existsSync(resolve(root, 'packages', name, 'package.json'))),
-    );
-    for (const name of [...packages].sort()) script('scripts/api-report.js', '--update', `--package=${name}`);
-    script('scripts/generate-all-entries.mjs');
+  if (branch.includes(SURFACE) && upstream.has(SURFACE)) {
+    const base = git(['merge-base', onto, head]).stdout.trim();
+    const [before, theirs, mine] = [base, onto, head].map((rev) => git(['show', `${rev}:${SURFACE}`]).stdout);
+    writeFileSync(resolve(root, SURFACE), mergeApiSurfaceRows(before, theirs, mine));
   }
+  // A report only one side changed is already right. One both sides changed is built again, for its package alone, so
+  // a re-export package (margoengine, a kit) only when its own report changed on both sides.
+  const packages = new Set(
+    [...conflicts, ...branch.filter((file) => upstream.has(file))]
+      .map((file) => /^api\/([^./]+)[^/]*\.api\.md$/.exec(file)?.[1])
+      .filter((name) => name && existsSync(resolve(root, 'packages', name, 'package.json'))),
+  );
+  console.log(`rebase:main: API reports to build: ${[...packages].sort().join(', ') || 'none'}`);
+  for (const name of [...packages].sort()) script('scripts/api-report.js', '--update', `--package=${name}`);
+  if (hit(API)) script('scripts/generate-all-entries.mjs');
   // Last: llms-full.txt is built from the READMEs, api reports and docs settled above.
   if (hit(/^(api\/|docs\/|site\/llms)/)) script('scripts/build-llms.mjs');
   git(['add', '-u']);
