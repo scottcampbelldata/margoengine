@@ -16,6 +16,7 @@
 // vortex-induced vibrations", J. Fluids Struct. 19, 2004 (eq. 2, read), epsilon 0.3 and A 12. Below the drag crisis a
 // circular cylinder's drag follows its Reynolds number: C_D = 1 + 10 Re^(-2/3) for 1 < Re < 2e5 (the curve fit of F. M.
 // White, "Viscous Fluid Flow", 2nd ed., McGraw-Hill 1991, read), where DNV's steady drag is the post-critical value.
+import { invalidLoad } from './errors.js';
 import { ln, pow } from '@margoengine/math/pinned';
 
 const LN10 = 2.302585092994046;
@@ -24,9 +25,7 @@ const PI = 3.141592653589793;
 /** The steady post-critical drag coefficient of a circular cylinder of relative roughness k / D (DNV-RP-C205 6.7.1.5). */
 export function steadyDrag(roughness: number): number {
   if (!(roughness >= 0 && Number.isFinite(roughness)))
-    throw new RangeError(
-      `A relative roughness k / D is finite and 0 or more (got ${roughness}); pass one, 0 for smooth.`,
-    );
+    throw invalidLoad(`A relative roughness k / D is finite and 0 or more (got ${roughness}); pass one, 0 for smooth.`);
   if (roughness < 1e-4) return 0.65;
   if (roughness > 1e-2) return 1.05;
   return (29 + 4 * (ln(roughness) / LN10)) / 20;
@@ -39,7 +38,7 @@ export function steadyDrag(roughness: number): number {
  */
 export function wakeAmplification(kc: number, steady: number): number {
   if (!(kc >= 0 && steady > 0))
-    throw new RangeError(`KC is 0 or more and C_DS above 0 (got ${kc}, ${steady}); pass them.`);
+    throw invalidLoad(`KC is 0 or more and C_DS above 0 (got ${kc}, ${steady}); pass them.`);
   const cpi = 1.5 - 0.024 * (12 / steady - 10);
   if (kc < 0.75) return cpi - 1 - 2 * (kc - 0.75);
   if (kc < 2) return cpi - 1;
@@ -55,7 +54,7 @@ export function wakeAmplification(kc: number, steady: number): number {
  */
 export function reynoldsDrag(re: number, roughness = 0): number {
   if (!(re >= 0 && Number.isFinite(re)))
-    throw new RangeError(`A Reynolds number is finite and 0 or more (got ${re}); pass one.`);
+    throw invalidLoad(`A Reynolds number is finite and 0 or more (got ${re}); pass one.`);
   const post = steadyDrag(roughness),
     white = (r: number) => 1 + 10 * pow(r, -2 / 3);
   if (re <= 2e5) return white(Math.max(re, 1));
@@ -66,7 +65,7 @@ export function reynoldsDrag(re: number, roughness = 0): number {
 
 /** The added mass coefficient of a circular cylinder at KC with steady drag C_DS (DNV-RP-C205 6.9.1). */
 export function cylinderAddedMass(kc: number, steady = 0.65): number {
-  if (!(kc >= 0)) throw new RangeError(`KC is 0 or more (got ${kc}); pass one.`);
+  if (!(kc >= 0)) throw invalidLoad(`KC is 0 or more (got ${kc}); pass one.`);
   return kc < 3 ? 1 : Math.max(1 - 0.044 * (kc - 3), 0.6 - (steady - 0.65));
 }
 
@@ -126,7 +125,7 @@ export function tangentialDrag(normal: number, sinPhi: number, cosPhi: number, m
 /** A sphere's drag coefficient at Reynolds number `re` (Morrison 2013, valid to 1e6). */
 export function sphereDrag(re: number): number {
   if (!(re > 0 && Number.isFinite(re)))
-    throw new RangeError(`A Reynolds number is finite and above 0 (got ${re}); pass one.`);
+    throw invalidLoad(`A Reynolds number is finite and above 0 (got ${re}); pass one.`);
   const r = Math.min(re, 1e6),
     a = r / 5,
     b = r / 263000;
@@ -135,7 +134,7 @@ export function sphereDrag(re: number): number {
 
 /** A circular cylinder's vortex-shedding frequency St U / D, Hz, St 0.2 (DNV-RP-C205 9.1.3). */
 export function sheddingFrequency(speed: number, diameter: number, strouhal = 0.2): number {
-  if (!(diameter > 0)) throw new RangeError(`A diameter is above 0 (got ${diameter}); pass one.`);
+  if (!(diameter > 0)) throw invalidLoad(`A diameter is above 0 (got ${diameter}); pass one.`);
   return (strouhal * Math.abs(speed)) / diameter;
 }
 
@@ -147,7 +146,7 @@ export function sheddingFrequency(speed: number, diameter: number, strouhal = 0.
  */
 export function liftMagnification(amplitude: number, ratio = 40): number {
   if (!(amplitude >= 0 && Number.isFinite(amplitude) && ratio > 0))
-    throw new RangeError(`An amplitude in diameters is finite and 0 or more (got ${amplitude}); pass one.`);
+    throw invalidLoad(`An amplitude in diameters is finite and 0 or more (got ${amplitude}); pass one.`);
   const target = (ratio * amplitude) / 2;
   let k = Math.max(1, pow(target, 1 / 3) + 0.5);
   for (let i = 0; i < 60; i++) {

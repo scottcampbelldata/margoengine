@@ -9,6 +9,8 @@
 // Each segment's wake oscillator is driven by the segment's own acceleration across the flow (Facchinetti, de Langre and
 // Biolley 2004, eq. 2, A = 12), so a cable free across a flow locks onto its own frequency.
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
+import { hypot } from '@margoengine/math/pinned';
+import { invalidLoad } from './errors.js';
 import { cylinderCoefficients, reynoldsDrag, tangentialDrag, wakeStep } from './morison.js';
 import { SEA_WATER_VISCOSITY, type LoadWater } from './solver.js';
 import { waterAcceleration, waterVelocity } from './water.js';
@@ -155,8 +157,8 @@ class Provider implements SegmentLoads {
         vr: Vec3 = [u[0] - vp[0], u[1] - vp[1], u[2] - vp[2]],
         along = vr[0] * e[0] + vr[1] * e[1] + vr[2] * e[2],
         vrN: Vec3 = [vr[0] - along * e[0], vr[1] - along * e[1], vr[2] - along * e[2]],
-        speedN = Math.hypot(vrN[0], vrN[1], vrN[2]),
-        speed = Math.hypot(vr[0], vr[1], vr[2]),
+        speedN = hypot(vrN[0], vrN[1], vrN[2]),
+        speed = hypot(vr[0], vr[1], vr[2]),
         aAlong = a[0] * e[0] + a[1] * e[1] + a[2] * e[2],
         aN: Vec3 = [a[0] - aAlong * e[0], a[1] - aAlong * e[1], a[2] - aAlong * e[2]],
         // DNV's coefficients by roughness and KC; below the drag crisis, the drag of the Reynolds number in place of the
@@ -233,7 +235,7 @@ class Provider implements SegmentLoads {
       state.length % 5 !== 0 ||
       (this.wakes.length > 0 && state.length !== (this.wakes.length / 2) * 5)
     )
-      throw new RangeError('A segment loads state is the Float64Array its takeState() gave; pass that one.');
+      throw invalidLoad('A segment loads state is the Float64Array its takeState() gave; pass that one.');
     const n = state.length / 5;
     this.wakes = state.slice(0, 2 * n);
     this.before = state.slice(2 * n);
@@ -250,25 +252,24 @@ class Provider implements SegmentLoads {
  */
 export function segmentLoads(sea: LoadWater, options: SegmentLoadOptions = {}): SegmentLoads {
   if (!sea || typeof sea.elevation !== 'function' || typeof sea.water?.sample !== 'function')
-    throw new TypeError(
+    throw invalidLoad(
       'Segment loads need the water: pass a SeaSurface (a SpectralSea) or {elevation, water, density}.',
     );
-  if (!(sea.density > 0)) throw new RangeError(`The water's density is above 0 (got ${sea.density}); pass kg/m^3.`);
+  if (!(sea.density > 0)) throw invalidLoad(`The water's density is above 0 (got ${sea.density}); pass kg/m^3.`);
   for (const key of ['roughness', 'drag', 'addedMass', 'viscosity'] as const) {
     const value = options[key];
     if (value !== undefined && !(value >= 0 && Number.isFinite(value)))
-      throw new RangeError(`Segment loads' ${key} is a finite number of 0 or more (got ${value}); pass one.`);
+      throw invalidLoad(`Segment loads' ${key} is a finite number of 0 or more (got ${value}); pass one.`);
   }
-  if (options.viscosity === 0)
-    throw new RangeError("Segment loads' viscosity is above 0; pass m^2/s, or leave it out.");
+  if (options.viscosity === 0) throw invalidLoad("Segment loads' viscosity is above 0; pass m^2/s, or leave it out.");
   if (options.period !== undefined && !(options.period > 0))
-    throw new RangeError(
+    throw invalidLoad(
       `Segment loads' period is above 0 s, or Infinity for a steady current (got ${options.period}); pass one.`,
     );
   if (options.vortex !== undefined && options.vortex !== false) {
     const { strouhal = 0.2, lift = 0.3 } = options.vortex;
     if (!(strouhal > 0 && Number.isFinite(strouhal) && lift >= 0 && Number.isFinite(lift)))
-      throw new RangeError("Segment loads' vortex takes a Strouhal number above 0 and a lift of 0 or more; pass them.");
+      throw invalidLoad("Segment loads' vortex takes a Strouhal number above 0 and a lift of 0 or more; pass them.");
   }
   return new Provider(sea, options);
 }

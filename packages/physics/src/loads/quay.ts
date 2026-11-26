@@ -9,6 +9,7 @@
 // - A ship's wash on the bed at the wall: the efflux of a bow thruster 1.17 (P / (rho D^2))^0.33 and the Dutch method's bed
 //   velocity (Blokland 1996), as PIANC report 180 (2015) gives them through F. Tukker's TU Delft thesis (2021, sections 2.2 and
 //   2.3, read); its efflux written 1.17 (P / (rho D^2))^0.33.
+import { invalidLoad } from './errors.js';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { exp, pow } from '@margoengine/math/pinned';
 import { wavenumber } from '../waves/spectral.js';
@@ -25,7 +26,7 @@ function sinh(x: number): number {
 }
 function check(height: number, period: number, depth: number): void {
   if (!(height > 0 && period > 0 && depth > 0 && Number.isFinite(height + period + depth)))
-    throw new RangeError(
+    throw invalidLoad(
       `A wave at a wall has a height, period and still-water depth, finite and above 0 (got ${height} m, ${period} s, ${depth} m); pass them.`,
     );
 }
@@ -101,7 +102,7 @@ export function goda(
 /** A bow thruster's efflux speed 1.17 (P / (rho D^2))^0.33, m/s, for power `power` W through a tunnel `diameter` m (PIANC 2015, its exponent as printed). */
 export function thrusterEfflux(power: number, diameter: number, density = 1025): number {
   if (!(power >= 0 && diameter > 0))
-    throw new RangeError(
+    throw invalidLoad(
       `A thruster has power 0 W or more and a tunnel above 0 m (got ${power}, ${diameter}); pass them.`,
     );
   return 1.17 * pow(power / (density * diameter * diameter), 0.33);
@@ -114,7 +115,7 @@ export function thrusterEfflux(power: number, diameter: number, density = 1025):
  */
 export function washOnBed(efflux: number, diameter: number, distance: number, height: number): number {
   if (!(efflux >= 0 && diameter > 0 && distance >= 0 && height > 0))
-    throw new RangeError(
+    throw invalidLoad(
       'Wash on the bed takes an efflux 0 or more, a diameter and height above 0, and a distance 0 or more; pass them.',
     );
   return distance / height < 1.8 ? (efflux * diameter) / height : (2.8 * efflux * diameter) / (distance + height);
@@ -160,19 +161,19 @@ export class QuayWall {
         (from[0] !== to[0] || from[1] !== to[1])
       )
     )
-      throw new RangeError(
+      throw invalidLoad(
         'A quay wall runs {from: [x, z], to: [x, z]} between two different points in metres; pass them.',
       );
     if (!(freeboard >= 0 && Number.isFinite(freeboard)))
-      throw new RangeError(
+      throw invalidLoad(
         `A quay's edge stands finite metres, 0 or more, above still water (got ${freeboard}); pass one.`,
       );
     if (!(reflection >= 0 && reflection <= 1))
-      throw new RangeError(
+      throw invalidLoad(
         `A reflection coefficient lies in [0, 1] (got ${reflection}); pass one, or 1 for a vertical wall.`,
       );
     if (!(Number.isInteger(points) && points >= 2 && points <= 4096))
-      throw new RangeError(`A wall is sampled at 2 to 4096 points (got ${points}); pass a whole number.`);
+      throw invalidLoad(`A wall is sampled at 2 to 4096 points (got ${points}); pass a whole number.`);
     this.from = [from[0], from[1]];
     this.to = [to[0], to[1]];
     this.freeboard = freeboard;

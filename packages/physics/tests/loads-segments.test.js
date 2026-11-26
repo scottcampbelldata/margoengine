@@ -50,7 +50,11 @@ test("a cylinder's drag follows White's fit below the drag crisis and DNV's stea
   assert.ok(Math.abs(reynoldsDrag(2e5 + 1) - reynoldsDrag(2e5)) < 1e-5);
   assert.ok(Math.abs(reynoldsDrag(5e5 - 1) - steadyDrag(0)) < 1e-5);
   assert.ok(reynoldsDrag(3e5) < reynoldsDrag(2e5) && reynoldsDrag(3e5) > steadyDrag(0));
-  assert.throws(() => reynoldsDrag(-1), RangeError);
+  assert.throws(() => reynoldsDrag(-1), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /pass one.+#hydrodynamic-loads/,
+  });
 });
 
 test('a submerged segment floats by its volume, carries its added mass, and is dragged as a damping toward the flow', () => {
@@ -111,7 +115,11 @@ test("a segment's wake oscillator is driven by its own motion, and its state goe
     shaken.apply([segment([0, -2, 0], [1, 0, 0], [0, 0.05 * Math.sin(i / 3), 0])], context, b);
     assert.deepEqual([...b[0].force], first[i], `step ${i}`);
   }
-  assert.throws(() => shaken.restoreState(new Float64Array(10)), RangeError);
+  assert.throws(() => shaken.restoreState(new Float64Array(10)), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /pass that one.+#hydrodynamic-loads/,
+  });
   // The shared step: a wake held still (no forcing) keeps the free cycle's amplitude near 2.
   const wake = Float64Array.of(0.1, 0);
   let top = 0;

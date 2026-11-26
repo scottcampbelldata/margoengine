@@ -1100,6 +1100,13 @@ Missing: measured ray or propeller lifted mass, field oil spreading, absolute en
 5. Replace the red-flag constants with cited values; throw `MargoError` with a help link.
 6. Add a Wasm hot loop for many bodies, work counts, and limits entries.
 
+**2026-11-26 upgrade progress.** The centre-of-buoyancy correction passes the manufactured finite-angle box and
+mesh cases, the small-heel metacentric limit, and the transformed ellipsoid half-cap test. A real rigid model
+settles at 26.91° using the published weight or 26.68° using the incompatible published relative density
+for the independently photographed 27.5° float. The derived image-resolution band is 0.92°. All bare
+argument errors in the loads entry now use `MargoError` with a specific repair and help anchor. Dynamic pressure
+validation, roll decay, hydrodynamic radiation, reciprocal water coupling and native scaling remain open.
+
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/rogue/index.ts` (1068 lines) and `groups.ts` (278 lines), plus the row in `docs/physics-solvers.md`, `docs/limits.md`, and the audit rows. Commits since the audit (2026-11-25) are only 47be5f699 and 116edc307 (three sisters); nothing touches a dynamic or high-order spectral tier. Tests run under run-with-timeout: `packages/physics/tests/rogue.test.js` 9 pass / 0 fail; `packages/physics/tests/sisters.test.js` 3 pass / 0 fail. There is no `tests/coupling` file for it, and no GPU or browser test.

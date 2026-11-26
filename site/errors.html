@@ -66,6 +66,11 @@
       <p><strong>Fix.</strong> Release the first owner (call its <code>dispose()</code> or the function it returned) before attaching another, or create a separate target for the second. The message names what is already attached.</p>
     </section>
     <h2>Messages</h2>
+    <section id="hydrodynamic-loads">
+      <h2><a href="#hydrodynamic-loads">@margoengine/physics/loads inputs</a></h2>
+      <p><strong>Cause.</strong> The load solver or a hydrodynamic helper received an unsupported geometry, flow, state or parameter.</p>
+      <p><strong>Fix.</strong> Use finite SI inputs. Supply a water field and positive density, a closed outward-wound mesh or positive shape dimensions, and valid rigid rows. Omit the force capacity to use the world capacity. The error names the rejected input and the change to make.</p>
+    </section>
     <section id="body-driver">
       <h2><a href="#body-driver">@margoengine/input/body: webcam hands and body to a skeleton</a></h2>
       <p class="messages"><code>Body minVisibility and minScore must be in 0..1; see https://margoengine.com/errors#body-driver</code> <code>Body hold must be seconds &gt;= 0; see https://margoengine.com/errors#body-driver</code> <code>Body limits must be radians in 0..pi; see https://margoengine.com/errors#body-driver</code> <code>Body aspect must be a finite width / height above 0; see https://margoengine.com/errors#body-driver</code> <code>BodyDriver needs a skeleton with names, parents, getPose and setPose; see https://margoengine.com/errors#body-driver</code> <code>BodyDriver skeleton parents must be an array as long as names; see https://margoengine.com/errors#body-driver</code> <code>BodyDriver skeleton parents must each be -1 or another bone index; see https://margoengine.com/errors#body-driver</code> <code>BodyDriver skeleton parents form a cycle; every chain must reach a root; see https://margoengine.com/errors#body-driver</code> <code>No humanoid bone of the targets is in the skeleton; pass a bones map; see https://margoengine.com/errors#body-driver</code> <code>Calibrate on a frame where the body or hands are visible; pass a frame with the person in view; see https://margoengine.com/errors#body-driver</code> <code>The body driver is disposed; create a new BodyDriver; see https://margoengine.com/errors#body-driver</code></p>

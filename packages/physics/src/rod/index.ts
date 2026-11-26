@@ -539,7 +539,7 @@ export class Rod implements PhysicsAttachment {
   }
   /**
    * Puts back what {@link Rod.takeState} took.
-   * @throws RangeError for a state another provider or rod gave.
+   * @throws RangeError for a malformed state, or the loads provider's coded error for its own incompatible state.
    */
   restoreState(state: Float64Array): this {
     this.check();

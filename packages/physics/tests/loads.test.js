@@ -27,7 +27,7 @@ import {
   wakeAmplification,
   washOnBed,
 } from '../dist/loads.js';
-import { PhysicsWorld, RigidSolver } from '../dist/world.js';
+import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../dist/world.js';
 
 await Physics.load();
 const near = (a, b, t) => Math.abs(a / b - 1) <= t;
@@ -196,6 +196,9 @@ function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0]) {
     made = bodies.map((b) =>
       physics.addBody(null, {
         position: b.position ?? [0, -5, 0],
+        rotation: b.rotation,
+        linearDamping: b.damping,
+        angularDamping: b.damping,
         colliders: b.collider,
         linearVelocity: b.velocity ?? [0, 0, 0],
       }),
@@ -212,6 +215,157 @@ function world(sea, bodies, members = [], extra = {}, gravity = [0, -9.81, 0]) {
       .couple(['loads', 'rigid'], 'staggered');
   return { physics, bodies: made, loads, world: w };
 }
+
+test('SEA-12 a heeled box and triangle mesh return the exact displaced volume and righting moment', () => {
+  const [length, height, beam] = [3, 1, 1.8];
+  const draft = 0.3;
+  const [a, b] = [height / 2, beam / 2];
+  const density = 1025.9;
+  const gravity = 7.6;
+  const probe = (theta, shape) => {
+    const worldY = a - draft;
+    const {
+      bodies,
+      loads,
+      world: simulation,
+    } = world(
+      still(),
+      [
+        {
+          position: [3, worldY, -2],
+          rotation: [Math.sin(theta / 2), 0, 0, Math.cos(theta / 2)],
+          collider: { shape: 'box', halfExtents: [length / 2, a, b], mass: density * draft * length * beam },
+          load: { shape, drag: 0, addedMass: [0, 0, 0] },
+        },
+      ],
+      [],
+      {},
+      [0, -gravity, 0],
+    );
+    simulation.advance(1);
+    const { region } = loads.exportPorts(0)[0];
+    const row = regionWords(simulation.arena.memory, region);
+    const i = bodies[0].row * FORCE_WORDS;
+    return [row[i + 1], row[i + 3]];
+  };
+  const mesh = boxMesh([length, height, beam]);
+  const shapes = [{ box: [length / 2, a, b] }, { mesh }];
+  const tolerance = 32 * 2 ** -23; // The rigid field carries the pose in float32.
+  for (const shape of shapes) {
+    // The mean waterline does not cross the top or the keel for these exact trapezoid sections.
+    for (const heel of [-0.25, -0.1, 0.1, 0.25]) {
+      const cosine = Math.cos(heel);
+      const sine = Math.sin(heel);
+      const heightAtCentre = (draft - a) / cosine;
+      const slope = sine / cosine;
+      const immersedHeight = a + heightAtCentre;
+      const displaced = length * beam * immersedHeight;
+      const centreZ = (slope * b * b) / (3 * immersedHeight);
+      const centreY = (heightAtCentre * heightAtCentre + (slope * slope * b * b) / 3 - a * a) / (2 * immersedHeight);
+      const expectedForce = density * gravity * displaced;
+      const expectedMoment = -expectedForce * (centreY * sine + centreZ * cosine);
+      const [force, moment] = probe(heel, shape);
+      assert.ok(near(force, expectedForce, tolerance), `${force} N vs ${expectedForce} N at ${heel} rad`);
+      assert.ok(near(moment, expectedMoment, tolerance), `${moment} N·m vs ${expectedMoment} N·m`);
+      assert.ok(moment * heel < 0, 'buoyancy opposes the heel');
+    }
+
+    // Infinitesimal metacentric limit, independent of the finite-angle trapezoid calculation.
+    const heel = 0.001;
+    const bm = (beam * beam) / (12 * draft);
+    const gm = bm + draft / 2 - a;
+    const [force, moment] = probe(heel, shape);
+    const gmMeasured = -moment / (force * Math.sin(heel));
+    assert.ok(near(gmMeasured, gm, 5e-6), `${gmMeasured} m GM vs ${gm} m`);
+  }
+});
+
+test('SEA-12 an inclined ellipsoid takes buoyancy through the transformed half-cap centroid', () => {
+  const axes = [1.1, 0.3, 0.8];
+  const heel = 0.37;
+  const [a, b, c] = axes;
+  const {
+    bodies,
+    loads,
+    world: simulation,
+  } = world(still(), [
+    {
+      position: [0, 0, 0],
+      rotation: [Math.sin(heel / 2), 0, 0, Math.cos(heel / 2)],
+      collider: { shape: 'box', halfExtents: axes, mass: 1000 },
+      load: { shape: { ellipsoid: axes }, drag: 0, addedMass: [0, 0, 0] },
+    },
+  ]);
+  simulation.advance(1);
+  const { region } = loads.exportPorts(0)[0];
+  const forces = regionWords(simulation.arena.memory, region);
+  const i = FORCE_WORDS * bodies[0].row;
+  const expectedForce = 1025.9 * 9.81 * (2 / 3) * Math.PI * a * b * c;
+  const cosine = Math.cos(heel);
+  const sine = Math.sin(heel);
+  const halfHeight = Math.hypot(b * cosine, c * sine);
+  const armZ = (-3 / 8) * (((b * b - c * c) * sine * cosine) / halfHeight);
+  assert.ok(near(forces[i + 1], expectedForce, 2 ** -21));
+  assert.ok(near(forces[i + 3], -expectedForce * armZ, 2 ** -19));
+});
+
+test('SEA-12 a free rectangular float settles at the independently measured substantial heel', (t) => {
+  // Hori and Hori (2023), §4.6. The float's dimensions and weight are inputs. The reported relative
+  // density 0.458 implies a different weight at nominal freshwater density, so run both input cases.
+  const halfExtents = [0.15, 0.05, 0.0575];
+  const density = 1000;
+  const g = 9.80665;
+  const volume = 8 * halfExtents[0] * halfExtents[1] * halfExtents[2];
+  const reference = 27.5;
+  // The 2× Fig. 4.6 raster top edge spans about 187 px. A one-pixel coordinate reading error
+  // per endpoint moves its direction by at most asin(2√2 / 187), plus half the printed tenth.
+  const angularResolution = (Math.asin((2 * Math.SQRT2) / 187) * 180) / Math.PI + 0.05;
+  const final = [];
+  for (const mass of [18.09 / g, 0.458 * volume * density]) {
+    for (const initialHeel of [12, 39]) {
+      const halfAngle = (initialHeel * Math.PI) / 360;
+      const { bodies, world: simulation } = world(
+        { ...still(), density },
+        [
+          {
+            position: [0, halfExtents[1] - mass / (density * 0.3 * 0.115), 0],
+            rotation: [Math.sin(halfAngle), 0, 0, Math.cos(halfAngle)],
+            // Rigid damping only shortens settling. At rest it exerts no force or torque.
+            damping: 4,
+            collider: { shape: 'box', halfExtents, mass },
+            load: { shape: { box: halfExtents }, drag: 0, addedMass: [0, 0, 0] },
+          },
+        ],
+        [],
+        {},
+        [0, -g, 0],
+      );
+      simulation.advance(600);
+      const body = bodies[0];
+      assert.ok(Math.abs(body.angularVelocity[0]) < 1e-5);
+      const [x, , , w] = body.rotation;
+      const heel = (2 * Math.atan2(x, w) * 180) / Math.PI;
+      assert.ok(Math.abs(heel - reference) <= angularResolution, `${heel}° vs ${reference}° ±${angularResolution}°`);
+      final.push(heel.toFixed(4));
+    }
+  }
+  t.diagnostic(`Final heel under the two reported load inputs: ${final.join(', ')}° vs photographed ${reference}°.`);
+});
+
+test('SEA-12 an open mesh or invalid triangle index produces an actionable coded error', () => {
+  const mesh = boxMesh([1, 1, 1]);
+  const code = { name: 'MargoError', code: 'unsupported' };
+  assert.throws(() => equivalentEllipsoid({ ...mesh, indices: mesh.indices.slice(3) }), {
+    ...code,
+    message: /close the mesh.+#hydrodynamic-loads/,
+  });
+  const indices = mesh.indices.slice();
+  indices[0] = mesh.vertices.length / 3;
+  assert.throws(() => equivalentEllipsoid({ ...mesh, indices }), {
+    ...code,
+    message: /integer indices into the vertex array.+#hydrodynamic-loads/,
+  });
+});
 
 test("a light sphere in water gathering speed is carried at (1 + C_A) / (m / (rho V) + C_A) of the water's acceleration", () => {
   // No gravity, drag off: water accelerating at 1 m/s^2 drives a sphere of a fifth of its displaced mass by its pressure

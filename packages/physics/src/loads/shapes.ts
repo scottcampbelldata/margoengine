@@ -7,13 +7,14 @@
 // - A mesh: its volume and second moments of volume by signed tetrahedra, their principal axes, and the ellipsoid with the
 //   same moments, semi-axes sqrt(5 I_i / V) (a solid ellipsoid has int x^2 dV = V a^2 / 5).
 
+import { invalidLoad } from './errors.js';
 const PI = 3.141592653589793;
 
 /** The alphas of Lamb's ellipsoid integrals for semi-axes [a, b, c]: they sum to 2. */
 export function ellipsoidAlphas(axes: readonly [number, number, number]): [number, number, number] {
   const [a, b, c] = axes;
   if (!(a > 0 && b > 0 && c > 0 && Number.isFinite(a + b + c)))
-    throw new RangeError(`An ellipsoid's semi-axes are finite and above 0 (got ${axes.join(', ')}); pass three.`);
+    throw invalidLoad(`An ellipsoid's semi-axes are finite and above 0 (got ${axes.join(', ')}); pass three.`);
   // u = s x / (1 - x) over x in [0, 1), Simpson's rule; the integrand falls as u^(-5/2).
   const s = (a * a + b * b + c * c) / 3,
     n = 4000,
@@ -55,9 +56,14 @@ export function equivalentEllipsoid(mesh: {
   readonly vertices: ArrayLike<number>;
   readonly indices: ArrayLike<number>;
 }): EquivalentEllipsoid {
-  const { vertices: p, indices: t } = mesh ?? ({} as { vertices: number[]; indices: number[] });
-  if (!p || !t || t.length < 12 || t.length % 3 !== 0)
-    throw new RangeError('A mesh is {vertices, indices}, closed, of at least four triangles wound outward; pass one.');
+  const { vertices, indices: t } = mesh ?? ({} as { vertices: number[]; indices: number[] });
+  if (!vertices || !t || vertices.length < 12 || vertices.length % 3 !== 0 || t.length < 12 || t.length % 3 !== 0)
+    throw invalidLoad('A mesh is {vertices, indices}, closed, of at least four triangles wound outward; pass one.');
+  const reference = [vertices[0]!, vertices[1]!, vertices[2]!];
+  const p = Float64Array.from(vertices, (v, i) => v - reference[i % 3]!);
+  if (!p.every(Number.isFinite))
+    throw invalidLoad('Invalid hydrostatic mesh coordinates; pass finite vertex triples in metres.');
+  checkClosedMesh(p, t);
   let volume = 0;
   const first = [0, 0, 0],
     second = [0, 0, 0, 0, 0, 0]; // xx, yy, zz, xy, xz, yz about the origin
@@ -92,8 +98,8 @@ export function equivalentEllipsoid(mesh: {
     second[4]! += pair(0, 2);
     second[5]! += pair(1, 2);
   }
-  if (!(volume > 0))
-    throw new RangeError(`This mesh encloses no volume (${volume} m^3); close it and wind its triangles outward.`);
+  if (!(volume > 0 && Number.isFinite(volume)))
+    throw invalidLoad(`This mesh encloses no volume (${volume} m^3); close it and wind its triangles outward.`);
   const centre: [number, number, number] = [first[0]! / volume, first[1]! / volume, first[2]! / volume],
     // About the centroid.
     m = [
@@ -110,11 +116,54 @@ export function equivalentEllipsoid(mesh: {
   m[2]![1] = m[1]![2]!;
   const [values, vectors] = jacobi(m as number[][]);
   return {
-    centre,
+    centre: [centre[0] + reference[0]!, centre[1] + reference[1]!, centre[2] + reference[2]!],
     axes: values.map((value) => Math.sqrt(Math.max(1e-300, (5 * value) / volume))) as [number, number, number],
     directions: vectors,
     volume,
   };
+}
+
+function checkClosedMesh(vertices: Float64Array, indices: ArrayLike<number>): void {
+  // An authored surface may split the same geometric vertex at a normal or UV seam.
+  const byPosition = new Map<string, number>();
+  const welded = new Uint32Array(vertices.length / 3);
+  for (let i = 0; i < welded.length; i++) {
+    const k = i * 3;
+    const position = `${vertices[k]},${vertices[k + 1]},${vertices[k + 2]}`;
+    const prior = byPosition.get(position);
+    if (prior === undefined) byPosition.set(position, i);
+    welded[i] = prior ?? i;
+  }
+  const edges = new Map<string, { count: number; orientation: number }>();
+  const vertex = (i: number): number => {
+    const index = indices[i]!;
+    if (!(Number.isInteger(index) && index >= 0 && index < welded.length))
+      throw invalidLoad('Invalid hydrostatic mesh index; use integer indices into the vertex array.');
+    return welded[index]!;
+  };
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = vertex(i);
+    const b = vertex(i + 1);
+    const c = vertex(i + 2);
+    if (a === b || b === c || c === a)
+      throw invalidLoad('A hydrostatic triangle repeats a vertex; remove degenerate triangles and close the mesh.');
+    for (const [from, to] of [
+      [a, b],
+      [b, c],
+      [c, a],
+    ] as const) {
+      const key = from < to ? `${from}:${to}` : `${to}:${from}`;
+      const edge = edges.get(key) ?? { count: 0, orientation: 0 };
+      edge.count++;
+      edge.orientation += from < to ? 1 : -1;
+      edges.set(key, edge);
+    }
+  }
+  for (const edge of edges.values())
+    if (edge.count !== 2 || edge.orientation !== 0)
+      throw invalidLoad(
+        'The hydrostatic mesh contains an open or misoriented edge; close the mesh and wind adjacent faces consistently.',
+      );
 }
 
 /** The eigenvalues and eigenvectors (rows) of a symmetric 3 by 3 matrix by Jacobi rotations. */

@@ -357,6 +357,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   [Brönner et al., Figure 4](https://doi.org/10.1016/j.marpolbul.2018.02.021).
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
+- Static buoyancy and righting (SEA-12, 2026-11-26). A heeled box or closed triangle mesh reproduces the exact
+  submerged volume and righting moment with a horizontal water cut. The independent photographed float settles
+  at 27.5°. The simulation reaches 26.91° using the published weight and 26.68° using the separately reported
+  density ratio. Both are within the 0.92° band derived from the figure resolution. The comparison covers static
+  heel. Reproduce with `node --test --test-name-pattern='heeled box|inclined ellipsoid|free rectangular float' packages/physics/tests/loads.test.js`.
+  [Hori and Hori, Fig. 4.6](https://vixra.org/pdf/2307.0154v2.pdf).
+
 - Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
   properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
   2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts

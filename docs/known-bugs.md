@@ -990,7 +990,10 @@ regression test.
 - **SEA-12, floating bodies have no righting moment, and the buoyancy is not exact.** **Repro:** float a heeled box
   with `LoadSolver`; it does not right itself. **Cause:** `packages/physics/src/loads/solver.ts` applies buoyancy at
   the shape's centre and takes the submerged volume from an equivalent ellipsoid (a box prism is exact only upright),
-  while the catalog row says exact submerged-volume buoyancy.
+  while the catalog row says exact submerged-volume buoyancy. **Fixed 2026-11-26.** The live rigid solver
+  receives the displaced-volume moment from a clipped box or mesh surface, or from the analytic ellipsoid cap.
+  **Regression:** `packages/physics/tests/loads.test.js`, “SEA-12 a heeled box and triangle mesh return the exact
+  displaced volume and righting moment”.
 - **FLUID-03, particles said to be jittered are seeded on a lattice, and a particle that would enter a solid stays
   put.** **Cause:** `packages/physics/src/flip/transfer.ts` describes jittered seeding while `solver.ts` places
   particles at exact octant centres, and `solver.ts` holds a particle in place instead of projecting it out of the

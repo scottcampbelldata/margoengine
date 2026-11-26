@@ -12925,11 +12925,34 @@ formulas). Written from standards, papers and public reports only (no code of an
 - O. Breivik, A. A. Allen, C. Maisondieu and J. C. Roth, "Wind-induced drift of objects at sea: the leeway field method",
   Applied Ocean Research 33, 2011 (read): measured leeways the windage default is held to.
 
-The equivalent ellipsoid of a mesh (its second moments by signed tetrahedra, semi-axes sqrt(5 I / V)), the submerged share as
-a sphere's cap under the ellipsoid's vertical half-height (a prism's for a box), the strip-theory drag of a spinning body, the
+The equivalent ellipsoid of a mesh (its second moments by signed tetrahedra, semi-axes sqrt(5 I / V)) supplies its
+drag and added mass axes. The strip-theory drag of a spinning body, the
 added mass held as M (M + A)^-1 (F + W) - W with members' added mass in the same tensor, the water's acceleration as a centred
 difference of the pure sample, and the quay wall's doubling by 1 + R at its face are this package's own arrangement. Proof:
 `packages/physics/tests/loads.test.js` and `tests/coupling/loads.test.js`.
+
+For hydrostatics, spheres and ellipsoids use an analytic cap. A closed mesh or box reuses
+SEA-08 wetted triangle clipping and [D. A. Dunavant's degree-four triangle quadrature (1985)](https://doi.org/10.1002/nme.1620210612).
+The plane uses the local sea height at the shape centre. Hydrostatic pressure is linear on each wet triangle.
+About the rigid centre of mass, the pressure moment is quadratic. The integrals give displaced volume and its
+righting moment by the divergence theorem. Unit-specific-weight pressure keeps the volume meaningful at zero
+gravity, and relative coordinates keep sea-level translation out of the quadrature. [Tsutomu Hori, *Position of
+Center of Buoyancy of a Vessel*, Part 6 (2021)](https://doi.org/10.18949/jinnavi.215.0_69)
+
+For an ellipsoid with shape matrix `A` and upward direction `n`, let `H = |Aᵀn|` and let `h` be the normalized
+height of the submerged cap. Integrating the unit sphere's discs gives volume fraction `h²(3−h)/4` and axial
+centroid distance `3(2−h)²/[4(3−h)]` from the centre toward the cap. Mapping the centroid back gives the
+offset along `−A Aᵀn/H`. The tests compare both mesh and box to finite-angle trapezoid pressure moments
+and the small-heel `GM = KB + I_waterplane / V − KG` limit. An inclined ellipsoid separately checks
+the affine half-cap moment.
+
+In [Tsutomu and Manami Hori, *Theoretical Hydrostatics of Floating Bodies* (2023), §4.6, Fig. 4.6](https://vixra.org/pdf/2307.0154v2.pdf),
+a 30 × 11.5 × 10 cm prism settles at a photographed 27.5°. The reported 18.09 N weight and the reported
+relative density 0.458 imply different displacement in nominal fresh water. The solver runs both inputs,
+from 12° and 39° releases, and settles at 26.91° and 26.68°, respectively. Neither input comes from the
+held-out angle. The upper edge spans about 187 pixels in a 2× page raster. One pixel of coordinate reading
+uncertainty at each end and the printed rounding give a 0.92° comparison band. These are static heel
+results. The added body damping is used to reach equilibrium and does not validate measured roll decay.
 
 ### Ships under way (SEA-09, `@margoengine/physics/ship`, 2026-11-26)
 

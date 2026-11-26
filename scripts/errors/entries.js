@@ -8,6 +8,14 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'hydrodynamic-loads',
+    title: '@margoengine/physics/loads inputs',
+    kind: 'family',
+    messages: [],
+    cause: 'The load solver or a hydrodynamic helper received an unsupported geometry, flow, state or parameter.',
+    fix: 'Use finite SI inputs. Supply a water field and positive density, a closed outward-wound mesh or positive shape dimensions, and valid rigid rows. Omit the force capacity to use the world capacity. The error names the rejected input and the change to make.',
+  },
+  {
     id: 'body-driver',
     title: '@margoengine/input/body: webcam hands and body to a skeleton',
     kind: 'family',

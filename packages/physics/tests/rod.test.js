@@ -392,7 +392,11 @@ test('a hose standing in the waves sways at their period, and a restored world w
     physics.step(1 / 60);
     assert.equal(physics.kernel.hash, first[i], `step ${i} after the restore`);
   }
-  assert.throws(() => rod.restoreState(new Float64Array(3)), RangeError);
+  assert.throws(() => rod.restoreState(new Float64Array(3)), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /pass that one.+#hydrodynamic-loads/,
+  });
   physics.dispose();
 });
 
@@ -434,7 +438,11 @@ test('a rod refuses a centre line it cannot make and options out of range, namin
   assert.throws(() => new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0], loads: {} }), /segmentLoads/);
   assert.throws(() => segmentLoads(water([0, 0, 0]), { drag: -1 }), /drag/);
   assert.throws(() => segmentLoads(water([0, 0, 0]), { period: 0 }), /period/);
-  assert.throws(() => segmentLoads({ density: 1000 }), TypeError);
+  assert.throws(() => segmentLoads({ density: 1000 }), {
+    name: 'MargoError',
+    code: 'unsupported',
+    message: /pass a SeaSurface.+#hydrodynamic-loads/,
+  });
   const rod = new Rod(physics, { start: [0, 0, 0], end: [1, 0, 0] });
   rod.remove();
   assert.equal(rod.valid, false);

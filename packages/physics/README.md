@@ -4096,14 +4096,17 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 `LoadSolver` holds rigid bodies in the water through `bodyForces` with the water's loads (SEA-12): divers, debris, buoys, hoses, piles and dolphins. Couple it before the rigid solver: `world.couple(['loads', 'rigid'], 'staggered')`.
 
-- **Compact bodies** (`bodies: [{row, shape}]`): a shape is `{sphere}`, `{ellipsoid}`, `{box}` or `{mesh}`, a mesh taken as its equivalent ellipsoid. Each body takes:
-  - buoyancy of its submerged share and the Froude-Krylov force of the water's acceleration;
+- **Compact bodies** (`bodies: [{row, shape}]`): a shape is `{sphere}`, `{ellipsoid}`, `{box}` or `{mesh}`. A mesh needs a closed surface with outward-wound triangles and may split vertices at coincident seams. Each body takes:
+  - buoyancy at the displaced volume's centroid, which produces a righting moment. The local sea height sets the horizontal cut. Boxes and meshes integrate pressure on clipped triangles. Spheres and ellipsoids use their exact cap. The Froude–Krylov force uses the water's acceleration;
   - added mass per axis from Lamb's ellipsoid integrals, held implicitly so light bodies stay stable;
   - quadratic drag on its velocity through the water, a sphere's by Reynolds number (Morrison), else 1.0 or `drag`;
   - a spinning body's drag;
   - the wind's drag on its emerged part (`windage`, default 1), so floating debris drifts at a few percent of the wind.
 - **Members** (`members: [{from, to, diameter, row?}]`): Morison's equation over the wetted length, its drag and added mass from DNV-RP-C205 by roughness (`roughness`, default 5e-5 m) and Keulegan-Carpenter number (`period`, default 8 s). A member takes Eames's tangential drag, and with `vortex: {strouhal, lift}` sheds vortices through Facchinetti's wake oscillator, its lift swinging at St U / D. A member on no `row` is fixed, a pile, and `memberLoad(i)` reports what it takes.
 - **The water** (`sea`): a `SeaSurface`, or any `{elevation, water, density}` such as a flood's (`{elevation: (x, z) => shallow.sample(x, z).surface, water: shallow.flow, density: 1000}`). Add `flows` for currents and races (`ShipSolver.water`) and `wind` for windage.
+
+Omit `capacity` to use the world's rigid body rows. Unsupported load inputs raise `MargoError` with
+code `unsupported` and a repair instruction. [Hydrodynamic input help](https://margoengine.com/errors#hydrodynamic-loads)
 
 The coefficients stand alone:
 - `cylinderCoefficients(KC, k/D)`, `steadyDrag`, `wakeAmplification` and `cylinderAddedMass`;
@@ -4158,8 +4161,7 @@ console.log(ellipsoidAddedMass([2, 1, 1]).map((c) => c.toFixed(2)).join(' ')); /
 const {drag, addedMass} = cylinderCoefficients(10, 0);
 console.log(drag.toFixed(2), addedMass.toFixed(2)); // 0.71 0.69
 
-// A crate of 600 kg/m^3 dropped into still water floats with 0.59 of its height under (it bobs: small bodies here make no
-// waves to damp them).
+// A heeled crate settles upright under the hydrostatic moment. Body damping lets the example reach equilibrium quickly.
 const still = {
   density: 1025,
   elevation: () => 0,
@@ -4167,13 +4169,18 @@ const still = {
 };
 await Physics.load();
 const physics = new Physics(null, {fixedTimestep: 1 / 60});
-const crate = physics.addBody(null, {position: [0, 1, 0], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1200}});
+const halfExtents: [number, number, number] = [1, 0.35, 0.6];
+const halfHeel = 0.12;
+const crate = physics.addBody(null, {
+  position: [0, 0.1, 0], rotation: [Math.sin(halfHeel), 0, 0, Math.cos(halfHeel)],
+  linearDamping: 1, angularDamping: 1, colliders: {shape: 'box', halfExtents, mass: 1008},
+});
 const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .add(new RigidSolver(), {physics})
-  .add(new LoadSolver(), {sea: still, bodies: [{row: crate.row, shape: {box: [1, 0.5, 0.5]}}]})
+  .add(new LoadSolver(), {sea: still, bodies: [{row: crate.row, shape: {box: halfExtents}}]})
   .couple(['loads', 'rigid'], 'staggered');
 world.advance(60 * 30);
-console.log(Math.abs(crate.position[1]) < 0.5); // true: afloat
+console.log(Math.abs(crate.position[1]) < 0.35, Math.abs(crate.rotation[0]) < 0.01); // true true
 ```
 
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)

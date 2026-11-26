@@ -1,11 +1,9 @@
 // Hydrodynamic loads on bodies in the water as a solver of the physics framework (SEA-12): divers, debris, buoys, hoses,
 // piles and dolphins. Each step it reads where the bodies are from the rigid solver's `bodies` port and holds them through
 // `bodyForces` with the water's loads (morison.ts, shapes.ts):
-// - a compact body (a diver, a crate, a buoy) as its equivalent ellipsoid: buoyancy of its submerged share (the share of an
-//   ellipsoid under a plane is the sphere's, (2 + 3 s - s^3) / 4 at s, the centre's depth over the ellipsoid's half-height
-//   along the vertical), the Froude-Krylov force rho V a, added mass per axis from Lamb's integrals, quadratic drag on its
-//   relative velocity per axis over its projected areas (a box's submerged share is a prism's, linear in depth), a rotating body's drag by strip theory along each axis, and the
-//   wind's drag on its emerged share, so floating debris drifts at a few percent of the wind as the leeway measurements say;
+// - a compact body (a diver, a crate, a buoy) displaces water below a locally horizontal surface. Analytic ellipsoid caps
+//   and triangle pressure integration give its buoyancy and righting moment. The body also takes Froude-Krylov force rho V a,
+//   Lamb added mass, quadratic drag, rotational strip drag and windage.
 // - a member (a pile, a dolphin, a hose segment, a diver's limb) by Morison's equation over its wetted length at two Gauss
 //   points, its drag and added mass coefficients from its roughness and Keulegan-Carpenter number (DNV-RP-C205), the
 //   tangential drag of Eames, and optionally its vortex shedding by Facchinetti's wake oscillator, the lift 1/4 rho U^2 D
@@ -16,9 +14,11 @@
 // pure sample in time.
 //
 // State: the wake oscillators. Couple it before the rigid solver: `world.couple(['loads', 'rigid'], 'staggered')`.
+import { invalidLoad } from './errors.js';
 import type { FlowField, FlowSample, SeaSurface, Wind } from '@margoengine/math/fields';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { pow } from '@margoengine/math/pinned';
+import type { HullMesh, WettedLoads } from '../seakeeping/wetted.js';
 import { regionWords } from '../world/memory.js';
 import {
   type Port,
@@ -30,7 +30,8 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
 import { cylinderCoefficients, sphereDrag, tangentialDrag, wakeStep } from './morison.js';
 import { ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
 import { waterAcceleration, waterVelocity } from './water.js';
@@ -94,7 +95,7 @@ export interface LoadParams {
   readonly members?: readonly LoadMember[];
   /** The water's kinematic viscosity, m^2/s (default 1.19e-6). */
   readonly viscosity?: number;
-  /** Body rows its `bodyForces` port covers (default one past the highest row). */
+  /** Body rows its `bodyForces` port covers. Omit to use the world's rigid body capacity. */
   readonly capacity?: number;
   readonly level?: RateLevel;
 }
@@ -108,8 +109,10 @@ interface BodyRuntime {
   readonly volume: number;
   readonly addedMass: Vec3;
   readonly sphere: boolean;
-  /** A box's half extents (its submerged share is a prism's, linear in depth), or none for an ellipsoid's. */
+  /** A box's exact half extents, also used for its vertical support. */
   readonly box: Vec3 | undefined;
+  /** Body-local pressure integration surface relative to the geometric centre. */
+  readonly mesh: HullMesh | undefined;
 }
 
 /** A member's load from the last step, world axes: force, N, at its middle, and its wake's lift coefficient. */
@@ -123,7 +126,6 @@ export class LoadSolver implements Solver<LoadParams> {
   private readonly id: string;
   private host!: SolverHost;
   private level: RateLevel = 0;
-  private capacity = 0;
   private g = 9.81;
   private nu = SEA_WATER_VISCOSITY;
   private sea!: LoadWater;
@@ -136,6 +138,7 @@ export class LoadSolver implements Solver<LoadParams> {
   private wakes!: Region;
   private cell: [number, number, number] = [0, 0, 0];
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
+  private readonly hydrostatic: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
 
   constructor(id = 'loads') {
     this.id = id;
@@ -164,14 +167,15 @@ export class LoadSolver implements Solver<LoadParams> {
       level = 0,
     } = params ?? ({} as LoadParams);
     if (!sea || typeof sea.elevation !== 'function' || typeof sea.water?.sample !== 'function')
-      throw new TypeError(
+      throw invalidLoad(
         'Loads in the water need the water: pass {sea}, a SeaSurface (a SpectralSea or NonlinearSea) or {elevation, water, density}.',
       );
-    if (!(sea.density > 0)) throw new RangeError(`The water's density is above 0 (got ${sea.density}); pass kg/m^3.`);
+    if (!(sea.density > 0 && Number.isFinite(sea.density)))
+      throw invalidLoad('Invalid water density for hydrodynamic loads; pass positive finite kg/m³.');
     if (!(viscosity > 0 && Number.isFinite(viscosity)))
-      throw new RangeError(`A kinematic viscosity is finite m^2/s above 0 (got ${viscosity}); pass one, or 1.19e-6.`);
+      throw invalidLoad(`A kinematic viscosity is finite m^2/s above 0 (got ${viscosity}); pass one, or 1.19e-6.`);
     if (!(Number.isInteger(level) && level >= 0 && level <= 7))
-      throw new RangeError(`A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
+      throw invalidLoad(`A rate level is a whole number from 0 to 7 (got ${level}); pass one.`);
     this.host = host;
     this.g = gravityMagnitude(host.gravity ?? DEFAULT_GRAVITY);
     this.sea = sea;
@@ -179,32 +183,44 @@ export class LoadSolver implements Solver<LoadParams> {
     this.wind = wind;
     this.nu = viscosity;
     this.level = level as RateLevel;
-    let top = -1;
+    const rows: number[] = [];
     this.bodies = bodies.map((spec) => {
       if (!(Number.isInteger(spec?.row) && spec.row >= 0))
-        throw new RangeError(`A body's row is a whole number, 0 or more (got ${spec?.row}); pass the body's row.`);
-      top = Math.max(top, spec.row);
+        throw invalidLoad(`A body's row is a whole number, 0 or more (got ${spec?.row}); pass the body's row.`);
+      rows.push(spec.row);
       return this.prepare(spec);
     });
     for (const m of members) {
       if (
-        !(m?.diameter > 0 && m.from?.length === 3 && m.to?.length === 3 && [...m.from, ...m.to].every(Number.isFinite))
+        !(
+          m?.diameter > 0 &&
+          Number.isFinite(m.diameter) &&
+          m.from?.length === 3 &&
+          m.to?.length === 3 &&
+          [...m.from, ...m.to].every(Number.isFinite)
+        )
       )
-        throw new RangeError(
+        throw invalidLoad(
           'A member is {from: [x, y, z], to: [x, y, z], diameter} in metres, its diameter above 0; pass them.',
         );
       if (m.row !== undefined) {
         if (!(Number.isInteger(m.row) && m.row >= 0))
-          throw new RangeError(
+          throw invalidLoad(
             `A member's row is a whole number, 0 or more, or none for a fixed pile (got ${m.row}); pass one.`,
           );
-        top = Math.max(top, m.row);
+        rows.push(m.row);
       }
     }
     this.members = members;
     this.memberLoads = members.map(() => ({ force: [0, 0, 0], lift: 0 }));
-    this.capacity = params.capacity ?? top + 1;
-    this.forces = host.allocate('forces', Math.max(1, this.capacity) * FORCE_WORDS * 8, 'f64', LOADS_LAYOUT);
+    const capacity = rows.length > 0 ? bodyRowsOf(host, this.id, rows) : (params.capacity ?? 0);
+    if (
+      !Number.isSafeInteger(capacity) ||
+      capacity < 0 ||
+      (params.capacity !== undefined && params.capacity !== capacity)
+    )
+      throw invalidLoad('Invalid hydrodynamic force capacity; omit capacity to use the world body rows.');
+    this.forces = host.allocate('forces', Math.max(1, capacity) * FORCE_WORDS * 8, 'f64', LOADS_LAYOUT);
     this.wakes = host.allocate('wakes', Math.max(1, members.length) * 2 * 8, 'f64', LOADS_LAYOUT);
     // The wake oscillators start at the free van der Pol cycle's amplitude, q = 2.
     const wakes = regionWords(host.memory, this.wakes) as Float64Array;
@@ -213,7 +229,9 @@ export class LoadSolver implements Solver<LoadParams> {
 
   /** A body's equivalent ellipsoid, frame and added mass. */
   private prepare(spec: LoadBody): BodyRuntime {
-    const shape = spec.shape as Record<string, unknown>;
+    const shape = spec.shape;
+    if (!shape || typeof shape !== 'object')
+      throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box} or {mesh}.');
     let axes: Vec3,
       frame: [Vec3, Vec3, Vec3] = [
         [1, 0, 0],
@@ -221,33 +239,45 @@ export class LoadSolver implements Solver<LoadParams> {
         [0, 0, 1],
       ],
       centre: Vec3 = spec.centre ? [spec.centre[0], spec.centre[1], spec.centre[2]] : [0, 0, 0],
-      volume: number;
-    if (shape && 'sphere' in shape) {
-      const r = shape.sphere as number;
-      if (!(r > 0)) throw new RangeError(`A sphere's radius is above 0 (got ${r}); pass one.`);
+      volume: number | undefined,
+      mesh: HullMesh | undefined,
+      box: Vec3 | undefined;
+    if (!centre.every(Number.isFinite))
+      throw invalidLoad('Invalid hydrodynamic shape centre; pass three finite coordinates in metres.');
+    if ('sphere' in shape) {
+      const r = shape.sphere;
       axes = [r, r, r];
-    } else if (shape && 'ellipsoid' in shape) axes = [...(shape.ellipsoid as Vec3)] as Vec3;
-    else if (shape && 'box' in shape) {
+    } else if ('ellipsoid' in shape) {
+      const h = shape.ellipsoid;
+      axes = [h?.[0], h?.[1], h?.[2]];
+    } else if ('box' in shape) {
       // A box as the ellipsoid of its second moments: semi-axes sqrt(5/3) of its half extents, its volume kept below.
-      const h = shape.box as Vec3;
-      axes = [h[0] * Math.sqrt(5 / 3), h[1] * Math.sqrt(5 / 3), h[2] * Math.sqrt(5 / 3)];
-    } else if (shape && 'mesh' in shape) {
-      const e = equivalentEllipsoid(shape.mesh as { vertices: ArrayLike<number>; indices: ArrayLike<number> });
+      const h = shape.box;
+      box = [h?.[0], h?.[1], h?.[2]];
+      axes = box.map((a) => a * Math.sqrt(5 / 3)) as Vec3;
+      volume = 8 * box[0] * box[1] * box[2];
+      mesh = boxSurface(box);
+    } else if ('mesh' in shape) {
+      const e = equivalentEllipsoid(shape.mesh);
       axes = e.axes;
       frame = e.directions;
       if (!spec.centre) centre = e.centre;
-    } else throw new TypeError('A body in the water has a shape: {ellipsoid}, {sphere}, {box} or {mesh}; pass one.');
+      volume = e.volume;
+      mesh = {
+        vertices: Float64Array.from(shape.mesh.vertices, (v, i) => v - e.centre[i % 3]!),
+        indices: Uint32Array.from(shape.mesh.indices),
+      };
+    } else throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box} or {mesh}.');
     if (!axes.every((a) => a > 0 && Number.isFinite(a)))
-      throw new RangeError(`A body's semi-axes are finite and above 0 (got ${axes.join(', ')}); pass them.`);
-    volume = (4 / 3) * Math.PI * axes[0] * axes[1] * axes[2];
-    if (shape && 'box' in shape) {
-      const h = shape.box as Vec3;
-      volume = 8 * h[0] * h[1] * h[2];
-    }
+      throw invalidLoad('Invalid hydrodynamic shape size; pass three positive finite dimensions or a positive radius.');
+    volume ??= (4 / 3) * Math.PI * axes[0] * axes[1] * axes[2];
+    if (!(volume > 0 && Number.isFinite(volume)))
+      throw invalidLoad('Hydrodynamic shape volume is outside numeric range; pass physical dimensions in metres.');
     const sphere = Math.max(...axes) < 1.05 * Math.min(...axes),
       addedMass = (spec.addedMass ? [...spec.addedMass] : ellipsoidAddedMass(axes)) as Vec3;
-    const box = shape && 'box' in shape ? ([...(shape.box as Vec3)] as Vec3) : undefined;
-    return { spec, axes, frame, centre, volume, addedMass, sphere, box };
+    if (addedMass.length !== 3 || !addedMass.every((coefficient) => coefficient >= 0 && Number.isFinite(coefficient)))
+      throw invalidLoad('Invalid hydrodynamic added mass; supply three finite nonnegative coefficients.');
+    return { spec, axes, frame, centre, volume, addedMass, sphere, box, mesh };
   }
 
   /** The water's velocity at a point and time: the sea's water plus every flow (water.ts). */
@@ -309,21 +339,34 @@ export class LoadSolver implements Solver<LoadParams> {
         ? Math.abs(b.box[0] * axesWorld[0][1]) +
           Math.abs(b.box[1] * axesWorld[1][1]) +
           Math.abs(b.box[2] * axesWorld[2][1])
-        : Math.sqrt(h0 * h0 + h1 * h1 + h2 * h2),
-      s = Math.max(-1, Math.min(1, (surface - centre[1]) / half)),
-      wet = b.box ? (1 + s) / 2 : (2 + 3 * s - s * s * s) / 4;
+        : Math.sqrt(h0 * h0 + h1 * h1 + h2 * h2);
+    if (!Number.isFinite(surface))
+      throw invalidLoad('Non-finite hydrodynamic surface height; return a finite elevation in metres.');
+    const depth = surface - centre[1];
+    const densityGravity = rho * this.g;
+    let submerged: number;
+    let torque: Vec3;
+    if (b.mesh) {
+      meshHydrostatics(b.mesh, q, depth, sub(cm, centre), this.hydrostatic);
+      submerged = Math.max(0, Math.min(b.volume, this.hydrostatic.force[1]));
+      torque = [densityGravity * this.hydrostatic.torque[0], 0, densityGravity * this.hydrostatic.torque[2]];
+    } else {
+      const offset: Vec3 = [0, 0, 0];
+      submerged = b.volume * ellipsoidHydrostatics(b.axes, axesWorld, half, depth, offset);
+      const buoyancyArm = add(sub(centre, cm), offset);
+      torque = cross(buoyancyArm, [0, densityGravity * submerged, 0]);
+    }
+    const wet = submerged / b.volume;
     const force: Vec3 = [0, 0, 0],
-      torque: Vec3 = [0, 0, 0];
+      buoyancy = densityGravity * submerged;
     let added: Vec3 = [0, 0, 0];
     if (wet > 0) {
       const u = this.water(centre[0], Math.min(centre[1], surface), centre[2], t, [0, 0, 0]),
         a = this.acceleration(centre[0], Math.min(centre[1], surface), centre[2], t, [0, 0, 0]),
         vc = add(v, cross(w, sub(centre, cm))),
         vr = sub(u, vc),
-        speed = Math.sqrt(dot(vr, vr)),
-        submerged = wet * b.volume;
-      // Buoyancy and the Froude-Krylov force: the water's pressure gradient, rho V (a - g).
-      force[1] += rho * this.g * submerged;
+        speed = Math.sqrt(dot(vr, vr));
+      // The velocity-derived Froude-Krylov force is distinct from the hydrostatic wrench above.
       for (let k = 0; k < 3; k++) force[k]! += rho * submerged * a[k]!;
       // Added mass per axis: its part pushed by the water's acceleration, rho C_A V a; the part the body's own acceleration
       // takes is held implicitly below.
@@ -380,6 +423,7 @@ export class LoadSolver implements Solver<LoadParams> {
       acc.force[k]! += force[k]!;
       acc.torque[k]! += torque[k]! + arm[k]!;
     }
+    acc.force[1] += buoyancy;
     for (let i = 0; i < 3; i++)
       for (let r = 0; r < 3; r++)
         for (let c = 0; c < 3; c++) acc.added[3 * r + c]! += added[i]! * axesWorld[i]![r]! * axesWorld[i]![c]!;
@@ -526,7 +570,7 @@ export class LoadSolver implements Solver<LoadParams> {
   /** Member `index`'s load from the last step (a fixed pile's is what it holds the water with). */
   memberLoad(index: number): MemberLoad {
     const load = this.memberLoads[index];
-    if (!load) throw new RangeError(`There is no member ${index}; pass 0 to ${this.memberLoads.length - 1}.`);
+    if (!load) throw invalidLoad(`There is no member ${index}; pass 0 to ${this.memberLoads.length - 1}.`);
     return load;
   }
 
