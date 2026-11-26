@@ -161,7 +161,7 @@ in the merge gate.
 | PA-89 | OPEN | P2 | `netcode/src/rollback.ts:263-280`, `game.ts:11-19` | There is no bridge from rollback to a physics world. Quantising each tick would corrupt warm starts. | A physics game adapter using the snapshot blob, with `world.hash` as the checksum. | GGPO; Fiedler |
 | PA-90 | OPEN | P2 | `gltf/src/physics.ts`; `usdz/src` | No OMI physics or USD Physics import. | Readers for OMI physics and the USD Physics schema. | OMI; USD Physics |
 | PA-91 | OPEN | P3 | `gltf/src/physics.ts:340, 374-383, 613` | glTF import approximations: soft joint limits become hard, and infinite planes become thin boxes. | Joint-limit springs in the kernel. | |
-| PA-92 | OPEN | P3 | `sciviz` | Generic documentary fluid and field visualization still needs integrations. | SPACE-01 ships the N-body and orbit portion in `physics/orbit` with a replayable disk clock. Its regression tests cover a binary, a perturbed orbit, re-entry drag and the Event Horizon emitter. | Hairer, Lubich and Wanner, *Geometric Numerical Integration*. Yoshida (1990). |
+| PA-92 | OPEN | P3 | `sciviz` | Generic documentary fluid and field visualization still needs integrations. | SPACE-01 ships the N-body and orbit portion in `physics/orbit` with a replayable disk clock. Its regression tests cover a binary, a perturbed orbit, re-entry drag and the Event Horizon emitter. SPACE-03 adds registry density, heating and phase from conservative disk transport and exterior Kerr coordinates. Event Horizon still needs the new fields connected to its render path. | Hairer, Lubich and Wanner, *Geometric Numerical Integration*. Yoshida (1990). |
 
 ## The solver plan
 

@@ -5708,3 +5708,10 @@ with no net source volume. Identical state is reproduced by restoring and in bot
 arena memory modes.
 [Direct tests](../../packages/physics/tests/tsunami.test.js) ·
 [Coupling tests](../../packages/physics/tests/coupling/tsunami.test.js)
+
+### Finite-volume accretion and Kerr test trajectories (SPACE-03)
+
+The optional entry closes its mass budget against both edge fluxes and supplied mass. On nonuniform cells its steady
+one-face heat and inward mass flux agree with the zero-torque solution. Its tracer reproduces prograde and retrograde
+circular frequencies, the inclined Schwarzschild orbital plane, radial turning radii, and the observer and proper
+times of radial infall. The coupling harness verifies identical memory modes, frame rates and snapshot replay.

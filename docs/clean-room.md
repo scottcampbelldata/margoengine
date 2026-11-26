@@ -14002,3 +14002,13 @@ Natural source displacement adds or removes water by a normalized compact footpr
 volume request outside the water budget is recorded as unplaced. Boundary volume uses the
 same stage-weighted flux as the update. Diagonal native SIMD operations work in arena memory
 without static writes.
+
+## Thin accretion disks and Kerr geodesics (SPACE-03)
+
+- Nikolai I. Shakura and Rashid A. Sunyaev, [*Black holes in binary systems. Observational appearance*](https://ui.adsabs.harvard.edu/abs/1973A%26A....24..337S/abstract), 1973, equations (2.1), (2.4) and (2.6). A Keplerian disk has `Ω = sqrt(GM/r³)`. Combining its shear stress and the one-face energy balance gives `9 ν Σ Ω² / 8`. For steady mass supply and zero inner torque, this is `3 GM Ṁ [1 − sqrt(rInner/r)] / (8 π r³)`.
+- James E. Pringle, [*Accretion Discs in Astrophysics*](https://doi.org/10.1146/annurev.aa.19.090181.001033), 1981, equations (2.9–2.10), (3.9–3.11) and (3.17). Multiply the diffusion equation by the annular area and set `x = sqrt(r)` to get the inward rate `3π ∂(νΣx)/∂x`. Each face flux leaves one annulus and enters the other. Differences in `x` preserve the linear steady torque profile on nonuniform meshes. A positive implicit tridiagonal solve advances the masses. Its residual fraction avoids a near cancellation in stiff pivots.
+- Steven A. Balbus and John F. Hawley, [*A Powerful Local Shear Instability in Weakly Magnetized Disks. I. Linear Analysis*](https://doi.org/10.1086/170270), 1991. Outward-decreasing angular velocity and a weak magnetic field can excite local stress. The disk describes its averaged transport through a supplied viscosity.
+- Subrahmanyan Chandrasekhar, [*The Mathematical Theory of Black Holes*](https://academic.oup.com/book/52805/chapter-abstract/421883824), 1983, chapter 7, and Ryuichi Fujita and Wataru Hikida, [*Analytical solutions of bound timelike geodesic orbits in Kerr spacetime*](https://arxiv.org/abs/0906.1420), 2009, equations (1–2). The Kerr Hamilton–Jacobi equation separates into radial and polar potentials. Differentiating the squared velocities advances signed Mino velocities through turning points. Divide by `dt/dλ` for observer time. Multiplying through by `Δ` and advancing `ln(r − r+)` removes the exterior radial coordinate singularity. Zero rest-mass normalization gives a null trajectory.
+- James M. Bardeen, William H. Press and Saul A. Teukolsky, [*Rotating Black Holes: Locally Nonrotating Frames, Energy Extraction, and Scalar Synchrotron Radiation*](https://doi.org/10.1086/151796), 1972, equations (2.12–2.16) and (2.21). Direct and retrograde circular constants, frequencies and marginally stable radii supply exact references.
+
+The implementation was written from the papers and existing Margo APIs.

@@ -9540,3 +9540,17 @@ three-dimensional impact generation and nested grid corrections require separate
 Inland arrival can differ from the linear still-water travel time.
 
 The optional tsunami entry is 6,538 B gzip with a 6,794 B ceiling. Both Wasm assets are 13,850 B raw and each is 6,294 B gzip. Core plus stage remains 24,820 B gzip.
+
+### Accretion and compact-object trajectories (SPACE-03)
+
+The disk is axisymmetric, Newtonian and geometrically thin. Viscosity is supplied. Its blackbody effective temperature
+comes from local dissipation, so it assumes the heat radiates where it is generated. Flows involving magnetic fields,
+self-gravity, radiative transport or the inner stress and plunge require additional equations.
+
+The Kerr tracer uses the fixed test-particle metric in the exterior observer chart. The polar angle is unfolded at the
+pole for zero axial angular momentum. The horizon offset is a separate value while f64 can represent it. The tracer
+subdivides each world tick by a power of two chosen from its local phase rate. Rendering the disk with light bending
+requires a separate light-transport stage and an emissivity source.
+
+The optional TypeScript entry is 6,095 B gzip. Each Wasm variant is 1,657 B raw and 919 B gzip. Neither uses
+a shared static window. Core and stage add zero bytes.

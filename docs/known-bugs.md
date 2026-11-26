@@ -16562,3 +16562,9 @@ volume. A changing atmospheric field requires an application update until the sh
 ### Loose road surface persistence (DYN-04 / EARTH-05)
 
 Vehicles now sink into a calibrated yielding surface and feel the resulting suspension load. `packages/road/test/driving.test.js` checks the pressure and spring balance and the effect on the wheel. Persistent ruts and displaced volume require a matching EARTH-05 shear and sediment producer feeding TerrainBed. The road driver operates on authored lanes. The original city and deck shots still need the production bindings.
+
+### Accretion field rendering and relativistic disk transport (SPACE-03)
+
+The Event Horizon scene still uses its established SPACE-01 emitter paths. Bind its emissivity and radial transport
+to the new annulus fields to show heating and density. A disk crossing the strongly relativistic inner region needs
+a relativistic stress and heat equation. The test-geodesic solve covers that region in the exterior observer chart.
