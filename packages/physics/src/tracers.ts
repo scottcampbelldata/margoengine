@@ -21,7 +21,7 @@
 // is needed), no flocculation of fine silt, and settled tracer parcels remain in the bed ledger.
 
 import type { Bed, FlowField, FlowSample, Wind } from '@margoengine/math/fields';
-import { cos, hypot, ln, pow, sin } from '@margoengine/math/pinned';
+import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.js';
@@ -102,9 +102,9 @@ export interface TracerSource {
 export interface TracerBedJets {
   /** The mobile fraction of the bed. Default 'sand'. */
   material?: 'sand' | 'silt';
-  /** Shields threshold for initiation of motion. Default 0.05. */
+  /** Shields threshold for initiation of motion. Default: the Soulsby–Whitehouse curve for the selected grain. */
   criticalShields?: number;
-  /** Erosion at unit excess shear, kg/m²/s. Default 0.02. */
+  /** Optional linear erosion rate at unit excess stress, kg/m²/s. Default: van Rijn's grain-dependent pick-up. */
   erodibility?: number;
   /** Total erodible bed mass in this simulation cell, kg. Default Infinity. */
   availableMass?: number;
@@ -189,7 +189,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private random!: RandomStream;
   private particles!: Region;
   private ledger!: Region;
-  private jetBed?: { material: number; threshold: number; erodibility: number; limit: number };
+  private jetBed?: { material: number; threshold: number; pickupScale: number; pickupExponent: number; limit: number };
   /** Breaches it takes cargo from, and each breach cargo's material (by its code in BREACH_CARGO, -1 for none). */
   private breachSlots = 0;
   private breachMaterials: number[] = [];
@@ -292,16 +292,11 @@ export class TracerSolver implements Solver<TracerParams> {
       this.sources.push({ material: this.materialIndex(material), source });
     });
     if (this.useBedJets) {
-      const {
-        material = 'sand',
-        criticalShields = 0.05,
-        erodibility = 0.02,
-        availableMass = Infinity,
-      } = params.bedJets ?? {};
+      const { material = 'sand', criticalShields, erodibility, availableMass = Infinity } = params.bedJets ?? {};
       if (
         (material !== 'sand' && material !== 'silt') ||
-        !(criticalShields > 0 && Number.isFinite(criticalShields)) ||
-        !(erodibility >= 0 && Number.isFinite(erodibility)) ||
+        (criticalShields !== undefined && !(criticalShields > 0 && Number.isFinite(criticalShields))) ||
+        (erodibility !== undefined && !(erodibility >= 0 && Number.isFinite(erodibility))) ||
         !(availableMass >= 0)
       )
         throw new RangeError(
@@ -312,10 +307,23 @@ export class TracerSolver implements Solver<TracerParams> {
         throw new RangeError(
           'The tracer bed requires sinking grains under gravity; use water less dense than the grains and nonzero gravity.',
         );
+      const reducedGravity = ((grains.density - waterDensity) / waterDensity) * this.g;
+      const grainSize = grains.diameter * pow(reducedGravity / viscosity / viscosity, 1 / 3);
+      // Soulsby–Whitehouse (1997) onset and van Rijn (1984) dry sediment mass flux per bed area.
+      const shields = criticalShields ?? 0.3 / (1 + 1.2 * grainSize) + 0.055 * (1 - exp(-0.02 * grainSize));
+      const threshold = shields * (grains.density - waterDensity) * this.g * grains.diameter;
+      const pickupScale =
+        erodibility ?? 0.00033 * grains.density * Math.sqrt(reducedGravity * grains.diameter) * pow(grainSize, 0.3);
+      if (!(threshold > 0 && Number.isFinite(threshold) && Number.isFinite(pickupScale)))
+        throw new MargoError(
+          'unsupported',
+          'The tracer bed shear threshold or pick-up rate is outside numeric range; use physical water density, viscosity and gravity.',
+        );
       this.jetBed = {
         material: this.materialIndex(grains),
-        threshold: criticalShields * (grains.density - waterDensity) * this.g * grains.diameter,
-        erodibility,
+        threshold,
+        pickupScale,
+        pickupExponent: erodibility === undefined ? 1.5 : 1,
         limit: availableMass,
       };
     }
@@ -516,7 +524,10 @@ export class TracerSolver implements Solver<TracerParams> {
       const spread = radius + 0.1 * hypot(height, centreX - x, centreZ - z);
       const area = Math.PI * spread * spread;
       const shear = (0.05 * downward) / (dt * area);
-      const mass = Math.min(bed.erodibility * (shear / bed.threshold - 1) * area * dt, bed.limit - book[lifted]!);
+      const excess = (shear - bed.threshold) / bed.threshold;
+      if (!(excess > 0)) continue;
+      const pickup = bed.pickupScale * pow(excess, bed.pickupExponent);
+      const mass = Math.min(pickup * area * dt, bed.limit - book[lifted]!);
       if (!(mass > 0 && Number.isFinite(mass))) continue;
       for (let parcel = 0; parcel < JET_PARCELS; parcel++) {
         while (free < capacity && words[free * STRIDE + 5] !== FREE) free++;

@@ -463,6 +463,13 @@ carries a ship race's air as parcels):
   - inception at σᵢ ≈ −C_p,min = k C_l² Re^0.4 (Billet and Holl, via Brandao 2024);
   - an upper bound on the tip-vortex cavity, r_c = Γ/(2π W √σ) (Pennings 2016 thesis).
 
+### SEA-15 film upgrade progress
+
+BB-7 now uses the Soulsby–Whitehouse grain-specific Shields curve and van Rijn's three-halves-power
+pick-up rate by default. A manufactured bed-stress test runs through the real swimmer and checks both
+grain classes, below and above onset, against the published equations. Independent bed measurements,
+the Phares wall-stress profile, and the original shot's plume and bed binding still need verification.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

@@ -2997,9 +2997,11 @@ console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.
 ```
 
 For a ray, enable `bedJets` to couple swimming impulses to the erodible bed. A downward fin impulse spreads
-as it reaches the bed. It lifts `sand` (default) or `silt` where its estimated shear passes the critical Shields
-number (default 0.05). `erodibility` defaults to 0.02 kg/m²/s at unit excess shear, and `availableMass` defaults
-to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
+as it reaches the bed. It lifts `sand` (default) or `silt` when the footprint-averaged shear exceeds the
+Soulsby–Whitehouse threshold for the grain size, water density and viscosity. The default van Rijn pick-up
+rate increases with the three-halves power of relative excess stress. Give `criticalShields` to override onset,
+or set `erodibility` to use a linear rate in kg/m²/s at unit excess stress for a prescribed bed. `availableMass`
+defaults to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
 for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. The rest of the bed stays solid.
 The [rendered coupling fixture](../environment/tests/swim-sediment.html) shows the sand rise, drift, and settle.
 

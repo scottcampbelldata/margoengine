@@ -13126,13 +13126,24 @@ jet and wall-stress dependence on jet height. Read §§2–3 and the submerged-j
 Suspended Load Transport” (1984), uses the excess bed shear term relative to the critical stress.
 <https://doi.org/10.1061/(ASCE)0733-9429(1984)110:11(1613)>.
 
+The default onset follows R. L. Soulsby and R. J. S. Whitehouse, “Threshold of sediment motion in coastal
+environments” (1997), reproduced as Eq. 3 in the [USACE sediment reference](https://www.hec.usace.army.mil/confluence/rasdocs/d2sd/ras2dsedtr/6.5/model-description/critical-thresholds-for-transport-and-erosion)
+and in the [HR Wallingford STEP paper](https://eprints.hrwallingford.com/id/eprint/771/1/HRPP491-STEP_Model.pdf).
+The default dry mass flux is L. C. van Rijn, [“Sediment Pick-Up Functions” (1984)](https://doi.org/10.1061/(ASCE)0733-9429(1984)110:10(1494)),
+as given in Eq. 1 of L. C. van Rijn, R. Bisschop, and C. van Rhee, [“Modified Sediment Pick-Up Function” (2019)](https://www.leovanrijn-sediment.com/papers/Pickup2019.pdf).
+For positive relative excess shear, the flux per bed area is `0.00033 ρ_s sqrt((s−1) g d) D_*^0.3 excess^1.5`,
+where `s = ρ_s/ρ_w` and `D_* = d [((s−1) g)/ν²]^(1/3)`. The cited 1984 data cover low-flow noncohesive sand
+of roughly 100 to 1,500 μm. The 40 μm silt setting extrapolates the relation to noncohesive silt.
+
 Margo's reduced model spreads the wake radius by 0.1 m per metre of travel and applies 5% of
-the incident normal momentum flux as a footprint-averaged shear. These constants and the linear
-excess-stress erosion are modelling choices. Four stratified parcels sample the wall-jet footprint.
+the incident normal momentum flux as a footprint-averaged shear. These jet constants are modelling
+choices. An explicitly prescribed linear erosion option is available for a specified bed.
+Four stratified parcels sample the wall-jet footprint.
 They settle by the SEA-15 grain law. In the render fixture, their optical cross section is twice the
 projected geometric area in the large-particle limit (van de Hulst, *Light Scattering by Small
 Particles*, 1957, extinction paradox). The mass, source placement, and replay assertions use the
-same packed wake from the live swimmer.
+same packed wake from the live swimmer. Manufactured stresses verify onset, dry mass flux and grain
+size dependence through the live ray path. Independent pickup measurements remain to be checked.
 
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 

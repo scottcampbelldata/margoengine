@@ -272,7 +272,7 @@ test('BB-7 a pectoral beat lifts sand above a near bed and the plume drifts and 
   const water = { medium: 'water', cell: zero, sample: () => ({ velocity: [0.5, 0, 0], density, temperature: 280 }) };
   const world = put(swimmer, [ray]).add(tracer, {
     bed: depth,
-    bedJets: { availableMass: 0.023 },
+    bedJets: { availableMass: 0.023, criticalShields: 0.05, erodibility: 0.02 },
     water,
     horizontalDiffusivity: 0,
     verticalDiffusivity: 0,
@@ -300,6 +300,53 @@ test('BB-7 a pectoral beat lifts sand above a near bed and the plume drifts and 
   world.restoreSnapshot(save.bytes);
   world.advance(180);
   assert.equal(world.hash(), hash);
+});
+
+test('BB-7 sediment starts at the grain-specific Shields stress and follows van Rijn pick-up', async () => {
+  const depth = 0.5;
+  const area = 0.05;
+  const footprint = Math.PI * (Math.sqrt(area / Math.PI) + 0.1 * 0.3) ** 2;
+  const fluidViscosity = 1e-6;
+  const grainDensity = 2650;
+  const submergedGravity = (grainDensity / density - 1) * -gravity;
+  const stressPerStrokeSpeedSquared = (0.05 * 0.5 * density * area) / footprint;
+
+  // These are manufactured wall stresses. The formulas test pickup independently of the jet's stress estimate.
+  for (const [material, diameter, shear] of [
+    ['sand', 2.5e-4, 0.12],
+    ['silt', 4e-5, 0.12],
+    ['sand', 2.5e-4, 0.4],
+    ['sand', 2.5e-4, 0.8],
+  ]) {
+    const swimmer = await SwimSolver.load();
+    const tracer = new TracerSolver('tracers', { bedJets: true });
+    const strokeSpeed = Math.sqrt(shear / stressPerStrokeSpeedSquared);
+    const strokeAmplitude = strokeSpeed / (2 * Math.PI * Math.cos(Math.PI * sec));
+    const ray = {
+      ...coast,
+      position: [0, -0.2, 0],
+      tail: noTail,
+      fins: { area, strokeAmplitude, strokeFrequency: 1 },
+      steering: [0, 1, 0],
+    };
+    const world = put(swimmer, [ray]).add(tracer, { bed: depth, viscosity: fluidViscosity, bedJets: { material } });
+    world.advance(1);
+
+    const dStar = diameter * Math.cbrt(submergedGravity / fluidViscosity ** 2);
+    const critical = 0.3 / (1 + 1.2 * dStar) + 0.055 * (1 - Math.exp(-0.02 * dStar));
+    const shields = shear / (density * submergedGravity * diameter);
+    const excess = Math.max(0, (shields - critical) / critical);
+    const rate = 0.00033 * grainDensity * Math.sqrt(submergedGravity * diameter) * dStar ** 0.3 * excess ** 1.5;
+    close(tracer.jetErosion, rate * footprint * sec);
+    close(tracer.budget.water, tracer.jetErosion);
+    assert.equal([...tracer.particlesOf()].length, excess > 0 ? 4 : 0);
+  }
+});
+
+test('the sediment bed rejects viscosity too small to compute a finite pickup rate', () => {
+  const world = new PhysicsWorld({ rate });
+  const tracer = new TracerSolver('tracers', { bedJets: true });
+  assert.throws(() => world.add(tracer, { viscosity: Number.MIN_VALUE }), { name: 'MargoError', code: 'unsupported' });
 });
 
 test('BB-7 still fins and a bed below the jet footprint do not release sand', async () => {
