@@ -144,6 +144,10 @@
       "types": "./dist/surf/index.d.ts",
       "import": "./dist/surf.js"
     },
+    "./rogue": {
+      "types": "./dist/rogue/index.d.ts",
+      "import": "./dist/rogue.js"
+    },
     "./ice": {
       "types": "./dist/ice/index.d.ts",
       "import": "./dist/ice.js"
