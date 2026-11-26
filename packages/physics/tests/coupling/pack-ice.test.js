@@ -174,6 +174,7 @@ test('PackIceSolver: live RigidSolver receives the opposite ice impulse and bend
       radiation: false,
       rollDamping: false,
       greenWater: false,
+      drag: false,
     })
     .couple(['hull', 'pack-ice', 'rigid'], 'staggered');
   let iceImpulse = [0, 0];

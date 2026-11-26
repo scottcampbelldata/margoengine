@@ -6,6 +6,7 @@ import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import {
   GRAVITY,
+  FORM_DRAG,
   HULL_BREACH_WORDS,
   HULL_BREACHES_FIELD,
   HullSolver,
@@ -173,7 +174,8 @@ test('HullSolver: driven up and down, a box heaves as Cummins equation in the fr
     form = lewisForm(B, T, B * T),
     f0 = 2000;
   for (const w of [2.5, 2.9, 3.5]) {
-    const { world, box } = single({}, [f0, w]),
+    // Potential flow, as the frequency-domain answer is: no form drag.
+    const { world, box } = single({ drag: false }, [f0, w]),
       rest = D / 2 - T;
     let amplitude = 0;
     for (let f = 1; f <= 40 * 60; f++) {
@@ -277,7 +279,8 @@ test('HullSolver: driven sideways, a box sways and rolls as the coupled frequenc
     pivot = T - D / 2 - 0,
     f0 = 2000;
   for (const w of [3, 4]) {
-    const { world, box } = single({}, [f0, w, 2, 10]),
+    // Potential flow, as the frequency-domain answer is: no form drag.
+    const { world, box } = single({ drag: false }, [f0, w, 2, 10]),
       sway = [],
       roll = [];
     for (let f = 1; f <= 40 * 60; f++) {
@@ -362,7 +365,7 @@ test('HullSolver: on a hull uneven fore and aft, heave drives pitch with the sig
     },
     w = 3,
     f0 = 3000,
-    { world, box } = single({}, [f0, w, 1], mesh, m),
+    { world, box } = single({ drag: false }, [f0, w, 1], mesh, m),
     heave = [],
     pitch = [];
   for (let f = 1; f <= 40 * 60; f++) {
@@ -452,7 +455,8 @@ test('HullSolver: held up by its buoyancy alone, a hull heaves and rolls on at t
       centerOfMass: [0, 0.0125, 0],
       principalInertia: [0.236, (m * (l * l + b * b)) / 12, (m * (l * l + d * d)) / 12],
     },
-    off = { addedMass: false, radiation: false, rollDamping: false },
+    // Nothing that damps: no radiation, roll damping or form drag.
+    off = { addedMass: false, radiation: false, rollDamping: false, drag: false },
     heave = released([l, d, b], mass, [0, d / 2 - t + 0.01, 0], [0, 0, 0, 1], off, 1000),
     angle = (10 * Math.PI) / 180,
     roll = released([l, d, b], mass, [0, d / 2 - t, 0], [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)], off, 1000),
@@ -527,7 +531,8 @@ test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measure
     },
     measured = (0.519 * Math.PI * Math.PI) / (0.93 * m * GRAVITY * gm),
     full = decay({}),
-    potential = decay({ rollDamping: false });
+    // Potential flow alone: no eddies or skin friction, and no form drag (which takes the roll where the eddies do not).
+    potential = decay({ rollDamping: false, drag: false });
   assert.ok(Math.abs(full.K - measured) <= 0.12 * measured, `K ${full.K} against the measured ${measured}`);
   assert.ok(Math.abs(full.period - 0.93) <= 0.05 * 0.93, `period ${full.period} s against the measured 0.93 s`);
   assert.ok(potential.K < measured / 3, `without its eddies and friction: K ${potential.K}`);
@@ -1033,3 +1038,37 @@ test('HullSolver: a flooding hull, the same state at 24, 30 and 60 frames a seco
   frameRateIndependent(floodedBarge));
 test('HullSolver: a flooding hull, a seek equals a continuous run', () =>
   seekEqualsContinuous(() => floodedBarge({ num: 24, den: 1 })));
+
+test('HullSolver: a box going down under the sea falls at the speed its form drag allows', () => {
+  // A 4 by 1 by 2 m box half again as dense as the sea, flat side down, all its motion along y: with the form drag on its
+  // bottom face, 1/2 rho C A v^2, it comes to the speed where that holds its weight less its buoyancy,
+  // v = sqrt(2 (m - rho V) g / (rho C A)), C = 1.05 (Hoerner's cube); its sides move along themselves and take none.
+  // Without the drag (and with no free surface to radiate into) it would fall faster and faster.
+  const size = [4, 1, 2],
+    volume = size[0] * size[1] * size[2],
+    mass = 1.5 * SEA_WATER * volume,
+    run = (drag) => {
+      const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
+        body = physics.addBody(null, {
+          position: [0, -5, 0],
+          colliders: { shape: 'box', halfExtents: [2, 0.5, 1], mass },
+        });
+      body.enabledRotations = [false, false, false];
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(new HullSolver(), {
+          hulls: [{ row: body.row, mesh: boxMesh(size) }],
+          sea: { density: SEA_WATER, elevation: () => 0 },
+          greenWater: false,
+          radiation: false,
+          drag,
+        })
+        .add(new RigidSolver(), { physics })
+        .couple(['hull', 'rigid'], 'staggered');
+      for (let f = 1; f <= 30 * 60; f++) world.advance(f);
+      return -body.linearVelocity[1];
+    },
+    terminal = Math.sqrt((2 * (mass - SEA_WATER * volume) * GRAVITY) / (SEA_WATER * FORM_DRAG * size[0] * size[2]));
+  const v = run(true);
+  assert.ok(Math.abs(v - terminal) < 1e-3 * terminal, `falls at ${v} m/s against ${terminal}`);
+  assert.ok(run(false) > 10 * terminal, 'without it, ever faster');
+});

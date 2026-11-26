@@ -42,6 +42,8 @@ export interface Deck {
     readonly height: Float64Array;
 }
 
+export const FORM_DRAG = 1.05;
+
 export const FRICTION: number;
 
 export interface FloodResult {
@@ -121,6 +123,8 @@ export interface HullParams {
     readonly drift?: boolean;
     readonly greenWater?: boolean;
     readonly slamming?: boolean;
+    readonly drag?: boolean;
+    readonly dragCoefficient?: number;
     readonly deckCells?: readonly [number, number];
     readonly rollDamping?: boolean;
     readonly viscosity?: number;
@@ -234,6 +238,11 @@ export interface SlamStation {
 
 export type Vec3 = readonly [number, number, number];
 
+export interface WettedDrag {
+    readonly coefficient: number;
+    velocity(x: number, y: number, z: number, out: [number, number, number]): void;
+}
+
 export interface WettedLoads {
     force: [number, number, number];
     torque: [number, number, number];
@@ -288,7 +297,7 @@ export function swayAddedMassRigidLid(draft: number, form: LewisForm, density: n
 
 export function volumeBelow(mesh: HullMesh, u: Vec3, s: number, moment?: [number, number, number]): number;
 
-export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads): WettedLoads;
+export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads, drag?: WettedDrag): WettedLoads;
 
 // Not exported from this entry, but used by the exports above:
 

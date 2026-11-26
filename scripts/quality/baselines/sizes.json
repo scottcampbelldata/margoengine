@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20358020,
+  "total": 20358387,
   "history": [
     {
       "date": "2026-10-24",
@@ -13065,6 +13065,12 @@
       "commit": "feat(physics) crests from the sea",
       "reason": "physics/flip 10,188 to 11,232 B gzip (this Mac): FlipSolver takes a sea (seeded from it, its sides on the sea's velocity, a band held to its motion and level; the density projection keeps those sides), so waves run in and break inside the box. It is the same solver's boundary; a separate entry would carry the whole solver again.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "KB-SEA-SINKDRAG1 form drag",
+      "grew": 1,
+      "reason": "@margoengine/physics/entry: wettedLoads, which the entry solver shares with the hull solver, takes an optional form drag on each wet piece (the stagnation pressure of Newton impact law), so a hull that has lost its buoyancy sinks at its drag speed; measured gzip (Mac build) 9908 B, was about 9838; the term sits inside the one quadrature loop, so a split would integrate the wet pieces twice. Budget (measured + max(3%, 256 B)): 9838 to 10205 B."
     }
   ],
   "items": {
@@ -13889,7 +13895,7 @@
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
-    "@margoengine/physics/entry": 9838,
+    "@margoengine/physics/entry": 10205,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
     "@margoengine/physics/flip": 11232,

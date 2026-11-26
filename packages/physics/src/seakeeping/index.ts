@@ -8,6 +8,8 @@ export {
   SEA_WATER,
   type SeaQuery,
   type Vec3,
+  FORM_DRAG,
+  type WettedDrag,
   type WettedLoads,
   wettedLoads,
 } from './wetted.js';

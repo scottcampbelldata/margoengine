@@ -87,8 +87,21 @@ function rotate(q: Quat, v: Vec3): [number, number, number] {
 }
 
 /**
+ * The form drag of a hull moving through the water: on each wet piece facing the way it moves, the stagnation pressure
+ * 1/2 rho C (v . n)^2 (Newton's impact model of drag; with C = 1.05, Hoerner's cube, a box face-on takes the cube's drag).
+ * `velocity(x, y, z, out)` writes the surface's velocity relative to the water at a point (world, m/s).
+ */
+export interface WettedDrag {
+  readonly coefficient: number;
+  velocity(x: number, y: number, z: number, out: [number, number, number]): void;
+}
+
+/** Hoerner's drag coefficient of a cube face-on (*Fluid-Dynamic Drag*, 1965). */
+export const FORM_DRAG = 1.05;
+
+/**
  * The water's load on `hull` at `pose` in `sea` at time `t`: the force, the moment about `about` and the wetted area.
- * Writes into `out` when given.
+ * Writes into `out` when given. With `drag`, each wet piece also takes its form drag.
  */
 export function wettedLoads(
   hull: HullMesh,
@@ -97,6 +110,7 @@ export function wettedLoads(
   t: number,
   about: Vec3,
   out?: WettedLoads,
+  drag?: WettedDrag,
 ): WettedLoads {
   const loads = out ?? { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
   loads.force[0] = loads.force[1] = loads.force[2] = 0;
@@ -120,7 +134,8 @@ export function wettedLoads(
         const below = sea.elevation(x, z, t) - y;
         return below > 0 ? rho * GRAVITY * below : 0;
       };
-  const at = (i: number): [number, number, number] => [world[3 * i]!, world[3 * i + 1]!, world[3 * i + 2]!];
+  const at = (i: number): [number, number, number] => [world[3 * i]!, world[3 * i + 1]!, world[3 * i + 2]!],
+    moving: [number, number, number] = [0, 0, 0];
   // Where the surface crosses the edge from wet `a` (height ha < 0) to dry `b` (hb >= 0).
   const cut = (a: Vec3, ha: number, b: Vec3, hb: number): [number, number, number] => {
     let lo = 0,
@@ -158,9 +173,15 @@ export function wettedLoads(
     for (const [u, v, w, weight] of RULE) {
       const x = u * p0[0] + v * p1[0] + w * p2[0],
         y = u * p0[1] + v * p1[1] + w * p2[1],
-        z = u * p0[2] + v * p1[2] + w * p2[2],
-        // -p n dA: the push of the water into the hull, half the cross product being n dA over the piece.
-        k = (-weight * pressure(x, y, z)) / 2,
+        z = u * p0[2] + v * p1[2] + w * p2[2];
+      let p = pressure(x, y, z);
+      if (drag) {
+        drag.velocity(x, y, z, moving);
+        const vn = (moving[0] * nx + moving[1] * ny + moving[2] * nz) / length;
+        if (vn > 0) p += 0.5 * rho * drag.coefficient * vn * vn;
+      }
+      // -p n dA: the push of the water into the hull, half the cross product being n dA over the piece.
+      const k = (-weight * p) / 2,
         fx = k * nx,
         fy = k * ny,
         fz = k * nz,
