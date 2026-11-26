@@ -4657,3 +4657,5 @@ Build Physics and run `node --test --test-name-pattern "through the mean current
 ### SEA-08 bow and stern displacement
 
 Build Physics and run `node --test --test-name-pattern "wake source" packages/physics/tests/coupling/seakeeping.test.js`. The analytic prism gives the signed source volume from the submerged section area and the distance swept during one tick, with zero net grid volume. Both memory modes restore and replay exactly. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --hull-advance` on WebGPU and with `MARGO_COMPAT=1` for the moving waterline renderer.
+
+For the independent Wigley tank comparison, run `node packages/physics/tests/coupling/measure-wigley-waterline.mjs 0.025` after building Physics. Pass `0.05` for the coarser grid. It reports the observed and predicted nondimensional elevations by station for both towing speeds with fixed trim and sinkage. The near-bow amplitude and phase residual remain open. [Primary data and numerical settings](../clean-room.md#sea-08-independently-measured-wigley-waterline)
