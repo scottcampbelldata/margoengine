@@ -6164,3 +6164,7 @@ Heave, pitch and roll publish signed volume to the dispersive wake. The rectangu
 ### SEA-08 forward viscous roll terms
 
 The inferred and prescribed 1 m/s courses and an inferred 2 m/s course reproduce the published bare-hull forward-speed roll formulas in a rectangular control. The absolute differences in the held torque are below 0.00009 N m. A forward course with roll, heave and pitch publishes the same state on both browser backends at replay hash `0e4b9d11e73c4230`. Independent sustained roll-decay validation is pending.
+
+### SEA-08 rolling deck moves loose props
+
+In a beam wave of amplitude 0.15 m at 1.9 rad/s, a forward-course hull reaches 0.0583 rad of heel. The low-friction prop slides 128.3 mm relative to the deck and stays within 1.622 mm of the independent rotating-plane contact calculation. The higher-friction prop stays within 0.016 mm laterally. Calm water gives less than 1 micrometre of slip. Plain and shared world states match and replay exactly. This engine control covers the contact for EF-3. The producer's cabin and camera still need scene binding.

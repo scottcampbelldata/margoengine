@@ -2864,6 +2864,8 @@ world.advance(60);
 console.log(body.position);
 ```
 
+For a moving cabin, attach its fixed fittings and camera to the hull's rigid pose. Give loose props separate rigid bodies and contact colliders in the same world. The deck collider belongs to the floating hull body. With that arrangement friction and normal contact follow the actual hull motion. `PhysicsBody.velocityAtPoint` reads the deck velocity at a world-space attachment point.
+
 #### Hull motion drives a dispersive wake
 
 Set the second argument of `HullSolver` to enable signed waterplane sources, then give its `wakeSourceField` to `WakeSolver`. Both run at the world base rate in the same origin cell. The example starts with a downward initial velocity. Use a `minimumRadius` at least as large as half the wake cell diagonal so every source reaches the grid. Omit it for the geometric patch radius. Pass the wake to `SpectralSea.patches` to query its surface, and to `WaterWake` to draw it.

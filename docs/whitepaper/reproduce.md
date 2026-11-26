@@ -4511,3 +4511,7 @@ responds to the mounted film through the real rigid force port. [Model and sourc
 ### SEA-08 forward viscous roll damping
 
 Build Physics and run `node --test --test-name-pattern "forward speed roll" packages/physics/tests/coupling/seakeeping.test.js`. The case derives the prismatic roll stiffness from the waterplane moment, computes lift, eddy and friction with the ITTC equations, and checks their held moment through the coupled added-mass solve. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --forward-course` for the moving hull capture. Repeat with `MARGO_COMPAT=1`.
+
+### SEA-08 cabin props on the floating rigid deck
+
+Build Physics and run `node --test --test-name-pattern "forward-course deck contact" packages/physics/tests/coupling/seakeeping.test.js`. The fixed-friction props start in contact at equal travel speed. The solver alone supplies the hull's water loads. The reference reads only the deck motion and integrates the predicted slip in its rotating frame, with calm-water and higher-friction controls and exact replay.
