@@ -66,6 +66,11 @@
       <p><strong>Fix.</strong> Release the first owner (call its <code>dispose()</code> or the function it returned) before attaching another, or create a separate target for the second. The message names what is already attached.</p>
     </section>
     <h2>Messages</h2>
+    <section id="actions">
+      <h2><a href="#actions">@margoengine/selection/actions: declarative trigger and action rules</a></h2>
+      <p><strong>Cause.</strong> An action rule was registered or driven with an unknown trigger, a missing other node or pick function, a negative time, or after it was disposed (a MargoError with code disposed).</p>
+      <p><strong>Fix.</strong> Register one of the listed triggers (pick, doublePick, longPick, pickDown, pickUp, pointerOver, pointerOut, intersectEnter, intersectExit, everyFrame, keyDown, keyUp), give intersect triggers an other node, pass the pick option before feeding pointer events, give times in seconds of 0 or more, and create a new ActionManager or ActionSystem after dispose.</p>
+    </section>
     <section id="sky">
       <h2><a href="#sky">@margoengine/sky: physical planet atmosphere</a></h2>
       <p class="messages"><code>Planet atmosphere needs a GPUDevice; use WebGPU or webgl2-compat</code> <code>Planet atmosphere is disposed; create a new instance</code> <code>Planet camera lies below ground; keep the observer outside the planet</code> <code>Planet atmosphere needs radii at most 100000 km and vertical scattering depth at most 6; reduce the medium</code> <code>Planet frame needs finite transforms, nonzero sun, illuminance 0..1000000 and exposure -20..20</code></p>

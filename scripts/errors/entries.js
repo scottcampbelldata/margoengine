@@ -8,6 +8,15 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'actions',
+    title: '@margoengine/selection/actions: declarative trigger and action rules',
+    kind: 'family',
+    messages: [],
+    cause:
+      'An action rule was registered or driven with an unknown trigger, a missing other node or pick function, a negative time, or after it was disposed (a MargoError with code disposed).',
+    fix: 'Register one of the listed triggers (pick, doublePick, longPick, pickDown, pickUp, pointerOver, pointerOut, intersectEnter, intersectExit, everyFrame, keyDown, keyUp), give intersect triggers an other node, pass the pick option before feeding pointer events, give times in seconds of 0 or more, and create a new ActionManager or ActionSystem after dispose.',
+  },
+  {
     id: 'sky',
     title: '@margoengine/sky: physical planet atmosphere',
     kind: 'family',

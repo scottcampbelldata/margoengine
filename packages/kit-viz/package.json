@@ -1991,6 +1991,10 @@
       "types": "./dist/selection/highlight.d.ts",
       "import": "./dist/selection/highlight.js"
     },
+    "./selection/actions": {
+      "types": "./dist/selection/actions.d.ts",
+      "import": "./dist/selection/actions.js"
+    },
     "./splats": {
       "types": "./dist/splats.d.ts",
       "import": "./dist/splats.js"

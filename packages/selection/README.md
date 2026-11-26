@@ -470,3 +470,41 @@ page, test command and measured integration boundaries.
 ## Film time
 
 `XRaySelection` moves its pulse clock in the frame update with `advanceTime(delta)` (manual `time` holds), so `seek` from `@margoengine/cutscene/seek` starts a film scene on the pulse a continuous run shows.
+
+## Declarative actions (`margoengine/selection/actions`)
+
+A trigger-to-action layer over picking, in the style of Babylon.js's ActionManager (public docs only). Register what should happen when a node is picked, hovered, touched by another node, or a key goes down, and chain the steps with `then()`. It has no GPU code: you give it a pick function and feed it events, so it works with `Picking`, `Raycaster` or anything that answers "which node is here".
+
+Triggers: `pick`, `doublePick`, `longPick` (`{ type: 'longPick', delay }`, default 0.5 s), `pickDown`, `pickUp`, `pointerOver`, `pointerOut`, `intersectEnter` / `intersectExit` (`{ type, other }`, world AABB overlap, touching counts), `everyFrame`, `keyDown` / `keyUp` (`{ type, key }`, one key or a list; no key matches all; `event.repeat` is ignored). Actions: `setValue`, `increment`, `interpolate` (a number or a vector, optional easing), `wait`, `play` / `stop` (any object with those methods), `run(callback)`. A condition (`when(target, 'on', '==', true)` or your own function) guards a link; a false condition ends that firing. All times are seconds.
+
+```ts
+import { ActionSystem, run, setValue, interpolate, when } from 'margoengine/selection/actions';
+
+type Node = { name: string; box: { min: number[]; max: number[] } };
+const door: Node = { name: 'door', box: { min: [0, 0, 0], max: [1, 2, 0.2] } };
+const player: Node = { name: 'player', box: { min: [5, 0, 0], max: [6, 2, 1] } };
+const lamp = { intensity: 0, open: false };
+let under: Node | null = door;
+
+const system = new ActionSystem<Node>({ pick: () => under, bounds: (n) => n.box });
+const door$ = system.manager(door);
+// pick: tween the lamp on, then log, then mark open. Each link waits for the one before.
+door$
+  .registerAction('pick', interpolate(lamp, 'intensity', 1, 0.5), when(lamp, 'open', '==', false))
+  .then(run(() => console.log('lamp on')))
+  .then(setValue(lamp, 'open', true));
+door$.registerAction({ type: 'intersectEnter', other: player }, run(() => console.log('player at the door')));
+door$.registerAction({ type: 'keyDown', key: 'e' }, setValue(lamp, 'open', false));
+
+system.pointerDown({ x: 10, y: 10 });
+system.pointerUp({ x: 10, y: 10 });
+player.box = { min: [0.5, 0, 0], max: [1.5, 2, 1] };
+for (let frame = 0; frame < 40; frame++) system.update(1 / 60); // once per frame in an app
+console.log(lamp.intensity, lamp.open); // 1 true
+system.keyDown({ key: 'e' });
+system.dispose();
+```
+
+`registerAction(trigger, action, condition?, mode?)` returns the chain; pass `'step'` as `mode` to run one link per firing (on, off, on, ...) instead of all of them. `ActionManager` also works alone: `new ActionManager(node)`, then `fire(type)` and `update(dt)`. `ActionSystem.pointerDown/pointerUp/pointerMove/pointerLeave` take canvas CSS pixels, so pass a DOM `PointerEvent`'s `offsetX/offsetY` as `x/y`. Disposal (`dispose()` or `using`) drops every registration and running chain. Pick is synchronous: for the asynchronous GPU `Picking`, resolve the node first and hand the result to your pick function.
+
+Sources: W3C, Pointer Events Level 3 (2023), https://www.w3.org/TR/pointerevents3/ for the down, up, move, over/out and click ordering; Babylon.js documentation, "How to use Actions" (https://doc.babylonjs.com/features/featuresDeepDive/events/actions) for the trigger and chained-action vocabulary; the ECA (event-condition-action) rule model of active databases, Dayal et al., "The HiPAC Project", SIGMOD Record 17(1), 1988.

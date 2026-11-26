@@ -45,6 +45,10 @@
     "./highlight": {
       "types": "./dist/highlight.d.ts",
       "import": "./dist/highlight.js"
+    },
+    "./actions": {
+      "types": "./dist/actions.d.ts",
+      "import": "./dist/actions.js"
     }
   },
   "files": [
