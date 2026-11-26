@@ -13491,6 +13491,25 @@ Research compared:
   mode is Margo's: the median is one of the samples, unchanged by the nonlinear depth encoding, and lies on the surface
   covering most of the footprint.
 
+## Render graph (2026-11-26)
+
+`@margoengine/post/render-graph` `RenderGraph`. Feature names were compared with the public documentation pages of
+Babylon.js Frame Graph and Node Render Graph (https://doc.babylonjs.com, "Frame Graph" section); no source of it was
+read. The JSON shape, slot types, `name@previous` history reads, effect tasks over the PostStack protocol and the
+error codes are Margo's.
+
+Research compared:
+- Yuriy O'Donnell, *FrameGraph: Extensible Rendering Architecture in Frostbite*, GDC 2017,
+  https://www.gdcvault.com/play/1024612/FrameGraph-Extensible-Rendering-Architecture-in (setup, compile and execute
+  phases; transient resources declared by passes and aliased by lifetime).
+- Graham Wihlidal, *Halcyon: Rapid Innovation using Modern Graphics*, Reboot Develop 2019 (a render graph with
+  automatic resource transitions and transient aliasing).
+- Arthur B. Kahn, *Topological Sorting of Large Networks*, CACM 5(11), 1962, https://doi.org/10.1145/368996.369025
+  (the build order and cycle detection).
+- Massimiliano Poletto and Vivek Sarkar, *Linear Scan Register Allocation*, ACM TOPLAS 21(5), 1999,
+  https://doi.org/10.1145/330249.330250 (lifetimes assigned in order to a free list of physical slots, as transient
+  textures are here).
+
 ## Trail texture (2026-11-26)
 
 `@margoengine/post/trail` `TrailTexture`. Feature names and options were compared with the public documentation of

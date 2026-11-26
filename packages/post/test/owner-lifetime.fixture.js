@@ -27,6 +27,7 @@ const entries = {
   outline: ['Outline'],
   overlays: ['Ramp', 'Grid', 'DepthView', 'TextureOverlay'],
   pixelate: ['Pixelate'],
+  'render-graph': ['RenderGraph'],
   smaa: ['SMAA'],
   ssao: ['SSAO'],
   ssgi: ['SSGI'],
@@ -43,6 +44,7 @@ const entries = {
 const required = {
   LUT1D: { lut: { data: [0, 0, 0, 1, 1, 1] } },
   MotionBlur: { velocity: () => undefined },
+  RenderGraph: { version: 1, tasks: [{ name: 'x', type: 'clear', outputs: { target: 'screen' } }] },
   SceneTargets: { outputs: { albedo: 'albedo', normal: 'normal' } },
   SelectiveBloom: { mask: () => undefined },
   TextureOverlay: { source: () => undefined },

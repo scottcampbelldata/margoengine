@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20282896,
+  "total": 20290900,
   "history": [
     {
       "date": "2026-10-24",
@@ -13005,6 +13005,12 @@
       "commit": "SEA-11 slamming",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: slamming: each station's table from the mesh's sections (the half-breadth by height, Wagner's wetted width by bisection, the added mass's slope) and the impact while a section enters; measured gzip (Mac build) 17233 B, was 16459; without it a hull's bow takes no impact as it comes down into a wave, and a split would load one hull solve from two entries. Budget (measured + max(3%, 256 B)): 16953 to 17750 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "render-graph",
+      "reason": "New optional post entry, 0 to 7,748 B gzip: render-graph (RenderGraph, a data-driven serializable pass graph with validation, topological build, transient aliasing, history textures and post effect tasks). Its own entry, loaded only when imported. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13929,6 +13935,7 @@
     "@margoengine/post/outline": 7282,
     "@margoengine/post/overlays": 11210,
     "@margoengine/post/pixelate": 10491,
+    "@margoengine/post/render-graph": 8004,
     "@margoengine/post/rt-gi": 16063,
     "@margoengine/post/rt-reflections": 16677,
     "@margoengine/post/scene-fade": 3074,
