@@ -629,6 +629,40 @@ export class PhysicsJoint {
       ? this.clearMotor()
       : this.drive(axis, { targetVelocity: 0, damping: 1e6, model: 'force', maxForce });
   }
+  /**
+   * The rotor inertia on a joint's axis, kg m² for a turn and kg for a slide (MuJoCo's armature: a motor's rotor and gearbox as
+   * the joint feels them, the rotor's own inertia times the gear ratio squared). It adds to its coordinate's diagonal of the
+   * tree's joint-space mass matrix, so it acts while the joint is part of a multibody (`physics.addMultibody`), and
+   * `multibody.massMatrix()` counts it. With no `dof` it is the axis of a hinge or a slider, or all three turns of a ball
+   * joint; a generic joint names its free axis. Default 0.
+   * @throws RangeError for a value below 0 or not finite; TypeError for a joint or axis with no free motion to load.
+   */
+  setArmature(inertia: number, dof?: JointDof): this {
+    if (!(inertia >= 0) || !Number.isFinite(inertia))
+      throw new RangeError(
+        'Joint armature must be a finite number of at least 0; pass kg m² for a turn or kg for a slide.',
+      );
+    const columns = this.owner.kernel.columns as never as Record<string, Float32Array>;
+    for (const axis of this.armatureAxes(dof)) columns[`jointArmature${axis}`]![this.row] = inertia;
+    this.wake();
+    return this;
+  }
+  /** The rotor inertia on an axis, as {@link PhysicsJoint.setArmature} names it. */
+  armature(dof?: JointDof): number {
+    const columns = this.owner.kernel.columns as never as Record<string, Float32Array>;
+    return columns[`jointArmature${this.armatureAxes(dof)[0]}`]![this.row]!;
+  }
+  private armatureAxes(dof?: JointDof): number[] {
+    if (this.removed) throw new MargoError('state', 'Joint was removed; create a new one with physics.addJoint.');
+    if (this.type === 'spherical') {
+      if (dof === undefined) return [TURN, TURN + 1, TURN + 2];
+      const axis = DOFS.indexOf(dof);
+      if (axis < TURN) throw new TypeError(`A ball joint turns only; name angX, angY or angZ (got ${String(dof)}).`);
+      return [axis];
+    }
+    if (dof === undefined) return [this.unit()];
+    return [this.free(dof)];
+  }
   /** Generic joints: keeps one free axis between `min` and `max`, in radians or units, from frame A to frame B. */
   setAxisLimits(dof: JointDof, min: number, max: number): this {
     const axis = this.free(dof);

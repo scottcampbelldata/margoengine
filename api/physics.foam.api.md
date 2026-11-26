@@ -1085,6 +1085,8 @@ class PhysicsJoint {
     setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
     setDamping(coefficient: number): this;
     setFriction(maxForce: number): this;
+    setArmature(inertia: number, dof?: JointDof): this;
+    armature(dof?: JointDof): number;
     setAxisLimits(dof: JointDof, min: number, max: number): this;
     setAxisMotor(dof: JointDof, motor: MotorOptions): this;
     clearMotor(): this;

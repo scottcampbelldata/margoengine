@@ -11,10 +11,16 @@
 // Jacobian of a link's centre of mass and M its mass and inertia, built from the same Jacobians; forward dynamics solves
 // H qdd = tau - bias, with bias the torques of inverse dynamics at zero acceleration (Featherstone, section 6.1). The root is the
 // frame of the tree: its own motion is not a coordinate, so the tree is treated as hanging from a root that does not accelerate.
+//
+// A joint's armature, the rotor inertia a motor and gearbox load its axis with, adds to its coordinate's diagonal of H and so to
+// its torque by a qdd (Featherstone 2008, section 9.7; MuJoCo's armature, Todorov, Erez and Tassa, "MuJoCo: A physics engine for
+// model-based control", IROS 2012). The augmented mass matrix adds what an implicit step of length h adds for each force motor
+// on an axis, h c + h^2 k for its damping c and stiffness k: the matrix a step's joint speeds are solved against (Baraff and
+// Witkin, "Large steps in cloth simulation", SIGGRAPH 1998, eq. 18, for a spring and damper taken implicitly).
 import { multiplyQuaternions, rotateByQuaternion } from '@margoengine/math/quat';
 import type { Vec3 } from './math.js';
 import type { PhysicsBody } from './body.js';
-import type { KernelWorld } from './kernel.js';
+import { JOINT_MOTOR_FORCE, JOINT_MOTOR_ON, type KernelWorld } from './kernel.js';
 import { describe, poseOf } from './kinematics.js';
 import type { Multibody } from './multibody.js';
 
@@ -50,8 +56,8 @@ interface Tree {
   parent: number[];
   /** The point of its parent a link is joined at. */
   joint: V[];
-  /** Per link: its coordinates, each with a world axis and whether it is a turn. */
-  coords: { axis: V; turn: boolean; index: number }[][];
+  /** Per link: its coordinates, each with a world axis, whether it is a turn, and its joint's row and axis (0 to 5). */
+  coords: { axis: V; turn: boolean; index: number; row: number; k: number }[][];
   count: number;
 }
 
@@ -104,8 +110,10 @@ function read(kernel: KernelWorld, multibody: Multibody): Tree {
     tree.parent.push(link.parent);
     tree.joint.push(add(parent.p, qrot(parent.q, link.anchorA)));
     tree.pivot.push(add(body.p, qrot(body.q, link.anchorB)));
-    for (const k of link.linear) list.push({ axis: qrot(frame, unit[k]!), turn: false, index: tree.count++ });
-    for (const k of link.angular) list.push({ axis: qrot(frame, unit[k]!), turn: true, index: tree.count++ });
+    for (const k of link.linear)
+      list.push({ axis: qrot(frame, unit[k]!), turn: false, index: tree.count++, row: link.row, k });
+    for (const k of link.angular)
+      list.push({ axis: qrot(frame, unit[k]!), turn: true, index: tree.count++, row: link.row, k: k + 3 });
     tree.coords.push(list);
   }
   return tree;
@@ -162,10 +170,21 @@ function cholesky(a: number[][], b: number[]): number[] {
   return x;
 }
 
-/** The joint-space mass matrix, dof by dof (symmetric positive definite). */
+/** Each coordinate's armature, in the order of the coordinates. */
+function armatures(kernel: KernelWorld, tree: Tree): number[] {
+  const columns = kernel.columns as never as Record<string, Float32Array>,
+    out = new Array<number>(tree.count).fill(0);
+  for (const list of tree.coords) for (const c of list) out[c.index] = columns[`jointArmature${c.k}`]![c.row]!;
+  return out;
+}
+
+/** The joint-space mass matrix, dof by dof (symmetric positive definite), the joints' armature on its diagonal. */
 export function massMatrix(kernel: KernelWorld, multibody: Multibody): number[][] {
-  const tree = read(kernel, multibody),
-    h = Array.from({ length: tree.count }, () => new Array<number>(tree.count).fill(0));
+  return massOf(kernel, read(kernel, multibody));
+}
+
+function massOf(kernel: KernelWorld, tree: Tree): number[][] {
+  const h = Array.from({ length: tree.count }, () => new Array<number>(tree.count).fill(0));
   for (let b = 1; b < tree.parent.length; b++) {
     const j = jacobianOf(tree, b, tree.centre[b]!);
     for (let r = 0; r < tree.count; r++) {
@@ -179,7 +198,46 @@ export function massMatrix(kernel: KernelWorld, multibody: Multibody): number[][
       }
     }
   }
+  armatures(kernel, tree).forEach((a, i) => {
+    h[i]![i]! += a;
+  });
   return h;
+}
+
+/**
+ * The augmented mass matrix of a step of `dt` seconds: the mass matrix with h c + h^2 k on the diagonal of each coordinate whose
+ * axis has a force motor of damping c and stiffness k (`setDamping`, `setFriction` before its cap binds, a `motor` with `model:
+ * 'force'`). An `acceleration` motor scales with the link's own mass along its axis and is left out.
+ */
+export function augmentedMassMatrix(kernel: KernelWorld, multibody: Multibody, dt: number): number[][] {
+  const tree = read(kernel, multibody),
+    h = massOf(kernel, tree),
+    c = kernel.columns as never as Record<string, Float32Array | Uint32Array>,
+    flags = c['jointFlags']!;
+  for (const list of tree.coords)
+    for (const coord of list) {
+      const on = JOINT_MOTOR_ON << coord.k,
+        force = JOINT_MOTOR_FORCE << coord.k,
+        f = flags[coord.row]!;
+      if ((f & on) === 0 || (f & force) === 0) continue;
+      const damping = c[`jointDamping${coord.k}`]![coord.row]!,
+        stiffness = c[`jointStiffness${coord.k}`]![coord.row]!;
+      h[coord.index]![coord.index]! += dt * (damping + dt * stiffness);
+    }
+  return h;
+}
+
+/** The inverse of a symmetric positive definite matrix, column by column through its Cholesky factor. */
+export function inverseOf(a: number[][]): number[][] {
+  const n = a.length,
+    out = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (let col = 0; col < n; col++) {
+    const e = new Array<number>(n).fill(0);
+    e[col] = 1;
+    const x = cholesky(a, e);
+    for (let row = 0; row < n; row++) out[row]![col] = x[row]!;
+  }
+  return out;
 }
 
 /** The Jacobian of a point of a link (in the link's frame): six rows (the point's velocity, then the link's spin) by dof columns. */
@@ -262,6 +320,9 @@ export function inverseDynamics(
         j[4]![c]! * torque[b]![1] +
         j[5]![c]! * torque[b]![2];
   }
+  armatures(kernel, tree).forEach((a, i) => {
+    tau[i]! += a * qdd[i]!;
+  });
   return tau;
 }
 

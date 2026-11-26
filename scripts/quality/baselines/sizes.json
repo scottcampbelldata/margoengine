@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20585993,
+  "total": 20638951,
   "history": [
     {
       "date": "2026-10-24",
@@ -14095,6 +14095,12 @@
       "commit": "14c38f2af5",
       "grew": 1,
       "reason": "SEA-15 oil emulsification moves physics/tracers from 15886 to 16474 B gzip. The optional ceiling rises from 16373 to 16969 B. The water state shares the existing parcel mass, evaporation, droplet and replay paths. A separate solver would require another field for every slick's component transfer and duplicate oil ownership."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "J-24",
+      "grew": 2,
+      "reason": "Joint armature in the multibody projection (J-24): six armature and six rotor columns a joint, the rotor term in the backward and outward passes, and the spin read at the step's start, on top of the multibody springs landed the same day. Measured gzip: @margoengine/physics 890,040 B (budget 889,499), its lazy kernel blueprint 797,402 B (budget 795,608). The term lives in the kernel's one multibody solve; a separate kernel would duplicate the solver. Budgets (measured + max(3%, 256 B)): 916,741 and 821,324 B. Core plus stage unchanged."
     }
   ],
   "items": {
@@ -14913,9 +14919,9 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 889499,
+    "@margoengine/physics": 916741,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 95086,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 821324,
     "@margoengine/physics/accretion": 5366,
     "@margoengine/physics/aeolian": 5256,
     "@margoengine/physics/ageing": 4384,

@@ -1053,6 +1053,9 @@ class Multibody {
     velocities(): number[];
     inverseKinematics(link: PhysicsBody, target: IkTarget, options?: IkOptions): IkResult;
     massMatrix(): number[][];
+    augmentedMassMatrix(h: number): number[][];
+    inverseMassMatrix(h?: number): number[][];
+    dofInverseInertia(h?: number): number[];
     jacobian(link: PhysicsBody, point?: Vec3): number[][];
     inverseDynamics(accelerations?: readonly number[], options?: {
         gravity?: Vec3;
@@ -1552,6 +1555,8 @@ class PhysicsJoint {
     setRotationMotor(rotation: Quat, motor?: RotationMotorOptions): this;
     setDamping(coefficient: number): this;
     setFriction(maxForce: number): this;
+    setArmature(inertia: number, dof?: JointDof): this;
+    armature(dof?: JointDof): number;
     setAxisLimits(dof: JointDof, min: number, max: number): this;
     setAxisMotor(dof: JointDof, motor: MotorOptions): this;
     clearMotor(): this;
