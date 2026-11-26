@@ -697,6 +697,203 @@ None is checked against a measurement. The Lake Superior test bounds the tilt on
    - no `water.sample` call per cell;
    - a directable target, for example a surge height at a place and time.
 
+## Pass 3, 2026-11-26 (`main` from 71e757b1f)
+
+Codex reported its solvers upgraded while the queue still showed them REOPENED or BUILDING, so this pass judges the code on `main`, not the status. Each film row's audit list (its film-table line, its detail row and its known-bugs bullets) was numbered and each item checked against the code and an opened test; the row's CPU tests were run under `scripts/run-with-timeout.mjs`. A row still marked BUILDING keeps that status, with its findings here.
+
+### SEA-08 Ship seakeeping (`@margoengine/physics/seakeeping`, 22 commits since the audit, c002e262b to 7406d8ff5, on top of the earlier landed set), owner Codex: not VERIFIED, status left BUILDING
+
+**Checked.** Read packages/physics/src/seakeeping (solver, course, excitation, bilge-keel, bilge-pressure, panel-surge, wave-reflection, memory, radiation, strips, viscous), the coupling tests and docs/limits.md line 1699. Ran under `scripts/run-with-timeout.mjs --max=15`: `node --test` on tests/seakeeping.test.js, tests/coupling/seakeeping.test.js, tests/coupling/kvlcc2-long-wave.test.js and tests/next-hull.test.js: 64 tests, 64 pass, 0 fail (235 s). No GPU or browser test exists for the hull solver (none in package.json, no hull browser fixture), so none run. The first attempt hit a dist chunk missing while another process rebuilt dist; the rerun was clean.
+
+**Validation.**
+- coupling/seakeeping.test.js "short-wave reflection agrees with held-out KVLCC2 short head-wave resistance": measured (Park, Lee and Kim 2014, Table 12, 16 tank runs, lambda/L 0.5), bound = the published expanded 95 percent uncertainty (2.932 ± 0.4643). Not fitted.
+- kvlcc2-long-wave.test.js, both tests: measured tank runs (Park et al. 2014; lambda/L 2 and 1.1), resistance, heave, pitch each within the published expanded uncertainty (for example heave 0.73 ± 0.0371, got 0.7555; pitch 0.5521 ± 0.0416, got 0.5876). Measured, held out. Close to the edge of the bounds.
+- "reproduces held-out Irkal BK10 roll damping at two step sizes": measured (Irkal et al. 2016 Table 6), damping 0.077 ± 0.00203 (one standard deviation over four runs). Measured. The period is about 6 percent short (1.124 s against 1.196 s) and is not asserted.
+- Jung, Chang and Jo box roll decay: measured, decay within 12 percent; 7.7 percent low (documented).
+- Heave, sway, roll and pitch against frequency-domain strip theory (1 to 4 percent): self-consistent, not independent measurement. Wigley waterline (Kajitani 1983) is recorded as a residual: the wake gives about 31 mm against 64 to 78 mm measured. It is not a passing test, so the bow wave is unvalidated.
+
+**Fails points** 1, 3, 4, 5, 6, 7 (point 2 is partly met; 8 fails, see 14).
+
+**Audit list.**
+1. Forward-speed strip terms (Salvesen, Tuck and Faltinsen) — PARTIAL. Heave, pitch and roll-lift terms are built (test "forward speed follows both heave-pitch cross terms"); sway and yaw speed terms are absent.
+2. Deck motion for loose props and cabins — PARTIAL. "forward-course deck contact agrees with a rotating-plane Coulomb calculation" proves the engine path. Production cabin binding is still open (demo-review EF-3).
+3. Radiated waves to SEA-04 — DONE ("wake source" tests, "wake pressure returns its own wave-making resistance"). The bow-wave elevation is 2 to 3 times too small against Wigley.
+4. Surge added mass — PARTIAL. `panel-surge.ts`; the test checks convergence on a hemisphere only.
+5. Three-dimensional panel impulse responses (Newman; NEMOH) — NOT DONE. The radiation is still two-dimensional strips.
+6. Validate against Journée Wigley experiments — NOT DONE as a passing test (residual only).
+7. ITTC S175 benchmark — NOT DONE. KVLCC2 tank runs stand in; there is no S175 case.
+8. Ikeda bilge-keel roll data — PARTIAL. Irkal BK10 passes; Ikeda 1978 is not used and the period is off.
+9. Added resistance in head seas — DONE for short and long waves (KVLCC2 tests).
+10. Finite depth — NOT DONE for radiation (deep-water strips, limits.md).
+11. Feeds SEA-14 / ICE-04 / BREAK-03 — DONE (`effectsOnly` launch; pack-ice, crush and shell-flood coupling tests exist).
+12. Roll axis clamp 0.95 d and Lewis-form clamp — NOT DONE (viscous.ts:22-27 and the Lewis border clamp remain).
+13. Rival match (WAMIT) — NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Build 3-D panel radiation and diffraction (Newman 1985; Babarit and Delhommeau 2015) in place of 2-D strips, with finite depth, and add sway and yaw speed terms.
+2. Add passing tests against the Journée Wigley and ITTC S175 measurements; bring the Wigley bow wave within its measured band (Kajitani 1983, Table I) and the bilge-keel period within Irkal's 1.196 s.
+3. Remove the clamps (viscous.ts:22-27, the Lewis border) or replace them with a method valid across the range (Ikeda 1978 roll prediction).
+4. Fix docs/limits.md line 1699: it still says bilge keels do not damp roll, surge added mass and forward-speed corrections are open, and the "Floating bodies..." column says "Bilge keels do not damp a hull's roll yet". These contradict the code.
+5. Add the hull solver to a browser/GPU render fixture, and show a measured scaling record (no Wasm, threads or work counts exist for this solver, so point 6 is unmet).
+6. Bind the production cabin shots (EF-3, EF-10) and re-render.
+
+### SEA-09 Ships under way, manoeuvring (`@margoengine/physics/ship`, commits ebfc65dbb, 3c2f57931, 7fc896c99, 663671e17, f4c07368e), owner Codex: REOPENED
+
+**Checked.** Read packages/physics/src/ship (solver, mmg, empirical, race, propeller, resistance, squat; 2,361 lines), packages/physics/tests/ship.test.js and packages/physics/tests/coupling/ship.test.js, the catalog row, the audit row and notes, and KB-SHIP-DAMP1. Ran `node --test packages/physics/tests/ship.test.js` under run-with-timeout: 18 tests, 18 pass, on packages built from current main (a first run during a rebuild failed the SEA-15 jet test; it passes on the fresh build). `tests/coupling/ship.test.js`: 2 pass. There is no browser or GPU test for this entry.
+
+**Validation.**
+- Holtrop and Mennen worked example (ship.test.js:42): published printed figures (1,793.26 kN, 0.1 percent); an exact reproduction of a published example. Valid check of the code.
+- KVLCC2 turning and zig-zag (:129): Yasukawa and Yoshimura's simulation tables, not measurements. Bounds are 7 and 10 percent, set by hand rather than derived. The parameters are the paper's own, so this is self-consistent with the source.
+- Squat (:209): published canal case, exact to ICORELS and Huuska formulas (formula against formula).
+- Empirical hull (:582): Kijima's KVLCC2 terms to 1e-4 (hand-checked formulas). The turn is within 30 percent of MARIN free-running KVLCC2 (3.25 L, 3.34 L). This is the only independent measurement, and the bound is arbitrary and loose. No SIMMAN data beyond KVLCC2, no second hull.
+- Race circulation (:485): Pennings propeller within 6 percent; cavitation (:555) Pennings wing 2.97 and Amini hysteresis. These are measurements, but they check the vortex model, not the ship.
+- The squat-through-HullSolver check keeps an arbitrary 15 percent bound (:381). The quay pull (solver.ts:549) is uncalibrated.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (point 8 is mostly honest in docs/limits.md).
+
+**Audit list.**
+1. Race and rudder jet as a velocity field with cavitation and aeration sources for SEA-13 and SEA-15 — DONE (race.ts; tests :485, :524, :555, :651). Hand-fit constants remain (Lamb-Oseen fade 0.8 to 1.5 D, 0.02 D core).
+2. Empirical derivatives for other hulls, Kijima 1990 — DONE for the formulas (:582). The Great Lakes freighter is flagged as out of range and has no validation.
+3. 4-DOF MMG with heel (Yasukawa 2019) — NOT DONE (3 DOF only).
+4. Shallow-water derivatives, Kijima and Nakiri 2003 — NOT DONE.
+5. Manoeuvring in waves, Skejic and Faltinsen — NOT DONE.
+6. Savitsky 1964 planing — NOT DONE.
+7. Sailing hull, heel, leeway, keel lift, VPP (Kerwin 1978), AERO-02 sail coupling — NOT DONE.
+8. Oars (Caplan and Gardner) — NOT DONE.
+9. Wageningen B-series (Bernitsas 1981) — NOT DONE (quadratic curves, constant-based four quadrants).
+10. `holtropMennen` wired into the solver — NOT DONE (grep finds no use in solver.ts).
+11. Autopilot and track targets — NOT DONE.
+12. ICE-04 coupling — NOT DONE.
+13. Validation against SIMMAN 2008 free-running data and Lataire bank-effect data — PARTIAL (one MARIN turn, 30 percent; no bank data).
+14. Red flags: thruster merit 0.55 (solver.ts:54, calibration), squat speed cap 0.69 (:440, now documented as a cap), shaft depth d − 0.6D (:450), quay pull 0.98, 0.6 L (:549-552) — NOT DONE as validated (only documented as calibrations).
+15. Sway and yaw damping counted twice with HullSolver — DONE (KB-SHIP-DAMP1, "a HullSolver on a ship leaves the surge, sway and yaw the ship claims", :415).
+16. Rust/Wasm kernel — NOT DONE.
+17. Coded errors (MargoError) — NOT DONE: the solver throws plain TypeError and RangeError (solver.ts:198-209).
+
+**To do before it can be VERIFIED:**
+1. Build the 4-DOF MMG with heel, the sailing hull (VPP, leeway, keel lift, AERO-02 sail), oars and planing named in the catalog row.
+2. Add shallow-water derivatives (Kijima and Nakiri 2003) and bank effect validated against Lataire's data.
+3. Validate against SIMMAN 2008 free-running KVLCC2, KCS and a second hull, with bounds derived from the data's spread, not 30 percent or 15 percent.
+4. Replace the quadratic open-water curves with Wageningen B-series and real four-quadrant data.
+5. Wire `holtropMennen` into the solver, and add autopilot and track targets.
+6. Throw MargoError with a help link and fix instead of TypeError and RangeError.
+7. Add a Rust/Wasm path or recorded work counts, and ICE-04 and AERO-02 coupling tests.
+8. Replace the thruster, shaft depth and quay constants with cited values.
+
+### SEA-10 Damage, flooding, capsize, sinking (`@margoengine/physics/seakeeping`, `Flooding` in `packages/physics/src/seakeeping/flooding.ts`, commits 533cc7249, 785aea704, 8fb5ed774, a0325f916, 24e67d6ff, f82be85af), owner Codex: REOPENED
+
+**Checked.** Read flooding.ts (946 lines), flooding.test.js, coupling/breaches.test.js, coupling/crush-shell-flood.test.js and the flooding tests in coupling/seakeeping.test.js. Ran everything under run-with-timeout. flooding.test.js passed 9 of 9. breaches.test.js passed 5 of 5. crush-shell-flood.test.js passed 3 of 3. The three files together passed 17 of 17 on a second run. The first combined run failed once, with a `code: 'state'` error at breaches.test.js:190 and a failed crush-shell-flood.test.js. I did not find the cause, so treat it as an intermittent failure to chase. In seakeeping.test.js the 7 flood, hole, sink and heel tests passed 7 of 7. No GPU or browser test exists for this row.
+
+**Validation.**
+- Torricelli filling: exact solution, with a derived first-order step bound (under 1e-3 m).
+- 2/3 weir law: exact, to 1e-12.
+- Boyle air pocket: exact, to 1e-9.
+- Two-compartment water conservation: exact, to 1e-6.
+- `volumeBelow` cube cut: exact, to 1e-14.
+- "Barge holed in a wing tank" (seakeeping.test.js:2407): equals the lost-buoyancy statics (Biran) within 1e-3 degrees. It is a good independent check, but it is a hydrostatic identity and not a measurement.
+- "A box going down" (seakeeping.test.js:2485): checks terminal speed against the code's own formula, v = sqrt(2(m - rho V)g/(rho C A)) with C = 1.05, to 0.1 percent. The reference comes from the same formula the code uses.
+- Beverloo and Wilson outflow: re-checks the code's own formula.
+- Still missing: a published measured flooding or capsize test. No test mentions Ruponen 2007 or the ITTC damaged-ship benchmark (Papanikolaou 2000). The only measured reference near this row is Jung, Chang and Jo's box roll (a SEA-08 test).
+
+**Fails points** 2, 3, 6, 7 (and 5, because errors are not coded).
+
+**Audit list.**
+1. Drag on a sinking hull (KB-SEA-SINKDRAG1, Hoerner 1965) — PARTIAL. Built in the hull solver, and the test above passes. Its reference is self-consistent. The drag coefficient is fixed at 1.05, and there is no measured sinking-speed comparison.
+2. Wire `hullBreaches` to SEA-13 bubbles and SEA-15 tracers — DONE. breaches.test.js "a holed hull lets its air bubble up…" passes, with losses accounted.
+3. Silent unconverged 200-sweep loop — DONE. `FloodResult.sweeps` is reported (flooding.ts:137,749,806), and the test "a vented box filling through a hole" covers it. The result is reported but not raised as an error.
+4. Iron-ore grain default versus taconite 0.012 m — PARTIAL. Only the comment changed. The default stays 1e-4 m.
+5. 48-level volume table rebuilt at every pose — NOT DONE as far as I can see. Nothing in the code or the queue changes it.
+6. Shallow-water flow inside each compartment (Santos and Guedes Soares 2008; Ruponen 2013) — NOT DONE. Water is still a point mass with a level, so there is no sloshing.
+7. Validate against Ruponen 2007 and the ITTC damaged-ship benchmark — NOT DONE.
+8. Righting-arm (GZ) curves and IMO/SOLAS criteria — NOT DONE. No GZ code exists. Only the SOLAS permeability constants appear.
+9. Wave pressure and green water at openings — NOT DONE for openings.
+10. Settling on the bed — NOT DONE.
+11. Free-surface effect — DONE at the level of heel-following water, shown by the heeling-barge test.
+12. Rust/Wasm for the hot loop and floating-origin cells — NOT DONE.
+13. Coded `MargoError` — NOT DONE. flooding.ts throws bare `RangeError` and `TypeError` (about 20 sites, lines 372-458). There are zero `MargoError` uses in the file.
+14. Hull breakup and crush linkage — DONE. The crush-shell-flood tests pass.
+
+Totals: 4 DONE, 3 PARTIAL, 7 NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Add a validation test against a published measured flooding or capsize result: Ruponen 2007 box-barge progressive flooding, or the ITTC damaged-ship benchmark (Papanikolaou et al. 2000). Use a bound derived from the reported uncertainty.
+2. Add compartment shallow-water flow, or at least an inertial sloshing model (Santos and Guedes Soares 2008; Ruponen et al. 2013), with a transient flooding validation.
+3. Add GZ curves and the IMO/SOLAS stability criteria, checked against a worked textbook case (Biran and Lopez Pulido, 2014).
+4. Replace every bare `RangeError` and `TypeError` in flooding.ts:372-458 with a `MargoError` that names the fix. Raise a coded warning when the sweeps hit 200.
+5. Compare the sinking speed with a measured sinking or drop-test dataset. Take the coefficient C from the data, not a fixed 1.05.
+6. Cache the 48-level volume table, add a work count, and decide on a Rust/Wasm hot loop and floating-origin cells.
+7. Add the missing capsize and sinking cases: cargo shift, bed settling, and hatch or opening wave loading (green water).
+8. Find the cause of the intermittent first-run failure in breaches.test.js:190 and crush-shell-flood.test.js.
+
+### SEA-11 Wave impact: slamming, green water (`seakeeping` slamming, with green water in `seakeeping/deck.ts` and `flip/deck-water.ts`, commits d90933a42, 16a69851a; green water from d865c4c8f, fd2db65d5, 01f11c4d7), owner Codex: REOPENED
+
+**Checked.** Read `seakeeping/slamming.ts`, `slamLoad` in `seakeeping/solver.ts:1493-1540`, the commit's two tests, the clean-room entry and the limits row. No commit touches slamming after d90933a42. Ran `node --test packages/physics/tests/seakeeping.test.js packages/physics/tests/coupling/seakeeping.test.js` under run-with-timeout: 52 tests, 52 pass, 0 fail (a first run failed only because the built output was being rebuilt by someone else and a chunk was missing; the rerun was clean). No browser or GPU test exists for this row.
+
+**Validation.** (a) "a section's slamming table: Wagner's wetted width..." (`tests/seakeeping.test.js:419`): the table is checked against Wagner's closed-form wedge width and slope, within 0.1 and 0.2 percent. This is an exact solution of the theory the code implements, not a measurement. (b) "a wedge coming down into still water ... slams as Wagner says" (`tests/coupling/seakeeping.test.js`, end of file): the force equals rho pi^3 V^2 h L / (4 tan^2 beta) within 0.1 percent, and none past the chine. Again a self-consistency check against the same formula. The bound is a measured agreement (0.02 percent) rounded up, not a derived error bound. Green water: Ritter's dam break within 1.1 percent at 400 cells (exact solution, from the earlier work). Missing: any measured drop-test force or pressure (Zhao et al. 1996 wedge drops, Tveitnes et al. 2008, Zhou, De Kat and Buchner 1999 deck loads), any case not used to build the model, any regime check. The docs themselves admit Wagner is high at larger deadrise and that measured forces were not read.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (8 partly met: limits are honest about vertical sections only).
+
+**Audit list.**
+1. Pressure distribution on the hull (plating peaks) — NOT DONE (the limits row says "no water-pressure peaks").
+2. Von Karman and Wagner as two models, and Korobkin's generalised Wagner — NOT DONE in seakeeping (only Wagner's momentum form; a modified Logvinovich model exists only in `entry/slam.ts`, not wired into hulls).
+3. Flare and lateral slams — NOT DONE (force along body y only, `solver.ts:1529-1531`).
+4. Green-water impact on deck structures and hatch covers (Zhou, De Kat and Buchner 1999) — NOT DONE (no hatch or deck-structure load in `deck.ts` or `deck-water.ts`; green water loads only the deck by weight rho g h).
+5. Bulwarks — PARTIAL (a bulwark wall and overtopping inflow exist, `deck.ts:15`, `deck-water.ts:51`; no impact load on a bulwark).
+6. Whipping (hull girder response to slams) — NOT DONE.
+7. Slam spray output to SEA-13 — NOT DONE (no spray output in `slamLoad`).
+8. Quadratic damping applied to every section moving down, not only at impact; untested on a V-hull motion response — PARTIAL (the damping term is applied only while a section enters; no V-hull motion test).
+9. Validation against Zhao et al. 1996, Tveitnes et al. 2008, Zhou et al. 1999 — NOT DONE.
+10. Catalog row still names `ShipSplash` stand-in — NOT DONE (`docs/physics-solvers.md:112`).
+
+**To do before it can be VERIFIED:**
+1. Add generalised Wagner (Zhao, Faltinsen and Aarsnes 1996) or Korobkin's modified Logvinovich model to hulls, with a fast and a high-fidelity tier behind one option, and the pressure distribution.
+2. Validate on measured wedge drop forces (Zhao et al. 1996, Tveitnes et al. 2008) at several deadrise angles, including angles not used to set any value, with a bound derived from the measurement scatter.
+3. Add flare and lateral slams (force direction from the section's normal, not body y only), 3-D end effects (Scolan and Korobkin 2001).
+4. Build green-water loads on hatch covers and deck structures, validated on Zhou, De Kat and Buchner 1999; bulwark impact loads.
+5. Send slam spray to SEA-13 and add a coupling test; couple the slam to the hull's motion with a V-hull response test.
+6. Refuse bad inputs (non-closed mesh, bad density) with a coded error naming the fix; add scaling counts, film controls and the whipping response; fix the catalog row.
+
+### SEA-13 Whitewater, foam, bubbles, spray (`@margoengine/physics/foam`, commits e9007d3bb, 8fb5ed774, 0dddec890), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/foam/{index,breaking,spray,plume}.ts`, the foam, plume, breaches and FLIP tests, the catalog row, the audit rows and `docs/limits.md`. Commits since the audit: 8fb5ed774 (hull venting), 0dddec890 (FLIP air, foam and spray). Nothing else touched the foam source since e9007d3bb. Tests run under run-with-timeout, all green: `foam.test.js` 12/12, `coupling/foam.test.js` 2/2, `bubble-plume.test.js` 3/3, `coupling/breaches.test.js` 5/5, `flip.test.js` 12/12, `coupling/flip.test.js` 7/7. No GPU or browser test exists for this entry. I did not run `bubbles.test.js` or `coupling/airborne.test.js`; I only read the airborne test names.
+
+**Validation.**
+- "whitecap coverage ... within a factor of 1.5" (`foam.test.js:68`): the reference is Monahan and Woolf's measured law, W = 1.95e-5 U10^2.55, at 7, 10 and 13 m/s. The bound is an arbitrary 1.5. The model's kappa (Leckler 2013) was tuned on that same law, so the test is not independent. The 16 m/s point is left out; limits records 0.56 of the law there.
+- Stokes drift sigma k a^2 (`:85`): an exact solution, 1e-9.
+- Events against Leckler's law (`:103`) and the 0.16 active share: self-consistent, because the constants were set to give exactly this. The 10 percent bound is arbitrary.
+- Decay of 3.8 s and 2.5 s (`:128`) and Gong spray (`:311`): both re-derive the code's own constants and formulas. No measurement is used.
+- Plume tests: Morton, Taylor and Turner's pure plume far field is an exact solution at 1e-10. The surface current is checked only against its own conservation laws. Limits says Milgram and Burgess's measured speeds were not compared.
+- Missing: any measured foam or bubble data held out from calibration (Callaghan et al. 2008 whitecap coverage; Anguelova and Huq 2017 persistence; Trevorrow et al. 1994 wake data).
+
+**Fails points** 2, 3, 5, 6, 7 (7 partly), 8 partly.
+
+**Audit list.**
+1. Deane and Stokes 2002 bubble entrainment and plumes: PARTIAL. `bubbles/solver.ts:13,139` has their spectrum, but its sources are a ship's race, hull breaches and FLIP air. No breaking-wave source feeds bubbles. `foam/plume.ts` and the `bubble-plume.test.js` "pure plume" test cover hull venting only.
+2. Bubbles that rise, wobble, grow and drift in orbital flow: PARTIAL. This lives in `BubbleSolver`, which I did not run. Foam does not call it for sea breakers.
+3. Streaked foam and spray read from the live sea's breakers: DONE. `breaking.ts` reads the ST4 spectrum, and `foam.test.js:181` (shear stretches a patch into a streak, foam conserved) and `:311` (spray) pass.
+4. Andreas 1998 and spume: NOT DONE. Limits says the spume source waits for a source that settles it. Only film drops and bag breakup exist.
+5. Hull venting: DONE. `coupling/breaches.test.js` "a holed hull lets its air bubble up into a boil".
+6. Diffuse particles (Ihmsen 2012): PARTIAL. FLIP gives `aeration`, `foam` and `spray` (`flip.test.js:397`), but there are no whitewater particles with their own advection.
+7. Langmuir windrows imposed as a sinusoid: NOT DONE (`foam/index.ts:724`, still a sinusoid on the grid-centre wind).
+8. Ship wakes painted: NOT DONE. They are painted from length and beam only (limits: no hull shape or prop wash).
+9. A SEA-04 breaking read: NOT DONE. Wake breaking does not feed foam.
+10. Spray passed to ATMO-06: DONE. `coupling/airborne.test.js:74` "PA-21 and RITS-4".
+11. Uncited constants (`index.ts:608,633-650`): PARTIAL. Reed and Milgram and jet theory are now cited; the bow ramp 0.15 to 0.4 is not.
+12. `wakePersistence` of 150 s fitted from an acoustic measure: NOT DONE.
+13. Callaghan 2008 held-out validation: NOT DONE. The only measured comparison is the one the model was tuned on.
+14. Houdini-class whitewater rival: PARTIAL.
+
+Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Add a breaking-wave bubble source (Deane and Stokes 2002; Ma, Shi and Kirby 2011) feeding `BubbleSolver`, with a coupling test.
+2. Validate coverage against held-out measurements (Callaghan et al. 2008; Anguelova and Huq 2017) with bounds derived from their scatter. Fix the 16 m/s shortfall.
+3. Add the spume source (Andreas 1998; Fairall, Kepert and Holland 1994 from the original). Add a test against a measured spray flux, not the code's own formula.
+4. Replace the sinusoidal windrows with a Langmuir-cell model (Craik and Leibovich 1976), or document the sinusoid as an accepted difference.
+5. Read SEA-04 wake breaking and hull shape for ship foam. Cite or calibrate the remaining constants.
+6. Add whitewater particles for the FLIP tier (Ihmsen et al. 2012) and a Rust or Wasm kernel for large grids (about 5 ms a step for a 128 by 128 grid, in TypeScript).
+7. Replace the arbitrary 1.5 and 10 percent bounds with derived ones.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
