@@ -369,15 +369,18 @@ dependent or not orthogonal still throws (`Singular glTF matrix`, `Sheared matri
 `@margoengine/gltf/texture-coordinates` exports `textureCoordinates` and the `TextureTransform` type (also on the root)
 for material extensions that read texture coordinates without loading the renderer.
 
-The native volume tint estimates a slab through `thicknessFactor` in mesh units and
-converts the refracted path to world units before applying Beer-Lambert absorption.
+The native volume tint estimates a slab through `thicknessFactor` in mesh units, times the green channel of
+`thicknessTexture` where the material has one (KHR_materials_volume; the map binds slot 20 of the extended shader, so a
+transmissive material with a thickness map compiles that variant), and
+converts the refracted path to world units before applying Beer-Lambert absorption. A texel of 0 is a thin wall that
+absorbs nothing.
 Node scale, rotation, shear, reflection and `EXT_mesh_gpu_instancing` affect that path;
 `attenuationDistance` stays in world units. This path retains its scalar thickness
-approximation and display-space blend; the optional transmission installation supplies
-screen-space refraction and thickness textures. Default normal textures use exactly
+approximation per texel and display-space blend; the optional transmission installation supplies
+screen-space refraction. Default normal textures use exactly
 neutral half-float texels, including when a live shading hook retains fallback bindings.
 Run `npm run test:gpu:native-volume --workspace @margoengine/gltf` after the package
-build for 56 analytic slab pixels on each backend, including transmission animated from zero.
+build for 64 analytic slab pixels on each backend, including transmission animated from zero and a thickness map.
 
 #### Animate an opaque material into glass
 
@@ -590,9 +593,9 @@ With `extendedMaterials`, declaring the extension reserves the physical frame ev
 at 0. Chromatic refraction is visible through `@margoengine/materials/transmission`
 when transmission and volume thickness are positive. Dispersion alone does not
 reserve transmission. The factor remains live, and 0 preserves the existing
-refraction output. Native transmission uses scalar volume thickness; imported
-`KHR_materials_volume.thicknessTexture` is sampled by the explicit
-`@margoengine/materials` installation route.
+refraction output. Native transmission's volume tint reads
+`KHR_materials_volume.thicknessTexture` (green channel) with `thicknessFactor`; the explicit
+`@margoengine/materials` installation route samples it for refraction too.
 
 `loadGLTF(engine, url, {optimize: true})` runs the import step of `@margoengine/geometry/optimize` on each opaque primitive
 as it packs: the same triangles in the order the vertex cache and early depth test read fastest, with `BLEND` primitives

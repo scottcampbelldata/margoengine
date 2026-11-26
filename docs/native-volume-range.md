@@ -50,4 +50,12 @@ Reproduce after building packages: run the three named CPU test files with
 `node packages/gltf/scripts/test-native-volume.mjs`, and again with
 `--compat`.
 
+Thickness maps (KB4000, 2026-11-26): the native tint multiplies the optical depth by the green channel of
+`thicknessTexture`, since the KHR_materials_volume text above defines the thickness as `thicknessFactor` times that
+channel, in mesh units, and Beer-Lambert optical depth is linear in the path length (the Matricardi optical-depth
+sections above). A transmissive material with the map takes the extended shader, whose slot 20 binds it; a texel of 0
+is the extension's thin-walled case and absorbs nothing, black channels included. `native-volume-path.test.js` checks
+the scale in binary32 and the binding; the slab proof adds eight pixels (factor 2 and 200 with a texel of 128/255, both
+mirrors and instancing modes) that fail on the parent, on WebGPU and WebGL2 compatibility.
+
 Live attenuation updates (review5, 2026-11-10): parsed optical depth now invalidates when public attenuation changes, while animation updates both transmittance and authored depth. Progressive material copies preserve the derived accessor. See [live-volume-materials.md](live-volume-materials.md) for cache semantics, regression tests, additional exact slab cases and reproducible commands.

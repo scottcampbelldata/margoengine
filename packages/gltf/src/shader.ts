@@ -567,6 +567,8 @@ export function texturedTintPBR(code: string): string {
 export function surfaceTintPBR(code: string): string {
   let out = (
     texturedTintPBR(code) +
+    // A shader without a thickness map (slot 20, extendedShader) reads the thickness factor alone.
+    (code.includes('fn margoThickness(') ? '' : 'fn margoThickness(i:Out)->f32 {return 1.0;}') +
     `
 // thicknessFactor is in mesh units; attenuationDistance is in world units (KHR_materials_volume).
 // The native route estimates a slab. Transform its refracted ray into mesh space before crossing that slab.
@@ -577,7 +579,10 @@ fn margoVolumeTint(i:Out,s:Surface,m:mat3x3f)->vec3f {
   let determinant=abs(dot(m[0],c0));
   let normal=normalize(vec3f(dot(m[0],i.normal),dot(m[1],i.normal),dot(m[2],i.normal)));
   let projected=abs(dot(vec3f(dot(c0,ray),dot(c1,ray),dot(c2,ray)),normal));
-  let depth=vec3f(f.coordsB.zw,f.ext.z);
+  // thicknessTexture.g scales the optical depth (Beer-Lambert is linear in it); an opaque channel (-1) stays opaque where
+  // the map leaves any thickness, and a texel of 0 is a thin wall that attenuates nothing.
+  let raw=vec3f(f.coordsB.zw,f.ext.z); let scale=margoThickness(i);
+  let depth=select(vec3f(0),select(raw*scale,vec3f(-1),raw<vec3f(0)),scale>0.0);
   if(projected==0.0){return select(vec3f(0),vec3f(1),depth==vec3f(0));}
   return select(exp(-max(depth,vec3f(0))*(determinant/projected)),vec3f(0),depth<vec3f(0));
 }
@@ -993,6 +998,8 @@ ${plan.scatter ? scatterEdit(sampleOf) : ''}${plan.diffuseRoughness ? `  s.dr=ve
           '@fragment fn fragment(',
       ],
     ]) +
+    // KHR_materials_volume thickness map (G), 1 when unbound: the native volume tint's share of thicknessFactor.
+    `fn margoThickness(i:Out)->f32 {return ${sampleOf('thickness')}.g;}` +
     `fn margoTintFresnel(s:Surface,nv:f32)->vec3f {return ${
       plan.iridescence
         ? 'mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'
