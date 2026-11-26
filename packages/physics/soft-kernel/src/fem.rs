@@ -144,6 +144,8 @@ pub struct Fem {
     pub(crate) vertex_block: crate::vertex_block::VertexBlock,
     /// Optional immutable rest-space reinforcement (axis x/y/z and additional axial modulus).
     pub(crate) fiber: Col<[f32; 4]>,
+    /// Optional elastic chain material (locking stretch, transverse fraction, invariant spread).
+    pub(crate) rubber: Col<[f32; 3]>,
     /// Optional orthotropic axes and stiffness in the cell's rest coordinates.
     pub(crate) orthotropy: Col<[f32; 18]>,
     /// Orthotropic tension, compression and shear strengths and their nine filtered loads.
@@ -218,6 +220,7 @@ impl Fem {
             imp: crate::implicit::Implicit::new(),
             vertex_block: crate::vertex_block::VertexBlock::new(),
             fiber: Col::new(),
+            rubber: Col::new(),
             orthotropy: Col::new(),
             orthotropic_failure: Col::new(),
             crack_band: Col::new(),

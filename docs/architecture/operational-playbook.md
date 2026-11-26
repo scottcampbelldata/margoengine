@@ -10046,6 +10046,12 @@ The native step sums all incident cell contributions at each shared particle. Bo
 law and use density-weighted material support to distribute nodal mass. Exact coupon and cut proofs cover those
 paths. Active contraction and held-out deformation measurements remain open.
 
+The optional finite-chain rubber branch evaluates first and second strain invariants in the native cell solve
+and checks each nonlinear vertex update against the full implicit objective. The authored curve words live
+with the native cell state so a world snapshot includes them. Exact derivative, inversion and replay checks
+pass. The measured traction fixture covers the withheld finite-strain Treloar data and records the small
+biaxial tension error. Independent large-deformation gelatin and ice evidence is pending.
+
 Volumetric vertex blocks (SOFT-04, `soft-kernel/src/vertex_block.rs`). The deterministic incident-corner list
 is rebuilt from the live tetrahedra, so tears retire their cells from the next solve. Inertia and exact local
 elastic Hessians accumulate in f64 for an LDLᵀ solve. Positions use the existing f32 columns. The mode is saved

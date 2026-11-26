@@ -4,6 +4,7 @@
 use crate::World;
 use crate::col::Col;
 use crate::fem::{NONE, TORN_TET, VERTEX_BLOCK_TET};
+use crate::rubber::{self, COMPONENTS, RubberLaw};
 
 pub(crate) type Vec3 = [f64; 3];
 pub(crate) type Columns = [Vec3; 3];
@@ -67,6 +68,25 @@ impl World {
         let Some([x, y, z, modulus]) = self.fem.fiber.get(t).copied() else { return ([0.0; 3], 0.0) };
         ([x as f64, y as f64, z as f64], modulus as f64)
     }
+    pub fn set_rubber(&mut self, row: usize, config: [f32; 3]) {
+        if config[0] == 0.0 && self.fem.rubber.is_empty() {
+            return;
+        }
+        self.fem.rubber.resize(self.fem.count.max(row + 1));
+        self.fem.rubber[row] = config;
+    }
+
+    fn rubber_law(&self, row: usize) -> Option<RubberLaw> {
+        let &[locking, transverse, spread] = self.fem.rubber.get(row)?;
+        if locking == 0.0 {
+            return None;
+        }
+        let (mu, lambda) = (self.fem.mu[row] as f64, self.fem.lambda[row] as f64);
+        let law = RubberLaw::new(mu, lambda, locking as f64, transverse as f64, spread as f64);
+        debug_assert!(law.valid());
+        Some(law)
+    }
+
     /// Builds a deterministic incident-corner list. Rebuilding from live flags also handles tears and new body pieces.
     pub(crate) fn prepare_vertex_blocks(&mut self) -> bool {
         if !(0..self.fem.count).any(|t| active_vertex_block(self.fem.flags[t])) {
@@ -126,6 +146,7 @@ impl World {
             let mut grad = [0, 1, 2].map(|j| mass * (current[j] - target[j]));
             let mut isotropic = mass;
             let mut determinant = [0.0; 6];
+            let mut has_rubber = false;
             while linked != NONE {
                 let t = (linked / 4) as usize;
                 let c = (linked % 4) as usize;
@@ -143,22 +164,39 @@ impl World {
                 let scale = h2 * self.fem.vol0[t] as f64;
                 let damping = self.fem.imp.beta[t] as f64 / dt;
                 let prior = if damping > 0.0 { self.vertex_deformation(corners, b, true) } else { f };
-                let mut fg = transform(f, g);
-                let mut volumetric = lambda * (j - 1.0) - mu;
-                if damping > 0.0 {
+                let fg = transform(f, g);
+                if let Some(law) = self.rubber_law(t) {
+                    has_rubber = true;
+                    let (elastic, hessian) = rubber::vertex_terms(law, f, cof, g);
                     let pg = transform(prior, g);
+                    let prior_j = dot(prior[0], cross(prior[1], prior[2]));
                     for axis in 0..3 {
-                        fg[axis] += damping * (fg[axis] - pg[axis]);
+                        let viscous = mu * (fg[axis] - pg[axis]) + lambda * (j - prior_j) * dj[axis];
+                        grad[axis] += scale * (elastic[axis] + damping * viscous);
                     }
-                    volumetric += damping * lambda * (j - dot(prior[0], cross(prior[1], prior[2])));
-                }
-                for axis in 0..3 {
-                    grad[axis] += scale * (mu * fg[axis] + volumetric * dj[axis]);
-                }
-                let stiff = scale * (1.0 + damping);
-                isotropic += stiff * mu * dot(g, g);
-                for (a, (j, k)) in [(0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2)].into_iter().enumerate() {
-                    determinant[a] += stiff * lambda * dj[j] * dj[k];
+                    let viscous_scale = scale * damping;
+                    isotropic += viscous_scale * mu * dot(g, g);
+                    for (a, (j, k)) in COMPONENTS.into_iter().enumerate() {
+                        determinant[a] += scale * hessian[a] + viscous_scale * lambda * dj[j] * dj[k];
+                    }
+                } else {
+                    let mut fg = fg;
+                    let mut volumetric = lambda * (j - 1.0) - mu;
+                    if damping > 0.0 {
+                        let pg = transform(prior, g);
+                        for axis in 0..3 {
+                            fg[axis] += damping * (fg[axis] - pg[axis]);
+                        }
+                        volumetric += damping * lambda * (j - dot(prior[0], cross(prior[1], prior[2])));
+                    }
+                    for axis in 0..3 {
+                        grad[axis] += scale * (mu * fg[axis] + volumetric * dj[axis]);
+                    }
+                    let stiff = scale * (1.0 + damping);
+                    isotropic += stiff * mu * dot(g, g);
+                    for (a, (j, k)) in [(0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2)].into_iter().enumerate() {
+                        determinant[a] += stiff * lambda * dj[j] * dj[k];
+                    }
                 }
                 let (axis, modulus) = self.fiber(t);
                 if modulus > 0.0 {
@@ -176,11 +214,82 @@ impl World {
             for diagonal in determinant.iter_mut().take(3) {
                 *diagonal += isotropic;
             }
-            let dx = solve(determinant, grad);
-            self.x[i] = (current[0] - dx[0]) as f32;
-            self.y[i] = (current[1] - dx[1]) as f32;
-            self.z[i] = (current[2] - dx[2]) as f32;
+            let mut direction = solve(determinant, grad).map(|value| -value);
+            if has_rubber {
+                if !direction.iter().all(|value| value.is_finite()) || dot(direction, direction) == 0.0 {
+                    continue;
+                }
+                let objective = |delta| self.vertex_objective(i, current, target, mass, dt, delta);
+                let initial = objective([0.0; 3]);
+                // The majorized block gives a descent direction. Backtracking accepts an actual energy decrease.
+                let mut accepted = false;
+                for _ in 0..24 {
+                    let next = objective(direction);
+                    if next.is_finite() && next < initial {
+                        accepted = true;
+                        break;
+                    }
+                    direction = direction.map(|value| value * 0.5);
+                }
+                if !accepted {
+                    continue;
+                }
+            }
+            self.x[i] = (current[0] + direction[0]) as f32;
+            self.y[i] = (current[1] + direction[1]) as f32;
+            self.z[i] = (current[2] + direction[2]) as f32;
         }
+    }
+
+    fn vertex_objective(&self, particle: usize, current: Vec3, target: Vec3, mass: f64, dt: f64, delta: Vec3) -> f64 {
+        let residual = [0, 1, 2].map(|i| current[i] + delta[i] - target[i]);
+        let mut value = 0.5 * mass * dot(residual, residual);
+        let mut linked = self.fem.vertex_block.head[particle];
+        while linked != NONE {
+            let cell = linked as usize / 4;
+            let corner = linked as usize % 4;
+            linked = self.fem.vertex_block.next[linked as usize];
+            let corners = [0, 1, 2, 3].map(|j| self.fem.p[j][cell] as usize);
+            let b = [0, 1, 2].map(|j| [0, 1, 2].map(|k| self.fem.b[3 * j + k][cell] as f64));
+            let g = if corner == 0 { [0, 1, 2].map(|j| -b[0][j] - b[1][j] - b[2][j]) } else { b[corner - 1] };
+            let mut f = self.vertex_deformation(corners, b, false);
+            for column in 0..3 {
+                for axis in 0..3 {
+                    f[column][axis] += delta[axis] * g[column];
+                }
+            }
+            let cof = [cross(f[1], f[2]), cross(f[2], f[0]), cross(f[0], f[1])];
+            let i1 = f.iter().map(|&axis| dot(axis, axis)).sum::<f64>();
+            let j = dot(f[0], cof[0]);
+            let mu = self.fem.mu[cell] as f64;
+            let lambda = self.fem.lambda[cell] as f64 + mu;
+            let elastic = if let Some(law) = self.rubber_law(cell) {
+                let i2 = cof.iter().map(|&axis| dot(axis, axis)).sum();
+                law.invariants(i1, i2, j).0
+            } else {
+                let gap = j - 1.0;
+                0.5 * mu * (i1 - 3.0) + (0.5 * lambda * gap - mu) * gap
+            };
+            let damping = self.fem.imp.beta[cell] as f64 / dt;
+            let prior = if damping > 0.0 { self.vertex_deformation(corners, b, true) } else { f };
+            let viscous = if damping > 0.0 {
+                let delta_j = j - dot(prior[0], cross(prior[1], prior[2]));
+                let delta_f = [0, 1, 2].map(|j| [0, 1, 2].map(|i| f[j][i] - prior[j][i]));
+                0.5 * damping * (mu * delta_f.iter().map(|&axis| dot(axis, axis)).sum::<f64>() + lambda * delta_j * delta_j)
+            } else { 0.0 };
+
+            let (axis, modulus) = self.fiber(cell);
+            let fiber = if modulus > 0.0 {
+                let image = transform(f, axis);
+                let elongation = crate::math::sqrt64(dot(image, image)) - 1.0;
+                let old = transform(prior, axis);
+                let displacement = [0, 1, 2].map(|i| image[i] - old[i]);
+                0.5 * modulus * (elongation * elongation + damping * dot(displacement, displacement))
+            } else { 0.0 };
+
+            value += dt * dt * self.fem.vol0[cell] as f64 * (elastic + viscous + fiber);
+        }
+        value
     }
 
     /// Minimize the implicit objective along the free translation after the local sweeps.

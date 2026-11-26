@@ -77,6 +77,18 @@ pub extern "C" fn soft_fem_fiber_rows() -> u32 {
     if fiber.is_empty() { 0 } else { fiber.as_mut_ptr() as usize as u32 }
 }
 
+/// Sets the chain locking stretch, transverse fraction and second-invariant spread for one cell. Zero clears it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_rubber(cell: u32, lock: f32, transverse: f32, spread: f32) {
+    world().set_rubber(cell as usize, [lock, transverse, spread]);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_rubber_rows() -> u32 {
+    let rows = &mut world().fem.rubber;
+    if rows.is_empty() { 0 } else { rows.as_mut_ptr() as usize as u32 }
+}
+
 /// Stores a uniform nine-constant orthotropic law and its three material axes on a body.
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_orthotropy(

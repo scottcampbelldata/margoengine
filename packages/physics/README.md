@@ -611,6 +611,41 @@ world.advance(60);
 console.log(rung.solver, rung.particlePosition(49), world.hash());
 ```
 
+#### Finite-chain rubber
+
+Set `CellMaterial.rubber` for large elastic stretches and choose `'vertex-block'`. `lockingStretch` is the
+dimensionless network parameter of the five-term Arruda–Boyce series. `transverseFraction` gives the share of
+small-strain shear carried by the second invariant and defaults to 0. `invariantSpread` controls the curvature
+of that logarithmic response and defaults to 3. Young's modulus and Poisson's ratio still set the small-strain
+response. Use a reversible isotropic material. `rubber: null`, the default, gives stable Neo-Hookean elasticity.
+
+<!-- example:node -->
+```js
+import { Physics } from '@margoengine/physics';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0] });
+const soft = await SoftBodies.attach(physics);
+const rubber = Object.assign(new CellMaterial(), {
+  youngsModulus: 1.03e6, poissonRatio: 0.45,
+  rubber: { lockingStretch: 4.52, transverseFraction: 0.305, invariantSpread: 6 },
+});
+const block = soft.create(new SoftBodyDesc([
+  [0, 0, 0], [0.1, 0, 0], [0, 0.1, 0], [0, 0, 0.1],
+]).setCells([0, 1, 2, 3], rubber).setSurface().setSolver('vertex-block').setPinnedParticles([0, 1, 2]));
+block.applyParticleImpulse(3, [0, 0, 0.02]);
+physics.step();
+console.log(block.particlePosition(3));
+physics.dispose();
+```
+
+The finite-chain law uses the same native particles and contact solver as stable Neo-Hookean material.
+The local solve checks decrease of the full elastic and inertial energy. The reversible fit covers the
+8% sulfur rubber measured by Treloar at large tensile strains. Those coefficients are an example, and
+experiments at different strain rates or temperatures require their own material settings.
+[Validation evidence](../../docs/limits.md#volumetric-vertex-blocks-soft-04)
+
 #### Projective Dynamics
 
 `setSolver('projective')` projects each tetrahedron onto a proper rotation and its original volume.

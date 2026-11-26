@@ -71,6 +71,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_reserve(tets: number, clusters: number, members: number): void;
   soft_fem_fiber(first: number, count: number, x: number, y: number, z: number, modulus: number): void;
   soft_fem_fiber_rows(): number;
+  soft_fem_rubber(cell: number, locking: number, transverse: number, spread: number): void;
+  soft_fem_rubber_rows(): number;
   soft_fem_orthotropy(first: number, count: number, ...words: number[]): void;
   soft_fem_orthotropy_rows(): number;
   soft_fem_orthotropic_failure(first: number, count: number, ...strengths: number[]): void;
@@ -565,6 +567,56 @@ interface BoundMesh {
   per: number;
 }
 
+/** Finite-chain rubber with a separate transverse invariant. Uses the native vertex-block solver. */
+export interface SoftRubberCurve {
+  /** Limiting network stretch of the eight-chain series, dimensionless and greater than 1. */
+  readonly lockingStretch: number;
+  /** Fraction of the infinitesimal shear modulus carried by the second invariant. Defaults to 0. */
+  readonly transverseFraction?: number;
+  /** Shape of the logarithmic second-invariant response. Defaults to 3, the Gent–Thomas law. */
+  readonly invariantSpread?: number;
+}
+
+type RubberWords = readonly [locking: number, transverse: number, spread: number];
+const NO_RUBBER: RubberWords = [0, 0, 0];
+
+function rubberWords(material: CellMaterial): RubberWords {
+  const { rubber } = material;
+  if (!rubber) return NO_RUBBER;
+  const locking = Math.fround(rubber.lockingStretch);
+  const transverse = Math.fround(rubber.transverseFraction ?? 0);
+  const spread = Math.fround(rubber.invariantSpread ?? 3);
+  if (
+    !Number.isFinite(locking) ||
+    locking <= 1 ||
+    !(transverse >= 0 && transverse < 1) ||
+    !Number.isFinite(spread) ||
+    spread <= 0
+  )
+    throw new MargoError(
+      'state',
+      'Rubber needs a finite locking stretch above 1, transverse fraction from 0 to below 1 and positive spread. Set those three material coefficients.',
+    );
+  if (material.model !== 'neo-hookean' || material.yieldStrain !== 0 || material.tearStrain !== 0)
+    throw new MargoError(
+      'state',
+      'The finite-chain rubber curve needs reversible isotropic elasticity. Use the neo-hookean base and clear plastic and tear strain.',
+    );
+  const [mu, lambda] = material.lame().map(Math.fround) as [number, number];
+  const inverse = 1 / (locking * locking);
+  const x = 3 * inverse;
+  const first = 0.5 + x * (0.1 + x * (33 / 1050 + x * (76 / 7050 + (2595 / 673750) * x)));
+  const second = inverse * (0.1 + x * (66 / 1050 + x * (228 / 7050 + (10380 / 673750) * x)));
+  const chain = (0.5 * mu * (1 - transverse)) / first;
+  const bulk = lambda + chain * (2 * first - 4 * second) + (8 * mu * transverse) / spread;
+  if (!(mu > 0 && Number.isFinite(bulk) && bulk > 0))
+    throw new MargoError(
+      'state',
+      'The rubber volume modulus is not positive and finite. Increase the Poisson ratio or locking stretch, or reduce the material coefficients.',
+    );
+  return [locking, transverse, spread];
+}
+
 /** The elastic model of a body's cells. */
 /**
  * How a body's cells are solved: `'constraints'` (default) as XPBD constraints, whose stiffness grows with the substeps and passes
@@ -752,6 +804,8 @@ export class CellMaterial {
    * volume, held by the bulk modulus, and nothing else: the cheapest, with the shape left to the edges; it never flows or tears.
    */
   model: CellModel = 'neo-hookean';
+  /** Optional large-strain response. Null keeps the native Neo-Hookean law. */
+  rubber: SoftRubberCurve | null = null;
   /**
    * Damping of the elastic body as a share of critical for a cell's own shear wave (default 0): the cell's constraints lose
    * 2 x this x the cell's wave frequency (shear modulus over density, over its size) of their speed each second, on top of
@@ -805,7 +859,7 @@ export class CellMaterial {
   tearStrain = 0;
   /** @internal */
   clone(): CellMaterial {
-    return Object.assign(new CellMaterial(), this);
+    return Object.assign(new CellMaterial(), this, { rubber: this.rubber && { ...this.rubber } });
   }
   /** @internal The Lame parameters. */
   lame(): [number, number] {
@@ -841,6 +895,7 @@ function checkCellMaterial(m: CellMaterial): void {
     [m.tearStrain, 'tearStrain'],
   ] as const)
     if (!(value >= 0 && Number.isFinite(value))) throw new RangeError(`${label} must be 0 or more.`);
+  rubberWords(m);
 }
 
 /** Where a body's cells, clusters and cluster members sit in the kernel's rows. */
@@ -2752,6 +2807,11 @@ export class SoftBody {
     this.check();
     checkCellMaterial(material);
     checkSolverModel(this.solverKind, CELL_MODEL[material.model]);
+    if (material.rubber && (this.solverKind !== 'vertex-block' || this.orthotropy || this.coplanarToughness))
+      throw new MargoError(
+        'state',
+        'The finite-chain rubber curve uses isotropic vertex blocks. Use vertex-block without a coplanar toughness setting.',
+      );
     checkStrengthModel(this.orthotropicStrength, material);
     if (this.coplanarToughness && (material.model === 'volume' || material.yieldStrain > 0 || material.tearStrain > 0))
       throw new RangeError(
@@ -3183,7 +3243,13 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed)
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const mode = checkedSolver(desc.solver);
-    checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
+    const usesRubber = desc.cellMaterial.rubber || desc.cellMaterials?.some((material) => material.rubber);
+    if (usesRubber && (mode !== 'vertex-block' || desc.orthotropy || desc.coplanarToughness))
+      throw new MargoError(
+        'state',
+        'The finite-chain rubber curve uses isotropic vertex blocks. Choose vertex-block and clear orthotropic and coplanar toughness settings.',
+      );
+
     if (
       desc.cellMaterials &&
       (desc.orthotropy ||
@@ -3194,6 +3260,7 @@ export class SoftBodies implements PhysicsAttachment {
         'Layered cells use reversible isotropic elasticity. Separate the materials with plasticity or orthotropy into their own bodies.',
       );
     const fiber = desc.fiber && softFiber(desc.fiber.direction, desc.fiber.modulus);
+    checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
     if (desc.orthotropy && (mode !== 'vertex-block' || fiber))
       throw new RangeError(
         'Orthotropic stiffness uses vertex blocks. Select vertex-block and supply either the orthotropic tensor or a separate fiber.',
@@ -3841,6 +3908,14 @@ export class SoftBodies implements PhysicsAttachment {
   setCellSolver(body: SoftBody, solver: SoftSolver): void {
     const f = this.cellColumns();
     const { first, count } = body.cellRange;
+    if (
+      solver !== 'vertex-block' &&
+      (body.cellMaterial.rubber || body.cellMaterials?.some((material) => material.rubber))
+    )
+      throw new MargoError(
+        'state',
+        'Finite-chain rubber needs vertex-block. Keep that solver or clear the material curve.',
+      );
     if (count > 0) checkSolverModel(solver, f.model![first]!);
     if (solver !== 'vertex-block' && this.cellOrthotropy(body))
       throw new RangeError(
@@ -3898,6 +3973,25 @@ export class SoftBodies implements PhysicsAttachment {
       f.imp_beta![t] = wave > 0 ? rate / (wave * wave) : 0;
       flags[t] = (flags[t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL | PROJECTIVE_CELL)) | mode;
     }
+    this.writeRubber(body);
+  }
+
+  private rubberState(): Float32Array | undefined {
+    const start = this.exports.soft_fem_rubber_rows();
+    if (start !== 0 && this.cellTotal > 0)
+      return new Float32Array(this.exports.memory.buffer, start, 3 * this.cellTotal);
+  }
+
+  private writeRubber(body: SoftBody): void {
+    const { first, count } = body.cellRange;
+    if (
+      !body.cellMaterial.rubber &&
+      !body.cellMaterials?.some((material) => material.rubber) &&
+      !this.exports.soft_fem_rubber_rows()
+    )
+      return;
+    for (let t = 0; t < count; t++)
+      this.exports.soft_fem_rubber(first + t, ...rubberWords(body.cellMaterials?.[t] ?? body.cellMaterial));
   }
 
   private writeFiber({ first, count }: CellRange, fiber: SoftFiber | null): void {
@@ -4116,6 +4210,10 @@ export class SoftBodies implements PhysicsAttachment {
     // Keep the rows of the other bodies, in order, and write them back without the removed one.
     const keep = this.bodies.filter((b) => b !== body),
       fiberSaved = keep.map((b) => this.cellFiber(b)),
+      rubber = this.rubberState(),
+      rubberSaved =
+        rubber &&
+        keep.map(({ cellRange }) => rubber.slice(3 * cellRange.first, 3 * (cellRange.first + cellRange.count))),
       orthotropySaved = keep.map((b) => this.cellOrthotropy(b)),
       fractureSaved = keep.map((b) => this.copyOrthotropicFailure(b)),
       bandSaved = keep.map((b) => this.copyCrackBand(b)),
@@ -4322,6 +4420,15 @@ export class SoftBodies implements PhysicsAttachment {
       }
       b.cellRange = next;
       this.writeFiber(next, fiberSaved[k]!);
+      const rubberBatch = rubberSaved?.[k];
+      if (rubberBatch)
+        for (let t = 0; t < next.count; t++)
+          this.exports.soft_fem_rubber(
+            next.first + t,
+            rubberBatch[3 * t]!,
+            rubberBatch[3 * t + 1]!,
+            rubberBatch[3 * t + 2]!,
+          );
       this.writeOrthotropy(next, orthotropySaved[k]!);
       this.cellTotal += r.count;
       const damage = fractureSaved[k];
@@ -4424,6 +4531,8 @@ export class SoftBodies implements PhysicsAttachment {
     const fiber = this.fiberWords();
     if (fiber && this.bodies.some(({ cellRange }) => cellRange.count > 0 && fiber[4 * cellRange.first + 3]! > 0))
       out.push(['cell.fiber', fiber]);
+    const rubber = this.rubberState();
+    if (rubber?.some((value, i) => i % 3 === 0 && value > 0)) out.push(['cell.rubber', rubber]);
     const orthotropy = this.orthotropyWords();
     if (
       orthotropy &&
