@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,258 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,260 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12641,6 +12641,18 @@ Core plus stage remains 24,820 B gzip.
 ### Wheel contact and lane tracking (DYN-04)
 
 The clocked driver tracks authored open or closed lanes with measured traction. It uses one wetness word per vehicle with the documented bank convention. It brakes smoothly before an open lane ends. The current driver routes an individual car and uses the supplied route around obstacles. Road colliders reuse their rendered triangle tessellation. A calibrated soft patch uses a constant footprint and the measured pressure exponent. EARTH-05 owns wear and terrain-volume feedback. The paired road and dynamics fixtures cover the existing tyres, drivetrain, motorcycles and tracks alongside the new road controls and terrain interface. The optional road driving entry measures 12,776 B minified and 5,373 B gzip. The Physics root measures 1,339,661 B minified and 865,782 B gzip. Core and Stage gain zero bytes.
+
+### Natural long waves, moving bathymetry and run-up (SEA-06)
+
+Use the regular-grid model where wavelength is long compared with depth. It moves a
+wet/dry shoreline, can reflect from closed edges or transmit an open coast's outgoing
+characteristics, and reports signed boundary and source volume. The wet-patch shallow
+Padé approximation of Kajiura's response is intended for rapid bottom movement about one
+representative depth. The dynamic model is depth averaged. Short-wave dispersion,
+three-dimensional impact generation and nested grid corrections require separate models.
+Inland arrival can differ from the linear still-water travel time.
+
+The optional tsunami entry is 6,538 B gzip with a 6,794 B ceiling. Both Wasm assets are 13,850 B raw and each is 6,294 B gzip. Core plus stage remains 24,820 B gzip.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -29067,11 +29079,11 @@ through springs and seepage. Connect its recharge port to `GroundwaterSolver` an
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
 
-### General water impulse sources still need SEA-06 (PA-25)
+### Additional natural water-impulse producers still need connections (PA-25)
 
 ICE-02 releases ice at its water-facing cells. ICE-03 turns those volumes into moving bodies and
 exports conservative local wave sources. The general impulse propagation and inundation model,
-the avalanche and lava sources, and the lahar feedback remain open under PA-25.
+the avalanche and lava sources, and the lahar feedback remain open under PA-25. SEA-06 now consumes the live Iceberg source and registered moving bathymetry and reproduces run-up on a dry beach.
 
 ### Ground animal terrain and rig adapters (LIFE-02)
 
@@ -29092,7 +29104,7 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)
 
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
-does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. General run-up and terrain, avalanche and lava sources still need SEA-06.
+does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. SEA-06 supplies natural shoreline run-up from the real calving and terrain fields. The avalanche and lava producers still need the shared displacement binding.
 
 ## Open: canonical fire and alpine canopy links (BIO-03)
 
