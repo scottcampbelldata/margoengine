@@ -181,6 +181,22 @@ export const entries = [
     fix: 'Rename the plugin, uniform or texture (letters and digits, starting with a letter), fix the option name, pass WGSL strings, move bindings into uniforms and textures, merge plugins so a material has at most 8, and keep @margoengine/materials and @margoengine/gltf at matching versions. Errors inside your WGSL itself are WebGPU validation errors when the shader first draws.',
   },
   {
+    id: 'mesh-debug-view',
+    title: '@margoengine/inspector/mesh-debug: options, device and mesh size',
+    kind: 'family',
+    messages: [
+      'MeshDebugView was disposed; attach a new MeshDebugView; see https://margoengine.com/errors#mesh-debug-view',
+      'MeshDebugView options must be an object; pass { mode: ... }; see https://margoengine.com/errors#mesh-debug-view',
+      'MeshDebugView multiply must be true, false or null; see https://margoengine.com/errors#mesh-debug-view',
+      'MeshDebugView wireWidth must be a number from 0 to 64; see https://margoengine.com/errors#mesh-debug-view',
+      "MeshDebugView wireColor must be '#rgb', '#rrggbb' or three linear numbers in 0..1; see https://margoengine.com/errors#mesh-debug-view",
+      'MeshDebugView reads vertices from storage buffers; create the engine on WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#mesh-debug-view',
+    ],
+    cause:
+      'MeshDebugView checks every option before changing any: an unknown name, a mode outside its list, a size outside its range or a colour that is neither a hex string nor three linear numbers is refused. It draws by reading vertex and index storage buffers, so native WebGL2 and a device without vertex-stage storage buffers are refused, and a mesh whose data does not fit one storage binding throws from the frame.',
+    fix: 'Correct the option the message names, create the engine on WebGPU or the WebGL2 compatibility layer, attach a new view after dispose(), and split a mesh that is too large or leave it out of meshes.',
+  },
+  {
     id: 'scene-helpers',
     title: '@margoengine/lines/scene-helpers: light probe and positional audio helpers',
     kind: 'family',
