@@ -5900,6 +5900,8 @@ normalized front stations 1.44, 2.33 and 3.00. Both density projection presets u
 The exact tests also check the three-dimensional kernel, the first Jacobi position correction, gravity and
 rigid momentum exchange. WebGPU and the WebGL2 compatibility renderer draw the same native 1,800-point field
 and retain its original mass.
+An underfilled free-water pair stays at rest with artificial pressure enabled. Halving a separate
+compressed pair's step quarters the artificial-pressure displacement at the same starting state.
 
 ### Railway motion and contact-wire uplift
 

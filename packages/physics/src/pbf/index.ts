@@ -98,7 +98,7 @@ export interface PbfParams {
   readonly iterations?: number;
   /** Nondimensional constraint mixing. Default 0.02. */
   readonly relaxation?: number;
-  /** Nondimensional PBF artificial pressure. Default 0.001. */
+  /** Nondimensional PBF artificial pressure at 60 Hz. Default 0.001. */
   readonly tensile?: number;
   /** Reference distance as a fraction of support. Default 0.3. */
   readonly tensileDistance?: number;

@@ -10618,6 +10618,8 @@ is the reserved point rows, statistics and in-flight rigid impulses. The grid an
 that state and the existing body field. Deterministic playback is checked across plain and shared memories.
 The renderer draws the same solved points on WebGPU and the WebGL2 compatibility backend. The current evidence
 includes a published surge timing comparison, a real offset rigid impulse and a native replay.
+Artificial pressure uses the solver substep squared relative to 60 Hz. The kernel preserves rest for
+free-water pairs outside the active density constraints, checked separately from the surge data.
 
 ### Rail wheelsets and catenary (DYN-05)
 

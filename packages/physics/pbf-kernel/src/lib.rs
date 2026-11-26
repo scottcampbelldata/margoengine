@@ -305,6 +305,10 @@ fn project_density(
     evaluations: &mut f64,
 ) -> f64 {
     let tensile_reference = kernel(settings.tensile_distance * settings.tensile_distance);
+    // The position coefficient is specified at 60 Hz. A constant acceleration
+    // produces a displacement proportional to the square of the step.
+    let reference_steps = dt * 60.0;
+    let tensile = settings.tensile * reference_steps * reference_steps;
     let mut longest: f64 = 0.0;
     for i in 0..points.len() {
         let current = item(points, i).position;
@@ -330,9 +334,14 @@ fn project_density(
             }
             let g = gradient(offset, d2, i, j);
             let coefficient = if j < points.len() {
-                let ratio = kernel(d2) / tensile_reference;
-                let square = ratio * ratio;
-                item(work, i).lambda + item(work, j).lambda - settings.tensile * square * square
+                let pressure = item(work, i).lambda + item(work, j).lambda;
+                if tensile == 0.0 || (pressure == 0.0 && settings.cohesive == 0.0) {
+                    pressure
+                } else {
+                    let ratio = kernel(d2) / tensile_reference;
+                    let square = ratio * ratio;
+                    pressure - tensile * square * square
+                }
             } else {
                 item(work, i).lambda.min(0.0)
             };

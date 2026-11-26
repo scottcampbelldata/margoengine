@@ -4791,7 +4791,9 @@ For contact with ice, load with `exchangeIce: true`, map distinct lava cells to 
 `@margoengine/physics/pbf` advances a free-surface liquid on the physics clock. Its sparse native neighbour search
 works in local cell coordinates. Choose `fast` for four density projections per advective substep or `precise`
 for twelve. Both profiles solve positive pressure at open interfaces. The optional `cohesive` setting restores
-the signed constraint for stylized sheets and droplets.
+the signed constraint for stylized sheets and droplets. `tensile` sets the artificial pressure at 60 Hz.
+Its positional displacement scales with the square of each substep. Free-water pairs with both density
+constraints inactive remain at rest.
 
 ```ts
 import { PbfSolver } from '@margoengine/physics/pbf';

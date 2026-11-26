@@ -9880,7 +9880,7 @@ dissipated mechanical energy. Bubble geometry, gas resonance and acoustic radiat
 
 ### Position-based particle water (FLUID-02)
 
-The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.
+The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,926 B raw and 7,175 B gzip.
 
 
 
@@ -9893,6 +9893,8 @@ The model uses one rest density and only corrects compression by default. The op
 apparent cohesion without a measured water–air tension law. The higher-iteration preset
 usefully reduces residual compression but retains the same explicit rigid exchange. Automatic shallow-water
 handoff, generic mesh contacts, and physical surface tension are tracked separately.
+The `tensile` coefficient is referenced to 60 Hz. Its position increment scales with the squared substep,
+and free-water pairs outside the active density constraints receive zero artificial pressure.
 
 ### Rail wheelsets and catenary (DYN-05)
 

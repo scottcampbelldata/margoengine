@@ -630,7 +630,12 @@ Applications*, equations 20–21, gives the three-dimensional Poly6 and Spiky ke
 in support-normalized coordinates, with particle rest volume as its kernel weight. The artificial pressure
 exponent is four and the reference distance is 0.3 support radii. A global correction scale limits a single
 Jacobi update to the 0.4-support advective interval without disturbing paired pressure reactions.
+The artificial pressure coefficient uses a 60 Hz reference step. Scaling it by the squared step relative to
+that reference keeps its acceleration scale fixed across dyadic rates and subdivisions. In free-water mode
+the artificial pressure acts on a pair while either density constraint is active. Miles Macklin et al. (2019),
+*Small Steps in Physics Simulation*, §6.4 discusses substepping for position-based liquids.
 [Macklin and Müller](https://mmacklin.com/pbf_sig_preprint.pdf),
+[Macklin et al.](https://mmacklin.com/smallsteps.pdf),
 [Müller, Charypar and Gross](https://cgl.ethz.ch/Downloads/Publications/Papers/2003/Mue03b/Mue03b.pdf).
 
 Matthias Teschner, Bruno Heidelberger, Matthias Müller, Danat Pomeranets and Markus Gross (2003), *Optimized

@@ -4338,6 +4338,8 @@ After building Physics, run `node --test packages/physics/tests/coupling/pbf.tes
 case runs at 480 Hz and subtracts the crossing time at `Z = 1.44` from the subsequent readings in each
 Martin and Moyce trial. The fixture allows the published spread, two simulated sampling intervals, the
 rounding seen in Table 2 and the 300 fps camera sampling described in section 3.
+The artificial-pressure regression applies the same compressed pair at 60 and 120 Hz and subtracts the
+respective zero-artificial-pressure controls. The underfilled pair uses a separate geometry.
 `npm run test:browser:pbf --workspace=@margoengine/physics` runs the rendered
 column regression on both backends and saves frames under `test-results/fluid02-browser`.
 

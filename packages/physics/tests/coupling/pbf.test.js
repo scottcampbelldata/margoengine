@@ -138,6 +138,46 @@ test('an under-filled free surface cannot pull itself together unless cohesion i
   }
 });
 
+test('artificial pressure preserves underfilled rest and scales displacement with the squared step', async () => {
+  const { world, pbf } = await solve({
+    ...relaxed,
+    spacing: 0.09,
+    support: 0.12,
+    bounds: wide,
+    tensile: 0.001,
+    particles: [{ position: [-0.04, 0, 0] }, { position: [0.04, 0, 0] }],
+  });
+  assert.ok(pbf.sample(0).density < 1000);
+  world.advance(1);
+  near(pbf.sample(0).position[0], -0.04);
+  near(pbf.sample(1).position[0], 0.04);
+
+  const displacements = [];
+  for (const rate of [60, 120]) {
+    const positions = [];
+    for (const tensile of [0, 0.003]) {
+      const fixture = await solve(
+        {
+          ...relaxed,
+          spacing: 0.75,
+          support: 1,
+          bounds: wide,
+          tensile,
+          particles: [{ position: [-0.1, 0, 0] }, { position: [0.1, 0, 0] }],
+        },
+        { rate: { num: rate, den: 1 } },
+        { rate: rate === 60 ? 0 : 1 },
+      );
+      fixture.world.advance(1);
+      assert.equal(fixture.pbf.statistics.substeps, 1);
+      positions.push(fixture.pbf.sample(0).position[0]);
+    }
+    displacements.push(positions[0] - positions[1]);
+  }
+  assert.ok(displacements[0] > 0);
+  near(displacements[1] * 4, displacements[0]);
+});
+
 test('XSPH blends equal and opposite velocities by the kernel weight and dissipates their kinetic energy', async () => {
   const speed = 0.15;
   const spacing = 0.5;
