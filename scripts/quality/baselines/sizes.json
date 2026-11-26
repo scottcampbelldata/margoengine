@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20170056,
+  "total": 20173829,
   "history": [
     {
       "date": "2026-10-24",
@@ -12885,6 +12885,12 @@
       "commit": "3ead56c312",
       "reason": "KB-BOUNCE-CAPTURE1: clustered/bounce 14,967 to 15,419 B gzip: LightBounce.add draws gltf/pbr models and terrain into its captures through the shared capture hook (the hook, its WGSL tail and the 1x model pass); a separate entry would load the same LightBounce class twice. gltf/prepare 35,482 to 35,545 B: extendedPlan groups slots by colour space (shareOwner) and ownSlot picks the sRGB member, so packed specular colour decodes as sRGB; the rule is the plan itself, nothing to split",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7b50b86947",
+      "reason": "BREAK-03 adds 3517 B gzip for an optional measured normal crush contact with rigid recoil and durable seal data. Core and Stage add zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13699,6 +13705,7 @@
     "@margoengine/physics/ageing": 5178,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
+    "@margoengine/physics/crush": 3773,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,

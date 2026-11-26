@@ -14098,6 +14098,10 @@
       "./drainage-fog": {
         "raw": 10863,
         "gzip": 4666
+      },
+      "./crush": {
+        "raw": 8123,
+        "gzip": 3517
       }
     },
     "@margoengine/physics2d": {

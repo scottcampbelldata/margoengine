@@ -3255,6 +3255,10 @@
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
     },
+    "./physics/crush": {
+      "types": "./dist/physics/crush.d.ts",
+      "import": "./dist/physics/crush.js"
+    },
     "./physics/legged": {
       "types": "./dist/physics/legged.d.ts",
       "import": "./dist/physics/legged.js"
