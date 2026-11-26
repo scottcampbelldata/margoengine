@@ -16834,8 +16834,9 @@ volume. A changing atmospheric field requires an application update until the sh
 
 Vehicles sink into a calibrated yielding surface and feel the resulting suspension load. EARTH-05 now transfers the
 real wheel and belt loads to TerrainBed and refits the same collider before the next rigid step. Live hoof and biped
-pressures produce persistent relief and loft mineral dust. A configured uniform hardpan changes the pressure
-response. Spatially varying bedrock and shared subsurface layers need a profile contract.
+pressures produce persistent relief and loft mineral dust. A configured hardpan changes the pressure response
+according to local layer thickness. The excavation floor accepts the same spatial data as TerrainBed. Solver
+exchange of changing subsurface properties still needs a shared soil contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.

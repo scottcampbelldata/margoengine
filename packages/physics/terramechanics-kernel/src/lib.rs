@@ -334,6 +334,7 @@ pub unsafe extern "C" fn stamp(
     pressure: *mut f64,
     heights: *const f32,
     floor: f64,
+    floor_grid: *const f64,
     budget: *mut f64,
     work: *mut f64,
     faces: *mut u32,
@@ -487,7 +488,12 @@ pub unsafe extern "C" fn stamp(
             // rounding boundary so we never request a cut the exact bedrock would refuse.
             let height = *heights.add(i);
             let lower = (height as f64 + height.next_down() as f64) * 0.5;
-            let room = (lower + *deltas.add(i) - floor).max(0.0);
+            let bedrock = if floor_grid.is_null() {
+                floor
+            } else {
+                *floor_grid.add(i)
+            };
+            let room = (lower + *deltas.add(i) - bedrock).max(0.0);
             let cut = (settlement * depth_shape * coverage - *peak.add(i))
                 .max(0.0)
                 .min(room);

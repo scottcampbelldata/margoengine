@@ -4657,7 +4657,8 @@ The default dry material has `kc = 1,000`, `kphi = 400,000` and `n = 1` in the S
 cohesion, 0.6 internal friction, 25 mm shear length, 20% compaction, 0.05% fines from uncompacted volume and
 1,600 kg/m³ dry bulk density. Replace these coefficients with a measured material for the footprint and moisture.
 Each empirical coefficient may be signed. The combined pressure coefficient for the chosen footprint must be positive.
-The optional `floor` is the same uniform bedrock elevation used on TerrainBed. Both solvers must share their cell.
+Set `floor` for uniform bedrock. Use `floorGrid` with one value per bed vertex or the same coordinate sampler
+as `TerrainBed.bedrock` for spatial data. The grid takes precedence and both solvers share their cell.
 
 `Terramechanics.load({ tier: 'resolved' })` distributes bearing stress within each patch and normalizes the
 integrated pressure to the measured load. It uses the effective width `2 × area / perimeter`. Set
@@ -4674,7 +4675,9 @@ and normalized vertex `depth` values in across-major order. A zero-depth gap car
 projected `area` in m² and total contact `perimeter` in metres measured on that shape.
 
 Both tiers accept `hardpan` for a prepared layer over denser material. Set `thickness` in metres below
-the original bed and provide the lower layer's `frictionalModulus`. The optional `cohesiveModulus` and
+the original bed and provide the lower layer's `frictionalModulus`. Set `hardpanDepths` to a vertex array or
+coordinate sampler to vary the thickness across the bed. The solver samples that grid at the centre of each
+footprint and uses `thickness` outside its bounds. The optional `cohesiveModulus` and
 `exponent` default to 0 and 1. Footprint width and topsoil friction determine when the pressure cone reaches
 the hardpan. Omit `hardpan` for a homogeneous pressure fit.
 

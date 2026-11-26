@@ -1,6 +1,14 @@
 import { MargoError } from '@margoengine/math/errors';
 import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
-import { BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT, BedChange, type BedShape, bedVertexCount } from '../earth/bed.js';
+import {
+  BED_CHANGE_FIELD,
+  BED_FIELD,
+  BED_LAYOUT,
+  BedChange,
+  type BedShape,
+  bedVertexCount,
+  type TerrainBedParams,
+} from '../earth/bed.js';
 import { LEGGED_CONTACT_FIELD } from '../legged/index.js';
 import { regionWords } from '../world/memory.js';
 import type { Cell, FieldDescriptor, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
@@ -135,6 +143,8 @@ export interface TerramechanicsParams {
   readonly material?: SoilMaterial;
   /** Finite topsoil over a dense supporting layer. Omit for homogeneous bearing. */
   readonly hardpan?: SoilHardpan;
+  /** Local topsoil thickness, m, sampled at each contact centre. Requires the hardpan fit. */
+  readonly hardpanDepths?: NonNullable<TerrainBedParams['bedrock']>;
   /** Known fixed contact loads. Live sources are configured with `input` or `legged`. */
   readonly patches?: readonly SoilPatch[];
   /** Number of external patch rows. Omit when there is no `input`. */
@@ -147,6 +157,8 @@ export interface TerramechanicsParams {
   readonly rollingWheels?: readonly (SoilRollingWheel | null)[];
   /** Minimum elevation to excavate, m in the bed cell. Default no floor. Set the same uniform floor as TerrainBed. */
   readonly floor?: number;
+  /** Per-vertex excavation floor. Share the same data as TerrainBed.bedrock. */
+  readonly floorGrid?: NonNullable<TerrainBedParams['bedrock']>;
   /** Distance between floating-origin cells, m. Default 4,096. */
   readonly cellSize?: number;
 }
@@ -295,6 +307,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private cell: Cell = CENTRE;
   private cellSize = 4096;
   private floor = -Infinity;
+  private floorGrid?: Region;
+  private thicknessGrid?: Region;
 
   private constructor(
     private readonly builds: Builds,
@@ -399,6 +413,16 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       );
     this.change = new BedChange(host, this.terrain, 'soil-bed-change');
     const allocate = (name: string, words: number) => host.allocate(name, words * 8, 'f64', SOIL_LAYOUT);
+    if (parameters.hardpanDepths !== undefined && !hardpan)
+      throw new MargoError('state', 'Local hardpan depths have no material. Provide the hardpan fit with them.');
+    this.floorGrid =
+      parameters.floorGrid === undefined
+        ? undefined
+        : this.samples(parameters.floorGrid, count, 'excavation floor', -Infinity);
+    this.thicknessGrid =
+      parameters.hardpanDepths === undefined
+        ? undefined
+        : this.samples(parameters.hardpanDepths, count, 'topsoil thickness', Number.MIN_VALUE);
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
@@ -444,6 +468,48 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
 
   private words(region: Region): Float64Array {
     return regionWords(this.host.memory, region) as Float64Array;
+  }
+
+  private samples(
+    source: NonNullable<TerrainBedParams['bedrock']>,
+    count: number,
+    label: string,
+    minimum: number,
+  ): Region {
+    if (typeof source !== 'function' && source.length !== count)
+      throw new MargoError('state', `The soil ${label} grid has the wrong size. Provide one value per bed vertex.`);
+    const region = this.host.allocate(`soil-${label.replaceAll(' ', '-')}`, count * 8, 'f64', SOIL_LAYOUT);
+    const field = this.words(region);
+    const { columns, rows, width, depth, centre } = this.terrain;
+    for (let c = 0; c <= columns; c++)
+      for (let r = 0; r <= rows; r++) {
+        const i = c * (rows + 1) + r;
+        const value =
+          typeof source === 'function'
+            ? source(centre[0] - width / 2 + (width * c) / columns, centre[1] - depth / 2 + (depth * r) / rows)
+            : source[i]!;
+        field[i] = finite(value, label, minimum);
+      }
+    return region;
+  }
+
+  private thicknessAt(x: number, z: number, thickness: number): number {
+    if (!this.thicknessGrid) return thickness;
+    const { columns, rows, width, depth, centre } = this.terrain;
+    const u = ((x - centre[0] + width / 2) * columns) / width;
+    const v = ((z - centre[1] + depth / 2) * rows) / depth;
+    if (u < 0 || u > columns || v < 0 || v > rows) return thickness;
+    const c = Math.min(columns - 1, Math.floor(u));
+    const r = Math.min(rows - 1, Math.floor(v));
+    const a = u - c;
+    const b = v - r;
+    const f = this.words(this.thicknessGrid);
+    const i = c * (rows + 1) + r;
+    const cross = f[i + rows + 1]!;
+    const along = f[i + 1]!;
+    return a + b <= 1
+      ? (1 - a - b) * f[i]! + a * cross + b * along
+      : (a + b - 1) * f[i + rows + 2]! + (1 - b) * cross + (1 - a) * along;
   }
 
   private shift(port: Port): readonly [number, number] {
@@ -499,7 +565,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const transition = hardpan
       ? Math.max(
           0,
-          hardpan.thickness -
+          this.thicknessAt(x, z, hardpan.thickness) -
             (resolved ? effectiveWidth : bearingWidth(length, width, ellipse, true)) *
               (hypot(1, material.friction) + material.friction),
         )
@@ -570,6 +636,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.pressure?.byteOffset ?? 0,
       bed.byteOffset,
       this.floor,
+      this.floorGrid?.byteOffset ?? 0,
       this.budgetRegion.byteOffset,
       this.workRegion?.byteOffset ?? 0,
       this.faces?.byteOffset ?? 0,
@@ -732,6 +799,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.dust,
       this.budgetRegion,
       this.response,
+      ...(this.floorGrid ? [this.floorGrid] : []),
+      ...(this.thicknessGrid ? [this.thicknessGrid] : []),
       ...(this.pressure && this.workRegion ? [this.pressure, this.workRegion] : []),
     ];
   }

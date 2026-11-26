@@ -20,12 +20,21 @@ function planted(
   soil,
   terrain,
   material,
-  { playback = rate, shared = false, floor, patches = [patch], profiles, hardpan } = {},
+  { playback = rate, shared = false, floor, patches = [patch], profiles, hardpan, hardpanDepths } = {},
 ) {
   const bed = new TerrainBed();
+  const bedrock = typeof floor === 'number' ? () => floor : floor;
   const world = new PhysicsWorld({ rate: playback, memory: worldMemory(shared) })
-    .add(bed, { ...terrain, elevations: () => 0, bedrock: floor === undefined ? undefined : () => floor })
-    .add(soil, { terrain, material, patches, floor, profiles, hardpan });
+    .add(bed, { ...terrain, elevations: () => 0, bedrock })
+    .add(soil, {
+      terrain,
+      material,
+      patches,
+      profiles,
+      hardpan,
+      hardpanDepths,
+      ...(typeof floor === 'number' ? { floor } : { floorGrid: floor }),
+    });
   world.couple(['terramechanics', 'bed'], 'staggered');
   return { world, bed };
 }
@@ -80,6 +89,34 @@ test('a shallow bedrock clips the cut and the material ledger closes on its tria
   );
   close(bed.volume(), budget.deposited - budget.removed, 2048 * eps * budget.removed);
   assert.ok(budget.compacted > 0 && budget.suspended > 0 && budget.deposited > 0);
+});
+
+test('a varying bedrock shares the terrain grid and closes the mass ledger on both sides', async () => {
+  const terrain = { columns: 64, rows: 64, width: 2, depth: 2, centre: [0, 0] };
+  const floor = (x) => (x < 0 ? -0.004 - 0.001 * x : -0.012 - 0.002 * x);
+  const load = { x: 0, z: 0, width: 0.25, length: 0.25, load: 1500 };
+  for (const tier of ['mean', 'resolved']) {
+    const soil = await Terramechanics.load({ tier });
+    const { world, bed } = planted(soil, terrain, { compaction: 0.2, dustFraction: 0.01 }, { floor, patches: [load] });
+    world.advance(1);
+    const elevations = bed.elevations();
+    close(elevations[30 * 65 + 32], floor(-0.0625), 8 * eps);
+    close(elevations[34 * 65 + 32], floor(0.0625), 8 * eps);
+    assert.equal(bed.refusedVolume(), 0);
+    const budget = soil.budget;
+    close(bed.volume(), budget.deposited - budget.removed, 2048 * eps * budget.removed);
+    close(
+      budget.removed,
+      budget.compacted + budget.suspended + budget.deposited + budget.exported,
+      2048 * eps * budget.removed,
+    );
+    const saved = world.takeSnapshot();
+    world.advance(8);
+    const hash = world.hash();
+    world.restoreSnapshot(saved.bytes);
+    world.advance(8);
+    assert.equal(world.hash(), hash);
+  }
 });
 
 test('native soil state matches across frame cadence, in-flight restore and memory type', async () => {
@@ -286,6 +323,23 @@ test('Salman et al. sandy loam follows the measured 200 mm plate beyond the hard
     const sinkage = -bed.bed.sample(0, 0).elevation;
     // Fig. 6 samples at 118.5 and 122.2 mm bracket 110 kPa. The bounds include one rendered PDF pixel.
     assert.ok(sinkage >= 0.1182 && sinkage <= 0.1225, `${tier}: ${sinkage} m`);
+  }
+});
+
+test('two otherwise identical footprints distinguish a shallow and deep layer from one mapped bed', async () => {
+  const terrain = { columns: 64, rows: 64, width: 2, depth: 2, centre: [0, 0] };
+  const material = { friction: 0, cohesiveModulus: 0, frictionalModulus: 100_000, compaction: 1 };
+  const patches = [-0.5, 0.5].map((x) => ({ x, z: 0, length: 0.25, width: 0.25, load: 1000 }));
+  const hardpan = { thickness: 0.25, frictionalModulus: 500_000 };
+  const hardpanDepths = (x) => Math.max(0.03125, 0.25 + 0.375 * x);
+  for (const tier of ['mean', 'resolved']) {
+    const soil = await Terramechanics.load({ tier });
+    const { world } = planted(soil, terrain, material, { hardpan, hardpanDepths, patches });
+    world.advance(1);
+    const shallow = soil.read(0).sinkage;
+    const deep = soil.read(1).sinkage;
+    assert.ok(shallow > 0 && deep > 0);
+    close(shallow * 5, deep, 2048 * eps * deep);
   }
 });
 

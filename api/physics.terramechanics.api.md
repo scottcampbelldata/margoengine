@@ -161,12 +161,14 @@ export interface TerramechanicsParams {
     readonly terrain: BedShape;
     readonly material?: SoilMaterial;
     readonly hardpan?: SoilHardpan;
+    readonly hardpanDepths?: NonNullable<TerrainBedParams['bedrock']>;
     readonly patches?: readonly SoilPatch[];
     readonly inputRows?: number;
     readonly feet?: readonly LeggedSoilPatch[];
     readonly profiles?: readonly (SoilContactProfile | null)[];
     readonly rollingWheels?: readonly (SoilRollingWheel | null)[];
     readonly floor?: number;
+    readonly floorGrid?: NonNullable<TerrainBedParams['bedrock']>;
     readonly cellSize?: number;
 }
 
@@ -2091,6 +2093,12 @@ interface StepContext {
     readonly seed: number;
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
+}
+
+interface TerrainBedParams extends BedShape {
+    readonly id?: string;
+    readonly elevations: ArrayLike<number> | ((x: number, z: number) => number);
+    readonly bedrock?: ArrayLike<number> | ((x: number, z: number) => number);
 }
 
 interface TrackOptions {

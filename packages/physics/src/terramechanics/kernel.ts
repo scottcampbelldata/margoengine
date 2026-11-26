@@ -18,6 +18,7 @@ export interface NativeSoil {
     pressure: number,
     heights: number,
     floor: number,
+    floorGrid: number,
     budget: number,
     work: number,
     faces: number,

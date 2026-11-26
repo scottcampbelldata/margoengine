@@ -89,8 +89,9 @@ there, add a line below with the solver ID and what is needed, and build against
   regions synchronously. Both native nonlinear modes run on that contract and use the existing rigid fields.
 
 - **EARTH-05:** Promote patch geometry, normal load, shear displacement and response to common terrain-contact layouts.
-  Expose per-vertex solid material and accepted excavation for varying bedrock. The optional entry already uses
-  `bedChange` and publishes versioned contact response and ATMO-06 dust.
+  Expose shared per-vertex solid material and accepted excavation so terrain, soil and erosion can exchange changing
+  properties in the same step. The optional entry accepts the same bedrock inputs as TerrainBed, samples hardpan
+  thickness locally, uses `bedChange` and publishes versioned contact response and ATMO-06 dust.
 
 - **ATMO-10:** Publish the SEA-07 adapter's regional pressure and wind input layout, including origin and
   spacing. The synoptic solver supplies pressure and horizontal wind on its local grid and already transfers

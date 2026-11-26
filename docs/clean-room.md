@@ -131,6 +131,10 @@ allowing one rendered PDF pixel. This checks the published fitted example. The q
 above use held-out plate geometry.
 [Salman et al.](https://doi.org/10.1299/jamdsm.2020jamdsm0084).
 
+Hardpan thickness can vary by vertex. The contact samples it with barycentric interpolation using TerrainBed's
+triangles. The excavation floor uses bedrock values at the same vertices and clips the cut before the native
+soil ledger divides the displaced volume. The two-sided tests use independent exact thickness and mass cases.
+
 L. Ding, H. Gao, Z. Deng and J. Tao, “Wheel slip-sinkage and its prediction model of lunar rover” (2010),
 Eqs. 13–19 and 22, supplies the slip-adjusted exponent, lug entry and shear geometry, asymmetric Wong–Reece
 normal stress and lug bearing offset. The implementation integrates each side of the pressure maximum

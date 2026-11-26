@@ -10494,6 +10494,9 @@ The optional hardpan uses a continuous two-regime bearing curve. The resolved na
 force integral, accounting for stations that reach the layer and those that still load homogeneous soil.
 The rolling option integrates normal and shear stresses on the loaded arc. Its moving projected footprint
 uses the published rigid load and signed shear displacement, and the bed continues to feed the collider.
+The configured hardpan depth and excavation bedrock can use separate vertex grids. Their copied values are
+snapshot state. Soil cuts reference the same floor data supplied to TerrainBed, so no rejected volume enters
+the compaction, berm or dust ledger.
 
 ### Divergence-free particle pressure
 

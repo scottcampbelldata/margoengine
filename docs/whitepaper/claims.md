@@ -5809,6 +5809,8 @@ and balances their integrated force independently.
 The moving Wh32 carriage reproduces reported sinkage at zero and 20% powered slip, closes the integrated
 vertical force and leaves a persistent rut along its moving path. The same rolling contact receives live rigid
 wheel loads in a separate vehicle-and-belt seek case.
+Both tiers close the volume budget against a spatially varying excavation floor and distinguish equal loads
+over different hardpan thicknesses on one registered bed.
 
 ### Divergence-free particle pressure (FLUID-01)
 
