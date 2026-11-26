@@ -15190,6 +15190,32 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differs by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap, webgl2-compat)
+
+- **Repro:** `node packages/tonemap/tests/settings-browser.mjs --compat` on the workstation (RTX A6000, Chrome, ANGLE
+  Direct3D 11): it failed 2 of 4 runs, then 4 of 6, at "local: the sweep's last frame is what writing its values once
+  draws" or "local: the defaults written leave the frame exact", one pixel (green 176 against 177). WebGPU passes.
+- **Found:** on such a frame the scene's own HDR target (`rgba16float`, before any Tonemap pass reads it) differs: 4 of
+  230,400 half floats, one step apart, inside the white box's faces (the same values with antialias off, so not an
+  edge or a resolve). `LocalExposure` only lifts that step across an 8-bit boundary. The frame's uniform uploads
+  (every `queue.writeBuffer`, hashed) are byte for byte the same, and a rebuilt Tonemap makes no GL program (the
+  layer's `glObjects`): only textures, framebuffers and 2 multisampled renderbuffers.
+- **Not seen with:** `antialias: false` (0 of 6 runs), ANGLE's OpenGL back end (`--use-angle=gl`, 0 of 8 on this
+  check), 20 frames in place of 2 before the compared frame (0 of 6), or a 400 ms wait before each compared frame's
+  first draw (0 of 6).
+- **Cause:** not found. The engine's input is identical, and the difference goes with wall-clock time with no draw in
+  between, so work below the engine that finishes in the background (ANGLE's Direct3D 11 back end or the driver) is
+  the suspect, most likely a second compile of the scene's pixel shader once a multisampled target is made again.
+- **Owed:** a Chrome trace (gpu and angle categories) of a failing run to see what runs in those 400 ms, then the fix in
+  the package that owns it and a regression test. The check is not loosened.
+
+### Open 2026-11-26: on ANGLE's OpenGL back end, tonemap's settings check sees no GPU object from `tonemap.curve` (KB-TONEMAP-CURVEGL1, tonemap, webgl2-compat)
+
+- **Repro:** `node packages/tonemap/tests/settings-browser.mjs --compat` with Chrome started with `--use-angle=gl`
+  (workstation, RTX A6000): 3 of 4 runs fail at "tonemap.curve is live: false because it makes GPU objects"; the
+  default Direct3D 11 back end passes that assertion.
+- **Cause:** not looked at yet.
+
 ### Fixed 2026-11-26: the subsurface case had no measured Direct3D 11 time (KB-VPT-SPLIT-SUBSURFACE, voxel-pathtracer)
 
 - **Repro:** at 7e04c03161, `node --test tests/voxel-pathtracer-gpu-split.test.js`: "test:gpu:light-transport: every
