@@ -14050,6 +14050,10 @@
       "./modal-sound": {
         "raw": 24922,
         "gzip": 9736
+      },
+      "./groundwater": {
+        "raw": 9420,
+        "gzip": 3939
       }
     },
     "@margoengine/physics2d": {
@@ -17801,6 +17805,16 @@
       "raw": 1567,
       "gzip": 919,
       "brotli": 816
+    },
+    "packages/physics/dist/groundwater-kernel.wasm": {
+      "raw": 11142,
+      "gzip": 3356,
+      "brotli": 3012
+    },
+    "packages/physics/dist/groundwater-kernel-shared.wasm": {
+      "raw": 11142,
+      "gzip": 3356,
+      "brotli": 3012
     }
   },
   "splits": {

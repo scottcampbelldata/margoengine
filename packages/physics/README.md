@@ -2214,6 +2214,67 @@ for (let frame = 1; frame <= 30 * 60; frame++) {
 }
 console.log(highest > 0.8); // true: it rides the swell's crests
 ```
+### Into the water and out of it (`EntrySolver`, `@margoengine/physics/entry`)
+
+`EntrySolver` is SEA-14: bodies striking the water, going under, breaking out and falling back, a cannonball, a diver, a
+launched hull or a breaching whale, beside the rigid solver (`world.couple(['entry', 'rigid'], 'staggered')`). Give it
+each body's row and its closed surface (`mesh`, wound outward, a few hundred to a few thousand triangles) and the water
+(`sea`: a `SpectralSea`, so the impact is against the local surface and relative to the waves' own motion, or anything
+with `elevation`). Each step it holds the body with:
+
+- the sea's own pressure over the wetted surface (as `HullSolver` takes it), but none over the part inside an open air
+  cavity;
+- the impact pressure 1/2 rho (U . n)^2 on each face moving into the water (Birkhoff's, which gives the ricochet: a ball
+  skips under 18 degrees / sqrt(sigma), Johnson and Reid's critical angle, here within 10 percent of it);
+- the slam as it strikes, from Wagner's wetted radius and Korobkin's modified Logvinovich model (a sphere's slam peaks at
+  C = 1.02 at 13 percent of its radius in, as Shiffman and Spencer's curve and the experiments of Antolik et al. do);
+- the water it carries: the wetted disc's added mass as it strikes, Lamb's spheroid under water, and S. F. Hoerner's
+  streamlined drag for a long body under water.
+
+Above Duez et al.'s threshold (7.2 m/s for a wetting surface; `contactAngle` over 90 degrees lowers it) it drags an air
+cavity down, which closes under the water's weight depth by depth (Duclaux et al., Aristoff et al.) and pinches: the deep
+seal throws a Worthington jet. `splashes()` lists what happened at the water, as events a renderer can draw (Water's
+`ShotSplash` draws them): `entry` (with its crown sheet), `seal` (the jet), `exit` (the water lifted as it breaks out),
+`skip`. `seaSources()` is the water it moved this step, for a `WakeSolver`'s `sources`, so the entry and the cavity's
+collapse make their waves; pass a `FoamSolver` as `foam` for the foam it leaves.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {EntrySolver} from 'margoengine/physics/entry';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 960});
+// A 25 mm steel ball dropped in at 9 m/s.
+const R = 0.0125;
+const ball = physics.addBody(null, {
+  position: [0, 0.02, 0],
+  linearVelocity: [0, -9, 0],
+  colliders: {shape: 'sphere', radius: R, mass: 7850 * (4 / 3) * Math.PI * R ** 3},
+});
+// Its surface: a UV sphere, wound outward.
+const vertices: number[] = [];
+const indices: number[] = [];
+for (let j = 0; j <= 16; j++)
+  for (let i = 0; i <= 32; i++) {
+    const th = (Math.PI * j) / 16, ph = (2 * Math.PI * i) / 32;
+    vertices.push(R * Math.sin(th) * Math.cos(ph), R * Math.cos(th), R * Math.sin(th) * Math.sin(ph));
+  }
+for (let j = 0; j < 16; j++)
+  for (let i = 0; i < 32; i++) {
+    const a = j * 33 + i;
+    if (j > 0) indices.push(a, a + 1, a + 34);
+    if (j < 15) indices.push(a, a + 34, a + 33);
+  }
+const entry = new EntrySolver();
+const world = new PhysicsWorld({rate: {num: 960, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(entry, {bodies: [{row: ball.row, mesh: {vertices, indices}}], sea: {elevation: () => 0}, level: 4})
+  .couple(['entry', 'rigid'], 'staggered');
+world.advance(96); // a tenth of a second
+console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in with a cavity, which pinches
+```
+
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
 
 `TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.
@@ -2247,7 +2308,7 @@ console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.
 - `bed`: the ground, the world's terrain (`terrain.bed` of a `TerrainBed` added before it, the surface over the elevations it publishes) or a bed of its own (`bedSurface`), read every step, so ground that erosion or a crater changes changes the flood; the water's cells are the bed's, and a cell's bed is the mean over its two triangles, the surface colliders see;
 - the water at the start: a `level` (a height, or a function of (x, z): every cell whose bed is lower fills to it) or a `depth`, and a `velocity` function;
 - `roughness`: Manning's n in s/m^(1/3), a number or a function of (x, z) (default 0.03, a natural channel; 0.013 concrete, 0.05 to 0.1 floodplain with brush);
-- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth), `{level}` (a lake or a sea held at a height in metres, or a function of time: a tide, a surge; long waves reflect from it), `{sea}` (the open sea at a height, which lets waves from inside leave: the characteristic coming in is still water at that height's) or `'periodic'` with its opposite side (a coast or a channel that goes on the same way);
+- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth), `{level}` (a lake or a sea held at a height in metres, or a function of time: a tide, a surge; long waves reflect from it), `{sea}` (the open sea at a height, which lets waves from inside leave: the characteristic coming in is still water at that height's, or with `incoming(t, x, z)` a long wave coming in from outside, [elevation, velocity x, z], such as a surf's `boundWave`) or `'periodic'` with its opposite side (a coast or a channel that goes on the same way);
 - `buildings`: `{min: [x, z], max: [x, z], height}` boxes that raise the bed under them (Schubert and Sanders' building blocks), so a flood goes round a town's blocks and over them only when deeper than they are tall;
 - `inflows`: rivers and pipes, `{position: [x, z], discharge}` in m^3/s or a function of time (a flood hydrograph);
 - `rain`, a `Precipitation` field (`@margoengine/weather`'s `PrecipitationField`), falling on water and ground alike; `wind`, a framework `Wind`, whose stress rho_a C_D |U| U drags the water (Garratt's C_D);
@@ -2348,15 +2409,18 @@ This is the phase-averaged "surfbeat" chain of XBeach (Roelvink et al. 2009). Th
 - `water`: the `ShallowWaterSolver`, added to the world first;
 - `incident`: the waves coming in, `{height, period, direction, spreading = 10, gamma = 3.3}` (significant height and peak period of a JONSWAP sea) or `{waves}`, a `WaveSpectrumField` (`WaveSolver.field`) sampled at the offshore side;
 - `side`, the offshore side they come in over (default `'minX'`), and `alongshore`, `'open'` (default) or `'periodic'` for a coast that goes on the same way (give the water periodic sides there too);
-- `groups` (default true): the incoming energy comes in groups, the envelope of the sea's components, so the water answers with surf beat and swash; off, it is steady;
+- `groups` (default true): the incoming energy comes in groups, the envelope of the sea's components, so the water answers with surf beat and swash; off, it is steady. Feed the groups' bound long wave to the water's open sea, `sides: {minX: {sea: 0, incoming: (t, x, z) => surf.boundWave(t, x, z)}}`, so the long waves come in with them (Longuet-Higgins and Stewart's zeta_b = (2n - 1/2)(E - mean E) / (rho (c_g^2 - g h)));
+- `currents` (default true): the waves ride the water's currents, keeping their absolute frequency and their action flux (c_g + U) E / sigma, refracted by the currents' shear and blocked where c_g + U falls to 0, so rips steepen the waves that meet them;
+- `level`, the still water level the set-up and run-up are measured from (default 0);
 - `directions` (default 36 over the incoming half-plane, 5 degrees);
 - `breaking` (`{gamma = 0.55, alpha = 1, n = 10}`), `roller` (`{beta = 0.1}` or `false`), `density` (default 1025) and `rate`.
 
 It publishes the field `surf` (per cell, H_rms, the mean direction and the roller's energy) and adds its forcing to the water's `surfaceWaterForcing`. Reading the surf:
 - `waveHeight(x, z)` (H_rms; H_s is about sqrt 2 times it) and `waveDirection(x, z)`;
 - `rollerEnergy(x, z)`, `stokesDrift(x, z)`, `undertow(x, z)` and `forcing(x, z)`;
-- `runUp(at?)`, the highest the water has reached up the shore on a line or on any line;
-- `wetSand(x, z, window = 600)`, whether a spot was wet within the window.
+- `runUp(at?)`, the highest the water has reached up the shore on a line or on any line, the short waves' uprush included;
+- `runUp2(at?)`, the run-up exceeded by 2 percent of the swash, Stockdon et al.'s R2 = 1.1 (<eta> + sqrt(S_inc^2 + S_IG^2) / 2) with the set-up and the infragravity swash from the water's own shoreline and the short waves' `incidentSwash(at?)` from Stockdon's law;
+- `wetSand(x, z, window = 600)`, whether a spot was wet within the window, the short waves' uprush (half the incident swash above the shoreline) included.
 
 The water's own `sample` gives the set-up and the currents.
 
@@ -3022,3 +3086,45 @@ The layout-1 f64 contact field has five words per track: normal impact impulse i
 scrape power times speed, rolling proxy power in W and rolling power times speed. The layout-1 fracture field
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
+
+## Groundwater and springs
+
+`@margoengine/physics/groundwater` evolves an unconfined water table with recharge, lateral Darcy flow, springs and
+surface seepage. Spring and seepage volumes can enter the shallow-water solver on the same world clock.
+
+```ts
+import { type BedShape, TerrainBed } from '@margoengine/physics/earth';
+import { GroundwaterSolver } from '@margoengine/physics/groundwater';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid: BedShape = { columns: 3, rows: 1, width: 3, depth: 1, centre: [0, 0] };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const bed = new TerrainBed();
+const aquifer = await GroundwaterSolver.load({ followTerrain: true });
+world.add(bed, { ...grid, elevations: () => 0 });
+world.add(aquifer, {
+  grid,
+  initialHead: -0.2,
+  recharge: 0.01,
+  springElevation: -0.5,
+  springConductance: [0, 0.05, 0],
+});
+const stream = new ShallowWaterSolver('water', aquifer.shallowInput());
+world.add(stream, { bed: bed.bed });
+world.advance(60);
+console.log(aquifer.read(1, 0), aquifer.budget, stream.volume());
+```
+
+The cell grid uses x-fast order. Default bottom and surface elevations are −10 m and 0 m. The starting head
+fills 80% of that thickness, specific yield is 0.2, and horizontal conductivity is `1e-4` m/s. Set
+`conductivityX` and `conductivityZ` to model direction-dependent flow. The default recharge and spring
+conductance are both zero. A spring starts above its specified `springElevation`, which defaults to the
+initial surface. `sideHeads` fixes absolute water levels on the specified sides. Other sides are impermeable.
+
+Set `rechargeField: runoff.rechargeField` to connect HYDRO-02 soil drainage. Set `followTerrain` (default false)
+to use the current terrain at each cell centre for surface seepage. `load` also accepts `id` (default `groundwater`)
+and an abort `signal`. The linear solve defaults to a relative residual of `1e-12`.
+`secondsPerSecond` defaults to 1. When accelerating underground time, outlet rates still describe volume per
+world second so a receiving stream gets the actual exported volume. The model records total storage, recharge,
+boundary inflow and outflow, spring discharge and seepage in cubic metres.

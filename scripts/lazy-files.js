@@ -15,6 +15,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/groundwater-kernel.wasm',
+    label: 'groundwater-kernel.wasm',
+    kind: 'Rust SIMD groundwater flow',
+    measure: 'file',
+    when: 'GroundwaterSolver.load() from the optional /groundwater entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/groundwater-kernel-shared.wasm',
+    label: 'groundwater-kernel-shared.wasm',
+    kind: 'Rust SIMD groundwater flow, shared world memory',
+    measure: 'file',
+    when: 'GroundwaterSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/landscape-kernel.wasm',
     label: 'landscape-kernel.wasm',
     kind: 'Rust SIMD landscape evolution',

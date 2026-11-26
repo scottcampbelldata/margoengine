@@ -10093,3 +10093,16 @@ shared kernels import the same arena layout and keep no evolving state in static
 cover the analytic impulse and held-force convolution, resting contact, rolling versus sliding,
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
+
+### Groundwater evidence (HYDRO-06)
+
+The optional Rust SIMD groundwater kernel imports world memory in both modes. It has an empty static data
+segment and only an instance-local stack pointer. Its build instantiates over a sentinel and checks every byte,
+including the existing rigid-kernel window. Aquifer controls, storage, forcing, ports and iterative work use
+world-owned regions. Snapshot hashing includes the controls, storage and ledger.
+
+The groundwater check verifies the fixed-head Dupuit profile, spring activation within an implicit step, wetting,
+the world clock and both native memory modes. HYDRO-02 supplies the exact water leaving its soil, and HYDRO-01
+receives the actual seepage volume. The aquifer and the surface solver keep independent volume ledgers.
+The production browser bundle fetches both kernels under cross-origin isolation and reproduces the same state
+hash in the two memory modes.

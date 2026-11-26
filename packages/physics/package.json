@@ -84,6 +84,10 @@
       "types": "./dist/waves/index.d.ts",
       "import": "./dist/waves.js"
     },
+    "./entry": {
+      "types": "./dist/entry/index.d.ts",
+      "import": "./dist/entry.js"
+    },
     "./sea": {
       "types": "./dist/sea/index.d.ts",
       "import": "./dist/sea.js"
@@ -135,6 +139,10 @@
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
+    },
+    "./groundwater": {
+      "types": "./dist/groundwater/index.d.ts",
+      "import": "./dist/groundwater.js"
     },
     "./landscape": {
       "types": "./dist/landscape/index.d.ts",

@@ -3199,6 +3199,10 @@
       "types": "./dist/physics/waves.d.ts",
       "import": "./dist/physics/waves.js"
     },
+    "./physics/entry": {
+      "types": "./dist/physics/entry.d.ts",
+      "import": "./dist/physics/entry.js"
+    },
     "./physics/sea": {
       "types": "./dist/physics/sea.d.ts",
       "import": "./dist/physics/sea.js"
@@ -3250,6 +3254,10 @@
     "./physics/runoff": {
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
+    },
+    "./physics/groundwater": {
+      "types": "./dist/physics/groundwater.d.ts",
+      "import": "./dist/physics/groundwater.js"
     },
     "./physics/landscape": {
       "types": "./dist/physics/landscape.d.ts",

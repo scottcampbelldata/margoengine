@@ -225,7 +225,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
-| HYDRO-06 | Groundwater and springs | none | Codex | BUILDING (codex/physics-hydro-06) |
+| HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | LANDED b6e01ceb4c |
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
 | ATMO-06 | Airborne particle transport | stand-in | Open | OPEN |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
@@ -234,7 +234,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Open | OPEN |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
-| EARTH-07 | Aeolian transport | stand-in | Open | OPEN |
+| EARTH-07 | Aeolian transport | stand-in | Codex | BUILDING (codex/physics-earth-07) |
 | EARTH-08 | Seismic waves and ground shaking | none | Open | OPEN |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Open | OPEN |

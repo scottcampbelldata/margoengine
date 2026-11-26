@@ -211,6 +211,139 @@ test('wave groups make the water surge up the beach: the run-up passes the set-u
   assert.ok(wetAbove >= 2, `${wetAbove} m of wet sand above the steady shoreline`);
 });
 
+test('waves against a current keep their action flux (c_g + U) E / sigma and their absolute frequency', () => {
+  // A channel shoaling from 4 m to 2 m carries 1 m^2/s seaward, so the current against the waves grows from 0.25 to 0.5 m/s.
+  const run = (currents) => {
+    const nx = 100,
+      dx = 2,
+      depth = (x) => 4 - 2 * Math.min(1, Math.max(0, (x - 40) / 100)),
+      shape = { columns: nx, rows: 1, width: nx * dx, depth: dx, centre: [(nx * dx) / 2, dx / 2] },
+      elevations = new Float64Array((nx + 1) * 2);
+    for (let c = 0; c <= nx; c++) for (let r = 0; r <= 1; r++) elevations[r + 2 * c] = -depth(c * dx);
+    const water = new ShallowWaterSolver(),
+      surf = new SurfSolver(),
+      world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(water, {
+          bed: bedSurface(shape, elevations),
+          level: 0,
+          velocity: (x) => [-1 / depth(x), 0],
+          roughness: 0,
+          sides: { minX: 'open', maxX: 'open' },
+        })
+        .add(surf, {
+          water,
+          incident: { height: 0.15, period: 4, spreading: 500 },
+          groups: false,
+          currents,
+          breaking: { gamma: 2 },
+        })
+        .couple(['surf', 'water'], 'staggered');
+    world.advance(100 * 60);
+    return { water, surf };
+  };
+  const { water, surf } = run(true),
+    omega = 2 * Math.PI * surf.meanFrequency,
+    // The Doppler relation omega = sigma + k U solved for the intrinsic frequency and the group velocity.
+    solve = (h, U) => {
+      let k = (omega * omega) / g;
+      for (let i = 0; i < 60; i++) {
+        const s = Math.sqrt(g * k * Math.tanh(k * h)),
+          cg = (s / k) * (0.5 + (k * h) / Math.sinh(2 * k * h));
+        k -= (s + k * U - omega) / (cg + U);
+      }
+      const s = Math.sqrt(g * k * Math.tanh(k * h));
+      return ((s / k) * (0.5 + (k * h) / Math.sinh(2 * k * h))) / s + U / s;
+    },
+    flux = (x) => {
+      const st = water.sample(x, 1);
+      return solve(st.depth, st.velocity[0]);
+    },
+    expected = surf.waveHeight(11, 1) * Math.sqrt(flux(11) / flux(151)),
+    still = run(false).surf.waveHeight(151, 1);
+  // Measured: to 4 figures (0.1207 m); ignoring the current gives the still-water shoaling, 0.1064 m.
+  assert.ok(Math.abs(surf.waveHeight(151, 1) / expected - 1) < 0.02, `${surf.waveHeight(151, 1)} against ${expected}`);
+  assert.ok(expected / still > 1.08, `the opposing current steepens them: ${expected} against ${still} without it`);
+});
+
+test("the open sea brings in the groups' bound long wave: the water sinks under each group as Longuet-Higgins and Stewart say", () => {
+  const rho = 1025,
+    h = 3,
+    nx = 150,
+    dx = 2,
+    shape = { columns: nx, rows: 1, width: nx * dx, depth: dx, centre: [(nx * dx) / 2, dx / 2] },
+    elevations = new Float64Array((nx + 1) * 2).fill(-h),
+    surf = new SurfSolver(),
+    water = new ShallowWaterSolver(),
+    world = new PhysicsWorld({ rate: { num: 30, den: 1 } })
+      .add(water, {
+        bed: bedSurface(shape, elevations),
+        level: 0,
+        roughness: 0,
+        sides: { minX: { sea: 0, incoming: (t, x, z) => surf.boundWave(t, x, z) }, maxX: { sea: 0 } },
+      })
+      .add(surf, { water, incident: { height: 0.6, period: 7, spreading: 200 }, breaking: { gamma: 2 } })
+      .couple(['surf', 'water'], 'staggered');
+  let frame = 60 * 30;
+  world.advance(frame);
+  const energy = [],
+    surface = [];
+  for (let s = 0; s < 600; s++) {
+    frame += 15;
+    world.advance(frame);
+    const H = surf.waveHeight(61, 1);
+    energy.push((rho * g * H * H) / 8);
+    surface.push(water.sample(61, 1).surface);
+  }
+  const k = wavenumber(surf.meanFrequency, h, g),
+    n = 0.5 + (k * h) / Math.sinh(2 * k * h),
+    cg = ((2 * Math.PI * surf.meanFrequency) / k) * n,
+    theory = (2 * n - 0.5) / (rho * (cg * cg - g * h)),
+    me = energy.reduce((a, b) => a + b) / energy.length,
+    mz = surface.reduce((a, b) => a + b) / surface.length;
+  let covariance = 0,
+    variance = 0,
+    residual = 0,
+    total = 0;
+  for (let i = 0; i < energy.length; i++) {
+    covariance += (energy[i] - me) * (surface[i] - mz);
+    variance += (energy[i] - me) ** 2;
+  }
+  const slope = covariance / variance;
+  for (let i = 0; i < energy.length; i++) {
+    residual += (surface[i] - mz - slope * (energy[i] - me)) ** 2;
+    total += (surface[i] - mz) ** 2;
+  }
+  // Measured: 1.08 of the theory's slope, R^2 0.86 (fed without the bound wave: 0.25 and 0.11).
+  assert.ok(Math.abs(slope / theory - 1) < 0.25, `slope ${slope} against ${theory}`);
+  assert.ok(1 - residual / total > 0.6, `R^2 ${1 - residual / total}`);
+});
+
+test("the run-up exceeded by 2 percent of the swash matches Stockdon et al.'s field law within 25 percent", () => {
+  // R2 = 1.1 (<eta> + sqrt(S_inc^2 + S_IG^2) / 2): set-up and infragravity swash from the water, the short waves' uprush from
+  // Stockdon's S_inc. Measured: 0.277 m against 0.307 on 1:50, 0.387 against 0.381 on 1:25.
+  for (const slope of [0.02, 0.04]) {
+    const surf = new SurfSolver(),
+      nx = 160,
+      shape = { columns: nx, rows: 1, width: nx, depth: 1, centre: [nx / 2, 0.5] },
+      elevations = new Float64Array((nx + 1) * 2);
+    for (let c = 0; c <= nx; c++) for (let r = 0; r <= 1; r++) elevations[r + 2 * c] = -2 + slope * c;
+    const water = new ShallowWaterSolver(),
+      world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+        .add(water, {
+          bed: bedSurface(shape, elevations),
+          level: 0,
+          sides: { minX: { sea: 0, incoming: (t, x, z) => surf.boundWave(t, x, z) } },
+        })
+        .add(surf, { water, incident: { height: 0.5, period: 8 } })
+        .couple(['surf', 'water'], 'staggered');
+    world.advance(600 * 60);
+    const L0 = (g * 64) / (2 * Math.PI),
+      root = Math.sqrt(0.5 * L0),
+      stockdon = 1.1 * (0.35 * slope * root + 0.5 * Math.sqrt(0.5 * L0 * (0.563 * slope * slope + 0.004)));
+    assert.ok(Math.abs(surf.runUp2() / stockdon - 1) < 0.25, `1:${1 / slope}: R2 ${surf.runUp2()} against ${stockdon}`);
+  }
+});
+
 test('the same sea gives the same bits', () => {
   const make = () => beach({ nx: 40, f: plane(1, 0.04), incident: { height: 0.3, period: 6 }, groups: true }),
     a = make(),
@@ -236,4 +369,5 @@ test('settings out of range are refused with what to pass', () => {
   assert.throws(() => add({ incident: { height: 1, period: 8 }, side: 'top' }), /'minX'/);
   assert.throws(() => add({ incident: { height: 1, period: 8 }, breaking: { gamma: 3 } }), /gamma/);
   assert.throws(() => add({ incident: { height: 1, period: 8 }, alongshore: 'round' }), /'open' or 'periodic'/);
+  assert.throws(() => add({ incident: { height: 1, period: 8 }, level: Number.NaN }), /still water level/);
 });

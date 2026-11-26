@@ -11913,6 +11913,16 @@ or any model was opened):
 - The Riemann invariants u +- 2 sqrt(g h) of the shallow-water equations for the open sea side: a textbook result (and
   `flood.ts`'s Flather boundary).
 
+Added the same day:
+- Wave-current interaction: the absolute frequency omega = sigma + k . u kept and the action E / sigma carried at c_g + u,
+  with the currents' refraction terms (the XBeach manual, eqs. 5 to 10; F. P. Bretherton and C. J. R. Garrett, "Wavetrains in
+  inhomogeneous moving media", Proc. R. Soc. A 302, 1968, known through it).
+- The bound long wave at the offshore side, zeta_b = (2n - 1/2)(E - mean E) / (rho (c_g^2 - g h)) and u_b = c_g zeta_b / h (M.
+  S. Longuet-Higgins and R. W. Stewart, J. Fluid Mech. 13, 1962, as the Delft3D manual's eqs. B.66 and B.67 state it), fed
+  through the open sea's incoming Riemann invariant.
+- The incident swash S_inc = 0.75 beta_f sqrt(H0 L0) and R2 = 1.1 (<eta> + sqrt(S_inc^2 + S_IG^2) / 2) of Stockdon et al.
+  (2006), the infragravity part from the shoreline record.
+
 The wave groups as the envelope of 48 equal-variance components drawn from the incoming sea by energy on the counter-based
 random numbers, the open-sea side by the invariants, the periodic sides with one face's flux taken by both ends, the stress
 force by central differences with a dry neighbour holding the cell's own stress, the run-up and wet-sand record, and the
@@ -12717,6 +12727,52 @@ by mass, independently limited lateral acceleration, and the exact drag-only spe
   weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.
 
 
+### Water entry and exit (`EntrySolver`, `@margoengine/physics/entry`, 2026-11-26, SEA-14)
+
+Written from papers read as text (no code, no companion repositories):
+
+- H. Wagner, "Uber Stoss- und Gleitvorgange an der Oberflache von Flussigkeiten", ZAMM 12, 193-215, 1932, in the
+  axisymmetric form T. Hulin, L. Tassin and A. Korobkin, "Gravity effects in water impact models", J. Fluid Mech. 944,
+  A9, 2022, https://doi.org/10.1017/jfm.2022.448, give (eq. 3.3, after Korobkin and Scolan 2006): the wetted radius.
+- A. A. Korobkin, "Analytical models of water impact", Eur. J. Appl. Math. 15, 821-838, 2004, the modified Logvinovich
+  model, in the form of Hulin et al. eqs. 2.17 to 2.19 (after Tassin et al. 2013): the slam's pressure.
+- A. Shiffman and D. C. Spencer, AMP Report 42.1R, 1945, as J. T. Antolik, J. L. Belden, N. B. Speirs and D. M. Harris,
+  "Slamming forces during water entry of a simple harmonic oscillator", J. Fluid Mech. 976, 2023, arXiv 2304.08672,
+  measure it (rigid spheres at 2 to 6 m/s), and N. B. Speirs, Z. Pan, J. Belden and T. T. Truscott, J. Fluid Mech. 863,
+  2019, arXiv 1806.11453: the peak C of about 1 at 10 to 20 percent of the radius (the check).
+- G. Birkhoff et al., "Ricochet off water", AMP Memo 42.4M, 1944, as W. Johnson and S. R. Reid, J. Mech. Eng. Sci. 17,
+  71-81, 1975, and I. M. Hutchings, Int. J. Mech. Sci. 18, 243-248, 1976: the impact pressure 1/2 rho (U . n)^2 and the
+  critical angle 18 degrees / sqrt(sigma) (the check).
+- C. Duez, C. Ybert, C. Clanet and L. Bocquet, "Making a splash with water repellency", Nature Physics 3, 180-183, 2007,
+  arXiv cond-mat/0701093: the cavity threshold.
+- V. Duclaux et al., J. Fluid Mech. 591, 1-19, 2007, and J. M. Aristoff, T. T. Truscott, A. H. Techet and J. W. M. Bush,
+  "The water entry of decelerating spheres", Phys. Fluids 22, 032102, 2010, https://doi.org/10.1063/1.3309454: the
+  cavity's walls, d^2(R^2)/dt^2 = -2 g z from R0 at sqrt(alpha) U, alpha = cot^2(theta_c - pi/2), theta_c 160 degrees;
+  the pinch (eq. 14 to 19). Their eq. 15 drops the R0^2 term of the collapse time (their limit alpha U^2 F / z >> 1); the
+  solver keeps it, so its pinch is up to some 7 percent later than their closed form where that ratio is near 3.
+- J. M. Aristoff and J. W. M. Bush, "Water entry of small hydrophobic spheres", J. Fluid Mech. 619, 45-78, 2009: the
+  sheet's retraction speed sqrt(2 gamma / (rho delta)) and its measured thickness of about 0.2 mm.
+- S. Gekle and J. M. Gordillo, "Generation and breakup of Worthington jets after cavity collapse. Part 1", J. Fluid
+  Mech. 663, 293-330, 2010, arXiv 0907.5154: the jet's speed (their golf ball, 20 m/s from 2.03 m/s).
+- H. Lamb, Hydrodynamics, 6th ed., 1932, section 373: the prolate spheroid's added-mass coefficients.
+- S. F. Hoerner, Fluid-Dynamic Drag, 1965, ch. 6: streamlined bodies' drag; the ITTC 1957 friction line.
+- P. Ward and E. Asphaug, "Asteroid impact tsunami: a probabilistic hazard assessment", Icarus 145, 64-78, 2000, as C.
+  Kharif and E. Pelinovsky, C. R. Physique 6, 361-366, 2005, https://doi.org/10.1016/j.crhy.2004.12.016: a transient
+  cavity's water in a rim out to sqrt(2) of its radius (the wake's sources).
+- R. Gunn and G. D. Kinzer, J. Meteorol. 6, 243-248, 1949: drops' terminal speeds (the splashes' heights).
+- J. A. Segre et al., "Energetic and physical limitations on the breaching performance of large whales", eLife 9,
+  e51760, 2020, https://doi.org/10.7554/eLife.51760: humpbacks leave the water at 6.1 +- 1.8 m/s pitched 56 +- 13 degrees
+  (the breach's test).
+
+Published and calibrated constants:
+
+| Constant | Value | Source | How it was set |
+| --- | --- | --- | --- |
+| alpha (cavity opening) | 0.1325 | Aristoff et al. 2010, theta_c about 160 degrees | Published |
+| xi (wetting threshold) | 0.1 | Duez et al. 2007 | Published |
+| Jet speed / entry speed | 9.85 | Gekle and Gordillo 2010, golf ball | Calibrated on that one sphere; their disc threw 12.3 times (20 percent above). No other measurement found to validate it on; uncertainty some 25 percent. |
+| Sheet thickness | 0.2 mm | Aristoff and Bush 2009 | Published, one case |
+
 ## Rooted plants in wind and water (`@margoengine/physics/vegetation`, BIO-01)
 
 `vegetation/model.ts` and `vegetation-kernel/src/lib.rs` were written from the following sources without companion
@@ -13100,3 +13156,31 @@ Research compared:
 The implementation uses separately built plain and shared SIMD Wasm against the world arena. Hardware
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
+
+### Groundwater and springs (HYDRO-06)
+
+- Lorenzo A. Richards, [Capillary conduction of liquids through porous mediums](https://doi.org/10.1063/1.1745010),
+  1931, derives the conductivity law with hydraulic potential and storage. Integrating horizontal saturated Darcy
+  flow over the wetted thickness gives the unconfined aquifer flux. Vertical drainage through the active soil is
+  supplied by the HYDRO-02 recharge field.
+- David E. Rupp and John S. Selker, [On the use of the Boussinesq equation for interpreting recession hydrographs
+  from sloping aquifers](https://doi.org/10.1029/2006WR005080), 2006, equations 3–4, apply that integration and
+  continuity with drainable porosity. On a level, homogeneous aquifer at steady state, integrating
+  \(q=-K h\,dh/dx\) shows that saturated thickness squared varies linearly between fixed heads. The face
+  discretisation reproduces the result because \((h_i+h_j)(h_i-h_j)=h_i^2-h_j^2\).
+- Arlen W. Harbaugh, [MODFLOW-2005, The U.S. Geological Survey Modular Ground-Water Model: The Ground-Water Flow
+  Process](https://pubs.usgs.gov/publication/tm6A16), 2005, chapters 2, 5 and 6, assembles positive face conductance,
+  harmonic resistance between differing porous materials and specific-yield storage. The horizontal face in this
+  solver uses the harmonic conductivity and the mean saturated thickness above the shared bottom. A fixed boundary
+  is half a cell away. The spring law uses Harbaugh's equations 6–11A/B with outward sign,
+  \(Q=C\max(0,H-H_\mathrm{spring})\). Its active set is solved with backward Euler.
+- Magnus R. Hestenes and Eduard Stiefel, [Methods of Conjugate Gradients for Solving Linear Systems](https://doi.org/10.6028/jres.049.044),
+  1952, give the residual and conjugate direction recurrences for a symmetric positive system. The solver uses the
+  storage-plus-conductance diagonal for preconditioning and checks the residual of the assembled equation. Face
+  volumes are used in equal and opposite pairs to update storage. A donor-volume limit maintains nonnegative
+  storage during rapid wetting. Surface overflow is left with the outlet as explicit seepage.
+
+The aquifer keeps water thickness relative to its bottom, so small inputs survive large coordinate elevations.
+Tests reconstruct the fixed-head solution, a two-cell material contact, a draining spring, and the water-volume
+exchange with the existing runoff and shallow-water solvers. The implementation uses the papers and the repository's
+field contracts.

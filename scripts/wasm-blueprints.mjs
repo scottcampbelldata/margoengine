@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'groundwater-kernel',
+    crate: 'packages/physics/groundwater-kernel',
+    blueprint: 'packages/physics/src/groundwater/groundwater-kernel.wasm',
+    script: 'packages/physics/scripts/build-groundwater-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'groundwater-kernel-shared',
+    crate: 'packages/physics/groundwater-kernel',
+    blueprint: 'packages/physics/src/groundwater/groundwater-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-groundwater-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'landscape-kernel',
     crate: 'packages/physics/landscape-kernel',
     blueprint: 'packages/physics/src/landscape/landscape-kernel.wasm',

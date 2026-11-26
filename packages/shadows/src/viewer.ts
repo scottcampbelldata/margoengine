@@ -65,6 +65,7 @@ export function shadowDepthToLinear(
   return Math.min(1, Math.max(0, (distance - n) / (f - n)));
 }
 
+// The fragment shader's lens.x: 1 reversed (mirror to near 0), 2 perspective (hyperbola to linear distance), 3 both.
 const shader = (array: boolean) => `
 struct U {rect:vec4f, view:vec4f, lens:vec4f}
 @group(0) @binding(0) var map:${array ? 'texture_depth_2d_array' : 'texture_depth_2d'};
@@ -76,7 +77,6 @@ struct U {rect:vec4f, view:vec4f, lens:vec4f}
   let uv = clamp((p.xy - u.view.xy) / u.view.zw, vec2f(0.0), vec2f(0.99999));
   let t = vec2i(u.rect.xy + uv * u.rect.zw);
   let d = textureLoad(map, t, ${array ? 'i32(u.lens.w), ' : ''}0);
-  // lens.x: 1 reversed (mirror to near 0), 2 perspective (hyperbola to linear distance), 3 both.
   let mode = u32(u.lens.x);
   var z = select(d, 1.0 - d, (mode & 1u) != 0u);
   if ((mode & 2u) != 0u) {

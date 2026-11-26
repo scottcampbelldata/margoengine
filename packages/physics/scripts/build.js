@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -53,6 +53,7 @@ await build({
         'modal-sound': resolve(root, 'src/modal-sound.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
+        entry: resolve(root, 'src/entry/index.ts'),
         sea: resolve(root, 'src/sea/index.ts'),
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         celestial: resolve(root, 'src/space/index.ts'),
@@ -67,6 +68,7 @@ await build({
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
         landscape: resolve(root, 'src/landscape/index.ts'),
+        groundwater: resolve(root, 'src/groundwater/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
         ice: resolve(root, 'src/ice/index.ts'),
         underwater: resolve(root, 'src/underwater/index.ts'),
@@ -100,6 +102,11 @@ await copyFile(resolve(root, 'src/sediment/sediment-kernel-shared.wasm'), resolv
 await copyFile(resolve(root, 'src/orbit/orbit-kernel.wasm'), resolve(dist, 'orbit-kernel.wasm'));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel-shared.wasm'), resolve(dist, 'orbit-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/landscape/landscape-kernel.wasm'), resolve(dist, 'landscape-kernel.wasm'));
+await copyFile(resolve(root, 'src/groundwater/groundwater-kernel.wasm'), resolve(dist, 'groundwater-kernel.wasm'));
+await copyFile(
+  resolve(root, 'src/groundwater/groundwater-kernel-shared.wasm'),
+  resolve(dist, 'groundwater-kernel-shared.wasm'),
+);
 await copyFile(
   resolve(root, 'src/landscape/landscape-kernel-shared.wasm'),
   resolve(dist, 'landscape-kernel-shared.wasm'),
