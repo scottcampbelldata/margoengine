@@ -9835,7 +9835,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 8,373 B gzip. The plain and shared native assets measure 36,539 and 36,533 B raw, and 14,808 and 14,802 B gzip.
+The DFSPH entry measures 8,526 B gzip. The plain and shared native assets measure 36,539 and 36,533 B raw, and 14,808 and 14,802 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -9888,7 +9888,7 @@ dissipated mechanical energy. Bubble geometry, gas resonance and acoustic radiat
 
 ### Position-based particle water (FLUID-02)
 
-The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,926 B raw and 7,175 B gzip.
+The dedicated PBF entry measures 6,244 B gzip. Each Wasm variant is 17,926 B raw and 7,175 B gzip.
 
 
 
@@ -9903,6 +9903,7 @@ usefully reduces residual compression but retains the same explicit rigid exchan
 handoff, generic mesh contacts, and physical surface tension are tracked separately.
 The `tensile` coefficient is referenced to 60 Hz. Its position increment scales with the squared substep,
 and free-water pairs outside the active density constraints receive zero artificial pressure.
+PBF input failures expose `PHYSICS_INPUT_TYPE` on `TypeError` and `PHYSICS_INPUT_RANGE` on `RangeError`.
 
 ### Rail wheelsets and catenary (DYN-05)
 

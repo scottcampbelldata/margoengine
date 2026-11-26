@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20566554,
+  "total": 20566923,
   "history": [
     {
       "date": "2026-10-24",
@@ -13609,6 +13609,12 @@
       "commit": "SOFT-01 water medium",
       "grew": 1,
       "reason": "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): soft bodies in water: Morison loads per particle (buoyancy from the body density, the water acceleration, the carried water inertia taken implicitly, quadratic drag on rope segments as cylinders and cloth faces as plates); measured gzip (Mac build) 47429 B; it runs in the soft step with the air drag it sits beside, so a separate entry would split one step. Budget (measured + max(3%, 256 B)): 46399 to 48852 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-02 coded particle inputs",
+      "grew": 1,
+      "reason": "FLUID-02 gives particle solver argument errors stable codes and a help link without removing the standard JavaScript error classes. Optional dfsph entry grows from 8526 to 8526 B gzip. Splitting validation would add another module dependency to each entry. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14435,7 +14441,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/crush": 3763,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/dfsph": 8413,
+    "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 10205,

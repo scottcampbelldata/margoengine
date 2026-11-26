@@ -9,6 +9,15 @@ export const BOUNDARY_WORDS = 5;
 const IDENTITY: Quat = [0, 0, 0, 1];
 const ZERO: Vec3 = [0, 0, 0];
 const POLY6 = 315 / (64 * Math.PI);
+const HELP = 'https://github.com/scottcampbelldata/margoengine/tree/main/packages/physics';
+
+export function inputTypeError(message: string) {
+  return Object.assign(new TypeError(`${message} See ${HELP}`), { code: 'PHYSICS_INPUT_TYPE' as const });
+}
+
+export function inputRangeError(message: string) {
+  return Object.assign(new RangeError(`${message} See ${HELP}`), { code: 'PHYSICS_INPUT_RANGE' as const });
+}
 
 interface BoundaryFrame {
   /** Centre in body coordinates when `body` is set. Default origin. */
@@ -40,29 +49,30 @@ export interface PreparedBoundary {
 }
 
 export function vec(input: readonly number[], subject: string): Vec3 {
-  if (!input || input.length !== 3 || !input.every(Number.isFinite))
-    throw new TypeError(`${subject} must have three finite values. Pass an XYZ vector.`);
+  if (input?.length !== 3 || ![input[0], input[1], input[2]].every(Number.isFinite))
+    throw inputTypeError(`${subject} must have three finite values. Pass an XYZ vector.`);
   return [input[0]!, input[1]!, input[2]!];
 }
 
 export function positive(value: number, subject: string): number {
   if (!Number.isFinite(value) || value <= 0)
-    throw new RangeError(`${subject} must be positive and finite. Pass an SI value above zero.`);
+    throw inputRangeError(`${subject} must be positive and finite. Pass an SI value above zero.`);
   return value;
 }
 
 function orientation(input: Quat, subject: string): Quat {
-  if (input.length !== 4 || !input.every(Number.isFinite))
-    throw new TypeError(`${subject} must have four finite values. Pass a quaternion as [x, y, z, w].`);
-  if (!input.some((value) => value !== 0))
-    throw new RangeError(`${subject} cannot have zero length. Pass a nonzero quaternion.`);
+  const components = [input?.[0], input?.[1], input?.[2], input?.[3]];
+  if (input?.length !== 4 || !components.every(Number.isFinite))
+    throw inputTypeError(`${subject} must have four finite values. Pass a quaternion as [x, y, z, w].`);
+  if (components.every((value) => value === 0))
+    throw inputRangeError(`${subject} cannot have zero length. Pass a nonzero quaternion.`);
   return normalizeQuaternion(input);
 }
 
 function sampleBudget(count: number): void {
   // A surface sample needs these arena words before its deterministic grid and host representation.
   if (!Number.isSafeInteger(count) || count * BOUNDARY_WORDS * 8 >= 0x1_0000_0000)
-    throw new RangeError('PBF boundary samples exceed wasm32 memory. Use a larger surface sample spacing.');
+    throw inputRangeError('PBF boundary samples exceed wasm32 memory. Use a larger surface sample spacing.');
 }
 
 function boxSurface(half: Vec3, spacing: number): Vec3[] {
@@ -166,7 +176,7 @@ export function prepareBoundary(
   const centre = vec(input.centre ?? ZERO, 'PBF boundary centre');
   const rotation = orientation(input.rotation ?? IDENTITY, 'PBF boundary rotation');
   if (input.body !== undefined && (!Number.isSafeInteger(input.body) || input.body < 0 || input.body >= bodyCapacity))
-    throw new RangeError(
+    throw inputRangeError(
       'PBF boundary body row is outside the configured rigid ports. Choose a valid RigidSolver row.',
     );
   const sampleSpacing = positive(input.sampleSpacing ?? spacing, 'PBF boundary sample spacing');

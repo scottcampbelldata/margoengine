@@ -4856,6 +4856,10 @@ PBF sizes its impulse field from the whole world's row count. Use `world.couple(
 and paired linear and angular reactions. The solver reads local coordinates from the body's owning cell. Set the
 same `cellSize` on both sides of a floating-origin scene.
 
+PBF argument errors retain `TypeError` for invalid shapes with `code: 'PHYSICS_INPUT_TYPE'` and `RangeError`
+for values outside the supported range with `code: 'PHYSICS_INPUT_RANGE'`. Each message gives the correction
+and links to the physics documentation.
+
 ### Divergence-free liquid pressure
 
 `@margoengine/physics/dfsph` solves density and velocity divergence independently on the world clock. The

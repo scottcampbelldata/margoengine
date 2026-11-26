@@ -17,6 +17,27 @@ test('the native liquid refuses aborted loads and belongs to its destination wor
   assert.equal(pbf.positions().length, 0);
 });
 
+test('particle-fluid argument failures expose stable codes and retain their error classes', async () => {
+  const world = newWorld();
+  await assert.rejects(PbfSolver.load(world.memory, { rate: 8 }), {
+    name: 'RangeError',
+    code: 'PHYSICS_INPUT_RANGE',
+    message: /Choose a dyadic level/,
+  });
+  const pbf = await PbfSolver.load(world.memory);
+  assert.throws(() => world.add(pbf, { walls: [true] }), {
+    name: 'TypeError',
+    code: 'PHYSICS_INPUT_TYPE',
+    message: /Pass six boolean values/,
+  });
+  const curved = await PbfSolver.load(world.memory);
+  assert.throws(() => world.add(curved, { boundaries: [{ shape: 'sphere', radius: 0 }] }), {
+    name: 'RangeError',
+    code: 'PHYSICS_INPUT_RANGE',
+    message: /Pass an SI value above zero/,
+  });
+});
+
 test('a bad emitted batch does not take any reserved rows, and rendering uses only the live XYZ prefix', async () => {
   const world = newWorld();
   const pbf = await PbfSolver.load(world.memory);
@@ -24,7 +45,11 @@ test('a bad emitted batch does not take any reserved rows, and rendering uses on
   const point = { position: [0.25, 0.5, 0.75] };
   assert.equal(pbf.emit([point]), 0);
   const mass = pbf.mass;
-  assert.throws(() => pbf.emit([point, { position: [1, Infinity, 2] }]), /Pass an XYZ vector/);
+  assert.throws(() => pbf.emit([point, { position: [1, Infinity, 2] }]), {
+    name: 'TypeError',
+    code: 'PHYSICS_INPUT_TYPE',
+    message: /Pass an XYZ vector/,
+  });
   assert.equal(pbf.statistics.particles, 1);
   assert.equal(pbf.mass, mass);
   const vertices = new Float32Array(9).fill(7);
@@ -32,5 +57,9 @@ test('a bad emitted batch does not take any reserved rows, and rendering uses on
   assert.equal(active.buffer, vertices.buffer);
   assert.deepEqual([...active], point.position);
   assert.deepEqual([...vertices.slice(3)], [7, 7, 7, 7, 7, 7]);
-  assert.throws(() => pbf.positions(new Float32Array(2)), /Provide three floats per active point/);
+  assert.throws(() => pbf.positions(new Float32Array(2)), {
+    name: 'RangeError',
+    code: 'PHYSICS_INPUT_RANGE',
+    message: /Provide three floats per active point/,
+  });
 });

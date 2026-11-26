@@ -18,6 +18,8 @@ import {
   SOLID_WORDS,
   type PbfBoundary,
   type PreparedBoundary,
+  inputRangeError,
+  inputTypeError,
   positive,
   prepareBoundary,
   vec,
@@ -145,13 +147,13 @@ type State = {
 
 function whole(value: number, minimum: number, label: string): number {
   if (!Number.isSafeInteger(value) || value < minimum)
-    throw new RangeError(`${label} is outside its range. Pass an integer of at least ${minimum}.`);
+    throw inputRangeError(`${label} is outside its range. Pass an integer of at least ${minimum}.`);
   return value;
 }
 
 function fraction(value: number, label: string, maximum = 1): number {
   if (!Number.isFinite(value) || value < 0 || value > maximum)
-    throw new RangeError(`${label} is out of range. Pass a value between zero and ${maximum}.`);
+    throw inputRangeError(`${label} is out of range. Pass a value between zero and ${maximum}.`);
   return value;
 }
 
@@ -183,7 +185,8 @@ export class PbfSolver implements Solver<PbfParams> {
   /** Load the optional plain or shared Wasm for this world's memory. */
   static async load(memory: WebAssembly.Memory, options: PbfOptions = {}): Promise<PbfSolver> {
     const rate = whole(options.rate ?? 0, 0, 'PBF rate');
-    if (rate > 7) throw new RangeError('PBF rate level is outside the world clock. Choose a dyadic level from 0 to 7.');
+    if (rate > 7)
+      throw inputRangeError('PBF rate level is outside the world clock. Choose a dyadic level from 0 to 7.');
     const module = await loadPbfKernel(memory, options.signal);
     return new PbfSolver(options.id ?? 'pbf', module, memory, options.rigid ?? false, rate as RateLevel);
   }
@@ -210,14 +213,14 @@ export class PbfSolver implements Solver<PbfParams> {
     for (let k = 0; k < 3; k++) {
       const span = upper[k]! - lower[k]!;
       if (!Number.isFinite(span) || span < 2 * radius)
-        throw new RangeError('PBF bounds cannot hold a particle. Widen the bounds or reduce the contact radius.');
+        throw inputRangeError('PBF bounds cannot hold a particle. Widen the bounds or reduce the contact radius.');
     }
     if (params.profile !== undefined && params.profile !== 'fast' && params.profile !== 'precise')
-      throw new TypeError('PBF profile is unknown. Choose fast or precise.');
+      throw inputTypeError('PBF profile is unknown. Choose fast or precise.');
     const iterations = whole(params.iterations ?? (params.profile === 'precise' ? 12 : 4), 1, 'PBF iterations');
     const walls = params.walls ?? [true, true, true, true, true, true];
     if (walls.length !== 6 || !walls.every((value) => typeof value === 'boolean'))
-      throw new TypeError('PBF walls must name six faces. Pass six boolean values in min/max XYZ order.');
+      throw inputTypeError('PBF walls must name six faces. Pass six boolean values in min/max XYZ order.');
     const mask = walls.reduce((flags, closed, index) => flags + (closed ? 1 << index : 0), 0);
     const boundaries = params.boundaries ?? [];
     const rows = boundaries.flatMap(({ body }) => (body === undefined ? [] : [body]));
@@ -237,7 +240,7 @@ export class PbfSolver implements Solver<PbfParams> {
           2 * IMPULSE_WORDS * bodyCapacity) +
       4 * (bucketCount * BUCKET_WORDS + 2 * (capacity + sampleCount));
     if (bytes >= MAX_MEMORY_PAGES * 65536)
-      throw new RangeError(
+      throw inputRangeError(
         'PBF grid and state exceed the wasm32 arena. Reserve fewer points or use coarser boundary sampling.',
       );
     const settings = [
@@ -412,7 +415,7 @@ export class PbfSolver implements Solver<PbfParams> {
   sample(index: number): PbfReading {
     const state = this.ready();
     if (!Number.isSafeInteger(index) || index < 0 || index >= numbers(state, state.stats)[0]!)
-      throw new RangeError('PBF point is outside the active rows. Choose a valid sample index.');
+      throw inputRangeError('PBF point is outside the active rows. Choose a valid sample index.');
     const out = numbers(state, state.points);
     const at = index * PBF_PARTICLE_WORDS;
     return { position: xyz(out, at), velocity: xyz(out, at + 3), density: out[at + 6]!, mass: out[at + 7]! };
@@ -424,7 +427,7 @@ export class PbfSolver implements Solver<PbfParams> {
     const count = numbers(state, state.stats)[0]!;
     const buffer = out ?? new Float32Array(count * 3);
     if (buffer.length < count * 3)
-      throw new RangeError('PBF position buffer is too short. Provide three floats per active point.');
+      throw inputRangeError('PBF position buffer is too short. Provide three floats per active point.');
     const rows = numbers(state, state.points);
     for (let i = 0; i < count; i++) {
       const from = i * PBF_PARTICLE_WORDS;
