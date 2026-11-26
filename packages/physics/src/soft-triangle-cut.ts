@@ -28,7 +28,6 @@ type Parent = {
 type Weights = NonNullable<SlicePoint['vertices']>;
 const AXES = [0, 1, 2] as const;
 const SIGNS = [-1, 1] as const;
-const EDGE_PLANES = [1, 2, 3] as const;
 
 const reference = (p: number): SlicePoint => ({ first: p, second: p, weight: 0 });
 const vertexOrder = (a: number, b: number): number => a - b;
@@ -37,8 +36,9 @@ const vector = (f: (i: 0 | 1 | 2) => number): Vec3 => [f(0), f(1), f(2)];
 
 class IncisionGeometry {
   readonly points: SlicePoint[];
+  readonly edgePlanes: readonly number[];
   private readonly positions: Vec3[];
-  private readonly zeros = [new Set<number>(), new Set<number>(), new Set<number>(), new Set<number>()];
+  private readonly zeros: Set<number>[];
   private readonly intersections = new Map<string, number>();
   private readonly subdivisions = new Map<string, number[]>();
   private readonly centres = new Map<string, number>();
@@ -47,6 +47,8 @@ class IncisionGeometry {
     current: Float32Array,
     private readonly planes: readonly Plane[],
   ) {
+    this.edgePlanes = planes.slice(1).map((_, i) => i + 1);
+    this.zeros = planes.map(() => new Set<number>());
     this.positions = Array.from({ length: current.length / 3 }, (_, p) => vector((i) => current[p * 3 + i]!));
     this.points = this.positions.map((_, p) => reference(p));
   }
@@ -103,7 +105,7 @@ class IncisionGeometry {
     const first = Math.min(a, b);
     const last = Math.max(a, b);
     const crossings: { plane: number; fraction: number }[] = [];
-    for (const plane of EDGE_PLANES) {
+    for (const plane of this.edgePlanes) {
       const u = this.distance(plane, first);
       const v = this.distance(plane, last);
       if (Math.sign(u) * Math.sign(v) < 0) crossings.push({ plane, fraction: u / (u - v) });
@@ -122,7 +124,7 @@ class IncisionGeometry {
       nodes.push(this.intersection(plane, first, last));
     }
     const boundary = [first, ...nodes, last];
-    const front = (node: number): boolean => EDGE_PLANES.some((plane) => this.distance(plane, node) === 0);
+    const front = (node: number): boolean => this.edgePlanes.some((plane) => this.distance(plane, node) === 0);
     const refined: number[] = [];
     for (let i = 0; i < boundary.length - 1; i++) {
       const a = boundary[i]!;
@@ -130,7 +132,11 @@ class IncisionGeometry {
       if (i > 0) refined.push(a);
       // A seam inside the blade can join two points on its front. Insert an interior
       // degree of freedom so the two lips do not share that edge in the tetrahedron mesh.
-      if (front(a) && front(b) && EDGE_PLANES.every((plane) => this.distance(plane, a) + this.distance(plane, b) > 0)) {
+      if (
+        front(a) &&
+        front(b) &&
+        this.edgePlanes.every((plane) => this.distance(plane, a) + this.distance(plane, b) > 0)
+      ) {
         const mid = this.blend([a, b], [0.5, 0.5]);
         this.zeros[0]!.add(mid);
         refined.push(mid);
@@ -218,8 +224,33 @@ export function planTriangleCut(
       normal: cross(n, subtract(blade[(i + 1) % 3]!, blade[i])),
     })),
   ];
+  return planIncision(current, cells, planes, null);
+}
+
+/** Release the entire section through the nominated material tetrahedron. */
+export function planNucleatedCut(
+  current: Float32Array,
+  cells: Uint32Array,
+  cell: number,
+  normal: Vec3,
+): SlicePlan | null {
+  const origin = vector((axis) => {
+    let sum = 0;
+    for (let k = 0; k < 4; k++) sum += current[cells[cell * 4 + k]! * 3 + axis]!;
+    return sum * 0.25;
+  });
+  return planIncision(current, cells, [{ origin, normal }], cell);
+}
+
+function planIncision(
+  current: Float32Array,
+  cells: Uint32Array,
+  planes: readonly Plane[],
+  nominated: number | null,
+): SlicePlan | null {
   const g = new IncisionGeometry(current, planes);
-  const d = cutDistances(current, blade[0], n);
+  const { origin, normal } = planes[0]!;
+  const d = cutDistances(current, origin, normal);
   const sections = new Map<string, Section>();
   const section = (ring: number[], negative: boolean, positive: boolean): Section => {
     const key = faceKey(ring);
@@ -263,11 +294,12 @@ export function planTriangleCut(
     });
   }
 
+  const nominatedSection = nominated === null ? null : parents[nominated]?.parts[0]?.section;
   const openSections = new Set<Section>();
   for (const cap of sections.values()) {
-    if (!cap.negative || !cap.positive) continue;
+    if (!cap.negative || !cap.positive || (nominated !== null && cap !== nominatedSection)) continue;
     let inside = cap.ring;
-    for (const plane of EDGE_PLANES) {
+    for (const plane of g.edgePlanes) {
       if (inside.length === 0) break;
       inside = g.splitRing(inside, plane).find((part) => part.inside)?.ring ?? [];
     }
@@ -285,7 +317,7 @@ export function planTriangleCut(
     }
     cap.refined = true;
     let sectors = [{ ring, covered: true }];
-    for (const plane of EDGE_PLANES) {
+    for (const plane of g.edgePlanes) {
       sectors = sectors.flatMap(({ ring, covered }) =>
         g.splitRing(ring, plane).map((part) => ({ ring: part.ring, covered: covered && part.inside })),
       );

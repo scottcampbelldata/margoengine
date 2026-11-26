@@ -1,6 +1,17 @@
 // The exports TypeScript calls for tetrahedra and clusters: rows by id, filled through the columns and `soft_tet_set`.
 use crate::api::world;
 
+/// Returns the most stretched cell over the supplied limit and leaves its current tensile axis in scratch.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_tensile_nucleation(first: u32, count: u32, threshold: f64) -> u32 {
+    world().tensile_nucleation(first as usize, count as usize, threshold)
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_fracture_axis() -> u32 {
+    world().fem.fracture_axis.as_ptr() as usize as u32
+}
+
 macro_rules! fem_columns {
     ($(($name:ident, $($field:tt)+),)*) => {
         #[allow(non_camel_case_types)]

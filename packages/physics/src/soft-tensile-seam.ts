@@ -4,6 +4,9 @@ import { cross, dot, subtract, type Tet } from './soft-plane-cut.js';
 type Triangle = readonly [Vec3, Vec3, Vec3];
 type Edges = [Vec3, Vec3, Vec3];
 
+/** Native cell flag carried through a cut and snapshots. */
+export const NUCLEATED_CELL = 32;
+
 /** A triangular weak patch in a single tetrahedron, opened by positive normal Green strain. */
 export interface SoftTensileSeam {
   /** The cell containing the patch, numbered in the order supplied to `setCells`. */

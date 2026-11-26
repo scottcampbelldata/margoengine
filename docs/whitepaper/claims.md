@@ -81,6 +81,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   rotated fixture, both lips have their analytically expected area. Restoring an intact snapshot
   repeats the opening and final hash. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Principal-strain tensile nucleation (SOFT-04, 2026-11-26). The unseeded option opens the
+  principal strain plane inside a tetrahedron under a derived native tensile load. Closed
+  fragment surfaces expose the analytically predicted area, and replay preserves the
+  crack history. A neighboring cell can nucleate on a later step while the first material
+  region stays intact after its opening. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

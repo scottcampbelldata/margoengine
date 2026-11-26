@@ -10062,6 +10062,11 @@ The seam rides the cell in affine coordinates. When the prescribed positive open
 the finite cut builds real separate lips, transfer preserves linear momentum, and the common
 tear event reports the source cell. An intact snapshot replays the same opening and state hash.
 
+The unseeded option scans the existing native cell state after contact, bounds the maximum
+strain and diagonalizes the surviving symmetric tensors. The principal direction orients the
+exact centroid section of the most stretched cell. The inherited native flag suppresses
+repeat nucleation in that material region and leaves all uncracked neighbors eligible.
+
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows
 cells through body compaction, both cut paths, and world snapshots. The existing tear scheduler

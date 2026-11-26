@@ -4,6 +4,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
 import type { SliceCell, SlicePlan, SlicePoint } from './soft-plane-cut.js';
 import { carryCutSurface, type SoftDestination, type SoftSplit } from './soft-split.js';
+import { NUCLEATED_CELL } from './soft-tensile-seam.js';
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 
 type NodeState = {
@@ -44,6 +45,7 @@ export function makeCutPieces(
   body: SoftBody,
   make: (positions: number[]) => SoftBodyDesc,
   planCut: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
+  crackedCell?: number,
 ): SoftSplit | null {
   const current = body.particlePositions();
   const oldCells = body.cells();
@@ -123,6 +125,7 @@ export function makeCutPieces(
         initialBasis: childBasis(cell, fem, row, 'o'),
         flowed: fem.flowed![row]!,
         load: fem.load![row]!,
+        fractured: cell.parent === crackedCell || (fem.flags![row]! & NUCLEATED_CELL) !== 0,
         parent: cell.parent,
       };
     });
@@ -154,6 +157,7 @@ export function makeCutPieces(
     desc.orthotropy = orthotropy;
     desc.orthotropicStrength = strength;
     desc.crackBand = bandLimits;
+    desc.tensileNucleation = body.tensileNucleation;
     desc.inheritedBand = bandLimits !== null;
     desc.groups = body.collisionGroups;
     desc.shapeMatching = body.matched;
@@ -219,6 +223,7 @@ export function makeCutPieces(
       f.vol0![row] = data.volume;
       f.flowed![row] = data.flowed;
       f.load![row] = data.load;
+      if (data.fractured) f.flags![row] = f.flags![row]! | NUCLEATED_CELL;
       if (damage) soft.restoreOrthotropicFailure(row, damage, data.parent);
       if (band) soft.restoreCrackBand(row, band, data.parent);
     });

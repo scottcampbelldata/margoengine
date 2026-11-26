@@ -9683,8 +9683,16 @@ the soft step, and consumes the seam when the topology changes. Use it with an u
 solid without springs, clusters or other native fracture criteria. The intact body has the usual
 elasticity up to the strain threshold. Normal compression, inverted cells and pure rigid rotation
 cannot trigger the seam. Restore an intact snapshot into the same topology with the same authored
-seam to replay the event. Unseeded fracture still follows existing cell faces.
+seam to replay the event.
 With tensile seams the optional entry is 138,830 B gzip, including 43,642 B in its base.
+
+Unseeded tensile nucleation scans the cells once after the soft step. It selects the largest
+principal elastic Green strain and opens the full centroid section of that cell. The scan skips
+inverted and previously nucleated material and uses an eigenvalue bound to avoid diagonalizing
+cells whose strain is too low. Other cells remain eligible after the topology changes. The
+remesher may also subdivide tetrahedra intersecting the supporting plane to preserve shared
+faces. Crack-front tracking and mixed-mode propagation remain open. Use tensile nucleation
+as the fracture rule on unskinned cells without independent springs or clusters.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.

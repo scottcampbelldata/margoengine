@@ -26,6 +26,7 @@ mod volume;
 pub mod fem;
 mod implicit;
 mod orthotropic;
+mod tensile_nucleation;
 mod projective;
 mod vertex_block;
 mod fem_api;

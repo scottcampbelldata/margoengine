@@ -15,12 +15,14 @@ import { makeCutPieces } from './soft-plane-pieces.js';
 import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
 import { bindTensileSeam, type BoundTensileSeam, openTensileSeam, type SoftTensileSeam } from './soft-tensile-seam.js';
-import { planTriangleCut } from './soft-triangle-cut.js';
+import { planNucleatedCut, planTriangleCut } from './soft-triangle-cut.js';
 
 export type { SoftDestination, SoftSplit } from './soft-split.js';
 export type { SoftTensileSeam } from './soft-tensile-seam.js';
 
 interface SoftExports extends WebAssembly.Exports {
+  soft_fem_tensile_nucleation(first: number, count: number, threshold: number): number;
+  soft_fem_fracture_axis(): number;
   memory: WebAssembly.Memory;
   soft_reserve(particles: number, edges: number, bodies: number, colliders: number): void;
   soft_column(id: number): number;
@@ -1010,6 +1012,7 @@ export class SoftBodyDesc {
   /** @internal */ orthotropicStrength: readonly number[] | null = null;
   /** @internal */ crackBand: readonly number[] | null = null;
   /** @internal */ tensileSeam: SoftTensileSeam | null = null;
+  /** @internal */ tensileNucleation: number | null = null;
   /** @internal A split inherits the validated reference volumes from the original cells. */
   inheritedBand = false;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
@@ -1640,6 +1643,12 @@ export class SoftBodyDesc {
     return this;
   }
 
+  /** Lets an overstretched cell start a tensile crack inside its volume with no authored path. */
+  setTensileNucleation(openingStrain: number | null): this {
+    this.tensileNucleation = openingStrain;
+    return this;
+  }
+
   /**
    * Gives the body tetrahedral cells: four particle indices per cell, the shape the particles stand in now as the cell's rest
    * shape. A cell listed left-handed has its last two corners swapped. The cells carry the body's elasticity (and its plastic
@@ -1994,6 +2003,8 @@ export class SoftBody {
   ) {}
   /** @internal */ removed = false;
   /** @internal */ cellsTornSeen = new Set<number>();
+  /** @internal The principal-strain limit inherited by uncracked regions of a split body. */
+  tensileNucleation: number | null = null;
   /** @internal The skin, and the cells (four particle indices each) it was bound against. */ skin: Skin | null = null;
   /** @internal */ skinCells = new Uint32Array(0);
   /** @internal Where each particle stood when the last step began (x, y, z), for drawing between steps. */ previous =
@@ -2801,7 +2812,7 @@ export class SoftBodies implements PhysicsAttachment {
   steps = 0;
   private bound: BoundMesh[] = [];
   private attachments: { soft: SoftBody; index: number; body: PhysicsBody; local: Vec3 }[] = [];
-  private readonly tensileSeams = new Map<SoftBody, BoundTensileSeam>();
+  private readonly tensileFractures = new Map<SoftBody, BoundTensileSeam | number>();
   private particleCount = 0;
   private edgeCount = 0;
   private cellView: Columns | null = null;
@@ -3040,8 +3051,18 @@ export class SoftBodies implements PhysicsAttachment {
       );
     checkStrengthModel(desc.orthotropicStrength, desc.cellMaterial);
     const seam = desc.tensileSeam && bindTensileSeam(desc.tensileSeam, desc.positions, desc.cells);
+    const nucleus = desc.tensileNucleation;
+    if (nucleus !== null && (!Number.isFinite(nucleus) || !(Math.fround(1 + 2 * nucleus) > 1) || !desc.cells.length))
+      throw new RangeError(
+        'Tensile nucleation needs cells and a positive strain resolvable in f32. Build a solid and increase openingStrain.',
+      );
+    if (seam && nucleus !== null)
+      throw new RangeError(
+        'Authored and nucleated cracks use different opening rules. Clear one fracture mode with null.',
+      );
+    const fracture = seam ?? nucleus;
     if (
-      seam &&
+      fracture !== null &&
       (desc.edgePairs.length ||
         desc.bendPairs.length ||
         desc.clusterGroups.length ||
@@ -3050,7 +3071,7 @@ export class SoftBodies implements PhysicsAttachment {
         desc.cellMaterial.tearStrain > 0)
     )
       throw new RangeError(
-        'A tensile seam needs a tetrahedral solid without springs, clusters, skin or native tear limits. Use a separate solid.',
+        'A tensile crack needs tetrahedral cells without springs, clusters, skin or native tear limits. Use a separate solid.',
       );
     if (desc.crackBand && !desc.inheritedBand) {
       const limit = Math.min(...desc.crackBand);
@@ -3272,7 +3293,8 @@ export class SoftBodies implements PhysicsAttachment {
     // A surface collider only when asked: the particles and the faces meet rigid bodies in the soft step, and a mesh would answer
     // a second time.
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
-    if (seam) this.tensileSeams.set(body, seam);
+    body.tensileNucleation = nucleus;
+    if (fracture !== null) this.tensileFractures.set(body, fracture);
     return body;
   }
 
@@ -4171,7 +4193,7 @@ export class SoftBodies implements PhysicsAttachment {
       info.proxy = null;
     }
     this.attachments = this.attachments.filter((a) => a.soft !== body);
-    this.tensileSeams.delete(body);
+    this.tensileFractures.delete(body);
     for (const mesh of this.bound.filter((m) => m.soft === body)) mesh.host.remove();
     this.bound = this.bound.filter((m) => m.soft !== body);
     body.surface?.remove();
@@ -4389,7 +4411,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.cellTornByHand = false;
       this.report(c);
     }
-    if (this.tensileSeams.size > 0) this.openTensileSeams();
+    if (this.tensileFractures.size > 0) this.openTensileFractures();
     const live = this.columns();
     for (const body of this.bodies) if (body.surface) this.moveSurface(body, live);
     for (const mesh of this.bound) this.moveBound(mesh, live);
@@ -4896,10 +4918,10 @@ export class SoftBodies implements PhysicsAttachment {
     settings: Omit<ColliderSettings, 'offset' | 'rotation'> = {},
   ): PhysicsCollider {
     if (soft.removed) throw new MargoError('state', 'Soft body was removed; create a new one with SoftBodies.create.');
-    if (this.tensileSeams.has(soft))
+    if (this.tensileFractures.has(soft))
       throw new MargoError(
         'state',
-        'A tensile seam cannot split a separately bound collider. Use createSurfaceCollider for the fracture surface.',
+        'A tensile crack cannot split a separately bound collider. Use createSurfaceCollider for the fracture surface.',
       );
     const count = mesh.vertices.length / 3;
     if (!Number.isInteger(count) || count < 3)
@@ -5226,20 +5248,40 @@ export class SoftBodies implements PhysicsAttachment {
   private splitGeometrically(
     body: SoftBody,
     plan: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
+    crackedCell?: number,
   ): SoftSplit | null {
     return this.transferCutAttachments(body, () =>
-      makeCutPieces(this, body, (positions) => new SoftBodyDesc(positions), plan),
+      makeCutPieces(this, body, (positions) => new SoftBodyDesc(positions), plan, crackedCell),
     );
   }
 
-  private openTensileSeams(): void {
-    for (const [body, seam] of [...this.tensileSeams]) {
+  private openTensileFractures(): void {
+    for (const [body, fracture] of [...this.tensileFractures]) {
       if (body.removed || body.asleep) continue;
-      const blade = openTensileSeam(seam, (particle) => body.particlePosition(particle));
+      if (typeof fracture === 'number') {
+        this.nucleateTensileFracture(body, fracture);
+        continue;
+      }
+      const blade = openTensileSeam(fracture, (particle) => body.particlePosition(particle));
       if (!blade || body.tornCells().length > 0) continue;
       const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
-      if (split) this.announce(body, [], [seam.cell], split);
+      if (split) this.announce(body, [], [fracture.cell], split);
     }
+  }
+
+  private nucleateTensileFracture(body: SoftBody, threshold: number): void {
+    const { first, count } = body.cellRange;
+    const row = this.exports.soft_fem_tensile_nucleation(first, count, threshold) >>> 0;
+    if (row === NO_NEIGHBOUR || body.tornCells().length > 0) return;
+    const axis = new Float64Array(this.exports.memory.buffer, this.exports.soft_fem_fracture_axis(), 3);
+    const direction: Vec3 = [axis[0]!, axis[1]!, axis[2]!];
+    const cell = row - first;
+    const split = this.splitGeometrically(
+      body,
+      (current, cells) => planNucleatedCut(current, cells, cell, direction),
+      cell,
+    );
+    if (split) this.announce(body, [], [cell], split);
   }
 
   private checkSolidCut(body: SoftBody): void {
@@ -5284,7 +5326,7 @@ export class SoftBodies implements PhysicsAttachment {
       for (const info of body.clusterInfo) if (info.proxy?.valid) this.physics.removeBody(info.proxy);
     }
     this.bodies.length = 0;
-    this.tensileSeams.clear();
+    this.tensileFractures.clear();
     this.listeners.clear();
   }
   [Symbol.dispose](): void {

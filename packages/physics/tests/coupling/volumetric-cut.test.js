@@ -613,7 +613,7 @@ test('a tensile seam rejects points outside its material cell and purely face-al
   );
 });
 
-test('applied tensile force opens a native volumetric seam inside the tetrahedron', async () => {
+test('applied tensile force opens an authored or nucleated crack inside the tetrahedron', async () => {
   const openingStrain = 0.005;
   const stiffness = 1200;
   const material = Object.assign(new CellMaterial(), {
@@ -621,38 +621,109 @@ test('applied tensile force opens a native volumetric seam inside the tetrahedro
     poissonRatio: 0,
     deformationDamping: 0,
   });
-  const { soft, body, world } = await specimen(
-    tetrahedron()
+  const fractureModes = [
+    [
+      (desc) =>
+        desc.setTensileSeam({
+          cell: 0,
+          triangle: [
+            [0.5, 0.2, 0.2],
+            [0.5, 0.65, 0.2],
+            [0.5, 0.2, 0.65],
+          ],
+          openingStrain,
+        }),
+      1,
+    ],
+    [(desc) => desc.setTensileNucleation(openingStrain), 2],
+  ];
+  // For this lateral constraint, stable Neo-Hookean elasticity at Poisson ratio zero has
+  // P_xx = E (stretch - 1). The corner's force is P_xx times rest volume divided by edge length.
+  const criticalStretch = Math.sqrt(1 + 2 * openingStrain);
+  const criticalForce = (unitVolume * stiffness * (criticalStretch - 1)) / 2;
+  for (const [fracture, pieceCount] of fractureModes) {
+    const desc = tetrahedron()
       .setCells([0, 1, 2, 3], material)
       .setMass(4)
       .setPinnedParticles([0, 2, 3])
       .setLinearDamping(4)
-      .setSolver('vertex-block')
-      .setTensileSeam({
-        cell: 0,
-        triangle: [
-          [0.5, 0.2, 0.2],
-          [0.5, 0.65, 0.2],
-          [0.5, 0.2, 0.65],
-        ],
-        openingStrain,
-      }),
-  );
+      .setSolver('vertex-block');
+    const { soft, body, world } = await specimen(fracture(desc));
+    const events = [];
+    soft.onTear((event) => events.push(event));
+    body.addParticleForce(1, [criticalForce / 4, 0, 0]);
+    world.advance(120);
+    assert.equal(events.length, 0);
+    assert.ok(body.particlePosition(1)[0] > 2);
+    body.resetForces().addParticleForce(1, [2 * criticalForce, 0, 0]);
+    world.advance(240);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].pieces.length, pieceCount);
+    const [tip] = events[0].destination(1);
+    assert.ok(tip.body.particlePosition(tip.particle)[0] > 2 * criticalStretch);
+  }
+});
+
+test('unseeded tensile nucleation cuts the principal plane and never reopens that material region', async () => {
+  const create = async () => {
+    const item = await specimen(
+      tetrahedron().setPinnedParticles([0, 1, 2, 3]).setSolver('vertex-block').setTensileNucleation(0.005),
+    );
+    const events = [];
+    item.soft.onTear((event) => events.push(event));
+    return { ...item, events };
+  };
+  const stretch = (item, frame, scale) => {
+    position.forEach(([x, y, z], i) => item.body.setParticleKinematicTarget(i, [3 - y, 1 + scale * x, z - 1]));
+    item.world.advance(frame);
+  };
+  const a = await create();
+  const b = await create();
+  stretch(a, 1, 0.96);
+  assert.equal(a.events.length, 0, 'compression does not nucleate a tensile crack');
+  stretch(a, 2, 1.004);
+  assert.equal(a.events.length, 0, 'analytically subcritical strain does not cut');
+  b.world.advance(1);
+  b.world.restoreSnapshot(a.world.takeSnapshot().bytes);
+  for (const item of [a, b]) {
+    stretch(item, 3, 1.1);
+    assert.equal(item.events.length, 1);
+    const [{ pieces, cells }] = item.events;
+    assert.deepEqual(cells, [0]);
+    assert.equal(pieces.length, 2);
+    let area = 0;
+    for (const piece of pieces) {
+      closed(piece);
+      const triangles = piece.triangles();
+      for (let j = 0; j < triangles.length; j += 3) {
+        const [p, q, r] = [...triangles.subarray(j, j + 3)].map((i) => piece.particlePosition(i));
+        if ([p, q, r].every((v) => Math.abs(v[1] - 1.55) < 4 * epsilon32))
+          area += Math.abs((q[0] - p[0]) * (r[2] - p[2]) - (r[0] - p[0]) * (q[2] - p[2])) / 2;
+      }
+    }
+    bound(area, 2.25, 2.25, 'both centroid sections are perpendicular to the rotated stretch axis');
+    item.world.advance(12);
+    assert.equal(item.events.length, 1, 'the same overstressed material does not keep subdividing');
+  }
+  assert.equal(a.world.hash(), b.world.hash());
+});
+
+test('native nucleation selects the largest cell strain and leaves other material eligible', async () => {
+  const desc = new SoftBodyDesc([...position, [0, 0, -2]])
+    .setCells([0, 1, 2, 3, 0, 2, 1, 4])
+    .setSurface()
+    .setPinnedParticles([0, 1, 2, 3, 4])
+    .setTensileNucleation(0.005);
+  const { soft, body, world } = await specimen(desc);
   const events = [];
   soft.onTear((event) => events.push(event));
-  // In this constrained axial configuration, stable Neo-Hookean with Poisson ratio zero gives
-  // P_xx = E (stretch - 1). The corner's force is P_xx times rest volume divided by edge length.
-  const criticalStretch = Math.sqrt(1 + 2 * openingStrain);
-  const criticalForce = (unitVolume * stiffness * (criticalStretch - 1)) / 2;
-  body.addParticleForce(1, [criticalForce / 4, 0, 0]);
-  world.advance(120);
-  assert.equal(events.length, 0);
-  assert.ok(body.particlePosition(1)[0] > 2);
-  body.resetForces().addParticleForce(1, [2 * criticalForce, 0, 0]);
-  world.advance(240);
+  body.setParticleKinematicTarget(3, [0, 0, 2.04]);
+  body.setParticleKinematicTarget(4, [0, 0, -2.2]);
+  world.advance(1);
   assert.equal(events.length, 1);
-  assert.equal(events[0].pieces.length, 1);
-  assert.ok(
-    events[0].destination(1)[0].body.particlePosition(events[0].destination(1)[0].particle)[0] > 2 * criticalStretch,
-  );
+  assert.deepEqual(events[0].cells, [1], 'the more stretched cell nucleates first');
+  world.advance(2);
+  assert.equal(events.length, 2, 'the remaining original cell can still fracture');
+  world.advance(12);
+  assert.equal(events.length, 2);
 });

@@ -3,6 +3,7 @@
 // During Simulation", SIGGRAPH 2004), and each piece of cells that is no longer joined to another becomes a soft body of its own,
 // with the rest shapes, plastic flow and rest lengths its cells and edges had.
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
+import { NUCLEATED_CELL } from './soft-tensile-seam.js';
 import { boundaryTriangles } from './soft-volume.js';
 
 const TORN = 1;
@@ -286,6 +287,7 @@ function carry(
   desc.orthotropy = body.orthotropy;
   desc.orthotropicStrength = body.orthotropicStrength;
   desc.crackBand = body.crackBand;
+  desc.tensileNucleation = body.tensileNucleation;
   desc.inheritedBand = desc.crackBand !== null;
   desc.groups = body.collisionGroups;
   desc.shapeMatching = body.matched;
@@ -436,6 +438,7 @@ function splitCells(
     ];
     mine.forEach((t, i) => {
       const row = piece.cellRange.first + i;
+      fem.flags![row] = fem.flags![row]! | (flags[t]! & NUCLEATED_CELL);
       if (damage) soft.restoreOrthotropicFailure(row, damage, t - first);
       if (band) soft.restoreCrackBand(row, band, t - first);
       for (const name of names) {

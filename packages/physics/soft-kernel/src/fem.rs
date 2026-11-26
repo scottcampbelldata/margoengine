@@ -46,6 +46,8 @@ pub const IMPLICIT_TET: u32 = 4;
 pub const VERTEX_BLOCK_TET: u32 = 8;
 /// The cell uses the local/global projective solve (src/projective.rs).
 pub const PROJECTIVE_TET: u32 = 16;
+/// This material region already nucleated a tensile crack. It still solves its elasticity.
+pub const NUCLEATED_TET: u32 = 32;
 /// No neighbour across a face.
 pub const NONE: u32 = u32::MAX;
 
@@ -56,6 +58,7 @@ pub struct Fem {
     /// Tetrahedra in use, and how many have torn so far.
     pub count: usize,
     pub torn: u32,
+    pub(crate) fracture_axis: [f64; 3],
     /// Rayleigh-style damping of the elastic constraints, 1 / s: the share of the relative speed along a constraint that they remove.
     pub damping: f32,
     /// The four corners, B = Dm^-1 row by row, rest volume.
@@ -145,6 +148,7 @@ impl Fem {
         Fem {
             count: 0,
             torn: 0,
+            fracture_axis: [0.0; 3],
             damping: 0.0,
             p: [U; 4],
             b: [F; 9],
