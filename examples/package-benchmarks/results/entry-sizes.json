@@ -14078,6 +14078,10 @@
       "./sea": {
         "raw": 19649,
         "gzip": 7745
+      },
+      "./snowpack": {
+        "raw": 13595,
+        "gzip": 5737
       }
     },
     "@margoengine/physics2d": {
@@ -17060,8 +17064,8 @@
         "gzip": 5577
       },
       "./avalanche": {
-        "raw": 17675,
-        "gzip": 6738
+        "raw": 18826,
+        "gzip": 7195
       },
       "./eruption": {
         "raw": 24673,
@@ -17879,6 +17883,16 @@
       "raw": 9128,
       "gzip": 4318,
       "brotli": 3792
+    },
+    "packages/physics/dist/snowpack-kernel.wasm": {
+      "raw": 6455,
+      "gzip": 2811,
+      "brotli": 2595
+    },
+    "packages/physics/dist/snowpack-kernel-shared.wasm": {
+      "raw": 6455,
+      "gzip": 2811,
+      "brotli": 2611
     }
   },
   "splits": {

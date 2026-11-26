@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20096393,
+  "total": 20103109,
   "history": [
     {
       "date": "2026-10-24",
@@ -12819,6 +12819,12 @@
       "commit": "fdac6c12cc",
       "reason": "ICE-03 adds physics/iceberg at 5162 B gzip (cap 5418 B) with lazy stateless Wasm. Physics/sea goes from its recorded 7361 B to 7745 B gzip (cap 7361 to 8001 B) for its typed SeaSource registry reader and checked coordinates. Splitting the reader would duplicate WakeSolver’s source stamping and add another entry. Core plus stage remains 24820 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "32e73cd1d9",
+      "grew": 2,
+      "reason": "ICE-01 entry sizes, previous record to current: @margoengine/physics/snowpack 0→5737 B (ceiling 0→5993 B); @margoengine/weather/avalanche 6738→7195 B (ceiling 6984→7451 B). The snowpack entry integrates the registry and lazily loads the arena solver. Weather adds solid reflection and distributed obstacle drag to the same avalanche flux. A separate wrapper would need to duplicate the main flow step to change its conservative boundary flux."
     }
   ],
   "items": {
@@ -13652,11 +13658,13 @@
     "@margoengine/physics/orbit": 4273,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/rogue": 7930,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
     "@margoengine/physics/seakeeping": 13843,
     "@margoengine/physics/sediment": 5512,
+    "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
@@ -14416,7 +14424,7 @@
     "@margoengine/water/wake": 1680,
     "@margoengine/weather": 8762,
     "@margoengine/weather/audio": 1908,
-    "@margoengine/weather/avalanche": 6984,
+    "@margoengine/weather/avalanche": 7451,
     "@margoengine/weather/boundary-layer": 2596,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
@@ -14708,7 +14716,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/rogue": 7930
+    "margoengine/web": 577
   }
 }

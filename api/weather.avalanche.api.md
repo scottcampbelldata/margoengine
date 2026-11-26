@@ -58,6 +58,8 @@ export interface AvalancheOptions {
     readonly origin?: readonly [number, number];
     readonly ground?: ArrayLike<number>;
     readonly snow?: AvalancheSnow;
+    readonly blocked?: ArrayLike<number>;
+    readonly obstacleDrag?: number | ArrayLike<number>;
     readonly cover?: number | ArrayLike<number>;
     readonly release?: AvalancheRelease | 'unstable';
     readonly releaseDepth?: number;
