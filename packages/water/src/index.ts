@@ -10,6 +10,7 @@ import {
 } from '@margoengine/core/extension';
 import { acquireDepth, group } from '../../shared/gpu.js';
 import { CoastalFlow, NO_FILL, waterFrame, oceanWaves } from './coastal.js';
+import { WATER_FLOW_TICKS_PER_FRAME } from './film.js';
 import { coastSurf, surfWaves } from './surf.js';
 import { Spray } from './spray.js';
 import { displayShader } from '../../shared/display.js';
@@ -141,8 +142,7 @@ const FAR_AT = 144;
 const SEA_AT = FAR_AT + FAR_FLOATS;
 /** The most waves a {@link WaterSea} may give Water to draw. */
 export const WATER_SEA_WAVES = 896;
-/** The most flow ticks a frame runs with a film clock (`WaterOptions.clock`); `settle()` runs the rest. */
-export const WATER_FLOW_TICKS_PER_FRAME = 480;
+export { WATER_FLOW_TICKS_PER_FRAME };
 // One tick's slice of the frame uniform: everything before the sea's rows, which the flow and the spray read.
 const TICK_FLOATS = SEA_AT + 4;
 const TICK_BYTES = TICK_FLOATS * 4;

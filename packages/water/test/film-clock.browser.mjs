@@ -1,6 +1,6 @@
 // Water on a film clock (WaterOptions.clock, PA-03): the coastal flow and its spray step in ticks of 1/240 s that the
 // clock owes, each with its own wave time and step from the ring of frame-uniform slices, so the same beach drawn at 24,
-// 30, 60 and 5 fps holds the same flow state and the same spray, every byte, at 1 s and 2 s; a fresh water whose clock
+// 30, 60 and 5 fps holds the same flow state, spray and ripples (a drop queued at 1 s), every byte, at 1 s and 2 s; a fresh water whose clock
 // is set to 3 s and then settled holds what a continuous run holds there; and a clock set back replays to the earlier
 // time. On the WebGL2 layer the kernels' routes are warmed first (its CPU path and its GL route round differently). Run on WebGPU and (MARGO_COMPAT=1) the WebGL2 compatibility layer:
 //   node scripts/run-with-timeout.mjs -- node packages/water/test/film-clock.browser.mjs
@@ -23,6 +23,7 @@ try {
     const { Water } = await import('/packages/water/dist/index.js');
     const { FilmClock } = await import('/packages/math/dist/clock.js');
     const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+    const { Ripples } = await import('/packages/water/dist/ripples.js');
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:160px;height:128px';
     document.body.replaceChildren(canvas);
@@ -91,8 +92,9 @@ try {
           sprayCount: 1024,
           waves: [{ direction: [1, 0.2], amplitude: 0.4, wavelength: 14, steepness: 0.4, phase: 0.3 }],
           ...(clocked ? { clock } : {}),
-        });
-      return { clock, water, fps };
+        }),
+        ripples = Ripples.attach(engine, { surface: water, size: 32, resolution: 64, followCamera: false, speed: 4 });
+      return { clock, water, ripples, fps };
     };
     const frame = async (w, f) => {
       w.clock.frame = f;
@@ -111,9 +113,27 @@ try {
       const w = make(fps);
       rows[fps] = {};
       for (let f = 0; f <= 2 * fps; f++) {
+        // A drop queued at 1 s on the clock, the first time every rate draws: it falls due at the clock's tick then, so
+        // it is born in the same step at every frame rate.
+        if (f === fps) {
+          w.clock.frame = f;
+          w.ripples.disturb(3, -2, 1.5, 0.3);
+        }
         await frame(w, f);
-        if (f === fps || f === 2 * fps)
-          rows[fps][f / fps] = { ...(await state(w.water)), time: w.water.time, ticks: w.water['flowTicks'] };
+        if (f === fps || f === 2 * fps) {
+          const ripple = await w.ripples.readFrame();
+          let h = 0x811c9dc5;
+          for (const b of new Uint8Array(ripple.data.buffer)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+          let peak = 0;
+          for (let i = 0; i < ripple.data.length; i += 2) peak = Math.max(peak, Math.abs(ripple.data[i]));
+          rows[fps][f / fps] = {
+            ...(await state(w.water)),
+            ripples: h.toString(16),
+            ripplePeak: peak,
+            time: w.water.time,
+            ticks: w.water['flowTicks'],
+          };
+        }
       }
       // On to 3 s, then back to 1 s: the flow starts again and replays.
       for (let f = 2 * fps + 1; f <= 3 * fps; f++) await frame(w, f);
@@ -150,9 +170,10 @@ try {
       base.wet > 100 && base.flying > 0,
       `the beach is wet and the spray flies at ${t} s: ${JSON.stringify(base)}`,
     );
+    if (t === 2) assert.ok(base.ripplePeak > 0.01, `the drop queued at 1 s rings at 2 s: ${base.ripplePeak}`);
     for (const fps of [30, 60, 5]) assert.deepEqual(rows[fps][t], base, `${fps} fps against 24 fps at ${t} s`);
     console.log(
-      `ok flow and spray at ${t} s equal at 24, 30, 60 and 5 fps: ${base.wet} wet cells, ${base.flying} droplets`,
+      `ok flow, spray and ripples at ${t} s equal at 24, 30, 60 and 5 fps: ${base.wet} wet cells, ${base.flying} droplets, ripple peak ${base.ripplePeak.toFixed(4)} m`,
     );
   }
   assert.equal(rows.seek3.capped, 480, 'a frame runs at most 480 ticks');

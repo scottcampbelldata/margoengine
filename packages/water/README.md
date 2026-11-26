@@ -1681,7 +1681,10 @@ most `WATER_FLOW_TICKS_PER_FRAME` (480) ticks; `await water.settle()` runs the r
 the clock back starts the flow again and replays it to the earlier time. The flow's first set-up (the surf's spin-up)
 runs at its first tick's time, whatever frame builds it. `test/film-clock.browser.mjs` checks all of it on WebGPU and
 the WebGL2 layer, and that without a clock 24 and 60 fps flow differently. A flood on the bridge (`@margoengine/water/flood`)
-keeps its own film clock.
+keeps its own film clock. A `Ripples` field on a Water with a clock steps on the same clock, at the dyadic rate its stability limit needs
+(60 * 2^k Hz up to 7,680, then whole substeps a tick), and a drop or wake queued with `disturb` or `wake` falls due at the
+clock's tick when it is queued, so it is born at the same instant at any frame rate; setting the clock back clears the
+field and replays it.
 
 ```ts
 import {Engine} from 'margoengine/core';

@@ -4,6 +4,7 @@ import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from 
 import type { Water } from './index.js';
 import { addSurfaceEffect, surfaceEffects } from './surface-effects.js';
 import { fault, rangeError } from '../../shared/errors.js';
+import { WATER_FLOW_TICKS_PER_FRAME } from './film.js';
 
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -86,6 +87,8 @@ export class Ripples implements EnginePlugin {
   private readonly damping: number;
   private readonly follow: boolean;
   private readonly pending: number[] = [];
+  /** The clock tick each queued event falls due on (-1 without a film clock: the next step). */
+  private readonly due: number[] = [];
   private readonly parameters = new Float32Array(524);
   private readonly origin: [number, number] = [0, 0];
   private engine?: Engine;
@@ -99,6 +102,8 @@ export class Ripples implements EnginePlugin {
   private remove?: () => void;
   private removeDispose?: () => void;
   private delta = 0;
+  /** Ticks stepped since the field started, when the surface has a film clock. */
+  private done = 0;
   private dirty = true;
   private rendered = false;
   private disposed = false;
@@ -133,6 +138,44 @@ export class Ripples implements EnginePlugin {
   private get cell(): number {
     return this.size / this.resolution;
   }
+  /** The field's tick rate on a film clock and its substeps a tick: the dyadic rate its stability limit needs. */
+  private tickRate(): { rate: number; substeps: number; limit: number } {
+    const limit = Math.min(1 / 120, (0.45 * this.cell) / this.speed);
+    let rate = 60;
+    while (rate < 7680 && 1 / rate > limit) rate *= 2;
+    return { rate, substeps: Math.ceil(1 / rate / limit - 1e-9), limit };
+  }
+  /** The bind groups of config buffer `index`, making the buffer and its groups the first time a step needs it. */
+  private configGroups(device: GPUDevice, index: number): GPUBindGroup[] {
+    while (this.configs.length <= index) {
+      const config = device.createBuffer({
+        size: this.parameters.byteLength,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.buffers.push(config);
+      this.configs.push(config);
+      this.groups.push(
+        [0, 1].map((i) =>
+          device.createBindGroup({
+            layout: this.pipeline!.getBindGroupLayout(0),
+            entries: [
+              { binding: 0, resource: { buffer: config } },
+              { binding: 1, resource: { buffer: this.fields[i] } },
+              { binding: 2, resource: { buffer: this.fields[1 - i] } },
+            ],
+          }),
+        ),
+      );
+    }
+    return this.groups[index]!;
+  }
+  /** A film clock set back: the field starts again from still water at its first place and replays its ticks. */
+  private restart(device: GPUDevice): void {
+    const zeros = new Uint8Array(this.resolution ** 2 * 8);
+    for (const field of this.fields) device.queue.writeBuffer(field, 0, zeros);
+    this.origin[0] = this.origin[1] = -this.size / 2;
+    this.done = 0;
+  }
   /** Queue a circular drop. Radius must cover at least one cell, strength is signed metres. */
   disturb(x: number, z: number, radius = 1, strength = 0.1): this {
     return this.wake([x, z], [x, z], radius, strength);
@@ -147,6 +190,10 @@ export class Ripples implements EnginePlugin {
     if (this.pending.length >= 64 * 8)
       throw fault('state', 'Ripple event queue full; render before adding more than 64 events');
     this.pending.push(...from, ...to, radius, strength, 0, 0);
+    // On a film clock an event falls due at the clock's tick when it is queued, so it is born at the same instant at any
+    // frame rate; without one, in the next step.
+    const clock = this.surface.options.clock;
+    this.due.push(clock ? clock.ticks(this.tickRate().rate) : -1);
     this.dirty = true;
     return this;
   }
@@ -219,31 +266,79 @@ export class Ripples implements EnginePlugin {
           Math.round(c.camera.position[2] / cell) * cell - this.size / 2,
         ]
       : [-this.size / 2, -this.size / 2];
-    const total = Math.min(0.25, this.delta);
-    const steps = Math.max(1, Math.ceil(total / Math.min(1 / 120, (0.45 * cell) / this.speed)));
-    this.parameters.fill(0);
-    this.parameters.set([
-      ...next,
-      cell,
-      this.resolution,
-      total / steps,
-      this.speed ** 2,
-      this.damping,
-      this.pending.length / 8,
-    ]);
-    new Int32Array(this.parameters.buffer).set(
-      [Math.round((next[0] - this.origin[0]) / cell), Math.round((next[1] - this.origin[1]) / cell)],
-      8,
-    );
-    this.parameters.set(this.pending, 12);
-    c.device.queue.writeBuffer(this.configs[0], 0, this.parameters);
-    this.parameters[7] = this.parameters[8] = this.parameters[9] = 0;
-    c.device.queue.writeBuffer(this.configs[1], 0, this.parameters);
+    // The surface's film clock (WaterOptions.clock): the field steps in fixed ticks at the dyadic rate its stability limit
+    // needs (60 * 2^k Hz, up to 7,680; above that a whole number of substeps a tick), as many as the clock owes, so the
+    // same shot at any frame rate ripples alike. Without one, the frame's delta in steps that keep that limit.
+    const clock = this.surface.options.clock,
+      { rate, substeps, limit } = this.tickRate(),
+      // Each queued event's step in this update: [step, event index]; an event due after it stays queued.
+      born: [number, number][] = [],
+      later: number[] = [];
+    let steps: number, step: number;
+    if (clock) {
+      const target = clock.ticks(rate);
+      if (!Number.isSafeInteger(target) || target < 0)
+        throw rangeError(
+          `A Ripples clock gives whole ticks from 0; got ${target}. Pass a FilmClock to the Water.`,
+          'geometry',
+        );
+      if (target < this.done) {
+        this.restart(c.device);
+        // Events queued on the old run's later ticks are not part of the replay.
+        for (let e = this.due.length - 1; e >= 0; e--)
+          if (this.due[e]! > target) {
+            this.due.splice(e, 1);
+            this.pending.splice(e * 8, 8);
+          }
+      }
+      const owed = Math.min(WATER_FLOW_TICKS_PER_FRAME, target - this.done);
+      // No tick owed: the field and the queued drops wait for the next one.
+      if (!(owed > 0)) return;
+      // An event due at tick T is born in the step that starts at T / rate, the first at or after its time (one due
+      // earlier, in the first step).
+      for (let e = 0; e < this.due.length; e++) {
+        const k = this.due[e]! - this.done;
+        if (k >= owed) later.push(e);
+        else born.push([Math.max(0, k) * substeps, e]);
+      }
+      this.done += owed;
+      steps = owed * substeps;
+      step = 1 / (rate * substeps);
+    } else {
+      const total = Math.min(0.25, this.delta);
+      steps = Math.max(1, Math.ceil(total / limit));
+      step = total / steps;
+      for (let e = 0; e < this.due.length; e++) born.push([0, e]);
+    }
+    // Config 0: the first step, with the scroll to the new origin and the events born in it; config 1: a plain step;
+    // configs 2 on: one for each later step with events born in it.
+    const write = (index: number, shift: boolean, at: number) => {
+      this.parameters.fill(0);
+      let count = 0;
+      for (const [s, e] of born)
+        if (s === at) this.parameters.set(this.pending.slice(e * 8, e * 8 + 8), 12 + 8 * count++);
+      this.parameters.set([...next, cell, this.resolution, step, this.speed ** 2, this.damping, count]);
+      if (shift)
+        new Int32Array(this.parameters.buffer).set(
+          [Math.round((next[0] - this.origin[0]) / cell), Math.round((next[1] - this.origin[1]) / cell)],
+          8,
+        );
+      this.configGroups(c.device, index);
+      c.device.queue.writeBuffer(this.configs[index]!, 0, this.parameters);
+    };
+    write(0, true, 0);
+    write(1, false, -1);
+    const extra = new Map<number, number>();
+    for (const [s] of born)
+      if (s > 0 && !extra.has(s)) {
+        extra.set(s, 2 + extra.size);
+        write(extra.get(s)!, false, s);
+      }
     let input = 0;
     for (let step = 0; step < steps; step++) {
       const pass = c.encoder.beginComputePass();
       pass.setPipeline(this.pipeline!);
-      pass.setBindGroup(0, this.groups[step === 0 ? 0 : 1][input]);
+      pass.setBindGroup(0, this.groups[step === 0 ? 0 : (extra.get(step) ?? 1)]![input]!);
       pass.dispatchWorkgroups(Math.ceil(this.resolution / 8), Math.ceil(this.resolution / 8));
       pass.end();
       input = 1 - input;
@@ -254,7 +349,12 @@ export class Ripples implements EnginePlugin {
     c.device.queue.writeBuffer(this.uniform!, 0, new Float32Array([...next, cell, this.resolution]));
     this.origin[0] = next[0];
     this.origin[1] = next[1];
-    this.pending.length = 0;
+    // The events due after this update stay queued, with their ticks.
+    const kept = later.flatMap((e) => this.pending.slice(e * 8, e * 8 + 8)),
+      keptDue = later.map((e) => this.due[e]!);
+    this.pending.length = this.due.length = 0;
+    this.pending.push(...kept);
+    this.due.push(...keptDue);
     this.delta = 0;
     this.dirty = false;
     this.rendered = true;
