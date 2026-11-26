@@ -109,7 +109,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | MISSING | L |  |
 | Scene change recorder: track edits to a loaded scene and save or re-apply them as a small JSON delta (prefab overrides exist) | Babylon delta files | DONE (`@margoengine/save/delta`) | S to M | 0d5b43853 |
 | Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | 861843398 |
-| `.babylon` scene import and scene-serializer export | Babylon | MISSING | S to M |  |
+| `.babylon` scene import and scene-serializer export | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; `exportBabylon` of `@margoengine/exporters/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; static pose on export) | S to M | 03dda3de5 |
 
 ## Lane D: tools, runtime and interaction
 
