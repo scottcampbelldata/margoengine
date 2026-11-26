@@ -14,8 +14,16 @@ against the problems in [physics-demo-review.md](physics-demo-review.md). Read a
 3. Build it on your branch. Land it on `main` in working pieces (rebase, fast-forward, never force-push).
 4. When it works with its tests, set Status **LANDED** with the commit, in the same push as the code.
 5. **REOPENED** means an audit in [physics-solver-audit.md](physics-solver-audit.md) found a landed solver short of
-   its catalog row or of the standard below. The owner keeps the row, builds the missing pieces and validation the
-   audit names, and sets **LANDED** again with the new commit when the audit's list is done.
+   its catalog row or of the standard below. Codex builds every REOPENED row's upgrades, whoever built the row:
+   the missing pieces and validation the audit names. It sets **LANDED** again with the new commit when the
+   audit's list is done.
+6. **VERIFIED** means a Claude reviewer has checked a LANDED row against the standard below and the audit's list:
+   - it read the code and the tests;
+   - it ran the row's tests;
+   - it confirmed each validation test asserts against the cited measurement or exact solution.
+
+   A row that fails verification goes back to **REOPENED**, with the reasons added to its audit entry. A row is
+   finished only when it is VERIFIED.
 
 Never take or edit a row owned by someone else. Claim one solver at a time per working session.
 
@@ -331,8 +339,9 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - Handed to Codex (Scott, 2026-11-26), so the Claude side stays on the film solvers: DYN-07, AERO-01 to AERO-03
   and ATMO-01 to ATMO-03. The AERO and ATMO rows are built and REOPENED; build their upgrades from
   `docs/physics-solver-audit.md`.
-- A REOPENED row stays with its owner while that owner is still building. Once an owner's list is done, the other
-  side may claim its REOPENED rows through this file.
+- Upgrades (Scott, 2026-11-26): Codex builds every upgrade, on every REOPENED row, whoever first built it. Claude
+  finishes the builds it still has CLAIMED, then verifies: each row Codex sets LANDED is checked and set VERIFIED,
+  or REOPENED with reasons.
 
 ## Open
 
@@ -347,7 +356,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c82d68bf98 |
-| SEA-03 | Nonlinear waves, rogue waves | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 47be5f699 |
+| SEA-03 | Nonlinear waves, rogue waves | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 1905b1c216 |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
@@ -427,24 +436,24 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
-| SEA-05 | Nearshore waves and surf zone | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8c7453cd8 |
+| SEA-05 | Nearshore waves and surf zone | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8c7453cd8 |
 | DYN-01 | 3D rigid body and contact | sound | Claude | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
 | DYN-06 | Mass properties and collision geometry | partial | Claude | CLAIMED |
 | SOFT-01 | Cloth and thin shells | partial | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
-| SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
-| SEA-02 | Ocean surface synthesis and query | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
-| SEA-04 | Local dispersive free surface | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
-| SEA-08 | Ship seakeeping | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d865c4c8f |
-| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
-| SEA-10 | Damage, flooding, capsize, sinking | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
-| SEA-11 | Wave impact: slamming, green water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
-| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5d2524732 |
-| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
-| SEA-14 | Water entry and exit | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
-| SEA-15 | Tracers and slicks in water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ccbc86285 |
+| SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
+| SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
+| SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
+| SEA-08 | Ship seakeeping | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d865c4c8f |
+| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
+| SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
+| SEA-11 | Wave impact: slamming, green water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
+| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5d2524732 |
+| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
+| SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
+| SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ccbc86285 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
-| HYDRO-01 | Conservative shallow water | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
-| ATMO-04 | Precipitation microphysics | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |
+| HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
+| ATMO-04 | Precipitation microphysics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |
