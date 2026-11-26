@@ -31,7 +31,7 @@ const magnitude = ([x, y, z]: Vec3): number => hypot(x, y, z);
 const scale = ([x, y, z]: Vec3, by: number): Vec3 => [x * by, y * by, z * by];
 
 /** Triangulate the actual wetted hull at the reference waterline, without an artificial lid. */
-function panelsOf(mesh: HullMesh, waterline: number, depth: number): Panel[] {
+export function panelsOf(mesh: HullMesh, waterline: number, depth: number, limit = MAX_PANELS): Panel[] {
   const points = (index: number): Vec3 => {
     const at = index * 3;
     return [mesh.vertices[at]!, mesh.vertices[at + 1]! - waterline, mesh.vertices[at + 2]!];
@@ -70,10 +70,10 @@ function panelsOf(mesh: HullMesh, waterline: number, depth: number): Panel[] {
         return { length, direction, outward: cross(direction, normal) };
       });
       panels.push({ vertices, centre, area, normal, edges });
-      if (panels.length > MAX_PANELS)
+      if (panels.length > limit)
         throw new MargoError(
           'state',
-          `The surge panel solve supports ${MAX_PANELS} wetted panels. Use a coarser closed hull mesh or disable surgeAddedMass.`,
+          `This hull panel solve supports ${limit} wetted panels. Use a coarser closed hull mesh or disable the panel option.`,
         );
     }
   }
