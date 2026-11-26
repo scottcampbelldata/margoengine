@@ -218,6 +218,7 @@ function numbers(v: unknown, what: string, multiple: number, max: number): numbe
 }
 
 const srgbToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const linearToSrgb = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
 
 function eulerToQuaternion(x: number, y: number, z: number): [number, number, number, number] {
   // Babylon's YXZ order: roll about Z first, then pitch about X, then yaw about Y; q = qy * qx * qz.
@@ -865,7 +866,17 @@ export function flattenBabylon(scene: LoadedBabylon, options: FlattenBabylonOpti
       start,
       count: indices.length - start,
       name: mesh.name,
-      ...(material ? { color: [...material.color] as [number, number, number, number] } : {}),
+      // LoadedGroup.color is sRGB; the material's colour is linear, so convert it back (alpha stays as it is).
+      ...(material
+        ? {
+            color: [
+              linearToSrgb(material.color[0]),
+              linearToSrgb(material.color[1]),
+              linearToSrgb(material.color[2]),
+              material.color[3],
+            ] as [number, number, number, number],
+          }
+        : {}),
     });
   }
   const out: LoadedGeometry = {
