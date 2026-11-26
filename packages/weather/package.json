@@ -140,7 +140,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js weather",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs && node packages/weather/tests/seek-check.mjs && node packages/weather/tests/settings-check.mjs",
+    "test:gpu": "cd ../.. && node packages/weather/tests/browser-check.mjs && node packages/weather/tests/seek-check.mjs && node packages/weather/tests/settings-check.mjs && node packages/weather/tests/snowpack-check.mjs && node packages/weather/tests/snowpack-check.mjs --compat",
     "prepack": "npm run build",
     "test:browser:parity": "cd ../.. && node packages/weather/tests/parity-browser.mjs gltf && node packages/weather/tests/parity-browser.mjs gltf --compat && node packages/weather/tests/parity-browser.mjs cover && node packages/weather/tests/parity-browser.mjs cover --compat && node packages/weather/tests/parity-browser.mjs lens && node packages/weather/tests/parity-browser.mjs lens --compat"
   }
