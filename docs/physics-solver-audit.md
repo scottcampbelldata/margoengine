@@ -1078,6 +1078,198 @@ Missing: measured ray or propeller lifted mass, field oil spreading, absolute en
 5. Replace the red-flag constants with cited values; throw `MargoError` with a help link.
 6. Add a Wasm hot loop for many bodies, work counts, and limits entries.
 
+### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/rogue/index.ts` (1068 lines) and `groups.ts` (278 lines), plus the row in `docs/physics-solvers.md`, `docs/limits.md`, and the audit rows. Commits since the audit (2026-11-25) are only 47be5f699 and 116edc307 (three sisters); nothing touches a dynamic or high-order spectral tier. Tests run under run-with-timeout: `packages/physics/tests/rogue.test.js` 9 pass / 0 fail; `packages/physics/tests/sisters.test.js` 3 pass / 0 fail. There is no `tests/coupling` file for it, and no GPU or browser test.
+
+**Validation.**
+- Stokes second harmonic (deep, 20 m, 8 m): exact solution, bound 1e-7.
+- Longuet-Higgins sum and difference terms: exact, 1e-12.
+- Longuet-Higgins and Stewart bound long wave: exact, 0.05 to 0.1 percent.
+- Rayleigh limits and expected largest wave of 1000 waves: exact, 0.4 percent.
+- Skewness: checked against the kernels' own sum, so it is self-consistent, not independent.
+- Draupner crest: placed by the code and then read back, so it is self-consistent and proves only placement.
+- Kimura's table 2 (sisters.test.js:29): a published table, 2 percent. The three-in-a-row rates are checked against the code's own computed rates.
+- No published measurement is used. Missing: the Onorato et al. 2004/2009 tank kurtosis against BFI, Forristall 2000 crest and height laws, Mori, Onorato and Janssen 2011, Christou and Ewans 2014 field rogue rates, and the Chabchoub 2012 Peregrine tank case. Nothing is checked on breaking or on regimes the model was not built for.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (partial), 8 (partial).
+
+**Audit list.**
+1. High-order spectral tier (Dommermuth and Yue 1987; West et al. 1987; Ducrozet 2016), with the second-order model as the fast tier — NOT DONE. `docs/physics-solvers.md:104` and `docs/limits.md:1705` both say it is not built. There is no tier switch behind one API.
+2. Dynamic focusing, so a placed rogue group builds and breaks over a hull in time (the film item) — NOT DONE. A rogue is a constrained NewWave inside a fixed window of 8 zero-crossing periods (`index.ts:292-294`). It is a prescribed shape, not Benjamin-Feir or Dysthe/NLS evolution.
+3. Fenton 1985 fifth-order waves, steep Stokes beyond second order — NOT DONE.
+4. Breaking — NOT DONE. A crest steeper than Barthelemy's onset is kept (`limits.md`). The Bx = 0.855 onset and dissipation are not built.
+5. Validation against Onorato, Forristall, Mori and Christou-Ewans — NOT DONE (see Validation).
+6. Rogue rate "one wave per zero-crossing wavelength squared per period" uncited (`index.ts:587-590`) — NOT DONE. Fedele's space-time extremes are listed as not used.
+7. The 8 Tz event window is a free choice (`index.ts:292-294`) — NOT DONE. It is documented as a choice, not derived.
+8. O(N²) pair cost per point — NOT DONE. About 50 microseconds at 160 components in plain TypeScript, with no Wasm or SIMD and no threads.
+9. Finite-depth statistics (the depth factors of Janssen 2018) — NOT DONE. Deep-water statistics are used in shallow water, which is documented.
+10. A coupling test and a `Solver` form instead of a bare query — PARTIAL. It implements `SeaSurface`, and `rogue.test.js:207` checks slope, orbital motion and pressure against the surface. No test floats a hull or body on a rogue, and no conserved quantity is accounted.
+11. Coded errors naming the fix (floor, point 5) — PARTIAL. The messages name the fix (`rogue.test.js:241`), but they throw plain `RangeError` and `TypeError` (`index.ts:172-190`, 567, 579, 762, 809). `MargoError` appears nowhere in the folder.
+12. Three sisters and placed groups (added since the audit) — DONE for statistics and placement. Code is in `groups.ts`; tests are `sisters.test.js:29`, `:50`, `:66`. It does not close any audit item above.
+
+**To do before it can be VERIFIED:**
+1. Build the HOS solver (West et al. 1987 with Dommermuth-Yue dealiasing, adaptive RK, finite depth) so a placed group focuses and breaks in time. Keep the second-order sea as the fast tier behind one API. Add Dysthe or NLS as the mid tier if wanted.
+2. Validate against measurements: Chabchoub 2012 Peregrine tank (amplification about 3), the Onorato kurtosis against BFI, Forristall 2000, Christou and Ewans 2014, and Benjamin-Feir growth rates (instability below 2.83 ε k0). Use bounds derived from the measurement scatter.
+3. Add breaking onset and dissipation (Barthelemy 2018; Derakhti 2020) and Fenton 1985 fifth-order waves.
+4. Cite or replace the rogue rate and derive the event window. Add finite-depth statistics (Janssen 2018).
+5. Throw `MargoError` with codes, add a hull-on-rogue coupling test with conserved quantities, add Wasm SIMD or threaded pair sums, record work counts, and add film seed or placement tests on the dynamic tier.
+
+### SEA-01 Wave spectrum and wave-field evolution (`@margoengine/physics/waves`, commits 62fa8c303, 526cc95c9, bb9be393e, 8035cee71), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/waves/spectral.ts` (928 lines), `st4.ts` (372), `packages/physics/tests/waves.test.js`, the SEA-01 rows in `docs/physics-solvers.md`, `docs/physics-solver-audit.md` (lines 60, 188, 344) and `docs/known-bugs.md` (KB-PHYS-AUDIT2). No commit touches the waves source or tests since the audit (2026-11-25 onward, only the four above, all before it). Ran `node scripts/run-with-timeout.mjs --max=15 -- node --test packages/physics/tests/waves.test.js`: 11 tests, 11 pass, 0 fail (about 65 s). Not run: no GPU or browser test exists for waves, and `foam.test.js` (coupling) was not re-run.
+
+**Validation.**
+- Kahma and Calkoen gale (20 m/s): published measurement; e* within -15%/+25% of 2.1e-3 chi*^0.79 at three fetches, slope 0.7 to 0.9. The bound is arbitrary (set around the measured 1.07 to 1.17). 20 m/s is also a case the ST4 sheltering was calibrated on (`st4.ts:44-49`), so it is not held out.
+- JONSWAP fetch laws at 10 m/s: published fit; Hs within 25%, Tp within 15%. Arbitrary bounds, and 10 m/s is a calibration case too.
+- Alves, Banner and Young 2003 fully developed sea: published measurement; the test band is wider than the data's.
+- Dispersion and group velocity: exact solution, 1e-12.
+- Swell test: self-consistent only (arrival at the group velocity, "late > 1.6 m" from 2 m, a 10% period band). It is not compared with any measured swell decay.
+- The held-out 30 m/s gale is in `docs/limits.md` only, not in a test. No Young and Verhagen finite-depth growth test. No swell-decay test against Ardhuin et al. 2009.
+
+**Fails points** 2, 3, 4, 5, 6, 7 (and 1 in part: no exact nonlinear transfer or ST6 tier).
+
+**Audit list.**
+1. Film item: swell propagation and dissipation against Ardhuin et al. 2009 SAR swell decay — NOT DONE (the swell test is a crude arrival window).
+2. Film item: the held-out 30 m/s Kahma-Calkoen gale as a test — NOT DONE (`waves.test.js:100-132` is 20 m/s).
+3. Calibration case used as validation (KB-PHYS-AUDIT2) — NOT DONE, still open.
+4. Arbitrary bounds — NOT DONE (25%, 15% and -15/+25% are not derived from the data scatter).
+5. Currents and Doppler shift — NOT DONE (`spectral.ts:9`, `:34`).
+6. Diffraction, reflection, triads, garden-sprinkler correction — NOT DONE (`spectral.ts:34`).
+7. Wave roughness back to ATMO-01 — PARTIAL (friction velocity comes from the waves with ST4, `waves.test.js:134`; no test of the wind profile responding).
+8. Return from SEA-04/05 at the nearshore boundary — NOT DONE.
+9. Young and Verhagen 1996 finite-depth growth — NOT DONE (a depth-breaking test only, `waves.test.js:216`).
+10. Duration-limited growth and refraction tests — NOT DONE.
+11. ST6 / exact nonlinear transfer tier — NOT DONE.
+12. Speed, about 4.7 s per step on 32 x 32 — NOT DONE (no Rust/Wasm or threads; tests take about 65 s).
+13. Coded errors — NOT DONE (plain `RangeError`, `spectral.ts:342-366`, not MargoError with a help link).
+14. Fetch law on a grid that resolves the coast — DONE (`waves.test.js:100`, "a gale of 20 m/s grows the sea...").
+15. Fully developed sea in U10 — DONE (`waves.test.js:160`).
+
+**To do before it can be VERIFIED:**
+1. Add a held-out 30 m/s Kahma-Calkoen test and a swell decay test against Ardhuin et al. 2009; derive every bound from the published scatter.
+2. Move the calibration to separate data from the validation cases and close the open KB-PHYS-AUDIT2 item.
+3. Add currents (Doppler shift), diffraction/reflection, triads and the garden-sprinkler correction (SWAN and WAVEWATCH III manuals), or a documented tier that does the same.
+4. Test duration-limited growth, refraction (Snell, Longuet-Higgins) and finite depth against Young and Verhagen 1996.
+5. Send roughness to the wind (ATMO-01) and take the nearshore return from SEA-04/05, each with a coupling test and a conserved-energy check.
+6. Throw MargoError with help links in place of RangeError.
+7. Build the hot loops in Rust/Wasm SIMD with work counts, and add an ST6 or exact-transfer fidelity tier.
+8. Add film controls (placed events, targets) and a limits entry that matches the code.
+
+### SEA-05 Nearshore waves and surf zone (`@margoengine/physics/surf`, commits 8c7453cd8, 046ee7e0d), owner Codex: REOPENED
+
+**Checked.** docs/physics-solvers.md row, docs/physics-solver-audit.md (Film-set table, THIN row, research notes), docs/physics-demo-review.md (CF-3, BB-2, CY-10, CY-14, Below the Swell), docs/limits.md surf entry, packages/physics/src/surf/index.ts (1,086 lines), packages/physics/tests/surf.test.js, tests/coupling/surf.test.js. No commit touches the surf code since the audit (the only two surf commits, 8c7453cd8 and 046ee7e0d, are dated 2026-11-26). Ran under run-with-timeout: `node --test packages/physics/tests/surf.test.js packages/physics/tests/coupling/surf.test.js`: 14 tests, 14 pass, 0 fail (233 s). No GPU or browser test exists for this row (no `test:browser` script).
+
+**Validation.**
+- Shoaling (energy flux): exact solution, 2 percent. Snell refraction: exact, 1 degree. Set-down: Longuet-Higgins and Stewart (1964) analytic, 4 percent. Set-up slope: Bowen analytic, 0 to 15 percent. Undertow: the model's own formula -(E_w+2E_r)/(rho h c), 1 percent, self-consistent. Longshore: balance of the model's own friction law, 10 percent, self-consistent. Wave action against a current: exact conservation. Bound wave: Longuet-Higgins and Stewart slope, 10 percent (R^2 0.86), analytic.
+- Run-up R2% within 25 percent of Stockdon et al. (2006) on 1:50 and 1:25 (surf.test.js:321-345). This is a published field fit, but the model's short-wave swash is taken from Stockdon's own S_inc (index.ts:940-962), so it is partly circular. The 25 percent bound is a tolerance, not derived. Only one sea (0.5 m, 8 s) is tested.
+- No test against a lab or field measurement (Boers 1996, Haller 2002, Visser 1991, Longuet-Higgins 1970, DUCK94). No held-out case.
+- Shore set-up is about twice Stockdon's fit (0.114 against 0.050 m); this is stated in limits.md and unfixed.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (8 largely met: limits.md:1700 is detailed and honest).
+
+**Audit list.**
+1. Phase-resolved (non-hydrostatic) tier published as orbital velocity for plants, sand and fish (film BB-2) — NOT DONE. No non-hydrostatic solver; no orbital-velocity field export found in surf/index.ts (only a surface elevation, `boundWave`).
+2. Validate against Boers 1996, Haller 2002, Visser 1991, Longuet-Higgins 1970, DUCK94 — NOT DONE.
+3. Run-up not built from Stockdon's own terms (index.ts:956,973 flagged) — NOT DONE. S_inc is still Stockdon's (index.ts:940); limits.md says "rather than resolved".
+4. Adaptive breaker gamma — NOT DONE (fixed gamma, limits.md).
+5. HYDRO-03 morphology coupling — NOT DONE (no sediment test in surf tests).
+6. Overtopping — NOT DONE (the catalog assigns it to the shallow water; no surf test).
+7. Both-ways HYDRO-01 test — PARTIAL. surf.test.js uses a staggered surf-water couple (run-up test, rip test), and the current-refraction test exists, but the coupling file holds only frame-rate and seek tests (coupling/surf.test.js:30-31), with no conservation accounting.
+8. Return to SEA-01 — NOT DONE (waves feed in via spectrum; no returned reflection or dissipation test).
+9. Shore set-up about twice Stockdon's — NOT DONE (stated, not fixed).
+10. Hard cap Hrms <= 2h (index.ts:719-723) — NOT DONE; the cap remains.
+11. Rival capabilities (SWASH, XBeach-NH, FUNWAVE) — NOT DONE.
+12. Catalog extras: swash, wet-sand line, run-up marks — PARTIAL. Run-up and a wet-sand record are tested (surf.test.js:189), but no swash-mark output for the renderer was found.
+13. Coded errors — NOT DONE. Out-of-range input throws plain RangeError/TypeError (index.ts:202-365), not MargoError with a help link (surf.test.js:356 matches message text only).
+14. Scale — NOT DONE: TypeScript only, about 5 ms a step for 1,200 cells (limits.md); no Rust/Wasm kernel.
+
+**To do before it can be VERIFIED:**
+1. Validate against measured data not used for tuning: Boers (1996) barred-beach flume, Haller et al. (2002) rip channels, Visser (1991) longshore current, Longuet-Higgins (1970); give derived bounds.
+2. Replace the S_inc-from-Stockdon swash with resolved run-up (a non-hydrostatic tier after Zijlema, Stelling and Smit 2011), and publish the orbital-velocity field for plants, sand and fish (BB-2).
+3. Fix the 2x set-up overshoot and remove the Hrms <= 2h cap; add an adaptive gamma (Ruessink et al. 2003).
+4. Add couplings with conservation tests: HYDRO-03 sediment, SEA-01 return, overtopping.
+5. Throw MargoError with codes and help links.
+6. Add a Rust/Wasm hot loop and recorded work counts; directional bound waves (Herbers et al. 1994).
+7. Add a swash-mark output for the renderer, plus a directed-event test (seeded sets, placed rips).
+
+### ATMO-04 Precipitation microphysics (`@margoengine/weather/precipitation`, commit acbc53c7e), owner Codex: REOPENED
+
+**Checked.** Commits for the row: acbc53c7e (the only code commit; the others are doc edits). No commit has touched `packages/weather/src/precipitation.ts` or its test since the audit (only ATMO-03's 8833dbf0c edited them earlier). Read `packages/weather/src/precipitation.ts` (689 lines), `packages/weather/tests/precipitation.test.js`, the coupling uses in `packages/physics/tests/coupling/synoptic.test.js` and `packages/physics/tests/runoff.test.js`, and the limits row (`docs/limits.md:1694`). Ran under run-with-timeout: `node --test packages/weather/tests/precipitation.test.js`: 14 tests, 14 pass, 0 fail. No GPU or browser test exists for this entry. No `tests/coupling` folder exists at the repo root; the coupling tests live in `packages/physics/tests/coupling`.
+
+**Validation.**
+- "raindrops fall at the speeds Gunn and Kinzer measured": published measurement, not fitted. Drop speeds for 1 to 5.8 mm. Bound: one-sided, model below measured and within 7%. The bound is the observed error of the drag law, so it is fitted to the result, not derived.
+- "a fine droplet falls at Stokes's speed": exact solution. The bound is 0.15 Re^0.687, which comes from the drag correction. That one is derived.
+- "hail and graupel fall as Heymsfield and Wright's power laws give": published fit, but the model is built from the same fit. Bound ±8% is arbitrary. Self-consistent, not independent.
+- "the drops carry exactly the rate asked for": Marshall-Palmer intercept within 15%, arbitrary. The rate check is an identity of the construction.
+- Snow speed test only asserts "about a metre a second", which is a loose range. It is not compared with Locatelli and Hobbs (1974) or any aggregate data.
+- The shaft, gust, snow-line and hail-share tests are behaviour checks with no outside reference.
+- Missing: any disdrometer data, any held-out regime, extreme rain (more than 100 mm/h), and the drop size distribution against measurement.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 8.
+
+**Audit list.**
+1. Rain carried by the gusty wind drop by drop, not one median speed — NOT DONE. `precipitation.ts:531-545` still takes one speed, the median drop's, for the whole shaft. Test "rain varies from place to place and gusts bend its streaks" covers gust bending only with that single speed.
+2. Rings and splash sources on SEA-04 — NOT DONE. No SEA-04 import or rain output in `packages/physics/src`. The only SEA-04 hit is a mention in the docs.
+3. Rain damping of short waves (Tsimplis 1992, Kuo and Hao) — NOT DONE.
+4. Snow fall speeds checked against Locatelli and Hobbs 1974 — NOT DONE. The test only asserts about 1 m/s.
+5. Below-cloud evaporation — NOT DONE (`precipitation.ts:38`).
+6. Melting: rain/snow switch is a smooth function of air temperature, hail and graupel never melt — PARTIAL. The snow share follows temperature (test "the snow line follows the air"), but there is no melting layer.
+7. Gamma or normalised size distributions (Testud 2001); two-moment scheme (Seifert and Beheng 2006) — NOT DONE. The size distribution is exponential only.
+8. Breakup and aggregation — NOT DONE (`precipitation.ts:38`).
+9. K23 particle ballistics — NOT DONE. No batched ballistics path; a sample costs about a millisecond (`docs/limits.md:1694`).
+10. Validate against 2DVD disdrometer data — NOT DONE.
+11. Coupling tests — PARTIAL. Conserved-water tests with ATMO-03 and runoff (HYDRO-02) exist in `synoptic.test.js` and `runoff.test.js`. Nothing exists for SEA-04, ATMO-06 or K23.
+12. Coded errors — NOT DONE. Throws are plain `RangeError` and `TypeError` (`precipitation.ts:77-85,163,433-492`), not MargoError with a help link.
+
+**To do before it can be VERIFIED:**
+1. Carry each drop size at its own fall speed, so the shaft sorts by size in gusts (`precipitation.ts:531`), as Veron and Mieussens 2016 describe.
+2. Add SEA-04 rain rings, splash sources and wave damping, with a coupling test (Kuo and Hao 2026; Tsimplis 1992; Laxague and Zappa 2020).
+3. Validate snow against Locatelli and Hobbs 1974 with a real band, and rain and DSD against disdrometer data on held-out regimes, with bounds derived from the data scatter.
+4. Add evaporation below cloud base and a melting layer; let hail melt.
+5. Add a gamma or normalised distribution and a two-moment tier (Seifert and Beheng 2006; Testud 2001) behind the same API, with aggregation and breakup.
+6. Add a batched particle path (K23) with work counts, in Rust/Wasm SIMD or documented otherwise.
+7. Replace RangeError and TypeError with MargoError codes that name the fix.
+8. Replace the arbitrary ±8% and ±15% bounds with ones derived from the source data.
+
+### LIFE-03 Aquatic locomotion (`@margoengine/physics/life`, commits 708e96a06, c1a005f94, 9c667b698, ae9371354, 56a1deab8, 3161bb917, 20b87aa03, d58422ca9, 03332d94c), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/life/{solver,model,wake,kernel}.ts`, `swim-kernel/src/lib.rs`, `tests/swim.test.js`, `tests/coupling/swim.test.js`, the catalog row, audit rows, known-bugs entry and limits.md section. Commits since the audit (2026-11-25) on the swimmer paths are all SEA-15 sand-pickup work; none touches the tail wake, Strouhal, tail-frequency cap, form drag or fin-lift clamp. Ran under run-with-timeout: `node --test packages/physics/tests/swim.test.js packages/physics/tests/coupling/swim.test.js` gave 25 tests, 25 pass, 0 fail. `packages/environment/tests/swim-sediment.browser.mjs` passed on WebGPU (1994 sand pixels at lift, 17.1 px downstream, 674.8 um bed relief) and with `--compat` (WebGL2, 2023 pixels, same relief); the runner prints no pass count.
+
+**Validation.**
+- `Lighthill mean thrust...` (coupling/swim.test.js:49): exact solution, a 128-sample cycle integral of the code's own Lighthill formula, 1e-12. Its Strouhal assertion (:68) is at a chosen speed of 1.5 wavelengths per second, not a reached speed.
+- `BB-4 axial speed...` (:74): exact tanh solution of the code's own ODE; checks first-order convergence only.
+- `BB-9 ... coast` (:94): exact quadratic-drag solution of the same model.
+- `BB-3 Blake drag stroke`, `fin lift curvature` and `BB-8 wake impulse`: closed forms of the model's own equations.
+- `BB-7`/`SEA-15` sand tests: van Rijn and Shields relations, self-consistent. Mass is conserved between water and bed.
+- No test uses a published measurement. Nothing is checked against Bainbridge 1958 (U about 0.75 L f), Taylor et al. 2003 Strouhal at the reached speed, or Domenici and Blake 1997 fast-start radius. The reached speed is never compared with Strouhal 0.2 to 0.4.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7 (8 partly).
+
+**Audit list.**
+1. Shed the tail wake as vortex and bubble sources into SEA-13 and SEA-15 — NOT DONE. `SWIM_WAKE_FIELD` (`wake.ts`) is read only by the sediment bed (`src/tracers.ts:458,1283`) for pectoral jets. Nothing consumes the tail rows (known-bugs "Open: LIFE-03 swimmer wake" says so). The test at coupling/swim.test.js:187 only checks the emitted impulse.
+2. Reached cruise speed against Bainbridge 1958 — NOT DONE (no test).
+3. Strouhal 0.2 to 0.4 at the reached cruise (setup gave about 0.49) — NOT DONE. `model.ts:68` and the :68 test use a chosen speed.
+4. Divers carried by wave surge — PARTIAL. Test `BS-1 the diver receives actual SEA-02 orbital acceleration` (:161) exists, but one material-acceleration sample is taken at the centroid. There is no SEA-12 loads coupling.
+5. Max tail frequency 3 Hz regardless of size (`solver.ts:212`) — NOT DONE.
+6. Fin lift servo-clamped with no induced drag (`lib.rs:276-285`) — NOT DONE.
+7. Form drag 0.1 x frontal area (`solver.ts:233`) — NOT DONE.
+8. Lighthill 1971 large-amplitude theory — NOT DONE; the code uses the small-amplitude 1960 result.
+9. Immersed-body high-fidelity tier (Gazzola 2011) — NOT DONE; the spine wave is visual only.
+10. Muscle bodies — NOT DONE.
+11. SEA-12 two-way coupling test — NOT DONE (no `SwimSolver` test with the loads solver).
+12. Seabed sand puff — DONE. Tests `BB-7 the live pectoral wall jet...` and `SEA-15 a native fin jet...` pass, and the browser test passes on both backends.
+13. Domenici and Blake 1997 fast-start validation — NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Add a tail-wake consumer: shed vortex rings and bubble sources into SEA-13 and SEA-15, and add a coupling test with conserved momentum. Cite Triantafyllou et al. 2000 and Gazzola 2011.
+2. Add a validation test against Bainbridge 1958 reached speed and Taylor et al. 2003 Strouhal 0.2 to 0.4 at the reached speed, with a bound derived from the published scatter. Fix the setup that gives 0.49, or document why.
+3. Remove the fixed 3 Hz cap (`solver.ts:212`). Derive the frequency from size and the Bainbridge scaling.
+4. Replace the fin-lift clamp (`lib.rs:276-285`) with a lift-curve and induced-drag model (Prandtl lifting line). Replace the 0.1 form-drag factor (`solver.ts:233`) with Hoerner 1965 shape-based drag.
+5. Add Lighthill 1971 large-amplitude theory and a validated high-fidelity tier, or an immersed-body tier (Gazzola 2011), behind the same API.
+6. Add a SEA-12 two-way coupling test, and a Domenici and Blake 1997 fast-start radius check.
+7. Add a SIMD Rust hot loop (`grep` finds no `v128` in `lib.rs`) or record the work counts. Correct limits.md (it does not state the 3 Hz cap or the missing wake consumer).
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
