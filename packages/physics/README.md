@@ -2192,7 +2192,8 @@ console.log(sea.elevation(-10, 0, 10) === wake.sample(-10, 0).height); // true: 
 - **The waves' drift:** the mean and slowly varying push of the waves a hull sends back. Each section's far-field drift in beam waves is the momentum the waves carry, 1/2 rho g a^2 |R|^2 per metre (Maruo; a wall sending everything back takes 1/2 rho g a^2), R the wave it sends back while it moves as the hull does (`scatterSection`, the two-dimensional scattering derived from the radiation solution). The solver applies it less the part its Froude-Krylov pressure over the moving wetted surface already gives, across the hull, over the sea's waves by Newman's approximation (the mean and the slow beat of wave groups). It needs a sea that gives its waves (`SpectralSea`'s `waveComponents`); `drift: false` leaves it out. Measured: moored in beam waves, a box's mean offset holds the far-field drift within 3 percent of the wall's force, and in short waves the wall's itself.
 - **Green water:** the sea coming over the deck, after Zhang and Reed (2024): shallow water on each hull's deck (`deckOf`, the mesh's upward-facing top above its still waterline, on a grid of `deckCells`, default [32, 12]) in the deck's moving frame (`stepDeck`: Rusanov's flux with Audusse's hydrostatic reconstruction, so a lake on a sloped deck stays still and cells dry). Where the sea stands above a deck edge it comes aboard as a dam breaks (Ritter's critical flow at the edge), and where it does not the deck water runs off at the brink. The deck water's weight, rho G h with G the deck's effective gravity, loads the hull, and the deck's own faces then take no Froude-Krylov pressure, so the water over them is counted once. What comes aboard is published in the `deckInflow` port for a liquid solver on the deck; where one owns a hull's on-deck load (`deckClaims` 1), the hull solver leaves its own out. `greenWater: false` leaves it out. Measured: a dam on the deck breaks within 1.1 percent of Ritter's solution, the sea comes over a dry edge at Ritter's flux (to 1e-4), and a box held with its deck under water takes the whole submerged box's buoyancy (to 1e-4).
 - **Slamming:** a section coming down into the water takes the momentum of the water it sets moving, (dm/dh) V^2 a metre (von Karman 1929), m the added mass of its wetted width with the water's pile-up (Wagner 1932: the wetted half-breadth c solves the mean of the section's height over c sin(theta) equal to its depth), V its speed into the water; past a chine or knuckle the flow leaves the hull and the impact ends. Each station's table comes from the mesh's sections (`slamStations`, `slamSlope`). `slamming: false` leaves it out. Measured: a 30 degree wedge entering at a steady speed takes Wagner's force within 0.02 percent until its chine is wet.
-- **Not yet:** bilge keels and forward speed in the roll damping, surge added mass, deck structures and bulwarks in the green water.
+- **Flooding:** a damaged hull's compartments taking in the sea and spreading it, the air they drive out or trap, the cargo they lose and the list, trim and loss of buoyancy that follow (`compartments` and `openings` on a hull; `Flooding` runs the same on its own). Each compartment is a closed mesh in the body's frame with its `permeability` (default 0.95; machinery 0.85, cargo 0.6 to 0.7, SOLAS II-1 regulation 7-3), its floodwater's surface level square to gravity, so it runs to the low side as the hull heels. Water flows through an opening (a breach, door, hatch, vent or pipe: a rectangle with its centre, normal, width and height) by Bernoulli's equation with a discharge coefficient (default 0.611, a sharp-edged hole), from the pressures on its two sides at each height, its air's and its water's head; an opening part under water and part in the air takes the weir's flow. Each compartment's air keeps its mass, at Boyle's pressure, so a compartment with no vent above its water keeps a pocket of air that stops the sea and floats an upturned hull; it leaves through vents and the dry part of a breach, and bubbles out under water. An opening can open and shut at given times (`opens`, `closes`) or give way under a head of water (`collapse`, a hatch cover or window). Backward Euler on the compartments' water and air keeps every level between its neighbours' at any step. The floodwater is added weight at its centre and moves with the hull in the added-mass solve. A hold's cargo (`cargo`: iron ore, coal, grain, sand, silt, dye or oil, its mass part of the body's) pours out through a breach under its top, by Beverloo's law dry and by Wilson et al.'s under water, while the sea is not coming in. What leaves through each opening to the outside is published in the `hullBreaches` port, for the tracers (the cargo) and the foam (the air). Measured: a box filling through a hole follows Torricelli's law within 6e-4 m of 1.5 m at 60 steps a second (first order in the step); a half-submerged side opening takes the weir's flow to 1e-12; an unvented box stops the sea where Boyle's law says (to 1e-9 m); a barge holed in a wing tank comes to rest at the lost-buoyancy equilibrium within 0.0002 degrees of heel and 0.04 mm of sinkage.
+- **Not yet:** bilge keels and forward speed in the roll damping, surge added mass, deck structures and bulwarks in the green water, the drag of a hull going under (so a hull that has lost its buoyancy sinks too fast), sloshing of the floodwater.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -2220,6 +2221,43 @@ const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .couple(['hull', 'rigid'], 'staggered');
 world.advance(60);
 console.log(Math.abs(box.position[1] - (D / 2 - T)) < 1e-3); // true: it floats at its draft
+```
+
+A barge holed in a wing tank, which floods through the hole while its air leaves by a vent, and lists:
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+/** A box from corner a to corner b, twelve triangles wound outward. */
+const cuboid = (a: number[], b: number[]) => {
+  const v: number[] = [];
+  for (const x of [a[0], b[0]]) for (const y of [a[1], b[1]]) for (const z of [a[2], b[2]]) v.push(x, y, z);
+  return {vertices: v, indices: [0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3]};
+};
+const physics = new Physics(null, {fixedTimestep: 1 / 60});
+// A 20 by 4 by 8 m barge floating at a 2 m draft.
+const barge = physics.addBody(null, {colliders: {shape: 'box', halfExtents: [10, 2, 4], mass: 1025 * 20 * 8 * 2}});
+const hull = {
+  row: barge.row,
+  mesh: cuboid([-10, -2, -4], [10, 2, 4]),
+  // A wing tank on the starboard side, the barge's full depth.
+  compartments: [{mesh: cuboid([-5, -2, 2.5], [5, 2, 4])}],
+  openings: [
+    // A 2 by 0.5 m hole in the side at the bottom, and a vent in the tank's top.
+    {from: 0, to: 'outside' as const, centre: [0, -1.5, 4] as const, normal: [0, 0, 1] as const, width: 2, height: 0.5},
+    {from: 0, to: 'outside' as const, centre: [0, 2, 3.25] as const, normal: [0, 1, 0] as const, width: 0.3, height: 0.3},
+  ],
+};
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new HullSolver(), {hulls: [hull], sea: {elevation: () => 0}, greenWater: false})
+  .add(new RigidSolver(), {physics})
+  .couple(['hull', 'rigid'], 'staggered');
+for (let f = 1; f <= 60 * 60; f++) world.advance(f);
+const heel = (2 * Math.asin(barge.rotation[0]) * 180) / Math.PI;
+console.log(heel > 13 && heel < 14.5); // true: it lists about 13.7 degrees as the lost buoyancy says
 ```
 
 On a sea of waves, the framework's `SpectralSea` from a spectrum (here one 1 m swell of 0.1 Hz along x):

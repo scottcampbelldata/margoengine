@@ -12816,6 +12816,41 @@ These are this package's own, each checked (`packages/physics/tests/seakeeping.t
 Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
 on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
 
+### A hull's flooding: compartments, Bernoulli's openings, Boyle's air and the cargo that leaves (`@margoengine/physics/seakeeping`, SEA-10, 2026-11-26)
+
+Built from papers and public procedures only; no other engine's or tool's code was read.
+
+- Progressive flooding as a hydraulic network: compartments joined by openings, water through each by Bernoulli's
+  equation with a discharge coefficient, the floodwater's surface level and the floating position quasi-static or
+  dynamic, the air compressed by Boyle's law. Sources: P. Ruponen, "Progressive flooding of a damaged passenger ship",
+  doctoral thesis, Helsinki University of Technology, 2007 (its pressure-correction method; known through its abstract
+  and Dankowski's account); H. Dankowski, "A fast and explicit method for simulating flooding and sinkage scenarios of
+  ships", doctoral thesis, TU Hamburg-Harburg, 2013 (doi:10.15480/882.1125); H. Dankowski and S. Kruger, "Dynamic
+  extension of a numerical flooding simulation in the time-domain", STAB 2015, Glasgow
+  (https://www.shipstab.org/files/Proceedings/STAB/STAB2015/Papers/7.2-3-Dankowski.pdf), eqs. 1-4: the pressure
+  height difference dz = (pa - pb) / (rho g) + (ua^2 - ub^2) / (2 g) + za - zb, u = sqrt(2 g dz), the flux the
+  integral of u over the opening times Cd, large openings split into elementary parts, Boyle's law for trapped air, and
+  the floodwater's masses updating the mass matrix at each step of the motion's integration.
+- The discharge coefficient: the contraction of a jet through a sharp-edged slot, pi / (pi + 2) = 0.611, by
+  Kirchhoff's free-streamline theory (G. Kirchhoff, "Zur Theorie freier Flussigkeitsstrahlen", J. reine angew. Math.
+  70, 1869; R. von Mises, "Berechnung von Ausfluss- und Ueberfallzahlen", Z. VDI 61, 1917).
+- Permeability: SOLAS chapter II-1, regulation 7-3 (0.95 for spaces in general, 0.85 machinery, 0.60 to 0.70 cargo).
+- Margo's own: the opening's strips integrated exactly (the pressure difference is linear in height between the two
+  water levels, so the mean of its square root over a strip is (2/3) (g1^(3/2) - g0^(3/2)) / (g1 - g0)); the time step
+  as backward Euler on the compartments' volumes, then on their air's pressures, each by nonlinear Gauss-Seidel with a
+  bracketed root (bisection, then the Illinois method), which keeps every level between its neighbours' where the
+  explicit step's derivative of sqrt(dh) is unbounded; a full compartment's pressure as its own unknown, so water
+  passes through it; the floodwater as point masses in the hull's added-mass solve.
+- Cargo out of a breach: W. A. Beverloo, H. A. Leniger and J. van de Velde, "The flow of granular solids through
+  orifices", Chem. Eng. Sci. 15, 1961 (W = C rho_b sqrt(g) (D - k d)^(5/2), C = 0.58, k = 1.5); T. J. Wilson,
+  C. R. Pfeifer, N. Mesyngier and D. J. Durian, "Granular discharge rate for submerged hoppers", Papers in Physics 6,
+  060009, 2014 (https://arxiv.org/abs/1307.2812; under water W = C rho_g v_t (D - k d)^2 with v_t a grain's terminal
+  speed, their Fig. 2's line 0.67 (D/d - 2.4) through the 0.3 to 3 mm glass beads, so C = 0.67^2); the terminal speed by
+  R. I. Ferguson and M. Church, "A simple universal equation for grain settling velocity", J. Sediment. Res. 74, 2004
+  (the tracers' own `settlingVelocity`).
+- Checked against: Torricelli's draining law, the weir's flow, Boyle's law with hydrostatics, and the lost-buoyancy
+  equilibrium of a holed barge (computed independently from the hull's and the tank's volumes under the sea).
+
 ### A hull's slamming: Wagner's wetted width and the momentum of the water (`@margoengine/physics/seakeeping`, SEA-11, 2026-11-26)
 
 `packages/physics/src/seakeeping/slamming.ts` (`slamStations`, `slamSlope`) tabulates each station's added mass against

@@ -5,6 +5,33 @@
 ```ts
 import { SeaSurface } from "@margoengine/math/fields";
 
+export const AIR_DENSITY = 1.225;
+
+export const ATMOSPHERE = 101325;
+
+export const BREACH_CARGO: readonly ['none', 'dye', 'silt', 'sand', 'ironOre', 'coal', 'grain', 'oil'];
+
+export type BreachCargo = (typeof BREACH_CARGO)[number];
+
+export const COMPARTMENT_WORDS = 3;
+
+export interface Compartment {
+    readonly mesh: HullMesh;
+    readonly permeability?: number;
+    readonly water?: number;
+    readonly cargo?: CompartmentCargo;
+}
+
+export interface CompartmentCargo {
+    readonly material: BreachCargo;
+    readonly mass: number;
+    readonly density?: number;
+    readonly diameter?: number;
+    readonly packing?: number;
+}
+
+export const DISCHARGE: number;
+
 export interface Deck {
     readonly nx: number;
     readonly nz: number;
@@ -17,7 +44,36 @@ export interface Deck {
 
 export const FRICTION: number;
 
+export interface FloodResult {
+    readonly water: Float64Array;
+    readonly air: Float64Array;
+    readonly cargo: Float64Array;
+    readonly open: Float64Array;
+    readonly mass: Float64Array;
+    readonly centre: Float64Array;
+    readonly lost: Float64Array;
+    readonly lostCentre: Float64Array;
+    readonly level: Float64Array;
+    readonly pressure: Float64Array;
+}
+
+export class Flooding {
+    readonly compartments: readonly CompartmentShape[];
+    readonly result: FloodResult;
+    constructor(compartments: readonly Compartment[], openings: readonly Opening[]);
+    get words(): number;
+    get openingCount(): number;
+    ends(i: number): readonly [number, number];
+    initialise(state: Float64Array): void;
+    levelOf(i: number, volume: number): number;
+    step(state: Float64Array, pose: Pose, sea: Surface, t: number, dt: number, rho: number, g: number): FloodResult;
+}
+
 export const GRAVITY = 9.81;
+
+export const HULL_BREACHES_FIELD: FieldDescriptor;
+
+export const HULL_BREACH_WORDS = 16;
 
 export interface HeaveSection {
     readonly addedMass: number;
@@ -29,6 +85,8 @@ export interface HeaveSection {
 export interface Hull {
     readonly row: number;
     readonly mesh: HullMesh;
+    readonly compartments?: readonly Compartment[];
+    readonly openings?: readonly Opening[];
 }
 
 export interface HullMemory {
@@ -112,6 +170,22 @@ export interface LewisForm {
     readonly a3: number;
     readonly sigma: number;
 }
+
+export interface Opening {
+    readonly from: number;
+    readonly to: number | 'outside';
+    readonly centre: Vec3;
+    readonly normal: Vec3;
+    readonly width: number;
+    readonly height: number;
+    readonly axis?: Vec3;
+    readonly discharge?: number;
+    readonly opens?: number;
+    readonly closes?: number;
+    readonly collapse?: number;
+}
+
+export const PERMEABILITY = 0.95;
 
 export type Quat = readonly [number, number, number, number];
 
@@ -212,6 +286,8 @@ export function stillWaterline(mesh: HullMesh, mass: number, density: number): n
 
 export function swayAddedMassRigidLid(draft: number, form: LewisForm, density: number): number;
 
+export function volumeBelow(mesh: HullMesh, u: Vec3, s: number, moment?: [number, number, number]): number;
+
 export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads): WettedLoads;
 
 // Not exported from this entry, but used by the exports above:
@@ -219,6 +295,17 @@ export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: nu
 type Cell = readonly [number, number, number];
 
 type Centring = 'cell' | 'face' | 'vertex' | 'particle';
+
+interface CompartmentShape {
+    readonly mesh: HullMesh;
+    readonly permeability: number;
+    readonly cargo: CompartmentCargo | null;
+    readonly grain: number;
+    readonly density: number;
+    readonly packing: number;
+    readonly water: number;
+    readonly free: number;
+}
 
 interface DiffractionForm {
     readonly lewis: LewisForm;
@@ -266,6 +353,11 @@ interface Port {
     readonly cell: Cell;
 }
 
+interface Pose {
+    readonly position: Vec3;
+    readonly rotation: readonly [number, number, number, number];
+}
+
 type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface Region {
@@ -311,5 +403,9 @@ interface StepContext {
     readonly seed: number;
     readonly inputs: ReadonlyMap<string, Port>;
     readonly cell: Cell;
+}
+
+interface Surface {
+    elevation(x: number, z: number, t: number): number;
 }
 ```

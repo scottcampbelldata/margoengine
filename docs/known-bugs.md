@@ -6,6 +6,14 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: a hull that has lost its buoyancy sinks with no drag (KB-SEA-SINKDRAG1, physics seakeeping)
+
+- **Repro:** a 20 by 4 by 8 m box barge floating at 2 m with one compartment filling most of it, holed at the bow and
+  vented (`HullSolver` with `compartments` and `openings`): it settles as it floods and goes under at about 25 s, then
+  falls faster and faster (17.7 m/s at 50 s) and pitches over, where a hull this shape falls at about 4 m/s.
+- **Cause:** the hull solver's loads model a floating hull (the waves it makes, its roll's bilge eddies); nothing takes
+  the form drag of a hull moving through the water once it is under, which sets a sinking hull's speed.
+
 ### Fixed 2026-11-26: visual vortices supplied neither full wind nor loads (PA-31)
 
 - **Repro:** Sample the eyewall of a 150 hPa hurricane or put a rigid object and a water grid under a moving vortex.

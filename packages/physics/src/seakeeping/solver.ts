@@ -32,6 +32,8 @@ import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../wor
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
+import { AIR_DENSITY, type Compartment, Flooding, type Opening } from './flooding.js';
+import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { type HullMemory, hullMemory } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections } from './strips.js';
@@ -49,6 +51,13 @@ import {
 export interface Hull {
   readonly row: number;
   readonly mesh: HullMesh;
+  /**
+   * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
+   * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
+   */
+  readonly compartments?: readonly Compartment[];
+  /** Its openings between the compartments and to the outside: breaches, doors, hatches, vents. */
+  readonly openings?: readonly Opening[];
 }
 
 /** What a {@link HullSolver} is made from. */
@@ -185,6 +194,10 @@ export class HullSolver implements Solver<HullParams> {
   private inflowRecords = 0;
   /** Per hull: its deck, and its mesh without the deck's faces (for the Froude-Krylov load). */
   private readonly decks = new Map<Hull, { deck: Deck; wet: HullMesh }>();
+  /** Per hull with compartments: its flooding, and where its state starts in the `flood` region. */
+  private readonly floods = new Map<Hull, { flooding: Flooding; at: number; record: number }>();
+  private flood: Region | null = null;
+  private breaches: Region | null = null;
 
   constructor(readonly id = 'hull') {}
 
@@ -197,6 +210,7 @@ export class HullSolver implements Solver<HullParams> {
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
         { field: DECK_INFLOW_FIELD, access: 'write' },
         { field: DECK_CLAIMS_FIELD, access: 'read', optional: true },
+        { field: HULL_BREACHES_FIELD, access: 'write' },
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -279,6 +293,29 @@ export class HullSolver implements Solver<HullParams> {
       this.deckWater = host.allocate('deckWater', hulls.length * (3 * cx * cz + 4) * 8, 'f64', HULL_LAYOUT);
     if (this.diffraction)
       this.waves = host.allocate('waves', hulls.length * this.stations * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
+    // Flooding: each hull's compartments' water, air and cargo, and its openings' state; one breach record an opening to
+    // the outside.
+    let words = 0,
+      records = 0;
+    for (const hull of hulls) {
+      if (!hull.compartments?.length) {
+        if (hull.openings?.length)
+          throw new RangeError(
+            `Hull ${hull.row} has openings but no compartments; pass the compartments they open from.`,
+          );
+        continue;
+      }
+      const flooding = new Flooding(hull.compartments, hull.openings ?? []);
+      this.floods.set(hull, { flooding, at: words, record: records });
+      words += flooding.words;
+      for (let k = 0; k < flooding.openingCount; k++) if (flooding.ends(k)[1] === -1) records++;
+    }
+    this.breaches = host.allocate('hullBreaches', (1 + records * HULL_BREACH_WORDS) * 8, 'f64', HULL_LAYOUT);
+    if (words > 0) {
+      this.flood = host.allocate('flood', words * 8, 'f64', HULL_LAYOUT);
+      const state = new Float64Array(host.memory.buffer, this.flood.byteOffset, words);
+      for (const { flooding, at } of this.floods.values()) flooding.initialise(state.subarray(at, at + flooding.words));
+    }
   }
 
   /** The sea's waves, when it gives them (`SpectralSea`'s `waveComponents`, its count and its depth). */
@@ -300,8 +337,10 @@ export class HullSolver implements Solver<HullParams> {
     if (!host || !this.sea || !this.forces)
       throw new MargoError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
     const out = new Float64Array(host.memory.buffer, this.forces.byteOffset, this.capacity * FORCE_WORDS),
-      records = new Float64Array(host.memory.buffer, this.inflow!.byteOffset, this.inflow!.byteLength / 8);
+      records = new Float64Array(host.memory.buffer, this.inflow!.byteOffset, this.inflow!.byteLength / 8),
+      breaches = new Float64Array(host.memory.buffer, this.breaches!.byteOffset, this.breaches!.byteLength / 8);
     records.fill(0);
+    breaches.fill(0);
     out.fill(0);
     const cell = (this.sea as Partial<SeaSurface>).cell;
     if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
@@ -374,10 +413,12 @@ export class HullSolver implements Solver<HullParams> {
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.slamming) this.slamLoad(hull, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.greenWater) this.deckLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), context, loads);
-      const w = hull.row * FORCE_WORDS,
-        held = this.addedMass
-          ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads)
-          : [...loads.force, ...loads.torque];
+      const points = this.floodLoad(hull, pose, centre, t, 1 / rateOf(context.level), context.tick, breaches, loads),
+        w = hull.row * FORCE_WORDS,
+        held =
+          this.addedMass || points.length > 0
+            ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads, points)
+            : [...loads.force, ...loads.torque];
       for (let k = 0; k < 6; k++) out[w + k]! += held[k]!;
     }
   }
@@ -937,6 +978,88 @@ export class HullSolver implements Solver<HullParams> {
    * roll rate, taken implicitly in the damping alone (backward Euler against the roll inertia with the water carried), so a
    * light hull's eddy damping stays stable at any step: -c p / (1 + dt c / I).
    */
+  /**
+   * The hull's flooding over the step (flooding.ts): the water, air and cargo moved, the floodwater's weight (less the
+   * cargo lost's) added to the load at their centres, the breaches' records written. Returns the point masses (m, x, y, z
+   * in world axes) the hull carries for the added-mass solve.
+   */
+  private floodLoad(
+    hull: Hull,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    t: number,
+    dt: number,
+    tick: number,
+    breaches: Float64Array,
+    loads: WettedLoads,
+  ): number[] {
+    const entry = this.floods.get(hull);
+    if (!entry || !this.flood) return [];
+    const { flooding, at, record } = entry,
+      state = new Float64Array(this.host!.memory.buffer, this.flood.byteOffset + at * 8, flooding.words),
+      density = this.sea!.density ?? SEA_WATER,
+      g = this.gravity,
+      magnitude = hypot(g[0], g[1], g[2]),
+      r = flooding.step(state, pose, this.sea!, t, dt, density, magnitude),
+      points: number[] = [],
+      add = (m: number, x: number, y: number, z: number) => {
+        if (m === 0) return;
+        const f = [m * g[0], m * g[1], m * g[2]],
+          d = [x - centre[0], y - centre[1], z - centre[2]];
+        loads.force[0] += f[0]!;
+        loads.force[1] += f[1]!;
+        loads.force[2] += f[2]!;
+        loads.torque[0] += d[1]! * f[2]! - d[2]! * f[1]!;
+        loads.torque[1] += d[2]! * f[0]! - d[0]! * f[2]!;
+        loads.torque[2] += d[0]! * f[1]! - d[1]! * f[0]!;
+        points.push(m, x, y, z);
+      };
+    for (let i = 0; i < flooding.compartments.length; i++) {
+      add(r.mass[i]!, r.centre[i * 3]!, r.centre[i * 3 + 1]!, r.centre[i * 3 + 2]!);
+      add(-r.lost[i]!, r.lostCentre[i * 3]!, r.lostCentre[i * 3 + 1]!, r.lostCentre[i * 3 + 2]!);
+    }
+    // The breaches: one record an opening to the outside, after the count word.
+    const openings = hull.openings ?? [],
+      q = pose.rotation;
+    let n = record;
+    for (let k = 0; k < openings.length; k++) {
+      const o = openings[k]!;
+      if (o.to !== 'outside') continue;
+      const c = rotate(q, o.centre),
+        nl = hypot(o.normal[0], o.normal[1], o.normal[2]),
+        normal = rotate(q, [o.normal[0] / nl, o.normal[1] / nl, o.normal[2] / nl]),
+        x = c[0] + pose.position[0],
+        y = c[1] + pose.position[1],
+        z = c[2] + pose.position[2],
+        cargo = flooding.compartments[o.from]!.cargo,
+        w = 1 + n * HULL_BREACH_WORDS;
+      breaches.set(
+        [
+          hull.row,
+          k,
+          x,
+          y,
+          z,
+          normal[0],
+          normal[1],
+          normal[2],
+          r.open[k]! * o.width * o.height,
+          r.water[k]!,
+          r.air[k]!,
+          r.air[k]! / AIR_DENSITY,
+          r.cargo[k]!,
+          cargo ? BREACH_CARGO.indexOf(cargo.material) : 0,
+          this.sea!.elevation(x, z, t) - y,
+          tick,
+        ],
+        w,
+      );
+      n++;
+    }
+    breaches[0] = Math.max(breaches[0]!, n);
+    return points;
+  }
+
   private dampRoll(
     hull: Hull,
     bodies: Float32Array,
@@ -1096,6 +1219,7 @@ export class HullSolver implements Solver<HullParams> {
     t: number,
     dt: number,
     loads: WettedLoads,
+    points: readonly number[] = [],
   ): number[] {
     const inverseMass = bodies[at + 16]!,
       f = [...loads.force, ...loads.torque];
@@ -1110,11 +1234,13 @@ export class HullSolver implements Solver<HullParams> {
       level = this.sea!.elevation(centre[0], centre[2], t),
       waterline = toBody([0, level - pose.position[1], 0])[1],
       density = this.sea!.density ?? SEA_WATER,
-      body = addedMassInfinite(hullSections(hull.mesh, waterline, this.stations), local, density),
-      memory = this.memoryOf(hull, bodies, at, local, dt);
+      body = this.addedMass
+        ? addedMassInfinite(hullSections(hull.mesh, waterline, this.stations), local, density)
+        : new Float64Array(36),
+      memory = this.addedMass ? this.memoryOf(hull, bodies, at, local, dt) : null;
     // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
     if (memory) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
-    let any = false;
+    let any = points.length > 0;
     for (let k = 0; k < 36; k++) any ||= body[k] !== 0;
     if (!any) return f;
     // Into world axes: A_world = T A T^T, T the rotation on both the linear and the angular block.
@@ -1128,6 +1254,23 @@ export class HullSolver implements Solver<HullParams> {
         for (let k = 0; k < 6; k++) for (let l = 0; l < 6; l++) sum += T(i, k) * body[k * 6 + l]! * T(j, l);
         a[i * 6 + j] = sum;
       }
+    // Floodwater (and cargo lost, with a negative mass) moves with the hull as point masses m at r from the centre of mass:
+    // momentum m (v + w x r), moment of momentum m r x (v + w x r): [[m I, -m [r]x], [m [r]x, -m [r]x [r]x]].
+    for (let k = 0; k + 3 < points.length; k += 4) {
+      const m = points[k]!,
+        r = [points[k + 1]! - centre[0], points[k + 2]! - centre[1], points[k + 3]! - centre[2]],
+        cross = [0, -r[2]!, r[1]!, r[2]!, 0, -r[0]!, -r[1]!, r[0]!, 0];
+      for (let i = 0; i < 3; i++) {
+        a[i * 6 + i]! += m;
+        for (let j = 0; j < 3; j++) {
+          a[i * 6 + j + 3]! -= m * cross[i * 3 + j]!;
+          a[(i + 3) * 6 + j]! += m * cross[i * 3 + j]!;
+          let sq = 0;
+          for (let l = 0; l < 3; l++) sq += cross[i * 3 + l]! * cross[l * 3 + j]!;
+          a[(i + 3) * 6 + j + 3]! -= m * sq;
+        }
+      }
+    }
     // M: the mass on the linear block, the world inertia (the inverse of the port's inverse inertia) on the angular.
     const ii = [
         bodies[at + 17]!,
@@ -1190,6 +1333,7 @@ export class HullSolver implements Solver<HullParams> {
     return [
       { field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] },
       { field: DECK_INFLOW_FIELD.name, region: this.inflow!, tick, cell: [0, 0, 0] },
+      { field: HULL_BREACHES_FIELD.name, region: this.breaches!, tick, cell: [0, 0, 0] },
     ];
   }
 
@@ -1197,7 +1341,7 @@ export class HullSolver implements Solver<HullParams> {
 
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [this.history, this.radiated, this.waves, this.carry, this.deckWater, this.slam].filter(
+    return [this.history, this.radiated, this.waves, this.carry, this.deckWater, this.slam, this.flood].filter(
       (r): r is Region => r !== null,
     );
   }

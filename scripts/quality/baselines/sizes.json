@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20290900,
+  "total": 20296697,
   "history": [
     {
       "date": "2026-10-24",
@@ -13011,6 +13011,12 @@
       "commit": "render-graph",
       "reason": "New optional post entry, 0 to 7,748 B gzip: render-graph (RenderGraph, a data-driven serializable pass graph with validation, topological build, transient aliasing, history textures and post effect tasks). Its own entry, loaded only when imported. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-10 flooding",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: flooding: compartments and openings on a hull (Bernoulli flow through each opening integrated exactly over its height, Boyle air, a backward-Euler Gauss-Seidel solve, cargo out by Beverloo and Wilson et al.), the floodwater as added weight and point masses in the added-mass solve, and the hullBreaches port; measured gzip (Mac build) 22861 B, was 17233; a split into its own entry would need HullSolver to take a flooding factory from the scene (its init cannot await an import), one more thing to wire for every damaged hull. Budget (measured + max(3%, 256 B)): 17750 to 23547 B."
     }
   ],
   "items": {
@@ -13861,7 +13867,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
-    "@margoengine/physics/seakeeping": 17750,
+    "@margoengine/physics/seakeeping": 23547,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,

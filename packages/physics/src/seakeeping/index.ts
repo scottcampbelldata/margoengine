@@ -14,6 +14,20 @@ export {
 export { type Hull, type HullParams, HullSolver, SEA_VISCOSITY } from './solver.js';
 export { type Deck, deckOf, stepDeck } from './deck.js';
 export { type SlamStation, slamSlope, slamStations } from './slamming.js';
+export {
+  AIR_DENSITY,
+  ATMOSPHERE,
+  type Compartment,
+  type CompartmentCargo,
+  COMPARTMENT_WORDS,
+  DISCHARGE,
+  type FloodResult,
+  Flooding,
+  type Opening,
+  PERMEABILITY,
+  volumeBelow,
+} from './flooding.js';
+export { BREACH_CARGO, type BreachCargo, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 export { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 export {
   addedMassInfinite,

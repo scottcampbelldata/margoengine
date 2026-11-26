@@ -6,11 +6,14 @@ import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import {
   GRAVITY,
+  HULL_BREACH_WORDS,
+  HULL_BREACHES_FIELD,
   HullSolver,
   heaveSection,
   lateralSection,
   lewisForm,
   SEA_WATER,
+  volumeBelow,
   wettedLoads,
 } from '../../dist/seakeeping.js';
 import { SpectralSea } from '../../dist/sea.js';
@@ -925,3 +928,108 @@ test('HullSolver: a wedge coming down into still water at a steady speed slams a
     }
   }
 });
+
+/**
+ * A 20 by 4 by 8 m box barge floating at 2 m (its centre of mass in its middle) with a wing tank on its starboard side,
+ * x -5 to 5, the full depth, z 2.5 to 4, holed in its side at the bottom and vented in its top; `rate` frames a second.
+ */
+function floodedBarge(rate = { num: 60, den: 1 }) {
+  const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
+    mass = SEA_WATER * 20 * 8 * 2,
+    body = physics.addBody(null, { colliders: { shape: 'box', halfExtents: [10, 2, 4], mass } }),
+    hull = new HullSolver(),
+    world = new PhysicsWorld({ rate })
+      .add(hull, {
+        hulls: [
+          {
+            row: body.row,
+            mesh: boxMesh([20, 4, 8]),
+            compartments: [{ mesh: boxMesh([10, 4, 1.5], [0, 0, 3.25]) }],
+            openings: [
+              { from: 0, to: 'outside', centre: [0, -1.5, 4], normal: [0, 0, 1], width: 2, height: 0.5 },
+              { from: 0, to: 'outside', centre: [0, 2, 3.25], normal: [0, 1, 0], width: 0.3, height: 0.3 },
+            ],
+          },
+        ],
+        sea: { density: SEA_WATER, elevation: () => 0 },
+        greenWater: false,
+      })
+      .add(new RigidSolver(), { physics })
+      .couple(['hull', 'rigid'], 'staggered');
+  return Object.assign(world, { body, hull, mass });
+}
+
+test('HullSolver: a barge holed in a wing tank heels and sinks to the lost-buoyancy equilibrium', () => {
+  // The floodwater as added weight (the tank's water, its level square to gravity, at its centre) comes to rest where
+  // the hydrostatics of lost buoyancy put it: the hull's displacement less the tank's under the sea equal to the barge's
+  // mass, its centre under the centre of mass. Measured at 120 s: heel 13.70066 against 13.70085 degrees, sinkage within
+  // 0.04 mm.
+  const world = floodedBarge(),
+    { body, mass } = world;
+  for (let f = 1; f <= 120 * 60; f++) world.advance(f);
+  const hull = boxMesh([20, 4, 8]),
+    tank = boxMesh([10, 4, 1.5], [0, 0, 3.25]),
+    // Heeled phi about x at height h: the body's frame's up is (0, cos, -sin); the sea's surface is the plane u . p = -h.
+    lost = (h, phi) => {
+      const u = [0, Math.cos(phi), -Math.sin(phi)],
+        mh = [0, 0, 0],
+        mt = [0, 0, 0],
+        v = volumeBelow(hull, u, -h, mh) - 0.95 * volumeBelow(tank, u, -h, mt),
+        m = [0, 1, 2].map((k) => mh[k] - 0.95 * mt[k]);
+      return [v - mass / SEA_WATER, m[1] * Math.sin(phi) + m[2] * Math.cos(phi)];
+    };
+  let h = 0,
+    phi = 0;
+  for (let it = 0; it < 40; it++) {
+    const f0 = lost(h, phi),
+      e = 1e-7,
+      fh = lost(h + e, phi),
+      fp = lost(h, phi + e),
+      J = [(fh[0] - f0[0]) / e, (fp[0] - f0[0]) / e, (fh[1] - f0[1]) / e, (fp[1] - f0[1]) / e],
+      det = J[0] * J[3] - J[1] * J[2];
+    h -= (J[3] * f0[0] - J[1] * f0[1]) / det;
+    phi -= (-J[2] * f0[0] + J[0] * f0[1]) / det;
+  }
+  const heel = (2 * Math.asin(body.rotation[0]) * 180) / Math.PI,
+    want = (phi * 180) / Math.PI;
+  assert.ok(want > 13 && want < 14.5, `the statics heel it ${want} degrees`);
+  assert.ok(Math.abs(heel - want) < 1e-3, `heeled ${heel} degrees against ${want}`);
+  assert.ok(Math.abs(body.position[1] - h) < 1e-4, `sunk to ${body.position[1]} m against ${h}`);
+});
+
+test('HullSolver: a flooding hull writes its breaches: the sea coming in, the air going out, where they are', () => {
+  const world = floodedBarge(),
+    { body, hull } = world;
+  for (let f = 1; f <= 30; f++) world.advance(f);
+  const port = hull.exportPorts(world.tick).find((p) => p.field === HULL_BREACHES_FIELD.name),
+    words = new Float64Array(world.memory.buffer, port.region.byteOffset, port.region.byteLength / 8);
+  assert.equal(words[0], 2, 'one record an opening to the outside');
+  const record = (k) => words.subarray(1 + k * HULL_BREACH_WORDS, 1 + (k + 1) * HULL_BREACH_WORDS),
+    [breach, vent] = [record(0), record(1)],
+    q = body.rotation,
+    turn = (v) => {
+      const t = [2 * (q[1] * v[2] - q[2] * v[1]), 2 * (q[2] * v[0] - q[0] * v[2]), 2 * (q[0] * v[1] - q[1] * v[0])];
+      return [
+        v[0] + q[3] * t[0] + (q[1] * t[2] - q[2] * t[1]),
+        v[1] + q[3] * t[1] + (q[2] * t[0] - q[0] * t[2]),
+        v[2] + q[3] * t[2] + (q[0] * t[1] - q[1] * t[0]),
+      ];
+    };
+  assert.equal(breach[0], body.row);
+  assert.deepEqual([breach[1], vent[1]], [0, 1]);
+  // The breach's centre and normal in the world (the pose its last step took, a little behind the body's now).
+  const centre = turn([0, -1.5, 4]).map((c, k) => c + body.position[k]);
+  for (let k = 0; k < 3; k++) assert.ok(Math.abs(breach[2 + k] - centre[k]) < 0.01, `centre ${k}: ${breach[2 + k]}`);
+  assert.ok(Math.abs(Math.hypot(breach[5], breach[6], breach[7]) - 1) < 1e-12 && breach[7] > 0.9);
+  assert.equal(breach[8], 1, 'its open area, 2 by 0.5 m');
+  assert.ok(breach[9] < -1, `the sea comes in: ${breach[9]} m^3/s`);
+  assert.ok(vent[10] > 0 && Math.abs(vent[11] - vent[10] / 1.225) < 1e-15, `air out: ${vent[10]} kg/s`);
+  assert.deepEqual([breach[12], breach[13]], [0, 0], 'no cargo');
+  assert.ok(breach[14] > 1 && vent[14] < 0, 'the breach under the sea, the vent above it');
+  assert.equal(breach[15], 29, 'the solver step it is for, its 30th');
+});
+
+test('HullSolver: a flooding hull, the same state at 24, 30 and 60 frames a second', () =>
+  frameRateIndependent(floodedBarge));
+test('HullSolver: a flooding hull, a seek equals a continuous run', () =>
+  seekEqualsContinuous(() => floodedBarge({ num: 24, den: 1 })));
