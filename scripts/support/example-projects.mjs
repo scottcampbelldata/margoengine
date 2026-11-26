@@ -26,6 +26,7 @@ export const EXAMPLE_FOLDERS = [
   'cathedral-light',
   'dune-coast',
   'event-horizon',
+  'from-babylon',
   'from-playcanvas',
   'from-threejs',
   'gallery',
