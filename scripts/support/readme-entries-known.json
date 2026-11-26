@@ -3,7 +3,7 @@
   "animator": ["./layers","./blend-trees","./masks"],
   "audio": ["./pan","./binaural","./voices","./sprites"],
   "behavior": ["./subtrees","./inspect","./fuzzy","./text","./triggers"],
-  "biomes": ["./region","./rivers","./cover","./far","./workers"],
+  "biomes": ["./region","./cover","./far","./workers"],
   "blender": ["./lightmap"],
   "cache": ["./stream","./decoded"],
   "cinematic": ["./physical-lens","./ortho"],
