@@ -20,7 +20,7 @@
 // spread by turbulence only (no Fay gravity-viscous spreading), constant diffusivities (no profile, so no drift correction
 // is needed), no flocculation of fine silt, and settled tracer parcels remain in the bed ledger.
 
-import type { Bed, FlowField, FlowSample, Wind } from '@margoengine/math/fields';
+import type { Bed, FlowField, FlowSample, SeaSurface, SeaSurfaceSample, Wind } from '@margoengine/math/fields';
 import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
@@ -129,15 +129,19 @@ export interface BreachTracerMix {
 export interface TracerParams {
   /** The sources. */
   sources?: readonly TracerSource[];
-  /** The water's velocity at any depth (default still water). */
+  /** Live surface, wave velocity at depth, and water density (default: flat, still water). */
+  sea?: SeaSurface;
+  /** Override the water's velocity at any depth (default: sea.water when supplied). */
   water?: FlowField;
+  /** Size of an origin cell, m. Match the PhysicsWorld setting (default 4096). */
+  cellSize?: number;
   /** The wind over the water, for floating slicks (default none). */
   wind?: Wind;
-  /** The water's surface height, y m (default 0). */
+  /** Still-water height in the sea's origin cell, or fixed local water height without a sea (default 0 m). */
   waterLevel?: number;
   /** The bed: a terrain bed, or a depth below the surface everywhere, m (default 30 m). */
   bed?: Bed | number;
-  /** Density of the water, kg/m^3 (default 1025, the sea). */
+  /** Density of the water, kg/m^3 (default: sea density, or 1025 without a sea). */
   waterDensity?: number;
   /** Kinematic viscosity of the water, m^2/s (default 1e-6). */
   viscosity?: number;
@@ -234,13 +238,23 @@ export class TracerSolver implements Solver<TracerParams> {
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private params!: Required<
-    Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources' | 'bedJets' | 'breaches' | 'breachMixes'>
+    Omit<TracerParams, 'sea' | 'water' | 'wind' | 'bed' | 'sources' | 'bedJets' | 'breaches' | 'breachMixes'>
   > & {
     bed: Bed | number;
   };
   private sources: { material: number; source: TracerSource }[] = [];
   private materials: TracerMaterial[] = [];
   private settling: number[] = [];
+  private sea?: SeaSurface;
+  private readonly seaOffset: [number, number, number] = [0, 0, 0];
+  private readonly seaSample: SeaSurfaceSample = {
+    height: 0,
+    normal: [0, 1, 0],
+    velocity: [0, 0, 0],
+    current: [0, 0, 0],
+    depth: Infinity,
+    density: 0,
+  };
   private water: FlowField | undefined;
   private wind: Wind | undefined;
   private random!: RandomStream;
@@ -280,11 +294,13 @@ export class TracerSolver implements Solver<TracerParams> {
   init(host: SolverHost, params: TracerParams = {}): void {
     const {
       sources = [],
+      sea,
       water,
       wind,
+      cellSize = 4096,
       waterLevel = 0,
       bed = 30,
-      waterDensity = 1025,
+      waterDensity = sea?.density ?? 1025,
       viscosity = 1e-6,
       horizontalDiffusivity = 0.1,
       verticalDiffusivity = 0.001,
@@ -313,6 +329,11 @@ export class TracerSolver implements Solver<TracerParams> {
       );
     if (!Number.isFinite(waterLevel))
       throw new RangeError(`The water level is a finite height (got ${waterLevel}); pass one.`);
+    if (!(Number.isInteger(cellSize) && cellSize >= 1 && cellSize <= 1 << 20 && (cellSize & (cellSize - 1)) === 0))
+      throw new MargoError(
+        'unsupported',
+        'Tracer cells must be powers of two from 1 to 2^20 m; use the PhysicsWorld cell size.',
+      );
     if (typeof bed === 'number' && !(bed > 0 && Number.isFinite(bed)))
       throw new RangeError(
         `A water depth is a finite number of metres above 0 (got ${bed}); pass one, or a terrain bed.`,
@@ -321,6 +342,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
     this.params = {
+      cellSize,
       waterLevel,
       bed,
       waterDensity,
@@ -330,6 +352,7 @@ export class TracerSolver implements Solver<TracerParams> {
       particleMass,
       capacity,
     };
+    this.sea = sea;
     this.water = water;
     this.wind = wind;
     sources.forEach((source, n) => {
@@ -506,16 +529,26 @@ export class TracerSolver implements Solver<TracerParams> {
   /** The bed's height under (x, z), y m. */
   private bedAt(x: number, z: number): number {
     const bed = this.params.bed;
-    return typeof bed === 'number' ? this.params.waterLevel - bed : bed.sample(x, z).elevation;
+    return typeof bed === 'number' ? this.params.waterLevel - this.seaOffset[1] - bed : bed.sample(x, z).elevation;
+  }
+
+  private surfaceAt(x: number, z: number, time: number): number {
+    const [dx, dy, dz] = this.seaOffset;
+    return this.params.waterLevel - dy + (this.sea?.elevation(x + dx, z + dz, time) ?? 0);
   }
 
   step(context: StepContext, dt: number): void {
     this.cell = context.cell;
+    const sea = this.sea;
+    if (sea)
+      for (let axis = 0; axis < 3; axis++)
+        this.seaOffset[axis] = (context.cell[axis]! - sea.cell[axis]!) * this.params.cellSize;
     if (this.random.seed !== context.seed) this.random = new RandomStream(context.seed, solverNumber(this.id));
     const time = (context.tick + 1) * dt,
       words = this.words(),
       book = this.book(),
       { capacity, horizontalDiffusivity: kh, verticalDiffusivity: kv, waterLevel } = this.params;
+    const [seaX, seaY, seaZ] = this.seaOffset;
     // Release: each source's mass this step, in particles of the set mass, the remainder carried to the next step.
     let free = 0;
     for (let s = 0; s < this.sources.length; s++) {
@@ -585,7 +618,16 @@ export class TracerSolver implements Solver<TracerParams> {
         uy = 0,
         uz = 0;
       if (this.water) {
-        const v = this.water.sample(x, y, z, time, this.flow).velocity;
+        const sampleY = sea && state === SURFACE ? this.surfaceAt(x, z, time) : y;
+        const v = this.water.sample(x, sampleY, z, time, this.flow).velocity;
+        ux = v[0];
+        uy = v[1];
+        uz = v[2];
+      } else if (sea) {
+        const v =
+          state === SURFACE
+            ? sea.sample(x + seaX, z + seaZ, time, this.seaSample).velocity
+            : sea.water.sample(x + seaX, y + seaY - waterLevel, z + seaZ, time, this.flow).velocity;
         ux = v[0];
         uy = v[1];
         uz = v[2];
@@ -593,19 +635,21 @@ export class TracerSolver implements Solver<TracerParams> {
       if (state === SURFACE) {
         if (this.wind) {
           const share = material.windage ?? 0.03,
-            w = this.wind.sample(x, waterLevel + 10, z, time, this.flow).velocity;
+            w = this.wind.sample(x, this.surfaceAt(x, z, time) + 10, z, time, this.flow).velocity;
           ux += share * w[0];
           uz += share * w[2];
         }
         words[p] = x + ux * dt + sh * n0;
         words[p + 2] = z + uz * dt + sh * n2;
+        if (sea) words[p + 1] = this.surfaceAt(words[p]!, words[p + 2]!, time);
         continue;
       }
       const nx = x + ux * dt + sh * n0;
       let ny = y + (uy - this.settling[words[p + 4]!]!) * dt + sv * n1;
       const nz = z + uz * dt + sh * n2;
       // The surface reflects what is in the water; the bed keeps what reaches it.
-      if (ny > waterLevel) ny = 2 * waterLevel - ny;
+      const surface = this.surfaceAt(nx, nz, time);
+      if (ny > surface) ny = 2 * surface - ny;
       const floor = this.bedAt(nx, nz);
       if (ny <= floor) {
         ny = floor;
@@ -617,10 +661,10 @@ export class TracerSolver implements Solver<TracerParams> {
       words[p + 1] = ny;
       words[p + 2] = nz;
     }
-    if (this.jetBed) this.entrainBed(context, dt, free, this.jetBed);
+    if (this.jetBed) this.entrainBed(context, dt, time, free, this.jetBed);
   }
 
-  private entrainBed(context: StepContext, dt: number, free: number, bed: JetBed): void {
+  private entrainBed(context: StepContext, dt: number, time: number, free: number, bed: JetBed): void {
     const port = context.inputs.get(SWIM_WAKE_FIELD.name);
     if (!port) return;
     const { region } = port;
@@ -632,7 +676,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const words = this.words(),
       book = this.book(),
       lifted = 4 + this.sources.length,
-      { capacity, waterLevel } = this.params;
+      { capacity } = this.params;
     for (let w = 0; w < wake.length; w += SWIM_WAKE_WORDS) {
       const x = wake[w]!,
         y = wake[w + 1]!,
@@ -640,7 +684,7 @@ export class TracerSolver implements Solver<TracerParams> {
         downward = -wake[w + 4]!,
         radius = wake[w + 6]!,
         height = y - this.bedAt(x, z);
-      if (!(wake[w + 7]! > 0 && downward > 0 && radius > 0 && height > 0 && y <= waterLevel)) continue;
+      if (!(wake[w + 7]! > 0 && downward > 0 && radius > 0 && height > 0 && y <= this.surfaceAt(x, z, time))) continue;
       const centreX = x + height * (wake[w + 3]! / downward),
         centreZ = z + height * (wake[w + 5]! / downward);
       const rings = height >= 2 * radius ? bed.rings : undefined;
@@ -662,12 +706,13 @@ export class TracerSolver implements Solver<TracerParams> {
           : spread * pow(0.0625 + 0.7475 * quantile, 0.5);
         const px = centreX + distance * cos(angle),
           pz = centreZ + distance * sin(angle),
-          floor = this.bedAt(px, pz);
-        if (!(floor < waterLevel)) continue;
+          floor = this.bedAt(px, pz),
+          surface = this.surfaceAt(px, pz, time);
+        if (!(floor < surface)) continue;
         const at = free++ * STRIDE,
           amount = mass / JET_PARCELS;
         words[at] = px;
-        words[at + 1] = floor + Math.min(spread * 0.3, (waterLevel - floor) * 0.5);
+        words[at + 1] = floor + Math.min(spread * 0.3, (surface - floor) * 0.5);
         words[at + 2] = pz;
         words[at + 3] = amount;
         words[at + 4] = bed.material;

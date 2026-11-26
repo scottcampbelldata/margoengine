@@ -13163,6 +13163,14 @@ individual grain density are prescribed, and its test checks mass conservation, 
 The release carries a separate mass remainder by material from the same port record and uses Ferguson and Church
 settling after release. The cargo reports supply size context. A comparison against measured plume evolution remains open.
 
+The tracer sea binding uses the shared `SeaSurface` query for elevation and surface velocity, and `SeaSurface.water`
+for submerged flow. It translates from the tracer origin to the sea origin before sampling. The floating parcels
+follow the material surface as in G. B. Airy's [*Tides and Waves* (1845)](https://books.google.com/books/about/Tides_and_Waves.html?id=41dSAAAAcAAJ).
+Submerged parcels reflect when the step crosses the moving
+surface. The coupling test advances a slick and submerged dye over a single travelling Fourier mode in a different
+origin cell, checks both paths at every step and replays the snapshot. This is an exact coupling check; the motion
+comes from the live SEA-02 solver.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

@@ -3074,6 +3074,31 @@ const cell = plume.mass.findIndex((m) => m > 0);
 console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
 ```
 
+Pass `sea` to place a slick on a live surface, use its orbital flow below the surface, and reflect submerged parcels
+from the moving waterline. `waterLevel` offsets the sea's still-water plane. An explicit `water` field overrides flow
+while the sea still sets the waterline. The tracer's `cellSize` defaults to 4096 m and must match its physics world.
+
+```ts
+import { SpectralSea } from 'margoengine/physics/sea';
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const energy = new Float64Array(12);
+energy[4] = 0.25 / (0.2 * Math.PI);
+const sea = new SpectralSea({ waves: {
+  frequencies: new Float64Array([0.2, 0.4, 0.6]),
+  directions: new Float64Array([0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]),
+  energy, depth: Infinity, density: 1025,
+} });
+const slick = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(slick, {
+  sea, sources: [{ material: 'oil', position: [0, 0, 0], rate: 60, stop: 1 / 60 }],
+});
+world.advance(1);
+const { position: [x, y, z] } = [...slick.particlesOf()][0]!;
+console.log(y === sea.elevation(x, z, 1 / 60)); // true
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.

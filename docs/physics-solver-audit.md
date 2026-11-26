@@ -476,6 +476,10 @@ EF-11 can now release coarse taconite pellets and suspended ore fines through th
 The two grain classes account for the hull's cargo flux separately, including fractional parcels, and the
 pellets settle farther than the fines. The measured sediment plume and original EF-11 playback remain open.
 
+The tracer entry can now query a live `SeaSurface`: the slick follows wave height and surface velocity,
+and submerged dye follows the sea's depth flow in a different origin cell. The test checks live SEA-02
+coupling and exact replay. Oil spreading, weathering and independent dispersion measurements remain open.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point
