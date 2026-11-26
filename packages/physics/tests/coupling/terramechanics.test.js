@@ -20,12 +20,12 @@ function planted(
   soil,
   terrain,
   material,
-  { playback = rate, shared = false, floor, patches = [patch], profiles } = {},
+  { playback = rate, shared = false, floor, patches = [patch], profiles, hardpan } = {},
 ) {
   const bed = new TerrainBed();
   const world = new PhysicsWorld({ rate: playback, memory: worldMemory(shared) })
     .add(bed, { ...terrain, elevations: () => 0, bedrock: floor === undefined ? undefined : () => floor })
-    .add(soil, { terrain, material, patches, floor, profiles });
+    .add(soil, { terrain, material, patches, floor, profiles, hardpan });
   world.couple(['terramechanics', 'bed'], 'staggered');
   return { world, bed };
 }
@@ -223,6 +223,69 @@ test('sparse repose matches a complete ordered face sweep on a large bed', async
       const fullFaces = (nx - 1) * nz + (nz - 1) * nx;
       assert.ok(soil.work.reposeFaces < fullFaces / 100, `${soil.work.reposeFaces} of ${fullFaces} faces`);
     }
+  }
+});
+
+test('layered soil balances the pressure on both sides of an independently integrated hardpan transition', async () => {
+  const spacing = 0.025;
+  const terrain = { columns: 64, rows: 64, width: 64 * spacing, depth: 64 * spacing, centre: [0, 0] };
+  const halfCells = 8;
+  const side = 2 * halfCells * spacing;
+  const material = { cohesiveModulus: 0, frictionalModulus: 100_000, friction: 0, compaction: 1 };
+  const hardpan = { thickness: 0.27, frictionalModulus: 600_000, exponent: 2 };
+  const transition = 0.07;
+  const stress = (z) => (z <= transition ? 100_000 * z : 7000 + 600_000 * (z * z - transition * transition));
+  const peak = 0.12;
+  let load = stress(peak) * spacing * spacing;
+  for (let ring = 1; ring < halfCells; ring++) {
+    const depth = peak * (1 - (ring * ring) / (halfCells * halfCells));
+    load += 8 * ring * stress(depth) * spacing * spacing;
+  }
+  const soil = await Terramechanics.load({ tier: 'resolved' });
+  const { world, bed } = planted(soil, terrain, material, {
+    hardpan,
+    patches: [{ x: 0, z: 0, length: side, width: side, load, rounded: true }],
+  });
+  world.advance(1);
+  const pressure = regionWords(world.memory, world.fields.port(soil.pressureField.name).region);
+  const areas = bedVertexAreas(terrain);
+  const force = pressure.reduce((sum, value, i) => sum + value * areas[i], 0);
+  close(force, load, 1024 * eps * load);
+  const centre = 32 * 65 + 32;
+  close(pressure[centre], stress(peak), 2048 * eps * stress(peak));
+  close(pressure[centre + 3], stress(peak * (1 - 9 / 64)), 2048 * eps * stress(peak));
+  close(pressure[centre + 6], stress(peak * (1 - 36 / 64)), 2048 * eps * stress(peak));
+  close(bed.elevations()[centre], -peak, 1024 * eps);
+  const saved = world.takeSnapshot();
+  world.advance(14);
+  const hash = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  world.advance(14);
+  assert.equal(world.hash(), hash);
+});
+
+test('Salman et al. sandy loam follows the measured 200 mm plate beyond the hardpan transition', async () => {
+  const terrain = { columns: 192, rows: 192, width: 1, depth: 1, centre: [0, 0] };
+  const diameter = 0.2;
+  const patchArea = Math.PI * (diameter / 2) * (diameter / 2);
+  // Table 2 equivalent moduli and exact printed regressions for the 200 mm plate.
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 702_020,
+    exponent: 0.9815,
+    friction: Math.tan((37.59 * Math.PI) / 180),
+  };
+  const hardpan = { thickness: 0.3, frictionalModulus: 9_549_600, exponent: 2.1037 };
+  for (const tier of ['mean', 'resolved']) {
+    const soil = await Terramechanics.load({ tier });
+    const { world, bed } = planted(soil, terrain, material, {
+      hardpan,
+      patches: [{ x: 0, z: 0, length: diameter, width: diameter, load: 110_000 * patchArea, elliptical: true }],
+    });
+    world.advance(1);
+    const sinkage = -bed.bed.sample(0, 0).elevation;
+    // Fig. 6 samples at 118.5 and 122.2 mm bracket 110 kPa. The bounds include one rendered PDF pixel.
+    assert.ok(sinkage >= 0.1182 && sinkage <= 0.1225, `${tier}: ${sinkage} m`);
   }
 });
 

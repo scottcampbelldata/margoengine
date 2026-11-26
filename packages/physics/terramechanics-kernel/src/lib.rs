@@ -42,6 +42,11 @@ struct Patch {
     profile: f64,
     profile_columns: f64,
     profile_rows: f64,
+    lower_stiffness: f64,
+    lower_exponent: f64,
+    transition: f64,
+    transition_pressure: f64,
+    lower_at_transition: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -186,6 +191,19 @@ unsafe fn raster(patch: &Patch, halo: f64, dx: f64, dz: f64) -> (f64, f64, f64) 
     (coverage, profile, ring)
 }
 
+fn layered_pressure(p: &Patch, depth: f64) -> (f64, f64) {
+    if depth > p.transition {
+        let raw = p.lower_stiffness * pow(depth, p.lower_exponent);
+        (
+            p.transition_pressure + (raw - p.lower_at_transition),
+            raw * p.lower_exponent,
+        )
+    } else {
+        let raw = p.stiffness * pow(depth, p.exponent);
+        (raw, raw * p.exponent)
+    }
+}
+
 /// Rasterizes one moving soil contact into pending bed deltas, using exact nodal areas for the mass ledger.
 /// Arrays belong to the caller's arena. Scratch is only accessed in the footprint and its first exterior ring.
 #[unsafe(no_mangle)]
@@ -222,16 +240,23 @@ pub unsafe extern "C" fn stamp(
     let resolved = p.distributed != 0.0;
     let mut settlement = p.settlement;
     let mut crest_pressure = 0.0;
+    let mut pressure_scale = 1.0;
+    let mut layered = false;
     if resolved {
         // Integrate F = sum K (z_max profile)^n dA, then solve once for the peak
         // settlement. The same geometry and weights are used for the load field.
         let mut contact_area = 0.0;
+        let mut largest_vertex = (0.0, 0.0);
         for x in x_start..x_end {
             let rx = origin_x + x as f64 * dx - p.x;
             for z in z_start..z_end {
                 let rz = origin_z + z as f64 * dz - p.z;
                 let (coverage, profile, _) = raster(p, halo, rx, rz);
-                contact_area += *areas.add(x * nz + z) * coverage * pow(profile, p.exponent);
+                let area = *areas.add(x * nz + z) * coverage;
+                contact_area += area * pow(profile, p.exponent);
+                if p.lower_stiffness > 0.0 && area * profile > largest_vertex.0 * largest_vertex.1 {
+                    largest_vertex = (area, profile);
+                }
             }
         }
         *work += visit;
@@ -242,6 +267,70 @@ pub unsafe extern "C" fn stamp(
         settlement = pow(crest_pressure / p.stiffness, 1.0 / p.exponent);
         if !settlement.is_finite() || !crest_pressure.is_finite() {
             return f64::NAN;
+        }
+        layered = p.lower_stiffness > 0.0 && settlement > p.transition;
+        if layered {
+            let (area, profile) = largest_vertex;
+            // A single vertex carrying the entire prescribed force bounds the solution from above.
+            let single_pressure = p.load / area;
+            let single_depth = if single_pressure > p.transition_pressure {
+                pow(
+                    (single_pressure - p.transition_pressure + p.lower_at_transition)
+                        / p.lower_stiffness,
+                    1.0 / p.lower_exponent,
+                )
+            } else {
+                pow(single_pressure / p.stiffness, 1.0 / p.exponent)
+            };
+            let mut upper = (single_depth / profile).max(settlement) * (1.0 + 8.0 * f64::EPSILON);
+            if !upper.is_finite() {
+                return f64::NAN;
+            }
+            let mut lower = p.transition;
+            loop {
+                *work += visit;
+                let mut force = 0.0;
+                let mut slope = 0.0;
+                for x in x_start..x_end {
+                    let rx = origin_x + x as f64 * dx - p.x;
+                    for z in z_start..z_end {
+                        let rz = origin_z + z as f64 * dz - p.z;
+                        let (coverage, profile, _) = raster(p, halo, rx, rz);
+                        if profile > 0.0 && coverage > 0.0 {
+                            let area = *areas.add(x * nz + z) * coverage;
+                            let (stress, slope_times_peak) =
+                                layered_pressure(p, settlement * profile);
+                            force += stress * area;
+                            slope += slope_times_peak * area;
+                        }
+                    }
+                }
+                let residual = force - p.load;
+                if residual.abs() <= (32.0 * f64::EPSILON) * p.load {
+                    pressure_scale = p.load / force;
+                    break;
+                }
+                if residual > 0.0 || !force.is_finite() {
+                    upper = settlement;
+                } else {
+                    lower = settlement;
+                }
+                let span = upper - lower;
+                let midpoint = lower + 0.5 * span;
+                if midpoint <= lower || midpoint >= upper {
+                    pressure_scale = p.load / force;
+                    break;
+                }
+                let newton = settlement - residual * (settlement / slope);
+                settlement = if newton > lower + 0.125 * span && newton < upper - 0.125 * span {
+                    newton
+                } else {
+                    midpoint
+                };
+            }
+            if !pressure_scale.is_finite() || pressure_scale <= 0.0 {
+                return f64::NAN;
+            }
         }
     }
     let mut removed = 0.0;
@@ -255,7 +344,11 @@ pub unsafe extern "C" fn stamp(
             let area = *areas.add(i);
             let depth_shape = if resolved { profile } else { 1.0 };
             if resolved {
-                *pressure.add(i) += crest_pressure * coverage * pow(profile, p.exponent);
+                *pressure.add(i) += if layered {
+                    layered_pressure(p, settlement * profile).0 * coverage * pressure_scale
+                } else {
+                    crest_pressure * coverage * pow(profile, p.exponent)
+                };
             }
             // The bed's exact heights are f64, but the registry publishes f32. Use the lower
             // rounding boundary so we never request a cut the exact bedrock would refuse.

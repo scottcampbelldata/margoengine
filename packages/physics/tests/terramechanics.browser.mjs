@@ -33,6 +33,7 @@ try {
     console.log(`Browser EARTH-05 ${tier} replay ${plain.hash}, rut ${plain.min} m, lofted ${plain.mass} kg.`);
   }
   assert.notEqual(results.mean[0].min, results.resolved[0].min);
+  assert.ok(results.hardpan[0].min > results.resolved[0].min);
   assert.deepEqual([...assets].sort(), ['terramechanics-kernel-shared.wasm', 'terramechanics-kernel.wasm']);
   await page.evaluate(() => window.prepareTerramechanicsRender());
   const flat = await page.evaluate(() => window.terramechanicsFrame(0));

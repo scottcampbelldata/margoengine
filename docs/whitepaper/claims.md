@@ -5796,6 +5796,9 @@ matches the independently integrated peak depth for both orientations.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.
+Both tiers reproduce the calibrated 200 mm sandy-loam plate response over a dense layer from Salman et al.
+(2020). A separate analytic test checks the resolved stress at vertices above and below the pressure transition
+and balances their integrated force independently.
 
 ### Divergence-free particle pressure (FLUID-01)
 

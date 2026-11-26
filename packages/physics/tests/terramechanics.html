@@ -11,21 +11,21 @@
 
     const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] };
 
-    async function makeWorld(shared, tier) {
+    async function makeWorld(shared, tier, hardpan) {
       const soil = await Terramechanics.load({ tier });
       const bed = new TerrainBed();
       const air = await AirborneParticles.load({ terrain: true, dustField: soil.dustField });
       const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) })
         .add(bed, { ...terrain, elevations: () => 0 })
-        .add(soil, { terrain, patches: [{ x: 0, z: 0, length: 0.38, width: 0.22, load: 900, displacement: [0.04, 0], rounded: true }] })
+        .add(soil, { terrain, hardpan, patches: [{ x: 0, z: 0, length: 0.38, width: 0.22, load: 900, displacement: [0.04, 0], rounded: true }] })
         .add(air, { terrain, capacity: 64, dustReleaseHeight: 0.02, dustLiftVelocity: 0.5 });
       world.couple(['terramechanics', 'bed'], 'staggered');
       return { world, bed, air };
     }
 
     window.runTerramechanics = async () => {
-      const simulate = async (shared, tier) => {
-        const { world, bed, air } = await makeWorld(shared, tier);
+      const simulate = async (shared, tier, hardpan) => {
+        const { world, bed, air } = await makeWorld(shared, tier, hardpan);
         world.advance(5);
         const saved = world.takeSnapshot();
         world.advance(30);
@@ -35,8 +35,10 @@
         if (world.hash() !== end) throw new Error('The restored soil and dust state changed. Inspect both registered fields.');
         return { hash: end, min: Math.min(...bed.elevations()), max: Math.max(...bed.elevations()), mass: air.budget.supplied };
       };
+      const hardpan = { thickness: 0.16, frictionalModulus: 900_000 };
       return { mean: [await simulate(false, 'mean'), await simulate(true, 'mean')],
-        resolved: [await simulate(false, 'resolved'), await simulate(true, 'resolved')] };
+        resolved: [await simulate(false, 'resolved'), await simulate(true, 'resolved')],
+        hardpan: [await simulate(false, 'resolved', hardpan), await simulate(true, 'resolved', hardpan)] };
     };
 
     window.prepareTerramechanicsRender = async () => {

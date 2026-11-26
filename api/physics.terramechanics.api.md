@@ -65,6 +65,13 @@ export class SoilContactRigidSolver extends RigidSolver {
 
 export type SoilContactTier = 'mean' | 'resolved';
 
+export interface SoilHardpan {
+    readonly thickness: number;
+    readonly cohesiveModulus?: number;
+    readonly frictionalModulus: number;
+    readonly exponent?: number;
+}
+
 export interface SoilMaterial {
     readonly cohesiveModulus?: number;
     readonly frictionalModulus?: number;
@@ -143,6 +150,7 @@ export interface TerramechanicsOptions {
 export interface TerramechanicsParams {
     readonly terrain: BedShape;
     readonly material?: SoilMaterial;
+    readonly hardpan?: SoilHardpan;
     readonly patches?: readonly SoilPatch[];
     readonly inputRows?: number;
     readonly feet?: readonly LeggedSoilPatch[];

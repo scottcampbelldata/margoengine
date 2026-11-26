@@ -16830,8 +16830,9 @@ volume. A changing atmospheric field requires an application update until the sh
 
 Vehicles sink into a calibrated yielding surface and feel the resulting suspension load. EARTH-05 now transfers the
 real wheel and belt loads to TerrainBed and refits the same collider before the next rigid step. Live hoof and biped
-pressures produce persistent relief and loft mineral dust. Varying bedrock and subsurface layers need a shared
-profile contract. The original city, deck, horse and courier shots still need the production bindings. The mean
+pressures produce persistent relief and loft mineral dust. A configured uniform hardpan changes the pressure
+response. Spatially varying bedrock and shared subsurface layers need a profile contract.
+The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected shoe and tread contours. Live 3D tread intersection and validation against measured
 moving-footprint and berm profiles remain EARTH-05 work.

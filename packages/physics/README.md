@@ -4595,10 +4595,14 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 
 const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] as const };
 const bed = new TerrainBed();
-const soil = await Terramechanics.load();
+const soil = await Terramechanics.load({ tier: 'resolved' });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
   .add(bed, { ...terrain, elevations: () => 0 })
-  .add(soil, { terrain, patches: [{ x: 0, z: 0, length: 0.25, width: 0.12, load: 500 }] })
+  .add(soil, {
+    terrain,
+    patches: [{ x: 0, z: 0, length: 0.25, width: 0.12, load: 500 }],
+    hardpan: { thickness: 0.16, frictionalModulus: 900_000 },
+  })
   .couple(['terramechanics', 'bed'], 'staggered');
 world.advance(30);
 console.log(soil.read(0).sinkage, soil.budget.removed, bed.elevations()[312]);
@@ -4631,3 +4635,8 @@ one entry for each fixed patch, then each external wheel or belt row, then each 
 for the built-in shape. Each profile contains `columns` across the footprint, `rows` along its forward direction,
 and normalized vertex `depth` values in across-major order. A zero-depth gap carries no pressure. Use the
 projected `area` in m² and total contact `perimeter` in metres measured on that shape.
+
+Both tiers accept `hardpan` for a prepared layer over denser material. Set `thickness` in metres below
+the original bed and provide the lower layer's `frictionalModulus`. The optional `cohesiveModulus` and
+`exponent` default to 0 and 1. Footprint width and topsoil friction determine when the pressure cone reaches
+the hardpan. Omit `hardpan` for a homogeneous pressure fit.

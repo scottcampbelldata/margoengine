@@ -89,6 +89,18 @@ export interface SoilContactProfile {
   readonly perimeter: number;
 }
 
+/** Pressure fit for a dense layer below prepared topsoil. */
+export interface SoilHardpan {
+  /** Depth below the original bed, m. The footing can sense this layer before touching it. */
+  readonly thickness: number;
+  /** Width-dependent pressure coefficient, Pa m^(1−n). Default zero. */
+  readonly cohesiveModulus?: number;
+  /** Width-independent pressure coefficient, Pa/m^n. */
+  readonly frictionalModulus: number;
+  /** Pressure exponent after the contact senses the layer. Default 1. */
+  readonly exponent?: number;
+}
+
 export interface TerramechanicsOptions {
   readonly id?: string;
   /** Read an external SOIL_LAYOUT F64 patch field, e.g. one returned by `soilPatchField`. */
@@ -103,6 +115,8 @@ export interface TerramechanicsOptions {
 export interface TerramechanicsParams {
   readonly terrain: BedShape;
   readonly material?: SoilMaterial;
+  /** Finite topsoil over a dense supporting layer. Omit for homogeneous bearing. */
+  readonly hardpan?: SoilHardpan;
   /** Known fixed contact loads. Live sources are configured with `input` or `legged`. */
   readonly patches?: readonly SoilPatch[];
   /** Number of external patch rows. Omit when there is no `input`. */
@@ -219,6 +233,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private readonly legged: boolean;
   private terrain!: BedShape;
   private material!: Required<SoilMaterial>;
+  private hardpan?: Required<SoilHardpan>;
   private host!: SolverHost;
   private kernel!: NativeSoil;
   private change!: BedChange;
@@ -300,6 +315,13 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const count = bedVertexCount(parameters.terrain);
     this.terrain = { ...parameters.terrain, centre: [...parameters.terrain.centre] };
     this.material = materialOf(parameters.material);
+    const hardpan = parameters.hardpan;
+    this.hardpan = hardpan && {
+      thickness: positive(hardpan.thickness, 'topsoil thickness'),
+      cohesiveModulus: finite(hardpan.cohesiveModulus ?? 0, 'hardpan cohesive modulus'),
+      frictionalModulus: finite(hardpan.frictionalModulus, 'hardpan frictional modulus'),
+      exponent: positive(hardpan.exponent ?? 1, 'hardpan exponent'),
+    };
     this.fixed = (parameters.patches ?? []).map(packed);
     this.feet = (parameters.feet ?? []).map((foot) => ({ ...foot }));
     this.inputRows = parameters.inputRows ?? 0;
@@ -327,7 +349,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 21);
+    this.nativePatch = allocate('soil-patch-scratch', 26);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -410,7 +432,32 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       material.cohesiveModulus / effectiveWidth + material.frictionalModulus,
       'effective stiffness at this footprint width',
     );
-    const depth = finite(pow(pressure / stiffness, 1 / material.exponent), 'settlement', 0);
+    const hardpan = this.hardpan;
+    const lowerStiffness = hardpan
+      ? positive(hardpan.cohesiveModulus / effectiveWidth + hardpan.frictionalModulus, 'effective hardpan stiffness')
+      : 0;
+    // Salman et al., 2020, Eqs. 6–7. tan(π/4 + φ/2) equals sec φ + tan φ.
+    const transition = hardpan
+      ? Math.max(
+          0,
+          hardpan.thickness -
+            (resolved ? effectiveWidth : bearingWidth(length, width, ellipse, true)) *
+              (hypot(1, material.friction) + material.friction),
+        )
+      : 0;
+    const transitionPressure = hardpan
+      ? finite(stiffness * pow(transition, material.exponent), 'hardpan transition pressure', 0)
+      : 0;
+    const lowerAtTransition = hardpan
+      ? finite(lowerStiffness * pow(transition, hardpan.exponent), 'hardpan pressure', 0)
+      : 0;
+    const depth = finite(
+      hardpan && pressure > transitionPressure
+        ? pow((pressure - transitionPressure + lowerAtTransition) / lowerStiffness, 1 / hardpan.exponent)
+        : pow(pressure / stiffness, 1 / material.exponent),
+      'settlement',
+      0,
+    );
     const slip = hypot(shearX, shearZ);
     const share = 1 - exp(-slip / material.shearLength);
     const shear = finite((material.cohesion + pressure * material.friction) * share, 'shear stress', 0);
@@ -438,6 +485,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       profile?.region.byteOffset ?? 0,
       profile?.columns ?? 0,
       profile?.rows ?? 0,
+      lowerStiffness,
+      hardpan?.exponent ?? 1,
+      transition,
+      transitionPressure,
+      lowerAtTransition,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,

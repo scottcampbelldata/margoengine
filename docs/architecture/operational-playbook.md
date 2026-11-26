@@ -10453,6 +10453,8 @@ and visits them in the same order as a complete sweep. A transfer schedules any 
 Reported work gives raster-vertex visits and candidate faces examined, and the volume moved is auditable without a timer.
 The browser fixture rebuilds the Terrain mesh from the published bed sampler on demand. The same physical relief
 reaches WebGPU and WebGL2 without transferring a solver-specific render texture.
+The optional hardpan uses a continuous two-regime bearing curve. The resolved native kernel brackets its
+force integral, accounting for stations that reach the layer and those that still load homogeneous soil.
 
 ### Divergence-free particle pressure
 

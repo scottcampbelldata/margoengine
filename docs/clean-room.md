@@ -99,6 +99,17 @@ and fire clay at 2 kPa (24.3–30.7 mm). The test bands use the plotted error ba
 allowance. The circular-plate fits used for the check are the slow quartz and fast clay measurements in Table 5.
 [Apfelbeck et al.](https://elib.dlr.de/69724/1/Apfelbeck_BevameterTest_JTerra2011.pdf).
 
+N. D. Salman, G. Pillinger, M. M. Hanon and P. Kiss, “Design and performance evaluation of bevameter
+equipment” (2020), Eqs. 6–7, computes the breaking depth as soil thickness minus the footing radius times
+`tan(π/4 + φ/2)`. Margo uses the area-perimeter equivalent radius for noncircular profiles. The two
+pressure laws are joined continuously at that depth by adding the upper law's pressure there and
+subtracting the lower law's value there. The resolved tier integrates the piecewise pressure at each vertex
+with a bracketed force solve. The test for the 200 mm plate uses the authors' Table 2 pressure fits for
+sandy loam. At 110 kPa it compares with the adjacent Fig. 6 marker centers at 118.5 and 122.2 mm,
+allowing one rendered PDF pixel. This checks the published fitted example. The quartz and clay examples
+above use held-out plate geometry.
+[Salman et al.](https://doi.org/10.1299/jamdsm.2020jamdsm0084).
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”
