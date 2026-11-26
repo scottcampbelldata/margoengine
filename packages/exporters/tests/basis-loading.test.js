@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { encodeNativeBasis, loadNativeBasis } from '../dist/basis-native.js';
+import { stubCompile } from '../../../tests/support/wasm-csp.js';
 
 const wasm = new URL('../dist/basis-encoder/margo_basis_encoder.wasm', import.meta.url);
 const image = { width: 4, height: 4, data: new Uint8Array(64).fill(255) };
@@ -87,7 +88,8 @@ test('Node retries a failed Basis load once per call, shares pending loads and r
   const { encodeKTX2 } = await import('../dist/ktx2.js?load-recovery');
   const instantiate = WebAssembly.instantiate;
   let attempts = 0;
-  t.mock.method(WebAssembly, 'instantiate', async (...args) => {
+  // Only compilations from bytes are counted and blocked: the Response above starts Node's own parser module.
+  stubCompile(t, 'instantiate', async (...args) => {
     if (++attempts <= 2) throw new WebAssembly.CompileError('blocked by CSP');
     return instantiate(...args);
   });

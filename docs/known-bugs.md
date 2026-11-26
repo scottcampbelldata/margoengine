@@ -6,6 +6,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: a CSP test's Wasm block also rejected Node's own parser module, after another test had ended (KB-CSP-STUB1, tests)
+
+- **Repro:** on Node 22.12, `node --test packages/decoders/tests/csp.test.js` (CI job "node22 unit tests"): every test
+  passes, then the file fails with 'Test "draco worker preserves CSP code and help: WebAssembly.CompileError" ...
+  generated asynchronous activity after the test ended ... "EvalError: Wasm blocked by Content Security Policy"'.
+- **Cause:** that EvalError is the one the later "JPEG XL worker reports blocked compilation" test throws from its
+  `WebAssembly.instantiate` stub. The first draco test makes the file's first `Response`, which starts Node's HTTP code;
+  it compiles its parser in the background and instantiates the compiled module later (inferred from the report: Node
+  attributes the rejection to the test that started the work, and Node 26 does not load it then). When that call landed
+  on the stub it rejected with nobody to handle it. No decoder worker is at fault: the draco worker had already replied.
+  `packages/exporters/tests/basis-loading.test.js` counted and blocked `instantiate` calls after its own `Response`, with
+  the same exposure.
+- **Fix:** `stubCompile` (`tests/support/wasm-csp.js`) blocks compilation from bytes and streams, as a CSP does, and
+  passes an already compiled `WebAssembly.Module` through; both tests use it.
+- **Regression:** `packages/decoders/tests/csp.test.js`, "a blocked-compilation stub leaves a module already loading in
+  the process alone", which makes the same race on every Node.
+
 ### Fixed 2026-11-26: half floats needed DataView.setFloat16 on Node 22, and were rounded twice (KB-NODE22-HALF1, decoders/shared)
 
 - **Repro:** on Node 22.12, `node --test packages/decoders/tests/tiff.test.js`: "TIFF 16, 32 and 64-bit float with the
