@@ -36,6 +36,7 @@ const entries = {
   stylize: ['Stylize'],
   'motion-blur': ['MotionBlur'],
   mrt: ['SceneTargets'],
+  'mesh-blend': ['MeshBlend'],
   'selective-bloom': ['SelectiveBloom'],
   trail: ['TrailTexture'],
 };

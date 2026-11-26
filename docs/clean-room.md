@@ -13999,6 +13999,40 @@ Research compared:
   Brushes*, SIGGRAPH 1986 (a stroke as a brush footprint swept along the path; sampling it closer than its radius leaves
   no gaps).
 
+## Mesh blending (2026-11-26)
+
+`@margoengine/post/mesh-blend` `MeshBlend`. Built from published prose descriptions only; no engine's or plugin's
+shader or source was read. The feature list (per-mesh tag and radius, depth-slope rejection) follows the gap row and
+public feature descriptions of screen-space mesh blenders. The tag pass that also writes untagged core surfaces (so
+only a pixel whose centre holds no visible core surface borrows a neighbour's tag, which settles the 1x tag pass
+against the stack's nearest-sample resolved depth), the golden-angle spiral search refined by bisection, the
+meet-in-the-middle depth test with each side's slope carried half the seam span, and the float16-exact split key are
+Margo's.
+
+Research compared:
+- Jack Tollenaar, *Mesh Seam Smoothing/Blending* (project write-up, undated),
+  https://sites.google.com/view/jack-tollenaar/mesh-seam-smoothing-blending: per-object ids in a separate target, a
+  post pass that finds the nearest id change within a radius scaled by depth, samples the colour mirrored across the
+  seam and mixes 50% at the seam down to 0% at the radius, with a depth comparison so overlapping but untouching
+  objects do not blend. Margo takes the id target, the mirror and the falloff from this description.
+- Andrew Hamilton and Kenneth Brown, *Photogrammetry and Star Wars Battlefront*, GDC 2016,
+  https://gdcvault.com/play/1022981/Photogrammetry-and-Star-Wars-Battlefront (natural meshes blended into the
+  environment as an art-pipeline goal; no screen-space method described).
+- Jeremy Moore, *Terrain Rendering in Far Cry 5*, GDC 2018, https://gdcvault.com/play/1025480/Terrain-Rendering-in-Far-Cry
+  (terrain data sampled by objects: object-space blending, the per-object alternative, which needs the terrain's
+  material on every object).
+- Tristan Lorach, *Soft Particles*, NVIDIA whitepaper, 2007,
+  https://developer.download.nvidia.com/whitepapers/2007/SDK10/SoftParticles_hi.pdf (a smooth fade over a depth
+  difference instead of a binary depth test; the smooth falloff and the depth-difference fade).
+- Carlo Tomasi and Roberto Manduchi, *Bilateral Filtering for Gray and Color Images*, ICCV 1998,
+  https://doi.org/10.1109/ICCV.1998.710815 (a range term that stops a filter crossing a depth edge: the rejection).
+- Lance Williams, *Casting Curved Shadows on Curved Surfaces*, SIGGRAPH 1978, https://doi.org/10.1145/965139.807402,
+  and Hang Dou et al., *Adaptive Depth Bias for Shadow Maps*, JCGT 3(4), 2014, https://jcgt.org/published/0003/04/08/
+  (a depth comparison widened by the local depth slope: each side's slope carries its depth to the seam).
+- Helmut Vogel, *A better way to construct the sunflower head*, Mathematical Biosciences 44, 1979,
+  https://doi.org/10.1016/0025-5564(79)90080-4 (the golden-angle spiral: even disc coverage with no directional
+  spokes, which eight fixed search directions left at mesh corners).
+
 ## Contact and modal sound (SOUND-04)
 
 - Kees van den Doel and Dinesh K. Pai, [*The Sounds of Physical Shapes*](https://www.persianney.com/kvdoelcsubc/publications/sound-shapes.pdf)

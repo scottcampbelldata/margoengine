@@ -1895,6 +1895,49 @@ is disposable (`using graph = ...`). Error codes are listed at
 [docs/limits.md](../../docs/limits.md#render-graph-margoenginepostrender-graph-2026-11-26); sources in
 [docs/clean-room.md](../../docs/clean-room.md#render-graph-2026-11-26). The visual editor is not built yet.
 
+## Mesh blending: `MeshBlend`
+
+`@margoengine/post/mesh-blend` softens the hard seam where separate meshes meet, such as rocks set into terrain or
+props sunk into the ground, in a `PostStack` (an HDR effect: place it before `Tonemap`). Tag the meshes that blend,
+each with its own radius in world units; near a seam the colour of the other surface, mirrored across the seam, is
+mixed in: half at the seam, none at the radius. Seams between untagged surfaces stay sharp, two tagged meshes that
+touch blend with the larger radius, and a tag on a parent covers its child meshes. Depth-slope rejection keeps
+silhouettes sharp: across a seam each side's depth is carried to the seam along its own slope, and where they do not
+meet (a rock's top against far ground, any edge against the sky) nothing blends, so the effect never smears an
+outline.
+
+```ts
+import {Engine, PbrMaterial, box} from 'margoengine/core';
+import {MeshBlend} from 'margoengine/post/mesh-blend';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, {backend: 'webgpu', camera: {position: [0, 1, 3], target: [0, 0, 0]}});
+engine.createMesh().setGeometry(box(20, 0.1, 20)).setPosition([0, -0.05, 0])
+  .setMaterial(new PbrMaterial({color: '#5a7a3a', roughness: 1}));
+const rock = engine.createMesh().setGeometry(box(0.8, 0.6, 0.8)).setPosition([0, 0.2, 0])
+  .setMaterial(new PbrMaterial({color: '#8a8078', roughness: 0.9}));
+const blend = MeshBlend.attach(engine, {maxPixels: 32});
+const untag = blend.tag(rock, 0.2); // blend within 0.2 world units of the rock's seams
+engine.render();
+blend.options.strength = 0.8; // options are read every frame
+untag();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `maxPixels` | `32` | Largest reach on screen, whole pixels 1 to 128; a near mesh's radius is cut to this |
+| `samples` | `32` | Search samples per pixel, 4 to 64, on a spiral over the reach, then 5 bisection steps to the seam |
+| `depthTolerance` | `0.5` | Largest depth miss at the seam that still counts as touching, as a share of the radius; above 0 |
+| `strength` | `1` | Share of the blend applied, 0 to 1 |
+| `enabled` | `true` | False passes frames through |
+| `order` | `20` | Frame graph order of the tag pass, after the main pass (0) and before the stack composes (30) |
+
+`tag(mesh, radius)` returns a remover; `untag(mesh)` and `tags` (a copy) manage the set. Core meshes can be tagged;
+terrain and glTF models take part as the untagged side of a seam. `meshBlendWeight` and `meshBlendGap` are the
+shader's weight and depth-slope test on the CPU, for tuning. `MeshBlend` is disposable (`using blend = ...`), runs on
+WebGPU and the WebGL2 layer, and costs a redraw of the core meshes into a tag target each frame. Limits are in
+[docs/limits.md](../../docs/limits.md#mesh-blending-margoenginepostmesh-blend-2026-11-26); sources in
+[docs/clean-room.md](../../docs/clean-room.md#mesh-blending-2026-11-26).
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for
