@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20612312,
+  "total": 20613093,
   "history": [
     {
       "date": "2026-10-24",
@@ -13789,6 +13789,12 @@
       "commit": "583b62b7ec",
       "grew": 1,
       "reason": "SEA-15's depth-dependent vertical mixing moves physics/tracers from 11002 to 11426 B gzip. The optional ceiling rises from 11333 to 11769 B. The profile supplies vertical variance and drift inside existing parcel integration. A separate entry would duplicate that integrator or call across it for each water parcel."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "8b286039a1",
+      "grew": 1,
+      "reason": "SEA-15's wave-averaged Stokes transport moves physics/tracers from 11426 to 12184 B gzip. The optional ceiling rises from 11769 to 12550 B. Stokes transport shares the tracer point motion and existing spectral dispersion relation. A separate entry would require a second transport adapter for the same parcels."
     }
   ],
   "items": {
@@ -14666,7 +14672,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 13395,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 11769,
+    "@margoengine/physics/tracers": 12550,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
