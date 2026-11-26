@@ -5629,3 +5629,12 @@ buoyancy enabled. The Water bridge uses that world state to write the rendered i
 ### Civil barrier crush
 
 The reduced station model conserves rigid linear momentum and transfers the predicted normal work into permanent deformation. `packages/physics/tests/coupling/crush.test.js` compares the observed work to the kinetic-energy loss on two unequal masses and checks the angular response at an offset contact. The floating hull fixture verifies recoil and seal loss while actual seakeeping loads remain active. The bounded claim covers calibrated normal events on configured contact stations.
+
+### Conservative thin films and physical rain coupling (FLUID-07)
+
+The 2D Oron lubrication solve agrees with the linear discrete capillary decay and the analytical
+viscous gravity flux across a glass sill. Real rigid-body motion changes rain intercepted by
+the window and the wind-driven direction of runnels. An impact on a wet platform adds its
+water exactly once and applies pressure to a zero-net-volume dispersive ring.
+[Closed-form tests](../../packages/physics/tests/thin-film.test.js) ·
+[Coupling tests](../../packages/physics/tests/coupling/thin-film.test.js)

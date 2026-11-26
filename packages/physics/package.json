@@ -172,6 +172,10 @@
       "types": "./dist/iceberg/index.d.ts",
       "import": "./dist/iceberg.js"
     },
+    "./thin-film": {
+      "types": "./dist/thin-film/index.d.ts",
+      "import": "./dist/thin-film.js"
+    },
     "./pack-ice": {
       "types": "./dist/pack-ice/index.d.ts",
       "import": "./dist/pack-ice.js"

@@ -9415,3 +9415,17 @@ The optional Physics entry measures 5,112 B gzip with a 5,368 B ceiling. Each la
 ### Crush response for civilian barriers (BREAK-03)
 
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and ignores shear and sustained contact. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8120 B minified and 3507 B gzip. Core and Stage gain zero bytes.
+
+### Lubrication films on moving surfaces (FLUID-07)
+
+A depth column assumes a film thin compared with the distance it varies over. The model fits
+water rivulets, flattening droplets and puddle margins. One film patch has planar orthogonal
+coordinates and can carry a sampled substrate height. Viscous shear is held at its midpoint
+over each coupling interval. Strongly curved glass needs multiple patches and flying splash
+droplets need a separate ballistic solver. Rim coalescence is by the shared depth field.
+The film accepts registered impact events and transfers their pressure to a local wake, while
+the film keeps their deposited water. Normal pressure acts along the supported side of the
+surface. Detaching films, contact-angle dynamics on a steep drop, thin-film interference and
+general rain damping of ocean waves are outside this equation.
+
+The optional thin-film entry is 5,917 B gzip with a 6,173 B ceiling. Both Wasm assets are 9,209 B raw and each is 3,995 B gzip. Core plus stage remains 24,820 B gzip.

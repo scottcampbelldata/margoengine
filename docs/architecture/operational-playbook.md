@@ -10228,3 +10228,11 @@ restore. Continuous-sheet blocks and grounding are outside the current planar pa
 ### Civil impact work and rigid coupling (BREAK-03)
 
 `CrushSolver` reads the versioned `bodies` port and accumulates linear and angular impulses at the same point for both bodies. The published deformation and work ledger, contact latch, and pending impulse rows survive snapshot restore. Closed-form spring, perfectly plastic, hardening, and compacted backing references check energy and stroke. Two-body and fixed-barrier runs check momentum, offset torque, transverse misses, and persistent seal loss. A floating service craft uses the same rigid row for live seakeeping and a quay impact. Pending water ingress needs the SEA-10 compartment contract.
+
+### Thin films on rigid panes and open ground (FLUID-07)
+
+The thin-film module imports world memory and reserves no static data. Film and input buffers are
+transactional during a step. The solver consumes the live rigid body record and authored plane,
+turns physical precipitation into intercepted water, and sends independently held impact pressure to
+the optional WakeSolver. Depth, capillary redistribution, drying and edge drainage have independent
+closed-form or volume checks. Plain/shared builds, frame cadence and restore agree bit for bit.

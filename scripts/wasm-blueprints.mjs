@@ -92,6 +92,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'thin-film-kernel',
+    crate: 'packages/physics/thin-film-kernel',
+    blueprint: 'packages/physics/src/thin-film/thin-film-kernel.wasm',
+    script: 'packages/physics/scripts/build-thin-film-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'thin-film-kernel-shared',
+    crate: 'packages/physics/thin-film-kernel',
+    blueprint: 'packages/physics/src/thin-film/thin-film-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-thin-film-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',

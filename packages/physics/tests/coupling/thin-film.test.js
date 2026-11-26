@@ -1,0 +1,205 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { Physics } from '../../dist/index.js';
+import { WakeSolver } from '../../dist/sea.js';
+import { FILM_IMPACT_WORDS, THIN_FILM_LAYOUT, THIN_FILM_WORDS, ThinFilmSolver } from '../../dist/thin-film.js';
+import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
+
+const rate = { num: 60, den: 1 };
+const rainVelocity = [0, -7, 4];
+const empty = { rate: 0, intercept: 0, slope: 0, fallSpeed: 0, impactRate: 0, energyFlux: 0, waterContent: 0 };
+const storm = (velocity = rainVelocity) => ({
+  cell: [0, 0, 0],
+  sample(_x, _y, _z, _t, out) {
+    out.rate = 36;
+    Object.assign(out.rain, empty, { rate: 36, fallSpeed: 7 });
+    out.velocity[0] = velocity[0];
+    out.velocity[1] = velocity[1];
+    out.velocity[2] = velocity[2];
+    return out;
+  },
+});
+const wind = {
+  medium: 'air',
+  cell: [0, 0, 0],
+  sample(_x, _y, _z, _t, out) {
+    out.velocity[0] = 0;
+    out.velocity[1] = 0;
+    out.velocity[2] = 0;
+    out.density = 1.2;
+    return out;
+  },
+};
+
+function balance(film, steps) {
+  const b = film.budget;
+  const supplied = b.initial + b.rain + b.impacts;
+  const found = b.evaporated + b.dripped + b.stored;
+  assert.ok(Math.abs(found - supplied) <= 64 * Math.max(1, steps) * Number.EPSILON * supplied);
+}
+
+async function pane({ wind, precipitation, speed = 0, roll = 0, seeded = false }) {
+  const film = await ThinFilmSolver.load({ rigid: true });
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
+  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+  const glass = rigid.addBody(null, {
+    position: [0, 0, 0],
+    linearVelocity: [speed, 0, 0],
+    angularVelocity: [roll, 0, 0],
+    gravityScale: 0,
+    colliders: { shape: 'box', halfExtents: [0.16, 0.16, 0.005], mass: 32 },
+  });
+  const depth = new Float64Array(64);
+  if (seeded) depth[4 + 2 * 8] = 0.0003;
+  world
+    .add(film, {
+      bodyRow: glass.row,
+      cells: [8, 8],
+      spacing: 0.04,
+      origin: [-0.16, 0.16, 0],
+      u: [1, 0, 0],
+      v: [0, -1, 0],
+      wind,
+      precipitation,
+      depth,
+      surfaceTension: 0,
+      drains: [false, false, false, true],
+    })
+    .add(new RigidSolver(), { physics: rigid });
+  return { film, world, glass, rigid };
+}
+
+function centroid(film) {
+  let u = 0;
+  let v = 0;
+  let water = 0;
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const c = film.sample(x, y);
+      u += c.depth * c.u;
+      v += c.depth * c.v;
+      water += c.depth;
+    }
+  }
+  return [u / water, v / water];
+}
+
+test('ThinFilmSolver: EF-4 window receives vertical rain as a real rigid hull rolls', async () => {
+  await Physics.load();
+  const weather = storm([0, -7, 0]);
+  const stationary = await pane({ precipitation: weather });
+  const rolling = await pane({ precipitation: weather, roll: 0.35 });
+  stationary.world.advance(30);
+  rolling.world.advance(30);
+  assert.equal(stationary.film.budget.rain, 0);
+  assert.ok(rolling.film.budget.rain > 0);
+  assert.ok(rolling.film.depths().some((h) => h > 0));
+  assert.ok(rolling.rigid.kernel.columns.rotationX[rolling.glass.row] > 0);
+  balance(rolling.film, 30);
+});
+
+test('ThinFilmSolver: LAST-TRAM-8 moving pane drives a runnel across the pane and sends drips out', async () => {
+  await Physics.load();
+  const station = await pane({ wind, precipitation: storm(), seeded: true });
+  const train = await pane({ wind, precipitation: storm(), seeded: true, speed: 30 });
+  station.world.advance(30);
+  train.world.advance(30);
+  const still = centroid(station.film);
+  const moving = centroid(train.film);
+  assert.ok(moving[0] < still[0], 'relative air shear drives the runnel across the passing window');
+  assert.ok(moving[1] > 0.1, 'gravity carries the wet film down the glass');
+  assert.ok(train.film.budget.dripped > 0, 'liquid leaves the open window sill');
+  assert.equal(
+    train.film.budget.rain,
+    station.film.budget.rain,
+    'motion along the pane does not change its rain interception',
+  );
+  balance(station.film, 30);
+  balance(train.film, 30);
+});
+
+const input = {
+  name: 'platform-impacts',
+  kind: 'surfaceSampleSet',
+  quantity: 'rainImpact',
+  unit: 'm, m³, m/s',
+  centring: 'particle',
+};
+const hit = { u: 0.14, v: 0.14, radius: 0.03, volume: 8e-8, speed: 6 };
+
+class Impacts {
+  describe() {
+    return { id: 'atmo04-impact', rate: 0, stableRate: () => 0, fields: [{ field: input, access: 'write' }] };
+  }
+  init(host) {
+    this.memory = host.memory;
+    this.region = host.allocate('impact', 8 * FILM_IMPACT_WORDS, 'f64', THIN_FILM_LAYOUT);
+  }
+  importPorts() {}
+  step({ tick }) {
+    const out = regionWords(this.memory, this.region);
+    if (tick === 2) out.set([hit.u, hit.v, hit.radius, hit.volume, hit.speed]);
+    else out.fill(0);
+  }
+  exportPorts(tick) {
+    return [{ field: input.name, region: this.region, tick, cell: [0, 0, 0] }];
+  }
+  stateRegions() {
+    return [this.region];
+  }
+  extraState() {
+    return [];
+  }
+}
+
+async function platforms(count) {
+  const loaded = await Promise.all(
+    Array.from({ length: count }, () => ThinFilmSolver.load({ impacts: input, waveSources: true })),
+  );
+  return (rateValue = rate, memory) => {
+    const film = loaded.shift();
+    const wake = new WakeSolver('platform-ring', film.waveField);
+    const world = new PhysicsWorld({ rate: rateValue, memory })
+      .add(wake, { cells: [24, 24], cellSize: 0.025, centre: [0.16, -0.16], depth: 0.03, sponge: 0 })
+      .add(film, { cells: [8, 8], spacing: 0.04, depth: 0.0004 })
+      .add(new Impacts(), {});
+    return Object.assign(world, { film, wake });
+  };
+}
+
+test('ThinFilmSolver: LAST-TRAM-8 impact fills a wet platform and sends a physical ring to the existing WakeSolver', async () => {
+  const make = await platforms(2);
+  const world = make();
+  const clean = make();
+  clean.advance(2);
+  assert.ok(clean.wake.heights().every((h) => h === 0));
+  world.advance(6);
+  assert.equal(world.film.budget.impacts, hit.volume);
+  assert.ok(world.film.sample(3, 3).depth > 0.0004);
+  balance(world.film, 6);
+  const waves = world.wake.heights();
+  assert.ok(waves.some((h) => h > 0));
+  assert.ok(waves.some((h) => h < 0));
+  const sum = waves.reduce((total, h) => total + h, 0);
+  const signed = waves.reduce((total, h) => total + Math.abs(h), 0);
+  assert.ok(Math.abs(sum) <= 128 * Number.EPSILON * signed);
+  const [out] = world.film.exportPorts(6);
+  assert.equal(out.region.byteLength, 8 * THIN_FILM_WORDS * 64);
+  assert.equal(out.region.layout, THIN_FILM_LAYOUT);
+});
+
+test('ThinFilmSolver: impact coupling replays across frame rates, snapshot and plain/shared memories', async () => {
+  const make = await platforms(7);
+  frameRateIndependent(make);
+  seekEqualsContinuous(make);
+  const plainMemory = worldMemory(false);
+  const sharedMemory = worldMemory(true);
+  assert.ok(plainMemory.buffer instanceof ArrayBuffer);
+  assert.ok(sharedMemory.buffer instanceof SharedArrayBuffer);
+  const plain = make(rate, plainMemory);
+  const shared = make(rate, sharedMemory);
+  plain.advance(18);
+  shared.advance(18);
+  assert.equal(plain.hash(), shared.hash());
+});

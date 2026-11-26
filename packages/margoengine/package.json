@@ -3315,6 +3315,10 @@
       "types": "./dist/physics/iceberg.d.ts",
       "import": "./dist/physics/iceberg.js"
     },
+    "./physics/thin-film": {
+      "types": "./dist/physics/thin-film.d.ts",
+      "import": "./dist/physics/thin-film.js"
+    },
     "./physics/pack-ice": {
       "types": "./dist/physics/pack-ice.d.ts",
       "import": "./dist/physics/pack-ice.js"

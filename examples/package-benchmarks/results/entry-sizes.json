@@ -14102,6 +14102,10 @@
       "./crush": {
         "raw": 8120,
         "gzip": 3507
+      },
+      "./thin-film": {
+        "raw": 14421,
+        "gzip": 5917
       }
     },
     "@margoengine/physics2d": {
@@ -17943,6 +17947,16 @@
       "raw": 8955,
       "gzip": 3273,
       "brotli": 2870
+    },
+    "packages/physics/dist/thin-film-kernel.wasm": {
+      "raw": 9209,
+      "gzip": 3995,
+      "brotli": 3531
+    },
+    "packages/physics/dist/thin-film-kernel-shared.wasm": {
+      "raw": 9209,
+      "gzip": 3995,
+      "brotli": 3521
     }
   },
   "splits": {

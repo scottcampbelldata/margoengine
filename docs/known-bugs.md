@@ -16422,3 +16422,11 @@ move those blocks independently.
 ### Below-deck ingress after civilian crush (BREAK-03 / SEA-10)
 
 A floating hull can give up normal kinetic energy, recoil from a contact, and publish lost seal integrity through `CrushSolver`. Run the floating service craft test in `packages/physics/tests/coupling/crush.test.js` to reproduce a fully failed seal. The below-deck water mass still needs a SEA-10 compartment and opening geometry to connect a damaged station to hydrostatic head, displaced water and the hull's centre of mass. EF-11 also needs its original scene and the later failure sequence. PA-52 remains open for its other paths.
+
+### Rain-sheet breakup and shared rain suppression of ocean waves (PA-23)
+
+A sloped film can flow off the grid and report its discharge. A nonzero discharge in the
+thin-film gravity-drain test leaves the patch without spawning airborne ligaments or
+atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
+general sea keeps its existing wind-wave damping because heterogeneous rain suppression
+and airborne secondary-drop transport are separate atmosphere and surface-wave work.

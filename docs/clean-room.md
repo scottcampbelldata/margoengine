@@ -13701,3 +13701,34 @@ with or without shared memory. No companion code or external assets were used.
 - Preben Terndrup Pedersen and Shengming Zhang, [On impact mechanics in ship collisions](https://orbit.dtu.dk/en/publications/on-impact-mechanics-in-ship-collisions-2/) (1998), separate the external impulse from structural work. The engine uses that separation for the normal component at a configured berthing station. Zhang's [The Mechanics of Ship Collisions](https://backend.orbit.dtu.dk/ws/files/5436875/Zhang.pdf) (1999), §3.2 and Fig. 3.1, discusses the scope of V. U. Minorsky's [An Analysis of Ship Collisions with Reference to Protection of Nuclear Power Plants](https://doi.org/10.5957/jsr.1959.3.2.1) (1959). The volume correlation sets historical context. The engine uses measured force-displacement response at the station.
 
 For unit normal `n` and contact arm `r`, the point's inverse mass along `n` is `1/m + (r × n) · I⁻¹(r × n)`. Sum both sides and invert to obtain effective mass. The yield curve is `F = Fy + H p` for persistent stroke `p`. Solving `F = k(x − p)` concurrently gives the post-yield tangent `kH/(k+H)`. Integrate each linear branch with `ΔW = F0 Δx + 0.5 k Δx²` and invert at incident relative kinetic energy. The recoverable energy is triangular elastic work plus the loaded backing's elastic work when compacted. The rest is permanent work. Apply the equal and opposite impulse implied by incident and rebound speeds at a single contact point so the angular momenta balance as well. This reduced event model was written from the cited mechanics and equations.
+
+## Thin liquid films on moving surfaces (FLUID-07)
+
+- Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid
+  films” (1997), equations 2.25–2.30. Substrate-normal gravity and surface tension give the
+  reduced pressure. Through-depth integration yields pressure mobility
+  `(h³/3 + βh²)/μ` and shear mobility `(h²/2 + βh)/μ` for Navier slip length β.
+  [Journal](https://doi.org/10.1103/RevModPhys.69.931) · [Paper](https://www.tmfcr.cz/39/pdf/04-oron.pdf)
+- Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
+  Contact angle gives an independent line force, and curvature links the exposed surface to
+  pressure. The present thin-film depth equation uses a parameter for contact-line retention
+  per unit width, with a local deadband only between wet and dry cells. It resolves a drop's
+  deposited volume and subcell footprint through conservative finite volumes.
+  [Author PDF](https://wanghmin.github.io/publication/wang-2005-wds/Wang-2005-WDS.pdf)
+- L. Zhornitskaya and A. L. Bertozzi, “Positivity-Preserving Numerical Schemes for
+  Lubrication-Type Equations” (2000). The fourth-order equation lacks the second-order maximum
+  principle. Here each shared face uses one single flux limited by the donor's total outgoing
+  water. This is a conservative remap after the implicit pressure solve.
+  [Author PDF](https://www.math.ucla.edu/~bertozzi/papers/ZhornitskayaBertozzi.pdf)
+- Ross Gunn and Gilbert D. Kinzer, “The Terminal Velocity of Fall for Water Droplets in
+  Stagnant Air” (1949). The atmospheric contract supplies both the measured-fall-speed model
+  and water-equivalent precipitation. The surface converts the horizontal flux to its
+  own area by the ratio of inward relative normal speed to still-air fall speed.
+  [Journal](https://doi.org/10.1175/1520-0469(1949)006%3C0243:TTVOFF%3E2.0.CO;2)
+
+The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
+the symmetric cell pressure operator K. It solves
+`[I + Δt sqrt(M) G K Gᵀ sqrt(M)] y = −sqrt(M) G p` by Jacobi PCG before applying the positive
+mass remap. A patch mounted on a body uses the published pose, angular velocity and the previous
+centre velocity. The impact couples to the wave-pressure field through the incoming normal
+momentum divided by step duration and the analytical area of the raised-cosine footprint.

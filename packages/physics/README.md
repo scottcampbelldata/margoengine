@@ -3702,3 +3702,37 @@ world.couple(['rigid', crush.id], 'staggered');
 world.advance(12);
 if (crush.read(0).impacts !== 1) throw new Error('Expected one barrier contact');
 ```
+
+## Thin films on glass and ground
+
+Use `@margoengine/physics/thin-film` for a thin layer of water on a backing surface. The solver tracks
+rainfall, impacts, gravity, pressure, viscous shear, capillarity, drying and liquid leaving an open edge.
+The first two axes define the patch in metres. Set its origin and tangents in a rigid body's local frame
+and pass a body row to move it with a window or deck.
+
+```ts
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { ThinFilmSolver } from '@margoengine/physics/thin-film';
+
+const film = await ThinFilmSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
+  cells: [4, 6],
+  spacing: 0.04,
+  u: [1, 0, 0],
+  v: [0, -1, 0],
+  depth: 0.0002,
+  drains: [false, false, false, true],
+});
+world.advance(60);
+console.log(film.budget.dripped, film.sample(0, 5).depth);
+```
+
+Pass a `Precipitation` field for rain arriving at the moving panel and a `Wind` for surface shear.
+A registered rain input can instead publish m/s as a scalar or per cell. The optional `impacts` input
+publishes layout-1 f64 rows of U, V, radius, deposited m³ and inward impact speed. A tick is consumed
+once, even when a slower writer's last value is held. Pass `waveSources: true` and give `film.waveField`
+to the local `WakeSolver` for pressure pulses on a wet platform in the same cell. The film retains
+the deposited water and the wake receives the normal impulse.
+
+Use `depths()` for a render texture, `filmField` to consume substrate, depth and drip records, and
+`dripsField` for cell discharge in m³/s. The options document the default water and wall properties.
