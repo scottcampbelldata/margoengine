@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20580146,
+  "total": 20581474,
   "history": [
     {
       "date": "2026-10-24",
@@ -14059,6 +14059,12 @@
       "commit": "5cd592e176",
       "grew": 1,
       "reason": "SEA-15 shear-limited cohesive breakup moves physics/tracers from 15497 to 15896 B gzip. The optional ceiling rises from 15783 to 16373 B. The implicit breakup solve uses the existing parcel diameter, settling and snapshot state. A separate solver would duplicate this work or expose private parcel state."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(water,terrain) short-crested surf",
+      "reason": "KB-WATER-SURFBANDS1 the water root entry grows past its 35865 B ceiling to 36109 B gzip, ceiling 37193 B: the surf shader gains a PCG value noise and the short-crested section swing (Baker et al. 2023), and the fragment roller gains holes. It is WGSL text inside the one water pipeline every Water draws with, so a lazy split cannot hold it without a second pipeline variant. Core plus stage untouched.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15688,7 +15694,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 35865,
+    "@margoengine/water": 37193,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,

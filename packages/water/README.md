@@ -188,7 +188,10 @@ open-sea cell's travel time from deep water (an eikonal, relaxed over the eight 
 arrives with its phase delayed and its crest turned by the depth (Snell's law). Its wavenumber follows the depth
 (Fenton and McKee 1990), its height grows by linear shoaling and is capped at 0.78 of the depth (McCowan), and the
 breaking wave takes a skewed, forward-leaning shape fitted to measured surf (Abreu et al. 2010, Ruessink et al. 2012).
-Breaking crests carry a roller of white foam with a lacy trail behind it, the broken water turns grey-green with
+Breaking crests carry a roller of white foam with a lacy trail behind it. Breaking is short-crested: it starts and
+stops along each crest in sections about 0.45 surf wavelengths over the swell's directional spread long (Baker et al.
+2023), the white water thins where a section breaks less, its toe is ragged and its body has holes. The broken water
+turns grey-green with
 stirred sand, and short wind waves fade where the swell breaks. Seaward of 0.9 m of depth the surface is this analytic
 surf; between 0.9 and 0.35 m it hands over to the conservative shallow flow, which it drives (height and flux, as a
 numerical wave maker), and the flow carries the bores up the sand: it carries their momentum (Stelling and Duinmeijer

@@ -394,6 +394,47 @@ test('wet sand borrows depth through a stable view without moving terrain colors
   }
 });
 
+test("wet and submerged sand carries no wind ripples: their relief fades with the record's moisture (KB-TERRAIN-SANDWET1)", async () => {
+  const h = optionalGPU(),
+    engine = new Engine({ width: 128, height: 96 }, await TransformStore.create(8), {
+      backend: 'webgpu',
+      gpu: h.engine.gpu,
+      add() {},
+      remove() {},
+      render() {},
+      dispose() {},
+    });
+  const wet = engine.createMesh(),
+    dry = engine.createMesh();
+  engine.use(
+    new TerrainColors(wet, { ...options, wetness: { texture: () => undefined, origin: [-2, -2], size: [4, 4] } }),
+  );
+  engine.use(new TerrainColors(dry, options));
+  try {
+    h.context.shader = wgsl;
+    h.context.bindings = [];
+    engine.frameGraph.execute(h.context);
+    const shader = h.context.shader,
+      body = (mesh) => {
+        const start = shader.indexOf(`fn terrainSurface_${meshRuntime(mesh).id}(`);
+        return shader.slice(start, shader.indexOf('return s;', start));
+      },
+      id = meshRuntime(wet).id;
+    // The ripple relief is scaled by the dryness of the record, which reads its moisture (x) bilinearly.
+    assert.match(body(wet), new RegExp(String.raw`let rv=[^;]*\*\(1\.0-terrainMoisture_${id}\(p\)\);`));
+    assert.ok(shader.includes(`fn terrainMoisture_${id}(position:vec3f)->f32 {`));
+    assert.match(
+      shader,
+      new RegExp(String.raw`fn terrainMoisture_${id}[\s\S]*?textureLoad\(terrainWater_${id},hi,0\)\.x,t\.x\)`),
+    );
+    // Without a wetness record there is no water to wet the sand: the ripples are as before.
+    assert.doesNotMatch(body(dry), /terrainMoisture/);
+    assert.match(body(dry), /let rv=/);
+  } finally {
+    engine.dispose();
+  }
+});
+
 // GAP-FILM-TIME: the wet-sand record dries by the frame clock, never the wall clock. Each frame's update hands the next
 // record pass exactly the seconds it stepped, so a film's fixed steps dry the same sand the same way on any machine; a
 // capture's zero-delta update and a second view in the frame dry nothing. The record itself is history on the GPU

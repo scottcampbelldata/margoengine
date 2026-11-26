@@ -177,6 +177,16 @@ Water's ships entry reads each turbulent foam sample from the stern's nearest hi
 
 The CPU regression compares two hull lengths at the same speed. The WebGPU and WebGL2 tests read four GPU foam samples with a 72 m ship at 3 m/s. Their values were 0.553 near the stern, 0.192 farther astern, and zero ahead and outside the trail on both backends. See the [clean-room research](../clean-room.md#stern-foam-history-in-water-2026-11-21).
 
+### Section 5 evidence: short-crested surf (2026-11-26)
+The surf's breaker index swings along each crest in sections scaled by the
+swell's deep directional spread, so breaking starts and stops along a crest
+and the roller has a ragged toe and holes (KB-WATER-SURFBANDS1). On a 1:50
+beach under the dune coast's swell the longest breaking section along 240 m
+fell from 73 to 114 m to 37.5 to 46 m (packages/water/test/surf-crests.browser.mjs,
+RTX A6000, WebGPU and the WebGL2 layer). TerrainColors' wind ripples now fade
+with the wetness record's moisture, so the sea floor is smooth (KB-TERRAIN-SANDWET1).
+See the [clean-room research](../clean-room.md#short-crested-surf-and-dry-sand-ripples-2026-11-26-kb-water-surfbands1-kb-terrain-sandwet1).
+
 ### Section 5 evidence: grazing refraction onto a shallow bed (2026-11-26)
 The texel reprojection above diverges on a bed seen at a grazing angle, and
 the crossing search used to hand its bracket back to it: 36% of the Kitty Hawk

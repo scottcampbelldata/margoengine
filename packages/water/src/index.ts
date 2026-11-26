@@ -726,7 +726,7 @@ ${displayShader}
    let q=i.world.xz;let t=frame.settings.x;
    let patches=noise(q*0.21+vec2f(t*0.03,0.0)).x+noise(q*0.63+vec2f(3.1,-t*0.05)).x*0.5;
    let web=1.0-abs(noise(q*0.9+vec2f(-t*0.04,7.3)).x+noise(q*2.3+vec2f(1.7,t*0.06)).x*0.45*grainDetail);
-   let roller=here.surf.foam.x*smoothstep(-0.5,0.05,patches+here.surf.foam.x*0.7);
+   let roller=here.surf.foam.x*smoothstep(-0.3,0.15,patches+here.surf.foam.x*0.45-0.2)*mix(0.6,1.0,smoothstep(0.35,0.8,web));
    let trail=here.surf.foam.y*smoothstep(-0.3,0.3,patches+here.surf.foam.y*0.3)*mix(0.25,1.0,smoothstep(0.62,0.9,web))*0.9;
    surfFoam=max(roller,trail)*here.weight;
   }

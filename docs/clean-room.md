@@ -12713,6 +12713,17 @@ diverges. Margo now accepts the bisected crossing with a thickness of 5 cm or
 2% of the distance, and takes the last on-screen texel for a ray that leaves
 the frame in front of the scene. Written from these descriptions.
 
+### Short-crested surf and dry-sand ripples (2026-11-26, KB-WATER-SURFBANDS1, KB-TERRAIN-SANDWET1)
+- C. Baker, M. Moulton, M. L. Palmsten, K. Brodie, E. Nuss and C. C. Chickadel, [Remotely sensed short-crested breaking waves in a laboratory directional wave basin](https://doi.org/10.1016/j.coastaleng.2023.104327), Coastal Engineering 183, 2023. Breaking crests get shorter and their ends more numerous as directional spread grows; refracting-wave theory overestimates their length.
+- O. M. Phillips, [Spectral and statistical properties of the equilibrium range in wind-generated gravity waves](https://doi.org/10.1017/S0022112085002221), JFM 156, 1985; J. M. Kleiss and W. K. Melville, [Observations of wave breaking kinematics in fetch-limited seas](https://doi.org/10.1175/2010JPO4383.1), JPO 40(12), 2010. Breaking is a length of crest per area, not whole crests.
+- P. J. Haller and P. A. Catalan, [Remote sensing of wave roller lengths in the laboratory](https://doi.org/10.1029/2008JC005185), JGR 114, 2009. The roller's extent as seen in imagery.
+- M. Jarzynski and M. Olano, [Hash Functions for GPU Rendering](https://jcgt.org/published/0009/03/02/), JCGT 9(3), 2020. The PCG hash under the section noise.
+- S. L. Namikas and D. J. Sherman, "A review of the effects of surface moisture content on aeolian sand transport", Desert Aeolian Processes, 1995; G. F. S. Wiggs, A. J. Baird and R. J. Atherton, [The dynamic effects of moisture on the entrainment and transport of sand by wind](https://doi.org/10.1016/j.geomorph.2003.09.002), Geomorphology 59, 2004. Moisture raises the wind's threshold, so wet sand keeps no fresh wind ripples.
+Margo swings the breaker index along each crest with value noise laid along
+the deep mean direction and the lead component's phase, scaled from the
+spread as Baker et al. describe; the constants are chosen against the s18
+still. Written from these descriptions.
+
 ## A buried voxel cell and the nearer side (2026-11-25)
 
 `packages/physics/kernel/src/voxel.rs` (`nearer_hidden_side`): when the ghost rule would snap a contact to an exposed face the

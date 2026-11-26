@@ -110,7 +110,9 @@ engine.camera.target = [0, 0, 0];
   gradient. Before a pixel covers half a ripple they fade out in object space (the footprint is the pixel's own, the
   longer screen-space derivative of the position, so it follows the frame size, device pixel ratio and grazing
   angle; `test/sand-footprint.browser.mjs` checks 540 and 270-line frames against a filtered 2160-line one), and the crest band has zero mean, so the far ground keeps its colour and
-  does not shimmer. They are left off avalanching slip faces.
+  does not shimmer. They are left off avalanching slip faces, and with a `wetness` record they fade with its
+  moisture: wet and submerged sand carries none (moisture holds the grains; Namikas and Sherman 1995, Wiggs et al.
+  2004), so a sea floor seen through water is smooth.
 - Sorting: a face turned downwind past about 15 to 27 degrees is a slip face (paler, fresh avalanche sand in strips
   about 1 m wide); a face turned upwind is windward (darker coarse lag). On sand only; meadow and stone are unchanged.
 - Measured (`npm run test:gpu` in this package runs `test/sand.browser.mjs`; RTX A6000, WebGPU and the WebGL2

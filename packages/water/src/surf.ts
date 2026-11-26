@@ -118,6 +118,17 @@ fn surfField(xz:vec2f,size:vec2i)->SurfField {
  if(total<1e-4){return SurfField(xz,0.0,0.0);}
  return SurfField(source/total,tau/total,total);
 }
+// Short-crested breaking (KB-WATER-SURFBANDS1): value noise on a PCG hash (M. Jarzynski and M. Olano, "Hash Functions
+// for GPU Rendering", JCGT 9(3), 2020), -1..1 with a smoothstep blend between lattice values.
+fn surfPcg(v:u32)->u32 {let s=v*747796405u+2891336453u;let w=((s>>((s>>28u)+4u))^s)*277803737u;return (w>>22u)^w;}
+fn surfHash(p:vec2i)->f32 {return f32(surfPcg(bitcast<u32>(p.x)+surfPcg(bitcast<u32>(p.y))))*4.656612875e-10-1.0;}
+fn surfNoise(p:vec2f)->f32 {
+ let i=vec2i(floor(p));let f=fract(p);let u=f*f*(3.0-2.0*f);
+ return mix(mix(surfHash(i),surfHash(i+vec2i(1,0)),u.x),mix(surfHash(i+vec2i(0,1)),surfHash(i+vec2i(1,1)),u.x),u.y);
+}
+// Crest sections: the mean breaking crest length over the local wavelength at a directional spread of 1 radian, and
+// how far the breaker index swings along a crest (see surfSample).
+const SURF_CREST=0.45;const SURF_SWING=0.3;
 struct SurfProfile {value:f32,slope:f32}
 // Abreu et al. (2010) at time-angle pi - phase, so the steep face leads: value and d value / d phase. r = 0 is sin.
 fn surfProfile(phase:f32,r:f32,phi:f32)->SurfProfile {
@@ -165,6 +176,7 @@ fn surfSample(xz:vec2f,sampleWidth:f32,depth:f32,field:SurfField,foam:bool)->Sur
  var parts:array<SurfPart,24>;var count=0u;
  // E, and G = sum a grad(phase) exp(i phase) (its cosine and sine parts), so grad E = i G; k is the mean wavenumber.
  var envelope=vec2f(0);var gCos=vec2f(0);var gSin=vec2f(0);var weight=0.0;var k=0.0;var omega=0.0;var energy=0.0;
+ var lead=0.0;var leadPhase=0.0;var deepMean=vec2f(0);var deepTotal=0.0;
  for(var j=0u;j<u32(frame.settings.w);j++){
   let w=frame.waves[j];
   for(var c=0u;c<3u;c++){
@@ -177,7 +189,8 @@ fn surfSample(xz:vec2f,sampleWidth:f32,depth:f32,field:SurfField,foam:bool)->Sur
     let along=deep.gradient-u*dot(deep.gradient,u);let g=along+u*sqrt(max(kl*kl-dot(along,along),0.0));
     parts[count]=SurfPart(g,s.phase,a*ks,w.shape.x,1.0);
     envelope+=a*ks*vec2f(cos(s.phase),sin(s.phase));gCos+=a*ks*g*cos(s.phase);gSin+=a*ks*g*sin(s.phase);
-    weight+=a*ks;k+=a*ks*kl;omega+=a*ks*sqrt(9.81*k0);energy+=a*ks*a*ks;
+    weight+=a*ks;k+=a*ks*kl;omega+=a*ks*sqrt(9.81*k0);energy+=a*ks*a*ks;deepMean+=w.wave.z*component.z*deep.direction;deepTotal+=w.wave.z*component.z;
+    if(w.wave.z*component.z>lead){lead=w.wave.z*component.z;leadPhase=s.phase;}
    } else {parts[count]=SurfPart(deep.gradient,deep.phase,a*min(ks,1.0),w.shape.x,0.0);energy+=a*min(ks,1.0)*a*min(ks,1.0);}
    count++;
   }
@@ -195,7 +208,33 @@ fn surfSample(xz:vec2f,sampleWidth:f32,depth:f32,field:SurfField,foam:bool)->Sur
   let profile=surfProfile(phase,r,phi);let slope=saturate*(grow*profile.value+size*profile.slope*turn);
   result.offset.y=saturate*size*profile.value;result.dx.y=slope.x;result.dz.y=slope.y;
   result.crest=smoothstep(0.75,0.98,sin(phase))*smoothstep(0.14,0.32,size*saturate*k);result.heading=turn/max(length(turn),1e-6);
-  if(foam&&breaking>0.0){result.foam=surfFoamAt(phase,r,phi)*breaking;}
+  if(foam&&breaking>0.0){
+   // Breaking is short-crested: it starts and stops along a crest, and the average breaking crest is shorter, with
+   // more crest ends, the wider the sea's directional spread (C. Baker, M. Moulton, M. L. Palmsten, K. Brodie, E. Nuss
+   // and C. C. Chickadel, "Remotely sensed short-crested breaking waves in a laboratory directional wave basin",
+   // Coastal Engineering 183, 2023, https://doi.org/10.1016/j.coastaleng.2023.104327; the breaking crest length per
+   // area of O. M. Phillips, "Spectral and statistical properties of the equilibrium range in wind-generated gravity
+   // waves", JFM 156, 1985, https://doi.org/10.1017/S0022112085002221, and its measurement by J. M. Kleiss and W. K.
+   // Melville, "Observations of wave breaking kinematics in fetch-limited seas", JPO 40(12), 2010,
+   // https://doi.org/10.1175/2010JPO4383.1). The phasor envelope above carries the spread only as a modulation 2 pi /
+   // (k dtheta) long, and in a saturated surf zone the index is past 1 everywhere, so every crest broke across the whole
+   // frame in one even band. Here the breaker index swings by SURF_SWING along each crest over sections SURF_CREST
+   // wavelengths / spread long (the deep spread: refraction narrows the local one, and crest lengths from refracted
+   // directions run too long, Baker et al. 2023), which makes crest ends where the sea starts to break, and the white
+   // water's density follows the same swing inside the surf zone. The sections ride the crests: their second
+   // coordinate is the largest swell component's phase in cycles, constant on a travelling crest and one apart from
+   // crest to crest. A finer swing moves the roller's toe, so its leading edge is ragged.
+   // The sections are laid along the swell's deep mean direction, which is the same everywhere (the crests' own heading
+   // turns from place to place, and its turn times a position hundreds of metres out drew the sections as swirls).
+   let mean=length(deepMean);let across=select(vec2f(0,1),vec2f(-deepMean.y,deepMean.x)/mean,mean>1e-6);
+   let spread=sqrt(max(2.0*(1.0-mean/max(deepTotal,1e-6)),0.0));
+   let crest=SURF_CREST*6.2831853/(k*max(spread,0.12));let cycle=leadPhase*0.15915494;let sAlong=dot(xz,across);
+   let swing=surfNoise(vec2f(sAlong/crest,cycle))*0.7+surfNoise(vec2f(sAlong*2.7/crest+17.0,cycle*1.9+5.0))*0.3;
+   let toe=surfNoise(vec2f(sAlong*4.0/crest+41.0,cycle*1.3+11.0))*0.75+surfNoise(vec2f(sAlong*10.0/crest+7.0,cycle*2.3+3.0))*0.25;
+   let onset=smoothstep(0.8,1.05,(high/(SURF_GAMMA*d))*(1.0+SURF_SWING*swing));
+   let density=mix(0.3,1.0,smoothstep(-0.45,0.35,swing));
+   result.foam=surfFoamAt(phase+0.4*toe,r,phi)*onset*density;
+  }
   // Linear theory's orbital speed at the bed, a omega / sinh(k h), against the 0.1 to 0.6 m/s over which fine sand
   // starts moving and goes into suspension under waves (P. D. Komar and M. C. Miller, "The threshold of sediment
   // movement under oscillatory water waves", Journal of Sedimentary Petrology 43(4), 1973,

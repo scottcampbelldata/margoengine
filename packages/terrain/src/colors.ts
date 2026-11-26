@@ -424,6 +424,13 @@ export class TerrainColors implements EnginePlugin {
     // Lancaster, "Geomorphology of Desert Dunes", 1995, ch. 4; R. E. Hunter, "Basic types of stratification in small
     // eolian dunes", Sedimentology 24, 1977) in grainflow tongues, so dune faces read apart in flat overcast light. Streaks run along the
     // wind, 1 to 2 m wide and tens of metres long (R. Greeley and J. D. Iversen, "Wind as a Geological Process", 1985).
+    // Wet sand carries no wind ripples (KB-TERRAIN-SANDWET1): moisture binds the grains and raises the wind's threshold
+    // for moving them far past a beach's winds (S. L. Namikas and D. J. Sherman, "A review of the effects of surface
+    // moisture content on aeolian sand transport", in Desert Aeolian Processes, Chapman and Hall, 1995; G. F. S. Wiggs,
+    // A. J. Baird and R. J. Atherton, "The dynamic effects of moisture on the entrainment and transport of sand by wind",
+    // Geomorphology 59, 2004, https://doi.org/10.1016/j.geomorph.2003.09.002), and the swash and the sea rework the bed
+    // with water. With a wetness record the ripples fade with its moisture, so the sea floor and the swash zone are
+    // smooth; without one they drew through the water as a fine aliased grid on the near seabed.
     const sandOn = !!sand && detail > 0;
     this.sandOn = sandOn;
     const sandCode = sandOn
@@ -441,7 +448,7 @@ export class TerrainColors implements EnginePlugin {
  // Grainflow tongues down the slip faces: strips about 1 m wide along the wind.
  let flow=(terrainNoise(vec2f(along*0.12,across*1.1)+vec2f(41.0,17.0)).x-0.5)*(1.0-smoothstep(0.25,0.5,foot));
  sandShade*=1.0+${U(10, 'x')}*lee*flow;
- var sandGrad=vec3f(0.0);let rv=${U(8, 'w')}*(1.0-smoothstep(${U(10, 'y')},${U(10, 'z')},foot))*(1.0-lee)*(1.0-sandT);
+ var sandGrad=vec3f(0.0);let rv=${U(8, 'w')}*(1.0-smoothstep(${U(10, 'y')},${U(10, 'z')},foot))*(1.0-lee)*(1.0-sandT)${wetness ? '*(1.0-terrainMoisture(p))' : ''};
  if(rv>0.0){
   let w1=terrainNoise(p.xz*0.9);let w2=terrainNoise(p.xz*3.3+vec2f(7.0,3.0));let amp=terrainNoise(p.xz*1.7+vec2f(5.0,11.0)).x;
   let t=fract(along/${U(8, 'z')}+1.6*w1.x+0.35*w2.x);
@@ -495,6 +502,14 @@ fn terrainSurface(p:vec3f,n:vec3f,footprint:f32)->TerrainSurface {
     this.wetCode = wetness
       ? `
 @group(0) @binding(9) var terrainWater:texture_2d<f32>;
+// The record's moisture at a position (0 off the map or above the beach heights).
+fn terrainMoisture(position:vec3f)->f32 {
+ if(position.y>=${U(4, 'w')}){return 0.0;}
+ let uv=(position.xz-vec2f(${wetness?.origin.join(',')}))/vec2f(${wetness?.size.join(',')});
+ if(any(uv<vec2f(0))||any(uv>vec2f(1))){return 0.0;}
+ let size=vec2i(textureDimensions(terrainWater));let pixel=clamp(uv*vec2f(size)-0.5,vec2f(0),vec2f(size-1));let lo=vec2i(floor(pixel));let hi=min(lo+1,size-1);let t=fract(pixel);
+ return mix(mix(textureLoad(terrainWater,lo,0).x,textureLoad(terrainWater,vec2i(hi.x,lo.y),0).x,t.x),mix(textureLoad(terrainWater,vec2i(lo.x,hi.y),0).x,textureLoad(terrainWater,hi,0).x,t.x),t.y);
+}
 fn terrainWet(position:vec3f)->vec2f {
  if(position.y>=${U(4, 'w')}){return vec2f(1.0);}
  let uv=(position.xz-vec2f(${wetness.origin.join(',')}))/vec2f(${wetness.size.join(',')});
@@ -583,7 +598,7 @@ fn terrainWet(position:vec3f)->vec2f {
 ` +
       this.wetCode.replace('@binding(9)', `@binding(${this.wetBinding})`) +
       this.surfaceCode
-    ).replace(/terrainSurface|terrainWater|terrainWet|terrainLook/g, (name) => name + suffix);
+    ).replace(/terrainSurface|terrainWater|terrainWet|terrainMoisture|terrainLook/g, (name) => name + suffix);
     return (
       (code.includes('struct TerrainSurface ') ? '' : surfaceStruct) +
       (this.surfaceCode.includes('terrainNoise(') && !code.includes('fn terrainNoise(') ? noiseCode : '') +
