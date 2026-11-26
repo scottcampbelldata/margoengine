@@ -358,10 +358,10 @@ that it connects to." Each builder works on ONE row at a time:
 5. Start the next row only when this one is VERIFIED. If the verifier sends it back, fix that before anything else.
 
 Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "get the solvers done for the videos").
-- Claude: SEA-09, SEA-08, SEA-11, SEA-10, SEA-04, SEA-02, SEA-13, SEA-14, LIFE-03, LIFE-04 and BIO-01, plus its own
-  SOFT-01 and FLUID-03.
-- Codex, in this order: SEA-12, SEA-15, FLUID-07, BREAK-03, SEA-03, SEA-01, SEA-05, SEA-07, ATMO-04, ATMO-06, then
-  every other REOPENED row, then the Open rows.
+- Claude: SEA-09, SEA-08, SEA-11, SEA-10, LIFE-03, LIFE-04 and BIO-01, plus its own SOFT-01 and FLUID-03. For the
+  RAF Fauld explosion film, Claude also builds FIRE-05, FIRE-04, EARTH-06, FIRE-03, EARTH-03, HYDRO-05 and BREAK-02.
+- Codex does the water, in this order: SEA-12, SEA-04, SEA-02, SEA-13, SEA-14, SEA-15, FLUID-07, BREAK-03, SEA-03,
+  SEA-01, SEA-05, SEA-07, ATMO-04, ATMO-06. Then every other REOPENED row, then the Open rows.
 
 ## Who builds what (Scott, 2026-11-26)
 
@@ -406,16 +406,16 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 3cb9cb3ebc |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed dc75a47d35 |
-| HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
+| HYDRO-05 | Dam and levee breach | stand-in | Claude | CLAIMED (Fauld film) |
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed b6e01ceb4c |
 | ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80aa218baa |
 | ATMO-06 | Airborne particle transport | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 965fab2df7 |
 | ATMO-07 | Lightning and atmospheric electricity | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 51ccc096bc |
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 93bf3f2435 |
-| EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
+| EARTH-03 | Particle-laden gravity currents | partial | Claude | CLAIMED (Fauld film) |
 | EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), upgrade parts c99bb12d2a and 0fa769d6dc |
-| EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
+| EARTH-06 | Impact and explosion cratering | stand-in | Claude | CLAIMED (Fauld film) |
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
@@ -425,8 +425,8 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7dbf9e06ee |
 | ICE-04 | Pack ice and floes | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed dbc7a0efd9 |
 | ICE-05 | Ice thermodynamics | physics/ice | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7b64dddf4f |
-| FIRE-04 | Explosive blast loading | none | Open | OPEN |
-| FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
+| FIRE-04 | Explosive blast loading | none | Claude | CLAIMED (Fauld film) |
+| FIRE-05 | Explosive source and fragments | stand-in | Claude | CLAIMED (Fauld film) |
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | physics/outdoor-sound and audio/outdoor | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 976796766b |
@@ -445,7 +445,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | native rods, fast guides and physical skin bindings | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c53e60dc12 |
 | SOFT-05 | Muscle, fat and skin soft tissue | physics/tissue with skeletal pins, sliding planes and passive layers | Open | OPEN |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
-| BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
+| BREAK-02 | Structural collapse and load path | stand-in | Claude | CLAIMED (Fauld film) |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 839a45208b |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 64bedcf038 |
 | LIFE-03 | Aquatic locomotion | physics/life | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 708e96a06b |
@@ -462,7 +462,7 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 | EARTH-04 | Discrete-element rubble and boulders | partial | Open | OPEN |
 | FIRE-01 | Wildfire spread | partial | Open | OPEN |
 | FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
-| FIRE-03 | Integral plume and thermal model | partial | Open | OPEN |
+| FIRE-03 | Integral plume and thermal model | partial | Claude | CLAIMED (Fauld film) |
 | BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a4d123a968 |
 | DYN-07 | Dynamic character, balance, push response | partial | Codex | OPEN |
 | AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
@@ -486,15 +486,15 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SOFT-01 | Cloth and thin shells | partial: water as a medium landed 1b7d95a48, curtains in a moving hull 3d1e785d7 | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | elastic rods (`@margoengine/physics/rod`: bend, twist and stretch in a multibody's direct solve, pins, cast-off) with water loads per segment (`segmentLoads` in `@margoengine/physics/loads`: buoyancy, Morison drag and inertia, vortex lift); validated against a cantilever in a current, a catenary, a taut cable's frequency and strumming lock-in (`packages/physics/tests/rod.test.js`, `loads-segments.test.js`) | Claude | LANDED d53e71328 |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
-| SEA-02 | Ocean surface synthesis and query | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
-| SEA-04 | Local dispersive free surface | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
+| SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
+| SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
 | SEA-08 | Ship seakeeping | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 0ae7b50ae2 |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | BUILDING (codex/physics-sea-12-upgrade) |
-| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
-| SEA-14 | Water entry and exit | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
+| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
+| SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 336a4413c4 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
