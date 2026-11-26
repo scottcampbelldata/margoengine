@@ -9766,3 +9766,18 @@ settings-table rows. One 80-byte uniform buffer, one more pipeline when added to
 not measured. Measured: new entry 1,282 B min+gzip; tonemap root, grade, hue, core and stage unchanged. GPU frames are
 within 0.5 of an 8-bit level of a CPU oracle on WebGPU and the WebGL2 layer (`tests/enhance-browser.mjs`). Margo's
 units are its own, so values from another engine's colour enhancement do not carry over one to one.
+
+### Physical strand guides (SOFT-03)
+
+The base native solver covers cylindrical elastic guides at 240 Hz by default. The follow tier
+keeps segment lengths and resolves a local bed plane. The rod tier resolves finite compliance
+and endpoint-sphere self contact using a sparse grid. Guide shear and twist use artist-supplied
+effective moduli where those have been measured. Sampled bodies are kinematic capsules and
+spheres with point contact. Separation between contacts depends on guide spacing and substep
+rate. Use enough points to resolve thin obstacles.
+
+The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
+changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
+native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,515 B gzip
+with a 4,771 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
+Stage gain zero bytes.

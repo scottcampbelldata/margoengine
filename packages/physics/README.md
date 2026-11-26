@@ -4667,3 +4667,40 @@ Both tiers accept `hardpan` for a prepared layer over denser material. Set `thic
 the original bed and provide the lower layer's `frictionalModulus`. The optional `cohesiveModulus` and
 `exponent` default to 0 and 1. Footprint width and topsoil friction determine when the pressure cone reaches
 the hardpan. Omit `hardpan` for a homogeneous pressure fit.
+
+## Physical strand guides
+
+Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone
+chains. A guide is a centreline in metres, with a material frame and both velocities per point.
+Give each root an anchor sampled at the world time to follow an animated skin. The rest root is the
+default stationary anchor.
+
+```ts
+import { StrandSolver } from '@margoengine/physics/strands';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const strand = await StrandSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(strand, {
+  strands: [{ points: [[0, 1.7, 0], [0, 1.6, 0.03], [0, 1.5, 0.06]] }],
+});
+world.advance(30);
+console.log(strand.sample(0, 2).position);
+```
+
+The default `'rod'` tier resolves stretch, shear, bend, and twist with XPBD. The `'follow'`
+tier keeps the authored segment lengths with one dynamic follow-the-leader pass. Use it for
+dense guide sets when elastic frames and point self contact are unnecessary.
+
+- A guide defaults to a 40 μm radius, 1,300 kg/m³ density, a 3 GPa Young modulus, and a shear
+  modulus of E / 2.6. The default projected drag width is the diameter, with a coefficient of 1.2.
+  Supply measured values for a shaft, bundle, or specific fibre. Wider vanes can use a separate
+  `dragWidth`.
+- The default rate is level 2 (240 Hz), with 12 rod passes, 2/s damping, 0.9 follower correction
+  and a Coulomb contact coefficient of 0.25. The rod tier defaults to point self contact.
+- `wind` takes the common air field; the default is still air at 1.225 kg/m³. `bed` takes
+  the common terrain surface; omitting it leaves ground contact disabled. Each `colliders`
+  element is a capsule, sphere, or time-sampled capsule in the strand's origin cell. The
+  origin cell length defaults to 4,096 m and must match the world's `cellSize` when customized.
+- `field` publishes `STRAND_LAYOUT` in the world registry. Each `STRAND_WORDS`-word f64 record
+  stores centreline position, linear velocity, XYZW material frame and angular velocity in that
+  order. Give the same deterministic anchor, wind, and body functions to playback and snapshot replay.

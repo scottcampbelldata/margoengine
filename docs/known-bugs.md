@@ -16901,3 +16901,12 @@ creep force. Profile-resolved rail-head and flange contact, free rigid-body impa
 of support, and a wired production render remain open. The contact wire uses fixed anchors and
 one loaded cable. Multi-wire hardware, moving switch point mechanisms and circuit-level arc
 measurements require separate models and evidence.
+
+### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
+
+The native guide solver receives time-sampled kinematic capsules, wind and a common terrain
+bed. Reciprocal rigid contact, segment-level continuous collision and inter-guide friction
+validation remain open. A point may pass a thin obstacle between substeps or slide past a
+capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
+solved guides. Horse tail and mane, the legacy spring-bone skin path and the named production
+shots remain open until their actual rigs receive the solved frames.

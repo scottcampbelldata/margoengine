@@ -155,6 +155,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'strand-kernel',
+    crate: 'packages/physics/strand-kernel',
+    blueprint: 'packages/physics/src/strands/strand-kernel.wasm',
+    script: 'packages/physics/scripts/build-strand-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'strand-kernel-shared',
+    crate: 'packages/physics/strand-kernel',
+    blueprint: 'packages/physics/src/strands/strand-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-strand-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'synoptic-kernel',
     crate: 'packages/physics/synoptic-kernel',
     blueprint: 'packages/physics/src/synoptic/synoptic-kernel.wasm',

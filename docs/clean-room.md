@@ -14593,3 +14593,38 @@ Size: new entry, absent to 6,877 B min+gzip, ceiling 7,133 B. No other entry gro
 
 Margo-own: one storage buffer with a block per attribute and a default row, `var<private>` values loaded per row, a flat
 varying for fragment points, and cullers that leave row-indexed materials in place.
+
+## Native strand guides (SOFT-03)
+
+- Florence Bertails, Basile Audoly, Marie-Paule Cani, Bernard Querleux, Frédéric Leroy and
+  Jean-Luc Lévêque, [*Super-helices for predicting the dynamics of natural hair*](https://doi.org/10.1145/1179352.1142012)
+  (2006). The strand model retains independent curvature and twist about a moving material frame.
+  This implementation discretizes space into segments with quaternion frames and rest rotations.
+- Tassilo Kugelstadt and Elmar Schömer, [*Position and Orientation Based Cosserat Rods*](https://animation.rwth-aachen.de/media/papers/2016-SCA-Cosserat-Rods.pdf)
+  (2016), section 6. The strain is the rotated centreline edge divided by its length minus the
+  frame's third director. The bend and twist projection uses the vector of the relative quaternion
+  against its natural rotation. The cylinder supplies axial and shear constants EA and GA and
+  angular constants EI and GJ. Miklós Bergou et al., [*Discrete Elastic Rods*](https://www.lmm.jussieu.fr/~audoly/publi/BergouWardetzkyRobinson-Discrete%20Elastic%20Rods-2008-00.pdf)
+  (2008), provides the frame-transport and natural-curvature comparison.
+- Miles Macklin, Matthias Müller and Nuttapong Chentanez, [*XPBD: Position-Based Simulation of Compliant Constrained Dynamics*](https://mmacklin.com/xpbd.pdf)
+  (2016), equations 7–9. Each scalar projection uses compliance divided by the square of the
+  time step and accumulates its multiplier within that substep.
+- Matthias Müller, Nuttapong Chentanez and Tae-Yong Kim, [*Fast Simulation of Inextensible Hair and Fur*](https://matthias-research.github.io/pages/publications/FTLHairFur.pdf)
+  (2012), sections 3.1–3.2. The fast pass follows the parent in root-to-tip order and subtracts
+  the scaled child correction from the parent velocity. For a local ground plane, the admissible
+  directions are the intersection of its positive half-space with the fixed-length link's sphere.
+- Matthias Teschner et al., [*Optimized Spatial Hashing for Collision Detection of Deformable Objects*](https://cgl.ethz.ch/Downloads/Publications/Papers/2003/Tes03/Tes03.pdf)
+  (2003). A separate ordered cell check rejects hash collisions; spacing is the largest point
+  diameter. Consecutive points in an authored guide are excluded.
+- Yang Yu et al., [*Structure and mechanical behavior of human hair*](https://www.sciencedirect.com/science/article/pii/S0928493116319208)
+  (2017), and Kento Fujita and Hironori Tohmyoh, [*Effect of testing conditions on the tensile properties of a single human hair and the in-situ observation of cuticles during the tensile deformation by an optical microscope*](https://doi.org/10.1299/transjsme.20-00043)
+  (2020), supply comparisons for diameter and the low-strain modulus. The default cylindrical
+  guide uses an 80 μm diameter and a nominal 3 GPa material. The cross-flow drag coefficient is
+  an exposed engineering estimate, and the drag step exactly integrates scalar quadratic
+  relative-velocity decay for the sampled, fixed air value and coefficient.
+
+The hanging-guide test compares extension with mgL / EA using the half-cylinder tip mass.
+The curved no-load fixture independently checks invariance under a rigid transform. The fast
+test measures every length during a wind reversal and contact with a live terrain bed. The
+browser fixture draws the solved centreline and frame in a fixed view and repeats the same
+gust against a still-air control.

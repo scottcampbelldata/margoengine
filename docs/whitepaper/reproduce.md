@@ -4356,3 +4356,11 @@ calculation. Run `node packages/physics/tests/dfsph.browser.mjs` and repeat with
 Water package displays the same simulated mass and front on both backends. The experimental diagnostic
 `node packages/physics/tests/dfsph-lab.mjs` compares the channel surge against the unaffected laboratory
 clock intervals and returns a failure when a tolerance is missed.
+
+### Strand guides (SOFT-03)
+
+Build the physics package and run `node --test packages/physics/tests/coupling/strands.test.js`.
+The browser proof is `node packages/physics/tests/strands.browser.mjs`. Run once using WebGPU and
+again with `MARGO_COMPAT=1` to exercise WebGL2. The script compares the same animated fixture with
+and without the boundary-layer wind, tests both native variants and verifies exact replay from a
+snapshot. It reports changed pixels, tip movement and the state hash.

@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|rail|terramechanics|synoptic|pbf|dfsph)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|rail|terramechanics|synoptic|strand|pbf|dfsph)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -53,6 +53,7 @@ await build({
         rail: resolve(root, 'src/rail/index.ts'),
         seismic: resolve(root, 'src/seismic/index.ts'),
         lightning: resolve(root, 'src/lightning/index.ts'),
+        strands: resolve(root, 'src/strands/index.ts'),
         synoptic: resolve(root, 'src/synoptic/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
         falling: resolve(root, 'src/falling.ts'),
@@ -207,3 +208,6 @@ for (const name of ['terramechanics-kernel.wasm', 'terramechanics-kernel-shared.
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);
+
+for (const name of ['strand-kernel.wasm', 'strand-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/strands', name), resolve(dist, name));

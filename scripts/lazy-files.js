@@ -287,6 +287,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/strand-kernel.wasm',
+    label: 'strand-kernel.wasm',
+    kind: 'Rust SIMD Cosserat and follow-the-leader strand dynamics',
+    measure: 'file',
+    when: 'StrandSolver.load() from the optional /strands entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/strand-kernel-shared.wasm',
+    label: 'strand-kernel-shared.wasm',
+    kind: 'Rust SIMD Cosserat and follow-the-leader strand dynamics, shared world memory',
+    measure: 'file',
+    when: 'StrandSolver.load() from the optional /strands entry with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/synoptic-kernel.wasm',
     label: 'synoptic-kernel.wasm',
     kind: 'Rust SIMD regional weather and moisture transport',

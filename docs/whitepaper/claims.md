@@ -5820,3 +5820,12 @@ The FLUID-01 capillary tests independently differentiate the two-particle surfac
 opposite impulse on a real rigid boundary sample. A three-particle chain resolves to the minimum-impulse
 velocity once the coupled pressure multipliers relax. The capillary state replays through shared and plain
 memories and snapshot restore.
+
+### Strand guides (SOFT-03)
+
+The optional strand solver has a Cosserat tier and an inextensible fast tier. The hanging-rod
+test compares axial extension with the exact weight and stiffness of a half-cylinder tip
+mass. The fast tier preserves authored link lengths through a wind reversal and moving roots.
+A fixed-camera 720-point proof measures a 0.4825 m tip difference from the still-air control
+and 3,107 changed pixels per backend with the same solved-state replay hash.
+[Reproduce](reproduce.md#strand-guides-soft-03)

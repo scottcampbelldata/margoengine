@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Strand wind and anchor fixture</title></head>
+<body>
+<script type="module">
+  import { Engine, Geometry, PbrMaterial, box } from '/packages/core/dist/index.js';
+  import { createHeadlessCanvas, readPixels } from '/packages/headless/dist/index.js';
+  import { PhysicsWorld, worldMemory } from '../dist/world.js';
+  import { TerrainBed } from '../dist/earth.js';
+  import { BoundaryLayerWind } from '/packages/weather/dist/boundary-layer.js';
+
+  const engine = await Engine.create(createHeadlessCanvas({ width: 480, height: 300 }), {
+    backend: 'webgpu', camera: { position: [0.16, 0.96, 2.85], target: [0.16, 0.78, 0], near: 0.05, far: 20 },
+  });
+  engine.stop();
+  const faults = [];
+  engine.gpu.addEventListener('uncapturederror', ({ error }) => faults.push(error.message));
+  const ground = engine.createMesh().setGeometry(box(4, 0.06, 3)).setPosition([0, -0.03, 0])
+    .setMaterial(new PbrMaterial({ color: '#7b776f', roughness: 0.86 }));
+  const clamp = engine.createMesh().setGeometry(box(0.67, 0.045, 0.11))
+    .setMaterial(new PbrMaterial({ color: '#52616a', roughness: 0.51 }));
+  const fibres = engine.createMesh().setMaterial(new PbrMaterial({ color: '#98603a', roughness: 0.48 }));
+  const distance = (a, b) => Math.hypot(...a.map((x, k) => x - b[k]));
+  const gust = new BoundaryLayerWind({ speed: 30, roughness: 0.03, turbulence: false });
+  const still = new BoundaryLayerWind({ speed: 0, roughness: 0.03, turbulence: false });
+  const wind = { medium: 'air', cell: gust.cell, sample: (x, y, z, t, out) =>
+    (t >= 0.28 ? gust : still).sample(x, y, z, t, out) };
+  const guides = Array.from({ length: 60 }, (_, group) => {
+    const x = ((group % 20) - 9.5) * 0.031, z = (Math.floor(group / 20) - 1) * 0.033;
+    const length = 0.62 + 0.061 * Math.sin(group * 2.39);
+    const points = Array.from({ length: 12 }, (_, i) => [x, 1.34 - length * i / 11, z + 0.01 * i / 11]);
+    return { points, radius: 0.0075, dragWidth: 0.031, young: 20e6, anchor: t => ({
+      position: [x + 0.065 * Math.sin(6 * t), 1.34, z],
+    }) };
+  });
+  const ring = Array.from({ length: 6 }, (_, j) => [Math.cos(j * Math.PI / 3), Math.sin(j * Math.PI / 3)]);
+  function fibreGeometry(solver) {
+    const vertices = [], normals = [], indices = [];
+    for (const [guide, { points, radius }] of guides.entries()) {
+      const start = vertices.length / 3;
+      for (const [i] of points.entries()) {
+        const { position, rotation: [x, y, z, w] } = solver.sample(guide, i);
+        const taper = radius * (1 - 0.74 * i / (points.length - 1));
+        for (const [u, v] of ring) {
+          const rx = -2 * z * v, ry = 2 * z * u, rz = 2 * (x * v - y * u);
+          const normal = [u + w * rx + y * rz - z * ry, v + w * ry + z * rx - x * rz, w * rz + x * ry - y * rx];
+          vertices.push(...position.map((axis, j) => axis + normal[j] * taper));
+          normals.push(...normal);
+        }
+        if (i === 0) continue;
+        for (let j = 0; j < ring.length; j++) {
+          const k = (j + 1) % ring.length, a = start + (i - 1) * ring.length, b = a + ring.length;
+          indices.push(a + j, a + k, b + j, a + k, b + k, b + j);
+        }
+      }
+    }
+    return new Geometry(vertices, normals, indices);
+  }
+  async function shot(solver, t) {
+    clamp.setPosition([0.065 * Math.sin(6 * t), 1.34, 0]);
+    fibres.setGeometry(fibreGeometry(solver));
+    engine.render({ delta: 1 / 60 });
+    return (await readPixels(engine)).data;
+  }
+  window.runStrands = async () => {
+    const { StrandSolver } = await import('../dist/strands.js');
+    const make = async (shared, flow) => {
+      const solver = await StrandSolver.load(), terrain = new TerrainBed();
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+      world.add(terrain, { rows: 2, columns: 2, depth: 6, width: 6, centre: [0, 0], elevations: () => 0 });
+      world.add(solver, { strands: guides, fidelity: 'rod', wind: flow, bed: terrain.bed });
+      return { solver, world };
+    };
+    const gusted = await make(false, wind), shared = await make(true, wind), reference = await make(false, still);
+    gusted.world.advance(17);
+    const before = await shot(gusted.solver, 17 / 60);
+    const snapshot = gusted.world.takeSnapshot();
+    gusted.world.advance(55);
+    shared.world.advance(55);
+    reference.world.advance(55);
+    const first = gusted.world.hash();
+    gusted.world.restoreSnapshot(snapshot.bytes);
+    gusted.world.advance(55);
+    const after = await shot(gusted.solver, 55 / 60);
+    const neutral = await shot(reference.solver, 55 / 60);
+    const changed = (a, b) => {
+      let differences = 0;
+      for (let p = 0; p < a.length; p += 4) {
+        if ([0, 1, 2].reduce((n, k) => n + Math.abs(a[p + k] - b[p + k]), 0) > 20) differences++;
+      }
+      return differences;
+    };
+    return {
+      first, shared: shared.world.hash(), replay: gusted.world.hash(),
+      drawChange: changed(before, after), windChange: changed(neutral, after), faults,
+      points: guides.flatMap(guide => guide.points).length,
+      tipMove: distance(gusted.solver.sample(14, 11).position, reference.solver.sample(14, 11).position),
+    };
+  };
+</script>
+</body>
+</html>

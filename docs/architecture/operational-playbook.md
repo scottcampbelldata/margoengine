@@ -4284,6 +4284,13 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+The optional SOFT-03 strand solver runs its rod and follow-the-leader constraints in a
+Rust SIMD module that imports the world's memory. Centreline and material-frame rows use
+the world's clock, region allocator and snapshot path. A fixed-camera fixture exercises
+720 solved points on both rendering backends with identical shared and plain memory
+replay. Reciprocal body contact and production skin bindings remain open.
+
+
 ### N-body and orbital dynamics (SPACE-01)
 
 The separate plain and shared SIMD modules use slot 8 and publish inertial positions, velocities and elapsed
