@@ -12339,3 +12339,31 @@ The optional physics/celestial entry uses the world tick and independent TT, UT1
 - K. Anderson and M. Mikofski, [Slope-Aware Backtracking for Single-Axis Trackers](https://www.nrel.gov/docs/fy20osti/76626.pdf) (2020), equations 4, 5, 14–16 and 32. Tests reproduce SOLARFIELD-2 and SOLARFIELD-3 with individual row slope/bias, wind stow and the independent closed-form projected aperture.
 
 The finite-precision check used JPL's official DE440s BSP (32,726,016 bytes, SHA-256 c1c7feeab882263fc493a9d5a5b2ddd71b54826cdf65d8d17a76126b260a49f2) and [Horizons vector queries](https://ssd-api.jpl.nasa.gov/doc/horizons.html) as an independent oracle. Query target 10, 301, 5 or 7, centre 500@399, ICRF, FRAME, VEC_CORR=NONE, KM-S, and TLIST of 2451545.0, 2457987.25 and 2460409.25 TDB. The twelve positions agree with Horizons DE441 within 2 m, and the component velocities within 0.00001 m/s. This is a sample comparison between ephemerides. Checked-in synthetic data exercises both byte orders and SPK representations, the common centre, time boundaries, and malformed input. The world harness tests live consumption of both fields and bit-identical results across frame rates and after restore.
+### Land-surface energy and water balance (ATMO-09, `@margoengine/weather/surface-energy`, 2026-11-25)
+
+- J. L. Monteith, [Evaporation and environment](https://pubmed.ncbi.nlm.nih.gov/5321565/), 1965, introduced the
+  canopy resistance in series with aerodynamic resistance. The original scan is catalogued by Rothamsted. The resistance
+  equation and the definition of its two terms were verified in Allen et al., [Crop Evapotranspiration, FAO-56,
+  Chapter 2](https://www.fao.org/4/x0490e/x0490e06.htm), 1998, equations 1–4. The patch solves for its surface
+  temperature directly, so it keeps the nonlinear surface saturation deficit. It uses the equation for saturation
+  pressure from [Chapter 3](https://www.fao.org/4/x0490e/x0490e07.htm), Eq. 11, and the 2.45 MJ/kg water vaporization
+  convention used for reference evapotranspiration. The daily grass-reference coefficients do not enter the solver.
+- G. E. Liston and K. Elder, [A Distributed Snow-Evolution Modeling System (SnowModel)](https://www.fs.usda.gov/rm/pubs_other/rmrs_2006_liston_g001.pdf),
+  2006, §2(b), Eq. 1, gives the surface terms and holds the snow surface at its melting temperature while the energy
+  surplus melts available snow. The patch uses 333.7 kJ/kg for melting and puts snowmelt in the liquid store.
+- K. W. Oleson et al. and the Community Terrestrial Systems Model team,
+  [CLM5 Technical Note, Momentum, Sensible Heat, and Latent Heat Fluxes](https://escomp.github.io/CTSM/release-clm5.0/tech_note/Fluxes/CLM50_Tech_Note_Fluxes.html),
+  2018, §§2.5.2 and 2.5.5, gives the bulk resistance fluxes in specific humidity and the exact conversion
+  `q = 0.622 e / (p - 0.378 e)`. The model holds one air density and heat capacity fixed for a step.
+- L. S. Bradshaw, J. E. Deeming, R. E. Burgan and J. D. Cohen,
+  [The 1978 National Fire-Danger Rating System, Technical Documentation](https://www.fs.usda.gov/rm/pubs_int/int_gtr169.pdf),
+  1983, Eq. 25, gives the exponential timelag relaxation. The targets reuse Margo's implementation of J. D. Cohen
+  and J. E. Deeming, [The National Fire-Danger Rating System, Basic Equations](https://research.fs.usda.gov/treesearch/27298),
+  1985.
+
+For one patch per instance, backward Euler adds a positive heat-capacity slope to the monotone outgoing energy
+balance. A bracketed scalar solve conserves storage and boundary fluxes to f64 roundoff. The water budget limits
+evaporation to available liquid, caps snow fusion at the remaining snow mass and sends liquid overflow to runoff.
+These are fixed-size calculations per patch and run in TypeScript. The tests compare the linear result to its closed
+form, check both budgets, exercise rain and dew, and verify that the material darkens as the RITS-10 ground wets.
+The implementation was written from the publications and Margo's existing interfaces.

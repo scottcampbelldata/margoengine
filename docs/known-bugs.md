@@ -6,6 +6,12 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-25 RITS-10 atmospheric-river scene still needs basin runoff and flooding
+
+- **Repro** Re-render RITS-10 at 7:55–8:20 and 9:48–10:15 and check the terrain, streams and valley floor.
+- **Cause** The demo needs the complete rainfall-runoff and flood-depth chain from HYDRO-02 and HYDRO-01. The ATMO-09
+  regression verifies the ground wetness, material response and local runoff flux in isolation. The scene review
+  remains open until the surface output is consumed and flood depth appears in the shot.
 ### Fixed 2026-11-25: missing time-varying celestial forcing and tracker backtracking (SPACE-02)
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).

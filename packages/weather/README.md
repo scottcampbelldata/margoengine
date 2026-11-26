@@ -50,6 +50,47 @@ A `WeatherState` is nine numbers: `rain`, `snow`, `hail` (0..1), `wind` (m/s), `
 
 `wetRoughness`, `wetColor`, `snowWeight` and `surfaceResponse` give a surface's roughness and colour from the ground state: wet is darker (up to 25 percent) and shinier (down to 35 percent of the dry roughness), and snow whitens up-facing surfaces first and steeper ones as the cover grows. `applyWetness(material, dryRoughness, wetness)` sets `material.roughness`. For a shader, paste `surfaceWGSL` ahead of it and call `weather_surface(roughness, color, normalY, wetness, snowCover)`; the real-GPU test checks that WGSL against the JavaScript.
 
+### Physical land-surface energy and water
+
+`@margoengine/weather/surface-energy` advances a patch's ground temperature, liquid storage, snow water equivalent and
+dead-fuel moisture on the `PhysicsWorld` clock. It accounts for incoming sunlight and longwave radiation, thermal
+emission, sensible and latent heat, ground conduction, melting, precipitation, condensation and runoff.
+
+```ts
+import { CelestialSolver, INSOLATION_FIELD, insolationFromPort } from '@margoengine/physics/celestial';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { wetColor } from '@margoengine/weather';
+import { SurfaceEnergySolver } from '@margoengine/weather/surface-energy';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const site = { latitude: 0, longitude: 0 }; // radians
+const ground = new SurfaceEnergySolver({
+  id: 'basin',
+  inputs: {
+    shortwave: {
+      field: INSOLATION_FIELD,
+      sample: (memory, port) => insolationFromPort(memory, port, site).horizontal,
+    },
+  },
+});
+world.add(new CelestialSolver(), {}).add(ground, { rain: 2e-5, initialWater: 0 });
+world.advance(60);
+const patch = ground.read();
+console.log(wetColor([0.35, 0.22, 0.13], patch.wetness), patch.temperature);
+```
+
+`read()` returns temperature in K, liquid and snow storage in kg/m², and wetness as a fraction of liquid capacity.
+Supply `inputs` to bind any forcing option to an upstream field. The default reader reads one layout-1 f32 or f64 word.
+A pure `sample(memory, port, context)` projection can read a point in a grid or obtain local sunlight from a celestial
+port. A `Precipitation` field can supply patch rain and snow, with rates converted from mm/h of water equivalent.
+Bound and published forcing ports take precedence over the sample and over the fallback options.
+
+Every output region uses layout 1 and f64. `temperatureField` and `wetnessField` each publish one value.
+`energyFluxField` publishes net radiation, sensible, latent, ground and melt heat flux in W/m², in that order.
+`waterFluxField` publishes evaporation, melt and runoff in kg/(m² s). Negative evaporation is condensation.
+`fuelMoistureField` publishes the 1-, 10- and 100-hour dead-fuel fractions by dry weight, in that order.
+Use `albedo` and `surfaceResistance` inputs to accept cover changes such as a burn scar.
+
 ## Puddles and wet ground
 
 `Puddles` from `margoengine/weather/puddles` makes the rain show on every core mesh: surfaces darken and turn shinier

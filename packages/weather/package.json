@@ -67,6 +67,10 @@
       "types": "./dist/precipitation.d.ts",
       "import": "./dist/precipitation.js"
     },
+    "./surface-energy": {
+      "types": "./dist/surface-energy.d.ts",
+      "import": "./dist/surface-energy.js"
+    },
     "./lava": {
       "types": "./dist/lava.d.ts",
       "import": "./dist/lava.js"
@@ -118,9 +122,11 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
     "@margoengine/post": "^1.0.0"
   },
   "peerDependenciesMeta": {
+    "@margoengine/physics": { "optional": true },
     "@margoengine/post": { "optional": true }
   },
   "dependencies": {

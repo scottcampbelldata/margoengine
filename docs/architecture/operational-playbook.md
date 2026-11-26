@@ -9916,3 +9916,13 @@ The production thermoelastic solver reads the same temperature port in the Physi
 In `packages/post/test/heat-haze-browser.mjs`, a changing thermal field displaces 2,123 native WebGPU and 2,131 WebGL2 compatibility fixture pixels by more than four RGB levels. The ambient, disabled, outside-volume and foreground cases each displace zero. The physics coupling tests verify a cooling gradient in photopic ceramic emission and the density decrease and expansion of heated gas at fixed pressure. The gas fixture supplies the pressure and mass balance while the flow and combustion solvers remain separate.
 
 Remaining evidence includes scalability for stiff heat grids with the shared sparse kernel and new renders of the original kiln and turbofan shots.
+
+### Surface energy and soil water (ATMO-09)
+
+The weather entry uses one world-clock `SurfaceEnergySolver` per patch. The monotone local heat balance advances
+implicitly, and the liquid and snow stores limit evaporation and melting to the water available. Incoming climate and
+land-cover fields can be resolved at the coupling tick. Consumers read temperature, evapotranspiration, melt, runoff,
+wetness and the three dead-fuel timelags from f64 registry ports. All prognostic state is in world-owned regions.
+Tests prove the implicit solution against an analytic linear case, close both storage budgets, and require identical
+replay in plain and shared memory. The RITS-10 surface fixture verifies that rain darkens dry ground and produces runoff
+after saturation. The finished shot still requires the watershed and flood-depth solvers.

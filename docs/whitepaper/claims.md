@@ -9,6 +9,14 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Land-surface balance (ATMO-09, 2026-11-25). The surface temperature follows the exact discrete solution of a
+  linear heat budget. The nonlinear case accounts for radiation, sensible heat, evaporation and conduction to
+  f64 roundoff. At the phase boundary, the available heat melts snow with an equal gain in liquid water.
+  A storm fixture closes the local water budget and darkens the rendered material input as the ground wets.
+  Replay gives the same hash with different frame rates, snapshots and memory modes. Reproduce with
+  `node --test packages/physics/tests/coupling/surface-energy.test.js packages/weather/tests/surface-energy.test.js`
+  after building Physics and Weather. The original valley scene still needs a complete rainfall-runoff and flood chain.
+
 - Own physics implicit soft solids (2026-11-24): a cantilever 1 m long, 0.25 m square, E = 3 MPa, on the `'fem'` solver (one
   linear solve a substep, conjugate gradient) sags at its free end to the same 88 percent of the Euler-Bernoulli deflection
   with one substep of one pass as with eight of four (within 3 percent of each other), where the constraints at one pass sag
