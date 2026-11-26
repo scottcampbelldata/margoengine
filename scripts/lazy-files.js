@@ -287,6 +287,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/granular-mpm-kernel.wasm',
+    label: 'granular-mpm-kernel.wasm',
+    kind: 'Rust SIMD sparse granular material points',
+    measure: 'file',
+    when: 'GranularMpmSolver.load() from the optional /granular-mpm entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/granular-mpm-kernel-shared.wasm',
+    label: 'granular-mpm-kernel-shared.wasm',
+    kind: 'Rust SIMD sparse granular material points, shared world memory',
+    measure: 'file',
+    when: 'GranularMpmSolver.load() from the optional /granular-mpm entry with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/strand-kernel.wasm',
     label: 'strand-kernel.wasm',
     kind: 'Rust SIMD Cosserat and follow-the-leader strand dynamics',

@@ -15077,6 +15077,39 @@ Size: new entry, absent to 6,877 B min+gzip, ceiling 7,133 B. No other entry gro
 Margo-own: one storage buffer with a block per attribute and a default row, `var<private>` values loaded per row, a flat
 varying for fragment points, and cullers that leave row-indexed materials in place.
 
+## Granular material points (EARTH-01)
+
+- Yuanming Hu, Yu Fang, Ziheng Ge, Ziyin Qu, Yixin Zhu, Andre Pradhana and Chenfanfu Jiang,
+  [*A Moving Least Squares Material Point Method with Displacement Discontinuity and
+  Two-Way Rigid Body Coupling*](https://doi.org/10.1145/3197517.3197523) (2018),
+  equations 15–19 and section 6. The quadratic spline has 27 neighbours and its
+  moment tensor is `h² I / 4`. The nodal impulse includes the affine velocity and
+  `−Δt V₀ τ (4/h²)` applied to the particle-to-node offset, where `τ` is the Kirchhoff
+  stress. Gather the velocity and its affine gradient from the same weights.
+- Gergely Klár, Theodore Gast, Andre Pradhana, Chuyuan Fu, Craig Schroeder, Chenfanfu
+  Jiang and Joseph Teran, [*Drucker–Prager Elastoplasticity for Sand Animation*](https://doi.org/10.1145/2897824.2925906)
+  (2016), and [technical supplement](https://www.math.ucla.edu/~cffjiang/research/sand/tech-doc.pdf),
+  sections 4.1 and 6.1. The Kirchhoff principal stress uses the logarithms of
+  principal elastic stretches, and the return map removes deviatoric strain until
+  it reaches the Drucker–Prager cone. The zero-cohesion tension return goes to the
+  cone tip. The optional cohesive shift adds cohesion to the admissible stress.
+- Alexey Stomakhin, Craig Schroeder, Lawrence Chai, Joseph Teran and Andrew Selle,
+  [*A Material Point Method for Snow Simulation*](https://media.disneyanimation.com/uploads/production/publication_asset/94/asset/SSCTS13_2.pdf)
+  (2013), equations 1–2, section 7 and table 2. Snow uses fixed-corotated elastic
+  stress, compression and stretch limits on the principal elastic stretches,
+  and the determinant ratio for plastic hardening.
+- Sachith Dunatunga and Ken Kamrin, [*Continuum modelling and simulation of granular flows
+  through their many phases*](https://doi.org/10.1017/jfm.2015.383) (2015), sections 2
+  and 4. The rate-dependent friction law distinguishes static and fast flow on an
+  inclined plane. The initial kernel uses the rate-independent return above. This
+  source defines a separate inertial-flow validation target.
+
+The one-point manufactured tests evaluate the exact spline stress update followed by
+the independent sand and snow returns. Free-fall uses the semi-implicit Euler
+sum, including the half-step displacement. The incline test exercises a real terrain
+bed and replays exactly in plain and shared memory. The fixed-camera collapse draws
+the simulated material-point positions on both renderers.
+
 ## Native strand guides (SOFT-03)
 
 - Florence Bertails, Basile Audoly, Marie-Paule Cani, Bernard Querleux, Frédéric Leroy and

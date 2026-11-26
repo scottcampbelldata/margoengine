@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Granular material point collapse fixture</title></head>
+<body>
+<script type="module">
+  import { Engine, Geometry, PbrMaterial, box } from '/packages/core/dist/index.js';
+  import { createHeadlessCanvas, readPixels } from '/packages/headless/dist/index.js';
+  import { TerrainBed } from '../dist/earth.js';
+  import { PhysicsWorld, worldMemory } from '../dist/world.js';
+
+  const engine = await Engine.create(createHeadlessCanvas({ width: 480, height: 300 }), {
+    backend: 'webgpu',
+    camera: { position: [0.85, 0.55, 1.24], target: [0, 0.26, 0], near: 0.03, far: 15 },
+  });
+  engine.stop();
+  const faults = [];
+  engine.gpu.addEventListener('uncapturederror', ({ error }) => faults.push(error.message));
+  engine.createMesh().setGeometry(box(2, 0.055, 1.75)).setPosition([0, -0.0275, 0])
+    .setMaterial(new PbrMaterial({ color: '#655e52', roughness: 0.91 }));
+  const grains = engine.createMesh().setMaterial(new PbrMaterial({ color: '#b28d54', roughness: 0.86 }));
+
+  const pitch = 0.043;
+  const points = [];
+  for (let z = 0; z < 6; z++)
+    for (let y = 0; y < 7; y++)
+      for (let x = 0; x < 6; x++)
+        points.push({ position: [pitch * (x - 2.5), 0.24 + pitch * y, pitch * (z - 2.5)], volume: pitch ** 3 });
+
+  const axes = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+  const faces = [[2,4,0], [2,1,4], [2,5,1], [2,0,5], [3,0,4], [3,4,1], [3,1,5], [3,5,0]];
+  function mesh(solver) {
+    const positions = [], normals = [], indices = [];
+    for (let i = 0; i < points.length; i++) {
+      const p = solver.sample(i).position;
+      const base = positions.length / 3;
+      for (const normal of axes) {
+        positions.push(...p.map((value, axis) => value + normal[axis] * pitch * 0.41));
+        normals.push(...normal);
+      }
+      for (const face of faces) indices.push(...face.map(index => base + index));
+    }
+    return new Geometry(positions, normals, indices);
+  }
+
+  async function frame(solver) {
+    grains.setGeometry(mesh(solver));
+    engine.render({ delta: 1 / 60 });
+    return (await readPixels(engine)).data;
+  }
+
+  window.runGranularMpm = async () => {
+    const { GranularMpmSolver } = await import('../dist/granular-mpm.js');
+    async function make(shared) {
+      const world = new PhysicsWorld({ memory: worldMemory(shared) });
+      const terrain = new TerrainBed();
+      world.add(terrain, { rows: 2, columns: 2, width: 2, depth: 1.75, centre: [0, 0], elevations: () => 0 });
+      const solver = await GranularMpmSolver.load();
+      world.add(solver, { points, bed: terrain.bed, spacing: 0.085, rate: 4, materials: [{ young: 25000 }] });
+      return { world, solver };
+    }
+    const {world, solver} = await make(false);
+    const shared = await make(true);
+    world.advance(5);
+    const before = await frame(solver);
+    const snapshot = world.takeSnapshot();
+    world.advance(41);
+    shared.world.advance(41);
+    const first = world.hash();
+    const after = await frame(solver);
+    let changed = 0;
+    for (let i = 0; i < before.length; i += 4) {
+      if (Math.abs(before[i] - after[i]) + Math.abs(before[i+1] - after[i+1]) + Math.abs(before[i+2] - after[i+2]) > 20)
+        changed++;
+    }
+    const drop = points[0].position[1] - solver.sample(0).position[1];
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(41);
+    return { first, shared: shared.world.hash(), replay: world.hash(), changed, faults, drop, particles: points.length, nodes: solver.activeNodes };
+  };
+</script>
+</body>
+</html>

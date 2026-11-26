@@ -4978,6 +4978,45 @@ const rigid = new SoilContactRigidSolver(input, { terrain, wheelPhase, wheelReac
 console.log(rigid.describe().id, soil.describe().id);
 ```
 
+## Granular material points
+
+Use the optional `@margoengine/physics/granular-mpm` entry for sand that yields under
+shear and snow that compacts under load. Both materials transfer mass and momentum
+through sparse quadratic grid supports. The module loads its SIMD kernel on demand.
+
+```ts
+import { GranularMpmSolver } from '@margoengine/physics/granular-mpm';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const sand = await GranularMpmSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(sand, {
+  points: Array.from({ length: 12 }, (_, i) => ({
+    position: [(i % 4) * 0.04, 0.16 + Math.floor(i / 4) * 0.04, 0],
+    volume: 0.000064,
+  })),
+  floor: 0,
+});
+world.advance(10);
+console.log(sand.sample(0).position);
+```
+
+Points can select a material table row. Sand defaults to 1600 kg/m³ density,
+110 kPa Young modulus, 0.2 Poisson ratio, a 34° internal friction angle and
+zero cohesion. Snow defaults to 400 kg/m³, 140 kPa and the same Poisson ratio,
+with 2.5% compressive yield, 0.75% tensile yield and a hardening coefficient of 10.
+Supply measured material parameters where available. The defaults are illustrative.
+
+The grid spacing defaults to 0.08 m and APIC retains local affine motion. Set
+`transfer: 'pic'` for the more dissipative profile. A caller can set a dyadic clock
+`rate`; otherwise the solver chooses a level from the initial material stiffness,
+speed and a 3 m/s speed margin. Reduce stiffness or increase the clock when the elastic
+CFL condition rejects a step. `bed` takes the common terrain sampler. With neither
+`bed` nor a horizontal `floor`, the domain is open. Ground friction defaults to 0.55.
+The origin cell length defaults to 4,096 m and matches the corresponding world option.
+The output rows expose positions, velocities, affine velocity, elastic deformation
+and material state for sampling and rendering.
+
 ## Physical strand guides
 
 Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone

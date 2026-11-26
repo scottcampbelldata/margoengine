@@ -54,6 +54,7 @@ await build({
         seismic: resolve(root, 'src/seismic/index.ts'),
         lightning: resolve(root, 'src/lightning/index.ts'),
         strands: resolve(root, 'src/strands/index.ts'),
+        'granular-mpm': resolve(root, 'src/granular-mpm/index.ts'),
         synoptic: resolve(root, 'src/synoptic/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
         falling: resolve(root, 'src/falling.ts'),
@@ -211,3 +212,5 @@ await stripPackageShaderComments(root);
 
 for (const name of ['strand-kernel.wasm', 'strand-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/strands', name), resolve(dist, name));
+for (const name of ['granular-mpm-kernel.wasm', 'granular-mpm-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/granular-mpm', name), resolve(dist, name));

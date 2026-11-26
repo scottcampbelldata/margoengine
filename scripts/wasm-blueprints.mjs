@@ -169,6 +169,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'granular-mpm-kernel',
+    crate: 'packages/physics/granular-mpm-kernel',
+    blueprint: 'packages/physics/src/granular-mpm/granular-mpm-kernel.wasm',
+    script: 'packages/physics/scripts/build-granular-mpm-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'granular-mpm-kernel-shared',
+    crate: 'packages/physics/granular-mpm-kernel',
+    blueprint: 'packages/physics/src/granular-mpm/granular-mpm-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-granular-mpm-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'synoptic-kernel',
     crate: 'packages/physics/synoptic-kernel',
     blueprint: 'packages/physics/src/synoptic/synoptic-kernel.wasm',

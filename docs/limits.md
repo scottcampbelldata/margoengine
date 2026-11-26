@@ -9938,6 +9938,26 @@ not measured. Measured: new entry 1,282 B min+gzip; tonemap root, grade, hue, co
 within 0.5 of an 8-bit level of a CPU oracle on WebGPU and the WebGL2 layer (`tests/enhance-browser.mjs`). Margo's
 units are its own, so values from another engine's colour enhancement do not carry over one to one.
 
+### Granular material points (EARTH-01)
+
+The native entry uses sparse 3D quadratic MLS transfer, Hencky sand with a
+Drucker–Prager return and snow with finite-strain hardening. All material points
+share the grid velocities. The return map records the rejected volumetric strain;
+every point retains its reference mass. Passive terrain contact applies Coulomb
+friction on occupied grid nodes. Grid spacing and the clock govern resolution and
+stability; a step that inverts an elastic deformation is rejected before committing
+its trial state.
+
+At 252 material points, the collapse occupied 337 grid nodes on its last step,
+changed 3,771 pixels and dropped the tracked point 0.2205 m on both WebGPU and
+WebGL2. Plain, shared and restored state hash to `032e9f9a1ed80ade`. The sparse
+grid visits only the occupied nodes, with storage sized for the maximum support
+of the input points. The kernel uses one deterministic scatter and gather order.
+
+The first increment covers dry or cohesive granular material and snow. Explicit
+pore-water transport, reciprocal contact with dynamic bodies, the voxel material
+handoff, the measured inertial regime and the persistent ray-bed imprint remain open.
+
 ### Physical strand guides (SOFT-03)
 
 The base native solver covers cylindrical elastic guides at 240 Hz by default. The follow tier
