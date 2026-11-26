@@ -16,6 +16,13 @@ import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './ma
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
 
 export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
+export {
+  resolveGirder,
+  type GirderFiber,
+  type GirderLoading,
+  type GirderResponse,
+  type GirderSample,
+} from './girder.js';
 
 export {
   resolveCrush,

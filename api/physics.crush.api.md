@@ -87,6 +87,31 @@ export interface CrushSupport {
 
 export type CrushVector = readonly [number, number, number];
 
+export interface GirderFiber {
+    readonly offset: number;
+    readonly area: number;
+    readonly curve: readonly GirderSample[];
+}
+
+export interface GirderLoading {
+    readonly axialForce?: number;
+    readonly previousStrain?: number;
+}
+
+export interface GirderResponse {
+    readonly referenceStrain: number;
+    readonly neutralAxis?: number;
+    readonly axialForce: number;
+    readonly bendingMoment: number;
+    readonly axialStiffness: number;
+    readonly fibers: readonly GirderSample[];
+}
+
+export interface GirderSample {
+    readonly strain: number;
+    readonly stress: number;
+}
+
 export interface SquareCrushTube {
     readonly width: number;
     readonly thickness: number;
@@ -99,6 +124,8 @@ export interface SquareCrushTube {
 export function resolveCrush(material: CrushMaterial, effectiveMass: number, closingSpeed: number, permanentStroke?: number): CrushResult;
 
 export function resolveCrushStroke(material: CrushMaterial, totalStroke: number, permanentStroke?: number): CrushStrokeResult;
+
+export function resolveGirder(fibers: readonly GirderFiber[], curvature: number, { axialForce, previousStrain }?: GirderLoading): GirderResponse | undefined;
 
 export function squareTubeCrushMaterial(tube: SquareCrushTube): Required<CrushMaterial>;
 

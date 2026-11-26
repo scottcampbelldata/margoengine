@@ -15077,6 +15077,28 @@ compartment. The lower bound subtracts the largest possible water level rise and
 within one tick. The same geometry with partial damage stays shut.
 [Ruponen (2007)](https://aaltodoc.aalto.fi/server/api/core/bitstreams/745b4f83-7891-4a64-bf68-25f016159491/content)
 
+Charles S. Smith, “Influence of Local Compressive Failure on Ultimate Longitudinal Strength of
+a Ship’s Hull” (1977), treats the section as independent load-shortening elements. Shen Li, Zhiqiang Hu
+and Simon Benson, “Progressive Collapse Analysis of Ship Hull Girders Subjected to Extreme Cyclic
+Bending” (2020), §2.2,
+summarize the curvature increment, element tangent, neutral-axis shift and force balance. For imposed
+curvature `κ`, element `i` has strain `ε₀ + κ yᵢ`. At each of its curve breakpoints the derivative of
+its section force changes by `Aᵢ (kᵢ⁺ − kᵢ⁻)`. Translate the breakpoints by `−κ yᵢ`, sum those
+changes in order and solve the linear force equation on each interval. This gives the stable or
+plastically neutral axial roots of the tabulated section. The prior strain identifies the continuation
+branch. The signed moment is `Σ yᵢ Aᵢ σᵢ`. The published implementation evaluates the section envelope
+at imposed curvature. Deformable shells and cyclic material history remain open.
+[Smith (1977)](https://cir.nii.ac.jp/crid/1570291226435916160)
+[Li, Hu and Benson (2020)](https://pure.strath.ac.uk/ws/portalfiles/portal/118344108/Li_etal_MS_2020_Progressive_collapse_analysis_of_ship_hull_girders.pdf)
+
+J. M. Gordo and C. Guedes Soares, “Experimental Analysis of the Effect of Frame Spacing Variation on the
+Ultimate Bending Moment of Box Girders” (2014), §3 supplies the N200 cross-sectional area, second moment
+and elastic steel data. Two equal fibers at `±√(I/A)` preserve the area and the second moment for linear
+elastic bending. The section predicts 153.6 MN·m² for slope of moment versus curvature. The held-out
+relaxed elastic cycles have a 140–160 MN·m² observed band in Fig. 12. The two-fiber reduction is only
+for this elastic comparison. The ultimate moments and loading cycles remain separate validation targets.
+[Gordo and Guedes Soares (2014)](https://doi.org/10.1016/j.marstruc.2014.03.003)
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

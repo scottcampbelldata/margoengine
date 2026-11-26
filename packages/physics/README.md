@@ -4736,6 +4736,23 @@ const energyAt100mm = loaded.absorbedEnergy + loaded.elasticEnergy;
 if (energyAt100mm < 900 || energyAt100mm > 1000) throw new Error('Expected progressive tube folding work');
 ```
 
+Use `resolveGirder` to bend a cross section made of plate strips and stiffeners. Give each strip its
+area, offset and stress–strain curve, including the unloaded origin. The solver finds the axial
+strain that balances the prescribed force. Pass the prior `referenceStrain` as `previousStrain` to
+follow a branch through softening. Omit `axialForce` for pure bending. The result gives the moment,
+neutral axis and per-strip state, or is `undefined` when the supplied curves cannot balance the force.
+
+```ts
+import { resolveGirder } from '@margoengine/physics/crush';
+
+const steel = [
+  { strain: -0.00125, stress: -250e6 }, { strain: 0, stress: 0 }, { strain: 0.00125, stress: 250e6 },
+];
+const section = [-0.5, 0.5].map(offset => ({ offset, area: 0.01, curve: steel }));
+const bent = resolveGirder(section, 0.001);
+if (!bent || Math.abs(bent.bendingMoment - 1e6) > 1e-6) throw new Error('Expected the elastic section moment');
+```
+
 `CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable
