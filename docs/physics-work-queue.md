@@ -32,11 +32,41 @@ Never take or edit a row owned by someone else. Claim one solver at a time per w
   read other engines' source code.
 - Tests: closed-form or measured checks with derived bounds, a determinism test (the same state hash twice, and after
   a snapshot and restore), and for every demo-review row the solver fixes, a test that reproduces that row's
-  failure. No loosened bounds, no fitted constants, no hard caps written up as limits.
+  failure. No loosened bounds and no hard caps written up as limits. Constants that published sources leave
+  uncertain may be calibrated against measured data, validated on data not used for the fit, and recorded (source,
+  method, value, uncertainty, validation); never tuned until a failing test passes.
 - CPU-heavy loops go in a Rust crate compiled to Wasm with SIMD (one crate per family, loaded lazily by its optional
   entry). The public API stays TypeScript. Core and stage gain zero bytes.
 - Docs in the same push: a README example that runs, the clean-room record, `docs/limits.md`, `docs/known-bugs.md`,
   and `npm run api:update` for new exports. Gate before every push as AGENTS.md describes (never `npm run verify`).
+
+### The standard: the best solver we can build (Scott, 2026-11-26)
+
+Scott: "I want every solver built to be the best most powerful we are capable of producing." Meeting the catalog row
+is the floor, not the goal. A solver is finished only when all of these hold:
+
+1. **The strongest model.** The most accurate published model that can run at film scale, from a wide search of
+   current literature (not the first textbook model). Where fidelity and cost trade off, ship both tiers behind one
+   API: a high-fidelity tier and a fast tier, each validated, chosen by an option with a documented default.
+2. **Validated against the real world.** Several published measurements or exact solutions across the regimes the
+   films use (calm to extreme), each with its source and a derived bound, including cases not used for calibration.
+3. **Broader than any rival.** At least every capability of the best engines and specialised libraries for that
+   phenomenon (web 3D engines, Rapier, and the leading specialised libraries and research codes), and better where
+   possible. A capability another tool has and this solver lacks is a gap to build.
+4. **Fully coupled.** Two-way coupling with every neighbour the catalog names, through fields, with a coupling test
+   for each, and conserved quantities (mass, momentum, energy) accounted across the coupling.
+5. **Robust at the extremes.** No NaN, no energy gain and no blow-up across the documented range, including storms,
+   high speeds, large mass ratios, tiny and huge scales and long runs. Inputs outside the range are refused with a
+   coded error that names the fix.
+6. **Scales.** Hot loops in Rust and Wasm with SIMD, threads where the work splits, and large worlds through cells
+   and floating origin, with work counts recorded.
+7. **Directable for film.** Controls a director needs (seeds, placed events, targets, look parameters) that steer
+   the result without breaking the physics, and output the renderer draws directly.
+8. **Honest.** `docs/limits.md` states what it does not do; nothing is called finished while a known piece is missing.
+
+A solver landed before this standard keeps its row and is re-audited against it (`docs/physics-solver-audit.md`).
+One that falls short goes back to its owner as REOPENED, with the missing pieces named. Solvers that block a film in
+production come first; upgrade passes follow, solver by solver.
 
 ## Framework requests
 
