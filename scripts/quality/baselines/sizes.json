@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20387833,
+  "total": 20402964,
   "history": [
     {
       "date": "2026-10-24",
@@ -13143,6 +13143,12 @@
       "commit": "460d6e29ff",
       "grew": 1,
       "reason": "EARTH-05 sampled projected treads and shoe profiles take the optional entry from 9692 to 10085 B gzip. The existing native contact integral supports each geometry, so a separate entry would duplicate the coupling and loader. Core plus Stage stays 24820 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f3c648b590",
+      "grew": 3,
+      "reason": "SOFT-04 adds a full material-space elastic tensor, local energy-descent updates and optional material state for snapshots and cuts, moving the soft entry from 123786 to 128798 B gzip. @margoengine/physics/soft: 125119 to 132662 B ceiling (128798 B measured); @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 35704 to 37225 B ceiling (36140 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 88516 to 94583 B ceiling (91828 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14003,9 +14009,9 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 125119,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
+    "@margoengine/physics/soft": 132662,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 37225,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 94583,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 10388,
