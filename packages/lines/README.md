@@ -263,6 +263,39 @@ engine.dispose();
 
 Options: `depth` (default 3, whole number 0 to 64), `color`, and every `LineMaterial` option; `RaycasterHelper` also takes `length` (drawn when the ray has no hit and an infinite `far`, default 10) and `markSize` (default 0.1). Sources: Timothy L. Kay and James T. Kajiya, Ray Tracing Complex Scenes (SIGGRAPH 1986), for bounding-volume hierarchies; Donald Meagher, Geometric Modeling Using Octree Encoding (Computer Graphics and Image Processing, 1982), for octrees. The helpers only read node bounds; no rival source was read.
 
+## Light probe and positional audio helpers
+
+`@margoengine/lines/scene-helpers` draws two things that have no mesh. `LightProbeHelper(source, { position, size })` draws a light probe as a wire sphere (7 latitude rings, 12 meridians) whose every point is coloured by the probe's irradiance in that point's normal direction, so it reads like a diffuse ball lit by the probe. `source` is 12 (L1) or 27 (L2) RGB spherical-harmonic coefficients in `Environment.sh` order (pass `environment.sh.irradiance`), or a function of the normal (`(n) => probes.irradianceAt(position, n)` for a `LightProbes` volume, or `environment.irradianceAt`). `PositionalAudioHelper(audio)` draws a positional sound's Web Audio inner and outer cones (8 lines and a rim each, at `length`; a cone wider than 180 degrees opens backwards and 360 draws none) and its `refDistance` and `maxDistance` as spheres of three circles (the maximum only below Web Audio's 10,000 default, which means no limit). A `PositionalAudio` from `@margoengine/audio` fits as it is. Both re-read their source on `update()` and rebuild only when a drawn value changed; `shIrradiance(sh, normal)` is the evaluator they use.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Lines } from '@margoengine/lines';
+import { LightProbeHelper, PositionalAudioHelper } from '@margoengine/lines/scene-helpers';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+// 9 L2 coefficients x RGB: a grey ambient with warm light from above (environment.sh.irradiance has this layout).
+const sh = new Float32Array(27);
+sh.set([1, 1, 1], 0);
+sh.set([0.6, 0.4, 0.1], 3);
+const probe = lines.add(new LightProbeHelper(sh, { position: [0, 1, 0], size: 0.3 }));
+const sound = {
+  worldPosition: [2, 1, 0],
+  worldDirection: [0, 0, 1],
+  refDistance: 1,
+  maxDistance: 6,
+  panner: { coneInnerAngle: 60, coneOuterAngle: 140 },
+};
+const cones = lines.add(new PositionalAudioHelper(sound)); // Or a PositionalAudio from @margoengine/audio.
+sound.panner.coneOuterAngle = 200; // Followed on the next update.
+cones.update();
+probe.position[1] = 2; // Moves the sphere.
+engine.render();
+engine.dispose();
+```
+
+Options: `LightProbeHelper` takes `position` (default `[0, 0, 0]`, editable later as `helper.position`), `size` (sphere radius, default 0.25), `exposure` (`'auto'` scales the brightest point to 1, or a number that multiplies the irradiance; default `'auto'`) and `convolve` (the coefficients are radiance: apply the clamped-cosine band factors 1, 2/3, 1/4 first; default false). `PositionalAudioHelper` takes `length` (cone length, default the reference distance, or 1 when it is 0), `innerColor`, `outerColor` and `distanceColor`. Both take every `LineMaterial` option. Sources: Ravi Ramamoorthi and Pat Hanrahan, An Efficient Representation for Irradiance Environment Maps (SIGGRAPH 2001, https://graphics.stanford.edu/papers/envmap/), for the L2 basis and the irradiance band factors; W3C, Web Audio API, PannerNode (https://www.w3.org/TR/webaudio/#PannerNode), for whole cone angles in degrees about the orientation and the distance parameters. No rival source was read.
+
 ## Infinite grid
 
 `InfiniteGrid` from `@margoengine/lines/infinite-grid` is a ground grid with no edge: thin cell lines, thick section lines, analytic antialiasing, a smooth distance fade and a disc that follows the camera. The lines come from the fragment shader, so one draw of two triangles covers any `cellSize`; `GridHelper` stays the finite, geometry-based grid. Lines closer than two pixels fade out instead of turning to moire, and the grid is depth tested against the scene without writing depth. WebGPU only (the engine's WebGL2 compatibility layer is a WebGPU device, so it works there too).

@@ -8,6 +8,12 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Light probe and positional audio helpers (`@margoengine/lines/scene-helpers`, 2026-11-25): `LightProbeHelper` reads
+  only L1 (12 floats) or L2 (27 floats) SH and samples its source at 408 directions per `update()` (a function source
+  is called that many times a frame); colours are clamped to 0..1 after `exposure`, so a probe brighter than the scale
+  saturates. `PositionalAudioHelper` does not draw `maxDistance` at or above Web Audio's 10,000 default, and it draws
+  the cones only, not the `coneOuterGain` falloff between them.
+
 - BVH, octree and raycaster helpers (`@margoengine/lines/tree-helpers`, 2026-11-25) draw box edges, 24 points a box, in
   one `Line`: a tree level with many thousands of nodes is that many boxes, so keep `depth` low on a deep tree (`maxDepth`
   says how deep it goes). They read the node bounds when built and on `setDepth`; they do not follow a `refit` or an

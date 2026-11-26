@@ -86,6 +86,10 @@
     "./tree-helpers": {
       "types": "./dist/tree-helpers.d.ts",
       "import": "./dist/tree-helpers.js"
+    },
+    "./scene-helpers": {
+      "types": "./dist/scene-helpers.d.ts",
+      "import": "./dist/scene-helpers.js"
     }
   },
   "files": [

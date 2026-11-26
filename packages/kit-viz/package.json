@@ -1103,6 +1103,10 @@
       "types": "./dist/lines/tree-helpers.d.ts",
       "import": "./dist/lines/tree-helpers.js"
     },
+    "./lines/scene-helpers": {
+      "types": "./dist/lines/scene-helpers.d.ts",
+      "import": "./dist/lines/scene-helpers.js"
+    },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
       "import": "./dist/loaders/ply.js"

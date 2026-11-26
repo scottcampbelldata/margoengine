@@ -1,5 +1,9 @@
 # Clean room
 
+### Light probe and positional audio helpers in Lines (2026-11-25)
+
+Ravi Ramamoorthi and Pat Hanrahan, [An Efficient Representation for Irradiance Environment Maps](https://graphics.stanford.edu/papers/envmap/), SIGGRAPH 2001, give the nine real L2 basis constants and the clamped-cosine band factors (pi, 2pi/3, pi/4) that `shIrradiance` evaluates; the coefficient order is the engine's own `Environment.sh` layout. The W3C [Web Audio API](https://www.w3.org/TR/webaudio/#PannerNode) PannerNode section defines `coneInnerAngle` and `coneOuterAngle` as whole cone angles in degrees about the orientation (360: no cone) and the `refDistance` / `maxDistance` parameters that `PositionalAudioHelper` draws. Helper names come from public documentation only; no rival source was read.
+
 ### BVH, octree and raycaster helpers in Lines (2026-11-25)
 
 Timothy L. Kay and James T. Kajiya, Ray Tracing Complex Scenes (SIGGRAPH 1986), and Donald Meagher, Geometric Modeling Using Octree Encoding (Computer Graphics and Image Processing 19, 1982), define the two hierarchies. `BVHHelper` and `OctreeHelper` walk the engine's own node layouts, draw the boxes at one level and the leaves above it, and nothing else. The helper names and the depth slider come from public documentation only; no rival source was read.

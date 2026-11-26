@@ -63,6 +63,21 @@ export const entries = [
     fix: 'Rename the plugin, uniform or texture (letters and digits, starting with a letter), fix the option name, pass WGSL strings, move bindings into uniforms and textures, merge plugins so a material has at most 8, and keep @margoengine/materials and @margoengine/gltf at matching versions. Errors inside your WGSL itself are WebGPU validation errors when the shader first draws.',
   },
   {
+    id: 'scene-helpers',
+    title: '@margoengine/lines/scene-helpers: light probe and positional audio helpers',
+    kind: 'family',
+    messages: [
+      'LightProbeHelper needs 12 or 27 SH coefficients or a function of the normal; see https://margoengine.com/errors#scene-helpers',
+      "LightProbeHelper size must be above 0 and exposure 'auto' or 0 and above; see https://margoengine.com/errors#scene-helpers",
+      'LightProbeHelper position needs 3 finite values; see https://margoengine.com/errors#scene-helpers',
+      'PositionalAudioHelper needs a PositionalAudio or its shape; see https://margoengine.com/errors#scene-helpers',
+      'PositionalAudioHelper length must be above 0; see https://margoengine.com/errors#scene-helpers',
+    ],
+    cause:
+      'A helper was given something it cannot draw: SH coefficients of another length (only L1, 12 floats, and L2, 27 floats, are read), a size, exposure or cone length that is not a finite positive number, or a sound without a finite worldPosition, worldDirection and a panner.',
+    fix: 'Pass `environment.sh.irradiance`, 12 or 27 floats, or a function such as `(n) => probes.irradianceAt(position, n)`; a size above 0; `exposure` as `auto` or a number of 0 or more. Pass a `PositionalAudio` or an object with `worldPosition`, `worldDirection`, `refDistance`, `maxDistance` and `panner.coneInnerAngle` / `coneOuterAngle`.',
+  },
+  {
     id: 'wav',
     title: '@margoengine/audio/wav: reading and writing WAV files',
     kind: 'family',

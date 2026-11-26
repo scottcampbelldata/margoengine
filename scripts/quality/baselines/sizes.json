@@ -12558,6 +12558,12 @@
     },
     {
       "date": "2026-11-26",
+      "commit": "lane-d-scene-helpers",
+      "reason": "Optional lines/scene-helpers: LightProbeHelper (wire sphere shaded by L1/L2 SH irradiance) and PositionalAudioHelper (Web Audio cones and distance spheres), Lines from structural shapes; a new entry, absent before (ceiling 6620 B, measured min+gzip 6366 B). A page that does not import it pays 0 B.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
       "commit": "c82d68bf98",
       "reason": "AERO-05, @margoengine/physics/falling 0 to 6259 B gzip, @margoengine/weather/hail 4901 to 5443 B gzip, @margoengine/weather/hail-physics 0 to 1056 B gzip. The falling solver shares one Wasm loader across plates, seeds and spheres. Hail shares one WebGPU overlay and compatible lighting for both trajectory sources. Splitting the source renderer would duplicate the draw and its ownership. Core and stage gain zero bytes.",
       "grew": 3
@@ -13182,6 +13188,7 @@
     "@margoengine/lines/hidden": 5219,
     "@margoengine/lines/infinite-grid": 4065,
     "@margoengine/lines/pick": 6268,
+    "@margoengine/lines/scene-helpers": 6620,
     "@margoengine/lines/stroke": 5680,
     "@margoengine/lines/texture": 7860,
     "@margoengine/lines/tiles": 1586,
