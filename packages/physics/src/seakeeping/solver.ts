@@ -16,6 +16,7 @@
 // State: the hulls' motion histories (the radiation's memory). Each step's load and added mass otherwise come from where
 // the bodies are and the sea at that time.
 import { MargoError } from '@margoengine/math/errors';
+import type { SeaSurface } from '@margoengine/math/fields';
 import { cos, sin } from '@margoengine/math/pinned';
 import {
   type Port,
@@ -51,7 +52,11 @@ export interface HullParams {
   /** The hulls, each on its own body row. */
   readonly hulls: readonly Hull[];
   /** The sea they float on. */
-  readonly sea: SeaQuery;
+  /**
+   * The sea they float on: a `SeaSurface` (the framework's, such as `SpectralSea` from `@margoengine/physics/sea`) in the
+   * solver's own origin cell, or anything with `elevation` (and `pressure`, `density`).
+   */
+  readonly sea: SeaSurface | SeaQuery;
   /** The solver's rate level, 60 * 2^level steps a second (default 0); step with the rigid solver. */
   readonly level?: RateLevel;
   /** Body rows its `bodyForces` port covers (default one past the highest hull row). */
@@ -190,6 +195,12 @@ export class HullSolver implements Solver<HullParams> {
       throw new MargoError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
     const out = new Float64Array(host.memory.buffer, this.forces.byteOffset, this.capacity * FORCE_WORDS);
     out.fill(0);
+    const cell = (this.sea as Partial<SeaSurface>).cell;
+    if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
+      throw new MargoError(
+        'state',
+        `The sea's origin cell is [${cell.join(', ')}] and the HullSolver's is [${context.cell.join(', ')}]; make the sea in the hull's cell (a SpectralSea's positions are offsets from its cell).`,
+      );
     const port: Port | undefined = context.inputs.get(BODIES_FIELD.name);
     if (!port) return;
     const memory = port.region.memory ?? host.memory,

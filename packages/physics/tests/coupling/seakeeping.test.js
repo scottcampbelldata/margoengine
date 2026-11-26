@@ -13,6 +13,7 @@ import {
   SEA_WATER,
   wettedLoads,
 } from '../../dist/seakeeping.js';
+import { SpectralSea } from '../../dist/sea.js';
 import { BODY_FORCES_FIELD, FORCE_WORDS, PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -518,4 +519,62 @@ test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measure
   assert.ok(Math.abs(full.K - measured) <= 0.12 * measured, `K ${full.K} against the measured ${measured}`);
   assert.ok(Math.abs(full.period - 0.93) <= 0.05 * 0.93, `period ${full.period} s against the measured 0.93 s`);
   assert.ok(potential.K < measured / 3, `without its eddies and friction: K ${potential.K}`);
+});
+
+test("HullSolver: on a SpectralSea's long swell, a box rides up and down as its frequency-domain response says", () => {
+  // The framework's sea (SpectralSea, @margoengine/physics/sea) as the hull's: one wave of 0.3 m at about 0.049 Hz (a
+  // 20.6 s swell, 650 m long), from a spectrum with all its energy in one bin. In waves this long the box's heave is
+  // X = C e^(-k T) E / (C - (m + A(w)) w^2 + i w B(w)), E the surface's own motion over the box (fitted from the sea), C
+  // the waterplane's stiffness, e^(-k T) the waves' pressure at the keel (Froude-Krylov, Smith's correction) and A, B the
+  // box's heave added mass and damping (Ursell-Tasai): diffraction is under 0.1 percent at k B = 0.02, and a box 4 m long
+  // in a 650 m wave takes the wave's pressure as one (sinc(k L / 2) = 1 - 6e-5); the surface is taken over the box as it
+  // moves. Measured 0.04 percent: a bound of 1 percent.
+  const nf = 34,
+    nd = 24,
+    frequencies = Float64Array.from({ length: nf }, (_, i) => 0.04 * (1 / 0.04) ** (i / (nf - 1))),
+    directions = Float64Array.from({ length: nd }, (_, j) => (2 * Math.PI * j) / nd),
+    energy = new Float64Array(nf * nd),
+    [i, a] = [2, 0.3],
+    df = (frequencies[i + 1] - frequencies[i - 1]) / 2;
+  energy[i * nd] = (a * a) / (2 * df * ((2 * Math.PI) / nd));
+  const sea = new SpectralSea({
+      waves: { frequencies, directions, energy, depth: Infinity, density: SEA_WATER },
+      seed: 7,
+      gravity: GRAVITY,
+    }),
+    w = 2 * Math.PI * frequencies[i],
+    k = (w * w) / GRAVITY,
+    { world, box } = single({ sea }),
+    rest = D / 2 - T,
+    heave = [],
+    surface = [];
+  // Nothing holds a floating box along the wave: let go at rest in moving water, it would drift with the difference and
+  // see the swell further along. It starts with the water's motion at its place, as a body long afloat has.
+  box.setLinearVelocity(sea.sample(0, 0, 0).velocity);
+  for (let f = 1; f <= 100 * 60; f++) {
+    world.advance(f);
+    heave.push(box.position[1] - rest);
+    surface.push(sea.elevation(box.position[0], box.position[2], f / 60));
+  }
+  const [X, E] = amplitudes([heave, surface], w, 40 * 60),
+    s = heaveSection(lewisForm(B, T, B * T), w, SEA_WATER, GRAVITY),
+    m = SEA_WATER * L * B * T,
+    C = SEA_WATER * GRAVITY * L * B,
+    h = solve2(
+      [C - (m + s.addedMass * L) * w * w, w * s.damping * L],
+      [0, 0],
+      [0, 0],
+      [1, 0],
+      [C * Math.exp(-k * T), 0],
+      [0, 0],
+    )[0],
+    want = [h[0] * E[0] - h[1] * E[1], h[0] * E[1] + h[1] * E[0]];
+  assert.ok(Math.abs(Math.hypot(...E) - a) <= 0.01 * a, `the sea's swell: ${Math.hypot(...E)} m`);
+  assert.ok(Math.hypot(X[0] - want[0], X[1] - want[1]) <= 0.01 * Math.hypot(...want), `heave ${X} against ${want}`);
+  // A sea made in another origin cell is refused, naming the fix.
+  const far = single({ sea: Object.assign(Object.create(sea), { cell: [1, 0, 0] }) });
+  assert.throws(
+    () => far.world.advance(1),
+    (error) => error.code === 'state' && /make the sea in the hull's cell/.test(error.message),
+  );
 });
