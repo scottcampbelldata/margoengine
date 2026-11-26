@@ -12990,7 +12990,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "779b932f50",
+      "commit": "3b81be0630",
       "reason": "SPACE-03 adds the optional 6095 B gzip accretion entry. Native disk transport and test geodesics share one optional import. Splitting would add two public entry points and separate the compact-object data readers. Core plus stage gains 0 B.",
       "grew": 1
     }

@@ -315,7 +315,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
-| SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | LANDED 23fecf5c92 |
+| SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | LANDED 0c11fd27f7 |
 | DYN-04 | Wheeled vehicles on roads | partial | Codex | LANDED 18ded2be7c (physical road contact, wet grip, yielding soil and replayable lane controls) |
 | DYN-05 | Rail vehicle dynamics | none | Codex | BUILDING (codex/physics-dyn05) |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
