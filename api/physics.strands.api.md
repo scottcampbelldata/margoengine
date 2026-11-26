@@ -56,6 +56,17 @@ export interface StrandRigidCapsule extends StrandCapsule {
     readonly body: number;
 }
 
+export interface StrandSection {
+    readonly radius?: number;
+    readonly area?: number;
+    readonly secondMoment?: number;
+    readonly torsionConstant?: number;
+    readonly density?: number;
+    readonly young?: number;
+    readonly shear?: number;
+    readonly dragWidth?: number;
+}
+
 export class StrandSolver implements Solver<StrandParams> {
     readonly id: string;
     readonly field: FieldDescriptor;
@@ -77,13 +88,9 @@ export class StrandSolver implements Solver<StrandParams> {
     get candidatePairs(): number;
 }
 
-export interface StrandSpec {
+export interface StrandSpec extends StrandSection {
     readonly points: readonly Vec3[];
-    readonly radius?: number;
-    readonly density?: number;
-    readonly young?: number;
-    readonly shear?: number;
-    readonly dragWidth?: number;
+    readonly sections?: readonly StrandSection[];
     readonly drag?: number;
     readonly anchor?: (time: number) => StrandAnchor;
 }

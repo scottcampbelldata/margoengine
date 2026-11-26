@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20508127,
+  "total": 20508583,
   "history": [
     {
       "date": "2026-10-24",
@@ -13329,6 +13329,12 @@
       "commit": "FLUID-01 rigid pressure response",
       "grew": 1,
       "reason": "FLUID-01 includes rigid boundary inertia and reciprocal velocity in the pressure projection, growing its optional entry from 8085 B to 8157 B gzip. Splitting would duplicate the solver binding and field setup. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "2ce9332ece160b47ddec208d840d2f7fab32d8fb",
+      "grew": 1,
+      "reason": "SOFT-03 moves the optional strands entry from 5806 to 6262 B gzip for per-link load-bearing sections, masses and projected drag areas. A split would duplicate the native loader and collide with the existing field ownership. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -14197,7 +14203,7 @@
     "@margoengine/physics/soft": 141962,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 43627,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 97921,
-    "@margoengine/physics/strands": 6062,
+    "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 13728,
