@@ -143,6 +143,9 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
 - Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
   plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is
   drawn or set up, `engine.lighting`, `plugins`, `stats` and `createMesh` are that scene's. `scene.dispose()` removes it.
+  A `background` is an sRGB colour (`#rgb` or `#rrggbb`). The canvas shows it as given. Under a post effect that
+  captures the scene in linear light (tone mapping, bloom) it is light in the scene, tone-mapped with the meshes:
+  `#808080` shows as 116 under the default tone map.
 - Which packages are view-aware: [multi-view-roadmap.md](../../docs/multi-view-roadmap.md).
 
 ## Camera, geometry, materials and picking

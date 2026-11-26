@@ -1,10 +1,23 @@
+### Section 5 evidence: a scene's background is linear light in a linear capture (2026-11-26)
+
+Core's clear colour follows a capture's format (KB-CLEAR-CAPTURE1): when a pass has redirected the draw into a float
+target (every HDR capture, rgba16float on WebGPU and rg11b10ufloat on the WebGL2 layer) or an `-srgb` one,
+`scene.background` and a view's `clear.color` are decoded with the sRGB transfer function (IEC 61966-2-1) on both
+clear paths, so the display transform encodes them once. The frame's own target (the canvas, a view's `target` of any
+format) and display-encoded captures keep the bytes, so a frame with no capture is unchanged.
+Evidence: `tests/clear-capture.test.js` (CPU) and `packages/post/test/scene-background-browser.mjs` on native WebGPU
+and on the WebGL2 layer, Intel Arc 140V: #808080 draws 116 under Tonemap and PostStack and 117 under Bloom
+(181 and 182 before), as ColorBackground does, and 128 with no effect, in an empty scene, beside a mesh and in a
+half-canvas view. Missing: other GPUs and browsers; core's own clear colour (no background set) is still the same
+numbers on every target (KB-CLEAR-DEFAULT1).
+
 ### Section 5 evidence: whole migration scenes in a browser (2026-11-26)
 
 A new root browser suite (the migration examples in the `ROOT` list of `scripts/gpu-package-tests.mjs`) composes glTF
 PBR, an HDR environment, sun shadows, an action mixer, orbit controls, SSAO, bloom, tone mapping, FXAA, GPU picking and
 outline selection in one scene, beside four smaller ones, and checks pixels and behaviour. Evidence: passed on native
 WebGPU and on the WebGL2 layer (ANGLE Direct3D 11), Intel Arc 140V. Missing: other GPUs and browsers not run; the
-defect it found (KB-CLEAR-CAPTURE1) is open.
+defect it found (KB-CLEAR-CAPTURE1) is fixed in core (the section above).
 
 ### Section 5 evidence: texture units counted before linking, glTF base maps packed by the limit (2026-11-26)
 

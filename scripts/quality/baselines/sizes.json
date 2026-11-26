@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20644456,
+  "total": 20644971,
   "history": [
     {
       "date": "2026-10-24",
@@ -13873,6 +13873,12 @@
       "commit": "FLUID-07-turning-receiver",
       "grew": 1,
       "reason": "FLUID-07 adds bounded angular contact and delivers the hit normal and lever arm to the existing film recoil path. Thin-film rises from 14185 to 15615 B gzip; cap changes from 14611 to 16084 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "KB-CLEAR-CAPTURE1",
+      "reason": "KB-CLEAR-CAPTURE1 (core fix): post/rt-reflections 16,624 to 16,691 B gzip (+67 B), cap 16,677 to 17,192 B. Its material clear (SSR's, which RTReflections extends) now writes a view's clear colour as core's own clear writes it into the capture, decoded to linear light for a float target, so a partial view and a whole view clear to one value. The decode is three lines used on every frame's draw path; a split would put them behind an import() inside a per-frame clear.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14819,7 +14825,7 @@
     "@margoengine/post/pixelate": 10491,
     "@margoengine/post/render-graph": 8004,
     "@margoengine/post/rt-gi": 16063,
-    "@margoengine/post/rt-reflections": 16677,
+    "@margoengine/post/rt-reflections": 17192,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,
