@@ -15,7 +15,10 @@ import {
 } from '@margoengine/math/quat';
 import type { Animator } from '@margoengine/animator';
 import type { Mesh as MeshHandle } from '@margoengine/core';
-import { type Mesh, meshRuntime } from '@margoengine/core/extension';
+import type { Mesh } from '@margoengine/core/extension';
+
+// Type-only twin of core's `meshRuntime` (an identity cast): a value import would bundle all of extension.
+const meshRuntime = (mesh: MeshHandle): Mesh => mesh as unknown as Mesh;
 
 /** How one bone of a chain moves; the numbers mean what VRMC_springBone's joint fields mean. */
 export interface SpringSettings {
