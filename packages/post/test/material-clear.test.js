@@ -7,7 +7,9 @@ import { harness } from './support.js';
 // uniform buffer cached per device by post's copy of shared/clear-color.js. Disposal (and the release on resize or
 // device restore) left that buffer alive for as long as the device.
 const partial = { viewport: [0, 0, 640, 360], scissor: [0, 0, 320, 360], clear: { color: '#336699' } };
-const tint = String(new Float32Array([0x33 / 255, 0x66 / 255, 0x99 / 255, 1]));
+// PostStack's HDR capture holds linear light, so the colour is the sRGB bytes decoded (IEC 61966-2-1, KB-CLEAR-CAPTURE1).
+const linear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+const tint = String(new Float32Array([linear(0x33 / 255), linear(0x66 / 255), linear(0x99 / 255), 1]));
 // The clear colour buffers: the live buffers written with the view's clear colour.
 function tracked() {
   const h = harness(),

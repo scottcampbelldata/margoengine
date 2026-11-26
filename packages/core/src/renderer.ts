@@ -5,7 +5,7 @@ import type { Scene } from './api.js';
 import { wgsl } from './shaders.js';
 import type { FrameGraph, PassContext, DrawOptions } from './plugin.js';
 import { sceneSamples } from './quality.js';
-import { defaultClear, clearColorValue, clearDraw } from '../../shared/clear-color.js';
+import { defaultClear, captureClearColor, clearDraw } from '../../shared/clear-color.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import { partialRect, validateRectangle } from '../../shared/view-rect.js';
 // WebGPU usage flags are written as their numbers, which the WebGPU specification fixes, so the minifier folds each
@@ -630,7 +630,12 @@ export class GPURenderer implements Renderer {
         const explicit = typeof named === 'string';
         const clearColor = options.clear ?? (named === false ? false : explicit || !context.view?.index),
           clearDepth = options.clearDepth ?? context.view?.clear?.depth ?? options.clear ?? true,
-          tint = clearColorValue(explicit ? named : undefined);
+          // A capture's target (not this frame's own) takes the colour for its format: linear light on a float one,
+          // so the display transform encodes it once (KB-CLEAR-CAPTURE1).
+          tint = captureClearColor(
+            explicit ? named : undefined,
+            context.color !== this.msaa && context.color !== this.resolveTarget && context.format,
+          );
         const mode = rectangleClear(
           context.view ? (viewport ?? scissor) : undefined,
           context.width,

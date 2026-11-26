@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20647062,
+  "total": 20647577,
   "history": [
     {
       "date": "2026-10-24",
@@ -13891,6 +13891,12 @@
       "commit": "168006e3ce",
       "reason": "BREAK-03 native circular rupture grows the optional crush entry from 12430 to 12996 B gzip. The ceiling rises from 12803 to 13386 B. The native membrane uses the same impulse transfer, seal layout and shape registry as the existing crush contacts. A second entry would duplicate that lifecycle in scenes that mix plate rupture with frame or ground contacts. Named imports remain tree-shakable.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "KB-CLEAR-CAPTURE1",
+      "reason": "KB-CLEAR-CAPTURE1 (core fix): post/rt-reflections 16,624 to 16,691 B gzip (+67 B), cap 16,677 to 17,192 B. Its material clear (SSR's, which RTReflections extends) now writes a view's clear colour as core's own clear writes it into the capture, decoded to linear light for a float target, so a partial view and a whole view clear to one value. The decode is three lines used on every frame's draw path; a split would put them behind an import() inside a per-frame clear.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14837,7 +14843,7 @@
     "@margoengine/post/pixelate": 10491,
     "@margoengine/post/render-graph": 8004,
     "@margoengine/post/rt-gi": 16063,
-    "@margoengine/post/rt-reflections": 16677,
+    "@margoengine/post/rt-reflections": 17192,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,

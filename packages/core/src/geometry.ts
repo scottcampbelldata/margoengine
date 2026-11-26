@@ -1,5 +1,5 @@
 import { rangeError, typeError } from '../../shared/errors.js';
-import { hexColor } from '../../shared/clear-color.js';
+import { hexColor, toLinear } from '../../shared/clear-color.js';
 
 /**
  * Math.fround(v) is finite exactly when |v| < 2 ** 128 - 2 ** 103 (from there on v rounds up past the largest float).
@@ -121,10 +121,7 @@ export class PbrMaterial {
         typeof color === 'string'
           ? hex < 0
             ? null
-            : [16, 8, 0].map((shift) => {
-                const v = ((hex >> shift) & 255) / 255;
-                return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-              })
+            : [16, 8, 0].map((shift) => toLinear((hex >> shift) & 255))
           : color;
     if (!rgb) throw typeError('Invalid Color', 'material');
     finite(rgb, 3, 'Color');
