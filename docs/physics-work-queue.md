@@ -207,7 +207,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOFT-06 | Pressure bodies | none | Open | OPEN |
 | BREAK-04 | Exterior ballistics | partial | Open | OPEN |
 | BREAK-05 | Terminal ballistics and impact damage | stand-in | Open | OPEN |
-| LIFE-02 | Limbless, insect and small-animal locomotion | none | Open | OPEN |
+| LIFE-02 | Limbless, insect and small-animal locomotion | none | Codex | BUILDING (codex/physics-life02) |
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | LANDED c82d68bf98 |
