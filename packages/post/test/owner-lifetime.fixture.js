@@ -39,6 +39,7 @@ const entries = {
   'mesh-blend': ['MeshBlend'],
   'selective-bloom': ['SelectiveBloom'],
   trail: ['TrailTexture'],
+  upscale: ['SpatialUpscale'],
 };
 // Not covered here: SceneFade ends itself on device restore by design (a captured transition cannot survive it).
 // Classes whose options have required members.

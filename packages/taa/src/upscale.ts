@@ -31,28 +31,11 @@ import { color, fullscreen } from './shader.js';
 import { sharpenCode } from './cas.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
 import { Settle, settleResolve } from './settle.js';
+import { renderSizeView } from '../../shared/render-size-view.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type View = NonNullable<Context['view']>;
-
-/**
- * The view TAAUpscale draws at render size, or undefined for a plain frame. Core passes a frame whose scene has a
- * `background` or a camera layer mask as one full-canvas view; that is still one full-canvas view, so its rectangles
- * shrink with the render size. Several views, a partial rectangle or a view into a target throw.
- */
-function renderSizeView(
-  view: View | undefined,
-  canvas: readonly [number, number],
-  size: readonly [number, number],
-): View | undefined {
-  if (!view) return undefined;
-  const full = (r: readonly number[] | undefined) =>
-    !r || (r[0] === 0 && r[1] === 0 && r[2] === canvas[0] && r[3] === canvas[1]);
-  if (view.count !== 1 || view.target || !full(view.viewport) || !full(view.scissor))
-    throw new MargoError('unsupported', 'TAAUpscale handles one full-canvas view; use TAA with several views');
-  return { ...view, viewport: [0, 0, size[0], size[1]], scissor: view.scissor && [0, 0, size[0], size[1]] };
-}
 
 /** Options of {@link TAAUpscale}; the object is kept and read every frame. */
 export interface TAAUpscaleOptions {
@@ -340,7 +323,12 @@ export class TAAUpscale implements EnginePlugin {
       width = Math.max(1, Math.round(c.width * scale)),
       height = Math.max(1, Math.round(c.height * scale)),
       temporal = o.temporal ?? true;
-    const view = renderSizeView(c.view, [c.width, c.height], [width, height]);
+    const view = renderSizeView(
+      c.view,
+      [c.width, c.height],
+      [width, height],
+      'TAAUpscale handles one full-canvas view; use TAA with several views',
+    );
     // More phases at lower scales, so every output pixel is covered: 8 per output pixel's share of a render pixel.
     const phases = Math.min(64, Math.ceil(8 / (scale * scale)));
     this.resize(c, width, height, phases);

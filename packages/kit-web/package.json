@@ -1603,6 +1603,10 @@
       "types": "./dist/post/mesh-blend.d.ts",
       "import": "./dist/post/mesh-blend.js"
     },
+    "./post/upscale": {
+      "types": "./dist/post/upscale.d.ts",
+      "import": "./dist/post/upscale.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"
