@@ -39,6 +39,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_fiber_rows(): number;
   soft_fem_orthotropy(first: number, count: number, ...words: number[]): void;
   soft_fem_orthotropy_rows(): number;
+  soft_fem_orthotropic_failure(first: number, count: number, ...strengths: number[]): void;
+  soft_fem_orthotropic_failure_rows(): number;
   soft_fem_column(id: number): number;
   soft_tet_set(
     t: number,
@@ -549,10 +551,40 @@ export interface SoftOrthotropy {
   readonly poissonRatios: Vec3;
   /** Optional X axis and a direction in its XY plane, in the rest vertices' coordinates. */
   readonly axes?: readonly [Vec3, Vec3];
+  /** Optional separate normal and shear strengths in pascals. */
+  readonly strength?: SoftOrthotropicStrength;
+}
+
+/** Stress at brittle failure in the orthotropic material frame, in pascals. */
+export interface SoftOrthotropicStrength {
+  /** X, Y and Z tensile strengths. */
+  readonly tensile: Vec3;
+  /** Positive magnitudes of X, Y and Z compressive strengths. */
+  readonly compressive: Vec3;
+  /** XY, XZ and YZ shear strengths. */
+  readonly shear: Vec3;
 }
 
 const ORTHOTROPY_WORDS = 18;
 const NO_ORTHOTROPY = Array<number>(ORTHOTROPY_WORDS).fill(0);
+const STRENGTH_COUNT = 9;
+const FAILURE_WORDS = 2 * STRENGTH_COUNT;
+const NO_ORTHOTROPIC_FAILURE = Array<number>(STRENGTH_COUNT).fill(0);
+
+function strengthWords({ tensile, compressive, shear }: SoftOrthotropicStrength): readonly number[] {
+  checkVec(tensile, 'Orthotropic tensile strengths');
+  checkVec(compressive, 'Orthotropic compressive strengths');
+  checkVec(shear, 'Orthotropic shear strengths');
+  const strengths = [...tensile, ...compressive, ...shear].map(Math.fround);
+  if (strengths.some((strength) => !(strength > 0 && Number.isFinite(strength))))
+    throw new RangeError('Orthotropic strengths must be positive finite float32 values. Supply strengths in pascals.');
+  return Object.freeze(strengths);
+}
+
+function checkStrengthModel(strength: readonly number[] | null, material: CellMaterial): void {
+  if (strength && material.tearStrain > 0)
+    throw new RangeError('Orthotropic strengths already govern fracture. Set CellMaterial.tearStrain to zero.');
+}
 
 function unitDirection(direction: Vec3, label: string): Vec3 {
   checkVec(direction, label);
@@ -939,6 +971,7 @@ export class SoftBodyDesc {
   /** @internal */ cellMaterial = new CellMaterial();
   /** @internal */ fiber: SoftFiber | null = null;
   /** @internal */ orthotropy: readonly number[] | null = null;
+  /** @internal */ orthotropicStrength: readonly number[] | null = null;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
   /** @internal */ clusterHertz = 0;
   /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
@@ -1629,7 +1662,10 @@ export class SoftBodyDesc {
   }
   /** Uses a full orthotropic elastic law in the vertex-block solver. Pass null to clear it. */
   setOrthotropicStiffness(material: SoftOrthotropy | null): this {
-    this.orthotropy = material ? orthotropicWords(material) : null;
+    const elastic = material ? orthotropicWords(material) : null;
+    const strength = material?.strength ? strengthWords(material.strength) : null;
+    this.orthotropy = elastic;
+    this.orthotropicStrength = strength;
     return this;
   }
   /** Replaces the cells' material (copied). */
@@ -1733,6 +1769,7 @@ export class SoftBodyDesc {
       this.cellMaterial = other.cellMaterial.clone();
       this.fiber = other.fiber;
       this.orthotropy = other.orthotropy;
+      this.orthotropicStrength = other.orthotropicStrength;
     }
     for (const p of other.cells) this.cells.push(p + base);
     for (const group of other.clusterGroups) this.clusterGroups.push(group.map((p) => p + base));
@@ -1928,6 +1965,11 @@ export class SoftBody {
   get orthotropy(): readonly number[] | null {
     this.check();
     return this.owner.cellOrthotropy(this);
+  }
+  /** @internal The first cell's authored failure limits. */
+  get orthotropicStrength(): readonly number[] | null {
+    this.check();
+    return this.owner.cellOrthotropicStrength(this);
   }
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
   /** @internal */ force: Vec3 = [0, 0, 0];
@@ -2537,6 +2579,7 @@ export class SoftBody {
     this.check();
     checkCellMaterial(material);
     checkSolverModel(this.solverKind, CELL_MODEL[material.model]);
+    checkStrengthModel(this.orthotropicStrength, material);
     this.cellMaterial = material.clone();
     this.owner.writeCellMaterial(this);
     return this;
@@ -2939,6 +2982,7 @@ export class SoftBodies implements PhysicsAttachment {
       throw new RangeError(
         'Orthotropic stiffness uses vertex blocks. Select vertex-block and supply either the orthotropic tensor or a separate fiber.',
       );
+    checkStrengthModel(desc.orthotropicStrength, desc.cellMaterial);
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
@@ -3135,6 +3179,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.bodies.push(body);
     this.writeFiber(range, fiber);
     this.writeOrthotropy(range, desc.orthotropy);
+    this.writeOrthotropicStrength(range, desc.orthotropicStrength);
     body.remember();
     this.setCellSolver(body, mode);
     this.writeMaterial(body);
@@ -3629,6 +3674,40 @@ export class SoftBodies implements PhysicsAttachment {
     return Array.from(view.subarray(at, at + ORTHOTROPY_WORDS));
   }
 
+  private writeOrthotropicStrength({ first, count }: CellRange, strengths: readonly number[] | null): void {
+    this.exports.soft_fem_orthotropic_failure(first, count, ...(strengths ?? NO_ORTHOTROPIC_FAILURE));
+  }
+
+  private orthotropicFailureWords(): Float32Array | undefined {
+    const at = this.exports.soft_fem_orthotropic_failure_rows();
+    if (at !== 0 && this.cellTotal > 0)
+      return new Float32Array(this.exports.memory.buffer, at, this.cellTotal * FAILURE_WORDS);
+  }
+
+  /** @internal Reads a copy of the authored material strengths from a body's first cell. */
+  cellOrthotropicStrength({ cellRange }: SoftBody): readonly number[] | null {
+    const view = this.orthotropicFailureWords();
+    const at = cellRange.first * FAILURE_WORDS;
+    if (!view || cellRange.count === 0 || view[at] === 0) return null;
+    return Array.from(view.subarray(at, at + STRENGTH_COUNT));
+  }
+
+  /** @internal Copies all authored strength and load rows of a body before changing its topology. */
+  copyOrthotropicFailure({ cellRange }: SoftBody): Float32Array | null {
+    const view = this.orthotropicFailureWords();
+    const first = cellRange.first * FAILURE_WORDS;
+    if (!view || cellRange.count === 0 || view[first] === 0) return null;
+    return view.slice(first, first + cellRange.count * FAILURE_WORDS);
+  }
+
+  /** @internal Carries one or more saved cell histories into the new topology. */
+  restoreOrthotropicFailure(first: number, history: Float32Array, start = 0, count = 1): void {
+    this.orthotropicFailureWords()!.set(
+      history.subarray(start * FAILURE_WORDS, (start + count) * FAILURE_WORDS),
+      first * FAILURE_WORDS,
+    );
+  }
+
   private fiberWords(): Float32Array | undefined {
     const at = this.exports.soft_fem_fiber_rows();
     if (at !== 0 && this.cellTotal > 0) return new Float32Array(this.exports.memory.buffer, at, this.cellTotal * 4);
@@ -3755,6 +3834,7 @@ export class SoftBodies implements PhysicsAttachment {
     const keep = this.bodies.filter((b) => b !== body),
       fiberSaved = keep.map((b) => this.cellFiber(b)),
       orthotropySaved = keep.map((b) => this.cellOrthotropy(b)),
+      fractureSaved = keep.map((b) => this.copyOrthotropicFailure(b)),
       c = this.columns(),
       cols = [
         'x',
@@ -3960,6 +4040,9 @@ export class SoftBodies implements PhysicsAttachment {
       this.writeFiber(next, fiberSaved[k]!);
       this.writeOrthotropy(next, orthotropySaved[k]!);
       this.cellTotal += r.count;
+      const damage = fractureSaved[k];
+      if (damage) this.restoreOrthotropicFailure(next.first, damage, 0, r.count);
+      else this.writeOrthotropicStrength(next, null);
       this.clusterTotal += r.clusterCount;
       this.memberTotal += r.memberCount;
     });
@@ -4061,6 +4144,12 @@ export class SoftBodies implements PhysicsAttachment {
       )
     )
       out.push(['cell.orthotropy', orthotropy]);
+    const fracture = this.orthotropicFailureWords();
+    if (
+      fracture &&
+      this.bodies.some(({ cellRange }) => cellRange.count > 0 && fracture[cellRange.first * FAILURE_WORDS]! > 0)
+    )
+      out.push(['cell.orthotropicFailure', fracture]);
     return out;
   }
 

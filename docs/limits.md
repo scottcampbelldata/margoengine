@@ -9588,7 +9588,7 @@ frame. The three axial and shear moduli and three Poisson ratios are small-strai
 A fourth-order determinant term resists compression as volume collapses and has zero tangent
 stiffness at rest. Each vertex update recomputes its incident cells' elastic energy to enforce
 descent with the stored f32 positions. The material uses one 18-word record per tetrahedron in
-the snapshot only when a body has authored orthotropy. The existing fracture rules remain scalar.
+the snapshot only when a body has authored orthotropy.
 The optional soft entry measures 128,798 B gzip, with 36,140 B in its base and 91,828 B in the
 lazy native kernel bundle.
 
@@ -9611,6 +9611,14 @@ continues to slice along existing faces. Embedded skins, separate spring or clus
 live external bindings need a separate transfer when introducing new cutting vertices. Snapshots
 of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
 with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
+
+Optional orthotropic failure uses nine stress limits in the material frame. It compares the
+stress conjugate to Green strain with each positive tension, compression, or shear strength.
+Its failure data adds 18 f32 words per cell when a body authors strength limits. Nine store
+the limits and nine store independently filtered utilizations. A cell reaches the tear threshold
+when its largest utilization exceeds one, or its interior-strength factor for an interior cell.
+The event splits the mesh along existing tetrahedral faces. It represents brittle onset without
+a directional fracture-energy or post-peak softening law.
 
 ### Gas-filled soft shells (SOFT-06)
 

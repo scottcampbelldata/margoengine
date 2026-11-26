@@ -40,6 +40,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   `node --test packages/physics/tests/coupling/volumetric-cut.test.js`. The cut rung and rigid
   load replay in both renderers with state hash `1c62fd120af035ef`.
 
+- Grain-dependent failure (SOFT-04, 2026-11-26). Axial beech loading distinguishes the three
+  material directions, including both signs, across stress intervals from measured specimens.
+  Each shear plane responds at its own stress and the damaged cell separates from an intact
+  neighbor. Signed history survives a plane cut, body compaction and replay. Run
+  `node --test packages/physics/tests/coupling/volumetric-strength.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

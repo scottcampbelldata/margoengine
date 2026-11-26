@@ -2,7 +2,7 @@
 // 2012). A fourth-order volume energy selects the proper orientation without changing the tangent
 // stiffness at rest. The elastic and damping energies are invariant under rigid rotation.
 use crate::World;
-use crate::fem::NONE;
+use crate::fem::{INTERIOR_TET, NONE};
 use crate::vertex_block::{Columns, Vec3, cross, dot, solve, transform};
 
 type Strain = [f64; 6];
@@ -75,6 +75,62 @@ impl World {
 
     pub(crate) fn has_orthotropy(&self, t: usize) -> bool {
         self.fem.orthotropy.get(t).is_some_and(|row| row[9] > 0.0)
+    }
+
+    pub fn set_orthotropic_failure(&mut self, first: usize, count: usize, strengths: [f32; 9]) {
+        if count == 0 || (strengths[0] == 0.0 && self.fem.orthotropic_failure.is_empty()) {
+            return;
+        }
+        let rows = &mut self.fem.orthotropic_failure;
+        let mut data = [0.0; 18];
+        data[..9].copy_from_slice(&strengths);
+        rows.resize(self.fem.count.max(first + count));
+        rows[first..first + count].fill(data);
+    }
+
+    /// Seeber et al. (2024), equation 26. The Green-strain conjugate stress is in material axes,
+    /// and the signed normal and absolute shear loads keep separate histories.
+    pub(crate) fn orthotropic_failure_ratio(&mut self, t: usize, h: f32) -> f32 {
+        let Some(row) = self.fem.orthotropic_failure.get(t) else {
+            return 0.0;
+        };
+        if row[0] <= 0.0 || !self.has_orthotropy(t) {
+            return 0.0;
+        }
+        let cell = self.orthotropic_corner(4 * t as u32, h as f64);
+        let (strain, _) = cell.strain(self.vertex_deformation(cell.corners, cell.inverse, false));
+        let [x, y, z, xy, xz, yz] = cell.stress(strain);
+        let loads = [
+            x.max(0.0),
+            y.max(0.0),
+            z.max(0.0),
+            (-x).max(0.0),
+            (-y).max(0.0),
+            (-z).max(0.0),
+            xy.abs(),
+            xz.abs(),
+            yz.abs(),
+        ];
+        let tau = self.fem.smooth[t];
+        let step = if tau > 0.0 {
+            (h as f64 / tau as f64).min(1.0)
+        } else {
+            1.0
+        };
+        let row = &mut self.fem.orthotropic_failure[t];
+        let mut maximum = 0.0f32;
+        for (i, load) in loads.into_iter().enumerate() {
+            let old = row[9 + i] as f64;
+            let target = load / row[i] as f64;
+            let next = ((1.0 - step) * old + step * target).min(f32::MAX as f64) as f32;
+            row[9 + i] = next;
+            maximum = maximum.max(next);
+        }
+        if self.fem.flags[t] & INTERIOR_TET != 0 {
+            maximum / self.fem.interior[t]
+        } else {
+            maximum
+        }
     }
 
     /// A body's cells share one material; its incident corners all use the same elastic law.

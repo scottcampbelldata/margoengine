@@ -265,6 +265,7 @@ function carry(
   desc.setCellMaterial(body.cellMaterial);
   desc.fiber = body.fiber;
   desc.orthotropy = body.orthotropy;
+  desc.orthotropicStrength = body.orthotropicStrength;
   desc.groups = body.collisionGroups;
   desc.shapeMatching = body.matched;
   desc.solver = body.solverKind;
@@ -279,6 +280,7 @@ function splitCells(
 ): SoftSplit | null {
   const c = snapshot(soft.columns()),
     f = snapshot(soft.cellColumns()),
+    damage = soft.copyOrthotropicFailure(body),
     { first, count } = body.cellRange,
     flags = f.flags as unknown as Uint32Array,
     at = (name: string): Float32Array => f[name]!,
@@ -412,6 +414,7 @@ function splitCells(
     ];
     mine.forEach((t, i) => {
       const row = piece.cellRange.first + i;
+      if (damage) soft.restoreOrthotropicFailure(row, damage, t - first);
       for (const name of names) {
         if (/^p\d$/.test(name)) {
           const k = Number(name[1]),

@@ -75,6 +75,8 @@ export function makePlanePieces(
   const volumeFactor = body.volumeOn ? old.vb_target![body.handle]! / body.surfaceRest : null;
   const fiber = body.fiber;
   const orthotropy = body.orthotropy;
+  const strength = body.orthotropicStrength;
+  const damage = soft.copyOrthotropicFailure(body);
   const externalForce = body.force;
   const velocity = [old.vx, old.vy, old.vz] as const;
   const positions = [old.x, old.y, old.z] as const;
@@ -114,6 +116,7 @@ export function makePlanePieces(
         initialBasis: childBasis(cell, fem, row, 'o'),
         flowed: fem.flowed![row]!,
         load: fem.load![row]!,
+        parent: cell.parent,
       };
     });
     if (
@@ -142,6 +145,7 @@ export function makePlanePieces(
     desc.setGravityScale(old.gravity_scale[body.handle]!).setLinearDamping(old.linear_damping[body.handle]!);
     desc.fiber = fiber;
     desc.orthotropy = orthotropy;
+    desc.orthotropicStrength = strength;
     desc.groups = body.collisionGroups;
     desc.shapeMatching = body.matched;
     desc.dominance = body.dominance;
@@ -197,6 +201,7 @@ export function makePlanePieces(
       f.vol0![row] = data.volume;
       f.flowed![row] = data.flowed;
       f.load![row] = data.load;
+      if (damage) soft.restoreOrthotropicFailure(row, damage, data.parent);
     });
     soft.relinkCells(piece);
     const massShare = piece.mass() / totalMass;

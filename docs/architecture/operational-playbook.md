@@ -10007,6 +10007,13 @@ smoothed fracture is active and is copied instead of reset during cut or body co
 The browser fixture cuts the loaded LH-4 rung into two meshes and follows the changed boot
 position in both renderers.
 
+Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
+filters tensile, compressive and shear utilization separately. That optional state follows
+cells through body compaction, both cut paths, and world snapshots. The existing tear scheduler
+uses the highest active utilization to separate overloaded cells without losing their mass.
+The beech fixtures bracket published axial means and verify all three shear channels, including
+an automatically separated pair of cells.
+
 Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
 - **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
   contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is
