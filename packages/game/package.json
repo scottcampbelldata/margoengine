@@ -2571,6 +2571,10 @@
       "types": "./dist/post/depth-downsample.d.ts",
       "import": "./dist/post/depth-downsample.js"
     },
+    "./post/trail": {
+      "types": "./dist/post/trail.d.ts",
+      "import": "./dist/post/trail.js"
+    },
     "./post/settings": {
       "types": "./dist/post/settings.d.ts",
       "import": "./dist/post/settings.js"

@@ -1777,6 +1777,58 @@ const depth = half.texture; // r32float, reversed Z (1 near, 0 empty): textureLo
 - With its own capture, add gltf/pbr models and materials meshes with `half.add(model)`. A `depth` drawn later in the
   frame (such as `PostStack`'s `depthTexture`, resolved at order 30) needs a later `order`, or it is a frame old.
 
+## Trail texture: `TrailTexture`
+
+`@margoengine/post/trail` (3,556 B min+gzip, its own entry) paints pointer or object motion into a texture that
+fades every frame: ripples and displacement under the cursor, reveal masks, wakes behind a moving object. Stamps are
+soft round brushes; a fast move is joined by stamps at most half a radius apart, so it leaves no gaps, and each move
+paints brighter the faster it goes. `texture` is `rgba16float` with the same value in all four channels, (0, 0) at
+the top-left texel, and keeps its identity from frame to frame, so a material or bind group made once keeps reading
+the latest trail. `trail.source` is a material `Texture` source that also follows a device restore.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Material, Texture, createMesh} from 'margoengine/materials';
+import {TrailTexture} from 'margoengine/post/trail';
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas);
+const trail = TrailTexture.attach(engine, {size: 256, radius: 0.05});
+const stop = trail.trackPointer(canvas); // the canvas box maps to the whole texture
+// The trail lights a full-screen quad: move the pointer over the canvas.
+createMesh(engine, {
+  positions: [-1,-1,0, 1,-1,0, 1,1,0, -1,1,0],
+  normals: [0,0,1, 0,0,1, 0,0,1, 0,0,1],
+  uvs: [0,1, 1,1, 1,0, 0,0],
+  indices: [0,1,2, 0,2,3],
+}, new Material({color: '#101820', emissive: '#40c0ff', emissiveMap: new Texture(trail.source)}));
+trail.move(0.2, 0.5); // or paint from code: texture coordinates, joined into one stroke
+trail.move(0.8, 0.5);
+trail.lift(); // the next move starts a new stroke
+trail.stamp(0.5, 0.25, 0.5); // one stamp, not weighted by speed
+trail.options.decay = 0.9; // options other than size and order are read every frame
+engine.render();
+stop();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `size` | `256` | Texels, a number for a square or `[width, height]`; fixed at construction |
+| `decay` | `0.95` | Fraction kept per 1/60 s, in (0, 1], scaled by the frame's delta; 1 never fades |
+| `radius` | `0.06` | Brush radius as a fraction of the texture width, in (0, 1]; round in texels |
+| `intensity` | `1` | Peak value of one stamp, >= 0 |
+| `smoothing` | `0` | Exponential smoothing of `move` samples in [0, 1); higher lags and rounds sharp turns |
+| `blend` | `'screen'` | `'screen'` (1 - (1 - a)(1 - b), stays within 0..1), `'add'` (can pass 1) or `'max'` |
+| `interpolate` | `32` | Most joining stamps between two `move` samples, 0 to 256; 0 stamps the samples only |
+| `speed` | `1` | Texture widths per second at which a move paints at full `intensity`; 0 paints every move at full |
+| `enabled` | `true` | False holds the trail as it is; queued stamps wait |
+| `order` | `-20` | Frame graph order of the update, before the main pass; fixed at construction |
+
+`move(x, y)` takes texture coordinates; for an object, pass the UV of the surface point under it or its projected
+screen position over the canvas size. `clear()` starts from black on the next frame. The update runs once a frame,
+also with several views. `TrailTexture` is disposable (`using trail = ...`). Limits are in
+[docs/limits.md](../../docs/limits.md#trail-texture-margoenginepostrail-2026-11-26); sources in
+[docs/clean-room.md](../../docs/clean-room.md#trail-texture-2026-11-26).
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for

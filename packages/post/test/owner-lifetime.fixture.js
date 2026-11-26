@@ -36,6 +36,7 @@ const entries = {
   'motion-blur': ['MotionBlur'],
   mrt: ['SceneTargets'],
   'selective-bloom': ['SelectiveBloom'],
+  trail: ['TrailTexture'],
 };
 // Not covered here: SceneFade ends itself on device restore by design (a captured transition cannot survive it).
 // Classes whose options have required members.
