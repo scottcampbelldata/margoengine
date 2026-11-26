@@ -112,6 +112,10 @@
       "types": "./dist/life/index.d.ts",
       "import": "./dist/life.js"
     },
+    "./crush": {
+      "types": "./dist/crush/index.d.ts",
+      "import": "./dist/crush.js"
+    },
     "./legged": {
       "types": "./dist/legged/index.d.ts",
       "import": "./dist/legged.js"

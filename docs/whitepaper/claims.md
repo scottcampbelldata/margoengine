@@ -5619,3 +5619,7 @@ threshold, account for level, rafted and ridged material, and step the same vess
 buoyancy enabled. The Water bridge uses that world state to write the rendered instance matrices.
 [Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
 [Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)
+
+### Civil barrier crush
+
+The reduced station model conserves rigid linear momentum and transfers the predicted normal work into permanent deformation. `packages/physics/tests/coupling/crush.test.js` compares the observed work to the kinetic-energy loss on two unequal masses and checks the angular response at an offset contact. The floating hull fixture verifies recoil and seal loss while actual seakeeping loads remain active. The bounded claim covers calibrated normal events on configured contact stations.

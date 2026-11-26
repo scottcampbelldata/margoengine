@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **BREAK-03:** SEA-10 needs a versioned compartment opening and resulting carried water mass and inertia. The
+  current crush entry publishes calibrated seal loss and posts matched normal and angular impulses through the
+  rigid ports. A contact effective-inertia port would share resolved fluid added mass during shorter crush events.
+
 - **BIO-03:** Register canonical x-fast cell fields for forest burn severity, fuel moisture, live canopy fuel,
   crown cover and root cohesion, and expose producer extents with their grid ports. The optional forest solver
   ships its versioned exposure and output fields and consumes HYDRO-01 and HYDRO-04 directly on matching grids.

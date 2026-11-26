@@ -3638,3 +3638,42 @@ put `pack-ice` and `rigid` in a staggered group. Add `hull` to that group when S
 Its body pose pushes the ice. The same contact sends the opposite linear and yaw impulse to the rigid
 body through `bodyImpulses`. `vesselImpulse(row)` reports the signed contact impulse of the current
 step. Use the same `rigidCapacity` as any other contributor to `bodyImpulses`.
+
+## Ductile crashworthiness (`@margoengine/physics/crush`)
+
+`resolveCrush` inverts a measured normal force-displacement curve to find the peak force, permanent stroke, and energy left for rebound. Use newtons, metres, kilograms, and metres per second. Positive hardening raises the yield force as the member permanently shortens. After the measured stroke is used, a stiffer elastic backing supports the load.
+
+```ts
+import { resolveCrush } from '@margoengine/physics/crush';
+
+const curve = { stiffness: 400, yieldForce: 40, stroke: 0.4 };
+const result = resolveCrush(curve, 4, 2);
+if (Math.abs(result.absorbedEnergy - 6) > 1e-12) throw new Error('Expected 6 J of permanent work');
+```
+
+`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const cart = physics.addBody(null, {
+  position: [-0.5, 0, 0], linearVelocity: [2, 0, 0],
+  colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 4 },
+});
+const crush = new CrushSolver();
+const bodyCapacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(crush, { bodyCapacity, patches: [{
+  body: cart.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.12,
+  support: { point: [-0.2, 0, 0] }, material: { stiffness: 400, yieldForce: 40, stroke: 0.4 },
+}] });
+world.couple(['rigid', crush.id], 'staggered');
+world.advance(12);
+if (crush.read(0).impacts !== 1) throw new Error('Expected one barrier contact');
+```

@@ -12,6 +12,7 @@ const thermalOnly = process.argv.includes('--thermal-only');
 const swimOnly = process.argv.includes('--swim-only');
 const pedestrianOnly = process.argv.includes('--pedestrian-only');
 const locomotionOnly = process.argv.includes('--locomotion-only');
+const crushOnly = process.argv.includes('--crush-only');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
@@ -51,10 +52,10 @@ try {
   await page.goto(`${server.resolvedUrls.local[0]}tests/physics.html`);
   await page.waitForFunction(() => typeof window.runPhysicsTests === 'function', null, { timeout: 60000 });
   const report =
-    thermalOnly || swimOnly || pedestrianOnly || locomotionOnly
+    thermalOnly || swimOnly || pedestrianOnly || locomotionOnly || crushOnly
       ? { checks: [] }
       : await page.evaluate(() => window.runPhysicsTests());
-  if (!swimOnly && !pedestrianOnly && !locomotionOnly) {
+  if (!crushOnly && !swimOnly && !pedestrianOnly && !locomotionOnly) {
     await page.evaluate(async () => {
       await import('/dist/thermal.js');
     });
@@ -81,7 +82,7 @@ try {
     assert.equal(temperature.value, 310);
     report.checks.push('Thermal Wasm loads on demand and advances the world in the browser');
   }
-  if (!thermalOnly && !pedestrianOnly && !locomotionOnly) {
+  if (!crushOnly && !thermalOnly && !pedestrianOnly && !locomotionOnly) {
     await page.evaluate(() => import('/dist/life.js'));
     assert.deepEqual(swimRequests, [], 'importing the swimming entry leaves both kernels unloaded');
     const reading = await page.evaluate(async () => {
@@ -120,7 +121,7 @@ try {
     assert.equal(reading.replayed, true);
     report.checks.push('Aquatic locomotion Wasm loads on demand, propels a swimmer and restores its snapshot');
   }
-  if (!thermalOnly && !swimOnly && !locomotionOnly) {
+  if (!crushOnly && !thermalOnly && !swimOnly && !locomotionOnly) {
     await page.evaluate(async () => {
       await import('/dist/pedestrians.js');
     });
@@ -152,7 +153,7 @@ try {
     report.checks.push('Pedestrian Wasm loads on demand and preserves unequal-mass contact momentum');
   }
 
-  if (!thermalOnly && !swimOnly && !pedestrianOnly) {
+  if (!crushOnly && !thermalOnly && !swimOnly && !pedestrianOnly) {
     await page.evaluate(() => Promise.all([import('/dist/locomotion.js'), import('/dist/legged.js')]));
     assert.deepEqual(locomotionRequests, [], 'importing either locomotion entry leaves the kernels unloaded');
     const reading = await page.evaluate(async () => {
@@ -184,6 +185,58 @@ try {
     assert.ok(reading.biped.position[2] > 0);
     assert.equal(reading.replayed, true);
     report.checks.push('Ground and legged locomotion share lazy Wasm, advance their own bodies and restore contacts');
+  }
+  if (!thermalOnly && !swimOnly && !pedestrianOnly && !locomotionOnly) {
+    const reading = await page.evaluate(async () => {
+      const { Physics } = await import('/dist/index.js');
+      const { CrushSolver } = await import('/dist/crush.js');
+      const { PhysicsWorld, RigidSolver, worldMemory } = await import('/dist/world.js');
+      const gravity = [0, 0, 0];
+      const shared = globalThis.crossOriginIsolated;
+      await Physics.load({ threads: shared });
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(shared) });
+      const physics = new Physics(null, { arena: world.arena, gravity });
+      try {
+        const body = physics.addBody(null, {
+          position: [-0.5, 0, 0],
+          linearVelocity: [2, 0, 0],
+          colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 4 },
+        });
+        const crush = new CrushSolver();
+        const bodyCapacity = physics.kernel.capacity;
+        world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+        world.add(crush, {
+          bodyCapacity,
+          patches: [
+            {
+              body: body.row,
+              anchor: [0.2, 0, 0],
+              normal: [1, 0, 0],
+              radius: 0.12,
+              support: { point: [-0.2, 0, 0] },
+              material: { stiffness: 400, yieldForce: 40, stroke: 0.4 },
+            },
+          ],
+        });
+        world.couple(['rigid', crush.id], 'staggered');
+        world.advance(1);
+        const saved = world.takeSnapshot();
+        world.advance(12);
+        const hash = world.hash();
+        const { absorbedEnergy, impacts } = crush.read(0);
+        const velocity = body.linearVelocity[0];
+        world.restoreSnapshot(saved.bytes);
+        world.advance(12);
+        return { absorbedEnergy, impacts, velocity, replayed: world.hash() === hash };
+      } finally {
+        physics.dispose();
+      }
+    });
+    assert.equal(reading.impacts, 1);
+    assert.ok(Math.abs(reading.absorbedEnergy - 6) < 1e-8);
+    assert.ok(Math.abs(reading.velocity + 1) < 1e-7);
+    assert.equal(reading.replayed, true);
+    report.checks.push('Ductile crush transfers the expected impulse and replays the browser rigid world');
   }
   if (report.image) {
     await writeFile(resolve(results, 'physics-stack.png'), Buffer.from(report.image.split(',')[1], 'base64'));

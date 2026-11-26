@@ -10222,3 +10222,7 @@ impulse accumulator, including when SEA-08 applies buoyancy to the same body. Th
 regression compares those opposite impulses and the Water regression checks the matrix boundary.
 The coupling harness establishes one hash across frame cadence, both memory modes and snapshot
 restore. Continuous-sheet blocks and grounding are outside the current planar pack model.
+
+### Civil impact work and rigid coupling (BREAK-03)
+
+`CrushSolver` reads the versioned `bodies` port and accumulates linear and angular impulses at the same point for both bodies. The published deformation and work ledger, contact latch, and pending impulse rows survive snapshot restore. Closed-form spring, perfectly plastic, hardening, and compacted backing references check energy and stroke. Two-body and fixed-barrier runs check momentum, offset torque, transverse misses, and persistent seal loss. A floating service craft uses the same rigid row for live seakeeping and a quay impact. Pending water ingress needs the SEA-10 compartment contract.
