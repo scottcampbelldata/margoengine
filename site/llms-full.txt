@@ -12782,6 +12782,16 @@ regression test.
   put.** **Cause:** `packages/physics/src/flip/transfer.ts` describes jittered seeding while `solver.ts` places
   particles at exact octant centres, and `solver.ts` holds a particle in place instead of projecting it out of the
   solid.
+- **AERO-01, rotated bodies get the wrong panels.** **Repro:** rotate a non-box collider 45° in a steady wind.
+  **Cause:** `packages/physics/src/aero.ts` builds panels from the world-axis bounding box as if it were a body-frame
+  box.
+- **AERO-03, stalled panels count profile drag twice.** **Cause:** `packages/physics/src/flight.ts` adds section
+  profile drag on top of the stalled-panel normal force.
+- **ATMO-01, two wind-direction conventions in one package.** **Cause:** `weather/src/boundary-layer.ts` reads
+  direction 0 as +x while `weather/src/wind.ts` reads it as +Z.
+- **ATMO-01, gusts repeat with height.** **Repro:** sample the boundary-layer gust at 4 m and 260 m. **Cause:** the
+  turbulence box wraps vertically every 256 m, so the vertical velocity does not vanish at the ground and the two
+  heights match.
 
 ### Open 2026-11-26: defects found by the physics solver audit (KB-PHYS-AUDIT1, physics)
 

@@ -403,9 +403,9 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | DYN-07 | Dynamic character, balance, push response | partial | Claude | CLAIMED |
 | SOFT-01 | Cloth and thin shells | partial | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
-| AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | LANDED 48b593a13 |
-| AERO-02 | Membrane aerodynamics (FSI) | none | Claude | LANDED 2f1860412 |
-| AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | LANDED f9161cc7e |
+| AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
+| AERO-02 | Membrane aerodynamics (FSI) | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
+| AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
@@ -418,8 +418,8 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-14 | Water entry and exit | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ccbc86285 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
-| HYDRO-01 | Conservative shallow water | partial | Claude | LANDED 9a189c4eb |
-| ATMO-01 | Boundary-layer wind field | stand-in | Claude | LANDED c38c25d3d |
-| ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | LANDED c38c25d3d |
-| ATMO-03 | Moist convection and cloud dynamics | none | Claude | LANDED 8833dbf0c |
+| HYDRO-01 | Conservative shallow water | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
+| ATMO-01 | Boundary-layer wind field | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
+| ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
+| ATMO-03 | Moist convection and cloud dynamics | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8833dbf0c |
 | ATMO-04 | Precipitation microphysics | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |
