@@ -4,7 +4,7 @@
 // example folder in no type-check project; only local CI's full root tests saw any of it, after the push.
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { readSizesInputs, sizesPage } from '../build-sizes.js';
+import { sizesPageStale } from '../build-sizes.js';
 import { collect, noticeAddenda, OUTPUT, render } from '../supply-chain.mjs';
 import { EXAMPLE_FOLDERS, PROJECTS } from './example-projects.mjs';
 import { packageCountFiles, packageCountProblems } from './public-truth.mjs';
@@ -72,7 +72,8 @@ export function packageRecordProblems(root) {
   );
   const problems = [...packageCountProblems(files, catalog.length), ...catalogExportProblems(root)];
   try {
-    sizesPage(readSizesInputs(root));
+    if (sizesPageStale(root))
+      problems.push('site/sizes.html is stale: run node scripts/build-sizes.js and commit the result');
   } catch (error) {
     problems.push(`site/sizes.html cannot be built: ${error.message}`);
   }

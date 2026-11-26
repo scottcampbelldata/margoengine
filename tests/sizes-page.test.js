@@ -8,7 +8,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
-import { readSizesInputs, sizesPage } from '../scripts/build-sizes.js';
+import { readSizesInputs, sizesPage, sizesPageStale } from '../scripts/build-sizes.js';
+import { packageRecordProblems } from '../scripts/support/package-records.mjs';
 import { LAZY_FILES, lazyFileDrift, unmeasuredLazyFiles } from '../scripts/lazy-files.js';
 import { CORE_STAGE_GZIP_LIMIT } from '../scripts/core-budget.js';
 import { sceneGraph } from '../scripts/support/basic-scene-graph.mjs';
@@ -239,4 +240,36 @@ test('every external of a file loaded later is a pattern, as entry-sizes tests e
   for (const { file, external = [] } of LAZY_FILES)
     for (const pattern of external)
       assert.ok(pattern instanceof RegExp, `${file} lists ${pattern}, which is no RegExp`);
+});
+
+// site/sizes.html stood at the records of 8fb3b07b38 while entry-sizes.json was measured at cf5b84a980 (2026-11-26): no
+// check compared the committed page with what its records build.
+test('site/sizes.html is the page its records build (run: node scripts/build-sizes.js)', () => {
+  assert.equal(sizesPageStale(), false);
+});
+
+test('an out-of-date site/sizes.html is reported with the command that builds it', (t) => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..'),
+    fake = mkdtempSync(join(tmpdir(), 'sizes-page-'));
+  t.after(() => rmSync(fake, { recursive: true, force: true }));
+  const write = (path, text) => {
+    mkdirSync(dirname(join(fake, path)), { recursive: true });
+    writeFileSync(join(fake, path), text);
+  };
+  const copy = (path) => write(path, readFileSync(join(root, path), 'utf8'));
+  for (const path of ['docs/catalog.json', 'entry-sizes.json', 'basic-scene-network.json'])
+    copy(path.startsWith('docs') ? path : `examples/package-benchmarks/results/${path}`);
+  for (const entry of catalog) copy(`packages/${entry.id}/package.json`);
+  assert.equal(sizesPageStale(fake), true, 'a missing page is out of date');
+  const page = sizesPage(readSizesInputs(fake));
+  write('site/sizes.html', page.replaceAll('\n', '\r\n'));
+  assert.equal(sizesPageStale(fake), false, 'line endings a checkout changed do not count');
+  // One entry measured again: the record moves and the page does not.
+  const record = JSON.parse(readFileSync(join(fake, 'examples/package-benchmarks/results/entry-sizes.json'), 'utf8')),
+    entry = Object.values(record.packages)[0];
+  Object.values(entry)[0].gzip += 1;
+  write('examples/package-benchmarks/results/entry-sizes.json', JSON.stringify(record));
+  assert.equal(sizesPageStale(fake), true);
+  const stale = packageRecordProblems(fake).filter((problem) => problem.includes('sizes.html'));
+  assert.deepEqual(stale, ['site/sizes.html is stale: run node scripts/build-sizes.js and commit the result']);
 });

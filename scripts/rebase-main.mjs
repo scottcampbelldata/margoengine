@@ -29,6 +29,7 @@ const GENERATED = [
   /^site\/llms[^/]*\.txt$/,
   /^package-lock\.json$/,
   /^scripts\/quality\/baselines\/sizes\.json$/,
+  /^site\/sizes\.html$/,
 ];
 
 let root = process.cwd();
@@ -254,6 +255,36 @@ function refreshErrorsPage() {
   console.log('rebase:main: site/errors.html was stale for scripts/errors/entries.js; built again and committed');
 }
 
+/**
+ * margoengine.com/sizes.html (site/sizes.html) is built from the size records, the catalog and the package manifests,
+ * and hygiene fails when it is not what they build. A branch that changed one of them, or took upstream's page in a
+ * conflict, gets the page built again here, as its own commit, when it no longer matches.
+ */
+function refreshSizesPage() {
+  const page = resolve(root, 'scripts/build-sizes.js');
+  if (!existsSync(page)) return;
+  const changed = lines(['diff', '--name-only', 'origin/main...HEAD']);
+  if (
+    !changed.some((file) =>
+      /^(site\/sizes\.html|docs\/catalog\.json|examples\/package-benchmarks\/results\/(entry-sizes|basic-scene-network)\.json|scripts\/(build-sizes|lazy-files)\.js|packages\/[^/]+\/package\.json)$/.test(
+        file,
+      ),
+    )
+  )
+    return;
+  if (run(process.execPath, [page, '--check'], { allowFail: true }).status === 0) return;
+  script('scripts/build-sizes.js');
+  git(['add', '--', 'site/sizes.html']);
+  if (git(['diff', '--cached', '--quiet'], { allowFail: true }).status === 0) return;
+  const commit = commitTree(
+    rev('HEAD'),
+    git(['write-tree']).stdout.trim(),
+    'chore: site/sizes.html matches the size records\n',
+  );
+  git(['update-ref', '-m', 'rebase:main: sizes page', 'HEAD', commit]);
+  console.log('rebase:main: site/sizes.html was stale for its records; built again and committed');
+}
+
 function main() {
   root = git(['rev-parse', '--show-toplevel']).stdout.trim();
   if (!rebasing() && !existsSync(ledger())) {
@@ -285,6 +316,7 @@ function main() {
   }
   if (existsSync(ledger())) regenerate();
   refreshErrorsPage();
+  refreshSizesPage();
   const markers = conflictMarkers(root);
   if (markers.length) stop(`Conflict markers are left in:\n  ${markers.join('\n  ')}\nRemove them before you push.`);
   // The commits to push must not delete or revert on a mass scale (the ff88a70e7 sync); a failure stops before "push".

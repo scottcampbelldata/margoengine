@@ -4,8 +4,13 @@
 // examples/package-benchmarks/results/entry-sizes.json (entries, lazy files, the commit measured),
 // results/basic-scene-network.json (scripts/basic-scene-network.mjs at the same commit), scripts/lazy-files.js (what
 // loads when) and packages/*/package.json (peers). scripts/build-site.js writes it after a fresh measurement.
-import { readFileSync } from 'node:fs';
+//   node scripts/build-sizes.js            write site/sizes.html, the committed page, from the committed records
+//   node scripts/build-sizes.js --check    exit 1 when that page is not what the records build
+// scripts/hygiene.js (package records) and tests/sizes-page.test.js run the same check: the page stood two days behind
+// its records on main (8fb3b07b38 against cf5b84a980) because nothing compared them.
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { LAZY_FILES, LAZY_SPLITS } from './lazy-files.js';
 
 const esc = (text) =>
@@ -212,4 +217,23 @@ ${sections.join('\n\n')}
 </body>
 </html>
 `;
+}
+
+const PAGE = 'site/sizes.html';
+/** True when site/sizes.html under `root` is missing or is not the page its records build. Throws when they build none. */
+export function sizesPageStale(root = resolve(import.meta.dirname, '..')) {
+  const path = resolve(root, PAGE),
+    page = sizesPage(readSizesInputs(root));
+  return !existsSync(path) || readFileSync(path, 'utf8').replaceAll('\r\n', '\n') !== page;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (!process.argv.includes('--check')) {
+    const page = sizesPage(readSizesInputs());
+    writeFileSync(resolve(import.meta.dirname, '..', PAGE), page);
+    console.log(`${PAGE}: ${page.length} characters`);
+  } else if (sizesPageStale()) {
+    console.error(`${PAGE} stale: run node scripts/build-sizes.js and commit the result`);
+    process.exitCode = 1;
+  } else console.log(`${PAGE} is current`);
 }

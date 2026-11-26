@@ -352,6 +352,27 @@ test('a branch that changed the errors entries without building the page gets th
   );
 });
 
+// site/sizes.html stood behind entry-sizes.json on main (2026-11-26): a size record landed without the page.
+test('a branch that changed a size record without building the sizes page gets the page built, in its own commit', (t) => {
+  const page = Array(3).fill(
+    "import { readFileSync, writeFileSync } from 'node:fs';\n" +
+      "const want = readFileSync('examples/package-benchmarks/results/entry-sizes.json', 'utf8').toUpperCase();\n" +
+      "if (process.argv.includes('--check')) process.exit(readFileSync('site/sizes.html', 'utf8') === want ? 0 : 1);\n" +
+      "writeFileSync('site/sizes.html', want);\n",
+  );
+  const repo = repository(t, {
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    'examples/package-benchmarks/results/entry-sizes.json': ['one\n', 'one\n', 'one\ntwo\n'],
+    'scripts/build-sizes.js': page,
+    'site/sizes.html': ['ONE\n', 'ONE\n', 'ONE\n'],
+  });
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /sizes\.html was stale/);
+  assert.equal(repo.read('site/sizes.html'), 'ONE\nTWO\n');
+  assert.equal(repo.git('log', '-1', '--format=%s').trim(), 'chore: site/sizes.html matches the size records');
+});
+
 test('a branch whose errors page already matches its entries gets no extra commit', (t) => {
   const page = Array(3).fill(
     "import { readFileSync } from 'node:fs';\n" +
