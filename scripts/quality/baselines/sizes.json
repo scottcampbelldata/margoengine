@@ -13434,7 +13434,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "7ef9322a95d0768ceff1dbd5640b0c6840ca6452",
+      "commit": "10b09d2e50da54df1627f4542d634b21f075931e",
       "grew": 0,
       "added": 1,
       "reason": "EARTH-01 adds the optional sparse granular material-point interface (4066 B gzip). Both native builds load only with the optional solver. Splitting its interface would duplicate the same arena binder and clock checks. Core and Stage gain zero bytes."
