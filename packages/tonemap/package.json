@@ -53,6 +53,10 @@
     "./3dl": {
       "types": "./dist/3dl.d.ts",
       "import": "./dist/3dl.js"
+    },
+    "./enhance": {
+      "types": "./dist/enhance.d.ts",
+      "import": "./dist/enhance.js"
     }
   },
   "files": [
@@ -86,6 +90,7 @@
     "test:gpu:dither-vignette": "cd ../.. && node packages/tonemap/tests/dither-vignette-browser.mjs",
     "test:gpu:hue": "cd ../.. && node packages/tonemap/tests/hue-browser.mjs",
     "test:gpu:export-cube": "cd ../.. && node packages/tonemap/tests/export-cube-browser.mjs",
+    "test:gpu:enhance": "cd ../.. && node packages/tonemap/tests/enhance-browser.mjs",
     "test:gpu:finite": "cd ../.. && node packages/tonemap/tests/finite-browser.mjs",
     "test:gpu:contrast-zero": "cd ../.. && node packages/tonemap/tests/contrast-zero-browser.mjs",
     "test:gpu:white-balance": "cd ../.. && node packages/tonemap/tests/white-balance-browser.mjs",

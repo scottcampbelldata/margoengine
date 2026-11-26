@@ -14352,3 +14352,30 @@ The marine output uses the exact geometric difference of consecutive occupied su
 - Herbert Edelsbrunner and Ernst Peter Muecke, [*Simulation of Simplicity: A Technique to Cope with Degenerate Cases in Geometric Algorithms*](https://doi.org/10.1145/77635.77639), ACM Transactions on Graphics 9(1), 1990. A ray exactly on an edge is moved by (d, d squared) in (y, z) for a vanishing d, so it lies on one side of every edge it touches.
 
 The implementation was written from the papers.
+
+## Colour enhancement and channel mixer: optional ColorEnhance (2026-11-26)
+
+`@margoengine/tonemap/enhance`. The list of controls and their ranges (shadows and highlights -3..3, midtones,
+vibrance and dehaze -1..1, mixer rows -2..2, applied to HDR colour before tone mapping) follows common
+colour-grading controls; no other library's source was read.
+
+Research compared:
+- H. Koschmieder, *Theorie der horizontalen Sichtweite*, Beiträge zur Physik der freien Atmosphäre 12, 1924 (unread;
+  the model as printed in the next paper). S. G. Narasimhan and S. K. Nayar, *Vision and the Atmosphere*, IJCV 48(3),
+  2002, https://doi.org/10.1023/A:1016328200723. Used: the haze image model I = J t + A (1 - t), inverted to remove
+  haze and run forwards to add it.
+- K. He, J. Sun and X. Tang, *Single Image Haze Removal Using Dark Channel Prior*, CVPR 2009,
+  https://doi.org/10.1109/CVPR.2009.5206515, and J.-P. Tarel and N. Hautière, *Fast Visibility Restoration from a
+  Single Color or Gray Level Image*, ICCV 2009, https://doi.org/10.1109/ICCV.2009.5459251. Used: the minimum over the
+  channels as the haze estimate, taken over one pixel. Not used: patch minima, guided or median filtering and a
+  transmission map, which need extra passes and are an image restoration, not a colour control. The 0.5 strength cap is
+  Margo's.
+- A. R. Smith, *Color Gamut Transform Pairs*, SIGGRAPH 1978, https://doi.org/10.1145/800248.807361. Used: HSV
+  saturation as the weight of vibrance. Adobe's public description of a vibrance control (dull colours move most,
+  https://www.adobe.com/creativecloud/photography/discover/photo-saturation.html) is the behaviour aimed at; the
+  formula x + (x - Y) v (1 - S) is Margo's, and keeps the order of saturations for every v in -1..1.
+- ITU-R BT.709-6, 2015: the luma weights.
+- Shadows, midtones and highlights: Margo's own, smoothstep weights in stops about 18% grey that sum to 1, applied as
+  one gain so hue is kept. The 7-stop width makes the tone map monotone: the weights' slope is at most 1.5 / 7 per stop
+  and neighbouring controls differ by at most 4 stops, 6 / 7 < 1 (`tests/enhance.test.js` walks every extreme setting).
+  The channel mixer is a 3x3 matrix.

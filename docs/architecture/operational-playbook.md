@@ -10421,3 +10421,11 @@ ledger splits cut material among the berm, compaction, dry fines and outflow. Th
 existing wheel and belt loads and refits the registered height field. The adapter snapshots the belt shear history and
 the collider-height mirror. LIFE-01 foot rows are another input. ATMO-06 consumes the same mineral dust grid used for
 aeolian sources. Tests include both clocks at their shared times and audit the held source mass at an intermediate tick.
+
+Section 5, Tonemap colour enhancement (2026-11-26): `@margoengine/tonemap/enhance` patches a scene-linear step in front
+of the display curve of both Tonemap shaders (the SDR one clamps its result at 0, the ColorOutput one keeps colours
+below 0): channel mixer, dehaze, tone gains in stops, vibrance. Every step is written as input plus a correction, so
+defaults are bit-for-bit identity, and no option changes the pipeline. Evidence: `packages/tonemap/tests/enhance.test.js`
+and `enhance-browser.mjs` on the Windows workstation, WebGPU and the WebGL2 layer (16 HDR colour bars within 0.5 level
+of a CPU oracle, identity at defaults, same frame after a device restore, ColorOutput path draws without a GPU error);
+owner/lifetime fixture. Missing: GPU time; a Mac run; pixel values of the ColorOutput path against the oracle.
