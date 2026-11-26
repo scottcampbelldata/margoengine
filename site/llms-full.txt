@@ -14590,9 +14590,17 @@ changed 3,771 pixels and dropped the tracked point 0.2205 m on both WebGPU and
 WebGL2. Plain, shared and restored state hash to `032e9f9a1ed80ade`. The sparse
 grid visits only the occupied nodes, with storage sized for the maximum support
 of the input points. The kernel uses one deterministic scatter and gather order.
-The optional JavaScript entry is 4,066 B gzip against a 4,322 B budget. The
-plain and shared native assets are each 14,251 B raw and 5,563 B and 5,564 B gzip,
-respectively. Core and Stage gain zero bytes.
+The optional JavaScript entry is 5,114 B gzip against a 5,370 B budget. The
+plain and shared native assets are each 15,063 B raw and 5,930 B gzip.
+Core and Stage gain zero bytes.
+
+The optional layer projection deposits each material point's current volume on
+the receiving terrain triangle using its barycentric weights. The sum of vertex
+area times height is the total layer volume change. The associated reference mass
+stays with the points. Choose a receiving terrain surface and separate supporting
+bedrock. The projection represents the volume in each ground column, including
+particles above its surface. Use it for a shallow layer. Separating suspended
+material and reconstructing overhangs need a different output.
 
 The first increment covers dry or cohesive granular material and snow. Explicit
 pore-water transport, reciprocal contact with dynamic bodies, the voxel material
@@ -31817,9 +31825,10 @@ measurements require separate models and evidence.
 The optional continuum produces shear yield and persistent compaction on the live
 terrain bed. Falling voxel sand now transfers a displaced liquid's full packed
 state to the vacated cell. The voxel-to-continuum material handoff for repose
-and pile evolution is still open. The BB-7 fixture
-still needs the ray's water-momentum input and a continuous bed-height update
-from the moving grains. The existing sand plume is a separate effect.
+and pile evolution is still open. The continuum publishes real layer-volume
+changes to the live bed. BB-7 still needs to drive that layer with ray wake
+momentum and verify the resulting imprint against its control. The sand plume
+is already proven separately.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 

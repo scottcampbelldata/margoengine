@@ -24,6 +24,7 @@ export interface GranularMaterial {
 
 export interface GranularMpmLoadOptions {
     readonly id?: string;
+    readonly projectBed?: boolean;
     readonly signal?: AbortSignal;
 }
 
@@ -35,6 +36,7 @@ export interface GranularMpmParams {
     readonly speedMargin?: number;
     readonly transfer?: 'apic' | 'pic';
     readonly bed?: Bed;
+    readonly bedSurface?: Bed;
     readonly floor?: number;
     readonly groundFriction?: number;
     readonly cellSize?: number;

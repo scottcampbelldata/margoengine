@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20530940,
+  "total": 20531988,
   "history": [
     {
       "date": "2026-10-24",
@@ -13462,6 +13462,13 @@
       "commit": "84a2a19855",
       "grew": 1,
       "reason": "SOFT-04 adds native paired-lip displacement correlation and independently authored mixed-mode toughness, moving the soft entry from 142266 to 145660 B gzip. @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 97921 to 103021 B ceiling (100020 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "4b4655a7b6fab1f871621b42c28663de0defba65",
+      "grew": 1,
+      "added": 0,
+      "reason": "EARTH-01 increases the optional granular entry from 4066 to 5114 B gzip for the conservative bed-volume projection and its readback. A split would duplicate the terrain registry binding. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -14297,7 +14304,7 @@
     "@margoengine/physics/flip": 11699,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
-    "@margoengine/physics/granular-mpm": 4322,
+    "@margoengine/physics/granular-mpm": 5370,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
