@@ -14090,6 +14090,10 @@
       "./legged": {
         "raw": 29240,
         "gzip": 11101
+      },
+      "./pack-ice": {
+        "raw": 12205,
+        "gzip": 5112
       }
     },
     "@margoengine/physics2d": {
@@ -17042,8 +17046,8 @@
         "gzip": 11041
       },
       "./ice": {
-        "raw": 33974,
-        "gzip": 13079
+        "raw": 34635,
+        "gzip": 13297
       },
       "./splash": {
         "raw": 12829,
@@ -17911,6 +17915,16 @@
       "raw": 6455,
       "gzip": 2811,
       "brotli": 2611
+    },
+    "packages/physics/dist/pack-ice-kernel.wasm": {
+      "raw": 5716,
+      "gzip": 2534,
+      "brotli": 2318
+    },
+    "packages/physics/dist/pack-ice-kernel-shared.wasm": {
+      "raw": 5716,
+      "gzip": 2534,
+      "brotli": 2332
     }
   },
   "splits": {

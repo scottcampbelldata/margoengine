@@ -16374,8 +16374,7 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)
 
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
-does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
-and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.
+does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. General run-up and terrain, avalanche and lava sources still need SEA-06.
 
 ## Open: canonical fire and alpine canopy links (BIO-03)
 
@@ -16392,3 +16391,12 @@ footage predates these fixtures. To exercise the scene-level hand-off, connect t
 rig and compare the posed feet to the published stance points after advancing the world. A complete articulated
 handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
 LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.
+
+### Pack ice grounded and continuous-sheet contacts
+
+ICE-04 handles floating pack ice against other floes and waterline capsules. An unbroken sheet
+cannot fragment into individually transported blocks under a bow in the current model. For a
+repro, replace the two independent disks in the pack-ice contact case with one equivalent larger
+disk. The fracture work reduces its footprint and thickens its subgrid pile while its row stays
+single. Explicit bonds, fracture-created rows and contact with grounded bathymetry are needed to
+move those blocks independently.

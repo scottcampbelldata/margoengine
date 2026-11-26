@@ -164,6 +164,10 @@
       "types": "./dist/iceberg/index.d.ts",
       "import": "./dist/iceberg.js"
     },
+    "./pack-ice": {
+      "types": "./dist/pack-ice/index.d.ts",
+      "import": "./dist/pack-ice.js"
+    },
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"

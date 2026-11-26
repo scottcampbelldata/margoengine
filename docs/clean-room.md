@@ -13574,3 +13574,38 @@ exact tests are in the package README and whitepaper claims.
 The engine verifies variable cadence, coupled normal and lateral traction, mean support height from independent hoof
 samples, an airborne trot phase, canting and slope work, world-space foot forces and opposing impulse on an actual
 rigid platform. Full limb mechanics, rig hand-off and water displacement remain separate couplings.
+
+## Discrete-element pack ice and vessel loads (ICE-04)
+
+- W. D. Hibler III, “A Dynamic Thermodynamic Sea Ice Model” (1979). Its area and thickness distribution
+  motivates separate bookkeeping for a remaining level-ice footprint and conserved ice volume. This
+  entry represents already fragmented ice at the scale of individual floes.
+  [Paper](https://doi.org/10.1175/1520-0485(1979)009%3C0815:ADTSIM%3E2.0.CO;2)
+- Agnieszka Herman, “Molecular-dynamics simulation of clustering processes in sea-ice floes”
+  (2011), equations 1–11. Circular area and submerged and exposed edge heights set the linear
+  ocean and quadratic air drag. The hard-disc normal impulse is the reduced mass times
+  `(1+e)` times closing speed. The air term here uses relative velocity. See also Herman,
+  “Discrete-Element bonded-particle Sea Ice model DESIgn, version 1.3a” (2016), section 4,
+  for disk contact and Coulomb slip. This solver uses an impulse law for the unbonded floes.
+  [Hard-disc paper](https://arxiv.org/abs/1110.0617) · [DESIgn paper](https://doi.org/10.5194/gmd-9-1219-2016)
+- D. Vella and J. S. Wettlaufer, “Explaining the patterns formed by ice floe interactions”
+  (2008), equation 12. The simple rafting threshold is `(8/3) exp(π/2)(1−ν²)σ²/(ρwgE)`.
+  Its table 1 sea-ice data and section 2.2 thickness range are checked separately.
+  [Paper](https://doi.org/10.1029/2008JC004781)
+- M. A. Hopkins, S. Frankenstein and A. S. Thorndike, “Formation of an aggregate scale in
+  Arctic sea ice” (2004). Ridging converts level ice into thick rubble during compression. The
+  local remap here takes an annulus with the same radial loss as the contact band and conserves
+  its mass on the parent row. Thick ice first pays a fracture-work estimate `σ × edge area × cut`.
+  Remaining dissipated work pays `ρi g h` per cubic metre for lifting a raft, or `ρw g h/2`
+  per cubic metre for lifting and submerging equal halves of a ridge.
+  [Paper](https://doi.org/10.1029/2003JC001855)
+- Gustav Lindqvist, “A straightforward method for calculation of ice resistance of ships”
+  (1989), distinguishes breaking and submerging ice from other hull losses. The local capsule
+  contact here transmits its impulse to the live rigid body. It uses the computed discrete contact
+  work for fracture and piles rather than adding Lindqvist's empirical continuous level-ice drag.
+  [Proceedings](https://iptek.its.ac.id/index.php/ijmeir/article/downloadSuppFile/4042/312)
+
+The one shared contact point defines torque and the Coulomb bound. The SIMD native step rebuilds
+a deterministic fixed-load spatial hash, reduces initial relative travel per substep, solves each
+local pair once per substep, and uses only world-owned scratch. The same compiled solver works
+with or without shared memory. No companion code or external assets were used.

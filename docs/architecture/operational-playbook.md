@@ -10205,3 +10205,12 @@ Controlled gait profiles live in extra state, preserving the existing uncontroll
 The optional deck adapter reads the real rigid `bodies` port and returns the opposite integrated `bodyImpulses` per
 substep. The direct HorseMotion path shares the same support concepts and stays renderable without a PhysicsWorld.
 Verified with real terrain, a moving rigid support, plain/shared memory and browser replay.
+
+### Pack ice as a separate world solver (ICE-04)
+
+The optional Rust SIMD module leaves the shared module address area untouched. Its floes and all
+work regions belong to their world. The field bridge uses the existing rigid body layout and
+impulse accumulator, including when SEA-08 applies buoyancy to the same body. The contact
+regression compares those opposite impulses and the Water regression checks the matrix boundary.
+The coupling harness establishes one hash across frame cadence, both memory modes and snapshot
+restore. Continuous-sheet blocks and grounding are outside the current planar pack model.

@@ -3500,3 +3500,36 @@ impulse to that same body. A fixed `bed` or `groundHeight` supplies the fallback
 Enable `readIntent` to receive f64 pairs of desired speed and heading. Enable `readLoad` to receive f64 triples of
 external force in newtons at the COM. Both use the documented layout and body-row order. The built-in target lives
 in world snapshots. Use the public pose, gait and foot readings to place a rig.
+
+## Pack ice and floes
+
+Use `@margoengine/physics/pack-ice` for freely drifting sea-ice disks that collide, raft thin ice and turn
+thicker broken ice into pressure ridges. The state keeps the volume of level, rafted and ridged ice.
+The optional Water ice entry can display those poses on a sampled sea.
+
+```ts
+import { PackIceSolver } from '@margoengine/physics/pack-ice';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const pack = await PackIceSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pack, {
+  restitution: 0,
+  floes: [
+    { position: [-1.015, 0], velocity: [2, 0], radius: 1, thickness: 0.08 },
+    { position: [1.015, 0], velocity: [-2, 0], radius: 1, thickness: 0.08 },
+  ],
+});
+world.advance(1);
+console.log(pack.sample(0).raftedVolume);
+```
+
+Supply a pure shared `Wind` and water `FlowField` for weather and current. Registered producers can instead
+publish `windField` or `currentField` with one layout-1 f64 row of X velocity, Z velocity and density per
+floe. `floeField` publishes layout-1 records in `PACK_ICE_WORDS` order. Lengths, masses, angles and clock
+values are in SI units. Change the world cell and use the same `cellSize` for every participating field.
+
+For a live ship, load with `{ rigid: true }`, pass a waterline capsule for each vessel body row, and
+put `pack-ice` and `rigid` in a staggered group. Add `hull` to that group when SEA-08 provides buoyancy.
+Its body pose pushes the ice. The same contact sends the opposite linear and yaw impulse to the rigid
+body through `bodyImpulses`. `vesselImpulse(row)` reports the signed contact impulse of the current
+step. Use the same `rigidCapacity` as any other contributor to `bodyImpulses`.

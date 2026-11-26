@@ -78,6 +78,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'pack-ice-kernel',
+    crate: 'packages/physics/pack-ice-kernel',
+    blueprint: 'packages/physics/src/pack-ice/pack-ice-kernel.wasm',
+    script: 'packages/physics/scripts/build-pack-ice-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'pack-ice-kernel-shared',
+    crate: 'packages/physics/pack-ice-kernel',
+    blueprint: 'packages/physics/src/pack-ice/pack-ice-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-pack-ice-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',

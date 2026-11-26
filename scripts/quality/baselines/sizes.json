@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20145913,
+  "total": 20151281,
   "history": [
     {
       "date": "2026-10-24",
@@ -12855,6 +12855,12 @@
       "commit": "7a5fc90bc0",
       "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "eab592cfd1",
+      "reason": "ICE-04 adds physics/pack-ice at 5112 B gzip with lazy no-slot SIMD assets. Water/ice changes from 13079 to 13297 B for the structural SeaIce pose reader. A separate adapter would duplicate matrix code. Core plus stage is 24820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13688,6 +13694,7 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
+    "@margoengine/physics/pack-ice": 5368,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/rogue": 7930,
