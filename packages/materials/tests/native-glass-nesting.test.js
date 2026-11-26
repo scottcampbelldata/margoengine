@@ -7,6 +7,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { acquireNativeGlass, nativeGlass } from '../src/native-glass.js';
 import { harness } from '../../post/test/support.js';
+import { acquireDepth } from '../../shared/gpu.js';
+import { VolumeDepthCapture } from '../../sciviz/src/volume-depth.ts';
 import { Tonemap } from '../../tonemap/dist/index.js';
 import { Bloom, PostStack } from '../../post/dist/index.js';
 
@@ -66,3 +68,35 @@ test('native glass alone still captures and presents into the frame colour', () 
     release();
   }
 });
+
+// KB-FILM-NEST2: a capture that begins inside the glass capture can end after it. The shared scene depth (water, html,
+// clustered contact: -15 to 10000) and sciviz volume depth (-0.001 to 39) end after the glass presented at 29: the
+// glass presented a colour nothing had drawn, and the scene went into the glass colour that was never shown.
+const volume = (engine) => VolumeDepthCapture.attach(engine).members.add({ visible: true });
+for (const [name, attach] of [
+  ['the shared scene depth', (engine) => acquireDepth(engine)],
+  ['sciviz volume depth', volume],
+  ['both', (engine) => (acquireDepth(engine), volume(engine))],
+])
+  for (const samples of [1, 4])
+    test(`native glass presents after ${name} ends at ${samples}x`, () => {
+      const h = harness({ samples }),
+        release = acquireNativeGlass(h.engine, () => true);
+      attach(h.engine);
+      let original;
+      h.engine.frameGraph.add({ name: 'test:first', order: -1000, execute: (c) => (original = c.color) });
+      try {
+        for (let frame = 0; frame < 2; frame++) {
+          const log = h.gpu.record(() => h.frame()),
+            passes = log.filter((e) => e[0] === 'beginRenderPass').map((e) => e[1]),
+            present = passes.findIndex((p) => p.label === 'native-glass:present'),
+            frameColour = h.gpu.snap(original);
+          assert.ok(present >= 0, 'the glass presents');
+          assert.equal(passes[present].colorAttachments[0].view, frameColour, 'into the frame colour');
+          assert.equal(present, passes.length - 1, `no capture writes after the glass presented (frame ${frame})`);
+          assert.equal(h.view.c.color, original, 'the frame ends on its own colour');
+        }
+      } finally {
+        release();
+      }
+    });

@@ -21,7 +21,8 @@ await runSuite(
       const lit = await decodePNG(Buffer.from(row.lit.split(',')[1], 'base64'));
       const light = Array.from(lit.data.slice(offset, offset + 3));
       const expected = light.map((x) => Math.round(255 * encode(decode(128 / 255) + decode(x / 255))));
-      console.log({ samples: row.samples, layers: row.layers, taa: row.taa, actual, expected });
+      const { samples, layers, taa, depth } = row;
+      console.log({ samples, layers, taa, depth, actual, expected });
       assert.ok(
         actual.every((x, k) => Math.abs(x - expected[k]) <= 1),
         'native glass must add light in linear values',
@@ -64,7 +65,7 @@ await runSuite(
         assert.ok(Math.abs(before[0] - over(row.layers, false)) <= 1, 'the first frame drew the display blend');
       }
     }
-    // GAP-FILM-LATE: under an HDR capture the frame read is the frame just drawn.
+    // GAP-FILM-LATE, KB-FILM-NEST2: with a capture outside or inside the glass's, the frame read is the one just drawn.
     for (const row of await browser.page.evaluate(() => window.hdrNesting())) {
       console.log({ hdrNesting: row.effect, samples: row.samples, late: row.after === row.before });
       assert.notEqual(

@@ -6,6 +6,24 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: native glass with the shared scene depth or a sciviz volume left the glass's own picture on screen (materials, KB-FILM-NEST2)
+
+- **Repro:** a transmissive glTF material in a scene that also holds water, `html`, clustered contact shadows (the
+  shared scene depth) or a sciviz volume, with no HDR post effect: with the shared depth at 4x, one frame on a new
+  background reads the frame before (`packages/materials/test/native-glass-browser.mjs` `hdrNesting`, `scene depth 4x`).
+  On a recorded pass list the glass presents a colour nothing has drawn into and the later capture writes after it, at
+  4x for both and at 1x for the sciviz volume (`packages/materials/tests/native-glass-nesting.test.js`).
+- **Cause:** captures nest, but the native glass capture presented at order 29 whatever had begun inside it: the shared
+  depth begins at -15 and ends at 10000, the volume depth begins at -0.001 and ends at 39. The glass copied its own
+  empty target to the frame, and the inner capture then wrote the scene into the glass's target, which was not shown
+  again until the next frame.
+- **Fix:** the glass presents at 29 only while it still owns the frame's colour; with a capture still open inside it,
+  it presents at 10000.5, after every such capture has ended (`packages/materials/src/native-glass.js`). Scenes with no
+  inner capture draw the same passes as before. A frame graph keeps a target until its last user is done (O'Donnell,
+  "FrameGraph: Extensible Rendering Architecture in Frostbite", GDC 2017, https://www.gdcvault.com/play/1024612);
+  no source treats this engine's pass orders.
+- **Regression:** the two tests above, the GPU one on native WebGPU and the WebGL2 layer.
+
 ### Fixed 2026-11-25: on ANGLE Direct3D 11 a lit glTF scene with image light, both shadow kinds and LightBounce crashed the GPU process (KB-BOUNCE-COMPATUNITS1, webgl2-compat)
 
 - **Repro:** `node scripts/run-with-timeout.mjs -- node scripts/compat-units-gpu-check.js --compat` (Edge, default
