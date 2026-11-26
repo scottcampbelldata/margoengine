@@ -14303,13 +14303,17 @@ split faces or edges. An existing front advances through an eligible adjacent te
 when its projected principal plane crosses the material. Front edge flags travel with
 their material through cuts and snapshots. The advancing front drops its released edge from
 all incident tetrahedra. General mixed-mode propagation remains open.
+An authored finite blade seeds eligible tensile fronts where its paired lips share two
+particles. Complete separation leaves no bonded lip edge. A candidate still needs a current
+principal plane that crosses adjacent cell material. An exactly tangent plane alone does not
+advance by opening a coplanar existing face.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.
 Nucleation can select another eligible cell in the same step. An authored blade still reports
 a geometry error when its exact requested cut cannot be represented.
-With released front edges retired, the optional entry measures 141,779 B gzip.
-The base is 45,269 B and the lazy native kernel is 96,646 B.
+With prescribed front seeding, the optional entry measures 141,859 B gzip.
+The base is 45,366 B and the lazy native kernel is 96,646 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -14518,6 +14522,8 @@ limit the paired impulse. A configured skid exponent adds signed two-region shea
 braking, including lockup. A configured shear radius uses actual wheel and ground speed.
 The optional side-force field combines rim shear and passive sidewall earth pressure with default
 gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
+A supplied `lateralShearLength` resolves directional shear in forward rolling within the same
+yield magnitude. Measured FJS-1 cases cover side force near 0.6 slip and four yaw angles.
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
@@ -14542,7 +14548,7 @@ crest-to-trough relief at one straight locked-wheel condition. Supply the same e
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 14,719 B gzip with a 15,161 B ceiling. Both Wasm assets are 37,818 B raw and 15,369 B gzip each.
+The optional entry is 14,749 B gzip with a 15,161 B ceiling. Both Wasm assets are 38,545 B raw and 15,635 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -31648,8 +31654,9 @@ Grouser transport can backfill its solver-owned trench from earlier cuts or feed
 The straight locked condition matches both measured relative bank crests. Absolute scanned
 profiles at powered slip and oblique angles remain open.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
-brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
-opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
+brake cases pass. Oblique rolling publishes shear and sidewall force, with a live opposing chassis
+impulse. Directional rolling shear matches FJS-1 side loads around 0.6 slip at four yaw angles.
+Reverse travel and the high-slip end of that side-load range remain open.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

@@ -85,6 +85,7 @@ export interface SoilMaterial {
     readonly cohesion?: number;
     readonly friction?: number;
     readonly shearLength?: number;
+    readonly lateralShearLength?: number;
     readonly compaction?: number;
     readonly dustFraction?: number;
     readonly density?: number;
