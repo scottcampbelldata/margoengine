@@ -180,6 +180,42 @@ console.log(restored.meshes[0].name);
 engine.start();
 ```
 
+## Asset queue and registry (`@margoengine/scene/assets`)
+
+`AssetQueue` runs loading tasks and tells you how each ended; `AssetRegistry` keeps assets by key so a texture or model can be swapped while the scene runs.
+
+```ts
+import {AssetQueue, AssetRegistry} from 'margoengine/scene/assets';
+
+// Real apps pass file URLs; data: URLs keep this example self-contained.
+const level = 'data:application/json,{"title":"Level 1"}';
+const queue = new AssetQueue({concurrency: 4, retries: 2, retryDelay: 250});
+queue.addJSON<{title: string}>('config', level, {onSuccess: (config) => console.log(config.title)});
+queue.addBinary('terrain', 'data:application/octet-stream;base64,AAECAw==');
+queue.add('sprites', async ({signal, progress}) => {   // any typed task: the loader gets the abort signal
+  const response = await fetch(level, {signal});
+  progress(0.5);
+  return response.json();
+});
+queue.on('progress', ({fraction, finished, total}) => console.log(`${finished}/${total}`, fraction));
+const {ok, done, failed} = await queue.run(AbortSignal.timeout(30_000)); // never rejects for a task
+if (!ok) await queue.retryFailed();
+
+const assets = new AssetRegistry<string>({
+  loadURL: async (url) => (await fetch(url)).text(),
+  onMissing: (key, reason) => 'data:text/plain,placeholder', // an unknown key or a failed load becomes this, once
+});
+assets.fromJSON({greeting: 'data:text/plain,Hello', config: {url: level, type: 'json'}});
+assets.subscribe('greeting', (text) => console.log('greeting is now', text));
+await assets.load('greeting');
+await assets.swap('greeting', 'data:text/plain,Hallo'); // subscribers see the new value; `dispose` gets the old one
+console.log(assets.toJSON());                    // the URL definitions, for saving
+```
+
+- `AssetQueue({concurrency = 4, retries = 0, retryDelay = 250, fetch})`: `add(name, load, {retries, weight, onSuccess, onError})` and the helpers `addText`, `addJSON`, `addBinary` (progress from `Content-Length`) and `addImage`. Names are unique. A failing task is attempted again `retries` times with `retryDelay * 2^(n-1)` ms between attempts. `run(signal)` resolves with `{done, failed, cancelled, ok}` and never rejects for a task; aborting `signal` cancels what is running and what is pending. Events (`on` returns the unsubscribe function): `success` and `error` per task, `progress` (`{fraction, finished, total, task}`, weighted by `weight`) and `finish`. `retryFailed()` sets the failed and cancelled tasks back to pending and runs them.
+- `AssetRegistry({loadURL, dispose, onMissing})`: `define(key, urlOrFunction, type)`, `fromJSON(map)` and `toJSON()`, `load(key, signal)` (one load shared by every caller; the value is kept), `get`, `has`, `keys`, `subscribe(key, callback)` (called with the value now if loaded, and after every swap), `swap(key, source)`, `remove(key)` and `dispose()`. `swap` cancels a load in flight, loads the new source at once when the key is loaded or watched (otherwise the next `load` does), then calls `dispose` on the old value and `subscribe`rs with the new one. `onMissing(key, 'undefined' | 'failed', error)` may return a replacement source; the registry tries it once, and `load` rejects when it returns nothing. Without `loadURL` the registry fetches a URL and reads it as `type`: `'json'`, `'text'`, else bytes.
+- Not here: the visual loading screen (`@margoengine/ui` draws one from `progress`) and loading engine objects (use `loadContainer` above, or pass `(url, signal) => loadGLTF(...)` as a task).
+
 ## Good to know
 
 - World results are right as soon as a value is written, before any frame: they read the local values up the parents, while `mesh.matrix` holds the last frame's matrix. Each call walks up the parents, so read `mesh.matrix` when a per-frame loop over many meshes needs no fresher value.

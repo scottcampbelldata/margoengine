@@ -59,6 +59,10 @@
       "types": "./dist/clone.d.ts",
       "import": "./dist/clone.js"
     },
+    "./assets": {
+      "types": "./dist/assets.d.ts",
+      "import": "./dist/assets.js"
+    },
     "./container": {
       "types": "./dist/container.d.ts",
       "import": "./dist/container.js"
