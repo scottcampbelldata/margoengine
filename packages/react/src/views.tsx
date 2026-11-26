@@ -1,6 +1,6 @@
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Camera, RenderView as CoreView } from '@margoengine/core/extension';
-import { Context, useCommit, useScene, type World } from './internal.js';
+import { Context, sceneContexts, useCommit, useScene, type World } from './internal.js';
 import { useSceneShadows } from './scene-shadows.js';
 import { fault } from '../../shared/errors.js';
 
@@ -46,6 +46,7 @@ export function Scene({ name, background, children }: SceneProps) {
     () => (world ? { ...parent, world, registry: null, shadows, requestShadows } : null),
     [parent, world, shadows, requestShadows],
   );
+  if (value) sceneContexts.set(value.world, value);
   return value ? <Context.Provider value={value}>{children}</Context.Provider> : null;
 }
 

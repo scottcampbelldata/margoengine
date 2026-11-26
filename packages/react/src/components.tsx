@@ -10,6 +10,7 @@ import {
   Suspense,
   type ReactNode,
   type CSSProperties,
+  type Ref,
 } from 'react';
 import {
   Engine,
@@ -40,6 +41,7 @@ import {
   one,
   useCommit,
   createViews,
+  sceneContexts,
   type Scene,
   type Registry,
   type Resources,
@@ -509,6 +511,8 @@ export function MargoCanvas({
     }),
     [stage, frames, invalidate],
   );
+  // A cache write, the same on every render: a `<ScenePortal>` into the default scene reads it.
+  if (scene?.engine.scene) sceneContexts.set(scene.engine.scene, scene);
   return (
     <MargoContext.Provider value={value}>
       <canvas
@@ -596,6 +600,31 @@ export interface MeshProps extends PointerHandlers {
 }
 /** The mesh component. */
 export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh(props, ref) {
+  return useMeshBinding(props, ref);
+});
+/** Props of `<MeshNode>`: an existing engine mesh plus the `<Mesh>` props, which apply only when passed. */
+export interface MeshNodeProps extends MeshProps {
+  /**
+   * The engine mesh to mount: `engine.createMesh()`, a loaded model's `root` or one of its nodes. It must belong to this
+   * Canvas's engine and to the scene this element sits in (the default scene, or the enclosing `<Scene>`'s).
+   */
+  node: MeshHandle;
+  /** Dispose the mesh when this element unmounts or `node` changes. Default false: the caller keeps owning it. */
+  dispose?: boolean;
+}
+/**
+ * Mounts a mesh made outside React into the tree: its children attach under it, the pointer handlers, `layers` and
+ * shadow props apply to it, and `position`, `rotation` and `scale` set it only when passed (left out, the mesh keeps its
+ * own transform). A mesh with no parent is placed under the nearest `<Mesh>`, as a `<Mesh>` is, and unparented again on
+ * unmount; a mesh that already has a parent (a model's node) stays where it is. The ref is the mesh itself.
+ */
+export const MeshNode = /* @__PURE__ */ forwardRef<MeshRef, MeshNodeProps>(function MeshNode(
+  { node, dispose = false, ...props },
+  ref,
+) {
+  return useMeshBinding(props, ref, node as unknown as EngineMesh, dispose);
+});
+function useMeshBinding(props: MeshProps, ref: Ref<MeshRef>, existing?: EngineMesh, owned = true) {
   const {
     position = zero,
     rotation = zero,
@@ -630,27 +659,40 @@ export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh
   );
   registry.model = model; // follows a model that finishes loading after this mesh mounted
   useCommit(() => {
+    if (existing && (engine.meshes.get(existing.id) !== existing || existing.scene !== (world ?? engine.scene)))
+      throw fault(
+        'attached',
+        'MeshNode node is disposed, from another engine or in another scene; pass a live mesh of this scene',
+        'react-usage',
+      );
     // In the enclosing <Scene>'s engine scene, else the default one.
-    const mesh = (world ?? engine).createMesh() as EngineMesh;
+    const mesh = existing ?? ((world ?? engine).createMesh() as EngineMesh),
+      // A node that already has a parent (a model's node) keeps it.
+      placed = parent && (!existing || engine.store.parents[mesh.id] === -1) ? parent : null;
     registry.current = mesh;
     ownerHook.remember?.(mesh, owner);
     try {
-      parent?.register(mesh);
+      placed?.register(mesh);
       for (const child of registry.children) if (engine.meshes.get(child.id) === child) child.setParent(mesh);
       for (const attach of registry.attachments) attach(mesh);
       setNode(mesh);
     } catch (error) {
-      parent?.unregister(mesh);
+      placed?.unregister(mesh);
       registry.current = null;
-      mesh.dispose();
+      if (!existing) mesh.dispose();
       throw error;
     }
     return () => {
-      parent?.unregister(mesh);
+      placed?.unregister(mesh);
       registry.current = null;
-      mesh.dispose();
+      if (!existing) mesh.dispose();
+      // An owned node outlives StrictMode's effect replay, which mounts it again before the microtask runs.
+      else if (owned)
+        queueMicrotask(() => {
+          if (registry.current !== mesh && !engine.disposed && engine.meshes.get(mesh.id) === mesh) mesh.dispose();
+        });
     };
-  }, [engine, world, parent, registry]);
+  }, [engine, world, parent, registry, existing, owned]);
   // The record reads the current props, so a new handler function needs no re-registration; it is registered while the
   // mesh has any handler at all.
   const latestEvents = useRef<PointerHandlers>(props);
@@ -667,10 +709,11 @@ export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh
   }, [registry, node, pointerHandlers, listening]);
   useCommit(() => {
     const mesh = registry.current;
+    // A mounted node keeps each part of its own transform that is not passed.
     if (mesh) {
-      mesh.setPosition(position);
-      mesh.setRotation(rotation);
-      mesh.setScale(scale);
+      if (!existing || props.position) mesh.setPosition(position);
+      if (!existing || props.rotation) mesh.setRotation(rotation);
+      if (!existing || props.scale) mesh.setScale(scale);
     }
   }, [
     registry,
@@ -711,7 +754,7 @@ export const Mesh = /* @__PURE__ */ forwardRef<MeshRef, MeshProps>(function Mesh
       <Context.Provider value={scene}>{children}</Context.Provider>
     </>
   );
-});
+}
 
 /** Declarative box geometry; place it inside a Mesh. */
 export function BoxGeometry({ args = one }: { args?: Vec3 }) {
