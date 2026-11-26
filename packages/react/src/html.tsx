@@ -93,8 +93,12 @@ export function Html({
     let active = true,
       current: HTMLOverlay | undefined,
       item: HTMLModule.Label | undefined;
-    const entry = acquireOverlay(engine),
-      element = engine.canvas.ownerDocument.createElement('div');
+    // A canvas outside a DOM document (the GPU-free stage of `/test`) has nowhere to put the overlay. Refuse before the
+    // overlay is acquired: acquiring first left its rejected load unhandled and threw a bare TypeError here.
+    const document = engine.canvas.ownerDocument as Document | null | undefined;
+    if (!document) throw fault('unsupported', 'Html needs a canvas in a DOM document', 'react-usage');
+    const element = document.createElement('div'),
+      entry = acquireOverlay(engine);
     const attach = (mesh: EngineMesh) => {
       item?.setMesh(mesh as unknown as MeshHandle);
       item?.setOffset(latest.current.position);

@@ -130,3 +130,26 @@ test('borrowed stage and supplied container survive cleanup; failed mount frees 
   await assert.rejects(createTestRenderer(h(Bad)), /mount failed/);
   assert.equal(document.body.children.length, 0);
 });
+
+// Html on the GPU-free stage, whose canvas is in no document, threw a bare TypeError from its effect and left the
+// overlay load it had started rejected and unhandled, which ended the Node process.
+test('Html on a canvas outside a DOM document refuses with a coded error and leaves no unhandled rejection', async () => {
+  const { Html } = await import('../dist/html.js');
+  const unhandled = [],
+    onUnhandled = (error) => unhandled.push(error);
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    await assert.rejects(createTestRenderer(h(Html, null, 'label')), (error) => {
+      const errors = error.errors ?? [error];
+      assert.ok(
+        errors.some((e) => e.code === 'unsupported' && /Html needs a canvas in a DOM document/.test(e.message)),
+      );
+      return true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
+  assert.equal(document.body.children.length, 0);
+});

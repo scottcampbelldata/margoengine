@@ -3027,6 +3027,7 @@ export const entries = [
       'Event target must be a live mesh in this test renderer',
       'GPU shadows require a rendering Canvas',
       'Geometry and material require <Mesh>; render them inside one',
+      'Html needs a canvas in a DOM document',
       'Instance requires Instances; place it below an <Instances> provider',
       'useMotion requires MotionPathControls; call it inside a <MotionPathControls>',
       'MarchingCube requires MarchingCubes; place it inside a <MarchingCubes>',
