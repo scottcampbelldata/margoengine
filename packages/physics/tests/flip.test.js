@@ -250,6 +250,116 @@ test('a snapshot restores the liquid bit for bit, and a second run gives the sam
   assert.equal(b.world.hash(), hash, 'a second run');
 });
 
+test("water slips along a solid as along the box's own sides: a dam break runs alike on either floor", () => {
+  // KB-FLIP-SOLIDSLIP1: the grid zeroed every face touching a solid, the faces inside it too, and the transfers read
+  // those faces as the liquid's neighbours, so water beside a solid felt a drag the box's sides do not give and, through
+  // APIC's affine part, ran 6.8 percent ahead of Martin and Moyce's front by Z = 14. Now a solid's side reads as the box's.
+  const a = 0.05715,
+    h = a / 12,
+    nx = Math.round((16 * a) / h),
+    fronts = (rows, wall) => {
+      const liquid = new FlipSolver(),
+        lift = rows * h,
+        x0 = wall ? 3 * h : 0,
+        solids = [];
+      if (rows) solids.push({ min: [0, 0, 0], max: [(nx + (wall ? 3 : 0)) * h, lift, h] });
+      if (wall) solids.push({ min: [0, 0, 0], max: [x0, (30 + rows) * h, h] });
+      const world = new PhysicsWorld({ rate: { num: 240, den: 1 }, gravity: [0, -G, 0] }).add(liquid, {
+        cells: [nx + (wall ? 3 : 0), 30 + rows, 1],
+        cellSize: h,
+        rate: 2,
+        initial: (x, y) => x > x0 && x < x0 + a && y > lift && y < lift + 2 * a,
+        ...(solids.length ? { solids } : {}),
+      });
+      const out = [];
+      for (let f = 1; f <= 72; f++) {
+        world.advance(f);
+        if (f % 24) continue;
+        const pos = liquid.positions();
+        let front = 0;
+        for (let q = 0; q < pos.length; q += 3) front = Math.max(front, pos[q] - x0);
+        out.push(front);
+      }
+      return out;
+    },
+    box = fronts(0, false);
+  for (const [rows, wall] of [
+    [2, false],
+    [0, true],
+  ]) {
+    const other = fronts(rows, wall);
+    // Alike to round-off (the wall's case shifts every position by three cells): a micrometre, a 4,000th of a cell.
+    for (let n = 0; n < box.length; n++)
+      assert.ok(Math.abs(other[n] - box[n]) < 1e-6, `solid ${rows ? 'floor' : 'wall'}: ${other} against ${box}`);
+  }
+});
+
+test('a particle carried into a solid comes back out at the face it went in by, never through a thin one', () => {
+  // KB-PHYS-AUDIT2 (FLUID-03): a particle whose step ended in a solid used to stay where it was, so it froze, its
+  // motion along the solid's face lost, and tried again the next substep. Now it comes out at the solid's nearest face on
+  // the side it came from.
+  const h = 0.05,
+    liquid = new FlipSolver();
+  new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] }).add(liquid, {
+    cells: [8, 8, 1],
+    cellSize: h,
+    initial: () => false,
+    // A shelf one cell thick (row 4, 0.2 to 0.25 m) and a block (columns 5 and 6, rows 0 to 2).
+    solids: [
+      { min: [0, 0.2, 0], max: [0.2, 0.25, h] },
+      { min: [0.25, 0, 0], max: [0.35, 0.15, h] },
+    ],
+  });
+  const out = (to, from) => {
+    const p = [...to];
+    assert.equal(liquid['outOfSolid'](p, ...from), true);
+    return p;
+  };
+  // From above, a little way in: out at the top face, x and z kept.
+  let p = out([0.1, 0.24, 0.025], [0.1, 0.27, 0.025]);
+  assert.ok(Math.abs(p[1] - 0.25) < 1e-6 && p[0] === 0.1 && p[2] === 0.025, `${p}`);
+  // From above, most of the way through the thin shelf: still out at the top, not through to the bottom.
+  p = out([0.1, 0.205, 0.025], [0.1, 0.27, 0.025]);
+  assert.ok(Math.abs(p[1] - 0.25) < 1e-6, `${p}`);
+  // From below: out at the bottom face.
+  p = out([0.1, 0.21, 0.025], [0.1, 0.18, 0.025]);
+  assert.ok(Math.abs(p[1] - 0.2) < 1e-6, `${p}`);
+  // Into the block's side, from the left: out at its left face.
+  p = out([0.26, 0.05, 0.025], [0.24, 0.05, 0.025]);
+  assert.ok(Math.abs(p[0] - 0.25) < 1e-6 && p[1] === 0.05, `${p}`);
+  // Outside every solid: left alone.
+  p = out([0.1, 0.1, 0.025], [0.1, 0.1, 0.025]);
+  assert.deepEqual(p, [0.1, 0.1, 0.025]);
+
+  // A dam break onto a block: every particle the flow carries into the block comes out of it on the side it came from.
+  const flow = new FlipSolver(),
+    g = 0.02,
+    world = new PhysicsWorld({ rate: { num: 120, den: 1 }, gravity: [0, -G, 0] }).add(flow, {
+      cells: [80, 30, 1],
+      cellSize: g,
+      rate: 2,
+      initial: (x, y) => x < 0.4 && y < 0.4,
+      solids: [{ min: [1.0, 0, 0], max: [1.1, 0.12, g] }],
+    });
+  const own = flow['outOfSolid'].bind(flow);
+  let entered = 0,
+    wrong = 0;
+  flow['outOfSolid'] = (to, fx, fy, fz) => {
+    const inside = to[0] > 1.0 && to[0] < 1.1 && to[1] < 0.12;
+    const ok = own(to, fx, fy, fz);
+    if (inside) {
+      entered++;
+      const stillIn = to[0] > 1.0 && to[0] < 1.1 && to[1] < 0.12,
+        side = (fx <= 1.0 && to[0] <= 1.0) || (fx >= 1.1 && to[0] >= 1.1) || (fy >= 0.12 && to[1] >= 0.12);
+      if (!ok || stillIn || !side) wrong++;
+    }
+    return ok;
+  };
+  for (let f = 1; f <= 120; f++) world.advance(f);
+  assert.ok(entered > 0, 'the flow carries particles into the block');
+  assert.equal(wrong, 0, `${wrong} of ${entered} left in the block or out the wrong side`);
+});
+
 test('bad boxes are refused, each naming its fix', () => {
   const w = new PhysicsWorld({ rate: { num: 60, den: 1 } });
   assert.throws(() => w.add(new FlipSolver('a'), { cells: [0, 4, 4] }), RangeError);

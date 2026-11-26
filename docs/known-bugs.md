@@ -6,6 +6,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: water beside a solid box ran faster than beside the liquid box's own sides (KB-FLIP-SOLIDSLIP1, physics, flip)
+
+- **Repro:** Martin and Moyce's dam break (`packages/physics/tests/flip.test.js`) on a floor of two solid rows instead of
+  the box's own floor: the front ran 0.8 to 6.8 percent ahead of their measured times from Z = 5 on, where the box's
+  floor keeps it within 2.8 percent. At 0.3 s the front stood at 8.65 column widths against 8.16.
+- **Cause:** three places read the faces inside a solid as the liquid's neighbours. After the pressure solve the grid
+  zeroed every face touching a solid, including the faces wholly inside it. The extrapolation kept the particles'
+  transfer to those faces, with APIC's affine part reaching into the wall. The transfers' stencils interpolated across
+  the solid's side, where at the box's own sides they clamp. Water within half a cell of a solid read a velocity and
+  gradient that the box's sides do not give.
+- **Fix:** faces inside a wall are left to the extrapolation, which never takes them as known and fills them from the
+  liquid (the density projection's displacement too). The transfers clamp at a solid's side as at the box's
+  (`wallFaces`, the `walls` argument of `toGrid`, `toParticles` and `sampleVelocity`). A solid floor or wall now gives
+  the box's own result to round-off.
+- **Regression:** "water slips along a solid as along the box's own sides: a dam break runs alike on either floor" in
+  `packages/physics/tests/flip.test.js`.
+
 ### Fixed 2026-11-26: a cloth torn in two failed to rebuild its surface (KB-SOFT-SPLITDENSITY1, physics soft)
 
 - **Repro:** `node --test --test-name-pattern="cloth torn in two" packages/physics/tests/soft-cells.test.js` failed on
@@ -408,7 +425,11 @@ regression test.
 - **FLUID-03, particles said to be jittered are seeded on a lattice, and a particle that would enter a solid stays
   put.** **Cause:** `packages/physics/src/flip/transfer.ts` describes jittered seeding while `solver.ts` places
   particles at exact octant centres, and `solver.ts` holds a particle in place instead of projecting it out of the
-  solid.
+  solid. **Fixed 2026-11-26:** the lattice is kept and documented, because jittered seeds set still water moving at
+  6 mm/s and gave water at rest in a deck a sideways load (measured; three tests caught it). A particle carried into a
+  solid now comes out at the solid's nearest face on the side it came from, never through a thin solid. Regression: "a
+  particle carried into a solid comes back out at the face it went in by, never through a thin one" in
+  `packages/physics/tests/flip.test.js`.
 - **AERO-01, rotated bodies get the wrong panels.** **Repro:** rotate a non-box collider 45° in a steady wind.
   **Cause:** `packages/physics/src/aero.ts` builds panels from the world-axis bounding box as if it were a body-frame
   box.

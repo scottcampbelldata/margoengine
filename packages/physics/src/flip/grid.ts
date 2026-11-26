@@ -247,6 +247,10 @@ export function project(
     const theta = Math.max(THETA_FLOOR, -phi[c]! / (-phi[c]! + 0.5 * h));
     return (-(1 - theta) / theta) * pressure[c]!;
   };
+  // A face inside a wall (solid or outside the box on both sides) is no boundary: its velocity runs along the wall, and
+  // is left to the extrapolation that follows, so the liquid slips along a solid as it does along the box's sides. Only
+  // a face between a wall and the liquid's side takes the wall's velocity.
+  const walled = (a: number, b: number): boolean => (a < 0 || kind[a] === SOLID) && (b < 0 || kind[b] === SOLID);
   for (let k = 0; k < nz; k++)
     for (let j = 0; j < ny; j++)
       for (let i = 0; i <= nx; i++) {
@@ -258,6 +262,7 @@ export function project(
           u[f]! -= k2 * (a < 0 ? pressure[b]! - openGhost(b) : openGhost(a) - pressure[a]!);
           continue;
         }
+        if (walled(a, b)) continue;
         if (a < 0 || b < 0 || kind[a] === SOLID || kind[b] === SOLID) {
           u[f] = 0;
           continue;
@@ -278,6 +283,7 @@ export function project(
           v[f]! -= k2 * (a < 0 ? pressure[b]! - openGhost(b) : openGhost(a) - pressure[a]!);
           continue;
         }
+        if (walled(a, b)) continue;
         if (a < 0 || b < 0 || kind[a] === SOLID || kind[b] === SOLID) {
           v[f] = 0;
           continue;
@@ -298,6 +304,7 @@ export function project(
           w[f]! -= k2 * (a < 0 ? pressure[b]! - openGhost(b) : openGhost(a) - pressure[a]!);
           continue;
         }
+        if (walled(a, b)) continue;
         if (a < 0 || b < 0 || kind[a] === SOLID || kind[b] === SOLID) {
           w[f] = 0;
           continue;

@@ -58,6 +58,7 @@ export class FlipSolver implements Solver<FlipParams> {
     protected countRegion: Region | null;
     protected pressureRegion: Region | null;
     protected solid: Uint8Array<ArrayBuffer>;
+    protected wallMask: Uint8Array[] | undefined;
     protected kind: Uint8Array<ArrayBuffer>;
     protected phi: Float64Array<ArrayBuffer>;
     protected vel: Float64Array[];
@@ -80,6 +81,7 @@ export class FlipSolver implements Solver<FlipParams> {
     protected afterStep(_context: StepContext, _dt: number): void;
     protected acceleration(_x: number, _y: number, _z: number, _v: V3, out: V3): V3;
     protected varying(): boolean;
+    protected outOfSolid(to: V3, fx: number, fy: number, fz: number): boolean;
     protected toWorld(x: number, y: number, z: number): V3;
     seaSources(): {
         x: number;
@@ -137,11 +139,13 @@ export const THETA_FLOOR = 0.01;
 
 export function project(g: GridShape, kind: Uint8Array, phi: Float64Array, u: Float64Array, v: Float64Array, w: Float64Array, dt: number, rho: number, pressure: Float64Array, open?: readonly boolean[], prescribed?: readonly boolean[], tolerance?: number, maxIterations?: number, source?: Float64Array): number;
 
-export function sampleVelocity(g: GridShape, vel: Float64Array[], x: number, y: number, z: number, out: [number, number, number]): [number, number, number];
+export function sampleVelocity(g: GridShape, vel: Float64Array[], x: number, y: number, z: number, out: [number, number, number], walls?: Uint8Array[]): [number, number, number];
 
-export function toGrid(g: GridShape, p: Float64Array, count: number, vel: Float64Array[], mass: Float64Array[]): void;
+export function toGrid(g: GridShape, p: Float64Array, count: number, vel: Float64Array[], mass: Float64Array[], walls?: Uint8Array[]): void;
 
-export function toParticles(g: GridShape, p: Float64Array, count: number, vel: Float64Array[]): void;
+export function toParticles(g: GridShape, p: Float64Array, count: number, vel: Float64Array[], walls?: Uint8Array[]): void;
+
+export function wallFaces(g: GridShape, solid: Uint8Array): Uint8Array[];
 
 // Not exported from this entry, but used by the exports above:
 

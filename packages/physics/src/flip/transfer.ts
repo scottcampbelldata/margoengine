@@ -6,8 +6,10 @@
 //   v_p . e_a = sum_i w_aip v_ai and c_pa = sum_i grad(w_aip) v_ai, with trilinear weights. Linear and angular momentum
 //   are kept by both transfers; the grid's filtering keeps it free of FLIP's ringing.
 // - Y. Zhu and R. Bridson, "Animating sand as a fluid", ACM Trans. Graph. 24(3), 965-972, 2005: eight particles a cell,
-//   jittered in its octants; the liquid's surface from the particles, phi(x) = |x - xbar| - rbar with xbar and rbar the
-//   averages weighted by k(s) = max(0, (1 - s^2)^3), s = |x - x_p| / R, R twice the particle spacing; velocities carried
+//   jittered in its octants. Margo seeds them at the octants' centres instead, without the jitter: still water then
+//   holds the density projection's rest state exactly, so it stays still, and water at rest in a deck puts no sideways
+//   load on its hull; jittered seeds set it moving at millimetres a second from the start (measured, cells of 5 cm).
+//   The liquid's surface from the particles, phi(x) = |x - xbar| - rbar with xbar and rbar the averages weighted by k(s) = max(0, (1 - s^2)^3), s = |x - x_p| / R, R twice the particle spacing; velocities carried
 //   into the air a few cells for the particles near the surface.
 import { AIR, cell, faceU, faceV, faceW, type GridShape, LIQUID, SOLID } from './grid.js';
 
@@ -28,7 +30,7 @@ interface Stencil {
  * The base node and fractions of point (x, y, z) on the face grid of axis `a` (0 x, 1 y, 2 z) of grid `g`, whose
  * origin (the grid's lowest corner) is at 0: x faces sit at (i h, (j + 1/2) h, (k + 1/2) h), and so on.
  */
-function stencil(g: GridShape, a: number, x: number, y: number, z: number, out: Stencil): Stencil {
+function stencil(g: GridShape, a: number, x: number, y: number, z: number, out: Stencil, walls?: Uint8Array): Stencil {
   const h = g.h,
     gx = x / h - (a === 0 ? 0 : 0.5),
     gy = y / h - (a === 1 ? 0 : 0.5),
@@ -46,6 +48,56 @@ function stencil(g: GridShape, a: number, x: number, y: number, z: number, out: 
   out.fx = Math.min(Math.max(gx - i, 0), 1);
   out.fy = my > 1 ? Math.min(Math.max(gy - j, 0), 1) : 0;
   out.fz = mz > 1 ? Math.min(Math.max(gz - k, 0), 1) : 0;
+  if (walls) {
+    // Across a solid's side (a face row inside the wall next to one that is not), clamp as at the box's own sides: the
+    // value of the row beside the wall, the gradient from that row inward.
+    const m = [mx, my, mz];
+    for (let b = 0; b < 3; b++) {
+      if (b === a || m[b]! < 2) continue;
+      const n = [out.i, out.j, out.k],
+        f = [out.fx, out.fy, out.fz];
+      // The stencil's nearest nodes along the other axes.
+      for (let c = 0; c < 3; c++) if (c !== b) n[c] = Math.min(n[c]! + (f[c]! >= 0.5 ? 1 : 0), m[c]! - 1);
+      const lo = n.slice(),
+        hi = n.slice();
+      hi[b]!++;
+      const w0 = walls[faceIndex(g, a, lo[0]!, lo[1]!, lo[2]!)],
+        w1 = walls[faceIndex(g, a, hi[0]!, hi[1]!, hi[2]!)];
+      if (w0 === w1) continue;
+      const base = b === 0 ? out.i : b === 1 ? out.j : out.k;
+      let nb: number, nf: number;
+      if (w0) [nb, nf] = base + 1 <= m[b]! - 2 ? [base + 1, 0] : [base, 1];
+      else [nb, nf] = base - 1 >= 0 ? [base - 1, 1] : [base, 0];
+      if (b === 0) [out.i, out.fx] = [nb, nf];
+      else if (b === 1) [out.j, out.fy] = [nb, nf];
+      else [out.k, out.fz] = [nb, nf];
+    }
+  }
+  return out;
+}
+
+/**
+ * Which faces of each axis lie inside a wall, solid (or beyond the box) on both sides: 1 for such a face. The transfers
+ * take them as `walls`, so the liquid reads a solid's side as it reads the box's own sides.
+ */
+export function wallFaces(g: GridShape, solid: Uint8Array): Uint8Array[] {
+  const out: Uint8Array[] = [],
+    n = [g.nx, g.ny, g.nz];
+  for (let a = 0; a < 3; a++) {
+    const [mx, my, mz] = faceCount(g, a),
+      m = new Uint8Array(mx * my * mz);
+    for (let k = 0; k < mz; k++)
+      for (let j = 0; j < my; j++)
+        for (let i = 0; i < mx; i++) {
+          const b = [i, j, k],
+            c = [i, j, k];
+          b[a]!--;
+          const sa = b[a]! < 0 || solid[cell(g, b[0]!, b[1]!, b[2]!)] === 1,
+            sb = c[a]! >= n[a]! || solid[cell(g, c[0]!, c[1]!, c[2]!)] === 1;
+          if (sa && sb) m[faceIndex(g, a, i, j, k)] = 1;
+        }
+    out.push(m);
+  }
   return out;
 }
 
@@ -56,9 +108,17 @@ const faceCount = (g: GridShape, a: number): [number, number, number] =>
 
 /**
  * Particles to faces (APIC): fills `vel[a]` with each face's mass-weighted velocity and `mass[a]` with its weight,
- * from `count` particles of `p` (PARTICLE_WORDS each). Faces no particle reaches keep 0 weight.
+ * from `count` particles of `p` (PARTICLE_WORDS each). Faces no particle reaches keep 0 weight. `walls` (from
+ * wallFaces) makes a solid's side read as the box's own sides.
  */
-export function toGrid(g: GridShape, p: Float64Array, count: number, vel: Float64Array[], mass: Float64Array[]): void {
+export function toGrid(
+  g: GridShape,
+  p: Float64Array,
+  count: number,
+  vel: Float64Array[],
+  mass: Float64Array[],
+  walls?: Uint8Array[],
+): void {
   const s: Stencil = { i: 0, j: 0, k: 0, fx: 0, fy: 0, fz: 0 },
     h = g.h;
   for (let a = 0; a < 3; a++) {
@@ -74,7 +134,7 @@ export function toGrid(g: GridShape, p: Float64Array, count: number, vel: Float6
         cx = p[o + 6 + 3 * a]!,
         cy = p[o + 7 + 3 * a]!,
         cz = p[o + 8 + 3 * a]!;
-      stencil(g, a, x, y, z, s);
+      stencil(g, a, x, y, z, s, walls?.[a]);
       for (let dk = 0; dk < 2; dk++) {
         const kk = s.k + dk;
         if (kk >= mz) continue;
@@ -105,8 +165,17 @@ export function toGrid(g: GridShape, p: Float64Array, count: number, vel: Float6
   }
 }
 
-/** Faces to particles (APIC): each particle's velocity and affine vectors from the faces' velocities. */
-export function toParticles(g: GridShape, p: Float64Array, count: number, vel: Float64Array[]): void {
+/**
+ * Faces to particles (APIC): each particle's velocity and affine vectors from the faces' velocities. `walls` (from
+ * wallFaces) makes a solid's side read as the box's own sides.
+ */
+export function toParticles(
+  g: GridShape,
+  p: Float64Array,
+  count: number,
+  vel: Float64Array[],
+  walls?: Uint8Array[],
+): void {
   const s: Stencil = { i: 0, j: 0, k: 0, fx: 0, fy: 0, fz: 0 },
     h = g.h;
   for (let a = 0; a < 3; a++) {
@@ -114,7 +183,7 @@ export function toParticles(g: GridShape, p: Float64Array, count: number, vel: F
       va = vel[a]!;
     for (let q = 0; q < count; q++) {
       const o = q * PARTICLE_WORDS;
-      stencil(g, a, p[o]!, p[o + 1]!, p[o + 2]!, s);
+      stencil(g, a, p[o]!, p[o + 1]!, p[o + 2]!, s, walls?.[a]);
       let v = 0,
         gx = 0,
         gy = 0,
@@ -147,7 +216,10 @@ export function toParticles(g: GridShape, p: Float64Array, count: number, vel: F
   }
 }
 
-/** The face velocity field's value at a point (trilinear on each face grid), into `out`. */
+/**
+ * The face velocity field's value at a point (trilinear on each face grid), into `out`. `walls` (from wallFaces) makes
+ * a solid's side read as the box's own sides.
+ */
 export function sampleVelocity(
   g: GridShape,
   vel: Float64Array[],
@@ -155,12 +227,13 @@ export function sampleVelocity(
   y: number,
   z: number,
   out: [number, number, number],
+  walls?: Uint8Array[],
 ): [number, number, number] {
   const s: Stencil = { i: 0, j: 0, k: 0, fx: 0, fy: 0, fz: 0 };
   for (let a = 0; a < 3; a++) {
     const [mx, my, mz] = faceCount(g, a),
       va = vel[a]!;
-    stencil(g, a, x, y, z, s);
+    stencil(g, a, x, y, z, s, walls?.[a]);
     let v = 0;
     for (let dk = 0; dk < 2; dk++) {
       const kk = Math.min(s.k + dk, mz - 1),
@@ -248,8 +321,9 @@ export function surface(
 
 /**
  * Carries the velocity from the faces next to liquid, and the faces particles reach (spray and thin sheets, which make
- * no liquid cell, keep the velocity their particles gave them), out into the air, `layers` faces deep, as the average of
- * the known neighbours on the same face grid (the particles near the surface read it there).
+ * no liquid cell, keep the velocity their particles gave them), out into the air and into the walls, `layers` faces
+ * deep, as the average of the known neighbours on the same face grid (the particles near the surface and the walls read
+ * it there). `wallsOnly` fills only the faces inside walls, every other face known as it stands.
  */
 export function extrapolate(
   g: GridShape,
@@ -257,6 +331,7 @@ export function extrapolate(
   vel: Float64Array[],
   layers: number,
   mass?: Float64Array[],
+  wallsOnly = false,
 ): void {
   for (let a = 0; a < 3; a++) {
     const [mx, my, mz] = faceCount(g, a),
@@ -270,9 +345,18 @@ export function extrapolate(
             b = [i, j, k],
             c = [i, j, k];
           b[a]!--;
-          const inA = b[a]! >= 0 && kind[cell(g, b[0]!, b[1]!, b[2]!)] === LIQUID,
-            inB = c[a]! < [g.nx, g.ny, g.nz][a]! && kind[cell(g, c[0]!, c[1]!, c[2]!)] === LIQUID;
-          known[f] = inA || inB || (mass !== undefined && mass[a]![f]! > 0) ? 1 : 0;
+          const hasA = b[a]! >= 0,
+            hasB = c[a]! < [g.nx, g.ny, g.nz][a]!,
+            kA = hasA ? kind[cell(g, b[0]!, b[1]!, b[2]!)] : SOLID,
+            kB = hasB ? kind[cell(g, c[0]!, c[1]!, c[2]!)] : SOLID;
+          // A face inside a wall (solid or beyond the box on both sides) is never known: it takes its neighbours'
+          // velocity, so the liquid slips along a solid as along the box's sides (the particles' own transfer to it,
+          // their affine part reaching into the wall, would drag or push the water beside it).
+          const walled = kA === SOLID && kB === SOLID;
+          known[f] =
+            !walled && (wallsOnly || kA === LIQUID || kB === LIQUID || (mass !== undefined && mass[a]![f]! > 0))
+              ? 1
+              : 0;
           if (!known[f]) va[f] = 0;
         }
     for (let layer = 0; layer < layers; layer++) {

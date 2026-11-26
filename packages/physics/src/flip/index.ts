@@ -4,4 +4,4 @@
 export { FlipSolver, type FlipParams, type LiquidSea, type LiquidSolid } from './solver.js';
 export { DeckWaterSolver, type DeckWaterOptions, type DeckWaterParams } from './deck-water.js';
 export { AIR, LIQUID, SOLID, project, THETA_FLOOR, type GridShape } from './grid.js';
-export { PARTICLE_WORDS, sampleVelocity, toGrid, toParticles } from './transfer.js';
+export { PARTICLE_WORDS, sampleVelocity, toGrid, toParticles, wallFaces } from './transfer.js';

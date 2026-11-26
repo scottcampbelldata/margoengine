@@ -19,7 +19,7 @@ import {
 } from '../world/solver.js';
 import { regionWords } from '../world/memory.js';
 import { cell, type GridShape, LIQUID, project, SOLID } from './grid.js';
-import { extrapolate, PARTICLE_WORDS, sampleVelocity, surface, toGrid, toParticles } from './transfer.js';
+import { extrapolate, PARTICLE_WORDS, sampleVelocity, surface, toGrid, toParticles, wallFaces } from './transfer.js';
 
 type V3 = [number, number, number];
 
@@ -99,6 +99,8 @@ export class FlipSolver implements Solver<FlipParams> {
   protected countRegion: Region | null = null;
   protected pressureRegion: Region | null = null;
   protected solid = new Uint8Array(0);
+  /** The faces inside the solids (wallFaces), or undefined with no solid. */
+  protected wallMask: Uint8Array[] | undefined = undefined;
   protected kind = new Uint8Array(0);
   protected phi = new Float64Array(0);
   protected vel: Float64Array[] = [];
@@ -210,6 +212,7 @@ export class FlipSolver implements Solver<FlipParams> {
               this.solid[cell(this.grid, i, j, k)] = 1;
           }
     }
+    this.wallMask = solids.length > 0 ? wallFaces(this.grid, this.solid) : undefined;
     this.kind = new Uint8Array(n);
     this.phi = new Float64Array(n);
     this.vel = [
@@ -239,7 +242,7 @@ export class FlipSolver implements Solver<FlipParams> {
     return { p: this.words(this.particleRegion), count: this.words(this.countRegion)[0]! };
   }
 
-  /** Eight particles in each cell where `inside` holds at their octant centres. */
+  /** Eight particles in each cell where `inside` holds at their octant centres (transfer.ts says why not jittered). */
   private seed(inside: (x: number, y: number, z: number) => boolean): void {
     const { nx, ny, nz, h } = this.grid,
       p = this.words(this.particleRegion),
@@ -326,7 +329,7 @@ export class FlipSolver implements Solver<FlipParams> {
       count = this.words(this.countRegion)[0]!,
       pressure = this.words(this.pressureRegion);
     this.correctDensity(dt);
-    toGrid(g, p, count, this.vel, this.mass);
+    toGrid(g, p, count, this.vel, this.mass, this.wallMask);
     this.accelerate(dt);
     if (this.sea) this.holdToSea(dt);
     for (let c = 0; c < this.kind.length; c++) this.kind[c] = this.solid[c] ? SOLID : 0;
@@ -345,7 +348,7 @@ export class FlipSolver implements Solver<FlipParams> {
       this.sea ? [true, true, false, false, g.nz > 1, g.nz > 1] : undefined,
     );
     extrapolate(g, this.kind, this.vel, 2, this.mass);
-    toParticles(g, p, count, this.vel);
+    toParticles(g, p, count, this.vel, this.wallMask);
     const mid: V3 = [0, 0, 0],
       lo = 1e-6 * h,
       top: V3 = [g.nx * h - lo, g.ny * h - lo, g.nz * h - lo],
@@ -356,8 +359,16 @@ export class FlipSolver implements Solver<FlipParams> {
         x = p[o]!,
         y = p[o + 1]!,
         z = p[o + 2]!;
-      sampleVelocity(g, this.vel, x, y, z, mid);
-      sampleVelocity(g, this.vel, x + 0.5 * dt * mid[0], y + 0.5 * dt * mid[1], z + 0.5 * dt * mid[2], mid);
+      sampleVelocity(g, this.vel, x, y, z, mid, this.wallMask);
+      sampleVelocity(
+        g,
+        this.vel,
+        x + 0.5 * dt * mid[0],
+        y + 0.5 * dt * mid[1],
+        z + 0.5 * dt * mid[2],
+        mid,
+        this.wallMask,
+      );
       const to: V3 = [x + dt * mid[0], y + dt * mid[1], z + dt * mid[2]];
       // Over an open side it leaves the liquid; at a wall it stops there.
       let gone = false;
@@ -378,11 +389,11 @@ export class FlipSolver implements Solver<FlipParams> {
         }
         continue;
       }
-      // A particle carried into a solid stays where it was this substep.
-      const into = this.solid[cell(g, Math.floor(to[0] / h), Math.floor(to[1] / h), Math.floor(to[2] / h))];
+      // A particle carried into a solid comes out at the solid's nearest face.
+      const out = this.outOfSolid(to, x, y, z);
       const d = kept * PARTICLE_WORDS;
       if (d !== o) p.copyWithin(d, o, o + PARTICLE_WORDS);
-      if (!into) {
+      if (out) {
         p[d] = to[0];
         p[d + 1] = to[1];
         p[d + 2] = to[2];
@@ -492,19 +503,63 @@ export class FlipSolver implements Solver<FlipParams> {
       400,
       source,
     );
+    // The displacement reads inside the walls as beside them, so particles slip along a solid as along the box's sides.
+    extrapolate(g, this.kind, this.vel, 1, undefined, true);
     const d: V3 = [0, 0, 0],
       lo = 1e-6 * h,
       top: V3 = [nx * h - lo, ny * h - lo, nz * h - lo];
     for (let q = 0; q < count; q++) {
       const o = q * PARTICLE_WORDS;
-      sampleVelocity(g, this.vel, p[o]!, p[o + 1]!, p[o + 2]!, d);
+      sampleVelocity(g, this.vel, p[o]!, p[o + 1]!, p[o + 2]!, d, this.wallMask);
       const to: V3 = [p[o]! + d[0] * dt, p[o + 1]! + d[1] * dt, p[o + 2]! + d[2] * dt];
       for (let a = 0; a < 3; a++) to[a] = Math.min(Math.max(to[a]!, lo), top[a]!);
-      if (this.solid[cell(g, Math.floor(to[0] / h), Math.floor(to[1] / h), Math.floor(to[2] / h))]) continue;
+      if (!this.outOfSolid(to, p[o]!, p[o + 1]!, p[o + 2]!)) continue;
       p[o] = to[0];
       p[o + 1] = to[1];
       p[o + 2] = to[2];
     }
+  }
+
+  /**
+   * Moves a point `to` (m from the box's corner) that lies in a solid cell out to a face of the solid it is in, just
+   * outside, keeping its other coordinates. The nearest point of a box's surface from inside lies along an axis, so it
+   * walks each axis to the first cell that is not solid (and inside the box) and takes the nearest of those faces that
+   * (fx, fy, fz), where the particle was, lies outside of: a particle comes back out the side it went in, never through a thin
+   * solid. Returns false, leaving the point, only for a point walled in on every side, which the step then leaves where
+   * it was.
+   */
+  protected outOfSolid(to: V3, fx: number, fy: number, fz: number): boolean {
+    const g = this.grid,
+      { nx, ny, nz, h } = g,
+      ci = Math.floor(to[0] / h),
+      cj = Math.floor(to[1] / h),
+      ck = Math.floor(to[2] / h);
+    if (!this.solid[cell(g, ci, cj, ck)]) return true;
+    const size = [nx, ny, nz],
+      from = [fx, fy, fz],
+      lo = 1e-6 * h;
+    let best = Infinity,
+      axis = -1,
+      face = 0,
+      bestAny = Infinity,
+      axisAny = -1,
+      faceAny = 0;
+    for (let a = 0; a < 3; a++)
+      for (const dir of [-1, 1]) {
+        const c = [ci, cj, ck];
+        while (c[a]! >= 0 && c[a]! < size[a]! && this.solid[cell(g, c[0]!, c[1]!, c[2]!)]) c[a]! += dir;
+        if (c[a]! < 0 || c[a]! >= size[a]!) continue;
+        // The face between the last solid cell and the free cell c, and a point a hair into c.
+        const plane = dir > 0 ? c[a]! * h : (c[a]! + 1) * h,
+          f = plane + dir * lo,
+          dist = Math.abs(f - to[a]!);
+        if (dist < bestAny) [bestAny, axisAny, faceAny] = [dist, a, f];
+        if ((dir > 0 ? from[a]! >= plane : from[a]! <= plane) && dist < best) [best, axis, face] = [dist, a, f];
+      }
+    if (axis < 0) [axis, face] = [axisAny, faceAny];
+    if (axis < 0) return false;
+    to[axis] = face;
+    return true;
   }
 
   private walls: Float64Array | null = null;
@@ -601,7 +656,7 @@ export class FlipSolver implements Solver<FlipParams> {
             const x = (i + (a === 0 ? 0 : 0.5)) * h,
               y = (j + (a === 1 ? 0 : 0.5)) * h,
               z = (k + (a === 2 ? 0 : 0.5)) * h;
-            sampleVelocity(g, before, x, y, z, v);
+            sampleVelocity(g, before, x, y, z, v, this.wallMask);
             this.acceleration(x, y, z, v, acc);
             va[f]! += acc[a]! * dt;
           }
@@ -772,7 +827,15 @@ export class FlipSolver implements Solver<FlipParams> {
 
   /** The liquid's velocity at (x, y, z) m from the world's cell, from the last substep's grid. */
   velocityAt(x: number, y: number, z: number, out: V3 = [0, 0, 0]): V3 {
-    return sampleVelocity(this.grid, this.vel, x - this.origin[0], y - this.origin[1], z - this.origin[2], out);
+    return sampleVelocity(
+      this.grid,
+      this.vel,
+      x - this.origin[0],
+      y - this.origin[1],
+      z - this.origin[2],
+      out,
+      this.wallMask,
+    );
   }
 
   /** The pressure (Pa above the air's) in the cell holding (x, y, z) m from the world's cell; 0 in air or outside. */

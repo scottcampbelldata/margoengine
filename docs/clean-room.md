@@ -14036,9 +14036,13 @@ Written from papers and notes read as text (no code, no companion repositories):
   trilinear weights, the gradient of the weight in place of D_p^-1) and their conservation of linear and angular
   momentum.
 - Y. Zhu and R. Bridson, "Animating sand as a fluid", ACM Trans. Graph. 24(3), 2005: eight particles a cell, the
-  surface from the particles (k(s) = max(0, (1 - s^2)^3), R twice the spacing), velocity carried into the air.
+  surface from the particles (k(s) = max(0, (1 - s^2)^3), R twice the spacing), velocity carried into the air. Their
+  particles are jittered in the octants; Margo's sit at the octants' centres, because jittered seeds set still water
+  moving (measured, 6 mm/s at cells of 5 cm).
 - R. Bridson and M. Muller-Fischer, "Fluid simulation", SIGGRAPH 2007 course notes, and R. Bridson, Fluid Simulation for
-  Computer Graphics, 2nd ed., 2015: the MAC grid, the pressure system, MIC(0) with tau = 0.97 and its sigma = 0.25 guard.
+  Computer Graphics, 2nd ed., 2015: the MAC grid, the pressure system, MIC(0) with tau = 0.97 and its sigma = 0.25 guard;
+  solid walls that take only the normal velocity, the velocity extrapolated into them, so the inviscid liquid slips
+  along a solid box as along the grid's own sides.
 - F. Gibou, R. Fedkiw, L.-T. Cheng and M. Kang, J. Comput. Phys. 176, 205-227, 2002 (as the course notes give it): the
   ghost-fluid free surface, theta = phi_i / (phi_i - phi_j), held at 0.01 or more.
 - T. Kugelstadt, A. Longva, N. Thuerey and J. Bender, "Implicit density projection for volume conserving liquids", IEEE
