@@ -12588,7 +12588,7 @@
     },
     {
       "date": "2026-11-25",
-      "commit": "6f4bbebc0e",
+      "commit": "dc75a47d35",
       "reason": "HYDRO-04 entry sizes, previous record to current: @margoengine/physics/landscape 0→4347 B (ceiling 0→4603 B); @margoengine/biomes/landscape 0→614 B (ceiling 0→870 B). The optional Physics entry publishes SI-unit watershed and sediment fields and loads two native memory variants on demand. The separate Biomes entry adapts physical terrain snapshots without adding code to the Biomes root, core or stage. A further split would add requests without removing any code when evolving a relief.",
       "grew": 2
     }
