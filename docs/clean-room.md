@@ -12749,3 +12749,49 @@ back-scattering law by way of a float texture. Tests reproduce van Rijn's three 
 Rouse profile, Wong–Parker transport, quiescent delta deposition, a two-sided bank transfer and rooted control,
 solid mass balance, the coupled bed and water response, snapshots and backend-equivalent optical results.
 The solver uses the papers and the repository's existing coupling infrastructure.
+
+### Pedestrian contact and crowd motion (LIFE-05)
+
+- D. Helbing, I. Farkas and T. Vicsek, [Simulating dynamical features of escape panic](https://arxiv.org/abs/cond-mat/0009448)
+  (2000), equations 1–3. Desired-motion acceleration is (v* − v)/τ. For contact overlap δ,
+  normal stiffness contributes kδ and sliding friction acts against relative tangential speed
+  with coefficient κδ. Static walls use the same compression and sliding relations.
+  The documented default stiffness and friction are the paper's illustrated material values.
+- I. Karamouzas, B. Skinner and S. J. Guy, [Universal power law governing pedestrian interactions](https://doi.org/10.1103/PhysRevLett.113.238701)
+  (2014), equations 2–3. Energy is k exp(−t/τ₀)/t² and the force is its negative gradient
+  with respect to separation. If a = v·v, b = r·v and c = r·r − R² for combined contact radius R,
+  the first forward root is c/(√(b²−ac)−b). Its spatial gradient is
+  (r+vt)/√(b²−ac). Apply the measured inverse-square energy law before overlap with an
+  explicit response-time offset for short times. The authors estimate an unscreened decay
+  near 3 s and report shorter observed horizons in the denser scenes.
+- R. Narain, A. Golas, S. Curtis and M. C. Lin, [Aggregate dynamics for dense crowd simulation](https://doi.org/10.1145/1618452.1618468)
+  (2009), equations 7–9 and 13–18. Compression activates a response when predicted packing would
+  exceed the density bound. This implementation uses a local one-sided speed reduction as a
+  compressible approximation. The discrete normal and friction impulses give the per-body
+  contact force. The normalized compact density weight in two dimensions is
+  4(1−r²/h²)³/(πh²) for r<h, obtained by integrating the cubic radially over a disk.
+- J. van den Berg, S. J. Guy, M. Lin and D. Manocha, [Reciprocal n-body Collision Avoidance](https://gamma.cs.unc.edu/ORCA/publications/ORCA.pdf)
+  (2011), equation 5 and section 5.4. A relative correction u gives two permitted half-planes.
+  The original equal shares minimize equal squared corrections. Minimizing their mass-weighted
+  squared magnitudes subject to δv₁−δv₂=u gives fractions m₂/(m₁+m₂) and m₁/(m₁+m₂).
+  A wall or a scripted obstacle gives the moving person full responsibility.
+- W. H. Warren and S. Whang, [Visual guidance of walking through apertures](https://doi.org/10.1037/0096-1523.13.3.371)
+  (1987), observed shoulder rotation when the clearance becomes small relative to body width.
+  The solver determines the minimum orientation needed from the projected support of an
+  ellipse with the supplied shoulder width and fore-aft depth. A finite turn rate updates the heading.
+  A. Seyfried, O. Passon, B. Steffen, M. Boltes, T. Rupprecht and W. Klingsch,
+  [New Insights into Pedestrian Flow Through Bottlenecks](https://doi.org/10.1287/trsc.1090.0263)
+  (2009), table 2 and sections 3–4, measured stop, release and staggered passage in different
+  door widths. A six-walker fixture verifies staggered passage and release with available clearance.
+
+- U. Weidmann, [Transporttechnik der Fussgänger](https://doi.org/10.3929/ethz-b-000242008)
+  (1993), chapter 4, is the source for the ordinary free pace of 1.34 m/s and the reference
+  packing density of 5.4 people/m². The crowd's locally compressible law uses those scales.
+
+For a pair of masses use inverse effective mass μ = 1/m₁+1/m₂. With undamped closing velocity v
+along the outward normal, the backward-Euler spring impulse is
+dt·k·max(0,δ−dt·v)/(1+μ·k·dt²). The sliding update divides the tangential relative
+speed by 1+μ·dt·κ·δ′, where δ′ is the remaining compression after solving the normal.
+A pair receives opposite impulses. The Rust kernel uses world-owned row storage, sorted neighbor
+cells, normalized elliptical projection and SIMD products, floors and square roots. Shape contact
+uses the two support radii along the line separating body centres. No companion code was used.

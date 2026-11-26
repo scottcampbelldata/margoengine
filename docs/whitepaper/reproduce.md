@@ -4268,3 +4268,14 @@ school couplings, wake and contact fixtures and replay. Run
 `node scripts/wasm-blueprints.mjs --rebuild --compare --only=swim-kernel,swim-kernel-shared` with the pinned
 Rust target to reproduce the optional Wasm assets.
 From packages/physics, run node scripts/test-browser.js --swim-only and repeat with --compat to check browser loading and snapshot restoration.
+
+### LIFE-05 pedestrian contact and crowd motion
+
+Build Physics and NavMesh. Run
+`node --test packages/physics/tests/pedestrians.test.js packages/physics/tests/coupling/pedestrians.test.js packages/navmesh/test/crowd-mass.test.js`.
+The Rust blobs are reproduced with
+`node scripts/wasm-blueprints.mjs --rebuild --compare --only=pedestrian-kernel,pedestrian-kernel-shared`
+on the pinned toolchain.
+From packages/physics, run `node scripts/test-browser.js --pedestrian-only`. Add `--compat`
+for the WebGL2 compatibility configuration. Both modes check lazy WebAssembly fetch and
+momentum in a physical contact.

@@ -750,6 +750,22 @@ export const LAZY_FILES = [
     measure: 'file',
     when: 'SwimSolver.load() in a runtime that supports shared world memory',
   },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/pedestrian-kernel.wasm',
+    label: 'pedestrian-kernel.wasm',
+    kind: 'Pedestrian contact and avoidance kernel (Rust, SIMD)',
+    measure: 'file',
+    when: '`await PedestrianCrowd.load()` (`@margoengine/physics/pedestrians`), on demand',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/pedestrian-kernel-shared.wasm',
+    label: 'pedestrian-kernel-shared.wasm',
+    kind: 'Shared pedestrian contact and avoidance kernel (Rust, SIMD)',
+    measure: 'file',
+    when: 'PedestrianCrowd.load() in a runtime with shared world memory',
+  },
   // Third-party Wasm runtimes.
   {
     package: '@margoengine/physics2d',

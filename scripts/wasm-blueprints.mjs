@@ -106,6 +106,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'pedestrian-kernel',
+    crate: 'packages/physics/pedestrian-kernel',
+    blueprint: 'packages/physics/src/pedestrians/pedestrian-kernel.wasm',
+    script: 'packages/physics/scripts/build-pedestrian-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'pedestrian-kernel-shared',
+    crate: 'packages/physics/pedestrian-kernel',
+    blueprint: 'packages/physics/src/pedestrians/pedestrian-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-pedestrian-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'swim-kernel',
     crate: 'packages/physics/swim-kernel',
     blueprint: 'packages/physics/src/life/swim-kernel.wasm',

@@ -44,6 +44,12 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **LIFE-05:** Register slot 10 for the pedestrian SIMD kernel. Provide canonical per-body force
+  and stance/position fields and an identity layout for LIFE-06 formations, DYN-07 body and foot
+  hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads
+  and reads versioned intent and force ports in the optional package until the shared fields are ready.
+
+
 - **LIFE-03:** Register swim kernel slot 5 in the module table alongside the other production families.
   Promote the school's kinematics and intent layouts when the shared fields owner is ready. The swimmer
   also needs shared world-space contact wrench and per-actuator water impulse layouts for articulated

@@ -4,7 +4,7 @@
 // app that only queries paths does not bundle it.
 import { MargoError } from '@margoengine/math/errors';
 import type { NavFilter, NavSurface, Vec3 } from './index.js';
-import { accelerate, avoidAmong, wallLine, type Agent } from './orca.js';
+import { accelerate, avoidAmong, DEFAULT_AGENT_MASS, wallLine, type Agent } from './orca.js';
 
 /** Where a crowd agent is in its journey. */
 export type CrowdAgentState = 'idle' | 'moving' | 'offmesh' | 'arrived' | 'unreachable';
@@ -15,6 +15,8 @@ export interface CrowdAgentOptions {
   position: Vec3;
   /** Disc radius, world units (default 0.4). */
   radius?: number;
+  /** Positive walker mass in kg (default 75). It distributes reciprocal velocity correction. */
+  mass?: number;
   /** Top speed, world units per second (default 3.5). */
   maxSpeed?: number;
   /** Largest change of velocity per second (default 8). */
@@ -56,6 +58,8 @@ export interface CrowdDensityOptions {
   jam?: number;
   /** Width of the Gaussian that measures density round an agent, world units (default 1, in m). */
   radius?: number;
+  /** Positive walker mass in kg (default 75). It distributes reciprocal velocity correction. */
+  mass?: number;
 }
 
 /** A dynamic obstacle for {@link Crowd.addObstacle}: a disc in XZ that agents steer around and do not push. */
@@ -121,6 +125,8 @@ export class CrowdAgent {
   /** Anything kept with the agent. */
   userData: unknown;
   readonly radius: number;
+  /** Walker mass in kg. */
+  readonly mass: number;
   maxSpeed: number;
   maxAcceleration: number;
   arrivalDistance: number;
@@ -153,6 +159,7 @@ export class CrowdAgent {
     preferred: [number, number];
     radius: number;
     maxSpeed: number;
+    mass: number;
   };
   private removed = false;
 
@@ -171,19 +178,24 @@ export class CrowdAgent {
     this.seen = surface.version;
     this.filter = options.filter;
     this.radius = positive(options.radius, 0.4, 'Agent radius');
+    this.mass = positive(options.mass, DEFAULT_AGENT_MASS, 'Agent mass');
     this.maxSpeed = positive(options.maxSpeed, 3.5, 'Agent maxSpeed', true);
     this.maxAcceleration = positive(options.maxAcceleration, 8, 'Agent maxAcceleration');
     this.arrivalDistance = positive(options.arrivalDistance, 0.1, 'Agent arrivalDistance');
     this.slowDownDistance = positive(options.slowDownDistance, 1, 'Agent slowDownDistance', true);
     this.userData = options.userData;
-    this.disc = {
-      id,
-      position: [position[0], position[2]],
-      velocity: [0, 0],
-      preferred: [0, 0],
-      radius: this.radius,
-      maxSpeed: this.maxSpeed,
-    };
+    this.disc = Object.assign(
+      {
+        id,
+        position: [position[0], position[2]],
+        velocity: [0, 0],
+        preferred: [0, 0],
+        radius: this.radius,
+        maxSpeed: this.maxSpeed,
+        mass: this.mass,
+      } satisfies CrowdAgent['disc'],
+      { mass: this.mass },
+    );
   }
   /** False after `remove()` or the crowd's `dispose()`. */
   get valid(): boolean {

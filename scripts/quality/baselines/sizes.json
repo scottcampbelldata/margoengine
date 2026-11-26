@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19250413,
+  "total": 19255259,
   "history": [
     {
       "date": "2026-10-24",
@@ -12573,6 +12573,12 @@
       "commit": "82748cbee4",
       "reason": "FG-17 piece 6b new entry post/rt-reflections 16,191 B gzip: RTReflections extends SSR (the entry carries SSR's own 15 KB chunk, shared with post/ssr) plus the hybrid trace patches, core's BRDF text for traced hits and the light uniform; sceneBvhWGSL comes from the optional @margoengine/bvh peer, not bundled; nothing else imports it",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fdb7f41cd1",
+      "reason": "LIFE-05: 4590 B gzip for the optional force-based pedestrian entry and declared ports. The NavMesh correction stays in the existing ORCA entry and defaults to equal masses. Core and stage add zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13378,6 +13384,7 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/meshfiles": 2857,
+    "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,

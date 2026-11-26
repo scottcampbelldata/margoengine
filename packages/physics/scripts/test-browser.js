@@ -10,6 +10,7 @@ import { compatRun, compatShim, compatUrl } from '../../../scripts/support/compa
 
 const thermalOnly = process.argv.includes('--thermal-only');
 const swimOnly = process.argv.includes('--swim-only');
+const pedestrianOnly = process.argv.includes('--pedestrian-only');
 const root = fileURLToPath(new URL('..', import.meta.url));
 const results = resolve(root, 'test-results');
 await mkdir(results, { recursive: true });
@@ -31,10 +32,12 @@ try {
   const errors = [];
   const thermalRequests = [];
   const swimRequests = [];
+  const pedestrianRequests = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
     if (/\/thermal-kernel(?:-shared)?\.wasm$/.test(url.pathname)) thermalRequests.push(url.pathname);
     if (/\/swim-kernel(?:-shared)?\.wasm$/.test(url.pathname)) swimRequests.push(url.pathname);
+    if (/\/pedestrian-kernel(?:-shared)?\.wasm$/.test(url.pathname)) pedestrianRequests.push(url.pathname);
   });
   // MARGO_COMPAT=1: the page runs on the WebGL2 compatibility layer (scripts/support/compat-shim.js).
   if (compatRun()) await page.addInitScript(compatShim, compatUrl());
@@ -44,8 +47,9 @@ try {
   });
   await page.goto(`${server.resolvedUrls.local[0]}tests/physics.html`);
   await page.waitForFunction(() => typeof window.runPhysicsTests === 'function', null, { timeout: 60000 });
-  const report = thermalOnly || swimOnly ? { checks: [] } : await page.evaluate(() => window.runPhysicsTests());
-  if (!swimOnly) {
+  const report =
+    thermalOnly || swimOnly || pedestrianOnly ? { checks: [] } : await page.evaluate(() => window.runPhysicsTests());
+  if (!swimOnly && !pedestrianOnly) {
     await page.evaluate(async () => {
       await import('/dist/thermal.js');
     });
@@ -72,7 +76,7 @@ try {
     assert.equal(temperature.value, 310);
     report.checks.push('Thermal Wasm loads on demand and advances the world in the browser');
   }
-  if (!thermalOnly) {
+  if (!thermalOnly && !pedestrianOnly) {
     await page.evaluate(() => import('/dist/life.js'));
     assert.deepEqual(swimRequests, [], 'importing the swimming entry leaves both kernels unloaded');
     const reading = await page.evaluate(async () => {
@@ -110,6 +114,37 @@ try {
     assert.ok(reading.velocity > 0);
     assert.equal(reading.replayed, true);
     report.checks.push('Aquatic locomotion Wasm loads on demand, propels a swimmer and restores its snapshot');
+  }
+  if (!thermalOnly && !swimOnly) {
+    await page.evaluate(async () => {
+      await import('/dist/pedestrians.js');
+    });
+    assert.deepEqual(pedestrianRequests, [], 'importing the pedestrian entry leaves both kernels unloaded');
+    const reading = await page.evaluate(async () => {
+      const { PedestrianCrowd } = await import('/dist/pedestrians.js');
+      const { PhysicsWorld } = await import('/dist/world.js');
+      const crowd = await PedestrianCrowd.load();
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(crowd, {
+        bodies: [
+          { position: [-0.2, 0, 0], mass: 20, driveAcceleration: 0 },
+          { position: [0.2, 0, 0], mass: 80, driveAcceleration: 0 },
+        ],
+        stiffness: 2500,
+      });
+      world.advance(1);
+      return {
+        normalLoad: crowd.read(0).normalLoad,
+        momentum: 20 * crowd.read(0).velocity[0] + 80 * crowd.read(1).velocity[0],
+        shared: globalThis.crossOriginIsolated,
+      };
+    });
+    assert.deepEqual(
+      pedestrianRequests.map((request) => request.split('/').at(-1)).sort(),
+      reading.shared ? ['pedestrian-kernel-shared.wasm', 'pedestrian-kernel.wasm'] : ['pedestrian-kernel.wasm'],
+    );
+    assert.ok(reading.normalLoad > 0);
+    assert.ok(Math.abs(reading.momentum) < 1e-12);
+    report.checks.push('Pedestrian Wasm loads on demand and preserves unequal-mass contact momentum');
   }
   if (report.image) {
     await writeFile(resolve(results, 'physics-stack.png'), Buffer.from(report.image.split(',')[1], 'base64'));

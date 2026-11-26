@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -57,6 +57,7 @@ await build({
         celestial: resolve(root, 'src/space/index.ts'),
         schooling: resolve(root, 'src/schooling/index.ts'),
         life: resolve(root, 'src/life/index.ts'),
+        pedestrians: resolve(root, 'src/pedestrians/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
@@ -76,6 +77,8 @@ for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
 for (const name of ['swim-kernel.wasm', 'swim-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/life', name), resolve(dist, name));
+for (const name of ['pedestrian-kernel.wasm', 'pedestrian-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/pedestrians', name), resolve(dist, name));
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],

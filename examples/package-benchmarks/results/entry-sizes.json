@@ -13750,8 +13750,8 @@
     },
     "@margoengine/navmesh": {
       ".": {
-        "raw": 28922,
-        "gzip": 10793
+        "raw": 29147,
+        "gzip": 10893
       },
       "./build": {
         "raw": 34202,
@@ -14030,6 +14030,10 @@
       "./sediment": {
         "raw": 12757,
         "gzip": 5256
+      },
+      "./pedestrians": {
+        "raw": 11272,
+        "gzip": 4590
       }
     },
     "@margoengine/physics2d": {
@@ -17701,6 +17705,16 @@
       "raw": 6501,
       "gzip": 3628,
       "brotli": 3284
+    },
+    "packages/physics/dist/pedestrian-kernel.wasm": {
+      "raw": 12041,
+      "gzip": 5695,
+      "brotli": 5142
+    },
+    "packages/physics/dist/pedestrian-kernel-shared.wasm": {
+      "raw": 12129,
+      "gzip": 5757,
+      "brotli": 5210
     },
     "packages/physics/dist/vegetation-kernel.wasm": {
       "raw": 6456,

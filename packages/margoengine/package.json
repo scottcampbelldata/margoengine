@@ -3179,6 +3179,10 @@
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
     },
+    "./physics/pedestrians": {
+      "types": "./dist/physics/pedestrians.d.ts",
+      "import": "./dist/physics/pedestrians.js"
+    },
     "./physics/schooling": {
       "types": "./dist/physics/schooling.d.ts",
       "import": "./dist/physics/schooling.js"

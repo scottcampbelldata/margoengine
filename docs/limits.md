@@ -9068,3 +9068,16 @@ sediment; external inflow at that edge carries clear water. Use the source grid'
 
 The optional sediment entry measures 5,256 B min+gzip. The plain and shared SIMD Wasm files are 12,483 B and
 12,571 B before HTTP compression. The Flood entry measures 14,457 B min+gzip with the concentration upload.
+
+### Pedestrian contact and crowd motion (LIFE-05)
+
+`@margoengine/physics/pedestrians` models horizontal translation, finite shoulder turn rate, and
+a specified ground height. Its uniformly oriented ellipses give an analytic projected footprint.
+An approximate support along the line of centres is used for ellipse pairs. It computes the normal
+and sliding impulse once per broadphase pair in canonical order. The density response is locally
+compressible. The open approach uses the measured time-to-collision power law with a finite reaction
+offset. The solver raises the dyadic rate so ideally dt·√(2k/m)≤1/2 for the lightest body and travel
+per tick stays inside half the shortest footprint radius. Multi-floor surfaces use separate groups or
+walkable route guidance with a height sampler. Injury, fall and ragdoll transitions use external
+consumers of the force/pose ports. Doorway and terrain fixtures use simulated actors and route geometry.
+The optional JavaScript entry is 4,590 B gzip. The plain and shared Wasm assets are 12,041 B and 12,129 B raw.

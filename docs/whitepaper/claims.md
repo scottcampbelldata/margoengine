@@ -24,6 +24,14 @@ first: each names its scope, its evidence file and how to reproduce it.
   discharge fixture added 60.002 m³ when the source delivered 60 m³. Run
   `node packages/biomes/tests/water-check.mjs --flow-only`.
 
+- Pedestrian crowd motion (LIFE-05). A 20 kg and an 80 kg pressed walker receive equal and opposite
+  impulses and displace in inverse mass ratio. A future encounter slows two separated walkers before
+  contact. An elliptical shoulder fits a narrower opening, and a six-person queue develops compressive
+  load before its bodies clear the doorway. A real NavMesh route follows a known grade. Reproduce with
+  `node --test packages/physics/tests/coupling/pedestrians.test.js packages/navmesh/test/crowd-mass.test.js`.
+  Original scene and dynamic-character integration remain open.
+
+
 - Aquatic locomotion (LIFE-03). The supplied tail wave accelerates a swimmer toward the analytic
   thrust/drag equilibrium with first-order time convergence. The unpowered coast is exact to roundoff
   for constant quadratic resistance. Pectoral load changes banking, yaw and station-keeping.

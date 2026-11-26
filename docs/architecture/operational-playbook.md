@@ -10025,3 +10025,13 @@ triangulated vertex areas, and the shallow-water solver samples the new bed. The
 Registry fields expose concentration, bedload capacity and shear. A row-major concentration upload drives the
 existing Flood tint on both rendering backends. Tests verify exact settling, bedload rating, a closed-form Rouse
 profile, travelling sediment, bank migration with root stabilisation, boundary exports and deterministic replay.
+
+## Pedestrian contact evidence (LIFE-05)
+
+The crowd Wasm imports only world memory in either variant. Static data uses slot 10 and mutable
+control, integration, neighbor and stack storage belongs to the world. A real NavMesh supplies
+route points and grades. Node fixtures check the spatial gradient against an analytic head-on
+encounter, the normal and tangential contact impulses against closed forms, equal and opposite
+loads for unequal masses, rotational clearance, wall loads, queue release, input ports and
+replay across frame rates and memory variants. The NavMesh regressions check weight in the
+existing ORCA planner and preserve covered-target and wall guidance behavior.

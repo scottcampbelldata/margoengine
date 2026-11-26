@@ -10,6 +10,7 @@ export interface Agent {
     preferred: readonly [number, number];
     radius: number;
     maxSpeed: number;
+    mass?: number;
     reciprocal?: boolean;
 }
 
@@ -41,6 +42,7 @@ export class CrowdAgent {
     partial: boolean;
     userData: unknown;
     readonly radius: number;
+    readonly mass: number;
     maxSpeed: number;
     maxAcceleration: number;
     arrivalDistance: number;
@@ -62,6 +64,7 @@ export class CrowdAgent {
         preferred: [number, number];
         radius: number;
         maxSpeed: number;
+        mass: number;
     };
     constructor(crowd: Crowd, id: number, options: CrowdAgentOptions, position: Vec3, polygon: number, surface: NavSurface);
     get valid(): boolean;
@@ -75,6 +78,7 @@ export class CrowdAgent {
 export interface CrowdAgentOptions {
     position: Vec3;
     radius?: number;
+    mass?: number;
     maxSpeed?: number;
     maxAcceleration?: number;
     arrivalDistance?: number;
@@ -90,6 +94,7 @@ export interface CrowdDensityOptions {
     gamma?: number;
     jam?: number;
     radius?: number;
+    mass?: number;
 }
 
 export interface CrowdEventMap {

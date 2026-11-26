@@ -16091,3 +16091,12 @@ size or surrounding geometry. `hailSphere` now converts the measured diameter an
 for each body, and `Hail` can draw poses from a falling-body solver. `fallingBoundaryFromPhysics` sweeps each sphere
 against fixed colliders. The two-diameter equilibrium fixture is in `packages/weather/tests/hail-physics.test.js`.
 The swept wall and raised platform fixtures are in `packages/physics/tests/coupling/falling.test.js`.
+
+## Open: pedestrian force hand-off in Opening Night and City-to-Street
+
+The frame-independent pedestrian solver publishes per-walker compressed load and net contact force.
+The Opening Night clips still need the production ragdoll and foot-placement consumers, and
+CITY-TO-STREET-2 still needs vehicle and rail actors. Run
+`node --test packages/physics/tests/coupling/pedestrians.test.js` after building Physics and NavMesh
+to reproduce the measured contact impulses, doorway release and real route grade.
+See LIFE-05 in [Framework requests](physics-work-queue.md#framework-requests).

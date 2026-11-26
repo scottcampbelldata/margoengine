@@ -96,6 +96,10 @@
       "types": "./dist/life/index.d.ts",
       "import": "./dist/life.js"
     },
+    "./pedestrians": {
+      "types": "./dist/pedestrians/index.d.ts",
+      "import": "./dist/pedestrians.js"
+    },
     "./schooling": {
       "types": "./dist/schooling/index.d.ts",
       "import": "./dist/schooling.js"

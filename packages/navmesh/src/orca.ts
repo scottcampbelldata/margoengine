@@ -24,12 +24,16 @@ export interface Agent {
   radius: number;
   /** Speed limit in world units per second, non-negative. */
   maxSpeed: number;
+  /** Positive inertial mass in kg (default 75). A lighter reciprocal agent takes more of a correction. */
+  mass?: number;
   /**
    * As a neighbour: false when it does not avoid back (a static or scripted obstacle, a player-driven character), so
    * the agent takes all of the avoidance instead of half. Default true.
    */
   reciprocal?: boolean;
 }
+
+export const DEFAULT_AGENT_MASS = 75;
 
 /** Below this |sin| between two boundary lines they count as parallel (our own floor, unit normals). */
 const PARALLEL = 1e-9;
@@ -63,10 +67,11 @@ function check(agent: Agent): void {
     typeof agent.maxSpeed !== 'number' ||
     !(agent.maxSpeed >= 0) ||
     !Number.isFinite(agent.maxSpeed) ||
+    (agent.mass !== undefined && !(Number.isFinite(agent.mass) && agent.mass > 0)) ||
     (agent.reciprocal !== undefined && typeof agent.reciprocal !== 'boolean')
   )
     throw new RangeError(
-      'Invalid ORCA agent: give a safe-integer id, two finite components for position, velocity and preferred, and a finite radius and maxSpeed >= 0',
+      'Invalid ORCA agent: give a safe-integer id, two finite components for position, velocity and preferred, finite radius and maxSpeed >= 0, and positive finite mass when supplied',
     );
 }
 
@@ -164,7 +169,7 @@ function leastViolation(count: number, first: number, radius: number, hard: numb
 
 /**
  * Reciprocal velocity-obstacle avoidance (ORCA) in XZ: the velocity closest to `agent.preferred` within
- * `agent.maxSpeed` that avoids every neighbor for `horizon` seconds, assuming each neighbor takes half the
+ * `agent.maxSpeed` that avoids every neighbor for `horizon` seconds, assuming each neighbor takes its mass-weighted part of the
  * responsibility. When no such velocity exists (crowded or overlapping agents) it returns the velocity within
  * `maxSpeed` that breaks the constraints least. Neighbors with the agent's own `id` are skipped. Synchronous,
  * allocation-free on steady ticks, and not re-entrant.
@@ -289,9 +294,12 @@ export function avoidAmong(
       ux = nx * push;
       uz = nz * push;
     }
-    // Half the responsibility (paper eq. 5): the boundary passes through v + u/2 with normal n. A neighbour that does
-    // not avoid back leaves all of it to the agent: v + u, as the paper does for static obstacles.
-    const share = other.reciprocal === false ? 1 : 0.5;
+    const ownMass = agent.mass ?? DEFAULT_AGENT_MASS;
+    const otherMass = other.mass ?? DEFAULT_AGENT_MASS;
+    // Partition u by the smallest mass-weighted change in kinetic velocity. Static
+    // obstacles still put the entire relative-velocity correction on the moving agent.
+    const scale = Math.max(ownMass, otherMass);
+    const share = other.reciprocal === false ? 1 : otherMass / scale / (ownMass / scale + otherMass / scale);
     lines[3 * count] = nx;
     lines[3 * count + 1] = nz;
     lines[3 * count + 2] = nx * (vx + ux * share) + nz * (vz + uz * share);

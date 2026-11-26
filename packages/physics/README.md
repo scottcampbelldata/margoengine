@@ -2662,3 +2662,55 @@ the solver uses motionless standard sea-level air. A wind with zero density give
 Each row holds position xyz, quaternion xyzw, linear velocity xyz and angular velocity xyz.
 `falling.pose(index)` copies a row. `writeSpheres` writes the positions, radii and velocities of rounded
 bodies to a supplied f32 draw buffer in their original order.
+
+## Pedestrian contact and crowd motion
+
+Use `PedestrianCrowd` for walkers that push, yield, and queue around doorways. It advances bodies
+on the PhysicsWorld clock with physical contact forces and a separate response to predicted encounters.
+A person can turn their elliptical torso through a narrow aperture. The solver reads a NavMesh route and
+height surface, so walkable grades and the positions used to animate feet stay in the same coordinate system.
+
+```js
+import { PedestrianCrowd } from '@margoengine/physics/pedestrians';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const crowd = await PedestrianCrowd.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(crowd, {
+  bodies: [
+    { position: [-0.3, 0, -1], mass: 55, path: [[0, 0, 0.4], [-0.5, 0, 3]] },
+    { position: [0.3, 0, -1.5], mass: 80, path: [[0, 0, 0.4], [0.5, 0, 3]] },
+  ],
+  walls: [[[-3, 0], [-0.4, 0]], [[0.4, 0], [3, 0]]],
+  apertures: [[[-0.4, 0], [0.4, 0]]],
+});
+world.advance(90);
+const walker = crowd.read(0);
+console.log(walker.position, walker.heading, walker.normalLoad, walker.distanceTravelled);
+```
+
+The world axes are y up. Walls and apertures are XZ segments from their two endpoints in the
+solver's cell. A walker starts at its feet position and has a default mass of 75 kg, width of 0.46 m,
+depth of 0.28 m, forward heading +z and zero velocity. It responds over 0.5 s by default, can propel
+itself at up to 3 m/s² and turn its heading at up to π rad/s. The default free route speed is 1.34 m/s
+and waypoint arrival distance is 0.1 m. A path can use `mesh.route(start, end).points`, and the same
+mesh can sample the ground height. Supply `preferredVelocity` for a walker without a route. Call
+`setPreferredVelocity(row, [vx, vz])` to change it between advances and use `null` to resume a path.
+Snapshots restore the route cursor, velocity override, distance travelled and all integrated state.
+
+Compression stiffness defaults to 120,000 N/m, approach damping to 0 N s/m, and sliding damping
+to 240,000 N s/m². Standing jam loads are available in newtons through `normalLoad` even when
+forces from different sides cancel in `contactForce`. Anticipation defaults to an energy coefficient of
+1 J s², a decay of 3 s, observation horizon of 6 s and reaction offset of 0.15 s. It sends a force
+before collision, when current trajectories have a future meeting. A normalized density field has a
+default radius of 1 m. Walkers reduce their preferred speed above the default packing density
+of 5.4 people/m², with `densityResponse` defaulting to 1. Set `packingDensity: 0` to disable that
+response. The aperture shoulder clearance defaults to 0.01 m per side.
+
+`PedestrianCrowd.load({ id, level, signal, readIntent, readForces, fields })` loads SIMD Wasm on
+demand. Defaults are id `pedestrians`, preferred level 0 and both input ports disabled. When enabled,
+write `PEDESTRIAN_INTENT_FIELD` with [vx, vz] and `PEDESTRIAN_FORCE_FIELD` with [fx, fz], one
+f64 row per walker. Readers can use `PEDESTRIAN_KINEMATICS_FIELD` for motion and accumulated
+stride distance, and `PEDESTRIAN_CONTACT_FIELD` for [fx, fz, normalLoad, density,
+anticipatoryFx, anticipatoryFz]. All four use `PEDESTRIAN_LAYOUT`. Use different `fields` names for
+multiple groups within one world. The same kernel runs in plain and shared world memory.
