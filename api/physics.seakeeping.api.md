@@ -176,6 +176,7 @@ export class HullSolver implements Solver<HullParams> {
             readonly cellSize?: number;
         };
     }): HullSolver;
+    connectEntryCavity(field: FieldDescriptor): this;
     describe(): SolverDescription;
     init(host: SolverHost, params: HullParams): void;
     step(context: StepContext, dt: number): void;
@@ -343,7 +344,7 @@ export function swayAddedMassRigidLid(draft: number, form: LewisForm, density: n
 
 export function volumeBelow(mesh: HullMesh, u: Vec3, s: number, moment?: [number, number, number]): number;
 
-export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads, drag?: WettedDrag): WettedLoads;
+export function wettedLoads(hull: HullMesh, pose: HullPose, sea: SeaQuery, t: number, about: Vec3, out?: WettedLoads, drag?: WettedDrag, cavityNormal?: Vec3): WettedLoads;
 
 // Not exported from this entry, but used by the exports above:
 

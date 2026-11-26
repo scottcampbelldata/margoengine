@@ -31,7 +31,10 @@ export interface EntryParams {
 
 export class EntrySolver implements Solver<EntryParams> {
     readonly id: string;
-    constructor(id?: string);
+    readonly cavityPressureField: FieldDescriptor;
+    constructor(id?: string, options?: {
+        readonly cavityPressure?: boolean;
+    });
     describe(): SolverDescription;
     init(host: SolverHost, params: EntryParams): void;
     step(context: StepContext, dt: number): void;

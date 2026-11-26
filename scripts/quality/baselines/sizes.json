@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20578357,
+  "total": 20578765,
   "history": [
     {
       "date": "2026-10-24",
@@ -14041,6 +14041,12 @@
       "commit": "feat(physics2d) collider mass",
       "reason": "Collider2D setMass, setMassProperties and mass() (C2-10); the whole entry 21,391 to 21,782 B gzip (this Mac).",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3d71906a85",
+      "grew": 1,
+      "reason": "SEA-08 coupled launch cavity: @margoengine/physics/entry changes from 9053 to 9429 B gzip. These bytes carry the per-hull cavity direction and clip pressure during the existing surface load solve. A split would duplicate the field and wetted-geometry path."
     }
   ],
   "items": {
@@ -14874,7 +14880,7 @@
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 4523,
     "@margoengine/physics/earth": 3456,
-    "@margoengine/physics/entry": 9304,
+    "@margoengine/physics/entry": 9712,
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,
