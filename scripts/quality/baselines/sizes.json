@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20242449,
+  "total": 20248800,
   "history": [
     {
       "date": "2026-10-24",
@@ -12981,6 +12981,12 @@
       "commit": "52b406322",
       "reason": "New optional post entry, 0 to 3,556 B gzip: trail (TrailTexture, a fading trail texture painted by motion). Its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "779b932f50",
+      "reason": "SPACE-03 adds the optional 6095 B gzip accretion entry. Native disk transport and test geodesics share one optional import. Splitting would add two public entry points and separate the compact-object data readers. Core plus stage gains 0 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13793,6 +13799,7 @@
     "@margoengine/physics": 889499,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 93993,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
+    "@margoengine/physics/accretion": 6351,
     "@margoengine/physics/aeolian": 5889,
     "@margoengine/physics/ageing": 5178,
     "@margoengine/physics/airborne": 8516,
