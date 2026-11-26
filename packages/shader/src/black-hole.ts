@@ -54,6 +54,10 @@ export interface BlackHoleOptions {
   galaxy?: number;
   /** Disk time scale: units of M of orbital time per second of the shader clock. Default 6. */
   timeScale?: number;
+  /** External disk clock in seconds for deterministic playback. Default null uses the camera clock. */
+  diskTime?: number | null;
+  /** Inward drift in M per unit of orbital time. Default 0.002. */
+  diskInflow?: number;
   /** Linear exposure multiplier of the output. Default 1. */
   exposure?: number;
   /** Shading view. Default 'beauty'. */
@@ -85,6 +89,33 @@ export function kerrIsco(spin: number): number {
 export function kerrPhotonOrbit(spin: number): number {
   const a = clampSpin(spin);
   return 2 * (1 + Math.cos((2 / 3) * Math.acos(-a)));
+}
+
+/**
+ * Traces a disk emitter backward along a constant radial drift.
+ * Returns its earlier radius in M and the prograde phase difference in radians.
+ */
+export function kerrDiskAdvection(
+  radius: number,
+  age: number,
+  spin: number,
+  inward: number,
+): readonly [radius: number, phase: number] {
+  if (!(radius > 0 && age >= 0 && inward >= 0 && inward <= 1 && Number.isFinite(radius + age)))
+    throw new RangeError(
+      'Invalid disk advection; use a positive finite radius, nonnegative age and drift from 0 to 1.',
+    );
+  const past = radius + inward * age;
+  const a = clampSpin(spin);
+  if (a === 0) {
+    const now = Math.sqrt(radius);
+    const previous = Math.sqrt(past);
+    return [past, (2 * age) / now / previous / (now + previous)];
+  }
+  const centre = (radius + past) * 0.5;
+  const offset = (past - radius) / (2 * Math.sqrt(3));
+  const angularVelocity = (r: number): number => 1 / (r * Math.sqrt(r) + a);
+  return [past, (angularVelocity(centre - offset) + angularVelocity(centre + offset)) * (age * 0.5)];
 }
 
 /** The three roots of x^3 - 3x + 2a = 0 used by Page and Thorne's flux, x = sqrt(r / M). */
@@ -560,16 +591,32 @@ fn bhDiskAlpha(r:f32)->f32 {
 // The two crossfaded phases of the advected texture (Neyret 2003): x = phase age in seconds, y = weight.
 fn bhPhase(k:f32)->vec2f {
   let period = 24.0;
-  let u = fract(camera.time / period + 0.5 * k);
+  let clock = select(camera.time, uniforms.diskTime, uniforms.diskClock > 0.5);
+  let u = fract(clock / period + 0.5 * k);
   return vec2f(u * period, 1.0 - abs(2.0 * u - 1.0));
 }
 
-// Noise coordinate of a disk point, carried round by Keplerian rotation for the phase's age.
+// Backtrace the emitter through the circular Kerr angular velocity and a steady inward radial drift.
+fn bhDiskAdvection(r:f32, age:f32)->vec2f {
+  let past = r + uniforms.diskInflow * age;
+  if (uniforms.spin == 0.0) {
+    let now = sqrt(r);
+    let previous = sqrt(past);
+    return vec2f(past, (2.0 * age) / (now * previous * (now + previous)));
+  }
+  let mid = 0.5 * (r + past);
+  let offset = (past - r) / (2.0 * sqrt(3.0));
+  let a = mid - offset;
+  let b = mid + offset;
+  let phase = 0.5 * age * (1.0 / (a * sqrt(a) + uniforms.spin) + 1.0 / (b * sqrt(b) + uniforms.spin));
+  return vec2f(past, phase);
+}
+
 fn bhDiskCoord(p:vec3f, age:f32, k:f32)->vec3f {
-  let rM = max(length(p.xz), 1e-3) * 2.0;
-  let omega = 1.0 / (pow(rM, 1.5) + uniforms.spin);
-  let phi = atan2(p.z, p.x) + omega * age * uniforms.timeScale;
-  return vec3f(cos(phi) * 3.0, sin(phi) * 3.0, log(rM) * 6.0 + k * 31.7);
+  let rM = sqrt(max(4.0 * dot(p.xz, p.xz) - uniforms.spin * uniforms.spin, 1e-4));
+  let previous = bhDiskAdvection(rM, age * uniforms.timeScale);
+  let phi = atan2(p.z, p.x) + previous.y;
+  return vec3f(cos(phi) * 3.0, sin(phi) * 3.0, log(previous.x) * 6.0 + k * 31.7);
 }
 
 // Light from the disk at crossing p (scene units) for a photon of axial angular momentum bk (M, conserved).
@@ -589,7 +636,8 @@ fn bhDisk(p:vec3f, bk:f32, turb:f32, order:f32)->vec3f {
   }
   // Turbulent brightness is log-normal, as in the surface density of magnetised disk turbulence (Balbus and Hawley 1991,
   // the magnetorotational instability), so hot knots and dark lanes both read; the mean stays near the smooth flux.
-  f *= exp(5.0 * uniforms.turbulence * turb);
+  let emitterGain = exp(5.0 * uniforms.turbulence * turb);
+  f *= emitterGain;
   // g = 1 / (u^t (1 - Omega b)) for a prograde circular orbit (Bardeen, Press, Teukolsky 1972).
   let s = sqrt(rM);
   let ut = (rM * s + uniforms.spin) / (pow(rM, 0.75) * sqrt(max(rM * s - 3.0 * s + 2.0 * uniforms.spin, 1e-5)));
@@ -603,7 +651,7 @@ fn bhDisk(p:vec3f, bk:f32, turb:f32, order:f32)->vec3f {
   if (v > 2.5) { return bhBlackbody(tEm) * select(0.0, 1.0, f > 0.0); }
   if (v > 1.5) {
     let e = clamp(log2(g * g * g * g) / 3.0, -1.0, 1.0);
-    return mix(vec3f(0.35, 0.35, 0.35), select(vec3f(0.15, 0.3, 1.0), vec3f(1.0, 0.95, 0.4), e > 0.0) * 1.6, abs(e)) * select(0.0, 1.0, f > 0.0);
+    return mix(vec3f(0.35, 0.35, 0.35), select(vec3f(0.15, 0.3, 1.0), vec3f(1.0, 0.95, 0.4), e > 0.0) * 1.6, abs(e)) * select(0.0, emitterGain, f > 0.0);
   }
   if (v > 0.5) {
     let e = clamp((g - 1.0) * 2.5, -1.0, 1.0);
@@ -944,6 +992,7 @@ export class BlackHole {
   private paths: RawMesh | null = null;
   private pathMaterial: RawShaderMaterial | null = null;
   private disposed = false;
+  private diskSeconds: number | null = null;
 
   /** Adds a RawShaders to `engine` and a BlackHole to it. */
   static attach(engine: EngineKernel, options: BlackHoleOptions = {}): BlackHole {
@@ -975,6 +1024,9 @@ export class BlackHole {
           'x3',
           'flareStart',
           'timeScale',
+          'diskTime',
+          'diskClock',
+          'diskInflow',
           'exposure',
           'steps',
           'stars',
@@ -998,6 +1050,8 @@ export class BlackHole {
     this.stars = options.stars ?? 1;
     this.galaxy = options.galaxy ?? 1;
     this.timeScale = options.timeScale ?? 6;
+    this.diskTime = options.diskTime ?? null;
+    this.diskInflow = options.diskInflow ?? 0.002;
     this.exposure = options.exposure ?? 1;
     this.view = options.view ?? 'beauty';
     this.prefilter = options.prefilter ?? true;
@@ -1091,6 +1145,24 @@ export class BlackHole {
   }
   set timeScale(v: number) {
     this.u('timeScale', clampNumber(v, 0, 1000));
+  }
+  /** Explicit time for disk texture advection, or null to follow the camera clock. */
+  get diskTime(): number | null {
+    return this.diskSeconds;
+  }
+  set diskTime(seconds: number | null) {
+    if (seconds !== null && !Number.isFinite(seconds))
+      throw new RangeError('Invalid disk time; pass finite seconds or null to follow the camera clock.');
+    this.diskSeconds = seconds;
+    this.u('diskClock', seconds === null ? 0 : 1);
+    this.u('diskTime', (seconds ?? 0) % 24);
+  }
+  /** Inward radial speed in M per simulated time unit. */
+  get diskInflow(): number {
+    return this.g('diskInflow');
+  }
+  set diskInflow(speed: number) {
+    this.u('diskInflow', clampNumber(speed, 0, 1));
   }
   get exposure(): number {
     return this.g('exposure');

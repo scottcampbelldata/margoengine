@@ -14030,6 +14030,10 @@
       "./sediment": {
         "raw": 12757,
         "gzip": 5256
+      },
+      "./orbit": {
+        "raw": 9148,
+        "gzip": 4017
       }
     },
     "@margoengine/physics2d": {
@@ -15360,8 +15364,8 @@
         "gzip": 15981
       },
       "./black-hole": {
-        "raw": 70718,
-        "gzip": 25293
+        "raw": 72258,
+        "gzip": 25814
       },
       "./effects": {
         "raw": 22356,
@@ -17741,6 +17745,16 @@
       "raw": 12571,
       "gzip": 5279,
       "brotli": 4747
+    },
+    "packages/physics/dist/orbit-kernel.wasm": {
+      "raw": 4444,
+      "gzip": 2380,
+      "brotli": 2191
+    },
+    "packages/physics/dist/orbit-kernel-shared.wasm": {
+      "raw": 4532,
+      "gzip": 2435,
+      "brotli": 2248
     }
   },
   "splits": {

@@ -8649,6 +8649,24 @@ clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.
 Near a capture edge, the filter and distortion determine the width of the transition.
 Reflected objects beyond the captured extent are unavailable to the planar adapter.
 
+## Orbital mechanics and disk motion (SPACE-01)
+
+The simulator uses a single inertial Cartesian frame for all bodies. Direct pair gravity costs O(n²) per
+force evaluation. Use fixed steps small relative to close-approach and orbital timescales. Optional Plummer
+softening changes the near-field force. A positive J2 models one body's axial figure. The exponential atmosphere
+is a prescribed rotating background with dissipative drag, so its combined integrator is second order.
+It models atmospheric deceleration without heating, ablation, aerodynamic lift, surface contact or a mission
+atmosphere. The Cartesian solver uses Newtonian gravity and provides a bound-ellipse helper. Catalog orbit
+elements continue to use the SGP4 entry.
+
+The lensed disk uses circular Kerr angular velocity and a prescribed radial drift. The angular integral is exact
+for zero spin and a two-point quadrature for spinning disks. The model covers slow radial drift of the emitter
+texture. Full relativistic gas dynamics, disk thickness and angular momentum transport are separate work.
+
+The orbit JS entry measures 4,017 B gzip against 4,273 B. Its optional plain and shared Rust Wasm assets
+measure 2,380 B and 2,435 B gzip. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
+budget. Core and stage together measure 24,820 B.
+
 ## Underwater acoustics (SOUND-03)
 
 The medium is stationary with sound speed varying only with depth. Each ray and beam propagate in a

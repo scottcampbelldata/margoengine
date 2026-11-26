@@ -127,6 +127,10 @@
     "./underwater": {
       "types": "./dist/underwater/index.d.ts",
       "import": "./dist/underwater.js"
+    },
+    "./orbit": {
+      "types": "./dist/orbit/index.d.ts",
+      "import": "./dist/orbit.js"
     }
   },
   "files": [
