@@ -75,6 +75,11 @@ const heightFormats = ['r32float', 'r16float', 'rgba32float', 'rgba16float', 'r8
 export interface ScatterVelocityParts {
   /** The frame values: camera 0-15, eye 16-18, wind 68-71, ground fit 72-75, blades 76-79, pixel footprint 80. */
   readonly values: Float32Array;
+  /**
+   * The wind (frame values 68-71: direction, strength, wind clock) of the last frame drawn with an earlier wind clock;
+   * the last frame's own on the first frame and after `resetTime`. `@margoengine/scatter/read` poses the shutter's open with it.
+   */
+  readonly windBefore: Float32Array;
   readonly instances: readonly GPUBuffer[];
   readonly commands: GPUBuffer;
   readonly vertices: readonly GPUBuffer[];
@@ -553,6 +558,9 @@ export class Scatter implements EnginePlugin {
   private readonly materialValues = new Float32Array(24);
   private seconds = 0;
   private windClock = 0;
+  /** The wind values (68-71) of the frame before the last drawn one, and whether a frame has been drawn since a reset. */
+  private readonly windBefore = new Float32Array(4);
+  private windDrawn = false;
   protected terrain?: GPUTexture;
   protected computeGroup?: GPUBindGroup;
   private readonly renderGroups = new Map<GPURenderPipeline, GPUBindGroup[]>();
@@ -1056,6 +1064,7 @@ export class Scatter implements EnginePlugin {
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.seconds = this.windClock = 0;
+    this.windDrawn = false;
   }
   /**
    * Moves the wind clock by `delta` seconds without drawing: all of a frame update. `seek` from
@@ -1102,6 +1111,8 @@ export class Scatter implements EnginePlugin {
             'Scatter needs a sampleable floating-height texture; return one from options.heightmap',
           );
         this.applyReach();
+        // A second view of the same frame (the clock has not moved) keeps the frame before's wind.
+        if (this.windDrawn && this.values[71] !== this.windClock) this.windBefore.set(this.values.subarray(68, 72));
         this.values.fill(0, 68, 71);
         if (this.options.wind) {
           const wind = this.options.wind,
@@ -1111,6 +1122,8 @@ export class Scatter implements EnginePlugin {
           this.values[70] = wind[2];
         }
         this.values[71] = this.windClock;
+        if (!this.windDrawn) this.windBefore.set(this.values.subarray(68, 72));
+        this.windDrawn = true;
         if (this.options.follow) this.followCamera(c.camera.position);
         this.options.states?.update(c);
         this.beforeDistribute(c, terrain);
@@ -1711,6 +1724,7 @@ export class Scatter implements EnginePlugin {
     const route = this.route;
     return {
       values: this.values,
+      windBefore: this.windBefore,
       instances: this.colourInstances(),
       commands: this.colourCommands(),
       vertices: this.vertices,

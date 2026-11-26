@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { instanceMatrix, readScatter } from '../dist/read.js';
+import { instanceMatrix, poseFrame, poseKernel, readScatter } from '../dist/read.js';
+import { grassPoseCode } from '../dist/grass.js';
+import { plantStatePoseCode } from '../dist/states.js';
+import { trampledPoseCode } from '../dist/interact.js';
 
 // The vertex stage's placement (pose.ts scatterGround and scatterTurn), written out again: the matrix must give the
 // same world point for any local point.
@@ -45,6 +48,51 @@ test('instanceMatrix places a local point where the vertex stage does, for yaw, 
     assert.deepEqual([out[19], out[23], out[27], out[31]], [0, 0, 0, 1]);
   }
   assert.deepEqual([...out.subarray(0, 16)], new Array(16).fill(0), 'writes only at the offset');
+});
+
+test('poseFrame lays out the pose kernel uniform from the frame values, with no pixel floor or widening', () => {
+  const values = new Float32Array(96).map((_, i) => i + 0.5),
+    before = [0.6, 0.8, 0.9, 3.25],
+    frame = poseFrame(values, before, 24),
+    f = new Float32Array(frame),
+    u = new Uint32Array(frame);
+  assert.equal(frame.byteLength, 96);
+  assert.deepEqual([...f.subarray(0, 4)], [16.5, 17.5, 18.5, 0], 'eye, pixel footprint 0');
+  assert.deepEqual([...f.subarray(4, 8)], [68.5, 69.5, 70.5, 71.5], 'the wind now');
+  assert.deepEqual([...f.subarray(8, 12)], before.map(Math.fround), 'the wind before');
+  assert.deepEqual([...f.subarray(12, 16)], [72.5, 73.5, 74.5, 75.5], 'ground fit');
+  assert.deepEqual([...f.subarray(16, 20)], [76.5, 0, 78.5, 79.5], 'blades, widening 0');
+  assert.deepEqual([u[20], u[21], u[22], u[23]], [0, 24, 6, 0], 'counts: per chunk, vertices, floats a vertex, first');
+});
+
+test('poseKernel calls the scatter pose twice and takes every pose patch the scatter applies', () => {
+  const plain = poseKernel((code) => code);
+  assert.match(plain, /@compute @workgroup_size\(64\) fn main/);
+  assert.equal(plain.split('scatterPose(p,n,data.position').length, 3, 'now and before');
+  assert.match(plain, /f\.windBefore/);
+  const bindings = [];
+  for (const patch of [
+    (code, binding) => grassPoseCode(code),
+    (code, binding) => plantStatePoseCode(code, 0, binding),
+    (code, binding) => trampledPoseCode(code, 0, binding),
+    (code, binding) => trampledPoseCode(plantStatePoseCode(code, 0, binding), 0, binding + 2),
+  ]) {
+    const code = poseKernel((code, binding) => {
+      bindings.push(binding);
+      return patch(code, binding);
+    });
+    assert.notEqual(code, plain, 'the patch changed the pose');
+    assert.equal(code.split('@compute').length, 2, 'one entry point');
+    // The patches bind in group 0 from 2 on; the kernel keeps its own group 0 bindings 0 and 1 and group 1.
+    for (const [, group, binding] of code.matchAll(/@group\((\d)\) @binding\((\d+)\)/g))
+      if (group === '0' && binding !== '0' && binding !== '1') assert.ok(+binding >= 2);
+  }
+  assert.deepEqual(bindings, [2, 2, 2, 2]);
+});
+
+test('readScatter refuses a pose that is not a boolean', async () => {
+  await assert.rejects(readScatter({}, {}, { pose: 'yes' }), TypeError);
+  await assert.rejects(readScatter({}, {}, { pose: 1 }), TypeError);
 });
 
 test('readScatter without a drawn scatter on a WebGPU engine is a state error', async () => {

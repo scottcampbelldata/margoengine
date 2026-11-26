@@ -589,12 +589,42 @@ engine.dispose();
   the height, slope, density, exclusion and path rules, before any occlusion pass. An instance cross-fading between two
   rings is kept once, in the nearer ring. Render a frame first; until then, after `dispose` or on a WebGL engine it
   throws MargoError `'state'`.
-- Rigid only: the wind's bend, grass blades' distance widening and plant-state poses are per vertex and left out. The
-  readback is one copy of the three ring buffers (32 bytes an instance slot) and one map.
+- The transforms are rigid. The readback is one copy of the three ring buffers (32 bytes an instance slot) and one
+  map.
+- `pose: true` also poses every vertex on the GPU: each ring gets `posed`, its instances as one world-space mesh
+  (`positions`, unit `normals`, `indices`, one copy of the ring mesh an instance in the order of `transforms`), posed
+  by the vertex stage's own `scatterPose` with every patch the scatter applies (the wind's bend, grass blades, plant
+  states, plant motion, trampling). Grass blades come at their true width: the raster-only widening with distance and
+  the pixel floor are left out, since a path tracer resolves thin blades with its own samples. `previousPositions`
+  are the same vertices under the wind of the last frame drawn on an earlier wind clock (equal to `positions` on the
+  first frame and after `resetTime`), so a shutter blurs the sway; plant states, trampling and the eye stay at the
+  last frame's. The cost is one compute pass and a read of 36 bytes a vertex, in chunks a storage binding holds.
+
+```ts
+import { Engine, box } from '@margoengine/core';
+import { Scatter } from '@margoengine/scatter';
+import { readScatter } from '@margoengine/scatter/read';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: { position: [0, 5, 9], target: [0, 0.8, 0] },
+});
+const reeds = Scatter.attach(engine, box(0.1, 2, 0.1), { count: 300, area: [10, 10], wind: [1, 0.2, 0.8] });
+engine.render({ delta: 1 / 30 });
+engine.render({ delta: 1 / 30 });
+const { rings } = await readScatter(engine, reeds, { pose: true, signal: AbortSignal.timeout(10_000) });
+const posed = rings[0].posed;
+console.log(posed && posed.positions.length / 3, posed && posed.indices.length / 3); // vertices, triangles
+reeds.dispose();
+engine.dispose();
+```
+
 - `instanceMatrix(floats, offset, alignToGround, out, at?)` turns one instance record (8 floats) into its transform.
 - Evidence: `test/read.test.js` (the matrix against the vertex stage's placement written out again, errors) and
   `packages/voxel-pathtracer/tests/from-engine-browser.mjs` (40 instances aligned to sloped ground drawn and traced:
-  silhouette IoU 0.9996; a field split by the fade band, 55 draws, read as 40 instances; WebGPU and the WebGL2 layer).
+  silhouette IoU 0.9996; a field split by the fade band, 55 draws, read as 40 instances; a windy field of 30 boxes
+  read with `pose: true`: IoU 1.000 against the drawn bent field where the rigid read scores 0.541, the shutter-open
+  pose equal bit for bit to the frame before's pose, grass blades and a trampled scatter posed through their own
+  patches; WebGPU and the WebGL2 layer).
 
 ## Interaction and trampling: `@margoengine/scatter/interact`
 

@@ -28,13 +28,25 @@ export interface TraceEngineOptions {
   terrain?: readonly TraceTerrainSource[];
   /**
    * Scattered instances to trace: each ring of a `readScatter` result (`@margoengine/scatter/read`) becomes one mesh
-   * with one placement per instance. Default none.
+   * with one placement per instance, or, for a ring read with `pose: true`, one world-space mesh of its posed vertices
+   * (bent by the wind as drawn) whose `previousPositions` are the pose a frame before, so a shutter above 0 blurs the
+   * sway. Default none.
    */
   scatter?: readonly TraceScatterSource[];
 }
 /** What {@link traceSceneFromEngine} needs of a scatter: a `ScatterReadout` from `readScatter` fits as it is. */
 export interface TraceScatterSource {
-  readonly rings: readonly { readonly geometry: Geometry; readonly transforms: Float32Array }[];
+  readonly rings: readonly {
+    readonly geometry: Geometry;
+    readonly transforms: Float32Array;
+    /** World vertices posed vertex by vertex (`readScatter` `pose: true`); traced in place of the placements. */
+    readonly posed?: {
+      readonly positions: Float32Array;
+      readonly normals: Float32Array;
+      readonly previousPositions: Float32Array;
+      readonly indices: Uint32Array;
+    };
+  }[];
   readonly color: readonly [number, number, number];
   readonly roughness: number;
   readonly metalness: number;
@@ -180,11 +192,17 @@ export function traceSceneFromEngine(engine: Engine, options: TraceEngineOptions
       metallicFactor: source.metalness,
       doubleSided: true,
     });
-    source.rings.forEach(({ geometry, transforms }, ring) => {
+    source.rings.forEach(({ geometry, transforms, posed }, ring) => {
       const count = transforms.length / 16;
       if (!count || geometry.indices.length === 0) return;
-      const meshId = `scatter-${n}-${ring}`,
-        s = split(geometry);
+      const meshId = `scatter-${n}-${ring}`;
+      if (posed) {
+        const { positions, normals, previousPositions, indices } = posed;
+        meshes.push({ id: meshId, positions, normals, indices, previousPositions, material: id });
+        meshInstances.push({ id: `engine-${meshId}`, mesh: meshId });
+        return;
+      }
+      const s = split(geometry);
       meshes.push({ id: meshId, positions: s.positions, normals: s.normals, indices: s.indices, material: id });
       for (let k = 0; k < count; k++)
         meshInstances.push({
