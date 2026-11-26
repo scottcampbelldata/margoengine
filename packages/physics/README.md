@@ -2214,6 +2214,67 @@ for (let frame = 1; frame <= 30 * 60; frame++) {
 }
 console.log(highest > 0.8); // true: it rides the swell's crests
 ```
+### Into the water and out of it (`EntrySolver`, `@margoengine/physics/entry`)
+
+`EntrySolver` is SEA-14: bodies striking the water, going under, breaking out and falling back, a cannonball, a diver, a
+launched hull or a breaching whale, beside the rigid solver (`world.couple(['entry', 'rigid'], 'staggered')`). Give it
+each body's row and its closed surface (`mesh`, wound outward, a few hundred to a few thousand triangles) and the water
+(`sea`: a `SpectralSea`, so the impact is against the local surface and relative to the waves' own motion, or anything
+with `elevation`). Each step it holds the body with:
+
+- the sea's own pressure over the wetted surface (as `HullSolver` takes it), but none over the part inside an open air
+  cavity;
+- the impact pressure 1/2 rho (U . n)^2 on each face moving into the water (Birkhoff's, which gives the ricochet: a ball
+  skips under 18 degrees / sqrt(sigma), Johnson and Reid's critical angle, here within 10 percent of it);
+- the slam as it strikes, from Wagner's wetted radius and Korobkin's modified Logvinovich model (a sphere's slam peaks at
+  C = 1.02 at 13 percent of its radius in, as Shiffman and Spencer's curve and the experiments of Antolik et al. do);
+- the water it carries: the wetted disc's added mass as it strikes, Lamb's spheroid under water, and S. F. Hoerner's
+  streamlined drag for a long body under water.
+
+Above Duez et al.'s threshold (7.2 m/s for a wetting surface; `contactAngle` over 90 degrees lowers it) it drags an air
+cavity down, which closes under the water's weight depth by depth (Duclaux et al., Aristoff et al.) and pinches: the deep
+seal throws a Worthington jet. `splashes()` lists what happened at the water, as events a renderer can draw (Water's
+`ShotSplash` draws them): `entry` (with its crown sheet), `seal` (the jet), `exit` (the water lifted as it breaks out),
+`skip`. `seaSources()` is the water it moved this step, for a `WakeSolver`'s `sources`, so the entry and the cavity's
+collapse make their waves; pass a `FoamSolver` as `foam` for the foam it leaves.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {EntrySolver} from 'margoengine/physics/entry';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, {fixedTimestep: 1 / 960});
+// A 25 mm steel ball dropped in at 9 m/s.
+const R = 0.0125;
+const ball = physics.addBody(null, {
+  position: [0, 0.02, 0],
+  linearVelocity: [0, -9, 0],
+  colliders: {shape: 'sphere', radius: R, mass: 7850 * (4 / 3) * Math.PI * R ** 3},
+});
+// Its surface: a UV sphere, wound outward.
+const vertices: number[] = [];
+const indices: number[] = [];
+for (let j = 0; j <= 16; j++)
+  for (let i = 0; i <= 32; i++) {
+    const th = (Math.PI * j) / 16, ph = (2 * Math.PI * i) / 32;
+    vertices.push(R * Math.sin(th) * Math.cos(ph), R * Math.cos(th), R * Math.sin(th) * Math.sin(ph));
+  }
+for (let j = 0; j < 16; j++)
+  for (let i = 0; i < 32; i++) {
+    const a = j * 33 + i;
+    if (j > 0) indices.push(a, a + 1, a + 34);
+    if (j < 15) indices.push(a, a + 34, a + 33);
+  }
+const entry = new EntrySolver();
+const world = new PhysicsWorld({rate: {num: 960, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(entry, {bodies: [{row: ball.row, mesh: {vertices, indices}}], sea: {elevation: () => 0}, level: 4})
+  .couple(['entry', 'rigid'], 'staggered');
+world.advance(96); // a tenth of a second
+console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in with a cavity, which pinches
+```
+
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
 
 `TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.

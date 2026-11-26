@@ -949,6 +949,7 @@ export * as e_margoengine_game_physics_modal_sound from '@margoengine/game/physi
 export * as e_margoengine_game_physics_falling from '@margoengine/game/physics/falling';
 export * as e_margoengine_game_physics_flight from '@margoengine/game/physics/flight';
 export * as e_margoengine_game_physics_waves from '@margoengine/game/physics/waves';
+export * as e_margoengine_game_physics_entry from '@margoengine/game/physics/entry';
 export * as e_margoengine_game_physics_sea from '@margoengine/game/physics/sea';
 export * as e_margoengine_game_physics_seakeeping from '@margoengine/game/physics/seakeeping';
 export * as e_margoengine_game_physics_celestial from '@margoengine/game/physics/celestial';
@@ -4098,6 +4099,7 @@ export * as e_margoengine_physics_modal_sound from 'margoengine/physics/modal-so
 export * as e_margoengine_physics_falling from 'margoengine/physics/falling';
 export * as e_margoengine_physics_flight from 'margoengine/physics/flight';
 export * as e_margoengine_physics_waves from 'margoengine/physics/waves';
+export * as e_margoengine_physics_entry from 'margoengine/physics/entry';
 export * as e_margoengine_physics_sea from 'margoengine/physics/sea';
 export * as e_margoengine_physics_seakeeping from 'margoengine/physics/seakeeping';
 export * as e_margoengine_physics_celestial from 'margoengine/physics/celestial';
@@ -4981,6 +4983,7 @@ export * as e_margoengine_physics_modal_sound_2 from '@margoengine/physics/modal
 export * as e_margoengine_physics_falling_2 from '@margoengine/physics/falling';
 export * as e_margoengine_physics_flight_2 from '@margoengine/physics/flight';
 export * as e_margoengine_physics_waves_2 from '@margoengine/physics/waves';
+export * as e_margoengine_physics_entry_2 from '@margoengine/physics/entry';
 export * as e_margoengine_physics_sea_2 from '@margoengine/physics/sea';
 export * as e_margoengine_physics_seakeeping_2 from '@margoengine/physics/seakeeping';
 export * as e_margoengine_physics_celestial_2 from '@margoengine/physics/celestial';

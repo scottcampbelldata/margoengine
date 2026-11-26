@@ -84,6 +84,10 @@
       "types": "./dist/waves/index.d.ts",
       "import": "./dist/waves.js"
     },
+    "./entry": {
+      "types": "./dist/entry/index.d.ts",
+      "import": "./dist/entry.js"
+    },
     "./sea": {
       "types": "./dist/sea/index.d.ts",
       "import": "./dist/sea.js"
