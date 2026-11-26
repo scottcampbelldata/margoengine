@@ -3139,6 +3139,11 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Shadow map viewer (`@margoengine/shadows/viewer`, 2026-11-25) shows one layer at a time, nearest texel, no
+  filtering, so a map larger than the viewer drops texels; it draws over the frame at order 1000 without depth or
+  blending. Virtual shadow map pages (`@margoengine/shadows/virtual`) and the colour (tint) maps of coloured shadows are
+  not covered: only depth arrays of `Shadows` and `LocalShadows` (and any depth texture passed by hand).
+
 - Light probe and positional audio helpers (`@margoengine/lines/scene-helpers`, 2026-11-25): `LightProbeHelper` reads
   only L1 (12 floats) or L2 (27 floats) SH and samples its source at 408 directions per `update()` (a function source
   is called that many times a frame); colours are clamped to 0..1 after `exposure`, so a probe brighter than the scale
