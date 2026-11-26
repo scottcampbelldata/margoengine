@@ -86,6 +86,13 @@ export interface FireOptions {
 export interface FloodOptions {
     readonly returnPeriods?: readonly number[];
     readonly wetland?: number;
+    readonly water?: {
+        readonly origin?: readonly [number, number];
+        sample(period: number, x: number, z: number): {
+            depth: number;
+            velocity: readonly [number, number];
+        };
+    };
 }
 
 export function decodeDisturbance(bytes: Uint8Array): Disturbance;

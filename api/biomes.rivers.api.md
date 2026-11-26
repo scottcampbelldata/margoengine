@@ -48,11 +48,13 @@ export interface ViewWaterChoice {
     readonly lakes?: 'auto' | false;
 }
 
+export function climateDischarge(world: Pick<BiomeWorld, 'bounds' | 'sampleRegion'>, drainage: Pick<Hydrology, 'flow' | 'nx' | 'nz' | 'step'>): (x: number, z: number) => number;
+
 export function lakeLevels(h: LakeHydrology): LakeLevels;
 
 export function paintRiverbed(paint: RiverbedPaint): void;
 
-export function riverSources(lines: readonly Int32Array[], heightAt: (x: number, z: number) => number, discharge: number, radius: number): {
+export function riverSources(lines: readonly Int32Array[], heightAt: (x: number, z: number) => number, discharge: number | ((x: number, z: number) => number), radius: number): {
     position: [number, number];
     discharge: number;
     radius: number;
@@ -81,12 +83,242 @@ export function viewWater(world: HydrologyWorld & {
 
 // Not exported from this entry, but used by the exports above:
 
+interface BiomeDefinition {
+    readonly id: string;
+    readonly climate: ClimateEnvelope;
+    readonly ground: readonly GroundLayer[];
+    readonly plants?: readonly SpeciesRule[];
+    readonly rocks?: readonly SpeciesRule[];
+    readonly props?: readonly SpeciesRule[];
+    readonly details?: readonly DetailRule[];
+    readonly wind?: {
+        readonly strength: number;
+        readonly detail?: number;
+    };
+    readonly tint?: ColorVariation;
+    readonly priority?: number;
+    readonly weight?: number;
+    readonly zones?: readonly string[];
+    readonly openFuel?: string;
+}
+
+interface BiomeSample {
+    height: number;
+    slope: number;
+    aspect: number;
+    curvature?: number;
+    temperature: number;
+    coldest: number;
+    warmest: number;
+    gdd5: number;
+    season: number;
+    treeline: number;
+    rainfall: number;
+    alpha: number;
+    moisture: number;
+    exposure: number;
+    waterDistance: number;
+    soil: number;
+    biomes: string[];
+    weights: number[];
+}
+
+interface BiomeTile {
+    readonly x: number;
+    readonly z: number;
+    readonly origin: readonly [number, number];
+    readonly cells: number;
+    readonly resolution: number;
+    readonly layers: readonly string[];
+    layer(name: string): RasterLayer | undefined;
+}
+
+class BiomeWorld implements Disposable {
+    readonly seed: number;
+    readonly tileSize: number;
+    readonly ecotone: number;
+    readonly resolution: number;
+    readonly regionResolution: number;
+    readonly bounds: Rect;
+    readonly tilesX: number;
+    readonly tilesZ: number;
+    private constructor();
+    static create(options?: BiomeWorldOptions): Promise<BiomeWorld>;
+    state(): WorldState;
+    get workers(): import('@margoengine/biomes/workers').BiomeWorkers | undefined;
+    get biomes(): readonly BiomeDefinition[];
+    get rivers(): readonly Int32Array[];
+    get region(): Region;
+    get paintEcotone(): number;
+    get paint(): readonly PaintLayer[];
+    overview(): {
+        readonly width: number;
+        readonly depth: number;
+        readonly resolution: number;
+        readonly height: Float32Array;
+    };
+    get climate(): Climate;
+    tile(x: number, z: number, options?: TileRequest): Promise<BiomeTile>;
+    tilePart(x: number, z: number, window: Rect, options?: TileRequest): Promise<BiomeTile & {
+        readonly window: Rect;
+    }>;
+    readLayer(name: string, x: number, z: number): Uint8Array | undefined;
+    writeLayer(name: string, x: number, z: number, data: Uint8Array | undefined): void;
+    writeLayers(writes: readonly LayerWrite[]): void;
+    tiles(rect: Rect, options?: TileRequest & {
+        readonly focus?: readonly [number, number];
+    }): AsyncIterableIterator<BiomeTile>;
+    sample(x: number, z: number, out?: BiomeSample): BiomeSample;
+    sampleRegion(x: number, z: number, out?: BiomeSample): BiomeSample;
+    heightAt(x: number, z: number): number;
+    update(changes: Partial<Pick<BiomeWorldOptions, 'biomes' | 'climate' | 'classifier' | 'paint' | 'height'>>): void;
+    onChange(listener: (rect: Rect) => void): () => void;
+    digest(x: number, z: number, options?: {
+        readonly signal?: AbortSignal;
+    }): Promise<string>;
+    dispose(): void;
+    [Symbol.dispose](): void;
+}
+
+interface BiomeWorldOptions {
+    readonly seed?: number;
+    readonly height?: HeightSource;
+    readonly origin?: readonly [number, number];
+    readonly size?: readonly [number, number];
+    readonly climate?: ClimateOptions;
+    readonly tileSize?: 128 | 256 | 512;
+    readonly resolution?: 0.5 | 1 | 2 | 4;
+    readonly regionResolution?: number;
+    readonly backend?: 'auto' | 'gpu' | 'cpu';
+    readonly device?: GPUDevice;
+    readonly biomes?: readonly BiomeDefinition[];
+    readonly classifier?: 'envelopes' | ZoneClassifier;
+    readonly paint?: readonly PaintLayer[];
+    readonly ecotone?: number;
+    readonly signal?: AbortSignal;
+    readonly workers?: number | false;
+    readonly createWorker?: () => Worker;
+    readonly cache?: number;
+}
+
+type BrushFalloff = 'smooth' | 'linear' | 'constant';
+
+interface Climate {
+    readonly latitude: number;
+    readonly sea: number;
+    readonly lapseDay: number;
+    readonly lapseNight: number;
+    readonly seaTemperature: number;
+    readonly rainfall: number;
+    readonly wind: readonly [number, number];
+    readonly shadow: number;
+    readonly inland: number;
+    readonly coldAir: number;
+    readonly rainSeason: 'uniform' | 'summer' | 'winter';
+    readonly warm: readonly [number, number];
+    readonly sinLatitude: number;
+    readonly radiation: readonly [number, number];
+}
+
+interface ClimateEnvelope {
+    readonly temperature?: Range;
+    readonly coldest?: Range;
+    readonly warmest?: Range;
+    readonly gdd5?: Range;
+    readonly season?: Range;
+    readonly treeline?: Range;
+    readonly rainfall?: Range;
+    readonly moistureIndex?: Range;
+    readonly moisture?: Range;
+    readonly height?: Range;
+    readonly slope?: Range;
+    readonly exposure?: Range;
+    readonly soil?: Range;
+    readonly waterDistance?: Range;
+    readonly custom?: Readonly<Record<string, Range>>;
+    readonly blend?: number;
+}
+
+interface ClimateOptions {
+    readonly latitude?: number;
+    readonly seaLevel?: number;
+    readonly lapseRate?: number;
+    readonly lapseSplit?: number;
+    readonly equatorTemperature?: number;
+    readonly poleTemperature?: number;
+    readonly rainfall?: number;
+    readonly wind?: readonly [x: number, z: number];
+    readonly rainShadow?: number;
+    readonly inland?: number;
+    readonly coldAir?: number;
+    readonly rainSeason?: 'auto' | 'uniform' | 'summer' | 'winter';
+}
+
+interface ClusterRule {
+    readonly kind: 'thomas' | 'matern' | '2dt';
+    readonly parents: number;
+    readonly spread: number;
+    readonly offspring?: number;
+    readonly tail?: number;
+}
+
+interface ColorVariation {
+    readonly hue?: number;
+    readonly value?: number;
+    readonly seasonal?: boolean;
+}
+
+interface DetailRule {
+    readonly id: string;
+    readonly mesh: string;
+    readonly density: number;
+    readonly suitability?: SpeciesRule['suitability'];
+    readonly light?: Range;
+    readonly blades?: boolean;
+}
+
+interface ErosionOptions {
+    readonly iterations?: number;
+    readonly talus?: number;
+    readonly thermal?: number;
+    readonly capacity?: number;
+    readonly incision?: number;
+    readonly deposition?: number;
+    readonly sea?: number;
+}
+
+interface GroundLayer {
+    readonly material: string;
+    readonly slope?: Range;
+    readonly height?: Range;
+    readonly moisture?: Range;
+    readonly curvature?: Range;
+    readonly temperature?: Range;
+    readonly coldest?: Range;
+    readonly warmest?: Range;
+    readonly weight?: number;
+}
+
 interface HeightGrid {
     readonly height: Int32Array;
     readonly nx: number;
     readonly nz: number;
     readonly step: number;
 }
+
+type HeightSource = {
+    readonly samples: Int32Array | Float32Array;
+    readonly width: number;
+    readonly depth: number;
+    readonly unit?: 'm' | 'mm';
+} | {
+    readonly field: (x: number, z: number) => number;
+} | {
+    readonly relief: ReliefOptions;
+} | {
+    readonly carve: readonly PathOptions[];
+    readonly base?: HeightSource;
+};
 
 interface Hydrology extends HeightGrid {
     readonly filled: Int32Array;
@@ -110,5 +342,195 @@ interface HydrologyWorld {
     readonly resolution: number;
 }
 
+interface IslandOptions {
+    readonly count?: number;
+    readonly radius?: number;
+    readonly shelf?: number;
+}
+
 type LakeHydrology = Pick<Hydrology, 'nx' | 'nz' | 'step' | 'height' | 'filled' | 'lake'>;
+
+type LayerFormat = 'i32' | 'i16' | 'u16' | 'u8' | 'rgba8';
+
+interface LayerWrite {
+    readonly name: string;
+    readonly x: number;
+    readonly z: number;
+    readonly data: Uint8Array | undefined;
+    readonly changed?: readonly [number, number, number, number];
+}
+
+interface MountainValleyOptions {
+    readonly outlet?: 'west' | 'east' | 'north' | 'south';
+    readonly center?: number;
+    readonly floor?: number;
+    readonly fall?: number;
+    readonly wall?: number;
+    readonly steepness?: number;
+    readonly ridges?: 'rounded' | 'sharp';
+    readonly gulches?: number;
+    readonly creek?: {
+        readonly width?: number;
+        readonly depth?: number;
+    };
+    readonly rail?: {
+        readonly grade?: number;
+        readonly width?: number;
+    } | false;
+    readonly step?: number;
+}
+
+interface PaintLayer {
+    readonly biome: string;
+    readonly mode?: PaintMode;
+    readonly mask?: string;
+    readonly ecotone?: number;
+}
+
+type PaintMode = 'replace' | 'add' | 'multiply' | 'max';
+
+interface PathCarve {
+    readonly mode?: 'flatten' | 'cut' | 'level';
+    readonly top?: number;
+    readonly depth?: number;
+    readonly grade?: number;
+}
+
+type PathCurve = 'polyline' | 'catmull-rom' | 'b-spline';
+
+interface PathOptions {
+    readonly points: readonly (readonly [number, number])[];
+    readonly curve?: PathCurve;
+    readonly closed?: boolean;
+    readonly step?: number;
+    readonly width?: number;
+    readonly edge?: number;
+    readonly falloff?: BrushFalloff;
+    readonly biome?: string;
+    readonly mask?: string;
+    readonly strength?: number;
+    readonly carve?: PathCarve;
+}
+
+type Range = readonly [min: number | null, max: number | null];
+
+interface RasterLayer {
+    readonly name: string;
+    readonly format: LayerFormat;
+    readonly width: number;
+    readonly depth: number;
+    readonly data: Int32Array | Int16Array | Uint16Array | Uint8Array;
+    readonly scale: number;
+    readonly unit: string;
+}
+
+type Rect = readonly [number, number, number, number];
+
+interface Region {
+    readonly nx: number;
+    readonly nz: number;
+    readonly step: number;
+    readonly height: Int32Array;
+    readonly fill: Int32Array;
+    readonly rain: Int32Array;
+    readonly exposure: Int32Array;
+    readonly water: Int32Array;
+    readonly continentality: Int32Array;
+}
+
+interface ReliefErosionOptions extends Omit<ErosionOptions, 'sea'> {
+    readonly step?: number;
+}
+
+interface ReliefOptions {
+    readonly seed?: number;
+    readonly origin?: readonly [number, number];
+    readonly size?: readonly [number, number];
+    readonly base?: number;
+    readonly relief?: number;
+    readonly coast?: 'none' | 'west' | 'east' | 'north' | 'south' | 'island';
+    readonly rivers?: number;
+    readonly seaDepth?: number;
+    readonly shelf?: number;
+    readonly valley?: ValleyOptions;
+    readonly ria?: RiaOptions;
+    readonly islands?: IslandOptions;
+    readonly mountainValley?: MountainValleyOptions;
+    readonly erosion?: ReliefErosionOptions;
+}
+
+interface RiaOptions {
+    readonly center?: number;
+    readonly width?: number;
+    readonly headWidth?: number;
+    readonly length?: number;
+    readonly depth?: number;
+    readonly headDepth?: number;
+    readonly slope?: number;
+    readonly flat?: number;
+    readonly flatHeight?: number;
+    readonly run?: number;
+    readonly river?: boolean;
+}
+
+type SizeDistribution = {
+    readonly kind: 'reverse-j';
+    readonly q: number;
+    readonly max: number;
+} | {
+    readonly kind: 'weibull';
+    readonly shape: number;
+    readonly scale: number;
+};
+
+interface SpeciesRule {
+    readonly id: string;
+    readonly mesh: string;
+    readonly canopyKind?: 'broadleaf' | 'conifer' | 'palm';
+    readonly density: number;
+    readonly radius: number;
+    readonly size?: SizeDistribution;
+    readonly cluster?: ClusterRule;
+    readonly stands?: StandRule;
+    readonly shade?: number;
+    readonly suitability?: Partial<Record<'temperature' | 'rainfall' | 'moisture' | 'slope' | 'height' | 'waterDistance', Range>>;
+    readonly alignToGround?: number;
+    readonly sink?: number;
+    readonly lod?: readonly [near: number, mid: number, far: number];
+    readonly color?: ColorVariation;
+    readonly tags?: readonly string[];
+    readonly fuel?: string;
+}
+
+interface StandRule {
+    readonly scale: number;
+    readonly cover: number;
+}
+
+interface TileRequest {
+    readonly layers?: readonly string[];
+    readonly signal?: AbortSignal;
+}
+
+interface ValleyOptions {
+    readonly width?: number;
+    readonly floor?: number;
+    readonly mouth?: number;
+}
+
+interface WorldState {
+    readonly options: BiomeWorldOptions;
+    readonly biomes: readonly BiomeDefinition[];
+    readonly classifier: 'envelopes' | ZoneClassifier;
+    readonly paint: readonly PaintLayer[];
+    readonly user: ReadonlyMap<string, ReadonlyMap<string, Uint8Array>>;
+}
+
+interface ZoneClassifier {
+    readonly kind: 'whittaker' | 'holdridge' | 'multinoise';
+    readonly inputs?: readonly string[];
+    readonly spec?: object;
+    readonly perCell?: true;
+    scorer(biomes: readonly BiomeDefinition[], slotOf: (layer: string) => number): (warped: Int32Array, cells: number, member: Int32Array) => void;
+}
 ```

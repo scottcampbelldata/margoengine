@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19192996,
+  "total": 19199213,
   "history": [
     {
       "date": "2026-10-24",
@@ -12519,6 +12519,12 @@
       "commit": "4a5eb59338",
       "reason": "3ddcd16437 added the optional entry @margoengine/ecs/coroutines (1,099 B gzip, generator scheduling) but its size row never reached main (fdafba53d5 holds only the entry list); the ecs root, core and stage are unchanged",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "9f6f7e9004",
+      "reason": "HYDRO-02 entry sizes, previous record to current: @margoengine/physics/runoff 0→3906 B (ceiling 0→4162 B); @margoengine/physics/hydro 6311→6724 B (ceiling 6567→6980 B); @margoengine/biomes/view 15293→15447 B (ceiling 15565→15565 B); @margoengine/biomes/rivers 2817→4193 B (ceiling 3073→4449 B); @margoengine/biomes/disturbance 6035→6292 B (ceiling 6282→6548 B). Runoff and shallow inflow share the per-cell discharge contract. Biomes adds live storm inflows, a climate-only catchment estimate and inundation queries at measured flood stages. A further split would duplicate the climate math or require an extra lazy request when opening river water. Core and stage carry no runtime runoff import.",
+      "grew": 4
     }
   ],
   "items": {
@@ -12596,7 +12602,7 @@
     "@margoengine/biomes dist/workers/biomes.js": 41860,
     "@margoengine/biomes/cover": 3795,
     "@margoengine/biomes/digest": 894,
-    "@margoengine/biomes/disturbance": 6282,
+    "@margoengine/biomes/disturbance": 6548,
     "@margoengine/biomes/ecosystem": 3466,
     "@margoengine/biomes/editor": 4433,
     "@margoengine/biomes/erosion": 3202,
@@ -12615,7 +12621,7 @@
     "@margoengine/biomes/presets": 3117,
     "@margoengine/biomes/region": 4672,
     "@margoengine/biomes/relief": 5694,
-    "@margoengine/biomes/rivers": 3073,
+    "@margoengine/biomes/rivers": 4449,
     "@margoengine/biomes/seasons": 3514,
     "@margoengine/biomes/settings": 6562,
     "@margoengine/biomes/settlements": 7678,
@@ -13317,10 +13323,11 @@
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/hydro": 6567,
+    "@margoengine/physics/hydro": 6980,
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 3437,
     "@margoengine/physics/seakeeping": 10371,

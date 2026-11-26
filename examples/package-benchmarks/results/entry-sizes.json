@@ -296,8 +296,8 @@
         "gzip": 4882
       },
       "./disturbance": {
-        "raw": 14640,
-        "gzip": 6035
+        "raw": 15334,
+        "gzip": 6292
       },
       "./seasons": {
         "raw": 6977,
@@ -336,12 +336,12 @@
         "gzip": 3492
       },
       "./view": {
-        "raw": 39256,
-        "gzip": 15293
+        "raw": 39729,
+        "gzip": 15447
       },
       "./rivers": {
-        "raw": 5912,
-        "gzip": 2817
+        "raw": 8833,
+        "gzip": 4193
       },
       "./cover": {
         "raw": 7456,
@@ -14006,6 +14006,14 @@
       "./ice": {
         "raw": 7973,
         "gzip": 3843
+      },
+      "./runoff": {
+        "raw": 9634,
+        "gzip": 3906
+      },
+      "./hydro": {
+        "raw": 15992,
+        "gzip": 6724
       }
     },
     "@margoengine/physics2d": {
@@ -17673,6 +17681,16 @@
       "raw": 6456,
       "gzip": 2226,
       "brotli": 1955
+    },
+    "packages/physics/dist/runoff-kernel.wasm": {
+      "raw": 7311,
+      "gzip": 3112,
+      "brotli": 2831
+    },
+    "packages/physics/dist/runoff-kernel-shared.wasm": {
+      "raw": 7402,
+      "gzip": 3177,
+      "brotli": 2847
     }
   },
   "splits": {

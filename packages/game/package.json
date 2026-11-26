@@ -2187,6 +2187,10 @@
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"
     },
+    "./physics/runoff": {
+      "types": "./dist/physics/runoff.d.ts",
+      "import": "./dist/physics/runoff.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

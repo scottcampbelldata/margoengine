@@ -3187,6 +3187,10 @@
       "types": "./dist/physics/ice.d.ts",
       "import": "./dist/physics/ice.js"
     },
+    "./physics/runoff": {
+      "types": "./dist/physics/runoff.d.ts",
+      "import": "./dist/physics/runoff.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

@@ -116,6 +116,9 @@ export type BiomeWaterSettings = Omit<WaterOptions, 'size' | 'height' | 'horizon
     readonly lakes?: 'auto' | false;
     readonly flow?: boolean | {
         readonly discharge?: number;
+        readonly runoff?: {
+            dischargeAt(x: number, z: number): number;
+        };
         readonly substeps?: number;
     };
 };

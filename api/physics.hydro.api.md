@@ -34,6 +34,14 @@ export interface ShallowInflow {
     readonly discharge: number | ((time: number) => number);
 }
 
+export interface ShallowRunoffInput {
+    readonly field: FieldDescriptor;
+    readonly outlets: ReadonlyArray<{
+        readonly sourceCell: number;
+        readonly position: readonly [number, number];
+    }>;
+}
+
 export type ShallowSide = 'wall' | 'open' | {
     readonly level: number | ((time: number) => number);
 };
@@ -60,7 +68,7 @@ export interface ShallowWaterParams {
 }
 
 export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
-    constructor(id?: string);
+    constructor(id?: string, runoff?: ShallowRunoffInput);
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
     step(context: StepContext, dt: number): void;
