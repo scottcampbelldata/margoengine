@@ -384,7 +384,7 @@ export function readCar(w: Float64Array, car: Car): RailCarState {
 }
 
 export function carFrequency(car: Car): number {
-  const normalStiffness = 3 * car.contactStiffness * Math.sqrt(car.restDepth);
+  const normalStiffness = 3 * car.contactStiffness * Math.sqrt(car.restDepth + car.track.maxHeightOffset);
   return Math.max(
     Math.sqrt((normalStiffness + car.primaryStiffness) / car.axleMass), // float division: wheel normal mode
     car.primaryDamping / car.axleMass, // float division: wheel damping time

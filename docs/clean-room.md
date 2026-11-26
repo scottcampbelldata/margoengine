@@ -14170,3 +14170,43 @@ The implementation was written from the papers and existing Margo APIs.
 - Amiram Harten, Peter D. Lax and Bram van Leer, [On Upstream Differencing and Godunov-Type Schemes for Hyperbolic Conservation Laws](https://doi.org/10.1137/1025002), 1983, section 3, and Emmanuel Audusse, François Bouchut, Marie-Odile Bristeau, Rupert Klein and Benoît Perthame, [A Fast and Stable Well-Balanced Scheme with Hydrostatic Reconstruction for Shallow Water Flows](https://perso.math.u-pem.fr/bouchut.francois/publications/hydroproj_published.pdf), 2004, equations 2.12–2.15. The numerical face uses the two bounding wave speeds and a shared-bed hydrostatic reconstruction. The liquid layer moves above ground plus stationary crust. The enthalpy flux is the upwind liquid enthalpy times the shared volume flux.
 
 The marine output uses the exact geometric difference of consecutive occupied submerged volumes below a specified reference surface. The signed difference excites the existing SEA-06 and wake sources without creating lava mass. The ice interface transfers the actual absorbed power from ICE-05 before advecting the columns. Verification includes analytical laminar resistance, phase enthalpy and sub-yield arrest, conservative conduction and charted vent intervals, a confined channel, a live coastal heightfield, a measured absorbed heat ledger and browser replay in both Wasm memory modes. The implementation was written from these publications and the engine's field contracts.
+
+### Rail running gear and wire interaction (DYN-05)
+
+- J. J. Kalker, *Three-Dimensional Elastic Bodies in Rolling Contact* (1990) and
+  [*On the rolling contact of two elastic bodies in the presence of dry friction* (1967)](https://repository.tudelft.nl/record/uuid%3Aaa44829b-c75c-4abd-9a03-fec17e121132).
+  The small-slip tangent is calibrated by the linear rolling coefficient. The contact patch model
+  uses one resultant tangent force per wheel.
+  [Book](https://link.springer.com/book/10.1007/978-94-015-7889-9)
+- Oldrich Polach, *Creep forces in simulations of traction vehicles running on adhesion limit*
+  (2005), equations 2–7, 9, 11 and 12. The clean-room force uses the finite-contact integral,
+  the paired reduction factors and the velocity-falling friction law. The small-creep slope
+  and saturation inequality are verified directly. Independent axle spin creepage is outside
+  this resultant-force approximation.
+  [Paper](https://oldrich.polach.ch/data/object_4/Wear_2005.pdf)
+- Simon Iwnicki (ed.), *Handbook of Railway Vehicle Dynamics* (2006), wheelset guidance and
+  suspension chapters, and Iwnicki's *Manchester Benchmarks for Rail Vehicle Simulation*
+  (1998). The reduced car uses two sprung bogies with four shared axle speeds. Hertz load follows
+  the 3/2 power also verified in P. A. Montenegro and R. Calçada, *Wheel–rail contact model for railway
+  vehicle–structure interaction applications* (2023), equation 11. Cant balance comes from
+  resolving gravity and centripetal acceleration along the banked cross-section.
+  [Handbook](https://www.iqytechnicalcollege.com/Handbook%20of%20Railway%20Vehicle%20Dynamics.pdf)
+  [Manchester benchmark](https://doi.org/10.1080/00423119808969454)
+  [Wheel–rail contact](https://doi.org/10.1007/s40534-023-00306-4)
+- Colin Cole, Maksym Spiryagin, Qing Wu and Chris Bosomworth, *Practical Modelling and
+  Simulation of Polymer Draft Gear Connections* (2017). The reduced connection has a measured
+  centre spacing, a free-travel region and independent linear compression and tension branches.
+  [Paper](https://doi.org/10.1061/9780784481257.041)
+- Stefano Bruni et al., *The results of the pantograph–catenary interaction benchmark*
+  (2015), and Andrea Collina, Stefano Bruni, Alan Facchinetti and Andrea Zuin, *PCaDA statement of methods* (2015).
+  The moving contact is unilateral and drives the fixed-support wire in both transverse axes.
+  Wave propagation follows the tensioned string's transverse balance in A. V. Metrikine and A. L. Bosch,
+  *Dynamic response of a two-level catenary to a moving load* (2006). The implementation
+  models one contact wire with linear wave propagation and a lumped collector.
+  [Benchmark](https://doi.org/10.1080/00423114.2014.953183)
+  [Method](https://re.public.polimi.it/retrieve/e0c31c0e-151d-4599-e053-1705fe0aef77/PCaDA%20statement%20of%20methods_11311-943365_Facchinetti.pdf)
+  [String response](https://research.tudelft.nl/en/publications/dynamic-response-of-a-two-level-catenary-to-a-moving-load/)
+- Andrea Mariscotti, *Dataset of measured and commented pantograph electric arcs in DC
+  railways* (2020), records the experimental association of detachment and powered arcing.
+  The documented option emits a brief visual event after mechanically measured contact loss.
+  [Dataset](https://pmc.ncbi.nlm.nih.gov/articles/PMC7378579/)

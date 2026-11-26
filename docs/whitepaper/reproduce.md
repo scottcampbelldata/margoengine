@@ -4331,3 +4331,10 @@ Build Biomes and the Physics and Procedural prerequisites, then run `node --test
 ### Physical road driving
 
 Build `physics`, `road`, and the existing Weather and Procedural prerequisites. Run `node --test packages/road/test/driving.test.js packages/road/tests/coupling/road-driver.test.js`. Run `node packages/road/test/driving-browser.mjs` with and without `MARGO_COMPAT=1` for the opted-in road and vehicle pipeline in Chromium.
+
+### Rail running gear and contact-wire motion
+
+Run `node --test packages/physics/tests/coupling/rail.test.js` after rebuilding Physics and
+Weather. Run `npm --workspace=@margoengine/physics run test:browser:rail` from the repository root
+to exercise WebGPU and WebGL2. The proof records the geometry render under
+`test-results/dyn05-browser` alongside the measured car displacement and pantograph load.

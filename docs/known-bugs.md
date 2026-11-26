@@ -16651,3 +16651,13 @@ summary combines unused top and bottom heat, so a live multilayer snowpack canno
 specifically from lava in the presence of other heat sources. A layout for separate basal heat feedback would
 close that ledger. EARTH-02 remains the future granular destination for the published solid deposit elevation.
 The marine test exercises the signed source on the same registry contract that water-entry sources use.
+
+### Rail production shot and full track contact (DYN-05)
+
+The Last Tram and City to Street shot sources are absent from the public checkout. The solver
+fixtures reproduce the specified motion and contact evidence, including the actual procedural
+running-stock render. The reduced wheel model uses a conical tread and a single resultant
+creep force. Profile-resolved rail-head and flange contact, free rigid-body impacts after loss
+of support, and a wired production render remain open. The contact wire uses fixed anchors and
+one loaded cable. Multi-wire hardware, moving switch point mechanisms and circuit-level arc
+measurements require separate models and evidence.

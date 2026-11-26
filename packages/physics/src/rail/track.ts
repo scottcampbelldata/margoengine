@@ -60,6 +60,8 @@ function normalise(vector: RailPoint): RailPoint {
 /** A surveyed route compiled once from SI centreline stations and the selected turnout alignments. */
 export class RailRoute {
   readonly length: number;
+  /** Largest absolute roughness offset of either surveyed rail, metres. */
+  readonly maxHeightOffset: number;
   private readonly stations: readonly Station[];
 
   constructor(input: readonly RailStation[]) {
@@ -70,6 +72,10 @@ export class RailRoute {
       leftHeight: railNumber(leftHeight, 'left rail elevation'),
       rightHeight: railNumber(rightHeight, 'right rail elevation'),
     }));
+    this.maxHeightOffset = samples.reduce(
+      (peak, s) => Math.max(peak, Math.abs(s.leftHeight), Math.abs(s.rightHeight)),
+      0,
+    );
     const edges = samples.slice(1).map(({ centre }, i) => diff(centre, samples[i]!.centre));
     const spans = edges.map((edge) => {
       railNumber(hypot(edge[0], edge[2]), 'horizontal station spacing', EPS);

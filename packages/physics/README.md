@@ -4213,3 +4213,72 @@ assert.ok(sea.budget.admittedSourceVolume > 0);
 Grid records are f64 in layout 1, with X fastest. `lavaField` exposes lava depth (m), bulk and skin temperature (K), crust thickness (m), X and Z discharge (m²/s), surface altitude (m) and enthalpy (J/m²). `depositField` provides ground plus solid crust altitude (m). Use `id` to name independent deposits, and match the receiving grid and origin. `seaSourceField` uses the same layout as water-entry and calving sources. Its signed volume is the change in submerged lava occupancy at each tick. With `seaLevel` omitted, the solver runs a terrestrial patch.
 
 For contact with ice, load with `exchangeIce: true`, map distinct lava cells to the `IceSolver` site's order and area with `ice`, and use a 60 Hz staggered group `.couple(['lava', 'ice-thermodynamics'], 'staggered')` with `new IceSolver({ readHeat: true })`. Heat used by the ice is removed from lava enthalpy. Drainage and steam mass are reported by both sides. The included `LavaBudget` records supplied and stored lava volume, environmental and ice heat, and displaced water.
+
+### Rail running gear and contact wire
+
+Import `@margoengine/physics/rail` for railway rolling stock with two sprung bogies, four wheelsets,
+wet adhesion, traction, braking and wagon connections. Give `RailRoute` SI track stations.
+Positive cant lowers the right rail viewed in increasing arclength. The two optional rail heights
+describe local roughness above that common banked plane. Use `railRouteAtSwitches` to resolve
+authored turnout alignments before the train runs.
+
+```ts
+import { RailRoute, RailSolver } from '@margoengine/physics/rail';
+import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
+
+const track = new RailRoute([
+  { centre: [0, 0, 0] }, { centre: [0, 0, 24] }, { centre: [0, 0, 64] },
+]);
+const world = new PhysicsWorld({
+  rate: { num: 60, den: 1 }, gravity: [0, -9.80665, 0], memory: worldMemory(false),
+});
+const rail = await RailSolver.load(world.memory);
+world.add(rail, {
+  cars: [{ track, distance: 12, speed: 6, wetness: 0.65 }],
+  wire: { track, pantographs: [{ car: 0, energized: true }] },
+});
+world.advance(60);
+const car = rail.read(0);
+const head = rail.readPantograph(0);
+const wire = rail.readWire(car.distance);
+if (car.distance < 17 || car.wheelsets[0].angle <= 0 || head.headHeight <= 4 || wire.height <= 4) {
+  throw new Error('Expected the rail car and contact head to advance along the wire');
+}
+```
+
+Use `new RailSolver()` for cars without a catenary. For a wire, `RailSolver.load(world.memory, options, signal)`
+fetches the SIMD module for that world's memory mode. `setControls(index, {drive, brake})` updates held
+torque commands in snapshot memory. A consumer can apply `read(index)` to a model using the car's
+position, forward, up, the two bogie deflections, and the four axle angles. `readPantograph` gives the
+head height, normal force, gap and a short visual arc pulse on powered separation. A catenary carries
+mechanical waves and contact impulses. The arc pulse is an animation event.
+
+| Car setting | Default |
+| --- | --- |
+| Sprung carbody, each bogie, each wheelset | 24,000 kg, 2,000 kg, 650 kg |
+| Contact gauge, wheel radius, conicity | 1.435 m, 0.35 m, 0.045 |
+| Bogie spacing, axle spacing, body centre height | 6.6 m, 1.85 m, 1.05 m |
+| Primary spring and damper per axle | 750 kN/m, 9 kN·s/m |
+| Secondary spring and damper per bogie | 190 kN/m, 16.5 kN·s/m |
+| Hertz and creep stiffness | 100 MN/m^(3/2), 600 kN per unit creepage |
+| Flange clearance, supported half tread, flange stiffness | 8 mm, 52 mm, 3 MN/m |
+| Drive and brake torque limits per axle | 1,600 and 2,200 N·m |
+| Dry and wet peak adhesion | 0.32 and 0.12, adjustable from measurements |
+| Initial speed and local wetness | 0 m/s and 0 |
+
+Draft gear defaults to 30 mm of slack, 450 kN/m tension stiffness, 820 kN/m buffer stiffness and
+21 kN·s/m damping. The wire defaults to 32 m spans, 12 intervals per span, 5.1 m support height,
+0.1 m alternating lateral stagger, 12.5 kN tension, 1.05 kg/m density and 1/s damping.
+The head defaults to 4.1 m above the carbody centre, 8 kg, 95 N uplift, 2,300 N/m spring,
+55 N·s/m damping, 26 kN/m contact stiffness, a 0.5 m shoe half width and shoe friction 0.15.
+The head can be offset longitudinally. Powered arc display is opt-in and defaults to a 12 mm
+gap window and 1/60 s display duration.
+
+`carField` provides layout-1 f64 records with `RAIL_CAR_WORDS` words per car. Words 0–11 contain
+arclength, speed, sway and sway speed, heave and heave speed, roll and roll speed, pitch and pitch
+speed, and longitudinal and lateral wheel loads. Words 12–23 hold two bogies with heave, sway,
+yaw and their rates. Words 24–30 hold controls, support flags, coupler loads and roof reactions.
+Words 32–55 hold the four wheelsets with angle, angular speed, heave, heave speed and left/right
+rail loads. `wireField` holds interleaved lateral/vertical displacement and velocity columns,
+followed by seven head words each. World snapshots preserve the commands, spring and axle state,
+wire motion and arc pulse.

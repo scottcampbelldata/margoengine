@@ -5725,3 +5725,12 @@ times of radial infall. The coupling harness verifies identical memory modes, fr
 ### Conservative lava transport with ice and marine displacement (EARTH-10)
 
 A vent-fed lava patch closes volume and sensible-plus-crystallisation enthalpy. The motion converges to the implicit analytical wide-sheet Bingham relation for a uniform layer, stays at rest below the yield stress, and follows a channel between cooled margins. A separate block checks the surface and basal heat ledger and lateral conduction against their finite-volume equations. ICE-05 removes measured heat, releases the initial ice mass as liquid and steam, and cools the lava. SEA-06 admits the same signed natural displacement that the terrain-following lava releases. The tracked proof runs on 24, 30 and 60 fps cadences, restores from a snapshot and replays plain and shared Wasm in an isolated browser. See `packages/physics/tests/lava.test.js`, `packages/physics/tests/coupling/lava.test.js`, `packages/physics/tests/lava.browser.mjs`, and the scope in [Limits](../limits.md#thermo-viscoplastic-lava-and-nearshore-occupancy-earth-10).
+
+### Railway motion and contact-wire uplift
+
+DYN-05 advances four common axle speeds and two sprung bogies on an authored route. The
+closed-form rolling and axle weight, measured-geometry roughness input, bank balance and actual
+ATMO-09 braking cases are in `packages/physics/tests/coupling/rail.test.js`. The same tests cover
+a moving pantograph exciting both cable axes, deterministic snapshot restore and shared/plain
+arena equality. Two Chromium render paths measure four metres of travel over one second from
+the actual procedural wagon and more than 36,000 changed frame pixels.

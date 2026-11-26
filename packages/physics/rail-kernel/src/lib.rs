@@ -36,7 +36,10 @@ pub unsafe extern "C" fn rail_wire_step(
         unsafe {
             let d = v128_load(position.add(i));
             let laplacian = f64x2_sub(
-                f64x2_add(v128_load(position.add(i - 1)), v128_load(position.add(i + 1))),
+                f64x2_add(
+                    v128_load(position.add(i - 1)),
+                    v128_load(position.add(i + 1)),
+                ),
                 f64x2_mul(two, d),
             );
             let accel = f64x2_add(

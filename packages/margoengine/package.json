@@ -3223,6 +3223,10 @@
       "types": "./dist/physics/earth.d.ts",
       "import": "./dist/physics/earth.js"
     },
+    "./physics/rail": {
+      "types": "./dist/physics/rail.d.ts",
+      "import": "./dist/physics/rail.js"
+    },
     "./physics/seismic": {
       "types": "./dist/physics/seismic.d.ts",
       "import": "./dist/physics/seismic.js"
