@@ -175,6 +175,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/room-sound-kernel.wasm',
+    label: 'room-sound-kernel.wasm',
+    kind: 'Rust SIMD room acoustic pressure waves',
+    measure: 'file',
+    when: 'RoomSoundSolver.load() from the optional /room-sound entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/room-sound-kernel-shared.wasm',
+    label: 'room-sound-kernel-shared.wasm',
+    kind: 'Rust SIMD room acoustic pressure waves, shared world memory',
+    measure: 'file',
+    when: 'RoomSoundSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/modal-sound-kernel.wasm',
     label: 'modal-sound-kernel.wasm',
     kind: 'Rust SIMD modal audio synthesis',

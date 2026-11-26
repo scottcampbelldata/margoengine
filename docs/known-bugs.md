@@ -16469,3 +16469,11 @@ positions. Embers, ash, high-speed debris and snow are outside the environmental
 ### Woody plant growth geometry and moving obstacles (BIO-02)
 
 `PlantGrowth` supplies an updated branch graph that `@margoengine/procedural/lsystem` can mesh; run the geometry case in `packages/biomes/tests/coupling/growth.test.js`. New branches avoid the supplied solid voxel grid. The solver still needs a shared moving-obstacle geometry input and an explicit seasonal transfer contract for live scatter and wind-driven branch physics. Branch growth currently changes the shared graph on a season boundary, and users rebuild the mesh from the new graph when needed.
+
+## Open: acoustic room mesh and concert-hall cutaway consumers (SOUND-02)
+
+The room solver accepts an explicit air-mask lattice, and the early path trace accepts finite convex faces.
+To connect dynamic EARTH-02 tunnel or canyon geometry, the solver needs a canonical material and occupancy
+field. The opening fixture proves shadow diffraction with explicit geometry. The concert-hall fixture verifies
+early arrival cutaway points and the README plays the actual convolved response. The filmed scene still needs
+to read those paths and room material inputs. See [Framework requests](physics-work-queue.md#framework-requests).

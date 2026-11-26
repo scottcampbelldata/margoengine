@@ -9457,3 +9457,17 @@ subdivision at half the smallest horizontal cell width; the aggregate ledger ret
 ### Developmental wood growth (BIO-02)
 
 The parametric solver places shoots on 60 Hz season boundaries and stores permanent branch structure. The initialization footprint follows the supplied productive seasons and the minimum extension per new branch. The light grid uses cubic voxels with a vertical, distance-attenuated penumbra and horizontal light-seeking gradient. Sites outside the supplied grid receive open light. Roots use a measured water threshold and the mean storage in their own supplied HYDRO-02 cell. The model has no water extraction, leaf anatomy, root branching or moving obstructors. Renderer-adapted coordinates are f32 within an origin cell. The optional growth entry measures 12,386 B minified and 5,474 B gzip. The selected lazy SIMD kernel is 601 B raw in either memory mode. Core and Stage gain zero bytes.
+
+### Enclosed and urban acoustics (SOUND-02)
+
+`@margoengine/physics/room-sound` separates finite specular paths from a linear low-frequency wave field.
+Paths accept convex planar faces and trace direct and reflected segments through the requested order, default two.
+The bounded search reports when its candidate image budget is exceeded. The ray gains are relative to a one-metre
+monopole and keep pressure signs. Their fractional sample impulses use two-point interpolation.
+
+The native scheme has cubic voxels and one real reflection coefficient per air cell at its closed faces.
+Normal-incidence wall admittance is exact in the model. Grazing and mixed-frequency impedance need finer
+geometry or a richer material boundary. For an axis wave resolved with ten cells per wavelength, the
+sinusoidal stencil bounds numerical phase speed from below by 1 − π²/600 of the configured speed.
+Use a finer grid for higher frequencies. The data-free plain and shared variants each measure 753 B raw.
+The optional entry measures 5,758 B gzip. Core plus stage stays at 24,820 B gzip.

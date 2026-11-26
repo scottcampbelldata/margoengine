@@ -3793,3 +3793,54 @@ matching SEA-13 grid in `spray` to turn active whitecaps into three measured-sou
 Supply `sources` for existing waterfall mist or mineral footstep dust. If `emissions` is enabled, an
 optional source owns one layout-1 f64 kg/s value for each row. Closed mass accounting includes the
 discrete parcels, waiting source mass, vapour, settled mass and open outflow.
+
+## Acoustic pressure in rooms and tunnels
+
+Use `@margoengine/physics/room-sound` for low-frequency pressure over an indoor air grid. Solid cells shape the room
+and the air-cell reflection values set its wall impedance. Blocks from `readTrace()` contain ordered pressure samples
+and their sample rate. Concatenate consecutive blocks to measure a room response with `roomEnergyDecay()`.
+
+```ts
+import { RoomSoundSolver } from '@margoengine/physics/room-sound';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const room = await RoomSoundSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(room, {
+  grid: { dimensions: [24, 12, 16], spacing: 0.25, reflection: 0.8 },
+  source: [3, 2, 5],
+  receiver: [17, 3, 5],
+});
+world.advance(10);
+console.log(room.readTrace());
+```
+
+The same entry traces exact early reflected paths from finite planar surfaces. The path points can drive a
+visual cutaway, and the signed pressure gains can drive a Web Audio convolver.
+
+```ts
+import { acousticBox, createRoomConvolver, roomArrivals } from '@margoengine/physics/room-sound';
+
+const context = new OfflineAudioContext(1, 2048, 48000);
+const arrivals = roomArrivals({
+  source: [2, 1, 3],
+  listener: [5, 1, 3],
+  surfaces: acousticBox([0, 0, 0], [8, 4, 6], [0.9, 0.8, 0.6]),
+});
+const convolver = createRoomConvolver(context, arrivals);
+const signal = context.createBuffer(1, 1, context.sampleRate);
+signal.getChannelData(0)[0] = 1;
+const source = context.createBufferSource();
+source.buffer = signal;
+source.connect(convolver).connect(context.destination);
+source.start();
+const output = await context.startRendering();
+if (!output.getChannelData(0).some((pressure) => pressure !== 0)) {
+  throw new Error('Room response is silent. Check the arrival paths.');
+}
+console.log(arrivals[0]?.points);
+```
+
+The wave grid and early-path surface list use separate scene descriptions. Both can be built from one game level.
+Set `excitation: true` if a world producer writes pressure increments, then publish a single impulse per world
+step or one increment for each internal sample in a layout-1 f64 port. `pressureLayout` gives the native region's
+voxel strides. Browser or Node callers can cancel the optional asset load with an AbortSignal.

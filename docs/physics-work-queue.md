@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **SOUND-02:** Add a shared scene occupancy, surface material and impedance layout for evolving EARTH-02 terrain.
+  The room entry accepts explicit air masks and finite convex reflection faces. Its layout-1 registry fields carry
+  pressure excitation and receiver samples in Pa with the configured grid and sample clock.
+
 - **BIO-02:** Promote branch topology and geometry rows to a shared growth contract, and expose an obstacle field
   and cell extent contract for moving scene geometry. The optional entry publishes a versioned geometry graph, reads
   the live HYDRO-02 field, and runs its slot-free occupancy test in both memory modes.
