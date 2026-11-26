@@ -228,8 +228,10 @@ export const TEARDOWN_GRACE_MS = 2_000;
  * elsewhere), releases the host and fails with `SHUTDOWN_TIMEOUT` and `killed`, so a close that cannot finish never holds
  * its suite past the limit. Sized from measurement: a close took 0.25 s alone and
  * 0.28 to 2.03 s beside two GPU suites and ten CPU hogs (nodes-browser, 2026-11-15); its own bounded waits add up to
- * about 7 s (the 5,000 ms listing, the 2,000 ms grace and two acknowledgements of a few ms). The limit is about three
- * times that, and leaves `CLOSE_KILL_MS` inside the shared 30,000 ms budget for the kill.
+ * about 7 s (the 5,000 ms listing, the 2,000 ms grace and two acknowledgements of a few ms). On Windows the end's
+ * acknowledgement also waits for the listed children's kill (KB-HOST-KILLLATE1): Windows PowerShell's start, 0.6 s
+ * alone and up to about 4 s on the loaded laptop, bounded at 10 s by `waitSignaled`'s own limit, so the worst case is
+ * 17 s, still inside the limit. It leaves `CLOSE_KILL_MS` inside the shared 30,000 ms budget for the kill.
  */
 export const CLOSE_LIMIT_MS = 20_000;
 
@@ -339,7 +341,7 @@ export async function startHost(settings, { spawnProcess = spawn, hostPath = HOS
           ),
           { code: 'HOST_GONE' },
         );
-      child.stdin.write(`${JSON.stringify({ end: true, children })}\n`);
+      child.stdin.write(`${JSON.stringify({ end: true, children, listedAt })}\n`);
       const answer = await next();
       if (!answer?.terminated)
         throw new Error(`browser host ${child.pid} did not acknowledge the end: ${JSON.stringify(answer)}`);

@@ -1,19 +1,19 @@
-// The playground page (docs/playground.md). User code runs only in a sandboxed srcdoc frame without
-// allow-same-origin, so it gets an opaque origin: no access to this page, its storage or its cookies.
+// The playground page (docs/playground.md). User code runs only in ./frame/, loaded as <iframe sandbox="allow-scripts">
+// without allow-same-origin, so it gets an opaque origin: no access to this page, its storage or its cookies. The frame
+// has its own loose policy (site/_headers); this page keeps a strict one, so it loads nothing from another host.
 import {
   addSnapshot,
   codeFromHash,
   decodeCode,
+  downloadDocument,
   encodeCode,
-  frameDocument,
   parseFrameMessage,
   readStore,
+  runMessage,
   writeStore,
 } from './share.js';
 import { templates } from './templates.js';
 
-/** margoengine's import map on jsDelivr, for the published 1.0.0 packages. */
-const CDN_MAP = 'https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/importmap.json';
 /** Console lines kept; older ones are dropped. */
 const MAX_LINES = 500;
 
@@ -24,8 +24,11 @@ const editor = $('editor'),
   output = $('console'),
   versions = $('versions');
 
-let importMap = null,
+let packages = null,
   frame = null,
+  frameCode = '',
+  // While a shared link's code is in the editor and the user has not edited, run or saved it: their own code.
+  ownCode = null,
   store = { current: null, history: [] };
 
 const storage = (() => {
@@ -66,6 +69,7 @@ editor.addEventListener('input', () => {
   renumber();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    adopt();
     store.current = editor.value;
     persist();
   }, 400);
@@ -104,7 +108,16 @@ function goToLine(line) {
   editor.scrollTop = Math.max(0, (line - 3) * height);
 }
 
+/** The editor's code becomes the user's own: a shared link's code is kept from here on. */
+function adopt() {
+  // Their own code is kept as a version, so taking up shared code never loses it.
+  if (ownCode?.trim()) store.history = addSnapshot(store.history, ownCode);
+  ownCode = null;
+  $('shared').hidden = true;
+}
+
 function setCode(code) {
+  adopt();
   editor.value = code;
   renumber();
   store.current = code;
@@ -149,24 +162,29 @@ addEventListener('message', (event) => {
   // Only the current frame's window; then the shape, never trusting the content.
   if (!frame || event.source !== frame.contentWindow) return;
   const message = parseFrameMessage(event.data);
-  if (message) showMessage(message);
+  if (message?.kind === 'ready') frame.contentWindow.postMessage(runMessage(frameCode, packages), '*');
+  else if (message) showMessage(message);
 });
 
 // ---- Run -----------------------------------------------------------------------------------------------------------
 
-function run(keepStatus = false) {
-  if (!importMap) return;
+/** Runs the editor's code in a new frame. `auto` (a page load or a link) saves nothing while shared code is shown. */
+function run({ keepStatus = false, auto = false } = {}) {
   const code = editor.value;
-  store.current = code;
-  store.history = addSnapshot(store.history, code);
-  persist();
-  listVersions();
+  if (!auto || ownCode === null) {
+    adopt();
+    store.current = code;
+    store.history = addSnapshot(store.history, code);
+    persist();
+    listVersions();
+  }
   output.replaceChildren();
   frame?.remove();
+  frameCode = code;
   frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.title = 'Result of the code';
-  frame.srcdoc = frameDocument(code, importMap);
+  frame.src = new URL('./frame/', import.meta.url).href;
   $('stage').append(frame);
   if (!keepStatus) say('Running.');
 }
@@ -189,6 +207,7 @@ function listVersions() {
 }
 
 function saveVersion() {
+  adopt();
   store.history = addSnapshot(store.history, editor.value);
   store.current = editor.value;
   persist();
@@ -237,10 +256,17 @@ $('share').addEventListener('click', async () => {
   }
 });
 
-$('download').addEventListener('click', () => {
-  const blob = new Blob([frameDocument(editor.value, importMap)], {
-    type: 'text/html',
-  });
+$('download').addEventListener('click', async () => {
+  let html;
+  try {
+    const response = await fetch(new URL('./frame/', import.meta.url));
+    if (!response.ok) throw new Error(`the frame page answered ${response.status}`);
+    html = downloadDocument(await response.text(), editor.value, packages);
+  } catch (error) {
+    say(`Could not build the download (${error.message}).`, true);
+    return;
+  }
+  const blob = new Blob([html], { type: 'text/html' });
   const link = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(blob),
     download: 'margo-playground.html',
@@ -266,34 +292,27 @@ addEventListener('keydown', (event) => {
 
 // ---- Start ---------------------------------------------------------------------------------------------------------
 
-/** `?packages=/node_modules/` serves the packages from this origin (a local dev server); the default is jsDelivr. */
-async function fetchJSON(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url} answered ${response.status}`);
-  return response.json();
-}
-
-async function loadImportMap() {
+/** `?packages=/node_modules/` runs against the packages this origin serves (a local dev server); the default is jsDelivr. */
+function packagesBase() {
   const base = new URLSearchParams(location.search).get('packages');
-  if (base === null) return fetchJSON(CDN_MAP);
+  if (base === null) return null;
   if (!/^\/(?!\/)[\w\-./@]*\/$/.test(base)) throw new Error('?packages= must be a path on this site ending in /');
-  const root = new URL(base, location.origin).href;
-  const [{ rebaseImportMap }, map] = await Promise.all([
-    import(`${root}margoengine/dist/importmap.js`),
-    fetchJSON(`${root}margoengine/dist/importmap.json`),
-  ]);
-  return rebaseImportMap(map, root);
+  return new URL(base, location.origin).href;
 }
 
-/** Opens a `#code=` link: on a bad link, says why and keeps the saved code. */
+/**
+ * Opens a `#code=` link. The shared code goes in the editor but not in storage: the user's own code stays saved, and
+ * "Back to my code" returns to it, until they edit, run or save the shared code. A bad link says why and changes nothing.
+ */
 async function openLink() {
   const value = codeFromHash(location.hash);
   if (value === null) return false;
   try {
     const code = await decodeCode(value);
-    if (editor.value.trim() && editor.value !== code) store.history = addSnapshot(store.history, editor.value);
-    setCode(code);
-    listVersions();
+    if (ownCode === null) ownCode = editor.value;
+    editor.value = code;
+    renumber();
+    $('shared').hidden = false;
     return true;
   } catch (error) {
     say(error.message, true);
@@ -301,20 +320,32 @@ async function openLink() {
   }
 }
 
+$('back').addEventListener('click', () => {
+  const code = ownCode ?? store.current ?? templates[0].code;
+  setCode(code);
+  history.replaceState(null, '', location.pathname + location.search);
+  run({ auto: true });
+  say('Back to your own code.');
+});
+
 store = storage ? readStore(storage) : store;
 editor.value = store.current ?? templates[0].code;
 renumber();
 listVersions();
-const linked = await openLink();
 addEventListener('hashchange', async () => {
-  if (await openLink()) run();
+  if (await openLink()) run({ auto: true });
 });
 try {
-  importMap = await loadImportMap();
+  packages = packagesBase();
+  const linked = await openLink();
   $('run').disabled = $('download').disabled = false;
-  const bad = status.classList.contains('alert');
-  if (!bad) say(linked ? 'Opened the shared code.' : 'Ready.');
-  run(true);
+  // A bad link leaves its message up and runs nothing: the output of other code would hide why the link failed.
+  if (status.classList.contains('alert'))
+    say(`${status.textContent} Your own code is in the editor; Run starts it.`, true);
+  else {
+    say(linked ? 'Shared code loaded.' : 'Ready.');
+    run({ keepStatus: true, auto: true });
+  }
 } catch (error) {
-  say(`Could not load the engine's import map (${error.message}). Check the connection and reload.`, true);
+  say(error.message, true);
 }

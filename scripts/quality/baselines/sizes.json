@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19406143,
+  "total": 19443214,
   "history": [
     {
       "date": "2026-10-24",
@@ -12675,6 +12675,18 @@
       "commit": "SEA-08 diffraction",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: the waves' diffraction by strip theory's relative motion principle (each section's added mass and damping kernel on the water's motion at its equivalent depths, the per-form kernels, the water-velocity history and its convolution), and each section's centroid; measured gzip (Mac build) 10910 B, was 10069; budget (measured + max(3%, 256 B)) 10371 to 11237 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b41f4709e4",
+      "reason": "SOUND-04 adds the optional 9736 B gzip modal sound entry. It shares one Rust loop and world clock between impact, sliding, rolling, and fracture. Splitting these paths would duplicate the mode and PCM state. Core and stage gain zero bytes.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f617b4134",
+      "reason": "New entries @margoengine/loaders/babylon (6.2 KB) and @margoengine/exporters/babylon (14.8 KB, bundles the shared exporter scene collector); the loaders root bundle grows by the same reader",
+      "grew": 3
     }
   ],
   "items": {
@@ -13263,7 +13275,7 @@
     "@margoengine/lines/trail": 6523,
     "@margoengine/lines/tree-helpers": 6296,
     "@margoengine/lines/tube-painter": 1507,
-    "@margoengine/loaders": 65216,
+    "@margoengine/loaders": 70635,
     "@margoengine/loaders dist/workers/usd.js": 9945,
     "@margoengine/loaders/3dm": 4094,
     "@margoengine/loaders/3ds": 3642,
@@ -13488,6 +13500,7 @@
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/meshfiles": 2857,
+    "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
@@ -13499,6 +13512,7 @@
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
+    "@margoengine/physics/surf": 8057,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/underwater": 5014,
@@ -14545,6 +14559,7 @@
     "margoengine/game": 946,
     "margoengine/viz": 800,
     "margoengine/web": 577,
-    "@margoengine/physics/surf": 8057
+    "@margoengine/exporters/babylon": 15198,
+    "@margoengine/loaders/babylon": 6425
   }
 }

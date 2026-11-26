@@ -13,6 +13,132 @@ export type AnyOptions = PLYOptions & ThreeMFOptions & PCDOptions & OFFOptions &
 
 export type AssetResolver = (path: string) => Promise<Uint8Array | string>;
 
+export interface BabylonAnimation {
+    name: string;
+    property: string;
+    fps: number;
+    loop: boolean;
+    keys: {
+        frame: number;
+        values: number[];
+    }[];
+}
+
+export interface BabylonBone {
+    name: string;
+    index: number;
+    parentBoneIndex: number;
+    matrix: number[];
+}
+
+export interface BabylonCamera {
+    id: string;
+    name: string;
+    parentId?: string;
+    className: string;
+    position: [number, number, number];
+    target: [number, number, number];
+    fov: number;
+    near: number;
+    far: number;
+    orthographic?: {
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
+    };
+}
+
+export interface BabylonLight {
+    id: string;
+    name: string;
+    parentId?: string;
+    kind: 'point' | 'directional' | 'spot' | 'hemispheric';
+    color: [number, number, number];
+    intensity: number;
+    position?: [number, number, number];
+    direction?: [number, number, number];
+    range?: number;
+    angle?: number;
+    innerAngle?: number;
+    groundColor?: [number, number, number];
+}
+
+export interface BabylonMaterial {
+    id: string;
+    name: string;
+    kind: 'standard' | 'pbr';
+    className: string;
+    color: [number, number, number, number];
+    emissive: [number, number, number];
+    specular: [number, number, number];
+    specularPower: number;
+    metallic?: number;
+    roughness?: number;
+    alpha: number;
+    doubleSided: boolean;
+    unlit: boolean;
+    textures: Partial<Record<'color' | 'normal' | 'emissive' | 'opacity' | 'metallicRoughness' | 'occlusion' | 'specular', BabylonTexture>>;
+}
+
+export interface BabylonMesh extends BabylonNode {
+    geometry: LoadedGeometry;
+    materialId?: string;
+    skeletonId?: string;
+    joints?: Uint16Array;
+    weights?: Float32Array;
+    joints1?: Uint16Array;
+    weights1?: Float32Array;
+    instanceOf?: string;
+}
+
+export interface BabylonMultiMaterial {
+    id: string;
+    name: string;
+    materials: string[];
+}
+
+export interface BabylonNode {
+    id: string;
+    name: string;
+    parentId?: string;
+    translation: [number, number, number];
+    rotation: [number, number, number, number];
+    scale: [number, number, number];
+    visible: boolean;
+    animations: BabylonAnimation[];
+}
+
+export interface BabylonOptions extends ParseLimits {
+    rightHanded?: boolean;
+    maxBytes?: number;
+    maxNodes?: number;
+    maxTextureBytes?: number;
+}
+
+export interface BabylonSkeleton {
+    id: string;
+    name: string;
+    bones: BabylonBone[];
+}
+
+export interface BabylonTexture {
+    name: string;
+    level: number;
+    offset: [number, number];
+    scale: [number, number];
+    angle: number;
+    hasAlpha: boolean;
+    invertY: boolean;
+    uvSet: number;
+    wrap: [number, number];
+    data?: Uint8Array;
+    mimeType?: string;
+}
+
+export interface BabylonTransformNode extends BabylonNode {
+}
+
 export type BinaryInput = ArrayBuffer | ArrayBufferView;
 
 export const CORE_MAX_VERTICES = 11184810;
@@ -376,6 +502,28 @@ export interface FetchedResource {
     type: string;
     status: number;
     redirects: number;
+}
+
+export interface FlattenBabylonOptions {
+    onlyVisible?: boolean;
+}
+
+export interface LoadedBabylon {
+    meshes: BabylonMesh[];
+    transformNodes: BabylonTransformNode[];
+    materials: BabylonMaterial[];
+    multiMaterials: BabylonMultiMaterial[];
+    cameras: BabylonCamera[];
+    lights: BabylonLight[];
+    skeletons: BabylonSkeleton[];
+    clearColor?: [number, number, number];
+    ambientColor?: [number, number, number];
+    activeCameraId?: string;
+    producer?: {
+        name: string;
+        version: string;
+    };
+    warnings: string[];
 }
 
 export interface LoadedDAE {
@@ -851,6 +999,8 @@ export function fetchBytes(url: string | URL, options?: FetchOptions): Promise<U
 
 export function fetchResource(url: string | URL, options?: FetchOptions): Promise<FetchedResource>;
 
+export function flattenBabylon(scene: LoadedBabylon, options?: FlattenBabylonOptions): LoadedGeometry;
+
 export function flattenDAE(dae: LoadedDAE, pose?: DAEPose): LoadedGeometry & {
     faceSizes: Uint32Array;
 };
@@ -864,6 +1014,8 @@ export function morphDAE(dae: LoadedDAE, morph: number, weights?: ArrayLike<numb
 export function parse3MF(input: BinaryInput, options?: ThreeMFOptions): Promise<ThreeMFResult>;
 
 export function parseAny(input: BinaryInput, options?: AnyOptions): Promise<LoadedGeometry>;
+
+export function parseBabylon(input: BinaryInput | string | object, options?: BabylonOptions): LoadedBabylon;
 
 export function parseDAE(input: BinaryInput | string, options?: DAEParseOptions): LoadedDAE;
 

@@ -1300,6 +1300,34 @@ Tracks are sampled at `fps`, as USD stores them, and the viewer blends between f
 
 A joint under nodes that are not joints takes their motion, and a joint scaled to zero, as a clip that makes a character appear does, keeps its rotation. What cannot be held is refused: a shear in the nodes above a joint, since a joint is a translation, rotation and scale. A mirrored node draws a reflected shape as in `exportUSDZ`, chosen at frame 0, so a clip that turns a scale negative part way keeps the winding it started with.
 
+## Babylon.js scenes (`@margoengine/exporters/babylon`)
+
+`exportBabylon(source, options)` writes a scene as a Babylon.js `.babylon` JSON document (format: doc.babylonjs.com, "Babylon file format"), the scene serializer's output that Babylon's `SceneLoader` reads. Each node with one mesh becomes a mesh with its own `positions`, `normals`, `uvs`, `uvs2`, `colors`, `indices`, one submesh and a `materialId`; a node with several primitives becomes a transform node with one mesh per primitive; the hierarchy is kept through `parentId`, with `position`, `rotationQuaternion` and `scaling`. Materials are `BABYLON.PBRMetallicRoughnessMaterial` (base colour, metallic, roughness, emissive, base, metallic-roughness, normal, emissive and occlusion textures, alpha mode) or, for lambert, phong and unlit materials, `BABYLON.StandardMaterial` with sRGB colours. Camera and light nodes are written at their world placement looking down the node's -Z (`FreeCamera` with `target`; point, directional and spot lights with full cone angles); the first camera is `activeCameraID`. It returns `{text, json, textures, meshes, materials}`.
+
+Static pose only: skins, morph targets, animation and texture rotation are not written. Light intensity is written as given (candela or lux), which Babylon reads as its own unit-less scale.
+
+```ts
+import { exportBabylon } from '@margoengine/exporters/babylon';
+import { parseBabylon } from '@margoengine/loaders/babylon';
+
+const scene = {
+  nodes: [
+    { name: 'tri', translation: [1, 2, 3], geometry: { positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] } },
+    { name: 'eye', translation: [0, 1, 5], camera: { type: 'perspective' as const, perspective: { yfov: 0.9, znear: 0.1 } } },
+  ],
+};
+const { text, meshes } = exportBabylon(scene);
+console.log(meshes, parseBabylon(text).meshes[0].translation); // 1 [1, 2, 3]
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `leftHanded` | true | Write Babylon's left-handed space: Z negated in positions, normals and placements, winding swapped. `parseBabylon` reads it back to the same scene; false keeps the engine's numbers |
+| `embedTextures` | true | Embed each texture as a `base64String` data URI; false names files the caller saves from `textures` |
+| `texturePrefix` | `''` | Prepended to texture file names |
+| `generator` | `'Margo Engine'` | `producer.version` |
+| The collector's options | as `exportGLB` | What the scene collects (visibility, `root`, `geometryData`, `materialData`) |
+
 ## G-code for 3D printers (`@margoengine/exporters/gcode`)
 
 `exportGCode(source, options)` slices a scene's meshes into layers and writes RepRap-flavour G-code (the dialect `parseGCode` of `@margoengine/loaders/gcode` reads): every layer prints its outlines, then rectilinear infill at `infill` density, the scanlines turning 90 degrees from layer to layer. A layer is sliced at its middle height; vertices on the cutting plane count as above it. Extrusion is the line's cross section, `layerHeight x lineWidth`, over the filament's, times `extrusionMultiplier`. `exportGCodePaths(paths, options)` instead prints polylines (`[x, y, z, ...]`, scene units) as they are, so a 3D line becomes a non-planar print path. Both return `{text, layers, filament, length, min, max}` (millimetres).

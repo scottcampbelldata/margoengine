@@ -1671,6 +1671,10 @@
       "types": "./dist/loaders/vrml.d.ts",
       "import": "./dist/loaders/vrml.js"
     },
+    "./loaders/babylon": {
+      "types": "./dist/loaders/babylon.d.ts",
+      "import": "./dist/loaders/babylon.js"
+    },
     "./loaders/tilt": {
       "types": "./dist/loaders/tilt.d.ts",
       "import": "./dist/loaders/tilt.js"
@@ -2162,6 +2166,10 @@
     "./physics/clouds": {
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
+    },
+    "./physics/modal-sound": {
+      "types": "./dist/physics/modal-sound.d.ts",
+      "import": "./dist/physics/modal-sound.js"
     },
     "./physics/falling": {
       "types": "./dist/physics/falling.d.ts",

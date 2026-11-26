@@ -16,12 +16,13 @@ it as one HTML file.
 - **Templates**: hello cube, a glTF loader, lights and shadows, particles, and an errors-and-console example, from the
   [stage README](../packages/stage/README.md) examples. Loading one runs it; the code it replaces is saved as a
   version first.
-- **Share link**: copies a link whose `#code=` holds the code. Opening it loads and runs that code; what was in the
-  editor is saved as a version first.
+- **Share link**: copies a link whose `#code=` holds the code. Opening it loads and runs that code in the sandboxed
+  frame and says "Shared code loaded", with **Back to my code**. The visitor's own saved code is not touched until they
+  edit, run or save the shared code; then their own code is kept as a version.
 - **Versions**: each run and each Save version (Ctrl+S) keeps a snapshot in this browser's `localStorage`, the newest
   first. Restore puts one back, saving the current code as a version first. The editor's code is saved as you type.
-- **Download HTML**: one HTML file with the import map, the scene container and the code, which runs when served from
-  a local server or HTTPS.
+- **Download HTML**: one HTML file, the run frame with the code built in, which loads the import map and runs when
+  served from a local server or HTTPS.
 
 The page loads margoengine's import map (`margoengine/dist/importmap.json`, see [the imports guide](guides/imports.md)),
 so code imports any `margoengine` or `@margoengine/*` entry by name.
@@ -41,29 +42,40 @@ the modules cross-origin.
 
 ## Security
 
-The visitor's code, and any code a share link carries, runs only inside an `<iframe sandbox="allow-scripts">` whose
-document is `srcdoc`. Without `allow-same-origin` the frame gets an opaque origin: it cannot read the page, its
-`localStorage` (the saved versions) or its cookies, and it cannot open pop-ups, submit forms or navigate the page.
+The visitor's code, and any code a share link carries, runs only inside `site/playground/frame/`, loaded as
+`<iframe sandbox="allow-scripts" src="frame/">`. Without `allow-same-origin` the frame gets an opaque origin: it cannot
+read the page, its `localStorage` (the saved versions) or its cookies, and it cannot open pop-ups, submit forms or
+navigate the page. The frame is a separate document rather than `srcdoc`, because a `srcdoc` document inherits its
+parent's Content Security Policy, which would force the page's policy open.
 
-- **Messages**: the page accepts a message only when `event.source` is the current frame's window, then only when it
-  matches the schema (`parseFrameMessage` in `site/playground/share.js`: a known `kind` and `level`, text capped at
-  4,000 characters, a line that is a positive integer, an error code of lowercase letters, digits and dashes). Text is
-  shown with `textContent`, never as HTML.
+- **Messages, both ways**: the frame posts `ready`; the page answers with one run message (`runMessage`: the code and
+  the packages base), and the frame accepts it only from `parent` and only in that shape (code a string within 256 KiB,
+  the base null or an http(s) URL ending in `/`), once. The frame imports the code as a blob module after adding the
+  import map, so error lines are lines of the code itself. The page accepts a message only when `event.source` is the
+  current frame's window, then only when it matches `parseFrameMessage` (`site/playground/share.js`: a known `kind` and
+  `level`, text capped at 4,000 characters, a positive integer line, an error code of lowercase letters, digits and
+  dashes). Text is shown with `textContent`, never as HTML.
 - **Share links are untrusted input**: the `#code=` value is capped (64 KiB of text), must be base64url, must
   decompress (deflate-raw) within 256 KiB and must be UTF-8. Anything else is refused with a message that says why
-  (`MargoError` code `playground-link`), and the editor keeps its code.
-- **Content Security Policy**: a `srcdoc` frame inherits its page's policy, so `/playground/*` has its own in
-  `site/_headers`: inline scripts and jsDelivr for the code and the packages, `https:` for the models and textures the
-  code fetches, `object-src 'none'`, `form-action 'none'` and `frame-ancestors 'self'`.
+  (`MargoError` code `playground-link`); the editor keeps the visitor's code and nothing runs until they press Run, so
+  other output never hides why the link failed. Shared code runs at once, inside the sandbox
+  (the sandbox is the boundary), but never replaces the visitor's saved code by itself.
+- **Content Security Policy** (`site/_headers`): the page, `/playground/*`, allows its own scripts only
+  (`script-src 'self'`, nothing inline), `connect-src 'self'` and `frame-src 'self'`; it talks to no other host. Only
+  `/playground/frame/*` gets the loose policy the code needs: inline script (the import map), `blob:` modules,
+  jsDelivr, and `https:` for the models and textures the code fetches. `npm run playground` serves both with these
+  headers, so the browser test runs under the real policies.
 
 ## Tests
 
 - `node --test tests/playground.test.js`: share links round-trip, the size caps, bad input (not base64url, truncated,
-  a decompression bomb, not UTF-8), the version history and full or blocked storage, the frame document (escaping and
-  line offsets), the message schema, and that every template imports only entries in the import map.
+  a decompression bomb, not UTF-8), the version history and full or blocked storage, the run message and the download, the
+  policies (no `unsafe-inline` and no `https:` on the page, the loose one on the frame only), the message schema, and
+  that every template imports only entries in the import map.
 - `npm run test:playground:browser` (after `npm run build:packages`): in Chromium, a template runs and draws, the frame
   has an opaque origin and cannot reach its parent, a forged message is ignored, an error shows its line and its
-  error-help link, a version restores, a share link opens in a fresh browser and a damaged link says so.
+  error-help link, a version restores, the page's response policy is strict, a share link opens and runs while the
+  saved code stays, Back to my code returns it, Run makes the shared code the saved one, and a damaged link says so.
 
 ## Not yet
 
@@ -72,7 +84,7 @@ row in [the rival parity list](rival-parity-gaps.md). The limits are in [docs/li
 
 ## Sources
 
-- WHATWG, *HTML Living Standard*, "The iframe element: the `sandbox` attribute" and "`srcdoc`" (2026):
+- WHATWG, *HTML Living Standard*, "The iframe element: the `sandbox` attribute" (2026):
   https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox. Without `allow-same-origin`
   the content is treated as being from a unique opaque origin.
 - WHATWG, *HTML Living Standard*, "Import maps" (2026): https://html.spec.whatwg.org/multipage/webappapis.html#import-maps.

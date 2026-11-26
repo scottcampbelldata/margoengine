@@ -7915,6 +7915,8 @@ The optional graph-gpu entry owns sorted Morton spatial trees, FR/FA2 compute pa
 
 82. The rigid kernel lives in a world memory (2026-11-26, `packages/physics/kernel/src/memory.rs`, `api.rs` `io_bind`, `packages/physics/src/kernel.ts` `KernelWorld`, `scripts/physics-modules.mjs` `KERNEL_SLOTS`, tests `tests/kernel-arena.test.js`, `tests/world-rigid-solver.test.js`). The kernel is linked as a module of the world's memory: it imports the memory, its statics sit in slot 15's window (14.9 KB of 64 KiB: the face and particle batch records, 720 KiB, moved out of statics into a region the host binds), and it links no stack (KernelWorld gives it a 1 MiB stack region). Its world's block is a region of an `Arena` (item K05 of the framework): `Arena::ensure` asks the host's `region_resize`, which allocates or resizes the block, moving it with one copy when it cannot grow in place; the kernel already re-reads its base after every growth, as growth re-lays its columns. KernelWorld's views rebind whenever the memory's buffer changes, so another region growing the memory between steps leaves them reading the world. `new Physics(null, {arena: world.arena})` puts the rigid solver's state in the physics world's memory, and its regions then name no memory of their own. Evidence: the replay fixture's state and arena hashes are unchanged (only the kernel source hash moved), a block forced to move steps on to the bits of one that grew in place, and a Physics on the world's arena steps and restores to the bits of one alone. Missing: the shared-memory (threaded) build of the kernel, so a shared world memory is refused with `unsupported`; the soft and 2D kernels still keep memories of their own.
 
+83. Islands share no solve state (2026-11-26, `packages/physics/kernel/src/solver.rs` `normal_rows`/`solve_impacts`, `world.rs` `Window`, `claim_stamps`, `multibody.rs` `unite_multibodies`, test `tests/next-multibody.test.js`). Groundwork for solving islands on threads: the strikes a substep finds are listed in the window's own run of `IMPACTS` (from its first pair times the manifold size) with the count in the window, not the header; multibody walk stamps come from per-window ranges claimed when the window is set up; and the moving links of a multibody under a fixed or kinematic root are one island (KB-PHYS-MBISLAND1). Evidence: the replay scenes' state hashes are unchanged (only the arena lists moved, as the header's walk count moves), the physics (1,219) and kernel suites pass. Missing: the solve window itself still lives in the one `World` the kernel's static holds; a thread needs a view of its own.
+
 ## Batch 252 navmesh worker evidence (section 5 supplement)
 
 The optional navmesh/wasm entry loads one feature-local Rust SIMD raster asset and an owned CPU worker. Exact output evidence is in packages/navmesh/test/wasm.test.js and the crate's tests: byte-identical ordinary/tiled polygon files, equal reference clipping counts, cancellation/error/timeout teardown and source/artifact hash enforcement. The SIMD work proof keeps coverage, triangle order, span merging, classification and polygonization unchanged. Native rasterization uses fixed stack clip buffers, not allocations per cell. Evidence still owed: quiet-machine end-to-end speed measurements and browser/CSP hosting matrix. No core/stage or GPU backend change.
@@ -10081,3 +10083,13 @@ Evidence: `packages/post/test/utility-passes-browser.mjs` on WebGPU and the WebG
 (blur spread and monotone edge, split-screen isolation, pixel-exact formulas for ColorAverage and LUT1D within one level,
 DepthDownsample texels and normals equal to a CPU reduction in all four modes for 2 x 2 and uneven footprints), and
 `utility-passes.test.js`. Missing: GPU timings, and a visual comparison of the blur against a large Gaussian.
+
+## Contact sound evidence (SOUND-04)
+
+The optional Physics modal kernel converts per-track mechanical excitation to audio-rate sample ranges.
+The contact adapter owns the rigid kernel step and publishes contact loads. A separate solver reads
+the contact and fracture fields and owns the acoustic state, on the world clock. Native plain and
+shared kernels import the same arena layout and keep no evolving state in static memory. CPU regressions
+cover the analytic impulse and held-force convolution, resting contact, rolling versus sliding,
+rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
+an actual browser audio destination to verify the rendered signal.

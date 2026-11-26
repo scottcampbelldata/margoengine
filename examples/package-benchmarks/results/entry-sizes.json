@@ -1,5 +1,5 @@
 {
-  "commit": "c82d68bf98",
+  "commit": "b41f4709e4",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14046,6 +14046,10 @@
       "./landscape": {
         "raw": 10290,
         "gzip": 4347
+      },
+      "./modal-sound": {
+        "raw": 24922,
+        "gzip": 9736
       }
     },
     "@margoengine/physics2d": {
@@ -17787,6 +17791,16 @@
       "raw": 12254,
       "gzip": 5302,
       "brotli": 4729
+    },
+    "packages/physics/dist/modal-sound-kernel.wasm": {
+      "raw": 1567,
+      "gzip": 919,
+      "brotli": 816
+    },
+    "packages/physics/dist/modal-sound-kernel-shared.wasm": {
+      "raw": 1567,
+      "gzip": 919,
+      "brotli": 816
     }
   },
   "splits": {

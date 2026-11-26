@@ -68,6 +68,10 @@
       "types": "./dist/clouds/index.d.ts",
       "import": "./dist/clouds.js"
     },
+    "./modal-sound": {
+      "types": "./dist/modal-sound.d.ts",
+      "import": "./dist/modal-sound.js"
+    },
     "./falling": {
       "types": "./dist/falling.d.ts",
       "import": "./dist/falling.js"

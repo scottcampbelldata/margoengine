@@ -98,23 +98,38 @@ test('endOwned without endListed (POSIX) signals each listed child by pid and wa
   assert.equal(alive(other.pid), false);
 });
 
-test('endOwned hands the listed children to endListed with the listing time, and signals none of them itself', async () => {
+test('endOwned hands the listed children to endListed with the listing time, waits for them only after, and signals none itself', async () => {
   const child = await fakeBrowser();
   const other = await fakeBrowser();
   const calls = [];
   const listedAt = Date.now() - 50;
-  const { listed, settled } = endOwned({ process: () => child, kill: async () => {} }, [other.pid], {
+  let release;
+  const { listed, ended, settled } = endOwned({ process: () => child, kill: async () => {} }, [other.pid], {
     reapMs: 5000,
-    settle: null,
-    listedAt,
-    endListed: async (pids, waitMs, since) => {
-      calls.push({ pids, waitMs, since });
+    settle: async (pids, waitMs, since) => {
+      calls.push({ settle: pids, since, positive: waitMs > 0 && waitMs <= 5000 });
       return [];
+    },
+    listedAt,
+    endListed: (pids, since) => {
+      calls.push({ endListed: pids, since });
+      return new Promise((resolve) => (release = resolve));
     },
   });
   assert.deepEqual(listed, [other.pid]);
+  let done = false;
+  ended.then(() => (done = true));
+  await new Promise((resolve) => setTimeout(resolve, 20)); // fixed-wait: give an early settle the chance to run
+  assert.equal(done, false, 'ended waits for endListed');
+  assert.deepEqual(
+    calls,
+    [{ endListed: [other.pid], since: listedAt }],
+    'no wait starts before the children are ended',
+  );
+  release();
+  await ended;
   assert.deepEqual(await settled, []);
-  assert.deepEqual(calls, [{ pids: [other.pid], waitMs: 5000, since: listedAt }]);
+  assert.deepEqual(calls[1], { settle: [other.pid], since: listedAt, positive: true });
   assert.equal(alive(other.pid), true, 'the bare pid was not signalled');
   other.kill('SIGKILL');
 });
@@ -273,6 +288,59 @@ test('hostBrowser speaks the protocol: ready, then the acknowledgement at once, 
     // Regression (2026-11-19, KB-OWN-EXIT2): the host kept reading its input after the end request, so a host process
     // could not end by its event loop and needed process.exit.
     assert.equal(input.listenerCount('data'), 0, `the input is let go after ${how}`);
+  }
+});
+
+// Regression (KB-HOST-KILLLATE1, 2026-11-26): the host acknowledged the end before Windows PowerShell had ended the
+// listed children, and the suite's close returned after its 2 s grace with them still running.
+test('hostBrowser acknowledges the end only once the listed children have been ended', async () => {
+  const child = await fakeBrowser();
+  const input = new PassThrough(),
+    output = new PassThrough();
+  const lines = [];
+  output.on('data', (chunk) =>
+    lines.push(
+      ...String(chunk)
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line)),
+    ),
+  );
+  let release;
+  const run = hostBrowser({
+    settings: {},
+    launchServer: async () => ({ process: () => child, wsEndpoint: () => 'ws://127.0.0.1:1/x', kill: async () => {} }),
+    input,
+    output,
+    reapMs: 10_000,
+    settle: null,
+    endListed: () => new Promise((resolve) => (release = resolve)),
+    log: () => {},
+  });
+  await new Promise((resolve) => output.once('data', resolve));
+  input.write(`${JSON.stringify({ end: true, children: [4_000_001] })}\n`);
+  await new Promise((resolve) => setTimeout(resolve, 50)); // fixed-wait: room for an early acknowledgement
+  assert.deepEqual(lines.slice(1), [], 'nothing is acknowledged while the children are still being ended');
+  release();
+  assert.equal(await run, 0);
+  assert.deepEqual(lines[1], { terminated: { browser: child.pid, children: [4_000_001] } });
+});
+
+// Regression (KB-HOST-KILLLATE1 follow-up, 2026-11-26): the suite never sent listedAt and the host dropped it from the
+// request, so the recycled-pid check compared start times with the host's request time, not with the listing.
+test('startHost sends the listing time with the end request and the host passes it to endListed', {
+  timeout: 30_000,
+}, async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'margo-host-since-'));
+  const sinceFile = join(dir, 'since.json');
+  try {
+    const host = await startHost({ name: 'since', sinceFile }, { hostPath: fixture });
+    const listedAt = Date.now() - 1234;
+    await host.end([4_000_001], listedAt);
+    await host.finished();
+    assert.deepEqual(JSON.parse(await readFile(sinceFile, 'utf8')), { pids: [4_000_001], since: listedAt });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
   }
 });
 

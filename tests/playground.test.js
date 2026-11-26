@@ -14,13 +14,15 @@ import {
   codeFromHash,
   decodeCode,
   encodeCode,
-  frameDocument,
+  downloadDocument,
   parseFrameMessage,
   readStore,
+  runMessage,
   scriptText,
   writeStore,
 } from '../site/playground/share.js';
 import { templates } from '../site/playground/templates.js';
+import { headersFor, parseHeaders } from '../scripts/support/headers.mjs';
 
 const linkError = (pattern) => (error) =>
   error.name === 'MargoError' && error.code === 'playground-link' && pattern.test(error.message);
@@ -127,22 +129,53 @@ test('the store survives missing, malformed and full storage', () => {
   assert.equal(writeStore(memory(5), { current: 'now', history }), null);
 });
 
-test('the frame document maps the imports, escapes the code and reports lines of the code itself', () => {
+test('the run message and the download carry the code safely', () => {
   const code = "console.log('</script><!-- x');\nthrow new Error('two');";
-  const html = frameDocument(code, { imports: { margoengine: 'https://example.test/m.js' } }, { title: 'a<b&c' });
-  assert.match(
-    html,
-    /<script type="importmap">\{"imports":\{"margoengine":"https:\/\/example.test\/m.js"\}\}<\/script>/,
+  assert.deepEqual(runMessage(code, 'http://127.0.0.1:5180/node_modules/'), {
+    channel: CHANNEL,
+    kind: 'run',
+    code,
+    packages: 'http://127.0.0.1:5180/node_modules/',
+  });
+  assert.equal(runMessage(code).packages, null);
+  assert.throws(() => runMessage(code, '/node_modules/'), TypeError);
+  assert.throws(() => runMessage(code, 'javascript:alert(1)//'), TypeError);
+  const frameHtml = readFileSync(new URL('../site/playground/frame/index.html', import.meta.url), 'utf8');
+  const html = downloadDocument(frameHtml, code);
+  assert.equal(
+    html.match(/<\/script>/gi).length,
+    frameHtml.match(/<\/script>/gi).length + 1,
+    'the code cannot end its element',
   );
-  assert.match(html, /<title>a&lt;b&amp;c<\/title>/);
-  assert.equal(html.match(/<\/script>/gi).length, 3, 'the code cannot close its element');
-  assert.ok(html.includes(scriptText(code)));
-  assert.ok(!html.includes('allow-same-origin'));
-  // The bridge subtracts this offset from document lines: line 1 of the code must land on offset + 1.
-  const offset = Number(/OFFSET = (\d+)/.exec(html)[1]);
-  const lines = html.split('\n');
-  assert.equal(lines[offset], scriptText("console.log('</script><!-- x');"));
-  assert.equal(lines[offset - 1], '<script type="module">');
+  assert.ok(html.includes(scriptText(JSON.stringify(runMessage(code)))));
+  assert.ok(html.indexOf('window.MARGO_PLAYGROUND') < html.indexOf("const CHANNEL = 'margo-playground'"));
+  assert.throws(() => downloadDocument('<html></html>', code), /marker/);
+});
+
+test('the playground page keeps a strict policy; only the sandboxed run frame gets the loose one', () => {
+  const rules = parseHeaders(readFileSync(new URL('../site/_headers', import.meta.url), 'utf8'));
+  const policy = (path) =>
+    Object.fromEntries(
+      headersFor(rules, path)
+        .get('content-security-policy')
+        .split(';')
+        .map((part) => part.trim().split(/\s+/))
+        .map(([name, ...values]) => [name, values]),
+    );
+  for (const path of ['/playground/', '/playground/index.html', '/playground/playground.js']) {
+    const page = policy(path);
+    assert.deepEqual(page['script-src'], ["'self'"], path);
+    assert.deepEqual(page['connect-src'], ["'self'"], path);
+    assert.ok(!JSON.stringify(page).includes('unsafe-inline'), `${path}: no unsafe-inline anywhere`);
+    assert.ok(!JSON.stringify(page).includes('https:'), `${path}: no https: source`);
+    assert.deepEqual(page['frame-src'], ["'self'"], path);
+  }
+  const frame = policy('/playground/frame/');
+  assert.ok(frame['script-src'].includes('https://cdn.jsdelivr.net') && frame['script-src'].includes('blob:'));
+  // The page loads the frame by URL in a sandbox without allow-same-origin, never as srcdoc (which inherits the policy).
+  const page = readFileSync(new URL('../site/playground/playground.js', import.meta.url), 'utf8');
+  assert.match(page, /setAttribute\('sandbox', 'allow-scripts'\)/);
+  assert.doesNotMatch(page, /\.srcdoc\b|'allow-same-origin'|allow-scripts allow-same-origin/);
 });
 
 test('only well-formed frame messages pass the schema', () => {

@@ -603,6 +603,10 @@
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"
     },
+    "./exporters/babylon": {
+      "types": "./dist/exporters/babylon.d.ts",
+      "import": "./dist/exporters/babylon.js"
+    },
     "./exporters/gcode": {
       "types": "./dist/exporters/gcode.d.ts",
       "import": "./dist/exporters/gcode.js"
@@ -1134,6 +1138,10 @@
     "./loaders/vrml": {
       "types": "./dist/loaders/vrml.d.ts",
       "import": "./dist/loaders/vrml.js"
+    },
+    "./loaders/babylon": {
+      "types": "./dist/loaders/babylon.d.ts",
+      "import": "./dist/loaders/babylon.js"
     },
     "./loaders/tilt": {
       "types": "./dist/loaders/tilt.d.ts",

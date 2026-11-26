@@ -188,11 +188,11 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/stats API](https://margoengine.com/llms/api/stats.md): 9 entry points
 - [@margoengine/inspector API](https://margoengine.com/llms/api/inspector.md): 16 entry points
 - [@margoengine/gltf API](https://margoengine.com/llms/api/gltf.md): 28 entry points
-- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 41 entry points
+- [@margoengine/loaders API](https://margoengine.com/llms/api/loaders.md): 42 entry points
 - [@margoengine/decoders API](https://margoengine.com/llms/api/decoders.md): 36 entry points
 - [@margoengine/fbx API](https://margoengine.com/llms/api/fbx.md): 13 entry points
 - [@margoengine/usdz API](https://margoengine.com/llms/api/usdz.md): 13 entry points
-- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 51 entry points
+- [@margoengine/exporters API](https://margoengine.com/llms/api/exporters.md): 52 entry points
 - [@margoengine/cad API](https://margoengine.com/llms/api/cad.md): 4 entry points
 - [@margoengine/brep API](https://margoengine.com/llms/api/brep.md): 1 entry point
 - [@margoengine/ifc API](https://margoengine.com/llms/api/ifc.md): 9 entry points
@@ -263,7 +263,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/selection API](https://margoengine.com/llms/api/selection.md): 7 entry points
 - [@margoengine/audio API](https://margoengine.com/llms/api/audio.md): 16 entry points
 - [@margoengine/mixer API](https://margoengine.com/llms/api/mixer.md): 12 entry points
-- [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 29 entry points
+- [@margoengine/physics API](https://margoengine.com/llms/api/physics.md): 30 entry points
 - [@margoengine/physics2d API](https://margoengine.com/llms/api/physics2d.md): 2 entry points
 - [@margoengine/ragdoll API](https://margoengine.com/llms/api/ragdoll.md): 6 entry points
 - [@margoengine/navmesh API](https://margoengine.com/llms/api/navmesh.md): 15 entry points

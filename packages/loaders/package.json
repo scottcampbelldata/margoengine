@@ -96,6 +96,10 @@
       "types": "./dist/vrml.d.ts",
       "import": "./dist/vrml.js"
     },
+    "./babylon": {
+      "types": "./dist/babylon.d.ts",
+      "import": "./dist/babylon.js"
+    },
     "./tilt": {
       "types": "./dist/tilt.d.ts",
       "import": "./dist/tilt.js"

@@ -106,6 +106,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'orbit-kernel',
+    crate: 'packages/physics/orbit-kernel',
+    blueprint: 'packages/physics/src/orbit/orbit-kernel.wasm',
+    script: 'packages/physics/scripts/build-orbit-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'orbit-kernel-shared',
+    crate: 'packages/physics/orbit-kernel',
+    blueprint: 'packages/physics/src/orbit/orbit-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-orbit-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'thermal-kernel',
     crate: 'packages/physics/thermal-kernel',
     blueprint: 'packages/physics/src/thermal/thermal-kernel.wasm',
@@ -145,6 +159,20 @@ export const BLUEPRINTS = [
     crate: 'packages/physics/swim-kernel',
     blueprint: 'packages/physics/src/life/swim-kernel-shared.wasm',
     script: 'packages/physics/scripts/build-swim-kernel.mjs',
+    args: ['shared'],
+  },
+  {
+    name: 'modal-sound-kernel',
+    crate: 'packages/physics/modal-sound-kernel',
+    blueprint: 'packages/physics/src/modal-sound/modal-sound-kernel.wasm',
+    script: 'packages/physics/scripts/build-modal-sound-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'modal-sound-kernel-shared',
+    crate: 'packages/physics/modal-sound-kernel',
+    blueprint: 'packages/physics/src/modal-sound/modal-sound-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-modal-sound-kernel.mjs',
     args: ['shared'],
   },
   {

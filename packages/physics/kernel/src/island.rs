@@ -323,6 +323,7 @@ impl World {
             }
         }
         self.unite_joints();
+        self.unite_multibodies();
         self.unite_couplings();
         // Number the islands, count their bodies, and see whether all of each are ready. A root holds its island's number.
         let mut islands = 0usize;

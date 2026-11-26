@@ -548,7 +548,7 @@ impl World {
     /// normal, short of the load by its impulse scale, a block slid that should hold (`a_block_slides_only_above_tan_t_equal_to_mu`).
     #[allow(clippy::too_many_arguments)]
     pub fn solve_contacts(&mut self, h: f32, step: Soft, biased: bool, turn: usize, least: u32, last: bool) {
-        let mut impacts = self.header().impacts as usize;
+        let mut impacts = self.window.impacts;
         // The chain spring of `CHAIN_LOAD`, and the load (impulse times the lighter body's inverse mass) a chain pair stays under.
         let passes = self.header().iterations;
         let chain = if biased && passes < 2 {
@@ -606,7 +606,7 @@ impl World {
             self.settle(a, &body_a);
             self.settle(b, &body_b);
         }
-        self.header_mut().impacts = impacts as u32;
+        self.window.impacts = impacts;
     }
 
     /// The frequency and damping ratio of the soft step pair `row` takes in a pushing pass at substep `h`: the chain spring's eighth
@@ -970,7 +970,8 @@ impl World {
                 let (gap, now) = (open[k], approach[k]);
                 let approach = if gap > 0.0 && pull < 0.0 { -sqrt(now * now - 2.0 * pull * gap) } else { now };
                 self.set_s(CONTACT_APPROACH, at, approach);
-                self.set_u(IMPACTS, *impacts, at as u32);
+                // A window's strikes are listed in its own run of the column: at most one a point of its pairs.
+                self.set_u(IMPACTS, self.window.pairs.0 * MANIFOLD + *impacts, at as u32);
                 *impacts += 1;
             }
         }
@@ -1013,7 +1014,8 @@ impl World {
 
     /// Sends the points struck in this substep off at their restitution, after relaxing took the push back out.
     pub fn solve_impacts(&mut self) {
-        for i in 0..self.header().impacts as usize {
+        let first = self.window.pairs.0 * MANIFOLD;
+        for i in first..first + self.window.impacts {
             let at = self.uu(IMPACTS, i) as usize;
             let row = at / MANIFOLD;
             let (a, b) = self.pair_bodies(row as u32);
@@ -1033,7 +1035,7 @@ impl World {
             self.settle(a, &body_a);
             self.settle(b, &body_b);
         }
-        self.header_mut().impacts = 0;
+        self.window.impacts = 0;
     }
 }
 

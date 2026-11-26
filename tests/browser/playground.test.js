@@ -31,13 +31,21 @@ test('the playground runs templates, reports errors with lines and codes, and op
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(page0);
+    // A policy that blocks something the page or the frame needs shows up as a console error.
+    page.on('console', (message) => /Content Security Policy/i.test(message.text()) && errors.push(message.text()));
+    const response = await page.goto(page0);
+    // The page's own policy is strict: its scripts only, nothing inline, no other host to talk to.
+    const policy = response.headers()['content-security-policy'];
+    assert.match(policy, /script-src 'self';/);
+    assert.match(policy, /connect-src 'self';/);
+    assert.doesNotMatch(policy, /unsafe-inline|https:/);
     await page.waitForFunction(() => !document.getElementById('run').disabled);
 
     // A template: it runs at once and draws the lit cube on the dark background.
     await page.selectOption('#template', 'hello-cube');
     await page.locator('#console li', { hasText: 'Rendering with' }).waitFor();
     assert.equal(await page.locator('#stage iframe').getAttribute('sandbox'), 'allow-scripts');
+    assert.equal(await page.locator('#stage iframe').getAttribute('srcdoc'), null);
     const frame = page.frames().find((f) => f !== page.mainFrame());
     assert.equal(await frame.evaluate(() => origin), 'null', 'the frame has an opaque origin');
     assert.equal(
@@ -85,22 +93,60 @@ test('the playground runs templates, reports errors with lines and codes, and op
     await page.selectOption('#template', 'error');
     await error.waitFor();
 
-    // Share: the link carries the code; a fresh browser with no saved state opens it.
+    // Share: the link carries the code.
     await page.click('#share');
     await page.waitForFunction(() => location.hash.startsWith('#code='));
     const link = page.url();
     const other = await context.browser().newContext();
+    // The same step deadline as the first context: the test as a whole has the hard limit.
+    other.setDefaultTimeout(120_000);
     try {
       const shared = await other.newPage();
-      await shared.goto(link);
+      const saved = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('margo-playground:v1') ?? 'null'));
+      // Someone with code of their own...
+      await shared.goto(page0);
       await shared.waitForFunction(() => !document.getElementById('run').disabled);
+      const own = '// My own scene\nconsole.log("mine");\n';
+      await shared.fill('#editor', own);
+      await shared.waitForFunction(
+        (own) => JSON.parse(localStorage.getItem('margo-playground:v1')).current === own,
+        own,
+      );
+      // ...opens the link: the shared code loads and runs, but their saved code stays as it was.
+      const visit = async () => {
+        await shared.goto('about:blank');
+        await shared.goto(link);
+        await shared.locator('#console li.error').waitFor();
+      };
+      await visit();
       assert.equal(await shared.inputValue('#editor'), errorTemplate.code);
-      assert.match(await shared.locator('#status').textContent(), /line 9|Opened the shared code/);
-      // A damaged link says so and keeps the editor usable.
+      assert.equal(await shared.locator('#shared').isVisible(), true);
+      assert.match(await shared.locator('#shared').textContent(), /Shared code loaded/);
+      assert.equal((await saved(shared)).current, own, 'opening a link does not replace the saved code');
+      // Back to my code: their code returns, nothing of the link is kept.
+      await shared.click('#back');
+      assert.equal(await shared.inputValue('#editor'), own);
+      assert.equal(await shared.locator('#shared').isVisible(), false);
+      assert.equal((await saved(shared)).current, own);
+      // Running the shared code makes it theirs; their own code is kept as a version.
+      await visit();
+      assert.equal((await saved(shared)).current, own);
+      await shared.click('#run');
+      await shared.locator('#console li.error').waitFor();
+      const after = await saved(shared);
+      assert.equal(after.current, errorTemplate.code);
+      assert.ok(
+        after.history.some((s) => s.code === own),
+        'their own code is a version',
+      );
+      assert.equal(await shared.locator('#shared').isVisible(), false);
+      // A damaged link says so and changes nothing.
+      await shared.goto('about:blank');
       await shared.goto(`${page0}#code=@@not-a-link`);
       await shared.waitForFunction(() => /damaged/.test(document.getElementById('status').textContent));
-      assert.match(await shared.locator('#status').textContent(), /damaged/);
       assert.equal(await shared.locator('#status').getAttribute('role'), 'alert');
+      assert.equal(await shared.inputValue('#editor'), errorTemplate.code);
+      assert.equal((await saved(shared)).current, errorTemplate.code);
     } finally {
       await other.close();
     }

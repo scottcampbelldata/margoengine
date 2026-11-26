@@ -49,6 +49,11 @@ there, add a line below with the solver ID and what is needed, and build against
   hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads
   and reads versioned intent and force ports in the optional package until the shared fields are ready.
 
+- **SOUND-04:** Publish full-step rigid point impulses with substep timing, tangential slip and rolling
+  kinematics. A canonical fracture-energy or fragment impulse field would let BREAK-01 drive the same
+  acoustic tracks. The optional rigid adapter uses existing impulse totals, final manifolds and joint
+  ruptures meanwhile. Its versioned contact and fracture descriptors also accept external producers.
+  Register the modal audio kernel in module slot 11 when the framework module table adds production entries.
 
 - **LIFE-03:** Register swim kernel slot 5 in the module table alongside the other production families.
   Promote the school's kinematics and intent layouts when the shared fields owner is ready. The swimmer
@@ -211,16 +216,16 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | LIFE-07 | Machine dynamics with actuators | stand-in | Open | OPEN |
 | AERO-04 | Turbomachines in flow | none | Open | OPEN |
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | LANDED c82d68bf98 |
-| SEA-03 | Nonlinear waves, rogue waves | none | Open | OPEN |
+| SEA-03 | Nonlinear waves, rogue waves | none | Claude | CLAIMED |
 | SEA-06 | Tsunami and impulse waves | none | Open | OPEN |
-| SEA-07 | Tides, storm surge and currents | none | Open | OPEN |
+| SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Open | OPEN |
 | FLUID-07 | Thin films and droplets on surfaces | stand-in | Open | OPEN |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
-| HYDRO-06 | Groundwater and springs | none | Open | OPEN |
+| HYDRO-06 | Groundwater and springs | none | Codex | BUILDING (codex/physics-hydro-06) |
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
 | ATMO-06 | Airborne particle transport | stand-in | Open | OPEN |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
@@ -245,11 +250,11 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
 | SOUND-02 | Enclosed and urban acoustics | partial | Open | OPEN |
 | SOUND-03 | Underwater acoustics | physics/underwater | Codex | LANDED 9f850999d0 |
-| SOUND-04 | Contact and modal sound | none | Codex | BUILDING (codex/physics-lane-3) |
+| SOUND-04 | Contact and modal sound | none | Codex | LANDED e0b1f274ab |
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
 | BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
 | BIO-03 | Forest ecosystem dynamics | sound | Open | OPEN |
-| BIO-04 | Material ageing | none | Open | OPEN |
+| BIO-04 | Material ageing | none | Codex | BUILDING (codex/physics-lane-3) |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
@@ -284,7 +289,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
-| SEA-05 | Nearshore waves and surf zone | partial | Claude | CLAIMED |
+| SEA-05 | Nearshore waves and surf zone | partial | Claude | LANDED 8c7453cd8 |
 | DYN-01 | 3D rigid body and contact | sound | Claude | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |

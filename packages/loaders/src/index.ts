@@ -81,6 +81,23 @@ export type { DXFOptions, DXFResult, DXFLayer, DXFText, DXFSolid, DXFLines, DXFC
 export type { ThreeMFOptions, ThreeMFResult } from './threemf.js';
 export { parsePCD, parsePCDHeader } from './pcd.js';
 export type { PCDOptions, PCDHeader, PCDField } from './pcd.js';
+export { parseBabylon, flattenBabylon } from './babylon.js';
+export type {
+  BabylonOptions,
+  LoadedBabylon,
+  BabylonMesh,
+  BabylonNode,
+  BabylonTransformNode,
+  BabylonMaterial,
+  BabylonMultiMaterial,
+  BabylonTexture,
+  BabylonCamera,
+  BabylonLight,
+  BabylonSkeleton,
+  BabylonBone,
+  BabylonAnimation,
+  FlattenBabylonOptions,
+} from './babylon.js';
 export { parseTilt, parseTiltSketch } from './tilt.js';
 export type { TiltOptions, TiltStroke, LoadedTilt } from './tilt.js';
 export { parsePRWM } from './prwm.js';

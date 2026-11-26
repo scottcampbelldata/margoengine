@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Margo Engine playground</title>
+  <style>html,body{margin:0;height:100%;background:#111;color:#eee;font:16px system-ui,sans-serif}#scene{position:fixed;inset:0}</style>
+</head>
+<body>
+  <div id="scene"></div>
+  <!-- run -->
+  <script>
+// The playground's run frame (docs/playground.md). The page loads it as <iframe sandbox="allow-scripts">, so it has an
+// opaque origin and its own loose policy (site/_headers): the page itself keeps a strict one. It waits for one run
+// message from its parent (checked by source and shape), loads margoengine's import map, adds it, then imports the code
+// as a blob module, so stack lines are lines of the code itself. Console output and errors go back to the parent.
+// A downloaded file sets window.MARGO_PLAYGROUND instead and runs at once.
+(() => {
+  'use strict';
+  const CHANNEL = 'margo-playground';
+  const MAX_CODE = 256 * 1024;
+  const CDN_MAP = 'https://cdn.jsdelivr.net/npm/margoengine@1.0.0/dist/importmap.json';
+  const CDN = /^https:\/\/cdn\.jsdelivr\.net\/npm\/((?:@[^/]+\/)?[^@/]+)@[^/]+\/(.+)$/;
+  const top = parent !== window ? parent : null;
+  let moduleUrl = '', started = false;
+
+  const text = (v) => {
+    if (v instanceof Error || (v && typeof v.message === 'string' && typeof v.name === 'string'))
+      return (v.name ? v.name + ': ' : '') + v.message;
+    if (typeof v === 'string') return v;
+    try { return JSON.stringify(v) ?? String(v); } catch { return String(v); }
+  };
+  const send = (message) => { if (top) top.postMessage({ channel: CHANNEL, ...message }, '*'); };
+  const lineOf = (error, fallback) => {
+    const at = moduleUrl && String((error && error.stack) || '').indexOf(moduleUrl + ':');
+    const m = at >= 0 ? /^:(\d+):\d+/.exec(String(error.stack).slice(at + moduleUrl.length)) : null;
+    const n = m ? Number(m[1]) : fallback;
+    return Number.isInteger(n) && n > 0 ? n : null;
+  };
+  const report = (error, line = null) =>
+    send({ kind: 'error', text: text(error), line: lineOf(error, line),
+      code: error && typeof error.code === 'string' ? error.code : null });
+
+  for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => { original(...args); send({ kind: 'log', level, text: args.map(text).join(' ') }); };
+  }
+  addEventListener('error', (e) => report(e.error ?? e.message, e.filename === moduleUrl ? e.lineno : null));
+  addEventListener('unhandledrejection', (e) => report(e.reason));
+
+  const valid = (m) => m && typeof m === 'object' && m.channel === CHANNEL && m.kind === 'run' &&
+    typeof m.code === 'string' && m.code.length <= MAX_CODE &&
+    (m.packages === null || (typeof m.packages === 'string' && /^https?:\/\/[^\s]+\/$/.test(m.packages)));
+
+  async function importMap(packages) {
+    const url = packages === null ? CDN_MAP : `${packages}margoengine/dist/importmap.json`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`The import map at ${url} answered ${response.status}`);
+    const map = await response.json();
+    if (packages === null) return map;
+    const imports = {};
+    for (const [name, target] of Object.entries(map.imports)) {
+      const m = CDN.exec(target);
+      imports[name] = m ? `${packages}${m[1]}/${m[2]}` : target;
+    }
+    return { imports };
+  }
+
+  async function run(message) {
+    if (started || !valid(message)) return;
+    started = true;
+    try {
+      const script = document.createElement('script');
+      script.type = 'importmap';
+      script.textContent = JSON.stringify(await importMap(message.packages));
+      document.head.append(script);
+      moduleUrl = URL.createObjectURL(new Blob([message.code], { type: 'text/javascript' }));
+      await import(moduleUrl);
+      send({ kind: 'done' });
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  if (window.MARGO_PLAYGROUND) run(window.MARGO_PLAYGROUND);
+  else if (top) {
+    addEventListener('message', (event) => { if (event.source === top) run(event.data); });
+    send({ kind: 'ready' });
+  }
+})();
+  </script>
+</body>
+</html>

@@ -680,7 +680,9 @@ public integration, full fuzz, peak-memory or speed result is claimed.
 
 Owned Chromium runs under a browser host process (`scripts/support/browser-host.mjs`,
 2026-11-10): the suite ends the browser through the host, is acknowledged as soon
-as every process has been told to end, and waits for the kernel's teardown of the
+as every process has been ended (on Windows the listed children's kill runs in Windows
+PowerShell, whose start takes 0.6 to about 4 s and is bounded at 10 s, KB-HOST-KILLLATE1),
+and waits for the kernel's teardown of the
 ended processes only up to 2,000 ms, then moves on. The host waits up to 120 s more
 and records any survivor in `test-results/browser-host-survivors.log`. A following GPU job can
 therefore start while the kernel is still freeing the ended browser's GPU
@@ -9166,12 +9168,31 @@ The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2
 - The version history keeps the newest 30 snapshots (`MAX_SNAPSHOTS`) in this browser's `localStorage`. When storage
   is full the oldest go first; where storage is blocked (some private windows) versions last only until the tab closes.
 - The console keeps the last 500 lines; each message is cut to 4,000 characters.
-- An error's line is read from the frame's stack (`about:srcdoc:<line>`) or the error event; an error thrown inside a
-  package, or one with no stack, shows no line.
+- An error's line is read from the stack frame of the code's blob module (or the error event for it); an error thrown
+  inside a package, or one with no stack, shows no line.
 - One file per playground; no type hints in the editor; no embed mode (the next piece of the row).
 - On margoengine.com the page loads the import map of `margoengine@1.0.0` from jsDelivr, which works once the packages
   are published on npm (they are not yet: the catalog lists 0 of 108 published). Until then, run it against a checkout
   with `npm run playground` and `?packages=/node_modules/`.
-- Download HTML gives the same document the frame runs; it loads the packages from the same place as the page did, so
-  a file downloaded from a local run needs that local server.
+- Download HTML gives the run frame with the code built in; it loads the packages from the same place as the page did,
+  so a file downloaded from a local run needs that local server.
 - The glTF template loads the Khronos Box sample from raw.githubusercontent.com, so it needs the network.
+
+## Contact and modal sound (SOUND-04)
+
+Modal material presets contain authored resonances for a wood object, metal object, glass object and bell.
+Use measured modes and gains for a specific object. Each rigid radiator uses one bank with effective
+point-independent gain. The mono output is dry normalized PCM with linear superposition. Use a listener
+for spatial transfer and a mixer for headroom. The snapshot includes the retained sample history.
+
+Rigid contacts use the total normal impulse for a step, the last manifold's point weights, and relative
+motion at those points. Impacts use the pre-step approach speed. A contact that forms and disappears
+between published rigid steps may lack point data. With the current rigid interface, transients are
+placed at the first sample of the observed range. Source timing is bounded by one rigid step on a matched
+clock. The scrape and roll spectra use effective roughness profiles. Acoustic microcontact feedback, exact
+geometry-dependent roughness, and elastic radiation into the room require additional field models.
+The optional joint route computes equivalent scalar fracture excitation from supplied energy and mass.
+A brittle-fracture producer can publish per-track excitation in the same field layout.
+
+The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
+raw, fetched only when the caller loads the solver.

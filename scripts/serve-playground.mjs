@@ -2,10 +2,13 @@
 // under /node_modules/, so `?packages=/node_modules/` runs code against this checkout. Every response allows any origin
 // because the sandboxed frame has an opaque origin and fetches its modules cross-origin. Run `npm run build:packages`
 // first, then `npm run playground` and open the URL it prints. Read-only: GET and HEAD of files under the repository.
+// Files under /site/ get the headers site/_headers gives their site path (/site/playground/ -> /playground/), so the
+// page's strict policy and the frame's own policy apply here as on margoengine.com.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { headersFor, parseHeaders } from './support/headers.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const types = {
@@ -31,9 +34,10 @@ export const server = createServer(async (request, response) => {
     response.writeHead(405, { Allow: 'GET, HEAD' }).end('Use GET or HEAD.');
     return;
   }
-  let file;
+  let file, site;
   try {
     let pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+    if (pathname.startsWith('/site/')) site = pathname.slice('/site'.length);
     if (pathname.endsWith('/')) pathname += 'index.html';
     file = resolve(root, `.${pathname}`);
     if (!file.startsWith(root + sep) || !types[extname(file)] || /[\\/]\.git[\\/]/.test(file)) {
@@ -46,7 +50,14 @@ export const server = createServer(async (request, response) => {
   }
   try {
     const body = await readFile(file);
+    // The site's headers, minus the two this server sets itself (no-store suits a dev server).
+    const own = site
+      ? headersFor(parseHeaders(await readFile(resolve(root, 'site/_headers'), 'utf8')), site)
+      : new Map();
+    own.delete('cache-control');
+    own.delete('x-content-type-options');
     response.writeHead(200, {
+      ...Object.fromEntries(own),
       'Content-Type': types[extname(file)],
       'Content-Length': body.length,
       'Cache-Control': 'no-store',

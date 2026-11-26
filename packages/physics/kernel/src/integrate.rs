@@ -204,6 +204,7 @@ impl World {
                 let count = substeps << level;
                 let hi = dt / count as f32;
                 self.window.substeps = count;
+                self.claim_stamps(count);
                 self.rescale_warm(level);
                 let raw = self.header().contact_hertz;
                 let stiffness = soft(if raw * hi > 0.25 { 0.25 / hi } else { raw }, damping, hi);
@@ -214,6 +215,7 @@ impl World {
             self.integrate_kinematics(h, substeps);
         } else {
             self.window = self.whole_window();
+            self.claim_stamps(substeps);
             self.run_substeps(h, substeps, stiffness, &mut inner, false);
         }
         self.break_joints(h);
@@ -315,6 +317,8 @@ impl World {
                 couplings: run(self.uu(ISLAND_COUPLING_START, group) as usize, self.uu(ISLAND_COUPLING_COUNT, group) as usize),
                 kin: None,
                 substeps: 0,
+                impacts: 0,
+                mb_call: 0,
             }
         } else {
             let end = |start: usize, count: usize| start + count;
@@ -327,6 +331,8 @@ impl World {
                 couplings: (after(ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, h.coupling_rows as usize), h.coupling_rows as usize),
                 kin: None,
                 substeps: 0,
+                impacts: 0,
+                mb_call: 0,
             }
         }
     }

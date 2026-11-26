@@ -1,4 +1,4 @@
-// The playground's pure parts: share links, the saved version history and the document the sandboxed frame runs.
+// The playground's pure parts: share links, the saved version history and the messages to and from the frame.
 // No DOM here, so tests/playground.test.js runs it in Node. docs/playground.md explains each limit and its sources.
 
 /** Largest `#code=` payload a link may carry, in characters (base64url of the deflated code). */
@@ -9,7 +9,7 @@ export const MAX_CODE_BYTES = 256 * 1024;
 export const MAX_SNAPSHOTS = 30;
 /** localStorage key of the saved state. */
 export const STORE_KEY = 'margo-playground:v1';
-/** The `channel` every message from the frame carries. */
+/** The `channel` every message between the page and the frame carries. */
 export const CHANNEL = 'margo-playground';
 
 const linkError = (message) =>
@@ -149,59 +149,26 @@ export function writeStore(storage, { current, history }) {
 /** Text for a `<script>` element: nothing in it can end the element or start a comment that hides the rest. */
 export const scriptText = (text) => text.replace(/<(\/script|!--)/gi, '<\\$1');
 
-// Runs first in the frame: forwards console output and errors to the playground. Each error carries its line in the
-// user's code (the frame's document line minus the lines before the code) and a MargoError code when it has one.
-const BRIDGE = String.raw`(() => {
-  const CHANNEL = %CHANNEL%, OFFSET = %OFFSET%, top = parent !== window ? parent : null;
-  const text = (v) => { if (v instanceof Error) return (v.name ? v.name + ': ' : '') + v.message; if (typeof v === 'string') return v;
-    try { return JSON.stringify(v) ?? String(v); } catch { return String(v); } };
-  const lineOf = (error, line) => { const m = /about:srcdoc:(\d+):\d+/.exec(error && error.stack || '');
-    const n = m ? Number(m[1]) : line; return Number.isInteger(n) && n > OFFSET ? n - OFFSET : null; };
-  const send = (message) => { if (top) top.postMessage({ channel: CHANNEL, ...message }, '*'); };
-  for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
-    const original = console[level].bind(console);
-    console[level] = (...args) => { original(...args); send({ kind: 'log', level, text: args.map(text).join(' ') }); };
-  }
-  const report = (error, line) => send({ kind: 'error', text: text(error), line: lineOf(error, line),
-    code: error && typeof error.code === 'string' ? error.code : null });
-  addEventListener('error', (e) => report(e.error ?? e.message, e.lineno));
-  addEventListener('unhandledrejection', (e) => report(e.reason, null));
-  window.__margoDone = () => send({ kind: 'done' });
-})();`;
+/**
+ * The message the page posts to the frame (site/playground/frame/) to run `code`: `packages` is null for jsDelivr, or
+ * the absolute URL (ending in `/`) the packages are served from. The frame checks the same shape before it runs.
+ */
+export function runMessage(code, packages = null) {
+  if (typeof code !== 'string') throw new TypeError('runMessage needs the code as a string');
+  if (packages !== null && !/^https?:\/\/[^\s]+\/$/.test(packages))
+    throw new TypeError('packages must be null or an http(s) URL ending in /');
+  return { channel: CHANNEL, kind: 'run', code, packages };
+}
 
 /**
- * The HTML document the frame runs (and the file Download saves): the import map, a full-size `#scene` container, the
- * console bridge and the code as one module script. `importMap` is `{imports: {...}}`.
+ * The file Download saves: the frame document with the run message built in, so it runs on its own (from a local
+ * server or HTTPS) with no page around it. `frameHtml` is the text of site/playground/frame/index.html.
  */
-export function frameDocument(code, importMap, { title = 'Margo Engine playground' } = {}) {
-  const head = [
-    '<!doctype html>',
-    '<html lang="en">',
-    '<head>',
-    '<meta charset="utf-8">',
-    '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    `<title>${title.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'))}</title>`,
-    '<style>html,body{margin:0;height:100%;background:#111;color:#eee;font:16px system-ui,sans-serif}#scene{position:fixed;inset:0}</style>',
-    `<script type="importmap">${scriptText(JSON.stringify(importMap))}</script>`,
-  ];
-  const bridgeLines = BRIDGE.split('\n').length;
-  // Lines before the user's code: the head, the bridge script, then </head>, <body>, the scene div and the module tag.
-  const offset = head.length + bridgeLines + 4;
-  const bridge = BRIDGE.replace('%CHANNEL%', JSON.stringify(CHANNEL)).replace('%OFFSET%', String(offset));
-  return [
-    ...head,
-    `<script>${bridge}</script>`,
-    '</head>',
-    '<body>',
-    '<div id="scene"></div>',
-    '<script type="module">',
-    scriptText(code),
-    ';window.__margoDone?.();',
-    '</script>',
-    '</body>',
-    '</html>',
-    '',
-  ].join('\n');
+export function downloadDocument(frameHtml, code, packages = null) {
+  const marker = '<!-- run -->';
+  if (!frameHtml.includes(marker)) throw new Error('The frame document has no <!-- run --> marker');
+  const config = `<script>window.MARGO_PLAYGROUND = ${scriptText(JSON.stringify(runMessage(code, packages)))};</script>`;
+  return frameHtml.replace(marker, () => config);
 }
 
 const LEVELS = new Set(['log', 'info', 'warn', 'error', 'debug']);
@@ -209,12 +176,12 @@ const LEVELS = new Set(['log', 'info', 'warn', 'error', 'debug']);
 /**
  * A message from the frame, checked against the schema, or null to ignore it. The caller checks `event.source` first;
  * this checks the shape: `{channel, kind: 'log', level, text}`, `{channel, kind: 'error', text, line, code}` or
- * `{channel, kind: 'done'}`. Text is capped at 4,000 characters.
+ * `{channel, kind: 'ready' | 'done'}`. Text is capped at 4,000 characters.
  */
 export function parseFrameMessage(data) {
   if (!data || typeof data !== 'object' || data.channel !== CHANNEL) return null;
   const text = typeof data.text === 'string' ? data.text.slice(0, 4000) : null;
-  if (data.kind === 'done') return { kind: 'done' };
+  if (data.kind === 'done' || data.kind === 'ready') return { kind: data.kind };
   if (data.kind === 'log' && LEVELS.has(data.level) && text !== null) return { kind: 'log', level: data.level, text };
   if (data.kind === 'error' && text !== null) {
     const line = Number.isInteger(data.line) && data.line > 0 ? data.line : null;

@@ -1752,7 +1752,7 @@ console.log([...robot.bodies.keys()].join(), robot.joints.has('hinge')); // post
 `@margoengine/physics/world` holds the contract every solver of the physics framework is built on ([docs/physics-framework.md](../../docs/physics-framework.md), section 5): a `Solver` says what it is (`describe()`: the fields it reads, writes or accumulates, its preferred rate level and its stability limit as a function of its state), allocates its state in regions a `SolverHost` gives it (`init`), steps (`step(context, dt)`, a pure function of its state, its input ports, `dt` and its random counter), publishes and gathers ports (`exportPorts`, `importPorts`), and names the regions of its state and its extra history (`stateRegions`, `extraState`), which the world alone snapshots, restores and hashes; a strongly coupled solver adds `iterate` and `rollback`. A `Region` is a stretch of the world's shared memory (byte offset, length, element type, layout version) and a `Port` is a field's region at a tick, with the `Cell` (an integer origin cell of a large world) its positions are expressed in; a step's `StepContext` carries the solver's own cell, and moving an origin changes only these integers. A solver exports a port for every field it writes or accumulates into: a contributor hands its contribution over through its own port, summed by contributor id and then by element. Rates are dyadic: a solver steps at `rateOf(level)` = 60 times 2 to the level steps a second, level 0 to 7, so two coupled solvers meet on every tick of the slower and the faster takes `substepsBetween(fast, slow)` steps per coupling interval. Allocating may grow the world's memory, which detaches every typed-array view over it (any solver's), so a solver takes its views after it allocates and makes them afresh at each use, never holding one across steps: a solver added to a running world grows the memory under the others. The field registry below keeps the fields between them, and `PhysicsWorld` drives them.
 
 ```ts
-import {rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
+import {Arena, rateOf, substepsBetween, type Region, type Solver, type SolverHost} from 'margoengine/physics/world';
 
 // A ball falling under the world's gravity, its height and speed in one f64 region.
 class Fall implements Solver<{height: number}> {
@@ -1790,16 +1790,13 @@ class Fall implements Solver<{height: number}> {
   }
 }
 
-const memory = new WebAssembly.Memory({initial: 1});
-let next = 0;
+const arena = new Arena();
 const host: SolverHost = {
-  memory,
+  memory: arena.memory,
   gravity: [0, -9.81, 0],
-  allocate: (name, byteLength, type, layout) => {
-    const region = {name, byteOffset: next, byteLength, type, layout};
-    next += byteLength;
-    return region;
-  },
+  allocate: arena.allocate.bind(arena),
+  resize: arena.resize.bind(arena),
+  free: arena.free.bind(arena),
   port: () => undefined,
 };
 const fall = new Fall();
@@ -2947,3 +2944,81 @@ Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic f
 `id` (default `landscape`) and `signal`. Discharge, gross incision and sediment flux are layout-1 f64 vertex
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
+
+## Contact and modal sound
+
+Use @margoengine/physics/modal-sound with a PhysicsWorld to turn collision, scrape, roll and fracture
+loads into mono audio tracks. A material supplies resonant frequencies, damping rates and gains.
+The example records one second at 24 frames per second and plays it through Web Audio's offline renderer.
+It uses plain world memory, the rigid module's current arena format.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { ModalContactRigidSolver, ModalSoundSolver } from '@margoengine/physics/modal-sound';
+import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const world = new PhysicsWorld({ rate: { num: 24, den: 1 }, memory: worldMemory(false) });
+const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
+physics.addBody(null, {
+  type: 'fixed',
+  position: [0, -0.1, 0],
+  colliders: { shape: 'box', halfExtents: [4, 0.1, 4] },
+});
+const bell = physics.addBody(null, {
+  position: [0, 1, 0],
+  colliders: { shape: 'sphere', radius: 0.25, mass: 0.6 },
+});
+const sound = await ModalSoundSolver.load();
+world.add(new ModalContactRigidSolver(sound), { physics, emitters: [bell] });
+world.add(sound, { tracks: [{ material: 'bell' }] });
+
+const pcm = new Float32Array(48000);
+let cursor = 0;
+for (let frame = 1; frame <= 24; frame++) {
+  world.advance(frame);
+  const block = sound.copySince(cursor);
+  if (!block) continue;
+  pcm.set(block.samples, block.firstSample);
+  cursor += block.samples.length;
+}
+
+const context = new window.OfflineAudioContext(1, pcm.length, 48000);
+const buffer = context.createBuffer(1, pcm.length, 48000);
+buffer.copyToChannel(pcm, 0);
+const source = context.createBufferSource();
+source.buffer = buffer;
+source.connect(context.destination);
+source.start();
+const printed = (await context.startRendering()).getChannelData(0);
+if (cursor !== 48000 || printed[0] !== 0 || !printed.some((sample) => Math.abs(sample) > 0.05)) {
+  throw new Error('Modal audio is incomplete or silent. Keep the two solvers and the dropped body in the example.');
+}
+physics.dispose();
+```
+
+The wood, metal, glass and bell presets provide authored examples. Call `modalPreset(name)` for a fresh material
+you can customize, or supply the damped frequencies in Hz, amplitude decays in 1/s and signed PCM gains per
+N s from measured objects. Each mode can have its own scrape, roll and fracture gain multipliers. Default
+scrape and rolling roughness are 0.4 and 0.2 N/√W. Their feature spacing defaults to 0.006 m and 0.024 m.
+Set the rigid emitter list in track order. A null emitter leaves its track free for fracture input.
+Rigid approach speed must exceed `impactSpeed` (default 0.25 m/s) to excite an impact. `rollingResistance`
+defaults to 0.025.
+
+Use `ModalSoundSolver.load({ id, rate, inputs, signal })` to set the field prefix, dyadic rate, declared input
+owners and load cancellation. Defaults are `modalSound`, level 0 (60 Hz) and `contacts`. Match the rigid
+fixed timestep to this rate. Select `both` to include fractures, then map joints in the rigid solver's
+`jointBreaks` setup or add a separate fracture producer. Each joint mapping provides its track, released
+strain energy in J, effective mass in kg and optional fraction of that joint's energy (default 1).
+`modalFractureImpulse` converts those values to an equivalent impulse for a fragment starting at rest.
+
+The default sample rate is 48 kHz. Use `copyBlock(track)` for the latest world step or `copySince(cursor, track)`
+to collect every retained sample after an advance. Keep one cursor per track. The default history is 0.25 s
+and can be set with `historySeconds`. The cursor and sample rate let an offline mixer place blocks exactly
+on its time line. The track data is a dry mono signal. Route audio buffers through Web Audio or
+`@margoengine/audio` to apply gain, panning, occlusion and room effects.
+
+The layout-1 f64 contact field has five words per track: normal impact impulse in N s, scrape power in W,
+scrape power times speed, rolling proxy power in W and rolling power times speed. The layout-1 fracture field
+has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
+Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
