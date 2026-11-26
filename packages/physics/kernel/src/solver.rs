@@ -542,9 +542,22 @@ impl World {
             // rounding, three times the move).
             let chord = |t: V3, arm: V3| t.cross(arm).sub(t.cross(t.cross(arm)).scale(0.5));
             let normal = self.v(PAIR_NORMAL_X, row);
+            // A ball or a capsule touches where its core's nearest point plus its radius along the normal is, as the normal
+            // rows read it, not at a point fixed in it: a point fixed in a rolling ball rolls up off the floor over the step, and
+            // its move would be a slide no contact made (a capsule rolling across two meshes ended 2 mm off where it ends
+            // on one, `next-mesh-seam.test.js`).
+            let (round_a, round_b) = (self.round_core(self.uu(PAIR_A, row) as usize), self.round_core(self.uu(PAIR_B, row) as usize));
             for k in 0..self.uu(PAIR_CONTACTS, row) as usize {
                 let at = row * MANIFOLD + k;
-                let (arm_a, arm_b) = (rotation_a.rotate(self.v(CONTACT_ANCHOR_A_X, at)), rotation_b.rotate(self.v(CONTACT_ANCHOR_B_X, at)));
+                let (anchor_a, anchor_b) = (self.v(CONTACT_ANCHOR_A_X, at), self.v(CONTACT_ANCHOR_B_X, at));
+                let arm_a = match round_a {
+                    Some(core) => rotation_a.rotate(core.nearest(anchor_a)).add(normal.scale(core.radius)),
+                    None => rotation_a.rotate(anchor_a),
+                };
+                let arm_b = match round_b {
+                    Some(core) => rotation_b.rotate(core.nearest(anchor_b)).sub(normal.scale(core.radius)),
+                    None => rotation_b.rotate(anchor_b),
+                };
                 let moved_a = linear_a.scale(h).add(chord(turn_a, arm_a));
                 let moved_b = linear_b.scale(h).add(chord(turn_b, arm_b));
                 let moved = moved_b.sub(moved_a);
