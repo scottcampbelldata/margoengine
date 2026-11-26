@@ -5008,20 +5008,26 @@ shear and snow that compacts under load. Both materials transfer mass and moment
 through sparse quadratic grid supports. The module loads its SIMD kernel on demand.
 
 ```ts
+import { TerrainBed } from '@margoengine/physics/earth';
 import { GranularMpmSolver } from '@margoengine/physics/granular-mpm';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const sand = await GranularMpmSolver.load();
+const sand = await GranularMpmSolver.load({ projectBed: true });
+const surface = new TerrainBed();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(surface, { rows: 2, columns: 2, width: 1, depth: 1, centre: [0, 0], elevations: () => 0.1 });
 world.add(sand, {
   points: Array.from({ length: 12 }, (_, i) => ({
     position: [(i % 4) * 0.04, 0.16 + Math.floor(i / 4) * 0.04, 0],
+    velocity: [0.12, 0, 0],
     volume: 0.000064,
   })),
   floor: 0,
+  bedSurface: surface.bed,
 });
+world.couple([sand.id, surface.id], 'staggered');
 world.advance(10);
-console.log(sand.sample(0).position);
+console.log(sand.sample(0).position, surface.bed.elevations);
 ```
 
 Points can select a material table row. Sand defaults to 1600 kg/m³ density,
@@ -5038,7 +5044,11 @@ CFL condition rejects a step. `bed` takes the common terrain sampler. With neith
 `bed` nor a horizontal `floor`, the domain is open. Ground friction defaults to 0.55.
 The origin cell length defaults to 4,096 m and matches the corresponding world option.
 The output rows expose positions, velocities, affine velocity, elastic deformation
-and material state for sampling and rendering.
+and material state for sampling and rendering. To make a shallow material layer
+change an existing terrain surface, load with `projectBed: true` and provide its
+`bedSurface` in the solver settings. Give the particles a separate support floor or
+bedrock bed. The solver records the starting layer and publishes each change in
+column volume through `bedChange`, so relief persists on the existing terrain.
 
 ## Physical strand guides
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TerrainBed } from '../../dist/earth.js';
+import { TerrainBed, bedVertexAreas, bedVolume } from '../../dist/earth.js';
 import { GRANULAR_MPM_LAYOUT, GRANULAR_MPM_WORDS, GranularMpmSolver } from '../../dist/granular-mpm.js';
 import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent } from './harness.js';
@@ -181,4 +181,36 @@ test('the granular contact shot is independent of the presentation frame rate', 
     const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
     return world.add(solvers.pop(), { points, floor: 0, rate: 4, materials: [{ young: 25000 }] });
   });
+});
+
+test('the material layer produces an exact, conserved translation of persistent bed relief', async () => {
+  const volume = 0.012;
+  const velocity = 0.6;
+  const surface = new TerrainBed();
+  const solver = await GranularMpmSolver.load({ projectBed: true });
+  const world = new PhysicsWorld({ rate, gravity: zero, memory: worldMemory(false) });
+  world.add(surface, { columns: 2, rows: 2, width: 2, depth: 2, centre: [0, 0], elevations: () => 0.2 });
+  world.add(solver, {
+    points: [{ position: [-0.5, 0.35, 0.2], velocity: [velocity, 0, 0], volume }],
+    bedSurface: surface.bed,
+    rate: 0,
+    spacing: 0.35,
+    materials: [{ young: 1000 }],
+  });
+  world.couple([solver.id, surface.id], 'staggered');
+  world.advance(4);
+  const snapshot = world.takeSnapshot();
+  const frame = 20;
+  world.advance(frame);
+  const areas = bedVertexAreas(surface.bed);
+  const moved = (volume * velocity * frame) / 60;
+  const top = surface.bed.elevations;
+  near((top[1] - 0.2) * areas[1], -moved, 8e-9);
+  near((top[4] - 0.2) * areas[4], moved, 8e-9);
+  near(bedVolume(surface.bed, top, 0.2), 0, 8e-9);
+  assert.ok(top[1] < 0.2 && top[4] > 0.2);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(frame);
+  assert.equal(world.hash(), hash);
 });

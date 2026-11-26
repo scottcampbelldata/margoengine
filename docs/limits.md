@@ -9966,6 +9966,14 @@ The optional JavaScript entry is 4,066 B gzip against a 4,322 B budget. The
 plain and shared native assets are each 14,251 B raw and 5,563 B and 5,564 B gzip,
 respectively. Core and Stage gain zero bytes.
 
+The optional layer projection deposits each material point's current volume on
+the receiving terrain triangle using its barycentric weights. The sum of vertex
+area times height is the total layer volume change. The associated reference mass
+stays with the points. Choose a receiving terrain surface and separate supporting
+bedrock. The projection represents the volume in each ground column, including
+particles above its surface. Use it for a shallow layer. Separating suspended
+material and reconstructing overhangs need a different output.
+
 The first increment covers dry or cohesive granular material and snow. Explicit
 pore-water transport, reciprocal contact with dynamic bodies, the voxel material
 handoff, the measured inertial regime and the persistent ray-bed imprint remain open.

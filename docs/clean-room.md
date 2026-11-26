@@ -15145,6 +15145,13 @@ sum, including the half-step displacement. The incline test exercises a real ter
 bed and replays exactly in plain and shared memory. The fixed-camera collapse draws
 the simulated material-point positions on both renderers.
 
+The shallow-layer output projects each particle's current volume
+`V₀ det(F_E) det(F_P)` onto the three vertices of the existing terrain triangle.
+Its barycentric weights sum to one, independently of the grid shape or cell
+offset. The height change at a vertex is its volume change divided by the exact
+vertex area from the terrain host. A uniform translation verifies the transferred
+volume analytically and restores the previous layer state exactly.
+
 For the voxel fallback, the two-cell swap preserves the exact liquid amount and
 metadata while sand descends. The conservation condition is independent of the
 continuum yield law. Yongning Zhu and Robert Bridson,

@@ -17149,9 +17149,10 @@ measurements require separate models and evidence.
 The optional continuum produces shear yield and persistent compaction on the live
 terrain bed. Falling voxel sand now transfers a displaced liquid's full packed
 state to the vacated cell. The voxel-to-continuum material handoff for repose
-and pile evolution is still open. The BB-7 fixture
-still needs the ray's water-momentum input and a continuous bed-height update
-from the moving grains. The existing sand plume is a separate effect.
+and pile evolution is still open. The continuum publishes real layer-volume
+changes to the live bed. BB-7 still needs to drive that layer with ray wake
+momentum and verify the resulting imprint against its control. The sand plume
+is already proven separately.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 

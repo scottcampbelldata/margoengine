@@ -3,6 +3,7 @@
 use core::arch::wasm32::unreachable;
 
 mod grid;
+mod layer;
 mod material;
 mod tensor;
 
