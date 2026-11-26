@@ -4251,3 +4251,11 @@ the analytical cases, predictive escape, cross-cell ports and replay hashes. Run
 `node scripts/wasm-blueprints.mjs --rebuild --compare --only=school-kernel,school-kernel-shared` with the pinned Rust toolchain
 to check the Wasm bytes. The optional JavaScript and separately fetched Wasm sizes are recorded by
 `node examples/package-benchmarks/entry-sizes.mjs`.
+
+### BIO-01 rooted plant motion
+
+Build with `npm run build:packages`. Run
+`node --test packages/physics/tests/vegetation.test.js packages/physics/tests/coupling/vegetation.test.js`.
+The coupling tests check both analytic frequencies, energy and phase, gust propagation,
+depth decay, failure and contact-driven body release. Run `node packages/scatter/test/states.browser.mjs` and the same
+command with `--compat` to exercise actual colour and shadow pipelines on the two GPU paths.

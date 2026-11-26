@@ -994,3 +994,39 @@ TypeScript comments, outside shipped shader strings. This removes runtime
 comment text while preserving the shader token sequence, heightfield sampling,
 extreme-coordinate guards, recovery and all defaults. The CPU interaction and
 scatter tests run unchanged; real-GPU coverage remains a separate gate.
+
+## Solved plant sway
+
+Use `@margoengine/scatter/plant-motion` as the `states` source for a Scatter or ScatterTiles. It reads the modal pose
+from `PlantSway` and bends the same plant geometry in the colour, depth and shadow passes. A root and its rendered
+instance share an X/Z cell. Pick a cell size that gives every independently simulated root its own cell and covers
+the placement jitter. Unmapped instances keep their usual scatter wind and posing. Positions are in metres.
+
+```ts
+import { PlantSway } from '@margoengine/physics/vegetation';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { PlantMotion } from '@margoengine/scatter/plant-motion';
+
+const sway = await PlantSway.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(sway, {
+  plants: [{ root: [0, 0, 0], height: 2, baseDiameter: 0.02,
+    youngModulus: 5e8, density: 600, initialDisplacement: [0.04, 0, 0, 0] }],
+});
+const motion = new PlantMotion({
+  roots: [{ xz: [0, 0], height: 2 }],
+  cellSize: 0.5,
+  origin: [-0.25, -0.25],
+  readSway: () => sway.readSway(),
+});
+world.advance(1);
+const options = { states: motion, wind: [1, 0, 0] as const };
+// Pass options to Scatter.attach(engine, geometry, options).
+// Dispose the Scatter before calling motion.dispose().
+console.log(options.states, sway.sample(0, 2));
+```
+
+The zero-strength wind in this example enables Scatter's wind culling reach allowance. The physical pose replaces
+wind on mapped roots. Set the mesh pivot at the root and match its scaled tip height to the solver's height.
+To compose an existing burn or flood treatment, pass its `PlantStateSource` as `states` to `PlantMotion`.
+Use `hideFailed: true` to remove a failed standing instance when detached geometry is drawn by the rigid body. This
+hides the entire instance, so a visible stump needs its own mesh.

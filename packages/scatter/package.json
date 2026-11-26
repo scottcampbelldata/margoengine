@@ -46,6 +46,10 @@
       "types": "./dist/states.d.ts",
       "import": "./dist/states.js"
     },
+    "./plant-motion": {
+      "types": "./dist/plant-motion.d.ts",
+      "import": "./dist/plant-motion.js"
+    },
     "./interact": {
       "types": "./dist/interact.d.ts",
       "import": "./dist/interact.js"

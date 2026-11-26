@@ -5423,3 +5423,15 @@ Node, as a function of film time: a seek draws the same bytes as the first visit
 Proof: `packages/video/test/frames.test.js` (frame choice, rows, one read per frame, latest seek wins, failed and
 aborted reads), `frames-gpu.mjs` (Node, WebGPU) and `frames-check.mjs` (browser, WebGPU and the WebGL2 layer). One GPU
 (NVIDIA RTX A6000); upload cost not measured.
+
+### Two-mode wind and water response of vegetation (BIO-01)
+
+The uniform-beam frequencies match the analytic clamped–free roots. The undamped solve follows the midpoint
+phase bound and preserves quadratic energy. Travelling wind reaches downstream roots later. Airy water motion
+alternates in direction and decays with depth. A rigid hit can uproot a plant and transfer its chord's motion to a
+preallocated rigid body. The coupled pose and enabled flags replay bit for bit after restoring a snapshot taken
+before the hit. Plant sway displaces real pixels in regular and tiled scatter on WebGPU and WebGL2 compatibility.
+
+Proof in [the coupling tests](../../packages/physics/tests/coupling/vegetation.test.js) and
+[the scatter browser test](../../packages/scatter/test/states.browser.mjs). See the [research record](../clean-room.md#rooted-plants-in-wind-and-water-margoenginephysicsvegetation-bio-01)
+and [engine limits](../limits.md#rooted-plant-mechanics-bio-01).

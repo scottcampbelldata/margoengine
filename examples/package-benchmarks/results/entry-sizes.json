@@ -1,5 +1,5 @@
 {
-  "commit": "e050200034",
+  "commit": "5829e2a5fc",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -13998,6 +13998,10 @@
       "./schooling": {
         "raw": 12628,
         "gzip": 4998
+      },
+      "./vegetation": {
+        "raw": 23538,
+        "gzip": 9402
       }
     },
     "@margoengine/physics2d": {
@@ -14860,6 +14864,10 @@
       "./read": {
         "raw": 1966,
         "gzip": 1173
+      },
+      "./plant-motion": {
+        "raw": 5202,
+        "gzip": 2248
       }
     },
     "@margoengine/scene": {
@@ -17651,6 +17659,16 @@
       "raw": 8710,
       "gzip": 4523,
       "brotli": 4100
+    },
+    "packages/physics/dist/vegetation-kernel.wasm": {
+      "raw": 6456,
+      "gzip": 2226,
+      "brotli": 1955
+    },
+    "packages/physics/dist/vegetation-kernel-shared.wasm": {
+      "raw": 6456,
+      "gzip": 2226,
+      "brotli": 1955
     }
   },
   "splits": {

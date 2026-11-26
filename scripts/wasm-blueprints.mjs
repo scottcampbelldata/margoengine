@@ -89,6 +89,19 @@ export const BLUEPRINTS = [
     crate: 'packages/physics/school-kernel',
     blueprint: 'packages/physics/src/schooling/school-kernel-shared.wasm',
     script: 'packages/physics/scripts/build-school-kernel.mjs',
+  },
+  {
+    name: 'vegetation-kernel',
+    crate: 'packages/physics/vegetation-kernel',
+    blueprint: 'packages/physics/src/vegetation-kernel.wasm',
+    script: 'packages/physics/scripts/build-vegetation-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'vegetation-kernel-shared',
+    crate: 'packages/physics/vegetation-kernel',
+    blueprint: 'packages/physics/src/vegetation-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-vegetation-kernel.mjs',
     args: ['shared'],
   },
   {

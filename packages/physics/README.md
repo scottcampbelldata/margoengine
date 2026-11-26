@@ -49,6 +49,76 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
+## Rooted plants in wind and water
+
+`@margoengine/physics/vegetation` models each plant as a tapered cantilever with two bending modes on each horizontal axis. Set its geometry, tissue density and Young’s modulus in SI units. A `FlowField` supplies the velocity and density of air or water at the plant and at the world clock's time.
+
+```ts
+import { PlantSway } from '@margoengine/physics/vegetation';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { BoundaryLayerWind } from '@margoengine/weather/boundary-layer';
+
+const breeze = new BoundaryLayerWind({ speed: 6, roughness: 0.03, turbulence: false });
+const sway = await PlantSway.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(sway, {
+  flow: breeze,
+  plants: [{ root: [0, 0, 0], height: 1.5, baseDiameter: 0.035,
+    tipDiameter: 0.012, youngModulus: 8e8, density: 650, dampingRatio: 0.04 }],
+});
+world.advance(60);
+const tip = sway.sample(0, 1.5);
+console.log(tip.displacement, sway.dryFrequencies(0));
+```
+
+Each root is a position in the solver's origin cell, and the stem starts along +Y. A plant without a crown is all stem.
+With no flow, the model reproduces free mechanical response. The tip diameter defaults to the base diameter,
+`hollowRatio` to zero, and the stem drag coefficient to one. The added-mass coefficient defaults to one in water and
+zero in air. Initial motion and internal damping default to zero. A crown can add distributed mass and projected drag
+area above a given height. Its displaced volume defaults to zero and its drag coefficient defaults to the stem's.
+Optional `ruptureStress` (Pa) and `anchorMoment` (N m) enable failure. The failure code, height, moment and world tick
+are recorded in `swayField`. Its status is 0 standing, 1 snapped, or 2 uprooted. A stopped plant keeps its last computed
+pose and velocity. An impact producer can project a horizontal hit at its height with `projectImpulse()` and publish the
+result to `impulseField`. Both ports keep the order of `plants`. Snapshots include the modal state and any failure.
+A supplied water `FlowField` uses the same interface. See [PlantMotion](../scatter/README.md#solved-plant-sway) to
+render these motions in instanced foliage.
+
+For rigid impacts, use `new PlantRigidSolver(sway)` in place of the world's `RigidSolver`. Pass `physics` and a binding
+for each plant in solver order, with `null` for plants without rigid contacts. Give each binding an enabled fixed trunk
+proxy and disabled dynamic fragments. A fragment at `baseHeight: 0` covers uprooting and root-level snaps. Other
+fragments use the monitored section heights `height * index / 8` for index 1–7, with their pivots at those heights
+and colliders extending along local +Y. Both bodies must exist before the world starts. If a fragment matches the
+failure height, it takes the failed stem segment's orientation and velocity and the standing proxy is disabled.
+Use `world.couple([rigid.id, sway.id], 'staggered')` to send that step's rigid contact load to the plant, then take
+the first coupled snapshot after stepping at least once. The rigid solver and plant need the same origin.
+
+```ts
+import { Physics, type ColliderOptions } from '@margoengine/physics';
+import { PlantRigidSolver, PlantSway } from '@margoengine/physics/vegetation';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
+const sway = await PlantSway.load();
+const plant = { root: [0, 0, 0] as const, height: 1.6, baseDiameter: 0.08,
+  density: 700, youngModulus: 1.2e8, anchorMoment: 0.5 };
+const colliders: ColliderOptions = { shape: 'box', halfExtents: [0.04, 0.8, 0.04], offset: [0, 0.8, 0] };
+const standing = physics.addBody(null, { type: 'fixed', colliders });
+const trunk = physics.addBody(null, { colliders });
+trunk.enabled = false;
+const ball = physics.addBody(null, {
+  position: [-0.45, 1.2, 0], colliders: { shape: 'sphere', radius: 0.12, mass: 1 },
+});
+ball.setLinearVelocity([4, 0, 0]);
+const rigid = new PlantRigidSolver(sway);
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] })
+  .add(sway, { plants: [plant] })
+  .add(rigid, { physics, plants: [{ root: plant.root, height: plant.height,
+    standing, fragments: [{ body: trunk, baseHeight: 0 }] }] })
+  .couple([rigid.id, sway.id], 'staggered');
+world.advance(20);
+console.log(trunk.enabled, trunk.position);
+```
+
 ## Ropes, vehicles and compound shapes
 
 ```ts

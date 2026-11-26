@@ -9,6 +9,9 @@ import {Engine,box,Geometry,PbrMaterial} from '/packages/core/dist/index.js';
 import {Scatter} from '/packages/scatter/dist/index.js';
 import {ScatterTiles} from '/packages/scatter/dist/tiles.js';
 import {PlantStates} from '/packages/scatter/dist/states.js';
+import {PlantMotion} from '/packages/scatter/dist/plant-motion.js';
+import {PlantSway} from '/packages/physics/dist/vegetation.js';
+import {PhysicsWorld} from '/packages/physics/dist/world.js';
 import {Shadows} from '/packages/shadows/dist/index.js';
 const canvas=document.querySelector('canvas'),errors=[];
 const engine=await Engine.create(canvas,{camera:{position:[0,5,14],target:[0,2,0],near:0.5,far:200}}),device=engine.gpu;
@@ -37,12 +40,12 @@ function filled(texel,format='rgba32float'){
  for(let i=0;i<16;i++)data.set(texel,i*4);
  device.queue.writeTexture({texture:t},data,{bytesPerRow:format==='rgba32float'?64:16},[4,4]);return t;
 }
-let scatter,states,remove,textures=[];
+let scatter,states,motion,remove,textures=[];
 const B=[-8,-8,8,8];
 window.check={
  // kind 'scatter' or 'tiles'; spec null (no states) or {fire, wet, flow, covers (texels), response, numbers, paint}.
  async show(kind,spec,frames=1){
-  remove?.();remove=undefined;scatter?.dispose();states?.dispose();states=undefined;for(const t of textures)t.destroy();textures=[];
+  remove?.();remove=undefined;scatter?.dispose();motion?.dispose();states?.dispose();states=undefined;for(const t of textures)t.destroy();textures=[];
   device.pushErrorScope?.('validation');
   const options={material:new PbrMaterial({color:[0.15,0.45,0.1],roughness:0.9})};
   if(spec){
@@ -52,6 +55,16 @@ window.check={
     fire:fire&&{texture:()=>fire,bounds:B},flood:wet&&{wet:()=>wet,velocity:flow&&(()=>flow),bounds:B},ground:covers&&{covers:()=>covers,bounds:B}});
    if(spec.paint)states.paint(spec.paint.rect,spec.paint.color,spec.paint.amount);
    options.states=states.plant({crownBase:2,trunkRadius:0.25,...spec.response});
+  }
+  if(spec?.motion!==undefined){
+   const sway=await PlantSway.load();
+   const world=new PhysicsWorld({rate:{num:60,den:1}}).add(sway,{plants:[{
+    root:[0,0,0],height:4.5,baseDiameter:0.3,density:600,youngModulus:1e9,initialDisplacement:[spec.motion,0,0,0],
+    anchorMoment:spec.failed?1:undefined,
+   }]});
+   if(spec.failed)world.advance(1);
+   motion=new PlantMotion({roots:[{xz:[0,0],height:4.5}],origin:[-0.5,-0.5],cellSize:1,readSway:()=>sway.readSway(),states:options.states,hideFailed:spec.failed});
+   options.states=motion;
   }
   if(kind==='scatter')scatter=Scatter.attach(engine,tree,{count:1,area:[0.001,0.001],scale:[1,1],...options});
   else{scatter=ScatterTiles.attach(engine,tree,{bounds:[-20,-20,20,20],...options});scatter.setTile('0,0',[-20,-20],40,record);}

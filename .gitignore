@@ -12,6 +12,7 @@ packages/*/target/
 packages/physics/kernel/target/
 packages/physics/thermal-kernel/target/
 packages/physics/school-kernel/target/
+packages/physics/vegetation-kernel/target/
 packages/physics2d/kernel/target/
 packages/physics2d/kernel/wasm-check/target/
 packages/sciviz/kernel/target/

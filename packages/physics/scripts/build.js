@@ -28,7 +28,7 @@ const exposeSchoolWasmUrl = {
 };
 await copyLegal(root);
 // The solver is Margo's own Rust kernel, shipped as a deflated blueprint inside src/wasm.ts (rebuilt by
-// scripts/build-kernel.mjs), so the package has no Wasm file of its own and no third-party code.
+// scripts/build-kernel.mjs). Optional family kernels load their own Wasm only when requested.
 await build({
   root,
   configFile: false,
@@ -58,6 +58,7 @@ await build({
         tracers: resolve(root, 'src/tracers.ts'),
         thermal: resolve(root, 'src/thermal.ts'),
         hydro: resolve(root, 'src/hydro/index.ts'),
+        vegetation: resolve(root, 'src/vegetation.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
@@ -76,6 +77,8 @@ execFileSync(
 await packageDeclarations(root);
 await copyFile(resolve(root, 'src/thermal/thermal-kernel.wasm'), resolve(dist, 'thermal-kernel.wasm'));
 await copyFile(resolve(root, 'src/thermal/thermal-kernel-shared.wasm'), resolve(dist, 'thermal-kernel-shared.wasm'));
+await copyFile(resolve(root, 'src/vegetation-kernel.wasm'), resolve(dist, 'vegetation-kernel.wasm'));
+await copyFile(resolve(root, 'src/vegetation-kernel-shared.wasm'), resolve(dist, 'vegetation-kernel-shared.wasm'));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

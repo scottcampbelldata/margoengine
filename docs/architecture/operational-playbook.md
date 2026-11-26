@@ -9935,3 +9935,16 @@ wetness and the three dead-fuel timelags from f64 registry ports. All prognostic
 Tests prove the implicit solution against an analytic linear case, close both storage budgets, and require identical
 replay in plain and shared memory. The RITS-10 surface fixture verifies that rain darkens dry ground and produces runoff
 after saturation. The finished shot still requires the watershed and flood-depth solvers.
+
+### Section 5 evidence for two-mode plant motion (BIO-01)
+
+The world arena holds the plant matrices, loads, two transverse modes and staged publication. Its plain and shared
+vegetation modules use slot 3 and give each instance a stack in the arena. Velocity,
+density and optional fluid inertia come from the same pure `FlowField` at the dyadic clock. The Wasm build proves
+that instantiation does not modify an existing arena. `packages/physics/tests/coupling/vegetation.test.js` checks
+uniform beam frequencies, midpoint phase and energy, delayed wind arrivals, depth-dependent water motion,
+impulse and failure state, identical plain and shared results, and bit-identical replay.
+`packages/scatter/test/states.browser.mjs` checks that the
+crown shifts and the root stays in place in regular and tiled instancing on WebGPU and the WebGL2 layer.
+The coupling suite also sends a rigid impact into a fixed trunk proxy, releases a preallocated fragment, and
+restores a snapshot from before impact. The standing and released enabled states, pose and hash replay exactly.

@@ -12401,3 +12401,61 @@ by mass, independently limited lateral acceleration, and the exact drag-only spe
 - Federal Aviation Administration, [Pilot’s Handbook of Aeronautical Knowledge](https://www.faa.gov/sites/faa.gov/files/2022-03/pilot_handbook.pdf)
   (FAA-H-8083-25B, Figure 5-34). In the level-turn controller fixture, the vertical component of lift balances
   weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.
+
+
+## Rooted plants in wind and water (`@margoengine/physics/vegetation`, BIO-01)
+
+`vegetation/model.ts` and `vegetation-kernel/src/lib.rs` were written from the following sources without companion
+code. The dry beam uses a two-term Rayleigh–Ritz projection with tip-normalized, uniform clamped-free shapes.
+Taper, a hollow section and a distributed crown enter the mass and stiffness integrals.
+
+- Sascha Eisenträger, Santosh Kapuria, Mayank Jain and Junqi Zhang,
+  *On the numerical properties of high-order spectral (Euler-Bernoulli) beam elements*, 2023,
+  [doi:10.1002/zamm.202200422](https://doi.org/10.1002/zamm.202200422), §3.3.2.2 and Eqs. 63–65. For a uniform
+  beam, `cos(beta) cosh(beta) = -1` defines the roots and `omega = beta^2 sqrt(E I / (rho A)) / H^2`.
+- Jos Stam, *Stochastic Dynamics: Simulating the Effects of Turbulence on Flexible Structures*, 1997,
+  [doi:10.1111/1467-8659.00152](https://doi.org/10.1111/1467-8659.00152), §2 and Appendix A. Modal mass,
+  stiffness and damping use projection of a distributed load. Ralf Habel, Alexander Kusternig and Michael Wimmer,
+  *Physically Guided Animation of Trees*, 2009, [doi:10.1111/j.1467-8659.2009.01391.x](https://doi.org/10.1111/j.1467-8659.2009.01391.x),
+  §3, motivates reducing tapered-plant dynamics to a few modes.
+- Frank W. J. Olver et al., NIST *Digital Library of Mathematical Functions*, [§3.5(v)](https://dlmf.nist.gov/3.5.v).
+  Gauss–Legendre weights integrate dry inertia and curvature with 16 nodes. Stem and crown drag, inertia and
+  buoyancy each use three force stations.
+- J. R. Morison, M. P. O’Brien, J. W. Johnson and S. A. Schaaf, *The Force Exerted by Surface Waves on Piles*, 1950,
+  [Eq. 4](https://onemine.org/documents/offshore-operation-the-force-exerted-by-surface-waves-on-piles), derives the
+  quadratic drag and acceleration load on a fixed cylinder. Mitul Luhar and Heidi Nepf, *Wave-induced dynamics of
+  flexible blades*, 2016, [Eqs. 2–6](https://arxiv.org/abs/1510.01237), give the moving-plant form. Relative
+  transverse velocity sets drag, `rho V a_fluid` is the pressure-gradient term, and `rho Ca V` multiplies relative
+  acceleration. Bring the plant's share of that acceleration to its mass matrix. Density times displaced volume
+  minus tissue mass gives the applied buoyancy after multiplication by gravity. Its tension or compression above
+  each section contributes geometric stiffness through the product of the two shape slopes. The wet test field uses
+  the depth decay of Airy's deep-water orbital velocity in J. M. J. Journee and W. W. Massie,
+  [*Offshore Hydromechanics*, §5.3](https://ocw.tudelft.nl/courses/offshore-hydromechanics/).
+- Heli Peltola, Seppo Kellomäki, Hannu Väisänen and Veli-Pekka Ikonen, *A mechanistic model for assessing the risk
+  of wind and snow damage to single trees and stands of Scots pine, Norway spruce, and birch*, 1999,
+  [doi:10.1139/x99-029](https://doi.org/10.1139/x99-029). Compare the maximum outer fibre stress `E R kappa`
+  and the moment `E I kappa` at the root with distinct rupture and anchorage thresholds.
+  Barry Gardiner, Heli Peltola and Seppo Kellomäki compare the separate resistance criteria against field data in
+  *Comparison of two models for predicting the critical wind speeds required to damage coniferous trees*, 2000.
+  [doi:10.1016/S0304-3800(00)00220-9](https://doi.org/10.1016/S0304-3800(00)00220-9).
+- Ernst Hairer, Christian Lubich and Gerhard Wanner, *Geometric Numerical Integration*, 2006,
+  [doi:10.1007/3-540-30666-8](https://doi.org/10.1007/3-540-30666-8). Implicit midpoint preserves the quadratic
+  energy of an undamped beam. Its free oscillator phase is `2 atan(omega dt/2)`. The inequality
+  `0 <= x-atan(x) <= x^3/3` gives less than 1% relative phase error per step when `omega dt <= sqrt(0.12)`.
+  Freezing the nonnegative drag coefficient over each solve keeps the drag term dissipative in still fluid.
+- Emmanuel de Langre, *Effects of Wind on Plants*, 2008, [doi:10.1146/annurev.fluid.40.111406.102135](https://doi.org/10.1146/annurev.fluid.40.111406.102135),
+  reviews plant-load coupling. Charlotte Py, Emmanuel de Langre and Bruno Moulia, *A frequency lock-in mechanism in the
+  interaction between wind and crop canopies*, 2006, [doi:10.1017/S0022112006002667](https://doi.org/10.1017/S0022112006002667),
+  describes feedback absent from a prescribed field. Frédérick Gosselin, Emmanuel de Langre and Bruno Machado-Almeida,
+  *Drag reduction of flexible plates by reconfiguration*, 2010,
+  [doi:10.1017/S0022112009993673](https://doi.org/10.1017/S0022112009993673), measures geometry-dependent reconfiguration.
+  The solver uses small deflections and its configured projected area.
+
+The coupling test `packages/physics/tests/coupling/vegetation.test.js` checks two uniform-beam frequencies, midpoint
+energy and phase, a travelling gust, an attenuating Airy wave, rupture and uprooting, and bit-identical replay.
+
+Scatter reads those same modal coordinates in the colour, depth and shadow vertex stages. For a horizontal
+offset `d(y)`, (x',y',z') = (x+d_x(y),y,z+d_z(y)); the inverse-transpose Jacobian changes only the normal's
+y component, to `n_y - dot(n_xz, slope)`. See Alan H. Barr, *Global and local deformations of solid primitives*,
+1984, [doi:10.1145/964965.808573](https://doi.org/10.1145/964965.808573), §3. Tests render a displaced crown,
+its planted root, and a tiled counterpart on WebGPU and the WebGL2 compatibility layer.

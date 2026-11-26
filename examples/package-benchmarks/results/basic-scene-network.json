@@ -1,16 +1,16 @@
 {
-  "commit": "e050200034",
+  "commit": "5829e2a5fc",
   "dirty": false,
   "browser": "msedge 158.0.4370.33 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-B0BB-Vqb.js",
+      "file": "assets/dist-eJeD2DAo.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
       "imports": [
         "_version-YYhCZP03.js",
-        "_model-DskIeHpP-DcwtEFuK.js",
+        "_model-C9qBHs9s-PpgMnUji.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ]
     },
@@ -77,13 +77,13 @@
       ]
     },
     "../../../packages/gltf/dist/compression-D4IkO5vE.js": {
-      "file": "assets/compression-D4IkO5vE-ZO3WGOge.js",
+      "file": "assets/compression-D4IkO5vE-rVZwZcfU.js",
       "name": "compression-D4IkO5vE",
       "src": "../../../packages/gltf/dist/compression-D4IkO5vE.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_asset-1b8ejkZX-BOXVSvwJ.js"
+        "_asset-1b8ejkZX-CcXDarDD.js"
       ]
     },
     "../../../packages/gltf/dist/dds.js": {
@@ -96,12 +96,12 @@
       ]
     },
     "../../../packages/gltf/dist/extended.js": {
-      "file": "assets/extended-BsYlVpWc.js",
+      "file": "assets/extended-xFsE3cWW.js",
       "name": "extended",
       "src": "../../../packages/gltf/dist/extended.js",
       "isDynamicEntry": true,
       "imports": [
-        "_extended-f0HlJ3yb.js"
+        "_extended-BCN0fLXy.js"
       ]
     },
     "../../../packages/gltf/dist/index.js": {
@@ -125,14 +125,14 @@
       "isDynamicEntry": true
     },
     "../../../packages/gltf/dist/pbr.js": {
-      "file": "assets/pbr-vaOff7Xb.js",
+      "file": "assets/pbr-r1xWepJK.js",
       "name": "pbr",
       "src": "../../../packages/gltf/dist/pbr.js",
       "isDynamicEntry": true,
       "imports": [
         "_preload-helper-CRzLMJPS.js",
-        "_model-DskIeHpP-DcwtEFuK.js",
-        "_asset-1b8ejkZX-BOXVSvwJ.js",
+        "_model-C9qBHs9s-PpgMnUji.js",
+        "_asset-1b8ejkZX-CcXDarDD.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js"
       ],
       "dynamicImports": [
@@ -140,15 +140,15 @@
       ]
     },
     "../../../packages/gltf/dist/spec-gloss.js": {
-      "file": "assets/spec-gloss-CQrZFGUe.js",
+      "file": "assets/spec-gloss-CCHjc0Ti.js",
       "name": "spec-gloss",
       "src": "../../../packages/gltf/dist/spec-gloss.js",
       "isDynamicEntry": true,
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js",
-        "_shader-Bfap_ob7-tSY5ygWK.js",
+        "_shader-CgxZjKRQ-KZzat02Q.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
-        "_extended-f0HlJ3yb.js"
+        "_extended-BCN0fLXy.js"
       ]
     },
     "../../../packages/gltf/dist/splats.js": {
@@ -258,8 +258,8 @@
         "_errors-THVaUwlL-C81vxm_p.js"
       ]
     },
-    "_asset-1b8ejkZX-BOXVSvwJ.js": {
-      "file": "assets/asset-1b8ejkZX-BOXVSvwJ.js",
+    "_asset-1b8ejkZX-CcXDarDD.js": {
+      "file": "assets/asset-1b8ejkZX-CcXDarDD.js",
       "name": "asset-1b8ejkZX",
       "imports": [
         "_preload-helper-CRzLMJPS.js",
@@ -301,11 +301,11 @@
       "file": "assets/errors-THVaUwlL-C81vxm_p.js",
       "name": "errors-THVaUwlL"
     },
-    "_extended-f0HlJ3yb.js": {
-      "file": "assets/extended-f0HlJ3yb.js",
+    "_extended-BCN0fLXy.js": {
+      "file": "assets/extended-BCN0fLXy.js",
       "name": "extended",
       "imports": [
-        "_shader-Bfap_ob7-tSY5ygWK.js"
+        "_shader-CgxZjKRQ-KZzat02Q.js"
       ]
     },
     "_extension-Bn1Wm_pY.js": {
@@ -329,9 +329,9 @@
         "_errors-D4ZctVpl.js"
       ]
     },
-    "_model-DskIeHpP-DcwtEFuK.js": {
-      "file": "assets/model-DskIeHpP-DcwtEFuK.js",
-      "name": "model-DskIeHpP",
+    "_model-C9qBHs9s-PpgMnUji.js": {
+      "file": "assets/model-C9qBHs9s-PpgMnUji.js",
+      "name": "model-C9qBHs9s",
       "imports": [
         "_version-YYhCZP03.js",
         "_extension-Bn1Wm_pY.js",
@@ -340,8 +340,8 @@
         "_errors-THVaUwlL-C81vxm_p.js",
         "_accessor-DuqjpuxI-DJ8jujwr.js",
         "_scene-scope-CZDEkd24-B97nmpn7.js",
-        "_asset-1b8ejkZX-BOXVSvwJ.js",
-        "_shader-Bfap_ob7-tSY5ygWK.js",
+        "_asset-1b8ejkZX-CcXDarDD.js",
+        "_shader-CgxZjKRQ-KZzat02Q.js",
         "_texture-coordinates-XFsEMdU6-rNEcXW-P.js",
         "_texture-BT_nk8cK.js"
       ],
@@ -368,9 +368,9 @@
         "_version-YYhCZP03.js"
       ]
     },
-    "_shader-Bfap_ob7-tSY5ygWK.js": {
-      "file": "assets/shader-Bfap_ob7-tSY5ygWK.js",
-      "name": "shader-Bfap_ob7",
+    "_shader-CgxZjKRQ-KZzat02Q.js": {
+      "file": "assets/shader-CgxZjKRQ-KZzat02Q.js",
+      "name": "shader-CgxZjKRQ",
       "imports": [
         "_errors-THVaUwlL-C81vxm_p.js"
       ]
@@ -395,7 +395,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-BHhg77iV.js",
+      "file": "assets/index-zCP-O8Cp.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -460,13 +460,13 @@
       "brotli": 1858
     },
     {
-      "path": "assets/index-BHhg77iV.js",
+      "path": "assets/index-zCP-O8Cp.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27180,
+      "transferred": 27178,
       "raw": 64983,
-      "gzip": 26798,
-      "brotli": 23645
+      "gzip": 26796,
+      "brotli": 23630
     },
     {
       "path": "assets/node-matrix-DeiKheBW-Cj_xL6KP.js",
@@ -510,7 +510,7 @@
       "encoding": "identity",
       "transferred": 969,
       "raw": 719,
-      "gzip": 411,
+      "gzip": 410,
       "brotli": 261
     },
     {
@@ -525,14 +525,14 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46087,
+    "transferred": 46085,
     "raw": 96119,
-    "gzip": 40539,
-    "brotli": 35798
+    "gzip": 40536,
+    "brotli": 35783
   },
   "notFetched": [
     {
-      "path": "assets/asset-1b8ejkZX-BOXVSvwJ.js",
+      "path": "assets/asset-1b8ejkZX-CcXDarDD.js",
       "raw": 30600
     },
     {
@@ -548,7 +548,7 @@
       "raw": 1134
     },
     {
-      "path": "assets/compression-D4IkO5vE-ZO3WGOge.js",
+      "path": "assets/compression-D4IkO5vE-rVZwZcfU.js",
       "raw": 4289
     },
     {
@@ -568,16 +568,16 @@
       "raw": 17774
     },
     {
-      "path": "assets/dist-B0BB-Vqb.js",
-      "raw": 79044
-    },
-    {
       "path": "assets/dist-BACDxnOY.js",
       "raw": 27485
     },
     {
       "path": "assets/dist-BiOVjC1X.js",
       "raw": 8699
+    },
+    {
+      "path": "assets/dist-eJeD2DAo.js",
+      "raw": 79044
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
@@ -608,12 +608,12 @@
       "raw": 563
     },
     {
-      "path": "assets/extended-BsYlVpWc.js",
-      "raw": 59
+      "path": "assets/extended-BCN0fLXy.js",
+      "raw": 2722
     },
     {
-      "path": "assets/extended-f0HlJ3yb.js",
-      "raw": 2717
+      "path": "assets/extended-xFsE3cWW.js",
+      "raw": 59
     },
     {
       "path": "assets/meshopt-DGT9-Q7J.js",
@@ -624,15 +624,15 @@
       "raw": 7513
     },
     {
-      "path": "assets/model-DskIeHpP-DcwtEFuK.js",
-      "raw": 159828
+      "path": "assets/model-C9qBHs9s-PpgMnUji.js",
+      "raw": 160020
     },
     {
       "path": "assets/optimize-7SEzNA23-BesG8gNH.js",
       "raw": 3727
     },
     {
-      "path": "assets/pbr-vaOff7Xb.js",
+      "path": "assets/pbr-r1xWepJK.js",
       "raw": 1058
     },
     {
@@ -640,15 +640,15 @@
       "raw": 862
     },
     {
-      "path": "assets/shader-Bfap_ob7-tSY5ygWK.js",
-      "raw": 42468
+      "path": "assets/shader-CgxZjKRQ-KZzat02Q.js",
+      "raw": 42906
     },
     {
       "path": "assets/sog-0tR2JImv-f7riG6JD.js",
       "raw": 11597
     },
     {
-      "path": "assets/spec-gloss-CQrZFGUe.js",
+      "path": "assets/spec-gloss-CCHjc0Ti.js",
       "raw": 2872
     },
     {

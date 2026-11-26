@@ -503,3 +503,13 @@ What it shows: a desert village plan built from tiles three times with different
 
 Handled acceptably: every house sits on the ground plate with no floating or sinking. Roads sit flat on the ground. The camera moves are smooth, and the gate and plaza stay in the same place across seeds.
 Not in the catalog: staged construction (placement of pieces, stacking, scaffolding, settling and touchdown dust). The nearest rows are BREAK-02 (collapse, the reverse process) and DYN-01 (rest contact). No row covers a build process.
+
+### BIO-01 automated reproductions
+
+- The underwater case in `packages/physics/tests/coupling/vegetation.test.js` uses a depth-decaying Airy field to
+  reproduce BS-1, BB-1 and BB-2. It checks alternating lateral deflection and a smaller excursion at depth.
+- Its travelling-front and real rigid-impact cases reproduce the plant response in HORSE-6 and TREE-1. The tests
+  check the arrival order at separated roots and activation of a colliding trunk after an impact.
+- The two analytic frequencies and the planted-root and moving-crown checks in `packages/scatter/test/states.browser.mjs`
+  cover the wind response in CY-14, CITY-TO-STREET-1, TREE-2 and THE-SCANNED-WORKSHOP-2.
+- TREE-3's permanent wind-shaped growth remains a plant establishment and growth problem in BIO-03.

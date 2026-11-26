@@ -16013,3 +16013,13 @@ point stopped and the cube turning about it, an equally valid answer of the same
 more firmly. The exact block solve of each manifold (`blockSolver`) gives the stop to all the points at once. Fixed by the
 block solver's default, which waits on KB-PHYS-BLOCK1; the test bounds the sweeps at 0.2 m until then. (The 2.2 cm sink that
 was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to its open bottom.)
+
+
+
+## Open: a time-zero coupled snapshot predates its accumulator sum region (BIO-01)
+
+Add `PlantSway` and `PlantRigidSolver` to a `PhysicsWorld`, snapshot before the first `advance()`, advance
+one frame and restore that snapshot. Restore rejects the unequal region count. The field registry allocates the
+accumulator's sum region on first use. A snapshot taken after the first step captures the full layout. The
+regression in `packages/physics/tests/coupling/vegetation.test.js` restores a frame-two snapshot, taken before the
+hit and before either body changes its enabled flag. See BIO-01 in [Framework requests](physics-work-queue.md#framework-requests).

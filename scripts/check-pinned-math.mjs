@@ -26,6 +26,7 @@ export const ALWAYS = [
   'packages/physics/src/air-hold.ts',
   'packages/physics/src/hydro/shallow.ts',
   'packages/physics/src/hydro/index.ts',
+  'packages/physics/src/vegetation/*.ts',
   'packages/math/src/atmosphere.ts',
   'packages/weather/src/boundary-layer.ts',
   'packages/weather/src/turbulence.ts',

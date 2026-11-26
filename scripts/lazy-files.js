@@ -30,6 +30,22 @@ export const LAZY_FILES = [
     when: 'The optional /thermal entry loads a kernel on a host with shared memory support',
   },
   {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/vegetation-kernel.wasm',
+    label: 'vegetation-kernel.wasm',
+    kind: 'Rust SIMD structural plant response',
+    measure: 'file',
+    when: 'PlantSway.load(), only from the optional /vegetation entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/vegetation-kernel-shared.wasm',
+    label: 'vegetation-kernel-shared.wasm',
+    kind: 'Rust SIMD structural plant response, shared world memory',
+    measure: 'file',
+    when: 'PlantSway.load() on a host with shared memory support',
+  },
+  {
     package: '@margoengine/compute',
     file: 'packages/compute/dist/onnx-kernel.wasm',
     label: 'onnx-kernel.wasm',

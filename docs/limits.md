@@ -8942,3 +8942,28 @@ still need playback checks.
 
 The optional entry is 4,998 B gzip. The plain SIMD kernel is 4,464 B gzip (8,622 B raw). The shared variant is 4,523 B gzip (8,710 B raw).
 That budget covers the field adapter and the point-mass mode in one import. Core and stage gain zero bytes.
+
+## Rooted plant mechanics (BIO-01)
+
+The optional vegetation kernel integrates two small-angle transverse modes about one upright root. The crown is a
+distributed load and mass on the stem. The model has fixed geometry, no branch topology, axial motion, finite-angle
+reconfiguration, growth or reciprocal flow feedback. The effect of a fluid is integrated at three stations on each
+element, and stem rupture is checked at nine cross-sections. A fluid sampler supplies density and velocity in the same
+origin cell. Deep-water Airy motion in the coupling test is a supplied field. Mixed media can use separate plant
+solvers; the sampled `medium` determines the default added mass and whether buoyancy is computed. Kernel execution
+requires Wasm SIMD. The plain and shared builds use the same layout in module slot 3, with a separate stack per
+instance. The dry model is checked against the uniform clamped–free solution.
+The optional physics entry is 9,402 B min+gzip. Each Wasm build is 6,456 B, or 2,226 B gzip. Loading on a
+shared-memory host prepares both builds so the same solver API can use either world memory type.
+The optional scatter entry is 2,248 B min+gzip. The measured core + stage gzip remains 24,820 B on Windows.
+
+`@margoengine/scatter/plant-motion` copies four modal displacements per plant to a 32-byte GPU record and maps
+instances to one root per selected X/Z cell. Bin indices and displacement use float32 for rendering. The input
+root and mesh pivot need to share a cell, and the rendered reach must fit Scatter's culling radius. A zero-strength
+Scatter wind enables its existing doubled reach while the solver poses mapped roots. The normal transform
+uses the derivative of the same displacement as the colour, depth and shadow geometry.
+
+The rigid adapter uses a fixed standing trunk proxy, so the rigid impact sees a fixed obstacle until release. It
+passes normal impulse to the bending modes at the stored contact heights. A released stem uses one authored rigid
+geometry with the pose and velocity of its detached chord. Release needs a preallocated dynamic fragment at the
+matching section height. Scatter can hide the entire failed instance when a separate body draws the fragment.

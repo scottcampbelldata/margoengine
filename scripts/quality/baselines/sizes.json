@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19175353,
+  "total": 19187542,
   "history": [
     {
       "date": "2026-10-24",
@@ -12501,6 +12501,12 @@
       "commit": "fcc06cb9b9",
       "reason": "LIFE-04: school imports the matching plain or shared arena build; the optional entry is 4998 B gzip; core and stage do not load the solver",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5829e2a5fc",
+      "reason": "BIO-01 adds optional vegetation (9402 B gzip) and scatter posing (2248 B gzip). Core and stage require no additional bytes.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13309,6 +13315,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/tracers": 4952,
+    "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 16988,
     "@margoengine/physics2d": 21360,
@@ -13516,6 +13523,7 @@
     "@margoengine/scatter/occlusion": 1433,
     "@margoengine/scatter/paint": 1507,
     "@margoengine/scatter/pick": 3793,
+    "@margoengine/scatter/plant-motion": 2504,
     "@margoengine/scatter/read": 1415,
     "@margoengine/scatter/settings": 2444,
     "@margoengine/scatter/simplify": 1643,

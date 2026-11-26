@@ -54,6 +54,18 @@ await runSuite(
       crownHigh = [0, 4.4, 1.01];
     assert.ok(green(await at(plain, crownLow)) && green(await at(plain, trunkLow)), 'the untouched tree is green');
 
+    const moving = await show('scatter', { motion: 0.6 });
+    assert.ok(green(await at(moving, [1.25, 4.4, 0])), 'modal crown moves onto its downwind side');
+    assert.ok(!green(await at(moving, [-0.85, 4.4, 0])), 'the upwind edge has moved with the crown');
+    assert.ok(green(await at(moving, trunkLow)), 'the root remains planted');
+    const movingTile = await show('tiles', { motion: 0.6 });
+    assert.ok(green(await at(movingTile, [1.25, 4.4, 0])), 'tiled scatter uses the same solved shape');
+    const failed = await show('scatter', { motion: 0.6, failed: true });
+    assert.ok(
+      !green(await at(failed, trunkLow)) && !green(await at(failed, [1.25, 4.4, 0])),
+      'failed tree leaves the standing scatter',
+    );
+
     // 1 and 3: a surface fire of 300 kW/m (state 2, burnt).
     const surface = await show('scatter', { fire: [0, 10, 0.3, 2] });
     const burn = layer(await map(), 0),
