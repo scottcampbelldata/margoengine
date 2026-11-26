@@ -13334,6 +13334,30 @@ by mass, independently limited lateral acceleration, and the exact drag-only spe
   weight and the horizontal component supplies centripetal acceleration. Their component ratio is `a/g`.
 
 
+### Bubbles (`BubbleSolver`, `@margoengine/physics/bubbles`, 2026-11-26, FW-4)
+
+Written from papers and a thesis read as text (no code, no companion repositories):
+
+- S. A. Thorpe (1982) and R. F. Keeling (1993), as L. Deike and W. K. Melville, "Gas transfer by breaking waves",
+  Geophys. Res. Lett. 45, 10482-10492, 2018, https://doi.org/10.1029/2018GL078758, print it: the rise of a bubble
+  whose surface is rigid with surfactants (the check: their formula's values).
+- A. M. Castro, "Polydispersed bubbly flow model for ship hydrodynamics with application to Athena R/V", PhD thesis,
+  University of Iowa, 2011: the dissolution model (Sherwood numbers of Levich and Whitaker, Henry's law at the wall,
+  kappa = 2e-9 m^2/s, H = 2.38e-7 kg/(m^3 Pa)) and its time scales at the Athena's stern (the check); the
+  entrainment depth phi_ent = 0.1 m.
+- G. B. Deane and M. D. Stokes, "Scale dependence of bubble creation mechanisms in breaking waves", Nature 418,
+  839-844, 2002, as E. Moraga, P. Carrica, D. Drew and R. Lahey, "The modeling of air entrainment processes for surface
+  ships", Mecanica Computacional XXIV, 2549-2560, 2005, use it: the size spectrum the air enters as; where a ship takes
+  air in.
+- P. Carrica, F. Bonetto and D. Drew (1997) and E. Paterson et al. (1997), as Castro gives them: 10 percent void at
+  the injection.
+- T. D. Anguelova and P. Huq, J. Mar. Sci. Eng. 5, 41, 2017: bubbles 2.5 to 4.2 mm across rise at 25 to 29 cm/s (why
+  the radii stop at 1 mm).
+
+Calibrated: the entrainment strength. The cited models all tune a source strength (S0 in Moraga et al. and Castro);
+here it is the 10 percent injection void of Carrica et al. and Paterson et al. over Castro's 0.1 m, not yet checked
+against a measured ship wake (only abstracts of those measurements were found).
+
 ### Grid-particle liquids (`FlipSolver`, `DeckWaterSolver`, `@margoengine/physics/flip`, 2026-11-26, FLUID-03)
 
 Written from papers and notes read as text (no code, no companion repositories):

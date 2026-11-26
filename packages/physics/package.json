@@ -131,6 +131,10 @@
       "types": "./dist/waves/index.d.ts",
       "import": "./dist/waves.js"
     },
+    "./bubbles": {
+      "types": "./dist/bubbles/index.d.ts",
+      "import": "./dist/bubbles.js"
+    },
     "./entry": {
       "types": "./dist/entry/index.d.ts",
       "import": "./dist/entry.js"

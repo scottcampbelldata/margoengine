@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20402964,
+  "total": 20406768,
   "history": [
     {
       "date": "2026-10-24",
@@ -13149,6 +13149,12 @@
       "commit": "f3c648b590",
       "grew": 3,
       "reason": "SOFT-04 adds a full material-space elastic tensor, local energy-descent updates and optional material state for snapshots and cuts, moving the soft entry from 123786 to 128798 B gzip. @margoengine/physics/soft: 125119 to 132662 B ceiling (128798 B measured); @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 35704 to 37225 B ceiling (36140 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 88516 to 94583 B ceiling (91828 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) bubbles",
+      "reason": "New optional physics/bubbles entry (FW-4): BubbleSolver, parcels of bubbles carried by a flow, rising (Thorpe and Keeling), dissolving (Castro), laying foam, and shipAeration from a ship race; 3,804 B gzip (this Mac). One solver; nothing to split.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13967,6 +13973,7 @@
     "@margoengine/physics/aeolian": 5889,
     "@margoengine/physics/ageing": 5178,
     "@margoengine/physics/airborne": 8516,
+    "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/crush": 3763,

@@ -63,6 +63,7 @@ await build({
         'outdoor-sound': resolve(root, 'src/outdoor-sound/index.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),
+        bubbles: resolve(root, 'src/bubbles/index.ts'),
         entry: resolve(root, 'src/entry/index.ts'),
         flip: resolve(root, 'src/flip/index.ts'),
         pbf: resolve(root, 'src/pbf/index.ts'),

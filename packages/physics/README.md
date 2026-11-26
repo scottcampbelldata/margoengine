@@ -2544,6 +2544,36 @@ for (let i = 0; i < p.length; i += 3) front = Math.max(front, p[i]);
 console.log(front > 1); // true: the surge has run more than a metre
 ```
 
+### Bubbles in the water (`BubbleSolver`, `@margoengine/physics/bubbles`)
+
+`BubbleSolver` carries the air the water takes in: the cloud and aerated plume behind a ship's stern, or any air you
+put in with `sources(t)` (a place, a box and a rate in m^3/s). Air enters split over eight radii from 20 um to 1 mm by
+Deane and Stokes' spectrum, as parcels of bubbles that:
+- ride the water's flow (`water`, any FlowField: a ship solver's races, a sea's water);
+- rise at the speed sea water's surfactants leave them (Thorpe's and Keeling's rigid-sphere formula);
+- dissolve by Castro's mass transfer (about 2 min for a 100 um bubble a metre down), swelling as they rise into lower
+  pressure;
+- lay foam where they surface (`foam`, a FoamSolver's `addFoam`).
+
+`shipAeration(ships)` gives a `ShipSolver`'s air: 10 percent void taken in over 0.1 m where each propeller race boils up
+to the surface. Couple the bubbles after the ship, so they read the races where its last step left them:
+`couple(['ship', 'rigid', 'bubbles'], 'staggered')`. Read `parcelData()` to draw them, `voidFraction(x, y, z, cell)` for
+how white the water is, and `ledger()` for the air taken in, dissolved, surfaced and held.
+
+```ts
+import {BubbleSolver} from 'margoengine/physics/bubbles';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+const bubbles = new BubbleSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}}).add(bubbles, {
+  // A litre a second of air taken in half a metre down, for two seconds.
+  sources: (t) => (t < 2 ? [{position: [0, -0.5, 0], width: 0.5, depth: 0.2, rate: 1e-3}] : []),
+});
+world.advance(240); // four seconds
+const air = bubbles.ledger();
+console.log(air.surfaced > 0 && air.held > 0); // true: the big bubbles are up, the small ones still rising
+```
+
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
 
 `TracerSolver` is the physics framework's tracers (SEA-15): dye, discoloured water, silt and cargo plumes, and oil slicks. Each is a cloud of particles of a material, carried by the water's velocity at its depth (`water`, any `FlowField` of water; still water by default). Turbulence spreads them as a random walk, so a cloud's variance grows as 2 K t (`horizontalDiffusivity`, default 0.1 m^2/s; `verticalDiffusivity`, default 0.001). Grains settle at Ferguson and Church's speed for their size and density and come to rest on the `bed` (a terrain bed, or a depth, default 30 m below `waterLevel`). Floating material stays on the surface and drifts with the water there plus a share of the `wind` (`windage`, default 3 percent). `sources` release a material (one of `TRACER_MATERIALS`: `dye`, `silt`, `sand`, `ironOre`, `coal`, `grain`, `oil`, or your own `{density, diameter, shape, floats, windage, colour}`) at a fixed place or along a path (a breach in a moving hull), at a rate in kg/s that may change with time, between `start` and `stop`. `particleMass` (default 1 kg) sets how fine the cloud is, and `capacity` (default 20,000) how many particles it may hold.
