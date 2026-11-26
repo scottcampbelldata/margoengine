@@ -14180,8 +14180,8 @@
         "gzip": 7930
       },
       "./strands": {
-        "raw": 10103,
-        "gzip": 4508
+        "raw": 12454,
+        "gzip": 5313
       }
     },
     "@margoengine/physics2d": {
@@ -18187,14 +18187,14 @@
       "brotli": 10091
     },
     "packages/physics/dist/strand-kernel.wasm": {
-      "raw": 16163,
-      "gzip": 6444,
-      "brotli": 5585
+      "raw": 18084,
+      "gzip": 7312,
+      "brotli": 6366
     },
     "packages/physics/dist/strand-kernel-shared.wasm": {
-      "raw": 16163,
-      "gzip": 6444,
-      "brotli": 5610
+      "raw": 18084,
+      "gzip": 7312,
+      "brotli": 6346
     }
   },
   "splits": {

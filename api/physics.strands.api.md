@@ -22,6 +22,12 @@ export interface StrandCapsule {
     readonly radius: number;
 }
 
+export interface StrandLoadOptions {
+    readonly id?: string;
+    readonly signal?: AbortSignal;
+    readonly rigidCapsules?: readonly StrandRigidCapsule[];
+}
+
 export interface StrandParams {
     readonly strands: readonly StrandSpec[];
     readonly fidelity?: 'rod' | 'follow';
@@ -44,22 +50,20 @@ export interface StrandReading {
     readonly spin: Vec3;
 }
 
+export interface StrandRigidCapsule extends StrandCapsule {
+    readonly body: number;
+}
+
 export class StrandSolver implements Solver<StrandParams> {
     readonly id: string;
     readonly field: FieldDescriptor;
     private constructor();
-    static load(options?: {
-        id?: string;
-        signal?: AbortSignal;
-    }): Promise<StrandSolver>;
+    static load(options?: StrandLoadOptions): Promise<StrandSolver>;
     describe(): {
         id: string;
         rate: 0;
         stableRate: () => RateLevel;
-        fields: {
-            field: FieldDescriptor;
-            access: 'write';
-        }[];
+        fields: FieldUse[];
     };
     init(host: SolverHost, params: StrandParams): void;
     step(context: StepContext, dt: number): void;

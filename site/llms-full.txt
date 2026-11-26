@@ -12976,10 +12976,16 @@ effective moduli where those have been measured. Sampled bodies are kinematic ca
 spheres with point contact. Separation between contacts depends on guide spacing and substep
 rate. Use enough points to resolve thin obstacles.
 
+Optional dynamic capsule contacts publish an equal reaction to the real RigidSolver in SI.
+The isolated moving-capsule test closes initial linear momentum including the in-flight
+registry impulse and measures angular response off the body's centre. Use the same
+coupling rate for both solvers. Mixed contact surfaces share the point contact budget.
+The native constraints sample discrete guide points and body poses at substep boundaries.
+
 The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
 changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 4,508 B gzip
-with a 4,764 B ceiling. Each lazy Wasm variant is 16,163 B raw and 6,444 B gzip. Core and
+native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 5,313 B gzip
+with a 5,569 B ceiling. Each lazy Wasm variant is 18,084 B raw and 7,312 B gzip. Core and
 Stage gain zero bytes.
 
 The optional horse adapter drives eight tail joints and ten five-point mane and forelock
@@ -29948,8 +29954,8 @@ measurements require separate models and evidence.
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 
 The native guide solver receives time-sampled kinematic capsules, wind and a common terrain
-bed. Reciprocal rigid contact, segment-level continuous collision and inter-guide friction
-validation remain open. A point may pass a thin obstacle between substeps or slide past a
+bed. Dynamic body capsules now exchange impulses through the shared rigid ports. Segment-level
+continuous collision and inter-guide friction validation remain open. A point may pass a thin obstacle between substeps or slide past a
 capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
 solved guides. The optional horse driver applies the solved frames to the actual horse skin and replays the gait.
 The optional physical rig also binds the weighted VRM reference ponytail. The named production shots still need their own bindings.

@@ -4821,3 +4821,26 @@ reaction field. Couple the two solvers at the same rate. With staggered rigid-th
 stepping, the accumulated reaction enters the next rigid step. Contact reactions include
 linear impulse and the moment about the body's centre of mass. Reciprocal contact uses the
 rod tier.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { StrandSolver } from '@margoengine/physics/strands';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] });
+using rigid = new Physics(null, { arena: world.arena, gravity: [0, 0, 0], fixedTimestep: 1 / 60 });
+const body = rigid.addBody(null, {
+  position: [0.14, 0, 0],
+  linearVelocity: [-3.6, 0, 0],
+  colliders: { shape: 'sphere', radius: 0.1, mass: 2 },
+});
+world.add(new RigidSolver(), { physics: rigid });
+const strand = await StrandSolver.load({
+  rigidCapsules: [{ body: body.row, start: [0, 0, 0], end: [0, 0, 0], radius: 0.1 }],
+});
+world.add(strand, { strands: [{ points: [[0, 0.3, 0], [0, 0, 0]], radius: 0.01 }], rate: 0 });
+world.couple(['rigid', strand.id], 'staggered');
+world.advance(2);
+console.log(body.linearVelocity, strand.sample(0, 1).velocity);
+```
