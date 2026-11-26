@@ -4020,7 +4020,7 @@ This section matches `AGENTS.md` "How work lands"; `AGENTS.md` wins where they d
 
 | Gate | Command or path | Contract |
 | --- | --- | --- |
-| Core and stage size | build and `npm run measure:size` | Combined minified ES2022 gzip must be strictly below 25,000 bytes. |
+| Core and stage size | build and `npm run measure:size` | Combined minified ES2022 gzip must be strictly below 25,000 bytes. A core or stage dist whose package stamp does not match the checked-out sources is not measured (`MEASURE_SIZE_STALE_DIST`, `tests/measure-size-stale.test.js`). |
 | Kernel payload | `scripts/build-modern.js` | Raw Wasm below 30 KiB, valid module, lossless raw-deflate round trip. |
 | Quality ratchets | `npm run quality` | New or worse size, duplication, test, API, clean-room or shader-comments item fails. |
 | Shipped shader text | `scripts/shader-comments.mjs` in every package build; `tests/shader-comments.test.js`; quality `shader-comments` | Builds strip WGSL/GLSL comments from shipped shader strings by the spec grammar (WGSL 3.3, nested blocks; GLSL ES 3.00.6 3.4), keeping every token's text, order and line, checked token for token at build; the test proves it over every shader in `packages/*/src` and catches broken strips; the gate fails when any comment ships (KB-WGSL1). Evidence: CPU token equality on the whole source corpus; GPU suites of each stripped package, native and MARGO_COMPAT=1. |

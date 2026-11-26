@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { isAbsolute, resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { checkCoreBudget, CORE_STAGE_GZIP_LIMIT } from './core-budget.js';
+import { stalePackages } from './package-stamps.mjs';
 
 export const compactOutput = {
   minify: { compress: { dropDebugger: true }, mangle: true, codegen: true },
@@ -147,14 +148,35 @@ export const coreStageExternal = external.filter(
   (name) => typeof name !== 'string' || !name.startsWith('@margoengine/core'),
 );
 
-export async function measureCoreStage() {
+/**
+ * Refuses to measure a dist that was not built from the checked-out sources. Bug (2026-11-26): a lane rebased past a
+ * core change (GAP-FILM-MSAA, core 22,202 B to 22,225 B) without rebuilding core, measured its old dist at 22,202 B and
+ * read the published 22,225 B as wrong. The package stamps (scripts/package-stamps.mjs) say which dists are current.
+ * `stale` defaults to the packages whose stamp does not match.
+ */
+export function checkFreshDist(dirs, stale = stalePackages(resolve(import.meta.dirname, '..'))) {
+  const old = dirs.filter((dir) => stale.includes(dir));
+  if (!old.length) return;
+  const error = new Error(
+    `${old.map((dir) => `packages/${dir}/dist`).join(' and ')} not built from the checked-out sources, so its size is not this commit's; run npm run build:packages, then measure again`,
+  );
+  error.code = 'MEASURE_SIZE_STALE_DIST';
+  throw error;
+}
+
+/** Core + stage, gzip and raw. Throws MEASURE_SIZE_STALE_DIST when either dist is stale (`stale` as checkFreshDist). */
+export async function measureCoreStage({ stale } = {}) {
+  checkFreshDist(['core', 'stage'], stale);
   const measured = await bundleEntry('packages/stage/dist/index.js', coreStageExternal);
   checkCoreBudget(measured.gzip);
   return measured;
 }
 
 /** Core alone, measured the way build-modern measures it (its core-only ceiling lives there). */
-export const measureCore = () => bundleEntry('packages/core/dist/index.js', external);
+export const measureCore = ({ stale } = {}) => {
+  checkFreshDist(['core'], stale);
+  return bundleEntry('packages/core/dist/index.js', external);
+};
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const { raw, gzip } = await measureCoreStage();
