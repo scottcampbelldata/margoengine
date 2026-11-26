@@ -1347,6 +1347,10 @@
       "types": "./dist/materials/batched.d.ts",
       "import": "./dist/materials/batched.js"
     },
+    "./materials/batched-lod": {
+      "types": "./dist/materials/batched-lod.d.ts",
+      "import": "./dist/materials/batched-lod.js"
+    },
     "./materials/mips": {
       "types": "./dist/materials/mips.d.ts",
       "import": "./dist/materials/mips.js"
