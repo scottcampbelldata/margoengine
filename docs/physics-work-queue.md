@@ -295,6 +295,17 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - **Collider:** `BedCollider`, a fixed body holding the kernel's height field, edited in place through
   `PhysicsCollider.setHeights` (the kernel's `refit_grid`): editing the ground every step allocates nothing.
 
+## Who builds what (Scott, 2026-11-26)
+
+- Codex builds every row in the Open table below, plus the rows it has claimed.
+- Claude builds the rows in the Taken table.
+- Solvers for films in production come first.
+- When both lists are built, all 103 solvers are audited against "The standard: the best solver we can build" above
+  (`docs/physics-solver-audit.md`). Every row that falls short is REOPENED with its upgrades named, and stays open
+  until it is the best on the market.
+- A REOPENED row stays with its owner while that owner is still building. Once an owner's list is done, the other
+  side may claim its REOPENED rows through this file.
+
 ## Open
 
 | ID | Solver | State today | Owner | Status |
@@ -397,9 +408,9 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-04 | Local dispersive free surface | stand-in | Claude | LANDED 33ab69766 |
 | SEA-08 | Ship seakeeping | stand-in | Claude | LANDED d865c4c8f |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | LANDED ebfc65dbb |
-| SEA-10 | Damage, flooding, capsize, sinking | none | Claude | CLAIMED |
+| SEA-10 | Damage, flooding, capsize, sinking | none | Claude | LANDED 533cc7249 |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Claude | LANDED d90933a42 (green water d865c4c8f) |
-| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | CLAIMED |
+| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | LANDED 5d2524732 |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | LANDED e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Claude | LANDED 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | LANDED ccbc86285 |
