@@ -46,7 +46,8 @@
     "test:gpu:fur": "cd ../.. && node packages/materials/test/fur-browser.mjs",
     "test:gpu:plugins": "cd ../.. && node packages/materials/test/plugins-browser.mjs",
     "test:gpu:native-glass": "cd ../.. && node packages/materials/test/native-glass-browser.mjs && node packages/materials/test/native-glass-browser.mjs --compat",
-    "test:gpu:portal": "cd ../.. && node packages/materials/test/portal-browser.mjs"
+    "test:gpu:portal": "cd ../.. && node packages/materials/test/portal-browser.mjs",
+    "test:gpu:instance-attributes": "cd ../.. && node packages/materials/test/instance-attributes-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
