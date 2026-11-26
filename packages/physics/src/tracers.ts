@@ -1289,14 +1289,18 @@ export class TracerSolver implements Solver<TracerParams> {
         'The swim wake port has an incompatible layout; connect the current SwimSolver wake output.',
       );
     const wake = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
+    const { cellSize } = this.params;
+    const wakeX = (port.cell[0] - context.cell[0]) * cellSize;
+    const wakeY = (port.cell[1] - context.cell[1]) * cellSize;
+    const wakeZ = (port.cell[2] - context.cell[2]) * cellSize;
     const words = this.words(),
       book = this.book(),
       lifted = 4 + this.sources.length,
       capacity = this.emissionCapacity;
     for (let w = 0; w < wake.length; w += SWIM_WAKE_WORDS) {
-      const x = wake[w]!,
-        y = wake[w + 1]!,
-        z = wake[w + 2]!,
+      const x = wake[w]! + wakeX,
+        y = wake[w + 1]! + wakeY,
+        z = wake[w + 2]! + wakeZ,
         downward = -wake[w + 4]!,
         radius = wake[w + 6]!,
         height = y - this.bedAt(x, z);

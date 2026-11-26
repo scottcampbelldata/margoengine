@@ -13255,6 +13255,10 @@ The downstream stress test reads four submerged electrochemical observations of 
 (1994) from Phares Fig. 10 (H/D = 2, Re = 42,600), with both log axes bounded by the marker sizes.
 Those observations were separate from the Poreh law's calibration and the Fig. 5b theoretical samples.
 
+The swimmer's wake uses the framework `Port.cell` convention. The tracer converts the position into its own cell
+before it reads water depth or terrain. The test repeats a native fin stroke with different cell coordinates and
+compares the same suspended mass, parcel positions, terrain elevations and replay.
+
 The optional developing wall layer uses Phares et al. Eq. 2.12 and Fig. 4 for the free-stream half width and
 velocity plateau. Using the plateau as constant edge speed, it integrates their axisymmetric Falkner momentum
 layer (Eqs. 2.34–2.36 with the inverse one-sixth shear dependence) analytically. The zero-gradient

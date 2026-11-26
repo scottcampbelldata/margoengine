@@ -495,6 +495,8 @@ coupling and exact replay. Independent dispersion measurements remain open.
 
 BB-7's live terrain exchange now debits the parcels' packed volume from a finite mobile layer and deposits
 it under the settled grains. The CPU and render fixtures check cut, deposit, final volume and replay.
+An offset swimming origin now produces identical parcels and packed-bed debit when translated along all three
+cell axes. The same test restores the snapshot and repeats the following ticks exactly.
 The original shot binding, independent lifted mass and multi-writer bedrock acceptance remain open.
 Fin-jet parcels now enter at the van Rijn Part II Eq. 37 reference level using measured bedform height or
 roughness when supplied and a minimum of 1% of the local depth. The fixture checks explicit and default levels

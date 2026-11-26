@@ -10437,6 +10437,8 @@ The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core a
 
 `turbulentTransition` defaults to false. When enabled, a round jet between two and four nozzle diameters from a flat bed develops a turbulent layer past the constant-pressure plateau if its predicted shear exceeds the laminar shear there. The stationary approximation omits adverse pressure gradients, turbulence history, jet travel time and sub-diameter clearances. The paired render carries suspended sediment 15.9 px downstream. The scoped tracer entry grows from 15,007 B to 15,323 B gzip within its 16,702 B ceiling.
 
+Fin-wake coordinates use the common cell length (4,096 m by default). Translating wake positions across origin cells brings the entry to 15,368 B gzip.
+
 ### Bow tunnel discharge for bed wash (SEA-15)
 
 The optional `Ship.thrusterOutlet` samples a straight submerged round jet. It omits quay and bed reflection, crossflow bending, and travel time after a change in command. The configured diameter and outlet position determine a Gaussian profile whose centreline was 12.7% high against the independent laboratory fit at 20 diameters. Configuring any outlet adds 64 bytes of live state per ship slot. The scoped ship entry grows from 13,770 B to 14,217 B gzip within its 14,951 B ceiling.

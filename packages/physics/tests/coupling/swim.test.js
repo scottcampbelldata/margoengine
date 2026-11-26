@@ -440,6 +440,55 @@ test('SEA-15 the native pectoral jet can lift sand in the secondary shear layer'
   assert.ok((await release(true)) > (await release(false)));
 });
 
+test('SEA-15 a native fin jet lifts and debits the same terrain across three origin-cell axes', async () => {
+  const cellSize = 4;
+  const origin = [0.125, -0.25, -0.125];
+  const bottom = -0.5;
+  const layer = { thickness: 0.002, porosity: 0.4 };
+  const run = async (cell) => {
+    const swimmer = await SwimSolver.load();
+    const terrain = new TerrainBed();
+    const tracer = TracerSolver.withBedChange();
+    const ray = {
+      ...coast,
+      position: origin.map((coordinate, axis) => coordinate - cell[axis] * cellSize),
+      tail: noTail,
+      fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+      steering: [0, 1, 0],
+    };
+    const world = put(swimmer, [ray], { cellSize }, { cellSize })
+      .add(terrain, {
+        columns: 24,
+        rows: 24,
+        width: 2,
+        depth: 2,
+        elevations: () => bottom,
+        bedrock: () => bottom - layer.thickness,
+      })
+      .add(tracer, {
+        cellSize,
+        bed: terrain.bed,
+        bedJets: { availableMass: 0.023, mobileLayer: layer },
+        horizontalDiffusivity: 0,
+        verticalDiffusivity: 0,
+      })
+      .setCell(swimmer.id, cell)
+      .couple([swimmer.id, 'tracers', 'bed'], 'staggered');
+    world.advance(1);
+    const suspended = tracer.budget.water;
+    assert.ok(suspended > 0);
+    close(-terrain.volume(bottom) * 2650 * (1 - layer.porosity), suspended, 1e-12);
+    const snapshot = world.takeSnapshot();
+    world.advance(3);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(3);
+    assert.equal(world.hash(), hash);
+    return { suspended, particles: [...tracer.particlesOf()], bed: terrain.elevations().slice() };
+  };
+  assert.deepEqual(await run([1, -1, -1]), await run(zero));
+});
+
 test('the sediment bed rejects viscosity too small to compute a finite pickup rate', () => {
   const world = new PhysicsWorld({ rate });
   const tracer = new TracerSolver('tracers', { bedJets: true });
