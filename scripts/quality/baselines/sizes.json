@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20610861,
+  "total": 20611876,
   "history": [
     {
       "date": "2026-10-24",
@@ -13777,6 +13777,12 @@
       "commit": "FLUID-07-film-drop-receiver",
       "grew": 1,
       "reason": "FLUID-07 adds continuous drop capture and transfers volume and normal impulse through the existing film impact field. Thin-film rises from 11825 to 13004 B gzip; cap changes from 12180 to 13395 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "dbe79b009c",
+      "grew": 1,
+      "reason": "SEA-08 wet bilge keel normal drag and forward lift grows seakeeping from 27343 to 28329 B gzip. It shares the hull roll impulse and live immersion sampler. A split would require a second hull force and pose connection. Core plus Stage remains 24846 B."
     }
   ],
   "items": {
@@ -14639,7 +14645,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8539,
-    "@margoengine/physics/seakeeping": 28164,
+    "@margoengine/physics/seakeeping": 29179,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,

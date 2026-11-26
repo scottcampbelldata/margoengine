@@ -10240,4 +10240,4 @@ The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Cor
 
 `Hull.bilgeKeels` terms apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Plate added inertia, hull pressure, skegs and large-angle decay measurements remain open.
 
-The bilge-keel seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.
+The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
