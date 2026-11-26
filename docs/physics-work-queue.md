@@ -446,7 +446,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
-| SEA-08 | Ship seakeeping | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d865c4c8f |
+| SEA-08 | Ship seakeeping | stand-in | Codex | BUILDING (codex/physics-seakeeping-speed) |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
