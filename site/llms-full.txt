@@ -15606,6 +15606,115 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/physics/tests/surge.test.js` (a wind with no scale, a wind at 60, and a sky at 1, each refused by a water at
   600; a wind at 600 accepted).
 
+### Open 2026-11-26: a body that touches through several colliders creeps under a changing load that one collider holds (KB-PHYS-MULTIPAIRCREEP1, physics kernel)
+
+- **Repro:** the storm deck of `packages/physics/tests/deck-props.test.js` (roll 20 degrees at 12 s, pitch 4 degrees at 9 s,
+  heave 2 m at 9 s, the prop 57 m aft), friction 1.3 times the deck's friction demand, 36 s at 8 substeps. A plate of one
+  box collider moves 1.5 mm. The same plate cut into two box colliders on one body moves 7.2 mm, and cut into four it
+  moves 10.5 mm. The test's chair (a seat on four legs, five colliders) creeps 2.0 cm. HEAD before this change gave
+  the chair 2.4 cm, so it is not new. The same loads on a fixed floor (gravity turned to the deck's specific force at the
+  prop) move the chair 2.4 mm and a single box 0.02 mm. A constant load holds it: on a floor tilted to tan 0.47 against
+  friction 0.72 the chair stays within 0.45 mm for 36 s.
+- **Cause, as measured:** each pair's friction is solved alone, with a cone of its own points' normal impulses. When the
+  load changes, the pair solved first takes the change and saturates its share of the cone while the body's other pairs
+  still hold. The relaxing pass then cuts that pair's anchors toward its points. The body did not slide, but the cut
+  pair's share of the load is lost, and the other pairs only take it up once the body has slipped far enough to pull on
+  their anchors. Each swing of the load ratchets the body along. Leg loads on the moving deck also swing between legs
+  from step to step, which feeds it. It does not depend on the leg spread, the feet's size, the legs' height, the
+  contact frequency (30 to 120 Hz) or the passes (2 to 8), and turning the order the pairs are solved in each substep
+  did not help.
+- **Tried, and not kept:** cutting an anchor only where the saturated impulse pulls toward it; cutting it only beyond
+  the impulse it already held; letting it follow by no more than the substep's own slide at the point. Each held the
+  chair better on the deck or not at all, and each made the chair resting on the tilted floor rock on its light legs
+  and creep 5 to 23 cm. The per-point cut is what takes the energy out of a saturated anchor's pull, so a fix must
+  keep that.
+- **Plan:** treat the anchors of all the pairs between two bodies as one patch: judge a cut on the patch's total
+  friction against its total cone (and its twist against its spread), the limit surface of Goyal, Ruina and Papadopoulos
+  (1991) across colliders, so one pair saturating while the patch holds moves no anchor. Until then, a prop that must
+  hold on a moving deck is best made with one collider where it touches.
+
+### Fixed 2026-11-26: a prop on a deck that rolls and pitches at once slid where its friction held it (KB-PHYS-SPINBCH1, physics kernel)
+
+- **Repro:** a block 57 m aft on the storm deck above, driven on a smooth path (`setNextVelocity`), moved 1.4 mm in 36 s;
+  roll alone or pitch alone left it within 0.1 and 0.3 mm.
+- **Cause:** on a smooth path a body's pose is exp(a(t)) times its start, a(t) a cubic in rotation vectors, and each
+  substep it was spun at (b - a) / h for the vectors at the substep's ends. When the spin's axis swings through a step,
+  the turn the poses make, exp(b) exp(a)^-1, is not b - a, because rotations do not commute. A prop's friction followed
+  the spin while the deck's surface followed the poses.
+- **Fix:** the spin is the Baker-Campbell-Hausdorff series of the poses' turn to third order, b - a + (a x b) / 2 +
+  (a + b) x (a x b) / 12. It is computed from the vectors rather than read off the two quaternions, whose f32 rounding
+  would move a point 60 m out by 6 microns a substep. The velocity is the centre's, carried round by that turn.
+- **Regression:** `a_smooth_path_spins_each_substep_by_the_turn_its_poses_make_when_its_axis_swings`
+  (`packages/physics/kernel/tests/solver.rs`): the spin is within the fourth-order bound of the poses' turn at every substep
+  of a half-radian step, and b - a misses by ten times more.
+
+### Open 2026-11-26: a prop on a moving deck slips at 32 substeps and more, though friction holds it at 8 and 16 (KB-PHYS-FINECONE1, physics kernel)
+
+- **Repro:** `a_plate_rides_a_deck_on_a_smooth_path_for_minutes_at_any_substeps` (`packages/physics/kernel/tests/solver.rs`)
+  with the world's substeps set to 32 or 64: the plate, at friction five times its need, slips about 4 cm in six minutes,
+  where at 8 and 16 it holds within 0.2 mm.
+- **Cause, as measured:** the contacts are soft constraints of 120 Hz and damping ratio 10, so at fine substeps the
+  anchors' pull back of a drift d is close to a fixed speed (bias_rate d, about 37 d per second), set in one pushing
+  substep. The relaxing pass then takes that speed back in one go. That impulse does not shrink with the substep, but the
+  friction cone a substep holds, mu N h, does. Past about 32 substeps (h under 1/2,000 s) the take-back alone saturates
+  the cone at the plate's corners, and each saturation cuts the anchors a little, so the plate slips by the cuts.
+  Clamping the anchors to what the cone can pull in a substep instead made a cube at tan 0.49 against mu 0.5 creep and a
+  pyramid sleep late, so it was not kept. Gating the relaxing pass's cut by the impulse's direction, or by the impulse
+  the pushing pass held, took the 32-substep slip from 4 cm to 2.5 mm, but let a resting chair rock and creep
+  (KB-PHYS-MULTIPAIRCREEP1), so neither was kept.
+- **Plan:** ration the anchors' pull to the cone over the step rather than the substep, or solve the anchor and the
+  relaxing take-back as one friction row. Until then, keep a world that carries loose props on a moving deck at 16
+  substeps or fewer (the default is 8).
+
+### Fixed 2026-11-26: a prop on a deck driven to its pose slipped at each step's change of speed (KB-PHYS-KINJUMP1, physics kernel)
+
+- **Repro:** `a_plate_rides_a_deck_turning_about_an_axis_far_away` (`packages/physics/kernel/tests/solver.rs`) run for six
+  minutes: the plate, at friction five times its need, slipped 3.6 mm at the world's 8 substeps.
+- **Cause:** a kinematicPosition body moved at one speed through a step, (target - pose) / dt, and changed speed only at
+  the step's start. A prop on it had to take the whole change of the step in the first substep. Friction holds at most mu
+  N h a substep, so wherever the deck's acceleration passed mu g / substeps (0.06 g at 8 substeps and mu 0.5) the prop
+  slipped in that substep.
+- **Fix:** targets can carry a velocity (`body.setNextVelocity(linear, angular)`, flag SMOOTH_PATH, columns TARGET_LINEAR_X
+  and START_LINEAR_X). The body then moves along the cubic Hermite path of its pose, its target and its speeds at both ends,
+  each substep at its chord, so its speed changes through the step and is the same across a step's end. Every
+  kinematicPosition body's substep pose is now taken along its path from the step's start in one product
+  (`kinematic_pose`), not built up from the substeps before.
+- **Regression:** `a_plate_rides_a_deck_on_a_smooth_path_for_minutes_at_any_substeps`: six minutes at 8 and 16 substeps,
+  within 1e-3 m (0.09 mm measured, 21 cm with the slide tallied at the step's levers); `a_kinematic_body_on_a_smooth_path_lands_on_its_targets_and_moves_through_the_step_at_its_chords`;
+  `kernel/tests/threads.rs` with a smooth body under a stack (the same bits on 1 to 8 threads).
+
+### Fixed 2026-11-26: a prop slid off a turning deck far from its axis through friction it did not need (KB-PHYS-ANCHORLEVER1, physics kernel)
+
+- **Repro:** `packages/physics/kernel/tests/solver.rs` `a_plate_rides_a_deck_turning_about_an_axis_far_away`: a deck
+  pitching 4 degrees at 9 s and a plate 60 m from the axis, friction 0.5 against a need of 0.1. The plate slid 4 mm each
+  pitch, 1.4 cm in 36 s; the slip grew with the distance from the axis (0.1 cm at 3 m) and was the same at three times the
+  friction.
+- **Cause:** each point's slide was tallied from the speeds at the step's levers, which are fixed for the step. A turning
+  body carries its anchor round, so the tally missed the centripetal w^2 r of a lever r, and missed it the same way every
+  substep.
+- **Fix:** each point's slide is the move of its two material anchor points over the substep: each centre's step, its speed
+  times h, and each arm's turn by the substep's spin t = w h, t x arm - t x (t x arm) / 2, at the arm the body has now. It
+  is written as a series because an arm less its turned self in f32 is its rounding. Reading the slide off the poses
+  instead took in their rounding (a unit of the last place where a resting box moves a fiftieth of one in a substep) and
+  made a pile's top boxes jitter, so it was not kept. The solve's levers stay the step's.
+- **Regression:** the test above, the plate at the origin and the axis 60 m off, within 1e-3 m over 36 s (0.7 mm measured,
+  1.8 cm before).
+
+### Open 2026-11-26: a body far from the origin falls behind its own speed, and slides off a moving deck (KB-PHYS-POSEROUND1, physics kernel)
+
+- **Repro:** a deck driven to its pose each step at 17 m/s from 1 km out, its targets worked out in doubles, and a box
+  resting on it at its speed (`World` with a KINEMATIC_POSITION deck at x = 1000, the box at friction 0.5): the box falls
+  back along the deck 0.43 m a minute, though friction holds it well inside its cone.
+- **Cause:** an f32 pose 1 km out moves only in whole units of its last place, 6.1e-5 m. Each substep's move of 0.0354 m
+  rounds down the same way, so the box loses 1.2e-4 m every step, and no friction acts on a move a pose cannot make.
+- **Tried:** carrying each move's rounding into the next (compensated summation in doubles) held the box to one unit of the
+  last place. It also made the residual speeds of resting bodies move them, which the rounding had held still: tall
+  piles' residue spread more from moment to moment, and a 210-cube pyramid slept at step 420 where it sleeps by 300
+  (`a_pyramid_settles_at_one_pass_a_substep`). So it was not kept.
+- **Plan:** a floating origin, `physics.shiftOrigin(offset)` moving every body, target and cached box by an offset. That
+  is the remedy rival engines with f32 poses give, and it keeps a scene's working area near the origin. Until then, keep a
+  moving scene within a few hundred metres of the origin.
+
 ### Fixed 2026-11-26: a faded occluder turned solid for the length of a level cross-fade (KB-LOD-FADECOMBO1, lod)
 
 - **Repro:** `LODFade` and `OccluderFade` (`@margoengine/lod/fade`, `@margoengine/lod/occluder-fade`) on one engine; a
