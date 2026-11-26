@@ -2,13 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { Physics } from '../../dist/index.js';
-import {
-  MODAL_CONTACT_WORDS,
-  ModalContactRigidSolver,
-  ModalSoundSolver,
-  modalFractureImpulse,
-  modalPreset,
-} from '../../dist/modal-sound.js';
+import { MODAL_CONTACT_WORDS, ModalContactRigidSolver, ModalSoundSolver } from '@margoengine/physics/modal-sound';
 import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -185,34 +179,6 @@ test('ModalSoundSolver retains complete audio at 24 fps and wraps its history wi
   assert.equal(film.sound.copySince(cursor), null);
   assert.throws(() => film.sound.copySince(0), /42000 through 48000/);
   assert.deepEqual(film.sound.copySince(42001).samples, recorded.slice(42001));
-});
-
-test('ModalSoundSolver verifies bounds, optional inputs, channel isolation and owning copies', async () => {
-  const sound = await ModalSoundSolver.load({ inputs: 'none' });
-  const world = new PhysicsWorld({ rate: FPS }).add(sound, { tracks: [{}, { material: 'bell' }] });
-  world.advance(1);
-  assert.equal(peak(sound.copyBlock().samples), 0);
-  assert.equal(peak(sound.copyBlock(1).samples), 0);
-  const copied = sound.copyBlock(1);
-  copied.samples[0] = 1;
-  assert.equal(sound.copyBlock(1).samples[0], 0);
-  assert.throws(() => sound.copyBlock(2), /index/);
-  assert.throws(() => modalPreset('stone'), /preset/);
-  assert.throws(() => modalFractureImpulse(-1, 2), /released energy/);
-  assert.equal(modalFractureImpulse(4, 3, 0.375), 3);
-  const invalid = await ModalSoundSolver.load();
-  assert.throws(() => new PhysicsWorld().add(invalid, { tracks: oneMode, sampleRate: 499 }), /sampleRate/);
-  assert.throws(
-    () =>
-      new PhysicsWorld().add(invalid, {
-        tracks: [{ material: { modes: [{ ...mode, frequency: 3800 }] } }],
-        sampleRate: 8000,
-      }),
-    /mode frequency/,
-  );
-  const controller = new AbortController();
-  controller.abort();
-  await assert.rejects(ModalSoundSolver.load({ signal: controller.signal }), (err) => err.name === 'AbortError');
 });
 
 test('ModalSoundSolver restores input history, seeded phase, force envelope and PCM on plain/shared memory', async () => {

@@ -159,7 +159,7 @@ function read(data: Data, port: Port | undefined, words: number): Float64Array |
   if (port.region.type !== 'f64' || port.region.layout !== LAYOUT || port.region.byteLength !== words * F64)
     throw new MargoError(
       'state',
-      `Modal sound field "${port.field}" has incompatible rows. Publish layout 1 with ${words} f64 words.`,
+      `Modal sound field "${port.field}" has incompatible rows. Use layout 1 and ${words} f64 words.`,
     );
   return regionWords(data.host.memory, port.region) as Float64Array;
 }
