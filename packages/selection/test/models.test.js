@@ -271,7 +271,7 @@ test('selection outlines selected model primitives with an equal-depth mask, nod
   assert.ok(!engine.hasPlugin('selection'));
 });
 
-test('instanced primitives: the micro pass draws every instance through the pick shader with one ID per row, outlines mark every instance in one draw', async () => {
+test('instanced primitives: the micro pass draws every instance through the pick shader with one ID per row, outlines mark every instance in one draw through it', async () => {
   const w = await world(),
     { engine, c, draws } = w,
     model = quads(engine, [[0, 0, 0]]),
@@ -311,14 +311,9 @@ test('instanced primitives: the micro pass draws every instance through the pick
   engine.frameGraph.execute(c);
   const marked = draws.filter((d) => d.pipeline?.fragment?.targets?.[0]?.format === 'r8unorm');
   assert.deepEqual(
-    marked.map((d) => [d.instances, d.firstInstance]),
-    [[4, 0]],
-    'one draw over four consecutive slots',
-  );
-  assert.deepEqual(
-    [...new Float32Array(w.storage().buffer).slice(52, 55)],
-    [0, 0, -2],
-    'third slot holds the third instance world matrix',
+    marked.map((d) => [d.instances, d.pipeline.vertex.buffers[1]?.arrayStride]),
+    [[4, 96]],
+    'one draw of the four rows through the instanced pick shader (KB-SEL-INSTMOVE1)',
   );
   selection.dispose();
   picking.dispose();
