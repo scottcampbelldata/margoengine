@@ -31,6 +31,7 @@ export interface StrandLoadOptions {
 export interface StrandParams {
     readonly strands: readonly StrandSpec[];
     readonly fidelity?: 'rod' | 'follow';
+    readonly rodSolve?: 'local' | 'direct';
     readonly rate?: RateLevel;
     readonly iterations?: number;
     readonly damping?: number;

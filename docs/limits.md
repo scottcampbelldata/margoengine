@@ -9879,8 +9879,9 @@ reduced stiffness accuracy as its link count rises.
 
 The 720-point fixture moved its selected tip 0.4884 m relative to the still-air control and
 changed 3,106 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `64c531bd4b6c08c2` in the fixture. The optional entry is 5,373 B gzip
-with a 5,569 B ceiling. Each lazy Wasm variant is 21,184 B raw and 8,599 B gzip. Core and
+native state all hash to `64c531bd4b6c08c2` in the fixture. The optional entry is 5,557 B gzip
+with a 5,569 B ceiling. The lazy Wasm variants are 34,655 B raw each and 13,675 B
+plain or 13,676 B shared gzip. Core and
 Stage gain zero bytes.
 
 The optional horse adapter drives eight tail joints and ten five-point mane and forelock
@@ -9890,7 +9891,7 @@ moved tail, mane and forelock tips by 0.2896, 0.0250 and 0.0579 m relative to th
 run. Both backends produced 1,478 changed pixels and replay hash `f1550b4d0b329005`. The
 body capsules follow the skin pose on each tick. The parameters represent effective hair
 bundles, and bundle-scale stiffness and drag calibration remain open. The horses root and model
-entries measure 17,283 B and 12,180 B gzip. The optional strand horse measures 18,228 B gzip.
+entries measure 17,283 B and 12,180 B gzip. The optional strand horse measures 18,244 B gzip.
 
 The weighted avatar binding accepts positive uniform transforms. Its offline replay uses the
 same time-sampled anchor and wind functions. On the Seed-san reference avatar the fixed
