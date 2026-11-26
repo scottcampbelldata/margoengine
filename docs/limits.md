@@ -8647,6 +8647,22 @@ clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.
 Near a capture edge, the filter and distortion determine the width of the transition.
 Reflected objects beyond the captured extent are unavailable to the planar adapter.
 
+## Underwater acoustics (SOUND-03)
+
+The medium is stationary with sound speed varying only with depth. Each ray and beam propagate in a
+two-dimensional vertical plane. Speed is continuous and piecewise linear. The surface, bottom and layer
+interfaces are flat. Reflection coefficients are signed pressure factors and attenuation is one constant
+in dB/km for the column. Exactly tangent rays that would leave the medium follow the surface or the
+sound-channel minimum. The Gaussian solution describes a high-frequency wave near each central ray.
+It omits range-dependent bathymetry, rough-interface scattering, lateral spread and broadband waveguide
+modes. Its pressure is relative to each beam's launch amplitude, with no automatic combination of independent
+launches into a calibrated point source. The path, delay and pressure ports can feed a downstream audio graph.
+
+Cost scales with rays and crossed layers. The world holds 384 bytes per ray for state, outputs and scratch,
+plus the field registry's output copies, and 24 bytes per profile knot. The workload is one closed-form
+drift or interface update per active ray interval. The optional entry measures 4,758 B gzip with a 5,014 B budget
+on the workstation.
+
 ## Ice thermodynamics (ICE-05)
 
 Ice sites are independent vertical columns, porous frost layers or axisymmetric icicles. The ice slab and

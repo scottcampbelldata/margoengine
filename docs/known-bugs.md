@@ -13,6 +13,13 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   routes rain and melt, checks water volume in the flood and reads the resulting inundation into Biomes. The demo review
   remains open until the scene consumes those fields and flood depth appears in the shot.
 
+### Fixed 2026-11-25 underwater sound lacked depth refraction and water-column arrivals (SOUND-03)
+
+The air propagation path used a fixed sound speed and had no depth axis for water. In a layered water column
+it could not reproduce a turning ray or its delayed pressure at a receiver. The optional underwater solver
+traces both the ray and its paraxial beam. See the turning-point and multi-reflection cases in
+`packages/physics/tests/underwater.test.js` and the registry reader in `packages/physics/tests/coupling/underwater.test.js`.
+
 ### Fixed 2026-11-25: fixed ice geometry could not respond to world-clock heating (ICE-05)
 
 The prior ice render shapes had no phase-change state. A pulse delivering fusion, sensible and vaporisation

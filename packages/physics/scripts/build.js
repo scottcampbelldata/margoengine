@@ -61,6 +61,7 @@ await build({
         runoff: resolve(root, 'src/runoff/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
         ice: resolve(root, 'src/ice/index.ts'),
+        underwater: resolve(root, 'src/underwater/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

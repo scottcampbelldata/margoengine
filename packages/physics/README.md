@@ -2282,6 +2282,48 @@ The three readers default to off. With an upstream source that also consumes ret
 source tick. A solver instance owns the four output fields in its world. Its ID defaults to
 `'ice-thermodynamics'`.
 
+### Underwater acoustics (`margoengine/physics/underwater`)
+
+`UnderwaterAcousticsSolver` traces sound rays through a layered water column at 60 Hz. Each ray carries a
+Gaussian beam whose width, phase and curvature change as the ray bends or reflects.
+
+```ts
+import { UnderwaterAcousticsSolver, acousticBeamPressure } from 'margoengine/physics/underwater';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const acoustics = new UnderwaterAcousticsSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(acoustics, {
+  profile: [
+    { depth: 0, speed: 1510 },
+    { depth: 25, speed: 1480 },
+    { depth: 60, speed: 1500 },
+  ],
+  rays: [{ depth: 10, declination: 0.3, frequency: 1000 }],
+});
+world.advance(12);
+const ray = acoustics.sample(0);
+const pressure = acousticBeamPressure(ray, 2);
+console.log(ray.range > 0, ray.width > 0, Number.isFinite(pressure.real)); // true true true
+```
+
+The profile starts at zero depth and ends at the bottom. Depth is metres down and sound speed is m/s.
+Knots must have increasing depths. The default is 1500 m/s between 0 and 100 m. `soundSpeed(depth)` reads the
+interpolated speed. With no `rays`, launch one ray horizontally at mid-depth. Each ray accepts `depth`
+(mid-depth), `declination` (0 rad, positive down), `frequency` (1000 Hz), `waist` (5 m at the 1/e pressure
+radius) and `pressure` (1 Pa). Set `surfaceReflection` (−1 for a pressure-release surface), `bottomReflection`
+(0.8), and `absorption` (0 dB/km) for the water column. The signed boundary coefficients multiply pressure.
+Pass `{ id }` to the constructor to name a second column. The default ID is `'underwater-acoustics'`.
+
+`sample(index)` gives the current ray in launch-array order. Use `acousticBeamPressure(ray, offset)` with a
+perpendicular offset in metres to obtain the real and imaginary pressure in Pa at the current wavefront.
+For another solver, read the layout-1 f64 ports below. The source ID prefixes each suffix.
+
+| Descriptor property | Suffix | Words per ray |
+| --- | --- | --- |
+| `pathField` | `.path` | Range, depth, total path length and beam width in metres |
+| `signalField` | `.signal` | Real and imaginary on-axis pressure in Pa |
+| `delayField` | `.delay` | Travel time in seconds |
+
 ## Limits
 
 - Scale from a parent that shears a part is not represented: a body has a position and a rotation. Mesh scale is read once when a geometry-derived collider is built.

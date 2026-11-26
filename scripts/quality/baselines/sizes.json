@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19199213,
+  "total": 19204227,
   "history": [
     {
       "date": "2026-10-24",
@@ -12525,6 +12525,12 @@
       "commit": "9f6f7e9004",
       "reason": "HYDRO-02 entry sizes, previous record to current: @margoengine/physics/runoff 0→3906 B (ceiling 0→4162 B); @margoengine/physics/hydro 6311→6724 B (ceiling 6567→6980 B); @margoengine/biomes/view 15293→15447 B (ceiling 15565→15565 B); @margoengine/biomes/rivers 2817→4193 B (ceiling 3073→4449 B); @margoengine/biomes/disturbance 6035→6292 B (ceiling 6282→6548 B). Runoff and shallow inflow share the per-cell discharge contract. Biomes adds live storm inflows, a climate-only catchment estimate and inundation queries at measured flood stages. A further split would duplicate the climate math or require an extra lazy request when opening river water. Core and stage carry no runtime runoff import.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "06aa29ae98",
+      "reason": "SOUND-03 adds its optional physics/underwater entry at 4758 B gzip (budget 5014 B) for world-stepped underwater rays, paraxial Gaussian beams and registered pressure and delay. Core and stage do not load the entry.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13336,6 +13342,7 @@
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/tracers": 4952,
+    "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 16988,

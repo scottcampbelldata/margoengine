@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,122 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,128 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -3138,6 +3138,11 @@ package or tool that takes you past it. The reference tables are [Scale](#scale)
 column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
+
+- BVH, octree and raycaster helpers (`@margoengine/lines/tree-helpers`, 2026-11-25) draw box edges, 24 points a box, in
+  one `Line`: a tree level with many thousands of nodes is that many boxes, so keep `depth` low on a deep tree (`maxDepth`
+  says how deep it goes). They read the node bounds when built and on `setDepth`; they do not follow a `refit` or an
+  edited tree until `setDepth` is called again. Depth is a whole number from 0 to 64.
 
 - Infinite grid (`@margoengine/lines/infinite-grid`, 2026-11-25) is a plane at one height `y`, drawn as a quad of
   the fade distance's half-width centred under the camera (or the origin), so nothing draws past `fadeDistance`;
@@ -11773,6 +11778,22 @@ clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.
 Near a capture edge, the filter and distortion determine the width of the transition.
 Reflected objects beyond the captured extent are unavailable to the planar adapter.
 
+## Underwater acoustics (SOUND-03)
+
+The medium is stationary with sound speed varying only with depth. Each ray and beam propagate in a
+two-dimensional vertical plane. Speed is continuous and piecewise linear. The surface, bottom and layer
+interfaces are flat. Reflection coefficients are signed pressure factors and attenuation is one constant
+in dB/km for the column. Exactly tangent rays that would leave the medium follow the surface or the
+sound-channel minimum. The Gaussian solution describes a high-frequency wave near each central ray.
+It omits range-dependent bathymetry, rough-interface scattering, lateral spread and broadband waveguide
+modes. Its pressure is relative to each beam's launch amplitude, with no automatic combination of independent
+launches into a calibrated point source. The path, delay and pressure ports can feed a downstream audio graph.
+
+Cost scales with rays and crossed layers. The world holds 384 bytes per ray for state, outputs and scratch,
+plus the field registry's output copies, and 24 bytes per profile knot. The workload is one closed-form
+drift or interface update per active ray interval. The optional entry measures 4,758 B gzip with a 5,014 B budget
+on the workstation.
+
 ## Ice thermodynamics (ICE-05)
 
 Ice sites are independent vertical columns, porous frost layers or axisymmetric icicles. The ice slab and
@@ -12115,6 +12136,18 @@ passes normal impulse to the bending modes at the stored contact heights. A rele
 geometry with the pose and velocity of its detached chord. Release needs a preallocated dynamic fragment at the
 matching section height. Scatter can hide the entire failed instance when a separate body draws the fragment.
 
+### Catchment runoff (HYDRO-02, 2026-11-25)
+
+`@margoengine/physics/runoff` uses fixed directed drainage links and one active soil-water layer per cell.
+The surface rating assumes a wide Manning section. Use the shallow-water solver for backwater, reversed flow
+and two-dimensional inundation at an outlet. The next soil step takes up routed water left upstream or downstream
+by the current routing step. Climate-only BiomeView flows use a quantized local climate representative of the
+contributing area. Event hydrographs use the live field. Calibrated flood return periods must come from separate
+hydraulic runs or from measurements.
+
+The optional runoff entry is 3,906 B min+gzip. Its lazy SIMD Wasm images are 7,311 B for plain memory and 7,402 B
+for shared memory before HTTP compression. Both preserve the existing world arena outside their reserved section.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12125,12 +12158,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-25 RITS-10 atmospheric-river scene still needs basin runoff and flooding
+### Open 2026-11-25 RITS-10 atmospheric-river scene still needs its watershed inputs wired
 
 - **Repro** Re-render RITS-10 at 7:55–8:20 and 9:48–10:15 and check the terrain, streams and valley floor.
-- **Cause** The demo needs the complete rainfall-runoff and flood-depth chain from HYDRO-02 and HYDRO-01. The ATMO-09
-  regression verifies the ground wetness, material response and local runoff flux in isolation. The scene review
-  remains open until the surface output is consumed and flood depth appears in the shot.
+- **Cause** The original scene has no connected precipitation → catchment → flood solver inputs. The engine fixture
+  routes rain and melt, checks water volume in the flood and reads the resulting inundation into Biomes. The demo review
+  remains open until the scene consumes those fields and flood depth appears in the shot.
+
+### Fixed 2026-11-25 underwater sound lacked depth refraction and water-column arrivals (SOUND-03)
+
+The air propagation path used a fixed sound speed and had no depth axis for water. In a layered water column
+it could not reproduce a turning ray or its delayed pressure at a receiver. The optional underwater solver
+traces both the ray and its paraxial beam. See the turning-point and multi-reflection cases in
+`packages/physics/tests/underwater.test.js` and the registry reader in `packages/physics/tests/coupling/underwater.test.js`.
+
 ### Fixed 2026-11-25: fixed ice geometry could not respond to world-clock heating (ICE-05)
 
 The prior ice render shapes had no phase-change state. A pulse delivering fusion, sensible and vaporisation
@@ -31818,6 +31859,30 @@ import {TerrainColors, heightfield} from 'margoengine/terrain';
 
 # @margoengine/biomes
 
+## Runoff into rivers
+
+Flowing rivers can consume the current catchment discharge. Give `BiomeView.attach` the option
+`water: { rivers: 'hydrology', flow: { runoff } }` after adding a `RainfallRunoff` solver to the world,
+or use `riverSources` to query that source independently. With `flow: true`, the view estimates annual
+mean flow from contributing area and the local precipitation and moisture index.
+
+```ts
+import { riverSources } from '@margoengine/biomes/rivers';
+import { RainfallRunoff } from '@margoengine/physics/runoff';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const runoff = await RainfallRunoff.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(runoff, { nx: 2, nz: 1, dx: 10, downstream: [1, -1], rainRate: 0.0001 });
+world.advance(120);
+const line = Int32Array.of(5000, 5000, 15000, 5000);
+const inflows = riverSources([line], x => 20 - x, (x, z) => runoff.dischargeAt(x, z), 5);
+console.log(inflows);
+```
+
+For disturbance history, `flood.water.sample(period, x, z)` can read depth and velocity from the
+hydraulically resolved run for that return period. Use the grid origin and metre coordinates of the flood bed.
+
 A biome map turns a heightmap and a few climate settings into tiled layers: climate fields, biome weights and masks
 that terrain, scatter and a terrain editor read. Forests, meadows, snow and sand land where the climate puts them, and
 the same seed gives the same bytes on every machine. This package is optional and tree-shakable and adds 0 bytes to
@@ -34225,25 +34290,29 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
-## Rooted plants in wind and water
+## Rainfall runoff and channel inflow
 
-`@margoengine/physics/vegetation` models each plant as a tapered cantilever with two bending modes on each horizontal axis. Set its geometry, tissue density and Young’s modulus in SI units. A `FlowField` supplies the velocity and density of air or water at the plant and at the world clock's time.
+`@margoengine/physics/runoff` turns rain and snowmelt into soil water, groundwater recharge and routed
+discharge. It integrates the Green-Ampt wetting front, handles saturation on a wetness-index grid, and
+routes excess water downstream using the implicit kinematic-wave balance.
 
 ```ts
-import { PlantSway } from '@margoengine/physics/vegetation';
+import { bedSurface } from '@margoengine/physics/earth';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { RainfallRunoff } from '@margoengine/physics/runoff';
 import { PhysicsWorld } from '@margoengine/physics/world';
-import { BoundaryLayerWind } from '@margoengine/weather/boundary-layer';
 
-const breeze = new BoundaryLayerWind({ speed: 6, roughness: 0.03, turbulence: false });
-const sway = await PlantSway.load();
-const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(sway, {
-  flow: breeze,
-  plants: [{ root: [0, 0, 0], height: 1.5, baseDiameter: 0.035,
-    tipDiameter: 0.012, youngModulus: 8e8, density: 650, dampingRatio: 0.04 }],
+const runoff = await RainfallRunoff.load();
+const flood = new ShallowWaterSolver('valley', {
+  field: runoff.outletField,
+  outlets: [{ sourceCell: 2, position: [5, 5] }],
 });
-world.advance(60);
-const tip = sway.sample(0, 1.5);
-console.log(tip.displacement, sway.dryFrequencies(0));
+const bed = bedSurface({ columns: 2, rows: 1, width: 20, depth: 10, centre: [10, 5] }, new Float64Array(6));
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(runoff, { nx: 3, nz: 1, dx: 10, downstream: [1, 2, -1], rainRate: 0.0001 });
+world.add(flood, { bed });
+world.advance(120);
+console.log(runoff.read(2, 0).outflow, runoff.budget, flood.budget.inflow);
 ```
 
 [README continues: https://margoengine.com/llms/packages/physics.md]

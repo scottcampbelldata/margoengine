@@ -2191,6 +2191,10 @@
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/underwater": {
+      "types": "./dist/physics/underwater.d.ts",
+      "import": "./dist/physics/underwater.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

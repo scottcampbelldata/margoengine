@@ -32,6 +32,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   tightens after it passes. Reproduce with `node --test packages/physics/tests/coupling/schooling.test.js`
   after building packages. The field and point dynamics were tested with synthetic geometry.
 
+- SOUND-03 underwater acoustics (2026-11-25) reproduces homogeneous Gaussian beam spreading, circular Snell
+  arcs, curvature changes at profile knots and reflected arrival depths and pressure. Reproduce with
+  `node --test packages/physics/tests/underwater.test.js packages/physics/tests/coupling/underwater.test.js`.
+  The registry test also compares exact hashes after seek and across 24, 30 and 60 fps.
+
 - ICE-05 ice thermodynamics (2026-11-25) uses a closed-form slab update and gives the analytic bare and snow-covered
   Stefan trajectories, tracks water through growth and thaw of an icicle and closes imposed heating's fusion,
   sensible and vaporisation budget. Reproduce with

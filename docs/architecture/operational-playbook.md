@@ -4193,6 +4193,14 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+### Underwater acoustics (SOUND-03)
+
+The underwater entry proves exact Snell arcs in a linear sound-speed gradient, refraction at a slope
+change, homogeneous Gaussian spreading and flat reflections against analytical references. A field
+reader receives the same pressure and travel time on the 60 Hz world clock as the solver's local sample.
+Tests compare complete world hashes across frame rates and after seek. The scope is a depth-dependent
+column and high-frequency paraxial beams. See the [clean-room record](../clean-room.md#underwater-acoustics-sound-03).
+
 ### Ice thermodynamics (ICE-05)
 
 The world coupling test applies heat through the registry and verifies the phase budget, liquid and vapour mass,

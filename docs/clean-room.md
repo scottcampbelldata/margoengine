@@ -12329,6 +12329,36 @@ The load point in the step is this package's own: a restoring load -k x taken at
 step of s symplectic-Euler substeps, has the update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), so
 theta = (s - 1) / (2 s) neither feeds nor drains the motion; the radiation force is carried there linearly.
 
+## Underwater acoustics (SOUND-03)
+
+- Finn B. Jensen, William A. Kuperman, Michael B. Porter and Henrik Schmidt, [Computational Ocean Acoustics](https://doi.org/10.1007/978-1-4419-8678-8),
+  2nd ed. (2011), [Ray Methods](https://doi.org/10.1007/978-1-4419-8678-8_3). For a range-independent medium
+  with depth positive down, a ray's horizontal slowness `p = cos(angle) / c` is constant. At fixed speed
+  gradient `g`, the vertical direction cosine `u = sin(angle)` obeys `du/dt = -g * (1 - u²)`. The implemented
+  hyperbolic-tangent addition formula integrates this relation in time. In each layer the path is the circular
+  arc with signed radius `1 / (p * g)`, or a straight segment for a uniform layer. Solving the same relation
+  for the known speed at the next interface identifies its crossing time. Each subinterval keeps its own
+  gradient, and a reflection changes only the vertical direction and the signed pressure coefficient.
+- Michael B. Porter and Homer P. Bucker, [Gaussian beam tracing for computing ocean acoustic fields](https://doi.org/10.1121/1.395269)
+  (1987), equations 5–13 and §IV. The [authors' scan](https://www.hlsresearch.com/personnel/porter/papers/JASA/gbt%20bw%20with%20errata.pdf)
+  gives the complex beam curvature `P/Q` and the waist where amplitude falls to 1/e. The authors' follow-up,
+  [Applications of Gaussian beam tracing to two- and three-dimensional problems in ocean acoustics](https://hlsresearch.com/personnel/porter/papers/GBT%203D%20grey.pdf)
+  (1989), defines the paraxial equations `dQ/ds = c P` and `dP/ds = -c_nn Q / c²` in equation 5. Within a linear layer
+  `c_nn` vanishes and the central arc gives the integral of `c² dt` exactly. At an interface the normal
+  derivative integrates a slope discontinuity into a real kick to `P/Q` while preserving width. Reflecting a
+  flat boundary is equivalent to unfolding the ray against a mirrored profile. We advance the argument of
+  `Q` along its drift segment to keep the phase continuous. The pressure is normalized against the assigned
+  launch pressure for a single beam in the propagation plane.
+- Timothy G. Leighton, [Fundamentals of underwater acoustics and ultrasound](https://resource.isvr.soton.ac.uk/staff/pubs/PubPDFs/Pub2488.pdf)
+  (1998), section on acoustic rays in piecewise-linear profiles. Equations 7.10–7.11 independently give the circular
+  path through a linear gradient. The code uses a time form of that same arc so a step crosses interfaces
+  without assuming a prescribed range or depth increment.
+
+Tests compare the uniform beam width, attenuation and phase, the analytic circular arc and turning point,
+the change in wavefront curvature at a knot, and repeated flat-boundary reflections with closed solutions.
+The coupling test verifies the recorded delay and complex pressure against the live registry reader and exact
+snapshot and frame-rate repeatability.
+
 ## Ice thermodynamics (ICE-05)
 
 - Josef Stefan, [Über die Theorie der Eisbildung](https://www.zobodat.at/pdf/SBAWW_98_2a_0965-0983.pdf),

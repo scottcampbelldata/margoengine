@@ -111,6 +111,10 @@
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
+    },
+    "./underwater": {
+      "types": "./dist/underwater/index.d.ts",
+      "import": "./dist/underwater.js"
     }
   },
   "files": [
