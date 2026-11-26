@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20370637,
+  "total": 20378000,
   "history": [
     {
       "date": "2026-10-24",
@@ -13101,6 +13101,12 @@
       "commit": "KB-PHYS-BODYROWS1 body rows",
       "grew": 1,
       "reason": "@margoengine/physics/flip: the deck-water solver sizes its body-set ports by the world body rows through the shared check (bodyRowsOf, with its coded error naming the fix), so it can share a world with the soft, air and rigid solvers; measured gzip (Mac build) 11358 B, was 11232 (after the crests commit); the check is the one every body-pushing solver uses, and a copy per entry would let the rule drift. Budget (measured + max(3%, 256 B)): 11232 to 11699 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3ef5862954",
+      "grew": 2,
+      "reason": "ATMO-10 adds optional physics/synoptic (5911 B gzip from zero) and weather/synoptic (940 B from zero). The regional atmosphere, optional SIMD allocation and film bindings remain outside World and Weather roots."
     }
   ],
   "items": {
@@ -13964,6 +13970,7 @@
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
     "@margoengine/physics/surf": 9345,
+    "@margoengine/physics/synoptic": 6167,
     "@margoengine/physics/terramechanics": 9483,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
@@ -14747,6 +14754,7 @@
     "@margoengine/weather/snow": 4616,
     "@margoengine/weather/snow-drift": 5806,
     "@margoengine/weather/surface-energy": 3616,
+    "@margoengine/weather/synoptic": 1196,
     "@margoengine/weather/turbulence": 1965,
     "@margoengine/webgl2-compat": 127852,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 95009,

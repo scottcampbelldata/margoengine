@@ -9608,6 +9608,10 @@ and fallout. Cloud output is column mass and Weather uses a display opacity deri
 development, vertical wind shear, evolving stability and forecast data assimilation require a multilayer model.
 Forecasts and film-length time acceleration use different clock scales. Keep coupled physical budgets on the same scale.
 
+The optional Physics entry measures 5,911 B gzip within a 6,167 B ceiling. The Weather adapter measures 940 B gzip
+within a 1,196 B ceiling. Both optional native assets are 13,821 B raw, or 5,419 B gzip plain and 5,420 B gzip shared.
+These entries leave Core, Stage, Physics World and the Weather root unchanged.
+
 ### Cloud-to-ground discharge (ATMO-07)
 
 The optional lightning solver follows one natural strike in a homogeneous dielectric with insulating sides, a

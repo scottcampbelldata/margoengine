@@ -14162,6 +14162,10 @@
       "./terramechanics": {
         "raw": 24362,
         "gzip": 9206
+      },
+      "./synoptic": {
+        "raw": 13632,
+        "gzip": 5911
       }
     },
     "@margoengine/physics2d": {
@@ -17214,6 +17218,10 @@
       "./hail-physics": {
         "raw": 2367,
         "gzip": 1056
+      },
+      "./synoptic": {
+        "raw": 1954,
+        "gzip": 940
       }
     },
     "@margoengine/webgl2-compat": {
@@ -18127,6 +18135,16 @@
       "raw": 2042,
       "gzip": 1194,
       "brotli": 1108
+    },
+    "packages/physics/dist/synoptic-kernel.wasm": {
+      "raw": 13821,
+      "gzip": 5419,
+      "brotli": 4764
+    },
+    "packages/physics/dist/synoptic-kernel-shared.wasm": {
+      "raw": 13821,
+      "gzip": 5420,
+      "brotli": 4765
     }
   },
   "splits": {
