@@ -12,6 +12,7 @@ import type {
   StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_IMPULSES_FIELD, BODY_WORDS, IMPULSE_WORDS } from '../world/solvers/rigid.js';
+import { type CompressionStep, stepCompression } from './continuous.js';
 import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
 
@@ -65,6 +66,8 @@ export interface CrushPatch {
   /** Transverse contact radius about the support's anchor, m. */
   readonly radius: number;
   readonly material: CrushMaterial;
+  /** Default 'impact'. Use 'continuous' to advance yielding under the actual end stroke each tick. */
+  readonly response?: 'impact' | 'continuous';
   /** Dry sliding and sticking coefficient for the contact pair. Default 0. */
   readonly friction?: number;
   /** Permanent stroke at which the barrier can no longer maintain its seal. Default the material's stroke. */
@@ -101,6 +104,7 @@ export interface CrushPatchState {
 
 interface Patch extends CrushPatch {
   readonly material: Required<CrushMaterial>;
+  readonly response: 'impact' | 'continuous';
   readonly friction: number;
   readonly sealStroke: number;
 }
@@ -283,6 +287,23 @@ function supportImpulse(depth: number, closing: number, inverseMass: number, sti
   return impulse;
 }
 
+function recordCompression(
+  damage: Float64Array,
+  at: number,
+  step: CompressionStep,
+  sealStroke: number,
+  continuing: boolean,
+): void {
+  damage[at] = step.permanentStroke;
+  damage[at + 1]! += step.absorbedEnergy;
+  damage[at + 2] = Math.max(continuing ? damage[at + 2]! : 0, step.totalStroke);
+  damage[at + 3] = Math.max(continuing ? damage[at + 3]! : 0, step.force);
+  damage[at + 4] = (continuing ? damage[at + 4]! : 0) + step.impulse;
+  damage[at + 5] = Math.max(continuing ? damage[at + 5]! : 0, step.elasticEnergy);
+  damage[at + CRUSH_SEAL_LOSS_WORD] = Math.min(1, step.permanentStroke / sealStroke); // float division: normalised damage
+  if (!continuing) damage[at + 7]! += 1;
+}
+
 function impact(
   state: State,
   patch: Patch,
@@ -307,14 +328,21 @@ function impact(
   const at = CRUSH_WORDS * index;
   const permanent = damage[at]!;
   const clearance = gap + permanent;
-  if (clearance > 0) latched[index] = 0;
+  const continuous = patch.response === 'continuous';
+  if (!continuous && clearance > 0) latched[index] = 0;
   const contact = add(anchor, scale(normal, 0.5 * gap));
   const a = atContact(bodies, out, body, contact, normal);
   const b = support.body === undefined ? undefined : atContact(bodies, out, support.body, contact, normal);
   const relative = sub(a.velocity, b?.velocity ?? ZERO);
   const closing = dot(relative, normal);
   const inverse = a.inverseMass + (b?.inverseMass ?? 0);
-  if (!(inverse > 0) || (!latched[index] && (!(closing > 0) || clearance > dt * closing))) return;
+  if (!(inverse > 0)) return;
+  if (continuous) {
+    if (clearance > 0 && clearance >= dt * closing) {
+      latched[index] = 0;
+      return;
+    }
+  } else if (!latched[index] && (!(closing > 0) || clearance > dt * closing)) return;
   const delay = clearance > 0 ? clearance / closing : 0; // float division: time to the first normal contact
   const lateral = sub(separation, scale(normal, gap));
   const travel = sub(relative, scale(normal, closing));
@@ -323,9 +351,14 @@ function impact(
     latched[index] = 0;
     return;
   }
-  const result = latched[index] ? undefined : crushPrepared(patch.material, 1 / inverse, closing, permanent); // float division
-  const normalImpulse =
-    result?.impulse ?? supportImpulse(-clearance, closing, inverse, patch.material.backingStiffness, dt);
+  const step = continuous
+    ? stepCompression(patch.material, permanent, Math.max(permanent, -gap), closing, inverse, dt - delay)
+    : undefined;
+  const result =
+    continuous || latched[index] ? undefined : crushPrepared(patch.material, 1 / inverse, closing, permanent); // float division
+  const normalImpulse = continuous
+    ? (step?.impulse ?? 0)
+    : (result?.impulse ?? supportImpulse(-clearance, closing, inverse, patch.material.backingStiffness, dt));
   if (normalImpulse === 0) return;
   const impulse = scale(normal, normalImpulse);
   impulseAt(out, body, scale(impulse, -1), a.arm);
@@ -342,6 +375,10 @@ function impact(
     );
     impulseAt(out, body, slide, a.arm);
     if (b && support.body !== undefined) impulseAt(out, support.body, scale(slide, -1), b.arm);
+  }
+  if (step) {
+    recordCompression(damage, at, step, patch.sealStroke, latched[index] !== 0);
+    latched[index] = 1;
   }
   if (!result) return;
   damage.set(
@@ -399,6 +436,9 @@ export class CrushSolver implements Solver<CrushParams> {
       );
     const patches = params.patches.map((patch): Patch => {
       const material = crushMaterial(patch.material);
+      const response = patch.response ?? 'impact';
+      if (response !== 'impact' && response !== 'continuous')
+        throw new MargoError('state', 'Choose impact or continuous for the crush patch response.');
       const body = rowIndex(patch.body, capacity);
       const normal = vector(patch.normal, 'normal');
       const length = positive(hypot(...normal), 'normal length');
@@ -410,6 +450,7 @@ export class CrushSolver implements Solver<CrushParams> {
       return {
         body,
         material,
+        response,
         friction: positive(patch.friction ?? 0, 'friction coefficient', 0),
         normal: scale(normal, 1 / length),
         anchor: vector(patch.anchor, 'anchor'), // float division: unit normal

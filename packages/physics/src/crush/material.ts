@@ -109,9 +109,19 @@ export function resolveCrushStroke(
   totalStroke: number,
   permanentStroke = 0,
 ): CrushStrokeResult {
-  const { stiffness: k, yieldForce, hardening, stroke, backingStiffness } = crushMaterial(material);
+  const curve = crushMaterial(material);
   const position = positive(totalStroke, 'total stroke', 0);
-  const prior = positive(permanentStroke, 'prior permanent stroke', 0, stroke);
+  const prior = positive(permanentStroke, 'prior permanent stroke', 0, curve.stroke);
+  return crushStrokePrepared(curve, position, prior);
+}
+
+/** Applies the compression-only material return map to a validated contact curve. */
+export function crushStrokePrepared(
+  material: Required<CrushMaterial>,
+  position: number,
+  prior: number,
+): CrushStrokeResult {
+  const { stiffness: k, yieldForce, hardening, stroke, backingStiffness } = material;
   const loading = Math.max(0, position - prior);
   const priorForce = yieldForce + hardening * prior;
   const yieldOffset = priorForce / k; // float division: recoverable stroke at yield

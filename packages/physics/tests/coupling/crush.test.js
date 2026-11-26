@@ -10,6 +10,14 @@ const zero = [0, 0, 0];
 const rate = { num: 60, den: 1 };
 
 const material = { stiffness: 400, yieldForce: 10, stroke: 0.4 };
+const measuredTube = {
+  width: 0.0381,
+  thickness: 0.00159,
+  length: 0.2032,
+  young: 69e9,
+  yieldStress: 118e6,
+  tensileStrength: 152e6,
+};
 const close = (got, want, bound = 32 * Number.EPSILON * Math.max(1, Math.abs(want))) =>
   assert.ok(Math.abs(got - want) <= bound, `${got} differs from ${want} by more than ${bound}`);
 
@@ -26,6 +34,8 @@ function withBodies({
   halfA = [0.2, 0.2, 0.2],
   halfB = halfA,
   curve = material,
+  response,
+  movingMass = 4,
 } = {}) {
   const world = new PhysicsWorld({ rate: frameRate, gravity: zero, memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: 1 / 60 });
@@ -35,7 +45,7 @@ function withBodies({
       linearVelocity,
       colliders: { shape: 'box', halfExtents, mass, sensor: true },
     });
-  const vehicle = add([-0.4 - gap, -slip[0] / 60, -slip[1] / 60], 4, [initial, ...slip], halfA);
+  const vehicle = add([-0.4 - gap, -slip[0] / 60, -slip[1] / 60], movingMass, [initial, ...slip], halfA);
   const other = two ? add([0, y, 0], 6, [0, 0, 0], halfB) : undefined;
   const crush = new CrushSolver();
   const capacity = physics.kernel.capacity;
@@ -49,6 +59,7 @@ function withBodies({
         normal: [1, 0, 0],
         radius: 0.12,
         material: curve,
+        response,
         friction,
         support: { body: other?.row, point: other ? [-0.2, offset, 0] : [-0.2, y + offset, 0] },
       },
@@ -242,14 +253,7 @@ test('a fixed barrier receives the equivalent normal work, with a versioned defo
 });
 
 test('a rigid sled transfers its energy into hollow-tube collapse predicted from wall and tensile inputs', async () => {
-  const curve = squareTubeCrushMaterial({
-    width: 0.0381,
-    thickness: 0.00159,
-    length: 0.2032,
-    young: 69e9,
-    yieldStress: 118e6,
-    tensileStrength: 152e6,
-  });
+  const curve = squareTubeCrushMaterial(measuredTube);
   const speed = 20;
   const { world, physics, crush, vehicle } = await assemble({ initial: speed, two: false, gap: 0.3, curve });
   try {
@@ -264,6 +268,85 @@ test('a rigid sled transfers its energy into hollow-tube collapse predicted from
     assert.ok(load > 8970 && load < 10490);
   } finally {
     physics.dispose();
+  }
+});
+
+test('continuous contact yields throughout guided compression and retains the measured tube work on unloading', async (t) => {
+  const curve = squareTubeCrushMaterial(measuredTube);
+  const movingMass = 5e6;
+  const input = { initial: 0, two: false, response: 'continuous', movingMass, curve };
+  const observations = [];
+  for (const frames of [32, 128]) {
+    const { world, physics, crush, vehicle } = await assemble(input);
+    const setStroke = (stroke) => {
+      // The specimen is driven by a displacement-controlled platen. A large carriage inertia keeps the
+      // actual RigidSolver's compliance small and its response can still be read from the live port.
+      vehicle.setPosition([-0.4 + stroke, 0, 0]);
+      vehicle.setLinearVelocity(zero);
+    };
+    try {
+      for (let i = 1; i <= frames; i++) {
+        setStroke((0.1 * i) / frames);
+        world.advance(i);
+      }
+      const loaded = crush.read(0);
+      assert.equal(loaded.impacts, 1);
+      assert.ok(loaded.permanentStroke > 0);
+      close(loaded.peakForce, curve.yieldForce);
+      const bias = (3 * curve.yieldForce) / (movingMass * 60 ** 2) + 8 * 2 ** -23;
+      close(loaded.peakStroke, 0.1, bias);
+      const work = loaded.absorbedEnergy + loaded.elasticEnergy;
+      // Yob et al. Table 4. The five guided 100 mm comparisons are independent of the geometry and tensile inputs.
+      assert.ok(work >= 897.4 && work <= 1048.77);
+      observations.push(work);
+      const saved = world.takeSnapshot();
+      const unload = () => {
+        setStroke(0.06);
+        world.advance(frames + 1);
+        assert.deepEqual(crush.read(0), loaded);
+        return world.hash();
+      };
+      const hash = unload();
+      world.restoreSnapshot(saved.bytes);
+      assert.equal(unload(), hash);
+    } finally {
+      physics.dispose();
+    }
+  }
+  close(observations[0], observations[1]);
+  t.diagnostic(
+    `Work at 100 mm for 32 and 128 driving steps: ${observations.map((value) => value.toFixed(3)).join(' and ')} J`,
+  );
+});
+
+test('continuous elastic, yielding and compacted branches return reciprocal native impulses', async () => {
+  const curve = { stiffness: 200, yieldForce: 40, hardening: 100, stroke: 0.4, backingStiffness: 800 };
+  const compliance = (1 / 4 + 1 / 6) / 60 ** 2;
+  const cases = [
+    [0.1, 200, 0, 0],
+    [0.5, 200 / 3, 0.2, 40],
+    [0.9, 800, 0.8, 80],
+  ];
+  for (const [depth, stiffness, origin, startForce] of cases) {
+    const { world, physics, crush, vehicle, other } = await assemble({ initial: 0, response: 'continuous', curve });
+    try {
+      vehicle.setPosition([depth - 0.4, 0, 0]);
+      world.advance(1);
+      const geometry = vehicle.position[0] - other.position[0] + 0.4;
+      const load = (startForce + (geometry - origin) * stiffness) / (1 + compliance * stiffness);
+      const displacement = geometry - compliance * load;
+      const first = crush.read(0);
+      const roundoff = 8 * 2 ** -23;
+      close(first.peakForce, load, roundoff * load);
+      close(first.peakStroke, displacement, roundoff);
+      close(first.impulse, load / 60, (roundoff * load) / 60);
+      assert.equal(first.impacts, 1);
+      world.advance(2);
+      close(4 * vehicle.linearVelocity[0], -load / 60, roundoff * load);
+      close(6 * other.linearVelocity[0], load / 60, roundoff * load);
+    } finally {
+      physics.dispose();
+    }
   }
 });
 
