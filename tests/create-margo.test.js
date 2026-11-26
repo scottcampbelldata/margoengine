@@ -128,7 +128,9 @@ for (const [template, { main, imports }] of Object.entries(templates))
     // Scott, 2026-11-21: 85,000 B for the 84,025 B public-main starter with the current Environment graph. It reached
     // 85,490 B on 2026-11-25 (the decoders' lazy chunks, 1aa72fb945); sharing one copy of math between them and
     // dropping Vite's modulepreload polyfill brought it to 84,852 B (docs/limits.md).
-    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 85_000, `unexpected bundle size ${gzip}`);
+    // Scott, 2026-11-26: 85,600 B for the shadows instanced cascade fit (b6781020ba, +456 B) and the turning penumbra
+    // jitter (5feaab3d71, +122 B); the starter measures 85,479 B after the nodeBounds rewrite (60b48b6d68).
+    if (template === 'web') assert.ok(gzip > 10_000 && gzip < 85_600, `unexpected bundle size ${gzip}`);
     else assert.ok(gzip > 10_000, `unexpected bundle size ${gzip}`);
     // Every browser the web starter runs in has modulepreload, so its start-up code carries no polyfill for it.
     if (template === 'web')
