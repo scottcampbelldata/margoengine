@@ -16,6 +16,57 @@ function close(actual, wanted, tolerance) {
   assert.ok(Math.abs(actual - wanted) <= tolerance, `${actual} vs ${wanted}, bound ${tolerance}`);
 }
 
+test('ThinFilmSolver: the surface mesh copies local wet elevations, unit normals and full patch bounds', async () => {
+  const spacing = 0.1;
+  const cells = [3, 2];
+  const origin = [0.2, 0.4, 0.3];
+  const depth = [];
+  const substrate = [];
+  for (let y = 0; y < cells[1]; y++) {
+    for (let x = 0; x < cells[0]; x++) {
+      const u = (x + 0.5) * spacing;
+      const v = (y + 0.5) * spacing;
+      depth.push(0.0002 + 0.04 * u + 0.03 * v);
+      substrate.push(0.005 + 0.05 * u - 0.02 * v);
+    }
+  }
+  const { film, world } = await patch({ cells, spacing, origin, u: [0, 0, 1], v: [0, -1, 0], depth, substrate });
+  const hash = world.hash();
+  const surface = film.surfaceGeometry();
+  const { positions, normals, uvs, indices } = surface;
+  const meshWidth = cells[0] + 2;
+  const sample = 2 * meshWidth + 2;
+  const sampleHeight = 0.0052 + 0.09 * 0.15 + 0.01 * 0.15;
+  const samplePosition = [origin[0] + sampleHeight, 0.25, 0.45].map(Math.fround);
+  assert.deepEqual(Array.from(positions.subarray(3 * sample, 3 * sample + 3)), samplePosition);
+  const normalLength = Math.hypot(1, 0.01, 0.09);
+  for (const [axis, value] of [1, 0.01, -0.09].entries())
+    close(normals[3 * sample + axis], value / normalLength, 2 ** -24);
+  assert.deepEqual(Array.from(uvs.subarray(2 * sample, 2 * sample + 2)), [0.5, 0.25]);
+  assert.equal(positions[1], Math.fround(origin[1]));
+  assert.equal(positions[2], Math.fround(origin[2]));
+  assert.equal(positions.at(-2), Math.fround(origin[1] - cells[1] * spacing));
+  assert.equal(positions.at(-1), Math.fround(origin[2] + cells[0] * spacing));
+  assert.equal(indices.length, 6 * (cells[0] + 1) * (cells[1] + 1));
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = 3 * indices[i],
+      b = 3 * indices[i + 1],
+      c = 3 * indices[i + 2];
+    const determinant =
+      (positions[b + 1] - positions[a + 1]) * (positions[c + 2] - positions[a + 2]) -
+      (positions[b + 2] - positions[a + 2]) * (positions[c + 1] - positions[a + 1]);
+    assert.ok(determinant > 0);
+  }
+  assert.deepEqual(film.surfaceGeometry(), surface);
+  assert.equal(world.hash(), hash);
+  const dry = await patch({ cells: [1, 1], spacing });
+  assert.equal(dry.film.surfaceGeometry().indices.length, 0);
+  const single = await patch({ cells: [1, 1], spacing, depth: 0.0003 });
+  const wet = single.film.surfaceGeometry();
+  assert.equal(wet.indices.length, 24);
+  for (const [axis, value] of [0, 1, 0].entries()) close(wet.normals[axis], value, 0);
+});
+
 test('ThinFilmSolver: hydrostatic plus capillary damping matches the closed-form discrete Fourier mode', async () => {
   const n = 16;
   const dx = 0.01;

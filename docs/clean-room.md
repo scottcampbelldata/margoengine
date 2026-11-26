@@ -15434,6 +15434,10 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   The normal momentum balance in §II.A gives the hydrostatic wall load `ρ (g · n) h`.
   Integrating the pressure and its first moment over the cells gives the net load and torque
   about the rigid body's centre of mass.
+  The rendering geometry uses the graph of substrate height plus film depth. In Eq. 2.112,
+  the normal comes from the height derivative. For the planar two-coordinate graph use
+  `normalize(n − u ∂H/∂u − v ∂H/∂v)`. Extend the edge cells to the authored boundary.
+  The mesh preserves the film clock and does not write into the solver arena.
   [Journal](https://doi.org/10.1103/RevModPhys.69.931) · [Paper](https://www.tmfcr.cz/39/pdf/04-oron.pdf)
 - Leonard W. Schwartz and Richard R. Eley, “Simulation of Droplet Motion on Low-Energy and
   Heterogeneous Surfaces” (1998). Add pressure `A (r² − r³)` for the resolved precursor, where

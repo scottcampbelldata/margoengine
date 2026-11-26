@@ -9679,12 +9679,14 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The exterior window fixture draws the solved surface with screen-space refraction and
-uses spherical drop geometry. It compares the same rigid pose with each liquid mesh
-hidden in turn. Interior camera attachment, full layered water–glass optics and production
-shot review remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
+`surfaceGeometry()` draws the cell-centred height field as a triangulated free surface in
+the backing's local frame. This geometry has the spatial resolution of the film grid.
+The exterior window fixture uses screen-space refraction and spherical drop geometry.
+It compares the same rigid pose with each liquid mesh hidden in turn. Full layered
+water–glass optics and complete production-cut review remain open.
+[Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-The optional thin-film entry is 15,912 B gzip with a 16,084 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 16,381 B gzip with a 16,873 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

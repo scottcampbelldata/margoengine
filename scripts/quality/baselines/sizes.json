@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20648325,
+  "total": 20649114,
   "history": [
     {
       "date": "2026-10-24",
@@ -13903,6 +13903,12 @@
       "commit": "react clustered options",
       "grew": 1,
       "reason": "react/clustered grows from 1,675 to 2,423 B gzip, ceiling 1,931 to 2,679: ClusteredLighting (grid, maxLights and the integrated shadow maps of the shared Clustered, made again when an option changes), the shadow prop of PointLight and SpotLight, and the pass that adds the castShadow meshes and models of the Canvas to the maps. A separate entry would need the shared lighting hub in a chunk of its own for under 1 KB. No other entry grows."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-surface-geometry",
+      "grew": 1,
+      "reason": "FLUID-07 exports the wet height field as renderer geometry with local normals, complete patch bounds and dry masking. Thin-film rises from 15912 to 16381 B gzip; cap changes from 16084 to 16873 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14780,7 +14786,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 16084,
+    "@margoengine/physics/thin-film": 16873,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 16126,
     "@margoengine/physics/tsunami": 6794,

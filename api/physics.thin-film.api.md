@@ -164,8 +164,16 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     extraState(): readonly Region[];
     sample(x: number, y: number): ThinFilmCell;
     depths(out?: Float64Array<ArrayBuffer>): Float64Array;
+    surfaceGeometry(): ThinFilmSurfaceGeometry;
     get heldDripVolume(): number;
     get budget(): ThinFilmBudget;
+}
+
+export interface ThinFilmSurfaceGeometry {
+    readonly positions: Float32Array;
+    readonly normals: Float32Array;
+    readonly uvs: Float32Array;
+    readonly indices: Uint32Array;
 }
 
 // Not exported from this entry, but used by the exports above:

@@ -4600,6 +4600,18 @@ and engine state fixed while hiding each liquid surface in turn. It compares 640
 rendered frames and writes the wet captures under `test-results/fluid07-window/`.
 Snapshot replay compares both the world hash and the exact rendered pixels on each backend.
 
+A separate local production check used the `window` probe at 56 s in the archived
+`4858e1dd4d` Last Tram scene. It kept the original 1920 × 1080 framing, moving car
+transforms and 17.28 mm/h WeatherMachine rain. The `surfaceGeometry()` mesh used the
+live film depths on the original glass. With camera and weather clocks held, hiding
+only the film changed 12,727 pixels by more than two summed RGB levels, including
+186 above 12. Its strongest changes lay on the far pane. `WeatherFX` with the original
+car and bellows models as cover changed 835 pixels above 12. Rewinding and replaying
+recovered state hash `b749336694ef6264` and the exact dry and wet frames on WebGPU.
+The archive and its render captures are kept locally. The production probe covers
+refractive film and roof shelter at the cabin window. The rendered spill path,
+puddle rings and complete cut remain for review.
+
 ### SEA-08 hull-to-wake displacement
 
 Build Physics and run `node --test --test-name-pattern "HullSolver wake source" packages/physics/tests/coupling/seakeeping.test.js`. The rigid hull publishes motion at the world base rate and the actual WakeSolver advances it. The tests measure the waterplane volume, pitch and roll moments, a distant-height gauge and exact replay. Steady surge, fully dry and fully submerged controls check that no volume is injected.

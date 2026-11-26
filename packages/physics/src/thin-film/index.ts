@@ -23,6 +23,7 @@ import {
 } from './drips.js';
 import { FILM_IMPACT_WORDS, FILM_SWEPT_IMPACT_LAYOUT, FILM_SWEPT_IMPACT_WORDS } from './drop-receiver.js';
 import { bindThinFilmKernel, loadThinFilmBuilds, type ThinFilmBuilds, type ThinFilmKernel } from './kernel.js';
+import { makeFilmSurface, type ThinFilmSurfaceGeometry } from './surface.js';
 
 export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
 export {
@@ -38,6 +39,7 @@ export {
   FILM_SWEPT_IMPACT_WORDS,
   type ThinFilmDropReceiver,
 } from './drop-receiver.js';
+export type { ThinFilmSurfaceGeometry } from './surface.js';
 
 /** Binary version of the optional film layout. */
 export const THIN_FILM_LAYOUT = 1;
@@ -1013,6 +1015,12 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     if (out.length !== s.count) throw new RangeError('Invalid thin-film destination size. Use one word per film cell.');
     out.set(words(s, s.depth));
     return out;
+  }
+
+  /** Copy a renderer-ready free-surface mesh in local metres. Mount it on the same body as the film, when mounted. */
+  surfaceGeometry(): ThinFilmSurfaceGeometry {
+    const s = this.live();
+    return makeFilmSurface(s.nx, s.ny, s.spacing, s.origin, s.u, s.v, words(s, s.depth), words(s, s.bottom));
   }
 
   /** Water in the detached-drop outlets awaiting release, in m³. */

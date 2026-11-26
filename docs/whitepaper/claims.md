@@ -6251,6 +6251,12 @@ The rolling window fixture draws the live film surface and airborne sill drops o
 WebGPU and WebGL2. Hiding either surface at the same rigid pose changes its pixels.
 Restoring and replaying the coupled world recovers the same simulation hash and every
 rendered pixel on each backend. [Reproduce](reproduce.md#fluid-07-moving-window-render)
+The surface adapter exposes the local elevations and normals directly as a mesh and
+covers the full wet patch bounds. A dry patch supplies an empty mesh. Drawing preserves
+the world hash. [Reproduce](reproduce.md#fluid-07-moving-window-render)
+The same surface adapter drew on the recovered original Last Tram scene at the
+authored cabin-window probe. It changed the far window at the same camera and rain
+time, and repeated the exact frame after seeking back. [Reproduce](reproduce.md#fluid-07-moving-window-render)
 
 One drop released by the sill arrives at a separate receiving film with the analytic
 contact location and speed. Its volume leaves flight once, enters the film once, and

@@ -5445,7 +5445,8 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   drains: [false, false, false, true],
 });
 world.advance(60);
-console.log(film.budget.dripped, film.sample(0, 5).depth);
+const surface = film.surfaceGeometry();
+console.log(film.budget.dripped, film.sample(0, 5).depth, surface.indices.length);
 ```
 
 Set `wetting` for a partially wetting surface. Enter the equilibrium contact angle in radians and
@@ -5469,8 +5470,11 @@ once, even when a slower writer's last value is held. Pass `waveSources: true` a
 to the local `WakeSolver` for pressure pulses on a wet platform in the same cell. The film retains
 the deposited water and the wake receives the normal impulse.
 
-Use `depths()` for a render texture, `filmField` to consume substrate, depth and drip records, and
-`dripsField` for cell discharge in m³/s. The options document the default water and wall properties.
+Use `surfaceGeometry()` to draw the liquid with `createMesh` from `@margoengine/materials`.
+It copies positions, normals, UVs and indices in the patch's local metres. Parent a mounted
+surface to the same body as the film, update it with `mesh.setGeometry`, and hide it when
+the index buffer is empty. Use `depths()` for a thickness texture, `filmField` for
+substrate, depth and drip records, and `dripsField` for discharge in m³/s.
 
 For a wet circular sill outlet, open its edge and pass its physical rim radius. The outlet holds
 its share of the discharge until a drop detaches.
@@ -5562,8 +5566,8 @@ world.advance(4);
 console.log(tray.linearVelocity[1]);
 ```
 
-The moving-window fixture connects `film.depths()` to a refractive surface and
-`flight.readDrops()` to water droplets at their simulated size and position. With
+The moving-window fixture draws `film.surfaceGeometry()` with a thickness map from
+`film.depths()` and draws `flight.readDrops()` at their simulated size and position. With
 the packages built, run `npm run test:browser:thin-film -w @margoengine/physics`
 to capture both renderer paths and check frame replay.
 
