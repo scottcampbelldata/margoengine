@@ -14,7 +14,16 @@ import type {
   StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_WORDS } from '../world/solvers/rigid.js';
+import {
+  completeDrips,
+  FILM_DROP_WORDS,
+  type PreparedOutlet,
+  prepareOutlets,
+  type ThinFilmDripOutlet,
+} from './drips.js';
 import { bindThinFilmKernel, loadThinFilmBuilds, type ThinFilmBuilds, type ThinFilmKernel } from './kernel.js';
+
+export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
 
 /** Binary version of the optional film layout. */
 export const THIN_FILM_LAYOUT = 1;
@@ -40,6 +49,8 @@ export interface ThinFilmLoadOptions {
   readonly impacts?: FieldDescriptor;
   /** Emit horizontal SeaSource objects for the optional dispersive wake. Defaults to false. */
   readonly waveSources?: boolean;
+  /** Publish geometrically placed detached droplets from circular drains. Defaults to false. */
+  readonly drops?: boolean;
   readonly signal?: AbortSignal;
 }
 
@@ -95,6 +106,8 @@ export interface ThinFilmOptions {
   readonly evaporation?: number;
   /** Open boundaries at u low, u high, v low or v high. Defaults to all closed. */
   readonly drains?: readonly [boolean, boolean, boolean, boolean];
+  /** Optional wetted circular rims. Load with drops: true and open the corresponding drains. */
+  readonly outlets?: readonly ThinFilmDripOutlet[];
 }
 
 /** Cumulative liquid budget, in m³, apart from the count of the last step's internal substeps. */
@@ -154,6 +167,11 @@ interface FilmState {
   readonly motion: Region;
   readonly waves?: Region;
   readonly nextWaves?: Region;
+  readonly outlets?: {
+    readonly entries: readonly PreparedOutlet[];
+    readonly held: Region;
+    readonly events: Region;
+  };
   readonly regions: readonly Region[];
 }
 
@@ -303,6 +321,8 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
   readonly dripsField: FieldDescriptor;
   /** Layout-1 SeaSource records for an optional wake consumer. */
   readonly waveField: FieldDescriptor;
+  /** Layout-1 timed drop records, one per configured circular outlet. */
+  readonly dropsField: FieldDescriptor;
   private readonly fields: readonly FieldUse[];
   private readonly windSample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly rainSample: PrecipitationSample = {
@@ -329,12 +349,20 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       unit: 'SI',
       centring: 'particle',
     });
+    this.dropsField = Object.freeze({
+      name: `${id}.drops`,
+      kind: 'surfaceSampleSet',
+      quantity: 'detachedWaterDrop',
+      unit: 'SI',
+      centring: 'particle',
+    });
     if (options.rainField && options.rainField.name === options.impacts?.name)
       throw new RangeError('Repeated thin-film inputs. Use different names for rain and impacts.');
     this.fields = [
       { field: this.filmField, access: 'write' },
       { field: this.dripsField, access: 'write' },
       ...(options.waveSources ? [{ field: this.waveField, access: 'write' as const }] : []),
+      ...(options.drops ? [{ field: this.dropsField, access: 'write' as const }] : []),
       ...(options.rigid ? [{ field: BODIES_FIELD, access: 'read' as const }] : []),
       ...(options.rainField ? [{ field: options.rainField, access: 'read' as const }] : []),
       ...(options.impacts ? [{ field: options.impacts, access: 'read' as const }] : []),
@@ -386,6 +414,21 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         new RangeError('Suspended thin films need capillary pressure. Use positive surface tension.'),
         { code: 'PHYSICS_INPUT_RANGE' },
       );
+    if (Boolean(this.options.drops) !== Boolean(opts.outlets?.length))
+      throw Object.assign(new RangeError('Thin-film outlets need drops: true at load and at least one open rim.'), {
+        code: 'PHYSICS_INPUT_RANGE',
+      });
+    const entries = opts.outlets?.length
+      ? prepareOutlets(opts.outlets, {
+          nx,
+          ny,
+          spacing,
+          drains,
+          density,
+          surfaceTension,
+          gravity: hypot(...host.gravity),
+        })
+      : undefined;
     const wettingValues = wettingConstants(opts.wetting, surfaceTension);
     const constantsValues = [
       positive('inverse spacing', 1 / spacing),
@@ -422,6 +465,11 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       : undefined;
     const nextWaves = waves && allocate('working-impact-waves', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT);
     const wetting = wettingValues && allocate('wetting', wettingValues.length);
+    const outlets = entries && {
+      entries,
+      held: allocate('drip-outlet-water', 3 + entries.length),
+      events: allocate('detached-drops', FILM_DROP_WORDS * entries.length),
+    };
     const kernel = bindThinFilmKernel(host, this.builds);
     const s: FilmState = {
       kernel,
@@ -460,6 +508,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       motion,
       waves,
       nextWaves,
+      outlets,
       regions: [
         constants,
         bottom,
@@ -470,6 +519,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
         motion,
         ...(waves ? [waves] : []),
         ...(wetting ? [wetting] : []),
+        ...(outlets ? [outlets.held, outlets.events] : []),
       ],
     };
     words(s, constants).set(constantsValues);
@@ -684,6 +734,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       throw new RangeError(
         'Thin-film step exceeds numeric range. Use finite material values and compatible surface scales.',
       );
+    this.releaseDrops(s, f, context.cell, dt);
     h.set(next);
     words(s, s.drips).set(words(s, s.nextDrips));
     if (s.waves && s.nextWaves) words(s, s.waves).set(words(s, s.nextWaves));
@@ -697,6 +748,41 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     budget[6] = delta[4]!;
     words(s, s.motion).set([1, ...velocity, impact.tick]);
     this.writeRecords(s);
+  }
+
+  private releaseDrops(s: FilmState, frame: Frame, cell: Cell, dt: number): void {
+    const outlets = s.outlets;
+    if (!outlets) return;
+    const held = words(s, outlets.held);
+    const events = words(s, outlets.events);
+    const runoff = words(s, s.nextDrips);
+    for (let i = 0; i < outlets.entries.length; i++) {
+      const outlet = outlets.entries[i]!;
+      const supplied = runoff[outlet.cell]! * dt;
+      const count = completeDrips(held[i + 3]! + supplied, outlet.volume);
+      if (!Number.isSafeInteger(count))
+        throw new MargoError(
+          'failed',
+          'Too many thin-film drops in one step. Use a larger circular rim or lower flow.',
+        );
+    }
+    held.set(cell, 0);
+    events.fill(0);
+    for (let i = 0; i < outlets.entries.length; i++) {
+      const outlet = outlets.entries[i]!;
+      const rate = runoff[outlet.cell]!;
+      runoff[outlet.cell] = 0;
+      if (rate === 0) continue;
+      const before = held[i + 3]!;
+      const available = before + rate * dt;
+      const count = completeDrips(available, outlet.volume);
+      held[i + 3] = available - count * outlet.volume;
+      if (!count) continue;
+      const at = position(frame, outlet.u, outlet.v);
+      const velocity = plus(frame.velocity, cross(frame.angular, minus(at, frame.center)));
+      const first = Math.min(dt, Math.max(0, (outlet.volume - before) / rate));
+      events.set([...at, ...velocity, outlet.volume, first, outlet.volume / rate, count], i * FILM_DROP_WORDS);
+    }
   }
 
   private writeRecords(s: FilmState): void {
@@ -726,6 +812,15 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       { field: this.dripsField.name, region: s.drips, tick, cell: ORIGIN },
     ];
     if (s.waves) ports.push({ field: this.waveField.name, region: s.waves, tick, cell: ORIGIN });
+    if (s.outlets) {
+      const origin = words(s, s.outlets.held);
+      ports.push({
+        field: this.dropsField.name,
+        region: s.outlets.events,
+        tick,
+        cell: [origin[0]!, origin[1]!, origin[2]!],
+      });
+    }
     return ports;
   }
 
@@ -753,6 +848,16 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     if (out.length !== s.count) throw new RangeError('Invalid thin-film destination size. Use one word per film cell.');
     out.set(words(s, s.depth));
     return out;
+  }
+
+  /** Water in the detached-drop outlets awaiting release, in m³. */
+  get heldDripVolume(): number {
+    const s = this.live();
+    if (!s.outlets) return 0;
+    const held = words(s, s.outlets.held);
+    let volume = 0;
+    for (let i = 3; i < held.length; i++) volume += held[i]!;
+    return volume;
   }
 
   /** Cumulative water volumes. */

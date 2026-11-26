@@ -2,7 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { WakeSolver } from '../../dist/sea.js';
-import { FILM_IMPACT_WORDS, THIN_FILM_LAYOUT, THIN_FILM_WORDS, ThinFilmSolver } from '../../dist/thin-film.js';
+import {
+  FILM_DROP_WORDS,
+  FILM_IMPACT_WORDS,
+  THIN_FILM_LAYOUT,
+  THIN_FILM_WORDS,
+  ThinFilmSolver,
+} from '../../dist/thin-film.js';
 import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -198,6 +204,103 @@ test('ThinFilmSolver: film depth from a calibrated inlet matches three held-out 
       );
     }
   }
+});
+
+test('ThinFilmSolver: a circular sill converts film discharge into timed detached drops conservatively', async () => {
+  // Independent experimental nozzle and pump from Zhang and Basaran (1996), Figure 1.
+  const spacing = 0.03;
+  const diameter = 0.0032;
+  const density = 998.2;
+  const surfaceTension = 0.07275;
+  const flow = 1e-6 / 60;
+  const film = await ThinFilmSolver.load({ drops: true });
+  const world = new PhysicsWorld({ rate }).add(film, {
+    cells: [1, 1],
+    spacing,
+    u: [1, 0, 0],
+    v: [0, -1, 0],
+    rainRate: flow / (spacing * spacing),
+    density,
+    surfaceTension,
+    drains: [false, false, false, true],
+    outlets: [{ edge: 'v1', index: 0, radius: diameter / 2 }],
+  });
+  const ideal = (Math.PI * diameter * surfaceTension) / (density * -world.gravity[1]);
+  const corrected = ideal * (0.6 + 0.4 * (1 - diameter / (1.4 * Math.cbrt(ideal))) ** 2.2);
+  const dt = 1 / rate.num;
+  // The dry film first fills about one drop's worth of water before its discharge settles.
+  const frames = 1080;
+  const events = [];
+  let released = 0;
+  let checkpoint;
+  for (let frame = 1; frame <= frames; frame++) {
+    world.advance(frame);
+    if (frame === 400) {
+      assert.ok(film.heldDripVolume > 0);
+      checkpoint = world.takeSnapshot();
+    }
+    const { region, cell } = world.fields.port(film.dropsField.name);
+    assert.equal(region.layout, THIN_FILM_LAYOUT);
+    assert.equal(region.byteLength, FILM_DROP_WORDS * 8);
+    const row = regionWords(world.memory, region);
+    const count = row[9];
+    if (!count) continue;
+    assert.equal(count, 1);
+    assert.deepEqual(cell, [0, 0, 0]);
+    assert.deepEqual(Array.from(row.subarray(0, 6)), [spacing / 2, -spacing, 0, 0, 0, 0]);
+    assert.ok(Math.abs(row[6] - corrected) <= 64 * Number.EPSILON * corrected);
+    assert.ok(row[7] >= 0 && row[7] <= dt);
+    events.push((frame - 1) * dt + row[7]);
+    released += row[6] * count;
+  }
+  assert.ok(events.length >= 4, `only ${events.length} discharged drops after ${frames * dt} s`);
+  const period = corrected / flow;
+  assert.ok(Math.abs(events.at(-1) - events.at(-2) - period) <= dt);
+  assert.equal(film.sample(0, 0).dripRate, 0, 'outlet water has one published route');
+  assert.ok(Math.abs(released + film.heldDripVolume - film.budget.dripped) <= 64 * frames * Number.EPSILON * released);
+  balance(film, frames);
+  const final = world.hash();
+  world.restoreSnapshot(checkpoint.bytes);
+  world.advance(frames);
+  assert.equal(world.hash(), final);
+});
+
+test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', async () => {
+  await Physics.load();
+  const spacing = 0.03;
+  const speed = 0.15;
+  const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
+  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
+  const body = rigid.addBody(null, {
+    position: [0.25, 0.5, -0.125],
+    linearVelocity: [speed, 0, 0],
+    gravityScale: 0,
+    colliders: { shape: 'box', halfExtents: [0.16, 0.16, 0.005], mass: 32 },
+  });
+  const film = await ThinFilmSolver.load({ rigid: true, drops: true });
+  world
+    .add(film, {
+      bodyRow: body.row,
+      cells: [1, 1],
+      spacing,
+      v: [0, -1, 0],
+      rainRate: 1e-6 / 60 / (spacing * spacing),
+      drains: [false, false, false, true],
+      outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
+    })
+    .add(new RigidSolver(), { physics: rigid });
+  for (let frame = 1; frame <= 480; frame++) {
+    world.advance(frame);
+    const { region } = world.fields.port(film.dropsField.name);
+    const row = regionWords(world.memory, region);
+    if (row[9] === 0) continue;
+    const [x, y, z] = body.position;
+    for (const [i, value] of [x + spacing / 2, y - spacing, z, ...body.linearVelocity].entries())
+      assert.ok(Math.abs(row[i] - value) <= 64 * Number.EPSILON * Math.max(1, Math.abs(value)));
+    balance(film, frame);
+    return;
+  }
+  assert.fail('Expected the moving sill to detach a drop within eight seconds.');
 });
 
 const input = {

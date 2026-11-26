@@ -4469,3 +4469,13 @@ checks the ratio `(1 + dt M ρg λ) / (1 + dt M σ λ²)` per step, where `λ` i
 Laplacian eigenvalue. A higher-growth case checks subdivision against the derived capillary–
 gravity rate and verifies the uniform-state fixed point.
 [Fermigier et al. (1992), Eq. 1.3 and §2](https://doi.org/10.1017/S0022112092001447)
+
+### FLUID-07 circular sill drops
+
+Run `node --test --test-name-pattern="circular sill" packages/physics/tests/coupling/thin-film.test.js`
+from a built physics entry. The fixture supplies 1 mL/min to a dry vertical film. Its open cell
+feeds the 3.2 mm rim, and the test checks the volume against the published quasistatic correlation,
+the event times, water retained at the rim, total release, and snapshot replay. The test's
+volume oracle is Mori's equation. The separately observed 3.09 s cycle corresponds to 51.5 μL
+and supplies the documented model difference.
+[Mori (1990)](https://doi.org/10.1002/aic.690360819) · [Zhang and Basaran (1996), Figure 1](https://doi.org/10.1017/S0022112096008300)

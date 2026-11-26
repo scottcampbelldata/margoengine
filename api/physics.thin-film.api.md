@@ -5,6 +5,8 @@
 ```ts
 import { Precipitation, Wind } from "@margoengine/math/fields";
 
+export const FILM_DROP_WORDS = 10;
+
 export const FILM_IMPACT_WORDS = 5;
 
 export const THIN_FILM_LAYOUT = 1;
@@ -29,12 +31,19 @@ export interface ThinFilmCell {
     readonly dripRate: number;
 }
 
+export interface ThinFilmDripOutlet {
+    readonly edge: 'u0' | 'u1' | 'v0' | 'v1';
+    readonly index: number;
+    readonly radius: number;
+}
+
 export interface ThinFilmLoadOptions {
     readonly id?: string;
     readonly rigid?: boolean;
     readonly rainField?: FieldDescriptor;
     readonly impacts?: FieldDescriptor;
     readonly waveSources?: boolean;
+    readonly drops?: boolean;
     readonly signal?: AbortSignal;
 }
 
@@ -65,12 +74,14 @@ export interface ThinFilmOptions {
     };
     readonly evaporation?: number;
     readonly drains?: readonly [boolean, boolean, boolean, boolean];
+    readonly outlets?: readonly ThinFilmDripOutlet[];
 }
 
 export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     readonly filmField: FieldDescriptor;
     readonly dripsField: FieldDescriptor;
     readonly waveField: FieldDescriptor;
+    readonly dropsField: FieldDescriptor;
     private constructor();
     static load({ signal, ...options }?: ThinFilmLoadOptions): Promise<ThinFilmSolver>;
     describe(): {
@@ -87,6 +98,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     extraState(): readonly Region[];
     sample(x: number, y: number): ThinFilmCell;
     depths(out?: Float64Array<ArrayBuffer>): Float64Array;
+    get heldDripVolume(): number;
     get budget(): ThinFilmBudget;
 }
 

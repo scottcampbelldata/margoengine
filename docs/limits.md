@@ -9558,13 +9558,19 @@ The optional `wetting` model gives the film a finite equilibrium contact angle b
 Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
-water balance. Measured spreading, contact-angle hysteresis and airborne drops remain open.
+water balance. Measured spreading and contact-angle hysteresis remain open.
+An explicitly placed, wetted circular rim can collect a single boundary cell's discharge and
+release timed droplets. Its quasistatic size uses Mori (1990) with a 0–1.4 diameter-to-ideal-volume
+scale ratio and negligible gas density. The 3.2 mm, 1 mL/min water control predicts 50.17 μL
+per drop, 2.6% below the 51.5 μL cycle volume from Zhang and Basaran (1996). Each event carries
+the rim pose and velocity. Flight dynamics, satellite breakup and free pinch-off away from
+an outlet remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
 For fully developed glycerol flow on a 20° glass plate, the modeled depths at the 350 mm probe
 are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 6,585 B gzip with a 6,768 B ceiling. Both Wasm assets are 9,832 B raw and each is 4,279 B gzip.
+The optional thin-film entry is 8,264 B gzip with a 8,520 B ceiling. Both Wasm assets are 9,832 B raw and each is 4,279 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

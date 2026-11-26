@@ -15066,6 +15066,17 @@ rigid bodies and derives the effective mass from the box dimensions.
   wavelength the explicit gravity coefficient is twice the rate, so the native solver
   subdivides to keep the explicit contribution at most one-half per step.
   [Journal](https://doi.org/10.1017/S0022112092001447)
+- Yasuhiko H. Mori, “Harkins–Brown correction factor for drop formation” (1990), equations
+  3 and 7. For a wet circular rim of diameter `D`, the ideal volume is `Vp = πDσ/(ρg)`.
+  The released volume is `Vp[0.6 + 0.4(1 − D/(1.4 Vp^(1/3)))^2.2]` in the published
+  diameter-ratio range. Accumulate volume from the assigned edge cell and publish each
+  crossing of this volume as a detached drop. This is a quasistatic, primed-rim model.
+  [Journal](https://doi.org/10.1002/aic.690360819)
+- Xiaoguang Zhang and Osman A. Basaran, “Dynamics of drop formation from a capillary in
+  the presence of an electric field” (1996), Figure 1 without an electric field. Its
+  1 mL/min input through a 3.2 mm outer diameter and roughly 3.09 s observed cycle imply
+  51.5 μL per cycle. The uncalibrated model releases 50.17 μL per cycle.
+  [Journal](https://doi.org/10.1017/S0022112096008300)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves

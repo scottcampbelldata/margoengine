@@ -4628,6 +4628,33 @@ the deposited water and the wake receives the normal impulse.
 Use `depths()` for a render texture, `filmField` to consume substrate, depth and drip records, and
 `dripsField` for cell discharge in m³/s. The options document the default water and wall properties.
 
+For a wet circular sill outlet, open its edge and pass its physical rim radius. The outlet holds
+its share of the discharge until a drop detaches.
+
+```ts
+import { PhysicsWorld, regionWords } from '@margoengine/physics/world';
+import { ThinFilmSolver } from '@margoengine/physics/thin-film';
+
+const spacing = 0.03;
+const film = await ThinFilmSolver.load({ drops: true });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
+  cells: [1, 1],
+  spacing,
+  v: [0, -1, 0],
+  rainRate: (1e-6 / 60) / (spacing * spacing),
+  drains: [false, false, false, true],
+  outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
+});
+world.advance(420);
+const { region } = world.fields.port(film.dropsField.name);
+console.log(film.heldDripVolume, regionWords(world.memory, region)[9]);
+```
+
+`dropsField` publishes one timed record per rim in its origin cell. Read XYZ, the rim's XYZ
+velocity, volume per drop, first offset from the tick start, interval between drops, and count.
+A zero count means the rim released no water that tick. `dripsField` carries the uncaptured
+edge discharge, while `budget.dripped` counts all water leaving the backing.
+
 ## Windborne dust, mist and sea spray
 
 `@margoengine/physics/airborne` moves individual environmental parcels using local wind, diameter-dependent

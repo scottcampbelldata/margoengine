@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20588853,
+  "total": 20590605,
   "history": [
     {
       "date": "2026-10-24",
@@ -13669,6 +13669,12 @@
       "commit": "3701ff6319",
       "reason": "BREAK-03 dry sliding and sticking grows the optional crush entry from 3625 to 3977 B gzip. The ceiling rises from 3763 to 4233 B. Friction uses the same contact offsets, inertia and normal impulse. Splitting into another entry would repeat those calculations and route the contact state across an extra boundary.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-circular-drips",
+      "grew": 1,
+      "reason": "FLUID-07 adds optional capillary-drop timing, a conservative outlet ledger and registered pose records. Thin-film rises from 6585 to 8264 B gzip; cap changes from 6768 to 8520 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14544,7 +14550,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 6768,
+    "@margoengine/physics/thin-film": 8520,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 7669,
     "@margoengine/physics/tsunami": 6794,
