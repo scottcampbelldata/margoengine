@@ -208,3 +208,27 @@ test('registry: remove and dispose release values and block further use', async 
   assert.throws(() => registry.define('c', '/c'), /disposed/);
   await assert.rejects(registry.load('b'), /disposed/);
 });
+
+test('registry: unload keeps the definition, reload replaces the value and tells subscribers, loadMap reads objects and Blobs', async () => {
+  let n = 0;
+  const disposed = [];
+  const registry = new AssetRegistry({ loadURL: async (url) => `${url}#${++n}`, dispose: (v) => disposed.push(v) });
+  registry.define('a', '/a');
+  const seen = [];
+  registry.subscribe('a', (v) => seen.push(v));
+  assert.equal(await registry.load('a'), '/a#1');
+  assert.equal(await registry.reload('a'), '/a#2');
+  assert.deepEqual(seen, ['/a#1', '/a#2']);
+  assert.deepEqual(disposed, ['/a#1']);
+  assert.equal(registry.unload('a'), true);
+  assert.equal(registry.get('a'), undefined);
+  assert.equal(registry.has('a'), true);
+  assert.deepEqual(disposed, ['/a#1', '/a#2']);
+  assert.equal(await registry.load('a'), '/a#3');
+  assert.equal(registry.unload('nope'), false);
+  await assert.rejects(registry.reload('nope'), /not defined/);
+  assert.deepEqual(await registry.loadMap({ b: '/b', c: { url: '/c', type: 'json' } }), ['b', 'c']);
+  assert.deepEqual(await registry.loadMap(new Blob(['{"d":"/d"}'])), ['d']);
+  assert.deepEqual(registry.keys, ['a', 'b', 'c', 'd']);
+  await assert.rejects(registry.loadMap(new Blob(['[1]'])), /JSON object/);
+});

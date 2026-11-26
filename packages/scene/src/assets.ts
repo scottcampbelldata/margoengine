@@ -339,6 +339,9 @@ export interface AssetRegistryOptions<T> {
   onMissing?(key: string, reason: 'undefined' | 'failed', error?: unknown): AssetSource<T> | void | Promise<AssetSource<T> | void>;
 }
 
+const isMap = (value: unknown): value is Record<string, AssetMapEntry> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
 interface Slot<T> {
   source: AssetSource<T>;
   type?: string;
@@ -497,6 +500,49 @@ export class AssetRegistry<T = unknown> {
     const value = await this.fetchValue(key, source, type, controller.signal);
     if (slot.version !== version) return slot.value;
     this.publish(slot, key, value);
+    return value;
+  }
+
+  /**
+   * Fills the registry from a JSON asset map given as an object, a URL (fetched), or a `File`/`Blob`. Resolves with the
+   * keys it defined or swapped. Without a `fetch`, a URL map needs the global one.
+   */
+  async loadMap(source: string | Blob | Record<string, AssetMapEntry>, signal?: AbortSignal): Promise<string[]> {
+    this.live();
+    let map: unknown = source;
+    if (typeof source === 'string') {
+      const response = await fetch(source, { signal });
+      if (!response.ok) throw fault('failed', `${source}: HTTP ${response.status}; check the asset map URL`);
+      map = await response.json();
+    } else if (typeof Blob !== 'undefined' && source instanceof Blob) map = JSON.parse(await source.text());
+    if (!isMap(map)) throw typeError('an asset map is a JSON object of {key: url | {url, type}}; check the file', 'arguments');
+    this.fromJSON(map);
+    return Object.keys(map);
+  }
+
+  /** Disposes the loaded value of a key but keeps its definition, so the next `load` fetches it again. Returns false for an unknown key. */
+  unload(key: string): boolean {
+    const slot = this.slots.get(key);
+    if (!slot) return false;
+    slot.controller?.abort(new Error(`asset "${key}" was unloaded`));
+    slot.version++;
+    slot.loading = undefined;
+    if (slot.value !== undefined) this.options.dispose?.(slot.value, key);
+    slot.value = undefined;
+    return true;
+  }
+
+  /** Loads a key again from its source: the new value replaces the old one (disposed) and subscribers get it. */
+  async reload(key: string, signal?: AbortSignal): Promise<T> {
+    const slot = this.slots.get(key);
+    if (!slot) throw fault('state', `asset "${key}" is not defined; define() it before reload()`);
+    const old = slot.value;
+    slot.controller?.abort(new Error(`asset "${key}" was reloaded`));
+    slot.version++;
+    slot.loading = undefined;
+    slot.value = undefined;
+    const value = await this.load(key, signal);
+    if (old !== undefined && old !== value) this.options.dispose?.(old, key);
     return value;
   }
 
