@@ -1,0 +1,331 @@
+{
+ "stage33": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"a\" (\n                        payload = @./l1.usda@</M/a> (offset = 3; scale = 2)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    5
+   ],
+   "/P/b": [
+    6,
+    2
+   ],
+   "/P/b/b": [
+    7,
+    8,
+    0,
+    3
+   ],
+   "/P/b/b/a": [
+    9
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage33-other-stack": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "l3.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n)\r\ndef \"M\" (\r\n    specializes = </C>\r\n)\r\n{\r\n    def \"a\"\r\n    {\r\n    }\r\n}\r\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"a\" (\n                        payload = @./l3.usda@</M/a> (offset = 3; scale = 2)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    7
+   ],
+   "/P/b": [
+    8,
+    2
+   ],
+   "/P/b/b": [
+    9,
+    10,
+    0,
+    5
+   ],
+   "/P/b/b/a": [
+    11,
+    4
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage33-unresolved": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "l3.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n)\r\ndef \"M\" (\r\n    specializes = </C>\r\n)\r\n{\r\n}\r\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"a\" (\n                        payload = @./l3.usda@</M/a> (offset = 3; scale = 2)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    6
+   ],
+   "/P/b": [
+    7,
+    2
+   ],
+   "/P/b/b": [
+    8,
+    9,
+    0,
+    4
+   ],
+   "/P/b/b/a": [
+    10
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "no-variant": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "l3.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n)\r\ndef \"M\" (\r\n    specializes = </C>\r\n)\r\n{\r\n    def \"a\"\r\n    {\r\n    }\r\n}\r\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            def \"a\" (\n                payload = @./l3.usda@</M/a> (offset = 3; scale = 2)\n            )\n            {\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    7
+   ],
+   "/P/b": [
+    8,
+    2
+   ],
+   "/P/b/b": [
+    9,
+    0,
+    5
+   ],
+   "/P/b/b/a": [
+    10,
+    4,
+    6
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "root-prim-payload": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"a\" (\n                        payload = @./l1.usda@</M> (offset = 3; scale = 2)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    5
+   ],
+   "/P/b": [
+    6,
+    2
+   ],
+   "/P/b/b": [
+    7,
+    8,
+    0,
+    3
+   ],
+   "/P/b/b/a": [
+    9,
+    0,
+    3,
+    4
+   ],
+   "/P/b/b/a/a": [
+    4
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "inherit": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "l3.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n)\r\ndef \"M\" (\r\n    inherits = </C>\r\n)\r\n{\r\n    def \"a\"\r\n    {\r\n    }\r\n}\r\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"a\" (\n                        payload = @./l3.usda@</M/a> (offset = 3; scale = 2)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    7
+   ],
+   "/P/b": [
+    8,
+    2
+   ],
+   "/P/b/b": [
+    9,
+    10,
+    0,
+    5
+   ],
+   "/P/b/b/a": [
+    11,
+    4,
+    6
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "no-specializes": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n)\n{\n    def \"a\"\n    {\n    }\n}\n",
+   "l3.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n)\r\ndef \"M\"\r\n{\r\n    def \"a\"\r\n    {\r\n    }\r\n}\r\n",
+   "root.usda": "#usda 1.0\n(\n\n)\nclass \"C\"\n{\n    def \"a\"\n    {\n    }\n}\ndef \"P\"\n{\n    def \"b\" (\n        references = @./l2.usda@</M/a> (offset = 10)\n    )\n    {\n        def \"b\" (\n            payload = @./l1.usda@</M> (offset = 10)\n            variantSets = \"vs\"\n        )\n        {\n            variantSet \"vs\" = {\n                \"y\" {\n                    def \"a\" (\n                        payload = @./l3.usda@</M/a> (offset = 3; scale = 2)\n                    )\n                    {\n                    }\n                }\n            }\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/P": [
+    7
+   ],
+   "/P/b": [
+    8,
+    2
+   ],
+   "/P/b/b": [
+    9,
+    10,
+    0,
+    5
+   ],
+   "/P/b/b/a": [
+    11,
+    4,
+    6
+   ]
+  },
+  "reading": {
+   "/P": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b": {
+    "type": "",
+    "props": {}
+   },
+   "/P/b/b/a": {
+    "type": "",
+    "props": {}
+   }
+  }
+ }
+}
