@@ -141,6 +141,13 @@ export interface CrushSheetSeamReading {
     readonly broken: boolean;
 }
 
+export interface CrushShellAnisotropy {
+    readonly rollingDirection: CrushVector;
+    readonly r0: number;
+    readonly r45: number;
+    readonly r90: number;
+}
+
 export interface CrushShellBudget {
     readonly kinetic: number;
     readonly membrane: number;
@@ -169,6 +176,7 @@ export interface CrushShellMaterial {
     readonly poissonRatio: number;
     readonly yieldStress: number;
     readonly hardeningModulus?: number;
+    readonly anisotropy?: CrushShellAnisotropy;
 }
 
 export interface CrushShellParams {
