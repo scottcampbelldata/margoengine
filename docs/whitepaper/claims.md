@@ -5607,6 +5607,12 @@ place of nh^2 (a2 - 1) + 1. The call logs differ only in the text of 12 shader m
 stories); every other call and argument is the same. tests/smith-shaders.test.js holds the precision claim.
 Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-26, KB-SHIPLAMP1): the water-ssr --current proof advances to 6191cc6f29, whose sun glint and
+ship lamps reflect through one lobe (seaGlint: GGX alpha = roughness^2 widened by the waves' slope variance,
+Schlick-Smith G, Fresnel). The call logs differ only in shader module text. packages/water/test/ships.browser.mjs holds
+the claim: a lamp 10 km along the sun's glint direction at the sun's irradiance lights 685 pixels where the sun lights
+686. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.
