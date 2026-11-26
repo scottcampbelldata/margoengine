@@ -378,7 +378,11 @@ export class FaceDriver implements Disposable {
    */
   calibrate(input: LandmarkFrame | FaceTrack): this {
     const face = this.track(input);
-    if (!face) throw new MargoError('state', 'Calibrate on a frame with a face in it' + HELP);
+    if (!face)
+      throw new MargoError(
+        'state',
+        'Calibrate on a frame with a face in it; pass a frame the detector found a face in' + HELP,
+      );
     if (face.landmarks?.length >= LANDMARK_COUNT) this.neutral = measureFace(face.landmarks, this.options.aspect);
     this.neutralScores = { ...(face.blendshapes ?? {}) };
     const r = this.raw(face).rotation;

@@ -184,7 +184,10 @@ export function fromMediaPipe(
 ): LandmarkFrame {
   const { face, hands, pose } = results ?? {};
   const list = <T>(value: T[] | undefined, name: string): T[] => {
-    if (!Array.isArray(value)) throw new TypeError(`MediaPipe ${name} result has no landmark arrays` + HELP);
+    if (!Array.isArray(value))
+      throw new TypeError(
+        `MediaPipe ${name} result has no landmark arrays; pass the object the ${name} landmarker returned` + HELP,
+      );
     return value;
   };
   const frame: LandmarkFrame = { time, faces: [], hands: [], poses: [] };

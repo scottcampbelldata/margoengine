@@ -171,3 +171,8 @@ test('OneEuroFilter is a first-order low-pass at rest whose cutoff rises with sp
   assert.equal(still.filter(5, 1), 5);
   assert.throws(() => new OneEuroFilter({ minCutoff: 0 }), RangeError);
 });
+
+test('a MediaPipe result without landmark arrays says which result to pass', () => {
+  assert.throws(() => fromMediaPipe({ face: {} }, 0), /; pass the object the face landmarker returned; see /);
+  assert.throws(() => fromMediaPipe({ hands: {} }, 0), /; pass the object the hand landmarker returned; see /);
+});

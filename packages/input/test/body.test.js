@@ -213,3 +213,11 @@ test('a NaN or Infinity landmark leaves the bone as it was; a limit outside 0..p
   for (const bad of [Number.NaN, -0.1, 4, Number.POSITIVE_INFINITY])
     assert.throws(() => new BodyDriver(skeleton(), { limits: { leftLowerArm: bad } }), RangeError);
 });
+
+test('calibrating on an empty frame says what frame to pass', () => {
+  using driver = new BodyDriver(skeleton());
+  assert.throws(() => driver.calibrate(frame(0)), {
+    code: 'state',
+    message: /; pass a frame with the person in view; see /,
+  });
+});

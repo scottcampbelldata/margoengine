@@ -187,3 +187,11 @@ test('a NaN or Infinity score or point leaves the previous weight and rotation',
   assert.equal(held.weights.jawOpen, good.weights.jawOpen);
   assert.deepEqual(held.rotation, good.rotation);
 });
+
+test('calibrating on a frame without a face says what frame to pass', () => {
+  using driver = new FaceDriver();
+  assert.throws(() => driver.calibrate({ time: 0, faces: [], hands: [], poses: [] }), {
+    code: 'state',
+    message: /; pass a frame the detector found a face in; see /,
+  });
+});

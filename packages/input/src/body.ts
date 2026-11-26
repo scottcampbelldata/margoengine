@@ -391,7 +391,11 @@ export class BodyDriver implements Disposable {
       if (d) found++;
       for (const f of b.filters) f.reset();
     }
-    if (!found) throw new MargoError('state', 'Calibrate on a frame where the body or hands are visible' + HELP);
+    if (!found)
+      throw new MargoError(
+        'state',
+        'Calibrate on a frame where the body or hands are visible; pass a frame with the person in view' + HELP,
+      );
     return this;
   }
   private check(): void {

@@ -21,7 +21,7 @@ export const entries = [
       'BodyDriver skeleton parents must each be -1 or another bone index; see https://margoengine.com/errors#body-driver',
       'BodyDriver skeleton parents form a cycle; every chain must reach a root; see https://margoengine.com/errors#body-driver',
       'No humanoid bone of the targets is in the skeleton; pass a bones map; see https://margoengine.com/errors#body-driver',
-      'Calibrate on a frame where the body or hands are visible; see https://margoengine.com/errors#body-driver',
+      'Calibrate on a frame where the body or hands are visible; pass a frame with the person in view; see https://margoengine.com/errors#body-driver',
       'The body driver is disposed; create a new BodyDriver; see https://margoengine.com/errors#body-driver',
     ],
     cause:
@@ -39,7 +39,7 @@ export const entries = [
       'Face hold must be seconds >= 0; see https://margoengine.com/errors#face-driver',
       'Face aspect must be a finite width / height above 0; see https://margoengine.com/errors#face-driver',
       'The face driver is disposed; create a new FaceDriver; see https://margoengine.com/errors#face-driver',
-      'Calibrate on a frame with a face in it; see https://margoengine.com/errors#face-driver',
+      'Calibrate on a frame with a face in it; pass a frame the detector found a face in; see https://margoengine.com/errors#face-driver',
       'The face has no detector blendshape scores; enable them in the detector or use source landmarks; see https://margoengine.com/errors#face-driver',
     ],
     cause:
@@ -56,7 +56,7 @@ export const entries = [
       'landmarkStream buffer must be a whole number >= 1; see https://margoengine.com/errors#webcam-landmarks',
       'The landmark stream has ended; create a new landmarkStream; see https://margoengine.com/errors#webcam-landmarks',
       'A landmark stream has one reader; await each next() in turn; see https://margoengine.com/errors#webcam-landmarks',
-      'MediaPipe face result has no landmark arrays; see https://margoengine.com/errors#webcam-landmarks',
+      'MediaPipe face result has no landmark arrays; pass the object the face landmarker returned; see https://margoengine.com/errors#webcam-landmarks',
       'This page has no camera access (getUserMedia); serve it over https; see https://margoengine.com/errors#webcam-landmarks',
       'webcamLandmarks needs a detect(video, time) function; see https://margoengine.com/errors#webcam-landmarks',
       'OneEuroFilter cutoffs must be finite and above 0 Hz; see https://margoengine.com/errors#webcam-landmarks',
