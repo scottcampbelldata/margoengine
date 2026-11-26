@@ -6118,6 +6118,10 @@ The optional shallow-film wetting model reproduces the discrete decay rate at it
 precursor. A disturbed positive film relaxes without gaining free energy or losing water and
 replays to the same state hash after restore. [Reproduce](reproduce.md#fluid-07-precursor-wetting)
 
+A two-material backing transfers water toward the more wettable cell by the amount predicted
+by the independent face balance. The patterned pressure domain conserves water and replays
+exactly. [Reproduce](reproduce.md#fluid-07-precursor-wetting)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings

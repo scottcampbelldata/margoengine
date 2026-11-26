@@ -21,6 +21,7 @@ export interface ThinFilmKernel {
     ny: number,
     dt: number,
     wetting: number,
+    wettingMap: number,
   ): number;
 }
 

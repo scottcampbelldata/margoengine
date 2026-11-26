@@ -15085,6 +15085,9 @@ within one tick. The same geometry with partial damage stays shut.
   sign. The linear continuation below `h*` matches the pressure and its slope at the
   precursor. The implicit slope `A/h*` bounds the resulting local energy curvature, while
   the remaining pressure stays in the face right-hand side.
+  A patterned backing uses the local angle in each cell's pressure and energy. The cell
+  stiffness then enters the symmetric face solve as a diagonal, and the exact face
+  preconditioner includes the sum of the two adjacent stiffnesses.
   [Journal](https://doi.org/10.1006/jcis.1998.5448)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
   Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to

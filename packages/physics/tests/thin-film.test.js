@@ -118,6 +118,46 @@ test('ThinFilmSolver: nonlinear wetting relaxes without gaining energy or losing
   assert.equal(world.hash(), settledHash);
 });
 
+test('ThinFilmSolver: a material boundary pulls water toward the more wettable glass', async () => {
+  // Schwartz and Eley (1998) prescribe an equilibrium angle field on the backing.
+  const h = 0.0004;
+  const precursorDepth = 0.0002;
+  const spacing = 0.0015;
+  const density = 998;
+  const viscosity = 0.05;
+  const surfaceTension = 0.0728;
+  const angle = [0.25, 0.65];
+  const { world, film } = await patch({
+    cells: [2, 1],
+    spacing,
+    depth: h,
+    density,
+    viscosity,
+    surfaceTension,
+    wetting: { contactAngle: angle[0], precursorDepth },
+    wettingAngleMap: [undefined, angle[1]],
+  });
+  const stiffness = angle.map((value) => (2 * surfaceTension * (1 - Math.cos(value))) / precursorDepth ** 2);
+  const ratio = precursorDepth / h;
+  const pressureDifference = (stiffness[1] - stiffness[0]) * precursorDepth * ratio ** 2 * (1 - ratio);
+  const mobility = h ** 3 / (3 * viscosity);
+  const implicit =
+    (2 * density * -world.gravity[1] + stiffness[0] + stiffness[1]) / spacing ** 2 +
+    (4 * surfaceTension) / spacing ** 4;
+  const delta = (dt * mobility * pressureDifference) / (spacing ** 2 * (1 + dt * mobility * implicit));
+  const initial = world.takeSnapshot();
+  world.advance(1);
+  const depth = film.depths();
+  close(depth[0], h + delta, 64 * Number.EPSILON * h);
+  close(depth[1], h - delta, 64 * Number.EPSILON * h);
+  assert.ok(depth[0] > depth[1]);
+  close(film.budget.stored, film.budget.initial, 64 * Number.EPSILON * film.budget.initial);
+  const hash = world.hash();
+  world.restoreSnapshot(initial.bytes);
+  world.advance(1);
+  assert.equal(world.hash(), hash);
+});
+
 test('ThinFilmSolver: malformed wetting parameters report the range and its fix', async () => {
   const options = { cells: [4, 1], spacing: 0.001 };
   await assert.rejects(() => patch({ ...options, wetting: null }), {
@@ -130,6 +170,10 @@ test('ThinFilmSolver: malformed wetting parameters report the range and its fix'
     code: 'PHYSICS_INPUT_RANGE',
     message: /Use a finite contact angle/,
   });
+  await assert.rejects(
+    () => patch({ ...options, wetting: { contactAngle: 0.35, precursorDepth: 0.0002 }, wettingAngleMap: [0.5] }),
+    { name: 'RangeError', code: 'PHYSICS_INPUT_RANGE', message: /one angle in radians per row-major film cell/ },
+  );
 });
 
 test('ThinFilmSolver: a suspended film amplifies the long mode and damps the short mode', async () => {

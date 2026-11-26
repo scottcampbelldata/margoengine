@@ -30,14 +30,14 @@ struct Wetting {
 }
 
 impl Wetting {
-    fn pressure(&self, h: f64) -> f64 {
+    fn pressure(&self, h: f64, stiffness: f64) -> f64 {
         let precursor = self.precursor_depth;
         if h <= precursor {
             // Continue the precursor tangent into the unresolved molecular layer.
-            return self.stiffness * (h - precursor);
+            return stiffness * (h - precursor);
         }
         let ratio = precursor / h;
-        self.stiffness * precursor * ratio * ratio * (1.0 - ratio)
+        stiffness * precursor * ratio * ratio * (1.0 - ratio)
     }
 }
 
@@ -181,6 +181,7 @@ struct Film {
     work: Workspace,
     model: *const Model,
     wetting: *const Wetting,
+    wetting_map: *const f64,
     external: *const Forcing,
     height: *mut f64,
     base: *const f64,
@@ -212,6 +213,11 @@ impl Film {
         let w = &self.work;
         self.grid.gradient_transpose(x, w.weight, w.transpose);
         self.hydraulic_pressure(w.transpose, k, w.cellwork);
+        if !self.wetting_map.is_null() {
+            for i in 0..self.grid.n {
+                *w.cellwork.add(i) += *self.wetting_map.add(i) * *w.transpose.add(i);
+            }
+        }
         for i in 0..self.grid.n {
             for axis in 0..2 {
                 let f = 2 * i + axis;
@@ -239,10 +245,16 @@ impl Film {
         // Gravity pulling liquid away from the backing enters only the right-hand side.
         // The implicit capillary and supporting-pressure terms remain positive semidefinite.
         let mut k = k.max(0.0);
+        let patterned = !self.wetting_map.is_null();
         if let Some(wetting) = self.wetting.as_ref() {
-            if wetting.stiffness > 0.0 {
+            if wetting.stiffness > 0.0 || patterned {
                 for i in 0..n {
-                    *work.pressure.add(i) += wetting.pressure(*self.height.add(i));
+                    let stiffness = if patterned {
+                        *self.wetting_map.add(i)
+                    } else {
+                        wetting.stiffness
+                    };
+                    *work.pressure.add(i) += wetting.pressure(*self.height.add(i), stiffness);
                 }
                 // Treat the upper bound on wetting energy curvature implicitly so PCG stays positive.
                 k += wetting.stiffness;
@@ -272,10 +284,15 @@ impl Film {
                         }
                     }
                     weight = scalar_sqrt(m);
+                    let stiffness = if patterned {
+                        *self.wetting_map.add(i) + *self.wetting_map.add(j)
+                    } else {
+                        0.0
+                    };
                     inverse = 1.0
                         / (1.0
                             + dt * m
-                                * (2.0 * k * dx2
+                                * ((2.0 * k + stiffness) * dx2
                                     + (grid.degree(i) + grid.degree(j) + 2.0) * capillary));
                     rhs *= weight * grid.inv_dx;
                 }
@@ -539,6 +556,7 @@ unsafe extern "C" fn thin_film_step(
     rows: u32,
     dt: f64,
     wetting: *const Wetting,
+    wetting_map: *const f64,
 ) -> u32 {
     let (cols, rows) = (cols as usize, rows as usize);
     let n = cols * rows;
@@ -554,6 +572,7 @@ unsafe extern "C" fn thin_film_step(
         work,
         model,
         wetting,
+        wetting_map,
         external: forcing,
         height,
         base,

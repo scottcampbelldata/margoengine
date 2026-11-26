@@ -4721,6 +4721,7 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   v: [0, -1, 0],
   depth: 0.0002,
   wetting: { contactAngle: 0.35, precursorDepth: 0.00005 },
+  wettingAngleMap: Array.from({ length: 24 }, (_, i) => (i % 4 < 2 ? 0.25 : 0.45)),
   drains: [false, false, false, true],
 });
 world.advance(60);
@@ -4730,6 +4731,8 @@ console.log(film.budget.dripped, film.sample(0, 5).depth);
 Set `wetting` for a partially wetting surface. Enter the equilibrium contact angle in radians and
 include the resolved precursor layer in the initial depth. The layer contributes to the same water
 budget as the rest of the film. Omit `wetting` to run without disjoining pressure.
+For patterned glass, give `wettingAngleMap` one row-major value per cell. Use `undefined`
+at a cell to apply the backing's default `contactAngle`.
 
 Set `suspended: true` on the underside of a panel with its normal pointing into the liquid.
 Gravity can then amplify long disturbances while surface tension damps short ones.

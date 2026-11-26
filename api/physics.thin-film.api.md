@@ -73,6 +73,7 @@ export interface ThinFilmOptions {
         readonly contactAngle: number;
         readonly precursorDepth: number;
     };
+    readonly wettingAngleMap?: ArrayLike<number | undefined>;
     readonly evaporation?: number;
     readonly drains?: readonly [boolean, boolean, boolean, boolean];
     readonly outlets?: readonly ThinFilmDripOutlet[];
