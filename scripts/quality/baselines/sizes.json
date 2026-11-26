@@ -13524,6 +13524,18 @@
       "commit": "69ca5def52",
       "grew": 1,
       "reason": "KB4000: the native volume tint reads KHR_materials_volume thicknessTexture (margoThickness, slot 20); @margoengine/gltf/pbr 92158 to 92204, gltf/prepare 35545 to 35588 and gltf/worker 92644 to 92722 B gzip. The WGSL lives in the shader strings these entries already carry; a split would move the whole tint shader for 46 B. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "68cc8cddc2",
+      "grew": 1,
+      "reason": "KB-SHIPLAMP1: ship lamps glitter through the Water's one glint lobe (seaGlint) and lampRoughness is documented as perceptual; @margoengine/water 34759 to 34779 and @margoengine/water/settings 6675 to 6689 B gzip. The text is shader and row strings already inside those entries; no split applies. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f3295120cc",
+      "grew": 1,
+      "reason": "KB4000: the native volume tint reads KHR_materials_volume thicknessTexture (margoThickness, slot 20); @margoengine/gltf/pbr 92158 to 92204, gltf/prepare 35545 to 35588 and gltf/worker 92644 to 92722 B gzip. The WGSL lives in the shader strings these entries already carry; a split would move the whole tint shader for 46 B. Core plus Stage unchanged."
     }
   ],
   "items": {
