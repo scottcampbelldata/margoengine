@@ -130,6 +130,19 @@ test('invalid graphs throw coded errors with a help link', () => {
   );
 });
 
+// Regression (2026-11-26): create-prewarm's seed went into the schedule unchecked, a string or NaN included.
+test('a prewarm seed is a checked number, wired or literal', () => {
+  const prewarm = (seed) => {
+    const g = graph();
+    g.blocks.push({ id: 'pw', type: 'create-prewarm', seconds: 1, seed });
+    block(g, 'sparks').create.push('pw');
+    return g;
+  };
+  assert.equal(compileNodeSystem(prewarm(7)).systems.get('sparks').options.schedule.seed, 7);
+  code(() => compileNodeSystem(prewarm('loud')), 'unknown-ref');
+  code(() => compileNodeSystem(prewarm(Number.NaN)), 'bad-param');
+});
+
 test('a death trigger turns its target into the parent sub-emitter', () => {
   const g = {
     format: 'margo-vfx-node-system',

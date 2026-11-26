@@ -292,7 +292,8 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
   if (!Number.isInteger(seed) || seed < 0 || seed > 0xffffffff)
     throw new RangeError('Node system seed must be an unsigned 32-bit integer; pass 0..4294967295');
 
-  const blocks = new Map<string, Record<string, unknown> & { id: string; type: string }>();
+  type RawBlock = Record<string, unknown> & { id: string; type: string };
+  const blocks = new Map<string, RawBlock>();
   const index = new Map<string, number>();
   graph.blocks.forEach((block, at) => {
     if (!own(block) || typeof block.id !== 'string' || block.id === '')
@@ -404,7 +405,7 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
   const rangeOf = (v: unknown, where: string, block: string): [number, number] =>
     typeof v === 'number' ? [v, v] : (tuple(v, 2, where, block) as [number, number]);
 
-  const shapeOf = (id: string, from: string): VFXEmitter => {
+  const shapeOf = (id: unknown, from: string): VFXEmitter => {
     const b = get(id, 'system shape', from);
     if (b.type !== 'shape')
       fail('wrong-type', `System "${from}" shape must name a shape block, not ${b.type} "${id}"`, from);
@@ -417,13 +418,13 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
           : key === 'shape'
             ? value
             : key === 'axis' || key === 'spacing'
-              ? vec3(value, `shape "${id}" ${key}`, id)
-              : num(value, `shape "${id}" ${key}`, id);
+              ? vec3(value, `shape "${b.id}" ${key}`, b.id)
+              : num(value, `shape "${b.id}" ${key}`, b.id);
     }
     return out as unknown as VFXEmitter;
   };
 
-  const apply = (b: Record<string, any>, o: VFXOptions & Record<string, any>) => {
+  const apply = (b: RawBlock, o: VFXOptions) => {
     const at = `${b.type} "${b.id}"`;
     switch (b.type) {
       case 'create-capacity':
@@ -453,7 +454,7 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
         break;
       case 'create-prewarm':
         o.schedule = { ...o.schedule, prewarm: num(b.seconds, at, b.id) };
-        if (b.seed !== undefined) o.schedule!.seed = b.seed;
+        if (b.seed !== undefined) o.schedule!.seed = num(b.seed, `${at} seed`, b.id);
         break;
       case 'create-burst': {
         const burst: Record<string, number> = {
@@ -496,14 +497,15 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
         break;
       case 'update-forces':
         if (!Array.isArray(b.graph)) fail('bad-param', `${at} needs a graph array of update-node operators`, b.id);
-        o.nodes = { graph: b.graph };
+        // Each operator is checked by the force graph itself when the VFX is built (vfx/src/nodes.ts).
+        o.nodes = { graph: b.graph as NonNullable<VFXOptions['nodes']>['graph'] };
         break;
     }
   };
-  const members = (system: Record<string, any>, key: 'create' | 'update', set: Set<string>): Record<string, any>[] => {
+  const members = (system: RawBlock, key: 'create' | 'update', set: Set<string>): RawBlock[] => {
     const ids = system[key] ?? [];
     if (!Array.isArray(ids)) fail('bad-param', `System "${system.id}" ${key} must be an array of block ids`, system.id);
-    return ids.map((id: unknown) => {
+    return (ids as unknown[]).map((id) => {
       const b = get(id, `System "${system.id}" ${key}`, system.id);
       if (!set.has(b.type))
         fail(
@@ -515,13 +517,13 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
     });
   };
 
-  const systems = [...blocks.values()].filter((b) => b.type === 'system') as Record<string, any>[];
+  const systems = [...blocks.values()].filter((b) => b.type === 'system');
   if (systems.length === 0) fail('no-system', 'Node system has no system block; add one with type "system"');
   if (systems.length > MAX_NODE_SYSTEMS)
     fail('limit', `Node system has more than ${MAX_NODE_SYSTEMS} systems; split the graph`);
-  const raw = new Map<string, VFXOptions & Record<string, any>>();
+  const raw = new Map<string, VFXOptions>();
   for (const system of systems) {
-    const o: VFXOptions & Record<string, any> = {};
+    const o: VFXOptions = {};
     if (system.shape !== undefined) o.emitter = shapeOf(system.shape, system.id);
     for (const b of members(system, 'create', CREATE)) apply(b, o);
     for (const b of members(system, 'update', UPDATE)) apply(b, o);
@@ -535,33 +537,34 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
   const targeted = new Set<string>();
   const children = new Set<string>();
   const hasEvents = new Set<string>();
-  for (const t of [...blocks.values()].filter((b) => b.type === 'trigger') as Record<string, any>[]) {
+  for (const t of [...blocks.values()].filter((b) => b.type === 'trigger')) {
     const at = `trigger "${t.id}"`;
     const [source, target] = [get(t.source, `${at} source`, t.id), get(t.target, `${at} target`, t.id)];
     if (source.type !== 'system' || target.type !== 'system')
       fail('trigger', `${at} source and target must be system blocks`, t.id);
     if (source === target) fail('trigger', `${at} cannot start its own source; name a second system`, t.id);
+    // The resolved blocks' ids: the same strings as t.source and t.target, typed.
+    const [from, to] = [source.id, target.id];
     if (t.on === 'start' || t.on === 'end') {
       const delay = t.delay === undefined ? 0 : num(t.delay, `${at} delay`, t.id);
       if (delay < 0 || delay > 1_000_000)
         throw new RangeError(`Node system ${at} delay must be 0..1000000 seconds; pass a finite value in range`);
-      chain.get(t.source)!.push({ on: t.on, target: t.target, delay });
-      targeted.add(t.target);
-    } else if (EVENT_ON.has(t.on)) {
-      if (hasEvents.has(t.source))
-        fail('trigger', `System "${t.source}" already has an event trigger; a sub-emitter has one (on, count)`, t.id);
-      const child = raw.get(t.target)!;
-      const childBlock = target as Record<string, any>;
+      chain.get(from)!.push({ on: t.on, target: to, delay });
+      targeted.add(to);
+    } else if (typeof t.on === 'string' && EVENT_ON.has(t.on)) {
+      if (hasEvents.has(from))
+        fail('trigger', `System "${from}" already has an event trigger; a sub-emitter has one (on, count)`, t.id);
+      const child = raw.get(to)!;
       if (
         child.emitter ||
-        childBlock.update?.length ||
-        chain.get(t.target)!.length ||
-        targeted.has(t.target) ||
-        children.has(t.source)
+        (Array.isArray(target.update) && target.update.length) ||
+        chain.get(to)!.length ||
+        targeted.has(to) ||
+        children.has(from)
       )
         fail(
           'trigger',
-          `${at} target "${t.target}" is a sub-emitter child: it takes its birth settings from create blocks only, with no shape, update blocks or triggers, and a child cannot itself raise events`,
+          `${at} target "${to}" is a sub-emitter child: it takes its birth settings from create blocks only, with no shape, update blocks or triggers, and a child cannot itself raise events`,
           t.id,
         );
       const events: Record<string, unknown> = { on: t.on };
@@ -572,9 +575,9 @@ export function compileNodeSystem(graph: NodeSystemGraph, options: NodeSystemCom
       if (child.velocity) events.velocity = child.velocity;
       if (child.spread !== undefined) events.spread = child.spread;
       if (child.color) events.color = child.color;
-      raw.get(t.source)!.events = events as unknown as VFXEvents;
-      hasEvents.add(t.source);
-      children.add(t.target);
+      raw.get(from)!.events = events as unknown as VFXEvents;
+      hasEvents.add(from);
+      children.add(to);
     } else fail('trigger', `${at} on must be start, end, birth, death or collision`, t.id);
   }
   for (const child of children)
