@@ -82,6 +82,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseTilt` (`/tilt`, async) | See [Tilt Brush](#tilt-brush) |
 | `parseBabylon`, `flattenBabylon` (`/babylon`) | See [Babylon scenes](#babylon-scenes) |
 | `parseX` (`/xfile`) | See [DirectX .x files](#directx-x-files) |
+| `parsePMD`, `parsePMX`, `parseMMD`, `parseVMD`, `sampleVMDBone` (`/mmd`) | See [MikuMikuDance](#mikumikudance-models-and-motions) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
@@ -714,6 +715,45 @@ Frame Root {
   Mesh Tri { 3; 0;0;0;, 1;0;0;, 0;1;0;; 1; 3;0,1,2;; }
 }`);
 console.log(x.frames[0].matrix.slice(12, 15), x.meshes[0].geometry.indices?.length); // [0, 0, -5] 3
+```
+
+## MikuMikuDance models and motions
+
+`parsePMD`, `parsePMX` and `parseMMD` (either, by signature) read MikuMikuDance models; `parseVMD` reads motion and camera clips. All from `./mmd`. Formats: the PMD 1.0 layout, the PMX 2.0 and 2.1 specification and the VMD layout. MMD is left-handed and measures in units of about 8 cm: `scale` (default 0.08) turns units into metres and `rightHanded` (default true) mirrors Z (positions, normals, Euler angles and quaternions) and swaps the winding; `maxVertices` and `maxTriangles` apply.
+
+`parsePMX(bytes, options)` returns `{format, version, name, comment, geometry, joints, weights, sdef, materials, textures, bones, morphs, rigidBodies, joints_, warnings}`:
+
+- `geometry` is the mesh with one group per material (`properties.materialIndex`); `attributes` holds `uv1` to `uv4` (four values each, the extra UV sets) and `edgeScale`. `joints` and `weights` give four bone influences a vertex (BDEF1, BDEF2, BDEF4, QDEF; SDEF counts as BDEF2 and its C, R0 and R1 vectors are in `sdef`).
+- `materials` carry diffuse, specular, ambient, edge colour and size, double-sided and edge flags, texture, sphere map and mode, and toon; `triangles` counts each group.
+- `bones` have parent, deform layer, flags, tail, inherit (grant) bone and rate, after-physics flag and IK (target, iterations, limit angle, links with optional angle limits). `morphs` are group, vertex, bone, UV, extra UV, material, flip and impulse morphs with their offsets.
+- `rigidBodies` and `joints_` are parsed as data only: shape, size, position, rotation, mass, damping, restitution, friction, group and mask, mode, and the joints' limits and springs. Nothing here simulates them.
+- Soft bodies of PMX 2.1 are not read (a note in `warnings`). Index sizes of 1, 2 and 4 bytes, UTF-16 and UTF-8 text, and the extra UV sets are honoured.
+
+`parsePMD(bytes, options)` reads the older format into the same shape: two-bone weights, per-material face ranges, bones with IK chains, morphs, the English name block, and rigid bodies and joints. Shift-JIS names are decoded with `TextDecoder('shift_jis')`.
+
+`parseVMD(bytes, {scale, rightHanded, maxKeys})` returns `{modelName, fps: 30, bones, morphs, camera, lights, shadows, ik, duration}`. Bone and morph keys are grouped by name and sorted by frame (`bones[i]`: `frames`, `positions`, `rotations` as x, y, z, w, and 64 bytes of `interpolation` a key; `morphs[i]`: `frames`, `weights`). `camera` holds `frames`, `distance`, `position` (the point looked at), Euler `rotation`, `fov` in radians, a `perspective` flag and 24 bytes of `interpolation` a key. `sampleVMDBone(track, frame)` samples a bone at a (fractional) frame, easing each axis and the rotation with the later key's Bezier curves; `vmdBezier` is the curve alone. An old file that ends after the bone keys parses with the later sections empty.
+
+Hostile files throw a `LoaderError` with a `code`: a count that claims more records than the bytes can hold is refused before anything is allocated, as are bad index sizes, texts, bone, texture, morph and vertex indices past their lists, and counts past the limits.
+
+```ts
+import { parseVMD, sampleVMDBone } from '@margoengine/loaders/mmd';
+
+// A 'Vocaloid Motion Data 0002' file with one bone key at frame 0 and one at frame 10.
+const bytes = new Uint8Array(30 + 20 + 4 + 2 * 111 + 16);
+bytes.set(new TextEncoder().encode('Vocaloid Motion Data 0002'));
+bytes.set(new TextEncoder().encode('model'), 30);
+const view = new DataView(bytes.buffer);
+view.setUint32(50, 2, true);
+for (const [i, [frame, x]] of [[0, 0], [10, 10]].entries()) {
+  const at = 54 + i * 111;
+  bytes.set(new TextEncoder().encode('arm'), at);
+  view.setUint32(at + 15, frame, true);
+  view.setFloat32(at + 19, x, true);
+  view.setFloat32(at + 43, 1, true); // quaternion w
+  bytes.set([20, 20, 20, 20, 20, 20, 20, 20, 107, 107, 107, 107, 107, 107, 107, 107], at + 47); // curve x1, y1, x2, y2
+}
+const motion = parseVMD(bytes, { scale: 1 });
+console.log(motion.bones[0].name, sampleVMDBone(motion.bones[0], 5)!.position[0].toFixed(2)); // arm 5.00
 ```
 
 ## Tilt Brush
