@@ -8,13 +8,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { benchRoot } from '../../../scripts/rival-pair.mjs';
-import { splatsRivalPlugin } from '../../../scripts/rival-splats-alias.mjs';
+import { splatsTruckPlugin } from '../../../scripts/splats-truck-data.mjs';
 
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 const save = process.argv.find((arg) => arg.startsWith('--save='))?.slice(7);
 const near = process.argv.find((arg) => arg.startsWith('--near='))?.slice(7);
 const ply = process.argv.find((arg) => arg.startsWith('--ply='))?.slice(6) ?? 'truck-7k.ply';
-const modules = realpathSync.native(join(benchRoot(), 'batch-168', 'node_modules'));
 const dataDir = realpathSync.native(join(benchRoot(), 'batch-168', 'data'));
 const repo = realpathSync.native(process.cwd());
 
@@ -23,7 +22,7 @@ try {
   context = await openBrowser({
     startPath: `/scripts/splats-truck-photo-page.html?ply=${encodeURIComponent(ply)}${save ? '&save' : ''}${near ? `&near=${near}` : ''}`,
     port: 'free',
-    plugins: [splatsRivalPlugin(modules, dataDir, repo)],
+    plugins: [splatsTruckPlugin(dataDir, repo)],
   });
   const { page, hardware } = context;
   const errors = [];

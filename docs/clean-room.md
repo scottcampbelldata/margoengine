@@ -4308,7 +4308,7 @@ Emission mixed by coverage, matching the unlit-pane transport. Public node descr
 https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/transparent.html and
 https://docs.blender.org/manual/en/latest/render/shader_nodes/shader/emission.html . Renderer code was
 not opened. Camera, meshes, node setup, float readback and comparison are independently authored in
-`scripts/rival-oit-cycles.py` and `.mjs`; generated EXR, float data and engine pictures stay in engine-bench.
+a Cycles script and its runner (both removed on 2026-11-26 with the rival harness); generated EXR, float data and engine pictures stay in engine-bench.
 
 ## Audio event containers (batch 110)
 
@@ -9127,7 +9127,7 @@ The example freezes an unmodified USGS all_day GeoJSON response and sorts only f
 
 ## Inspector live shader editing (batch 107 job 2, 2026-11-10)
 
-Built from the W3C WebGPU specification, https://www.w3.org/TR/webgpu/ (sections on `GPUShaderModule.getCompilationInfo` and `GPUCompilationMessage` line and column numbering, error scopes with `pushErrorScope` and `popErrorScope`, and invalid objects making a command buffer invalid at submit), and the W3C WGSL specification, https://www.w3.org/TR/WGSL/ (module-scope declarations). No editor or engine source was read. The approach (compile the module text the engine drew with the edit spliced in, swap only a clean result, keep the old material for undo) is Margo's own; public behaviour reference is the general idea of in-place shader editing in browser shader playgrounds, with no code consulted.
+Built from the W3C WebGPU specification, https://www.w3.org/TR/webgpu/ (sections on `GPUShaderModule.getCompilationInfo` and `GPUCompilationMessage` line and column numbering, error scopes with `pushErrorScope` and `popErrorScope`, and invalid objects making a command buffer invalid at submit), and the W3C WGSL specification, https://www.w3.org/TR/WGSL/ (module-scope declarations). No editor or engine source was read. The approach (compile the module text the engine drew with the edit spliced in, swap only a clean result, keep the old material for undo) is Margo's own; public behaviour reference is the general idea of in-place shader editing in browser shader editors, with no code consulted.
 
 ## Batch 64 job 5: automatic scatter LOD rings (2026-11-10)
 Simplification reuses Margo's existing mesh-edit quadric simplifier (Michael Garland and Paul S. Heckbert, Surface Simplification Using Quadric Error Metrics, SIGGRAPH 1997, https://doi.org/10.1145/258734.258849, already recorded for mesh-edit) through lod's attribute-keeping chain; no second simplifier was written. New code: the ring deviation bound uses the point-to-triangle closest point by Voronoi regions from Christer Ericson, Real-Time Collision Detection (Morgan Kaufmann, 2005), section 5.1.5, written from the book's description; the book was not re-read in this session, and the tests check every region against hand-computed distances instead. ringDistance is the pinhole projection of a length onto the screen (WebGPU-independent perspective geometry). No other engine's or repository's source was read.

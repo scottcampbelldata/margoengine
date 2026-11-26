@@ -9313,33 +9313,6 @@ wiring, scales and constants are fixed when the runtime is made (values and `ena
 textures and closed `VideoFrame`s are gone: set them again. Video and camera input need a page
 (`HTMLVideoElement`); in a worker pass `VideoFrame`s to `setImage`. GPU cost not measured.
 
-## Playground
-
-The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2026-11-26:
-
-- A share link's `#code=` holds at most 65,536 characters (`MAX_LINK_CHARS`) and expands to at most 262,144 bytes of
-  UTF-8 code (`MAX_CODE_BYTES`); longer code is refused with a message to download it instead. Browsers and servers
-  cap URL length separately; the hash never reaches the server.
-- The version history keeps the newest 30 snapshots (`MAX_SNAPSHOTS`) in this browser's `localStorage`. When storage
-  is full the oldest go first; where storage is blocked (some private windows) versions last only until the tab closes.
-- The console keeps the last 500 lines; each message is cut to 4,000 characters.
-- An error's line is read from the stack frame of the code's blob module (or the error event for it); an error thrown
-  inside a package, or one with no stack, shows no line.
-- A project holds at most 12 files (`MAX_FILES`), named with letters, digits, `-` and `_` then `.js` (32 characters
-  before the extension); the 256 KiB cap is for all files together. Only `./name.js` imports of the project's own files
-  are linked; a path into a folder (`./lib/x.js`) is not.
-- On margoengine.com the page loads the import map of `margoengine@1.0.0` from jsDelivr, which works once the packages
-  are published on npm (they are not yet: the catalog lists 0 of 108 published). Until then, run it against a checkout
-  with `npm run playground` and `?packages=/node_modules/`.
-- Download HTML gives the run frame with the code built in; it loads the packages from the same place as the page did,
-  so a file downloaded from a local run needs that local server.
-- The API panel lists top-level exports only (no class members, no full type checking, no inferred types), read from
-  at most 120 `.d.ts` files per run, 20 imported entries and 400 names each; a declaration's line is cut at 300
-  characters and its doc at its first sentence.
-- The embed (`/playground/embed/`) saves nothing in the browser and has no templates, versions, sharing or download;
-  its Open in Playground link carries the files only while they fit a share link (256 KiB, 64 KiB of link).
-- The glTF template loads the Khronos Box sample from raw.githubusercontent.com, so it needs the network.
-
 ## Contact and modal sound (SOUND-04)
 
 Modal material presets contain authored resonances for a wood object, metal object, glass object and bell.

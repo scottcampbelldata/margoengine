@@ -107,7 +107,7 @@ per-round minimum. The rounds do not overlap (Margo 10.765 to 14.535 ms, Gaussia
 rival's shared-memory GPU sort produced no draw calls, so the timed path is its CPU sort (`gpuAcceleratedSort`
 false, `sharedMemoryForWorkers` false, `integerBasedSort` false), antialiasing off, SH degree 3, black background.
 RTX A6000, busy machine, diagnostic. The loss and the picture error stay open. Rerun:
-`node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
+the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 The fit count is `packages/splats/test/storage-fit.test.js`. The pose maths are `packages/splats/test/paper-camera.test.js`.
 
 The tiles rows are one explicit REPLACE quadtree, 7 levels, 5,461 tiles, 256 m on a side, y-up, no geodetic
@@ -120,7 +120,7 @@ select the same 1,120 tiles: 992 at level 5 and 128 at level 6, checksum 1215863
 `update`, not the load. Two warmups, then 7 paired rounds, per-round minimum. The rounds do not overlap (Margo
 0.300 to 0.900 ms, 3DTilesRendererJS 2.300 to 3.100). Busy machine, diagnostic. The selected set is locked by
 `packages/tiles/tests/sse-scene.test.js`. Rerun:
-`node scripts/run-with-timeout.mjs -- node packages/tiles/scripts/rival-bench.mjs`.
+the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 The points row is one Potree 2.0 folder, a single leaf of 10,000,000 points on a 200 x 200 x 250 grid in a 100 m
 cube centred on the origin. Both budgets are 10,000,000, so a settled frame draws every point. Point size is 4
@@ -131,7 +131,7 @@ completion: `onSubmittedWorkDone` on Margo, and a one-pixel `readPixels` on the 
 (Margo 9.000 to 12.400 ms, potree-core 5.400 to 7.600). The rival submitted 7 draws of 10,000,000 points. Busy
 machine, diagnostic. The loss stays open. The grid and the file layout round-trip in
 `packages/points/tests/points-10m.test.js`. Rerun:
-`node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
+the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 The lightmap row is the published Cornell box, scaled by 0.01, with every face snapped to a parallelogram
 (`p2 = p1 + p3 - p0`). The short block top moves from (240, 165, 272) to (242, 165, 274). The floor, the back wall,
@@ -163,7 +163,7 @@ Completion is queue.onSubmittedWorkDone on Margo, one-pixel readPixels on Babylo
 Busy machine, diagnostic, not isolated GPU pass costs. Weighted OIT approximates depth-ordered transport,
 while depth peeling resolves these five layers. Like for like (2026-11-11, KB3148a): Margo's own depth peeling, `PeelOIT`, draws the same picture as Babylon's, MAE 0.048151, PSNR 61.305 dB, max 1, and so do `ExactOIT` and the core's per-mesh sort (RTX A6000, `packages/oit/test/gpu/reference-check.mjs`, no rival code). The weighted default's loss is the accepted difference of the method it is (one pass, no layer limit, order-free for interpenetrating parts), recorded in docs/limits.md. Nonbinary colours introduce an
 additional display-domain blending limitation, which this binary-palette algorithm comparison does not cover.
-Rerun: `node scripts/run-with-timeout.mjs -- node packages/oit/scripts/rival-bench.mjs`.
+Rerun: the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 
 The sky comparison evaluates the shipped Preetham WGSL directly on the GPU, before display mapping.
@@ -205,7 +205,7 @@ has MAE 0.094812; their centre RGB is identical (198,163,103). Residual path noi
 differences give max 125 on all three comparisons, so the full-frame PSNR includes reference noise and
 edge differences. The independent trace confirms the weighted image loss, not an accuracy-parity claim.
 No second timing row is published. [Path-traced result](results/batch-168-oit-cycles.json).
-Reproduce: `node scripts/run-with-timeout.mjs --max=6 -- node scripts/rival-oit-cycles.mjs`.
+Reproduce: the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 ## Batch 169 procedural: work counts, 2026-11-10
 

@@ -138,7 +138,7 @@ has no curve-curve intersection, so the intersection work has no like-for-like r
 
 Reproduce after `npm run build:packages`:
 `node --test packages/splines/test/intersect-workcount.test.js` and
-`node scripts/bp-169-splines-oracle.mjs --three=<absolute external three directory>`.
+the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 No time is measured.
 
 Research: E. Catmull and R. Rom, *A Class of Local Interpolating Splines*, Computer Aided

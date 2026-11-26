@@ -2447,7 +2447,7 @@ The full VFX GPU suite checks the same velocity-stretch pixels on WebGPU and Web
 
 | Claim | Evidence | Scope |
 | --- | --- | --- |
-| Cycles independently confirms the weighted OIT image loss | [Path-traced result](results/batch-168-oit-cycles.json), `scripts/rival-oit-cycles.mjs` | 1024-sample emission/transparent mixtures, MAE 1.632960 vs 0.132651; oracle/Cycles MAE 0.094812; reference noise and silhouette differences included, no new speed or dielectric claim |
+| Cycles independently confirms the weighted OIT image loss | [Path-traced result](results/batch-168-oit-cycles.json), the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run) | 1024-sample emission/transparent mixtures, MAE 1.632960 vs 0.132651; oracle/Cycles MAE 0.094812; reference noise and silhouette differences included, no new speed or dielectric claim |
 
 ## Own 2D frame preparation (2026-11-08)
 
