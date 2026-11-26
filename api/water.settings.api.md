@@ -724,9 +724,20 @@ class SeaIce {
     writeInstances(instances: IceInstances, first?: number, count?: number): number;
 }
 
+interface SeaIceFloeSource {
+    readonly count: number;
+    sample(index: number): {
+        readonly position: readonly [number, number];
+        readonly radius: number;
+        readonly heading: number;
+        readonly equivalentThickness: number;
+    };
+}
+
 type SeaIceKind = 'pancake' | 'brash' | 'floe';
 
 interface SeaIceOptions {
+    floeSource?: SeaIceFloeSource;
     kind?: SeaIceKind;
     centre?: readonly [number, number];
     size: readonly [number, number];
