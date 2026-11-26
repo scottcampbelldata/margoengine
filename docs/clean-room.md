@@ -238,9 +238,17 @@ the direction of travel, and the rim projects a rectangle. This optional deposit
 area ratio between 10° and 80° and equal shares at other angles. It builds each side from the
 actual cut volume after compaction and dust. Separate quadrature over the physical terrain
 areas closes both banks' volumes. Each vertex integrates its partial overlap with the wedge.
-The coupled fixture verifies both banks, a deliberately
-missing bank at an open boundary and exact seek. The full scanned berm profiles and the
-publication's closed-form inward refilling and soil carried in grousers remain separate work.
+The coupled fixture verifies both banks, a deliberately missing bank at an open boundary and exact seek.
+Equation 4.3 gives transport area per metre of advance as
+`r (ω/v) ζ μ h_g b`, with `ω` in radians per second. The optional `grouserFill` supplies
+`ζ μ`. The native ratio uses the signed forward slip definition with the same effective shear
+radius as the rolling model. The transported fraction is bounded by the actual loose cut,
+and oblique travel draws it only from the source-side bank.
+When the front and rear corners align, the article's high-obliquity rule moves the transported
+portion to the opposite bank. Otherwise the solver returns it into the available newly cut
+rear contact area. The cases check locked zero transport, full-spin bounded backfill, highly
+oblique transfer and exact total volume. The publication's steady backfill shape and full
+scanned profile remain separate comparisons.
 [Pavlov and Johnson (2019)](https://www.andrew.cmu.edu/user/amj1/papers/ICRA2019_Wheel.pdf).
 
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement

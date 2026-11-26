@@ -75,6 +75,8 @@ struct Patch {
     side_weight: f64,
     camber: f64,
     berm_slope: f64,
+    grouser_fill: f64,
+    grouser_slip: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -487,20 +489,22 @@ struct BermLattice {
     origin_z: f64,
 }
 
-fn berm_right_share(p: &Patch, depth: f64, cosine: f64, sine: f64) -> f64 {
+fn berm_sections(p: &Patch, depth: f64, cosine: f64, sin_abs: f64, chord: f64) -> (f64, f64) {
+    let radius = p.wheel_radius;
+    let centre_height = radius - depth;
+    // Project the submerged wheel-face segment and the rim rectangle across travel.
+    let angle = 2.0 * arc_sin(root(0.5 * depth / radius));
+    let section = sin_abs * (radius * radius * angle - centre_height * chord).max(0.0);
+    (section, 2.0 * p.half_width * depth * cosine)
+}
+
+fn berm_right_share(section: f64, face: f64, sine: f64) -> f64 {
     let sin_abs = sine.abs();
     if !(sin(core::f64::consts::PI / 18.0)..=sin(4.0 * core::f64::consts::PI / 9.0))
         .contains(&sin_abs)
     {
         return 0.5;
     }
-    let radius = p.wheel_radius;
-    let centre_height = radius - depth;
-    // Project the submerged wheel-face segment and the rim rectangle across travel.
-    let angle = 2.0 * arc_sin(root(0.5 * depth / radius));
-    let chord = root(depth * (radius + centre_height));
-    let section = sin_abs * (radius * radius * angle - centre_height * chord).max(0.0);
-    let face = 2.0 * p.half_width * depth * cosine;
     let area = section + face;
     if area == 0.0 {
         return 0.5;
@@ -510,6 +514,65 @@ fn berm_right_share(p: &Patch, depth: f64, cosine: f64, sine: f64) -> f64 {
     } else {
         section / area
     }
+}
+
+fn grouser_share(p: &Patch, area: f64) -> f64 {
+    if area <= 0.0 || p.lug_height == 0.0 || p.grouser_fill == 0.0 {
+        return 0.0;
+    }
+    let radius_ratio = p.wheel_radius / (p.wheel_radius + 0.5 * p.lug_height);
+    let swept = radius_ratio * (2.0 * p.half_width * p.lug_height) * p.grouser_fill;
+    if swept == 0.0 {
+        return 0.0;
+    }
+    if p.grouser_slip < 0.0 {
+        (swept * (1.0 + p.grouser_slip) / area).min(1.0)
+    } else {
+        (swept / (area * (1.0 - p.grouser_slip))).min(1.0)
+    }
+}
+
+unsafe fn deposit_backfill(
+    p: &Patch,
+    lattice: &BermLattice,
+    (x_start, x_end, z_start, z_end): (usize, usize, usize, usize),
+    (travel_x, travel_z): (f64, f64),
+    volume: f64,
+    areas: *const f64,
+    cuts: *const f64,
+    deltas: *mut f64,
+    work: *mut f64,
+) -> f64 {
+    if volume <= 0.0 {
+        return 0.0;
+    }
+    let mut rear_volume = 0.0;
+    for x in x_start..x_end {
+        let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
+        for z in z_start..z_end {
+            let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
+            let i = x * lattice.nz + z;
+            if along < 0.0 {
+                rear_volume += *cuts.add(i) * *areas.add(i);
+            }
+        }
+    }
+    let returned = volume.min(rear_volume);
+    if returned > 0.0 {
+        let scale = returned / rear_volume;
+        for x in x_start..x_end {
+            let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
+            for z in z_start..z_end {
+                let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
+                let i = x * lattice.nz + z;
+                if along < 0.0 {
+                    *deltas.add(i) += *cuts.add(i) * scale;
+                }
+            }
+        }
+    }
+    *work += (1.0 + f64::from(returned > 0.0)) * ((x_end - x_start) * (z_end - z_start)) as f64;
+    returned
 }
 
 fn berm_node_weight(height: f64, slope: f64, distance: f64, grid_width: f64) -> f64 {
@@ -529,6 +592,7 @@ unsafe fn deposit_cross_track(
     halo: f64,
     depth: f64,
     loose: f64,
+    cut_bounds: (usize, usize, usize, usize),
     areas: *const f64,
     deltas: *mut f64,
     rim: *mut f64,
@@ -549,8 +613,46 @@ unsafe fn deposit_cross_track(
     let reach = p.half_width * inverse + p.half_length * sine.abs();
     let travel_x = p.forward_x * inverse - p.forward_z * sine;
     let travel_z = p.forward_z * inverse + p.forward_x * sine;
-    let right = loose * berm_right_share(p, depth, inverse, sine);
-    let left = loose - right;
+    let chord = root(depth * (2.0 * p.wheel_radius - depth));
+    let (section, face) = berm_sections(p, depth, inverse, sine.abs(), chord);
+    let right_share = berm_right_share(section, face, sine);
+    let front_aligned = chord * sine.abs() > p.half_width * inverse;
+    let centred = !front_aligned && sine.abs() < sin(core::f64::consts::PI / 18.0);
+    let source_share = if centred {
+        1.0
+    } else if sine > 0.0 {
+        right_share
+    } else {
+        1.0 - right_share
+    };
+    let requested = loose * grouser_share(p, section + face).min(source_share);
+    let backfill = if front_aligned {
+        0.0
+    } else {
+        deposit_backfill(
+            p,
+            &lattice,
+            cut_bounds,
+            (travel_x, travel_z),
+            requested,
+            areas,
+            rim,
+            deltas,
+            work,
+        )
+    };
+    let banks = loose - backfill;
+    let transferred = if front_aligned { requested } else { backfill };
+    let right = if centred {
+        banks * right_share
+    } else if sine > 0.0 {
+        (loose * right_share - transferred).max(0.0)
+    } else if front_aligned {
+        (loose * right_share + transferred).min(banks)
+    } else {
+        (loose * right_share).min(banks)
+    };
+    let left = banks - right;
     // Each side has triangular cross-section h²/(2*slope) and extends for twice span.
     let height_left = root(left * p.berm_slope / span);
     let height_right = root(right * p.berm_slope / span);
@@ -627,7 +729,7 @@ unsafe fn deposit_cross_track(
         }
     }
     *work += 2.0 * ((x_end - x_start) * (z_end - z_start)) as f64;
-    f64::from(left_area > 0.0) * left + f64::from(right_area > 0.0) * right
+    backfill + f64::from(left_area > 0.0) * left + f64::from(right_area > 0.0) * right
 }
 
 fn phase_offset(angle: f64, pitch: f64) -> f64 {
@@ -1104,6 +1206,8 @@ pub unsafe extern "C" fn stamp(
                 };
                 *rim.add(i) = weight;
                 rim_area += weight * area;
+            } else if p.grouser_fill > 0.0 {
+                *rim.add(i) = cut;
             }
         }
     }
@@ -1125,6 +1229,7 @@ pub unsafe extern "C" fn stamp(
             halo,
             depth.rim,
             loose,
+            (x_start, x_end, z_start, z_end),
             areas,
             deltas,
             rim,

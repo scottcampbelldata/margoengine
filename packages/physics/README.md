@@ -4906,6 +4906,11 @@ placed using the prepared soil's repose slope and the exact terrain vertex areas
 outside the modeled terrain is accounted as exported soil. The default `'ring'` is a compact
 local deposit and also applies at zero repose slope.
 
+Set `grouserFill` on a cross-track wheel to the effective fraction of its lug envelope carrying
+soil. The default is zero. The turning lugs return part of the loose cut into the rear footprint.
+At large obliquity, they move that share to the opposite bank instead. A locked wheel carries no soil.
+The returned amount is limited to the material removed and the available newly cut space.
+
 ```ts
 import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
 

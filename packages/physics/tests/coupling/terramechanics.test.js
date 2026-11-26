@@ -544,6 +544,64 @@ test('cross-track wheel berms conserve each side allocation and export an absent
   }
 });
 
+test('turning grousers return a bounded share of the cut while locked grousers carry none', async () => {
+  const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
+  const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', skidExponent: 0 };
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 800_000,
+    compaction: 0,
+    dustFraction: 0,
+    reposeSlope: 0.55,
+  };
+  const rig = { width: 0.1, length: 0.16, load: 100, speed: 0.03 };
+  for (const slip of [1, -1]) {
+    const empty = await rollingBench(terrain, material, wheel, { ...rig, slip });
+    const carrying = await rollingBench(
+      terrain,
+      material,
+      { ...wheel, grouserFill: 1 },
+      { ...rig, slip, shared: true },
+    );
+    empty.world.advance(1);
+    carrying.world.advance(1);
+    const before = empty.bed.elevations();
+    const after = carrying.bed.elevations();
+    assert.equal(carrying.soil.budget.removed, empty.soil.budget.removed);
+    close(carrying.bed.volume(), 0, 2048 * eps * carrying.soil.budget.removed);
+    if (slip === -1) {
+      assert.deepEqual(after, before);
+    } else {
+      const row = 50 * (terrain.rows + 1);
+      const track = before.subarray(row, row + terrain.rows + 1);
+      const filled = after.subarray(row, row + terrain.rows + 1);
+      assert.ok(track.some((height, i) => height < 0 && filled[i] > height));
+      assert.ok(track.some((height, i) => height < 0 && filled[i] === height));
+    }
+  }
+
+  const lateral = 3;
+  const oblique = await rollingBench(terrain, material, { ...wheel, grouserFill: 1 }, { ...rig, slip: 1, lateral });
+  oblique.world.advance(1);
+  const matched = oblique.soil.read(0).sinkage - wheel.lugHeight;
+  const halfArc = 0.5 * Math.sqrt(matched * (2 * wheel.radius - matched));
+  const zMid = -0.16 + halfArc;
+  const positive = oblique.bed.elevations();
+  let oppositeBank = 0;
+  let leadingBank = 0;
+  for (let x = 0; x <= terrain.columns; x++) {
+    for (let z = 0; z <= terrain.rows; z++) {
+      const rx = terrain.width * (x / terrain.columns - 0.5);
+      const rz = terrain.depth * (z / terrain.rows - 0.5) - zMid;
+      if (rx + lateral * rz > 0) leadingBank += Math.max(0, positive[x * (terrain.rows + 1) + z]);
+      else oppositeBank += Math.max(0, positive[x * (terrain.rows + 1) + z]);
+    }
+  }
+  assert.ok(oppositeBank > 0);
+  assert.equal(leadingBank, 0);
+  close(oblique.bed.volume(), 0, 2048 * eps * oblique.soil.budget.removed);
+});
+
 test('a yawed smooth wheel reproduces the sidewall earth pressure integral', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const radius = 0.14;

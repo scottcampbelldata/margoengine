@@ -9901,8 +9901,9 @@ The optional side-force field combines rim shear and passive sidewall earth pres
 gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
-or off-grid banks report their volume as exported. Closed-form backfill and transport in grousers
-are outside this initial deposit model.
+or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
+[0, 1], rotating lugs return up to the current rear cut capacity or transfer loose soil between
+banks at large obliquity. Previously filled and compacted tracks use the cumulative bed state.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor

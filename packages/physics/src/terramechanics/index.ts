@@ -137,6 +137,8 @@ export interface SoilRollingWheel {
   readonly treadMesh?: SoilTreadMesh;
   /** Place the loose soil in separate triangular berms across travel. The default uses a local ring. */
   readonly bermProfile?: 'ring' | 'cross-track';
+  /** Effective fraction of the lug envelope carrying soil, in [0, 1]. Default zero. */
+  readonly grouserFill?: number;
 }
 
 /** Indexed tread geometry centred on the axle. Coordinates are across, up and forward, in metres. */
@@ -337,6 +339,7 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
     lugCount,
     lugWidth,
     bermProfile,
+    grouserFill: finite(wheel.grouserFill ?? 0, 'grouser fill fraction', 0, 1),
   };
 }
 
@@ -539,7 +542,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 53);
+    this.nativePatch = allocate('soil-patch-scratch', 55);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -796,6 +799,8 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.sideWeight,
       finite(camber, 'wheel camber sine', -1, 1),
       rolling?.bermProfile === 'cross-track' ? material.reposeSlope : 0,
+      rolling?.grouserFill ?? 0,
+      rolling?.grouserFill ? Math.max(-1, Math.min(1, longitudinalSlip)) : 0,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
