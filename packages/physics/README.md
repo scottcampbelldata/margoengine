@@ -4944,8 +4944,10 @@ For a dynamic capsule or sphere, give `StrandSolver.load({ rigidCapsules })` its
 row, local endpoints and radius. Add the `RigidSolver` first so the strand solver can size its
 reaction field. Couple the two solvers at the same rate. With staggered rigid-then-strand
 stepping, the accumulated reaction enters the next rigid step. Contact reactions include
-linear impulse and the moment about the body's centre of mass. Reciprocal contact uses the
-rod tier.
+linear impulse and the moment about the body's centre of mass. The rod tier uses the
+body's inverse mass and angular inertia at the contact witness. The strand's contact
+position correction is separate from its velocity impulse. A fixed root carries the
+reaction corresponding to its share of the link contact.
 
 ```ts
 import { Physics } from '@margoengine/physics';

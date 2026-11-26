@@ -15008,6 +15008,17 @@ fixtures drive a kinematic capsule, a rigid capsule at 24 m/s and a second stran
 the way through an edge between sampled positions. The rigid fixture includes the
 in-flight registry impulse and verifies an exact snapshot replay on both sides of contact.
 
+David Baraff, [*Rigid Body Simulation II: Nonpenetration Constraints*](https://www.myphysicslab.com/develop/docs/Baraff_Siggraph_97_Course_Notes.pdf)
+(1997), equations in section 6 and course slides D47–48, derives the normal impulse from
+closing velocity and effective inverse mass. For a rigid contact arm `r` and normal
+`n`, the rigid term is `1/m + (r × n) · I⁻¹(r × n)`. The link contribution sums each
+endpoint's inverse mass times the square of its witness weight. The positional projection
+uses the same relative mass for the strand share and does not generate an impulse.
+Brian Mirtich and John Canny, [*Impulse-based Dynamic Simulation*](https://digicoll.lib.berkeley.edu/record/134699/files/CSD-94-815.pdf)
+(1994), sections 4.1–4.2, supplies the opposing tangent and Coulomb impulse limit.
+The off-centre sphere regressions compare linear and angular impulse to the solid-sphere
+inertia, including the impulse share carried by the anchor.
+
 ### Strand motion on the horse skin
 
 The optional horse driver uses the authored joint hierarchy and applies the solved guides as

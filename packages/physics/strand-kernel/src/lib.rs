@@ -258,6 +258,12 @@ struct RigidCapsule {
 }
 
 #[repr(C)]
+struct RigidMass {
+    inverse_mass: f64,
+    inverse_inertia: [f64; 6],
+}
+
+#[repr(C)]
 struct Reaction {
     impulse: V,
     angular: V,
@@ -265,8 +271,24 @@ struct Reaction {
 
 #[repr(C)]
 struct Hit {
-    collider: usize,
-    point: V,
+    position: V,
+    velocity: V,
+}
+
+impl Hit {
+    fn velocity(&self, node: &State, old: &State, dt: f64) -> V {
+        node.position
+            .subtract(old.position)
+            .subtract(self.position)
+            .scale(1.0 / dt)
+            .add(self.velocity)
+    }
+
+    fn apply(&mut self, node: &mut State, shift: V, velocity: V) {
+        node.position = node.position.add(shift);
+        self.position = self.position.add(shift);
+        self.velocity = self.velocity.add(velocity);
+    }
 }
 
 #[repr(C)]
@@ -589,6 +611,8 @@ fn nearest_segments(first: Segment, second: Segment) -> (f64, f64, V) {
 
 struct SegmentContact {
     surface: V,
+    normal: V,
+    fraction: f64,
     first: V,
     second: V,
 }
@@ -636,6 +660,8 @@ fn edge_response(
     let correction = normal.scale(overlap / inverse);
     Some(SegmentContact {
         surface,
+        normal,
+        fraction: s,
         first: correction.scale(alpha),
         second: correction.scale(beta),
     })
@@ -664,9 +690,11 @@ fn edge_contacts(
     previous_obstacles: &[Capsule],
     swept: bool,
     rigid: &[RigidCapsule],
+    masses: &[RigidMass],
     hits: &mut [Hit],
     reactions: &mut [Reaction],
     dt: f64,
+    friction: f64,
 ) {
     for (i, ma) in material.iter().enumerate() {
         if ma.length == 0.0 {
@@ -684,7 +712,7 @@ fn edge_contacts(
                 add_contact(a, b, scratch, i, &correction);
             }
         }
-        for (index, obstacle) in rigid.iter().enumerate() {
+        for (obstacle, mass) in rigid.iter().zip(masses) {
             if obstacle.row < 0.0 {
                 continue;
             }
@@ -705,69 +733,132 @@ fn edge_contacts(
             if let Some(correction) =
                 swept_hit.or_else(|| contact_edge(a, b, ma, mb, &obstacle.shape))
             {
-                add_contact(a, b, scratch, i, &correction);
-                let mut impulse = V::ZERO;
-                if ma.inverse_mass > 0.0 {
-                    impulse = impulse.add(correction.first.scale(-1.0 / (ma.inverse_mass * dt)));
-                    *slot_mut(hits, i) = Hit {
-                        collider: index + 1,
-                        point: correction.surface,
-                    };
-                }
-                if mb.inverse_mass > 0.0 {
-                    impulse = impulse.add(correction.second.scale(-1.0 / (mb.inverse_mass * dt)));
-                    *slot_mut(hits, i + 1) = Hit {
-                        collider: index + 1,
-                        point: correction.surface,
-                    };
-                }
-                transfer(reactions, obstacle, correction.surface, impulse);
+                let weight_b = correction.fraction;
+                let weight_a = 1.0 - weight_b;
+                let mass_a = ma.inverse_mass * weight_a;
+                let mass_b = mb.inverse_mass * weight_b;
+                let inverse = weight_a * mass_a + weight_b * mass_b;
+                let (first, second) = pair(hits, i, i + 1);
+                let velocity = first
+                    .velocity(a, &slot(scratch, i).old, dt)
+                    .scale(weight_a)
+                    .add(
+                        second
+                            .velocity(b, &slot(scratch, i + 1).old, dt)
+                            .scale(weight_b),
+                    );
+                let (share, impulse) = resolve_rigid(
+                    obstacle,
+                    mass,
+                    correction.surface,
+                    correction.normal,
+                    velocity,
+                    inverse,
+                    reactions,
+                    friction,
+                );
+                first.apply(a, correction.first.scale(share), impulse.scale(mass_a));
+                second.apply(b, correction.second.scale(share), impulse.scale(mass_b));
             }
         }
     }
 }
 
-// The reaction is taken at the capsule surface and reported about the rigid centre of mass.
-fn transfer(reactions: &mut [Reaction], body: &RigidCapsule, point: V, impulse: V) {
+impl RigidMass {
+    fn spin_change(&self, moment: V) -> V {
+        let [xx, xy, xz, yy, yz, zz] = self.inverse_inertia;
+        V {
+            x: xx * moment.x + xy * moment.y + xz * moment.z,
+            y: xy * moment.x + yy * moment.y + yz * moment.z,
+            z: xz * moment.x + yz * moment.y + zz * moment.z,
+        }
+    }
+
+    fn point_change(&self, arm: V, impulse: V) -> V {
+        impulse
+            .scale(self.inverse_mass)
+            .add(self.spin_change(arm.cross(impulse)).cross(arm))
+    }
+}
+
+fn resolve_rigid(
+    body: &RigidCapsule,
+    mass: &RigidMass,
+    surface: V,
+    normal: V,
+    velocity: V,
+    inverse: f64,
+    reactions: &mut [Reaction],
+    friction: f64,
+) -> (f64, V) {
     let reaction = slot_mut(reactions, body.row as usize);
-    reaction.impulse = reaction.impulse.add(impulse);
-    reaction.angular = reaction
-        .angular
-        .add(point.subtract(body.centre).cross(impulse));
+    let arm = surface.subtract(body.centre);
+    let wall = body
+        .velocity
+        .add(reaction.impulse.scale(mass.inverse_mass))
+        .add(
+            body.angular
+                .add(mass.spin_change(reaction.angular))
+                .cross(arm),
+        );
+    let relative = velocity.subtract(wall);
+    let normal_change = mass.point_change(arm, normal).add(normal.scale(inverse));
+    let normal_inverse = normal.dot(normal_change);
+    let normal_impulse = (-relative.dot(normal) / normal_inverse).max(0.0);
+    let after_normal = relative.add(normal_change.scale(normal_impulse));
+    let tangent = after_normal.subtract(normal.scale(after_normal.dot(normal)));
+    let speed = tangent.length();
+    let mut impulse = normal.scale(normal_impulse);
+    if friction > 0.0 && speed > 0.0 && normal_impulse > 0.0 {
+        let direction = tangent.scale(1.0 / speed);
+        let tangent_inverse = inverse + direction.dot(mass.point_change(arm, direction));
+        let slide = (speed / tangent_inverse).min(friction * normal_impulse);
+        impulse = impulse.subtract(direction.scale(slide));
+    }
+    reaction.impulse = reaction.impulse.subtract(impulse);
+    reaction.angular = reaction.angular.subtract(arm.cross(impulse));
+    (inverse / normal_inverse, impulse)
 }
 
 fn rigid_contact(
-    position: &mut V,
+    node: &mut State,
+    old: &State,
     material: &Material,
     bodies: &[RigidCapsule],
+    masses: &[RigidMass],
     reactions: &mut [Reaction],
     hit: &mut Hit,
     dt: f64,
-) -> V {
+    friction: f64,
+) {
     if material.inverse_mass == 0.0 {
-        return V::ZERO;
+        return;
     }
-    let mut total = V::ZERO;
-    for (i, body) in bodies.iter().enumerate() {
+    for (body, mass) in bodies.iter().zip(masses) {
         if body.row < 0.0 {
             continue;
         }
         if let Some((surface, correction)) =
-            capsule_contact(*position, material.radius, &body.shape)
+            capsule_contact(node.position, material.radius, &body.shape)
         {
-            *position = position.add(correction);
-            total = total.add(correction);
-            transfer(
-                reactions,
+            let normal = correction.scale(1.0 / correction.length());
+            let (share, impulse) = resolve_rigid(
                 body,
+                mass,
                 surface,
-                correction.scale(-1.0 / (material.inverse_mass * dt)),
+                normal,
+                hit.velocity(node, old, dt),
+                material.inverse_mass,
+                reactions,
+                friction,
             );
-            hit.collider = i + 1;
-            hit.point = surface;
+            hit.apply(
+                node,
+                correction.scale(share),
+                impulse.scale(material.inverse_mass),
+            );
         }
     }
-    total
 }
 
 fn contact(
@@ -831,6 +922,7 @@ unsafe extern "C" fn advance_strands(
     reaction_count: usize,
     direct_blocks: *mut direct::Block,
     previous_obstacles: *const Capsule,
+    rigid_masses: *const RigidMass,
 ) -> f64 {
     let cfg = unsafe { &*config };
     let nodes = unsafe { core::slice::from_raw_parts_mut(nodes, count) };
@@ -842,11 +934,15 @@ unsafe extern "C" fn advance_strands(
     let links = unsafe { core::slice::from_raw_parts_mut(links, count) };
     let buckets = unsafe { core::slice::from_raw_parts_mut(buckets, bucket_count) };
     let bodies = unsafe { core::slice::from_raw_parts(moving_capsules, moving_count) };
+    let masses = unsafe { core::slice::from_raw_parts(rigid_masses, moving_count) };
     let reactions = unsafe { core::slice::from_raw_parts_mut(reactions, reaction_count) };
     let hits =
         unsafe { core::slice::from_raw_parts_mut(hits, if bodies.is_empty() { 0 } else { count }) };
     for hit in hits.iter_mut() {
-        hit.collider = 0;
+        *hit = Hit {
+            position: V::ZERO,
+            velocity: V::ZERO,
+        };
     }
     let dt = cfg.dt;
     for (i, node) in nodes.iter_mut().enumerate() {
@@ -958,20 +1054,33 @@ unsafe extern "C" fn advance_strands(
                     obstacles,
                 ));
                 if !bodies.is_empty() {
-                    state.contact = state.contact.add(rigid_contact(
-                        &mut node.position,
+                    rigid_contact(
+                        node,
+                        &state.old,
                         slot(material, i),
                         bodies,
+                        masses,
                         reactions,
                         slot_mut(hits, i),
                         dt,
-                    ));
+                        cfg.friction,
+                    );
                 }
             }
             if contacts & 2 != 0 {
                 edge_contacts(
-                    nodes, material, scratch, obstacles, previous, swept, bodies, hits, reactions,
+                    nodes,
+                    material,
+                    scratch,
+                    obstacles,
+                    previous,
+                    swept,
+                    bodies,
+                    masses,
+                    hits,
+                    reactions,
                     dt,
+                    cfg.friction,
                 );
             }
             if contacts & 1 != 0 {
@@ -994,47 +1103,22 @@ unsafe extern "C" fn advance_strands(
             } else {
                 V::ZERO
             };
-            node.velocity = node
-                .position
-                .subtract(last.old.position)
-                .subtract(follower)
-                .scale(1.0 / dt);
+            node.velocity = if let Some(hit) = hits.get(i) {
+                hit.velocity(node, &last.old, dt)
+            } else {
+                node.position
+                    .subtract(last.old.position)
+                    .subtract(follower)
+                    .scale(1.0 / dt)
+            };
             let correction = last.contact.length();
             if correction > 0.0 {
                 let normal = last.contact.scale(1.0 / correction);
-                let hit = if bodies.is_empty() {
-                    None
-                } else {
-                    hits.get(i).filter(|hit| hit.collider != 0)
-                };
-                let wall = hit
-                    .map(|hit| {
-                        let body = slot(bodies, hit.collider - 1);
-                        body.velocity
-                            .add(body.angular.cross(hit.point.subtract(body.centre)))
-                    })
-                    .unwrap_or(V::ZERO);
-                let prior = node.velocity;
-                let relative = if hit.is_some() {
-                    prior.subtract(wall)
-                } else {
-                    prior
-                };
-                let speed = relative.dot(normal);
-                let tangent = relative.subtract(normal.scale(speed));
+                let speed = node.velocity.dot(normal);
+                let tangent = node.velocity.subtract(normal.scale(speed));
                 let limit = cfg.friction * (correction / dt);
                 let retained = (1.0 - limit / tangent.length()).max(0.0);
                 node.velocity = tangent.scale(retained).add(normal.scale(speed.max(0.0)));
-                if let Some(hit) = hit {
-                    node.velocity = node.velocity.add(wall);
-                    let mass = 1.0 / slot(material, i).inverse_mass;
-                    transfer(
-                        reactions,
-                        slot(bodies, hit.collider - 1),
-                        hit.point,
-                        prior.subtract(node.velocity).scale(mass),
-                    );
-                }
             }
             let difference = node.frame.mul(last.old.frame.conjugate());
             let sign = if difference.w < 0.0 { -1.0 } else { 1.0 };

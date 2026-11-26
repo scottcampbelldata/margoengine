@@ -27,7 +27,8 @@ const CAPSULE_WORDS = 7;
 const RIGID_CAPSULE_WORDS = 24;
 const BODY_INDEX = 16;
 const PREVIOUS_POSE = 17;
-const CAPSULE_HIT_WORDS = 4;
+const RIGID_MASS_WORDS = 7;
+const CAPSULE_HIT_WORDS = 6;
 const DIRECT_BLOCK_WORDS = 138;
 
 /** Field layout 1 stores centreline position, velocity, material frame and angular velocity. */
@@ -158,6 +159,7 @@ type Native = {
     reactionCount: number,
     directBlocks: number,
     previousObstacles: number,
+    rigidMasses: number,
   ): number;
 };
 
@@ -285,6 +287,7 @@ export class StrandSolver implements Solver<StrandParams> {
   private buckets!: Region;
   private movingCapsules?: Region;
   private capsuleHits?: Region;
+  private rigidMasses?: Region;
   private reactions?: Region;
   private rigidRows = 0;
   private directBlocks?: Region;
@@ -374,7 +377,7 @@ export class StrandSolver implements Solver<StrandParams> {
         (direct ? this.count * DIRECT_BLOCK_WORDS : 0) +
         (this.rigidRows
           ? this.count * CAPSULE_HIT_WORDS +
-            this.rigidCapsules.length * RIGID_CAPSULE_WORDS +
+            this.rigidCapsules.length * (RIGID_CAPSULE_WORDS + RIGID_MASS_WORDS) +
             this.rigidRows * IMPULSE_WORDS
           : 0)) *
         8;
@@ -406,6 +409,7 @@ export class StrandSolver implements Solver<StrandParams> {
       this.movingCapsules = area('strand-dynamic-body-capsules', this.rigidCapsules.length * RIGID_CAPSULE_WORDS);
       this.capsuleHits = area('strand-rigid-contact-witness', this.count * CAPSULE_HIT_WORDS);
       this.reactions = area('strand-rigid-body-impulses', this.rigidRows * IMPULSE_WORDS);
+      this.rigidMasses = area('strand-rigid-inverse-inertia', this.rigidCapsules.length * RIGID_MASS_WORDS);
       const poses = this.words(this.movingCapsules);
       for (let i = 0; i < this.rigidCapsules.length; i++) poses[i * RIGID_CAPSULE_WORDS + BODY_INDEX] = -1;
     }
@@ -611,9 +615,10 @@ export class StrandSolver implements Solver<StrandParams> {
   }
 
   private updateRigidCapsules(port: Port | undefined, dt: number): void {
-    if (!this.movingCapsules || !this.reactions) return;
+    if (!this.movingCapsules || !this.reactions || !this.rigidMasses) return;
     this.words(this.reactions).fill(0);
-    const capsules = this.words(this.movingCapsules);
+    const capsules = this.words(this.movingCapsules),
+      masses = this.words(this.rigidMasses);
     if (
       port &&
       (port.region.layout !== 2 ||
@@ -645,6 +650,7 @@ export class StrandSolver implements Solver<StrandParams> {
         }
       }
       capsules.set([...start, ...end, capsule.radius, ...centre, ...linear, ...angular, capsule.body], at);
+      masses.set(bodies.subarray(body + 16, body + 23), index * RIGID_MASS_WORDS);
     }
   }
 
@@ -678,6 +684,7 @@ export class StrandSolver implements Solver<StrandParams> {
       this.rigidRows,
       this.directBlocks?.byteOffset ?? this.config.byteOffset,
       this.previousObstacles?.byteOffset ?? this.config.byteOffset,
+      this.rigidMasses?.byteOffset ?? this.config.byteOffset,
     );
     if (checks < 0)
       throw new MargoError(

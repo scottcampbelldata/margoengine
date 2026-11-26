@@ -9929,9 +9929,11 @@ spheres with point contact. Separation between contacts depends on guide spacing
 rate. Use enough points to resolve thin obstacles.
 
 Optional dynamic capsule contacts publish an equal reaction to the real RigidSolver in SI.
-The isolated moving-capsule test closes initial linear momentum including the in-flight
-registry impulse and measures angular response off the body's centre. Use the same
-coupling rate for both solvers. Mixed contact surfaces share the point contact budget.
+Moving-capsule tests measure linear and angular impulses including the in-flight registry
+reaction. Off-centre contacts include the inverse inertia of the rigid body. At a weighted
+edge witness, the clamp carries its share of the reaction. Geometry correction does not
+become a velocity impulse. Use the same coupling rate for both solvers. The staggered
+registry applies the rigid impulse on its next step and does not rewind the rigid pose.
 Optional segment geometry resolves capsule and self intersections along each guide edge
 at substep boundaries. The swept profile tests linear endpoint trajectories for both.
 Increase the dyadic rate when a fast rotating capsule needs a closer approximation of its

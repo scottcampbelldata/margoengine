@@ -4321,7 +4321,8 @@ the world's clock, region allocator and snapshot path. A fixed-camera fixture ex
 720 solved points on both rendering backends with identical shared and plain memory
 replay. An optional sweep detects contacts along linear link and capsule trajectories.
 The native collision tests cover the rigid reaction and replay, two-way momentum between
-guide links and sparse pair enumeration. Horse and VRM skin fixtures exercise the engine
+guide links and sparse pair enumeration. The rigid reaction uses the existing inverse
+mass and inertia port, with an analytical closure at 1 g and 2 kg. Horse and VRM skin fixtures exercise the engine
 bindings. The named production shots still need bindings.
 
 

@@ -276,7 +276,7 @@ test('segment contact clears a narrow capsule between two guide points', async (
   await assert.rejects(attach(strands, { fidelity: 'follow', contactGeometry: 'segments' }, zero), /Use the rod tier/);
 });
 
-test('a moving sphere receives the full impulse from a contact in the middle of a link', async () => {
+test('a moving sphere receives the matched impulse from an anchored link witness', async () => {
   await Physics.load();
   const world = new PhysicsWorld({ rate, gravity: zero });
   const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: zero });
@@ -323,7 +323,13 @@ test('a moving sphere receives the full impulse from a contact in the middle of 
     const tip = solver.sample(0, 1),
       tipMass = 0.5 * density * Math.PI * radius * radius * span;
     assert.ok(tip.velocity[1] < 0 && reaction[at + 1] > 0 && reaction[at + 5] > 0);
-    near(reaction[at + 1] + tipMass * tip.velocity[1] + mass * body.linearVelocity[1], mass * velocity, 1e-6);
+    const offset = 0.03;
+    const fraction = (span / 2 + offset) / span;
+    const inertia = (2 / 5) * mass * 0.06 ** 2;
+    const expected = -velocity / (fraction ** 2 / tipMass + 1 / mass + offset ** 2 / inertia);
+    near(reaction[at + 1], expected, 1e-6);
+    near(reaction[at + 5], offset * expected, 1e-6);
+    near(fraction * reaction[at + 1] + tipMass * tip.velocity[1], 0, 1e-6);
     world.advance(2);
     assert.ok(body.linearVelocity[1] > velocity && body.angularVelocity[2] > 0);
   } finally {
@@ -388,71 +394,83 @@ test('swept geometry catches a kinematic capsule crossing a whole guide within o
   assert.deepEqual(swept.solver.sample(0, 0).position, points[0]);
 });
 
-test('a rigid capsule crossing the strand in one tick transfers impulse and replays its swept history', async () => {
-  await Physics.load();
-  const world = new PhysicsWorld({ rate, gravity: zero });
-  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: zero });
-  try {
-    const velocity = -24,
-      mass = 2,
-      radius = 0.01,
-      density = 850,
-      span = 0.5;
-    const body = rigid.addBody(null, {
-      position: [0, 0.6, 0],
-      linearVelocity: [0, velocity, 0],
-      colliders: { shape: 'sphere', radius: 0.06, sensor: true, mass },
-    });
-    world.add(new RigidSolver(), { physics: rigid });
-    const solver = await StrandSolver.load({
-      rigidCapsules: [{ body: body.row, start: [0.02, 0, 0], end: [0.02, 0, 0], radius: 0.06 }],
-    });
-    world.add(solver, {
-      strands: [
-        {
-          points: [
-            [-0.25, 0, 0],
-            [0.25, 0, 0],
-          ],
-          radius,
-          density,
-          young: 9,
-          drag: 0,
-        },
-      ],
-      rate: 0,
-      damping: 0,
-      friction: 0,
-      iterations: 1,
-      selfCollision: false,
-      contactGeometry: 'swept',
-    });
-    world.couple(['rigid', solver.id], 'staggered');
-    world.advance(1);
-    near(solver.sample(0, 1).velocity[1], 0, 64 * Number.EPSILON);
-    const start = world.takeSnapshot();
-    world.advance(2);
-    const port = solver.exportPorts(1).find((value) => value.field === BODY_IMPULSES_FIELD.name);
-    const reaction = regionWords(world.memory, port.region),
-      at = body.row * 6;
-    const tip = solver.sample(0, 1),
-      tipMass = 0.5 * density * Math.PI * radius * radius * span;
-    assert.ok(tip.position[1] < -0.2 && reaction[at + 1] > 0 && reaction[at + 5] > 0);
-    near(reaction[at + 1] + tipMass * tip.velocity[1] + mass * body.linearVelocity[1], mass * velocity, 3e-6);
-    const middle = world.takeSnapshot();
-    world.advance(4);
-    const hash = world.hash();
-    assert.ok(body.linearVelocity[1] > velocity);
-    world.restoreSnapshot(middle.bytes);
-    world.advance(4);
-    assert.equal(world.hash(), hash);
-    world.restoreSnapshot(start.bytes);
-    world.advance(4);
-    assert.equal(world.hash(), hash);
-  } finally {
-    rigid.dispose();
-  }
-});
+for (const mass of [2, 0.001]) {
+  test(`a ${mass} kg rigid capsule transfers a passive swept impulse and replays its contact`, async () => {
+    await Physics.load();
+    const world = new PhysicsWorld({ rate, gravity: zero });
+    const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: zero });
+    try {
+      const velocity = -24,
+        radius = 0.01,
+        density = 850,
+        span = 0.5;
+      const body = rigid.addBody(null, {
+        position: [0, 0.6, 0],
+        linearVelocity: [0, velocity, 0],
+        colliders: { shape: 'sphere', radius: 0.06, sensor: true, mass },
+      });
+      world.add(new RigidSolver(), { physics: rigid });
+      const solver = await StrandSolver.load({
+        rigidCapsules: [{ body: body.row, start: [0.02, 0, 0], end: [0.02, 0, 0], radius: 0.06 }],
+      });
+      world.add(solver, {
+        strands: [
+          {
+            points: [
+              [-0.25, 0, 0],
+              [0.25, 0, 0],
+            ],
+            radius,
+            density,
+            young: 9,
+            drag: 0,
+          },
+        ],
+        rate: 0,
+        damping: 0,
+        friction: 0,
+        iterations: 1,
+        selfCollision: false,
+        contactGeometry: 'swept',
+      });
+      world.couple(['rigid', solver.id], 'staggered');
+      world.advance(1);
+      near(solver.sample(0, 1).velocity[1], 0, 64 * Number.EPSILON);
+      const start = world.takeSnapshot();
+      world.advance(2);
+      const port = solver.exportPorts(1).find((value) => value.field === BODY_IMPULSES_FIELD.name);
+      const reaction = regionWords(world.memory, port.region),
+        at = body.row * 6;
+      const tip = solver.sample(0, 1),
+        tipMass = 0.5 * density * Math.PI * radius * radius * span;
+      const offset = 0.02;
+      const fraction = (span / 2 + offset) / span;
+      const inertia = (2 / 5) * mass * 0.06 ** 2;
+      const expected = -velocity / (fraction ** 2 / tipMass + 1 / mass + offset ** 2 / inertia);
+      near(reaction[at + 1], expected, 3e-6);
+      near(fraction * reaction[at + 1] + tipMass * tip.velocity[1], 0, 3e-6);
+      near(reaction[at + 5], offset * expected, 3e-6);
+      const outgoing = body.linearVelocity[1] + reaction[at + 1] / mass;
+      const spin = body.angularVelocity[2] + reaction[at + 5] / inertia;
+      const energy = 0.5 * (mass * outgoing ** 2 + inertia * spin ** 2 + tipMass * tip.velocity[1] ** 2);
+      assert.ok(energy < 0.5 * mass * velocity ** 2);
+      assert.ok(tip.position[1] < 0);
+      if (mass === 2) assert.ok(tip.position[1] < -0.2);
+      const middle = world.takeSnapshot();
+      world.advance(4);
+      const hash = world.hash();
+      assert.ok(body.linearVelocity[1] > velocity);
+      world.restoreSnapshot(middle.bytes);
+      world.advance(4);
+      assert.equal(world.hash(), hash);
+      world.restoreSnapshot(start.bytes);
+      world.advance(4);
+      assert.equal(world.hash(), hash);
+    } finally {
+      rigid.dispose();
+    }
+  });
+}
 
 test('sparse segment self contact sees crossing links and exchanges equal internal momentum', async () => {
   const radius = 0.02,

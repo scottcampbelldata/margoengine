@@ -16983,6 +16983,15 @@ Fast rotation still requires enough substeps to resolve the capsule's arc.
 The optional horse driver applies solved frames to the horse skin, and the physical spring
 rig binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
 
+### Energy at a strand contact with a light rigid capsule (SOFT-03)
+
+Fixed for the reciprocal capsule path. Penetration correction previously acted as a
+velocity impulse against an effectively immovable capsule. A 1 g sphere sweeping across
+an anchored link at 24 m/s could gain more than 2,000 J from an initial 0.288 J. The
+contact solve now uses the published rigid inverse mass and inertia and accounts for
+the anchored reaction through the witness weights. Tests at 1 g and 2 kg verify the
+analytical linear and angular impulse and decreasing kinetic energy.
+
 ### Refined thin strand bending (SOFT-03)
 
 Fixed for the default rod solve. A 30 mm fibre with an 80 μm diameter and a 3.45 GPa
