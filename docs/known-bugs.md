@@ -393,7 +393,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   substep.
 - **Fix:** each point's slide is the move of its two material anchor points over the substep: each centre's step, its speed
   times h, and each arm's turn by the substep's spin t = w h, t x arm - t x (t x arm) / 2, at the arm the body has now. It
-  is written as a series because an arm less its turned self in f32 is its rounding. Reading the slide off the poses
+  is written as a series because an arm less its turned self in f32 is its rounding. A ball or a capsule is read at the
+  point it touches, its core's nearest point plus its radius along the normal as the normal rows read it, since a point
+  fixed in a rolling ball rolls up off the floor (`next-mesh-seam.test.js`, a capsule rolling across two meshes, kept). Reading the slide off the poses
   instead took in their rounding (a unit of the last place where a resting box moves a fiftieth of one in a substep) and
   made a pile's top boxes jitter, so it was not kept. The solve's levers stay the step's.
 - **Regression:** the test above, the plate at the origin and the axis 60 m off, within 1e-3 m over 36 s (0.7 mm measured,
