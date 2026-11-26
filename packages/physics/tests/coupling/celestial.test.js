@@ -24,6 +24,8 @@ class SeaAndAtmosphere {
       ],
       rate: 0,
       stableRate: () => 0,
+      // It reads the sky at the sky's time, which runs 120 seconds a world second here.
+      timeScale: () => 120,
     };
   }
 

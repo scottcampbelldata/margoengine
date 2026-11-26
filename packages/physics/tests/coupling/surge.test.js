@@ -16,15 +16,19 @@ const bed = bedSurface(shape, elevations);
 
 const make = (rate = { num: 24, den: 1 }) => {
   const water = new ShallowWaterSolver();
-  return new PhysicsWorld({ rate })
-    .add(new CelestialSolver(), { timeScale: 3600 })
-    .add(water, { bed, level: 0, coriolis: { latitude: 0.8 } })
-    .add(new SurgeSolver('surge', { tide: true }), {
-      water,
-      site: { latitude: 0.8, longitude: -1.5 },
-      pressure: (x, z, t) => 101325 - 2000 * Math.exp(-((x - 200 * t) ** 2 + (z - 2000) ** 2) / 1e7),
-    })
-    .couple(['surge', 'water'], 'staggered');
+  return (
+    new PhysicsWorld({ rate })
+      .add(new CelestialSolver(), { timeScale: 3600 })
+      // The water and the sky on one clock, an hour a world second (the world refuses them apart).
+      .add(water, { bed, level: 0, coriolis: { latitude: 0.8 }, timeScale: 3600 })
+      .add(new SurgeSolver('surge', { tide: true }), {
+        water,
+        site: { latitude: 0.8, longitude: -1.5 },
+        // A low crossing at 20 m/s of the water's time.
+        pressure: (x, z, t) => 101325 - 2000 * Math.exp(-((x - 20 * t) ** 2 + (z - 2000) ** 2) / 1e7),
+      })
+      .couple(['surge', 'water'], 'staggered')
+  );
 };
 
 test('SurgeSolver: the same surge at 24, 30 and 60 frames a second', () => frameRateIndependent(make));

@@ -68,6 +68,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   distribution's stored pages on Direct3D 11 against ANGLE Vulkan after the first training batch.
 - **Impact:** `guiding: true` on a browser that has no WebGPU and runs ANGLE on Direct3D 11 gives a far noisier
   image than `guiding: false`.
+### Fixed 2026-11-26: a sped-up water took a tide and a wind on other clocks without a word (KB-SURGE-SCALE1, physics hydro, surge and space)
+
+- **Repro (before):** a `ShallowWaterSolver` at `timeScale: 600` with a `SurgeSolver` reading the tide of a
+  `CelestialSolver` at its default scale of 1, or with a `wind` field that gives no scale: both were accepted. The
+  tide then ran 600 times slower than the water, and a storm's wind 600 times slower than its pressure (the pressure is
+  a function of the water's time, the wind was read at the world's).
+- **Cause:** the world's time-scale check sees only solvers that declare `timeScale()`, and the celestial solver took a
+  `timeScale` parameter without declaring it; the water read its wind and rain at the world's time whatever its scale.
+- **Fix:** the celestial solver declares its scale (a frozen or reversed sky counts as the world's), so a surge at
+  another scale is refused its tide. The water refuses a wind or rain whose `timeScale` (1 when it gives none) is not its
+  own, with a `state` error naming the fix. The surge's coupling test, which had paired a sky at 3,600 with a water at 1,
+  now runs both at 3,600.
+- **Regression:** "a surge and a tide refuse what they cannot be made from, naming the fix" in
+  `packages/physics/tests/surge.test.js` (a wind with no scale, a wind at 60, and a sky at 1, each refused by a water at
+  600; a wind at 600 accepted).
 
 ### Fixed 2026-11-26: a faded occluder turned solid for the length of a level cross-fade (KB-LOD-FADECOMBO1, lod)
 

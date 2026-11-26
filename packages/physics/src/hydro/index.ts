@@ -17,6 +17,7 @@
 //
 // State: h, hu and hv per cell in f64, and the ledger of water that came in and went out (inflow, rain, the sides).
 import type { Bed, FlowField, FlowSample, Precipitation, Wind } from '@margoengine/math/fields';
+import { MargoError } from '@margoengine/math/errors';
 import { gravityMagnitude } from '@margoengine/math/gravity';
 import { cos, sin } from '@margoengine/math/pinned';
 import { type BedShape, bedVertexCount } from '../earth/bed.js';
@@ -341,6 +342,20 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.level = rate as RateLevel;
     this.rain = params.rain;
     this.wind = params.wind;
+    // A field is read at the world's time, its state then; it must run at the water's time scale (one that does not say
+    // runs at the world's), or one storm's pressure and wind would drift apart.
+    for (const [name, field] of [
+      ['wind', this.wind],
+      ['rain', this.rain],
+    ] as const) {
+      const declared = (field as { timeScale?: unknown } | undefined)?.timeScale,
+        scale = typeof declared === 'number' ? declared : 1;
+      if (field && scale !== this.scale)
+        throw new MargoError(
+          'state',
+          `The water runs ${this.scale} of its seconds a world second and its ${name} field ${scale}${typeof declared === 'number' ? '' : " (it gives no timeScale, so the world's time)"}; give the ${name}'s maker the water's timeScale, or set timeScale: ${this.scale} on a ${name} written as a function of time (it is still read at the world's time t, its weather at t times ${this.scale}).`,
+        );
+    }
     const windDragLimit = params.windDragLimit ?? WIND_DRAG_LIMIT;
     if (!(windDragLimit > 0 && windDragLimit <= 0.01))
       throw new RangeError(

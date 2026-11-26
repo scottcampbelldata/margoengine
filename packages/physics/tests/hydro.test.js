@@ -418,6 +418,7 @@ test("the water's own inputs run on its time and other solvers' fields on the wo
     const wind = {
         medium: 'air',
         cell: [0, 0, 0],
+        timeScale: scale,
         sample: (_x, _y, _z, t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) => {
           latest = Math.max(latest, t);
           out.velocity[0] = 5;

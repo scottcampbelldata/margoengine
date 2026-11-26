@@ -173,6 +173,9 @@ export class CelestialSolver implements Solver<CelestialParams> {
       ],
       rate: 0,
       stableRate: () => 0,
+      // Astronomical seconds per world second: a solver reading the sky's insolation or tide must run at the same. A sky
+      // frozen (0) or run backwards is a set input, not a faster clock, and counts as the world's time.
+      timeScale: () => (this.#settings.timeScale > 0 ? this.#settings.timeScale : 1),
     };
   }
 

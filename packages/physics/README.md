@@ -3661,7 +3661,7 @@ console.log(developed > submergedJetWallShear(jet, 0.185)); // true
 - `coriolis`, the Earth's rotation: a Coriolis parameter f in 1/s, or `{latitude, north}` (radians; `north` from -Z toward +X, default 0) for the beta plane about the grid's centre. Each substep turns the momentum by f dt exactly, so currents swing right in the north and a Kelvin wave keeps to its coast (default none);
 - `timeScale`: seconds of the water's time per second of world time (default 1). 3600 runs an hour of surge or flood each world second, for a timelapse or a long test. Each world step is then many of the water's seconds, taken in as many substeps as the Courant bound asks, each the longest it allows, never one long step. `water.work` counts the steps and substeps.
   - On the water's time: its own inputs (the inflows' discharges, the sides' levels, and a surge's pressure and ramp).
-  - On the world's time: fields other solvers publish (the rain, the wind, the tide), so give those solvers the same scale.
+  - On the world's time: fields (the rain, the wind, the tide), each running at the water's scale. A field gives its `timeScale` (one that gives none runs at the world's), and the water refuses, with a `state` error, a wind or rain at another scale: give its maker the water's `timeScale`, or set `timeScale` on one you write as a function of time (still read at the world's time t, its weather at t times the scale). The `CelestialSolver` declares its own, so the surge refuses a tide at another scale.
   - What the water publishes carries its scale: the `surfaceWater` field, the surge's potential and `water.flow`. The world refuses, with a `state` error naming the fix, a solver at another scale that reads them or is given `water.flow`. Ships, hulls, loads, tracers and anything riding the water run on the world's time, so a sped-up surge is for scenes of the water alone, or of solvers that take the same `timeScale` (the surge, the synoptic weather);
 - `courant` (default 0.4, at most 0.5), `density` (default 1000), `rate` (its rate level, default the world's base rate).
 
@@ -3728,7 +3728,8 @@ const elevations = new Float64Array((columns + 1) * (rows + 1)).fill(-147);
 const wind = {
   medium: 'air' as const,
   cell: [0, 0, 0] as const,
-  // A field is read at the world's time: one world second is an hour of the storm.
+  // A field is read at the world's time and says the water's time scale: one world second is an hour of the storm.
+  timeScale: hour,
   sample: (_x: number, _y: number, _z: number, t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0}) => {
     out.velocity[0] = 25.7 * Math.tanh((t * hour) / 7200);
     out.velocity[1] = out.velocity[2] = 0;
@@ -4167,7 +4168,7 @@ console.log(typeof load); // function
 
 `CelestialSolver` advances the Sun, Moon and major planets with the physics world (SPACE-02). Its positions are geocentric J2000 vectors in metres. The two framework fields publish direct solar insolation and lunar/solar tidal potential. Read them through `insolationFromPort` and `tideFromPort`, passing the world memory and each solver's input port. Local samples use WGS 84 latitude and east longitude in radians, and optional ellipsoidal height in metres (default zero).
 
-The default epoch is J2000, with TT and TDB seconds zero and UT1 seconds −63.86. To set another epoch, give `epoch.ttSeconds` and `epoch.ut1Seconds` as seconds from JD 2451545.0 on their respective timescales. Supply `epoch.tdbSeconds` when known. It defaults to TT. `timeScale` defaults to one astronomical second per world second. Zero freezes the sky and negative values run it backwards. Optional `orientation` supplies IERS celestial pole and locator, polar motion and TIO locator for the run. Defaults use IAU 2006 precession, four nutation terms and zero polar motion.
+The default epoch is J2000, with TT and TDB seconds zero and UT1 seconds −63.86. To set another epoch, give `epoch.ttSeconds` and `epoch.ut1Seconds` as seconds from JD 2451545.0 on their respective timescales. Supply `epoch.tdbSeconds` when known. It defaults to TT. `timeScale` defaults to one astronomical second per world second. Zero freezes the sky and negative values run it backwards. A scale above 0 is declared to the world, so a solver reading the sky's insolation or tide must run at the same (a surge's water does); a frozen or reversed sky counts as the world's time. Optional `orientation` supplies IERS celestial pole and locator, polar motion and TIO locator for the run. Defaults use IAU 2006 precession, four nutation terms and zero polar motion.
 
 For high-precision or historical work, pass `ephemeris: new SpkEphemeris(bytes)` with a complete JPL planetary/lunar SPK kernel such as DE440s. The input can be an `ArrayBuffer` or `Uint8Array`. The reader copies the bytes and supports IEEE little- and big-endian J2000 type 2 and type 3 data. The default analytic mode uses JPL's fitted 1800–2050 orbit elements and the Meeus lunar series. SPK solar and lunar directions include light time and geocentric stellar aberration. Insolation is a geometric direct-beam estimate above the horizon. Clouds, atmospheric extinction and ocean response are supplied by their own solvers.
 

@@ -25,12 +25,13 @@ function ground(columns, rows, width, depth, f) {
 
 /**
  * A wind field of a velocity [u, w] m/s at 10 m, a function of the water's time: a field is read at the world's time, which
- * runs `scale` times slower than the water's.
+ * runs `scale` times slower than the water's, and says its scale so the water takes it.
  */
 function windOf(velocity, scale) {
   return {
     medium: 'air',
     cell: [0, 0, 0],
+    timeScale: scale,
     sample: (x, _y, z, t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) => {
       const [u, w] = velocity(x, z, t * scale);
       out.velocity[0] = u;
@@ -399,5 +400,28 @@ test('a surge and a tide refuse what they cannot be made from, naming the fix', 
   assert.throws(() => sea({ water: { bed, level: 0 }, surge: {}, tide: true, celestial: {} }), /site/);
   assert.throws(() => sea({ water: { bed, level: 0, coriolis: { latitude: 3 } } }), /latitude/);
   assert.throws(() => sea({ water: { bed, level: 0, timeScale: 0 } }), /time scale/);
+  // One storm's pressure and wind on one clock: a wind that gives no time scale is the world's, refused by a sped-up water.
+  const still = { medium: 'air', cell: [0, 0, 0], sample: (_x, _y, _z, _t, out) => out };
+  assert.throws(
+    () => sea({ water: { bed, level: 0, wind: still }, surge: { pressure: () => 101325 }, scale: 600 }),
+    (e) => e.code === 'state' && /wind field 1 \(it gives no timeScale/.test(e.message),
+  );
+  assert.throws(
+    () => sea({ water: { bed, level: 0, wind: { ...still, timeScale: 60 } }, scale: 600 }),
+    /its wind field 60;/,
+  );
+  sea({ water: { bed, level: 0, wind: { ...still, timeScale: 600 } }, scale: 600 });
+  // The tide on the same clock: a sky at the world's time refused by a surge at 600.
+  assert.throws(
+    () =>
+      sea({
+        water: { bed, level: 0 },
+        surge: { site: { latitude: 0, longitude: 0 } },
+        tide: true,
+        celestial: { timeScale: 1 },
+        scale: 600,
+      }),
+    (e) => e.code === 'state' && /reads "tidalPotential" from "[^"]+" at a time scale of 600/.test(e.message),
+  );
   assert.throws(() => tidalLevel([]), /at least one/);
 });

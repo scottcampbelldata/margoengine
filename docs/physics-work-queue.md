@@ -370,7 +370,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | AERO-05 | Falling and tumbling light bodies | falling plates, winged seeds and swept hail | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c82d68bf98 |
 | SEA-03 | Nonlinear waves, rogue waves | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 47be5f699 |
 | SEA-06 | Tsunami and impulse waves | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 1905b1c216 |
-| SEA-07 | Tides, storm surge and currents | physics/surge (`SurgeSolver` over HYDRO-01's shallow water: inverse barometer, equilibrium tide, wind, Coriolis, open-sea tides, time scale) | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e5462e9cc |
+| SEA-07 | Tides, storm surge and currents | physics/surge (`SurgeSolver` over HYDRO-01's shallow water: inverse barometer, equilibrium tide, wind, Coriolis, open-sea tides, time scale) | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e5462e9cc |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a540dd915c |
 | FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | BUILDING (codex/physics-thin-film-upgrade) |
