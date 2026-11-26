@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20577854,
+  "total": 20578940,
   "history": [
     {
       "date": "2026-10-24",
@@ -13633,6 +13633,12 @@
       "commit": "FLUID-07-wetting",
       "grew": 1,
       "reason": "FLUID-07 adds opt-in precursor contact angles with pinned sine and coded input checks. Thin-film rises from 5917 to 6512 B gzip; cap changes from 6173 to 6768 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d0bd940679",
+      "grew": 1,
+      "reason": "KB-CAPTURE-TWOEFFECTS1: water keeps one capture pipeline per effect (keyed by that effect's declarations) and its bind groups per view per pipeline, so one water in two capture effects draws each effect's own stage without a rebuild per draw; @margoengine/water measured 34820 B gzip, budget 34779 to 35865. The map lives in the capture draw the entry already carries; a split would move the whole capture path. Core plus Stage unchanged."
     }
   ],
   "items": {
@@ -15254,7 +15260,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 34779,
+    "@margoengine/water": 35865,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6669,
