@@ -113,7 +113,7 @@ export interface BabylonMesh extends BabylonNode {
 /** A TransformNode: a pure parent. */
 export interface BabylonTransformNode extends BabylonNode {}
 
-/** A camera of a .babylon scene, with its look-at point and lens. */
+/** A camera of the scene file, with its look-at point and lens. */
 export interface BabylonCamera {
   id: string;
   name: string;
@@ -131,7 +131,7 @@ export interface BabylonCamera {
   orthographic?: { left: number; right: number; top: number; bottom: number };
 }
 
-/** A light of a .babylon scene: point, directional, spot or hemispheric, in linear rgb. */
+/** A light of the scene file: point, directional, spot or hemispheric, in linear rgb. */
 export interface BabylonLight {
   id: string;
   name: string;
@@ -151,7 +151,7 @@ export interface BabylonLight {
   groundColor?: [number, number, number];
 }
 
-/** One bone of a {@link BabylonSkeleton}. */
+/** One bone of a skeleton: its name, index, parent and bind matrix. */
 export interface BabylonBone {
   name: string;
   index: number;
@@ -160,7 +160,7 @@ export interface BabylonBone {
   matrix: number[];
 }
 
-/** A skeleton of a .babylon scene: its bones in file order. */
+/** A skeleton of the scene file: its bones in file order. */
 export interface BabylonSkeleton {
   id: string;
   name: string;

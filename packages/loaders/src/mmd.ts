@@ -15,6 +15,7 @@ export interface MMDOptions extends ParseLimits {
   rightHanded?: boolean;
 }
 
+/** A material of a PMX or PMD model, with the run of triangles it draws. */
 export interface MMDMaterial {
   name: string;
   nameEnglish: string;
@@ -39,6 +40,7 @@ export interface MMDMaterial {
   triangles: number;
 }
 
+/** A bone of a PMX or PMD model: its rest position, parent, flags, grant and IK chain. */
 export interface MMDBone {
   name: string;
   nameEnglish: string;
@@ -63,9 +65,15 @@ export interface MMDBone {
   inherit: number;
   inheritRate: number;
   afterPhysics: boolean;
-  ik?: { target: number; iterations: number; limitAngle: number; links: { bone: number; limit?: { min: number[]; max: number[] } }[] };
+  ik?: {
+    target: number;
+    iterations: number;
+    limitAngle: number;
+    links: { bone: number; limit?: { min: number[]; max: number[] } }[];
+  };
 }
 
+/** A morph of a PMX or PMD model: its panel, type and raw offsets. */
 export interface MMDMorph {
   name: string;
   nameEnglish: string;
@@ -268,7 +276,8 @@ function conversion(options: MMDOptions) {
     dir: (v: number[]): [number, number, number] => [v[0], v[1], rh ? 0 - v[2] : v[2]],
     // Euler angles mirror like an axis does: x and y turn the other way.
     euler: (v: number[]): [number, number, number] => (rh ? [0 - v[0], 0 - v[1], v[2]] : [v[0], v[1], v[2]]),
-    quat: (q: number[]): [number, number, number, number] => (rh ? [0 - q[0], 0 - q[1], q[2], q[3]] : [q[0], q[1], q[2], q[3]]),
+    quat: (q: number[]): [number, number, number, number] =>
+      rh ? [0 - q[0], 0 - q[1], q[2], q[3]] : [q[0], q[1], q[2], q[3]],
     size: (v: number[]): [number, number, number] => [v[0] * scale, v[1] * scale, v[2] * scale],
   };
 }
@@ -285,7 +294,8 @@ function geometryOf(
   vertexCount: number,
 ): LoadedGeometry {
   if (faces.length % 3) fail('syntax', `${faces.length} face indices is not a multiple of 3`);
-  if (faces.length / 3 > c.maxTriangles) fail('limit', `triangle count ${faces.length / 3} exceeds the limit of ${c.maxTriangles}`);
+  if (faces.length / 3 > c.maxTriangles)
+    fail('limit', `triangle count ${faces.length / 3} exceeds the limit of ${c.maxTriangles}`);
   for (let i = 0; i < faces.length; i++)
     if (faces[i] >= vertexCount) fail('range', `face index ${faces[i]} is past the ${vertexCount} vertices`);
   const indices = new Uint32Array(faces.length);
@@ -758,7 +768,10 @@ export function parsePMX(input: BinaryInput, options: MMDOptions = {}): LoadedMM
       b.ik.links.forEach((l) => checkBone(l.bone, `bone ${i} IK link`));
     }
   });
-  for (let i = 0; i < nv; i++) for (let k = 0; k < 4; k++) if (joints[i * 4 + k] >= Math.max(nb, 1)) fail('range', `vertex ${i} is skinned to bone ${joints[i * 4 + k]} of ${nb}`);
+  for (let i = 0; i < nv; i++)
+    for (let k = 0; k < 4; k++)
+      if (joints[i * 4 + k] >= Math.max(nb, 1))
+        fail('range', `vertex ${i} is skinned to bone ${joints[i * 4 + k]} of ${nb}`);
 
   const nmo = r.i32();
   r.records(nmo, 10, 'morphs');
@@ -808,7 +821,12 @@ export function parsePMX(input: BinaryInput, options: MMDOptions = {}): LoadedMM
           break;
         }
         case 'impulse':
-          offsets.push({ rigidBody: r.index(rSize, true), local: r.u8() !== 0, velocity: c.point(r.vec(3)), torque: r.vec(3) });
+          offsets.push({
+            rigidBody: r.index(rSize, true),
+            local: r.u8() !== 0,
+            velocity: c.point(r.vec(3)),
+            torque: r.vec(3),
+          });
           break;
         default: {
           // uv, uv1 .. uv4
@@ -882,7 +900,8 @@ export function parsePMX(input: BinaryInput, options: MMDOptions = {}): LoadedMM
         a = r.index(rSize, true),
         b = r.index(rSize, true);
       const v = (n: number) => r.vec(n);
-      if (a >= rigidBodies.length || b >= rigidBodies.length) fail('range', `joint ${i} names a rigid body past ${rigidBodies.length}`);
+      if (a >= rigidBodies.length || b >= rigidBodies.length)
+        fail('range', `joint ${i} names a rigid body past ${rigidBodies.length}`);
       joints_.push({
         name: jn,
         nameEnglish: je,
@@ -926,7 +945,8 @@ export function parsePMX(input: BinaryInput, options: MMDOptions = {}): LoadedMM
 /** Reads a PMD or a PMX file, by its signature. */
 export function parseMMD(input: BinaryInput, options: MMDOptions = {}): LoadedMMD {
   const bytes = toBytes(input, F);
-  if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4d && bytes[2] === 0x58 && bytes[3] === 0x20) return parsePMX(bytes, options);
+  if (bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4d && bytes[2] === 0x58 && bytes[3] === 0x20)
+    return parsePMX(bytes, options);
   if (bytes.length >= 3 && bytes[0] === 0x50 && bytes[1] === 0x6d && bytes[2] === 0x64) return parsePMD(bytes, options);
   throw new LoaderError(F, 'header', 'not a PMD or PMX file');
 }
@@ -999,9 +1019,11 @@ export function parseVMD(input: BinaryInput, options: VMDOptions = {}): LoadedVM
   const bytes = toBytes(input, F);
   const c = conversion({ scale: options.scale, rightHanded: options.rightHanded });
   const maxKeys = options.maxKeys ?? 2_000_000;
-  if (!Number.isSafeInteger(maxKeys) || maxKeys < 0) throw new LoaderError(F, 'range', 'maxKeys must be a non-negative integer');
+  if (!Number.isSafeInteger(maxKeys) || maxKeys < 0)
+    throw new LoaderError(F, 'range', 'maxKeys must be a non-negative integer');
   const header = decode(bytes.subarray(0, Math.min(30, bytes.length)), 'ascii');
-  if (!header.startsWith('Vocaloid Motion Data')) throw new LoaderError(F, 'header', 'missing the "Vocaloid Motion Data" signature');
+  if (!header.startsWith('Vocaloid Motion Data'))
+    throw new LoaderError(F, 'header', 'missing the "Vocaloid Motion Data" signature');
   const v2 = header.startsWith('Vocaloid Motion Data 0002');
   const r = new Reader(bytes, true);
   r.p = 30;
@@ -1064,13 +1086,25 @@ export function parseVMD(input: BinaryInput, options: VMDOptions = {}): LoadedVM
   const morphs: VMDMorphTrack[] = [];
   for (const [name, list] of morphLists) {
     list.sort((a, b) => a.frame - b.frame);
-    morphs.push({ name, frames: Uint32Array.from(list, (k) => k.frame), weights: Float32Array.from(list, (k) => k.weight) });
+    morphs.push({
+      name,
+      frames: Uint32Array.from(list, (k) => k.frame),
+      weights: Float32Array.from(list, (k) => k.weight),
+    });
     duration = Math.max(duration, list[list.length - 1].frame);
   }
   let camera: VMDCameraTrack | undefined;
   const nc = section(61, 'camera');
   if (nc) {
-    const keys: { frame: number; d: number; p: number[]; rot: number[]; interp: Uint8Array; fov: number; persp: number }[] = [];
+    const keys: {
+      frame: number;
+      d: number;
+      p: number[];
+      rot: number[];
+      interp: Uint8Array;
+      fov: number;
+      persp: number;
+    }[] = [];
     for (let i = 0; i < nc; i++) {
       const frame = r.u32(),
         d = r.f32(),
@@ -1101,7 +1135,8 @@ export function parseVMD(input: BinaryInput, options: VMDOptions = {}): LoadedVM
   }
   const lights: LoadedVMD['lights'] = [];
   const nl = section(28, 'light');
-  for (let i = 0; i < nl; i++) lights.push({ frame: r.u32(), color: r.vec(3) as [number, number, number], position: c.dir(r.vec(3)) });
+  for (let i = 0; i < nl; i++)
+    lights.push({ frame: r.u32(), color: r.vec(3) as [number, number, number], position: c.dir(r.vec(3)) });
   const shadows: LoadedVMD['shadows'] = [];
   const ns = section(9, 'shadow');
   for (let i = 0; i < ns; i++) shadows.push({ frame: r.u32(), mode: r.u8(), distance: r.f32() });
@@ -1127,7 +1162,8 @@ export function vmdBezier(x1: number, y1: number, x2: number, y2: number, t: num
     ay = y1 / 127,
     bx = x2 / 127,
     by = y2 / 127;
-  const at = (a: number, b: number, s: number): number => 3 * a * s * (1 - s) * (1 - s) + 3 * b * s * s * (1 - s) + s * s * s;
+  const at = (a: number, b: number, s: number): number =>
+    3 * a * s * (1 - s) * (1 - s) + 3 * b * s * s * (1 - s) + s * s * s;
   let lo = 0,
     hi = 1;
   for (let i = 0; i < 24; i++) {
@@ -1152,7 +1188,12 @@ export function sampleVMDBone(
   if (!n) return undefined;
   const key = (i: number) => ({
     p: [track.positions[i * 3], track.positions[i * 3 + 1], track.positions[i * 3 + 2]] as [number, number, number],
-    q: [track.rotations[i * 4], track.rotations[i * 4 + 1], track.rotations[i * 4 + 2], track.rotations[i * 4 + 3]] as [number, number, number, number],
+    q: [track.rotations[i * 4], track.rotations[i * 4 + 1], track.rotations[i * 4 + 2], track.rotations[i * 4 + 3]] as [
+      number,
+      number,
+      number,
+      number,
+    ],
   });
   if (frame <= track.frames[0]) return { position: key(0).p, rotation: key(0).q };
   if (frame >= track.frames[n - 1]) return { position: key(n - 1).p, rotation: key(n - 1).q };
@@ -1192,7 +1233,12 @@ export function sampleVMDBone(
     wa = Math.sin((1 - s) * theta) / sin;
     wb = Math.sin(s * theta) / sin;
   }
-  const q: [number, number, number, number] = [wa * a.q[0] + wb * bx, wa * a.q[1] + wb * by, wa * a.q[2] + wb * bz, wa * a.q[3] + wb * bw];
+  const q: [number, number, number, number] = [
+    wa * a.q[0] + wb * bx,
+    wa * a.q[1] + wb * by,
+    wa * a.q[2] + wb * bz,
+    wa * a.q[3] + wb * bw,
+  ];
   const len = Math.hypot(q[0], q[1], q[2], q[3]) || 1;
   return { position, rotation: [q[0] / len, q[1] / len, q[2] / len, q[3] / len] };
 }

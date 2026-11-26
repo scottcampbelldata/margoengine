@@ -84,6 +84,7 @@ export interface XAnimation {
   matrix?: XTrack;
 }
 
+/** An AnimationSet: the animations that play together under one name. */
 export interface XAnimationSet {
   name: string;
   animations: XAnimation[];
@@ -166,8 +167,18 @@ function textTokens(text: string, limit: number): Tok[] {
 }
 
 const T = {
-  NAME: 1, STRING: 2, INTEGER: 3, GUID: 5, INTEGER_LIST: 6, FLOAT_LIST: 7, OBRACE: 10, CBRACE: 11,
-  TEMPLATE: 31, LAST_PUNCT: 20, FIRST_TYPE: 40, LAST_TYPE: 52,
+  NAME: 1,
+  STRING: 2,
+  INTEGER: 3,
+  GUID: 5,
+  INTEGER_LIST: 6,
+  FLOAT_LIST: 7,
+  OBRACE: 10,
+  CBRACE: 11,
+  TEMPLATE: 31,
+  LAST_PUNCT: 20,
+  FIRST_TYPE: 40,
+  LAST_TYPE: 52,
 } as const;
 
 function binaryTokens(bytes: Uint8Array, start: number, floatSize: number, limit: number): Tok[] {
@@ -204,12 +215,18 @@ function binaryTokens(bytes: Uint8Array, start: number, floatSize: number, limit
       const count = view.getUint32(p, true);
       p += 4;
       const size = id === T.INTEGER_LIST ? 4 : floatSize;
-      if (count > (bytes.length - p) / size) bad('truncated', `a list of ${count} values runs past the end of the file`);
+      if (count > (bytes.length - p) / size)
+        bad('truncated', `a list of ${count} values runs past the end of the file`);
       if (out.length + count > limit) bad('limit', `more than ${limit} tokens`);
       for (let i = 0; i < count; i++, p += size)
         out.push({
           k: 'num',
-          v: id === T.INTEGER_LIST ? view.getUint32(p, true) : size === 4 ? view.getFloat32(p, true) : view.getFloat64(p, true),
+          v:
+            id === T.INTEGER_LIST
+              ? view.getUint32(p, true)
+              : size === 4
+                ? view.getFloat32(p, true)
+                : view.getFloat64(p, true),
         });
     } else if (id === T.OBRACE) out.push({ k: '{' });
     else if (id === T.CBRACE) out.push({ k: '}' });
@@ -317,7 +334,8 @@ class Reader {
   }
   int(): number {
     const v = this.values[this.at++];
-    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) return bad('syntax', `${this.what}: expected a count or index`);
+    if (typeof v !== 'number' || !Number.isInteger(v) || v < 0)
+      return bad('syntax', `${this.what}: expected a count or index`);
     return v;
   }
   num(): number {
@@ -342,7 +360,8 @@ class Reader {
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function mul(a: number[], b: number[]): number[] {
   const o = new Array<number>(16).fill(0);
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
   return o;
 }
 
@@ -361,8 +380,7 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
     rh = options.rightHanded ?? true;
   for (const [k, v] of Object.entries({ maxVertices, maxTriangles, maxDepth, maxNodes }))
     if (!Number.isSafeInteger(v) || v < 0) throw new LoaderError(F, 'range', `${k} must be a non-negative integer`);
-  const bytes =
-    typeof input === 'string' ? new TextEncoder().encode(input) : toBytes(input, F);
+  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : toBytes(input, F);
   if (bytes.length < 16) throw new LoaderError(F, 'truncated', 'file is shorter than the 16-byte header');
   const tag = (o: number): string => String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]);
   if (tag(0) !== 'xof ') throw new LoaderError(F, 'header', 'missing the "xof " signature');
@@ -370,8 +388,10 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
     kind = tag(8),
     floats = tag(12);
   if (!/^0[0-9]{3}$/.test(major)) throw new LoaderError(F, 'header', `bad version "${major}"`);
-  if (floats !== '0032' && floats !== '0064') throw new LoaderError(F, 'header', `float size "${floats}" is not 0032 or 0064`);
-  if (kind === 'tzip' || kind === 'bzip') throw new LoaderError(F, 'unsupported', 'compressed .x files (MSZip) are not read');
+  if (floats !== '0032' && floats !== '0064')
+    throw new LoaderError(F, 'header', `float size "${floats}" is not 0032 or 0064`);
+  if (kind === 'tzip' || kind === 'bzip')
+    throw new LoaderError(F, 'unsupported', 'compressed .x files (MSZip) are not read');
   if (kind !== 'txt ' && kind !== 'bin ') throw new LoaderError(F, 'header', `format "${kind}" is not txt or bin`);
   const budget = Math.max(1024, bytes.length * 2);
   const tokens =
@@ -384,7 +404,7 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
   const M = (m: number[]): number[] => {
     if (!rh) return m;
     const o = m.slice();
-    for (let i = 0; i < 16; i++) if (((i & 3) === 2) !== ((i >> 2) === 2)) o[i] = 0 - o[i];
+    for (let i = 0; i < 16; i++) if (((i & 3) === 2) !== (i >> 2 === 2)) o[i] = 0 - o[i];
     return o;
   };
   const named = new Map<string, XNode>();
@@ -435,7 +455,8 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
       const k = r.int();
       if (k < 3 || k > r.left) bad('syntax', `${what}: face ${f} has ${k} indices`);
       const face = r.take(k);
-      for (const v of face) if (!Number.isInteger(v) || v < 0 || v >= nv) bad('range', `${what}: face ${f} names vertex ${v} of ${nv}`);
+      for (const v of face)
+        if (!Number.isInteger(v) || v < 0 || v >= nv) bad('range', `${what}: face ${f} names vertex ${v} of ${nv}`);
       faces.push(face);
       cornerCount += k;
       if (cornerCount > maxTriangles * 3 * 4) bad('limit', `${what}: too many face corners`);
@@ -458,9 +479,12 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
         normalFaces = [];
         for (let f = 0; f < nfn; f++) {
           const k = cr.int();
-          if (k !== faces[f].length || k > cr.left) bad('syntax', `${what}: normal face ${f} has ${k} indices, the face has ${faces[f].length}`);
+          if (k !== faces[f].length || k > cr.left)
+            bad('syntax', `${what}: normal face ${f} has ${k} indices, the face has ${faces[f].length}`);
           const nf2 = cr.take(k);
-          for (const v of nf2) if (!Number.isInteger(v) || v < 0 || v >= nn) bad('range', `${what}: normal face ${f} names normal ${v} of ${nn}`);
+          for (const v of nf2)
+            if (!Number.isInteger(v) || v < 0 || v >= nn)
+              bad('range', `${what}: normal face ${f} names normal ${v} of ${nn}`);
           normalFaces.push(nf2);
         }
       } else if (c.type === 'MeshTextureCoords') {
@@ -484,7 +508,9 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
         const idx = cr.take(ni);
         faceMaterial = ni === nf ? idx : Array.from({ length: nf }, (_, i) => idx[i % Math.max(ni, 1)] ?? 0);
         if (ni !== nf && ni !== 1 && ni !== 0) bad('syntax', `${what}: ${ni} material indices for ${nf} faces`);
-        for (const v of faceMaterial) if (!Number.isInteger(v) || v < 0 || (nm > 0 && v >= nm)) bad('range', `${what}: material index ${v} of ${nm}`);
+        for (const v of faceMaterial)
+          if (!Number.isInteger(v) || v < 0 || (nm > 0 && v >= nm))
+            bad('range', `${what}: material index ${v} of ${nm}`);
         for (const item of c.items) {
           if (typeof item !== 'string') {
             if (item.type === 'Material') meshMaterials.push(material(item));
@@ -526,7 +552,12 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
       const face = faces[f];
       const m = faceMaterial ? faceMaterial[f] : 0;
       if (faceMaterial && m !== groupMaterial) {
-        if (groupMaterial >= 0) groups.push({ start: groupStart, count: tris.length - groupStart, properties: { materialIndex: groupMaterial } });
+        if (groupMaterial >= 0)
+          groups.push({
+            start: groupStart,
+            count: tris.length - groupStart,
+            properties: { materialIndex: groupMaterial },
+          });
         groupMaterial = m;
         groupStart = tris.length;
       }
@@ -590,7 +621,8 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
           w = sr.take(nw),
           offset = sr.take(16);
         for (let i = 0; i < nw; i++) {
-          if (!Number.isInteger(idx[i]) || idx[i] < 0 || idx[i] >= nv) bad('range', `${what}: skin weight for vertex ${idx[i]} of ${nv}`);
+          if (!Number.isInteger(idx[i]) || idx[i] < 0 || idx[i] >= nv)
+            bad('range', `${what}: skin weight for vertex ${idx[i]} of ${nv}`);
           influences[idx[i]].push([bone, w[i]]);
         }
         mesh.bones.push({ name: boneName, frame: -1, inverseBind: M(offset) });
@@ -629,7 +661,13 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
     const t = n.children.find((c) => c.type === 'FrameTransformMatrix');
     let matrix = IDENTITY.slice();
     if (t) matrix = M(new Reader(t.values, 'FrameTransformMatrix').take(16));
-    frames.push({ name: n.name, parent, matrix, world: parent >= 0 ? mul(frames[parent].world, matrix) : matrix.slice(), meshes: [] });
+    frames.push({
+      name: n.name,
+      parent,
+      matrix,
+      world: parent >= 0 ? mul(frames[parent].world, matrix) : matrix.slice(),
+      meshes: [],
+    });
     for (const item of n.items) {
       if (typeof item !== 'string') {
         if (item.type === 'Frame') frameOf(item, own);
@@ -654,7 +692,13 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
   for (const r of roots) {
     if (r.type === 'Frame') frameOf(r, -1);
     else if (r.type === 'Mesh') {
-      frames.push({ name: r.name, parent: -1, matrix: IDENTITY.slice(), world: IDENTITY.slice(), meshes: [meshes.length] });
+      frames.push({
+        name: r.name,
+        parent: -1,
+        matrix: IDENTITY.slice(),
+        world: IDENTITY.slice(),
+        meshes: [meshes.length],
+      });
       meshOf(r);
     } else if (r.type === 'Material') material(r);
   }
@@ -709,5 +753,13 @@ export function parseX(input: BinaryInput | string, options: XOptions = {}): Loa
     }
     animationSets.push({ name: set.name, animations, duration });
   }
-  return { format: kind === 'txt ' ? 'text' : 'binary', frames, meshes, materials, animationSets, ticksPerSecond: ticks, warnings };
+  return {
+    format: kind === 'txt ' ? 'text' : 'binary',
+    frames,
+    meshes,
+    materials,
+    animationSets,
+    ticksPerSecond: ticks,
+    warnings,
+  };
 }
