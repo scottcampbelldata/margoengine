@@ -3319,6 +3319,10 @@
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/drainage-fog": {
+      "types": "./dist/physics/drainage-fog.d.ts",
+      "import": "./dist/physics/drainage-fog.js"
+    },
     "./physics/snowpack": {
       "types": "./dist/physics/snowpack.d.ts",
       "import": "./dist/physics/snowpack.js"

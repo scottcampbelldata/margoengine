@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Solved fog movement</title>
+  <style>body { margin: 0; } canvas { display: block; }</style>
+</head>
+<body>
+  <canvas width="256" height="160"></canvas>
+  <script type="module">
+    import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+    import { FogGrid } from '/packages/environment/dist/fog-volumes.js';
+    import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
+    import { DrainageFog } from '/packages/physics/dist/drainage-fog.js';
+    import { PhysicsWorld } from '/packages/physics/dist/world.js';
+    import { Bloom } from '/packages/post/dist/bloom.js';
+
+    const engine = await Engine.create(document.querySelector('canvas'), {
+      backend: 'webgpu', camera: { position: [0, 2.4, 13], target: [0, 2.2, 0], near: 0.1, far: 80 },
+    });
+    engine.stop();
+    Bloom.attach(engine, { strength: 0 });
+    const dark = new PbrMaterial({ color: '#202c24' });
+    engine.createMesh().setGeometry(box(30, 0.2, 30)).setPosition([0, -0.1, 0]).setMaterial(dark);
+    engine.createMesh().setGeometry(box(20, 7, 0.2)).setPosition([0, 3.5, -8]).setMaterial(dark);
+    const errors = [];
+    engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+    const fog = await DrainageFog.load();
+    const width = 18, depth = 10;
+    const liquid = Array.from({ length: width * depth }, (_, i) => (i % width >= 4 && i % width < 7 ? 0.003 : 0));
+    world.add(fog, {
+      width, depth, spacing: [1, 1], origin: [-8.5, -5], initialDepth: 4, initialLiquid: liquid,
+      initialTemperature: 286, airTemperature: 280, initialHumidity: 1, initialVelocity: [2, 0],
+      drag: 0, settling: 0, emissivity: 0, entrainment: 0,
+    });
+    const grid = new FogGrid(fog);
+    const pass = VolumetricFog.attach(engine, { density: 0, temporal: 0, grid: [36, 24, 24], range: 40, ambient: [1, 1, 1] });
+
+    window.step = async (frame, show) => {
+      world.advance(frame);
+      pass.options.volumes = show ? grid : undefined;
+      engine.render({ delta: 0 });
+      await engine.gpu.queue.onSubmittedWorkDone();
+      return { water: fog.budget.water, errors: errors.splice(0) };
+    };
+    window.retire = () => { pass.options.volumes = undefined; grid.dispose(); };
+    window.ready = true;
+  </script>
+</body>
+</html>
