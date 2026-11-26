@@ -9780,13 +9780,14 @@ Rigid boxes, spheres and capsules use sampled boundaries and hold their last pub
 fluid substeps. Contact audio represents an impulse on one selected modal track. Capillarity uses one liquid and
 uniform material energies on its solids. The interface spans a three-spacing kernel neighbourhood.
 The capillary force runs before pressure and leaves out the paper's simultaneous nonlinear pressure and friction
-solve. The narrow-channel surge remains early. Bubble acoustics, shallow-water exchange and film production
-bindings are open.
+solve. The coarse and interactive narrow-channel surges arrive early. Bubble acoustics and production
+bindings for crests and shorelines are open.
 
 The parcel interface moves one particle rest-volume per ticket. Fractions remain with the sender.
-It reports all momentum components and resolves origin-cell offsets. Shallow-water and crest adapters
-need to apply the receipts to their own conserved state. The checked second endpoint is a closed test
-reservoir, including capacity refusal, retransmission and replay.
+It reports all momentum components and resolves origin-cell offsets. The live shallow-water test is a
+closed 1 m² periodic wet cell, with reciprocal volume and horizontal momentum and an independent
+vertical ledger. Production wet/dry cells and the breaking crest need owner-side reservation and receipt
+of applied fluxes.
 
 ### Position-based particle water (FLUID-02)
 

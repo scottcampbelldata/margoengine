@@ -341,7 +341,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 | LIFE-01/03 ↔ SEA-12 | Animals wading, swimming, carried by flow; swimmers displace water | two-way |
 | SEA-06 ← EARTH-02, ICE-03, ICE-02 | Slide, calving or fault volume source | one-way |
 | SEA-07 ← ATMO-05, ATMO-10, SPACE-02 | Wind stress, pressure, tidal potential | one-way |
-| FLUID-01/03 ↔ SEA-04/HYDRO-01 | Particle liquid hand-off to and from the surface solvers (mass and momentum exchange) | two-way |
+| FLUID-01/03 ↔ SEA-04/HYDRO-01 | Particle liquid hand-off to and from the surface solvers (mass and momentum exchange) | two-way; FLUID-01 has a real wet-cell HYDRO-01 test, with shoreline and SEA-04 receipts still open |
 | FLUID-01/02 ↔ DYN-01 | Boundary particles and pressure forces on rigid bodies | two-way; FLUID-02 has a staggered live rigid pose and impulse test in `packages/physics/tests/coupling/pbf.test.js` |
 
 ### Rivers, rain, terrain and sediment

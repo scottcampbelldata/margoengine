@@ -4372,3 +4372,11 @@ snapshot. It reports changed pixels, tip movement and the state hash.
 Run `node --test packages/physics/tests/coupling/dfsph.test.js` for the two-way parcel ledger. The fixture
 debits and credits known volume and all three momentum components, puts liquid and reservoir in different
 world cells, rejects a full-capacity arrival, and replays a retried receipt through a snapshot.
+
+Run `node --test packages/physics/tests/coupling/dfsph-hydro.test.js` for the wet-cell transfer to
+a production shallow-water solver. The donor reserves volume above the wet threshold. In the same
+staggered tick DFSPH returns a signed volume ΔV and impulse Δp in its receipt. The paired shallow
+sources are −ΔV/Δt m³/s and −Δpₓ,𝓏/(ρ A Δt) m²/s², where A is the cell area and ρ is the water
+density. The vertical ledger records −Δpᵧ. This uses the conservative volume and velocity mixture of
+Chentanez and Müller (2010), §2.4.1, Equation 18, with the represented volume equal to the physical
+particle volume. [Real-time Simulation of Large Bodies of Water with Small Scale Details](https://diglib.eg.org/items/d0320015-4b07-416b-8f41-047485c9f7f3)

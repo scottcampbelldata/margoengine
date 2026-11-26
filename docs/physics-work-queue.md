@@ -77,12 +77,13 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
-- **FLUID-01:** Connect SEA-04 and HYDRO-01 to the optional DFSPH layout-1 parcel requests and receipts.
-  Each half needs to reserve whole-particle volume, apply the acknowledged signed volume and x/z momentum,
-  and account for vertical momentum separately from depth-averaged motion. The optional FLUID-01 endpoint
-  and conservative fixture already use those fields. The current runoff and wake inputs carry volume and
-  have no paired horizontal momentum or acceptance. SOUND-05 still needs a mapped liquid/bubble event record
-  with position, energy and a clock. SOUND-04's existing modal contact field has a real impact producer.
+- **FLUID-01:** Connect SEA-04 and general HYDRO-01 cells to the optional DFSPH layout-1 parcel requests and
+  receipts. The real HYDRO-01 wet-cell test settles signed depth and both horizontal momentum components in
+  the same tick through the signed inflow and added forcing. Vertical momentum stays in a separate ledger.
+  General shoreline coupling needs HYDRO-01 to reserve donor volume and report what signed volume and
+  momentum the wet/dry update actually accepts. SEA-04 needs a paired debit and horizontal momentum
+  receipt at the solver boundary. SOUND-05 needs a mapped liquid/bubble event record with position,
+  energy and a clock. SOUND-04's modal contact field has a real impact producer.
 
 - **SOFT-04** needs a same-tick handoff for GPU-resident positions and reciprocal rigid-contact impulses,
   with an ordered snapshot readback after the tick commits. The current SoftSolver contract steps CPU
