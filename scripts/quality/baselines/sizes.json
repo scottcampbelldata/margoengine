@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20582874,
+  "total": 20585397,
   "history": [
     {
       "date": "2026-10-24",
@@ -14083,6 +14083,12 @@
       "commit": "feat(physics2d) solver settings",
       "reason": "the same five settings",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "4f651aecc9",
+      "grew": 1,
+      "reason": "SEA-08 three-dimensional radiation grows seakeeping from 35043 to 37493 B gzip. Its integration shares the existing implicit inertia and radiation history. Splitting the hull integration would duplicate those runtime paths. The separate 22012 B gzip Rust panel bake remains lazy."
     }
   ],
   "items": {
@@ -14950,7 +14956,7 @@
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 6661,
-    "@margoengine/physics/seakeeping": 36095,
+    "@margoengine/physics/seakeeping": 38618,
     "@margoengine/physics/sediment": 4669,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 14644,

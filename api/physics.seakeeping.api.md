@@ -93,6 +93,7 @@ export interface Hull {
     readonly course?: HullCourse;
     readonly bilgeKeels?: readonly HullBilgeKeel[];
     readonly surgeAddedMass?: boolean;
+    readonly panels?: HullPanelResponse;
     readonly shortWaveResistance?: boolean;
     readonly compartments?: readonly Compartment[];
     readonly openings?: readonly Opening[];
@@ -127,6 +128,36 @@ export interface HullMemory {
 export interface HullMesh {
     readonly vertices: ArrayLike<number>;
     readonly indices: ArrayLike<number>;
+}
+
+export interface HullPanelOptions {
+    readonly waterline?: number;
+    readonly centre?: Vec3;
+    readonly depth?: number;
+    readonly density?: number;
+    readonly gravity?: number;
+    readonly frequencies: ArrayLike<number>;
+    readonly headings?: number;
+    readonly signal?: AbortSignal;
+}
+
+export interface HullPanelResponse {
+    readonly waterline: number;
+    readonly centre: Vec3;
+    readonly depth: number;
+    readonly gravity: number;
+    readonly density: number;
+    readonly headings: number;
+    readonly panelCount: number;
+    readonly frequencies: readonly number[];
+    readonly samples: readonly HullPanelSample[];
+    readonly infiniteMass: readonly number[];
+}
+
+export interface HullPanelSample {
+    readonly addedMass: readonly number[];
+    readonly damping: readonly number[];
+    readonly diffraction: readonly number[];
 }
 
 export interface HullParams {
@@ -298,6 +329,8 @@ export interface WettedLoads {
 }
 
 export function addedMassInfinite(sections: readonly Section[], centre: readonly [number, number, number], density: number): Float64Array;
+
+export function bakeHullPanels(mesh: HullMesh, options: HullPanelOptions): Promise<HullPanelResponse>;
 
 export function deckOf(mesh: {
     readonly vertices: ArrayLike<number>;
