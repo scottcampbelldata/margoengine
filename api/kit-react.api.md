@@ -265,6 +265,10 @@ export { MergedSource } from "@margoengine/react";
 
 export { Mesh } from "@margoengine/react";
 
+export { MeshNode } from "@margoengine/react";
+
+export { MeshNodeProps } from "@margoengine/react";
+
 export { MeshProps } from "@margoengine/react";
 
 export { MeshRef } from "@margoengine/react";
@@ -390,6 +394,10 @@ export { SamplerSource } from "@margoengine/react";
 export { SamplerTransform } from "@margoengine/react";
 
 export { Scene } from "@margoengine/react";
+
+export { ScenePortal } from "@margoengine/react";
+
+export { ScenePortalProps } from "@margoengine/react";
 
 export { SceneProps } from "@margoengine/react";
 

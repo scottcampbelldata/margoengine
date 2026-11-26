@@ -4,6 +4,7 @@
 
 ```ts
 import { Mesh, Vec3 } from "@margoengine/core";
+import { ModelNode, PBRMaterial, PBRModel } from "@margoengine/gltf/pbr";
 import { ReactNode } from "react";
 
 export { Model as Gltf };
@@ -40,6 +41,11 @@ export const Model: ((props: ModelProps) => import("react").JSX.Element) & {
     preload: (src: string) => Promise<void>;
 };
 
+export interface ModelParts<Node extends string = string, Material extends string = string> {
+    readonly nodes: Readonly<Record<Node, ModelNode>>;
+    readonly materials: Readonly<Record<Material, PBRMaterial>>;
+}
+
 export interface ModelProps extends PointerHandlers {
     src: string;
     position?: Vec3;
@@ -52,6 +58,8 @@ export interface ModelProps extends PointerHandlers {
     onLoad?: (mesh: MeshHandle) => void;
     onError?: (error: unknown) => void;
 }
+
+export function useModelParts<Node extends string = string, Material extends string = string>(model?: PBRModel | null): ModelParts<Node, Material> | null;
 
 // Not exported from this entry, but used by the exports above:
 

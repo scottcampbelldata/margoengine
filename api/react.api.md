@@ -129,6 +129,13 @@ export interface MargoPointerEvent<E extends MouseEvent = PointerEvent> {
 
 export const Mesh: import("react").ForwardRefExoticComponent<MeshProps & import("react").RefAttributes<MeshHandle>>;
 
+export const MeshNode: import("react").ForwardRefExoticComponent<MeshNodeProps & import("react").RefAttributes<MeshHandle>>;
+
+export interface MeshNodeProps extends MeshProps {
+    node: MeshHandle;
+    dispose?: boolean;
+}
+
 export interface MeshProps extends PointerHandlers {
     position?: Vec3;
     rotation?: Vec3;
