@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,242 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,244 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12560,6 +12560,22 @@ surface. Detaching films, contact-angle dynamics on a steep drop, thin-film inte
 general rain damping of ocean waves are outside this equation.
 
 The optional thin-film entry is 5,917 B gzip with a 6,173 B ceiling. Both Wasm assets are 9,209 B raw and each is 3,995 B gzip. Core plus stage remains 24,820 B gzip.
+
+### Environmental airborne transport (ATMO-06)
+
+The optional `@margoengine/physics/airborne` advances mineral dust, freshwater mist and sea spray at 240 Hz.
+Source parcels represent many physical particles. Each parcel holds 16 f64 words in the arena. Sources retain
+pending mass and get round-robin emission turns when the parcel allocation is full. Both native builds are
+610 B raw. The optional entry is 8,260 B gzip. Core plus stage remains 24,820 B gzip. The portable and shared variants use the same SIMD arithmetic and import the world memory without
+an initial static region.
+
+The drag law is for rounded particles in environmental air. The Stokes option checks Re ≤ 0.1; the default
+uses a transitional correlation and a constant-drag large-particle approximation. Wind and drag are held during
+one 1/240 s interval, so gradients are resolved at the local query rate. Homogeneous turbulence approaches the
+specified variance from a zero initial fluctuation. The wet-droplet evaporation model is diffusion-limited with
+prescribed humidity and a salt-dependent equilibrium diameter. It conserves the dry sea salt remaining after water loss. Mixed atmospheric chemistry,
+collisions between droplets and two-way air heating need separate fields. Deposition tests use heightfield
+subdivision at half the smallest horizontal cell width; the aggregate ledger retains the mass.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -28995,6 +29011,15 @@ thin-film gravity-drain test leaves the patch without spawning airborne ligament
 atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
 general sea keeps its existing wind-wave damping because heterogeneous rain suppression
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
+
+## Open: environmental airborne sources, feedback and filmed bindings (ATMO-06)
+
+The live path receives aeolian mineral dust and whitecaps through registry fields. Existing footage and the
+legacy water spray and debris renderers still use their earlier particles. Footstep dust can use the emission port;
+the coupling fixture supplies its measured rate without an EARTH-05 source writer. The mass ledger tracks vapour
+and deposited mass. Temperature, humidity and bed composition feedback need coastal or ground output layouts with
+positions. Embers, ash, high-speed debris and snow are outside the environmental water/mineral scope here. See
+[Framework requests](physics-work-queue.md#framework-requests).
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
