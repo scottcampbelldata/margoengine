@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,260 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,264 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -3138,6 +3138,14 @@ package or tool that takes you past it. The reference tables are [Scale](#scale)
 column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
+
+- Vortex forcing (ATMO-05, 2026-11-26). The storm has prescribed motion and intensity. The atmosphere uses
+  a radial pressure profile with a height envelope. It represents no storm formation, terrain interaction,
+  or evolving supercell. Bodies use configured drag area and a pressure lever. Their load field records
+  threshold crossings for structural consumers. Water sees spatial atmospheric pressure and wind stress.
+  The neutral drag coefficient saturates above 33 m/s. The physics wind keeps its full speed. WeatherRegions
+  keeps its 60 m/s styling range. The standalone GPU Flood retains its scalar preview settings.
+  The optional physical entry is 6,113 bytes gzip.
 
 - Seismic waves (EARTH-08, 2026-11-26). One plane-strain section resolves in-plane P and SV, with
   a level, traction-free top. Pick cell spacing for the shortest wavelength in the scene. The world
@@ -12674,6 +12682,15 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: visual vortices supplied neither full wind nor loads (PA-31)
+
+- **Repro:** Sample the eyewall of a 150 hPa hurricane or put a rigid object and a water grid under a moving vortex.
+- **Cause:** The visual weather sample capped mean wind and the storm had no physical consumer.
+- **Fix:** Sky reports the full speed. A matching `StormVortex` drives plant sway and publishes real rigid loads,
+  pressure forcing, and wind stress for the world-stepped water.
+- **Regression:** `packages/physics/tests/coupling/vortices.test.js` covers the >60 m/s case, real rigid debris,
+  a moving shallow-water reach and the CY-14 gale. The Sky hurricane and tornado suites check shared balances.
+
 ### Open 2026-11-26: the flood bounds test process once ended without a report (water)
 
 - **Repro:** Not reproduced. In one `test:changed` run of 70 packages on the Windows workstation (CPU load about 88%),
@@ -12737,6 +12754,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** packages/gltf/test/extensions.test.js ("a material extension coat weighs k by its keep"), and the
   `installed`, `materials` and `coated` rows of scripts/clustered-bounce-gpu-check.js on WebGPU and `MARGO_COMPAT=1`
   (0.9548 and 0.9586 of the core patch, within 1% of 0.96; the materials patch 1.0000; the JS twin within 2%).
+
+### Fixed 2026-11-26: sand ripples aliased into moire on frames under 1080 lines (KB-TERRAIN-SAND3, terrain)
+
+- **Repro:** `packages/terrain/test/sand-footprint.browser.mjs`: flat sand from 20 m up, rendered at 960 x 540 and
+  480 x 270 and compared with a 3840 x 2160 frame filtered down to each (a Gaussian of 0.5 small pixels). Mean sRGB
+  luma error was 1.90 and 2.76 steps with ripples on (0.07 and 0.12 with them off).
+- **Cause:** the `sandSurface` ripple clamp took its pixel footprint as the distance over 1,000, one pixel of a
+  1080-line frame at 50 degrees, whatever the frame's real size. A 540-line pixel is 1.7 times wider and a 270-line one
+  3.5 times, so 0.1 m ripples stayed on where a pixel no longer resolves them.
+- **Fix:** `TerrainColors` takes the footprint once per pixel as the longer of `dpdx` and `dpdy` of the position, at the
+  top of the shared per-pixel block where control flow is uniform (as the mesh blend and rock surface do), and passes
+  it to every mesh's `terrainSurface`. Errors now 1.10 and 0.66 (RTX A6000, Edge 158).
+- **Regression:** the test above (under 1.4 steps with ripples, under 0.3 without), in terrain's `test:gpu`.
 
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
