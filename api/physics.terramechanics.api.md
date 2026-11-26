@@ -43,6 +43,7 @@ export interface SoilContactRigidOptions {
     readonly id?: string;
     readonly wheelPhase?: FieldDescriptor;
     readonly wheelReaction?: FieldDescriptor;
+    readonly wheelSideForce?: FieldDescriptor;
     readonly terrain?: BedShape;
 }
 
@@ -169,6 +170,7 @@ export interface TerramechanicsOptions {
     readonly input?: FieldDescriptor;
     readonly wheelPhase?: FieldDescriptor;
     readonly wheelReaction?: FieldDescriptor;
+    readonly wheelSideForce?: FieldDescriptor;
     readonly legged?: boolean;
     readonly tier?: SoilContactTier;
     readonly signal?: AbortSignal;
@@ -184,6 +186,7 @@ export interface TerramechanicsParams {
     readonly feet?: readonly LeggedSoilPatch[];
     readonly profiles?: readonly (SoilContactProfile | null)[];
     readonly rollingWheels?: readonly (SoilRollingWheel | null)[];
+    readonly sidewallGravity?: number;
     readonly floor?: number;
     readonly floorGrid?: NonNullable<TerrainBedParams['bedrock']>;
     readonly cellSize?: number;
@@ -215,6 +218,8 @@ export function soilPatchField(name?: string): FieldDescriptor;
 export function soilWheelPhaseField(name?: string): FieldDescriptor;
 
 export function soilWheelReactionField(name?: string): FieldDescriptor;
+
+export function soilWheelSideForceField(name?: string): FieldDescriptor;
 
 export function wheelSoil(width: number, length: number, material?: SoilMaterial, elliptical?: boolean, resolvedContact?: {
     readonly rounded?: boolean;
@@ -2274,6 +2279,7 @@ interface WheelGroundTraction {
     readonly load: number;
     readonly drawbar: number;
     readonly axleTorque: number;
+    readonly sideForce?: number;
 }
 
 interface WheelOptions {

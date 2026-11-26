@@ -14772,8 +14772,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 1342152,
-        "gzip": 866724
+        "raw": 1342588,
+        "gzip": 866898
       },
       "./decomposition": {
         "raw": 26661,
@@ -14804,8 +14804,8 @@
         "gzip": 3274
       },
       "./terramechanics": {
-        "raw": 35985,
-        "gzip": 12899
+        "raw": 37625,
+        "gzip": 13328
       },
       "./rail": {
         "raw": 23282,
@@ -18415,14 +18415,14 @@
       "brotli": 5677
     },
     "packages/physics/dist/terramechanics-kernel.wasm": {
-      "raw": 26453,
-      "gzip": 10717,
-      "brotli": 9475
+      "raw": 28248,
+      "gzip": 11398,
+      "brotli": 10047
     },
     "packages/physics/dist/terramechanics-kernel-shared.wasm": {
-      "raw": 26453,
-      "gzip": 10717,
-      "brotli": 9475
+      "raw": 28248,
+      "gzip": 11398,
+      "brotli": 10086
     },
     "packages/physics/dist/lava-kernel.wasm": {
       "raw": 9735,

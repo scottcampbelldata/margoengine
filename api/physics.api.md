@@ -2029,6 +2029,7 @@ export interface WheelGroundTraction {
     readonly load: number;
     readonly drawbar: number;
     readonly axleTorque: number;
+    readonly sideForce?: number;
 }
 
 export interface WheelJoint {

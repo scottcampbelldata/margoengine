@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20505651,
+  "total": 20506093,
   "history": [
     {
       "date": "2026-10-24",
@@ -13299,6 +13299,12 @@
       "commit": "ef1a72d01a",
       "grew": 0,
       "reason": "SOFT-04 adds preserved deformable query surfaces and live contact settings through geometric cuts, moving the soft entry from 137827 to 137978 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3ea3c16663",
+      "grew": 1,
+      "reason": "EARTH-05 coupled oblique wheel shear and sidewall force take the optional entry from 12899 to 13328 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24846 B."
     }
   ],
   "items": {
@@ -14170,7 +14176,7 @@
     "@margoengine/physics/strands": 5569,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 13286,
+    "@margoengine/physics/terramechanics": 13728,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,

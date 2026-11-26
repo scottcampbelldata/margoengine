@@ -12745,6 +12745,13 @@ can lock near incompressibility or need refinement to resolve bending. This mode
 and shares the rigid/soft contact passes. Its optional entry and kernel sizes are recorded in the
 [entry-size results](../examples/package-benchmarks/results/entry-sizes.json).
 
+Free vertex-block bodies get one exact translational minimization per native substep, preserving
+their inertial linear impulse to working precision before contact. The pass visits live cell
+ranges and reads and translates unpinned body particles once each. It applies to the linear
+movement of the center of mass. Bodies with pins instead exchange reaction with their supports,
+and authored whole-body drag still changes momentum. The optional entry measures 137,827 B
+gzip with the translation correction, including 95,068 B for its lazy native kernel.
+
 The local/global `'projective'` mode uses the corotated material. A local rotation and unit-determinant
 projection per live tetrahedron precedes each global solve. Each matrix application visits its four
 corners once, then the preconditioner acts once per particle. The iteration limits are the configured
@@ -12782,7 +12789,11 @@ The operation validates all pieces before replacing the body. It builds the edit
 and uses the normal native solve for the fragments. The finite triangle blade in `SoftBodies.cut`
 continues to slice along existing faces. Geometric cuts and face tears retain live rigid anchors
 at the same point in the rigid frame for every surviving copy of the attached vertex. Embedded
-skins, separate spring or cluster constraints and bound meshes need a separate transfer. Snapshots
+skins, separate spring or cluster constraints and separately bound meshes need a separate transfer.
+The built-in surface collider is rebuilt from each piece's boundary, including open incision faces.
+Its contact, sensor, filtering and event settings carry over. Each collider has a new identity
+and derives its mass properties from its boundary and copied density. This brings the optional
+soft entry to 137,978 B gzip. Snapshots
 of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
 with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
 
@@ -12791,7 +12802,7 @@ existing tetrahedron. Tetrahedra that meet the supporting plane may be subdivide
 neighboring faces remain conforming. Only the triangles covered by the blade are released.
 Cells outside the blade keep their material connections. Tiny subdivisions must fit the
 same f32 geometry and rest-basis requirements as a full plane cut. The API accepts one
-triangle per operation. Embedded skins, springs, cluster constraints and bound meshes still
+triangle per operation. Embedded skins, springs, cluster constraints and separately bound meshes still
 require their own state transfer.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
@@ -12934,6 +12945,10 @@ closed 1 m² periodic wet cell, with reciprocal volume and horizontal momentum a
 vertical ledger. Production wet/dry cells and the breaking crest need owner-side reservation and receipt
 of applied fluxes.
 
+The measured quadrupole period of a 20.10 mm free water drop is 1.481 s, compared with the
+0.742 s Rayleigh limit for the same density, tension and rest volume. The separated surface
+energy and pressure updates need more validation for shape frequencies.
+
 ### Position-based particle water (FLUID-02)
 
 The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.
@@ -12981,14 +12996,16 @@ Its reciprocal rigid binding applies the previous contact result on the same col
 independent wheel spin and lateral grip. Lower actual load and the discrete kinetic-work bound
 limit the paired impulse. A configured skid exponent adds signed two-region shear under forward
 braking, including lockup. A configured shear radius uses actual wheel and ground speed.
+The optional side-force field combines rim shear and passive sidewall earth pressure with default
+gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 12,899 B gzip with a 13,286 B ceiling. Both Wasm assets are 26,453 B raw and 10,717 B gzip each.
-The Physics root is 866,724 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+The optional entry is 13,328 B gzip with a 13,728 B ceiling. Both Wasm assets are 28,248 B raw and 11,398 B gzip each.
+The Physics root is 866,898 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
@@ -29931,8 +29948,8 @@ open. The resolved rolling arc exchanges drawbar and axle reactions with the liv
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
-brake cases pass. Reverse travel, measured braking across multiple slip angles and sidewall
-bulldozing remain open.
+brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
+opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 
@@ -29943,9 +29960,9 @@ tensile, compressive or shear stresses exceed authored strengths. A progressive 
 tension and shear before tearing. Automatic tears follow cell faces. The finite cutting tool
 can author an oblique crack inside a tetrahedron.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
-Plane cuts and finite interior incisions work on tetrahedral solids with live rigid anchors.
-Geometric cutting of bodies with embedded skins, springs, clusters or bound meshes still
-needs their state transfer.
+Plane cuts and finite interior incisions work on tetrahedral solids with live rigid anchors and
+their own deformable surface colliders. Geometric cutting of bodies with embedded skins, springs,
+clusters or separately bound meshes still needs their state transfer.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 
@@ -29997,6 +30014,13 @@ The live HYDRO-01 test also settles whole-particle transfers against a wet perio
 capacity refusal, the last wet depth and snapshot replay. General HYDRO-01 needs a reserve/accept
 boundary when its wet/dry limiter can clip signed volume or horizontal momentum. SEA-04 still needs
 a paired volume and momentum receipt.
+
+The separated capillary and pressure updates also produce a slow shape oscillation in a free droplet.
+Run `node packages/physics/tests/dfsph-capillary-lab.mjs` after building Physics. With 2,176 particles,
+20.10 mm equivalent radius and the measured water tension 0.07274 N/m, the first quadrupole period is 1.481 s
+against the 0.742 s Rayleigh prediction. This fixture starts an equal-volume ellipsoid from rest without
+gravity or a container impact. The period provides a separate accuracy check for the planned unified
+pressure and surface-energy solve at several resolutions.
 
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
 using the interactive iteration limits, which reads 0.328 and 0.569 against the two original measurement
