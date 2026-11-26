@@ -159,7 +159,7 @@ export class TrackedVehicle implements PhysicsAttachment {
       if (!(track.length > 0 && Number.isFinite(track.length)))
         throw new RangeError('A track length must be a finite number above 0 metres.');
       const count = track.roadWheels ?? 5;
-      if (!Number.isInteger(count) || count < 2 || count > 64) throw new RangeError('A track has 2 to 64 road wheels.');
+      if (!Number.isInteger(count) || count < 2 || count > 64) throw new RangeError('A track has 2 to 64 road wheels; pass a roadWheels count between 2 and 64.');
       const rest = track.suspensionRestLength ?? 0.3;
       if (!(rest > 0)) throw new RangeError('A track suspensionRestLength must be above 0 metres.');
       this.tracks.push({

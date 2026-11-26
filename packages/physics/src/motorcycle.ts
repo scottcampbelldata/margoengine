@@ -70,7 +70,7 @@ export class Motorcycle implements PhysicsAttachment {
     options: MotorcycleOptions,
   ) {
     if (!options?.front || !options?.rear)
-      throw new RangeError('A motorcycle has a front and a rear wheel: {front: {...}, rear: {...}}.');
+      throw new RangeError('A motorcycle has a front and a rear wheel; pass {front: {...}, rear: {...}}.');
     this.balance = options.balance ?? true;
     this.maxSteer = options.maxSteeringAngle ?? 0.45;
     this.maxLateral = options.maxLateralAcceleration ?? 7;
