@@ -104,6 +104,62 @@ button:disabled {
   font-weight: 400;
   color: var(--muted);
 }
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tab {
+  display: inline-flex;
+}
+.tabs button,
+.add-file button,
+.add-file input {
+  font: inherit;
+  min-height: 44px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+.tabs button {
+  cursor: pointer;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+.tabs button[aria-selected='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 -3px 0 var(--accent);
+  font-weight: 700;
+}
+.tab button:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.tab .remove {
+  border-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-inline: 10px;
+}
+.add-file {
+  display: flex;
+  gap: 6px;
+}
+.add-file input {
+  width: 12ch;
+}
+.add-file button {
+  cursor: pointer;
+}
 .editor {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

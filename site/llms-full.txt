@@ -12302,7 +12302,9 @@ The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2
 - The console keeps the last 500 lines; each message is cut to 4,000 characters.
 - An error's line is read from the stack frame of the code's blob module (or the error event for it); an error thrown
   inside a package, or one with no stack, shows no line.
-- One file per playground; no type hints in the editor; no embed mode (the next piece of the row).
+- A project holds at most 12 files (`MAX_FILES`), named with letters, digits, `-` and `_` then `.js` (32 characters
+  before the extension); the 256 KiB cap is for all files together. Only `./name.js` imports of the project's own files
+  are linked; a path into a folder (`./lib/x.js`) is not.
 - On margoengine.com the page loads the import map of `margoengine@1.0.0` from jsDelivr, which works once the packages
   are published on npm (they are not yet: the catalog lists 0 of 108 published). Until then, run it against a checkout
   with `npm run playground` and `?packages=/node_modules/`.

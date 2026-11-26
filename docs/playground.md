@@ -8,24 +8,51 @@ it as one HTML file.
 
 - **Run**: the Run button or Ctrl+Enter (Cmd+Enter on a Mac). Each run starts a new frame, so nothing from the last
   run is left behind.
+- **Files**: a project is up to 12 files, one tab each. `main.js` runs first; the others are modules it (or each
+  other) imports as `./name.js`, cycles included. **Add file** makes a tab (letters, digits, `-` and `_`, then `.js`);
+  a tab's × removes it, keeping the project before it as a version. Left and right arrows move between tabs.
 - **Editor**: a code font, line numbers, Tab and Shift+Tab indent and outdent the line or the selected lines. Esc, then
   Tab, moves focus out of the editor (so the keyboard is never trapped).
 - **Console**: `console.log`, `info`, `warn`, `error` and `debug` from the code appear under the canvas. An uncaught
-  error or rejected promise shows its message and its line in your code (a button that selects that line). An error
+  error or rejected promise shows its message, its file and its line (a button that opens that tab and selects the
+  line). An error
   with a MargoError `code` links to its entry on the [error help page](https://margoengine.com/errors).
 - **Templates**: hello cube, a glTF loader, lights and shadows, particles, and an errors-and-console example, from the
   [stage README](../packages/stage/README.md) examples. Loading one runs it; the code it replaces is saved as a
   version first.
-- **Share link**: copies a link whose `#code=` holds the code. Opening it loads and runs that code in the sandboxed
+- **Share link**: copies a link whose `#code=` holds every file (see [Link format](#link-format)). Opening it loads and runs that code in the sandboxed
   frame and says "Shared code loaded", with **Back to my code**. The visitor's own saved code is not touched until they
   edit, run or save the shared code; then their own code is kept as a version.
-- **Versions**: each run and each Save version (Ctrl+S) keeps a snapshot in this browser's `localStorage`, the newest
+- **Versions**: each run and each Save version (Ctrl+S) keeps a snapshot of every file in this browser's `localStorage`, the newest
   first. Restore puts one back, saving the current code as a version first. The editor's code is saved as you type.
 - **Download HTML**: one HTML file, the run frame with the code built in, which loads the import map and runs when
   served from a local server or HTTPS.
 
 The page loads margoengine's import map (`margoengine/dist/importmap.json`, see [the imports guide](guides/imports.md)),
 so code imports any `margoengine` or `@margoengine/*` entry by name.
+
+## Link format
+
+`#code=` is base64url without padding (RFC 4648 §5) of a version byte and a payload:
+
+| Version | First byte | Payload |
+| --- | --- | --- |
+| 2 (now) | `0x07` | deflate-raw of the UTF-8 JSON `[[name, code], ...]`, `main.js` first |
+| 1 (first playground) | none | deflate-raw of `main.js`'s code alone |
+
+`0x07` is a final deflate block of the reserved type `11`, which no deflate stream may start with (RFC 1951 §3.2.3),
+so a version 1 link is told apart without a byte of its own and still opens. Any other first byte of the reserved type
+is a later version: the page says the link is from a newer playground instead of guessing. The decoded files are
+checked like a project from the editor (names, `main.js` first, at most 12), and the caps below apply to the whole
+payload.
+
+## How files import each other
+
+Each file runs as a blob module, and a blob URL cannot be the base of a relative URL, so the frame points every
+`./name.js` in an `import`, `export ... from` or `import()` of the project at an import map entry `#tab/name.js` (the
+blob URL of that file), added beside margoengine's entries before main.js loads. Through the map, files may import each
+other in any order, cycles included; lines are not moved, so an error's line is the line in its own file. A
+`./name.js` that names no file of the project is left as written and fails to load with the browser's own error.
 
 ## Run it against this checkout
 
@@ -79,8 +106,7 @@ parent's Content Security Policy, which would force the page's policy open.
 
 ## Not yet
 
-Multiple files or tabs, type hints from the packages' `.d.ts`, and an embed mode (`?embed`) are the next piece of this
-row in [the rival parity list](rival-parity-gaps.md). The limits are in [docs/limits.md](limits.md#playground).
+Type hints from the packages' `.d.ts` and an embed mode are the next pieces of this row in [the rival parity list](rival-parity-gaps.md). The limits are in [docs/limits.md](limits.md#playground).
 
 ## Sources
 

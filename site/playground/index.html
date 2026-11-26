@@ -41,6 +41,14 @@
     <div class="panes">
       <section class="pane" aria-labelledby="editor-label">
         <h2 id="editor-label" class="pane-title">Code <span class="hint">Ctrl+Enter runs. Esc, then Tab, leaves the editor.</span></h2>
+        <div class="files">
+          <div id="tabs" class="tabs" role="tablist" aria-label="Files"></div>
+          <form id="add-file" class="add-file">
+            <label for="new-file" class="visually-hidden">New file name</label>
+            <input id="new-file" placeholder="util.js" autocomplete="off" spellcheck="false" maxlength="35">
+            <button type="submit">Add file</button>
+          </form>
+        </div>
         <div class="editor">
           <pre id="gutter" class="gutter" aria-hidden="true">1</pre>
           <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"

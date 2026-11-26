@@ -2,9 +2,11 @@
 // the frame's `#scene` container and falls back to WebGL2 where the browser has no WebGPU, except where it says so.
 // tests/playground.test.js checks that every import here is in margoengine's import map.
 
+import { single } from './share.js';
+
 const fallback = `import {webglRenderer} from 'margoengine/webgl2-compat/preview';`;
 
-export const templates = [
+const list = [
   {
     id: 'hello-cube',
     title: 'Hello cube',
@@ -80,4 +82,37 @@ ball.dispose();
 ball.setPosition([0, 1, 0]); // A disposed mesh throws MargoError 'disposed': its code links to the error help.
 `,
   },
+  {
+    id: 'modules',
+    title: 'Several files',
+    files: [
+      {
+        name: 'main.js',
+        code: `// Several files: main.js imports the other tabs as ./name.js.
+import {createStage} from 'margoengine';
+${fallback}
+import {ring} from './ring.js';
+
+const app = await createStage('#scene', {background: '#14202e', fallback: webglRenderer});
+const balls = ring(app, 8);
+app.onTick((delta) => balls.forEach((ball, i) => (ball.rotation.y += delta * (1 + i / 8))));
+console.log('Made', balls.length, 'balls with ring.js');
+`,
+      },
+      {
+        name: 'ring.js',
+        code: `// ring.js: a module of its own; main.js imports it.
+export function ring(app, count, radius = 2) {
+  return Array.from({length: count}, (_, i) => {
+    const a = (i / count) * Math.PI * 2;
+    return app.sphere({radius: 0.3, position: [Math.cos(a) * radius, 0, Math.sin(a) * radius], color: '#84d6bd'});
+  });
+}
+`,
+      },
+    ],
+  },
 ];
+
+/** The starter projects: `{id, title, files}`, files as the editor holds them, main.js first. */
+export const templates = list.map(({ id, title, code, files }) => ({ id, title, files: files ?? single(code) }));

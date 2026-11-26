@@ -9,10 +9,16 @@ import { test } from 'node:test';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { server } from '../../scripts/serve-playground.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
+import { single } from '../../site/playground/share.js';
 import { templates } from '../../site/playground/templates.js';
 import { decodePNG } from '../support/png.js';
 
-const errorTemplate = templates.find((t) => t.id === 'error');
+const errorCode = templates.find((t) => t.id === 'error').files[0].code;
+// The page is ready when Run is enabled. A goto waits for DOMContentLoaded, not load: load also waits for the sandboxed
+// run frame, which Chromium starts in a renderer process of its own (an opaque origin), so a goto to load times a
+// process start under whatever else the machine runs. 45 cold loads in fresh contexts, three runs at once, measured
+// 0.2 to 0.9 s to load (2026-11-26); one goto in about 15 test runs passed 30 s, waiting for load alone.
+const ready = { waitUntil: 'domcontentloaded' };
 
 test('the playground runs templates, reports errors with lines and codes, and opens share links', {
   timeout: 240_000,
@@ -27,13 +33,16 @@ test('the playground runs templates, reports errors with lines and codes, and op
     context = await browser.newContext({
       viewport: { width: 1280, height: 900 },
     });
+    // The first context's first frame creates the browser's first GPU device and compiles the engine's pipelines,
+    // which is the slow step of the whole test (a cold shader cache); later steps reuse it. Other contexts keep the
+    // default 30 s.
     context.setDefaultTimeout(120_000);
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     // A policy that blocks something the page or the frame needs shows up as a console error.
     page.on('console', (message) => /Content Security Policy/i.test(message.text()) && errors.push(message.text()));
-    const response = await page.goto(page0);
+    const response = await page.goto(page0, ready);
     // The page's own policy is strict: its scripts only, nothing inline, no other host to talk to.
     const policy = response.headers()['content-security-policy'];
     assert.match(policy, /script-src 'self';/);
@@ -82,14 +91,48 @@ test('the playground runs templates, reports errors with lines and codes, and op
         const e = document.getElementById('editor');
         return e.value.slice(e.selectionStart, e.selectionEnd);
       }),
-      errorTemplate.code.split('\n')[8],
+      errorCode.split('\n')[8],
     );
 
+    // Several files: main.js imports ring.js by './ring.js'.
+    await page.selectOption('#template', 'modules');
+    await page.locator('#console li', { hasText: 'Made 8 balls with ring.js' }).waitFor();
+    assert.deepEqual(await page.locator('#tabs [role=tab]').allTextContents(), ['main.js', 'ring.js']);
+    // A new tab, imported by main.js, that throws: the error names its file and line, and opens that tab.
+    await page.fill('#new-file', 'boom');
+    await page.click('#add-file button');
+    assert.equal(await page.locator('#tabs [role=tab][aria-selected=true]').textContent(), 'boom.js');
+    await page.fill('#editor', "// boom.js\nexport const ok = 1;\nthrow new Error('from boom');\n");
+    await page.locator('#tab-0').click();
+    const main = await page.inputValue('#editor');
+    await page.fill('#editor', `import './boom.js';\n${main}`);
+    await page.click('#run');
+    const boom = page.locator('#console li.error', { hasText: 'from boom' });
+    await boom.waitFor();
+    await boom.getByRole('button', { name: 'boom.js line 3' }).click();
+    assert.equal(await page.locator('#tabs [role=tab][aria-selected=true]').textContent(), 'boom.js');
+    assert.equal(
+      await page.evaluate(() => {
+        const e = document.getElementById('editor');
+        return e.value.slice(e.selectionStart, e.selectionEnd);
+      }),
+      "throw new Error('from boom');",
+    );
+    // Removing the tab keeps the project before it as a version.
+    await page.getByRole('button', { name: 'Remove boom.js' }).click();
+    assert.deepEqual(await page.locator('#tabs [role=tab]').allTextContents(), ['main.js', 'ring.js']);
+    await page.selectOption('#template', 'error');
+    await page.locator('#console li.error', { hasText: 'Mesh disposed' }).waitFor();
+
     // The version history holds both runs and restores the earlier one.
-    assert.ok((await page.locator('#versions option').count()) >= 2);
-    await page.selectOption('#versions', '1');
+    const versions = await page.locator('#versions option').allTextContents();
+    assert.ok(
+      versions.some((v) => /\(3 files\)$/.test(v)),
+      'the three-file project is a version',
+    );
+    await page.selectOption('#versions', String(versions.findIndex((v) => /\(3 files\)$/.test(v))));
     await page.click('#restore');
-    assert.equal(await page.inputValue('#editor'), templates[0].code);
+    assert.deepEqual(await page.locator('#tabs [role=tab]').allTextContents(), ['main.js', 'ring.js', 'boom.js']);
     await page.selectOption('#template', 'error');
     await error.waitFor();
 
@@ -98,55 +141,53 @@ test('the playground runs templates, reports errors with lines and codes, and op
     await page.waitForFunction(() => location.hash.startsWith('#code='));
     const link = page.url();
     const other = await context.browser().newContext();
-    // The same step deadline as the first context: the test as a whole has the hard limit.
-    other.setDefaultTimeout(120_000);
     try {
       const shared = await other.newPage();
       const saved = (p) => p.evaluate(() => JSON.parse(localStorage.getItem('margo-playground:v1') ?? 'null'));
       // Someone with code of their own...
-      await shared.goto(page0);
+      await shared.goto(page0, ready);
       await shared.waitForFunction(() => !document.getElementById('run').disabled);
       const own = '// My own scene\nconsole.log("mine");\n';
       await shared.fill('#editor', own);
       await shared.waitForFunction(
-        (own) => JSON.parse(localStorage.getItem('margo-playground:v1')).current === own,
+        (own) => JSON.parse(localStorage.getItem('margo-playground:v1')).current?.[0]?.code === own,
         own,
       );
       // ...opens the link: the shared code loads and runs, but their saved code stays as it was.
       const visit = async () => {
         await shared.goto('about:blank');
-        await shared.goto(link);
+        await shared.goto(link, ready);
         await shared.locator('#console li.error').waitFor();
       };
       await visit();
-      assert.equal(await shared.inputValue('#editor'), errorTemplate.code);
+      assert.equal(await shared.inputValue('#editor'), errorCode);
       assert.equal(await shared.locator('#shared').isVisible(), true);
       assert.match(await shared.locator('#shared').textContent(), /Shared code loaded/);
-      assert.equal((await saved(shared)).current, own, 'opening a link does not replace the saved code');
+      assert.deepEqual((await saved(shared)).current, single(own), 'opening a link does not replace the saved code');
       // Back to my code: their code returns, nothing of the link is kept.
       await shared.click('#back');
       assert.equal(await shared.inputValue('#editor'), own);
       assert.equal(await shared.locator('#shared').isVisible(), false);
-      assert.equal((await saved(shared)).current, own);
+      assert.deepEqual((await saved(shared)).current, single(own));
       // Running the shared code makes it theirs; their own code is kept as a version.
       await visit();
-      assert.equal((await saved(shared)).current, own);
+      assert.deepEqual((await saved(shared)).current, single(own));
       await shared.click('#run');
       await shared.locator('#console li.error').waitFor();
       const after = await saved(shared);
-      assert.equal(after.current, errorTemplate.code);
+      assert.deepEqual(after.current, single(errorCode));
       assert.ok(
-        after.history.some((s) => s.code === own),
+        after.history.some((s) => s.files[0].code === own),
         'their own code is a version',
       );
       assert.equal(await shared.locator('#shared').isVisible(), false);
       // A damaged link says so and changes nothing.
       await shared.goto('about:blank');
-      await shared.goto(`${page0}#code=@@not-a-link`);
+      await shared.goto(`${page0}#code=@@not-a-link`, ready);
       await shared.waitForFunction(() => /damaged/.test(document.getElementById('status').textContent));
       assert.equal(await shared.locator('#status').getAttribute('role'), 'alert');
-      assert.equal(await shared.inputValue('#editor'), errorTemplate.code);
-      assert.equal((await saved(shared)).current, errorTemplate.code);
+      assert.equal(await shared.inputValue('#editor'), errorCode);
+      assert.deepEqual((await saved(shared)).current, single(errorCode));
     } finally {
       await other.close();
     }

@@ -1,12 +1,16 @@
 // The playground page (docs/playground.md). User code runs only in ./frame/, loaded as <iframe sandbox="allow-scripts">
 // without allow-same-origin, so it gets an opaque origin: no access to this page, its storage or its cookies. The frame
 // has its own loose policy (site/_headers); this page keeps a strict one, so it loads nothing from another host.
+// A project is files: main.js runs first and imports the others as './name.js'; each file is a tab of the editor.
 import {
+  FILE_NAME,
+  MAX_FILES,
   addSnapshot,
+  checkFiles,
   codeFromHash,
-  decodeCode,
+  decodeProject,
   downloadDocument,
-  encodeCode,
+  encodeProject,
   parseFrameMessage,
   readStore,
   runMessage,
@@ -22,13 +26,16 @@ const editor = $('editor'),
   gutter = $('gutter'),
   status = $('status'),
   output = $('console'),
-  versions = $('versions');
+  versions = $('versions'),
+  tabs = $('tabs');
 
 let packages = null,
   frame = null,
-  frameCode = '',
-  // While a shared link's code is in the editor and the user has not edited, run or saved it: their own code.
-  ownCode = null,
+  frameFiles = null,
+  files = templates[0].files,
+  active = 0,
+  // While a shared link's files are in the editor and the user has not edited, run or saved them: their own files.
+  ownFiles = null,
   store = { current: null, history: [] };
 
 const storage = (() => {
@@ -53,7 +60,13 @@ function persist() {
   else store.history = kept;
 }
 
-// ---- Editor: line numbers, Tab indent, shortcuts -------------------------------------------------------------------
+/** The editor's files, with the open tab's text taken from the editor. */
+function project() {
+  files[active] = { name: files[active].name, code: editor.value };
+  return checkFiles(files);
+}
+
+// ---- Editor: tabs, line numbers, Tab indent, shortcuts -------------------------------------------------------------
 
 function renumber() {
   const lines = editor.value.split('\n').length;
@@ -63,16 +76,102 @@ function renumber() {
 }
 editor.addEventListener('scroll', () => (gutter.scrollTop = editor.scrollTop));
 
+function renderTabs() {
+  tabs.replaceChildren(
+    ...files.map((file, i) => {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.role = 'tab';
+      tab.id = `tab-${i}`;
+      tab.textContent = file.name;
+      tab.setAttribute('aria-selected', String(i === active));
+      tab.setAttribute('aria-controls', 'editor');
+      tab.tabIndex = i === active ? 0 : -1;
+      tab.addEventListener('click', () => openTab(i));
+      if (i === 0) return tab;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'remove';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', `Remove ${file.name}`);
+      remove.addEventListener('click', () => removeTab(i));
+      const group = document.createElement('span');
+      group.className = 'tab';
+      group.append(tab, remove);
+      return group;
+    }),
+  );
+  editor.setAttribute('aria-labelledby', `editor-label tab-${active}`);
+}
+
+function openTab(i) {
+  project();
+  active = Math.max(0, Math.min(i, files.length - 1));
+  editor.value = files[active].code;
+  editor.scrollTop = 0;
+  renumber();
+  renderTabs();
+}
+
+/** Shows `next` in the editor, opening main.js, without saving anything. */
+function show(next) {
+  files = checkFiles(next);
+  active = 0;
+  editor.value = files[0].code;
+  renumber();
+  renderTabs();
+}
+
+tabs.addEventListener('keydown', (event) => {
+  const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+  if (!step) return;
+  event.preventDefault();
+  openTab((active + step + files.length) % files.length);
+  $(`tab-${active}`).focus();
+});
+
+function changed() {
+  adopt();
+  store.current = project();
+  persist();
+}
+
+$('add-file').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const input = $('new-file');
+  const name = input.value.trim().endsWith('.js') ? input.value.trim() : `${input.value.trim()}.js`;
+  if (!FILE_NAME.test(name)) return say('A file name has letters, digits, - and _, such as util.js.', true);
+  if (files.some((f) => f.name === name)) return say(`There is already a file named ${name}.`, true);
+  if (files.length >= MAX_FILES) return say(`A project holds at most ${MAX_FILES} files.`, true);
+  project();
+  files.push({ name, code: `// ${name}: import it in main.js with import {...} from './${name}';\nexport {};\n` });
+  input.value = '';
+  openTab(files.length - 1);
+  changed();
+  say(`Added ${name}.`);
+});
+
+function removeTab(i) {
+  project();
+  const [gone] = files.splice(i, 1);
+  // The removed file stays in the version history.
+  store.history = addSnapshot(store.history, [...files.slice(0, i), gone, ...files.slice(i)]);
+  active = Math.min(active >= i ? active - 1 : active, files.length - 1);
+  active = Math.max(active, 0);
+  editor.value = files[active].code;
+  renumber();
+  renderTabs();
+  changed();
+  listVersions();
+  say(`Removed ${gone.name}; the version before is in Versions.`);
+}
+
 let tabReleased = false,
   saveTimer = 0;
 editor.addEventListener('input', () => {
   renumber();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    adopt();
-    store.current = editor.value;
-    persist();
-  }, 400);
+  saveTimer = setTimeout(changed, 400);
 });
 
 function indent(outdent) {
@@ -82,8 +181,8 @@ function indent(outdent) {
     editor.setRangeText('  ', start, end, 'end');
   } else {
     const block = value.slice(from, end);
-    const changed = outdent ? block.replace(/^ {1,2}/gm, '') : block.replace(/^/gm, '  ');
-    editor.setRangeText(changed, from, end, 'select');
+    const result = outdent ? block.replace(/^ {1,2}/gm, '') : block.replace(/^/gm, '  ');
+    editor.setRangeText(result, from, end, 'select');
   }
   editor.dispatchEvent(new Event('input'));
 }
@@ -98,29 +197,31 @@ editor.addEventListener('keydown', (event) => {
 });
 editor.addEventListener('blur', () => (tabReleased = false));
 
-/** Puts the caret at the start of a 1-based line and scrolls it into view. */
-function goToLine(line) {
+/** Opens `file`'s tab and selects its 1-based `line`. */
+function goToLine(file, line) {
+  const i = files.findIndex((f) => f.name === file);
+  if (i < 0) return;
+  if (i !== active) openTab(i);
   const lines = editor.value.split('\n');
   const at = lines.slice(0, Math.min(line, lines.length) - 1).reduce((n, l) => n + l.length + 1, 0);
   editor.focus();
   editor.setSelectionRange(at, at + (lines[line - 1]?.length ?? 0));
-  const height = editor.scrollHeight / lines.length;
-  editor.scrollTop = Math.max(0, (line - 3) * height);
+  editor.scrollTop = Math.max(0, (line - 3) * (editor.scrollHeight / lines.length));
 }
 
-/** The editor's code becomes the user's own: a shared link's code is kept from here on. */
+/** The editor's files become the user's own: a shared link's files are kept from here on. */
 function adopt() {
-  // Their own code is kept as a version, so taking up shared code never loses it.
-  if (ownCode?.trim()) store.history = addSnapshot(store.history, ownCode);
-  ownCode = null;
+  // Their own files are kept as a version, so taking up shared code never loses them.
+  if (ownFiles?.some((f) => f.code.trim())) store.history = addSnapshot(store.history, ownFiles);
+  ownFiles = null;
   $('shared').hidden = true;
 }
 
-function setCode(code) {
+/** Puts `next` in the editor and saves it as the current files. */
+function setFiles(next) {
   adopt();
-  editor.value = code;
-  renumber();
-  store.current = code;
+  show(next);
+  store.current = project();
   persist();
 }
 
@@ -139,48 +240,50 @@ function showMessage(message) {
   if (message.kind === 'log') return line(message.level, [message.text]);
   if (message.kind === 'done') return;
   const parts = [message.text];
-  if (message.line !== null) {
+  const place =
+    message.line === null ? '' : `${message.file === 'main.js' ? '' : `${message.file} `}line ${message.line}`;
+  if (place) {
     const go = document.createElement('button');
     go.type = 'button';
-    go.textContent = `line ${message.line}`;
-    go.addEventListener('click', () => goToLine(message.line));
+    go.textContent = place;
+    go.addEventListener('click', () => goToLine(message.file, message.line));
     parts.push(' (', go, ')');
   }
   if (message.code !== null) {
     const help = document.createElement('a');
-    help.href = new URL(`../errors.html#${message.code}`, location.href).href;
+    help.href = new URL(`../errors.html#${message.code}`, import.meta.url).href;
     help.target = '_blank';
     help.rel = 'noopener';
     help.textContent = `error help: ${message.code}`;
     parts.push(' ', help);
   }
   line('error', parts);
-  say(`Error${message.line !== null ? ` on line ${message.line}` : ''}: ${message.text}`, true);
+  say(`Error${place ? ` on ${place}` : ''}: ${message.text}`, true);
 }
 
 addEventListener('message', (event) => {
   // Only the current frame's window; then the shape, never trusting the content.
   if (!frame || event.source !== frame.contentWindow) return;
   const message = parseFrameMessage(event.data);
-  if (message?.kind === 'ready') frame.contentWindow.postMessage(runMessage(frameCode, packages), '*');
+  if (message?.kind === 'ready') frame.contentWindow.postMessage(runMessage(frameFiles, packages), '*');
   else if (message) showMessage(message);
 });
 
 // ---- Run -----------------------------------------------------------------------------------------------------------
 
-/** Runs the editor's code in a new frame. `auto` (a page load or a link) saves nothing while shared code is shown. */
+/** Runs the files in a new frame. `auto` (a page load or a link) saves nothing while shared code is shown. */
 function run({ keepStatus = false, auto = false } = {}) {
-  const code = editor.value;
-  if (!auto || ownCode === null) {
+  const current = project();
+  if (!auto || ownFiles === null) {
     adopt();
-    store.current = code;
-    store.history = addSnapshot(store.history, code);
+    store.current = current;
+    store.history = addSnapshot(store.history, current);
     persist();
     listVersions();
   }
   output.replaceChildren();
   frame?.remove();
-  frameCode = code;
+  frameFiles = current;
   frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.title = 'Result of the code';
@@ -191,10 +294,7 @@ function run({ keepStatus = false, auto = false } = {}) {
 
 // ---- Versions ------------------------------------------------------------------------------------------------------
 
-const timeFormat = new Intl.DateTimeFormat(undefined, {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-});
+const timeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 function listVersions() {
   versions.replaceChildren(
     ...(store.history.length
@@ -208,8 +308,8 @@ function listVersions() {
 
 function saveVersion() {
   adopt();
-  store.history = addSnapshot(store.history, editor.value);
-  store.current = editor.value;
+  store.current = project();
+  store.history = addSnapshot(store.history, store.current);
   persist();
   listVersions();
   say('Version saved in this browser.');
@@ -219,8 +319,8 @@ $('restore').addEventListener('click', () => {
   const snapshot = store.history[Number(versions.value)];
   if (!snapshot) return;
   // Keep what is in the editor as a version first, so a restore never loses work.
-  store.history = addSnapshot(store.history, editor.value);
-  setCode(snapshot.code);
+  store.history = addSnapshot(store.history, project());
+  setFiles(snapshot.files);
   listVersions();
   say(`Restored the version from ${timeFormat.format(snapshot.time)}.`);
 });
@@ -233,21 +333,22 @@ templateSelect.addEventListener('change', () => {
   const template = templates.find((t) => t.id === templateSelect.value);
   templateSelect.value = '';
   if (!template) return;
-  if (editor.value.trim()) store.history = addSnapshot(store.history, editor.value);
-  setCode(template.code);
+  const before = project();
+  if (before.some((f) => f.code.trim())) store.history = addSnapshot(store.history, before);
+  setFiles(template.files);
   listVersions();
   run();
 });
 
 $('share').addEventListener('click', async () => {
   try {
-    const text = await encodeCode(editor.value);
+    const text = await encodeProject(project());
     const url = new URL(location.href);
     url.hash = `code=${text}`;
     history.replaceState(null, '', url);
     try {
       await navigator.clipboard.writeText(url.href);
-      say('Share link copied. Anyone who opens it gets this code.');
+      say('Share link copied. Anyone who opens it gets these files.');
     } catch {
       say('Share link is in the address bar: copy it from there.');
     }
@@ -261,14 +362,13 @@ $('download').addEventListener('click', async () => {
   try {
     const response = await fetch(new URL('./frame/', import.meta.url));
     if (!response.ok) throw new Error(`the frame page answered ${response.status}`);
-    html = downloadDocument(await response.text(), editor.value, packages);
+    html = downloadDocument(await response.text(), project(), packages);
   } catch (error) {
     say(`Could not build the download (${error.message}).`, true);
     return;
   }
-  const blob = new Blob([html], { type: 'text/html' });
   const link = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(blob),
+    href: URL.createObjectURL(new Blob([html], { type: 'text/html' })),
     download: 'margo-playground.html',
   });
   link.click();
@@ -301,17 +401,16 @@ function packagesBase() {
 }
 
 /**
- * Opens a `#code=` link. The shared code goes in the editor but not in storage: the user's own code stays saved, and
- * "Back to my code" returns to it, until they edit, run or save the shared code. A bad link says why and changes nothing.
+ * Opens a `#code=` link. The shared files go in the editor but not in storage: the user's own files stay saved, and
+ * "Back to my code" returns to them, until they edit, run or save the shared ones. A bad link says why, changes nothing.
  */
 async function openLink() {
   const value = codeFromHash(location.hash);
   if (value === null) return false;
   try {
-    const code = await decodeCode(value);
-    if (ownCode === null) ownCode = editor.value;
-    editor.value = code;
-    renumber();
+    const shared = await decodeProject(value);
+    if (ownFiles === null) ownFiles = project();
+    show(shared);
     $('shared').hidden = false;
     return true;
   } catch (error) {
@@ -321,16 +420,14 @@ async function openLink() {
 }
 
 $('back').addEventListener('click', () => {
-  const code = ownCode ?? store.current ?? templates[0].code;
-  setCode(code);
+  setFiles(ownFiles ?? store.current ?? templates[0].files);
   history.replaceState(null, '', location.pathname + location.search);
   run({ auto: true });
   say('Back to your own code.');
 });
 
 store = storage ? readStore(storage) : store;
-editor.value = store.current ?? templates[0].code;
-renumber();
+show(store.current ?? templates[0].files);
 listVersions();
 addEventListener('hashchange', async () => {
   if (await openLink()) run({ auto: true });
