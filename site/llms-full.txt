@@ -12710,6 +12710,26 @@ fiber modulus for longitudinal reinforcement. It captures the parallel/transvers
 while the transverse base remains isotropic. Distinct radial and tangential elastic and shear
 coefficients are outside that material model. Fiber rows join the snapshot when the scene authors them.
 
+The optional orthotropic vertex-block material assigns one full stiffness tensor per body. For
+each tetrahedron it applies the symmetric Hooke tensor to Green strain in the rest-space material
+frame. The three axial and shear moduli and three Poisson ratios are small-strain measurements.
+A fourth-order determinant term resists compression as volume collapses and has zero tangent
+stiffness at rest. Each vertex update recomputes its incident cells' elastic energy to enforce
+descent with the stored f32 positions. The material uses one 18-word record per tetrahedron in
+the snapshot only when a body has authored orthotropy. The existing fracture rules remain scalar.
+The optional soft entry measures 128,798 B gzip, with 36,140 B in its base and 91,828 B in the
+lazy native kernel bundle.
+
+The tetrahedral energy follows Green strain as described by Eftychios Sifakis and Jernej Barbič,
+2012. [Theory and Discretization of Finite Elements](https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf)
+
+The material example uses Douglas-fir moduli and Poisson ratios from Tables 5–1 and 5–2 of
+C. Adam Senalik and Benjamin Farber, 2021. [Mechanical Properties of Wood](https://research.fs.usda.gov/treesearch/62244)
+
+Geoffrey Irving, Joseph Teran and Ronald Fedkiw described the inversion problem in 2004.
+The fourth-order determinant term here keeps the calibrated tangent at rest.
+[Invertible Finite Elements for Robust Simulation of Large Deformation](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf)
+
 ### Gas-filled soft shells (SOFT-06)
 
 `@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber
@@ -29578,11 +29598,10 @@ moving-footprint and berm profiles remain EARTH-05 work.
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
-climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support
-fixture uses isotropic elasticity. Directional reinforcement is available in both nonlinear modes.
-Distinct radial and tangential shear and Poisson coefficients need a full orthotropic material law.
-Both native nonlinear modes pass the rung fixture. Dedicated GPU elasticity remains open and needs a
-same-tick GPU contact and snapshot handoff through the physics framework.
+climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support rung
+now runs with a full orthotropic tensor in native vertex blocks. The fracture threshold uses scalar
+cohesion. Grain-dependent timber fracture remains open.
+Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 
