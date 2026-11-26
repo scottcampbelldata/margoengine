@@ -32,9 +32,11 @@ try {
   assert.deepEqual(plain, { ...shared, isShared: false });
   assert.deepEqual(roughPlain, roughShared);
   assert.deepEqual(depositPlain, depositShared);
-  assert.equal(depositPlain.mass, 1800);
-  assert.equal(depositPlain.volume, 4.5);
-  assert.equal(depositPlain.elevation, 0.375);
+  assert.equal(depositPlain.mass, 900);
+  assert.equal(depositPlain.volume, 2.25);
+  assert.equal(depositPlain.elevation, -1.625);
+  assert.deepEqual(depositPlain.marine, { occupiedVolume: 2.25, displacedVolume: -0.75 });
+  assert.ok(Math.abs(depositPlain.admitted + 0.75) <= 6 * Number.EPSILON * 0.75);
   assert.ok(roughPlain.velocity > 0.02 * Math.cos((23.3 * Math.PI) / 180));
   assert.ok(plain.advance > 0.1);
   assert.equal(plain.barrier.depth, 0);

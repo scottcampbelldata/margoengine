@@ -8,6 +8,19 @@ export interface GranularFlowBuilds {
 }
 
 export interface GranularFlowKernel {
+  granular_sea_source(
+    previousState: number,
+    advanced: number,
+    earlier: number,
+    next: number,
+    source: number,
+    bedChange: number,
+    grid: number,
+    previousBudget: number,
+    budget: number,
+    nx: number,
+    nz: number,
+  ): number;
   granular_deposit(
     input: number,
     output: number,

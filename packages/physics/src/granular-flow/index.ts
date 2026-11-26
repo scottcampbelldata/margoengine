@@ -1,6 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { cos, sin } from '@margoengine/math/pinned';
 import { BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT, BedChange, bedVertexCount, type BedShape } from '../earth/bed.js';
+import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import { regionWords } from '../world/memory.js';
 import type { FieldDescriptor, FieldUse, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
 import {
@@ -22,6 +23,8 @@ export interface GranularFlowLoadOptions {
   readonly liveTerrain?: boolean;
   /** Read the live bed and transfer arrested material into it. Default false. */
   readonly depositToTerrain?: boolean;
+  /** Publish signed submerged-volume changes for SeaSource consumers. Default false. */
+  readonly marineDisplacement?: boolean;
   /** Cancel loading of the optional native kernels. */
   readonly signal?: AbortSignal;
 }
@@ -84,6 +87,15 @@ export interface GranularFlowOptions {
   readonly density?: number;
   /** Arrested-layer transfer parameters when depositToTerrain is enabled. */
   readonly deposition?: GranularDeposition;
+  /** Reference water surface in metres from the world cell, default 0. Requires marineDisplacement. */
+  readonly seaLevel?: number;
+}
+
+export interface GranularMarineBudget {
+  /** Current submerged occupancy of loose and consolidated material, cubic metres. */
+  readonly occupiedVolume: number;
+  /** Signed volume change since the first terrain sample, cubic metres. */
+  readonly displacedVolume: number;
 }
 
 export interface GranularFlowSample {
@@ -98,6 +110,16 @@ interface DepositState {
   readonly areas: Region;
   readonly deltas: Region;
   readonly params: Region;
+  readonly trialBudget: Region;
+}
+
+interface MarineState {
+  readonly history: Region;
+  readonly next: Region;
+  readonly source: Region;
+  readonly sourceTrial: Region;
+  readonly grid: Region;
+  readonly budget: Region;
   readonly trialBudget: Region;
 }
 
@@ -119,6 +141,7 @@ interface State {
   readonly trial: Region;
   readonly ledger: Region;
   readonly deposit?: DepositState;
+  readonly marine?: MarineState;
   readonly regions: readonly Region[];
 }
 
@@ -176,6 +199,8 @@ function words(state: State, region: Region): Float64Array {
 export class GranularFlowSolver implements Solver<GranularFlowOptions> {
   /** Cell-centred granular state using GRANULAR_FLOW_LAYOUT. */
   readonly flowField: FieldDescriptor;
+  /** Layout-1 SeaSource rows describing motion of the occupied volume. */
+  readonly seaSourceField: FieldDescriptor;
   private readonly fields: readonly FieldUse[];
   private runtime?: State;
 
@@ -184,6 +209,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     private readonly id: string,
     private readonly liveTerrain: boolean,
     private readonly depositToTerrain: boolean,
+    private readonly marineDisplacement: boolean,
   ) {
     if (typeof id !== 'string' || !id.trim() || id !== id.trim())
       throw new RangeError('Invalid granular flow ID. Use a nonempty name without outer whitespace.');
@@ -194,8 +220,16 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       quantity: 'granularFlowState',
       unit: 'SI',
     });
+    this.seaSourceField = Object.freeze({
+      name: `${id}.seaSource`,
+      kind: 'scalarSeries',
+      centring: 'cell',
+      quantity: 'seaSource',
+      unit: 'SI',
+    });
     this.fields = [
       { field: this.flowField, access: 'write' },
+      ...(marineDisplacement ? [{ field: this.seaSourceField, access: 'write' as const }] : []),
       ...(liveTerrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ...(depositToTerrain ? [{ field: BED_CHANGE_FIELD, access: 'accumulate' as const }] : []),
     ];
@@ -206,6 +240,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     id = 'granularFlow',
     liveTerrain = false,
     depositToTerrain = false,
+    marineDisplacement = false,
     signal,
   }: GranularFlowLoadOptions = {}): Promise<GranularFlowSolver> {
     return new GranularFlowSolver(
@@ -213,6 +248,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       id,
       liveTerrain || depositToTerrain,
       depositToTerrain,
+      marineDisplacement,
     );
   }
 
@@ -231,6 +267,21 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     finite(dx * dz, 'cell area', Number.MIN_VALUE);
     finite(dx + dz, 'cell size', Number.MIN_VALUE);
     const gravity = finite(-host.gravity[1], 'downward gravity', 0);
+    if (options.seaLevel !== undefined && !this.marineDisplacement)
+      throw new RangeError('Granular seaLevel requires a marine field. Enable marineDisplacement when loading.');
+    const seaLevel = finite(options.seaLevel ?? 0, 'sea datum');
+    const marineRadius = this.marineDisplacement
+      ? finite(Math.sqrt((dx * dz) / Math.PI), 'marine footprint radius', Number.MIN_VALUE)
+      : 0;
+    if (this.marineDisplacement) {
+      for (const [centre, span] of [
+        [grid.centre[0], grid.width],
+        [grid.centre[1], grid.depth],
+      ] as const) {
+        finite(centre - span / 2, 'marine near edge');
+        finite(centre + span / 2, 'marine far edge');
+      }
+    }
     const poreSupport = finite(options.poreSupport ?? 0, 'pore pressure fraction', 0);
     if (poreSupport > 1) throw new RangeError('Invalid granular pore support. Set the fraction between zero and one.');
     if (options.roughness && options.friction !== undefined)
@@ -290,9 +341,11 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
           GRANULAR_FLOW_LAYOUT,
         )
       : undefined;
+    const marine = this.marineDisplacement ? this.allocateMarine(host, count) : undefined;
     const regions = [state, ledger];
     if (roughness) regions.push(roughness);
     if (deposit) regions.push(deposit.change.state);
+    if (marine) regions.push(marine.history, marine.source, marine.budget);
     const s: State = {
       host,
       kernel,
@@ -311,6 +364,7 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       trial,
       ledger,
       deposit,
+      marine,
       regions,
     };
     words(s, state).set(initial);
@@ -319,6 +373,15 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       words(s, deposit.areas).set(deposit.change.area);
       words(s, deposit.params).set([depositDensity, density, stopSpeed]);
     }
+    if (marine)
+      words(s, marine.grid).set([
+        grid.centre[0] - grid.width / 2,
+        grid.centre[1] - grid.depth / 2,
+        dx,
+        dz,
+        seaLevel,
+        marineRadius,
+      ]);
     this.runtime = s;
   }
 
@@ -331,6 +394,20 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       deltas: host.allocate('granular-flow-delta-trial', change.state.byteLength, 'f64', BED_LAYOUT),
       params: host.allocate('granular-flow-deposit-model', 3 * amount, 'f64', GRANULAR_FLOW_LAYOUT),
       trialBudget: host.allocate('granular-flow-deposit-trial', 4 * amount, 'f64', GRANULAR_FLOW_LAYOUT),
+    };
+  }
+
+  private allocateMarine(host: SolverHost, count: number): MarineState {
+    const allocate = (name: string, length: number, layout = GRANULAR_FLOW_LAYOUT) =>
+      host.allocate(name, length * Float64Array.BYTES_PER_ELEMENT, 'f64', layout);
+    return {
+      history: allocate('granular-marine-history', 2 * count),
+      next: allocate('granular-marine-next', 2 * count),
+      source: allocate('granular-marine-source', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT),
+      sourceTrial: allocate('granular-marine-source-trial', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT),
+      grid: allocate('granular-marine-grid', 6),
+      budget: allocate('granular-marine-budget', 3),
+      trialBudget: allocate('granular-marine-budget-trial', 3),
     };
   }
 
@@ -388,12 +465,23 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       throw new RangeError(
         'Granular flow exceeded its finite-volume step range. Check layer depth, speed and spacing.',
       );
-    if (s.deposit) this.deposit(s, s.deposit);
-    else words(s, s.state).set(work);
+    if (s.deposit) this.prepareDeposit(s, s.deposit);
+    const advanced = s.deposit ? s.trial : s.working;
+    if (s.marine) this.prepareMarine(s, s.marine, advanced);
+    if (s.deposit) {
+      s.deposit.change.deltas.set(words(s, s.deposit.deltas));
+      words(s, s.ledger).set(words(s, s.deposit.trialBudget), 1);
+    }
+    if (s.marine) {
+      words(s, s.marine.source).set(words(s, s.marine.sourceTrial));
+      words(s, s.marine.history).set(words(s, s.marine.next));
+      words(s, s.marine.budget).set(words(s, s.marine.trialBudget));
+    }
+    words(s, s.state).set(words(s, advanced));
     words(s, s.ledger)[0] = substeps;
   }
 
-  private deposit(s: State, deposit: DepositState): void {
+  private prepareDeposit(s: State, deposit: DepositState): void {
     const trialBudget = words(s, deposit.trialBudget);
     trialBudget.set(words(s, s.ledger).subarray(1));
     const result = s.kernel.granular_deposit(
@@ -416,17 +504,36 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       throw new RangeError(
         'Granular deposition exceeded its mass or field range. Use finite physical depths and densities.',
       );
-    deposit.change.deltas.set(words(s, deposit.deltas));
-    words(s, s.ledger).set(trialBudget, 1);
-    words(s, s.state).set(words(s, s.trial));
+  }
+
+  private prepareMarine(s: State, marine: MarineState, advanced: Region): void {
+    const result = s.kernel.granular_sea_source(
+      s.state.byteOffset,
+      advanced.byteOffset,
+      marine.history.byteOffset,
+      marine.next.byteOffset,
+      marine.sourceTrial.byteOffset,
+      s.deposit?.deltas.byteOffset ?? 0,
+      marine.grid.byteOffset,
+      marine.budget.byteOffset,
+      marine.trialBudget.byteOffset,
+      s.grid.columns,
+      s.grid.rows,
+    );
+    if (result !== 0)
+      throw new RangeError(
+        'Granular marine displacement exceeded its finite volume range. Check the sea datum, bed and grid spacing.',
+      );
   }
 
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
     const s = this.attached();
-    const flow: Port = { field: this.flowField.name, region: s.state, tick, cell: [0, 0, 0] };
-    return s.deposit ? [flow, s.deposit.change.port(tick)] : [flow];
+    const ports: Port[] = [{ field: this.flowField.name, region: s.state, tick, cell: [0, 0, 0] }];
+    if (s.deposit) ports.push(s.deposit.change.port(tick));
+    if (s.marine) ports.push({ field: this.seaSourceField.name, region: s.marine.source, tick, cell: [0, 0, 0] });
+    return ports;
   }
 
   stateRegions(): readonly Region[] {
@@ -466,6 +573,14 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     const s = this.attached();
     const ledger = words(s, s.ledger);
     return { mass: ledger[1] ?? 0, impulse: [ledger[2] ?? 0, ledger[3] ?? 0], horizontalKineticEnergy: ledger[4] ?? 0 };
+  }
+
+  /** Submerged material volume and the signed change for water displacement. */
+  get marineBudget(): GranularMarineBudget {
+    const s = this.attached();
+    if (!s.marine) return { occupiedVolume: 0, displacedVolume: 0 };
+    const budget = words(s, s.marine.budget);
+    return { occupiedVolume: budget[2]!, displacedVolume: budget[2]! - budget[1]! };
   }
 
   /** Number of positivity-limited subdivisions in the last world step. */

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { TerrainBed } from '../../dist/earth.js';
 import { GranularFlowSolver } from '../../dist/granular-flow.js';
+import { TsunamiSolver } from '../../dist/tsunami.js';
 import { PhysicsWorld, worldMemory } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -193,4 +194,64 @@ test('EARTH-02 a symmetric peak with zero net discharge remains free to spread d
   const peak = flow.sample(2, 1);
   assert.ok(peak.depth > 0.9);
   assert.ok(Math.abs(peak.discharge[0]) <= Number.EPSILON);
+});
+
+const shoreGrid = { columns: 28, rows: 3, width: 28, depth: 3, centre: [14, 1.5] };
+const shoreAltitude = (x) => Math.max(-1.25, 0.5 - x * 0.125);
+
+async function coastal(fps = rate, powered = true, shared = false) {
+  const slide = await GranularFlowSolver.load({ liveTerrain: true, marineDisplacement: powered });
+  const sea = await TsunamiSolver.load({ sources: powered ? [slide.seaSourceField] : [] });
+  const depth = Array.from({ length: 84 }, (_, i) => (i % 28 < 3 ? 0.8 : 0));
+  const bathymetry = Array.from({ length: 84 }, (_, i) => (shoreAltitude(i % 28) + shoreAltitude((i % 28) + 1)) / 2);
+  const world = new PhysicsWorld({ rate: fps, memory: worldMemory(shared) })
+    .add(new TerrainBed(), { ...shoreGrid, elevations: shoreAltitude })
+    .add(slide, { grid: shoreGrid, depth, friction: 0.07, velocity: [1.5, 0] })
+    .add(sea, { cells: [28, 3], spacing: 1, bathymetry });
+  return { world, slide, sea };
+}
+
+test('EARTH-02 a natural granular release generates a real SEA-06 wave with conserved signed occupancy', async () => {
+  const coupled = await coastal();
+  const baseline = await coastal(rate, false);
+  const releasedMass = coupled.slide.mass;
+  coupled.world.advance(180);
+  baseline.world.advance(180);
+  assert.ok(coupled.sea.sample(12, 1).height > 0.05);
+  assert.equal(baseline.sea.sample(12, 1).height, 0);
+  const { occupiedVolume, displacedVolume } = coupled.slide.marineBudget;
+  assert.ok(displacedVolume > 0.5);
+  assert.equal(occupiedVolume, displacedVolume);
+  const wave = coupled.sea.budget;
+  assert.ok(Math.abs(wave.admittedSourceVolume - displacedVolume) <= 1024 * Number.EPSILON * displacedVolume);
+  assert.equal(wave.unplacedSourceVolume, 0);
+  assert.ok(
+    Math.abs(wave.storedVolume - wave.initialVolume - displacedVolume) <= 1024 * Number.EPSILON * wave.initialVolume,
+  );
+  assert.ok(Math.abs(coupled.slide.mass - releasedMass) <= 1024 * Number.EPSILON * releasedMass);
+});
+
+test('EARTH-02 coastal source history replays through the actual water receiver', async () => {
+  const runs = await Promise.all([coastal({ num: 24, den: 1 }), coastal({ num: 24, den: 1 }, true, true)]);
+  seekEqualsContinuous(() => runs.shift().world);
+});
+
+test('EARTH-02 already submerged material only displaces its net change when it consolidates', async () => {
+  const grid = { columns: 4, rows: 3, width: 4, depth: 3, centre: [2, 1.5] };
+  const slide = await GranularFlowSolver.load({ depositToTerrain: true, marineDisplacement: true });
+  const sea = await TsunamiSolver.load({ sources: [slide.seaSourceField] });
+  const bed = new TerrainBed();
+  const world = new PhysicsWorld({ rate })
+    .add(bed, { ...grid, elevations: () => -2 })
+    .add(slide, { grid, depth: 0.5, density: 300, deposition: { density: 400 } })
+    .add(sea, { cells: [4, 3], spacing: 1, bathymetry: -2 })
+    .couple(['granularFlow', 'bed'], 'staggered');
+  world.advance(2);
+  assert.equal(slide.marineBudget.occupiedVolume, 4.5);
+  assert.equal(slide.marineBudget.displacedVolume, -1.5);
+  // Twelve per-cell signed contributions are summed after area projection.
+  assert.ok(Math.abs(sea.budget.admittedSourceVolume + 1.5) <= 12 * Number.EPSILON * 1.5);
+  assert.equal(slide.depositBudget.mass, 1800);
+  assert.equal(slide.mass, 0);
+  assert.equal(bed.requestedVolume(), 4.5);
 });

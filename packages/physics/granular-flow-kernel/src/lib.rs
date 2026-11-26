@@ -547,3 +547,129 @@ pub extern "C" fn granular_deposit(
     }
     0
 }
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct SeaCell {
+    submerged_depth: f64,
+    deposit_height: f64,
+}
+
+#[repr(C)]
+struct SeaGrid {
+    x: f64,
+    z: f64,
+    dx: f64,
+    dz: f64,
+    datum: f64,
+    radius: f64,
+}
+
+#[repr(C)]
+struct SeaBudget {
+    baseline_computed: f64,
+    initial_volume: f64,
+    occupied_volume: f64,
+}
+
+#[repr(C)]
+struct SeaSource {
+    x: f64,
+    z: f64,
+    radius: f64,
+    pressure: f64,
+    volume: f64,
+}
+
+fn mean_deposit(deltas: &[f64], x: usize, z: usize, nz: usize) -> f64 {
+    let stride = nz + 1;
+    let i = x * stride + z;
+    let lower =
+        unsafe { *deltas.get_unchecked(i) } / 6.0 + unsafe { *deltas.get_unchecked(i + 1) } / 3.0;
+    let upper = unsafe { *deltas.get_unchecked(i + stride) } / 3.0
+        + unsafe { *deltas.get_unchecked(i + stride + 1) } / 6.0;
+    lower + upper
+}
+
+// Emit the local change of combined slide and consolidated occupation at the water datum.
+// A transfer from the mobile layer to TerrainBed must count once, including any compaction.
+#[unsafe(no_mangle)]
+pub extern "C" fn granular_sea_source(
+    previous_state: *const f64,
+    advanced: *const f64,
+    earlier: *const f64,
+    next: *mut f64,
+    source: *mut f64,
+    bed_change: *const f64,
+    grid: *const f64,
+    previous_budget: *const f64,
+    budget: *mut f64,
+    nx: usize,
+    nz: usize,
+) -> i32 {
+    if nx == 0 || nz == 0 {
+        return -1;
+    }
+    let count = nx * nz;
+    let previous_state =
+        unsafe { core::slice::from_raw_parts(previous_state.cast::<Column>(), count) };
+    let advanced = unsafe { core::slice::from_raw_parts(advanced.cast::<Column>(), count) };
+    let earlier = unsafe { core::slice::from_raw_parts(earlier.cast::<SeaCell>(), count) };
+    let next = unsafe { core::slice::from_raw_parts_mut(next.cast::<SeaCell>(), count) };
+    let sources = unsafe { core::slice::from_raw_parts_mut(source.cast::<SeaSource>(), count) };
+    let deltas = if bed_change.is_null() {
+        None
+    } else {
+        Some(unsafe { core::slice::from_raw_parts(bed_change, (nx + 1) * (nz + 1)) })
+    };
+    let grid = unsafe { &*grid.cast::<SeaGrid>() };
+    let before = unsafe { &*previous_budget.cast::<SeaBudget>() };
+    let budget = unsafe { &mut *budget.cast::<SeaBudget>() };
+    let area = grid.dx * grid.dz;
+    let first = before.baseline_computed == 0.0;
+    let mut initial = if first { 0.0 } else { before.initial_volume };
+    let mut occupied = 0.0;
+    for (i, cell) in advanced.iter().enumerate() {
+        let past = unsafe { *earlier.get_unchecked(i) };
+        let x = i % nx;
+        let z = i / nx;
+        let local_deposit = deltas.map_or(0.0, |d| mean_deposit(d, x, z, nz));
+        let deposit_height = past.deposit_height + local_deposit;
+        let underlying = cell.bed - past.deposit_height;
+        let available = (grid.datum - underlying).max(0.0);
+        let old = if first {
+            let pre = unsafe { previous_state.get_unchecked(i) };
+            let initial_depth = pre.depth.min(available);
+            initial += initial_depth * area;
+            initial_depth
+        } else {
+            past.submerged_depth
+        };
+        let current = (cell.depth + deposit_height).min(available);
+        let delta = (current - old) * area;
+        occupied += current * area;
+        if !deposit_height.is_finite() || !delta.is_finite() {
+            return -1;
+        }
+        *unsafe { next.get_unchecked_mut(i) } = SeaCell {
+            submerged_depth: current,
+            deposit_height,
+        };
+        *unsafe { sources.get_unchecked_mut(i) } = SeaSource {
+            x: grid.x + (x as f64 + 0.5) * grid.dx,
+            z: grid.z + (z as f64 + 0.5) * grid.dz,
+            radius: grid.radius,
+            pressure: 0.0,
+            volume: delta,
+        };
+    }
+    if !occupied.is_finite() || !initial.is_finite() {
+        return -1;
+    }
+    *budget = SeaBudget {
+        baseline_computed: 1.0,
+        initial_volume: initial,
+        occupied_volume: occupied,
+    };
+    0
+}

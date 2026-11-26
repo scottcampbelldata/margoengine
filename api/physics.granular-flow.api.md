@@ -24,6 +24,7 @@ export interface GranularFlowLoadOptions {
     readonly id?: string;
     readonly liveTerrain?: boolean;
     readonly depositToTerrain?: boolean;
+    readonly marineDisplacement?: boolean;
     readonly signal?: AbortSignal;
 }
 
@@ -38,6 +39,7 @@ export interface GranularFlowOptions {
     readonly turbulence?: number;
     readonly density?: number;
     readonly deposition?: GranularDeposition;
+    readonly seaLevel?: number;
 }
 
 export interface GranularFlowSample {
@@ -49,8 +51,9 @@ export interface GranularFlowSample {
 
 export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     readonly flowField: FieldDescriptor;
+    readonly seaSourceField: FieldDescriptor;
     private constructor();
-    static load({ id, liveTerrain, depositToTerrain, signal }?: GranularFlowLoadOptions): Promise<GranularFlowSolver>;
+    static load({ id, liveTerrain, depositToTerrain, marineDisplacement, signal }?: GranularFlowLoadOptions): Promise<GranularFlowSolver>;
     describe(): {
         id: string;
         fields: readonly FieldUse[];
@@ -66,7 +69,13 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     sample(x: number, z: number): GranularFlowSample;
     get mass(): number;
     get depositBudget(): GranularDepositBudget;
+    get marineBudget(): GranularMarineBudget;
     get lastSubsteps(): number;
+}
+
+export interface GranularMarineBudget {
+    readonly occupiedVolume: number;
+    readonly displacedVolume: number;
 }
 
 export interface GranularRoughness {

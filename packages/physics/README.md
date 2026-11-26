@@ -5299,3 +5299,24 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
 world.advance(2);
 console.log(bed.volume(), flow.depositBudget.mass);
 ```
+
+Enable `marineDisplacement` for a natural coastal release and pass `seaSourceField` to the receiving `TsunamiSolver`. `seaLevel` defaults to 0 metres in the shared world cell. The resulting volume is signed when material enters water, leaves it or compacts. The initial submerged volume establishes the baseline. Supply the receiving water solver with its reference bathymetry when the source includes the growing granular deposit.
+
+```js
+import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
+import { TsunamiSolver } from '@margoengine/physics/tsunami';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 28, rows: 3, width: 28, depth: 3, centre: [14, 1.5] };
+const bed = Float64Array.from({ length: 84 }, (_, i) => Math.max(-1.25, 0.4375 - (i % 28) * 0.125));
+const flow = await GranularFlowSolver.load({ marineDisplacement: true });
+const sea = await TsunamiSolver.load({ sources: [flow.seaSourceField] });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(flow, {
+    grid, bed, friction: 0.07, velocity: [1.5, 0],
+    depth: Float64Array.from({ length: 84 }, (_, i) => i % 28 < 3 ? 0.8 : 0),
+  })
+  .add(sea, { cells: [28, 3], spacing: 1, bathymetry: bed });
+world.advance(180);
+console.log(flow.marineBudget.displacedVolume, sea.budget.admittedSourceVolume);
+```
