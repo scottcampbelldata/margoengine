@@ -10944,3 +10944,11 @@ A skin or morph pose is written by a compute pass into a GPU buffer, and WebGPU 
 The two evaluations are not bit-equal by construction: the CPU sums in float64 and rounds once, the shader works in float32 and WGSL lets a compiler reassociate and fuse. Evidence that they agree: `packages/bvh/tests/gpu-build-browser.js` in `test:browser` (RTX A6000, D3D12, Chromium) reads the Fox's deformed buffer back at three times of its clip; every CPU position is within 1.00 float32 step of the largest coordinate of the GPU's (the check allows 4), every normal within 1e-4, and 102 synchronous first hits equal `intersectModel`'s on the read-back vertices. On the CPU, `packages/bvh/tests/deformed-sync.test.js` compares 900 rays with a brute-force scan and `packages/animation/tests/sync-pick.test.js` checks a skinned strip against its closed form.
 
 Still missing: the same comparison on Metal and Vulkan drivers (a fused multiply-add there moves a position by a step, which the bound of 4 is meant to cover but no run has shown); eight-influence and morphed assets on a real GPU (their CPU arithmetic is tested against closed forms only); a CPU pose for a `skinning` mode, for weights a `MorphWeightPlayer` samples on the GPU and for `BatchedMesh` (open in docs/known-bugs.md, each refuses with `unsupported` meanwhile). The WebGL2 layer runs no deformation pass (`Animation` needs WebGPU), so there is nothing to compare there.
+
+## Voxel path guiding on ANGLE Direct3D 11 (KB-VPT-GUIDE-D3D11, section 5 evidence, 2026-11-26)
+
+Evidence that now exists: `packages/voxel-pathtracer/tests/guiding-browser.mjs` runs its values on WebGPU, on the
+WebGL2 layer on ANGLE Vulkan and, on Windows, on the layer on ANGLE Direct3D 11; the three give the same guided error
+(10.24 against a baseline of 350.05). Before, the Direct3D 11 leg read 807,472: a loop left by `break` after a
+`continue` picked a wrong box face there. Still missing: which of ANGLE's translation or Direct3D's compiler is at
+fault, and a scan of the other packages' shaders for the same loop shape.

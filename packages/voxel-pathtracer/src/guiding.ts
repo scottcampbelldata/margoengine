@@ -82,6 +82,8 @@ function guidedSource(source: string, guideStrength: number): string {
   //   that a continuous PDF cannot represent.
   // - Area sampling of visible box faces has a one-to-one directional mapping. Inside the bound, all six faces are sampled,
   //   and the PDF uses the exit face then. The last active face is kept if cumulative floating-point subtraction rounds up.
+  // - The face is picked under a flag, with no `continue` or `break` in its loop: with them the WebGL2 layer on ANGLE
+  //   Direct3D 11 picked a wrong face, whose directions the PDF then weighed as another face's (KB-VPT-GUIDE-D3D11).
   const helpers = /* wgsl */ `
 fn guidedRoulette(thr:ptr<function,vec3f>,bounces:u32,guideScale:f32)->bool {
  if(bounces<3u){return true;}
@@ -146,13 +148,10 @@ fn guidedSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32,o:vec3f,air:bool)->Bounce {
  for(var j=select(1u,0u,guided);j<=count;j++){
   let g=guideBox(o,select(j-1u,k,j==0u));
   if(j>0u){pdf+=boxPdf(o,s.wi,g)/f32(count);continue;}
-  var pick=rand()*g.total;var selected=0u;
+  var pick=rand()*g.total;var selected=0u;var open=true;
   for(var face=0u;face<6u;face++){
    let axis=face>>1u;let sign=select(-1.0,1.0,(face&1u)!=0u);
-   if(!guideFace(g,axis,sign)){continue;}
-   pick-=g.area[axis];
-   selected=face;
-   if(pick<=0.0){break;}
+   if(open&&guideFace(g,axis,sign)){pick-=g.area[axis];selected=face;open=pick>0.0;}
   }
   let axis=selected>>1u;var p=vec3f(0.0);
   p[axis]=select(0.0,g.size[axis],(selected&1u)!=0u);

@@ -3,11 +3,18 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
 import { legDevice, legDevices } from '../../../scripts/support/compat-shim.js';
 const results = [];
-for (const compat of [false, true]) {
+// Legs: WebGPU, the WebGL2 layer on ANGLE Vulkan and, on Windows, the layer on ANGLE Direct3D 11 (the browser's default
+// there), where the guide's face choice was compiled wrongly (KB-VPT-GUIDE-D3D11: squared error 807,472 against 10.24).
+const legs = [
+  { compat: false },
+  { compat: true, angle: 'vulkan' },
+  ...(process.platform === 'win32' ? [{ compat: true, angle: 'd3d11' }] : []),
+];
+for (const { compat, angle } of legs) {
   const context = await openBrowser({
     startPath: '/packages/voxel-pathtracer/tests/guiding.html',
     port: 'free',
-    ...(compat && process.platform === 'win32' ? { args: ['--use-angle=vulkan'] } : {}),
+    ...(compat && process.platform === 'win32' ? { args: [`--use-angle=${angle}`] } : {}),
   });
   const errors = [];
   context.page.on('pageerror', (error) => errors.push(error.message));
@@ -17,7 +24,9 @@ for (const compat of [false, true]) {
   try {
     await context.page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     const result = await context.page.evaluate((compat) => window.run(compat), compat);
-    console.log(JSON.stringify({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result }));
+    console.log(
+      JSON.stringify({ compat, device: legDevice(compat, context.hardware), hardware: context.hardware, result }),
+    );
     assert.deepEqual(errors, []);
     assert.deepEqual(result.errors, []);
     assert.deepEqual(result.messages, []);

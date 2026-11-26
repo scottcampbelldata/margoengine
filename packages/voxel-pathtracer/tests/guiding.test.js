@@ -96,6 +96,12 @@ test('the lines caustic guiding adds to the shader carry no comment text (KB-WGS
       added.filter((line) => line.includes('//')),
       [],
     );
+    // No loop the guide adds leaves by `break`: the face choice did, after a `continue`, and the WebGL2 layer on ANGLE
+    // Direct3D 11 then picked a wrong face (KB-VPT-GUIDE-D3D11; tests/guiding-browser.mjs has the measured leg).
+    assert.deepEqual(
+      added.filter((line) => /break;/.test(line)),
+      [],
+    );
   } finally {
     for (const tracer of tracers) tracer.dispose();
   }

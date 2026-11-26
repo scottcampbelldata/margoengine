@@ -107,20 +107,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stays flat across and rises toward the sun. One colour, one density and one sun angle are on disk; telling its
   model apart needs MagicaVoxel renders at other densities, colours and sun angles, and a view of the side faces.
 
-### Open 2026-11-26: path guiding is wrong on the WebGL2 layer on ANGLE Direct3D 11 (KB-VPT-GUIDE-D3D11, voxel-pathtracer)
+### Fixed 2026-11-26: path guiding was wrong on the WebGL2 layer on ANGLE Direct3D 11 (KB-VPT-GUIDE-D3D11, voxel-pathtracer)
 
-- **Repro:** on Windows (Edge 158, RTX A6000), `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/guiding-browser.mjs`.
-  `MARGO_COMPAT=1` puts the test's first leg on the WebGL2 layer on ANGLE Direct3D 11, and it stops at "guided squared
-  error 807472.092169678 must beat baseline 350.04741706417326 by 2x" after 136 s. The baseline is right and the
-  guided image is far off.
-- **Seen where:** main at adf7d36c5a and the KB1673 commit give the same two numbers to every digit, so KB1673 did
-  not cause it. Without `MARGO_COMPAT` the test passes: WebGPU, and its own WebGL2 leg on ANGLE Vulkan (guided error
-  10.24 against baseline 350.05 on both).
-- **Cause:** not found yet. Ruled out: the layer's staged route as such (ANGLE Vulkan passes the same programs) and
-  the time limits of KB-L5a-10 (this is a wrong value, reached well inside the limit). Next step: compare the guide
-  distribution's stored pages on Direct3D 11 against ANGLE Vulkan after the first training batch.
-- **Impact:** `guiding: true` on a browser that has no WebGPU and runs ANGLE on Direct3D 11 gives a far noisier
-  image than `guiding: false`.
+- **Repro (before):** on Windows (Edge 158, RTX A6000), `MARGO_COMPAT=1 node
+  packages/voxel-pathtracer/tests/guiding-browser.mjs`: the first leg runs on the WebGL2 layer on ANGLE Direct3D 11
+  and stops at "guided squared error 807472.092169678 must beat baseline 350.04741706417326 by 2x". WebGPU and the
+  layer on ANGLE Vulkan read 10.24 against 350.05.
+- **Cause:** the loop in `guidedSurface` (`packages/voxel-pathtracer/src/guiding.ts`) that picks which visible face
+  of a guide box to sample skipped hidden faces with `continue` and left with `break` once the pick was used up. On
+  ANGLE Direct3D 11 that six-step loop chose a wrong face. A point on it was still sampled, but `boxPdf` weighs a
+  direction by the face a ray enters through, so those samples got another face's density and far too much weight.
+  Found by rewriting one loop at a time: the pdf loop alone changed nothing (807,472.092169678 again), the face loop
+  alone gives 10.238534781150044, the number ANGLE Vulkan gives. The same GLSL is right on ANGLE Vulkan and the same
+  WGSL on WebGPU; whether ANGLE's HLSL or Direct3D's compiler drops the `break` was not established (the translated
+  HLSL was not read).
+- **Fix:** the face is picked under a flag (`open`), with no `continue` or `break` in the loop; the random numbers
+  and their order are unchanged, so WebGPU and ANGLE Vulkan give the numbers they gave.
+- **Regression:** `tests/guiding-browser.mjs` gains a leg on the layer on ANGLE Direct3D 11 (`--use-angle=d3d11`, on
+  Windows); `tests/guiding.test.js` fails on a `break` in any loop the guide adds to the shader.
+
 ### Fixed 2026-11-26: a sped-up water took a tide and a wind on other clocks without a word (KB-SURGE-SCALE1, physics hydro, surge and space)
 
 - **Repro (before):** a `ShallowWaterSolver` at `timeScale: 600` with a `SurgeSolver` reading the tide of a
