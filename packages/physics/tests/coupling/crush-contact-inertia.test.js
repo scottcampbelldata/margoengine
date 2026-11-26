@@ -26,7 +26,14 @@ function near(actual, expected, tolerance) {
   assert.ok(Math.abs(actual - expected) <= tolerance, `expected ${expected}, got ${actual}, tolerance ${tolerance}`);
 }
 
-async function setup(axis, order = ['hull', 'crush', 'rigid'], volume = water, exterior, friction = 0) {
+async function setup(
+  axis,
+  order = ['hull', 'crush', 'rigid'],
+  volume = water,
+  exterior,
+  friction = 0,
+  { approach = speed, indentation } = {},
+) {
   await Physics.load();
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false), gravity: zero });
   // One native substep evaluates the exterior load at the exact half-submerged pose.
@@ -34,7 +41,7 @@ async function setup(axis, order = ['hull', 'crush', 'rigid'], volume = water, e
   const normal = [0, 0, 0];
   normal[axis] = 1;
   const anchor = exterior ? zero : normal.map((component) => component * half);
-  const velocity = normal.map((component) => component * speed);
+  const velocity = normal.map((component) => component * approach);
   if (friction > 0) velocity[0] = 1;
   const vessel = physics.addBody(null, {
     linearVelocity: velocity,
@@ -61,19 +68,11 @@ async function setup(axis, order = ['hull', 'crush', 'rigid'], volume = water, e
     drag: false,
     slamming: false,
   });
+  const contact = { body: vessel.row, anchor, normal, radius: 0.4, support: { point: anchor }, friction };
   world.add(crush, {
     bodyCapacity: capacity,
-    patches: [
-      {
-        body: vessel.row,
-        anchor,
-        normal,
-        radius: 0.4,
-        support: { point: anchor },
-        material: { stiffness, yieldForce: 1e9, stroke: 1 },
-        friction,
-      },
-    ],
+    patches: indentation ? [] : [{ ...contact, material: { stiffness, yieldForce: 1e9, stroke: 1 } }],
+    indentationPatches: indentation ? [{ ...contact, indentation }] : undefined,
   });
   world.couple(order, 'staggered');
   const receipt = () => {
@@ -125,6 +124,48 @@ test('wet transverse contact rotates from the carried-water offset with correctl
   near(vessel.angularVelocity[2], rotation, 4e-6);
   near(receipt()[0], -2 * mass * speed, 0.0002);
   near(receipt()[5], dryI * rotation, 0.0002);
+});
+
+test('real carried water changes the deformed hull panel from denting to rupture', async (t) => {
+  // Simonsen & Lauridsen, Table 1. Use the material and specimen dimensions independently of their force/work result.
+  const indentation = { radius: 0.1114, thickness: 0.001, indenterRadius: 0.025, strength: 497e6, hardening: 0.19 };
+  const approach = 1.35;
+  const dry = await setup(0, undefined, 0, undefined, 0, { approach, indentation });
+  using _dry = dry.physics;
+  const wet = await setup(0, undefined, water, undefined, 0, { approach, indentation });
+  using _wet = wet.physics;
+  const points = [0, 0, 0.025, 0, indentation.radius, 0];
+  const evaluate = (scene, volume) => {
+    scene.world.advance(1);
+    const damage = scene.crush.read(0);
+    const dent = scene.crush.readIndentation(0, points);
+    assert.equal(damage.impacts, 1);
+    near(damage.absorbedEnergy, dent.work, 1e-9);
+    assert.equal(dent.surface.positions[2], dent.stroke);
+    assert.equal(dent.surface.positions[8], 0);
+    const u = scene.vessel.linearVelocity[0];
+    const spin = scene.vessel.angularVelocity[2];
+    const carried = density * volume;
+    const arm = -half + volume / 2;
+    const carriedSpeed = u - arm * spin;
+    const outgoing = 0.5 * (mass * u ** 2 + (mass / 6) * spin ** 2 + carried * carriedSpeed ** 2);
+    const incoming = 0.5 * (mass + carried) * Math.fround(approach) ** 2;
+    // Use the initial lever arm throughout the frozen-inertia interval and allow float32 rigid publication.
+    near(incoming - outgoing, damage.absorbedEnergy, 5e-5);
+    near(mass * u + carried * carriedSpeed, (mass + carried) * Math.fround(approach) - damage.impulse, 6e-5);
+    return { damage, dent, u, spin };
+  };
+  const dryResult = evaluate(dry, 0);
+  const wetResult = evaluate(wet, water);
+  assert.equal(dryResult.dent.fractured, false);
+  assert.equal(dryResult.u, 0);
+  assert.equal(wetResult.dent.fractured, true);
+  assert.equal(wetResult.damage.sealLoss, 1);
+  assert.ok(wetResult.spin > 0 && wetResult.u > 0);
+  assert.ok(wetResult.dent.stroke > dryResult.dent.stroke);
+  t.diagnostic(
+    `Dry dent ${(1000 * dryResult.dent.stroke).toFixed(2)} mm; wet rupture ${(1000 * wetResult.dent.stroke).toFixed(2)} mm and ${wetResult.dent.work.toFixed(2)} J. Published specimen rupture: 41.84 mm and 575.2 J.`,
+  );
 });
 
 test('dry hulls keep bare response and an invalid schedule names the coupling order', async () => {

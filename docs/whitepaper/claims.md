@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Carried water and hull panel rupture (BREAK-03 / SEA-08, 2026-11-26).
+  The live wet inertia of the same moving hull changes a 37.03 mm dent
+  to rupture at 41.80 mm and 605.07 J. The independently measured panel
+  reached 41.84 mm and 575.2 J. [Reproduce](reproduce.md#break-03-carried-water-and-hull-panel-rupture)
 - Native shell work (BREAK-03, 2026-11-26). With fixed element size and 35
   substeps, the 32/128-face specimens use 1,152/4,608 membrane and 576/2,304
   hinge evaluations. The plain and shared builds agree exactly.

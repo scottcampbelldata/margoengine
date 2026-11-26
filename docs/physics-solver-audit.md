@@ -106,11 +106,14 @@ The worst cases, where the gap is closest to the row not being met:
   The optional sphere manifold resolves both faces of a folded shell and preserves a
   single load on a shared flat edge or vertex. SEA-10 returns hydrostatic and gas
   pressure to the shell of a fixed hull before and after a live seam rupture.
+  The SEA-08 inertia exchange changes a model panel from denting to rupture
+  on the moving hull at the same contact speed.
   Arbitrary rigid shapes, moving-hull pressure feedback, automatic tearing,
   full-scale vessel response and broader vehicle coverage remain open.
   [Model-ship evidence](whitepaper/reproduce.md#break-03-held-out-model-ship-contacts) ·
   [Folded-shell evidence](whitepaper/reproduce.md#break-03-folded-shell-contact) ·
-  [Pressure feedback](whitepaper/reproduce.md#break-03-hydrostatic-shell-feedback)
+  [Pressure feedback](whitepaper/reproduce.md#break-03-hydrostatic-shell-feedback) ·
+  [Wet hull deformation](whitepaper/reproduce.md#break-03-carried-water-and-hull-panel-rupture)
 - **SEA-06 tsunamis:** there is no fault source anywhere in the code, although the clean-room record says the solver
   uses Okada deformation; run-up is only asserted to be positive.
 - **ATMO-07 lightning:** no electrification and no breakdown threshold (with no space charge the path ignores the

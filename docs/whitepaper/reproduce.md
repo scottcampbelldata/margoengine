@@ -1,5 +1,24 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 carried water and hull panel rupture
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-contact-inertia.test.js`.
+The same rigid hull with a circular panel station meets a fixed support at
+1.35 m/s in both runs. SEA-08 supplies the six-axis added-inertia contribution
+from its compartment. The hull is empty in one run and carries 250 kg of
+water in the other. The crush law receives the effective inertia and
+returns recoil to the same moving hull. The shell output retains the
+deformed surface and reports the change of seal state.
+
+The dry panel dents 37.03 mm and stops the hull. The wet panel ruptures at
+41.80 mm and 605.07 J, with positive residual hull motion and rotation.
+Simonsen and Lauridsen's 25 mm indenter specimen ruptured at 41.84 mm and
+575.2 J. Its dimensions and coupon properties set the panel input. The
+floating hull's external response in this fixture has an analytical energy
+and momentum check from the initial carried water position and final rigid
+motion. The experiment supplies an independent panel comparison.
+[Simonsen and Lauridsen, *Energy absorption and ductile failure in metal sheets under lateral indentation by a sphere* (2000)](https://www.sciencedirect.com/science/article/pii/S0734743X00000245)
+
 ## BREAK-03 native shell work
 
 Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.
