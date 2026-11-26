@@ -4,8 +4,8 @@
 // (MARGO_COMPAT=1 for the WebGL2 compatibility layer). A flat 0.5 source with a mask of weight 1 meters log2(0.18 / 0.5).
 // After `engine.rebootDevice()` a plain mask is dropped: no validation error or throw, one 'state' report linking
 // #borrowed-lost, and the meter has no weight so it stores nothing; a new mask through `autoExposure.mask` brings the
-// exposure back with no second report. A `(device) => texture` mask is made once per device and meters after a second
-// restore with no report.
+// exposure back with no second report. A function mask (`() => texture`, read every frame since d0cc35ea50) that keeps
+// one texture per device meters after a second restore with no report.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { postBrowser } from '../../post/test/post-browser.mjs';
@@ -91,7 +91,16 @@ await postBrowser(
       tonemap.options.autoExposure = { metering: 'mask', mask: mask(engine.gpu) };
       out.replaced = await exposure();
       out.reportsAfterReplace = reported.length;
-      tonemap.options.autoExposure = { metering: 'mask', mask: (device) => (made++, mask(device)) };
+      // The function form takes no argument and is read every frame (README): it keeps one texture per device.
+      const perDevice = new WeakMap();
+      tonemap.options.autoExposure = {
+        metering: 'mask',
+        mask: () => {
+          const device = engine.gpu;
+          if (!perDevice.has(device)) perDevice.set(device, (made++, mask(device)));
+          return perDevice.get(device);
+        },
+      };
       out.fn = await exposure();
       await restore();
       out.fnAfter = await exposure();
