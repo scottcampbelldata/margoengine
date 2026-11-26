@@ -215,7 +215,8 @@ function isAlive(pid) {
  * resolves to the ones still running when `waitMs` ran out. A pid that is gone, that a newer process took after
  * `sinceMs` (epoch ms), or whose start time cannot be read is not waited for. Node has no call that waits on a process
  * it did not start, so .NET's `Process.WaitForExit` does, from one Windows PowerShell for all the pids. With `kill`,
- * each pid that passed the start-time check is ended first, through that same process handle.
+ * each pid that passed the start-time check is ended first, through that same process handle, all of them before
+ * the first wait.
  * @param {number[]} pids
  * @param {number} waitMs
  * @param {number} sinceMs
@@ -231,6 +232,7 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile, { kill = fal
     "$ErrorActionPreference = 'Stop'",
     `$end = [DateTime]::UtcNow.AddMilliseconds(${Math.round(waitMs)})`,
     `$since = [DateTimeOffset]::FromUnixTimeMilliseconds(${Math.round(sinceMs)}).UtcDateTime`,
+    '$kept = @()',
     `foreach ($id in @(${ids.join(',')})) {`,
     '  try { $p = [Diagnostics.Process]::GetProcessById($id) } catch [ArgumentException] { continue }',
     // A start time that cannot be read means the pid names no process of ours any more, so it is not waited for or
@@ -249,8 +251,14 @@ export function waitSignaled(pids, waitMs, sinceMs, run = execFile, { kill = fal
     ...(kill
       ? ['  try { $p.Kill() } catch [InvalidOperationException] { } catch [ComponentModel.Win32Exception] { }']
       : []),
+    '  $kept += ,@($id, $p)',
+    '}',
+    // Every pid is ended before the first wait: a killed Edge child's process object can stay unsignalled for the
+    // whole bound after its exit code is set, and a kill-then-wait loop left every later child running that long
+    // (browser-teardown, "close ends its main process": GPU, network and storage alive 6 s after the close).
+    'foreach ($k in $kept) {',
     '  $left = [int][Math]::Max(0, ($end - [DateTime]::UtcNow).TotalMilliseconds)',
-    '  if (-not $p.WaitForExit($left)) { $id }',
+    '  if (-not $k[1].WaitForExit($left)) { $k[0] }',
     '}',
     // A caught missing-process exception leaves PowerShell's last status false.
     // The complete handled loop is a successful query, including an empty result.

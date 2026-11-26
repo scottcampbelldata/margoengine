@@ -569,6 +569,40 @@ test('Windows waiter with kill: a child already terminating (Kill throws access 
   }
 });
 
+test('Windows waiter with kill: every child is ended before the first wait', { timeout: 30_000 }, async () => {
+  if (process.platform !== 'win32') return;
+  // A killed Edge child's process object can stay unsignalled for the whole bound: a kill-then-wait loop left every
+  // later child running that long. Each wait is held 1.5 s here; the children must still end together.
+  const children = [0, 1].map(() =>
+    spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true }),
+  );
+  try {
+    await Promise.all(
+      children.map((c) => new Promise((resolve, reject) => c.once('spawn', resolve).once('error', reject))),
+    );
+    const ended = children.map((c) => new Promise((resolve) => c.once('exit', () => resolve(performance.now()))));
+    const survivors = await waitSignaled(
+      children.map((c) => c.pid),
+      10_000,
+      Date.now() + 60_000,
+      (file, args, options, callback) => {
+        const slow = args[3].replace(/^(\s*)\$left = /m, '$1Start-Sleep -Milliseconds 1500; $left = ');
+        assert.notEqual(slow, args[3], 'the wait line is where the test expects it');
+        return execFile(file, [...args.slice(0, 3), slow], options, callback);
+      },
+      { kill: true },
+    );
+    const [first, second] = await Promise.all(ended);
+    assert.deepEqual(survivors, []);
+    assert.ok(
+      Math.abs(second - first) < 1000,
+      `the second child ended ${Math.round(second - first)} ms after the first`,
+    );
+  } finally {
+    for (const c of children) if (c.exitCode === null) c.kill();
+  }
+});
+
 test('Windows waiter with kill: a child Kill could not end that stays running is still a survivor', {
   timeout: 15_000,
 }, async () => {
