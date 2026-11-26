@@ -299,6 +299,7 @@ export class SoftBody {
     removed: boolean;
     cellsTornSeen: Set<number>;
     tensileNucleation: number | null;
+    coplanarToughness: readonly [opening: number, sliding: number, tearing: number] | null;
     skin: Skin | null;
     skinCells: Uint32Array<ArrayBuffer>;
     previous: Float32Array<ArrayBuffer>;
@@ -451,6 +452,7 @@ export class SoftBodyDesc {
     crackBand: readonly number[] | null;
     tensileSeam: SoftTensileSeam | null;
     tensileNucleation: number | null;
+    coplanarToughness: readonly [opening: number, sliding: number, tearing: number] | null;
     inheritedBand: boolean;
     clusterGroups: number[][];
     clusterHertz: number;
@@ -493,6 +495,7 @@ export class SoftBodyDesc {
     setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
     setTensileSeam(seam: SoftTensileSeam | null): this;
     setTensileNucleation(openingStrain: number | null): this;
+    setCoplanarFractureToughness(toughness: readonly [opening: number, sliding: number, tearing: number] | null): this;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
     addCellEdges(): this;
     setSurface(): this;
