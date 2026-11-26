@@ -22,11 +22,11 @@ export interface RGBMOptions {
 
 const range = (maxRange: number): number => {
   if (!(maxRange > 0) || !Number.isFinite(maxRange))
-    throw new RangeError(`RGBM maxRange ${maxRange} must be a positive number; the default is 6`);
+    throw new RangeError(`RGBM maxRange ${maxRange} must be a positive number; pass a value above 0 (the default is 6)`);
   return maxRange;
 };
 const power = (gamma: number): number => {
-  if (!(gamma > 0) || !Number.isFinite(gamma)) throw new RangeError(`RGBM gamma ${gamma} must be a positive number`);
+  if (!(gamma > 0) || !Number.isFinite(gamma)) throw new RangeError(`RGBM gamma ${gamma} must be a positive number; pass a value above 0 (the default is 1)`);
   return gamma;
 };
 const check = (image: RGBA8Image, name: string): void => {
@@ -58,7 +58,7 @@ export function encodeRGBM(image: FloatImage, { maxRange = 6, gamma = 1 }: RGBMO
   const scale = range(maxRange),
     g = power(gamma),
     n = image.width * image.height;
-  if (image.data.length < n * 4) throw new MargoError('failed', 'encodeRGBM: the image holds fewer than width x height RGBA floats');
+  if (image.data.length < n * 4) throw new MargoError('failed', 'encodeRGBM: the image holds fewer than width x height RGBA floats; pass four floats per pixel');
   const out = new Uint8Array(n * 4);
   for (let i = 0; i < n; i++) {
     const r = Math.max(image.data[i * 4], 0),
@@ -110,7 +110,7 @@ export function decodeLogLuv(image: RGBA8Image): FloatImage {
 /** Encodes linear Rec. 709 RGBA floats as 32-bit LogLuv bytes (the layout of {@link decodeLogLuv}). Luminance past 2^64 clips. */
 export function encodeLogLuv(image: FloatImage): Uint8Array {
   const n = image.width * image.height;
-  if (image.data.length < n * 4) throw new MargoError('failed', 'encodeLogLuv: the image holds fewer than width x height RGBA floats');
+  if (image.data.length < n * 4) throw new MargoError('failed', 'encodeLogLuv: the image holds fewer than width x height RGBA floats; pass four floats per pixel');
   const out = new Uint8Array(n * 4),
     d = image.data;
   for (let i = 0; i < n; i++) {
