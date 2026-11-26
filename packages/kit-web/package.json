@@ -1287,6 +1287,10 @@
       "types": "./dist/lod/stream.d.ts",
       "import": "./dist/lod/stream.js"
     },
+    "./lod/occluder-fade": {
+      "types": "./dist/lod/occluder-fade.d.ts",
+      "import": "./dist/lod/occluder-fade.js"
+    },
     "./materials": {
       "types": "./dist/materials.d.ts",
       "import": "./dist/materials.js"
