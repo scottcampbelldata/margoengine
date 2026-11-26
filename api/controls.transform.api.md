@@ -91,6 +91,12 @@ export class TransformControls extends EventDispatcher {
     [Symbol.dispose]: () => void;
     pointerDown(x: number, y: number): void;
     pointerMove(x: number, y: number): void;
+    rayHover(origin: readonly number[], direction: readonly number[]): HandleName | null;
+    rayDown(origin: readonly number[], direction: readonly number[]): boolean;
+    rayMove(origin: readonly number[], direction: readonly number[]): void;
+    scaleDown(): boolean;
+    scaleTo(factor: number): void;
+    rayUp(): void;
 }
 
 export interface TransformControlsOptions {

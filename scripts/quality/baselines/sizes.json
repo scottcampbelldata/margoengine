@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20649690,
+  "total": 20654017,
   "history": [
     {
       "date": "2026-10-24",
@@ -13915,6 +13915,12 @@
       "commit": "SEA-15-wax-film",
       "grew": 1,
       "reason": "SEA-15's cohesive waxy oil radius and film probe move physics/tracers from 15704 to 16215 B gzip. The optional ceiling rises from 16126 to 16702 B. The waxy option reuses the slick slots, radius state, advection, and mass ledger. A separate entry would split spreading state from the solver that owns those parcels and duplicate its coupling."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "xr-gizmo-ray",
+      "reason": "XR controller rays drive the transform gizmo: controls/transform gains rayHover, rayDown, rayMove, rayUp, scaleDown and scaleTo with the closest-point axis solve and its parallel guard (13,110 to 13,943 B gzip, controls root 29,462 to 30,273 B), and the new xr/gizmo entry is 1,541 B. Worth it: the gizmo's own constraints, snapping and multi-object drags serve XR with no second copy. A split would need a subclass with the drag internals made protected, and an existing gizmo could not be driven",
+      "grew": 3
     }
   ],
   "items": {
@@ -14129,7 +14135,7 @@
     "@margoengine/compute/sparse": 7238,
     "@margoengine/compute/stream": 1324,
     "@margoengine/compute/subgroups": 2537,
-    "@margoengine/controls": 29556,
+    "@margoengine/controls": 31182,
     "@margoengine/controls/arcball": 9248,
     "@margoengine/controls/behaviors": 1156,
     "@margoengine/controls/box-gizmo": 6842,
@@ -14146,7 +14152,7 @@
     "@margoengine/controls/profiles": 960,
     "@margoengine/controls/third-person": 5355,
     "@margoengine/controls/trackball": 4608,
-    "@margoengine/controls/transform": 13458,
+    "@margoengine/controls/transform": 14362,
     "@margoengine/controls/transitions": 14529,
     "@margoengine/controls/walk": 14348,
     "@margoengine/core": 22467,
@@ -15620,6 +15626,7 @@
     "@margoengine/xr/ar-extra": 3289,
     "@margoengine/xr/body": 1757,
     "@margoengine/xr/device-check": 2344,
+    "@margoengine/xr/gizmo": 1797,
     "@margoengine/xr/hands": 2546,
     "@margoengine/xr/interaction": 2421,
     "@margoengine/xr/launch": 1618,

@@ -6687,6 +6687,10 @@
       "types": "./dist/xr/near.d.ts",
       "import": "./dist/xr/near.js"
     },
+    "./xr/gizmo": {
+      "types": "./dist/xr/gizmo.d.ts",
+      "import": "./dist/xr/gizmo.js"
+    },
     "./game": {
       "types": "./dist/game.d.ts",
       "import": "./dist/game.js"
