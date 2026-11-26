@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20608554,
+  "total": 20609001,
   "history": [
     {
       "date": "2026-10-24",
@@ -13759,6 +13759,12 @@
       "commit": "FLUID-07-detached-drop-flight",
       "grew": 1,
       "reason": "FLUID-07 adds timed drop tracking, transient droplet drag and the replayable flight ledger. Thin-film rises from 9159 to 11825 B gzip; cap changes from 9434 to 12180 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "44603fa997",
+      "reason": "BREAK-03 continuous plastic compression grows the optional crush entry from 7159 to 7606 B gzip. The ceiling rises from 7415 to 7862 B. The new solver reuses the prepared material envelope, existing rigid port and damage ledger. A split would repeat the same contact or force the caller to register and reconcile a second damage writer.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14583,7 +14589,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 7415,
+    "@margoengine/physics/crush": 7862,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
