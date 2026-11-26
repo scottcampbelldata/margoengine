@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20180912,
+  "total": 20189428,
   "history": [
     {
       "date": "2026-10-24",
@@ -12903,6 +12903,12 @@
       "commit": "d8e800d08e",
       "reason": "FLUID-07 adds physics/thin-film at 5917 B gzip (cap 6173 B). The moving-pane fields, pressure rings and drainage are optional and load independent stateless native assets. Core plus stage is 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "0a86343197",
+      "reason": "ATMO-06 adds the optional 8260 B gzip environmental airborne solver. Wind sampling, source conservation and terrain deposition share parcel state. Splitting them would duplicate the field setup and accounting. Core plus stage gains 0 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13715,6 +13721,7 @@
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
     "@margoengine/physics/aeolian": 5889,
     "@margoengine/physics/ageing": 5178,
+    "@margoengine/physics/airborne": 8516,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/crush": 3763,
