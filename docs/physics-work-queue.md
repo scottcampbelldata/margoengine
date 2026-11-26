@@ -208,7 +208,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Open | OPEN |
 | FLUID-07 | Thin films and droplets on surfaces | stand-in | Open | OPEN |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
-| HYDRO-04 | Landscape evolution | stand-in | Open | OPEN |
+| HYDRO-04 | Landscape evolution | stand-in | Codex | BUILDING (codex/physics-hydro-04) |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
 | HYDRO-06 | Groundwater and springs | none | Open | OPEN |
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
