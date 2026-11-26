@@ -329,7 +329,9 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     )
       throw new RangeError('Pass finite speed, heading, frequency and a duty between zero and one.');
     if (4 * frequency > rateOf(this.rate) * Math.min(duty, 1 - duty))
-      throw new RangeError('Seed a faster gait in the group to raise the configured rate for live drive changes.');
+      throw new RangeError(
+        'Set a faster configured gait in the group to raise the configured rate for live drive changes.',
+      );
     if (force.length !== 3 || !force.every(Number.isFinite))
       throw new RangeError('Pass finite force components in world newtons.');
     if (support.length !== 3 || !support.every(Number.isFinite))

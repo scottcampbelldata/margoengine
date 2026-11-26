@@ -106,5 +106,13 @@ test('moving rigid support carries a standing body and receives the opposing con
   assert.ok(plate.position[1] < 2, 'the compressed legs push the real rigid plate down');
   assert.ok(locomotion.read(0).position[1] > 2.95, 'the plate supports the body above the static floor');
   assert.ok(locomotion.readContact(0, 0).position[0] > start[0], 'the stance anchor has deck velocity');
+  const saved = world.takeSnapshot();
+  world.advance(90);
+  const released = locomotion.read(0);
+  close(75 * released.velocity[1] + mass * plate.linearVelocity[1], 0, 2e-4);
+  const finished = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  world.advance(90);
+  assert.equal(world.hash(), finished);
   physics.dispose();
 });
