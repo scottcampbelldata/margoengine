@@ -389,7 +389,7 @@ REOPENED row, then the Open rows.
 | SEA-07 | Tides, storm surge and currents | physics/surge (`SurgeSolver` over HYDRO-01's shallow water: inverse barometer, equilibrium tide, wind, Coriolis, open-sea tides, time scale) | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e5462e9cc |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
 | FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a540dd915c |
-| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | BUILDING (codex/physics-thin-film-upgrade) |
+| FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 3cb9cb3ebc |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
@@ -432,7 +432,7 @@ REOPENED row, then the Open rows.
 | SOFT-05 | Muscle, fat and skin soft tissue | physics/tissue with skeletal pins, sliding planes and passive layers | Open | OPEN |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
-| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | BUILDING (codex/physics-crush-film) |
+| BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | physics/crush with permanent work, rigid recoil and seal loss | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 839a45208b |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | physics/legged with live terrain and rigid decks and Horses gait drive | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 64bedcf038 |
 | LIFE-03 | Aquatic locomotion | physics/life | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 708e96a06b |
 | LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 006faf6368 |
@@ -474,14 +474,14 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
-| SEA-08 | Ship seakeeping | stand-in | Codex | BUILDING (codex/physics-seakeeping-speed) |
+| SEA-08 | Ship seakeeping | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 0ae7b50ae2 |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5d2524732 |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
-| SEA-15 | Tracers and slicks in water | stand-in | Codex | BUILDING (codex/physics-sand-puff-pass1) |
+| SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 336a4413c4 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
 | ATMO-04 | Precipitation microphysics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |
