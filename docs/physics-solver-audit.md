@@ -384,6 +384,14 @@ Tp 9.3 s. Stable air gives 5.23 m and unstable air 7.22 m; the split is in Kahma
 - Snow: Locatelli and Hobbs (1974, JGR) give fall-speed and mass laws for aggregates of unrimed dendrites, for
   densely rimed dendrites and for the graupel types, but not for single dendrites. Their table belongs in the test.
 
+**SEA-02 and SEA-04: the water's velocity below a patch, done (4ec0717e8, FLUID-03).** Codex builds on it:
+
+- `WakeSolver` made with `waterBelow` keeps the potential's gradient at depth layers each step, each mode decaying as
+  cosh(k (D - d)) / cosh(k D). The layers are extra state, so a snapshot restores them. `velocityAt(x, y, z)` reads them.
+- `SeaPatch` gains an optional `velocityAt`, and `SpectralSea.water.sample` adds it.
+- Tests in `sea-wake.test.js`: a single mode against the linear potential's decay, deep and 3 m deep, within the
+  bilinear reading's (k dx)^2 / 8; and the sea's water equal to the wake's below its surface.
+
 **SEA-04 boundaries and hull sources.** Research handed to Codex, which builds the upgrade:
 
 - Walls are a Neumann condition (∂φ/∂n = 0, the wave's slope across the wall zero). Masking the height to zero
