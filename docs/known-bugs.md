@@ -23,7 +23,7 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   and shrinks every correction when any one is large, instead of substepping; the clamps hold the energy test while
   the column compresses. Found by the FLUID-02 verification in [physics-solver-audit.md](physics-solver-audit.md).
 
-### Open 2026-11-26: Picking attached to a scene of more than 4096 gltf/pbr models stops every frame (KB-PICK-BUDGET1, selection)
+### Fixed 2026-11-26: Picking attached to a scene of more than 4096 gltf/pbr models stopped every frame (KB-PICK-BUDGET1, selection)
 
 - **Repro:** `node examples/package-benchmarks/textured-instancing-gpu.mjs` (RTX A6000, Edge, WebGPU and the WebGL2
   layer): after the pick checks attach `Picking`, the timing leg builds 5,000 materials `createMesh` meshes and
@@ -31,7 +31,14 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `PickingPrimitives.discover` (Picking's capture pass). The frame comparisons and picks before it pass.
 - **Cause:** `discover` (packages/selection/src/picking-primitives.ts) counts each discovered model against the
   4096-source budget meant for `add`, and throws inside the render graph, so a large scene fails every frame instead of
-  picking within the budget or reporting once. Found while fixing KB-SHADOW-INSTFIT1; not fixed there.
+  picking within the budget or reporting once. Found while fixing KB-SHADOW-INSTFIT1. The draw also threw every frame
+  past 65,536 primitives a pass and past 64 pipeline variants, the same class.
+- **Fix:** the models of a scene count against no budget: `discover` finds them all, the 4,096 cap counts only sources
+  registered with `add` (refused once, at `add`), and the per-frame primitive and variant caps are gone (the per-source
+  primitive check stays at `add` and attach). Limits in docs/limits.md, "Models and sources per `Picking`".
+- **Regression:** `packages/selection/test/many-models.browser.mjs` (5,000 models: four frames render without an error,
+  picks hit the first and the last, WebGPU and the WebGL2 layer); `packages/selection/test/models.test.js` (5,000
+  discovered models, the last picked).
 
 ### Fixed 2026-11-26: an instanced caster kept the cascades unfitted, so textured-instancing-gpu.mjs failed (KB-SHADOW-INSTFIT1, shadows)
 

@@ -114,16 +114,13 @@ export class PickingPrimitives {
   discover(meshes: Iterable<MeshHandle>): void {
     if (this.disposed)
       throw new MargoError('disposed', 'Picking is disposed; create a new Picking to register sources.');
+    // Every model of the scene is picked: the scene bounds them, not a budget (KB-PICK-BUDGET1).
     const next = new Set<PickingSource>();
-    let count = this.sources.size;
     for (const mesh of meshes) {
       const triangles = meshTriangles(mesh);
       if (triangles?.kind !== 'pbr') continue;
       const source = triangles.source.model as PickingSource;
-      if (source.disposed || next.has(source)) continue;
-      if (!this.sources.has(source) && ++count > 4096)
-        throw new RangeError('Picking source budget exceeded; register at most 4096 sources.');
-      next.add(source);
+      if (!source.disposed) next.add(source);
     }
     if (next.size !== this.discovered.size || [...next].some((source) => !this.discovered.has(source)))
       this.clearDraws();
@@ -142,7 +139,8 @@ export class PickingPrimitives {
         'state',
         'Duplicate picking source; add each source once, or call its remove function first.',
       );
-    if (!this.discovered.has(source) && this.allSources().size >= 4096)
+    // Sources registered by hand; the models of a scene are found by `discover` and do not count.
+    if (this.sources.size >= 4096)
       throw new RangeError('Picking source budget exceeded; register at most 4096 sources.');
     this.sources.add(source);
     return () => {
@@ -288,8 +286,6 @@ export class PickingPrimitives {
           p.instances?.count === 0
         )
           continue;
-        if (primitives.length >= budget)
-          throw new RangeError('Picking primitive budget exceeded; split the model into sources of fewer primitives.');
         primitives.push(p);
         ids.push(options.id?.(node, source, sourceIndex) ?? node.id + 1);
         let owners = candidates.get(node);
@@ -470,10 +466,6 @@ export class PickingPrimitives {
       ].join(':');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      if (this.pipelines.size >= 64)
-        throw new RangeError(
-          'Too many picking primitive variants; reduce distinct formats, sample counts and mask modes to 64 or fewer.',
-        );
       let code = shader(mask);
       if (displaced) code = displacedDepth(code, 1, displacement);
       // The shadow casters' order: the vertex move in mesh space, then the instance and node transforms.

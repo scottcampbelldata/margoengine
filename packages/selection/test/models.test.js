@@ -55,7 +55,7 @@ function quads(engine, translations, { doubleSided = false, primitiveCount = 1 }
   engine.use(model);
   return model;
 }
-async function world() {
+async function world(capacity = 256) {
   const h = optionalGPU(),
     device = h.engine.gpu,
     c = h.context,
@@ -67,7 +67,7 @@ async function world() {
   const canvas = { width: 128, height: 96, clientWidth: 128, clientHeight: 96 };
   const engine = new Engine(
     canvas,
-    await TransformStore.create(256),
+    await TransformStore.create(capacity),
     { backend: 'webgpu', gpu: device, add() {}, remove() {}, render() {}, dispose() {} },
     { position: [0, 0, 6], target: [0, 0, 0], fov: 60 },
     null,
@@ -431,4 +431,17 @@ test('outline masks of two views in one frame each keep their own camera', async
     new Float32Array(camera(masks[1]).data).slice(0, 16),
   );
   selection.dispose();
+});
+
+test('a scene of more than 4096 gltf/pbr models is picked: discovered models count against no budget (KB-PICK-BUDGET1)', async () => {
+  const w = await world(16384),
+    { engine } = w,
+    models = Array.from({ length: 5000 }, () => quads(engine, [[0, 0, 0]])),
+    picking = Picking.attach(engine),
+    capacity = engine.store.capacity;
+  w.setPixel(capacity + 1 + 4999);
+  const hit = await picking.pick(64, 48);
+  assert.equal(hit?.mesh, models[4999].nodes[1], 'the last model is picked');
+  assert.equal(hit.model, models[4999]);
+  picking.dispose();
 });
