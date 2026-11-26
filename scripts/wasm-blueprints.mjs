@@ -106,6 +106,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'drainage-fog-kernel',
+    crate: 'packages/physics/drainage-fog-kernel',
+    blueprint: 'packages/physics/src/drainage-fog/drainage-fog-kernel.wasm',
+    script: 'packages/physics/scripts/build-drainage-fog-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'drainage-fog-kernel-shared',
+    crate: 'packages/physics/drainage-fog-kernel',
+    blueprint: 'packages/physics/src/drainage-fog/drainage-fog-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-drainage-fog-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'snowpack-kernel',
     crate: 'packages/physics/snowpack-kernel',
     blueprint: 'packages/physics/src/snowpack/snowpack-kernel.wasm',

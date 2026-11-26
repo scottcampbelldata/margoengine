@@ -13369,6 +13369,31 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+### Drainage fog and its live medium (ATMO-08)
+
+- P. C. Manins and B. L. Sawford (1979), [A Model of Katabatic Winds](https://journals.ametsoc.org/view/journals/atsc/36/4/1520-0469_1979_036_0619_amokw_2_0_co_2.xml).
+  The shallow hydraulic layer has drag, entrainment and buoyant forcing from the cold layer's density excess.
+  The implementation carries depth, momentum, moist enthalpy and total water. It computes reduced gravity from
+  the ambient and layer virtual temperatures and applies it along the gradient of the layer top. The shear
+  entrainment flux is `E0 |u - uAmbient| / (1 + Ri)` with `Ri = gReduced depth / |u - uAmbient|²`. This is its
+  regularized neutral-to-stable closure. It carries ambient momentum, water and heat with entrained air.
+- P. G. Duynkerke (1991), [Radiation Fog: A Comparison of Model Simulation with Detailed Observations](https://journals.ametsoc.org/view/journals/mwre/119/2/1520-0493_1991_119_0324_rfacom_2_0_co_2.xml).
+  The observed processes used here are longwave cooling, turbulent transport, fog condensation and droplet
+  settling. A grey-layer boundary applies `emissivity * sigma * (skyT⁴ - airT⁴)`. Surface sensible and latent
+  exchanges are separate inputs. Stokes settling passes `2 rhoWater g r² / (9 muAir)` through an implicit depth
+  update and credits the settled mass to the ground.
+- D. Bolton (1980), [The Computation of Equivalent Potential Temperature](https://journals.ametsoc.org/view/journals/mwre/108/7/1520-0493_1980_108_1046_tcoept_2_0_co_2.xml).
+  Equation 10 is `eSat = 611.2 exp(17.67 T_C / (T_C + 243.5))` in Pa, and the vapour mixing ratio is
+  `0.622 e / (p - e)`. Solve equilibrium by keeping `qVapour + qLiquid` and
+  `1005 (T - 273.15) + 2500000 qVapour` fixed during phase change. The native solver calls the project's pinned
+  exponential for both modes. Its column light extinction follows geometric optics with efficiency 2, giving
+  `3 rhoDryAir qLiquid / (2 rhoWater radius)` for dispersed spherical droplets.
+- J. Stam (1999), [Stable Fluids](https://doi.org/10.1145/311535.311548), and Y. Dobashi, K. Kaneda,
+  H. Yamashita, T. Okita and T. Nishimoto (2000), [A Simple, Efficient Method for Realistic Animation of Clouds](https://doi.org/10.1145/344779.344795).
+  The PA-34 research calls for density to evolve in the flow in place of rigid procedural scrolling. This fog
+  solver uses a conservative donor-cell flux for depth and the transported fields, with a face sill at the higher
+  bed elevation. Environment interpolates the resulting extinction in X and Z before froxel accumulation.
+
 ### Layered snowpack and dense avalanche obstacles (ICE-01)
 
 - P. Bartelt and M. Lehning (2002), [A physical SNOWPACK model for the Swiss avalanche warning, Part I](https://doi.org/10.1016/S0165-232X%2802%2900074-5).

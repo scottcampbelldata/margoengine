@@ -192,6 +192,32 @@ Additive and multiply glTF PBR materials, native transmission and additive point
 
 ## Local fog volumes
 
+`FogGrid` connects the solved wet-air layer to `VolumetricFog`. It samples the current height and extinction of the
+surrounding fog columns at each froxel. Its upload follows the source's revision, including after restoring a snapshot.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { FogGrid } from '@margoengine/environment/fog-volumes';
+import { VolumetricFog } from '@margoengine/environment/volumetric';
+import { DrainageFog } from '@margoengine/physics/drainage-fog';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Bloom } from '@margoengine/post/bloom';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+engine.stop();
+Bloom.attach(engine, { strength: 0 });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const fog = await DrainageFog.load();
+world.add(fog, { width: 4, depth: 4, origin: [-15, -15], initialHumidity: 1, initialLiquid: 0.0003 });
+const grid = new FogGrid(fog);
+const pass = VolumetricFog.attach(engine, { volumes: grid, density: 0, range: 60 });
+world.advance(60);
+engine.render({ delta: 0 });
+pass.options.volumes = undefined;
+grid.dispose();
+```
+
+
 `@margoengine/environment/fog-volumes` adds boxes and spheres of fog with their own density, colour and 3D noise to `VolumetricFog`, for mist in a valley, smoke in a room or steam over a vent. They go into the same froxel grid, so they take the sun, its shafts and shadows, the ambient, clustered lights and the reprojection exactly as the fog does:
 
 ```ts

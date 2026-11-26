@@ -5530,6 +5530,14 @@ agree between 24 and 60 frame-per-second views of one world, and snapshots repro
 plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
 and modal sound example.
 
+### Radiation fog transport and rendering (ATMO-08)
+
+The layer conserves moist enthalpy and total water during condensation and warming. Its step ledger accounts for
+entrainment, drying or evaporation at the surface, boundary export and deposition. A live terrain slope accelerates
+dense air downhill. In the focused browser fixture, the visible extinction moves downstream through
+the existing volumetric pipeline on both backends. See `packages/physics/tests/coupling/drainage-fog.test.js` and
+`packages/environment/tests/drainage-fog.browser.mjs` after the scoped package builds.
+
 ### Layer heat, meltwater and snow obstacles (ICE-01)
 
 The two-layer conduction fixture matches the closed-form backward-Euler temperature difference and preserves
