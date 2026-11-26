@@ -114,15 +114,15 @@ path such as `/controls` means `@margoengine/react/controls`; no path means the 
 | `ambientLight`, `hemisphereLight` (R3F) | `AmbientLight`, `HemisphereLight` (`/environment`) | `HemisphereLight` takes `sky` and `ground` colours. |
 | `pointLight`, `spotLight`, `rectAreaLight` (R3F) | No equivalent component | Use `Environment` children such as `Lightformer` (`/environment`) for studio light. |
 | `fog` (R3F) | `Fog` (`/environment`) | |
-| `primitive object={...}` (R3F) | No equivalent | Use `Model` for a glTF file and `GeometryResource` for a core `Geometry`; anything else goes through `useEngine()` in an effect. |
+| `primitive object={...}` (R3F) | `MeshNode node={mesh}` | Mounts an engine mesh made outside React (`engine.createMesh()`, a model's node); its children attach under it. The caller keeps owning it unless `dispose` is passed. `GeometryResource` mounts a core `Geometry`. |
 | `extend` (R3F) | `extend` | Takes React components, not engine classes. |
-| `createPortal` (R3F) | No equivalent | Use `Scene name` with `RenderView`, or `Hud` and `RenderTexture` (`/portals`). |
+| `createPortal` (R3F) | `ScenePortal` (`/portals`) | `scene` is a `<Scene name>` or a core scene, `node` an existing mesh to attach under. For a drawn overlay or texture use `Hud` or `RenderTexture`. |
 | `View` (drei) | `RenderView` | `View` is not a Margo component. |
 | `useFrame` (R3F) | `useFrame` | `(engine, delta)`, optional priority. |
 | `useThree` (R3F) | `useMargo`, `useEngine`, `useCamera` | `useMargo()` gives `stage`, `gl` (the engine), `camera`, `canvas`, `size`, `clock`, `ready`, `invalidate`. |
 | `useThree` viewport (R3F) | `useViewport`, `useAspect` (`/helpers`) | |
 | `useLoader` (R3F) | `useLoader`, `clearLoader` | A load function instead of a loader class. |
-| `useGraph` (R3F) | No equivalent | |
+| `useGraph` (R3F) | `useModelParts` (`/gltf`) | Inside `<Model>` children, or given a loaded `PBRModel`: `{ nodes, materials }` by name, typed with `useModelParts<'Wheel', 'Paint'>()`. |
 | `invalidate` (R3F) | `useMargo().invalidate()` | With `frameloop="demand"`. |
 | `advance`, `addEffect`, `addAfterEffect` (R3F) | No equivalent | Use `useFrame` priorities. |
 
@@ -239,7 +239,7 @@ path such as `/controls` means `@margoengine/react/controls`; no path means the 
 | `useRapier` | `usePhysics` | |
 | `useBeforePhysicsStep`, `useAfterPhysicsStep` | same names (`/physics`) | |
 | the joint hooks (fixed, spherical, revolute, prismatic, rope, spring) | `useJoint(bodyA, bodyB, options)` (`/physics`) | One hook; `options.type` is `'fixed'`, `'spherical'`, `'revolute'`, `'prismatic'`, `'rope'`, `'spring'`, `'pinSlot'`, `'cone'` or `'generic'`. |
-| `InstancedRigidBodies` | No equivalent | One `RigidBody` per body. |
+| `InstancedRigidBodies` | `RigidBodyInstances` (`/physics`) | `instances` lists each body's pose, tint and overrides; the children are the shared geometry and material, drawn as one instanced mesh. `onReady(body, index)`. |
 | `debug` view | No equivalent | |
 
 ### XR
@@ -250,7 +250,8 @@ path such as `/controls` means `@margoengine/react/controls`; no path means the 
 | entering a session from a button | `useXR().enter(mode?, options?)` | And `exit()`, `session`, `ready`. |
 | controllers | `Controller` (`/xr`) | `handedness`, `pose`, `onSelect`, `onSqueeze` and their start and end events. |
 | pointer events on meshes in XR | `XRPointerEvents` (`/xr-pointer`) | |
-| `XROrigin`, hand models, teleport helpers | No equivalent | |
+| `XROrigin` | `TrackingOrigin` (`/xr`) | The node the camera and controllers are posed from; moving it moves the player. Scale is ignored, and a move applies from the next XR frame. |
+| hand models, teleport helpers | No equivalent | |
 
 ## Units and handedness
 

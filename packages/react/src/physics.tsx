@@ -12,6 +12,7 @@ import type {
   PhysicsJoint,
 } from '@margoengine/physics';
 import { Mesh, type MeshProps } from './components.js';
+import { Instances, Instance, type InstancesProps, type InstanceProps } from './instances.js';
 import { splitPointerHandlers } from './events.js';
 import { useScene, useCommit, useResourceEffect, type Scene, type Registry } from './internal.js';
 import { sceneOwner } from './scene-owner.js';
@@ -758,3 +759,50 @@ export type {
   JointOptions,
   PhysicsJoint,
 } from '@margoengine/physics';
+
+/** One body of `<RigidBodyInstances>`: its start pose, tint and any `RigidBody` prop that differs from the shared ones. */
+export interface RigidBodyInstance extends Omit<RigidBodyProps, 'children' | 'onReady'> {
+  /** React key of this body, so a list that changes keeps each body. Default its index. */
+  key?: string | number;
+  /** sRGB hex or linear RGB multiplier of the shared material. Default white. */
+  color?: InstanceProps['color'];
+}
+/** Props of `<RigidBodyInstances>`; every prop but `instances` is optional. */
+export interface RigidBodyInstancesProps
+  extends Omit<RigidBodyProps, 'children' | 'onReady' | 'position' | 'rotation' | 'scale'>,
+    Pick<InstancesProps, 'limit' | 'geometry' | 'material'> {
+  /** One entry per body. A new entry adds a body, a removed one removes it; changing an entry's pose rebuilds that body. */
+  instances: readonly RigidBodyInstance[];
+  /** The shared geometry and material of the instanced mesh (`<BoxGeometry>`, `<PbrMaterial>`), or use `geometry`. */
+  children?: ReactNode;
+  /** Called once per body when it exists, with its index in `instances`. */
+  onReady?: (body: PhysicsBody, index: number) => void;
+}
+/**
+ * Many rigid bodies drawn as one instanced mesh: every entry of `instances` is a `RigidBody` (shared props, overridden per
+ * entry) whose body drives one instance of `<Instances>`, so a thousand falling crates are one draw call. Colliders fit
+ * the shared geometry per body as `RigidBody`'s do (default 'cuboid'). Needs `<Physics>`; each body is removed with its
+ * entry or on unmount.
+ */
+export function RigidBodyInstances({
+  instances,
+  children,
+  limit,
+  geometry,
+  material,
+  onReady,
+  ...shared
+}: RigidBodyInstancesProps) {
+  const latest = useRef(onReady);
+  latest.current = onReady;
+  return (
+    <Instances limit={limit ?? Math.max(instances.length, 1)} geometry={geometry} material={material}>
+      {children}
+      {instances.map(({ key, color, ...body }, index) => (
+        <RigidBody key={key ?? index} {...shared} {...body} onReady={(made) => latest.current?.(made, index)}>
+          <Instance color={color} />
+        </RigidBody>
+      ))}
+    </Instances>
+  );
+}

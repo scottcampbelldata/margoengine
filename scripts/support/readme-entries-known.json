@@ -38,7 +38,7 @@
   "post": ["./selective-bloom","./mask","./halftone","./stylize","./curvature"],
   "procedural": ["./tree-mesh"],
   "quality": ["./demand","./events","./knobs"],
-  "react": ["./html","./sky","./post","./dof","./tonemap","./taa","./jsx-runtime","./jsx-dev-runtime"],
+  "react": ["./sky","./post","./dof","./tonemap","./taa","./jsx-runtime","./jsx-dev-runtime"],
   "rigging": ["./vrm-constraints","./vrma","./pose-tracking"],
   "road": ["./intersections","./lanes","./geojson","./structures"],
   "save": ["./scene-state","./materials"],

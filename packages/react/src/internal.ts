@@ -148,6 +148,8 @@ export function createViews(engine: Engine): Views {
   return views;
 }
 export const Context = /* @__PURE__ */ createContext<Scene | null>(null);
+/** The context of each engine scene's own binding (the Canvas for the default scene, a `<Scene>` for its), for portals. */
+export const sceneContexts = /* @__PURE__ */ new WeakMap<World, Scene>();
 export function useScene(): Scene {
   const scene = useContext(Context);
   if (!scene) throw fault('state', 'Engine components require <Canvas>; render them inside one', 'react-usage');

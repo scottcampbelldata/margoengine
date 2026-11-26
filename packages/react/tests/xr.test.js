@@ -29,7 +29,13 @@ class Manager {
     requests.push({ manager: this, mode, options });
     this.options = options;
     this.session = new Session();
+    this.referenceSpace = new Space(null, null);
+    this.spaces = [];
     return Promise.resolve(this.session);
+  }
+  useReferenceSpace(space) {
+    this.spaces.push(space);
+    this.referenceSpace = space;
   }
   async end() {
     if (this.session) {
@@ -45,6 +51,21 @@ class Manager {
     if (this.engine.hasPlugin(this.name)) this.engine.removePlugin(this.name);
   }
 }
+class Space {
+  constructor(base, transform) {
+    this.base = base;
+    this.transform = transform;
+  }
+  getOffsetReferenceSpace(transform) {
+    return new Space(this, transform);
+  }
+}
+globalThis.XRRigidTransform = class {
+  constructor(position, orientation) {
+    this.position = position;
+    this.orientation = orientation;
+  }
+};
 class Session extends EventTarget {
   constructor() {
     super();
@@ -68,7 +89,7 @@ class Session extends EventTarget {
 }
 mock.module('@margoengine/xr', { namedExports: { XR: Manager } });
 const { Canvas, Mesh, BoxGeometry, useFrame, useMargo } = await (await import('./entries.js')).allEntries();
-const { XR, Controller, useXR } = await import('../dist/xr.js');
+const { XR, Controller, TrackingOrigin, useXR } = await import('../dist/xr.js');
 const { worldPose } = await import('../dist/scene-transform.js');
 const h = React.createElement,
   tree = (children) => h(StrictMode, null, h(Canvas, { frameloop: 'demand' }, children));
@@ -296,4 +317,43 @@ test('XR initialization errors reach the explicit error handler', async () => {
   await flush();
   assert.equal(errors.length, 1);
   assert.equal(errors[0], failCreate);
+});
+
+test('TrackingOrigin offsets the session space by its inverse pose, only on change, and restores it on unmount', async () => {
+  let context;
+  function Probe() {
+    context = useXR();
+    return null;
+  }
+  const app = (origin) => tree(h(XR, null, h(Probe), origin && h(TrackingOrigin, origin, h(Controller))));
+  const view = render(app({ position: [1, 0, 2], rotation: [0, Math.PI / 2, 0] }));
+  await flush();
+  let session;
+  await act(async () => {
+    session = await context.enter('inline');
+  });
+  const manager = managers.at(-1),
+    base = manager.referenceSpace,
+    frame = () => manager.options.onFrame({ time: 0, delta: 0, frame: { session }, viewer: null, inputs: [] });
+  await act(async () => frame());
+  assert.equal(manager.spaces.length, 1);
+  const offset = manager.spaces[0];
+  assert.equal(offset.base, base, 'the offset is taken from the session space');
+  // The inverse of T(1, 0, 2) R_y(90 deg): orientation R_y(-90 deg), position -(R_y(-90 deg) [1, 0, 2]) = [2, 0, -1].
+  near(offset.transform.position.x, 2);
+  near(offset.transform.position.y, 0);
+  near(offset.transform.position.z, -1);
+  near(offset.transform.orientation.y, -Math.SQRT1_2);
+  near(offset.transform.orientation.w, Math.SQRT1_2);
+  await act(async () => frame());
+  assert.equal(manager.spaces.length, 1, 'an unmoved origin sets nothing');
+  view.rerender(app({ position: [0, 0, 0] }));
+  await act(async () => frame());
+  assert.equal(manager.spaces.at(-1), base, 'the world origin gives the session its own space back');
+  view.rerender(app({ position: [0, 3, 0] }));
+  await act(async () => frame());
+  near(manager.spaces.at(-1).transform.position.y, -3);
+  view.rerender(app(null));
+  await flush();
+  assert.equal(manager.spaces.at(-1), base, 'unmount restores the session space');
 });
