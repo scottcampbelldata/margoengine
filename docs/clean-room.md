@@ -14875,3 +14875,15 @@ contact point uses the closest point on the capsule axis. The linear and angular
 matches David Baraff, [*An Introduction to Physically Based Modeling: Rigid Body Simulation II*](https://www.cs.cmu.edu/~baraff/sigcourse/notesd2.pdf)
 (1997), equations 8–5 to 8–7 and C–11. The tests include the reaction still in the registry when closing
 the initial impulse budget. They also check both memory variants and an origin-cell offset.
+
+### Strand segment and capsule contact
+
+Robert Bridson, Ronald Fedkiw and John Anderson, [*Robust Treatment of Collisions, Contact
+and Friction for Cloth Animation*](https://graphics.stanford.edu/papers/cloth-sig02/) (2002),
+sections 7.1–7.3, derives the closest edge pairs and barycentric transfer to their endpoints.
+Christer Ericson, [*Real-Time Collision Detection*](https://www.routledge.com/Real-Time-Collision-Detection/Ericson/p/book/9781558607323)
+(2005), section 5.1.9, gives the finite-segment closest point problem including parallel segments.
+The implementation minimizes the squared separation over the interior and boundaries of the
+two segment parameters. The corresponding XPBD contact correction distributes by barycentric
+inverse mass. The static test places a sphere completely between guide endpoints. The dynamic
+test uses the published contact reaction to close the momentum of a moving rigid sphere.

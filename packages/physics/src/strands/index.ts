@@ -99,6 +99,8 @@ export interface StrandParams {
   readonly friction?: number;
   /** Cloth-like contacts between nonadjacent points, default true in the rod tier. */
   readonly selfCollision?: boolean;
+  /** Rod body contact geometry. 'segments' also resolves capsule contact between adjacent points. Default 'points'. */
+  readonly contactGeometry?: 'points' | 'segments';
   /** World-owned wind, sampled for each point. Default still air at 1.225 kg/m³. */
   readonly wind?: Wind;
   /** Ground in SI world units. Omit for no terrain contact. */
@@ -313,6 +315,10 @@ export class StrandSolver implements Solver<StrandParams> {
     if (follow > 1) invalid('Set follower damping between zero and one.');
     const self = params.selfCollision ?? fidelity === 'rod';
     if (self && fidelity === 'follow') invalid('Use the rod tier for self contact.');
+    const contactGeometry = params.contactGeometry ?? 'points';
+    if (contactGeometry !== 'points' && contactGeometry !== 'segments')
+      invalid('Choose point or segment body contact.');
+    if (contactGeometry === 'segments' && fidelity !== 'rod') invalid('Use the rod tier for segment body contact.');
     this.damping = finite(params.damping ?? 2, 'damping per second', 0);
     this.cellSize = positive(params.cellSize ?? 4096, 'origin cell length');
     this.wind = params.wind;
@@ -376,7 +382,7 @@ export class StrandSolver implements Solver<StrandParams> {
       fidelity === 'rod' ? iterations : 0,
       follow,
       finite(params.friction ?? 0.25, 'contact friction', 0),
-      Number(self),
+      Number(self) + 2 * Number(contactGeometry === 'segments'),
       2 * maxRadius,
     ]);
     this.anchorAndColliders(0);

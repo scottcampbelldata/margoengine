@@ -9850,7 +9850,8 @@ Optional dynamic capsule contacts publish an equal reaction to the real RigidSol
 The isolated moving-capsule test closes initial linear momentum including the in-flight
 registry impulse and measures angular response off the body's centre. Use the same
 coupling rate for both solvers. Mixed contact surfaces share the point contact budget.
-The native constraints sample discrete guide points and body poses at substep boundaries.
+Optional segment geometry resolves capsule intersections along each guide edge at substep
+boundaries. Self contact still uses point geometry. This path does not search a swept volume.
 
 The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
 changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored

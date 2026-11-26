@@ -271,7 +271,7 @@ struct Advance {
     iterations: f64,
     follow_damping: f64,
     friction: f64,
-    self_collision: f64,
+    contact_flags: f64,
     grid_size: f64,
 }
 
@@ -514,6 +514,173 @@ fn capsule_contact(position: V, radius: f64, obstacle: &Capsule) -> Option<(V, V
     ))
 }
 
+#[derive(Clone, Copy)]
+struct Segment {
+    start: V,
+    edge: V,
+}
+
+impl Segment {
+    fn new(start: V, end: V) -> Self {
+        Self {
+            start,
+            edge: end.subtract(start),
+        }
+    }
+
+    fn point(self, fraction: f64) -> V {
+        self.start.add(self.edge.scale(fraction))
+    }
+
+    fn closest(self, point: V) -> f64 {
+        let length_sq = self.edge.dot(self.edge);
+        if length_sq == 0.0 {
+            0.0
+        } else {
+            (self.edge.dot(point.subtract(self.start)) / length_sq).clamp(0.0, 1.0)
+        }
+    }
+}
+
+/// The constrained quadratic minimum lies either inside the parameter square or on one of its four edges.
+fn nearest_segments(first: Segment, second: Segment) -> (f64, f64, V) {
+    let base = first.start.subtract(second.start);
+    let uu = first.edge.dot(first.edge);
+    let vv = second.edge.dot(second.edge);
+    let uv = first.edge.dot(second.edge);
+    let u_base = first.edge.dot(base);
+    let v_base = second.edge.dot(base);
+    let area_sq = first.edge.cross(second.edge);
+    let denominator = area_sq.dot(area_sq);
+    if denominator > 16.0 * f64::EPSILON * uu * vv {
+        let along_first = (uv * v_base - vv * u_base) / denominator;
+        let along_second = (uu * v_base - uv * u_base) / denominator;
+        if (0.0..=1.0).contains(&along_first) && (0.0..=1.0).contains(&along_second) {
+            return (
+                along_first,
+                along_second,
+                first
+                    .point(along_first)
+                    .subtract(second.point(along_second)),
+            );
+        }
+    }
+    let mut along_first = first.closest(second.start);
+    let mut along_second = 0.0;
+    let mut gap = first.point(along_first).subtract(second.start);
+    for (a, b) in [
+        (first.closest(second.point(1.0)), 1.0),
+        (0.0, second.closest(first.start)),
+        (1.0, second.closest(first.point(1.0))),
+    ] {
+        let delta = first.point(a).subtract(second.point(b));
+        if delta.dot(delta) < gap.dot(gap) {
+            (along_first, along_second, gap) = (a, b, delta);
+        }
+    }
+    (along_first, along_second, gap)
+}
+
+struct SegmentContact {
+    surface: V,
+    first: V,
+    second: V,
+}
+
+fn contact_edge(
+    a: &State,
+    b: &State,
+    ma: &Material,
+    mb: &Material,
+    obstacle: &Capsule,
+) -> Option<SegmentContact> {
+    let strand = Segment::new(a.position, b.position);
+    let axis = Segment::new(obstacle.start, obstacle.end);
+    let (s, t, gap) = nearest_segments(strand, axis);
+    if s == 0.0 || s == 1.0 {
+        return None;
+    }
+    let length = gap.length();
+    let overlap = obstacle.radius + ma.radius - length;
+    let alpha = ma.inverse_mass * (1.0 - s);
+    let beta = mb.inverse_mass * s;
+    let inverse = alpha * (1.0 - s) + beta * s;
+    if overlap <= 0.0 || inverse == 0.0 {
+        return None;
+    }
+    let fallback = strand.edge.cross(V::X).direction(V::Y);
+    let normal = gap.direction(strand.edge.cross(axis.edge).direction(fallback));
+    let correction = normal.scale(overlap / inverse);
+    Some(SegmentContact {
+        surface: axis.point(t).add(normal.scale(obstacle.radius)),
+        first: correction.scale(alpha),
+        second: correction.scale(beta),
+    })
+}
+
+fn add_contact(
+    a: &mut State,
+    b: &mut State,
+    scratch: &mut [Scratch],
+    index: usize,
+    contact: &SegmentContact,
+) {
+    a.position = a.position.add(contact.first);
+    b.position = b.position.add(contact.second);
+    let first = slot_mut(scratch, index);
+    first.contact = first.contact.add(contact.first);
+    let second = slot_mut(scratch, index + 1);
+    second.contact = second.contact.add(contact.second);
+}
+
+fn edge_contacts(
+    nodes: &mut [State],
+    material: &[Material],
+    scratch: &mut [Scratch],
+    obstacles: &[Capsule],
+    rigid: &[RigidCapsule],
+    hits: &mut [Hit],
+    reactions: &mut [Reaction],
+    dt: f64,
+) {
+    for (i, ma) in material.iter().enumerate() {
+        if ma.length == 0.0 {
+            continue;
+        }
+        let mb = slot(material, i + 1);
+        let (a, b) = pair(nodes, i, i + 1);
+        for obstacle in obstacles {
+            if let Some(correction) = contact_edge(a, b, ma, mb, obstacle) {
+                add_contact(a, b, scratch, i, &correction);
+            }
+        }
+        for (index, obstacle) in rigid.iter().enumerate() {
+            if obstacle.row < 0.0 {
+                continue;
+            }
+            if let Some(correction) = contact_edge(a, b, ma, mb, &obstacle.shape) {
+                add_contact(a, b, scratch, i, &correction);
+                let mut impulse = V::ZERO;
+                if ma.inverse_mass > 0.0 {
+                    impulse = impulse.add(correction.first.scale(-1.0 / (ma.inverse_mass * dt)));
+                    *slot_mut(hits, i) = Hit {
+                        collider: index + 1,
+                        point: correction.surface,
+                    };
+                }
+                if mb.inverse_mass > 0.0 {
+                    impulse = impulse.add(correction.second.scale(-1.0 / (mb.inverse_mass * dt)));
+                    *slot_mut(hits, i + 1) = Hit {
+                        collider: index + 1,
+                        point: correction.surface,
+                    };
+                }
+                transfer(reactions, obstacle, correction.surface, impulse);
+            }
+        }
+    }
+}
+
 // The reaction is taken at the capsule surface and reported about the rigid centre of mass.
 fn transfer(reactions: &mut [Reaction], body: &RigidCapsule, point: V, impulse: V) {
     let reaction = slot_mut(reactions, body.row as usize);
@@ -666,6 +833,7 @@ unsafe extern "C" fn advance_strands(
         first.frame = root.frame;
     }
     let iterations = cfg.iterations as usize;
+    let contacts = cfg.contact_flags as u8;
     let mut checked = 0.0;
     if iterations == 0 {
         for root in roots {
@@ -731,7 +899,12 @@ unsafe extern "C" fn advance_strands(
                     ));
                 }
             }
-            if cfg.self_collision > 0.0 {
+            if contacts & 2 != 0 {
+                edge_contacts(
+                    nodes, material, scratch, obstacles, bodies, hits, reactions, dt,
+                );
+            }
+            if contacts & 1 != 0 {
                 checked += self_contacts(nodes, material, scratch, links, buckets, cfg.grid_size);
             }
         }

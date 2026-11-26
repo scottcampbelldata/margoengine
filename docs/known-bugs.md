@@ -16952,8 +16952,18 @@ measurements require separate models and evidence.
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 
 The native guide solver receives time-sampled kinematic capsules, wind and a common terrain
-bed. Dynamic body capsules now exchange impulses through the shared rigid ports. Segment-level
-continuous collision and inter-guide friction validation remain open. A point may pass a thin obstacle between substeps or slide past a
+bed. Dynamic body capsules exchange impulses through the shared rigid ports, including optional
+contacts along the guide links. Continuous collision and inter-guide friction validation
+remain open. A point may pass a thin obstacle between substeps or slide past a
 capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
 solved guides. The optional horse driver applies the solved frames to the actual horse skin and replays the gait.
 The optional physical rig also binds the weighted VRM reference ponytail. The named production shots still need their own bindings.
+
+### Refined thin strand bending (SOFT-03)
+
+A horizontal 30 mm cylindrical guide with an 80 μm diameter, 1,300 kg/m³ density and a
+3.45 GPa Young modulus sags about 10.55 mm in the eight-edge test at 60 constraint passes and
+240 Hz. Linear beam theory gives approximately 0.94 mm under its own weight. Explicit
+resolution of more links worsens the error, and more local projection passes reduce it.
+Simultaneous rod constraints are needed to retain the measured fibre stiffness on fine
+guides. The independently validated axial extension remains effective.

@@ -4850,3 +4850,8 @@ world.couple(['rigid', strand.id], 'staggered');
 world.advance(2);
 console.log(body.linearVelocity, strand.sample(0, 1).velocity);
 ```
+
+Set `contactGeometry: 'segments'` in the rod tier to resolve body contacts between guide
+points. The intersection uses the full strand link against the capsule axis. It distributes
+the correction to both movable endpoints and reports the matched rigid reaction when a
+capsule is connected to a body row. The default `'points'` preserves existing guide settings.

@@ -243,3 +243,90 @@ test('a real moving rigid capsule gets the opposite strand impulse and an off-ce
     }
   }
 });
+
+test('segment contact clears a narrow capsule between two guide points', async () => {
+  const points = [
+    [-0.23, 0, 0],
+    [0.23, 0, 0],
+  ];
+  const bead = { start: [0, 0.035, 0], end: [0, 0.035, 0], radius: 0.06 };
+  const radius = 0.01;
+  const params = { iterations: 24, rate: 0, damping: 0, selfCollision: false, colliders: [bead] };
+  const strands = [{ points, radius, young: 70, drag: 0 }];
+  const old = await attach(strands, params, zero);
+  const selected = await attach(strands, { ...params, contactGeometry: 'segments' }, zero);
+  const clearance = (solver) => {
+    const first = solver.sample(0, 0).position,
+      second = solver.sample(0, 1).position;
+    const edge = second.map((x, axis) => x - first[axis]);
+    const numerator = edge.reduce((n, x, axis) => n + x * (bead.start[axis] - first[axis]), 0);
+    const denominator = edge.reduce((n, x) => n + x * x, 0);
+    const t = Math.max(0, Math.min(1, numerator / denominator));
+    return distance(
+      first.map((x, axis) => x + t * edge[axis]),
+      bead.start,
+    );
+  };
+  old.world.advance(1);
+  selected.world.advance(1);
+  near(clearance(old.solver), 0.035, 1e-12);
+  assert.ok(clearance(selected.solver) >= bead.radius + radius - 2e-6);
+  assert.deepEqual(selected.solver.sample(0, 0).position, points[0]);
+  assert.ok(selected.solver.sample(0, 1).position[1] < -0.05);
+  await assert.rejects(attach(strands, { fidelity: 'follow', contactGeometry: 'segments' }, zero), /Use the rod tier/);
+});
+
+test('a moving sphere receives the full impulse from a contact in the middle of a link', async () => {
+  await Physics.load();
+  const world = new PhysicsWorld({ rate, gravity: zero });
+  const rigid = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: zero });
+  try {
+    const velocity = -2.8,
+      mass = 2,
+      radius = 0.01,
+      density = 850,
+      span = 0.4;
+    const body = rigid.addBody(null, {
+      position: [0, 0.095, 0],
+      linearVelocity: [0, velocity, 0],
+      colliders: { shape: 'sphere', radius: 0.06, sensor: true, mass },
+    });
+    world.add(new RigidSolver(), { physics: rigid });
+    const solver = await StrandSolver.load({
+      rigidCapsules: [{ body: body.row, start: [0.03, 0, 0], end: [0.03, 0, 0], radius: 0.06 }],
+    });
+    world.add(solver, {
+      strands: [
+        {
+          points: [
+            [-0.2, 0, 0],
+            [0.2, 0, 0],
+          ],
+          radius,
+          density,
+          young: 1,
+          drag: 0,
+        },
+      ],
+      rate: 0,
+      damping: 0,
+      friction: 0,
+      iterations: 1,
+      selfCollision: false,
+      contactGeometry: 'segments',
+    });
+    world.couple(['rigid', solver.id], 'staggered');
+    world.advance(1);
+    const pending = solver.exportPorts(0).find((value) => value.field === BODY_IMPULSES_FIELD.name);
+    const reaction = regionWords(world.memory, pending.region),
+      at = body.row * 6;
+    const tip = solver.sample(0, 1),
+      tipMass = 0.5 * density * Math.PI * radius * radius * span;
+    assert.ok(tip.velocity[1] < 0 && reaction[at + 1] > 0 && reaction[at + 5] > 0);
+    near(reaction[at + 1] + tipMass * tip.velocity[1] + mass * body.linearVelocity[1], mass * velocity, 1e-6);
+    world.advance(2);
+    assert.ok(body.linearVelocity[1] > velocity && body.angularVelocity[2] > 0);
+  } finally {
+    rigid.dispose();
+  }
+});
