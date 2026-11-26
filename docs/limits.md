@@ -9953,6 +9953,9 @@ changed 3,771 pixels and dropped the tracked point 0.2205 m on both WebGPU and
 WebGL2. Plain, shared and restored state hash to `032e9f9a1ed80ade`. The sparse
 grid visits only the occupied nodes, with storage sized for the maximum support
 of the input points. The kernel uses one deterministic scatter and gather order.
+The optional JavaScript entry is 4,066 B gzip against a 4,322 B budget. The
+plain and shared native assets are each 14,251 B raw and 5,563 B and 5,564 B gzip,
+respectively. Core and Stage gain zero bytes.
 
 The first increment covers dry or cohesive granular material and snow. Explicit
 pore-water transport, reciprocal contact with dynamic bodies, the voxel material

@@ -14305,15 +14305,15 @@ their material through cuts and snapshots. The advancing front drops its release
 all incident tetrahedra. General mixed-mode propagation remains open.
 An authored finite blade seeds eligible tensile fronts where its paired lips share two
 particles. Complete separation leaves no bonded lip edge. A candidate still needs a current
-principal plane that crosses adjacent cell material. An exactly tangent plane alone does not
-advance by opening a coplanar existing face.
+principal plane that crosses adjacent cell material or coincides with a bonded face. A plane
+that only touches an exposed face cannot advance.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.
 Nucleation can select another eligible cell in the same step. An authored blade still reports
 a geometry error when its exact requested cut cannot be represented.
-With prescribed front seeding, the optional entry measures 141,859 B gzip.
-The base is 45,366 B and the lazy native kernel is 96,646 B.
+With coincident-face release, the optional entry measures 142,266 B gzip.
+The base is 45,555 B and the lazy native kernel is 96,878 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -14565,6 +14565,29 @@ settings-table rows. One 80-byte uniform buffer, one more pipeline when added to
 not measured. Measured: new entry 1,282 B min+gzip; tonemap root, grade, hue, core and stage unchanged. GPU frames are
 within 0.5 of an 8-bit level of a CPU oracle on WebGPU and the WebGL2 layer (`tests/enhance-browser.mjs`). Margo's
 units are its own, so values from another engine's colour enhancement do not carry over one to one.
+
+### Granular material points (EARTH-01)
+
+The native entry uses sparse 3D quadratic MLS transfer, Hencky sand with a
+Drucker–Prager return and snow with finite-strain hardening. All material points
+share the grid velocities. The return map records the rejected volumetric strain;
+every point retains its reference mass. Passive terrain contact applies Coulomb
+friction on occupied grid nodes. Grid spacing and the clock govern resolution and
+stability; a step that inverts an elastic deformation is rejected before committing
+its trial state.
+
+At 252 material points, the collapse occupied 337 grid nodes on its last step,
+changed 3,771 pixels and dropped the tracked point 0.2205 m on both WebGPU and
+WebGL2. Plain, shared and restored state hash to `032e9f9a1ed80ade`. The sparse
+grid visits only the occupied nodes, with storage sized for the maximum support
+of the input points. The kernel uses one deterministic scatter and gather order.
+The optional JavaScript entry is 4,066 B gzip against a 4,322 B budget. The
+plain and shared native assets are each 14,251 B raw and 5,563 B and 5,564 B gzip,
+respectively. Core and Stage gain zero bytes.
+
+The first increment covers dry or cohesive granular material and snow. Explicit
+pore-water transport, reciprocal contact with dynamic bodies, the voxel material
+handoff, the measured inertial regime and the persistent ray-bed imprint remain open.
 
 ### Physical strand guides (SOFT-03)
 
@@ -31752,6 +31775,14 @@ creep force. Profile-resolved rail-head and flange contact, free rigid-body impa
 of support, and a wired production render remain open. The contact wire uses fixed anchors and
 one loaded cable. Multi-wire hardware, moving switch point mechanisms and circuit-level arc
 measurements require separate models and evidence.
+
+### Granular erosion at the voxel and ray-bed boundaries (EARTH-01, PA-42, BB-7)
+
+The optional continuum produces shear yield and persistent compaction on the live
+terrain bed. The falling-sand voxel source still needs a conserved material
+handoff to replace its one-cell movement and water deletion. The BB-7 fixture
+still needs the ray's water-momentum input and a continuous bed-height update
+from the moving grains. The existing sand plume is a separate effect.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 
