@@ -11923,7 +11923,7 @@ arrangement. Proof: `packages/physics/tests/tracers.test.js` and `tests/coupling
 - The JONSWAP relations (Hasselmann et al. 1973): alpha = 0.076 chi^-0.22 and omega_p = 22 (g / U) chi^(-1/3), as restated
   in arXiv:2606.28165 and arXiv:2608.27105 (search abstracts read), with gamma = 3.3 and sigma = 0.07 and 0.09; the energy
   growth g^2 E / U^4 = 1.6e-7 chi the tests compare against is the same paper's, known through these.
-- The Pierson-Moskowitz fully developed sea, H_s = 0.21 U^2 / g and f_p = 0.13 g / U, the tests' bound, and the dispersion
+- The Pierson-Moskowitz fully developed sea, H_s = 0.21 U^2 / g and f_p = 0.13 g / U (in the wind at 19.5 m; 0.241 in U10, see the ST4 record below for the bound the tests now use), and the dispersion
   relation sigma^2 = g k tanh(k d): textbook results.
 
 First-order upwind fluxes in space in substeps of half a cell, refraction in direction from the depth's gradient, the
@@ -11981,8 +11981,15 @@ C_nl4 2.5e7. One constant was calibrated:
     restating Hwang 2006), and of JONSWAP's, e = 1.6e-7 chi, over chi 1,000 to 10,000. Kahma and Calkoen's composite,
     5.2e-7 chi^0.9, is the highest of the published laws at long fetch (Hwang's, Young and Verhagen's deep-water law and
     JONSWAP's lie 23 to 48 percent below it at chi 1e4).
-  - Duration growth at 10 m/s, unlimited fetch: 106 percent of the Pierson-Moskowitz height and 105 percent of its period
-    at 72 hours. At 20 m/s it reaches 122 percent of the Pierson-Moskowitz height, open as KB-SEA-FULLDEV1.
+  - Full development, unlimited fetch, run to g t / U10 = 2.5e5 (KB-SEA-FULLDEV1): 0.221, 0.281 and 0.355 U10^2 / g at
+    10, 20 and 30 m/s against J. H. G. M. Alves, M. L. Banner and I. R. Young, "Revisiting the Pierson-Moskowitz asymptotic
+    limits for fully developed wind waves", J. Phys. Oceanogr. 33, 1301-1323, 2003, https://doi.org/10.1175/1520-0485(2003)033<1301:RTPALF>2.0.CO;2,
+    read in full: e = (4.02 +- 0.62) 1e-3, H_s = 0.254 U10^2 / g, f_p = 0.123 g / U10, no trend with wind over 9.5 to 21.6 m/s.
+    Pierson and Moskowitz's 0.21 is in U19.5 (U19.5 = 1.077 U10, so 0.241 in U10); the old bound compared it with U10.
+    The rise with wind (1.27 from 10 to 20 m/s against the data's 1.02) is ST4's u* scaling: pure u* scaling gives 1.30 to
+    1.45, Rogers, Babanin and Wang (2012, J. Atmos. Oceanic Technol. 29, read) note the KHH family scales with u*, Ardhuin
+    et al. (2010) that ST4 has no true full development, and Liu et al. (2019) that ST4 with the DIA reaches e* = 1.00e3
+    (0.266 U10^2 / g) at 20 m/s. The roughness cap (0.0015, 0.002 or none) moves the 30 m/s sea by under 2 percent.
   - A 300 s source step lowers the short-fetch end: the action limiter, a fixed amount of action a step, then shapes the
     growth. ST4 was tuned at steps where it rarely acts.
 - Sources for this record, read 2026-11-26 (papers and public documentation, no code):

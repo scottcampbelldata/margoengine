@@ -157,31 +157,36 @@ test("the wind's friction velocity comes from the waves with ST4 and from the dr
   assert.ok(drag(2000) > drag(30000), 'a younger sea drags harder');
 });
 
-test('with unlimited fetch the sea grows with duration toward the fully developed sea', () => {
-  const U = 10,
-    heights = [3, 12, 48].map((hours) => {
+test('with unlimited fetch the sea grows to the fully developed sea Alves, Banner and Young measured (KB-SEA-FULLDEV1)', () => {
+  // Alves, Banner and Young (2003): H_s = 0.254 U10^2 / g (95 percent band 0.233 to 0.272) and f_p = 0.123 g / U10, with no
+  // trend with the wind over 9.5 to 21.6 m/s. Pierson and Moskowitz's 0.21 is in the wind at 19.5 m, 0.241 in U10. Each wind
+  // runs to the same g t / U10 = 2.5e5. ST4's input scales with u*, so the developed sea rises with the wind (measured
+  // 0.221 at 10 m/s, 0.281 at 20, a ratio of 1.27 against the data's 1.02 and pure u* scaling's 1.30 to 1.45), and ST4
+  // has no true full development (Ardhuin et al. 2010): it keeps growing slowly.
+  const developed = (U, hours) => {
       const { waves } = sea({
         cells: [1, 1],
         cellSize: 1e7,
         wind: steady(U),
         periodic: ['x', 'z'],
         warmUp: hours * 3600,
-        frequencies: { min: 0.03, max: 1, count: 40 },
+        frequencies: { min: 0.02, max: 1, count: 42 },
       });
-      return [waves.significantHeight(0, 0), waves.peakPeriod(0, 0)];
-    }),
-    // Pierson-Moskowitz: H_s = 0.21 U^2 / g, f_p = 0.13 g / U.
-    pmHeight = (0.21 * U * U) / g,
-    pmPeriod = U / (0.13 * g);
-  assert.ok(heights[0][0] < heights[1][0] && heights[1][0] < heights[2][0], 'growing');
-  assert.ok(
-    heights[2][0] > 0.85 * pmHeight && heights[2][0] < 1.05 * pmHeight,
-    `after two days ${heights[2][0]} m against ${pmHeight}`,
-  );
-  assert.ok(
-    heights[2][1] > 0.85 * pmPeriod && heights[2][1] < 1.05 * pmPeriod,
-    `period ${heights[2][1]} s against ${pmPeriod}`,
-  );
+      return { height: (waves.significantHeight(0, 0) * g) / (U * U), peak: U / (waves.peakPeriod(0, 0) * g) };
+    },
+    young = developed(10, 12),
+    ten = developed(10, (2.5e5 * 10) / g / 3600),
+    twenty = developed(20, (2.5e5 * 20) / g / 3600);
+  assert.ok(young.height < ten.height, 'growing');
+  for (const [U, s] of [
+    [10, ten],
+    [20, twenty],
+  ]) {
+    assert.ok(Math.abs(s.height / 0.254 - 1) < 0.15, `${U} m/s: H_s ${s.height} U^2/g against 0.254`);
+    assert.ok(Math.abs(s.peak / 0.123 - 1) < 0.1, `${U} m/s: f_p ${s.peak} g/U against 0.123`);
+  }
+  const trend = twenty.height / ten.height;
+  assert.ok(trend > 1 && trend < 1.35, `20 m/s against 10 m/s: ${trend}`);
 });
 
 test('swell from the open sea runs in at its group velocity (RITS-1, OO-2, BS-6)', () => {

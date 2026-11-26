@@ -160,15 +160,18 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
   Results of a scene with air loads change at f32 rounding from before; the physics is unchanged. Regression:
   `packages/physics/tests/world-air-solver.test.js`, "stepped alone, an air load comes off exactly when it stops".
 
-### Open 2026-11-26: a 20 m/s sea with unlimited fetch grows past the Pierson-Moskowitz height (KB-SEA-FULLDEV1, physics waves)
+### Fixed 2026-11-26: a 20 m/s sea with unlimited fetch seemed to grow past the Pierson-Moskowitz height (KB-SEA-FULLDEV1, physics waves)
 
-- **Repro:** `WaveSolver` with one periodic cell (`cells: [1, 1]`, `cellSize: 1e7`, `periodic: ['x', 'z']`), a steady 20 m/s
-  wind and `warmUp: 72 * 3600`: the significant height is 122 percent of Pierson-Moskowitz's 0.21 U^2 / g (10 m/s: 106
-  percent, and 105 percent of its period).
-- **Cause:** not yet traced. The fetch law is right on a resolved grid (KB-SEA-GROWTH1), so the growth rates are not the
-  suspect; the balance at full development is (the breaking's saturation threshold against the input at old wave ages),
-  and the Pierson-Moskowitz limit itself is reported low by later work (Alves, Banner and Young 2003, not read yet). Next:
-  read it, and compare the developed spectrum's peak and its energy against it at 10, 20 and 30 m/s.
+- **Repro (as filed):** `WaveSolver` with one periodic cell, a steady 20 m/s wind and `warmUp: 72 * 3600`: the significant
+  height was 122 percent of 0.21 U^2 / g (10 m/s: 106 percent).
+- **Cause:** the reference. Pierson and Moskowitz's 0.21 is in the wind at 19.5 m; in U10 it is 0.241, and Alves, Banner
+  and Young's re-analysis (2003) gives 0.254 (band 0.233 to 0.272). The 20 m/s run was also only half as developed (g t /
+  U10 1.27e5 against 2.54e5 at 10 m/s).
+- **Fixed:** the test runs each wind to g t / U10 = 2.5e5 and holds the sea to Alves et al.: 0.221 at 10 m/s and 0.281 at 20,
+  each within 15 percent, the peak within 10 percent. The remaining rise with wind (1.27 against the data's 1.02) is ST4's
+  u* scaling, published for this family (pure u* scaling gives 1.30 to 1.45; ST4 with the DIA reaches 0.266 at 20 m/s, Liu
+  et al. 2019), and is recorded as an accepted difference in docs/limits.md. Regression: `packages/physics/tests/waves.test.js`,
+  "with unlimited fetch the sea grows to the fully developed sea Alves, Banner and Young measured (KB-SEA-FULLDEV1)".
 
 ### Fixed 2026-11-26: a strong wind grew the sea too fast, and the fetch law was flatter than measured (KB-SEA-GROWTH1, physics waves)
 
