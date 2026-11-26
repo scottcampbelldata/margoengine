@@ -3606,7 +3606,8 @@ and requires the plane to be below the surface. The parcels drift with `water` a
 for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. `TracerSolver.withBedChange(id)` also deforms a live
 `TerrainBed`. Give `mobileLayer.thickness` in metres and `porosity` as a volume fraction in [0, 1). Place the layer
 above bedrock and use one sediment writer on it. The layer loses the mass carried in the puff and receives it when
-the grains settle. Both modes are off by default. The [rendered coupling fixture](../environment/tests/swim-sediment.html)
+the grains settle. Each vertex supplies its own mobile stock, so erosion can continue next to exposed bedrock.
+Both modes are off by default. The [rendered coupling fixture](../environment/tests/swim-sediment.html)
 uses the moving bed mesh as well as the rising, drifting and settling sand.
 
 Give `bedJets.grains` a sinking `TracerMaterial` with a diameter in metres and density in kg/m³ to match a measured

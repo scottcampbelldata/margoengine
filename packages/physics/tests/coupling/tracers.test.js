@@ -1102,6 +1102,65 @@ test('SEA-15 a live propeller race lifts its predicted sediment mass and cuts th
   assert.equal(idle.tracer.jetErosion, 0);
 });
 
+test('SEA-15 a bare corner leaves adjacent mobile bed sediment available to a wash', () => {
+  const floor = -0.5;
+  const thickness = 0.01;
+  const porosity = 0.4;
+  const bulkDensity = 2650 * (1 - porosity);
+  const waterDensity = 1025;
+  const dt = 1 / 60;
+  const referenceHeight = 0.04;
+  const roughnessLength = 0.001;
+  const criticalShields = 0.05;
+  const criticalStress = criticalShields * (2650 - waterDensity) * 9.80665 * 2.5e-4;
+  const speed = (Math.sqrt((2 * criticalStress) / waterDensity) * Math.log(referenceHeight / roughnessLength)) / 0.4;
+  const water = {
+    medium: 'water',
+    cell: [0, 0, 0],
+    sample: () => ({ velocity: [speed, 0, 0], density: waterDensity, temperature: 285 }),
+  };
+  const terrain = new TerrainBed();
+  const tracer = TracerSolver.withBedWash();
+  // A corner of a one-square-metre cell supplies 1/6 m² of bed. The next forcing point splits
+  // its request equally between that depleted corner and the shared vertex with 1/3 m².
+  const cornerStock = (thickness * bulkDensity) / 6;
+  const cellArea = 0.5 * 0.2;
+  const erodibility = (2 * cornerStock) / (cellArea * dt);
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+    .add(terrain, {
+      columns: 1,
+      rows: 1,
+      width: 1,
+      depth: 1,
+      elevations: () => floor,
+      bedrock: () => floor - thickness,
+    })
+    .add(tracer, {
+      bed: terrain.bed,
+      capacity: 2,
+      bedWash: { water, bounds: [-0.75, -0.6, 0.25, -0.4], cells: [2, 1], referenceHeight, roughnessLength },
+      bedJets: { criticalShields, erodibility, mobileLayer: { thickness, porosity } },
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+    })
+    .couple([tracer.id, terrain.id], 'staggered');
+  world.advance(1);
+  assert.ok(Math.abs(tracer.jetErosion - 2 * cornerStock) < 1e-12, `lifted ${tracer.jetErosion} kg`);
+  assert.ok(Math.abs(tracer.budget.water + terrain.volume(floor) * bulkDensity) < 1e-12);
+  assert.equal(terrain.refusedVolume(), 0);
+  const [corner, adjacent] = [...tracer.particlesOf()];
+  assert.ok(Math.abs(corner.mass - cornerStock) < 1e-12);
+  assert.ok(Math.abs(adjacent.mass - cornerStock) < 1e-12);
+  assert.equal(terrain.elevations()[0], floor - thickness);
+  assert.equal(terrain.elevations()[2], floor - thickness * 0.5);
+  const first = world.takeSnapshot();
+  world.advance(2);
+  const hash = world.hash();
+  world.restoreSnapshot(first.bytes);
+  world.advance(2);
+  assert.equal(world.hash(), hash);
+});
+
 test('SEA-15 bed wash uses the true sloping bed area and the tangential flow in another origin cell', () => {
   const terrain = new TerrainBed();
   const tracer = new TracerSolver();

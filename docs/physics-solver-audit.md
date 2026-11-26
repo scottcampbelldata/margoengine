@@ -505,6 +505,9 @@ coupling and exact replay. Independent dispersion measurements remain open.
 
 BB-7's live terrain exchange now debits the parcels' packed volume from a finite mobile layer and deposits
 it under the settled grains. The CPU and render fixtures check cut, deposit, final volume and replay.
+Erosion at each triangle vertex now stops independently at its own mobile mass. A depleted corner leaves
+the two other vertices available. The two-cell wash regression lifts 5.30 kg where the old shared cap lifted
+2.65 kg, with zero rejected bed volume and exact replay.
 An offset swimming origin now produces identical parcels and packed-bed debit when translated along all three
 cell axes. The same test restores the snapshot and repeats the following ticks exactly.
 Rotating the fin and planar bed together preserves the released mass and rotates the pickup footprint.

@@ -13271,6 +13271,12 @@ pressure closure remains Phares's normal-incidence law. S. Beltaos's
 describes the directional shear outside that assumption. A rigid rotation of the live swimmer and planar bed
 preserves the lifted dry mass and rotates each emitted footprint coordinate.
 
+The tracer allocates the pick-up request to the terrain triangle's three vertex control volumes by barycentric
+weight. Each contribution stops at its own mobile stock. The parcel receives the sum of accepted contributions,
+and each accepted contribution lowers the bed by its packed volume divided by the corresponding vertex area. A two-cell wash drains
+one corner and then removes half of its adjacent shared vertex's stock. The test measures both vertex changes,
+the 5.30 kg lifted, zero bedrock rejection and exact replay.
+
 The optional developing wall layer uses Phares et al. Eq. 2.12 and Fig. 4 for the free-stream half width and
 velocity plateau. Using the plateau as constant edge speed, it integrates their axisymmetric Falkner momentum
 layer (Eqs. 2.34–2.36 with the inverse one-sixth shear dependence) analytically. The zero-gradient

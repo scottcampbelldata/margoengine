@@ -63,16 +63,21 @@ export class TracerBedExchange {
     const indices = [diagonal ? base + rows + 2 : base, base + rows + 1, base + 1];
     const weights = diagonal ? [a + b - 1, 1 - b, 1 - a] : [1 - (a + b), a, b];
     const available = this.available();
-    let mass = amount;
-    if (sign < 0)
-      for (let i = 0; i < 3; i++) if (weights[i]! > 0) mass = Math.min(mass, available[indices[i]!]! / weights[i]!);
     const elevation = this.change.deltas;
+    let moved = 0;
+    let limited = false;
     for (let i = 0; i < 3; i++) {
       const index = indices[i]!;
-      const change = sign * mass * weights[i]!;
-      available[index] = Math.max(0, available[index]! + change);
+      const requested = amount * weights[i]!;
+      // Each vertex contributes its own remaining mobile mass. A bare vertex must not
+      // prevent pickup from its neighbours in the same triangle.
+      const movedHere = sign < 0 ? Math.min(requested, available[index]!) : requested;
+      const change = sign * movedHere;
+      moved += movedHere;
+      limited ||= movedHere < requested;
+      available[index]! += change;
       elevation[index]! += change / (this.bulkDensity * this.change.area[index]!);
     }
-    return mass;
+    return limited ? Math.min(amount, moved) : amount;
   }
 }
