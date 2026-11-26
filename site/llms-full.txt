@@ -12996,6 +12996,23 @@ test.
 - **Regression:** `packages/physics/tests/deck-water.test.js`, "a dynamic hull held by locks takes its deck water's
   weight as the deck load (KB-FLIP-DECKLOAD1)".
 
+### Fixed 2026-11-26: a box mesh was filled with a tunnel by `SoftBodyDesc.volumetric` (KB-SOFT-HOLLOWBOX1, physics soft cells)
+
+- **Repro:** `packages/physics/tests/soft-cells.test.js`, "the volume constraint and the skin go with the pieces of a body that is cut",
+  and "a box mesh is filled by every cube of its lattice, whichever way its faces are cut into triangles". A 0.4 m box mesh of
+  twelve triangles with `SoftBodyDesc.volumetric(vertices, indices, 0.1)` came out with 360 cells instead of 384 and a surface
+  of 232 triangles instead of 192, with an edge four triangles met at. `soft.create` of it with a volume target threw
+  "A body that holds its volume needs a closed surface whose triangles face outward" (since SOFT-06 added that check).
+- **Cause:** `insideMesh` in `soft-volume.ts` counted a +x ray through a triangle with inclusive edge tests, so a ray exactly on
+  the diagonal two triangles of a face share crossed both. Every cube centre level with a face diagonal (the lattice centres
+  with y equal to z here) crossed two diagonals, an even count, and read as outside. The cubes in the middle of the box were
+  left out, a tunnel along x, and the body's surface pinched at it. Before SOFT-06 only the volume was checked, so the hole
+  went unseen.
+- **Fix:** the crossing is counted watertight: each edge is measured once, in one canonical direction, for the triangles that
+  share it, and a ray on an edge is nudged symbolically (Woop, Benthin and Wald 2013; Edelsbrunner and Muecke 1990), so it crosses
+  the surface once. With both triangulations of the faces and three lattice sizes the box fills every cube.
+- **Regression:** the two tests above (the second fails on the previous code: 60 of 64 cubes for a 4 cube box).
+
 ### Open 2026-11-26: on the WebGL2 compatibility layer, test:shot's sky-coverage check loses the device on the orrery shot (KB-SHOT-COMPATLOST1, tools/shot)
 
 - **Repro:** on an Apple M6 Mac (ANGLE on Metal), `npm run build:packages`, then `MARGO_COMPAT=1 npm run test:shot`. Two
