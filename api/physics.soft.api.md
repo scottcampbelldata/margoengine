@@ -11,6 +11,7 @@ export class CellMaterial {
     youngsModulus: number;
     poissonRatio: number;
     model: CellModel;
+    rubber: SoftRubberCurve | null;
     elasticDampingRatio: number;
     deformationDamping: number | null;
     density: number;
@@ -629,6 +630,12 @@ export interface SoftOrthotropy {
     readonly poissonRatios: Vec3;
     readonly axes?: readonly [Vec3, Vec3];
     readonly strength?: SoftOrthotropicStrength;
+}
+
+export interface SoftRubberCurve {
+    readonly lockingStretch: number;
+    readonly transverseFraction?: number;
+    readonly invariantSpread?: number;
 }
 
 export interface SoftSoftness {

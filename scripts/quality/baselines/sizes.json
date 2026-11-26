@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20567212,
+  "total": 20577259,
   "history": [
     {
       "date": "2026-10-24",
@@ -13621,6 +13621,12 @@
       "commit": "fix(physics) solid slip",
       "reason": "FlipSolver: solid walls read as the box sides (wallFaces, the transfers clamp at a solid side, faces inside walls left to the extrapolation) and particles carried into a solid come back out at its face (KB-FLIP-SOLIDSLIP1, KB-PHYS-AUDIT2); 11,699 to 11,988 B gzip (this Mac). One solver; nothing to split.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ae961846ea",
+      "grew": 2,
+      "reason": "SOFT-04 adds finite-chain elasticity, determinant continuation and per-vertex energy descent for held-out rubber data, moving the soft entry from 146343 to 153261 B gzip. @margoengine/physics/soft: 151973 to 157859 B ceiling (153261 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 103021 to 107182 B ceiling (104060 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14488,9 +14494,9 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 151973,
+    "@margoengine/physics/soft": 157859,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 103021,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 107182,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
