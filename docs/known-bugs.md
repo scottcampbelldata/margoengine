@@ -17261,10 +17261,12 @@ measurements require separate models and evidence.
 
 The optional continuum produces shear yield and persistent compaction on the live
 terrain bed. Falling voxel sand now transfers a displaced liquid's full packed
-state to the vacated cell. The voxel-to-continuum material handoff for repose
-and pile evolution is still open. The continuum publishes layer-volume changes to the live bed when it receives the
-ray wake; the fin-on and still-fin test measures erosion and deposition, and both
-memory modes replay identically. The original BB-7 shot still needs the scene binding.
+state to the vacated cell. A separate voxel entry transfers selected solid cubes
+into the continuum. The transfer preserves reference volume, with independent
+pile-repose validation still open. The continuum publishes layer-volume changes
+to the live bed when it receives the ray wake. The fin-on and still-fin test
+checks erosion and deposition, and both memory modes replay identically. The
+original BB-7 shot still needs the scene binding.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 

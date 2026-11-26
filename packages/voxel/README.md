@@ -1621,6 +1621,47 @@ console.log(debris.pieces[0].body!.position[1] < 5); // true: the beam fell onto
 - **Limits.** Pieces are whole cubes for both the collider and the picture (slabs and stairs too), drawn in flat
   colour without the world's textures or light; the search runs on this thread; see `docs/limits.md`.
 
+## Granular piles from voxel cells
+
+Use `@margoengine/voxel/granular-mpm` to move loose full cubes into the native
+material point solver for continuous settling, shear and pile flow. The selected
+cells supply equal-volume midpoint samples in a shared solver, so adjacent cells
+can interact. Unselected voxels and packed liquid states keep their original values.
+
+```ts
+import { GranularMpmSolver } from '@margoengine/physics/granular-mpm';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { BlockTypes, VoxelWorld } from '@margoengine/voxel';
+import { transferVoxelGranular } from '@margoengine/voxel/granular-mpm';
+
+const blocks = new BlockTypes();
+const sand = blocks.define('sand');
+const voxels = new VoxelWorld({ blocks });
+voxels.setBlock(0, 2, 0, sand);
+voxels.setBlock(0, 3, 0, sand);
+const physics = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const grains = await GranularMpmSolver.load();
+transferVoxelGranular(voxels, physics, grains, {
+  cells: [{ position: [0, 2, 0], block: sand }, { position: [0, 3, 0], block: sand }],
+  metresPerVoxel: 0.25,
+  params: { floor: 0, speedMargin: 5 },
+});
+physics.advance(12);
+console.log(voxels.getBlock(0, 2, 0), grains.sample(0).mass); // 0, 3.125 kg
+```
+
+Supply a fresh, loaded solver and call at its step boundary. Each cell includes
+its expected block ID and can set a material table index (default 0). Voxel side
+length defaults to 1 m, samples per axis to 2, and solver spacing to the sample
+spacing. `voxelOrigin` and the solver `cell` both default to `[0, 0, 0]`. Use
+`voxelOrigin` to anchor voxel coordinates to the chosen floating-origin cell.
+Choose the expected travel speed for the drop through `params.speedMargin`.
+
+Existing voxel ticks remain available for distant cells. Remove each selected
+cell once at setup. The complete selection leaves the voxel world only after
+the solver accepts the points. Change observers run after the transfer commits.
+Save voxel and physics states together when a checkpoint crosses the handoff.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

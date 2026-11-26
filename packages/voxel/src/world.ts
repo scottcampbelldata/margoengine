@@ -44,6 +44,12 @@ export let writeChunkCells: (
   from: number,
   to: number,
 ) => number;
+
+/** Package-internal removal of captured, non-air states, with all edits visible before change listeners run. */
+export let takeMatchingCells: (
+  world: VoxelWorld,
+  cells: readonly (readonly [x: number, y: number, z: number, state: number])[],
+) => boolean;
 // For each border code bx * 9 + by * 3 + bz (per axis 0: inside, 1: at 0, 2: at 31), the 27-bit mask of neighbour
 // offsets (dx + 1) * 9 + (dy + 1) * 3 + (dz + 1) whose one-cell shell holds such a cell (13, the chunk itself, set).
 const SHELL = Array.from({ length: 27 }, (_, code) => {
@@ -87,6 +93,14 @@ export class VoxelWorld {
   private key = '';
   private chunk: VoxelChunk | undefined;
   static {
+    takeMatchingCells = (world, cells) => {
+      for (const [x, y, z, state] of cells) if (world.getBlock(x, y, z) !== state) return false;
+      for (const [x, y, z] of cells) world.write(x, y, z, 0, false);
+      for (const [x, y, z, state] of cells) {
+        for (const listener of world.listeners) listener(x, y, z, 0, state);
+      }
+      return true;
+    };
     writeChunkCells = (world, cx, cy, cz, cells, colors, table, from, to) => {
       const key = chunkKey(cx, cy, cz),
         chunk = world.chunks.get(key) ?? world.addChunk(cx, cy, cz),
@@ -293,7 +307,7 @@ export class VoxelWorld {
     if ((state & 0xffff) >= this.blocks.table.length)
       throw new RangeError(`Block id ${state & 0xffff} is not defined; define it with blocks.define() first`);
   }
-  private write(x: number, y: number, z: number, state: number): number {
+  private write(x: number, y: number, z: number, state: number, notify = true): number {
     const cx = x >> 5,
       cy = y >> 5,
       cz = z >> 5,
@@ -320,7 +334,7 @@ export class VoxelWorld {
       lz ? 0 : -1,
       lz === 31 ? 1 : 0,
     );
-    for (const listener of this.listeners) listener(x, y, z, state, previous);
+    if (notify) for (const listener of this.listeners) listener(x, y, z, state, previous);
     return previous;
   }
   // Marks the loaded chunks at offsets x0..x1, y0..y1, z0..z1 (each -1..1) from (cx, cy, cz) dirty, except itself.

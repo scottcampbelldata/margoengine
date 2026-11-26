@@ -15161,6 +15161,15 @@ sum, including the half-step displacement. The incline test exercises a real ter
 bed and replays exactly in plain and shared memory. The fixed-camera collapse draws
 the simulated material-point positions on both renderers.
 
+Klár et al. (2016), section 6.2, equation 20, attributes a reference volume to
+each particle for the discrete energy quadrature. For a full voxel cube of side
+`L`, the handoff partitions its reference volume into `n³` congruent subcubes.
+It uses their midpoints and volumes `(L/n)³`, which makes the constant-volume
+and linear-position moments of a cube exact. This regular midpoint quadrature
+uses the known voxel volume. The simulations in section 5.7 initialize positions
+with Poisson disk sampling. The source cells are removed after registration and
+all edits are applied before notifying voxel observers.
+
 The shallow-layer output projects each particle's current volume
 `V₀ det(F_E) det(F_P)` onto the three vertices of the existing terrain triangle.
 Its barycentric weights sum to one, independently of the grid shape or cell

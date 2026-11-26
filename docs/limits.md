@@ -9997,8 +9997,15 @@ At 45 frames the fin-on case cuts about 49.6 μm and raises an adjacent region b
 about 73.0 μm relative to the still-fin case. This is a reduced one-way bed-shear
 model. It tracks the received horizontal impulse and preserves each grain's mass.
 The field does not return unresolved water momentum or pore pressure. Explicit
-pore-water transport, reciprocal dynamic contact, the voxel material handoff
-and measured inertial flow remain open.
+pore-water transport, reciprocal dynamic contact and measured inertial flow remain open.
+
+The voxel handoff samples complete solid cubes into a newly loaded solver at a
+world step boundary. The sum of reference volumes equals the original selected
+volume, and the mass follows the destination material density. Plan sufficient
+grid resolution and the solver clock for the expected speed. The handoff starts
+new material at rest, with no pre-existing stress. It does not convert liquids,
+partial cells, or particles back to voxels. The voxel and physics checkpoints
+need to be restored together when rewinding across the transfer.
 
 ### Physical strand guides (SOFT-03)
 

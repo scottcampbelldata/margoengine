@@ -6059,6 +6059,10 @@
       "types": "./dist/voxel/physics.d.ts",
       "import": "./dist/voxel/physics.js"
     },
+    "./voxel/granular-mpm": {
+      "types": "./dist/voxel/granular-mpm.d.ts",
+      "import": "./dist/voxel/granular-mpm.js"
+    },
     "./voxel/render": {
       "types": "./dist/voxel/render.d.ts",
       "import": "./dist/voxel/render.js"
