@@ -25,6 +25,7 @@ export interface GranularMaterial {
 export interface GranularMpmLoadOptions {
     readonly id?: string;
     readonly projectBed?: boolean;
+    readonly bedWakes?: boolean;
     readonly signal?: AbortSignal;
 }
 
@@ -37,6 +38,8 @@ export interface GranularMpmParams {
     readonly transfer?: 'apic' | 'pic';
     readonly bed?: Bed;
     readonly bedSurface?: Bed;
+    readonly wakeDepth?: number;
+    readonly wakeFraction?: number;
     readonly floor?: number;
     readonly groundFriction?: number;
     readonly cellSize?: number;
@@ -69,6 +72,7 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     sample(index: number): GranularMpmSample;
+    get wakeImpulse(): Vec3;
     get activeNodes(): number;
 }
 

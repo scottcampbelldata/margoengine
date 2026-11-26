@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20537542,
+  "total": 20538512,
   "history": [
     {
       "date": "2026-10-24",
@@ -13499,6 +13499,13 @@
       "commit": "lane-d-shadow-instfit",
       "grew": 1,
       "reason": "KB-SHADOW-INSTFIT1: shadows fits its cascades to an instanced caster's drawn instances (the union of its local box under each instance matrix, cached on PBRInstances.version), so instanced and separate meshes get the same shadow texels. @margoengine/shadows root 22060 to 22106 B gzip measured on a7ff48e5d; on top of 5feaab3d7 (whose golden-ratio soft-filter noise left the row at 22060) the root measures 22229 B, recorded here. The fit runs each frame in range() beside the existing caster bounds, so it cannot move behind a lazy import."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7f25e19570922fc13bfcb21bbe5c16ddc5cebeb4",
+      "grew": 1,
+      "added": 0,
+      "reason": "EARTH-01 increases the optional granular entry from 5114 to 5961 B gzip for the swim-wake receiver and its replayable impulse ledger. A split would duplicate the terrain and native registry bindings. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -14335,7 +14342,7 @@
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/granular-flow": 4462,
-    "@margoengine/physics/granular-mpm": 5370,
+    "@margoengine/physics/granular-mpm": 6217,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
