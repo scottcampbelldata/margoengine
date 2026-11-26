@@ -451,6 +451,14 @@ export interface LoadedTMX {
     warnings: string[];
 }
 
+export interface LoadedTilt {
+    geometry: LoadedGeometry;
+    strokes: TiltStroke[];
+    brushes: string[];
+    metadata?: Record<string, unknown>;
+    version: number;
+}
+
 export class LoaderError extends Error {
     readonly format: string;
     readonly code: LoaderErrorCode;
@@ -578,6 +586,19 @@ export interface PLYProperty {
     list?: {
         count: ScalarType;
     };
+}
+
+export interface PRWMGeometry extends LoadedGeometry {
+    layout: {
+        name: string;
+        components: number;
+        normalized: boolean;
+        integer: boolean;
+    }[];
+    nonIndexed: boolean;
+}
+
+export interface PRWMOptions extends ParseLimits {
 }
 
 export interface ParseLimits {
@@ -716,6 +737,27 @@ export interface TileQuadsOptions {
     tileSize?: number;
 }
 
+export interface TiltOptions extends ParseLimits, Pick<ZipOptions, 'maxEntries' | 'maxEntryBytes' | 'maxRatio'> {
+    scale?: number;
+    rightHanded?: boolean;
+    widthScale?: number;
+    minControlPoints?: number;
+    signal?: AbortSignal;
+}
+
+export interface TiltStroke {
+    brushIndex: number;
+    brush?: string;
+    color: [number, number, number, number];
+    size: number;
+    points: {
+        position: [number, number, number];
+        orientation: [number, number, number, number];
+        pressure: number;
+        timestamp: number;
+    }[];
+}
+
 export interface ToGeometryOptions {
     normals?: 'auto' | 'smooth' | 'flat';
     group?: number | LoadedGroup;
@@ -841,9 +883,18 @@ export function parsePLY(input: BinaryInput, options?: PLYOptions): LoadedGeomet
 
 export function parsePLYHeader(input: BinaryInput): PLYHeader;
 
+export function parsePRWM(input: BinaryInput, options?: PRWMOptions): PRWMGeometry;
+
 export function parseSTL(input: BinaryInput, options?: STLOptions): STLGeometry;
 
 export function parseTMX(input: BinaryInput | string, options?: TMXParseOptions): Promise<LoadedTMX>;
+
+export function parseTilt(input: BinaryInput, options?: TiltOptions): Promise<LoadedTilt>;
+
+export function parseTiltSketch(input: BinaryInput, options?: TiltOptions): {
+    strokes: TiltStroke[];
+    version: number;
+};
 
 export function parseUSDA(input: string | BinaryInput, options?: USDOptions): LoadedGeometry;
 

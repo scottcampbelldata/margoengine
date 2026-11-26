@@ -83,7 +83,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| Smart assets: a per-scene registry mapping stable string keys to asset URLs, with load, unload, reload and swap by key (a texture swap rebinds existing materials), a JSON asset map that loads from URL, file or object and serialises back, and a missing-asset callback that can return a replacement URL or file | Babylon Smart Assets | MISSING | M |  |
+| Smart assets: a per-scene registry mapping stable string keys to asset URLs, with load, unload, reload and swap by key (a texture swap rebinds existing materials), a JSON asset map that loads from URL, file or object and serialises back, and a missing-asset callback that can return a replacement URL or file | Babylon Smart Assets | DONE (`AssetRegistry` of `@margoengine/scene/assets`: a swap reaches material textures through `subscribe`, where the app assigns the new texture; the registry holds no materials) | M | 4c2816151, c08384ef9, f538279fd |
 | Asset containers: load, add, remove and duplicate a set of objects as one unit, plus scene save and load | Babylon | DONE (scene save and load already existed: `save/src/engine.ts`) | M | f19d13852 |
 | Layer sort modes (back-to-front, front-to-back, manual) | PlayCanvas | DONE (`setMaterialSortModes`: per engine, opaque and transparent material meshes) | S | 8aaf6a290 |
 | Blob shadow and planar `ShadowMesh` | three.js, drei | DONE (`@margoengine/materials/fake-shadows`; pixels checked on WebGPU and the WebGL2 layer, `features-browser.mjs fakeShadows`) | S | 196b41134, 2ed1a656d |
@@ -100,15 +100,15 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | --- | --- | --- | --- | --- |
 | MMD loader: PMD/PMX models plus VMD motion and camera clips (no physics) | three.js | MISSING | M |  |
 | DirectX `.x` loader (text and binary, skin and animation sets) | three.js | MISSING | M |  |
-| Tilt Brush `.tilt` loader (brush strokes as ribbons) | three.js | DONE (`@margoengine/loaders/tilt`) | S | 2044668ee |
-| PRWM loader (packed binary mesh) | three.js | DONE (`@margoengine/loaders/prwm`) | S | 2044668ee |
-| RGBM, LogLuv and HDR-JPG texture loaders (Ultra HDR gain maps exist) | three.js | DONE (`@margoengine/environment/encoded-hdr`; HDR-JPG is the existing gain-map decoder, now also `decodeHDRJPG`) | S | 693c1a802 |
-| G-code exporter (toolpath from a mesh or lines; the G-code loader exists) | three.js | DONE (`@margoengine/exporters/gcode`) | S | 9006b584d |
-| Depth-video point cloud (RGB plus depth video to points) | three.js | DONE (`@margoengine/points/depth-video`) | S | 535de2278 |
-| Parametric surface presets (Klein bottle, Mobius strip, torus-knot variants) on the generic `geometry/src/parametric.ts` builder | three.js | DONE (`@margoengine/geometry/extras`: Klein bottle, Möbius strip, knots) | S | f09135490 |
+| Tilt Brush `.tilt` loader (brush strokes as ribbons) | three.js | DONE (`@margoengine/loaders/tilt`) | S | 3ae26d084 |
+| PRWM loader (packed binary mesh) | three.js | DONE (`@margoengine/loaders/prwm`) | S | 3ae26d084 |
+| RGBM, LogLuv and HDR-JPG texture loaders (Ultra HDR gain maps exist) | three.js | DONE (`@margoengine/environment/encoded-hdr`; HDR-JPG is the existing gain-map decoder, now also `decodeHDRJPG`) | S | 3d1b19180 |
+| G-code exporter (toolpath from a mesh or lines; the G-code loader exists) | three.js | DONE (`@margoengine/exporters/gcode`) | S | 0ad7f6f96 |
+| Depth-video point cloud (RGB plus depth video to points) | three.js | DONE (`@margoengine/points/depth-video`) | S | 90957b5b7 |
+| Parametric surface presets (Klein bottle, Mobius strip, torus-knot variants) on the generic `geometry/src/parametric.ts` builder | three.js | DONE (`@margoengine/geometry/extras`: Klein bottle, Möbius strip, knots) | S | e622081be |
 | Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | MISSING | L |  |
-| Scene change recorder: track edits to a loaded scene and save or re-apply them as a small JSON delta (prefab overrides exist) | Babylon delta files | DONE (`@margoengine/save/delta`) | S to M | 690205db4 |
-| Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | cb14d45ca |
+| Scene change recorder: track edits to a loaded scene and save or re-apply them as a small JSON delta (prefab overrides exist) | Babylon delta files | DONE (`@margoengine/save/delta`) | S to M | 737a37d0b |
+| Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | 4c2816151 |
 | `.babylon` scene import and scene-serializer export | Babylon | MISSING | S to M |  |
 
 ## Lane D: tools, runtime and interaction

@@ -17,6 +17,28 @@ export interface GeodesicOptions {
     smooth?: boolean;
 }
 
+export type KleinBottleKind = 'bottle' | 'figure8';
+
+export interface KleinBottleOptions extends SurfaceGridOptions {
+    kind?: KleinBottleKind;
+    radius?: number;
+}
+
+export type KnotName = 'trefoil' | 'figure-eight' | 'cinquefoil' | 'three-twist';
+
+export interface KnotOptions {
+    tube?: number;
+    tubularSegments?: number;
+    radialSegments?: number;
+    scale?: number;
+}
+
+export interface MobiusStripOptions extends SurfaceGridOptions {
+    radius?: number;
+    width?: number;
+    halfTwists?: number;
+}
+
 export type ParametricFunction = (u: number, v: number, target: [number, number, number]) => ArrayLike<number> | void;
 
 export interface PolyhedronGeometryData extends GeometryData {
@@ -24,6 +46,12 @@ export interface PolyhedronGeometryData extends GeometryData {
     adjacentFaces: number[][];
     faceCenters: MutableVec3[];
     faceNormals: MutableVec3[];
+}
+
+export interface SurfaceGridOptions {
+    slices?: number;
+    stacks?: number;
+    scale?: number;
 }
 
 export type TilePattern = 'none' | 'flip-tile' | 'rotate-tile' | 'flip-row' | 'rotate-row' | 'flip-rotate-tile' | 'flip-rotate-row';
@@ -56,6 +84,18 @@ export function geodesicGeometry(options?: GeodesicOptions): PolyhedronGeometryD
 export function goldbergGeometry(options?: GeodesicOptions): PolyhedronGeometryData;
 
 export function hemisphereGeometry(radius?: number, segments?: number, rings?: number, cap?: boolean): GeometryData;
+
+export function kleinBottleGeometry(options?: KleinBottleOptions): GeometryData;
+
+export function kleinBottleSurface(scale?: number): ParametricFunction;
+
+export function kleinFigure8Surface(radius?: number, scale?: number): ParametricFunction;
+
+export function knotGeometry(name: KnotName, options?: KnotOptions): GeometryData;
+
+export function mobiusStripGeometry(options?: MobiusStripOptions): GeometryData;
+
+export function mobiusSurface(radius?: number, width?: number, halfTwists?: number, scale?: number): ParametricFunction;
 
 export function parametricGeometry(fn: ParametricFunction, slices?: number, stacks?: number): GeometryData;
 

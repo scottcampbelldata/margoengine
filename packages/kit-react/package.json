@@ -539,6 +539,10 @@
       "types": "./dist/environment/exr-write.d.ts",
       "import": "./dist/environment/exr-write.js"
     },
+    "./environment/encoded-hdr": {
+      "types": "./dist/environment/encoded-hdr.d.ts",
+      "import": "./dist/environment/encoded-hdr.js"
+    },
     "./environment/exr-tiled": {
       "types": "./dist/environment/exr-tiled.d.ts",
       "import": "./dist/environment/exr-tiled.js"
@@ -598,6 +602,10 @@
     "./exporters": {
       "types": "./dist/exporters.d.ts",
       "import": "./dist/exporters.js"
+    },
+    "./exporters/gcode": {
+      "types": "./dist/exporters/gcode.d.ts",
+      "import": "./dist/exporters/gcode.js"
     },
     "./exporters/usdz": {
       "types": "./dist/exporters/usdz.d.ts",
@@ -1126,6 +1134,14 @@
     "./loaders/vrml": {
       "types": "./dist/loaders/vrml.d.ts",
       "import": "./dist/loaders/vrml.js"
+    },
+    "./loaders/tilt": {
+      "types": "./dist/loaders/tilt.d.ts",
+      "import": "./dist/loaders/tilt.js"
+    },
+    "./loaders/prwm": {
+      "types": "./dist/loaders/prwm.d.ts",
+      "import": "./dist/loaders/prwm.js"
     },
     "./loaders/gcode": {
       "types": "./dist/loaders/gcode.d.ts",
@@ -1766,6 +1782,10 @@
     "./scene/clone": {
       "types": "./dist/scene/clone.d.ts",
       "import": "./dist/scene/clone.js"
+    },
+    "./scene/assets": {
+      "types": "./dist/scene/assets.d.ts",
+      "import": "./dist/scene/assets.js"
     },
     "./scene/container": {
       "types": "./dist/scene/container.d.ts",
