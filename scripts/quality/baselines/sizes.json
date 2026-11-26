@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20642022,
+  "total": 20642983,
   "history": [
     {
       "date": "2026-10-24",
@@ -13861,6 +13861,12 @@
       "commit": "b2c33ca0e6",
       "grew": 1,
       "reason": "SEA-08 the optional three-dimensional axial panel solve grows seakeeping from 30177 to 31553 B gzip. The panel solve carries axial inertia in the existing implicit hull mass matrix. A split would duplicate hull geometry, pose, and force connections. Core plus Stage remains 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "80e472d5c8",
+      "grew": 1,
+      "reason": "SEA-15's resolved propeller-wash pickup moves physics/tracers from 13982 to 14915 B gzip. The optional ceiling rises from 14402 to 15363 B. Bed wash shares the existing sediment pickup, release and conservative terrain exchange. A separate entry would need a second tracer store or a second sediment transfer adapter."
     }
   ],
   "items": {
@@ -14740,7 +14746,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 14611,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 14402,
+    "@margoengine/physics/tracers": 15363,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,

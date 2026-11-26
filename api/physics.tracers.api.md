@@ -75,6 +75,14 @@ export interface TracerBedJets {
     };
 }
 
+export interface TracerBedWash {
+    water: FlowField;
+    bounds: readonly [number, number, number, number];
+    cells?: readonly [number, number];
+    referenceHeight: number;
+    roughnessLength: number;
+}
+
 export interface TracerBreakerExposure {
     energy: number;
     turnover: number;
@@ -141,6 +149,7 @@ export interface TracerParams {
     viscosity?: number;
     horizontalDiffusivity?: number;
     horizontalDispersion?: TracerHorizontalDispersion;
+    bedWash?: TracerBedWash;
     verticalDiffusivity?: number;
     verticalDiffusivityProfile?: readonly TracerDiffusionKnot[];
     particleMass?: number;
@@ -155,6 +164,7 @@ export class TracerSolver implements Solver<TracerParams> {
         bedJets?: boolean;
     });
     static withBedChange(id?: string): TracerSolver;
+    static withBedWash(id?: string): TracerSolver;
     describe(): SolverDescription;
     init(host: SolverHost, params?: TracerParams): void;
     step(context: StepContext, dt: number): void;
