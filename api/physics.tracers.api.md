@@ -69,6 +69,10 @@ export interface TracerBedJets {
     criticalShields?: number;
     erodibility?: number;
     availableMass?: number;
+    mobileLayer?: {
+        thickness: number;
+        porosity: number;
+    };
 }
 
 export interface TracerMaterial {
@@ -103,6 +107,7 @@ export class TracerSolver implements Solver<TracerParams> {
     constructor(id?: string, options?: {
         bedJets?: boolean;
     });
+    static withBedChange(id?: string): TracerSolver;
     describe(): SolverDescription;
     init(host: SolverHost, params?: TracerParams): void;
     step(context: StepContext, dt: number): void;

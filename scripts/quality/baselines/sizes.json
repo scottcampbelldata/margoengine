@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20595397,
+  "total": 20596649,
   "history": [
     {
       "date": "2026-10-24",
@@ -13705,6 +13705,12 @@
       "commit": "feat(physics) wake waterBelow",
       "reason": "WakeSolver waterBelow and velocityAt: the water velocity below the wake at depth layers, and SpectralSea adding a patch velocity to its water; 8,001 to 8,539 B gzip (this Mac). The wake and the sea surface share the entry; a split would duplicate the FFT and grid reading.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "56a1deab8e",
+      "grew": 1,
+      "reason": "SEA-15's live terrain exchange moves physics/tracers from 8246 to 9469 B gzip. The optional ceiling rises from 8502 to 9754 B. The same parcels and ledger now debit and replace terrain mass; a separate entry would need a duplicate binding or new per-parcel transfer ports."
     }
   ],
   "items": {
@@ -14582,7 +14588,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 8928,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 8502,
+    "@margoengine/physics/tracers": 9754,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
