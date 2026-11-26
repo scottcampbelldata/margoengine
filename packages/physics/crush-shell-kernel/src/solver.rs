@@ -3,7 +3,7 @@ use core::ptr::copy_nonoverlapping;
 use crate::bending::{angle, bend};
 use crate::cohesive::{CohesiveEdge, History, seam};
 use crate::contact::{closest, contact};
-use crate::material::{Plastic, Steel};
+use crate::material::{Hill, Plastic, Steel};
 use crate::math::sqrt;
 use crate::membrane::{Element, Vector, combine, cross, dot, membrane, sub};
 
@@ -104,6 +104,7 @@ struct Shell {
     seams: *const CohesiveEdge,
     seam_history: *mut History,
     seam_count: u32,
+    hill: Hill,
 }
 
 struct Workspace {
@@ -224,6 +225,11 @@ impl Workspace {
         budget.bend = 0.0;
         budget.hardening = 0.0;
         budget.plastic = 0.0;
+        let hill = if shell.hill.f > 0.0 {
+            Some(shell.hill)
+        } else {
+            None
+        };
         for i in 0..shell.node_count as usize {
             let node = unsafe { *shell.nodes.add(i) };
             let applied = unsafe { *shell.applied.add(i) };
@@ -242,7 +248,7 @@ impl Workspace {
             if !(area_squared.is_finite() && area_squared > 0.0) {
                 return false;
             }
-            let result = membrane(face.element, points, shell.steel, state.plastic);
+            let result = membrane(face.element, points, shell.steel, state.plastic, hill);
             state.plastic = result.result.state;
             state.stress = result.result.stress;
             budget.membrane += face.element.volume * result.result.elastic;

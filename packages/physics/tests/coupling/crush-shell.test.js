@@ -402,3 +402,42 @@ test('invalid cohesive seam inputs identify boundary, endpoint order and fractur
     await assert.rejects(model({ ...joined, seams: [seam] }), { code: 'state', message });
   }
 });
+
+const rolling = { rollingDirection: [1, 0, 0], r0: 0.49, r45: 0.59, r90: 0.51 };
+
+test('rolled sheet uses its original material directions under alternate triangle bases', async () => {
+  const run = async (triangles) => {
+    const { shell, world } = await model({
+      triangles,
+      pinned: [0, 2],
+      material: { ...material, anisotropy: rolling },
+    });
+    shell.setForce(1, [5000, 0, 0]);
+    world.advance(2);
+    const { positions, velocities } = shell.readMesh();
+    const face = shell.readFace(0);
+    assert.ok(face.equivalentPlasticStrain > 1e-3);
+    const [xx, yy, xy] = face.stress;
+    const g = 1 / (1 + rolling.r0);
+    const h = rolling.r0 * g;
+    const f = h / rolling.r90;
+    const n = ((rolling.r0 + rolling.r90) * (rolling.r45 + 0.5) * g) / rolling.r90;
+    const equivalent = Math.sqrt(f * yy ** 2 + g * xx ** 2 + h * (xx - yy) ** 2 + 2 * n * xy ** 2);
+    near(equivalent, material.yieldStress + material.hardeningModulus * face.equivalentPlasticStrain, 1e-7);
+    return { positions, velocities, face };
+  };
+  const first = await run([[0, 1, 2]]);
+  const next = await run([[1, 2, 0]]);
+  for (const [index, value] of first.positions.entries()) near(next.positions[index], value, 3e-14);
+  for (const [index, value] of first.velocities.entries()) near(next.velocities[index], value, 1e-12);
+  for (const [index, value] of first.face.stress.entries()) near(next.face.stress[index], value, 1e-7);
+});
+
+test('rolled shell rejects unusable coupon values and directions normal to a sheet', async () => {
+  for (const [anisotropy, message] of [
+    [{ ...rolling, r45: 0 }, /Use finite positive Lankford ratios/],
+    [{ ...rolling, rollingDirection: [0, 0, 1] }, /Give a rolling direction with a tangent projection/],
+  ]) {
+    await assert.rejects(model({ material: { ...material, anisotropy } }), { code: 'state', message });
+  }
+});

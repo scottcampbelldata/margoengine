@@ -12,6 +12,7 @@ import type {
 import { isRateLevel, type RateLevel, rateOf } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_IMPULSES_FIELD } from '../world/solvers/rigid.js';
 import { type CrushVector, triple, ZERO } from './rigid-contact.js';
+import { type CrushShellAnisotropy, shellAnisotropy } from './shell-anisotropy.js';
 import { SHELL_APERTURE_LAYOUT, SHELL_APERTURE_WORDS, shellApertureField } from './shell-aperture.js';
 import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
 import { type CrushShellContact, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
@@ -36,6 +37,8 @@ export interface CrushShellMaterial {
   readonly yieldStress: number;
   /** Linear isotropic hardening slope in Pa. Default 0, ideal plasticity. */
   readonly hardeningModulus?: number;
+  /** Optional Hill-48 yield. Omit for isotropic von Mises yield. */
+  readonly anisotropy?: CrushShellAnisotropy;
 }
 
 /** Authored rest sheet, constraints and initial velocities. */
@@ -59,7 +62,7 @@ export interface CrushShellParams {
 }
 
 export interface CrushShellFace {
-  /** In-plane normal and shear second Piola–Kirchhoff stress in local rest coordinates, Pa. */
+  /** In-plane second Piola–Kirchhoff stress, Pa. Uses the material's rolling axes when set. */
   readonly stress: CrushVector;
   readonly equivalentPlasticStrain: number;
   /** Irreversible initial-yield work per rest cubic metre, J/m³. */
@@ -227,7 +230,8 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         throw new MargoError('state', 'Use zero initial velocity on fixed shell vertices.');
     });
     const steel = coefficients(material);
-    const topology = makeShell(positions, triangles, material);
+    const hill = material.anisotropy && shellAnisotropy(material.anisotropy);
+    const topology = makeShell(positions, triangles, material, hill?.rolling);
     const seams = params.seams ?? [];
     if (this.publishApertures && seams.length === 0)
       throw new MargoError('state', 'Give an aperture-enabled shell at least one cohesive seam.');
@@ -266,7 +270,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         }
       : undefined;
     const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount + SEAM_STATE_WORDS * seams.length);
-    const descriptor = host.allocate('shell-descriptor', 136, 'u8', 1);
+    const descriptor = host.allocate('shell-descriptor', 168, 'u8', 1);
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
@@ -308,6 +312,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       seamState?.byteOffset ?? 0,
       seams.length,
     ]);
+    if (hill) new Float64Array(memory.buffer, descriptor.byteOffset + 136, 4).set(hill.metric);
     if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
       throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
     this.state = {

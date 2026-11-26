@@ -5382,6 +5382,35 @@ default 1. The explicit integrator accepts at most 8,192 substeps per tick. Choo
 resolution within that limit and test convergence for the applied load.
 [Shell method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-ductile-shell)
 
+For rolled metal, set `anisotropy` with three uniaxial width-to-thickness plastic strain
+ratios `r0`, `r45` and `r90`. Set `yieldStress` from the rolling-direction coupon. Supply
+the rest-space `rollingDirection`, with a nonzero projection onto each face. The resulting
+Hill-48 stresses are reported in the projected rolling and transverse material directions.
+Omit `anisotropy` for the standard isotropic yield law.
+
+```ts
+import { CrushShellSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const shell = await CrushShellSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] });
+world.add(shell, {
+  positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+  triangles: [[0, 1, 2]],
+  pinned: [0, 2],
+  material: {
+    thickness: 0.002, density: 2660, youngModulus: 70e9, poissonRatio: 0.33,
+    yieldStress: 119.704e6, hardeningModulus: 150.4e6 * 10.7,
+    anisotropy: { rollingDirection: [1, 0, 0], r0: 0.49, r45: 0.59, r90: 0.51 },
+  },
+});
+shell.setForce(1, [140000, 0, 0]);
+world.advance(2);
+if (shell.readFace(0).equivalentPlasticStrain <= 0) throw new Error('Expected this rolled sheet to yield');
+```
+
+[Rolled-sheet material source and held-out tests](../../docs/whitepaper/reproduce.md#break-03-rolled-sheet-yield)
+
 To load a sheet with a moving rigid sphere, call `CrushShellSolver.loadRigid()`. Register a
 centered sphere, give its radius and effective Hertz contact modulus, and let the shell own the
 pair's collision. Match the rigid clock to the shell's `rate`. Add the rigid solver before the

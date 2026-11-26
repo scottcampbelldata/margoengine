@@ -1,4 +1,4 @@
-use crate::material::{Plastic, Steel, Stress, return_stress};
+use crate::material::{Hill, Plastic, Steel, Stress, return_hill, return_stress};
 
 pub(crate) type Vector = [f64; 3];
 
@@ -45,6 +45,7 @@ pub(crate) fn membrane(
     points: [Vector; 3],
     steel: Steel,
     plastic: Plastic,
+    hill: Option<Hill>,
 ) -> Membrane {
     let b = sub(points[1], points[0]);
     let c = sub(points[2], points[0]);
@@ -53,7 +54,10 @@ pub(crate) fn membrane(
     let x = combine(b, bx, c, cx);
     let y = combine(b, by, c, cy);
     let total = [0.5 * (dot(x, x) - 1.0), 0.5 * (dot(y, y) - 1.0), dot(x, y)];
-    let result = return_stress(steel, total, plastic);
+    let result = match hill {
+        Some(metric) => return_hill(steel, metric, total, plastic),
+        None => return_stress(steel, total, plastic),
+    };
     let [sxx, syy, sxy] = result.stress;
     let p = combine(x, -element.volume * sxx, y, -element.volume * sxy);
     let q = combine(x, -element.volume * sxy, y, -element.volume * syy);
@@ -86,8 +90,8 @@ mod tests {
     fn finite_rigid_motion_rotates_the_forces_and_preserves_energy() {
         let initial = [[0.0, 0.0, 0.0], [1.003, 0.0, 0.0], [0.02, 0.9991, 0.0]];
         let world = initial.map(|p| [4.0 - p[1], -7.0 + p[2], 3.0 - p[0]]);
-        let local = membrane(ELEMENT, initial, STEEL, Plastic::default());
-        let rotated = membrane(ELEMENT, world, STEEL, Plastic::default());
+        let local = membrane(ELEMENT, initial, STEEL, Plastic::default(), None);
+        let rotated = membrane(ELEMENT, world, STEEL, Plastic::default(), None);
         for (a, b) in local.forces.into_iter().zip(rotated.forces) {
             let expected = [-a[1], a[2], -a[0]];
             assert!(sub(expected, b).into_iter().all(|v| v.abs() < 1e-5));
@@ -104,15 +108,19 @@ mod tests {
             [0.0002, 1.0001, 0.0002],
         ];
         let state = Plastic::default();
-        let result = membrane(ELEMENT, points, STEEL, state);
+        let result = membrane(ELEMENT, points, STEEL, state, None);
         let epsilon = 1e-7;
         for i in 0..3 {
             for axis in 0..3 {
                 let mut perturbed = points;
                 perturbed[i][axis] -= epsilon;
-                let minus = membrane(ELEMENT, perturbed, STEEL, state).result.elastic;
+                let minus = membrane(ELEMENT, perturbed, STEEL, state, None)
+                    .result
+                    .elastic;
                 perturbed[i][axis] += 2.0 * epsilon;
-                let plus = membrane(ELEMENT, perturbed, STEEL, state).result.elastic;
+                let plus = membrane(ELEMENT, perturbed, STEEL, state, None)
+                    .result
+                    .elastic;
                 let derivative = ELEMENT.volume * (plus - minus) / (2.0 * epsilon);
                 assert!((result.forces[i][axis] + derivative).abs() < 0.003);
             }

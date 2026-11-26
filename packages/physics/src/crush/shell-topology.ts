@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { type CrushVector, cross, dot, sub } from './rigid-contact.js';
+import { type CrushVector, cross, dot, scale, sub } from './rigid-contact.js';
 import type { CrushShellMaterial } from './shell.js';
 
 export type Triangle = readonly [number, number, number];
@@ -28,6 +28,7 @@ export function makeShell(
   positions: readonly CrushVector[],
   triangles: readonly Triangle[],
   material: CrushShellMaterial,
+  rolling?: CrushVector,
 ): ShellTopology {
   const masses = new Float64Array(positions.length);
   const stiffnesses = new Float64Array(positions.length);
@@ -70,7 +71,23 @@ export function makeShell(
     const gradients = [Math.sqrt(bx * bx + (by + cy) ** 2), Math.sqrt(bx * bx + by * by), cy];
     const rowBound = membraneBound * volume * (gradients[0]! + gradients[1]! + cy);
     faceNodes.set(vertices, 14 * index);
-    faceValues.set([bx, by, 0, cy, volume], 7 * index + 2);
+    if (rolling) {
+      const first = scale(base, 1 / baseLength);
+      const second = cross(scale(normal, 1 / doubleArea), first);
+      const u = dot(rolling, first);
+      const v = dot(rolling, second);
+      const projection = Math.sqrt(u * u + v * v);
+      if (!(projection > 0 && Number.isFinite(projection)))
+        throw new MargoError('state', 'Give a rolling direction with a tangent projection on every shell face.');
+      const cosine = u / projection;
+      const sine = v / projection;
+      faceValues.set(
+        [cosine * bx + sine * by, -sine * bx + cosine * by, sine * cy, cosine * cy, volume],
+        7 * index + 2,
+      );
+    } else {
+      faceValues.set([bx, by, 0, cy, volume], 7 * index + 2);
+    }
     for (const [corner, vertex] of vertices.entries()) {
       masses[vertex]! += (volume * density) / 3;
       stiffnesses[vertex]! += rowBound * gradients[corner]!;

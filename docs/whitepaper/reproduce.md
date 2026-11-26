@@ -45,6 +45,30 @@ oblique plane, an intervening ridge and a cell with one raised corner. The analy
 speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
 The ridge test compares a saved run and its replay in both world memory modes.
 
+## BREAK-03 rolled-sheet yield
+
+Run `cargo test --manifest-path packages/physics/crush-shell-kernel/Cargo.toml -- uniaxial_aa5086`
+and `node --test packages/physics/tests/coupling/crush-shell.test.js`. The material kernel uses the
+119.704 MPa uniaxial rolling-direction yield, Lankford ratios 0.49, 0.59 and 0.51, and the
+initial uniaxial Voce slope (150.4 MPa times 10.7). These are from section 3.1 and Table 2 of
+[Chen, Wang, Chu, Yue, Zhao and Zhou, *Calibration of Yld2000-2D Anisotropy Yield Criterion with Traditional Testing and Inverse Identification Strategies* (2023)](https://doi.org/10.3390/ma16216904).
+The test holds out all three equal-biaxial replicates, 106.155, 106.259 and 105.787 MPa.
+The returned onset is 104.349 MPa, within 1.80% of each measurement. The reference isotropic
+onset from the same rolling-direction input is 119.704 MPa. The pressure-free material
+test constructs its loading path from the model and the independent uniaxial data.
+
+The constrained Hill metric uses
+`F*sy² + G*sx² + H*(sx-sy)² + 2N*txy²` for the squared equivalent stress.
+The coefficients use the three uniaxial ratios, with `G+H=1` for rolling-direction yield.
+The associated backward-Euler step solves `(I + multiplier*C*A) stress = trial`, where
+`A` is the Hill metric and `C` the plane-stress elastic matrix. The scalar multiplier
+enforces the hardening yield surface. The basis is the rest triangle tangent plane with
+its first axis aligned to the authored rolling direction. See
+[Rodney Hill, *A theory of the yielding and plastic flow of anisotropic metals* (1948)](https://doi.org/10.1098/rspa.1948.0045)
+and [Simo and Taylor, *A return mapping algorithm for plane stress elastoplasticity* (1986)](https://doi.org/10.1002/nme.1620220310).
+Constitutive evidence covers initial proportional yield. Solid through-thickness failure,
+large-strain forming and cyclic hardening remain outside this model.
+
 ## BREAK-03 live shell aperture
 
 Run `node --test packages/physics/tests/coupling/crush-shell-flood.test.js`. The mesh is

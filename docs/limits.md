@@ -9636,7 +9636,10 @@ distributed crack surface, plate fragments and strain-rate dependence remain ope
 The distributed shell uses constant-strain membrane triangles and elastic interior hinges on
 a consistently wound manifold sheet of uniform thickness. It accepts fixed supports and
 vertex loads. It uses one through-thickness material state per face and a small material-strain
-law in the rotating element frame. Hinge stiffness depends on triangulation. Each explicit
+law in the rotating element frame. The optional Hill-48 yield uses the projected rolling
+direction and three uniaxial strain ratios. Its held-out AA5086 initial biaxial yield is within
+1.80% of the three measured values. Large-strain anisotropy and anisotropic fracture remain open.
+Hinge stiffness depends on triangulation. Each explicit
 substep is at most 0.5 divided by the rest mesh frequency bound. Large deformation can
 increase the true frequency, so refine the time step and compare the result at the applied
 load. The solver rejects more than 8,192 substeps per world tick. Rigid contact accepts centred
@@ -9659,7 +9662,7 @@ compartment and use the same world scale. Closing the geometric gap stops flow w
 seam remains fractured. Fluid pressure feedback to the shell, unilateral lip contact,
 automatic crack paths, mode-dependent cohesive properties and independent measured
 shell fracture remain open.
-The optional shell loader fetches the 10,030 B plain Wasm asset (4,951 B gzip). On hosts with
+The optional shell loader fetches the 11,106 B plain Wasm asset (5,410 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 47654 B minified and 17539 B gzip under its 18720 B ceiling. The optional seakeeping entry measures 86363 B minified and 33399 B gzip under its 33698 B ceiling. Core and Stage gain zero bytes.
