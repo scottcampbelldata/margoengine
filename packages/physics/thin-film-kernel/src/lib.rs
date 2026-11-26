@@ -29,6 +29,12 @@ struct Wetting {
     stiffness: f64,
 }
 
+#[repr(C)]
+struct ContactAngles {
+    receding: f64,
+    advancing: f64,
+}
+
 impl Wetting {
     fn pressure(&self, h: f64, stiffness: f64) -> f64 {
         let precursor = self.precursor_depth;
@@ -153,6 +159,7 @@ struct Workspace {
     direction: *mut f64,
     result: *mut f64,
     flux: *mut f64,
+    contact: *mut f64,
 }
 
 impl Workspace {
@@ -172,6 +179,7 @@ impl Workspace {
             direction: base.add(19 * cells),
             result: base.add(21 * cells),
             flux: base.add(23 * cells),
+            contact: base.wrapping_add(25 * cells),
         }
     }
 }
@@ -182,6 +190,7 @@ struct Film {
     model: *const Model,
     wetting: *const Wetting,
     wetting_map: *const f64,
+    contact: *const ContactAngles,
     external: *const Forcing,
     height: *mut f64,
     base: *const f64,
@@ -209,7 +218,14 @@ impl Film {
         }
     }
 
-    unsafe fn matrix(&self, x: *const f64, result: *mut f64, k: f64, dt: f64) {
+    unsafe fn matrix(
+        &self,
+        x: *const f64,
+        result: *mut f64,
+        k: f64,
+        dt: f64,
+        contact_norm: *const f64,
+    ) {
         let w = &self.work;
         self.grid.gradient_transpose(x, w.weight, w.transpose);
         self.hydraulic_pressure(w.transpose, k, w.cellwork);
@@ -218,6 +234,13 @@ impl Film {
                 *w.cellwork.add(i) += *self.wetting_map.add(i) * *w.transpose.add(i);
             }
         }
+        if !contact_norm.is_null() {
+            for i in 0..self.grid.n {
+                let scale = *contact_norm.add(i);
+                *w.cellwork.add(i) = dt * *w.cellwork.add(i) + scale * scale * *w.transpose.add(i);
+            }
+        }
+        let factor = if contact_norm.is_null() { dt } else { 1.0 };
         for i in 0..self.grid.n {
             for axis in 0..2 {
                 let f = 2 * i + axis;
@@ -226,7 +249,7 @@ impl Film {
                 } else {
                     0.0
                 };
-                *result.add(f) = *x.add(f) + dt * g * *w.weight.add(f);
+                *result.add(f) = *x.add(f) + factor * g * *w.weight.add(f);
             }
         }
     }
@@ -262,7 +285,6 @@ impl Film {
         }
         let dx2 = grid.inv_dx * grid.inv_dx;
         let capillary = model.surface_tension * dx2 * dx2;
-        zero(work.solution, 2 * n);
         for i in 0..n {
             let h = *self.height.add(i);
             let head = *work.pressure.add(i);
@@ -295,26 +317,53 @@ impl Film {
                                 * ((2.0 * k + stiffness) * dx2
                                     + (grid.degree(i) + grid.degree(j) + 2.0) * capillary));
                     rhs *= weight * grid.inv_dx;
+                    if !self.contact.is_null() && weight > 0.0 {
+                        rhs += *work.flux.add(f) / weight;
+                    }
                 }
                 work.weight.add(f).write(weight);
                 work.diagonal.add(f).write(inverse);
                 work.residual.add(f).write(rhs);
-                work.direction.add(f).write(rhs * inverse);
             }
         }
-        let len = 2 * n;
+        if let Some(contact) = self.contact.as_ref() {
+            self.contact_solution(contact, k, dt)
+        } else {
+            self.solve_faces(k, dt, core::ptr::null(), false)
+        }
+    }
+
+    #[inline(never)]
+    unsafe fn solve_faces(&self, k: f64, dt: f64, contact_norm: *const f64, warm: bool) -> bool {
+        let work = &self.work;
+        let len = 2 * self.grid.n;
         let rhs2 = dot(work.residual, work.residual, len);
         if !rhs2.is_finite() {
             return false;
         }
         if rhs2 == 0.0 {
+            zero(work.solution, len);
             return true;
         }
-        // PCG on a symmetric positive definite face operator, with an exact diagonal.
         let tolerance2 = rhs2 * 1e-22;
+        if warm {
+            self.matrix(work.solution, work.result, k, dt, contact_norm);
+            for i in 0..len {
+                *work.residual.add(i) -= *work.result.add(i);
+            }
+            if dot(work.residual, work.residual, len) <= tolerance2 {
+                return true;
+            }
+        } else {
+            zero(work.solution, len);
+        }
+        for i in 0..len {
+            *work.direction.add(i) = *work.residual.add(i) * *work.diagonal.add(i);
+        }
+        // PCG on a symmetric positive definite face operator, with an exact diagonal.
         let mut rz = dot(work.residual, work.direction, len);
         for _ in 0..len {
-            self.matrix(work.direction, work.result, k, dt);
+            self.matrix(work.direction, work.result, k, dt, contact_norm);
             let denom = dot(work.direction, work.result, len);
             if !(denom > 0.0 && denom.is_finite()) {
                 return false;
@@ -333,6 +382,133 @@ impl Film {
             rz = next_rz;
             for i in 0..len {
                 *work.direction.add(i) = *work.z.add(i) + beta * *work.direction.add(i);
+            }
+        }
+        false
+    }
+
+    unsafe fn contact_solution(&self, angles: &ContactAngles, k: f64, dt: f64) -> bool {
+        let w = &self.work;
+        let grid = self.grid;
+        let n = grid.n;
+        let norm = w.contact;
+        let receding = norm.add(n);
+        let advancing = norm.add(2 * n);
+        let target = norm.add(3 * n);
+        let multiplier = norm.add(4 * n);
+        let rhs = norm.add(5 * n);
+        let wetting = &*self.wetting;
+        zero(w.solution, 2 * n);
+        rhs.copy_from_nonoverlapping(w.residual, 2 * n);
+        let rhs2 = dot(rhs, rhs, 2 * n);
+        if !(rhs2 > 0.0 && rhs2.is_finite()) {
+            return rhs2 == 0.0;
+        }
+        zero(norm, 5 * n);
+        for i in 0..n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let f = 2 * i + axis;
+                    let face = *w.weight.add(f) * grid.inv_dx;
+                    let metric = face * face * *w.diagonal.add(f);
+                    *norm.add(i) += metric;
+                    *norm.add(j) += metric;
+                }
+            }
+        }
+        let mut resist = false;
+        for i in 0..n {
+            let h = *self.height.add(i);
+            let metric = *norm.add(i);
+            if !metric.is_finite() {
+                return false;
+            }
+            let profile = if h > wetting.precursor_depth {
+                wetting.pressure(h, 1.0)
+            } else {
+                0.0
+            };
+            if metric > 0.0 && profile > 0.0 {
+                let local = if self.wetting_map.is_null() {
+                    wetting.stiffness
+                } else {
+                    *self.wetting_map.add(i)
+                };
+                let scale = scalar_sqrt(metric);
+                *norm.add(i) = 1.0 / scale;
+                *receding.add(i) = (local - angles.receding) * profile * scale;
+                *advancing.add(i) = (angles.advancing - local) * profile * scale;
+                if !(*receding.add(i)).is_finite() || !(*advancing.add(i)).is_finite() {
+                    return false;
+                }
+                resist = true;
+            } else {
+                *norm.add(i) = 0.0;
+            }
+        }
+        if !resist {
+            return self.solve_faces(k, dt, core::ptr::null(), false);
+        }
+        for i in 0..n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let f = 2 * i + axis;
+                    let face = *w.weight.add(f) * grid.inv_dx;
+                    let a = *norm.add(i) * face;
+                    let b = *norm.add(j) * face;
+                    *w.diagonal.add(f) = 1.0 / (1.0 / *w.diagonal.add(f) + a * a + b * b);
+                }
+            }
+        }
+        // Split the wet-area rates from the face flux. Their exact proximal update
+        // is the asymmetric soft threshold for the rate-independent dissipation.
+        let tolerance2 = rhs2 * 1e-20;
+        for iteration in 0..512 {
+            for i in 0..n {
+                *w.pressure.add(i) = *norm.add(i) * (*target.add(i) - *multiplier.add(i));
+            }
+            for i in 0..n {
+                for axis in 0..2 {
+                    let f = 2 * i + axis;
+                    let change = if let Some(j) = grid.neighbor(i, axis) {
+                        (*w.pressure.add(j) - *w.pressure.add(i)) * *w.weight.add(f) * grid.inv_dx
+                    } else {
+                        0.0
+                    };
+                    *w.residual.add(f) = *rhs.add(f) + change;
+                }
+            }
+            if !self.solve_faces(k, dt, norm, iteration > 0) {
+                return false;
+            }
+            grid.gradient_transpose(w.solution, w.weight, w.transpose);
+            let mut primal2 = 0.0;
+            for i in 0..n {
+                let rate = *norm.add(i) * *w.transpose.add(i);
+                let trial = rate + *multiplier.add(i);
+                let friction = trial.max(-*receding.add(i)).min(*advancing.add(i));
+                let next = trial - friction;
+                let error = rate - next;
+                primal2 += error * error;
+                *w.pressure.add(i) = (*target.add(i) - next) * *norm.add(i);
+                *target.add(i) = next;
+                *multiplier.add(i) = friction;
+            }
+            if primal2 <= tolerance2 {
+                let mut dual2 = 0.0;
+                for i in 0..n {
+                    for axis in 0..2 {
+                        if let Some(j) = grid.neighbor(i, axis) {
+                            let change = (*w.pressure.add(j) - *w.pressure.add(i))
+                                * *w.weight.add(2 * i + axis)
+                                * grid.inv_dx;
+                            dual2 += change * change;
+                        }
+                    }
+                }
+                if dual2 <= tolerance2 {
+                    return true;
+                }
             }
         }
         false
@@ -510,7 +686,13 @@ impl Film {
         let step = dt / substeps;
         for _ in 0..substeps as u32 {
             self.advective_faces();
-            self.move_water(step, true, exits);
+            if self.contact.is_null() {
+                self.move_water(step, true, exits);
+            } else if drains {
+                zero(self.work.flux, 2 * n);
+                self.move_water(step, true, exits);
+                self.advective_faces();
+            }
             if !self.wet_solution(k, step) {
                 return 2;
             }
@@ -557,6 +739,7 @@ unsafe extern "C" fn thin_film_step(
     dt: f64,
     wetting: *const Wetting,
     wetting_map: *const f64,
+    contact: *const ContactAngles,
 ) -> u32 {
     let (cols, rows) = (cols as usize, rows as usize);
     let n = cols * rows;
@@ -573,6 +756,7 @@ unsafe extern "C" fn thin_film_step(
         model,
         wetting,
         wetting_map,
+        contact,
         external: forcing,
         height,
         base,

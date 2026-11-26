@@ -4450,13 +4450,18 @@ Moss et al. (2009), §3, model bubble resonance separately from the direct liqui
 
 ### FLUID-07 precursor wetting
 
-Run `node --test --test-name-pattern="precursor contact-angle|nonlinear wetting|material boundary" packages/physics/tests/thin-film.test.js`
+Run `node --test --test-name-pattern="precursor contact-angle|nonlinear wetting|material boundary|advancing and receding|tilted cap" packages/physics/tests/thin-film.test.js`
 from a built physics entry. The first fixture compares a cosine perturbation to the discrete
 implicit decay with stiffness `2 σ (1 − cos θ) / h*²`. The second integrates the capillary and
 wetting energies of a positive film while checking water volume and snapshot replay.
 The two-cell fixture checks the pressure jump and places the sum of the two material
 stiffnesses in the single face equation. The model transports water toward the lower
 contact angle.
+The hysteresis pair uses shear below and above the threshold in both directions.
+Its pressure difference is the difference between the receding and advancing
+Schwartz–Eley pressures at the initial depth divided by the cell spacing. Beyond that
+threshold the remaining shear drives the implicit face response. The inclined cap
+checks the energy and volume on transposed gravity directions.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
 ### FLUID-07 measured inclined film

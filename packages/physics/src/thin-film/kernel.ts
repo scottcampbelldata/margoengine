@@ -22,6 +22,7 @@ export interface ThinFilmKernel {
     dt: number,
     wetting: number,
     wettingMap: number,
+    contactAngles: number,
   ): number;
 }
 

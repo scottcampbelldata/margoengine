@@ -15122,10 +15122,25 @@ for this elastic comparison. The ultimate moments and loading cycles remain sepa
   [Journal](https://doi.org/10.1006/jcis.1998.5448)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
   Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to
-  pressure. The film uses the resolved precursor in its depth equation. The separately configured
-  retention parameter is a static deadband at wet/dry faces. A deposited drop contributes its
-  volume and subcell footprint through conservative finite volumes.
+  pressure. Equation 10 brackets the stationary contact front by the advancing and receding
+  contact angles. A deposited drop contributes its volume and subcell footprint through
+  conservative finite volumes.
   [Author PDF](https://wanghmin.github.io/publication/wang-2005-wds/Wang-2005-WDS.pdf)
+- Giovanni Alberti and Antonio DeSimone, “Quasistatic evolution of sessile drops and contact angle
+  hysteresis” (2011), sections 2.6–2.7. The loss per unit change of footprint is
+  `σ(cos θ_eq − cos θ_a)` when advancing and `σ(cos θ_r − cos θ_eq)` when receding.
+  The resolved footprint uses `χ(h) = (1 − h*/h)²` above the precursor and zero below.
+  The frozen derivative `χ′(h)` converts the two area losses to pressure thresholds.
+  This is a smooth-footprint adaptation of the paper's dissipation distance.
+  [Author PDF](https://cvgmt.sns.it/media/doc/paper/827/gads2.pdf)
+- Stephen Boyd, Neal Parikh, Eric Chu, Borja Peleato and Jonathan Eckstein, “Distributed
+  Optimization and Statistical Learning via the Alternating Direction Method of Multipliers”
+  (2011), sections 3.1–3.3. The weighted face flux and cell wet-area rate form the two blocks.
+  The face solve includes the tangential body force and air shear. The cell update clips the
+  multiplier to the interval between its advancing and receding thresholds. The face and cell
+  residuals must both converge. Cell scaling uses the diagonal approximation of the face
+  solve's inverse to account for capillary and wetting stiffness.
+  [Author PDF](https://stanford.edu/~boyd/papers/pdf/admm_distr_stats.pdf)
 - L. Zhornitskaya and A. L. Bertozzi, “Positivity-Preserving Numerical Schemes for
   Lubrication-Type Equations” (2000). The fourth-order equation lacks the second-order maximum
   principle. Here each shared face uses one single flux limited by the donor's total outgoing

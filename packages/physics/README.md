@@ -4809,6 +4809,7 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   depth: 0.0002,
   wetting: { contactAngle: 0.35, precursorDepth: 0.00005 },
   wettingAngleMap: Array.from({ length: 24 }, (_, i) => (i % 4 < 2 ? 0.25 : 0.45)),
+  contactAngleHysteresis: [0.15, 0.55],
   drains: [false, false, false, true],
 });
 world.advance(60);
@@ -4820,6 +4821,11 @@ include the resolved precursor layer in the initial depth. The layer contributes
 budget as the rest of the film. Omit `wetting` to run without disjoining pressure.
 For patterned glass, give `wettingAngleMap` one row-major value per cell. Use `undefined`
 at a cell to apply the backing's default `contactAngle`.
+
+Set `contactAngleHysteresis: [receding, advancing]` to retain a shallow drop until
+gravity, pressure or air shear overcomes its contact-line resistance. Angles are in
+radians and must bracket every equilibrium angle on the backing. Supply the wetting
+precursor and omit the older scalar `pinning` option. Hysteresis is off by default.
 
 Set `suspended: true` on the underside of a panel with its normal pointing into the liquid.
 Gravity can then amplify long disturbances while surface tension damps short ones.

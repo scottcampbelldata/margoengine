@@ -158,6 +158,114 @@ test('ThinFilmSolver: a material boundary pulls water toward the more wettable g
   assert.equal(world.hash(), hash);
 });
 
+test('ThinFilmSolver: advancing and receding angles hold or release a precursor film by its force balance', async () => {
+  const precursorDepth = 0.0002;
+  const h = 1.5 * precursorDepth;
+  const spacing = 0.0015;
+  const viscosity = 0.05;
+  const surfaceTension = 0.0728;
+  const angles = [0.2, 0.4, 0.55];
+  const stiffness = angles.map((angle) => (2 * surfaceTension * (1 - Math.cos(angle))) / precursorDepth ** 2);
+  const ratio = precursorDepth / h;
+  const mobility = h ** 3 / (3 * viscosity);
+  const threshold = ((stiffness[2] - stiffness[0]) * precursorDepth * ratio ** 2 * (1 - ratio)) / spacing;
+  const shearWeight = (h * h) / (2 * viscosity);
+  for (const factor of [-1.8, -0.8, 0.8, 1.8]) {
+    const forcing = factor * threshold;
+    const { world, film } = await patch({
+      cells: [2, 1],
+      spacing,
+      depth: h,
+      viscosity,
+      surfaceTension,
+      shear: [(mobility * forcing) / shearWeight, 0],
+      wetting: { contactAngle: angles[1], precursorDepth },
+      contactAngleHysteresis: [angles[0], angles[2]],
+    });
+    const implicit =
+      (2 * (998 * -world.gravity[1] + stiffness[1])) / spacing ** 2 + (4 * surfaceTension) / spacing ** 4;
+    const excess = Math.sign(forcing) * Math.max(0, Math.abs(forcing) - threshold);
+    const delta = (dt * mobility * excess) / (spacing * (1 + dt * mobility * implicit));
+    const initial = world.takeSnapshot();
+    world.advance(1);
+    assert.equal(film.budget.substeps, 1);
+    // The normalized two-cell rate tolerance is 1e-10 of the unpinned flux.
+    const tolerance = (4e-10 * dt * mobility * Math.abs(forcing)) / spacing + 64 * Number.EPSILON * h;
+    close(film.sample(0, 0).depth, h - delta, tolerance);
+    close(film.sample(1, 0).depth, h + delta, tolerance);
+    close(film.budget.stored, film.budget.initial, 64 * Number.EPSILON * film.budget.initial);
+    const final = world.hash();
+    world.restoreSnapshot(initial.bytes);
+    world.advance(1);
+    assert.equal(world.hash(), final);
+  }
+});
+
+test('ThinFilmSolver: a tilted cap with wetting hysteresis loses energy in either grid direction', async () => {
+  const size = 32;
+  const spacing = 0.025 / size;
+  const precursorDepth = 0.00008;
+  const radius = 0.004;
+  const density = 998;
+  const sigma = 0.0728;
+  const equilibrium = 0.3;
+  const tilt = Math.PI / 15;
+  const c = Math.cos(tilt);
+  const s = Math.sin(tilt);
+  const coordinate = (i) => (i + 0.5 - size / 2) * spacing;
+  const depth = Array.from({ length: size * size }, (_, i) => {
+    const u = coordinate(i % size);
+    const v = coordinate(Math.floor(i / size));
+    return precursorDepth + 0.0006 * Math.max(0, 1 - (u * u + v * v) / (radius * radius));
+  });
+  const options = {
+    cells: [size, size],
+    spacing,
+    depth,
+    density,
+    viscosity: 0.05,
+    surfaceTension: sigma,
+    wetting: { contactAngle: equilibrium, precursorDepth },
+    contactAngleHysteresis: [0.18, 0.45],
+  };
+  const first = await patch({ ...options, u: [c, -s, 0] });
+  const second = await patch({ ...options, v: [0, -s, -c] });
+  const gravity = -first.world.gravity[1];
+  const energy = (values) => {
+    let total = 0;
+    for (let j = 0; j < size; j++) {
+      for (let i = 0; i < size; i++) {
+        const index = i + size * j;
+        const h = values[index];
+        const stretch = h > precursorDepth ? 1 - precursorDepth / h : (h - precursorDepth) / precursorDepth;
+        total +=
+          density * gravity * (0.5 * c * h * h - s * coordinate(i) * h) +
+          sigma * (1 - Math.cos(equilibrium)) * stretch * stretch;
+        if (i > 0) total += 0.5 * sigma * ((h - values[index - 1]) / spacing) ** 2;
+        if (j > 0) total += 0.5 * sigma * ((h - values[index - size]) / spacing) ** 2;
+      }
+    }
+    return total * spacing * spacing;
+  };
+  const oldEnergy = energy(depth);
+  for (const { world, film } of [first, second]) {
+    world.advance(8);
+    close(film.budget.stored, film.budget.initial, 128 * size * size * Number.EPSILON * film.budget.initial);
+  }
+  const alongU = first.film.depths();
+  const alongV = second.film.depths();
+  assert.ok(energy(alongU) < oldEnergy);
+  let downhill = 0;
+  for (let j = 0; j < size; j++) {
+    for (let i = 0; i < size; i++) {
+      const h = alongU[i + size * j];
+      close(h, alongV[j + size * i], 2e-9 * precursorDepth);
+      downhill += coordinate(i) * (h - depth[i + size * j]);
+    }
+  }
+  assert.ok(downhill > 0);
+});
+
 test('ThinFilmSolver: malformed wetting parameters report the range and its fix', async () => {
   const options = { cells: [4, 1], spacing: 0.001 };
   await assert.rejects(() => patch({ ...options, wetting: null }), {
@@ -173,6 +281,19 @@ test('ThinFilmSolver: malformed wetting parameters report the range and its fix'
   await assert.rejects(
     () => patch({ ...options, wetting: { contactAngle: 0.35, precursorDepth: 0.0002 }, wettingAngleMap: [0.5] }),
     { name: 'RangeError', code: 'PHYSICS_INPUT_RANGE', message: /one angle in radians per row-major film cell/ },
+  );
+  await assert.rejects(
+    () =>
+      patch({
+        ...options,
+        wetting: { contactAngle: 0.35, precursorDepth: 0.0002 },
+        contactAngleHysteresis: [0.4, 0.5],
+      }),
+    {
+      name: 'RangeError',
+      code: 'PHYSICS_INPUT_RANGE',
+      message: /receding and advancing angles that bracket equilibrium/,
+    },
   );
 });
 

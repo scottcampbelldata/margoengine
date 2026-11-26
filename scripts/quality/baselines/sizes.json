@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20597645,
+  "total": 20598151,
   "history": [
     {
       "date": "2026-10-24",
@@ -13717,6 +13717,12 @@
       "commit": "dd6d4b7f23",
       "reason": "BREAK-03 sectional girder force balance grows the optional crush entry from 5102 to 6094 B gzip. The ceiling rises from 5354 to 6350 B. The girder envelope is a named, tree-shakable export from the ductile material entry. A separate entry would repeat numeric validation and require a second opt-in for one crush workflow.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-contact-hysteresis",
+      "grew": 1,
+      "reason": "FLUID-07 adds advancing and receding contact angles with a conservative frictional pressure solve. Thin-film rises from 8878 to 9159 B gzip; cap changes from 8928 to 9434 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14592,7 +14598,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 8928,
+    "@margoengine/physics/thin-film": 9434,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 9754,
     "@margoengine/physics/tsunami": 6794,

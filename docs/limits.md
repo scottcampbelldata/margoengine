@@ -9570,10 +9570,15 @@ The optional `wetting` model gives the film a finite equilibrium contact angle b
 Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
-water balance. Measured spreading and contact-angle hysteresis remain open.
+water balance. Measured spreading remains open.
 The optional backing angle map adds one f64 value per film cell. Its pressure and
 implicit stiffness both vary by cell, and the exact two-cell check covers conservative
 motion toward the more wettable side and snapshot replay.
+The optional advancing and receding angles add a rate-independent resistance on the
+resolved precursor. It uses seven f64 scratch values per cell. The residual ceiling is
+512 iterations per wetting substep. Evidence covers a two-cell force balance, both
+directions on a 32 × 32 tilted film, and deterministic replay. Independent measured
+sliding and cases with a steep contact slope remain open.
 An explicitly placed, wetted circular rim can collect a single boundary cell's discharge and
 release timed droplets. Its quasistatic size uses Mori (1990) with a 0–1.4 diameter-to-ideal-volume
 scale ratio and negligible gas density. The 3.2 mm, 1 mL/min water control predicts 50.17 μL
@@ -9588,7 +9593,7 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 8,878 B gzip with a 8,928 B ceiling. Both Wasm assets are 10,119 B raw and each is 4,363 B gzip.
+The optional thin-film entry is 9,159 B gzip with a 9,434 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

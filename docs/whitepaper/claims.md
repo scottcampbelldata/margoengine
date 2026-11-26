@@ -6127,6 +6127,12 @@ A two-material backing transfers water toward the more wettable cell by the amou
 by the independent face balance. The patterned pressure domain conserves water and replays
 exactly. [Reproduce](reproduce.md#fluid-07-precursor-wetting)
 
+Advancing and receding contact angles hold a shallow film within the predicted force
+interval. Beyond it the two-cell solution matches the analytic remaining flux in both
+directions. A 32 × 32 tilted cap lowers its gravitational, capillary and wetting energy
+together, conserves film volume and gives the same rotated response in both grid axes.
+[Reproduce](reproduce.md#fluid-07-precursor-wetting)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings
