@@ -14625,8 +14625,15 @@ At 45 frames the fin-on case cuts about 49.6 μm and raises an adjacent region b
 about 73.0 μm relative to the still-fin case. This is a reduced one-way bed-shear
 model. It tracks the received horizontal impulse and preserves each grain's mass.
 The field does not return unresolved water momentum or pore pressure. Explicit
-pore-water transport, reciprocal dynamic contact, the voxel material handoff
-and measured inertial flow remain open.
+pore-water transport, reciprocal dynamic contact and measured inertial flow remain open.
+
+The voxel handoff samples complete solid cubes into a newly loaded solver at a
+world step boundary. The sum of reference volumes equals the original selected
+volume, and the mass follows the destination material density. Plan sufficient
+grid resolution and the solver clock for the expected speed. The handoff starts
+new material at rest, with no pre-existing stress. It does not convert liquids,
+partial cells, or particles back to voxels. The voxel and physics checkpoints
+need to be restored together when rewinding across the transfer.
 
 ### Physical strand guides (SOFT-03)
 
@@ -31964,10 +31971,12 @@ measurements require separate models and evidence.
 
 The optional continuum produces shear yield and persistent compaction on the live
 terrain bed. Falling voxel sand now transfers a displaced liquid's full packed
-state to the vacated cell. The voxel-to-continuum material handoff for repose
-and pile evolution is still open. The continuum publishes layer-volume changes to the live bed when it receives the
-ray wake; the fin-on and still-fin test measures erosion and deposition, and both
-memory modes replay identically. The original BB-7 shot still needs the scene binding.
+state to the vacated cell. A separate voxel entry transfers selected solid cubes
+into the continuum. The transfer preserves reference volume, with independent
+pile-repose validation still open. The continuum publishes layer-volume changes
+to the live bed when it receives the ray wake. The fin-on and still-fin test
+checks erosion and deposition, and both memory modes replay identically. The
+original BB-7 shot still needs the scene binding.
 
 ### Strand contacts and production skin wiring (SOFT-03, PA-71 and PA-75)
 

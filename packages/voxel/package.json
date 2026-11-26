@@ -62,6 +62,10 @@
       "types": "./dist/physics.d.ts",
       "import": "./dist/physics.js"
     },
+    "./granular-mpm": {
+      "types": "./dist/granular-mpm.d.ts",
+      "import": "./dist/granular-mpm.js"
+    },
     "./render": {
       "types": "./dist/render.d.ts",
       "import": "./dist/render.js"
