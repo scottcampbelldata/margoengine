@@ -39,6 +39,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./babylon": {
+      "types": "./dist/babylon.d.ts",
+      "import": "./dist/babylon.js"
+    },
     "./gcode": {
       "types": "./dist/gcode.d.ts",
       "import": "./dist/gcode.js"

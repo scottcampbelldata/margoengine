@@ -80,6 +80,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parseVRML`, `parseX3D` (`/vrml`) | See [VRML and X3D](#vrml-and-x3d) |
 | `parsePRWM` (`/prwm`) | See [PRWM](#prwm) |
 | `parseTilt` (`/tilt`, async) | See [Tilt Brush](#tilt-brush) |
+| `parseBabylon`, `flattenBabylon` (`/babylon`) | See [Babylon scenes](#babylon-scenes) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
@@ -658,6 +659,38 @@ data.set([...header, ...name]);
 new Float32Array(data.buffer, header.length + name.length, 9).set([0, 0, 0, 1, 0, 0, 0, 1, 0]);
 const model = parsePRWM(data);
 console.log(model.positions.length, [...model.indices]); // 9 [0, 1, 2]
+```
+
+## Babylon scenes
+
+`parseBabylon(input, {rightHanded, maxBytes, maxNodes, maxTextureBytes, maxVertices, maxTriangles})` from `./babylon` reads a Babylon.js `.babylon` scene (JSON; the format is described at doc.babylonjs.com, "Babylon file format"). `input` is the bytes, the JSON text or the parsed object. It returns `{meshes, transformNodes, materials, multiMaterials, cameras, lights, skeletons, clearColor, ambientColor, activeCameraId, producer, warnings}`:
+
+- **Meshes** keep the file's vertices (`positions`, `normals`, `uvs`, `uvs2` as `attributes.uv1`, `colors` as rgb) or the shared `geometries.vertexData` they name through `geometryId`; each submesh is a group with `properties.materialIndex`; `instances` become meshes with `instanceOf` that share the geometry object. Placement is `translation`, `rotation` (a quaternion; an Euler `rotation` is read as Babylon's YXZ order) and `scale`, relative to `parentId`. Four (or eight, with `matricesIndicesExtra`) bone influences per vertex arrive as `joints` and `weights`.
+- **Materials** are `standard` (diffuse, specular, specular power, emissive, alpha, `backFaceCulling`) or `pbr` (`PBRMaterial` and `PBRMetallicRoughnessMaterial`: base colour, metallic, roughness). Colours come out linear: Babylon's Standard colours are sRGB and are converted, PBR colours already are linear. Texture slots keep their name, offset, scale, wrap and `invertY`; an embedded `base64String` is decoded into `data`.
+- **Cameras** give `position`, `target`, `fov` and the clip range, from `target`, from `alpha`/`beta`/`radius` (ArcRotate) or from the rotation (Free); `mode` 1 gives `orthographic`. **Lights** are `point`, `directional`, `spot` (full cone `angle`) or `hemispheric`. **Skeletons** list bones with column-major local bind matrices. Node animations of position, rotation and scaling arrive as keys (`animations`).
+- Babylon is left-handed. `rightHanded` (default true) negates Z in positions, normals, placements, camera and light vectors and swaps each triangle's winding, so the scene lands in the engine's space; false keeps the file's numbers.
+- Skipped with a note in `warnings`: delay-loaded `.babylonbinarymeshdata` meshes, pivot matrices, and light types past the four. Particle systems, sprites, sounds, LODs and post processes are not read. A non-JSON, wrongly shaped, out-of-range or cyclic file, an index past the vertices, a submesh past the indices, more than `maxNodes` nodes, a texture past `maxTextureBytes`, or counts past the vertex and triangle limits throws a `LoaderError` with a `code`.
+
+`flattenBabylon(scene, {onlyVisible})` bakes every visible mesh's world transform (through its parents) into one `LoadedGeometry`, one group per mesh. `@margoengine/exporters/babylon` writes the same format.
+
+```ts
+import { parseBabylon, flattenBabylon } from '@margoengine/loaders/babylon';
+
+const scene = parseBabylon({
+  cameras: [{ id: 'cam', type: 'FreeCamera', position: [0, 1, -5], target: [0, 1, 0], fov: 0.9 }],
+  materials: [{ id: 'red', diffuse: [1, 0, 0] }],
+  meshes: [
+    {
+      id: 'tri',
+      position: [1, 2, 3],
+      materialId: 'red',
+      positions: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+      indices: [0, 1, 2],
+    },
+  ],
+});
+console.log(scene.cameras[0].position, scene.meshes[0].translation); // [0, 1, 5] [1, 2, -3]
+console.log(flattenBabylon(scene).positions.length / 3); // 3
 ```
 
 ## Tilt Brush
