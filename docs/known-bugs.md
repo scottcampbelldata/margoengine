@@ -6,6 +6,33 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: the subsurface case had no measured Direct3D 11 time (KB-VPT-SPLIT-SUBSURFACE, voxel-pathtracer)
+
+- **Repro:** at 7e04c03161, `node --test tests/voxel-pathtracer-gpu-split.test.js`: "test:gpu:light-transport: every
+  case has a measured Direct3D 11 time", missing `subsurface`.
+- **Cause:** 67653d1dc3 (KB1673) added the `subsurface` case to `test:gpu:light-transport` without its time in
+  `packages/voxel-pathtracer/tests/compat-d3d11-case-seconds.json`; that landing's gate did not run the split test.
+- **Fix:** the case measured cold on the WebGL2 layer over ANGLE Direct3D 11 (RTX A6000), 55.4 s, is recorded; the
+  script's cases sum to 265.9 s against its 600 s limit.
+- **Regression:** `tests/voxel-pathtracer-gpu-split.test.js`, which fails without the entry.
+
+### Open 2026-11-26: on the WebGL2 layer a camera that moves every frame is shown no traced image (KB-VPT-ROUTE-MOVING, voxel-pathtracer)
+
+- **Repro:** at 7e04c03161, `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/browser-check.mjs denoisehistory`
+  (RTX A6000, ANGLE Direct3D 11): "moving camera, 1 sample a frame for 30 frames: RMS 185.86 (raw frames 185.86, still
+  camera 4.99)" and the case fails; on WebGPU the same case reads 5.44, 16.00 and 2.78. The canvas is as far from the
+  converged image with the denoiser as without it, which is what a frame with no traced sample gives.
+- **Cause:** on the layer's route a frame launches a batch of samples that lands tens of frames later
+  (`#routeViewport` in `packages/voxel-pathtracer/src/tracer.ts`). A camera change restarts the view, a batch that
+  lands after a restart is dropped (its epoch is not the view's), and a view with no samples draws nothing. A camera
+  that moves every frame therefore never gets a sample on screen until it rests. The case moved the camera every
+  frame; nobody saw it fail because `test:gpu:denoise` stops earlier on the layer (KB-L5a-10).
+- **Done 2026-11-26 (the check):** the steps of `denoisehistory` and `denoisedisocclusion` wait until their sample
+  has landed (`sampled` in `tests/browser-check.html`); both cases now give the same numbers on WebGPU and on the
+  layer (5.47, 16.00, 2.80).
+- **Still open (the tracer):** while the camera moves on the layer, the viewport should keep showing an image: the
+  last one that landed, or the batch in flight once it lands, reprojected as the denoiser's history is.
+
 ### Fixed 2026-11-26: a long thin body that hit a wall hard and spinning swung through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
 
 - **Repro:** a 2 m by 0.1 m box with `ccd: true`, moving at 150 m/s and turning at 8 rad/s toward a 0.1 m thick wall,
@@ -11248,6 +11275,32 @@ reproduced `EBUSY` and the live server/worker ports; the repaired seven-test fil
 
 - **Job 1, repro:** voxel-pathtracer's README and `tests/magicavoxel/` record subsurface differences of 7-16 display levels, glass over a lit floor 1-2 levels brighter, and atmosphere residuals. The renderer uses a fitted single-density random-walk subsurface model and a fitted single-scattering atmosphere; neither establishes the external editor's full transport model. No checked-in repeatable zero-error image oracle exists. These partial implementations do not satisfy exact pixel parity. Closing this needs an external black-box reference corpus across density, glass and atmosphere settings and a root-cause transport comparison, without changing the oracle or its zero-error requirement. Job 1 remains BLOCKED.
 - **Job 2, repro:** `tests/browser-check.mjs denoisehistory` and the README's viewport measurements retain noise on newly uncovered surfaces after a camera move. Reprojection has no valid history there, and a finite noisy first-frame spatial estimate cannot in general recover an arbitrary hidden radiance field exactly. Schied et al., [Spatiotemporal Variance-Guided Filtering](https://research.nvidia.com/sites/default/files/pubs/2017-07_Spatiotemporal-Variance-Guided-Filtering%3A/svgf_preprint.pdf), section 6, also reports low-light and motion limitations. The existing classical temporal filter is partial coverage, not the requested noise-free guarantee. A repeatable disocclusion oracle and an algorithm meeting that guarantee remain missing. Job 2 remains BLOCKED.
+
+- **Job 2, the oracle and what it measures (2026-11-26, KB1664):** `tests/browser-check.mjs denoisedisocclusion` (in
+  `test:gpu:denoise`) is the repeatable oracle: 17 pillars before a wall under a roof, lit by bounce light, a lamp and
+  sun stripes on the floor; the camera moves sideways 1 sample a frame, uncovering a 4-pixel strip beside every
+  pillar. First-hit maps of the last cameras class each pixel (silhouettes left out). 8-bit RMS against the converged
+  image, the same on WebGPU and the WebGL2 layer (RTX A6000): uncovered in the last frame 6.49 (2,230 pixels; one raw
+  sample 66.66), uncovered in the two frames before 4.74, history kept 4.64. On the wall alone (luminance): 4.02
+  against 2.46, of which smooth error 3.40 against 1.75, grain 1.93 against 1.61, mean -1.57 against -0.41. So the
+  uncovered strip is mostly darker and smoothly wrong, not grainy; the darkening is the luminance stop around a
+  single sample of a skewed distribution. At 8 samples a frame the wall reads 3.23 against 1.87: more samples there
+  do not close the gap.
+- **Job 2, candidates measured and rejected (uncovered pixels overall; wall, then floor with sun stripes; before:
+  6.49; 4.11, 12.09):** a 7 x 7 surface-weighted variance (Schied et al. 2017, section 4.2) alone: 6.55. Borrowing the
+  estimate history of neighbours (the history fix of Zhdan, "Fast Denoising with Self-Stabilizing Recurrent Blurs",
+  GTC 2020, <https://developer.nvidia.com/gtc/2020/video/s22699>): 9.00, blotches from the few old taps in reach,
+  and darker still (mean -3.6 to -5.1) once gated by local statistics. A 7 x 7 first estimate with its variance
+  reduced: 9.64. Filling the displayed history from same-surface neighbours: 7.44 (3.58, 14.96). A 7 x 7 first
+  estimate that keeps the variance, weighted by estimated errors with a successive-difference test for structure
+  (von Neumann 1941, <https://doi.org/10.1214/aoms/1177731677>): 6.64 (3.69, 12.85); it removes the darkening (mean
+  -0.27) and lowers the wall by 10 to 16 percent, but blurs the sun stripes in the strip (the two frames after: 7.05
+  to 8.51 there). None beats the filter as it is, so none landed; the case's bounds (uncovered at most 1.6 times the
+  kept pixels, at most a sixth of a raw sample) keep it from getting worse.
+- **Job 2, what is left:** the sun's sharp shadows need one sample and no blur, the bounce light needs many; one
+  filter over their sum cannot serve both in a strip with no history. Filtering direct and indirect light apart
+  (Schied et al. 2017, section 3) would let the uncovered strip's indirect part take the wide first estimate above.
+  That is a second set of accumulators and filter chains: a design decision, not done here. Job 2 remains open.
 
 ### Batch 99 caustic guide scope
 

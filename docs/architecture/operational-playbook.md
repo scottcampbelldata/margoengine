@@ -10927,6 +10927,16 @@ The correction to heave and pitch is computed from the spectral components while
 
 `@margoengine/animation/instanced-morph` keeps `SkinnedCrowd`'s vertex stage and adds one step before its `skinned` call: for each block of the vertex's primitive (one entry texel naming the first offset texel and the weight index), a non-zero weight adds the target's position and normal offsets, read with `textureLoad` from the bone texture after its bone rows. Weights live in the instance row as `array<vec4f, ceil(targets / 4)>`, so the crowd keeps VATCrowd's six bindings, its shadow caster and its lighting hooks unchanged; the text of the stage is `skinnedCrowdVertex` with four edits (a CPU test takes them out and compares). The order, morph then skin, is the deformation pass's. Evidence that exists: the CPU twin against the analytic strip and the baked offsets; the compute readback of the vertex stage against the twin and the pixel comparison with the model, on native WebGPU and the WebGL2 compatibility layer. Evidence still missing: no run on a second GPU vendor or on Firefox and Safari, no measured frame cost at the 64-target limit, and the upload is the whole instance buffer rather than the changed rows.
 
+## Voxel path tracer uncovered-pixel oracle (section 5 evidence, 2026-11-26)
+
+Evidence that now exists: `packages/voxel-pathtracer/tests/browser-check.mjs denoisedisocclusion` (in
+`test:gpu:denoise`) classes the pixels of a moving camera's last frame by when their first hit came into view and
+bounds the viewport denoiser's error on the uncovered ones against the pixels that keep their history (6.49, 4.74 and
+4.64 of 255 on an RTX A6000, the same on WebGPU and the WebGL2 layer). `denoisehistory` and this case wait for each
+step's sample to land, so both run on the layer's route. Still missing: a filter that brings the uncovered pixels to
+the level of the rest (five candidates measured worse, docs/known-bugs.md Batch 99 job 2), and a traced image while
+the camera moves on the layer (KB-VPT-ROUTE-MOVING).
+
 ## Synchronous raycasts on GPU-deformed meshes (KB-BVH-SYNCPOSE1, section 5 evidence, 2026-11-26)
 
 A skin or morph pose is written by a compute pass into a GPU buffer, and WebGPU has no synchronous readback, so a CPU query can test the drawn pose only if the same arithmetic runs on the CPU. Each deformer now registers that evaluation per primitive (`packages/shared/pose-source.js`): `Animation` runs the deformation shader's terms in `packages/animation/src/pose.ts` (morph deltas times weights, then the weighted sum of four or eight palette matrices, the cofactor normal with its handedness flip, a final normalize) on a palette computed as `upload` computes it, `inverse(node) * joint * inverseBind` in float32; `Skin` hands over the vertices its CPU `pose` already made; `GeometryCachePlayer` hands over the array it uploads. `@margoengine/bvh` reads every model primitive through `primitiveEntry`, which swaps in the posed vertices while `deformed` is set and refits one tree per pose (Wald, Boulos and Shirley 2007).

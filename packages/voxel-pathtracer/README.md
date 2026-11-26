@@ -522,7 +522,11 @@ disposal releases them.
   camera (diffuse, glass and cloud scenes): turning 0.001 degrees per frame 2.40 / 6.08 / 5.22 before, 0.98 / 2.33 /
   1.60 now; turning 0.5 degrees per frame 2.40 / 6.05 / 5.00 before, 2.13 / 2.78 / 2.32 now. Where a move uncovers a
   surface (behind an object the camera passes) the history starts again there, so those pixels are noisier for a few
-  frames; 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
+  frames. Measured (`denoisedisocclusion`: pillars passing before a wall lit by bounce light, 1 sample per frame, a
+  4-pixel strip uncovered per frame, the same on WebGPU and the WebGL2 layer): the pixels uncovered in the last frame
+  are 6.49 from the converged image, those uncovered in the two frames before 4.74, those that keep their history
+  4.64 (one raw sample: 66.66). The gap is a darker, smoothly wrong strip, not grain, and 8 samples per frame leave
+  most of it (`docs/known-bugs.md`, under the oracle for uncovered pixels). 8 frames after the camera stops the diffuse and cloud scenes are 1.10 and 2.28 against 0.96 and 2.03 without
   history (the glass scene 1.95 against 2.03). A camera that never moves gives the same image as before. Every camera
   pose draws its own sample sequence, so equal inputs still give equal images. Cost at 1920 x 1080: two more images of
   history, kept in two textures (348 against 285 MiB for the denoised material scene) and about 0.6 ms per frame; scenes without glass,
@@ -792,8 +796,10 @@ Numbers on other GPUs are not measured.
   - a lamp beside a wall (160 x 120, against 16,384 samples): the lit stretch keeps 0.912 of its level at 16 samples and
     0.967 at 64 (0.883 and 0.958 before the wide levels' ratio stop), RMSE x1.99 and x1.38 below raw (it was worse than
     raw at 64 before);
-  - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.31 against the converged image,
-    raw frames 16.00, a still camera 2.78;
+  - the viewport denoiser while the camera moves (30 frames, 1 sample each): RMS 5.47 against the converged image,
+    raw frames 16.00, a still camera 2.80, the same on the WebGL2 layer (each step waits for its sample to land);
+  - the pixels a camera move uncovers (24 frames, 1 sample each, pillars before a wall): RMS 6.49 against the
+    converged image where the last frame uncovered them, 4.74 two frames on, 4.64 where the history was kept;
   - depth of field blurs only out-of-focus edges; motion blur spreads a moving cube over its path; camera motion of 2
     units with the shutter open moves a 1-unit line's centroid by 0.9977 (1) and widens its profile to a standard
     deviation of 0.6455 units (the box convolution's sqrt(5/12) = 0.6455);

@@ -40,6 +40,8 @@
 // - denoise: error with and without the wavelet denoiser, overall and at object edges, also on two caustic scenes;
 // - denoisepeak: a lamp-lit stretch of wall keeps its level and loses error through the denoiser (16, 64 samples);
 // - denoisehistory: the viewport's denoiser while the camera moves, against the converged image and a still camera;
+// - denoisedisocclusion: the same on the pixels a camera move uncovers (no history to reproject), against the pixels
+//   that keep their history and the raw frame (KB1664); `--picture` writes the frames and the pixel classes as PNGs;
 // - lens: depth of field blurs out-of-focus edges only; motion blur spreads a moving cube along its path; camera motion
 //   blur widens a line's profile to the box-convolution width;
 // - viewport: disabled is bit-identical to raster, dispose restores raster, a device restore redraws the same image;
@@ -730,6 +732,27 @@ try {
     assert.deepEqual(r.errors, []);
     assert.ok(r.moving <= r.raw / 2.5, 'moving camera: the denoised history stays well below one raw sample');
     assert.ok(r.moving <= r.still * 2.5, 'moving camera: within reach of the still camera (no ghosting)');
+  }
+  if (wanted('denoisedisocclusion')) {
+    const picture = args.includes('--picture'),
+      r = await run('denoisedisocclusion', picture);
+    for (const name of ['fresh', 'young', 'kept'])
+      console.log(
+        `  ${name} (${r[name].pixels} px): RMS ${r[name].rms.toFixed(2)} (raw frame ${r[name].raw.toFixed(2)})`,
+      );
+    if (picture) {
+      await mkdir('test-results/voxel-pathtracer', { recursive: true });
+      for (const [name, data] of Object.entries(r.pictures))
+        await writeFile(`test-results/voxel-pathtracer/disocclusion-${name}.png`, Buffer.from(data, 'base64'));
+      delete report.results.denoisedisocclusion.pictures;
+    }
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.fresh.pixels >= 1500 && r.young.pixels >= 1500, 'uncovered strips: enough pixels to measure');
+    // Measured 6.49, 4.74 and 4.64 (raw frame 66.66), the same on WebGPU and on the WebGL2 layer. Five candidate
+    // filters for the uncovered pixels read 6.60 to 9.64 (docs/known-bugs.md, Batch 99 job 2).
+    assert.ok(r.fresh.rms <= r.fresh.raw / 6, 'uncovered pixels: the denoiser removes most of one raw sample');
+    assert.ok(r.fresh.rms <= r.kept.rms * 1.6, 'uncovered pixels: within reach of the pixels that keep their history');
+    assert.ok(r.young.rms <= r.kept.rms * 1.25, 'two frames after: as the pixels that keep their history');
   }
   if (wanted('motion')) {
     const r = await run('motion');
