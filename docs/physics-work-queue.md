@@ -478,7 +478,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ebfc65dbb |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 533cc7249 |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d90933a42 |
-| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5d2524732 |
+| SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | BUILDING (codex/physics-sea-12-upgrade) |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
 | SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), checkpoint 336a4413c4 |
