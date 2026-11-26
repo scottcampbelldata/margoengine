@@ -292,6 +292,14 @@ export function validateShot(input) {
       add('shot.page.settings', 'must name a function from globalThis with dots, for example margoShot.settings');
     if ('aovs' in page && (typeof page.aovs !== 'string' || !DOTTED.test(page.aovs)))
       add('shot.page.aovs', 'must name a function from globalThis with dots, for example stormLight.aovs');
+    if ('film' in page && (typeof page.film !== 'string' || !DOTTED.test(page.film)))
+      add('shot.page.film', 'must name a function from globalThis with dots, for example margoShot.film');
+    // The film hook gets each sub-frame's time as an exact fraction of a frame, which a whole number of degrees gives.
+    if ('film' in page && (shot.subframes ?? 1) > 1 && !Number.isInteger(shot.shutter ?? 180))
+      add(
+        'shot.shutter',
+        'must be a whole number of degrees when shot.page.film is set, so sub-frames have exact times',
+      );
     if ('ground' in page && (typeof page.ground !== 'string' || !DOTTED.test(page.ground)))
       add(
         'shot.page.ground',
@@ -366,6 +374,16 @@ export function subframeOffsets({ fps, subframes, shutter }) {
   if (subframes <= 1) return [0];
   const open = shutter / 360 / fps;
   return Array.from({ length: subframes }, (_, k) => ((k + 0.5) / subframes) * open);
+}
+
+/**
+ * The exact film time of sub-frame `k` of the frame drawn as render frame `frame` (`shot.page.film`): the frame, the
+ * offset into it as a fraction of a frame (the sub-frame's middle on the shutter, `(2k + 1) shutter / (720 subframes)`,
+ * 0 / 1 for a frame drawn once), and the frame rate, so a page's FilmClock lands on the same ticks in every render.
+ */
+export function filmTime({ fps, subframes, shutter }, frame, k = 0, drawnOnce = false) {
+  if (drawnOnce || subframes <= 1) return { frame, offset: { num: 0, den: 1 }, fps: { num: fps, den: 1 } };
+  return { frame, offset: { num: (2 * k + 1) * shutter, den: 720 * subframes }, fps: { num: fps, den: 1 } };
 }
 
 /** The kept frame index of each probe, by name: the frame at or just after its time. */

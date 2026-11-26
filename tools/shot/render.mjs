@@ -21,6 +21,7 @@ import {
   renderSize,
   shotFrames,
   subframeOffsets,
+  filmTime,
 } from './shot-file.mjs';
 import { shotBrowser } from './platform.mjs';
 
@@ -131,6 +132,7 @@ export const shotStep = async ({
   engine,
   apply,
   settingsHook,
+  filmHook,
   ground,
   canvas,
   png,
@@ -146,7 +148,7 @@ export const shotStep = async ({
   let result = null,
     drawn = null;
   for (let sub = 0; sub < subs.length; sub++) {
-    const { time, state, settings } = subs[sub];
+    const { time, state, settings, film } = subs[sub];
     let { camera } = subs[sub];
     // Heights above the ground (shot.page.ground): the page's ground added under the camera and the target,
     // as onGround in shot-file.mjs does. The page may give its ground only once it has loaded it.
@@ -189,6 +191,14 @@ export const shotStep = async ({
       const hook = shot.get(apply);
       if (typeof hook !== 'function') throw new Error(`${apply} is not a function in the page`);
       await hook(state, { time: time.seconds, kept });
+    }
+    // The page's film hook, after the cutscene state and before the frame's callbacks: the page sets its FilmClock to the
+    // sub-frame's exact time, moves its animation there and then its physics, so the frame draws bodies where the
+    // animation put them in this frame, not the last (KB-PHYS-FRAMEORDER1), whatever order the page added its plugins in.
+    if (film && filmHook) {
+      const hook = shot.get(filmHook);
+      if (typeof hook !== 'function') throw new Error(`${filmHook} is not a function in the page`);
+      await hook(film, { time: time.seconds, kept });
     }
     // The sky's own coverage record, for skyClip of a shot with no page sky mask: on before the frame is drawn.
     if (recordSky) shot.recordSky(engine);
@@ -283,6 +293,7 @@ export const pageHooks = (shot, recordSky = false) => ({
   engine: shot.page.engine,
   apply: shot.page.apply,
   settingsHook: shot.page.settings,
+  filmHook: shot.page.film,
   ground: shot.page.ground,
   canvas: shot.page.canvas,
   recordSky,
@@ -400,8 +411,9 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
         // A kept frame of a production render's check that is not a probe: drawn in full, not captured.
         pass = !skip && kept !== null && only !== null && !only.has(kept),
         // A kept frame's sub-frames over the shutter (P2); pre-roll and skipped frames draw at the frame's own time.
-        offsets = kept === null || skip ? [0] : subframeOffsets(shot),
-        subs = offsets.map((offset) => {
+        drawnOnce = kept === null || skip,
+        offsets = drawnOnce ? [0] : subframeOffsets(shot),
+        subs = offsets.map((offset, k) => {
           const seconds = frame.time + offset,
             state = cutscene.evaluate(seconds);
           return {
@@ -412,6 +424,8 @@ export async function renderOnce(browser, file, { out, label, write, expect, onl
             // sub-frame, so they move (KB-SHOT-SETTINGS2: only the warm-up wrote them, so a keyed row held its first
             // value for the whole shot); a held row went in once, with the warm-up.
             settings: shotKeyedValuesAt(shot, tables, seconds),
+            // The exact film time for the page's film hook (shot.page.film): its FilmClock, animation and physics.
+            film: shot.page.film ? filmTime(shot, frame.render, k, drawnOnce) : null,
           };
         });
       const result = await step({

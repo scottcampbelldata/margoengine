@@ -74,3 +74,32 @@ test('shotStep calls no settings hook for a shot without settings, and names a h
     delete globalThis.__margoShot;
   }
 });
+
+test("shotStep calls the page's film hook with the sub-frame's exact time, after page.apply and before the frame", async () => {
+  const calls = [];
+  globalThis.__margoShot = standIn(calls);
+  const page = { film: async (film, at) => calls.push(['film', film, at]) };
+  const get = globalThis.__margoShot.get;
+  globalThis.__margoShot.get = (name) => (name === 'page.film' ? page.film : get(name));
+  try {
+    const film = { frame: 48, offset: { num: 180, den: 2880 }, fps: { num: 24, den: 1 } };
+    await shotStep({
+      ...args({ time: { ms: 2000, seconds: 2.0026 }, state: { t: 1 }, settings: null, film }),
+      filmHook: 'page.film',
+    });
+    assert.deepEqual(
+      calls.map((c) => c[0]),
+      ['apply', 'film', 'frame'],
+    );
+    assert.deepEqual(calls[1][1], film);
+    // A shot with no film hook calls nothing for it.
+    calls.length = 0;
+    await shotStep(args({ time: { ms: 16, seconds: 0.5 }, state: { t: 1 }, settings: null, film }));
+    assert.deepEqual(
+      calls.map((c) => c[0]),
+      ['apply', 'frame'],
+    );
+  } finally {
+    delete globalThis.__margoShot;
+  }
+});

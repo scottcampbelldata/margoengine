@@ -12,6 +12,7 @@ import {
   SHOT_KINDS,
   cameraFrames,
   compareRenders,
+  filmTime,
   firstSeconds,
   frameName,
   onGround,
@@ -799,4 +800,26 @@ test('every Fauld countryside, crater and blast shot has a lens in a named band,
     }
   }
   assert.equal(n, 102);
+});
+
+test('shot.page.film names a page function, needs whole-degree shutters with sub-frames, and gets exact film times', () => {
+  const page = { path: 'examples/storm-light/index.html', engine: 'stormLight.engine', film: 'margoShot.film' };
+  assert.deepEqual(paths(shot({ page })), []);
+  assert.ok(paths(shot({ page: { ...page, film: 'not a name' } })).includes('shot.page.film'));
+  assert.ok(paths(shot({ page, subframes: 4, shutter: 172.8 })).includes('shot.shutter'));
+  assert.deepEqual(paths(shot({ page, subframes: 4, shutter: 180 })), []);
+  const file = parseShot(shot({ page, fps: 24, subframes: 4, shutter: 180 }));
+  // Sub-frame k sits at (2k + 1) / 8 of the 180 degree shutter: 180 / 2880, 540 / 2880, ... of a frame.
+  assert.deepEqual(filmTime(file.shot, 48, 0), {
+    frame: 48,
+    offset: { num: 180, den: 2880 },
+    fps: { num: 24, den: 1 },
+  });
+  assert.deepEqual(filmTime(file.shot, 48, 3).offset, { num: 1260, den: 2880 });
+  // The seconds the shot tool draws a sub-frame at are the same instant.
+  for (let k = 0; k < 4; k++) {
+    const { offset } = filmTime(file.shot, 48, k);
+    assert.ok(Math.abs(offset.num / offset.den / 24 - ((k + 0.5) / 4) * (180 / 360 / 24)) < 1e-15);
+  }
+  assert.deepEqual(filmTime(file.shot, 7, 2, true).offset, { num: 0, den: 1 }, 'a frame drawn once sits on its frame');
 });
