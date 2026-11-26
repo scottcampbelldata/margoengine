@@ -73,34 +73,129 @@ export const WATER_SETTINGS: readonly WaterSetting[] = [
     'wind',
   ),
   follows(
-    n('windDirection', 'wind', 0, 0, 360, 1, 'degrees', 'Compass direction the waves travel: 0 is +Z, 90 is +X. Null follows the weather.'),
+    n(
+      'windDirection',
+      'wind',
+      0,
+      0,
+      360,
+      1,
+      'degrees',
+      'Compass direction the waves travel: 0 is +Z, 90 is +X. Null follows the weather.',
+    ),
     'windDirection',
   ),
-  n('fetch', 'wind', DEFAULT_FETCH, 1, 1e7, 100, 'm', 'Distance the wind has blown over open water: a short fetch is a small sea, a long one a full one.'),
+  n(
+    'fetch',
+    'wind',
+    DEFAULT_FETCH,
+    1,
+    1e7,
+    100,
+    'm',
+    'Distance the wind has blown over open water: a short fetch is a small sea, a long one a full one.',
+  ),
   follows(
-    n('whitecaps', 'surface', 0, 0, 1, 0.01, '', 'Breaking crests, 0 none to 1 a gale with long streaks. Null lets the wind decide (3.84e-6 U^3.41 of the sea).'),
+    n(
+      'whitecaps',
+      'surface',
+      0,
+      0,
+      1,
+      0.01,
+      '',
+      'Breaking crests, 0 none to 1 a gale with long streaks. Null lets the wind decide (3.84e-6 U^3.41 of the sea).',
+    ),
     'wind',
   ),
   follows(
-    n('chop', 'surface', 0, 0, 1, 0.01, '', 'Wind chop: stronger ripples and a short wind-sea layer. Null leaves the value the weather or the options gave.'),
+    n(
+      'chop',
+      'surface',
+      0,
+      0,
+      1,
+      0.01,
+      '',
+      'Wind chop: stronger ripples and a short wind-sea layer. Null leaves the value the weather or the options gave.',
+    ),
     'wind',
   ),
   {
-    ...n('waveHeight', 'surface', 0.3, 0, 100, 0.01, 'm', 'Amplitude of the largest swell train: scales the whole sea. Null is the height the wind raises. Too large for the wind folds the surface and throws.'),
+    ...n(
+      'waveHeight',
+      'surface',
+      0.3,
+      0,
+      100,
+      0.01,
+      'm',
+      'Amplitude of the largest swell train: scales the whole sea. Null is the height the wind raises. Too large for the wind folds the surface and throws.',
+    ),
     default: null,
     nullable: true,
   },
   {
-    ...n('seaLevel', 'surface', 0, -1000, 1000, 0.01, 'm', 'Mean sea level, world Y: raise it slowly for a storm surge or a tide and the flow floods the land below it, lower it and it drains. Null keeps the level the Water was made with (`height`) or last given.'),
+    ...n(
+      'seaLevel',
+      'surface',
+      0,
+      -1000,
+      1000,
+      0.01,
+      'm',
+      'Mean sea level, world Y: raise it slowly for a storm surge or a tide and the flow floods the land below it, lower it and it drains. Null keeps the level the Water was made with (`height`) or last given.',
+    ),
     default: null,
     nullable: true,
   },
-  colorSetting('color', 'look', [0.01, 0.18, 0.25], 0, 1, 'Deep-water colour, linear RGB: green for a shallow sea, near black for night or ice, brown for a flood.') as WaterSetting,
+  colorSetting(
+    'color',
+    'look',
+    [0.01, 0.18, 0.25],
+    0,
+    1,
+    'Deep-water colour, linear RGB: green for a shallow sea, near black for night or ice, brown for a flood.',
+  ) as WaterSetting,
   n('foamDistance', 'look', 1, 0.01, 100, 0.01, 'm', 'Width of the foam along a shore and round things in the water.'),
-  n('glitterRoughness', 'look', 0.12, 0.02, 0.6, 0.01, '', 'Lowest roughness of the sun glitter: 0.12 is the floor of the real sea; higher widens and smooths the glints.'),
-  n('foamSoftness', 'look', 0, 0, 1, 0.01, '', 'Softness of the foam edge: 0 is the physical foam with its fine pattern, 1 fades the pattern and widens the edge into large soft shapes.'),
-  colorSetting('shallowColor', 'look', [0.0, 0.28, 0.3], 0, 1, 'Colour of water over a shallow bed, linear RGB: the band between it and the deep colour (see shallowDepth).') as WaterSetting,
-  n('shallowDepth', 'look', 0, 0, 100, 0.1, 'm', 'Depth over which the shallow colour fades into the deep one; 0 turns the colour band off.'),
+  n(
+    'glitterRoughness',
+    'look',
+    0.12,
+    0.02,
+    0.6,
+    0.01,
+    '',
+    'Lowest roughness of the sun glitter: 0.12 is the floor of the real sea; higher widens and smooths the glints.',
+  ),
+  n(
+    'foamSoftness',
+    'look',
+    0,
+    0,
+    1,
+    0.01,
+    '',
+    'Softness of the foam edge: 0 is the physical foam with its fine pattern, 1 fades the pattern and widens the edge into large soft shapes.',
+  ),
+  colorSetting(
+    'shallowColor',
+    'look',
+    [0.0, 0.28, 0.3],
+    0,
+    1,
+    'Colour of water over a shallow bed, linear RGB: the band between it and the deep colour (see shallowDepth).',
+  ) as WaterSetting,
+  n(
+    'shallowDepth',
+    'look',
+    0,
+    0,
+    100,
+    0.1,
+    'm',
+    'Depth over which the shallow colour fades into the deep one; 0 turns the colour band off.',
+  ),
 ];
 /** The rows that can change every frame (all of them: none builds a pipeline, buffer or texture). */
 export const WATER_LIVE_SETTINGS: readonly WaterSetting[] = liveSettings(WATER_SETTINGS) as WaterSetting[];
@@ -190,7 +285,10 @@ export function applyWaterSettings(water: Water, values: WaterSettingValues = {}
       );
   } else {
     // A wind given back without a direction had the sea's own (setWind keeps the present one when none is given).
-    const direction = angle === null ? (held.direction ?? (before ? SEA_DIRECTION : undefined)) : ([Math.sin((angle * Math.PI) / 180), Math.cos((angle * Math.PI) / 180)] as const);
+    const direction =
+      angle === null
+        ? (held.direction ?? (before ? SEA_DIRECTION : undefined))
+        : ([Math.sin((angle * Math.PI) / 180), Math.cos((angle * Math.PI) / 180)] as const);
     const wanted = speed ?? held.speed;
     if (
       wanted !== now.speed ||
@@ -232,8 +330,16 @@ export interface FloodSetting extends SettingRow {
 }
 /** Values by flood setting name; a name left out takes its default. */
 export type FloodSettingValues = Readonly<Record<string, number | null>>;
-const fn = (name: string, group: FloodSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string): FloodSetting =>
-  numberSetting(name, group, value, min, max, step, unit, about) as FloodSetting;
+const fn = (
+  name: string,
+  group: FloodSettingGroup,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  unit: string,
+  about: string,
+): FloodSetting => numberSetting(name, group, value, min, max, step, unit, about) as FloodSetting;
 /** Every Flood control that can change every frame, in panel order. */
 export const FLOOD_SETTINGS: readonly FloodSetting[] = [
   {
@@ -250,17 +356,80 @@ export const FLOOD_SETTINGS: readonly FloodSetting[] = [
     default: null,
     nullable: true,
   },
-  fn('surgeRise', 'sea', 600, 0, 86400, 1, 's', 'Seconds a change of the surge takes to arrive: 600 is a surge building over ten minutes; 0 is a step.'),
-  fn('shelfLength', 'sea', 50000, 1, 1e7, 100, 'm', 'Length of the shallow shelf the wind pushes the sea up over; a long shelf gives a bigger wind set-up.'),
+  fn(
+    'surgeRise',
+    'sea',
+    600,
+    0,
+    86400,
+    1,
+    's',
+    'Seconds a change of the surge takes to arrive: 600 is a surge building over ten minutes; 0 is a step.',
+  ),
+  fn(
+    'shelfLength',
+    'sea',
+    50000,
+    1,
+    1e7,
+    100,
+    'm',
+    'Length of the shallow shelf the wind pushes the sea up over; a long shelf gives a bigger wind set-up.',
+  ),
   fn('shelfDepth', 'sea', 20, 0.1, 1e4, 0.1, 'm', 'Depth of that shelf; a shallow one gives a bigger wind set-up.'),
-  fn('swell', 'sea', 1, 0, 10, 0.01, '', "Multiplier of the Water's swell coming in through the sea sides: 0 keeps it out, 1 is the Water's own sea, 2 doubles it."),
-  fn('waveMaker', 'sea', 1, 0, 10, 0.01, '', 'Multiplier of every wave maker amplitude: 0 stills them, 1 is as given, 2 doubles the waves.'),
+  fn(
+    'swell',
+    'sea',
+    1,
+    0,
+    10,
+    0.01,
+    '',
+    "Multiplier of the Water's swell coming in through the sea sides: 0 keeps it out, 1 is the Water's own sea, 2 doubles it.",
+  ),
+  fn(
+    'waveMaker',
+    'sea',
+    1,
+    0,
+    10,
+    0.01,
+    '',
+    'Multiplier of every wave maker amplitude: 0 stills them, 1 is as given, 2 doubles the waves.',
+  ),
   followsWeather(
-    fn('rain', 'flow', 0, 0, 2000, 1, 'mm/h', 'Rain on the whole map as depth. Null follows the weather drive (its rain rate); a number overrides it, 0 is none, 100 is a cloudburst.'),
+    fn(
+      'rain',
+      'flow',
+      0,
+      0,
+      2000,
+      1,
+      'mm/h',
+      'Rain on the whole map as depth. Null follows the weather drive (its rain rate); a number overrides it, 0 is none, 100 is a cloudburst.',
+    ),
     'storm',
   ) as FloodSetting,
-  fn('roughness', 'flow', 0.03, 0, 0.2, 0.001, 's/m^(1/3)', "Manning's n of the bed: 0.012 smooth concrete, 0.03 earth, 0.1 thick brush; higher slows a flood and deepens it."),
-  fn('inflow', 'flow', 1, 0, 100, 0.01, '', 'Multiplier of every inflow discharge: 0 shuts the sources, 1 is as given, 2 doubles them.'),
+  fn(
+    'roughness',
+    'flow',
+    0.03,
+    0,
+    0.2,
+    0.001,
+    's/m^(1/3)',
+    "Manning's n of the bed: 0.012 smooth concrete, 0.03 earth, 0.1 thick brush; higher slows a flood and deepens it.",
+  ),
+  fn(
+    'inflow',
+    'flow',
+    1,
+    0,
+    100,
+    0.01,
+    '',
+    'Multiplier of every inflow discharge: 0 shuts the sources, 1 is as given, 2 doubles them.',
+  ),
 ];
 /** The flood rows that can change every frame (all of them). */
 export const FLOOD_LIVE_SETTINGS: readonly FloodSetting[] = liveSettings(FLOOD_SETTINGS) as FloodSetting[];
@@ -316,25 +485,105 @@ export interface ShipSetting extends SettingRow {
 }
 /** Values by ship setting name; a name left out takes its default. */
 export type ShipSettingValues = Readonly<Record<string, number | null>>;
-const sn = (name: string, group: ShipSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string): ShipSetting =>
-  numberSetting(name, group, value, min, max, step, unit, about) as ShipSetting;
+const sn = (
+  name: string,
+  group: ShipSettingGroup,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  unit: string,
+  about: string,
+): ShipSetting => numberSetting(name, group, value, min, max, step, unit, about) as ShipSetting;
 /** Every ShipWakes control, in panel order; all are live. */
 export const SHIP_SETTINGS: readonly ShipSetting[] = [
-  sn('wakeHeight', 'wake', 1, 0, 5, 0.01, '', 'Height of the Kelvin wake waves: 1 is a quarter of the bow wave at one hull length out, 0 none.'),
-  sn('sternWaves', 'wake', 0.5, 0, 1, 0.01, '', "The stern's wave system against the bow's (opposite in sign): 0 the bow's alone, 1 as strong."),
-  sn('wakeLife', 'wake', 120, 1, 3600, 1, 's', 'Seconds a wave left on the trail takes to fade to a third: 30 a choppy sea, 600 a glassy calm.'),
-  sn('bowWave', 'wake', 1, 0, 3, 0.01, '', 'Bow wave height multiplier: 1 is Noblesse et al. (2008) for the hull and speed.'),
-  sn('waterlineFoam', 'foam', 0.8, 0, 10, 0.01, 'm', 'Width of the foam band along the waterline at Froude 0.5; it widens with speed.'),
+  sn(
+    'wakeHeight',
+    'wake',
+    1,
+    0,
+    5,
+    0.01,
+    '',
+    'Height of the Kelvin wake waves: 1 is a quarter of the bow wave at one hull length out, 0 none.',
+  ),
+  sn(
+    'sternWaves',
+    'wake',
+    0.5,
+    0,
+    1,
+    0.01,
+    '',
+    "The stern's wave system against the bow's (opposite in sign): 0 the bow's alone, 1 as strong.",
+  ),
+  sn(
+    'wakeLife',
+    'wake',
+    120,
+    1,
+    3600,
+    1,
+    's',
+    'Seconds a wave left on the trail takes to fade to a third: 30 a choppy sea, 600 a glassy calm.',
+  ),
+  sn(
+    'bowWave',
+    'wake',
+    1,
+    0,
+    3,
+    0.01,
+    '',
+    'Bow wave height multiplier: 1 is Noblesse et al. (2008) for the hull and speed.',
+  ),
+  sn(
+    'waterlineFoam',
+    'foam',
+    0.8,
+    0,
+    10,
+    0.01,
+    'm',
+    'Width of the foam band along the waterline at Froude 0.5; it widens with speed.',
+  ),
   sn('foamLife', 'foam', 40, 1, 600, 1, 's', "Seconds the turbulent wake's foam takes to fade to a third."),
   sn('turbulentWake', 'foam', 1, 0, 3, 0.01, '', 'Strength of the white propeller wash behind the stern: 0 none.'),
   followsWeather(
-    sn('lampRoughness', 'lamps', 0.2, 0.02, 1, 0.01, '', "Roughness of the lamps' glints, perceptual like the Water's glitter (GGX alpha = roughness^2, widened by the waves' slope variance): 0.2 a long thin glitter path on glassy water, 0.7 a wide smear. Null follows the Water's glitter, which follows the wind (Cox and Munk 1954)."),
+    sn(
+      'lampRoughness',
+      'lamps',
+      0.2,
+      0.02,
+      1,
+      0.01,
+      '',
+      "Roughness of the lamps' glints, perceptual like the Water's glitter (GGX alpha = roughness^2, widened by the waves' slope variance): 0.2 a long thin glitter path on glassy water, 0.7 a wide smear. Null follows the Water's glitter, which follows the wind (Cox and Munk 1954).",
+    ),
     'wind',
   ) as ShipSetting,
   sn('lampIntensity', 'lamps', 1, 0, 100, 0.01, '', "Multiplier of every lamp's intensity."),
   sn('sprayRate', 'splash', 2000, 0, 1e6, 10, '1/s', 'Bow spray particles a second where the bow wave breaks fully.'),
-  sn('slamBurst', 'splash', 400, 0, 1e6, 1, '', 'Particles a slam throws at its threshold; grows with the square of the excess.'),
-  sn('slamThreshold', 'splash', 1, 0.1, 10, 0.01, '', "Slam threshold as a multiple of Ochi's 0.093 sqrt(g L) re-entry speed."),
+  sn(
+    'slamBurst',
+    'splash',
+    400,
+    0,
+    1e6,
+    1,
+    '',
+    'Particles a slam throws at its threshold; grows with the square of the excess.',
+  ),
+  sn(
+    'slamThreshold',
+    'splash',
+    1,
+    0.1,
+    10,
+    0.01,
+    '',
+    "Slam threshold as a multiple of Ochi's 0.093 sqrt(g L) re-entry speed.",
+  ),
 ];
 /** The ship rows that can change every frame (all of them). */
 export const SHIP_LIVE_SETTINGS: readonly ShipSetting[] = liveSettings(SHIP_SETTINGS) as ShipSetting[];
@@ -348,7 +597,14 @@ export const SHIP_LOOKS = {
   /** A glassy harbour at night: long-lived wakes, little foam, sharp lamp paths. */
   calmNight: { wakeLife: 600, foamLife: 60, turbulentWake: 0.6, lampRoughness: 0.25, lampIntensity: 2 },
   /** A ship driving into a storm: short-lived wakes torn up by the sea, heavy foam and spray. */
-  heavyWeather: { wakeLife: 30, wakeHeight: 1.2, waterlineFoam: 2, turbulentWake: 1.5, sprayRate: 6000, slamBurst: 1200 },
+  heavyWeather: {
+    wakeLife: 30,
+    wakeHeight: 1.2,
+    waterlineFoam: 2,
+    turbulentWake: 1.5,
+    sprayRate: 6000,
+    slamBurst: 1200,
+  },
 } as const satisfies Record<string, ShipSettingValues>;
 /** The name of a look in {@link SHIP_LOOKS}. */
 export type ShipLookName = keyof typeof SHIP_LOOKS;
@@ -402,40 +658,156 @@ export interface IceSetting extends SettingRow {
 }
 /** Values by ice setting name; a name left out takes its default. */
 export type IceSettingValues = Readonly<Record<string, number | null>>;
-const ice = (name: string, group: IceSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string): IceSetting =>
-  numberSetting(name, group, value, min, max, step, unit, about) as IceSetting;
+const ice = (
+  name: string,
+  group: IceSettingGroup,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  unit: string,
+  about: string,
+): IceSetting => numberSetting(name, group, value, min, max, step, unit, about) as IceSetting;
 /** Every ice control, in panel order; all are live. */
 export const ICE_SETTINGS: readonly IceSetting[] = [
-  ice('blueIce', 'ice', 0.25, 0, 1, 0.01, '', 'Share of blue, clear ice in bands through the white bubbly ice: 0 all white, 1 all blue.'),
+  ice(
+    'blueIce',
+    'ice',
+    0.25,
+    0,
+    1,
+    0.01,
+    '',
+    'Share of blue, clear ice in bands through the white bubbly ice: 0 all white, 1 all blue.',
+  ),
   ice('bandScale', 'ice', 0.06, 0.005, 2, 0.005, '1/m', 'Blue bands per metre: 0.02 broad layers, 0.5 thin veins.'),
-  ice('bubbles', 'ice', 0.05, 0.001, 0.3, 0.001, '', 'Air bubble volume share of the white ice (1 - density / 917): more is whiter.'),
-  ice('bubbleRadius', 'ice', 0.5, 0.05, 5, 0.05, 'mm', 'Bubble radius of the white ice: smaller bubbles scatter more and whiten it.'),
-  ice('subsurface', 'ice', 0.7, 0, 1, 0.01, '', 'Light seen through the ice: 0 opaque, 1 glowing where the moon or sun is behind it.'),
-  ice('scatterDepth', 'ice', 5, 0, 50, 0.1, 'm', 'Clear ice the light crosses for the tint of that glow: deeper is bluer (Warren and Brandt 2008).'),
+  ice(
+    'bubbles',
+    'ice',
+    0.05,
+    0.001,
+    0.3,
+    0.001,
+    '',
+    'Air bubble volume share of the white ice (1 - density / 917): more is whiter.',
+  ),
+  ice(
+    'bubbleRadius',
+    'ice',
+    0.5,
+    0.05,
+    5,
+    0.05,
+    'mm',
+    'Bubble radius of the white ice: smaller bubbles scatter more and whiten it.',
+  ),
+  ice(
+    'subsurface',
+    'ice',
+    0.7,
+    0,
+    1,
+    0.01,
+    '',
+    'Light seen through the ice: 0 opaque, 1 glowing where the moon or sun is behind it.',
+  ),
+  ice(
+    'scatterDepth',
+    'ice',
+    5,
+    0,
+    50,
+    0.1,
+    'm',
+    'Clear ice the light crosses for the tint of that glow: deeper is bluer (Warren and Brandt 2008).',
+  ),
   ice('roughness', 'ice', 0.35, 0.02, 1, 0.01, '', 'Roughness of dry ice.'),
   ice('scallopSize', 'ice', 0.3, 0.02, 5, 0.01, 'm', 'Size of the melt scallops dimpling the walls.'),
   ice('scallopDepth', 'ice', 0.35, 0, 2, 0.01, '', 'Depth of the melt scallops: 0 smooth walls.'),
   ice('wetHeight', 'waterline', 1.5, 0, 20, 0.05, 'm', 'Height above the water the waves wet: about the wave height.'),
   ice('wetDarkening', 'waterline', 0.35, 0, 0.9, 0.01, '', 'How much darker wet ice is (Lekner and Dorf 1988).'),
   ice('wetRoughness', 'waterline', 0.06, 0.02, 1, 0.01, '', 'Roughness of wet ice: a water film is glossy.'),
-  ice('notchDepth', 'waterline', 0.8, 0, 10, 0.05, 'm', 'Depth the waves have cut into the waterline (waveErosion gives metres a day).'),
+  ice(
+    'notchDepth',
+    'waterline',
+    0.8,
+    0,
+    10,
+    0.05,
+    'm',
+    'Depth the waves have cut into the waterline (waveErosion gives metres a day).',
+  ),
   ice('notchHeight', 'waterline', 1.2, 0.05, 10, 0.05, 'm', 'Height of the wave-cut notch: about the wave height.'),
   followsWeather(
-    ice('driftWind', 'drift', 0, 0, 60, 0.1, 'm/s', 'Wind speed driving the sea ice. Null follows the wind of the Water (speed and direction).'),
+    ice(
+      'driftWind',
+      'drift',
+      0,
+      0,
+      60,
+      0.1,
+      'm/s',
+      'Wind speed driving the sea ice. Null follows the wind of the Water (speed and direction).',
+    ),
     'wind',
   ) as IceSetting,
   ice('windFactor', 'drift', 0.02, 0, 0.1, 0.001, '', 'Sea ice drift as a share of the wind: 0.02 (Nansen 1902).'),
-  ice('turning', 'drift', 25, -90, 90, 1, 'deg', 'Degrees the drift turns to the right of the wind: 20 to 40 in the north, negative in the south.'),
-  ice('attenuation', 'drift', 1, 0, 20, 0.1, '', 'How fast the swell dies into the ice field: 1 is Doble et al. (2015), 0 none.'),
+  ice(
+    'turning',
+    'drift',
+    25,
+    -90,
+    90,
+    1,
+    'deg',
+    'Degrees the drift turns to the right of the wind: 20 to 40 in the north, negative in the south.',
+  ),
+  ice(
+    'attenuation',
+    'drift',
+    1,
+    0,
+    20,
+    0.1,
+    '',
+    'How fast the swell dies into the ice field: 1 is Doble et al. (2015), 0 none.',
+  ),
   ice('foamWidth', 'foam', 3, 0, 50, 0.1, 'm', 'Width of the foam ring round the berg; it widens with the waves.'),
   ice('breakFoam', 'foam', 1, 0, 3, 0.01, '', 'Breaking white water on the weather side: 0 none.'),
   ice('foamTrail', 'foam', 60, 0, 1000, 1, 'm', 'Length of the foam streaks the swell carries past the berg.'),
   followsWeather(
-    ice('waveHeight', 'foam', 2, 0, 20, 0.05, 'm', 'Significant wave height breaking on the berg. Null follows the wind of the Water (Pierson and Moskowitz, 0.21 U^2 / g).'),
+    ice(
+      'waveHeight',
+      'foam',
+      2,
+      0,
+      20,
+      0.05,
+      'm',
+      'Significant wave height breaking on the berg. Null follows the wind of the Water (Pierson and Moskowitz, 0.21 U^2 / g).',
+    ),
     'wind',
   ) as IceSetting,
-  ice('sprayRate', 'spray', 1500, 0, 1e6, 10, '1/s', 'Spray particles a second while the water climbs the weather face.'),
-  ice('surgeBurst', 'spray', 300, 0, 1e6, 1, '', 'Particles a surge throws at its threshold; grows with the square of the excess.'),
+  ice(
+    'sprayRate',
+    'spray',
+    1500,
+    0,
+    1e6,
+    10,
+    '1/s',
+    'Spray particles a second while the water climbs the weather face.',
+  ),
+  ice(
+    'surgeBurst',
+    'spray',
+    300,
+    0,
+    1e6,
+    1,
+    '',
+    'Particles a surge throws at its threshold; grows with the square of the excess.',
+  ),
   ice('surgeThreshold', 'spray', 0.8, 0.05, 20, 0.01, 'm/s', 'Rise speed of the water at the face that throws spray.'),
 ];
 /** The ice rows that can change every frame (all of them). */
@@ -448,9 +820,27 @@ export function iceSettingDefaults(): Record<string, number | null> {
 /** Named looks of ice, each only values of {@link ICE_SETTINGS}. */
 export const ICE_LOOKS = {
   /** A glacier berg on a calm night: much blue ice, a strong glow, a deep old notch. */
-  calmNight: { blueIce: 0.4, subsurface: 0.85, scatterDepth: 8, wetHeight: 0.6, notchDepth: 1.5, breakFoam: 0.3, waveHeight: 0.5 },
+  calmNight: {
+    blueIce: 0.4,
+    subsurface: 0.85,
+    scatterDepth: 8,
+    wetHeight: 0.6,
+    notchDepth: 1.5,
+    breakFoam: 0.3,
+    waveHeight: 0.5,
+  },
   /** A berg in a North Atlantic gale: wet high up its face, heavy white water and spray. */
-  gale: { wetHeight: 6, notchHeight: 3, breakFoam: 2.5, foamWidth: 8, foamTrail: 200, waveHeight: 7, sprayRate: 8000, surgeBurst: 1500, driftWind: 20 },
+  gale: {
+    wetHeight: 6,
+    notchHeight: 3,
+    breakFoam: 2.5,
+    foamWidth: 8,
+    foamTrail: 200,
+    waveHeight: 7,
+    sprayRate: 8000,
+    surgeBurst: 1500,
+    driftWind: 20,
+  },
 } as const satisfies Record<string, IceSettingValues>;
 /** The name of a look in {@link ICE_LOOKS}. */
 export type IceLookName = keyof typeof ICE_LOOKS;
@@ -495,12 +885,18 @@ export function applyIceSettings(targets: IceSettingTargets, values: IceSettingV
   if (seaIce) {
     const wind = value('driftWind');
     if (wind !== null) seaIce.setDrift({ wind: { speed: wind } });
-    else if (water?.wind) seaIce.setDrift({ wind: { speed: water.wind.speed, direction: water.wind.direction ?? [1, 0.3] } });
+    else if (water?.wind)
+      seaIce.setDrift({ wind: { speed: water.wind.speed, direction: water.wind.direction ?? [1, 0.3] } });
     holdFromWeather(seaIce, 'wind', wind !== null);
     seaIce.setDrift({ windFactor: num('windFactor'), turning: num('turning'), attenuation: num('attenuation') });
   }
   if (foam) {
-    foam.setLook({ foamWidth: num('foamWidth'), breakFoam: num('breakFoam'), foamTrail: num('foamTrail'), waveHeight: value('waveHeight') });
+    foam.setLook({
+      foamWidth: num('foamWidth'),
+      breakFoam: num('breakFoam'),
+      foamTrail: num('foamTrail'),
+      waveHeight: value('waveHeight'),
+    });
     holdFromWeather(foam, 'waveHeight', value('waveHeight') !== null);
   }
   if (spray) {
@@ -521,19 +917,78 @@ export interface SplashSetting extends SettingRow {
   readonly kind: 'number';
   readonly default: number | null;
 }
-const spn = (name: string, group: SplashSettingGroup, value: number, min: number, max: number, step: number, unit: string, about: string): SplashSetting =>
-  numberSetting(name, group, value, min, max, step, unit, about) as SplashSetting;
+const spn = (
+  name: string,
+  group: SplashSettingGroup,
+  value: number,
+  min: number,
+  max: number,
+  step: number,
+  unit: string,
+  about: string,
+): SplashSetting => numberSetting(name, group, value, min, max, step, unit, about) as SplashSetting;
 /** Every ShotSplash control, in panel order; all are live. */
 export const SPLASH_SETTINGS: readonly SplashSetting[] = [
-  spn('crown', 'spray', 1, 0, 10, 0.01, '', 'Particles of the crown of spray thrown up round each graze and entry (a multiple).'),
-  spn('column', 'spray', 1, 0, 10, 0.01, '', 'Particles of the column that rises when the cavity behind an entering shot seals (a multiple; 0 none).'),
+  spn(
+    'crown',
+    'spray',
+    1,
+    0,
+    10,
+    0.01,
+    '',
+    'Particles of the crown of spray thrown up round each graze and entry (a multiple).',
+  ),
+  spn(
+    'column',
+    'spray',
+    1,
+    0,
+    10,
+    0.01,
+    '',
+    'Particles of the column that rises when the cavity behind an entering shot seals (a multiple; 0 none).',
+  ),
   spn('mist', 'spray', 1, 0, 10, 0.01, '', 'Particles of the fine mist that hangs over a splash (a multiple).'),
-  spn('height', 'spray', 1, 0, 5, 0.01, '', 'Drawn heights against the laws (drop-limited crown and Worthington jet): 1 is the law.'),
+  spn(
+    'height',
+    'spray',
+    1,
+    0,
+    5,
+    0.01,
+    '',
+    'Drawn heights against the laws (drop-limited crown and Worthington jet): 1 is the law.',
+  ),
   spn('foamWidth', 'foam', 1, 0, 10, 0.01, '', 'Width of the foam ring each splash leaves (a multiple; 0 none).'),
   spn('foamLife', 'foam', 25, 0.5, 600, 0.5, 's', 'Seconds the foam ring takes to fade to a third.'),
-  spn('waveLift', 'spray', 1, 0, 1, 0.01, '', 'How far a splash rides the waves: 1 rises from the surface and throws its velocity (a WaveQuery as water), 0 the impact at rest.'),
-  followsWeather(spn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind east-west on the spray and mist; null follows the weather.'), 'wind') as SplashSetting,
-  followsWeather(spn('wind.z', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind north-south on the spray and mist; null follows the weather.'), 'wind') as SplashSetting,
+  spn(
+    'waveLift',
+    'spray',
+    1,
+    0,
+    1,
+    0.01,
+    '',
+    'How far a splash rides the waves: 1 rises from the surface and throws its velocity (a WaveQuery as water), 0 the impact at rest.',
+  ),
+  followsWeather(
+    spn('wind.x', 'wind', 0, -100, 100, 0.1, 'm/s', 'Wind east-west on the spray and mist; null follows the weather.'),
+    'wind',
+  ) as SplashSetting,
+  followsWeather(
+    spn(
+      'wind.z',
+      'wind',
+      0,
+      -100,
+      100,
+      0.1,
+      'm/s',
+      'Wind north-south on the spray and mist; null follows the weather.',
+    ),
+    'wind',
+  ) as SplashSetting,
 ];
 const SPLASH_BY_NAME = settingIndex(SPLASH_SETTINGS) as Map<string, SplashSetting>;
 /** The splash rows that may change every frame (all of them). */
@@ -554,7 +1009,11 @@ export const SPLASH_LOOKS = {
 /** What applySplashSettings writes: a ShotSplash's look and its slots' emitters. */
 export interface SplashSettingTarget {
   setLook(look: Record<string, number>): unknown;
-  readonly slots: readonly { readonly crown: { options: object }; readonly column: { options: object }; readonly mist: { options: object } }[];
+  readonly slots: readonly {
+    readonly crown: { options: object };
+    readonly column: { options: object };
+    readonly mist: { options: object };
+  }[];
 }
 /**
  * Writes `values` onto a ShotSplash (a name left out takes its default); everything is read from the next frame. Both
@@ -563,10 +1022,17 @@ export interface SplashSettingTarget {
  * @throws TypeError for a name not in {@link SPLASH_SETTINGS}; RangeError for a value outside its row's range.
  * @example applySplashSettings(splash, SPLASH_LOOKS.gale);
  */
-export function applySplashSettings(target: SplashSettingTarget, values: Readonly<Record<string, number | null>> = {}): void {
+export function applySplashSettings(
+  target: SplashSettingTarget,
+  values: Readonly<Record<string, number | null>> = {},
+): void {
   checkSettings(SPLASH_BY_NAME, values, 'water splash', 'SPLASH_SETTINGS in @margoengine/water/settings');
   const value = (name: string) => (name in values ? values[name] : SPLASH_BY_NAME.get(name)!.default) as number | null;
-  target.setLook(Object.fromEntries(['crown', 'column', 'mist', 'height', 'foamWidth', 'foamLife', 'waveLift'].map((k) => [k, value(k) as number])));
+  target.setLook(
+    Object.fromEntries(
+      ['crown', 'column', 'mist', 'height', 'foamWidth', 'foamLife', 'waveLift'].map((k) => [k, value(k) as number]),
+    ),
+  );
   const wx = value('wind.x'),
     wz = value('wind.z');
   for (const slot of target.slots)
