@@ -332,11 +332,49 @@ test("ShotSplash draws the physics' splashes: an entry's crown, its seal's jet a
     const k = splash.slots[s.slot].column.options;
     assert.ok(k.rate > 0, 'the column runs at once');
     near(k.velocity[1], Math.sqrt(2 * 9.81 * s.event.columnHeight), 1e-9, 'launched to its height');
-    assert.equal(splash.slots[s.slot].crown.bursts.at(-1), 0, 'and throws no crown');
+    assert.equal(splash.slots[s.slot].crown.bursts.length, 0, 'and throws no crown');
   }
   // A seek back: the splashes are taken again as the clock reaches them.
   splash.resetTime();
   splash.advanceTime(0.2);
   assert.equal(splash.events.length, 3);
   assert.throws(() => new ShotSplash({ splashes: {}, particles: emitter }), TypeError);
+});
+
+test('a splash with no crown leaves the crown and mist emitters alone, so a VFX never gets an empty lifetime', () => {
+  // An emitter that checks its lifetime as a VFX does: 0 < min <= max.
+  const strict = () => ({
+    options: {},
+    bursts: [],
+    burst(n) {
+      const [a, b] = this.options.lifetime ?? [1, 1];
+      if (!(a > 0 && a <= b)) throw new RangeError(`lifetime ${a}, ${b}`);
+      this.bursts.push(n);
+    },
+  });
+  // The look's height at 0 (its range allows it), and a seal's column alone.
+  const flat = new ShotSplash({
+    source: [{ time: 0, position: [0, 0, 0], velocity: [0, -200, 0], radius: 0.08, density: 7200 }],
+    particles: strict,
+    look: { height: 0 },
+  });
+  flat.advanceTime(0.1);
+  assert.equal(flat.active().length, 1);
+  const seal = {
+      kind: 'seal',
+      row: 0,
+      time: 0,
+      position: [0, 0, 0],
+      velocity: [0, 80, 0],
+      speed: 80,
+      sine: 1,
+      radius: 0.05,
+      crownSpeed: 0,
+      crownHeight: 0,
+      columnSpeed: 80,
+      columnHeight: 20,
+    },
+    jet = new ShotSplash({ splashes: { splashes: () => [seal] }, particles: strict });
+  jet.advanceTime(0.05);
+  assert.ok(jet.slots[jet.active()[0].slot].column.options.rate > 0);
 });

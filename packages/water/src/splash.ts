@@ -800,22 +800,26 @@ export class ShotSplash implements EnginePlugin {
         energy = Math.min(1, (e.radius / 0.08) ** 2 * (e.crownSpeed / 60)),
         [sea, wv] = this.surface(e.position),
         lean = e.kind === 'skip' ? 0.8 : 0.3;
-      const c = slot.crown.options;
-      c.position = [e.position[0], sea + 0.05, e.position[2]];
-      // The sheet rises round the shot's hole and leans the way the shot went, in the frame of the water it leaves;
-      // drops fall back as soon as they rise.
-      c.velocity = [e.heading[0] * side * lean + wv[0], up + wv[1], e.heading[1] * side * lean + wv[2]];
-      c.spread = side;
-      c.emissionExtent = [e.radius * 6, 0.05, e.radius * 6];
-      c.lifetime = [(1.6 * up) / G, (2 * up) / G + 0.05];
-      c.ground = -1e9;
-      slot.crown.burst(Math.round(Math.min(3000, 600 * energy * look.crown)));
-      const m = slot.mist.options;
-      m.position = [e.position[0], sea + height * 0.3, e.position[2]];
-      m.velocity = [e.heading[0] * 1.5 + wv[0], up * 0.15 + wv[1], e.heading[1] * 1.5 + wv[2]];
-      m.spread = Math.max(0.5, side * 0.15);
-      m.emissionExtent = [height * 0.3, height * 0.2, height * 0.3];
-      slot.mist.burst(Math.round(Math.min(1500, 120 * energy * look.mist)));
+      // No crown to throw (a column alone, or the look's height at 0): its emitters are left as they are, since a
+      // drop thrown nowhere has no lifetime an emitter takes.
+      if (height > 0) {
+        const c = slot.crown.options;
+        c.position = [e.position[0], sea + 0.05, e.position[2]];
+        // The sheet rises round the shot's hole and leans the way the shot went, in the frame of the water it leaves;
+        // drops fall back as soon as they rise.
+        c.velocity = [e.heading[0] * side * lean + wv[0], up + wv[1], e.heading[1] * side * lean + wv[2]];
+        c.spread = side;
+        c.emissionExtent = [e.radius * 6, 0.05, e.radius * 6];
+        c.lifetime = [(1.6 * up) / G, (2 * up) / G + 0.05];
+        c.ground = -1e9;
+        slot.crown.burst(Math.round(Math.min(3000, 600 * energy * look.crown)));
+        const m = slot.mist.options;
+        m.position = [e.position[0], sea + height * 0.3, e.position[2]];
+        m.velocity = [e.heading[0] * 1.5 + wv[0], up * 0.15 + wv[1], e.heading[1] * 1.5 + wv[2]];
+        m.spread = Math.max(0.5, side * 0.15);
+        m.emissionExtent = [height * 0.3, height * 0.2, height * 0.3];
+        slot.mist.burst(Math.round(Math.min(1500, 120 * energy * look.mist)));
+      }
     }
     // Columns run from the deep seal while the jet rises, a third of its flight.
     for (const slot of this.slots) {

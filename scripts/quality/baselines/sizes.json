@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19465023,
+  "total": 19465030,
   "history": [
     {
       "date": "2026-10-24",
@@ -12723,6 +12723,12 @@
       "commit": "feat(water) ShotSplash draws the physics splashes",
       "reason": "water/splash 5,779 to 5,886 B gzip (this Mac): the splashes option, splashOf and the queue of physics splashes (SEA-14, PA-17), so ShotSplash draws what EntrySolver works out. The code reads the solver's events and turns each into a drawn splash; a separate entry would only add an import.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fix(water) crownless splash",
+      "reason": "water/splash 5,886 to 5,893 B gzip (this Mac): a splash with no crown (a column alone, or the look's height at 0) leaves its crown and mist emitters alone instead of giving a VFX an empty lifetime.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14303,7 +14309,7 @@
     "@margoengine/water/sea-state": 1380,
     "@margoengine/water/settings": 6675,
     "@margoengine/water/ships": 11259,
-    "@margoengine/water/splash": 5886,
+    "@margoengine/water/splash": 5893,
     "@margoengine/water/underwater": 9360,
     "@margoengine/water/wake": 1680,
     "@margoengine/weather": 8762,
