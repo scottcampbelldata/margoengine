@@ -68,7 +68,7 @@ return out;`,
  * number of at least 0; every error SSR throws. */
 export class RTReflections extends SSR {
   declare readonly options: RTReflectionsOptions;
-  readonly #light = new TracedLight();
+  readonly #light = new TracedLight('RTReflections', 'SSR');
   constructor(options: RTReflectionsOptions) {
     super(options);
     checkTraced(this.options, 'RTReflections');

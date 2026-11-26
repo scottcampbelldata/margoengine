@@ -2,6 +2,9 @@
 // Hi-Z tracing after Y. Uludag, "Hi-Z Screen-Space Cone-Traced Reflections" (GPU Pro 5, 2014) and McGuire & Mara,
 // "Efficient GPU Screen-Space Ray Tracing" (JCGT 3(4), 2014); the start offset and nudge constants are Margo's.
 // SSR's composite is assembled from these pieces, so its shader text is what it was before they moved here.
+import { group as bind } from '../../shared/gpu.js';
+import { compatibilityLevel } from '../../shared/compat.js';
+declare const GPUTextureUsage: { TEXTURE_BINDING: number; STORAGE_BINDING: number; COPY_SRC: number; COPY_DST: number };
 export const vertex =
   '@vertex fn vertex(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {return vec4f(array<vec2f,3>(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);}\n';
 // Hierarchical depth (Hi-Z) level: each texel keeps the closest (largest reversed-Z) depth of its 2x2 source texels, and
@@ -15,6 +18,75 @@ let base=p*2;let end=select(base+1,vec2i(textureDimensions(source))-1,p==size-1)
 for(var y=base.y;y<=end.y;y++){for(var x=base.x;x<=end.x;x++){m=max(m,textureLoad(source,vec2i(x,y),0)${load});}}
 textureStore(reduced,p,vec4f(m));
 }`;
+/** A Hi-Z pyramid of `levels` r32float levels over a depth view, and how to build it each frame. */
+export interface HiZ {
+  /** All levels, for the march. */
+  view: GPUTextureView;
+  /** One reduction per level: its bind group and its size. */
+  groups: GPUBindGroup[];
+  sizes: number[][];
+  /** At WebGPU's compatibility level: each level's own texture, copied into the pyramid after the reduction. */
+  own?: { pyramid: GPUTexture; levels: GPUTexture[] };
+}
+
+/**
+ * The Hi-Z pyramid of `half` (the depth's size halved) with `levels` levels; `texture` makes and owns each texture. A
+ * dispatch at WebGPU's compatibility level may not bind two views of one texture, so there each level reduces into a
+ * texture of its own, read by the next level and copied into its mip of the pyramid (`encodeHiZ`); elsewhere each level
+ * reads the mip above it in place.
+ */
+export function createHiZ(
+  device: GPUDevice,
+  depth: GPUTextureView,
+  reduceDepth: GPUComputePipeline,
+  reduce: GPUComputePipeline,
+  half: number[],
+  levels: number,
+  texture: (size: number[], format: GPUTextureFormat, usage: number, mipLevelCount?: number) => GPUTexture,
+): HiZ {
+  const sampled = GPUTextureUsage.TEXTURE_BINDING,
+    storage = GPUTextureUsage.STORAGE_BINDING,
+    split = compatibilityLevel(device),
+    pyramid = texture(half, 'r32float', sampled | (split ? GPUTextureUsage.COPY_DST : storage), levels),
+    own: GPUTexture[] = [],
+    groups: GPUBindGroup[] = [],
+    sizes: number[][] = [];
+  for (let i = 0; i < levels; i++) {
+    const size = [Math.max(1, half[0] >> i), Math.max(1, half[1] >> i)];
+    if (split) own.push(texture(size, 'r32float', sampled | storage | GPUTextureUsage.COPY_SRC));
+    sizes.push(size);
+    groups.push(
+      bind(device, i ? reduce : reduceDepth, [
+        i ? (split ? own[i - 1].createView() : pyramid.createView({ baseMipLevel: i - 1, mipLevelCount: 1 })) : depth,
+        split ? own[i].createView() : pyramid.createView({ baseMipLevel: i, mipLevelCount: 1 }),
+      ]),
+    );
+  }
+  return { view: pyramid.createView(), groups, sizes, own: split ? { pyramid, levels: own } : undefined };
+}
+
+/** Encodes a frame's Hi-Z reduction (and, at the compatibility level, the copies into the pyramid). */
+export function encodeHiZ(
+  encoder: GPUCommandEncoder,
+  hiz: HiZ,
+  reduceDepth: GPUComputePipeline,
+  reduce: GPUComputePipeline,
+): void {
+  const pass = encoder.beginComputePass();
+  for (let i = 0; i < hiz.groups.length; i++) {
+    pass.setPipeline(i ? reduce : reduceDepth);
+    pass.setBindGroup(0, hiz.groups[i]);
+    pass.dispatchWorkgroups(Math.ceil(hiz.sizes[i][0] / 8), Math.ceil(hiz.sizes[i][1] / 8));
+  }
+  pass.end();
+  if (hiz.own)
+    for (let i = 0; i < hiz.sizes.length; i++)
+      encoder.copyTextureToTexture({ texture: hiz.own.levels[i] }, { texture: hiz.own.pyramid, mipLevel: i }, [
+        hiz.sizes[i][0],
+        hiz.sizes[i][1],
+      ]);
+}
+
 export const downsampleShader =
   vertex +
   `

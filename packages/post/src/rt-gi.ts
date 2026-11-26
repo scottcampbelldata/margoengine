@@ -34,7 +34,8 @@ const trace = (code: string): string =>
  * number of at least 0; every error SSGI throws. */
 export class RTGI extends SSGI {
   declare readonly options: RTGIOptions;
-  readonly #light = new TracedLight();
+  // SSGI's trace binds one storage buffer of its own, its rays.
+  readonly #light = new TracedLight('RTGI', 'SSGI', 1);
   constructor(options: RTGIOptions) {
     super(options);
     checkTraced(this.options, 'RTGI');

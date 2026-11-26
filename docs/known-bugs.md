@@ -11106,6 +11106,12 @@ It is listed with the others as an LDR refusal, message still checked. Regressio
 - **Fix:** one predicate, `linearHdr` in `packages/shared/hdr-format.js` (every float format is linear), at every site; creative's planet and grass passes also accept the `rg11b10ufloat` capture instead of refusing it. The sky now differs from the full level by at most 3 of 255 and the fogged frame by 4, all in blue, the capture's 5-bit blue mantissa against rgba16float's 10 bits.
 - **Regression:** `tests/hdr-format.test.js` (fails on the old source: 25 sites compare a pass format with `rgba16float` alone); `packages/webgl2-compat/test/adapter-browser.mjs` asserts the sky and fogged frames within 4 of 255 (19 before); `packages/creative/tests/planet.test.js` draws into `rg11b10ufloat`.
 
+### Fixed 2026-11-26: SSR and SSGI failed every frame on WebGPU's compatibility level
+
+- **Was:** each Hi-Z reduction read mip i-1 and wrote mip i of one `r32float` texture in one dispatch, and that level allows one view of a texture per draw or dispatch ("must not have different views in a single draw/dispatch command"), so every frame of SSR, SSGI, `RTReflections` and `RTGI` was rejected there. Found while testing FG-17 piece 6d.
+- **Fix:** `createHiZ` and `encodeHiZ` in `packages/post/src/hiz.ts`, shared by SSR and SSGI: at the compatibility level each level reduces into a texture of its own and is copied into its mip of the pyramid; at the full level the reduction is unchanged.
+- **Regression:** `packages/post/test/hiz-compat-level.test.js` (failed on the old source) and `rt-gi-browser.mjs` / `rt-reflections-browser.mjs --mode=compatibility` in post `test:gpu` (validation errors on the old source).
+
 ### Fixed 2026-11-11: a lone Bloom failed at 4x on WebGPU's compatibility level
 
 - **Was:** `Bloom.attach(engine)` without `PostStack` created a 4x `rgba16float` capture, which the level cannot multisample ("does not support multisampling"); `PostStack` picked `rg11b10ufloat` there, Bloom alone did not.

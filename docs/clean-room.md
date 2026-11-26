@@ -12538,6 +12538,19 @@ Nowrouzezahrai and Morgan McGuire, "Dynamic Diffuse Global Illumination with Ray
 this piece. Hit shading is core's own BRDF text, shared with piece 6b. Written from these papers; no engine's code was
 read.
 
+### Traced effects on limited devices, and Hi-Z at the compatibility level (FG-17 piece 6d, 2026-11-26)
+
+`packages/post/src/rt-shade.ts` (`TracedLight.active`) and `src/hiz.ts` (`createHiZ`, `encodeHiZ`), used by SSR, SSGI,
+`RTReflections` and `RTGI`. Written from specifications: the WebGPU specification (W3C, https://www.w3.org/TR/webgpu/,
+the `maxStorageBuffersInFragmentStage` limit and `featureLevel: 'compatibility'`), the WebGPU compatibility mode
+proposal (GPU for the Web Community Group, https://github.com/gpuweb/gpuweb/blob/main/proposals/compatibility-mode.md,
+its default of 4 fragment-stage storage buffers and its rule of one view of a texture per draw or dispatch), and the
+OpenGL ES 3.1 specification (Khronos, 2014, its minimum implementation limits: `MAX_FRAGMENT_SHADER_STORAGE_BLOCKS` 0,
+https://registry.khronos.org/OpenGL/specs/es/3.1/es_spec_3.1.pdf). The fallback order, the traced pass when the device
+can bind the scene and the screen-space pass otherwise, is the hybrid order of Barre-Brisebois et al. (piece 6b). The
+per-level Hi-Z textures keep the pyramid of Y. Uludag (GPU Pro 5, 2014) and M. McGuire and M. Mara (JCGT 3(4), 2014)
+unchanged; only where each level is written moves. No engine's code was read.
+
 ### Deforming mesh motion blur in the path tracer (FG-17 piece 4b, 2026-11-25)
 
 `packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-build.ts`, `mesh-shader.ts`, `sequence.ts` and

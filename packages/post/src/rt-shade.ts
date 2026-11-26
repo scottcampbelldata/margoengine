@@ -1,6 +1,6 @@
 import type { Engine, PassContext } from '@margoengine/core/extension';
 import { sceneBvhWGSL, type GPUSceneBVH } from '@margoengine/bvh/gpu-scene';
-import { margoError } from '../../shared/errors.js';
+import { fault, margoError } from '../../shared/errors.js';
 import { retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type PostPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -55,9 +55,13 @@ export function checkTraced(options: TracedOptions | undefined, owner: string): 
     throw new RangeError(`Invalid ${owner} bias; pass a finite number of at least 0`);
 }
 
+/** Storage buffers the scene adds to a traced fragment shader: sceneBvhWGSL's bindings 0 to 3. */
+const SCENE_STORAGE = 4;
+
 /** The light uniform and the group-1 bind groups of a traced effect. */
 export class TracedLight {
   #uniform?: GPUBuffer;
+  #warned?: GPUDevice;
   #device?: GPUDevice;
   #slice?: GPUBufferBinding;
   readonly #values = new Float32Array(16);
@@ -65,9 +69,37 @@ export class TracedLight {
     GPURenderPipeline,
     { scene: GPUSceneBVH; uniform: GPUBuffer; groups: { get(copy?: GPUBufferBinding): GPUBindGroup } }
   >();
-  /** True when `options.scene` is live on `device`. */
+  /**
+   * @param owner The effect, for the fallback warning.
+   * @param plain The screen-space effect it runs as when it cannot trace.
+   * @param storage Storage buffers the effect's own traced fragment shader binds besides the scene's.
+   */
+  constructor(
+    readonly owner: string,
+    readonly plain: string,
+    readonly storage = 0,
+  ) {}
+  /**
+   * True when `options.scene` is live on `device` and the device can bind it in a fragment shader. A device at WebGPU's
+   * compatibility feature level may allow fewer storage buffers there (`maxStorageBuffersInFragmentStage`: 4 by default
+   * at that level, and OpenGL ES 3.1 requires none); such a device warns once and runs the plain effect.
+   */
   active(options: TracedOptions, device: GPUDevice): boolean {
-    return !options.scene.disposed && options.scene.device === device;
+    if (options.scene.disposed || options.scene.device !== device) return false;
+    const limit = (device.limits as { maxStorageBuffersInFragmentStage?: number }).maxStorageBuffersInFragmentStage,
+      need = SCENE_STORAGE + this.storage;
+    if (limit === undefined || limit >= need) return true;
+    if (this.#warned !== device) {
+      this.#warned = device;
+      console.warn(
+        fault(
+          'unsupported',
+          `${this.owner} needs ${need} storage buffers in a fragment shader and this device allows ${limit}; it runs as ${this.plain}`,
+          'compatibility-layer',
+        ),
+      );
+    }
+    return false;
   }
   /** Writes this view's light from the engine's lighting. */
   prepare(c: PostPassContext, engine: Engine, options: TracedOptions): void {
@@ -112,7 +144,7 @@ export class TracedLight {
   }
   release(): void {
     if (this.#device) retire(this.#device, this.#uniform);
-    this.#device = this.#uniform = undefined;
+    this.#device = this.#uniform = this.#warned = undefined;
   }
 }
 

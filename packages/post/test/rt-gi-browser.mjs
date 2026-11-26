@@ -7,11 +7,15 @@
 // - multiBounce: the ceiling is black, so no second bounce adds light; the floor stays within 1/255 of one bounce.
 // - The ceiling moved out of reach (setMatrix + update): the floor goes black again.
 // - A disposed scene runs as SSGI: black.
+// --mode= runs the page on another device (traced-device.js): 'half-float' (the layer's half-float tier) and
+// 'compatibility' (native WebGPU at the compatibility level) trace as above; 'short' (that level with 4 storage buffers
+// in a fragment shader, one fewer than the traced trace binds) warns once and runs as SSGI: the floor is black.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { pbrNeutral } from '../../shared/display.js';
 import { postBrowser } from './post-browser.mjs';
 
+const mode = process.argv.find((arg) => arg.startsWith('--mode='))?.slice(7);
 const E = 0.5,
   height = 3,
   maxDistance = 100;
@@ -38,7 +42,9 @@ await postBrowser(
   () => launchBrowser({ headless: true }),
   async (page, shot) => {
     await page.evaluate(
-      async ({ E, height, maxDistance }) => {
+      async ({ E, height, maxDistance, mode }) => {
+        const { tracedDevice, legDevice } = await import('/packages/post/test/traced-device.js'),
+          warnings = await tracedDevice(mode, 5);
         const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
           { MeshBVH } = await import('/packages/bvh/dist/index.js'),
           { GPUSceneBVH } = await import('/packages/bvh/dist/gpu-scene.js'),
@@ -68,6 +74,8 @@ await postBrowser(
         const gi = new RTGI({ scene, maxDistance });
         PostStack.attach(engine, [gi]);
         window.t = {
+          warnings,
+          device: legDevice(engine),
           engine,
           gi,
           scene,
@@ -78,7 +86,7 @@ await postBrowser(
           },
         };
       },
-      { E, height, maxDistance },
+      { E, height, maxDistance, mode },
     );
     const frames = async (n, code = '') => {
       await page.evaluate(`${code}; window.t.frames(${n})`);
@@ -92,9 +100,12 @@ await postBrowser(
       ),
       back = await frames(2, 'window.t.scene.setMatrix(0, window.t.at(0, 3.05, 0)); window.t.scene.update()'),
       plain = await frames(2, 'window.t.scene.dispose()');
-    const layer = await page.evaluate(() => {
+    const { device, warnings } = await page.evaluate(() => {
       window.t.engine.dispose();
-      return !!globalThis.__margoCompat;
+      return {
+        device: window.t.device,
+        warnings: window.t.warnings.map((warning) => ({ code: warning?.code, message: String(warning?.message) })),
+      };
     });
     // The floor: the lower half of the view, away from the edges.
     const floor = [];
@@ -104,7 +115,8 @@ await postBrowser(
       return values[values.length >> 1];
     };
     const result = {
-      device: layer ? 'webgl2-layer' : 'webgpu',
+      device,
+      warnings: warnings.length,
       expected: +expected.toFixed(2),
       fade: +fade.toFixed(5),
       one: median(one),
@@ -114,6 +126,17 @@ await postBrowser(
       plain: median(plain),
     };
     console.log(JSON.stringify(result));
+    if (mode === 'short') {
+      assert.ok(device.includes('fragment storage buffers 4'), device);
+      assert.equal(warnings.length, 1, 'one warning');
+      assert.equal(warnings[0].code, 'unsupported');
+      assert.match(warnings[0].message, /^RTGI needs 5 storage buffers in a fragment shader and this device allows 4/);
+      for (const key of ['one', 'multi', 'away', 'back', 'plain'])
+        assert.ok(result[key] <= 2, `${key}: runs as SSGI, nothing on screen to bounce`);
+      return;
+    }
+    if (mode) assert.ok(device.includes(mode === 'half-float' ? '(half-float)' : 'compatibility level'), device);
+    assert.equal(warnings.length, 0, 'no warning');
     assert.ok(Math.abs(result.one - expected) <= 0.02 * expected, 'one traced bounce matches albedo x E within 2%');
     assert.ok(Math.abs(result.multi - result.one) <= 1, 'a black ceiling adds no second bounce');
     assert.ok(result.away <= 2, 'with the ceiling out of reach the floor is dark');
