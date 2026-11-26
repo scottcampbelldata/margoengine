@@ -14820,8 +14820,8 @@
         "gzip": 5861
       },
       "./granular-mpm": {
-        "raw": 14888,
-        "gzip": 5961
+        "raw": 15373,
+        "gzip": 6162
       },
       "./strands": {
         "raw": 15272,
@@ -19141,14 +19141,14 @@
       "brotli": 424250
     },
     "packages/physics/dist/granular-mpm-kernel.wasm": {
-      "raw": 16082,
-      "gzip": 6348,
-      "brotli": 5528
+      "raw": 16409,
+      "gzip": 6501,
+      "brotli": 5659
     },
     "packages/physics/dist/granular-mpm-kernel-shared.wasm": {
-      "raw": 16082,
-      "gzip": 6348,
-      "brotli": 5528
+      "raw": 16409,
+      "gzip": 6502,
+      "brotli": 5644
     },
     "packages/physics/dist/granular-flow-kernel.wasm": {
       "raw": 9620,

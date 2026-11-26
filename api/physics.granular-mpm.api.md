@@ -10,6 +10,14 @@ export const GRANULAR_MPM_LAYOUT = 1;
 
 export const GRANULAR_MPM_WORDS: number;
 
+export interface GranularInertialRheology {
+    readonly grainDiameter: number;
+    readonly grainDensity: number;
+    readonly staticFriction: number;
+    readonly highRateFriction: number;
+    readonly referenceInertialNumber: number;
+}
+
 export interface GranularMaterial {
     readonly kind?: 'sand' | 'snow';
     readonly density?: number;
@@ -17,6 +25,7 @@ export interface GranularMaterial {
     readonly poisson?: number;
     readonly frictionAngle?: number;
     readonly cohesion?: number;
+    readonly inertial?: GranularInertialRheology;
     readonly compressiveYield?: number;
     readonly tensileYield?: number;
     readonly hardening?: number;
