@@ -12991,7 +12991,9 @@ wheel option resolves the driven rim's average stress envelope below its axle. E
 individual contact marks from live spin. Their projected strip uses 65 along-track stations. Indexed tread
 triangles can instead intersect the local horizontal bearing plane at configurable resolution (17 by 65
 profile samples by default). Supply three finite coordinates per vertex and three zero-based indices per
-triangle. Wheel camber is outside that phase-only footprint model. The optional reaction field
+triangle. The optional single-value camber field accepts the right-axis vertical component in [-1, 1],
+default zero. It tilts indexed tread geometry. The analytic bearing arc remains upright while
+determining load. The optional reaction field
 reports vertical and longitudinal force and resisting axle torque for the forward driven arc.
 Its reciprocal rigid binding applies the previous contact result on the same collider. A tyre provides
 independent wheel spin and lateral grip. Lower actual load and the discrete kinetic-work bound
@@ -13005,8 +13007,8 @@ drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Su
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 13,328 B gzip with a 13,728 B ceiling. Both Wasm assets are 28,248 B raw and 11,398 B gzip each.
-The Physics root is 866,898 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
+The optional entry is 13,527 B gzip with a 13,728 B ceiling. Both Wasm assets are 28,505 B raw and 11,559 B gzip each.
+The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
@@ -29950,8 +29952,9 @@ exchange of changing subsurface properties still needs a shared soil contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
-It stamps evenly spaced lugs and indexed triangle treads from live wheel spin, with wheel tilt still
-open. The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
+It stamps evenly spaced lugs from spin and indexed triangle treads from both live spin and camber.
+The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
+Measured cross-slope camber forces remain open.
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live

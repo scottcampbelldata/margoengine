@@ -1959,6 +1959,7 @@ export class Vehicle implements PhysicsAttachment {
     get speed(): number;
     setWheelGroundTraction(index: number, traction: WheelGroundTraction): void;
     wheel(index: number): WheelState;
+    wheelCamberSine(index: number): number;
     get motionStateWords(): number;
     writeMotionState(output: Float64Array): void;
     readMotionState(source: Float64Array): void;

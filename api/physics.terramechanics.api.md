@@ -42,6 +42,7 @@ export interface SoilContactProfile {
 export interface SoilContactRigidOptions {
     readonly id?: string;
     readonly wheelPhase?: FieldDescriptor;
+    readonly wheelCamber?: FieldDescriptor;
     readonly wheelReaction?: FieldDescriptor;
     readonly wheelSideForce?: FieldDescriptor;
     readonly terrain?: BedShape;
@@ -169,6 +170,7 @@ export interface TerramechanicsOptions {
     readonly id?: string;
     readonly input?: FieldDescriptor;
     readonly wheelPhase?: FieldDescriptor;
+    readonly wheelCamber?: FieldDescriptor;
     readonly wheelReaction?: FieldDescriptor;
     readonly wheelSideForce?: FieldDescriptor;
     readonly legged?: boolean;
@@ -214,6 +216,8 @@ export interface WheelSoilBinding {
 }
 
 export function soilPatchField(name?: string): FieldDescriptor;
+
+export function soilWheelCamberField(name?: string): FieldDescriptor;
 
 export function soilWheelPhaseField(name?: string): FieldDescriptor;
 
@@ -2211,6 +2215,7 @@ class Vehicle implements PhysicsAttachment {
     get speed(): number;
     setWheelGroundTraction(index: number, traction: WheelGroundTraction): void;
     wheel(index: number): WheelState;
+    wheelCamberSine(index: number): number;
     get motionStateWords(): number;
     writeMotionState(output: Float64Array): void;
     readMotionState(source: Float64Array): void;
