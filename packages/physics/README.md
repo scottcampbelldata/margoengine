@@ -4873,6 +4873,43 @@ const bent = resolveGirder(section, 0.001);
 if (!bent || Math.abs(bent.bendingMoment - 1e6) > 1e-6) throw new Error('Expected the elastic section moment');
 ```
 
+Use `GirderJointSolver` to join two independently simulated rigid parts at a section. Set their
+body-local anchors and the first body's bending axis in the aligned rest pose. Give the section's
+gauge length, anchor stiffness, tensile failure strain and plate or stiffener curves. While intact,
+the anchors transmit three-dimensional force and the section transmits its bending couple. When a
+fiber reaches the specified strain, the joint releases permanently. The authored bodies keep their
+own colliders and motion. `read(index)` copies signed curvature, resisting moment, peak tensile
+strain, anchor separation and the failure flag. The `seamField` publishes layout-1 f64 rows in
+the same order with the reference axial strain inserted between moment and peak tensile strain.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { GirderJointSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const colliders = { shape: 'box', halfExtents: [0.25, 0.25, 0.25], mass: 4, sensor: true } as const;
+const fore = physics.addBody(null, { position: [-0.25, 0, 0], colliders });
+const aft = physics.addBody(null, { position: [0.25, 0, 0], colliders });
+const curve = [{ strain: -0.2, stress: -400 }, { strain: 0, stress: 0 }, { strain: 0.2, stress: 400 }];
+const fibers = [-0.1, 0.1].map(offset => ({ offset, area: 0.01, curve }));
+const seam = new GirderJointSolver();
+const bodyCapacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(seam, { bodyCapacity, joints: [{
+  first: { body: fore.row, anchor: [0.25, 0, 0] }, second: { body: aft.row, anchor: [-0.25, 0, 0] },
+  axis: [0, 0, 1], gaugeLength: 0.6, anchorStiffness: 900, failureStrain: 0.045, fibers,
+}] });
+world.couple(['rigid', seam.id], 'staggered');
+fore.addTorque([0, 0, -0.8]);
+aft.addTorque([0, 0, 0.8]);
+world.advance(60);
+if (!seam.read(0).broken) throw new Error('Expected the girder seam to release under differential bending');
+```
+
 Use `resolvePlateBuckling` for the first elastic mode of a simply supported rectangular plate.
 Specify dimensions, Young's modulus, Poisson's ratio (default `0.3`) and a signed initial crest
 (default `0`, in metres). Pass the end shortening in metres. Optional rest-plane XY pairs

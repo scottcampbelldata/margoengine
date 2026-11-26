@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Breakable girder seam (BREAK-03, 2026-11-26). Two rigid parts exchange a bending couple and
+  off-axis point impulse that match the analytical elastic section and point mobility. Applied
+  differential torques release the seam at the authored strain. The restored state repeats
+  separation bit for bit. [Reproduce](reproduce.md#break-03-breakable-girder-seam)
 - Live crush-linked plate (BREAK-03, 2026-11-26). Real rigid contact drives the deformed mesh to an
   8.46 mm crest. It retains 7.45 mm after the load releases. Both rendering backends resolve the shape
   and repeat the loaded frame from the saved world. [Reproduce](reproduce.md#break-03-measured-plate-buckling)

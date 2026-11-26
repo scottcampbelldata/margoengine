@@ -62,6 +62,27 @@ function stressAt(curve: readonly GirderSample[], strain: number): number {
   return a.stress;
 }
 
+/** Moment derivative at constant section axial force, evaluated on the active curve branches. */
+export function girderTangent(fibers: readonly GirderFiber[], states: readonly GirderSample[]): number {
+  let axial = 0;
+  let first = 0;
+  let second = 0;
+  for (let i = 0; i < fibers.length; i++) {
+    const { area, offset, curve } = fibers[i]!;
+    const strain = states[i]!.strain;
+    if (strain <= curve[0]!.strain) continue;
+    const right = curve.findIndex((sample) => sample.strain >= strain);
+    if (right < 1) continue;
+    const a = curve[right - 1]!;
+    const b = curve[right]!;
+    const slope = (area * (b.stress - a.stress)) / (b.strain - a.strain); // float division
+    axial += slope;
+    first += slope * offset;
+    second += slope * offset * offset;
+  }
+  return axial > 0 ? second - (first * first) / axial : 0; // float division: eliminate axial strain
+}
+
 function breakpoints(fiber: GirderFiber, curvature: number, output: Breakpoint[]): number {
   const { offset, curve } = fiber;
   const area = positive(fiber.area, 'girder fiber area');

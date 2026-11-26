@@ -15161,6 +15161,25 @@ relaxed elastic cycles have a 140–160 MN·m² observed band in Fig. 12. The tw
 for this elastic comparison. The ultimate moments and loading cycles remain separate validation targets.
 [Gordo and Guedes Soares (2014)](https://doi.org/10.1016/j.marstruc.2014.03.003)
 
+Kazuhiro Iijima, Kazuhiro Kimura, Weijun Xu and Masahiko Fujikubo, “Hydroelasto-plasticity
+approach to predicting the post-ultimate strength behavior of a ship’s hull girder in waves”
+(2011), §2.1, connect the two rigid bodies with reciprocal interface force and a rotational
+spring. M. A. Crisfield's “A Consistent Co-Rotational Formulation for Non-Linear,
+Three-Dimensional, Beam-Elements” (1990) derives forces and tangents from strain in a
+rotating frame. Tassilo Kugelstadt and Elmar Schömer's “Position and Orientation Based
+Cosserat Rods” (2016), §5, discretizes Darboux curvature as twice the vector part of relative
+rotation divided by segment length. For the selected unit axis `a`, take relative quaternion
+`(r,w)`, projected bend `κ = 2(a·r)/L` and angular gradient `g = wa + r×a`.
+Work conjugacy with section moment `M` gives the couple `M R_A g` in world axes. The
+constant-axial-force moment tangent is
+`Σ A E_t y² − (Σ A E_t y)² / Σ A E_t`. The angular update uses its nonnegative directional
+tangent to advance the couple over the step. The point spring evaluates the anchor gap, holds
+step velocities at the anchors' common midpoint and inverts their combined three-axis
+mobility. Both reactions are reciprocal. The tensile limit releases both.
+[Iijima et al. (2011)](https://doi.org/10.1007/s00773-011-0142-1)
+[Crisfield (1990)](https://doi.org/10.1016/0045-7825(90)90106-V)
+[Kugelstadt and Schömer (2016)](https://diglib.eg.org/items/eb5dd4ac-529c-4d6b-86ab-454cec714272)
+
 Manuel Stein, “Loads and Deformations of Buckled Rectangular Plates” (1959), NASA TR R-40, Eqs. 1–3
 and Fig. 1, gives the von Kármán plate equations and longitudinal mode selection. Pai C. Hu, Eugene
 E. Lundquist and S. B. Batdorf, “Effect of Small Deviations from Flatness on Effective Width and

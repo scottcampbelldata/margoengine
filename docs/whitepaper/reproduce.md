@@ -23,6 +23,15 @@ The same browser test also loads and retracts a native rigid carriage. It evalua
 `CrushSolver.readPlate` surface at both strokes and draws them with the same camera. The loaded and
 released frames differ, and rerunning the loaded state gives the same world hash and image.
 
+## BREAK-03 breakable girder seam
+
+Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run
+`node --test packages/physics/tests/coupling/crush-girder-joint.test.js`. The fixture derives the
+couple from an elastic two-fiber section and the eccentric impulse from the native box masses
+and inertias. It checks reciprocal transfer in two orientations, differential-load failure and
+identical snapshot replay. The floating-model hammering and wave records in Iijima et al.
+remain independent validation targets. [Iijima et al. (2011)](https://doi.org/10.1007/s00773-011-0142-1)
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard
