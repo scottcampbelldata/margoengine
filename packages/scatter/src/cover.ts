@@ -63,9 +63,13 @@ export function coverCode(code: string, lit: boolean, at = 0, depth = false): st
     const c = b && one(b, 'return vec4f(color,1);}', kept);
     return c && coverDeclaration + coverageShader + c;
   }
-  const head = /@fragment fn fragment\(((?:[^()]|\([^()]*\))*)\)->@location\(0\) vec4f \{/.exec(code);
+  // A capture stage (`captureStage`) returns the hook's MargoSSR: only its coverage-depth form exists, kept where the
+  // strip's coverage passes the pose's threshold, as the depth pass after the blended colour keeps it.
+  const head = /@fragment fn fragment\(((?:[^()]|\([^()]*\))*)\)->(@location\(0\) vec4f|MargoSSR) \{/.exec(code);
   const struct = /struct Output \{[^}]+\}/.exec(code)?.[0];
   if (!head || !struct || !/@vertex fn vertex\([\s\S]*?return o;/.test(code)) return undefined;
+  const captured = head[2] === 'MargoSSR';
+  if (captured && !depth) return undefined;
   const params = head[1].split(',').map((x) => x.replace(/@\w+(\([^)]*\))?\s*/g, '').trim());
   const names = params.map((x) => x.split(':')[0].trim());
   // The varyings are the parameter of type Output, whatever the stage names it (core's shader i, PbrMaterial's varyings).
@@ -74,17 +78,20 @@ export function coverCode(code: string, lit: boolean, at = 0, depth = false): st
   // The fragment is kept whole as a function (a discard there still ends the fragment) and wrapped: its colour, with
   // its alpha scaled by the coverage (or, for depth, kept above the threshold).
   const cover = `${varyings}.cover`,
-    kept = depth
-      ? `if(c.a*scatterCoverage(${cover})<=${cover}.w){discard;}return c;}`
-      : `return vec4f(c.rgb,c.a*scatterCoverage(${cover}));}`;
+    kept = captured
+      ? `if(scatterCoverage(${cover})<=${cover}.w){discard;}return c;}`
+      : depth
+        ? `if(c.a*scatterCoverage(${cover})<=${cover}.w){discard;}return c;}`
+        : `return vec4f(c.rgb,c.a*scatterCoverage(${cover}));}`,
+    output = captured ? 'MargoSSR' : '@location(0) vec4f';
   return (
     coverDeclaration +
     coverageShader +
     code
       .replace(struct, struct.slice(0, -1) + `,@location(${at}) cover:vec4f}`)
       .replace(/(@vertex fn vertex\([\s\S]*?)return o;/, '$1o.cover=scatterCover;return o;')
-      .replace(head[0], `fn scatterOpaque(${params.join(',')})->vec4f {`) +
-    `\n@fragment fn fragment(${head[1]})->@location(0) vec4f {let c=scatterOpaque(${names.join(',')});${kept}\n`
+      .replace(head[0], `fn scatterOpaque(${params.join(',')})->${captured ? 'MargoSSR' : 'vec4f'} {`) +
+    `\n@fragment fn fragment(${head[1]})->${output} {let c=scatterOpaque(${names.join(',')});${kept}\n`
   );
 }
 

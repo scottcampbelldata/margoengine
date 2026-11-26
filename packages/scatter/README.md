@@ -921,6 +921,42 @@ engine.start();
 Each record places a clump; the GPU picks the near, middle and far mesh by distance and fades between them. Manage
 the held set with `setTile` and `removeTile`; the coordinate range alone does not allocate records for unheld chunks.
 
+## Material capture: SSR, SceneTargets and LightBounce see the plants
+
+`scatter.setCapture(hook)` lets a capture effect of `@margoengine/post` draw the plants with their own material:
+`ssr.add(scatter)`, `targets.add(scatter, {ground: false})` and `bounce.add(scatter)` call it for you. The capture pass
+draws this frame's three LOD rings with the colour pass's own stage (wind, ground fit, LOD dither, blade normals,
+`variation`, texture maps and the cut-out) ending in the effect's `margoSSR`, depth tested and written, so the effect's
+masks, reflections and bounce see a fern in front of the ground instead of the ground behind it. Covered rings (grass
+tips, far blades) capture where their coverage passes the pose's threshold, as their depth pass keeps them; an imposter
+far ring captures as its mesh. One Scatter in several effects keeps each effect's stage. The instances are the main
+camera's culled and LOD'd set (as `drawShadow`), and the vertex stage is the colour pass's, so under TAA the plants
+depth-test against the core replay exactly.
+
+- Lit Scatters only (the `material` option): an unlit one has no world position, sun or material in its stage, and
+  `setCapture` throws MargoError `unsupported` (docs/limits.md).
+- `draw(c, 'capture')` draws nothing without a hook, before the first distribute or after `dispose()`;
+  `onDispose(callback)` lets an effect forget a disposed Scatter.
+- `ScatterTiles`, textured and states scatters inherit it; WebGPU and the WebGL2 layer.
+
+```ts
+import { Engine, PbrMaterial, box } from 'margoengine/core';
+import { Scatter } from 'margoengine/scatter';
+import { SceneTargets } from 'margoengine/post/mrt';
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const ferns = new Scatter(box(0.4, 0.6, 0.4), {
+  count: 2000,
+  area: [40, 40],
+  material: new PbrMaterial({ color: [0.2, 0.45, 0.1], roughness: 0.8 }),
+});
+engine.use(ferns);
+const looks = SceneTargets.attach(engine, {
+  outputs: { lit: 'litGround', shade: 'shadedGround', plants: { wgsl: 'vec4f(1.0-t.ground,0,0,1)', format: 'r8unorm' } },
+});
+looks.add(ferns, { ground: false });
+engine.start();
+```
+
 ## Motion vectors and motion blur in wind: `@margoengine/scatter/velocity`
 
 A swaying field is still to TAA and `MotionBlur` unless its motion reaches their velocity buffer. `new
