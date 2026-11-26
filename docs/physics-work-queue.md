@@ -372,7 +372,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
-| EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5032e1a3b4 |
+| EARTH-05 | Terramechanics | physics/terramechanics with native soil, live rigid and legged contacts, and mineral dust | Codex | BUILDING (codex/physics-terramechanics-pass1) |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
 | EARTH-07 | Aeolian transport | physics/aeolian | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | physics/seismic | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 32c933e9d0 |
