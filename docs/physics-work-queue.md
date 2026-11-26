@@ -247,7 +247,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
 | BREAK-03 | Ductile crushing: hulls, car bodies, rail cars | none | Open | OPEN |
 | LIFE-01 | Legged animal locomotion (quadrupeds, bipeds) | stand-in | Open | OPEN |
-| LIFE-03 | Aquatic locomotion | none | Codex | BUILDING (codex/physics-life03) |
+| LIFE-03 | Aquatic locomotion | physics/life | Codex | LANDED 032d5183b2 |
 | LIFE-04 | Collective animal motion | deterministic schooling, physical steering and intent ports | Codex | LANDED 006faf6368 |
 | LIFE-05 | Pedestrian and dense-crowd dynamics | partial | Open | OPEN |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
