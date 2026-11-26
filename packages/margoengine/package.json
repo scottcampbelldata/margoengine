@@ -1263,6 +1263,10 @@
       "types": "./dist/ecs/objects.d.ts",
       "import": "./dist/ecs/objects.js"
     },
+    "./ecs/coroutines": {
+      "types": "./dist/ecs/coroutines.d.ts",
+      "import": "./dist/ecs/coroutines.js"
+    },
     "./ecs/scripts": {
       "types": "./dist/ecs/scripts.d.ts",
       "import": "./dist/ecs/scripts.js"

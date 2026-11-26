@@ -175,6 +175,34 @@ Every attribute also takes `default` and `title` (an inspector label). A bad def
 
 Sources: the feature set follows the public documentation of PlayCanvas script components (attributes, initialize/postInitialize/update/postUpdate, enable/disable, swap for hot reload) and Needle Engine components; the code is written clean room from those feature names.
 
+## Coroutines
+
+`Coroutines` (from `@margoengine/ecs/coroutines`) runs multi-frame logic written as a generator, so a sequence reads top to bottom instead of as a state machine. `update(dt)` steps every running coroutine once; `install(schedule)` adds a frame system that does it. A bare `yield` waits one update, `yield 0.5` waits half a second, `yield promise` waits for a promise (a rejection is thrown into the generator at that `yield`), and `yield other` waits until another coroutine ends. `start(generator)` returns a `Coroutine` with `cancel()`, `active` and `done`; `run(generator)` is the async form and returns `done`, which resolves when the generator returns and rejects with an AbortError when it is cancelled. Cancelling runs the generator's `finally` blocks. Pass `{signal}` to cancel with an `AbortSignal`.
+
+```ts
+import {Schedule} from '@margoengine/ecs/schedule';
+import {Coroutines} from '@margoengine/ecs/coroutines';
+
+const coroutines = new Coroutines();
+const schedule = new Schedule();
+coroutines.install(schedule);
+const log: string[] = [];
+function* door() {
+  log.push('open');
+  yield 0.2; // seconds
+  log.push('close');
+}
+const sequence = coroutines.run(door());
+for (let i = 0; i < 30; i++) schedule.update(1 / 60);
+await sequence;
+console.log(log); // ['open', 'close']
+const blink = coroutines.start((function* () { while (true) yield; })());
+blink.cancel(); // blink.done rejects with an AbortError
+coroutines.dispose();
+```
+
+A coroutine that throws goes to `onError(error, coroutine)` when you pass it, otherwise `update` rethrows a MargoError `'failed'` with the first error as `cause` after stepping the others. `update` throws a RangeError for a negative or non-finite `dt`, and a coroutine that yields a negative number gets one thrown at its `yield`. A script can start coroutines from its hooks and cancel them in `destroy`. The pattern follows the coroutine runners of other engines' public docs; the stepping is plain generator protocol.
+
 ## Change detection
 
 `ChangeTracker` (from `margoengine/ecs`, or `margoengine/ecs/changes` alone) answers which entities gained, changed or lost one component since its last `clear()`.
