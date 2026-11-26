@@ -1826,7 +1826,7 @@ stop();
 `move(x, y)` takes texture coordinates; for an object, pass the UV of the surface point under it or its projected
 screen position over the canvas size. `clear()` starts from black on the next frame. The update runs once a frame,
 also with several views. `TrailTexture` is disposable (`using trail = ...`). Limits are in
-[docs/limits.md](../../docs/limits.md#trail-texture-margoenginepostrail-2026-11-26); sources in
+[docs/limits.md](../../docs/limits.md#trail-texture-margoengineposttrail-2026-11-26); sources in
 [docs/clean-room.md](../../docs/clean-room.md#trail-texture-2026-11-26).
 
 ## Render graph: `RenderGraph`
