@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20657132,
+  "total": 20658330,
   "history": [
     {
       "date": "2026-10-24",
@@ -13927,6 +13927,12 @@
       "commit": "64367a8847",
       "reason": "BREAK-03 distributed sheet advances the optional crush entry from 12996 to 16020 B gzip. The ceiling rises from 13386 to 16501 B. The solver adds checked membrane and hinge topology, arena layout and its live force, stress and mesh API. A separate entry would add another optional entry and public import for a scene that uses both reduced crush and the shell. Named imports are tree-shakable, and the compiled material and bending code is fetched by the shell loader.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7e9782ab39",
+      "grew": 1,
+      "reason": "SEA-08 mean short-wave resistance grows seakeeping from 31849 to 32716 B gzip. The hull computes directional interception and encounter-dependent wall reflectance for its axial force. Splitting it would duplicate the shared hull, spectra and rigid force setup. Core plus Stage remains 24892 B."
     }
   ],
   "items": {
@@ -14790,7 +14796,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8539,
-    "@margoengine/physics/seakeeping": 32500,
+    "@margoengine/physics/seakeeping": 33698,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,
