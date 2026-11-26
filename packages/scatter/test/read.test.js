@@ -4,6 +4,22 @@ import { instanceMatrix, poseFrame, poseKernel, readScatter } from '../dist/read
 import { grassPoseCode } from '../dist/grass.js';
 import { plantStatePoseCode } from '../dist/states.js';
 import { trampledPoseCode } from '../dist/interact.js';
+import { readdirSync } from 'node:fs';
+
+// The unpatched pose functions the root entry hands readScatter (`velocityParts().poseSource`), from the build's
+// entries and shared chunks: the strings that define windBend and scatterPose.
+const chunks = await Promise.all(
+  readdirSync(new URL('../dist/', import.meta.url))
+    .filter((f) => f.endsWith('.js'))
+    .map((f) => import(new URL(`../dist/${f}`, import.meta.url))),
+);
+const strings = chunks.flatMap((m) => Object.values(m).filter((v) => typeof v === 'string'));
+const pick = (head) => {
+  const found = [...new Set(strings.filter((s) => s.includes(head)))];
+  assert.equal(found.length, 1, head);
+  return found[0];
+};
+const source = pick('fn windBend(') + pick('fn scatterPose(p:vec3f');
 
 // The vertex stage's placement (pose.ts scatterGround and scatterTurn), written out again: the matrix must give the
 // same world point for any local point.
@@ -66,7 +82,7 @@ test('poseFrame lays out the pose kernel uniform from the frame values, with no 
 });
 
 test('poseKernel calls the scatter pose twice and takes every pose patch the scatter applies', () => {
-  const plain = poseKernel((code) => code);
+  const plain = poseKernel(source, (code) => code);
   assert.match(plain, /@compute @workgroup_size\(64\) fn main/);
   assert.equal(plain.split('scatterPose(p,n,data.position').length, 3, 'now and before');
   assert.match(plain, /f\.windBefore/);
@@ -77,7 +93,7 @@ test('poseKernel calls the scatter pose twice and takes every pose patch the sca
     (code, binding) => trampledPoseCode(code, 0, binding),
     (code, binding) => trampledPoseCode(plantStatePoseCode(code, 0, binding), 0, binding + 2),
   ]) {
-    const code = poseKernel((code, binding) => {
+    const code = poseKernel(source, (code, binding) => {
       bindings.push(binding);
       return patch(code, binding);
     });

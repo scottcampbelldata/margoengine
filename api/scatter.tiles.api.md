@@ -222,6 +222,7 @@ interface ScatterVariation {
 interface ScatterVelocityParts {
     readonly values: Float32Array;
     readonly windBefore: Float32Array;
+    readonly poseSource: string;
     readonly instances: readonly GPUBuffer[];
     readonly commands: GPUBuffer;
     readonly vertices: readonly GPUBuffer[];

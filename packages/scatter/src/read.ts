@@ -22,8 +22,6 @@ import type { EngineKernel, Geometry } from '@margoengine/core';
 import type { Scatter, ScatterVelocityParts } from './index.js';
 import { margoError } from '../../shared/errors.js';
 import { mapRead } from '../../shared/map-read.js';
-import { poseShader } from './pose.js';
-import { windShader } from './wind.js';
 
 declare const GPUBufferUsage: {
   COPY_DST: number;
@@ -180,15 +178,15 @@ const POSED = 9;
 const GROUP = 64;
 const ROW = 65535;
 /**
- * WGSL of the pose kernel, with a scatter's pose patches applied by `pose` (`ScatterVelocityParts.pose`, their
+ * WGSL of the pose kernel on `source`, the scatter's unpatched pose functions (`ScatterVelocityParts.poseSource`, so
+ * this entry carries no copy of them), with its pose patches applied by `pose` (`ScatterVelocityParts.pose`, their
  * bindings from 2 in group 0, as in every posing stage). Each invocation poses one vertex: instance `counts.w + i /
  * counts.y` of `instances`, vertex `i % counts.y` of `readMesh` (`counts.z` floats a vertex), `counts.x` instances in
  * all, into 9 floats of `readPosed`: world position, unit normal, and the position under the wind before.
  */
-export const poseKernel = (pose: (code: string, binding: number) => string): string =>
+export const poseKernel = (source: string, pose: (code: string, binding: number) => string): string =>
   pose(
-    windShader +
-      poseShader +
+    source +
       `
 struct ReadFrame {eye:vec4f,wind:vec4f,windBefore:vec4f,ground:vec4f,blade:vec4f,counts:vec4u}
 struct Instance {position:vec4f,rotation:vec4f}
@@ -246,7 +244,7 @@ async function poseRing(
   geometry: Geometry,
   signal: AbortSignal | undefined,
 ): Promise<ScatterPosedRing> {
-  const code = poseKernel(parts.pose);
+  const code = poseKernel(parts.poseSource, parts.pose);
   let cache = pipelines.get(device);
   if (!cache) pipelines.set(device, (cache = new Map()));
   let pipeline = cache.get(code);
