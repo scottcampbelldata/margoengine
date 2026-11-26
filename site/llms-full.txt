@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,288 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,294 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -4349,6 +4349,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Output dithering (materials `dithering`, 2026-11-06) | Acts when a material writes straight to the 8-bit target. | Rendering to a float scene target leaves the values alone: the pass that presents them owns the output. | On an RTX A6000 a dark gradient's columns stay within a fifth of an 8-bit step of the true level, against the half step of plain banding, with black and white exact and frames identical. Adds up to one 8-bit step of noise per pixel. Cost not timed. | `Bloom` and `Sky` dither their own output with the same noise; depth of field, environment and other presenting passes do not. |
 | Hardware clip distances (materials `clippingPlanes`, 2026-11-06) | On an RTX A6000 with `features: ['clip-distances']` the compiled shader holds no clip `discard`, the cut matches the plane to the pixel, the wall behind shows with no depth left over, a cascaded shadow matches the discard path away from the cut, and the same scene on a device without the feature takes the discard path. | Needs the feature requested at `Engine.create`, as core does not ask for it. `clipIntersection`, more than 8 planes (WGSL's `clip_distances` holds at most 8; a material holds up to 16 since 2026-11-16), materials with vertex outputs at location 13 or higher, and passes other than the colour pass and cascaded casters stay on discard. | Eight distances take two inter-stage slots. Edge pixels differ from discard, as multisampling smooths the cut. Speed not timed. | Request the feature with `Engine.create(canvas, { features: ['clip-distances'] })`; where it cannot be used the planes fall back to `discard` with the same picture except for pixels on the cut. |
 | Material plugins (`@margoengine/materials/plugins`, 2026-11-25) | Hosted on this package's `PbrMaterial` (and every Material class of it, `WgslMaterial` included), which renders through gltf/pbr; core's own `PbrMaterial` (`@margoengine/core`, `createStage` meshes) cannot be hooked from a package without a core change, so plugins do not reach it. Enforced: names are letters and digits not used by the PBR shader or WGSL; uniforms 1 to 4 finite float32 numbers; at most 4 filterable textures per plugin and 8 plugins per material (bindings 300 + 16 x place of group 2); declarations may not bind (`TypeError`, `RangeError`, `MargoError` `unsupported` when a point is missing). By method ([plugins-browser.mjs](../packages/materials/test/plugins-browser.mjs), WebGPU and the WebGL2 layer): an output colour reaches the canvas to the byte, live uniforms and textures change the next frame, two plugins apply in list order, a surface base colour lights exactly as the same material colour, a vertex move draws a plain and an instanced mesh elsewhere, and a moved caster's shadow moves with it. | The `vertex` point sees mesh position and normal only (no UV, no vertex index); TAA velocity uses this frame's uniforms for last frame too, so an animated move adds no velocity of its own. `surface` edits run before the alpha test but shadows cut by the material's own alpha, not the plugin's. A `FurMaterial`, or another subclass with its own caster, keeps its caster: plugin vertex moves then reach the colour pass only. `light` runs before an `envMap` combine. Errors inside the WGSL are WebGPU validation errors at first draw. | Plugins with bindings re-derive their draw every frame (as every feature with bindings); not timed. Each composed variant is a new shader module. | Use `WgslMaterial` for a whole custom surface, NodeMaterial for graphs; merge plugins past 8; save with `materialPluginCodec`. |
+| Per-instance attributes (`@margoengine/materials/instance-attributes`, 2026-11-26) | Enforced: capacity a whole number from 1 to 1,000,000, 1 to 16 attributes (letters and digits) of `f32`, `vec2f` to `vec4f`, `color`, `mat3x3f` or `mat4x4f`, finite float32 values, rows inside the capacity (`TypeError`, `RangeError`, `MargoError` `disposed`, and `unsupported` when the shader lacks the points or both varyings 6 and 8 are taken); the buffer, 4 bytes x floats per instance x (capacity + 1), must fit the device's `maxStorageBufferBindingSize` and `maxBufferSize` (`RangeError` at first draw). By method ([instance-attributes-browser.mjs](../packages/materials/test/instance-attributes-browser.mjs), WebGPU and the WebGL2 layer, Intel Arc 140V): every type reads its own row to the byte; single, bulk, in-place and reset edits reach the next frame; rows past the capacity read the defaults; a restored device draws the same; plain meshes read row 0; cascaded, virtual and local spot shadows and GPU picking of a plain mesh follow a vertex move; TAA compiles its velocity shader with the row load; a culler and a sorter leave the rows in place. Not run on the GPU: the shadow atlas and contact shadows. Entry sizes (gzip): `/instance-attributes` 0 to 3,008 B (ceiling 3,264); `/plugins` 4,461 to 4,923 B (ceiling 4,715 to 5,179). | One read-only storage buffer per set and plugin, read by instance index: it counts toward WebGPU's 8 storage buffers per shader stage. `CulledModels` and `FrontToBack` draw such instances unculled and unsorted. TAA velocity: instances keep camera motion only; a plain mesh uses this frame's values for last frame too. GPU picking of instanced meshes ignores the vertex move (docs/known-bugs.md KB-PICK-INSTMOVE1). Occluder depth, mesh `bounds`, CPU raycasts, path tracing and exporters ignore the values. Meshes that share a material share its values. Core meshes take no material plugins. Adapters without vertex-stage storage buffers (compatibility mode) are not covered. | A vertex shader has the row index only; a culler's compacted 96-byte rows carry no spare lane for the original index. | Give each mesh that needs its own values its own material and set; cull such meshes on the CPU or not at all. |
 | Retroreflection (`@margoengine/materials/retroreflection`, 2026-11-24) | Enforced: `strength` and `roughness` 0 to 1 (drawn roughness at least 0.045), `color` three numbers 0 to 1; a bad value throws `RangeError`. One value per feature, no strength map. Needs a `PbrMaterial` without anisotropy or a thin film (`TypeError`). By method ([features-browser.mjs](../packages/materials/test/features-browser.mjs) `retro`, WebGPU and the WebGL2 layer, a flat stand-in quad): with the light at the eye the pixel matches the GGX formula within 0.02 (0.03 through a normal map), strength 0 and a removed feature draw the plain material, and the sun, a `Clustered` point light and an image each return their light toward its own side. No photograph or measured retroreflector has been compared. | The Minimal Retroreflective Microfacet model (Portsmouth et al. 2026): a single-scattering GGX lobe, so a rough retro lobe loses the light that bounces between facets; no multiple-scattering term, no wavelength spread, no fall-off with entrance angle beyond the lobe's own. | Area lights, clearcoat and sheen reflections stay as the plain material draws them. Image light costs a second read of the ambient term. Cost not timed. | Raise `strength` for sheeting, lower `roughness` for a tighter return; use two materials for stripes. |
 | Object-space normal maps (`@margoengine/materials/object-normal`, 2026-11-06) | A transform that is not rigid. | By method: rigid transforms only (rotation, non-uniform scale, mirroring, instance matrices), read back as shading normals within 0.03 on an RTX A6000 from a solid stand-in map. | A skinned or morphed mesh and a `BatchedMesh` item with its own matrix keep the bind pose's normals. | `up` covers Y-up and Z-up maps; other axis orders need the map rebaked. |
 | Layered materials (`@margoengine/materials/layered`, 2026-11-06) | At most 8 layers and 9 distinct textures per feature, because the group has 19 binding numbers set aside; maps are fixed at creation. A layer's height map does not displace or change parallax. | By method: masks, packed channels, layer order, vertex colours, height blends, array layers, tiling, detail, roughness, metalness, normals and live numbers read back on an RTX A6000 from small stand-in data textures. | Every map is sampled for every fragment, so cost grows with layers; no timing is recorded yet. | Put layers in one `'2d-array'` Texture and give each layer's map as `{texture, layer}`, so one texture serves many layers; a Texture used twice in the same colour space counts once. |
@@ -4674,6 +4675,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Editing other packages' objects (`@margoengine/inspector/packages`, 2026-11-08) | Enforced: each number within its documented range (light intensity, range and decay 0 or more, cone angles 0 to pi / 2, Bloom strength 0 to 4, threshold 0 to 100, exposure -10 to 10, radius 0 to 1, shadow lambda 0 to 1, material factors 0 to 1), a value of the property's kind, no edit of a read-only object. By method: objects are found by shape: a light outside a `clustered*` plugin's `list`, a material that is not a gltf/pbr record and a plugin without `options` or settable accessors are not listed unless passed in `objects`; only numbers, switches and 3-vectors are edited (no textures, strings, enums or alpha mode). | The editor imports none of the packages it edits, so it relies on their documented shapes. | A glTF material whose `@margoengine/materials` shading reports a version is shown read only; an option a package reads only when it attaches keeps its old value until it is attached again. | Pass the object in `objects` (a materials `Material`, app settings), or edit it in code. |
 | Plugin and pass view (`FrameReport.plugins`, `@margoengine/inspector/frame`, 2026-11-08) | By method: only `onPreUpdate` is timed (setup, pass and pick time are not; a plugin's passes are timed in `graph`), as CPU time with `performance.now`; a frozen plugin is listed but not timed; plugins and scenes added during the frame are not listed. Needs WebGPU, like every capture. LIM-570 | The debugger wraps a plugin's hook only for the captured frame, so a frame not captured pays nothing. | A frozen plugin reads null. | Time the work inside the plugin, or do not freeze it while profiling. |
 | Live shader editing (`@margoengine/inspector/shaders`, 2026-11-10) | By method: only `@margoengine/materials` WgslMaterial meshes are edited (the material's WGSL, not gltf/pbr's or another material's generated shader, which the Inspector shows read only); an edit makes a new material and swaps it onto the mesh, so code holding the old material object keeps the old one; the first edit of a material draws one frame with a copy of it to learn the drawn module text; an edit is checked on the device before it is drawn, so a mesh not drawn within `timeoutMs` (hidden, or no frame running) and a device without `getCompilationInfo` are swapped unchecked. Diagnostics need WebGPU; without a device the edit is applied unchecked. Old materials stay alive while the history can undo to them. LIM-649 | A WgslMaterial's WGSL is fixed at construction and drawing an invalid pipeline invalidates the whole frame's commands, so an edit is compiled first and only a clean one is swapped in. | A pipeline (not module) error that only shows when drawn puts the old material back after one bad frame. | Keep the mesh visible while editing; edit generated shaders by writing a WgslMaterial. |
+| Mesh data debug view (`@margoengine/inspector/mesh-debug`, 2026-11-26) | Enforced: `wireWidth` and `vertexRadius` 0 to 64 pixels, `uvScale` from 0.000001 to 4096, `specularPower` 1 to 10000, at most 4096 `materialColors`; each mesh's vertex and index data must fit the device's storage binding (`RangeError` from the frame); a device without vertex-stage storage buffers is refused. By method: core meshes and PBR nodes only (no points, lines, splats or other packages' own draws); vertices moved by a vertex shader (displacement maps, node or plugin vertex code, vertex animation textures, GPU instanced skinning) show unmoved, and alpha cut-outs, clipping planes and `CulledModels` redirects are not applied; dots and edges are painted inside the triangles, so a silhouette dot or edge shows its inner half and a dot is cut where triangles are smaller than it; every triangle edge shows, diagonals included; an index array rewritten in place is not read again (pass a new array, as materials `setGeometry` does); a deformer buffer without storage usage shows the bind pose; with an HDR scene target the debug colours pass through the later tone mapping and effects. | The view pulls vertices from the buffers the mesh already draws and changes no material or geometry, so it cannot run another package's vertex or discard code. | One extra draw per visible mesh primitive, and a GPU copy of each index array (and of core vertices) while enabled. | Limit `meshes`; bake displacement into geometry to inspect it. |
 | Remote inspection (`@margoengine/inspector/remote`, `/remote-relay`, 2026-11-10) | By method: the viewer edits what `@margoengine/inspector/packages` finds (lights, glTF materials, shadows, post effects, passed objects) and the scene's meshes (numbers, switches, colours, vectors); no remote hierarchy editing, gizmo, shader or frame capture. The relay keeps no history: a message sent while the other side has no open stream is dropped, and a stream that fails is not reopened (`onError` says so). Capture is one PNG on request, at most 12 MB, not a video stream. Enforced: the target token is 8 or more characters, the relay token 16 or more, messages at most 16,000,000 bytes. Development only: anyone with the token can read and edit the scene; the relay listens on 127.0.0.1 unless `host: '0.0.0.0'`. LIM-651 | A phone and a desktop page cannot reach each other directly, so both reach one relay with plain HTTP (no WebSocket server needed), and the target runs only a fixed list of operations, so a viewer can never run code on the device. | A phone that sleeps drops its stream; reload the target page. | Use `channelTransport` over a WebSocket or WebRTC data channel the app already has. |
 | Camera brain (`@margoengine/cinematic/brain`, 2026-11-07) | Enforced: names in one brain differ, a blend's `duration` is 0 or more, priorities are finite. By method: every enabled camera runs every frame, so the cost grows with the camera count; disable the ones not in use. A blend is linear in position, field of view and roll, with the view turned on the shortest arc, so `'direct'` can pass through a subject (use `'orbit'`). An `ease` is clamped to 0..1, so no overshoot. Blend rules match by name. Not measured: no timed number. | Every enabled camera runs every frame, and a blend is linear in position, field of view and roll. | `'direct'` can pass through a subject, and an `ease` is clamped to 0..1, so no overshoot. | Disable the cameras not in use, and use `'orbit'` instead of `'direct'`. LIM-304 |
 | Framing composer (`@margoengine/cinematic/composer`, 2026-11-07) | Enforced: `softZone` at least `deadZone`, `screen` within 0..1. | The composer turns the camera and never moves it. | By method: it turns the camera and never moves it, so a subject past what a turn can reach (straight overhead) stops 0.001 radians short of the pole. It ignores `pose.roll`. Lookahead is a smoothed velocity times a time, so it trails a change of direction and overshoots a stop. Not measured: no timed number. | Put a stage that moves the camera before the composer, and leave `lookahead` at 0, its default, to avoid trailing and overshoot. |
@@ -12825,6 +12827,21 @@ bedrock. The volume ledger records material crossing the modeled bounds, compact
 The optional entry is 9,692 B gzip with a 9,983 B ceiling. Both Wasm assets are 5,820 B raw and 2,684 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
+## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
+
+Enforced: mixer rows three numbers -2..2; shadows and highlights -3..3 stops; midtones -1..1 stops; vibrance and dehaze
+-1..1; haze colour 0.01..16 per channel. Applies to scene-linear colour after exposure, white balance and local
+exposure and before the display curve; auto exposure meters the source without it. The tone ranges are weights of Rec.709
+luminance over 7 stops each side of middle grey and are not adjustable: diffuse white (2.5 stops up) takes 29% of
+`highlights`, and 8 stops from grey a control has its full effect. Dehaze reads one pixel (no neighbourhood, transmission
+map or depth), is capped at half the haze model's strength, and leaves channels at or above the haze colour as they are
+when removing haze. Under an HDR `ColorOutput` a colour already outside sRGB keeps its part below zero through the
+nonlinear steps. Not baked by `exportCube` or `export3dl` (they take a display-linear `Grade`), and no
+settings-table rows. One 80-byte uniform buffer, one more pipeline when added to the list, no pass or texture; GPU time
+not measured. Measured: new entry 1,282 B min+gzip; tonemap root, grade, hue, core and stage unchanged. GPU frames are
+within 0.5 of an 8-bit level of a CPU oracle on WebGPU and the WebGL2 layer (`tests/enhance-browser.mjs`). Margo's
+units are its own, so values from another engine's colour enhancement do not carry over one to one.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12834,6 +12851,99 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Open 2026-11-26: GPU picking of an instanced mesh tests the instances where its vertex shader did not move them (KB-PICK-INSTMOVE1, selection)
+
+- **Repro:** `createInstancedMesh` with a material whose `materialPlugin` vertex point (or a `displacementMap`) moves the
+  quad 1.5 units; `Picking.attach(engine)`, then `pick` where it draws answers null (the `picking` check of
+  `packages/materials/test/instance-attributes.html` logs `instancedThere: false` on WebGPU and the WebGL2 layer).
+- **Cause:** `packages/selection/src/picking.ts` draws instanced model primitives through its model pipeline from each
+  instance's world matrix and the geometry's bounding sphere; it never takes the primitive's `displacement` caster, which
+  plain primitives and every shadow pass draw through. A fix needs a caster variant of the picking pass drawn per
+  instance with ids per row.
+
+### Fixed 2026-11-26: GPU picking missed a mesh its shader moved past its geometry's bounds (KB-PICK-MOVED1, selection)
+
+- **Repro:** `createMesh` of a 0.8 wide quad whose material plugin moves it 1.5 units; `Picking` at the drawn place
+  answered null (the `picking` check of `packages/materials/test/instance-attributes-browser.mjs`).
+- **Cause:** the picking pass culled each primitive by its unmoved geometry's bounding sphere before drawing it through
+  its displacement caster.
+- **Fix:** a primitive whose material displaces is not culled by that sphere, as gltf/pbr's frustum test and the shadow
+  passes already do. Regression: the check above.
+
+### Fixed 2026-11-26: a material plugin's output point never ran on unlit, normal and matcap materials (KB-MAT-PLUGINUNLIT1)
+
+- **Repro:** `new UnlitMaterial({features: [materialPlugin({name: 'paint', output: 'color = vec3f(1.0, 0.0, 0.0);'})]})`
+  drew white.
+- **Cause:** those shadings return from the fragment entry before the lit code, where the point was inserted.
+- **Fix:** the point runs on the colour of the early return too. Regression: `packages/materials/test/plugins.test.js`.
+
+### Fixed 2026-11-26: a material plugin taken off and put back in one step left shadows bound to a destroyed buffer (KB-MAT-PLUGINCAST1)
+
+- **Repro:** `material.features = []; material.features = [plugin];` on a material whose plugin has uniforms and a vertex
+  point: the material kept the caster record bound to the buffers the first line destroyed.
+- **Cause:** the caster record was keyed by the plugins' ids, which a detach and re-attach kept.
+- **Fix:** a plugin takes a new id when its last detach frees its buffers. Regression:
+  `packages/materials/test/instance-attributes.test.js`.
+
+### Fixed 2026-11-26: a CSP test's Wasm block also rejected Node's own parser module, after another test had ended (KB-CSP-STUB1, tests)
+
+- **Repro:** on Node 22.12, `node --test packages/decoders/tests/csp.test.js` (CI job "node22 unit tests"): every test
+  passes, then the file fails with 'Test "draco worker preserves CSP code and help: WebAssembly.CompileError" ...
+  generated asynchronous activity after the test ended ... "EvalError: Wasm blocked by Content Security Policy"'.
+- **Cause:** that EvalError is the one the later "JPEG XL worker reports blocked compilation" test throws from its
+  `WebAssembly.instantiate` stub. The first draco test makes the file's first `Response`, which starts Node's HTTP code;
+  it compiles its parser in the background and instantiates the compiled module later (inferred from the report: Node
+  attributes the rejection to the test that started the work, and Node 26 does not load it then). When that call landed
+  on the stub it rejected with nobody to handle it. No decoder worker is at fault: the draco worker had already replied.
+  `packages/exporters/tests/basis-loading.test.js` counted and blocked `instantiate` calls after its own `Response`, with
+  the same exposure.
+- **Fix:** `stubCompile` (`tests/support/wasm-csp.js`) blocks compilation from bytes and streams, as a CSP does, and
+  passes an already compiled `WebAssembly.Module` through; both tests use it.
+- **Regression:** `packages/decoders/tests/csp.test.js`, "a blocked-compilation stub leaves a module already loading in
+  the process alone", which makes the same race on every Node.
+
+### Fixed 2026-11-26: half floats needed DataView.setFloat16 on Node 22, and were rounded twice (KB-NODE22-HALF1, decoders/shared)
+
+- **Repro:** on Node 22.12, `node --test packages/decoders/tests/tiff.test.js`: "TIFF 16, 32 and 64-bit float with the
+  floating point predictor (Predictor 3)" fails with `view.setFloat16 is not a function`. Separately, on any Node,
+  `f16Bits(1 + 2 ** -11 + 2 ** -40)` (also behind `floatToHalf` and `toHalf`) gave 0x3c00 where `setFloat16` stores
+  0x3c01.
+- **Cause:** the test's TIFF writer called `DataView.setFloat16` and its expectation `Math.f16round`, neither of which
+  Node 22 has; no shipped source calls either (`npm run check:node-apis` reads shipped files only, so nothing checked
+  the tests CI runs on Node 22). The binary16 encoders narrowed a number to binary32 first, rounding it twice.
+- **Fix:** the writer stores `f16Bits` (`packages/shared/f16.js`), which now narrows with rounding to odd (Boldo and
+  Melquiond, IEEE Transactions on Computers 57(4), 2008, https://doi.org/10.1109/TC.2007.70819) so it rounds once;
+  `floatToHalf` (`@margoengine/environment`) and `toHalf` (`@margoengine/materials`) use it instead of their own copies.
+  Binary32 inputs encode as before. The TIFF reader already decoded half floats itself.
+- **Regression:** `packages/decoders/tests/tiff.test.js`, "TIFF half floats and the binary16 encoder need no built-in
+  float16, and match it where it exists", and `tests/node-apis.test.js`, "the Node 22 test files and their helpers use
+  no built-in float16 API without a feature test".
+
+### Open 2026-11-26: some tests CI runs on Node 22.12 import APIs it lacks (KB-NODE22-TESTS1, tests)
+
+- **Repro:** on Node 22.12, `npm run test:node22`: files that import `registerHooks` from `node:module` (in
+  `packages/biomes/tests`, `packages/mesh-edit/tests`, `packages/gltf/test/auto.test.js`,
+  `packages/blender/tests/pbr-ext-close.test.js`, `packages/webgl2-compat/test/routes.test.js`) or `zstdCompressSync` /
+  `zstdDecompressSync` from `node:zlib` (`packages/decoders/tests/streams.test.js` and `zstd-destination.test.js`,
+  `packages/exporters/tests/basis-native.test.js` and `basis-zstd.test.js`, `packages/splats/test/zstd.test.js`) can fail
+  with "does not provide an export named".
+- **Cause:** both arrived after Node 22.12 (22.22 has them), and `scripts/check-node-apis.mjs` reads shipped sources
+  only. `tests/node-apis.test.js` checks the Node 22 test files for the float16 APIs alone until these are guarded.
+
+### Fixed 2026-11-26: rebase:main built API reports for every touched package, so a push lost the race for main (KB-REBASE-SLOW1, scripts)
+
+- **Repro:** a branch that adds exports entries to a package and to the re-export packages (`margoengine`, the kits),
+  rebased while `main` takes a landing every few minutes: `npm run rebase:main`, then `npm run push:main`. Four rounds
+  on 2026-11-25 each took 7 to 9 minutes and each push was refused with "HEAD does not contain origin/main".
+- **Cause:** `scripts/rebase-main.mjs` ran `api-report.js --update` once for every package the branch changed any file
+  of, whenever a generated file conflicted (`docs/api-surface.md` conflicts on its totals line at nearly every landing).
+  Each run builds the stale packages and loads every package's declarations.
+- **Fix:** a report is built only when both sides changed it, for its package alone; any other report replays as it is,
+  and `docs/api-surface.md` is merged row by row and entry by entry. For the branch above the report runs go from six per
+  round to none. `npm run api:check` after the rebase stays the check.
+- **Regression:** `tests/rebase-main.test.js`: a branch that adds entries builds no report and the merged surface holds
+  both sides; a report both sides changed builds its own package only.
 
 ### Fixed 2026-11-26: solvers that push on bodies could not share a world (KB-PHYS-BODYROWS1, physics framework)
 
