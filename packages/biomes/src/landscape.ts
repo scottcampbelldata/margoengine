@@ -1,3 +1,4 @@
+import { rangeError } from '../../shared/errors.js';
 import type { TerrainBed } from '@margoengine/physics/earth';
 import type { LandscapeEvolution, LandscapeLoadOptions, LandscapeParams } from '@margoengine/physics/landscape';
 import type { PhysicsWorld } from '@margoengine/physics/world';
@@ -36,7 +37,7 @@ export async function evolveRelief(relief: Relief, options: ReliefLandscapeOptio
   } = relief.settings;
   const { step = 128, frameRate, forcing, ...params } = options;
   if (!Number.isFinite(step) || step <= 0)
-    throw new RangeError('Invalid landscape grid spacing; supply positive finite metres.');
+    throw rangeError('Invalid landscape grid spacing; supply positive finite metres.', 'biomes');
   const MM_PER_METRE = 1000;
   const grid = {
     columns: Math.ceil(width / (step * MM_PER_METRE)), // float division: millimetres to grid cells
