@@ -1,8 +1,9 @@
 import { MargoError } from '@margoengine/math/errors';
 import { exp, hypot, ln } from '@margoengine/math/pinned';
 import { atan2 } from '../ship/propeller.js';
+import { bilgePressureMoment, type BilgePressureSection, bilgePressureSections } from './bilge-pressure.js';
 import type { HullMemory } from './memory.js';
-import type { Vec3 } from './wetted.js';
+import type { HullMesh, Vec3 } from './wetted.js';
 
 /** A thin rectangular plate along the hull's x axis, below the mean waterline on its side. */
 export interface HullBilgeKeel {
@@ -20,6 +21,7 @@ export interface RollKeel extends HullBilgeKeel {
   readonly arm: number;
   readonly breadth: number;
   readonly velocityFactor: number;
+  readonly pressure: readonly (BilgePressureSection | null)[];
 }
 
 export function validateBilgeKeels(keels: readonly HullBilgeKeel[]): void {
@@ -43,7 +45,12 @@ export function validateBilgeKeels(keels: readonly HullBilgeKeel[]): void {
   }
 }
 
-export function rollKeelsOf(keels: readonly HullBilgeKeel[], centre: Vec3, memory: HullMemory): readonly RollKeel[] {
+export function rollKeelsOf(
+  keels: readonly HullBilgeKeel[],
+  centre: Vec3,
+  memory: HullMemory,
+  mesh: HullMesh,
+): readonly RollKeel[] {
   return keels.map((keel) => {
     const { root, span } = keel;
     const breadth = hypot(span[0], span[1]);
@@ -54,7 +61,13 @@ export function rollKeelsOf(keels: readonly HullBilgeKeel[], centre: Vec3, memor
       if (nearest && Math.abs(strip.x - x) < Math.abs(nearest.x - x)) nearest = strip;
     }
     const sigma = nearest ? memory.stripForms[nearest.form]!.lewis.sigma : 0;
-    return { ...keel, breadth, arm, velocityFactor: 1 + 0.3 * exp(-160 * (1 - sigma)) };
+    return {
+      ...keel,
+      breadth,
+      arm,
+      velocityFactor: 1 + 0.3 * exp(-160 * (1 - sigma)),
+      pressure: bilgePressureSections(mesh, root, keel.length, centre),
+    };
   });
 }
 
@@ -87,28 +100,37 @@ export function bilgeKeelDamping(
   natural: number,
   density: number,
   courseSpeed: number,
+  centre: Vec3,
   depthAt: (point: Vec3) => number,
 ): number {
   const speed = Math.abs(rate);
   if (speed === 0) return 0;
   let damping = 0;
   for (const keel of keels) {
-    const { root, span, breadth, length, velocityFactor } = keel;
+    const { root, span, breadth, length, velocityFactor, pressure } = keel;
     const arm = Math.abs(keel.arm);
     const frequency = keel.rollFrequency ?? natural;
     const amplitude = frequency > 0 ? hypot(angle, speed / frequency) : Math.abs(angle);
     const excursion = Math.PI * arm * amplitude * velocityFactor;
     const offset = length / (2 * Math.sqrt(3));
-    for (const x of [root[0] - offset, root[0] + offset]) {
+    for (const [i, x] of [root[0] - offset, root[0] + offset].entries()) {
       const [start, finish] = wetInterval(
         depthAt([x, root[1], root[2]]),
         depthAt([x, root[1] + span[0], root[2] + span[1]]),
       );
       const wetBreadth = breadth * (finish - start);
       if (wetBreadth === 0) continue;
-      const cd = normalDrag(excursion / wetBreadth);
+      const kc = excursion / wetBreadth;
+      const cd = normalDrag(kc);
       const flow = velocityFactor * arm;
-      damping += 0.25 * density * length * wetBreadth * cd * flow * flow * arm * speed;
+      const station = pressure[i];
+      const suction = 0.3 * excursion + 1.95 * wetBreadth;
+      const pressureArm = station
+        ? Math.sign(rate) * bilgePressureMoment(station, x, centre, rate > 0, suction, cd, depthAt)
+        : 0;
+      // The closure transfers pressure across the station, with zero net propulsion from passive roll.
+      const momentArm = Math.max(0, wetBreadth * cd * arm + pressureArm);
+      damping += 0.25 * density * length * momentArm * flow * flow * speed;
       if (courseSpeed > 0) {
         const liftArm = Math.abs(keel.arm + 0.5 * breadth * (start + finish));
         const crossSpeed = liftArm * speed;

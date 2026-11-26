@@ -6241,3 +6241,7 @@ Held-box head and following-wave fixtures recover the ordinary-strip incident he
 ### SEA-08 wet bilge keel plate damping
 
 A prismatic hull with configured plates reproduces the published normal drag and forward lift moments within 0.001% of their independent evaluation through the rigid force port. Fully wet, partially wet, dry and opposite roll directions use the same coefficients. The renderer fixture runs the plates on a floating hull with a dispersive wake and exact restored replay. The near-calm 0.001 rad/s reference gives a plate damping coefficient of 5.712 N m s/rad with the published low-excursion fit. The prior extrapolation of Ikeda’s formula gave 497.309 N m s/rad. These are equation evaluations. Independent measured roll decay and nonlinear plate loads remain open.
+
+### SEA-08 hull pressure at an attached bilge keel
+
+The wet rectangular girth adds 2,010.140 N m s/rad at 0.125 rad/s in the mirror-symmetric fixture. Both roll directions agree to 0.001% with the direct pressure moment. Translating the plate slightly along its normal keeps the plate arm and width fixed and removes the hull-pressure term. This establishes numerical pressure integration. The rotating-cylinder measurements report wake-pressure variability beyond the model’s piecewise footprint.

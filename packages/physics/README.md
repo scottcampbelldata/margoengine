@@ -2851,7 +2851,7 @@ console.log(highest > 0.8); // true: it rides the swell's crests
 
 #### Ship hull on a steady course
 
-Set a tow speed relative to the water and keep the body on that course with the rigid solver or the ship controller. The hull still responds to heave and pitch loads. Add optional `bilgeKeels` for viscous roll damping. Each plate specifies a root midpoint in hull coordinates, a `[dy, dz]` offset from root to tip and a fore–aft length, all in metres. The hull’s natural small-amplitude roll frequency is used unless a prescribed `rollFrequency` is given in rad/s. Omit the list for a bare hull. The wet part of each plate contributes normal drag and forward lift. The drag coefficient uses the low-excursion extension of the ITTC model so that a light roll in calm water does not acquire the extrapolated large drag of the original fit.
+Set a tow speed relative to the water and keep the body on that course with the rigid solver or the ship controller. The hull still responds to heave and pitch loads. Add optional `bilgeKeels` for viscous roll damping. Each plate specifies a root midpoint in hull coordinates, a `[dy, dz]` offset from root to tip and a fore–aft length, all in metres. The hull’s natural small-amplitude roll frequency is used unless a prescribed `rollFrequency` is given in rad/s. Omit the list for a bare hull. The wet part of each plate contributes normal drag and forward lift. Seat the root midpoint on the hull mesh to include the separate hull-pressure moment. It follows the wet girth on that side of the hull. The drag coefficient uses the low-excursion extension of the ITTC model so that a light roll in calm water does not acquire the extrapolated large drag of the original fit.
 
 ```ts
 import {Physics} from 'margoengine/physics';

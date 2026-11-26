@@ -1413,7 +1413,7 @@ export class HullSolver implements Solver<HullParams> {
       const across = rotate(q, [0, 0, 1]);
       const angle = atan2(-across[1], up[1]);
       const sea = this.sea!;
-      c += bilgeKeelDamping(roll.keels, p, angle, roll.natural, sea.density ?? SEA_WATER, speed, (point) => {
+      c += bilgeKeelDamping(roll.keels, p, angle, roll.natural, sea.density ?? SEA_WATER, speed, local, (point) => {
         const r = rotate(q, point);
         const eta = sea.elevation(pose.position[0] + r[0], pose.position[2] + r[2], t);
         return eta - pose.position[1] - r[1];
@@ -1471,7 +1471,7 @@ export class HullSolver implements Solver<HullParams> {
       linear: memory.rollFriction * Math.sqrt(2 * Math.PI * this.viscosity * natural),
       forward: hull.course ? forwardRollOf(memory, density, natural) : undefined,
       natural,
-      keels: hull.bilgeKeels ? rollKeelsOf(hull.bilgeKeels, local, memory) : undefined,
+      keels: hull.bilgeKeels ? rollKeelsOf(hull.bilgeKeels, local, memory, hull.mesh) : undefined,
       inertia,
       own,
       stiffness,

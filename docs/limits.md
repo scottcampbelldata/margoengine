@@ -10262,3 +10262,9 @@ The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core a
 The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20. The pressure and added-inertia terms remain open.
 
 The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
+
+### Attached bilge keel hull pressure
+
+Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Added inertia, forces in the other degrees of freedom, phase lag, and physical measurements of hull-pressure amplitudes remain open.
+
+The bilge hull-pressure seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.

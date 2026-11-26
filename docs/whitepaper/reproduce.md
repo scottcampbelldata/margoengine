@@ -4577,3 +4577,7 @@ Build Physics and run `node --test --test-name-pattern "forward encounter correc
 ### SEA-08 bilge keel plates
 
 Build Physics and run `node --test --test-name-pattern "bilge keel damping" packages/physics/tests/coupling/seakeeping.test.js`. The test isolates the plate moment through the rigid solver and checks it against the ITTC’s normal and forward-lift formulas. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --bilge-keels` on WebGPU and again with `MARGO_COMPAT=1` for the rendered wake and restored replay.
+
+### SEA-08 attached bilge keel pressure
+
+Build Physics and run `node --test --test-name-pattern "bilge keel damping" packages/physics/tests/coupling/seakeeping.test.js`. The box control isolates hull pressure by moving the bilge keels off the hull along the plate normal while holding their arm and wet breadth. The independent expression integrates the straight bottom and side normal levers. Run the existing `--bilge-keels` wake renderer fixture on WebGPU and WebGL2 for attached plates on a moving hull.

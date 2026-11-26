@@ -718,6 +718,40 @@ test('HullSolver bilge keel damping follows measured-range drag, wet span and fo
     );
     if (fraction) assert.ok((fitted - bare) * rate < 0, 'bilge drag removes roll energy');
   }
+  const plates = [-1, 1].map((side) => ({
+    root: [0, -D / 2, (side * B) / 2],
+    span: [-0.06, side * 0.08],
+    length,
+    rollFrequency: frequency,
+  }));
+  const detached = plates.map((plate, i) => ({
+    ...plate,
+    // Translate parallel to the plate normal so the roll arm and total wet breadth stay fixed.
+    root: [0, plate.root[1] + 0.016, plate.root[2] + (i ? 0.012 : -0.012)],
+  }));
+  const cornerArm = (0.6 * D) / 2 + (0.8 * B) / 2;
+  const f = 1.3;
+  const y = D / 2 - T;
+  for (const rate of [0.125, -0.125]) {
+    const kc = (Math.PI * cornerArm * Math.abs(rate) * f) / (frequency * breadth);
+    const logKc = Math.log(kc);
+    const drag = 0.47 * logKc ** 2 - 4.94 * logKc + 13.75;
+    const suction = (0.3 * kc + 1.95) * breadth;
+    const floor = B / 2;
+    const aftWall = Math.min(T, suction);
+    const aftFloor = Math.min(floor, suction);
+    // The analytic moment of a pressure strip with a linearly changing normal lever.
+    const ahead = 1.2 * ((floor * floor) / 3 + T * (D / 4 - T / 6));
+    const aft = (drag - 1.2) * (aftWall * (D / 2 - aftWall / 2) + aftFloor * (floor - aftFloor / 2));
+    const expected = 0.5 * SEA_WATER * length * (f * cornerArm) ** 2 * Math.abs(rate) * (ahead + aft);
+    const inviscid = run(y, rate, undefined, 0, false);
+    const coefficient = (held) => {
+      const moment = held - inviscid;
+      return -moment / (rate + (dt * moment) / rollInertia);
+    };
+    const actual = coefficient(run(y, rate, plates)) - coefficient(run(y, rate, detached));
+    assert.ok(Math.abs(actual - expected) < 1e-5 * expected, JSON.stringify({ actual, expected, rate }));
+  }
   assert.throws(() => run(D / 2 - T, 0.125, [{ root: [0, -0.4, 0.7], span: [0, 0], length }]), /nonzero finite span/);
 });
 
