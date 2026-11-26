@@ -158,6 +158,8 @@ async function sphereModel({
   substeps = 4,
   friction,
   presentationHz = 60,
+  mesh = { positions, triangles },
+  contactManifold,
 }) {
   await Physics.load({ threads: shared });
   const world = new PhysicsWorld({ rate: { num: presentationHz, den: 1 }, gravity: zero, memory: worldMemory(shared) });
@@ -179,12 +181,12 @@ async function sphereModel({
   const shell = await CrushShellSolver.loadRigid({ rate: rateLevel });
   world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
   world.add(shell, {
-    positions,
-    triangles,
+    ...mesh,
     material,
     pinned,
     cellSize: 2,
     spheres: [{ body: sphere.row, radius, contactModulus, friction }],
+    contactManifold,
   });
   world.setCell('rigid', sphereCell);
   world.couple([shell.id, 'rigid'], 'staggered');
@@ -212,6 +214,142 @@ test('fixed sphere contact distributes independent Hertz load and work to all th
   near(shell.supportReaction(1)[2], force / 4, 1e-9);
   near(shell.supportReaction(2)[2], force / 4, 1e-9);
   assert.deepEqual(shell.readMesh().positions, Float64Array.from(positions.flat()));
+});
+
+test('a fixed sphere loads both faces of a folded sheet and does not double-count coplanar edges or vertices', async () => {
+  const folded = {
+    positions: [
+      [0, 0, 0],
+      [0, 1, 0],
+      [1, 0, 0],
+      [0, 0, 1],
+    ],
+    triangles: [
+      [0, 2, 1],
+      [0, 1, 3],
+    ],
+  };
+  const evaluate = async (mesh, position, contactManifold) => {
+    const loaded = await sphereModel({
+      rateLevel: 2,
+      fixed: true,
+      position,
+      pinned: mesh.positions.map((_, i) => i),
+      mesh,
+      contactManifold,
+    });
+    using _physics = loaded.physics;
+    loaded.world.advance(1);
+    return {
+      hit: loaded.shell.readSphereContact(0),
+      reactions: mesh.positions.map((_, i) => loaded.shell.supportReaction(i)),
+    };
+  };
+  const normal = (4 / 3) * 7e6 * Math.sqrt(0.125) * (0.5 * material.thickness) ** 1.5;
+  const multi = await evaluate(folded, [0.125, 0.25, 0.125], true);
+  near(multi.hit.impulse[0], normal / 240, 1e-10);
+  near(multi.hit.impulse[2], normal / 240, 1e-10);
+  near(multi.hit.energy, 2 * 0.4 * normal * 0.5 * material.thickness, 1e-12);
+  near(multi.reactions[2][2], normal * 0.125, 1e-9);
+  near(multi.reactions[3][0], normal * 0.125, 1e-9);
+  const single = await evaluate(folded, [0.125, 0.25, 0.125], false);
+  assert.equal(single.hit.impulse[0], 0);
+  near(single.hit.impulse[2], normal / 240, 1e-10);
+
+  // The projection lands first on a shared diagonal, then at a four-face junction.
+  const planar = {
+    positions: [
+      [0, 0, 0],
+      [1, 0, 0],
+      [1, 1, 0],
+      [0, 1, 0],
+      [0.5, 0.5, 0],
+    ],
+    triangles: [
+      [0, 1, 4],
+      [1, 2, 4],
+      [2, 3, 4],
+      [3, 0, 4],
+    ],
+  };
+  for (const position of [
+    [0.4375, 0.4375, 0.125],
+    [0.5, 0.5, 0.125],
+    [0.5, 0.4375, 0.125],
+  ]) {
+    const { hit, reactions } = await evaluate(planar, position, true);
+    near(hit.impulse[2], normal / 240, 1e-10);
+    near(hit.energy, 0.4 * normal * 0.5 * material.thickness, 1e-12);
+    near(
+      reactions.reduce((sum, force) => sum + force[2], 0),
+      normal,
+      1e-9,
+    );
+  }
+});
+
+test('opposite shell contacts dissipate sliding even when their normal impulses cancel', async () => {
+  const mesh = {
+    positions: [
+      [0, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+      [0.25, 0, 0],
+      [0.25, 0, 1],
+      [0.25, 1, 0],
+    ],
+    triangles: [
+      [0, 1, 2],
+      [3, 4, 5],
+    ],
+  };
+  const run = async (shared) => {
+    const loaded = await sphereModel({
+      rateLevel: 3,
+      fixed: false,
+      position: [0.125, 0.25, 0.25],
+      speed: [0, 2, 0],
+      pinned: [0, 1, 2, 3, 4, 5],
+      mesh,
+      contactManifold: true,
+      friction: 0.025,
+      shared,
+      presentationHz: 480,
+    });
+    using _physics = loaded.physics;
+    const { world, sphere, shell, mass, contactModulus, radius } = loaded;
+    const force = (4 / 3) * contactModulus * Math.sqrt(radius) * (0.5 * material.thickness) ** 1.5;
+    const frictionForce = 2 * 0.025 * force;
+    world.advance(1);
+    const saved = world.takeSnapshot();
+    const before = sphere.linearVelocity[1];
+    const measure = () => {
+      world.advance(2);
+      const hit = shell.readSphereContact(0);
+      const friction = shell.readSphereFriction(0);
+      const sliding = sphere.linearVelocity[1];
+      near(hit.impulse[0], 0, 1e-12);
+      near(hit.impulse[1], -frictionForce / 480, 1e-8);
+      near(friction.angularImpulse[2], 0, 1e-11);
+      near(friction.dissipatedEnergy, 0.5 * mass * (before ** 2 - sliding ** 2), 5e-6);
+      near(
+        shell.supportReaction(0)[1] + shell.supportReaction(1)[1] + shell.supportReaction(2)[1],
+        -0.025 * force,
+        1e-6,
+      );
+      near(
+        shell.supportReaction(3)[1] + shell.supportReaction(4)[1] + shell.supportReaction(5)[1],
+        -0.025 * force,
+        1e-6,
+      );
+      return { hit, friction, sliding };
+    };
+    const expected = measure();
+    world.restoreSnapshot(saved.bytes);
+    assert.deepEqual(measure(), expected);
+    return expected;
+  };
+  assert.deepEqual(await run(false), await run(true));
 });
 
 test('moving rigid sphere transfers reciprocal linear and angular momentum to a deforming shell and replays', async (t) => {

@@ -216,6 +216,7 @@ export interface CrushShellParams {
     readonly velocities?: readonly CrushVector[];
     readonly resolution?: number;
     readonly spheres?: readonly CrushShellSphere[];
+    readonly contactManifold?: boolean;
     readonly cellSize?: number;
     readonly seams?: readonly CrushSheetSeam[];
 }

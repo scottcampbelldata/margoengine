@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Folded shell contact (BREAK-03, 2026-11-26). An optional native manifold loads
+  both faces of a crease and deduplicates a flat shared edge or vertex. Opposing
+  normal forces cancel while both faces dissipate sliding. The WebGPU and
+  WebGL2 fold fixture differs by 656 rendered pixels from the single-contact
+  option. [Reproduce](reproduce.md#break-03-folded-shell-contact)
 - Held-out wet model-ship compression (BREAK-03, 2026-11-26). One published panel
   loading curve predicts compression in two independent measured tests within
   6.5% for work and within half a measured position sample for stroke. Peak loads

@@ -208,6 +208,43 @@
     }
   };
 
+  window.drawFoldedShell = async (contactManifold) => {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity });
+    using physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: 1 / 480, substeps: 4 });
+    const tool = physics.addBody(null, {
+      position: [0.265, 0.18, 0.165], linearVelocity: [-0.7, 0, -0.7],
+      colliders: { shape: 'sphere', radius: 0.125, mass: 14, sensor: true },
+    });
+    const sheet = await CrushShellSolver.loadRigid({ rate: 3 });
+    world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
+    world.add(sheet, {
+      positions: [[0.1, 0, 0], [0.1, 0.6, 0], [0.7, 0, 0], [0.1, 0, 0.55]],
+      triangles: [[0, 2, 1], [0, 1, 3]],
+      material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
+      spheres: [{ body: tool.row, radius: 0.125, contactModulus: 7e6, friction: 0.2 }],
+      contactManifold,
+    });
+    world.couple([sheet.id, 'rigid'], 'staggered');
+    world.advance(6);
+    const mesh = sheet.readMesh();
+    const coordinates = [];
+    const normals = [];
+    for (let face = 0; face < mesh.triangles.length; face += 3) {
+      const [a, b, c] = Array.from(mesh.triangles.subarray(face, face + 3), vertex =>
+        Array.from(mesh.positions.subarray(3 * vertex, 3 * vertex + 3)),
+      );
+      const x = b.map((value, axis) => value - a[axis]);
+      const y = c.map((value, axis) => value - a[axis]);
+      const n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+      const length = Math.hypot(...n);
+      const normal = n.map(value => value / length);
+      coordinates.push(...a, ...b, ...c);
+      normals.push(...normal, ...normal, ...normal);
+    }
+    await drawSurface({ positions: Float32Array.from(coordinates), normals: Float32Array.from(normals) }, [0, 1, 2, 3, 4, 5]);
+    return { wall: 0.1 - mesh.positions[9], floor: -mesh.positions[8], hash: world.hash(), visible: engine.stats.visible };
+  };
+
   const seamWorld = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
   const seamShell = await CrushShellSolver.load();
   seamWorld.add(seamShell, {

@@ -24,6 +24,39 @@ const length = (point: CrushVector): number => Math.sqrt(dot(point, point));
 
 export const shellEdgeKey = (a: number, b: number): string => (a < b ? `${a}/${b}` : `${b}/${a}`);
 
+/**
+ * Six feature records per face, vertices first and then edges opposite each corner.
+ * Each shared feature has one owner, whose record points to its live incident vertices.
+ */
+export function manifoldTopology(triangles: readonly Triangle[]): Uint32Array {
+  const features = new Map<string | number, { readonly slot: number; readonly neighbors: Set<number> }>();
+  const slots = new Uint32Array(triangles.length * 12).fill(0xffffffff);
+  for (const [faceIndex, face] of triangles.entries()) {
+    for (let corner = 0; corner < 3; corner++) {
+      const vertex = face[corner]!;
+      const next = face[(corner + 1) % 3]!;
+      const previous = face[(corner + 2) % 3]!;
+      const edge = shellEdgeKey(next, previous);
+      const vertexFeature = features.get(vertex) ?? { slot: faceIndex * 12 + 2 * corner, neighbors: new Set<number>() };
+      const edgeFeature = features.get(edge) ?? { slot: faceIndex * 12 + 6 + 2 * corner, neighbors: new Set<number>() };
+      vertexFeature.neighbors.add(next).add(previous);
+      edgeFeature.neighbors.add(vertex);
+      features.set(vertex, vertexFeature);
+      features.set(edge, edgeFeature);
+    }
+  }
+  const incidence: number[] = [];
+  for (const { slot, neighbors } of features.values()) {
+    slots[slot] = slots.length + incidence.length;
+    for (const neighbor of neighbors) incidence.push(neighbor);
+    slots[slot + 1] = slots.length + incidence.length;
+  }
+  const packed = new Uint32Array(slots.length + incidence.length);
+  packed.set(slots);
+  packed.set(incidence, slots.length);
+  return packed;
+}
+
 export function makeShell(
   positions: readonly CrushVector[],
   triangles: readonly Triangle[],

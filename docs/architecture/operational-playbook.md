@@ -10656,6 +10656,12 @@ Coulomb sticking, and schedule and replay behaviour. The channel is local to the
 optional solvers.
 
 
+The optional shell contact manifold applies separate normal and tangential forces at verified
+local distance minima of each rigid sphere against the live sheet. It assigns one owner to
+each shared mesh feature. Native tests cover folded and flat sheets, opposing normal loads
+with continuing friction, and exact plain and shared replay. The folded sheet is rendered
+on WebGPU and WebGL2. Arbitrary rigid shapes and shell self-contact remain open.
+
 Staged crush envelopes extend the same contact path with trigger peaks followed by
 folding at lower loads. Their increasing permanent offsets separate return work from
 elastic recoil. The continuous contact uses the rigid rate and rejects an active

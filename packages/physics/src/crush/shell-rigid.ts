@@ -105,7 +105,7 @@ export class ShellRigid {
     }
   }
 
-  stage(context: StepContext, dt: number, velocity: Float64Array, inverseMass: number): number {
+  stage(context: StepContext, dt: number, velocity: Float64Array, inverseMass: number, contacts: number): number {
     const port = context.inputs.get(BODIES_FIELD.name);
     if (!port || port.tick !== context.tick - 1)
       throw new MargoError(
@@ -165,7 +165,7 @@ export class ShellRigid {
       }
       // Hertz's maximum normal tangent over 0 <= compression <= radius.
       const tangent = 1.5 * sphere.stiffness * Math.sqrt(sphere.radius);
-      rateSquared += (inv + inverseMass) * tangent;
+      rateSquared += contacts * (inv + inverseMass) * tangent;
       const relativeSpeed = Math.sqrt(dot(v, v)) + maxNodeSpeed + 2 * dt * gravity;
       maxStep = Math.min(maxStep, sphere.radius / (4 * relativeSpeed));
     }

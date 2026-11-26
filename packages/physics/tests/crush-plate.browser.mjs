@@ -115,6 +115,19 @@ try {
   assert.deepEqual(await canvas.screenshot(), glancingImage);
   await writeFile(`test-results/break03-friction-shell-${device}.png`, glancingImage);
   console.log(`Glancing sheet contact: ${glancingPixels} pixels, ${glancing.omega[1].toFixed(3)} rad/s spin.`);
+  await page.evaluate(() => window.drawFoldedShell(false));
+  const singleContactImage = await decodePNG(await canvas.screenshot());
+  const multipleContact = await page.evaluate(() => window.drawFoldedShell(true));
+  const multipleContactImage = await canvas.screenshot();
+  const foldPixels = changedPixels(singleContactImage, await decodePNG(multipleContactImage));
+  assert.equal(multipleContact.visible, 1);
+  assert.ok(multipleContact.wall > 0.002 && multipleContact.floor > 0.002 && foldPixels > 32);
+  assert.deepEqual(await page.evaluate(() => window.drawFoldedShell(true)), multipleContact);
+  assert.deepEqual(await canvas.screenshot(), multipleContactImage);
+  await writeFile(`test-results/break03-folded-shell-${device}.png`, multipleContactImage);
+  console.log(
+    `Folded shell: ${foldPixels} pixels, ${(1000 * multipleContact.wall).toFixed(2)} mm wall and ${(1000 * multipleContact.floor).toFixed(2)} mm floor movement.`,
+  );
   await page.waitForFunction(() => typeof window.drawCohesiveSeam === 'function', null, { timeout: 20_000 });
   const intactSeam = await page.evaluate(() => window.drawCohesiveSeam(true));
   const intactSeamImage = await decodePNG(await canvas.screenshot());

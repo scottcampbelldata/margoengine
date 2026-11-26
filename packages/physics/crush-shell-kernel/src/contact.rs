@@ -57,6 +57,44 @@ pub(crate) fn closest(center: Vector, [a, b, c]: [Vector; 3]) -> Closest {
     best
 }
 
+pub(crate) fn within_bounds(center: Vector, radius: f64, vertices: [Vector; 3]) -> bool {
+    (0..3).all(|axis| {
+        let min = vertices[0][axis]
+            .min(vertices[1][axis])
+            .min(vertices[2][axis]);
+        let max = vertices[0][axis]
+            .max(vertices[1][axis])
+            .max(vertices[2][axis]);
+        center[axis] + radius >= min && center[axis] - radius <= max
+    })
+}
+
+impl Closest {
+    /// Feature index in the host's per-face incidence table. Interior points need no neighbors.
+    pub fn boundary_slot(&self) -> Option<usize> {
+        let active = self.weights.map(|weight| weight > 16.0 * f64::EPSILON);
+        match active {
+            [true, true, true] => None,
+            [true, false, false] => Some(0),
+            [false, true, false] => Some(1),
+            [false, false, true] => Some(2),
+            [false, true, true] => Some(3),
+            [true, false, true] => Some(4),
+            _ => Some(5),
+        }
+    }
+
+    /// The squared-distance derivative into any neighboring face must be nonnegative.
+    pub fn descends_toward(&self, relative_vertex: Vector) -> bool {
+        let direction = sub(self.separation, relative_vertex);
+        // Allow cancellation in the dot product and point subtraction at a shared feature.
+        let roundoff = 32.0
+            * f64::EPSILON
+            * (dot(self.separation, self.separation) + dot(direction, direction));
+        dot(self.separation, direction) > roundoff
+    }
+}
+
 #[derive(Clone, Copy)]
 pub(crate) struct Contact {
     pub force: Vector,

@@ -103,8 +103,11 @@ The worst cases, where the gap is closest to the row not being met:
   calibrated only from NCAP sedan test 8035 to the independent coupe trial 8104 at 55.65 km/h.
   A panel curve from Tabri model-ship trial 103 also predicts the compression work and stroke of
   separate trials 104 and 105 using published wet inertia. Peak load runs up to 12.7% high.
-  General shell contact, automatic tearing, full-scale vessel response and broader vehicle
-  coverage remain open. [Model-ship evidence](whitepaper/reproduce.md#break-03-held-out-model-ship-contacts)
+  The optional sphere manifold resolves both faces of a folded shell and preserves a
+  single load on a shared flat edge or vertex. Arbitrary rigid shapes, automatic tearing,
+  full-scale vessel response and broader vehicle coverage remain open.
+  [Model-ship evidence](whitepaper/reproduce.md#break-03-held-out-model-ship-contacts) ·
+  [Folded-shell evidence](whitepaper/reproduce.md#break-03-folded-shell-contact)
 - **SEA-06 tsunamis:** there is no fault source anywhere in the code, although the clean-room record says the solver
   uses Okada deformation; run-up is only asserted to be positive.
 - **ATMO-07 lightning:** no electrification and no breakdown threshold (with no space charge the path ignores the

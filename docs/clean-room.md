@@ -15410,6 +15410,18 @@ to the opposite rigid impulse. The moment of this impulse is about the same worl
 both bodies, and the sphere's first time moments feed the existing rigid accumulator ports.
 [Preclik, Eibl and Rüde](https://arxiv.org/abs/1706.00221) · [Independent balance and replay checks](whitepaper/reproduce.md#break-03-distributed-shell-friction)
 
+For simultaneous shell contacts, David E. Johnson and Peter Willemsen,
+*Accelerated Haptic Rendering of Polygonal Models through Local Descent*
+(2004), use local distance minima to define repulsive contact points.
+Miles Macklin and colleagues, *Local Optimization for Robust Signed
+Distance Field Collision* (2020), derive per-face minima on a rigid distance
+field. The engine specialises this idea to the exact sphere. An edge or vertex
+projection is a minimum only while every incident direction has a nonnegative
+squared-distance derivative. Barycentric weights from Bridson, Fedkiw and
+Anderson, *Robust Treatment of Collisions, Contact and Friction for Cloth
+Animation* (2002), distribute the force and friction to the live shell.
+[Johnson and Willemsen](https://www-old.cs.utah.edu/gdc/publications/papers/johnson2004.pdf) · [Macklin et al.](https://mmacklin.com/sdfcontact.pdf) · [Bridson, Fedkiw and Anderson](https://graphics.stanford.edu/papers/cloth-sig02/)
+
 Dry friction minimizes the kinetic-energy change `vₜ · q + 0.5 qᵀ W q` with `|q| ≤ μJₙ` after the normal step.
 Tobias Preclik, Sebastian Eibl and Ulrich Rüde, “The Maximum Dissipation Principle in Rigid-Body Dynamics
 with Purely Inelastic Impacts” (2018), Eqs. 1–3, derive the contact inverse mass and energy objective.

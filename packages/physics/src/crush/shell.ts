@@ -23,7 +23,7 @@ import {
   readSeamRow,
   SEAM_STATE_WORDS,
 } from './shell-seam.js';
-import { makeShell, type Triangle } from './shell-topology.js';
+import { makeShell, manifoldTopology, type Triangle } from './shell-topology.js';
 
 const MAX_SUBSTEPS = 8192;
 const FACE_STATE_WORDS = 8;
@@ -55,6 +55,8 @@ export interface CrushShellParams {
   readonly resolution?: number;
   /** Centered rigid spheres, available after calling `CrushShellSolver.loadRigid()`. */
   readonly spheres?: readonly CrushShellSphere[];
+  /** Resolve separate local sphere contacts on folded or disconnected sheets. Default false. */
+  readonly contactManifold?: boolean;
   /** Width of each position cell in metres when rigid spheres and the shell have different cells. */
   readonly cellSize?: number;
   /** Optional initially bonded pairs of coincident boundary edges. */
@@ -93,6 +95,7 @@ interface ShellState {
   readonly triangles: Uint32Array;
   readonly maxStep: number;
   readonly resolution: number;
+  readonly contactBound: number;
   readonly rigid?: ShellRigid;
   readonly maxNodeInverseMass: number;
   readonly seams?: Region;
@@ -244,6 +247,8 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     if (!(maxStep > 0) || substeps(1 / rateOf(this.rate), maxStep, resolution) > MAX_SUBSTEPS)
       throw new MargoError('state', 'Give the shell larger minimum elements or reduce its requested resolution.');
     const rigid = this.rigid ? new ShellRigid(host, spheres, material.thickness, params.cellSize) : undefined;
+    if (params.contactManifold && !rigid)
+      throw new MargoError('state', 'Enable rigid spheres before requesting a shell contact manifold.');
     const { kernel } = instanceFor(host, this.builds);
     const f64 = (name: string, count: number) => host.allocate(name, count * 8, 'f64', 1);
     const vertex = f64('shell-positions', 3 * nodeCount);
@@ -271,6 +276,8 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       : undefined;
     const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount + SEAM_STATE_WORDS * seams.length);
     const descriptor = host.allocate('shell-descriptor', 176, 'u8', 1);
+    const incidence = params.contactManifold ? manifoldTopology(triangles) : undefined;
+    const contactTopology = incidence && host.allocate('shell-contact-topology', incidence.byteLength, 'u32', 1);
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
@@ -314,6 +321,10 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     ]);
     if (hill) new Float64Array(memory.buffer, descriptor.byteOffset + 136, 4).set(hill.metric);
     new DataView(memory.buffer).setUint32(descriptor.byteOffset + 168, rigid?.frictionWork?.byteOffset ?? 0, true);
+    if (contactTopology && incidence) {
+      (regionWords(memory, contactTopology) as Uint32Array).set(incidence);
+      new DataView(memory.buffer).setUint32(descriptor.byteOffset + 172, contactTopology.byteOffset, true);
+    }
     if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
       throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
     this.state = {
@@ -329,6 +340,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       triangles: Uint32Array.from(triangles.flat()),
       maxStep,
       resolution,
+      contactBound: params.contactManifold ? faceCount : 1,
       rigid,
       maxNodeInverseMass,
       seams: seamState,
@@ -337,9 +349,10 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
   }
 
   step(_context: StepContext, dt: number): void {
-    const { host, kernel, descriptor, velocities, maxStep, resolution, rigid, maxNodeInverseMass } =
+    const { host, kernel, descriptor, velocities, maxStep, resolution, rigid, maxNodeInverseMass, contactBound } =
       this.requireState();
-    const contactStep = rigid?.stage(_context, dt, values(host, velocities), maxNodeInverseMass) ?? maxStep;
+    const contactStep =
+      rigid?.stage(_context, dt, values(host, velocities), maxNodeInverseMass, contactBound) ?? maxStep;
     const n = substeps(dt, Math.min(maxStep, contactStep), resolution);
     if (!Number.isFinite(n) || n > MAX_SUBSTEPS || n < 1)
       throw new MargoError('state', 'Use a positive shell step within the explicit integration budget.');

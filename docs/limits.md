@@ -9658,13 +9658,16 @@ substep is at most 0.5 divided by the rest mesh frequency bound. Large deformati
 increase the true frequency, so refine the time step and compare the result at the applied
 load. The solver rejects more than 8,192 substeps per world tick. Rigid contact accepts centred
 spheres, a matching shell and rigid tick rate, and at least two rigid substeps for a moving
-body. Each sphere uses the closest live triangle in the current substep with an authored Hertz
-interface modulus and a compliant skin. Positive optional Coulomb friction uses barycentric
+body. Each sphere uses the closest live triangle by default. The optional contact manifold
+uses separate local minima and counts a shared feature once. It checks one geometry candidate
+per face per sphere per force evaluation, plus incident vertices for a boundary candidate.
+With friction it repeats the same geometry check before the half-kick. The step bound
+includes the maximum Hertz tangent of every face when the manifold is enabled. Both modes
+use an authored Hertz interface modulus and a compliant skin. Positive optional Coulomb friction uses barycentric
 material-point mobility and the sphere's staged angular inertia. Multiple spheres apply their
-half-step projections in authored order. Simultaneous manifold friction and distributed surface
-pressure footprints remain open.
-This covers local sheet contact. Multi-point manifolds per sphere, sheet self-contact,
-swept time of impact and layered plastic bending remain open.
+half-step projections in authored order, with multiple contacts for each sphere processed in
+face order. A simultaneous global friction solve, arbitrary rigid shapes, distributed pressure,
+sheet self-contact, swept time of impact and layered plastic bending remain open.
 Analytic tests cover world motion, reactions, elastic bending, plastic history and contact
 momentum. The measured rupture check above uses the separate circular station.
 The distributed seam model opens authored coincident boundaries after both quadrature

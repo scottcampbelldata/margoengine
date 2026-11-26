@@ -5605,6 +5605,7 @@ world.add(shell, {
   triangles: [[0, 1, 2]],
   material: { thickness: 0.015, density: 7800, youngModulus: 200e9, poissonRatio: 0.3, yieldStress: 350e6 },
   spheres: [{ body: tool.row, radius: 0.125, contactModulus: 7e6, friction: 0.28 }],
+  contactManifold: true,
 });
 world.couple([shell.id, 'rigid'], 'staggered');
 world.advance(1);
@@ -5612,9 +5613,12 @@ if (tool.linearVelocity[2]! <= -0.8) throw new Error('Expected the compliant con
 if (shell.readSphereFriction(0).dissipatedEnergy <= 0) throw new Error('Expected energy loss from sliding contact');
 ```
 
-Contact selects the closest live triangle within one sphere radius plus half the thickness.
+By default contact selects the closest live triangle within one sphere radius plus half the thickness.
+Use `contactManifold: true` on folded or disconnected sheets to apply simultaneous contacts
+at each local distance minimum. Shared edges and vertices produce one contact each.
+The contact reading sums interface energies and reports the deepest compression.
 Set `cellSize` if the rigid and shell solvers use different origin cells.
-[Normal contact checks](../../docs/whitepaper/reproduce.md#break-03-distributed-sphere-contact) · [Friction method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-shell-friction)
+[Normal contact checks](../../docs/whitepaper/reproduce.md#break-03-distributed-sphere-contact) · [Friction method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-shell-friction) · [Manifold proof](../../docs/whitepaper/reproduce.md#break-03-folded-shell-contact)
 
 Give `CrushShellSolver` cohesive `seams` where two pieces meet along a prescribed fracture
 line. Each side is a separate boundary edge with matching rest positions in the same

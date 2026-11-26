@@ -1,5 +1,32 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 folded shell contact
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.
+With `contactManifold: true`, project the sphere centre onto each live triangle
+within its compliant skin. A boundary projection is a local minimum only if no
+incident direction reduces the squared distance. For centre-to-surface separation
+`s` pointing towards the centre and a direction `d` into the sheet, the test is
+`s · d ≤ 0`. A shared feature has one owner. Coplanar tessellation produces one
+load, including at a shared diagonal and a four-face junction.
+
+A sphere pressing into a right-angle crease produces both analytical Hertz
+normal forces and the expected barycentric reactions. Two parallel sheets exert
+equal and opposite normal forces while both exert tangential friction during
+sliding. Their opposing forces cancel and the friction continues to dissipate
+kinetic energy. The results replay exactly in plain and shared memory.
+
+Run `node packages/physics/tests/crush-plate.browser.mjs` and repeat with `--compat`.
+The public folded-panel fixture moves the wall by 20.41 mm and the floor by
+17.29 mm at the sampled instant. Both render paths show 656 changed pixels
+compared with the single-contact option.
+
+Johnson and Willemsen use local distance minima for multiple repulsive contacts.
+Macklin et al. derive local contacts on triangles against a rigid signed
+distance field. Here the rigid field is an exact centred sphere and the
+incident directions are evaluated from the current sheet geometry.
+[Johnson and Willemsen (2004)](https://www-old.cs.utah.edu/gdc/publications/papers/johnson2004.pdf) · [Macklin et al. (2020)](https://mmacklin.com/sdfcontact.pdf)
+
 ## BREAK-03 held-out model-ship contacts
 
 Run `node --test packages/physics/tests/coupling/crush-ship-model.test.js` after
