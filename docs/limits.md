@@ -9532,10 +9532,12 @@ compressed inside the patch radius. A sustained 30 N load settles to 90.23 mm ag
 95.11 mm between the movable specimens. Both match the discrete loaded equilibrium derived from the
 contact step and rigid substeps. The movable pair conserves total momentum with reciprocal inputs.
 The fixture preserves one material impact through six seconds of applied load and exact snapshot replay.
-The durable damage ledger records material work. The maintained contact is a normal patch with elastic
-and viscous support, and surface friction, distributed panel collapse and flooding remain open.
+The durable damage ledger records material work. Optional dry friction applies one isotropic coefficient
+for sticking and sliding, with a circular limit from the current normal impulse. The normal solve runs
+first, and the friction solve includes its change to the velocity at the same contact point. Coupled
+contact evolution is resolved on successive ticks. Distributed panel collapse and flooding remain open.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. The reduced model uses measured backing and carries normal response only. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8428 B minified and 3625 B gzip. Core and Stage gain zero bytes.
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. The seal field reports a caller-calibrated stroke threshold. Below-deck ingress requires geometry and a compartment consumer. The optional crush package entry measures 8428 B minified and 3625 B gzip. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 

@@ -46,6 +46,8 @@ export interface CrushPatch {
   /** Transverse contact radius about the support's anchor, m. */
   readonly radius: number;
   readonly material: CrushMaterial;
+  /** Dry sliding and sticking coefficient for the contact pair. Default 0. */
+  readonly friction?: number;
   /** Permanent stroke at which the barrier can no longer maintain its seal. Default the material's stroke. */
   readonly sealStroke?: number;
 }
@@ -85,6 +87,7 @@ export interface CrushPatchState {
 
 interface Patch extends CrushPatch {
   readonly material: Required<CrushMaterial>;
+  readonly friction: number;
   readonly sealStroke: number;
 }
 
@@ -181,6 +184,70 @@ function impulseAt(out: Float64Array, row: number, force: CrushVector, arm: Crus
   out.set(add(triple(out, at + 3), cross(arm, force)), at + 3);
 }
 
+function angularMass(
+  bodies: Float32Array,
+  row: number,
+  arm: CrushVector,
+  first: CrushVector,
+  second: CrushVector,
+): CrushVector {
+  const left = cross(arm, first);
+  const right = cross(arm, second);
+  const at = row * BODY_WORDS;
+  const leftResponse = inertiaProduct(bodies, at, left);
+  const rightResponse = inertiaProduct(bodies, at, right);
+  return [dot(left, leftResponse), dot(left, rightResponse), dot(right, rightResponse)];
+}
+
+function frictionImpulse(
+  bodies: Float32Array,
+  body: number,
+  a: AtContact,
+  other: number | undefined,
+  b: AtContact | undefined,
+  normal: CrushVector,
+  limit: number,
+): CrushVector {
+  const relative = sub(a.velocity, b?.velocity ?? ZERO);
+  const tangent = sub(relative, scale(normal, dot(relative, normal)));
+  const speed = hypot(...tangent);
+  if (speed === 0 || limit === 0) return ZERO;
+  const first: CrushVector = [tangent[0] / speed, tangent[1] / speed, tangent[2] / speed]; // float division
+  const second = cross(normal, first);
+  const [xx, xy, yy] = add(
+    angularMass(bodies, body, a.arm, first, second),
+    b && other !== undefined ? angularMass(bodies, other, b.arm, first, second) : ZERO,
+  );
+  const inverse = bodies[body * BODY_WORDS + 16]! + (other === undefined ? 0 : bodies[other * BODY_WORDS + 16]!);
+  // The first tangent points along the incoming slip, so the second component of the right side is zero.
+  const opposing = (shift: number): readonly [number, number] => {
+    const ratio = xy / (inverse + yy + shift); // float division: eliminate the second tangent component
+    // The angular Schur term is nonnegative. Keep the translational mass separate from its roundoff.
+    const primary = -speed / (inverse + shift + Math.max(0, xx - xy * ratio)); // float division: Schur complement
+    return [primary, -ratio * primary];
+  };
+  let [along, across] = opposing(0);
+  if (hypot(along, across) > limit) {
+    // The constrained minimum has (W + lambda I) q = -v and |q| = limit. Its norm decreases with lambda.
+    let low = 0;
+    let high = speed / limit; // float division: positive semidefinite W bounds the norm by speed / lambda
+    if (!Number.isFinite(high)) return scale(first, -limit);
+    [along, across] = opposing(high);
+    for (let i = 0; i < 52; i++) {
+      const middle = low + 0.5 * (high - low);
+      const [candidateAlong, candidateAcross] = opposing(middle);
+      if (hypot(candidateAlong, candidateAcross) > limit) {
+        low = middle;
+      } else {
+        high = middle;
+        along = candidateAlong;
+        across = candidateAcross;
+      }
+    }
+  }
+  return add(scale(first, along), scale(second, across));
+}
+
 function fixedAnchor(support: CrushSupport, cell: Cell, size: number | undefined): CrushVector {
   const difference = sub(support.cell ?? ZERO, cell);
   if (!size && difference.some((value) => value !== 0))
@@ -249,6 +316,19 @@ function impact(
   const impulse = scale(normal, normalImpulse);
   impulseAt(out, body, scale(impulse, -1), a.arm);
   if (b && support.body !== undefined) impulseAt(out, support.body, impulse, b.arm);
+  if (patch.friction > 0) {
+    const slide = frictionImpulse(
+      bodies,
+      body,
+      atContact(bodies, out, body, contact, normal),
+      support.body,
+      support.body === undefined ? undefined : atContact(bodies, out, support.body, contact, normal),
+      normal,
+      patch.friction * normalImpulse,
+    );
+    impulseAt(out, body, slide, a.arm);
+    if (b && support.body !== undefined) impulseAt(out, support.body, scale(slide, -1), b.arm);
+  }
   if (!result) return;
   damage.set(
     [
@@ -266,7 +346,7 @@ function impact(
   latched[index] = 1;
 }
 
-/** Ductile crush with normal impulse feedback to a real RigidSolver and a published durable damage ledger. */
+/** Ductile crush with normal and dry friction feedback to RigidSolver and a durable damage ledger. */
 export class CrushSolver implements Solver<CrushParams> {
   readonly id: string;
   readonly damageField: FieldDescriptor;
@@ -316,6 +396,7 @@ export class CrushSolver implements Solver<CrushParams> {
       return {
         body,
         material,
+        friction: positive(patch.friction ?? 0, 'friction coefficient', 0),
         normal: scale(normal, 1 / length),
         anchor: vector(patch.anchor, 'anchor'), // float division: unit normal
         radius: positive(patch.radius, 'contact radius'),

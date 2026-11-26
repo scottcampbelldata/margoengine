@@ -15009,6 +15009,18 @@ actual rigid bodies as well as a fixed support.
 [Stewart and Trinkle](https://www.cse.lehigh.edu/~trink/Papers/STicra00.pdf)
 [Baraff and Witkin](https://graphics.stanford.edu/courses/cs448b-00-winter/papers/baraff_98.pdf)
 
+Dry friction minimizes the kinetic-energy change `vₜ · q + 0.5 qᵀ W q` with `|q| ≤ μJₙ` after the normal step.
+Tobias Preclik, Sebastian Eibl and Ulrich Rüde, “The Maximum Dissipation Principle in Rigid-Body Dynamics
+with Purely Inelastic Impacts” (2018), Eqs. 1–3, derive the contact inverse mass and energy objective.
+Here the compliant normal reaction sets the fixed friction disk radius. In the tangent plane `W` adds
+the two inverse masses and each body's angular response `(r × eᵢ) · I⁻¹(r × eⱼ)`. The zero-slip solution
+is `W q = −vₜ`. If that exceeds the disk, choose the unique shift `λ > 0` for which
+`(W + λI) q = −vₜ` and `|q| = μJₙ`. The norm decreases monotonically with the shift and is bounded by
+`|vₜ|/λ`. Applying the two impulses at the same point transfers momentum while the friction update
+dissipates energy. The fixture infers the impulses from the actual motions of unequal rectangular
+rigid bodies and derives the effective mass from the box dimensions.
+[Preclik, Eibl and Rüde](https://arxiv.org/abs/1706.00221)
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

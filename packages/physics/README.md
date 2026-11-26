@@ -4555,6 +4555,11 @@ impact continues to support load. It uses its `backingStiffness` and critical da
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable
 damage fields record the prior material event and accumulated crush work. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.
 
+Set a patch's `friction` to the measured dry friction coefficient of the pair. It defaults to `0`.
+Friction uses the normal impulse from each tick to limit the tangential impulse. It sticks when the
+point can stop slipping within that limit and slides otherwise. The impulse accounts for both
+surfaces' angular inertia. The damage ledger continues to report permanent material work.
+
 ```ts
 import { Physics } from '@margoengine/physics';
 import { CrushSolver } from '@margoengine/physics/crush';
@@ -4565,7 +4570,7 @@ const gravity = [0, 0, 0] as const;
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
 using physics = new Physics(null, { arena: world.arena, gravity });
 const cart = physics.addBody(null, {
-  position: [-0.5, 0, 0], linearVelocity: [2, 0, 0],
+  position: [-0.5, 0, 0], linearVelocity: [2, 0, 0.5],
   colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 4 },
 });
 const crush = new CrushSolver();
@@ -4573,11 +4578,12 @@ const bodyCapacity = physics.kernel.capacity;
 world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
 world.add(crush, { bodyCapacity, patches: [{
   body: cart.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.12,
-  support: { point: [-0.2, 0, 0] }, material: { stiffness: 400, yieldForce: 40, stroke: 0.4 },
+  support: { point: [-0.2, 0, 0] }, material: { stiffness: 400, yieldForce: 40, stroke: 0.4 }, friction: 0.25,
 }] });
 world.couple(['rigid', crush.id], 'staggered');
 world.advance(12);
 if (crush.read(0).impacts !== 1) throw new Error('Expected one barrier contact');
+if (cart.linearVelocity[2] >= 0.5) throw new Error('Expected friction to slow the slide');
 ```
 
 ## Thin films on glass and ground

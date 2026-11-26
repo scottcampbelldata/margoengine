@@ -32,6 +32,7 @@ export interface CrushPatch {
     readonly support: CrushSupport;
     readonly radius: number;
     readonly material: CrushMaterial;
+    readonly friction?: number;
     readonly sealStroke?: number;
 }
 

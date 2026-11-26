@@ -502,6 +502,9 @@ test.
   already contacted patch because the latch suppressed all subsequent normal reactions. A unilateral, damped
   backing step now carries the continuing load without creating a new damage event. The six-second fixed
   and reciprocal movable-support regression is in `packages/physics/tests/coupling/crush.test.js`.
+- **BREAK-03, crush contact ignored surface friction.** Oblique contact transferred a normal impulse and
+  left slip unaffected. A configured dry coefficient now bounds the tangential reaction at the same point,
+  including after the first contact. Coverage is in `packages/physics/tests/coupling/crush.test.js`.
 - **ATMO-07, a lightning leader can stall with no flash and no error.** **Repro:** a domain where the leader runs out
   of candidate cells before it reaches ground or a target. **Cause:** `packages/physics/src/lightning/index.ts` ends
   growth silently.

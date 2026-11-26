@@ -13,17 +13,29 @@ const material = { stiffness: 400, yieldForce: 10, stroke: 0.4 };
 const close = (got, want, bound = 32 * Number.EPSILON * Math.max(1, Math.abs(want))) =>
   assert.ok(Math.abs(got - want) <= bound, `${got} differs from ${want} by more than ${bound}`);
 
-function withBodies({ shared = false, two = true, y = 0, offset = 0, initial = 2, frameRate = rate } = {}) {
+function withBodies({
+  shared = false,
+  two = true,
+  y = 0,
+  offset = 0,
+  initial = 2,
+  frameRate = rate,
+  slip = [0, 0],
+  gap = 0.1,
+  friction,
+  halfA = [0.2, 0.2, 0.2],
+  halfB = halfA,
+} = {}) {
   const world = new PhysicsWorld({ rate: frameRate, gravity: zero, memory: worldMemory(shared) });
   const physics = new Physics(null, { arena: world.arena, gravity: zero, fixedTimestep: 1 / 60 });
-  const add = (position, mass, linearVelocity) =>
+  const add = (position, mass, linearVelocity, halfExtents) =>
     physics.addBody(null, {
       position,
       linearVelocity,
-      colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass, sensor: true },
+      colliders: { shape: 'box', halfExtents, mass, sensor: true },
     });
-  const vehicle = add([-0.5, 0, 0], 4, [initial, 0, 0]);
-  const other = two ? add([0, y, 0], 6, [0, 0, 0]) : undefined;
+  const vehicle = add([-0.4 - gap, -slip[0] / 60, -slip[1] / 60], 4, [initial, ...slip], halfA);
+  const other = two ? add([0, y, 0], 6, [0, 0, 0], halfB) : undefined;
   const crush = new CrushSolver();
   const capacity = physics.kernel.capacity;
   world.add(new RigidSolver(), { physics, capacity });
@@ -36,6 +48,7 @@ function withBodies({ shared = false, two = true, y = 0, offset = 0, initial = 2
         normal: [1, 0, 0],
         radius: 0.12,
         material,
+        friction,
         support: { body: other?.row, point: other ? [-0.2, offset, 0] : [-0.2, y + offset, 0] },
       },
     ],
@@ -113,6 +126,91 @@ test('a pressed crush patch supports a sustained load and retains one impact his
     } finally {
       physics.dispose();
     }
+  }
+});
+
+test('crush sliding minimizes contact kinetic energy within a round 3D friction bound', async () => {
+  const slip = [0.875, -0.625];
+  const halfA = [0.2, 0.55, 0.08];
+  const halfB = [0.2, 0.35, 0.12];
+  let normalDamage;
+  for (const friction of [0, 0.04, 2]) {
+    const { world, physics, crush, vehicle, other } = await assemble({ friction, slip, halfA, halfB, gap: 0.025 });
+    try {
+      world.advance(1);
+      const damage = crush.read(0);
+      assert.equal(damage.impacts, 1);
+      normalDamage ??= damage;
+      assert.deepEqual(damage, normalDamage);
+      // The centred box arms are along x at the contact. The y and z moments have different inertias.
+      const halfSeparation = 0.5 * (other.position[0] - vehicle.position[0]);
+      const inverse = [1, 2].map((axis) => {
+        const inertiaA = (4 * (halfA[0] ** 2 + halfA[axis] ** 2)) / 3;
+        const inertiaB = (6 * (halfB[0] ** 2 + halfB[axis] ** 2)) / 3;
+        return 1 / 4 + 1 / 6 + halfSeparation ** 2 * (1 / inertiaA + 1 / inertiaB);
+      });
+      const saved = world.takeSnapshot();
+      world.advance(2);
+      // Infer the actual impulse from the momentum of the two native RigidSolver bodies.
+      const impulse = slip.map((velocity, axis) => 4 * (vehicle.linearVelocity[axis + 1] - velocity));
+      const rounding = 32 * 2 ** -23;
+      for (let axis = 0; axis < 2; axis++) close(impulse[axis] + 6 * other.linearVelocity[axis + 1], 0, rounding);
+      const remaining = slip.map((velocity, axis) => velocity + inverse[axis] * impulse[axis]);
+      const energy = impulse.reduce((sum, value, axis) => sum + value * (slip[axis] + 0.5 * inverse[axis] * value), 0);
+      if (friction === 0) {
+        assert.deepEqual(impulse, [0, 0]);
+      } else if (friction < 1) {
+        close(Math.hypot(...impulse), friction * damage.impulse, rounding);
+        close(remaining[0] * impulse[1] - remaining[1] * impulse[0], 0, rounding);
+        assert.ok(remaining[0] * impulse[0] + remaining[1] * impulse[1] < 0);
+        assert.ok(energy < 0);
+      } else {
+        close(Math.hypot(...remaining), 0, rounding);
+        assert.ok(Math.hypot(...impulse) < friction * damage.impulse);
+        assert.ok(energy < 0);
+      }
+      const hash = world.hash();
+      world.restoreSnapshot(saved.bytes);
+      world.advance(2);
+      assert.equal(world.hash(), hash);
+    } finally {
+      physics.dispose();
+    }
+  }
+});
+
+test('a fixed crush shoe opposes slip under a continued load without counting a second material event', async () => {
+  const { world, physics, crush, vehicle } = await assemble({ friction: 0.25, two: false, initial: 0.05 });
+  try {
+    vehicle.setPosition([-0.3, 0, 0]);
+    world.advance(2);
+    const impact = crush.read(0);
+    assert.equal(impact.impacts, 1);
+    vehicle.addForce([30, 0, 0]);
+    world.advance(180);
+    vehicle.setLinearVelocity([vehicle.linearVelocity[0], 0, 0.5]);
+    world.advance(182);
+    assert.deepEqual(crush.read(0), impact);
+    // The pre-existing 30 N load has built one tick's worth of Coulomb capacity at 60 Hz.
+    close(4 * (0.5 - vehicle.linearVelocity[2]), (0.25 * 30) / 60, 4e-6);
+  } finally {
+    physics.dispose();
+  }
+});
+
+test('crush patches reject negative or nonfinite dry friction coefficients', () => {
+  for (const friction of [-1, Infinity, NaN]) {
+    const world = new PhysicsWorld({ rate, gravity: zero, memory: worldMemory(false) });
+    assert.throws(
+      () =>
+        world.add(new CrushSolver(), {
+          bodyCapacity: 1,
+          patches: [
+            { body: 0, anchor: zero, normal: [1, 0, 0], radius: 0.1, support: { point: zero }, material, friction },
+          ],
+        }),
+      { code: 'state', message: /Choose crush friction coefficient/ },
+    );
   }
 });
 

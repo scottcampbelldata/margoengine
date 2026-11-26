@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Dry friction at a crush station (BREAK-03, 2026-11-26). Two movable rectangular bodies exchange equal and
+  opposite momentum. The sliding impulse saturates the circular friction bound, while a higher coefficient
+  brings the relative slip to zero. Both dissipate kinetic energy. A fixed shoe also slows sliding under a
+  sustained 30 N load. Run `node --test packages/physics/tests/coupling/crush.test.js`.
 - Wing stall drag (AERO-03, 2026-11-26). A 25° fixed wing matches the analytic plate drag, and a flapping wing's
   separated force and torque are independent of the attached profile coefficient. A mixed-flow fixture checks the
   attached share of area and zero attached circulation on separated panels. The original light flapping-wing case
