@@ -5864,6 +5864,11 @@ frame to its edge. The call logs differ only in shader module text; every other 
 packages/water/test/refraction-grazing.browser.mjs holds the claim. Reproduce with
 `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-26, KB-WATER-SURFBANDS1): the water-ssr --current proof advances to 3424ada843, whose surface
+shader swings the breaker index along each crest in short-crested sections and gives the roller holes. The call logs
+differ only in shader module text; every other call and argument is the same. packages/water/test/surf-crests.browser.mjs
+holds the claim. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.

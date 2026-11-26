@@ -15262,14 +15262,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   is drawn by the LOD system's own shader, which the occluder fade does not patch, so it stays solid in a sight line
   and a switch to or from one hands nothing over (docs/limits.md, occluder fade).
 
-### Open 2026-11-26: the surf's rollers are long, even, pale bands (KB-WATER-SURFBANDS1, water)
+### Fixed 2026-11-26: wind ripples on sand under the sea drew a fine grid through the water (KB-TERRAIN-SANDWET1, terrain)
+
+- **Repro:** the Kitty Hawk film's shot s18 on main after KB-WATER-SEABEDMAZE1, once the refraction reached the near
+  bed: a fine regular grid of lines over the near water. Turning the sand ripples off removed it.
+- **Cause:** `TerrainColors`' wind ripples (`packages/terrain/src/colors.ts`) were drawn on every sand pixel, the sea
+  floor and the swash zone included, where wet sand forms none; seen at a grazing angle the 10 cm ripples aliased.
+- **Fix:** with a `wetness` record the ripple relief is scaled by one less the record's moisture (`terrainMoisture`),
+  so wet and submerged sand is smooth; without a record nothing changes.
+- **Regression:** `packages/terrain/test/colors.test.js` "wet and submerged sand carries no wind ripples".
+
+### Fixed 2026-11-26: the surf's rollers were long, even, pale bands (KB-WATER-SURFBANDS1, water)
 
 - **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, the dune coast, 6 m up looking out over the
   surf): every breaking crest draws one unbroken grey band across the whole frame, the same width and tone along its
   length, with straight smooth edges. Real surf breaks in short-crested sections: white water starts and stops along a
   crest, its toe is ragged and its body has holes and streaks.
-- **Cause:** being traced in `packages/water/src/surf.ts` (the roller's share along a crest) and the water fragment's
-  roller gate in `packages/water/src/index.ts`.
+- **Cause:** `packages/water/src/surf.ts` broke every crest by one breaker index from the phasor envelope. The
+  envelope carries the swell's directional spread only as a modulation 2 pi / (k dtheta) long, and across a saturated
+  surf zone the index is past 1 everywhere, so each roller ran 70 to 114 m along the shore at one strength. The water
+  fragment (`index.ts`) gated the roller by a noise it could never fall below at full foam, so the band had no holes.
+- **Fix:** the breaker index swings by 0.3 along each crest in sections 0.45 surf wavelengths over the deep spread
+  long, riding the crest (their second coordinate is the lead swell component's phase in cycles), which makes crest
+  ends (Baker et al. 2023, Phillips 1985); the white water's density follows the swing, a finer noise moves the toe,
+  and the fragment's roller has holes and lace. The sections lie along the swell's fixed deep mean direction.
+- **Regression:** `packages/water/test/surf-crests.browser.mjs` (WebGPU and the WebGL2 layer): along 240 m of a 1:50
+  beach under the dune coast's swell, the longest breaking section was 114, 73 and 112.5 m at three times with 2 to 6
+  sections; now 39, 46 and 37.5 m with 7 to 9 sections, gaps 29 to 55% of the shore.
+- **Left:** the white water is lit as a flat sheet (no roller relief), and under the s18 overcast it is little
+  brighter than the sky's reflection on the water around it.
 
 ### Fixed 2026-11-26: the near seabed showed a contour maze through the water (KB-WATER-SEABEDMAZE1, water)
 
