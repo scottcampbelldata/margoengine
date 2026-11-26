@@ -220,7 +220,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |
 | HYDRO-05 | Dam and levee breach | stand-in | Open | OPEN |
-| HYDRO-06 | Groundwater and springs | none | Open | OPEN |
+| HYDRO-06 | Groundwater and springs | none | Codex | BUILDING (codex/physics-hydro-06) |
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
 | ATMO-06 | Airborne particle transport | stand-in | Open | OPEN |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
