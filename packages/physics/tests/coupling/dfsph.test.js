@@ -9,7 +9,15 @@ import {
 } from '../../dist/dfsph.js';
 import { Physics } from '../../dist/index.js';
 import { ModalSoundSolver } from '../../dist/modal-sound.js';
-import { BODY_IMPULSES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import {
+  BODIES_FIELD,
+  BODY_IMPULSES_FIELD,
+  BODY_WORDS,
+  PhysicsWorld,
+  regionWords,
+  RigidSolver,
+  worldMemory,
+} from '../../dist/world.js';
 import { measureSurge } from '../dfsph-lab.mjs';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -217,6 +225,63 @@ test('pressure on a real rigid plate conserves total momentum in different origi
       }
       assert.ok(plate.linearVelocity[0] > 0);
       assert.ok(plate.angularVelocity[2] < 0);
+    } finally {
+      rigid.dispose();
+    }
+  }
+});
+
+test('the native pressure projection includes the recoil of a light rigid plate', async () => {
+  for (const shared of [false, true]) {
+    await Physics.load({ threads: shared });
+    const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(shared) });
+    const rigid = new Physics(null, { arena: world.arena, gravity: ZERO, fixedTimestep: DT });
+    try {
+      const bodyMass = 0.125;
+      const halfExtents = [0.035, 0.7, 0.7];
+      const plate = rigid.addBody(null, {
+        colliders: { shape: 'box', halfExtents, mass: bodyMass, sensor: true },
+      });
+      world.add(new RigidSolver(), { physics: rigid, capacity: rigid.kernel.capacity });
+      const liquid = await DfsphSolver.load(world.memory, { rigid: true });
+      const velocity = -0.375;
+      world.add(liquid, {
+        bounds: wide,
+        spacing: 0.5,
+        viscosity: 0,
+        friction: 0,
+        divergenceTolerance: 1e-10,
+        boundaries: [{ body: plate.row, halfExtents }],
+        particles: [{ position: [0.34, 0, 0], velocity: [velocity, 0, 0] }],
+      });
+      world.couple(['rigid', liquid.id], 'implicitPressure');
+      world.advance(1);
+      // Centre-line loading has no torque. The remaining relative velocity
+      // should be zero when both masses share the original total momentum.
+      const bodyPort = world.fields.port(BODIES_FIELD.name);
+      const inverseMass = regionWords(world.memory, bodyPort.region)[plate.row * BODY_WORDS + 16];
+      const point = liquid.sample(0);
+      const expectedVelocity = (point.mass * velocity) / (point.mass + 1 / inverseMass);
+      assert.ok(point.position[0] > halfExtents[0] + 0.25);
+      assert.equal(liquid.statistics.densityIterations, 0);
+      assert.equal(liquid.statistics.divergenceIterations, 1);
+      near(point.velocity[0], expectedVelocity);
+      near(point.velocity[1], 0);
+      near(point.velocity[2], 0);
+      const { region } = liquid.exportPorts(0).find(({ field }) => field === BODY_IMPULSES_FIELD.name);
+      const reaction = regionWords(world.memory, region).subarray(6 * plate.row, 6 * plate.row + 6);
+      near(reaction[0] * inverseMass, expectedVelocity);
+      near(reaction[0] + point.mass * point.velocity[0], point.mass * velocity);
+      for (const wrench of reaction.subarray(1)) near(wrench, 0);
+      const incomingEnergy = (point.mass * velocity ** 2) / 2;
+      const outgoingEnergy = ((point.mass + 1 / inverseMass) * expectedVelocity ** 2) / 2;
+      assert.ok(outgoingEnergy < incomingEnergy);
+      const snapshot = world.takeSnapshot();
+      world.advance(2);
+      const hash = world.hash();
+      world.restoreSnapshot(snapshot.bytes);
+      world.advance(2);
+      assert.equal(world.hash(), hash);
     } finally {
       rigid.dispose();
     }

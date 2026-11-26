@@ -68,6 +68,32 @@ pub struct PressurePair {
 const _: () = assert!(core::mem::size_of::<PressurePair>() == 40);
 const UNCACHED: u32 = u32::MAX;
 
+#[repr(C)]
+pub struct BodyMobility {
+    inverse_mass: f64,
+    inverse_inertia: [f64; 6],
+    linear: Vec3,
+    angular: Vec3,
+}
+
+const _: () = assert!(core::mem::size_of::<BodyMobility>() == 13 * 8);
+
+impl BodyMobility {
+    #[inline]
+    fn response(&self, impulse: &Reaction) -> (Vec3, Vec3) {
+        let [xx, xy, xz, yy, yz, zz] = self.inverse_inertia;
+        let [x, y, z] = [impulse[3], impulse[4], impulse[5]];
+        (
+            scale([impulse[0], impulse[1], impulse[2]], self.inverse_mass),
+            [
+                xx * x + xy * y + xz * z,
+                xy * x + yy * y + yz * z,
+                xz * x + yz * y + zz * z,
+            ],
+        )
+    }
+}
+
 #[inline]
 fn cubic(q: f64) -> f64 {
     if q < 0.5 {
@@ -182,6 +208,19 @@ fn visit(
 #[inline]
 fn body_velocity(object: &Solid, at: Vec3) -> Vec3 {
     add(object.linear, cross(object.angular, sub(at, object.centre)))
+}
+
+#[inline]
+fn pressure_body_velocity(object: &Solid, at: Vec3, mobility: &[BodyMobility]) -> Vec3 {
+    let velocity = body_velocity(object, at);
+    if object.body < 0.0 {
+        return velocity;
+    }
+    let body = item(mobility, object.body as usize);
+    add(
+        velocity,
+        add(body.linear, cross(body.angular, sub(at, object.centre))),
+    )
 }
 
 #[inline]
@@ -538,7 +577,12 @@ fn pressure_error(
     dt: f64,
     density: bool,
     evaluations: &mut f64,
+    reactions: &[Reaction],
+    mobility: &mut [BodyMobility],
 ) -> (f64, f64) {
+    for (body, impulse) in mobility.iter_mut().zip(reactions) {
+        (body.linear, body.angular) = body.response(impulse);
+    }
     let mut compression = 0.0;
     let mut complementarity = 0.0;
     for (i, (p, w)) in points.iter().zip(work.iter_mut()).enumerate() {
@@ -557,7 +601,7 @@ fn pressure_error(
                     item(points, j).velocity
                 } else {
                     let b = item(boundary, j - points.len());
-                    body_velocity(item(shapes, b.shape as usize), b.position)
+                    pressure_body_velocity(item(shapes, b.shape as usize), b.position, mobility)
                 };
                 derivative += dot(sub(p.velocity, velocity), grad);
             },
@@ -593,6 +637,7 @@ fn pressure_velocity(
     settings: &Settings,
     cache: &[PressurePair],
     evaluations: &mut f64,
+    mobility: &[BodyMobility],
 ) -> f64 {
     trial.fill([0.0; 6]);
     for (i, p) in points.iter().enumerate() {
@@ -625,12 +670,20 @@ fn pressure_velocity(
         );
         item_mut(work, i).change = change;
     }
-    // The pressure dual is quadratic for this fixed neighborhood, with
-    // directional gradient lambda·error and curvature |Dᵀlambda|².
-    // Constrain the line to the non-negative multiplier segment.
-    let (descent, curvature) = work.iter().fold((0.0, 0.0), |(slope, norm), w| {
+    // The pressure dual uses the fluid and rigid inverse-mass metric.
+    // The relative boundary velocity changes with its reciprocal impulse,
+    // including the angular response about the body's centre of mass.
+    let (descent, mut curvature) = work.iter().fold((0.0, 0.0), |(slope, norm), w| {
         (slope + w.lambda * w.error, norm + norm2(w.change))
     });
+    if let Some(particle) = points.first() {
+        for (body, impulse) in mobility.iter().zip(trial.iter()) {
+            let (linear, angular) = body.response(impulse);
+            let translation = dot(linear, [impulse[0], impulse[1], impulse[2]]);
+            let rotation = dot(angular, [impulse[3], impulse[4], impulse[5]]);
+            curvature += (translation + rotation) / particle.mass;
+        }
+    }
     let fraction = if curvature > 0.0 {
         (descent / curvature).clamp(0.0, 1.0)
     } else {
@@ -660,6 +713,7 @@ fn pressure(
     dt: f64,
     density: bool,
     evaluations: &mut f64,
+    mobility: &mut [BodyMobility],
 ) -> (f64, f64) {
     for w in work.iter_mut() {
         w.multiplier = 0.0;
@@ -675,6 +729,8 @@ fn pressure(
         dt,
         density,
         evaluations,
+        reactions,
+        mobility,
     );
     let (iterations, tolerance) = if density {
         (settings.density_iterations, settings.density_tolerance / dt)
@@ -710,6 +766,7 @@ fn pressure(
             settings,
             cache,
             evaluations,
+            mobility,
         );
         fraction
     } else {
@@ -730,6 +787,8 @@ fn pressure(
             dt,
             density,
             evaluations,
+            reactions,
+            mobility,
         );
     }
     let mut used = 0.0;
@@ -751,6 +810,7 @@ fn pressure(
             settings,
             cache,
             evaluations,
+            mobility,
         );
         if fraction == 0.0 {
             break;
@@ -770,6 +830,8 @@ fn pressure(
             dt,
             density,
             evaluations,
+            reactions,
+            mobility,
         );
     }
     for w in work.iter_mut() {
@@ -1131,6 +1193,7 @@ pub unsafe extern "C" fn solve_dfsph(
     boundary_color: *mut f64,
     pair_cache: *mut PressurePair,
     pair_capacity: usize,
+    body_mobility: *mut BodyMobility,
 ) -> u32 {
     let (points, work, boundary, shapes, reactions, trial, settings, stats) = unsafe {
         (
@@ -1145,6 +1208,7 @@ pub unsafe extern "C" fn solve_dfsph(
         )
     };
     let cache = unsafe { core::slice::from_raw_parts_mut(pair_cache, pair_capacity) };
+    let mobility = unsafe { core::slice::from_raw_parts_mut(body_mobility, body_count) };
     let surface = settings
         .liquid_vapor
         .max(settings.solid_liquid)
@@ -1265,6 +1329,7 @@ pub unsafe extern "C" fn solve_dfsph(
             step,
             true,
             &mut evaluations,
+            mobility,
         );
         density_rounds += rounds;
         density_error = error * step;
@@ -1296,6 +1361,7 @@ pub unsafe extern "C" fn solve_dfsph(
             step,
             false,
             &mut evaluations,
+            mobility,
         );
         divergence_rounds += rounds;
         divergence_error = error;

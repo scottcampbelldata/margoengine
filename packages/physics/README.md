@@ -4652,6 +4652,8 @@ A fixed or rigid-body box, sphere or capsule uses sampled pressure at its moving
 exchange, load with `rigid: true`, set the boundary's `body` row and use
 `world.couple(['rigid', water.id], 'staggered')`. Pass a one-track `ModalSoundSolver.contactField` as
 `modalContactField` to excite resonances from hard liquid impacts. Run both at the same world rate.
+Each pressure iteration evaluates rigid boundary velocities after their reciprocal linear and angular
+impulse. The solver takes inverse mass and world-axis inverse inertia from the rigid body field.
 
 Use `parcelCapacity` when a second world solver owns a liquid volume and momentum ledger. Register
 `parcelFields.requests` as its output and `parcelFields.receipts` as its input on the same dyadic rate,

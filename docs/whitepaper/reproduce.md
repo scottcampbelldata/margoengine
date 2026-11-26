@@ -4396,3 +4396,14 @@ that rest volume and uses the two zero crossings of the signed quadrupole moment
 period. The current solver measures 0.885 s. Rayleigh's small-disturbance solution is
 ω² = 8 σ/(ρ R³), or 0.742 s at the fixture's parameters. The previous rest area produced 1.481 s.
 This comparison tracks the remaining error in the free-drop period. [On the Capillary Phenomena of Jets, Lord Rayleigh (1879)](https://www.jstor.org/stable/113738)
+
+### FLUID-01 rigid recoil
+
+Run `node --test --test-name-pattern="light rigid plate|real rigid plate" packages/physics/tests/coupling/dfsph.test.js`.
+The test steps a simulated rigid body and DFSPH against the analytic centre-line projection
+v⁺ = m_f v_f/(m_f + m_b), which follows from equal final boundary and particle speeds and conserved momentum.
+The native pressure line uses the rigid contribution JᵀM⁻¹J and τᵀI⁻¹τ, divided by the uniform
+particle mass to match the fluid velocity-squared metric. At each iteration it applies the current
+impulse through the rigid inverse mass and inertia and updates the sampled boundary velocity.
+The fluid–rigid part follows Gissler et al. (2019), §§3.1–3.3 and Equations 2–4. The world retains
+its own rigid contact solver. [Interlinked SPH Pressure Solvers for Strong Fluid-Rigid Coupling](https://cg.informatik.uni-freiburg.de/publications/2019_TOG_strongCoupling_v2.pdf)

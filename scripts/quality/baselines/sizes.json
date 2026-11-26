@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20507833,
+  "total": 20508127,
   "history": [
     {
       "date": "2026-10-24",
@@ -13323,6 +13323,12 @@
       "commit": "237a751aab",
       "reason": "materials/portal loads gltf/pbr-model and gltf/extended-materials through Material and WgslMaterial, as materials, batched and fake-shadows do: every mesh Portals.add takes comes from the materials root createMesh, which already loads both. Measured with every dependency bundled, min+gzip: createMesh + Material 110,802 B, plus Portals 116,380 B (5,578 B added, the same 19 gltf modules). A lazy import would need Portals.add or render to become async or draw a second-scene mask unshaded for the first frames, and would save a working page nothing",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-01 rigid pressure response",
+      "grew": 1,
+      "reason": "FLUID-01 includes rigid boundary inertia and reciprocal velocity in the pressure projection, growing its optional entry from 8085 B to 8157 B gzip. Splitting would duplicate the solver binding and field setup. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14149,7 +14155,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/crush": 3763,
     "@margoengine/physics/decomposition": 11130,
-    "@margoengine/physics/dfsph": 8119,
+    "@margoengine/physics/dfsph": 8413,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 10205,

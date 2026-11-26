@@ -5941,3 +5941,10 @@ The independent spherical-cap integral over the cubic kernel establishes the res
 prescribed surface energy per flat area. The earlier rest area provided 20.7% of that energy. The
 2,176-particle drop's quadrupole period falls from 1.481 s to 0.885 s against Rayleigh's 0.742 s.
 The original refined Martin–Moyce bars still pass. [Reproduce](reproduce.md#fluid-01-capillary-shape-oscillation)
+
+### FLUID-01 rigid recoil in pressure
+
+A 125 kg liquid sample approaching a 0.125 kg rigid plate at 0.375 m/s gives both the same 0.374625 m/s
+speed in one pressure iteration. The opposite impulse of 0.046828 N·s preserves momentum and the
+kinetic energy decreases to the constrained minimum. Plain and shared native memory replay identically.
+[Reproduce](reproduce.md#fluid-01-rigid-recoil)
