@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><title>BatchedLOD culling and levels</title></head><body style="margin:0">
+<canvas width="320" height="240" style="width:320px;height:240px;display:block"></canvas>
+<script type="module">
+import {Engine} from '/packages/core/dist/index.js';
+import {Material} from '/packages/materials/dist/index.js';
+import {BatchedMesh} from '/packages/materials/dist/batched.js';
+import {BatchedLOD} from '/packages/materials/dist/batched-lod.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,0,5],target:[0,0,0]}});
+engine.stop();engine.scene.background='#000000';
+let device=engine.gpu;const errors=[];
+const listen=()=>device.addEventListener('uncapturederror',e=>errors.push(e.error.message));listen();
+const at=(x,y)=>[1,0,0,0,0,1,0,0,0,0,1,0,x,y,0,1];
+const batch=BatchedMesh.attach(engine,new Material({shading:'basic',color:'#ffffff'}),{maxItems:8,maxVertices:64});
+const lod=BatchedLOD.attach(engine,batch);
+// A red item with a large fine level and a small coarse one from distance 8, and a green item with one level.
+const a=lod.add([{geometry:planeGeometry(1.2,1.2)},{geometry:planeGeometry(0.3,0.3),distance:8}],{matrix:at(-1,0),color:[1,0,0]});
+const b=lod.add(planeGeometry(1,1),{matrix:at(2.5,0),color:[0,1,0]});
+// The largest position magnitude the compute pass wrote for each batch item: 0 for one it collapsed.
+async function drawn(){
+ const output=batch.mesh.primitives[0].deformed,size=batch.usage.vertices*80;
+ const read=device.createBuffer({size,usage:GPUBufferUsage.MAP_READ|GPUBufferUsage.COPY_DST});
+ const encoder=device.createCommandEncoder();encoder.copyBufferToBuffer(output,0,read,0,size);device.queue.submit([encoder.finish()]);
+ await read.mapAsync(GPUMapMode.READ);const data=new Float32Array(read.getMappedRange().slice(0));read.unmap();read.destroy();
+ const reach={};
+ for(let v=0;v<batch.usage.vertices;v++){const id=batch.itemOf(v);if(id<0)continue;reach[id]=Math.max(reach[id]??0,Math.abs(data[v*20]),Math.abs(data[v*20+1]),Math.abs(data[v*20+2]));}
+ return reach;
+}
+async function frame(position,target){
+ if(position){engine.camera.position=position;engine.camera.target=target;}
+ device.pushErrorScope('validation');engine.render();await device.queue.onSubmittedWorkDone();
+ const validation=(await device.popErrorScope())?.message??null;
+ return {validation,errors:errors.splice(0),levels:lod.has(a)?[lod.levelOf(a),lod.levelOf(b)]:null,stats:{...lod.stats},reach:await drawn(),count:batch.count};
+}
+window.check={
+ frame,
+ async restore(){await engine.rebootDevice();device=engine.gpu;listen();return frame();},
+ async dispose(){lod.dispose();return frame();},
+};window.ready=true;
+</script></body></html>
