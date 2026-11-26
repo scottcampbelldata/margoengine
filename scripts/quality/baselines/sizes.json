@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20581474,
+  "total": 20582563,
   "history": [
     {
       "date": "2026-10-24",
@@ -14065,6 +14065,12 @@
       "commit": "fix(water,terrain) short-crested surf",
       "reason": "KB-WATER-SURFBANDS1 the water root entry grows past its 35865 B ceiling to 36109 B gzip, ceiling 37193 B: the surf shader gains a PCG value noise and the short-crested section swing (Baker et al. 2023), and the fragment roller gains holes. It is WGSL text inside the one water pipeline every Water draws with, so a lazy split cannot hold it without a second pipeline variant. Core plus stage untouched.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "92c02826cf",
+      "reason": "BREAK-03 fixed-hull shell pressure feedback changes @margoengine/physics/seakeeping from 34437 to 35043 B gzip. Ceiling 35006 to 36095 B. Flooding and shell share the live aperture and the pressure sample. Separate entries would duplicate those state bridges around the same native kernel.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14932,7 +14938,7 @@
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
     "@margoengine/physics/sea": 6661,
-    "@margoengine/physics/seakeeping": 35006,
+    "@margoengine/physics/seakeeping": 36095,
     "@margoengine/physics/sediment": 4669,
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 14644,

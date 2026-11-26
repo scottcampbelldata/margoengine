@@ -14884,8 +14884,8 @@
         "gzip": 7745
       },
       "./seakeeping": {
-        "raw": 89290,
-        "gzip": 34437
+        "raw": 91434,
+        "gzip": 35043
       },
       "./celestial": {
         "raw": 21275,
@@ -14896,8 +14896,8 @@
         "gzip": 7296
       },
       "./crush": {
-        "raw": 57286,
-        "gzip": 20599
+        "raw": 59507,
+        "gzip": 21214
       },
       "./legged": {
         "raw": 29240,
@@ -19161,14 +19161,14 @@
       "brotli": 3875
     },
     "packages/physics/dist/crush-shell-kernel.wasm": {
-      "raw": 17398,
-      "gzip": 8163,
-      "brotli": 7066
+      "raw": 18799,
+      "gzip": 8743,
+      "brotli": 7600
     },
     "packages/physics/dist/crush-shell-kernel-shared.wasm": {
-      "raw": 17398,
-      "gzip": 8163,
-      "brotli": 7068
+      "raw": 18799,
+      "gzip": 8743,
+      "brotli": 7600
     }
   },
   "splits": {
