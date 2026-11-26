@@ -102,6 +102,7 @@ export const FORM_DRAG = 1.05;
 /**
  * The water's load on `hull` at `pose` in `sea` at time `t`: the force, the moment about `about` and the wetted area.
  * Writes into `out` when given. With `drag`, each wet piece also takes its form drag.
+ * An open cavity excludes the half-space behind `cavityNormal` through `about` from the water load.
  */
 export function wettedLoads(
   hull: HullMesh,
@@ -111,6 +112,7 @@ export function wettedLoads(
   about: Vec3,
   out?: WettedLoads,
   drag?: WettedDrag,
+  cavityNormal?: Vec3,
 ): WettedLoads {
   const loads = out ?? { force: [0, 0, 0], torque: [0, 0, 0], area: 0 };
   loads.force[0] = loads.force[1] = loads.force[2] = 0;
@@ -161,7 +163,7 @@ export function wettedLoads(
     }
     return [a[0] + s * (b[0] - a[0]), a[1] + s * (b[1] - a[1]), a[2] + s * (b[2] - a[2])];
   };
-  const piece = (p0: Vec3, p1: Vec3, p2: Vec3): void => {
+  const integrate = (p0: Vec3, p1: Vec3, p2: Vec3): void => {
     // Twice the area times the outward normal.
     const e1 = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]],
       e2 = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]],
@@ -197,6 +199,29 @@ export function wettedLoads(
       loads.torque[2] += rx * fy - ry * fx;
     }
   };
+  const piece = cavityNormal
+    ? (a: Vec3, b: Vec3, c: Vec3) => {
+        const triangle = [a, b, c] as const,
+          polygon: Vec3[] = [];
+        let previous: Vec3 = c,
+          before = planeDistance(c, about, cavityNormal);
+        for (const vertex of triangle) {
+          const after = planeDistance(vertex, about, cavityNormal);
+          if ((before < 0) !== (after < 0)) {
+            const f = before / (before - after);
+            polygon.push([
+              previous[0] + f * (vertex[0] - previous[0]),
+              previous[1] + f * (vertex[1] - previous[1]),
+              previous[2] + f * (vertex[2] - previous[2]),
+            ]);
+          }
+          if (after >= 0) polygon.push(vertex);
+          previous = vertex;
+          before = after;
+        }
+        for (let i = 2; i < polygon.length; i++) integrate(polygon[0]!, polygon[i - 1]!, polygon[i]!);
+      }
+    : integrate;
   for (let k = 0; k + 2 < indices.length; k += 3) {
     const i = [indices[k]!, indices[k + 1]!, indices[k + 2]!],
       h = [height[i[0]!]!, height[i[1]!]!, height[i[2]!]!],
@@ -228,4 +253,10 @@ export function wettedLoads(
     }
   }
   return loads;
+}
+
+function planeDistance(point: Vec3, origin: Vec3, normal: Vec3): number {
+  return (
+    (point[0] - origin[0]) * normal[0] + (point[1] - origin[1]) * normal[1] + (point[2] - origin[2]) * normal[2]
+  );
 }

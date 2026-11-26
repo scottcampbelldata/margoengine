@@ -6500,7 +6500,7 @@ Pressure returned through the SEA-08 and SEA-04 coupling slows a 4 m prism from 
 
 ### SEA-08 hull-launch cavity and splash
 
-The same rigid and wake state is obtained with or without the passive EntrySolver launch observer. The ordinary body in the same EntrySolver still receives water-entry loads. The passive hull emits a cavity and crown event from the live trajectory, with identical replay in plain and shared memory. ShotSplash draws that exact event over the live wake. [Coupling record](../clean-room.md#sea-08-launch-effects-from-the-carried-hull)
+The same rigid and wake state is obtained with or without the passive EntrySolver launch observer. The ordinary body in the same EntrySolver still receives water-entry loads. The passive hull emits a cavity and crown event from the live trajectory, with identical replay in plain and shared memory. When the optional pressure field is connected, the open cavity changes the held hull load until the underwater seal. The clipped hydrostatic force and moment match their closed form. ShotSplash draws that exact event over the live wake. [Coupling record](../clean-room.md#sea-08-launch-effects-from-the-carried-hull)
 
 ### SEA-08 full KVLCC2 head-sea resistance and motion
 

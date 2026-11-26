@@ -72,6 +72,24 @@ function box(size, n = 1) {
 const still = { elevation: () => 0 };
 const identity = [0, 0, 0, 1];
 
+test('an air cavity clips the exact hydrostatic load and moment across hull triangles', () => {
+  const centre = [0, -1, 0],
+    pose = { position: centre, rotation: identity },
+    scale = SEA_WATER * GRAVITY;
+  for (const n of [1, 3]) {
+    const hull = box([1, 1, 1], n);
+    const { force, torque, area } = wettedLoads(hull, pose, still, 0, centre, undefined, undefined, [1, 0, 0]);
+    // The exposed vertical face has pressure rho*g*(1-y). Each horizontal face has half its full area.
+    assert.ok(Math.abs(force[0] / scale + 1) < 1e-12);
+    assert.ok(Math.abs(force[1] / scale - 1 / 2) < 1e-12);
+    assert.ok(Math.abs(force[2] / scale) < 1e-12);
+    assert.ok(Math.abs(torque[0] / scale) < 1e-12);
+    assert.ok(Math.abs(torque[1] / scale) < 1e-12);
+    assert.ok(Math.abs(torque[2] / scale - (1 / 8 - 1 / 12)) < 1e-12);
+    assert.ok(Math.abs(area - 3) < 1e-12);
+  }
+});
+
 test('a box at its draft in still water is held up by the weight of the water it displaces, through its centre of buoyancy', () => {
   const [L, D, B, T] = [10, 3, 4, 1.2],
     hull = box([L, D, B], 4),

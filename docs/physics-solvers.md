@@ -333,7 +333,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 | SEA-08 ↔ ICE-04 | Ice resistance on the hull; ship breaks or pushes floes | two-way |
 | SEA-08 ↔ DYN-01 (cargo, crew, cannon) | The deck as a moving platform; recoil and shifting loads act back | two-way |
 | SEA-08 ↔ SOFT-02 (rigging, anchor chain) | Tension on the hull; hull motion on the line | two-way |
-| SEA-08 → SEA-14 | The solver reads the carried hull through the rigid-body field and produces cavity, splash and foam. The hull supplies loads and wake displacement. | one-way |
+| SEA-08 ↔ SEA-14 | EntrySolver reads the carried hull through the rigid-body field for cavity, splash and foam. Its optional cavity-pressure field clips the hull's wetted load behind the open contact plane. HullSolver supplies the hull load and wake displacement. | two-way |
 | SEA-04, SEA-14 → SEA-13 | Breaking and splash set foam and spray source | one-way |
 | SEA-13 → ATMO-06 | Spray droplets enter the air | one-way. Spray evaporation cools air and adds moisture (weak return). |
 | SEA-12 ↔ HYDRO-01 | Flood velocity and depth load bodies (drag, buoyancy); bodies block flow | two-way |

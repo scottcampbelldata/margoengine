@@ -3107,6 +3107,8 @@ console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in 
 
 Set `effectsOnly: true` on an `EntryBody` when a `HullSolver` handles that body's loads and wake. Entry follows the rigid pose and the local water to produce cavity, splash and foam events. The hull supplies the force and displaced volumes for this row. The default is false, so other bodies in the same EntrySolver retain their usual water-entry loads.
 
+For an open cavity to change the hull's water load, enable `cavityPressure` on the EntrySolver (default false), connect its field to the HullSolver, and step EntrySolver before HullSolver at the same rate. HullSolver clips the immersed mesh at the cavity contact plane, putting the trailing side at atmospheric pressure until the cavity closes.
+
 ```ts
 import {Physics} from 'margoengine/physics';
 import {EntrySolver} from 'margoengine/physics/entry';
@@ -3128,7 +3130,8 @@ const mesh = {
   indices: Uint32Array.of(0, 1, 2, 3, 5, 4, 0, 4, 1, 0, 3, 4, 0, 5, 3,
     0, 2, 5, 1, 5, 2, 1, 4, 5),
 };
-const hull = new HullSolver('hull', {minimumRadius: 0.12});
+const entry = new EntrySolver('entry', {cavityPressure: true});
+const hull = new HullSolver('hull', {minimumRadius: 0.12}).connectEntryCavity(entry.cavityPressureField);
 const wake = new WakeSolver('wake', hull.wakeSourceField);
 const sea = new SpectralSea({
   waves: {
@@ -3136,12 +3139,11 @@ const sea = new SpectralSea({
     energy: new Float64Array(6), depth: 2, density: 1025,
   }, patches: [wake],
 });
-const entry = new EntrySolver();
 world.add(new RigidSolver(), {physics})
   .add(hull, {hulls: [{row: boat.row, mesh}], sea, radiation: false, rollDamping: false, greenWater: false})
   .add(wake, {cells: [40, 40], cellSize: 0.15, depth: 2, waterBelow: true})
   .add(entry, {bodies: [{row: boat.row, mesh, contactAngle: 160, effectsOnly: true}], sea})
-  .couple(['hull', 'wake', 'entry', 'rigid'], 'staggered');
+  .couple(['entry', 'hull', 'wake', 'rigid'], 'staggered');
 world.advance(14);
 console.log(entry.splashes()[0]?.kind); // entry
 ```

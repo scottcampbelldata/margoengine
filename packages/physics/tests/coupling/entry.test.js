@@ -122,3 +122,52 @@ test('EntrySolver observes a launching HullSolver hull without duplicating loads
   assert.ok(peak > 0.001, 'the HullSolver still sends a resolved wave');
   context.diagnostic(JSON.stringify({ entryTime: entry.time, crownHeight: entry.crownHeight, peak }));
 });
+
+test('an open launch cavity changes the live hull force once and returns to water pressure after seal', async (context) => {
+  await Physics.load({ threads: true });
+  function launch(pressure, shared) {
+    const { world, physics, vessel, hull, entry } = makeEntryLaunch({ pressure, shared, mass: 60 });
+    using _cleanup = physics;
+    world.advance(3);
+    const snapshot = world.takeSnapshot();
+    const trace = [];
+    for (let frame = 4; frame <= 32; frame++) {
+      world.advance(frame);
+      const [entryForce, air] = entry.exportPorts(frame - 1);
+      const state = (port) => regionWords(world.arena.memory, port.region);
+      const at = vessel.row * FORCE_WORDS;
+      const load = state(hull.exportPorts(frame - 1)[0]).slice(at, at + FORCE_WORDS);
+      const cavity = entry.bodyState(vessel.row).cavity;
+      assert.ok(state(entryForce).every((value) => value === 0));
+      assert.deepEqual(entry.seaSources(), []);
+      if (air) {
+        assert.equal(state(air)[4 * vessel.row], Number(cavity));
+        const direction = state(air).subarray(4 * vessel.row + 1, 4 * vessel.row + 4);
+        assert.ok(Math.abs(Math.hypot(...direction) - Number(cavity)) < 1e-12);
+      }
+      trace.push({ cavity, load, speed: vessel.linearVelocity[1] });
+    }
+    const hash = world.hash();
+    const seal = entry.splashes().find((event) => event.kind === 'seal');
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(32);
+    assert.equal(world.hash(), hash);
+    return { trace, seal, hash };
+  }
+
+  const reference = launch(false, false);
+  const coupled = launch(true, false);
+  assert.deepEqual(launch(true, true), coupled);
+  const opening = coupled.trace.findIndex(({ cavity, load }, frame) =>
+    cavity && Math.abs(load[1] - reference.trace[frame].load[1]) > 0.01);
+  assert.ok(opening >= 0, 'the published cavity changes the hull water load');
+  assert.deepEqual(coupled.trace.slice(0, opening), reference.trace.slice(0, opening));
+  const forceChange = coupled.trace[opening].load[1] - reference.trace[opening].load[1];
+  assert.ok(Math.abs(coupled.trace[opening].speed - reference.trace[opening].speed) > 1e-4);
+  assert.ok(coupled.seal);
+  const sealFrame = Math.round(coupled.seal.time * 60 + 0.5);
+  assert.equal(coupled.trace[sealFrame - 5].cavity, true);
+  assert.equal(coupled.trace[sealFrame - 4].cavity, false);
+  assert.ok(!coupled.trace.at(-1).cavity);
+  context.diagnostic(JSON.stringify({ forceChange, opening: opening + 4, sealTime: coupled.seal.time }));
+});
