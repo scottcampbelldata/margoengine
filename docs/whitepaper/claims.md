@@ -6261,3 +6261,7 @@ A prismatic hull with configured plates reproduces the published normal drag and
 ### SEA-08 hull pressure at an attached bilge keel
 
 The wet rectangular girth adds 2,010.140 N m s/rad at 0.125 rad/s in the mirror-symmetric fixture. Both roll directions agree to 0.001% with the direct pressure moment. Translating the plate slightly along its normal keeps the plate arm and width fixed and removes the hull-pressure term. This establishes numerical pressure integration. The rotating-cylinder measurements report wake-pressure variability beyond the model’s piecewise footprint.
+
+### SEA-08 bilge keel virtual inertia
+
+The held force of a box with a horizontal plate pair matches its independent normal-mass reduction. A dry pair and the disabled added-mass option produce the expected controls. The moving-hull case checks the sway–roll coupling in the force port using a direct two-coordinate Schur complement. The wall-tunnel measurements were used to calibrate the plate coefficient. The independent Wind Orca roll-period series remains reserved.

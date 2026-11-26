@@ -44,7 +44,14 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, bodyRowsOf, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
-import { type HullBilgeKeel, bilgeKeelDamping, type RollKeel, rollKeelsOf, validateBilgeKeels } from './bilge-keel.js';
+import {
+  addBilgeKeelInertia,
+  type HullBilgeKeel,
+  bilgeKeelDamping,
+  type RollKeel,
+  rollKeelsOf,
+  validateBilgeKeels,
+} from './bilge-keel.js';
 import { courseLoad, courseSpeedLimit, courseWords, type HullCourse } from './course.js';
 import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../world/manoeuvring.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
@@ -110,7 +117,7 @@ export interface HullParams {
   readonly capacity?: number;
   /** The rigid world's gravity, m/s^2 (default [0, -9.81, 0]): the weight the added-mass solve takes with the load. */
   readonly gravity?: Vec3;
-  /** Carry the water a hull moves (default true): its added mass at infinite frequency from its sections (strips.ts). */
+  /** Carry the water the hull and any wet bilge keel plates move (default true). */
   readonly addedMass?: boolean;
   /** Stations along the hull for its sections (default 24). */
   readonly stations?: number;
@@ -940,11 +947,7 @@ export class HullSolver implements Solver<HullParams> {
     local: Vec3,
     memory: HullMemory,
   ): { frequencies: Float64Array; coefficient: Float64Array } {
-    let roll = this.rolls.get(hull);
-    if (!roll) {
-      roll = this.rollOf(hull, bodies, at, q, local, memory);
-      this.rolls.set(hull, roll);
-    }
+    const roll = this.rollState(hull, bodies, at, q, local, memory);
     const density = this.sea!.density ?? SEA_WATER,
       g = -this.gravity[1],
       mass = 1 / bodies[at + 16]!,
@@ -1426,11 +1429,7 @@ export class HullSolver implements Solver<HullParams> {
       ]),
       memory = this.memoryOf(hull, bodies, at, local, dt);
     if (!memory) return;
-    let roll = this.rolls.get(hull);
-    if (!roll) {
-      roll = this.rollOf(hull, bodies, at, q, local, memory);
-      this.rolls.set(hull, roll);
-    }
+    const roll = this.rollState(hull, bodies, at, q, local, memory);
     const p = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0];
     const course = this.course[this.hulls.indexOf(hull)];
     let c = roll.eddy * Math.abs(p) + roll.linear;
@@ -1463,6 +1462,22 @@ export class HullSolver implements Solver<HullParams> {
     const moment = roll.inertia > 0 ? (-c * p) / (1 + (dt * c) / roll.inertia) : -c * p,
       m = rotate(q, [moment, 0, 0]);
     for (let k = 0; k < 3; k++) loads.torque[k]! += m[k]!;
+  }
+
+  private rollState(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    q: readonly [number, number, number, number],
+    local: Vec3,
+    memory: HullMemory,
+  ): Roll {
+    let roll = this.rolls.get(hull);
+    if (!roll) {
+      roll = this.rollOf(hull, bodies, at, q, local, memory);
+      this.rolls.set(hull, roll);
+    }
+    return roll;
   }
 
   /**
@@ -1662,6 +1677,16 @@ export class HullSolver implements Solver<HullParams> {
       memory = this.addedMass ? this.memoryOf(hull, bodies, at, local, dt) : null;
     // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
     if (memory) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
+    if (memory && hull.bilgeKeels?.length) {
+      const roll = this.rollState(hull, bodies, at, q, local, memory);
+      const p = toBody([bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0];
+      const up = rotate(q, [0, 1, 0]);
+      const across = rotate(q, [0, 0, 1]);
+      addBilgeKeelInertia(body, roll.keels!, p, atan2(-across[1], up[1]), roll.natural, density, local, (point) => {
+        const r = rotate(q, point);
+        return this.sea!.elevation(pose.position[0] + r[0], pose.position[2] + r[2], t) - pose.position[1] - r[1];
+      });
+    }
     // Surge, sway and yaw added mass a manoeuvring model claims are its: their rows and columns leave the hull's.
     if (this.claim & CLAIM_ADDED_MASS)
       for (const k of [0, 2, 4]) for (let j = 0; j < 6; j++) body[6 * k + j] = body[6 * j + k] = 0;

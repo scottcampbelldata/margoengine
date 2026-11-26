@@ -10284,18 +10284,24 @@ The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Cor
 
 ### Bilge keel plate damping
 
-`Hull.bilgeKeels` terms apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Plate added inertia, hull pressure, skegs and large-angle decay measurements remain open.
+`Hull.bilgeKeels` normal drag and lift apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Skegs and large-angle decay measurements remain open.
 
 The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
 
 ### Very small bilge keel excursions
 
-The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20. The pressure and added-inertia terms remain open.
+The Wassermann force coefficient is used up to KC 3, with its lower endpoint held at KC 0.3 for smaller excursions. KC 3–4 blends continuously into the Ikeda force. This corrects the divergence of the drag coefficient in near-calm roll. The original Ikeda fit is retained past KC 4, including its pre-existing extrapolation beyond KC 20.
 
 The small-excursion seakeeping entry is 28,388 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
 
 ### Attached bilge keel hull pressure
 
-Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Added inertia, forces in the other degrees of freedom, phase lag, and physical measurements of hull-pressure amplitudes remain open.
+Attach the authored plate midpoint to the closed hull mesh within `1e-8 × max(1 m, plate length)`. A detached plate retains its usual normal drag and lift. The attached pressure closure follows connected transverse mesh strips from the keel to the first waterline or half-section boundary, with two longitudinal samples. It targets a single connected hull contour. It adds a roll moment only. Other force and torque axes from the pressure footprint, phase lag, and physical measurements of hull-pressure amplitudes remain open.
 
 The bilge hull-pressure seakeeping entry is 29,592 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
+
+### Bilge keel added inertia
+
+The `addedMass` path applies the plate’s normal virtual mass through the existing six-axis solve. A dry plate adds zero. The model uses the oscillatory long-plate wall calibration and the current harmonic roll-amplitude estimate. Finite-section and mount-gap corrections, wave excitation of the plates and higher time harmonics remain open. The estimate is a local virtual mass, with no separate time derivative of the plate’s mass matrix during a fast wetting transition.
+
+The bilge virtual-inertia seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.

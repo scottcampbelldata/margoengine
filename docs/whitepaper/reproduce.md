@@ -4595,3 +4595,7 @@ Build Physics and run `node --test --test-name-pattern "bilge keel damping" pack
 ### SEA-08 attached bilge keel pressure
 
 Build Physics and run `node --test --test-name-pattern "bilge keel damping" packages/physics/tests/coupling/seakeeping.test.js`. The box control isolates hull pressure by moving the bilge keels off the hull along the plate normal while holding their arm and wet breadth. The independent expression integrates the straight bottom and side normal levers. Run the existing `--bilge-keels` wake renderer fixture on WebGPU and WebGL2 for attached plates on a moving hull.
+
+### SEA-08 bilge keel added inertia
+
+Build Physics and run `node --test --test-name-pattern "bilge keel damping|bilge keel inertia" packages/physics/tests/coupling/seakeeping.test.js`. The heave case checks the denominator of the held normal acceleration with the horizontal plates wet and dry. The separate forward-roll case recovers its viscous moment through the coupled sway and roll added-inertia matrix.

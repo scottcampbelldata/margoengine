@@ -1,5 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
-import { exp, hypot, ln } from '@margoengine/math/pinned';
+import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
 import { atan2 } from '../ship/propeller.js';
 import { bilgePressureMoment, type BilgePressureSection, bilgePressureSections } from './bilge-pressure.js';
 import type { HullMemory } from './memory.js';
@@ -142,4 +142,46 @@ export function bilgeKeelDamping(
     }
   }
   return damping;
+}
+
+/** Add the normal virtual mass of the wetted plates to the hull-frame six-axis inertia. */
+export function addBilgeKeelInertia(
+  matrix: Float64Array,
+  keels: readonly RollKeel[],
+  rate: number,
+  angle: number,
+  natural: number,
+  density: number,
+  centre: Vec3,
+  depthAt: (point: Vec3) => number,
+): void {
+  for (const keel of keels) {
+    const { root, span, length, breadth, velocityFactor } = keel;
+    const frequency = keel.rollFrequency ?? natural;
+    const amplitude = frequency > 0 ? hypot(angle, rate / frequency) : Math.abs(angle);
+    const travel = 2 * Math.PI * Math.abs(keel.arm) * amplitude * velocityFactor;
+    const offset = length / (2 * Math.sqrt(3));
+    const ny = span[1] / breadth;
+    const nz = -span[0] / breadth;
+    for (const x of [root[0] - offset, root[0] + offset]) {
+      const [start, finish] = wetInterval(
+        depthAt([x, root[1], root[2]]),
+        depthAt([x, root[1] + span[0], root[2] + span[1]]),
+      );
+      const width = breadth * (finish - start);
+      if (width === 0) continue;
+      // Sarpkaya and O'Keefe (1996), Figure 2. K = Um T / b, twice the drag model's KC.
+      const samples = pow(Math.min(30, travel / width) / 10.1969, 2.1764);
+      const cm = 1.12 + (3.3528 * samples) / (1 + samples);
+      const mass = (Math.PI * density * width * width * length * cm) / 8;
+      const middle = (start + finish) / 2;
+      const rx = x - centre[0];
+      const ry = root[1] + middle * span[0] - centre[1];
+      const rz = root[2] + middle * span[1] - centre[2];
+      const jacobian = [0, ny, nz, ry * nz - rz * ny, -rx * nz, rx * ny];
+      for (let i = 1; i < 6; i++) {
+        for (let j = 1; j < 6; j++) matrix[6 * i + j]! += mass * jacobian[i]! * jacobian[j]!;
+      }
+    }
+  }
 }

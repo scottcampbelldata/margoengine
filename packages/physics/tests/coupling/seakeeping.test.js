@@ -701,17 +701,26 @@ test('HullSolver bilge keel damping follows measured-range drag, wet span and fo
     const normalLift = (Math.PI * SEA_WATER * effectiveWidth ** 2 * attack * speed * relative) / 2;
     const cKeel = cDrag + (2 * normalLift * liftArm) / Math.abs(rate);
     const added = mem.lateralInfinite;
-    const fold = speed ? inertia / (rollInertia - (added[15] * added[20]) / (portMass + added[14])) : 1;
+    const inertiaRatio = (Math.min(30, 2 * kc) / 10.1969) ** 2.1764;
+    const cm = 1.12 + 3.3528 / (1 + 1 / inertiaRatio);
+    const plateMass = (Math.PI * SEA_WATER * effectiveWidth ** 2 * length * cm) / 2;
+    const fold = (plates) => {
+      if (!speed) return 1;
+      // The pair's heave and pitch couplings cancel. The heave block does not contribute to the roll impulse.
+      const cross = added[15] - 0.6 * liftArm * plates;
+      const sway = portMass + added[14] + 0.36 * plates;
+      return inertia / (rollInertia + liftArm * liftArm * plates - (cross * cross) / sway);
+    };
     const inviscid = run(y, rate, undefined, speed, false);
-    // Remove the unchanged inviscid force and invert the solver's held-time impulse. This isolates the plate
-    // coefficient from the bare hull's damping without using the plates in the reference.
-    const viscous = (held) => {
-      const moment = (held - inviscid) / fold;
+    const plateInviscid = speed ? run(y, rate, keels, speed, false) : inviscid;
+    // Remove each inviscid force and invert the held-time impulse with that hull's inertia.
+    const viscous = (held, baseline, plates) => {
+      const moment = (held - baseline) / fold(plates);
       return -moment / (rate + (dt * moment) / rollInertia);
     };
     const bare = run(y, rate, undefined, speed);
     const fitted = run(y, rate, keels, speed);
-    const actual = viscous(fitted) - viscous(bare);
+    const actual = viscous(fitted, plateInviscid, plateMass) - viscous(bare, inviscid, 0);
     assert.ok(
       Math.abs(actual - cKeel) < 1e-5 * Math.max(1, cKeel),
       JSON.stringify({ y, rate, speed, fraction, actual, expected: cKeel }),
@@ -753,6 +762,58 @@ test('HullSolver bilge keel damping follows measured-range drag, wet span and fo
     assert.ok(Math.abs(actual - expected) < 1e-5 * expected, JSON.stringify({ actual, expected, rate }));
   }
   assert.throws(() => run(D / 2 - T, 0.125, [{ root: [0, -0.4, 0.7], span: [0, 0], length }]), /nonzero finite span/);
+});
+
+test('HullSolver bilge keel inertia opposes acceleration only on its wet normal', () => {
+  const mass = SEA_WATER * L * B * T;
+  const representedMass = 1 / Math.fround(1 / mass);
+  const mesh = boxMesh([L, D, B]);
+  const length = 3;
+  const breadth = 0.1;
+  const keels = [-1, 1].map((side) => ({
+    root: [0, -0.4, (side * B) / 2],
+    span: [0, side * breadth],
+    length,
+  }));
+  const heldForce = (y, bilgeKeels, addedMass = true) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60, substeps: 1 });
+    const body = physics.addBody(null, {
+      position: [0, y, 0],
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -GRAVITY, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh, bilgeKeels }],
+        sea: { elevation: () => 0 },
+        addedMass,
+        radiation: false,
+        rollDamping: false,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    const forces = new Float64Array(world.memory.buffer, region.byteOffset, region.byteLength / 8);
+    return forces[body.row * FORCE_WORDS + 1];
+  };
+  for (const [y, wet] of [
+    [0.3, true],
+    [0.45, false],
+  ]) {
+    const draft = D / 2 - Math.fround(y);
+    const hydro = SEA_WATER * GRAVITY * L * B * draft;
+    const own = representedMass * GRAVITY;
+    const bare = L * heaveAddedMassInfinite(B, lewisForm(B, draft, B * draft), SEA_WATER);
+    const plates = wet ? (1.12 * Math.PI * SEA_WATER * breadth * breadth * length) / 2 : 0;
+    const fold = (extra) => own + (representedMass * (hydro - own)) / (representedMass + bare + extra);
+    const measured = heldForce(y, keels) - heldForce(y, undefined);
+    assert.ok(Math.abs(measured - (fold(plates) - fold(0))) < 1e-7, JSON.stringify({ y, measured }));
+    assert.ok(Math.abs(heldForce(y, keels, false) - hydro) < 1e-7);
+  }
 });
 
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
