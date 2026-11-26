@@ -14,7 +14,7 @@ import {
   wettedLoads,
 } from '../../dist/seakeeping.js';
 import { SpectralSea } from '../../dist/sea.js';
-import { freeSection } from './sections.js';
+import { freeSection, vHull } from './sections.js';
 import {
   BODY_FORCES_FIELD,
   DECK_CLAIMS_FIELD,
@@ -864,3 +864,64 @@ function claimer(row) {
     extraState: () => [],
   };
 }
+
+test('HullSolver: a wedge coming down into still water at a steady speed slams as Wagner says, until its chine is wet', () => {
+  // A 30 degree V hull 4 m long, 1 m half-breadth at its chine, so heavy (and with the rigid world's gravity off) that it
+  // enters at a steady 2 m/s: the slamming force (the hull's load with slamming less without) is Wagner's, rho pi^3 V^2 h L /
+  // (4 tan(beta)^2) at its depth h when the load is taken, 7/16 of each step on; once the chine is wet the flow leaves the
+  // hull and the impact ends (past one level of the section's table beyond it). Measured within 0.02 percent at 60 steps a
+  // second: a bound of 0.1 percent.
+  const beta = Math.PI / 6,
+    b = 1,
+    length = 4,
+    speed = 2,
+    rho = 1025,
+    mesh = vHull(beta, b, length),
+    run = (slamming) => {
+      const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, 0, 0] }),
+        body = physics.addBody(null, {
+          position: [0, 0.001, 0],
+          linearVelocity: [0, -speed, 0],
+          colliders: { shape: 'box', halfExtents: [length / 2, 0.3, b], mass: 1e7 },
+        });
+      body.enabledRotations = [false, false, false];
+      const hull = new HullSolver(),
+        world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(hull, {
+          hulls: [{ row: body.row, mesh }],
+          sea: { density: rho, elevation: () => 0 },
+          gravity: [0, 0, 0],
+          addedMass: false,
+          radiation: false,
+          rollDamping: false,
+          greenWater: false,
+          slamming,
+        });
+      const out = [];
+      for (let f = 1; f <= 15; f++) {
+        const before = -body.position[1],
+          v = -body.linearVelocity[1];
+        world.advance(f);
+        out.push({
+          depth: before + (7 / 16) * v * (1 / 60),
+          v,
+          held: new Float64Array(world.memory.buffer, hull.exportPorts(0)[0].region.byteOffset + body.row * 48, 6)[1],
+        });
+      }
+      return out;
+    },
+    on = run(true),
+    off = run(false),
+    chine = (2 * b * Math.tan(beta)) / Math.PI;
+  for (let k = 1; k < on.length; k++) {
+    const { depth, v } = on[k],
+      slam = on[k].held - off[k].held;
+    if (depth < chine - 0.01) {
+      const wagner = (rho * Math.PI ** 3 * v * v * depth * length) / (4 * Math.tan(beta) ** 2);
+      assert.ok(Math.abs(slam - wagner) <= 0.001 * wagner, `at ${depth} m: ${slam} N against Wagner's ${wagner} N`);
+    } else if (depth > chine + 0.025) {
+      // What is left is the runs' own difference (the slam slowed the body a little, so its buoyancy differs).
+      const atChine = (rho * Math.PI ** 3 * v * v * chine * length) / (4 * Math.tan(beta) ** 2);
+      assert.ok(Math.abs(slam) < 1e-3 * atChine, `past the chine, ${slam} N`);
+    }
+  }
+});

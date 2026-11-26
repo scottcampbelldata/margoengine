@@ -46,3 +46,23 @@ export function freeSection([B, T, D], w, rho = SEA_WATER) {
     ),
   };
 }
+
+/** A prismatic V hull of deadrise `beta`, half-breadth `b` at its chine, `length` long, closed by a flat deck at the chine. */
+export function vHull(beta, b, length) {
+  const h = b * Math.tan(beta),
+    v = [],
+    indices = [];
+  for (const x of [-length / 2, length / 2]) v.push(x, 0, 0, x, h, b, x, h, -b);
+  for (const t of [
+    [0, 2, 1],
+    [3, 4, 5],
+    [0, 1, 4],
+    [0, 4, 3],
+    [0, 3, 5],
+    [0, 5, 2],
+    [1, 2, 5],
+    [1, 5, 4],
+  ])
+    indices.push(...t);
+  return { vertices: Float64Array.from(v), indices: Uint32Array.from(indices) };
+}

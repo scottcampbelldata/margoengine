@@ -31,6 +31,7 @@ import {
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
+import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import { type HullMemory, hullMemory } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections } from './strips.js';
@@ -98,6 +99,12 @@ export interface HullParams {
    * owns a hull's on-deck load (`deckClaims`), the hull solver leaves its own out.
    */
   readonly greenWater?: boolean;
+  /**
+   * Take the hull's slamming (default true): each section that comes down into the water takes the momentum of the water
+   * it sets moving, (dm/dh) V^2 a metre, m its added mass at its depth of entry with Wagner's wetted width and V its speed
+   * into the water (slamming.ts).
+   */
+  readonly slamming?: boolean;
   /** The deck's grid, cells along the hull and across it (default [32, 12]). */
   readonly deckCells?: readonly [number, number];
   /**
@@ -166,6 +173,10 @@ export class HullSolver implements Solver<HullParams> {
   private readonly drifts = new Map<Hull, { frequencies: Float64Array; coefficient: Float64Array }>();
   private waves32 = new Float32Array(0);
   private greenWater = true;
+  private slamming = true;
+  /** Per hull: a flag, then each station's depth of entry a step ago. */
+  private slam: Region | null = null;
+  private readonly slams = new Map<Hull, SlamStation[]>();
   private deckCells: readonly [number, number] = [32, 12];
   /** Per hull: the water on its deck (h, h u, h w a cell, body frame), then its velocity a step ago (flag, linear). */
   private deckWater: Region | null = null;
@@ -251,6 +262,8 @@ export class HullSolver implements Solver<HullParams> {
     this.diffraction = (params.diffraction ?? true) && this.waterOf() !== null;
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     this.greenWater = params.greenWater ?? true;
+    this.slamming = params.slamming ?? true;
+    if (this.slamming) this.slam = host.allocate('slam', hulls.length * (this.stations + 1) * 8, 'f64', HULL_LAYOUT);
     this.deckCells = params.deckCells ?? [32, 12];
     const [cx, cz] = this.deckCells;
     if (!(Number.isInteger(cx) && Number.isInteger(cz) && cx >= 2 && cz >= 2 && cx * cz <= 65536))
@@ -359,6 +372,7 @@ export class HullSolver implements Solver<HullParams> {
       if (this.diffraction)
         this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), loads);
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
+      if (this.slamming) this.slamLoad(hull, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.greenWater) this.deckLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), context, loads);
       const w = hull.row * FORCE_WORDS,
         held = this.addedMass
@@ -868,6 +882,57 @@ export class HullSolver implements Solver<HullParams> {
   }
 
   /**
+   * Adds the hull's slamming to `loads`: at each station, its keel's depth under the sea's surface over it (h) and that
+   * depth's rate over the step (V, the step before kept as state); where the section comes down into the water (V > 0) it
+   * takes (dm/dh) V^2 of its width up its own axis (the body's y), at its keel, about the centre of mass.
+   */
+  private slamLoad(
+    hull: Hull,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    t: number,
+    dt: number,
+    loads: WettedLoads,
+  ): void {
+    let stations = this.slams.get(hull);
+    if (!stations) {
+      stations = slamStations(hull.mesh, this.sea!.density ?? SEA_WATER, this.stations);
+      this.slams.set(hull, stations);
+    }
+    const index = this.hulls.indexOf(hull),
+      words = this.stations + 1,
+      state = new Float64Array(this.host!.memory.buffer, this.slam!.byteOffset + index * words * 8, words),
+      q = pose.rotation,
+      conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
+      local = rotate(conjugate, [
+        centre[0] - pose.position[0],
+        centre[1] - pose.position[1],
+        centre[2] - pose.position[2],
+      ]),
+      seen = state[0] === 1,
+      body = [0, 0, 0, 0, 0, 0];
+    stations.forEach((station, s) => {
+      const r = rotate(q, [station.x, station.keel, local[2]]),
+        p: Vec3 = [pose.position[0] + r[0], pose.position[1] + r[1], pose.position[2] + r[2]],
+        h = this.sea!.elevation(p[0], p[2], t) - p[1],
+        rate = seen ? (h - state[1 + s]!) / dt : 0;
+      state[1 + s] = h;
+      if (!(rate > 0)) return;
+      const f = slamSlope(station, h) * rate * rate * station.width;
+      body[1]! += f;
+      // r x (0, f, 0), r from the centre of mass to the keel point on its centre line: a pitch about z.
+      body[5]! += (station.x - local[0]) * f;
+    });
+    state[0] = 1;
+    const force = rotate(q, [body[0]!, body[1]!, body[2]!]),
+      moment = rotate(q, [body[3]!, body[4]!, body[5]!]);
+    for (let k = 0; k < 3; k++) {
+      loads.force[k]! += force[k]!;
+      loads.torque[k]! += moment[k]!;
+    }
+  }
+
+  /**
    * Adds the viscous roll moment to `loads`: -(eddy |p| + linear) p about the body's x axis through its centre of mass, p its
    * roll rate, taken implicitly in the damping alone (backward Euler against the roll inertia with the water carried), so a
    * light hull's eddy damping stays stable at any step: -c p / (1 + dt c / I).
@@ -1132,7 +1197,9 @@ export class HullSolver implements Solver<HullParams> {
 
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [this.history, this.radiated, this.waves, this.carry, this.deckWater].filter((r): r is Region => r !== null);
+    return [this.history, this.radiated, this.waves, this.carry, this.deckWater, this.slam].filter(
+      (r): r is Region => r !== null,
+    );
   }
 
   extraState(): readonly Region[] {
