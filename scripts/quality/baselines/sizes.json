@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19458535,
+  "total": 19461141,
   "history": [
     {
       "date": "2026-10-24",
@@ -12523,7 +12523,7 @@
     {
       "date": "2026-11-25",
       "commit": "9f6f7e9004",
-      "reason": "HYDRO-02 entry sizes, previous record to current: @margoengine/physics/runoff 0→3906 B (ceiling 0→4162 B); @margoengine/physics/hydro 6311→6724 B (ceiling 6567→6980 B); @margoengine/biomes/view 15293→15447 B (ceiling 15565→15565 B); @margoengine/biomes/rivers 2817→4193 B (ceiling 3073→4449 B); @margoengine/biomes/disturbance 6035→6292 B (ceiling 6282→6548 B). Runoff and shallow inflow share the per-cell discharge contract. Biomes adds live storm inflows, a climate-only catchment estimate and inundation queries at measured flood stages. A further split would duplicate the climate math or require an extra lazy request when opening river water. Core and stage carry no runtime runoff import.",
+      "reason": "HYDRO-02 entry sizes, previous record to current: @margoengine/physics/runoff 0\u21923906 B (ceiling 0\u21924162 B); @margoengine/physics/hydro 6311\u21926724 B (ceiling 6567\u21926980 B); @margoengine/biomes/view 15293\u219215447 B (ceiling 15565\u219215565 B); @margoengine/biomes/rivers 2817\u21924193 B (ceiling 3073\u21924449 B); @margoengine/biomes/disturbance 6035\u21926292 B (ceiling 6282\u21926548 B). Runoff and shallow inflow share the per-cell discharge contract. Biomes adds live storm inflows, a climate-only catchment estimate and inundation queries at measured flood stages. A further split would duplicate the climate math or require an extra lazy request when opening river water. Core and stage carry no runtime runoff import.",
       "grew": 4
     },
     {
@@ -12577,7 +12577,7 @@
     {
       "date": "2026-11-25",
       "commit": "db1950c88f",
-      "reason": "HYDRO-03 entry sizes, previous record to current: @margoengine/physics/sediment 0→5256 B (ceiling 0→5512 B); @margoengine/water/flood 14174→14457 B (ceiling 14600→14600 B). The optional sediment entry owns conservative routing and Exner coupling with lazy Wasm. Flood adds live concentration upload and reuses its existing tint shader and texture lifetime. Splitting the upload would add a lazy request to that same existing texture path.",
+      "reason": "HYDRO-03 entry sizes, previous record to current: @margoengine/physics/sediment 0\u21925256 B (ceiling 0\u21925512 B); @margoengine/water/flood 14174\u219214457 B (ceiling 14600\u219214600 B). The optional sediment entry owns conservative routing and Exner coupling with lazy Wasm. Flood adds live concentration upload and reuses its existing tint shader and texture lifetime. Splitting the upload would add a lazy request to that same existing texture path.",
       "grew": 1
     },
     {
@@ -12601,7 +12601,7 @@
     {
       "date": "2026-11-25",
       "commit": "dc75a47d35",
-      "reason": "HYDRO-04 entry sizes, previous record to current: @margoengine/physics/landscape 0→4347 B (ceiling 0→4603 B); @margoengine/biomes/landscape 0→614 B (ceiling 0→870 B). The optional Physics entry publishes SI-unit watershed and sediment fields and loads two native memory variants on demand. The separate Biomes entry adapts physical terrain snapshots without adding code to the Biomes root, core or stage. A further split would add requests without removing any code when evolving a relief.",
+      "reason": "HYDRO-04 entry sizes, previous record to current: @margoengine/physics/landscape 0\u21924347 B (ceiling 0\u21924603 B); @margoengine/biomes/landscape 0\u2192614 B (ceiling 0\u2192870 B). The optional Physics entry publishes SI-unit watershed and sediment fields and loads two native memory variants on demand. The separate Biomes entry adapts physical terrain snapshots without adding code to the Biomes root, core or stage. A further split would add requests without removing any code when evolving a relief.",
       "grew": 2
     },
     {
@@ -12691,7 +12691,7 @@
     {
       "date": "2026-11-25",
       "commit": "b6e01ceb4c",
-      "reason": "HYDRO-06 entry sizes, previous record to current: @margoengine/physics/groundwater 0→3939 B (ceiling 0→4195 B). The optional groundwater entry carries the aquifer registry interface and loads its arena kernel on demand. The kernel has no static data and can share full worlds without occupying a reserved module window. A further split would add a request for the aquifer registry interface.",
+      "reason": "HYDRO-06 entry sizes, previous record to current: @margoengine/physics/groundwater 0\u21923939 B (ceiling 0\u21924195 B). The optional groundwater entry carries the aquifer registry interface and loads its arena kernel on demand. The kernel has no static data and can share full worlds without occupying a reserved module window. A further split would add a request for the aquifer registry interface.",
       "grew": 1
     },
     {
@@ -12705,6 +12705,12 @@
       "commit": "33a9d4228",
       "reason": "physics/surf ceiling 8,057 to 9,345 B (built 7,801 to 9,072 B): wave-current interaction (Doppler relation and action transport), the groups' bound long wave for the open sea, and Stockdon's incident swash for R2 and the wet sand. In the surf entry because every surf scene with currents, groups or run-up needs them; a split would load with each such scene.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-08 wave drift",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: the waves' drift: a section's two-dimensional scattering derived from the radiation solution (scatterSection, its reflected and transmitted waves and the held loads), the hull's beam-sea motions and far-field drift table, the Froude-Krylov mean taken off, and Newman's approximation over the sea's waves; measured gzip (Mac build) 13440 B, was 10910; without it a moored or drifting hull takes none of the waves' mean push (the wall's 1/2 rho g a^2 in short waves), and a split would load one hull solve from two entries. Budget (measured + max(3%, 256 B)): 11237 to 13843 B."
     }
   ],
   "items": {
@@ -13529,7 +13535,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 7361,
-    "@margoengine/physics/seakeeping": 11237,
+    "@margoengine/physics/seakeeping": 13843,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,

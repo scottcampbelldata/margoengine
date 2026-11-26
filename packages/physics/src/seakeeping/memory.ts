@@ -50,6 +50,9 @@ export interface DiffractionStrip {
  * and sway-roll (roll about the centre of mass), and the kernels of its damping in the same, sampled at the step.
  */
 export interface DiffractionForm {
+  /** The section's Lewis form and breadth. */
+  readonly lewis: LewisForm;
+  readonly breadth: number;
   readonly a33: number;
   readonly a22: number;
   readonly a24: number;
@@ -77,6 +80,8 @@ export interface HullMemory {
   readonly rollEddy: number;
   /** Its skin friction in roll at frequency w is rollFriction sqrt(2 pi nu w) (N m s), nu the water's kinematic viscosity. */
   readonly rollFriction: number;
+  /** The depth of the centre of mass under the still waterline: the sections roll about it. */
+  readonly pivot: number;
   /** Its sections for the diffraction loads, and their forms. */
   readonly strips: readonly DiffractionStrip[];
   readonly stripForms: readonly DiffractionForm[];
@@ -151,6 +156,7 @@ export function hullMemory(
       dt,
       rollEddy: 0,
       rollFriction: 0,
+      pivot,
       strips: [],
       stripForms: [],
     };
@@ -265,6 +271,8 @@ export function hullMemory(
         index = stripForms.length;
         formIndex.set(id, index);
         stripForms.push({
+          lewis: form,
+          breadth: s.breadth,
           a33: heaveAddedMassInfinite(s.breadth, form, density),
           a22,
           a24,
@@ -281,7 +289,18 @@ export function hullMemory(
         form: index,
       };
     });
-  return { waterline, frequencies, pairs: tables, lateralInfinite, dt, rollEddy, rollFriction, strips, stripForms };
+  return {
+    waterline,
+    frequencies,
+    pairs: tables,
+    lateralInfinite,
+    dt,
+    rollEddy,
+    rollFriction,
+    pivot,
+    strips,
+    stripForms,
+  };
 }
 
 /**

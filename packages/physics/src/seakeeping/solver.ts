@@ -17,7 +17,7 @@
 // the bodies are and the sea at that time.
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, SeaSurface, SeaWater } from '@margoengine/math/fields';
-import { cos, sin } from '@margoengine/math/pinned';
+import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
 import {
   type Port,
   type RateLevel,
@@ -30,6 +30,7 @@ import {
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
 import { type HullMemory, hullMemory } from './memory.js';
+import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections } from './strips.js';
 import {
   GRAVITY,
@@ -82,6 +83,13 @@ export interface HullParams {
    */
   readonly diffraction?: boolean;
   /**
+   * Take the waves' mean and slow drift (default true, when the sea gives its waves, as `SpectralSea`'s `waveComponents`
+   * do): each section's far-field drift in beam waves, 1/2 rho g R^2 per metre and square metre of wave amplitude, R the
+   * wave it sends back held by the hull's motions (Maruo; the momentum the waves carry), less the part the Froude-Krylov
+   * pressure over the moving wetted surface already gives, over the waves by Newman's approximation.
+   */
+  readonly drift?: boolean;
+  /**
    * Damp a hull's roll by its bilge eddies and its skin friction (default true): Ikeda's component method (viscous.ts), the
    * viscous part of roll damping that potential flow leaves out and that damps a real hull's roll most near its resonance.
    */
@@ -92,6 +100,22 @@ export interface HullParams {
 
 /** Sea water's kinematic viscosity at 15 degrees C, m^2/s (ITTC 7.5-02-01-03, 2011). */
 export const SEA_VISCOSITY = 1.19e-6;
+
+/** A hull's roll: its eddy coefficient, its linear damping, its inertia with and without its added inertia, its stiffness. */
+interface Roll {
+  readonly eddy: number;
+  readonly linear: number;
+  readonly inertia: number;
+  readonly own: number;
+  readonly stiffness: number;
+}
+
+/** A sea that gives its waves one by one (`SpectralSea`). */
+interface SeaWaves {
+  readonly waveCount: number;
+  readonly stillDepth?: number;
+  waveComponents(t: number, out: Float32Array): number;
+}
 
 /** The layout version of the `forces` port region and the state regions. */
 const HULL_LAYOUT = 3;
@@ -125,7 +149,11 @@ export class HullSolver implements Solver<HullParams> {
   private rollDamping = true;
   private viscosity = SEA_VISCOSITY;
   /** Per hull: its eddy coefficient, its linear (friction) roll damping and its roll inertia with the water it carries. */
-  private readonly rolls = new Map<Hull, { eddy: number; linear: number; inertia: number }>();
+  private readonly rolls = new Map<Hull, Roll>();
+  private drift = true;
+  /** Per hull: its drift coefficient (N per m of hull and square metre of wave amplitude, summed along it) by frequency. */
+  private readonly drifts = new Map<Hull, { frequencies: Float64Array; coefficient: Float64Array }>();
+  private waves32 = new Float32Array(0);
 
   constructor(readonly id = 'hull') {}
 
@@ -199,8 +227,17 @@ export class HullSolver implements Solver<HullParams> {
     }
     if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
     this.diffraction = (params.diffraction ?? true) && this.waterOf() !== null;
+    this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     if (this.diffraction)
       this.waves = host.allocate('waves', hulls.length * this.stations * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
+  }
+
+  /** The sea's waves, when it gives them (`SpectralSea`'s `waveComponents`, its count and its depth). */
+  private wavesOf(): SeaWaves | null {
+    const sea = this.sea as Partial<SeaWaves> | null;
+    return sea && typeof sea.waveComponents === 'function' && typeof sea.waveCount === 'number'
+      ? (sea as SeaWaves)
+      : null;
   }
 
   /** The water under the sea's surface, when the sea gives it. */
@@ -276,6 +313,7 @@ export class HullSolver implements Solver<HullParams> {
       if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, 1 / rateOf(context.level), loads);
       if (this.diffraction)
         this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), loads);
+      if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
       const w = hull.row * FORCE_WORDS,
         held = this.addedMass
           ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads)
@@ -385,6 +423,230 @@ export class HullSolver implements Solver<HullParams> {
   }
 
   /**
+   * Adds the waves' drift to `loads`, by Newman's approximation over the sea's waves: with each wave's amplitude a_i, its
+   * phase theta_i over the hull's centre and its drift coefficient D_i (the hull's, at its frequency, times s|s|, s the
+   * share of its direction across the hull, so a wave from abeam pushes hardest and one from ahead not at all), the force
+   * across the hull is Re[(sum a_i D_i e^(i theta_i)) (sum a_j e^(-i theta_j))]: the mean sum a_i^2 D_i and the slow beat of
+   * the waves' groups, none of their sum frequencies.
+   */
+  private driftLoad(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    t: number,
+    dt: number,
+    loads: WettedLoads,
+  ): void {
+    const sea = this.wavesOf();
+    if (!sea) return;
+    const q = pose.rotation,
+      conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
+      local = rotate(conjugate, [
+        centre[0] - pose.position[0],
+        centre[1] - pose.position[1],
+        centre[2] - pose.position[2],
+      ]),
+      memory = this.memoryOf(hull, bodies, at, local, dt);
+    if (!memory || memory.strips.length === 0) return;
+    let table = this.drifts.get(hull);
+    if (!table) {
+      table = this.driftOf(hull, bodies, at, q, local, memory);
+      this.drifts.set(hull, table);
+    }
+    if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
+    const n = sea.waveComponents(t, this.waves32),
+      w = this.waves32,
+      g = -this.gravity[1],
+      depth = sea.stillDepth ?? Infinity;
+    let ar = 0,
+      ai = 0,
+      br = 0,
+      bi = 0;
+    for (let i = 0; i < n; i++) {
+      const kx = w[4 * i]!,
+        kz = w[4 * i + 1]!,
+        a = w[4 * i + 2]!,
+        k = hypot(kx, kz);
+      if (!(k > 0 && a > 0)) continue;
+      const deep = depth < Infinity ? (1 - exp(-2 * k * depth)) / (1 + exp(-2 * k * depth)) : 1,
+        omega = Math.sqrt(g * k * deep),
+        across = rotate(conjugate, [kx / k, 0, kz / k])[2],
+        d = a * interpolate(table.frequencies, table.coefficient, omega) * across * Math.abs(across),
+        theta = kx * centre[0] + kz * centre[2] + w[4 * i + 3]!,
+        c = cos(theta),
+        sn = sin(theta);
+      ar += d * c;
+      ai += d * sn;
+      br += a * c;
+      bi += a * sn;
+    }
+    const force = ar * br + ai * bi,
+      f = rotate(q, [0, 0, force]);
+    for (let k = 0; k < 3; k++) loads.force[k]! += f[k]!;
+  }
+
+  /**
+   * A hull's drift coefficient at each of its memory's frequencies, in waves from abeam (along its z), from its still-water
+   * pose. At each frequency: the hull's heave and its coupled sway and roll in a wave of unit amplitude (its added mass and
+   * damping from its sections, the Froude-Krylov load from its wetted surface, the diffraction as the solver takes it, its
+   * mass, inertia, waterplane and roll stiffness); each section's reflected wave held by those motions (`scatterSection`),
+   * giving the far-field drift sum 1/2 rho g |R|^2 over the sections' widths (Maruo); less the mean force the Froude-Krylov
+   * pressure over the moving wetted surface gives the hull in those motions (the time average of `wettedLoads`), which
+   * the solver already takes.
+   */
+  private driftOf(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    q: readonly [number, number, number, number],
+    local: Vec3,
+    memory: HullMemory,
+  ): { frequencies: Float64Array; coefficient: Float64Array } {
+    let roll = this.rolls.get(hull);
+    if (!roll) {
+      roll = this.rollOf(hull, bodies, at, q, local, memory);
+      this.rolls.set(hull, roll);
+    }
+    const density = this.sea!.density ?? SEA_WATER,
+      g = -this.gravity[1],
+      mass = 1 / bodies[at + 16]!,
+      { strips, stripForms, pivot, frequencies, waterline } = memory,
+      count = frequencies.length,
+      coefficient = new Float64Array(count),
+      waterplane = strips.reduce((sum, s) => sum + stripForms[s.form]!.breadth * s.width, 0),
+      c33 = density * g * waterplane,
+      c44 = roll.stiffness,
+      still = { density, elevation: () => waterline },
+      rest = wettedLoads(hull.mesh, { position: [0, 0, 0], rotation: [0, 0, 0, 1] }, still, 0, local),
+      restZ = rest.force[2];
+    for (let f = 0; f < count; f++) {
+      const omega = frequencies[f]!,
+        k = (omega * omega) / g,
+        // The hull's coefficients at omega, summed over its sections (one solve a form).
+        perForm = stripForms.map((form) => ({
+          heave: heaveSection(form.lewis, omega, density, g),
+          lateral: lateralSection(form.lewis, omega, density, pivot, g),
+          // The wave's load on the section held still (Froude-Krylov and diffraction, exact in two dimensions).
+          held: scatterSection(form.lewis, omega, pivot, {}, g, 16, 64, density),
+        }));
+      let a33 = 0,
+        b33 = 0,
+        a22 = 0,
+        b22 = 0,
+        a24 = 0,
+        b24 = 0,
+        a44 = 0,
+        b44 = 0,
+        f3: [number, number] = [0, 0],
+        f2: [number, number] = [0, 0],
+        f4: [number, number] = [0, 0],
+        // The diffraction as the solver takes it (the relative motion principle): (-i w a + b) U, U the water's vertical
+        // velocity at the mean draft (-i w e^(-k d)) and its velocity across at the centroid (w e^(-k d)).
+        d3: [number, number] = [0, 0],
+        d2: [number, number] = [0, 0],
+        d4: [number, number] = [0, 0];
+      for (const strip of strips) {
+        const { heave, lateral, held } = perForm[strip.form]!,
+          w = strip.width,
+          s24 = (lateral.swayOfRoll.addedMass + lateral.rollOfSway.addedMass) / 2,
+          t24 = (lateral.swayOfRoll.damping + lateral.rollOfSway.damping) / 2,
+          u3: [number, number] = [0, -omega * exp(-k * strip.heaveDepth)],
+          u2 = omega * exp(-k * strip.swayDepth);
+        d3 = add(d3, times([heave.damping * w, -omega * heave.addedMass * w], u3));
+        d2 = add(d2, [lateral.sway.damping * w * u2, -omega * lateral.sway.addedMass * w * u2]);
+        d4 = add(d4, [t24 * w * u2, -omega * s24 * w * u2]);
+        a33 += heave.addedMass * w;
+        b33 += heave.damping * w;
+        a22 += lateral.sway.addedMass * w;
+        b22 += lateral.sway.damping * w;
+        a24 += s24 * w;
+        b24 += t24 * w;
+        a44 += lateral.roll.addedMass * w;
+        b44 += lateral.roll.damping * w;
+        // The book's heave is down, the body's y up.
+        f3 = add(f3, [-held.heaveForce[0] * w, -held.heaveForce[1] * w]);
+        f2 = add(f2, [held.swayForce[0] * w, held.swayForce[1] * w]);
+        f4 = add(f4, [held.rollMoment[0] * w, held.rollMoment[1] * w]);
+      }
+      const small =
+          1e-3 *
+          Math.max(
+            1e-3,
+            strips.reduce((m, s) => Math.max(m, s.heaveDepth), 0),
+          ),
+        wave = (amplitude: number) => ({
+          density,
+          elevation: (_x: number, z: number, t: number) => waterline + amplitude * cos(k * z - omega * t),
+          pressure: (_x: number, y: number, z: number, t: number) => {
+            const level = Math.min(y - waterline, 0);
+            return density * g * (amplitude * exp(k * level) * cos(k * z - omega * t) - (y - waterline));
+          },
+        }),
+        // The Froude-Krylov load of a small wave over the hull at rest (its complex amplitude from a quarter period apart),
+        // with which the solver's own loads move the hull.
+        frozen = (t: number) =>
+          wettedLoads(hull.mesh, { position: [0, 0, 0], rotation: [0, 0, 0, 1] }, wave(small), t, local),
+        [l0, l1] = [frozen(0), frozen(Math.PI / (2 * omega))],
+        fk = (index: number, torque: boolean): [number, number] => {
+          const base = torque ? rest.torque[index]! : rest.force[index]!,
+            at0 = torque ? l0.torque[index]! : l0.force[index]!,
+            at1 = torque ? l1.torque[index]! : l1.force[index]!;
+          return [(at0 - base) / small, (at1 - base) / small];
+        },
+        // The motions under loads (f3, f2, f4), e^(-i w t): heave alone, sway and roll together.
+        m22: [number, number] = [-omega * omega * (mass + a22), -omega * b22],
+        m24: [number, number] = [-omega * omega * a24, -omega * b24],
+        m44: [number, number] = [c44 - omega * omega * (roll.own + a44), -omega * b44],
+        det = sub(times(m22, m44), times(m24, m24)),
+        motions = (g3: [number, number], g2: [number, number], g4: [number, number]) => ({
+          x3: divide(g3, [c33 - omega * omega * (mass + a33), -omega * b33]),
+          x2: divide(sub(times(g2, m44), times(m24, g4)), det),
+          x4: divide(sub(times(m22, g4), times(m24, g2)), det),
+        }),
+        // The true motions, from the loads of the two-dimensional scattering: they give the far-field drift.
+        exact = motions(f3, f2, f4),
+        // The motions the solver gives the hull, from its own loads: they give the Froude-Krylov mean it already takes.
+        own = motions(add(fk(1, false), d3), add(fk(2, false), d2), add(fk(0, true), d4)),
+        velocity = (x: [number, number]): [number, number] => [omega * x[1], -omega * x[0]];
+      // Each section's reflected wave held by the hull's motions (the book's heave down, sway along z, roll about x).
+      let far = 0;
+      const heaveDown = velocity([-exact.x3[0], -exact.x3[1]]),
+        sway = velocity(exact.x2),
+        turn = velocity(exact.x4),
+        { x2, x3, x4 } = own;
+      const reflected = stripForms.map(
+        (form) =>
+          scatterSection(form.lewis, omega, pivot, { heave: heaveDown, sway, roll: turn }, g, 16, 64, density)
+            .reflected,
+      );
+
+      for (const strip of strips) {
+        const r = reflected[strip.form]!;
+        far += 0.5 * density * g * (r[0] * r[0] + r[1] * r[1]) * strip.width;
+      }
+      // The mean the Froude-Krylov pressure gives over the moving wetted surface, by the time average over a period.
+      const phases = 16;
+      let mean = 0;
+      for (let j = 0; j < phases; j++) {
+        const t = (2 * Math.PI * j) / (phases * omega),
+          c = cos(-omega * t),
+          sn = sin(-omega * t),
+          part = (x: [number, number]) => small * (x[0] * c - x[1] * sn),
+          angle = part(x4),
+          r = [sin(angle / 2), 0, 0, cos(angle / 2)] as const,
+          moved = rotate(r, local),
+          position: Vec3 = [local[0] - moved[0], local[1] - moved[1] + part(x3), local[2] - moved[2] + part(x2)],
+          centreNow: Vec3 = [local[0], local[1] + part(x3), local[2] + part(x2)];
+        mean += wettedLoads(hull.mesh, { position, rotation: r }, wave(small), t, centreNow).force[2] - restZ;
+      }
+      coefficient[f] = far - mean / phases / (small * small);
+    }
+    return { frequencies: Float64Array.from(frequencies), coefficient };
+  }
+
+  /**
    * Adds the viscous roll moment to `loads`: -(eddy |p| + linear) p about the body's x axis through its centre of mass, p its
    * roll rate, taken implicitly in the damping alone (backward Euler against the roll inertia with the water carried), so a
    * light hull's eddy damping stays stable at any step: -c p / (1 + dt c / I).
@@ -431,7 +693,7 @@ export class HullSolver implements Solver<HullParams> {
     q: readonly [number, number, number, number],
     local: Vec3,
     memory: HullMemory,
-  ): { eddy: number; linear: number; inertia: number } {
+  ): Roll {
     const world = invertSymmetric([
         bodies[at + 17]!,
         bodies[at + 18]!,
@@ -465,6 +727,8 @@ export class HullSolver implements Solver<HullParams> {
       eddy: memory.rollEddy,
       linear: memory.rollFriction * Math.sqrt(2 * Math.PI * this.viscosity * natural),
       inertia,
+      own,
+      stiffness,
     };
   }
 
@@ -731,4 +995,36 @@ function turn(
     ns = s - (a * x + b * y + c * z),
     length = Math.sqrt(nx * nx + ny * ny + nz * nz + ns * ns);
   return [nx / length, ny / length, nz / length, ns / length];
+}
+
+/** Complex numbers as [re, im]. */
+function add(a: readonly [number, number], b: readonly [number, number]): [number, number] {
+  return [a[0] + b[0], a[1] + b[1]];
+}
+function sub(a: readonly [number, number], b: readonly [number, number]): [number, number] {
+  return [a[0] - b[0], a[1] - b[1]];
+}
+function times(a: readonly [number, number], b: readonly [number, number]): [number, number] {
+  return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]];
+}
+function divide(a: readonly [number, number], b: readonly [number, number]): [number, number] {
+  const m = b[0] * b[0] + b[1] * b[1];
+  return m > 0 ? [(a[0] * b[0] + a[1] * b[1]) / m, (a[1] * b[0] - a[0] * b[1]) / m] : [0, 0];
+}
+
+/** `values` at `x`, linear between `at`'s samples (rising), held at the ends. */
+function interpolate(at: Float64Array, values: Float64Array, x: number): number {
+  const n = at.length;
+  if (n === 0) return 0;
+  if (x <= at[0]!) return values[0]!;
+  if (x >= at[n - 1]!) return values[n - 1]!;
+  let lo = 0,
+    hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (at[mid]! <= x) lo = mid;
+    else hi = mid;
+  }
+  const t = (x - at[lo]!) / (at[hi]! - at[lo]!);
+  return values[lo]! + t * (values[hi]! - values[lo]!);
 }

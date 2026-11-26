@@ -12512,6 +12512,40 @@ frequency-domain answer at 2.5, 3 and 3.5 rad/s (a box section's mean-pressure d
 82 to 267 percent off without the diffraction. Held in beam seas, its sway force and roll moment are within 1.5 percent of
 the Froude-Krylov load plus (i w a(w) + b(w)) U, 50 to 390 percent off without. No constant is calibrated.
 
+### A hull's wave drift: two-dimensional scattering and the far field (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-26)
+
+`scatterSection` in `packages/physics/src/seakeeping/radiation.ts` gives a section's reflected and transmitted waves and the
+wave's load on it, and `solver.ts` (`driftOf`, `driftLoad`) turns them into the hull's drift. Read for this job: J. M. J.
+Journee and W. W. Massie, *Offshore Hydromechanics*, TU Delft, 2001 (https://ocw.tudelft.nl/wp-content/uploads/Part_2.pdf
+and Part_3.pdf): the mean wave load on a wall (section 6.4.1, eqs. 6.86-6.106, 1/2 rho g a^2 for full reflection), the
+second-order wave forces by direct pressure integration (section 9.3.1, eq. 9.67, Pinkster), and the low-frequency drift
+by its spectrum (section 9.3.6). The far-field drift 1/2 rho g a^2 |R|^2 per metre is the momentum flux balance of the
+incident, reflected and transmitted waves (deep-water momentum flux 1/4 rho g a^2, with |R|^2 + |T|^2 = 1), as Maruo
+(1960) gives it; Newman's approximation of the slow drift (J. N. Newman, "Second-order, slowly-varying forces on vessels
+in irregular waves", 1974) is known through the book.
+
+These are this package's own, derived and checked:
+- **The scattering from the radiation solution.** The held section's scattered flow is the same multipoles and outgoing
+  wave as the radiation's, with the incident wave's stream function cancelled on the contour, split into its even part
+  (heave's basis) and its odd part (sway's), each wave's two components unknowns of the least squares. The series' wave
+  functions are the physical flow only on the side x > 0 (on the other they take the opposite parity, a branch of the
+  logarithm), so the far field is read there and continued even or odd by hand. Checked: |R|^2 + |T|^2 = 1 within 1e-4
+  for a box and a half circle from long waves (R -> 0) to short (R -> 1).
+- **The motions' phase.** The incident potential raises the surface a quarter period after it, so a motion given against
+  the elevation enters the stream function times i. Checked: in long waves a section heaving with the surface sends out
+  the wave that cancels its scattering (to 0.1 percent), and with the other phase does not.
+- **The held section's loads** from the pressure of the incident and scattered flow over the contour, their sign and
+  phase fixed by energy: a free section moved by them and its own radiation keeps |R|^2 + |T|^2 = 1 within 1e-3 at every
+  frequency, which none of the other fifteen combinations of sign and quarter period does.
+- **The drift the solver applies** is the far field (the hull's true motions, from those loads) less the mean its
+  Froude-Krylov pressure over the moving wetted surface gives in the motions the solver's own loads produce (their time
+  average by `wettedLoads`), so the time domain's mean is the far field. Checked
+  (`packages/physics/tests/coupling/seakeeping.test.js`): a moored box's mean drift within 3 percent of the wall's force
+  of the far field at 3 and 8.7 rad/s, and the wall's in short waves.
+- **Newman's approximation in O(N)**: Re[(sum a_i D_i e^(i theta_i))(sum a_j e^(-i theta_j))], the difference frequencies
+  with the mean of the two waves' coefficients, so a coefficient of either sign is taken.
+- **Oblique waves** by their share across the hull squared. That scaling is assumed, not derived.
+
 ### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the
