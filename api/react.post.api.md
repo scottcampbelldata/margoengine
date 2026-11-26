@@ -5,7 +5,9 @@
 ```ts
 import { Afterimage, AfterimageOptions, Bloom, BloomOptions, FXAA, GTAO, GTAOOptions, Glitch, GlitchOptions, LensFlare, LensFlareOptions, MotionBlur, MotionBlurOptions, SMAA, SMAAOptions, SSAO, SSAOOptions, SSGI, SSGIOptions, SSR, SSROptions } from "@margoengine/post";
 import { DepthTexture, DepthTextureOptions } from "@margoengine/post/depth";
+import { DotScreen, HalftoneOptions } from "@margoengine/post/halftone";
 import { SceneTargets, SceneTargetsOptions } from "@margoengine/post/mrt";
+import { Pixelate, PixelateOptions } from "@margoengine/post/pixelate";
 import { ReactNode } from "react";
 
 export function Afterimage({ onReady, onError, ...options }: AfterimageProps): null;
@@ -18,10 +20,21 @@ export function Bloom({ onReady, onError, ...options }: BloomProps): null;
 export interface BloomProps extends BloomOptions, Callbacks<BloomEffect> {
 }
 
+export function ChromaticAberration({ amount }: ChromaticAberrationProps): null;
+
+export interface ChromaticAberrationProps {
+    amount?: number;
+}
+
 export const DepthTexture: import("react").ForwardRefExoticComponent<DepthTextureProps & import("react").RefAttributes<DepthPlugin>>;
 
 export interface DepthTextureProps extends DepthTextureOptions, ErrorProps {
     onResize?: (depth: DepthPlugin) => void;
+}
+
+export function DotScreen({ onReady, onError, ...options }: DotScreenProps): null;
+
+export interface DotScreenProps extends Omit<HalftoneOptions, 'grayscale' | 'angles'>, Callbacks<DotScreenEffect> {
 }
 
 export function EffectComposer(_arg0: EffectComposerProps): import("react").JSX.Element;
@@ -35,6 +48,12 @@ export interface EffectComposerProps {
 export function FXAA({ onReady, onError }: FXAAProps): null;
 
 export interface FXAAProps extends Callbacks<FXAAEffect> {
+}
+
+export function FilmGrain({ amount }: FilmGrainProps): null;
+
+export interface FilmGrainProps {
+    amount?: number;
 }
 
 export function GTAO({ onReady, onError, ...options }: GTAOProps): null;
@@ -55,6 +74,11 @@ export interface LensFlareProps extends LensFlareOptions, Callbacks<LensFlareEff
 export function MotionBlur({ onReady, onError, ...options }: MotionBlurProps): null;
 
 export interface MotionBlurProps extends Partial<MotionBlurOptions>, Callbacks<MotionBlurEffect> {
+}
+
+export function Pixelate({ onReady, onError, ...options }: PixelateProps): null;
+
+export interface PixelateProps extends PixelateOptions, Callbacks<PixelateEffect> {
 }
 
 export function SMAA({ onReady, onError, ...options }: SMAAProps): null;
@@ -80,6 +104,18 @@ export interface SSRProps extends SSROptions, Callbacks<SSREffect> {
 export const SceneTargets: import("react").ForwardRefExoticComponent<SceneTargetsProps & import("react").RefAttributes<TargetsPlugin>>;
 
 export interface SceneTargetsProps extends SceneTargetsOptions, ErrorProps {
+}
+
+export function Vignette({ amount, radius, softness, color, center, roundness, blend }: VignetteProps): null;
+
+export interface VignetteProps {
+    amount?: number;
+    radius?: number;
+    softness?: number;
+    color?: readonly [number, number, number];
+    center?: readonly [number, number];
+    roundness?: number;
+    blend?: 'multiply' | 'opaque';
 }
 
 // Not exported from this entry, but used by the exports above:

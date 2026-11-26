@@ -97,7 +97,7 @@ export const SHIP_LOOKS: {
         readonly wakeLife: 600;
         readonly foamLife: 60;
         readonly turbulentWake: 0.6;
-        readonly lampRoughness: 0.06;
+        readonly lampRoughness: 0.25;
         readonly lampIntensity: 2;
     };
     readonly heavyWeather: {

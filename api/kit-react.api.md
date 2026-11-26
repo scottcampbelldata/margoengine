@@ -61,6 +61,10 @@ export { Center } from "@margoengine/react";
 
 export { CenterProps } from "@margoengine/react";
 
+export { ChromaticAberration } from "@margoengine/react";
+
+export { ChromaticAberrationProps } from "@margoengine/react";
+
 export { Circle } from "@margoengine/react";
 
 export { CircleGeometry } from "@margoengine/react";
@@ -109,6 +113,10 @@ export { Dodecahedron } from "@margoengine/react";
 
 export { DodecahedronGeometry } from "@margoengine/react";
 
+export { DotScreen } from "@margoengine/react";
+
+export { DotScreenProps } from "@margoengine/react";
+
 export { DragControls } from "@margoengine/react";
 
 export { DragControlsProps } from "@margoengine/react";
@@ -134,6 +142,10 @@ export { FBOOptions } from "@margoengine/react";
 export { FXAA } from "@margoengine/react";
 
 export { FXAAProps } from "@margoengine/react";
+
+export { FilmGrain } from "@margoengine/react";
+
+export { FilmGrainProps } from "@margoengine/react";
 
 export { FirstPersonControls } from "@margoengine/react";
 
@@ -304,6 +316,10 @@ export { PivotControls } from "@margoengine/react";
 export { PivotControlsProps } from "@margoengine/react";
 
 export { PivotDragStart } from "@margoengine/react";
+
+export { Pixelate } from "@margoengine/react";
+
+export { PixelateProps } from "@margoengine/react";
 
 export { Plane } from "@margoengine/react";
 
@@ -480,6 +496,10 @@ export { TransformControlsProps } from "@margoengine/react";
 export { Tube } from "@margoengine/react";
 
 export { TubeGeometry } from "@margoengine/react";
+
+export { Vignette } from "@margoengine/react";
+
+export { VignetteProps } from "@margoengine/react";
 
 export { BoxGeometry as boxGeometry } from "@margoengine/react";
 

@@ -3215,6 +3215,10 @@
       "types": "./dist/physics/soft.d.ts",
       "import": "./dist/physics/soft.js"
     },
+    "./physics/tissue": {
+      "types": "./dist/physics/tissue.d.ts",
+      "import": "./dist/physics/tissue.js"
+    },
     "./physics/meshfiles": {
       "types": "./dist/physics/meshfiles.d.ts",
       "import": "./dist/physics/meshfiles.js"
