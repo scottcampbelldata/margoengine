@@ -90,8 +90,16 @@ export interface Hull {
     readonly row: number;
     readonly mesh: HullMesh;
     readonly course?: HullCourse;
+    readonly bilgeKeels?: readonly HullBilgeKeel[];
     readonly compartments?: readonly Compartment[];
     readonly openings?: readonly Opening[];
+}
+
+export interface HullBilgeKeel {
+    readonly root: Vec3;
+    readonly span: readonly [number, number];
+    readonly length: number;
+    readonly rollFrequency?: number;
 }
 
 export interface HullCourse {

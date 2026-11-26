@@ -14229,8 +14229,10 @@ scale ratio and negligible gas density. The 3.2 mm, 1 mL/min water control predi
 per drop, 2.6% below the 51.5 μL cycle volume from Zhang and Basaran (1996). Each event carries
 the rim pose and velocity. `ThinFilmDropFlight` uses that velocity as constant over the source
 tick to recover the release position, then advances the drop relative to the air. It tracks
-diameters from 1 μm to 7 mm at a configurable capacity and expires each drop by age. Flight
-does not yet feed impact pulses to a new receiving surface. Satellite breakup and free
+diameters from 1 μm to 7 mm at a configurable capacity and expires each drop by age. An
+optional static, planar receiver absorbs incoming drops in its UV bounds. It sends volume
+and normal momentum to the receiving film in the same tick and can drive its wake. The
+receiver covers deposition. Moving receivers, splashing, rebound, satellite breakup and free
 pinch-off away from a configured outlet remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
 The optional `hydrostaticLoad` adds the film's normal gravitational force and moment to
 its rigid mount. The coupled test checks both a supported tray and an off-centre underside
@@ -14240,7 +14242,7 @@ are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Du
 Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
 cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
-The optional thin-film entry is 11,825 B gzip with a 12,180 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 13,004 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
@@ -14868,6 +14870,12 @@ The forward-roll seakeeping entry is 25,505 B gzip with a 26,271 B ceiling. Core
 The ordinary-strip vertical excitation correction on `Hull.course` uses a `SpectralSea` wavelength, phase and amplitude for each wave. The world-space ship velocity gives the encounter frequency. The water-relative course controls the longitudinal added-mass term. The heave and pitch correction is added to the existing velocity-field convolution, including wake and current. Under very small encounter frequencies the finite-history static mass and continuous odd damping ratio replace the unresolved deep-water singularity. Two 56-value f64 arrays and one static mass value are retained per distinct section at the defaults. The section masses come from deep-water Lewis forms. The orbital wave input follows the specified depth. A free three-dimensional hull and a tank require additional measured qualification.
 
 The incident-wave seakeeping entry is 27,343 B gzip with a 28,164 B ceiling. Core and Stage gain zero bytes.
+
+### Bilge keel plate damping
+
+`Hull.bilgeKeels` terms apply only when viscous roll damping is enabled. The rectangular-plate integration samples the local surface at two longitudinal stations, with a linear crossing from root to tip. It estimates roll excursion from the current pose and rate at the natural roll frequency, or at the frequency explicitly prescribed for a forced oscillator. The wet normal-force and lift terms cover small roll, a slender hull, and the configured water-relative forward speed. Plate added inertia, hull pressure, skegs and large-angle decay measurements remain open.
+
+The bilge-keel seakeeping entry is 28,329 B gzip with a 29,179 B ceiling. Core and Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
