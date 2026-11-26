@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19132933,
+  "total": 19133052,
   "history": [
     {
       "date": "2026-10-24",
@@ -12433,7 +12433,7 @@
     {
       "date": "2026-11-25",
       "commit": "FG-17e",
-      "reason": "FG-17 piece 6a new entry bvh/gpu-scene 7,747 B gzip: GPUSceneBVH (two-level scene tree: pooled bottom trees, CPU binned-SAH top tree with refit and rebuild, instance records with materials, raycast and encodeTrace) and sceneBvhWGSL; the shared triangle WGSL and node packing moved to gpu-pack.ts so bvh/gpu does not grow; optional, nothing else imports it",
+      "reason": "FG-17 piece 6a new entry bvh/gpu-scene 7,866 B gzip: GPUSceneBVH (two-level scene tree: pooled bottom trees, CPU binned-SAH top tree with refit and rebuild, instance records with materials, raycast and encodeTrace with per-trace settings uniforms the scene owns and frees) and sceneBvhWGSL; the shared triangle WGSL and node packing moved to gpu-pack.ts so bvh/gpu does not grow; optional, nothing else imports it",
       "grew": 1
     }
   ],
@@ -12561,7 +12561,7 @@
     "@margoengine/bvh/bake": 2583,
     "@margoengine/bvh/gpu": 5402,
     "@margoengine/bvh/gpu-build": 19505,
-    "@margoengine/bvh/gpu-scene": 7747,
+    "@margoengine/bvh/gpu-scene": 7866,
     "@margoengine/bvh/inside": 12903,
     "@margoengine/bvh/lines": 6113,
     "@margoengine/bvh/parallel": 11405,
