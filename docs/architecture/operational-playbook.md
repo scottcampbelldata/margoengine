@@ -10426,3 +10426,5 @@ Both tiers use the same coupling contracts. The resolved tier balances integrate
 force and exposes a layout-1 pressure grid. The native repose sweep transfers unconstrained, newly deposited loose
 soil across each grid face at most once per step. Reported work gives raster-vertex visits and grid faces examined,
 and the volume moved is auditable without a timer.
+The browser fixture rebuilds the Terrain mesh from the published bed sampler on demand. The same physical relief
+reaches WebGPU and WebGL2 without transferring a solver-specific render texture.

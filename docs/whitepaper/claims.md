@@ -5779,3 +5779,7 @@ exactly. After building Physics, run `node --test packages/physics/tests/terrame
 packages/physics/tests/coupling/terramechanics.test.js` and
 `node packages/physics/tests/terramechanics.browser.mjs`.
 [Measurement and test conditions](../clean-room.md#soil-pressure-shear-and-permanent-footprints-earth-05).
+
+The browser fixture feeds the live TerrainBed sampler directly into Terrain's render geometry. WebGPU and WebGL2
+each recorded 3,906 changed pixels between the flat bed and the loaded footprint, using the same material,
+camera and lighting. The measured center elevation fell 72 mm in that render fixture.

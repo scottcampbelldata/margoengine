@@ -1,24 +1,31 @@
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Terramechanics native replay</title></head>
-<body>
+<body style="margin:0">
+  <canvas id="soil" width="640" height="360"></canvas>
   <script type="module">
     import { AirborneParticles } from '/packages/physics/dist/airborne.js';
     import { TerrainBed } from '/packages/physics/dist/earth.js';
     import { Terramechanics } from '/packages/physics/dist/terramechanics.js';
     import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
 
+    const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] };
+
+    async function makeWorld(shared, tier) {
+      const soil = await Terramechanics.load({ tier });
+      const bed = new TerrainBed();
+      const air = await AirborneParticles.load({ terrain: true, dustField: soil.dustField });
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) })
+        .add(bed, { ...terrain, elevations: () => 0 })
+        .add(soil, { terrain, patches: [{ x: 0, z: 0, length: 0.38, width: 0.22, load: 900, displacement: [0.04, 0], rounded: true }] })
+        .add(air, { terrain, capacity: 64, dustReleaseHeight: 0.02, dustLiftVelocity: 0.5 });
+      world.couple(['terramechanics', 'bed'], 'staggered');
+      return { world, bed, air };
+    }
+
     window.runTerramechanics = async () => {
       const simulate = async (shared, tier) => {
-        const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] };
-        const soil = await Terramechanics.load({ tier });
-        const bed = new TerrainBed();
-        const air = await AirborneParticles.load({ terrain: true, dustField: soil.dustField });
-        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) })
-          .add(bed, { ...terrain, elevations: () => 0 })
-          .add(soil, { terrain, patches: [{ x: 0, z: 0, length: 0.38, width: 0.22, load: 900, displacement: [0.04, 0], rounded: true }] })
-          .add(air, { terrain, capacity: 64, dustReleaseHeight: 0.02, dustLiftVelocity: 0.5 });
-        world.couple(['terramechanics', 'bed'], 'staggered');
+        const { world, bed, air } = await makeWorld(shared, tier);
         world.advance(5);
         const saved = world.takeSnapshot();
         world.advance(30);
@@ -30,6 +37,36 @@
       };
       return { mean: [await simulate(false, 'mean'), await simulate(true, 'mean')],
         resolved: [await simulate(false, 'resolved'), await simulate(true, 'resolved')] };
+    };
+
+    window.prepareTerramechanicsRender = async () => {
+      const [{ createStage }, { heightfield }] = await Promise.all([
+        import('/packages/stage/dist/index.js'),
+        import('/packages/terrain/dist/index.js'),
+      ]);
+      const { world, bed } = await makeWorld(true, 'resolved');
+      const errors = [];
+      const stage = await createStage(document.querySelector('#soil'), {
+        autoStart: false, controls: false, exactSize: [640, 360], background: '#9aaab1',
+        camera: { position: [0.53, 0.68, 0.95], target: [0, -0.032, 0], fov: 46, near: 0.1, far: 10 },
+        onError: error => errors.push(String(error.message ?? error)),
+      });
+      stage.engine.lighting.direction.set([-4, 2, -1, 2]);
+      stage.engine.lighting.radiance.set([1, 0.93, 0.86, 0.26]);
+      const geometry = () => {
+        const surface = bed.bed;
+        return heightfield((x, z) => surface.sample(x, z).elevation,
+          { size: [terrain.width, terrain.depth], resolution: 72 });
+      };
+      const ground = stage.mesh(geometry(), { color: '#76634e', roughness: 0.91 });
+      window.terramechanicsFrame = async tick => {
+        world.advance(tick);
+        ground.setGeometry(geometry());
+        await stage.engine.render({ delta: 0 });
+        await stage.engine.render({ delta: 0 });
+        return { elevation: bed.bed.sample(0, 0).elevation, drawCalls: stage.engine.scene.stats.drawCalls, errors };
+      };
+      window.closeTerramechanicsRender = () => stage.dispose();
     };
   </script>
 </body>
