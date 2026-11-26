@@ -9196,3 +9196,14 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
+
+### Groundwater and springs (HYDRO-06)
+
+Use an unconfined aquifer with one active horizontal layer. Darcy conductance is integrated over the saturated
+overlap and held during each implicit tick. Opposite face transfers conserve liquid volume. The water table follows
+the terrain if bound. A drain below the aquifer floor is limited to that floor. Surface level limits saturated
+storage and excess leaves as seepage. Springs and seepage supply the shallow-water solver in one direction.
+Specify a physical groundwater time scale appropriate to the rate at which the saturated thickness changes.
+
+Detailed unsaturated pressure and moisture profiles, multiple aquifer layers and surface-water backflow through
+spring openings are outside this model. HYDRO-02 calculates recharge through the active soil.

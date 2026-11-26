@@ -16210,3 +16210,10 @@ the event by hand. A physics world with `ModalContactRigidSolver` and `ModalSoun
 an impulse, rolling or scraping excitation, with sound and damping set by the contacted materials.
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
+
+## Fixed: soil drainage had no groundwater storage or spring receiver (HYDRO-06)
+
+Previously HYDRO-02 could export soil drainage, but no aquifer stored that water or passed it back to the surface
+through springs and seepage. Connect its recharge port to `GroundwaterSolver` and give the existing shallow-water
+solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
+check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.

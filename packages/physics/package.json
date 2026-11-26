@@ -136,6 +136,10 @@
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
     },
+    "./groundwater": {
+      "types": "./dist/groundwater/index.d.ts",
+      "import": "./dist/groundwater.js"
+    },
     "./landscape": {
       "types": "./dist/landscape/index.d.ts",
       "import": "./dist/landscape.js"

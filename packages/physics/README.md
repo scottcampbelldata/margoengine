@@ -3022,3 +3022,45 @@ The layout-1 f64 contact field has five words per track: normal impact impulse i
 scrape power times speed, rolling proxy power in W and rolling power times speed. The layout-1 fracture field
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
+
+## Groundwater and springs
+
+`@margoengine/physics/groundwater` evolves an unconfined water table with recharge, lateral Darcy flow, springs and
+surface seepage. Spring and seepage volumes can enter the shallow-water solver on the same world clock.
+
+```ts
+import { type BedShape, TerrainBed } from '@margoengine/physics/earth';
+import { GroundwaterSolver } from '@margoengine/physics/groundwater';
+import { ShallowWaterSolver } from '@margoengine/physics/hydro';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid: BedShape = { columns: 3, rows: 1, width: 3, depth: 1, centre: [0, 0] };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const bed = new TerrainBed();
+const aquifer = await GroundwaterSolver.load({ followTerrain: true });
+world.add(bed, { ...grid, elevations: () => 0 });
+world.add(aquifer, {
+  grid,
+  initialHead: -0.2,
+  recharge: 0.01,
+  springElevation: -0.5,
+  springConductance: [0, 0.05, 0],
+});
+const stream = new ShallowWaterSolver('water', aquifer.shallowInput());
+world.add(stream, { bed: bed.bed });
+world.advance(60);
+console.log(aquifer.read(1, 0), aquifer.budget, stream.volume());
+```
+
+The cell grid uses x-fast order. Default bottom and surface elevations are −10 m and 0 m. The starting head
+fills 80% of that thickness, specific yield is 0.2, and horizontal conductivity is `1e-4` m/s. Set
+`conductivityX` and `conductivityZ` to model direction-dependent flow. The default recharge and spring
+conductance are both zero. A spring starts above its specified `springElevation`, which defaults to the
+initial surface. `sideHeads` fixes absolute water levels on the specified sides. Other sides are impermeable.
+
+Set `rechargeField: runoff.rechargeField` to connect HYDRO-02 soil drainage. Set `followTerrain` (default false)
+to use the current terrain at each cell centre for surface seepage. `load` also accepts `id` (default `groundwater`)
+and an abort `signal`. The linear solve defaults to a relative residual of `1e-12`.
+`secondsPerSecond` defaults to 1. When accelerating underground time, outlet rates still describe volume per
+world second so a receiving stream gets the actual exported volume. The model records total storage, recharge,
+boundary inflow and outflow, spring discharge and seepage in cubic metres.

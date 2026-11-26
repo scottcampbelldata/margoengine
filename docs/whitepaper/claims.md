@@ -5528,3 +5528,11 @@ excitation paths. A real rigid joint rupture drives the fragment's mode once. Sa
 agree between 24 and 60 frame-per-second views of one world, and snapshots reproduce the state in
 plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
 and modal sound example.
+
+### Water-table and spring conservation (HYDRO-06)
+
+Fixed aquifer heads preserve the steady Dupuit profile and its discharge. Recharge entering from runoff adds the
+same aquifer volume, and water leaving the aquifer as seepage adds the same shallow-water volume. Both native
+memory modes preserve the same deterministic state across frame rates and snapshot restoration.
+Proof in [the groundwater coupling tests](../../packages/physics/tests/coupling/groundwater.test.js) and
+[the arena placement test](../../packages/physics/tests/groundwater.test.js).

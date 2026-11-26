@@ -136,7 +136,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | HYDRO-03 | Sediment transport and channel morphodynamics | Exner bed update, bedload, suspended load, scour, deposition, meanders, deltas | @margoengine/physics/sediment; water/flood tint | Conservative bedload, Rouse suspension, erosion and deposition, with bank exchange and actual TerrainBed feedback | Meyer-Peter and Müller (1948). van Rijn (1984). Ikeda, Parker and Sawai, "Bend theory of river meanders" (1981). | K12 K14 K21 |
 | HYDRO-04 | Landscape evolution | Multidirectional runoff, implicit stream-power incision, uplift, hillslope diffusion and thermal transport | @margoengine/physics/landscape; @margoengine/biomes/landscape | Physical time, sediment classes, shear thresholds and shared TerrainBed changes (PA-39) | Braun and Willett (2013). Cordonnier et al. (2016, 2017). Schott et al. (2023). | K12 K21 |
 | HYDRO-05 | Dam and levee breach | Overtopping and piping, breach hydrograph, embankment erosion | scenes/src/fauld-blast.ts (constant-discharge source) | stand-in: PA-19, 60 | Froehlich (1995). Visser (1998). | K14 K21 |
-| HYDRO-06 | Groundwater and springs | Darcy flow, water table, baseflow, seepage | none | none | Richards (1931). Harbaugh, MODFLOW-2005 (2005). | K12 |
+| HYDRO-06 | Groundwater and springs | Unconfined Darcy flow, water table, spring drainage and surface seepage | @margoengine/physics/groundwater | Conservative aquifer storage and registry coupling to recharge and shallow water | Richards (1931). Harbaugh, MODFLOW-2005 (2005). Rupp and Selker (2006). | K12 |
 
 ### Family ATMO: atmosphere and weather (10)
 

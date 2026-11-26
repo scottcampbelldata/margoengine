@@ -13100,3 +13100,31 @@ Research compared:
 The implementation uses separately built plain and shared SIMD Wasm against the world arena. Hardware
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
+
+### Groundwater and springs (HYDRO-06)
+
+- Lorenzo A. Richards, [Capillary conduction of liquids through porous mediums](https://doi.org/10.1063/1.1745010),
+  1931, derives the conductivity law with hydraulic potential and storage. Integrating horizontal saturated Darcy
+  flow over the wetted thickness gives the unconfined aquifer flux. Vertical drainage through the active soil is
+  supplied by the HYDRO-02 recharge field.
+- David E. Rupp and John S. Selker, [On the use of the Boussinesq equation for interpreting recession hydrographs
+  from sloping aquifers](https://doi.org/10.1029/2006WR005080), 2006, equations 3–4, apply that integration and
+  continuity with drainable porosity. On a level, homogeneous aquifer at steady state, integrating
+  \(q=-K h\,dh/dx\) shows that saturated thickness squared varies linearly between fixed heads. The face
+  discretisation reproduces the result because \((h_i+h_j)(h_i-h_j)=h_i^2-h_j^2\).
+- Arlen W. Harbaugh, [MODFLOW-2005, The U.S. Geological Survey Modular Ground-Water Model: The Ground-Water Flow
+  Process](https://pubs.usgs.gov/publication/tm6A16), 2005, chapters 2, 5 and 6, assembles positive face conductance,
+  harmonic resistance between differing porous materials and specific-yield storage. The horizontal face in this
+  solver uses the harmonic conductivity and the mean saturated thickness above the shared bottom. A fixed boundary
+  is half a cell away. The spring law uses Harbaugh's equations 6–11A/B with outward sign,
+  \(Q=C\max(0,H-H_\mathrm{spring})\). Its active set is solved with backward Euler.
+- Magnus R. Hestenes and Eduard Stiefel, [Methods of Conjugate Gradients for Solving Linear Systems](https://doi.org/10.6028/jres.049.044),
+  1952, give the residual and conjugate direction recurrences for a symmetric positive system. The solver uses the
+  storage-plus-conductance diagonal for preconditioning and checks the residual of the assembled equation. Face
+  volumes are used in equal and opposite pairs to update storage. A donor-volume limit maintains nonnegative
+  storage during rapid wetting. Surface overflow is left with the outlet as explicit seepage.
+
+The aquifer keeps water thickness relative to its bottom, so small inputs survive large coordinate elevations.
+Tests reconstruct the fixed-head solution, a two-cell material contact, a draining spring, and the water-volume
+exchange with the existing runoff and shallow-water solvers. The implementation uses the papers and the repository's
+field contracts.
