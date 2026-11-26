@@ -14695,6 +14695,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: a cloth torn in two fails to rebuild its surface (KB-SOFT-SPLITDENSITY1, physics soft)
+
+- **Repro:** `node --test --test-name-pattern="cloth torn in two" packages/physics/tests/soft-cells.test.js` fails on
+  `main` with "A trimesh with a mass or a density must be a closed surface".
+- **Cause:** `packages/physics/src/soft-split.ts` copies `density: collider.density()` into the rebuilt surface
+  collider (since ef1a72d01, which rebuilt query surfaces after cuts), so an open cloth piece is given a density and
+  fails the closed-trimesh check. Found by the SOFT-04 verification in
+  [physics-solver-audit.md](physics-solver-audit.md); the failing test is the regression test.
+
+### Open 2026-11-26: position-based liquid clamps hide compression (KB-PBF-CLAMP1, physics pbf)
+
+- **Repro:** a resting 10 × 30 × 10 particle column 60 cm tall in `PbfSolver` settles to 72% of its height after 4 s
+  with the fast preset and 83% with the precise one, still sinking.
+- **Cause:** `packages/physics/pbf-kernel/src/lib.rs` rescales every particle's velocity to a global energy budget
+  and shrinks every correction when any one is large, instead of substepping; the clamps hold the energy test while
+  the column compresses. Found by the FLUID-02 verification in [physics-solver-audit.md](physics-solver-audit.md).
+
 ### Open 2026-11-26: Picking attached to a scene of more than 4096 gltf/pbr models stops every frame (KB-PICK-BUDGET1, selection)
 
 - **Repro:** `node examples/package-benchmarks/textured-instancing-gpu.mjs` (RTX A6000, Edge, WebGPU and the WebGL2

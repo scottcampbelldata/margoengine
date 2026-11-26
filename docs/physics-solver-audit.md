@@ -227,6 +227,101 @@ measured, not landed (the upgrade moved to Codex). What it did, in body axes (x 
   needs the drift angle). Radiated waves to SEA-04 were not started: `WakeSolver` reads layout-1 `seaSource` rows (x, z,
   radius, pressure, volume pushed over the step), so the hull would write one row a station.
 
+## Verification passes
+
+A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point
+standard and the row's entry here: it reads the diff and tests, runs the row's CPU tests and its GPU tests where it
+has them (under `scripts/run-with-timeout.mjs`), confirms each validation test asserts against the cited measurement
+or exact solution with a derived bound, and confirms each listed item is done. The row is then VERIFIED, or REOPENED
+with the reasons below, which become its work list.
+
+## Pass 1, 2026-11-26 (`main` at 004304517)
+
+No reopened row had been set LANDED again. Five rows had their first landing; **VERIFIED 0, REOPENED 5.** All five
+are real work with sound exact-solution checks; none yet validates against independent measurements, and one left a
+failing test on `main` (KB-SOFT-SPLITDENSITY1).
+
+### SOFT-03 hair, fur, mane, tail, feathers (landed c53e60dc12): REOPENED
+
+- **Checked:** 12 commits from 1f99e19bf to c53e60dc1. CPU tests (`coupling/strands.test.js`, `horses/test/strand-horse.test.js`, `rigging/tests/strand-springs.test.js`, `rigging/tests/springs.test.js`): 45 pass, 0 fail. `test:browser:strands` passes on WebGPU and the WebGL2 compatibility layer (720 points, 3,022 wind-driven pixels, the same replay hash on both).
+- **Validation:** exact and classical solutions with derived bounds, nothing fitted to its own check: hanging-rod extension ρgL²/2E (128 ε), discrete cantilever under its own weight (1 − 1/n)² wL⁴/8EI with Fujita and Tohmyoh 2020's 3.45 GPa as input, rachis bending with Bachmann 2012 section moments as input, finite-amplitude pendulum period (DLMF 22.19, 1/60 s), leaf beam in cross-flow, capsule impulse momentum (3e-6). Solid work; none of it is a measured motion.
+- **Fails points:** 1, 2, 3, 4, 6, 7, 8. Point 5 passes (coded `MargoError`).
+- **To do before it can be VERIFIED:**
+  1. Validate against measured motion: Bertails et al. 2006's comparison of predicted and filmed strand shape and motion; calibrate the horse bundle stiffness (`young: 32e6` and `60e6`, `horses/src/strands.ts:98-99`, uncalibrated per limits).
+  2. Add a super-helix element (Bertails et al. 2006) with a curly-hair rest-shape test; today the model is Kugelstadt–Schömer Cosserat segments only.
+  3. Test the extremes with derived bounds: hurricane wind, large time steps, high-speed root whip.
+  4. Build fur strand dynamics (the fur shells have none), feather and wing bindings beyond a rachis beam, and a strand binding for `humans` head hair (only the VRM ponytail has one).
+  5. Interpolate guides into render hairs; the horse uses cards weighted to guides.
+  6. Two-way coupling: wind drag reaction, cloth (SOFT-01), water and wetness, two-way bed contact.
+  7. Scale: explicit SIMD (today compiler auto-vectorisation only), threads, and work counts at thousands of guides (largest fixture is 720 points).
+  8. Film control: pull toward the animated or groomed pose, placed events; replace the arbitrary motion thresholds in `strand-horse.browser.mjs:24` and `strand-springs.test.js:62`.
+  9. Fix the stale number in `docs/limits.md` (2,907 changed pixels; the run measures 3,022).
+  10. Close the named film rows LH-5, OPENING-NIGHT-9 and HORSE-1, still OPEN in the demo review.
+
+### SOFT-04 volumetric solids (landed a0de32ed1b): REOPENED
+
+- **Checked:** a0de32ed1b, 07a8b6b82 and the history behind them from b3a3d3a6e to 84a2a1985. CPU (four `volumetric-*.test.js` files, `soft-cells.test.js`, `world-soft-solver.test.js`): 96 pass, **1 fail** on `main`: `soft-cells.test.js` "a cloth torn in two becomes two cloths" throws "A trimesh with a mass or a density must be a closed surface" (KB-SOFT-SPLITDENSITY1). `test:browser:volumetric-solids` passes on WebGPU (0 WGSL errors); the script has no compatibility-layer run.
+- **Validation:** orthotropic compliance and fibre response are genuine exact solutions. The regime tests are circular: gelatin and flesh feed the measured μ (Gravelle et al. 2021; Geerligs et al. 2008) in and check one tet at 0.08% strain against μV/L² built from the same μ (`volumetric-solids.test.js:122`); ice passes the Frederking and Timco 1983 strain to `setTensileNucleation` and moves particles kinematically to 0.9 and 1.1 of it, never exercising the ice's elastic response (`:168`); beech uses the published strengths as the thresholds (`volumetric-strength.test.js:80`). The LH-4 sag bound is arbitrary (`:72`).
+- **Fails points:** 1, 2, 3, 4, 5, 6; 7 and 8 in part (`docs/limits.md` calls the regime checks validation).
+- **To do before it can be VERIFIED:**
+  1. Fix the regression: `packages/physics/src/soft-split.ts:49` copies `density: collider.density()` into the rebuilt surface collider (from ef1a72d01), so an open cloth fails the closed-trimesh check. The failing test is the regression test.
+  2. Validate behaviour against measured curves the code does not take as inputs: Treloar 1944 rubber uniaxial and biaxial; gelatin large-strain curves (Gravelle et al. 2021); Frederking and Timco 1983 load-deflection and failure load from a simulated cantilever. Large strain, rubber and inversion have no measured check today.
+  3. Make the LH-4 timber timber: `volumetric-ladder.js` uses E = 2 MPa and the browser test 12 MPa, against about 12.5 GPa for beech (Seeber et al. 2024), so the 23.8 mm sag and 0.015 crack strain are not physical.
+  4. Coded errors: `soft.ts` has 121 `RangeError` throws against 18 `MargoError`.
+  5. Scale the vertex-block solve: `soft-kernel/src/vertex_block.rs:110` is serial Gauss–Seidel with no graph colouring, threads or GPU (Chen et al. 2024's parallel colouring), and its Hessian drops the (λ(J − 1) − μ)∂²J term with no PSD projection.
+  6. Couple to fluid buoyancy, thermal (for ice), cloth and SOUND-04 modal contact; only rigid and hull couplings are tested.
+  7. Finish the items the docs list as open: GPU handoff, kinked and orthotropic mixed-mode propagation, the production binding.
+
+### FLUID-02 position-based liquids (landed 14a5956173): REOPENED
+
+- **Checked:** 339e4c1cc, 14a595617, 313a4c51e, 818aeab2c, 26ddb53dc, and ea4320111 (FLUID-01, which shares the Rust crate). CPU (`pbf.test.js`, `coupling/pbf.test.js`): 16 pass, 0 fail. `pbf.browser.mjs` passes on WebGPU and with `--compat` (15,319 changed pixels, 5 shaders, 0 errors); both are smoke tests (front moves more than 0.32 m, mass constant, pixels change).
+- **Validation:** Martin and Moyce 1952 table 2 surge-front intervals (`coupling/pbf.test.js:211`) with a ±0.149 margin derived from step size, table rounding and film frame rate; nothing fitted to it, but the bands are wide enough that both presets pass. The rest are exact single-step checks (Poly6 kernel, Jacobi update, XSPH, free flight, scale invariance). No hydrostatic or rest-density case. A resting 10 × 30 × 10 particle column 60 cm tall, run by the reviewer, settles to 72% of its height after 4 s with the fast preset (peak density error 0.96) and 83% with the precise preset (0.31), still sinking at 0.4-0.6 m/s.
+- **Fails points:** 1 to 8.
+- **To do before it can be VERIFIED:**
+  1. Incompressibility: test hydrostatic pressure ρgh and a column at rest with a derived density-error bound, and the Martin and Moyce residual column height.
+  2. Remove the global clamps and fix their cause with substeps (Macklin and Müller 2013 §5): `pbf-kernel/src/lib.rs:401` rescales every particle's velocity to an energy budget, and `lib.rs:356-362` and `680-689` shrink every correction when any one is large. They couple unrelated regions, and `coupling/pbf.test.js:45` passes because of them (KB-PBF-CLAMP1).
+  3. A second validation case not used for tuning: Koshizuka and Oka 1996 or Lobovsky et al. 2014 dam-break pressure probes.
+  4. Put the fast and accurate tiers behind one API (today `PbfSolver` and `DfsphSolver`; "precise" is the same PBF solve with 12 iterations).
+  5. Coded errors in `src/pbf/index.ts` and `boundary.ts` (`TypeError` and `RangeError` today).
+  6. Rival capabilities: physical surface tension (Akinci et al. 2013), multiple densities, mesh boundaries, whitewater and spray (Ihmsen et al. 2012), unified solids and cloth (Macklin et al. 2014); Salva and FleX have them.
+  7. Coupling beyond DYN-01: the particle-to-shallow-water handoff (PA-22, open in known-bugs).
+  8. Threads and large-scene work counts.
+  9. Film output and control: spray, foam and whitewater (the browser run shows none), targets and guides.
+  10. State the measured compression in `docs/limits.md` and stop presenting the clamps as conservation.
+
+### ATMO-10 synoptic weather and moisture transport (landed d19267aa1e): REOPENED
+
+- **Checked:** 736727ab7, 3ef586295, df469b302, 033798119, d19267aa1, c3af6eca2, 17cfd3df9. CPU `coupling/synoptic.test.js`: 13 pass, 0 fail. `test:browser:synoptic` passes (58,381 changed pixels, 9 shader modules, 0 errors; the script has no compatibility-layer run).
+- **Validation:** exact solutions with roundoff-derived bounds: discrete geostrophic balance, Crank–Nicolson Rossby phase, solid-rotation curved-flow balance, cloud and fallout time solution, Phillips two-layer growth rate. The Smith–Barstad test covers only zero stratification. The Garratt and Donelan "measured" values are the Garratt formula evaluated at 10, 40 and 80 m/s, so the code is checked against itself. Nothing is compared with observations.
+- **Fails points:** 2, 3, 4, 7, and 6 in part (no threads). Points 1, 5 and 8 pass.
+- **To do before it can be VERIFIED:**
+  1. Validate against observations: an atmospheric-river IVT case (Ralph et al. 2004; Neiman et al. 2008) and an orographic rain case (Barstad and Smith 2005, Olympic Mountains).
+  2. Test the Smith–Barstad wave branch with normal stratification (N ≈ 0.01 s⁻¹) against its eq. 19 (`src/synoptic/index.ts:568-571`).
+  3. Replace the untested straight-line drag blend between 21 and 33 m/s (`index.ts:222-226`) with Donelan et al. 2004 or Powell et al. 2003 data, and test that range.
+  4. Condense only saturated rising air (`synoptic-kernel/src/lib.rs:503` condenses on any ascent), and take the lift sensitivity from the moving temperature field instead of a fixed 288.15 K.
+  5. With two layers on, compute IVT from both layers (`index.ts:632-633` uses the lower layer only).
+  6. Two-way coupling: evaporation from sea temperature and wind instead of a user value; momentum back from the water drag; a runoff mass-handover test (today it asserts only rain > 0); the SEA-07 adapter (open in known-bugs).
+  7. Add surface friction and dissipation to both layers (`layers.rs:170-200`) and test the nonlinear life cycle for energy and enstrophy (pyqg has bottom drag).
+  8. Film control: placed events, targets and seeds; close RITS-6 to 9, CF-1 and WIND-1/2, still OPEN in the demo review.
+  9. Threads where the work splits.
+  10. Correct `docs/whitepaper/claims.md`, which calls the high-wind drag plateau "measured" while the test only replays the formula.
+
+### EARTH-05 terramechanics (landed 5032e1a3b4): REOPENED
+
+- **Checked:** 5032e1a3b4, 40413c537, dc1ebb90e, 237815862 and the feature and fix commits on `packages/physics/src/terramechanics` from 237a751aa to 78f45688c. CPU (`terramechanics.test.js`, `coupling/terramechanics.test.js`): 38 pass, 0 fail. `test:browser:terramechanics` passes on WebGPU (3,904 changed pixels, plain and shared builds identical); it checks kernel parity, not a reference, and has no compatibility-layer run.
+- **Validation:** sound exact closed forms (Bekker and Janosi pressure-sinkage and shear, two-region axle moment, sidewall integral, hardpan transition, 8-64 ε). A real held-out check: Apfelbeck square plates from circular-plate coefficients, bounded by the measured bar ±1 plot pixel. Ding Wh2 drawbar and torque within the marker edges, and the Pavlov crest-to-trough ratio for one condition: acceptable.
+- **Fails points:** 1, 2, 3, 4, 6, 8; 7 in part (no seeds or targets for prints and dust). Point 5 passes.
+- **To do before it can be VERIFIED:**
+  1. Replace "held-out" checks that use parameters fitted to the same data with independent datasets: Salman's 200 mm plate against its own Fig. 6 regressions (`coupling/terramechanics.test.js:313-336`); Ishigami's kx(β), ky(β) fitted to the same FJS-1 tests (`:1003-1004`); Wh32's 0.72 slip exponent identified on the same wheel, with its 20% bound widened by an arbitrary 2× scatter (`:440, 459`).
+  2. Use one cohesion for one sand (251 Pa at `:1071`, 250 Pa at `:450`), or justify the difference.
+  3. Validate feet, hooves and tracks against measurements: Li, Zhang and Goldman 2013 resistive force theory, Setterbo et al. 2009 and Crevier-Denoix et al. 2010 hoof data, Wong's tracked-vehicle data. The hoof test only asserts that trot moves more soil than walk (`:1238-1243`).
+  4. Model unloading, rebound and repeated passes (Wong; Holm); the bed keeps only the peak indentation. Chrono SCM has this.
+  5. Return soil force to belts (`world/solvers/rigid.ts:144-176` applies reactions to wheels only) and couple feet beyond the bed shape.
+  6. Add a high-fidelity tier (MPM, continuum SPH or resistive force theory); both tiers are Bekker semi-empirical.
+  7. Real SIMD and threads: `f64x2` is used for single square roots only (`terramechanics-kernel/src/lib.rs:86-89, 258`).
+  8. Correct the catalog row and the test names that call the checks in item 1 held out.
+  9. Close HORSE-5, COURIER-3 and MAKING-3, still OPEN in the demo review.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
