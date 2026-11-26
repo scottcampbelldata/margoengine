@@ -27,7 +27,7 @@ import { geometrySurface, meshSource, type MeshDraw, type MeshSource } from '../
 import { instanceLayout } from '../../shared/instances.js';
 import { applyView, inView, viewRect } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
-import { beginScenePass } from '../../shared/scene-pass.js';
+import { beginScenePass, sceneAttachments } from '../../shared/scene-pass.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { hexColor } from '../../shared/clear-color.js';
@@ -301,14 +301,7 @@ export class MeshDebugView implements EnginePlugin {
   private readonly records = new Map<object, DrawRecord>();
   private readonly uploads = new Map<object, Upload>();
   private readonly values = new Float32Array(FLOATS);
-  private readonly colorAttachment: GPURenderPassColorAttachment = {
-    view: undefined as unknown as GPUTextureView,
-    loadOp: 'load',
-    storeOp: 'store',
-  };
-  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
-    view: undefined as unknown as GPUTextureView,
-  };
+  private readonly attachments = sceneAttachments();
 
   constructor(options: MeshDebugViewOptions = {}) {
     this.set(options);
@@ -684,7 +677,7 @@ export class MeshDebugView implements EnginePlugin {
       v[74] = item.side;
       return record.groups.get(writeUniform(device, record.uniform, v as Float32Array<ArrayBuffer>, c.view ?? c));
     });
-    const pass = beginScenePass(c, this.colorAttachment, this.depthAttachment);
+    const pass = beginScenePass(c, this.attachments.color, this.attachments.depth);
     applyView(pass, c);
     pass.setPipeline(pipeline);
     items.forEach((item, i) => {

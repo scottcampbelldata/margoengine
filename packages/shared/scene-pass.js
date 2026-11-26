@@ -1,5 +1,10 @@
 // One render pass on a frame pass context's scene colour and depth, for a pass that `joins` (core FramePass.joins).
 
+/** The attachment objects a pass that calls {@link beginScenePass} keeps for its life; beginScenePass sets every field. */
+export function sceneAttachments() {
+  return { color: { view: undefined, loadOp: 'load', storeOp: 'store' }, depth: { view: undefined } };
+}
+
 /**
  * Points `color` and `depth` (attachment objects the caller keeps, so a frame allocates nothing) at the context's
  * scene targets, set to load and store (stencil too when the depth format has one), hands them to `attach` as the
