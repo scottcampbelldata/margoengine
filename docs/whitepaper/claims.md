@@ -5594,3 +5594,10 @@ incision into annual mortality, and send the forest's root cohesion back to Land
 root term in measured slab stability and loses its support after a burn. The TREE-3 fixture
 compares the exposed fir's axis with a sheltered fir and measures the permanent horizontal crown-tip component
 after calm conditions return. It proves the orientation used by a renderer, prior to binding it into the filmed shot.
+
+### Physical legged gaits
+
+LIFE-01 produces quadruped and biped pose from normal support, compressive springs, friction-limited stance loads
+and a gait chosen by measured speed. Tests reproduce variable equine cadence, slower uphill locomotion, bank and
+slip, diagonal trot flight, and transfer of the opposite contact impulse to a rigid platform. The scoped coupling
+harness verifies identical hashes through snapshot and replay.

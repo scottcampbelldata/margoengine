@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Bed, BedSample } from '@margoengine/math/fields';
-import { hypot } from '@margoengine/math/pinned';
+import { cos, hypot, sin } from '@margoengine/math/pinned';
 import { BED_FIELD, bedFromPort, type BedShape, bedVertexCount } from '../earth/bed.js';
 import {
   type Cell,
@@ -14,12 +14,22 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { finite, type GroundLocomotionOptions, type GroundLocomotionParams, makeModel, sampleBed } from './config.js';
+import {
+  finite,
+  type GroundLeggedDrive,
+  type GroundLocomotionOptions,
+  type GroundLocomotionParams,
+  makeModel,
+  sampleBed,
+} from './config.js';
 import { bindLocomotionKernel, loadLocomotionBuilds, type LocomotionBuilds, type LocomotionKernel } from './kernel.js';
 
 const ORIGIN: Cell = [0, 0, 0];
 const BODY_WORDS = 14;
-const PROFILE_WORDS = 26;
+const PROFILE_WORDS = 34;
+const DRIVE_FREQUENCY = 6;
+const DRIVE_DUTY = 10;
+const DRIVE_HEADING = 24;
 const FOOT_WORDS = 7;
 const ANCHOR_WORDS = 3;
 const GEOMETRY_WORDS = 15;
@@ -137,6 +147,9 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   private readonly bedShape?: BedShape;
   private readonly cellSize: number;
   private readonly id: string;
+  private readonly controlled: boolean;
+  private readonly poseField: FieldDescriptor;
+  private readonly contactField: FieldDescriptor;
   private readonly groundPoint: BedSample = { elevation: 0, normal: [0, 1, 0] };
 
   private constructor(
@@ -144,6 +157,9 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     options: GroundLocomotionOptions,
   ) {
     this.id = options.id ?? 'ground-locomotion';
+    this.controlled = options.controlled ?? false;
+    this.poseField = { ...GROUND_POSE_FIELD, name: options.poseField ?? GROUND_POSE_FIELD.name };
+    this.contactField = { ...GROUND_CONTACT_FIELD, name: options.contactField ?? GROUND_CONTACT_FIELD.name };
     this.cellSize = finite(options.cellSize ?? 1024, 'origin cell size');
     if (this.cellSize <= 0) throw new RangeError('Pass the world cell size as a positive length in metres.');
     if (options.bedShape) {
@@ -162,8 +178,8 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     return {
       id: this.id,
       fields: [
-        { field: GROUND_POSE_FIELD, access: 'write' },
-        { field: GROUND_CONTACT_FIELD, access: 'write' },
+        { field: this.poseField, access: 'write' },
+        { field: this.contactField, access: 'write' },
         ...(this.bedShape ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ],
       rate: 0,
@@ -289,6 +305,51 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     return range;
   }
 
+  /** Updates the drive and foot clock of a legged body in a group loaded with controlled commands. */
+  setLeggedDrive(body: number, drive: GroundLeggedDrive): void {
+    const range = this.bodyRange(body);
+    const { host, lease } = this;
+    if (!this.controlled || !host || !lease)
+      throw new MargoError('state', 'Load ground locomotion with controlled enabled before setting live drives.');
+    const profile = words(host, lease.profile);
+    const row = body * PROFILE_WORDS;
+    const count = range.count - 1;
+    if (profile[row] !== 0 || drive.phases.length !== count)
+      throw new RangeError('Supply each foot phase for a legged body instead of a snake.');
+    const { speed, heading, frequency, duty, phases } = drive;
+    const force = drive.force ?? [0, 0, 0];
+    const support = drive.supportVelocity ?? [0, 0, 0];
+    if (
+      !Number.isFinite(speed) ||
+      speed < 0 ||
+      !Number.isFinite(heading) ||
+      !Number.isFinite(frequency) ||
+      frequency < 0 ||
+      !(duty > 0 && duty < 1)
+    )
+      throw new RangeError('Pass finite speed, heading, frequency and a duty between zero and one.');
+    if (4 * frequency > rateOf(this.rate) * Math.min(duty, 1 - duty))
+      throw new RangeError('Seed a faster gait in the group to raise the configured rate for live drive changes.');
+    if (force.length !== 3 || !force.every(Number.isFinite))
+      throw new RangeError('Pass finite force components in world newtons.');
+    if (support.length !== 3 || !support.every(Number.isFinite))
+      throw new RangeError('Pass finite support velocity components in world metres per second.');
+    for (let foot = 0; foot < count; foot++) {
+      const phase = phases[foot]!;
+      if (!(phase >= 0 && phase < 1)) throw new RangeError('Pass foot phases in [0, 1) cycles.');
+    }
+    const actuators = words(host, lease.actuators);
+    profile[row + DRIVE_FREQUENCY] = frequency;
+    profile[row + DRIVE_DUTY] = duty;
+    profile.set(
+      [sin(heading * 0.5), cos(heading * 0.5), speed, ...force, drive.lean ? 1 : 0, ...support],
+      row + DRIVE_HEADING,
+    );
+    for (let foot = 0; foot < count; foot++) {
+      actuators[(range.offset + foot) * FOOT_WORDS + 6] = phases[foot]!;
+    }
+  }
+
   /** Number of link rows or foot rows followed by one torso row for this animal. */
   contactCount(body: number): number {
     return this.bodyRange(body).count;
@@ -345,8 +406,8 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
     const { lease } = this;
     return lease
       ? [
-          { field: GROUND_POSE_FIELD.name, region: lease.pose, tick, cell: ORIGIN },
-          { field: GROUND_CONTACT_FIELD.name, region: lease.contacts, tick, cell: ORIGIN },
+          { field: this.poseField.name, region: lease.pose, tick, cell: ORIGIN },
+          { field: this.contactField.name, region: lease.contacts, tick, cell: ORIGIN },
         ]
       : [];
   }
@@ -359,6 +420,6 @@ export class GroundLocomotion implements Solver<GroundLocomotionParams> {
   }
 
   extraState(): readonly Region[] {
-    return [];
+    return this.controlled && this.lease ? [this.lease.profile, this.lease.actuators] : [];
   }
 }

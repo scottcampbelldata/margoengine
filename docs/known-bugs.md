@@ -16349,3 +16349,11 @@ weather packages publishes the shared cell layout. The exposure fixture in `pack
 reproduces the effects on snags and live fuel. Forest growth provides the permanent axis required by TREE-3, and that
 fixture checks the crown-tip direction. Existing treeline footage and its distant impostors still need a growth-axis
 consumer in the shot. The remaining shared fields are listed in [Framework requests](physics-work-queue.md#framework-requests).
+
+### Legged rig, rider and flow hand-off (LIFE-01)
+
+The world solver can walk and run on live terrain and load a rigid platform. The recorded HORSE and COURIER
+footage predates these fixtures. To exercise the scene-level hand-off, connect the solved feet and COM to the
+rig and compare the posed feet to the published stance points after advancing the world. A complete articulated
+handoff and reacquisition strategy, rider leaning and immersed-body displacement require the linked DYN-07,
+LIFE-06 and SEA-12 couplings. The current fields provide the contact pose and wrench for those consumers.

@@ -48,6 +48,11 @@ there, add a line below with the solver ID and what is needed, and build against
   crown cover and root cohesion, and expose producer extents with their grid ports. The optional forest solver
   ships its versioned exposure and output fields and consumes HYDRO-01 and HYDRO-04 directly on matching grids.
 
+- **LIFE-01:** Publish common legged intent/load/pose/stance descriptors and moving support geometry with a
+  per-contact surface velocity. The optional module reads `bodies` and posts `bodyImpulses` for an explicit rigid
+  rectangular deck. DYN-07 articulation, LIFE-06 rider forces and SEA-12 immersion can consume the versioned
+  legged fields until their shared contracts are available. Reuses slot 13.
+
 - **LIFE-02:** Reserve static Wasm slot 13 and promote the versioned `groundAnimalPose` and
   `groundAnimalContact` rows to shared fields when the rigid/animation readers adopt them. Add initial cell and
   cell size to the solver host, portable bed geometry, and a contact-wrench accumulator for articulated bodies

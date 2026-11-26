@@ -9369,3 +9369,15 @@ updates the crown axis in proportion to new projected area. It represents long-t
 axis rather than tracking individual branches or modelling physiological dormancy, burial or ice damage. Flood
 tolerance represents measured depth and duration for one species and life stage. The burn and fuel-moisture input
 is an explicit versioned port. Cover, roots and canopy fuel update at annual boundaries.
+
+### Grounded biped and quadruped gait (LIFE-01)
+
+The optional `@margoengine/physics/legged` entry and the ground-animal entry share the same slot-13 SIMD module.
+Each moving body has 16 B of stored target, 40 B of gait state and two or four persistent foot contact points,
+plus the torso. A deck uses its declared planar rectangular support and the rigid body's pose. The projected COM
+sets the approximation for angularly varying contact-surface velocity. A highly articulated surface needs a
+contactable support-patch field. Planting and flight follow a reduced spring-mass model with a finite support
+couple. The renderer's baked export clips keep a single pace for each clip, while runtime horse posing uses the
+actual instantaneous stride.
+
+<!-- LIFE01_SIZE -->
