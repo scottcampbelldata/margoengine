@@ -197,3 +197,28 @@ test('invalid input and disposal throw coded errors; Symbol.dispose works', () =
   s.dispose();
   assert.throws(() => s.manager({}), { name: 'MargoError', code: 'disposed' });
 });
+
+test('property paths cannot reach prototypes, must exist, and accessors on a prototype still work', () => {
+  for (const path of ['__proto__.polluted', 'constructor.prototype.polluted', 'a.__proto__', 'prototype', 'a..b', '']) {
+    assert.throws(() => setValue({ a: {} }, path, 1), { name: 'RangeError', message: /not allowed/ });
+    assert.throws(() => increment({}, path), { name: 'RangeError' });
+    assert.throws(() => interpolate({}, path, 1, 1), { name: 'RangeError' });
+    assert.throws(() => when({}, path, '==', 1), { name: 'RangeError' });
+  }
+  assert.equal({}.polluted, undefined);
+  assert.throws(() => setValue({}, 'missing.x', 1)(), { name: 'RangeError', message: /does not lead to an object/ });
+  assert.throws(() => setValue({ a: null }, 'a.x', 1)(), { name: 'RangeError' });
+  assert.throws(() => setValue({ a: {} }, 'a.nope', 1)(), { name: 'RangeError', message: /existing property/ });
+  class P {
+    get x() {
+      return this._x;
+    }
+    set x(v) {
+      this._x = v;
+    }
+  }
+  const node = { position: new P() };
+  setValue(node, 'position.x', 4)();
+  assert.equal(node.position.x, 4);
+  assert.equal({}.polluted, undefined);
+});

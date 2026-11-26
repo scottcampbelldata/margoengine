@@ -248,28 +248,43 @@ export const wait =
     let t = 0;
     return (dt) => (t += dt) >= seconds;
   };
+const banned = ['__proto__', 'prototype', 'constructor'];
+/** Reject a property path with an empty or prototype-reaching segment; called when the action is created. */
+const check = (path: string): void => {
+  if (typeof path !== 'string' || path.split('.').some((part) => part === '' || banned.includes(part)))
+    throw bad(`Property path ${String(path)} is not allowed; use plain names such as position.x, never __proto__, prototype or constructor`);
+};
 const walk = (target: any, path: string): [any, string] => {
   const parts = path.split('.');
   const last = parts.pop() as string;
   let object = target;
-  for (const part of parts) object = object?.[part];
-  if (object === null || typeof object !== 'object') throw bad(`Property path ${path} does not lead to an object`);
+  for (const part of parts) {
+    if (object === null || typeof object !== 'object' || !(part in object))
+      throw bad(`Property path ${path} does not lead to an object at ${part}`);
+    object = object[part];
+  }
+  if (object === null || typeof object !== 'object' || !(last in object))
+    throw bad(`Property path ${path} does not name an existing property`);
   return [object, last];
 };
 /** Set `target[property]` (a dotted path such as `position.x` works) to `value`. */
 export const setValue =
-  <N = unknown>(target: object, property: string, value: unknown): Action<N> =>
-  () => {
+  <N = unknown>(target: object, property: string, value: unknown): Action<N> => {
+  check(property);
+  return () => {
     const [object, key] = walk(target, property);
     object[key] = value;
   };
+};
 /** Add `by` (default 1) to the number at `target[property]`. */
 export const increment =
-  <N = unknown>(target: object, property: string, by = 1): Action<N> =>
-  () => {
+  <N = unknown>(target: object, property: string, by = 1): Action<N> => {
+  check(property);
+  return () => {
     const [object, key] = walk(target, property);
     object[key] += by;
   };
+};
 /** Move a number, or a numeric vector, at `target[property]` to `to` over `seconds`, easing with `ease` (default linear). The end value is set exactly. */
 export const interpolate =
   <N = unknown>(
@@ -278,9 +293,10 @@ export const interpolate =
     to: number | ArrayLike<number>,
     seconds: number,
     ease: Ease = (t) => t,
-  ): Action<N> =>
-  () => {
-    if (!(Number.isFinite(seconds) && seconds >= 0)) throw bad('interpolate needs seconds, 0 or more');
+  ): Action<N> => {
+  check(property);
+  if (!(Number.isFinite(seconds) && seconds >= 0)) throw bad('interpolate needs seconds, 0 or more');
+  return () => {
     const [object, key] = walk(target, property);
     const vector = typeof to !== 'number';
     const start: number[] = vector ? Array.from(object[key] as ArrayLike<number>) : [object[key]];
@@ -299,6 +315,7 @@ export const interpolate =
       return done;
     };
   };
+};
 /** Call `target.play(...args)`, for example an animation player. */
 export const play =
   <N = unknown>(target: { play(...args: any[]): unknown }, ...args: unknown[]): Action<N> =>
@@ -318,13 +335,15 @@ export const when =
     property: string,
     op: '==' | '!=' | '<' | '<=' | '>' | '>=',
     value: unknown,
-  ): Condition<N> =>
-  () => {
+  ): Condition<N> => {
+  check(property);
+  return () => {
     const [object, key] = walk(target, property);
     const v = object[key];
     const w = value as any;
     return op === '==' ? v === w : op === '!=' ? v !== w : op === '<' ? v < w : op === '<=' ? v <= w : op === '>' ? v > w : v >= w;
   };
+};
 
 /** A world-space axis-aligned box. */
 export interface ActionBounds {
