@@ -12549,6 +12549,12 @@
       "commit": "gap-lane-d",
       "reason": "Lane D: labels Hotspot and lines tube-painter sizes (see earlier entry).",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d-helpers",
+      "reason": "Optional lines/tree-helpers: BVHHelper, OctreeHelper and RaycasterHelper, box-edge Lines drawn from structural tree shapes; a new entry, absent before (ceiling 6296 B, measured min+gzip about 6040 B). A page that does not import it pays 0 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13131,6 +13137,7 @@
     "@margoengine/lines/texture": 7860,
     "@margoengine/lines/tiles": 1586,
     "@margoengine/lines/trail": 6523,
+    "@margoengine/lines/tree-helpers": 6296,
     "@margoengine/lines/tube-painter": 1507,
     "@margoengine/loaders": 62425,
     "@margoengine/loaders dist/workers/usd.js": 9945,
