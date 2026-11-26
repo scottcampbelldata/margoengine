@@ -9822,7 +9822,7 @@ post test/scene-targets.test.js, biomes tests/objects.test.js (shared hook, rele
 post test/scene-targets-scatter-browser.mjs (WebGPU and the WebGL2 layer: 466 lit and 341 shaded ground pixels on the
 plants before, 0 and 0 with `{ground: false}`, 823 plant pixels, mean height 0.63 m, 52 edge pixels apart from the
 4x multisampled frame). Missing: `ScatterInstances` capture, the timber-valley masks check on a real shot, and the
-cost on a forest (one draw per ring per scatter per effect).
+cost on a forest (one draw per ring per scatter per effect). A ring replaced by `ScatterTiles` growing (`instancesChanged()`) drops the capture ring groups with the colour ones, and the WebGL2 route arriving drops the capture stages, so a capture never binds a destroyed ring (KB-SCATTER-CAPTURESTALE1; scatter `test/capture.test.js`).
 
 **Water in every capture effect (KB-WATER-TARGETS1, KB-WATER-STALEDEPTH1, 2026-11-26).** Water writes SSR's three
 fields only for SSR's own `MargoSSR` and otherwise returns the hook's `margoSSR` with its surface, so SceneTargets,

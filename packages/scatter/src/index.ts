@@ -941,6 +941,8 @@ export class Scatter implements EnginePlugin {
         this.pipelines.clear();
         this.renderGroups.clear();
         this.pbrGroups.clear();
+        // The capture stages are counted too now, and their ring groups bind each ring's count.
+        this.forgetCapture();
       });
   }
   /**
@@ -1204,6 +1206,7 @@ export class Scatter implements EnginePlugin {
   /** Call after replacing `instances`: the bind groups that read them are made again. */
   protected instancesChanged(): void {
     this.renderGroups.clear();
+    this.captureRings.clear();
     this.shadowGroups.length = 0;
     this.computeGroup = undefined;
   }

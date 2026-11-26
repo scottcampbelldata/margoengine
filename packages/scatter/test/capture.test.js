@@ -111,6 +111,46 @@ test("a lit Scatter draws its three rings into a capture hook's pass with its ow
   r.scatter.dispose();
 });
 
+test('replaced instance buffers are bound in the next capture, not the destroyed ones', () => {
+  // ScatterTiles grows its rings by replacing `instances` and calling `instancesChanged`: the capture ring groups
+  // were kept, so the next capture bound a destroyed buffer ("used in submit while destroyed" on a real GPU).
+  const r = rig(),
+    device = r.h.engine.gpu,
+    made = device.createBindGroup?.bind(device),
+    bound = [];
+  device.createBindGroup = (descriptor) => ({ descriptor, inner: made?.(descriptor) });
+  r.h.frame();
+  const hook = r.hook('a'),
+    begin = hook.begin;
+  hook.begin = () => {
+    const pass = begin();
+    return new Proxy(pass, {
+      get: (target, key) =>
+        key === 'setBindGroup'
+          ? (index, group, ...rest) => {
+              if (index === 1) bound.push(group);
+              return target.setBindGroup(index, group, ...rest);
+            }
+          : typeof target[key] === 'function'
+            ? target[key].bind(target)
+            : target[key],
+    });
+  };
+  r.scatter.setCapture(hook);
+  const buffer = (group) => group.descriptor.entries[0].resource.buffer;
+  r.capture();
+  assert.deepEqual(bound.map(buffer), r.scatter.instances, 'each ring group binds its ring');
+  const old = r.scatter.instances[0];
+  r.scatter.instances[0] = device.createBuffer({ size: old.size, usage: old.usage });
+  old.destroy();
+  r.scatter.instancesChanged();
+  bound.length = 0;
+  r.capture();
+  assert.equal(buffer(bound[0]), r.scatter.instances[0], 'the new near ring is bound');
+  assert.notEqual(buffer(bound[0]), old);
+  r.scatter.dispose();
+});
+
 test('capture hooks are validated, an unlit Scatter refuses one, onDispose runs once and a disposed Scatter draws nothing', () => {
   const r = rig();
   r.h.frame();
