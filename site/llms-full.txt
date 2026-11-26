@@ -12859,14 +12859,17 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 7,914 B gzip. Each lazy native asset measures 33,256 B raw and 12,480 B gzip.
+The DFSPH entry measures 7,930 B gzip. Each lazy native asset measures 29,616 B raw and 11,643 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
 are reported when iteration budgets are reached. The clock switches to smaller advective substeps above
 0.4 spacings of travel. The support radius, contact radius and arena capacity control resolved detail.
 Plain and shared Wasm preserve the same clocked state and snapshot. Shared memory does not parallelize the
-native loops.
+native loops. The grid reuses 27 connected-list head indices per fluid row between position updates.
+This takes 112 extra bytes per reserved particle row, including alignment. A rebuild refreshes those
+indices before new density or divergence calculations. Capillary interactions centred on solid samples
+take their own neighborhood query from the same grid.
 
 Closed planar walls sample the outside volume of the cubic pressure kernel on a rest lattice. The sample
 spacing fits each axis of the domain and every exterior site belongs to the union of closed faces.
@@ -12921,15 +12924,18 @@ with several grid vertices. Surface repose uses one ordered face sweep over the 
 The candidate set follows newly moved soil and can spread far when the specified repose slope approaches zero.
 The ground is a height field with peak indentation per vertex. Optional hardpan adds one subsurface pressure
 transition sampled at the footprint centre. Resolve changes in layer depth at the scale of the footprint.
-Shear and displaced material use the topsoil fit. Time-varying 3D tread contact, shared layer exchange,
-overhangs and accumulated subgrade fatigue remain open. The rolling
+Shear and displaced material use the topsoil fit. Shared layer exchange, overhangs and accumulated
+subgrade fatigue remain open. The rolling
 wheel option resolves the driven rim's average stress envelope below its axle. Evenly spaced lugs can stamp
-individual contact marks from live spin. Their projected strip uses 65 along-track stations. Transient digging
+individual contact marks from live spin. Their projected strip uses 65 along-track stations. Indexed tread
+triangles can instead intersect the local horizontal bearing plane at configurable resolution (17 by 65
+profile samples by default). Supply three finite coordinates per vertex and three zero-based indices per
+triangle. Wheel camber is outside that phase-only footprint model. Transient digging
 forces, braking-specific stress shapes and direct tyre torque exchange remain open. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 11,837 B gzip with a 12,193 B ceiling. Both Wasm assets are 18,739 B raw and 7,854 B gzip each.
+The optional entry is 12,192 B gzip with a 12,193 B ceiling. Both Wasm assets are 23,755 B raw and 9,375 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -29855,8 +29861,8 @@ exchange of changing subsurface properties still needs a shared soil contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
-It stamps individual evenly spaced lugs from live wheel spin. General moving 3D tread intersection,
-measured high-slip digging forces and measured berm profiles remain EARTH-05 work.
+It stamps evenly spaced lugs and indexed triangle treads from live wheel spin. Full wheel tilt and
+terrain-relative torque, measured high-slip digging forces and measured berm profiles remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

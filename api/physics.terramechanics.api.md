@@ -108,6 +108,14 @@ export interface SoilRollingWheel {
     readonly exitFraction?: number;
     readonly lugCount?: number;
     readonly lugWidth?: number;
+    readonly treadMesh?: SoilTreadMesh;
+}
+
+export interface SoilTreadMesh {
+    readonly positions: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+    readonly columns?: number;
+    readonly rows?: number;
 }
 
 export class Terramechanics implements Solver<TerramechanicsParams> {
