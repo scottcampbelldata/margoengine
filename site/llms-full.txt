@@ -12683,7 +12683,10 @@ projection per live tetrahedron precedes each global solve. Each matrix applicat
 corners once, then the preconditioner acts once per particle. The iteration limits are the configured
 soft iterations and the existing preconditioned conjugate-gradient limits. Extreme expansion also
 searches the small-root volume branch before accepting a feasible unit-determinant target. This CPU
-mode accepts isotropic tetrahedral elasticity. The existing contact solver still owns rigid reactions.
+mode retains the existing rigid contact solver. Both nonlinear modes also accept a single rest-space
+fiber modulus for longitudinal reinforcement. It captures the parallel/transverse axial contrast
+while the transverse base remains isotropic. Distinct radial and tangential elastic and shear
+coefficients are outside that material model. Fiber rows join the snapshot when the scene authors them.
 
 ### Gas-filled soft shells (SOFT-06)
 
@@ -29533,7 +29536,8 @@ remain EARTH-05 work.
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support
-fixture uses isotropic elasticity. Timber with directional grain needs an anisotropic material model.
+fixture uses isotropic elasticity. Directional reinforcement is available in both nonlinear modes.
+Distinct radial and tangential shear and Poisson coefficients need a full orthotropic material law.
 Both native nonlinear modes pass the rung fixture. Dedicated GPU elasticity remains open and needs a
 same-tick GPU contact and snapshot handoff through the physics framework.
 
