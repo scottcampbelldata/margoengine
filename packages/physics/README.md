@@ -2058,7 +2058,7 @@ console.log(sea.pressure(10, -20, 0, 3.5) > 1025 * 9.81 * 19); // true: about 20
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.
 - **Each step:** it reads where each hull's body is from the `bodies` port, and integrates the water's pressure over the wetted part of the hull's surface, taken where the held load neither feeds the motion nor drains it (see **The load each step**). It then holds the body with that force, and its moment about the centre of mass, over the rigid step through `bodyForces`.
 - **The hull** is a closed triangle mesh in the body's frame, wound outward. Each triangle is cut where the sea's surface crosses it (the linear cut, then two secant steps on the surface). The wet pieces are integrated by Dunavant's six-point rule, which is exact for the hydrostatic force and moment.
-- **The sea** is anything with `elevation(x, z, t)`, and optionally `pressure(x, y, z, t)`: the hydrostatic pressure plus the waves' dynamic pressure, stretched to 0 at the surface (Wheeler). Without it, the water is still to its local surface, rho g (eta - y). The pressure over the instantaneous wetted surface is the nonlinear Froude-Krylov load. `density` is the sea's, default sea water.
+- **The sea** is the framework's sea surface, `SpectralSea` from `@margoengine/physics/sea` (the wave solver's spectrum as a sum of waves; measured: in its long swell a box rides up and down within 0.04 percent of the frequency-domain answer), made in the hull solver's origin cell (another cell is refused, naming the fix); or anything with `elevation(x, z, t)`, and optionally `pressure(x, y, z, t)`: the hydrostatic pressure plus the waves' dynamic pressure, stretched to 0 at the surface (Wheeler). Without it, the water is still to its local surface, rho g (eta - y). The pressure over the instantaneous wetted surface is the nonlinear Froude-Krylov load. `density` is the sea's, default sea water.
 - **`wettedLoads(mesh, pose, sea, t, about)`** gives the same force, moment and wetted area for one hull at one instant.
 - **Measured:**
   - a box at its draft is held up by the weight of the water it displaces, to f64 rounding;
@@ -2107,6 +2107,47 @@ const world = new PhysicsWorld({rate: {num: 60, den: 1}})
   .couple(['hull', 'rigid'], 'staggered');
 world.advance(60);
 console.log(Math.abs(box.position[1] - (D / 2 - T)) < 1e-3); // true: it floats at its draft
+```
+
+On a sea of waves, the framework's `SpectralSea` from a spectrum (here one 1 m swell of 0.1 Hz along x):
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {SpectralSea} from 'margoengine/physics/sea';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const frequencies = Float64Array.from({length: 34}, (_, i) => 0.04 * 25 ** (i / 33));
+const directions = Float64Array.from({length: 24}, (_, j) => (2 * Math.PI * j) / 24);
+const energy = new Float64Array(34 * 24);
+const bin = frequencies.findIndex((f) => f >= 0.1);
+// All the energy in one bin: a wave of amplitude a holds a^2 / 2 over the bin's width in frequency and direction.
+energy[bin * 24] = 1 / 2 / (((frequencies[bin + 1] - frequencies[bin - 1]) / 2) * ((2 * Math.PI) / 24));
+const sea = new SpectralSea({waves: {frequencies, directions, energy, depth: Infinity, density: 1025}});
+
+const physics = new Physics(null, {fixedTimestep: 1 / 60});
+const [L, D, B, T] = [4, 1.5, 2, 0.5];
+const box = physics.addBody(null, {
+  position: [0, D / 2 - T, 0],
+  colliders: {shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass: 1025 * L * B * T},
+});
+const v = [];
+for (const x of [-L / 2, L / 2]) for (const y of [-D / 2, D / 2]) for (const z of [-B / 2, B / 2]) v.push(x, y, z);
+const mesh = {
+  vertices: v,
+  indices: [0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3],
+};
+const world = new PhysicsWorld({rate: {num: 60, den: 1}})
+  .add(new RigidSolver(), {physics})
+  .add(new HullSolver(), {hulls: [{row: box.row, mesh}], sea})
+  .couple(['hull', 'rigid'], 'staggered');
+let highest = -Infinity;
+for (let frame = 1; frame <= 30 * 60; frame++) {
+  world.advance(frame);
+  if (frame > 10 * 60) highest = Math.max(highest, box.position[1] - (D / 2 - T));
+}
+console.log(highest > 0.8); // true: it rides the swell's crests
 ```
 ### Tracers and slicks in water (`@margoengine/physics/tracers`)
 
