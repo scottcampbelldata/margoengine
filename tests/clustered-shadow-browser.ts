@@ -58,6 +58,8 @@ type Config = {
    * clearcoat 1). `'not added'` makes the plain quad and leaves it out of the bounce.
    */
   patchModel?: boolean | 'not added' | 'installed' | 'materials' | 'coated';
+  /** The two rooms' wall (`roomsWall`'s box) as a gltf/pbr model added to the bounce (`bounce.add`), KB-BOUNCE-OCCLUDE1. */
+  wallModel?: boolean;
 };
 const canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, {
@@ -104,6 +106,45 @@ let stochastic: StochasticLights | undefined;
 let bounce: LightBounce | undefined;
 let patchModel: { dispose(): void } | undefined;
 let patchInstall: { dispose(): void } | undefined;
+// A core box as a glTF mesh: the same 24 vertices and 12 triangles, its node translated to `position`.
+function boxGLTF(size: [number, number, number], position: [number, number, number]) {
+  const g = box(...size),
+    count = g.vertices.length / 6,
+    floats = new Float32Array(count * 6);
+  for (let i = 0; i < count; i++) {
+    floats.set(g.vertices.subarray(i * 6, i * 6 + 3), i * 3);
+    floats.set(g.vertices.subarray(i * 6 + 3, i * 6 + 6), (count + i) * 3);
+  }
+  const indices = Uint16Array.from(g.indices),
+    bytes = new Uint8Array(floats.byteLength + indices.byteLength);
+  bytes.set(new Uint8Array(floats.buffer));
+  bytes.set(new Uint8Array(indices.buffer), floats.byteLength);
+  const half = size.map((v) => v / 2);
+  return {
+    doc: {
+      asset: { version: '2.0' },
+      scene: 0,
+      scenes: [{ nodes: [0] }],
+      nodes: [{ mesh: 0, translation: position }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+      materials: [
+        { pbrMetallicRoughness: { baseColorFactor: [0.8, 0.8, 0.8, 1], metallicFactor: 0, roughnessFactor: 1 } },
+      ],
+      buffers: [{ byteLength: bytes.byteLength }],
+      bufferViews: [
+        { buffer: 0, byteOffset: 0, byteLength: count * 12 },
+        { buffer: 0, byteOffset: count * 12, byteLength: count * 12 },
+        { buffer: 0, byteOffset: count * 24, byteLength: indices.byteLength },
+      ],
+      accessors: [
+        { bufferView: 0, componentType: 5126, count, type: 'VEC3', min: half.map((v) => -v), max: half },
+        { bufferView: 1, componentType: 5126, count, type: 'VEC3' },
+        { bufferView: 2, componentType: 5123, count: indices.length, type: 'SCALAR' },
+      ],
+    },
+    bytes,
+  };
+}
 // The patch as a glTF quad: x -1 to 1, z 0 to 2 at y 0, facing +y, base colour 0.8 (linear), metallic 0, roughness 1.
 function patchGLTF(coat = false) {
   const floats = new Float32Array([-1, 0, 0, 1, 0, 0, 1, 0, 2, -1, 0, 2, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
@@ -221,6 +262,12 @@ async function scene(config: Config) {
   if (config.stochastic) stochastic = StochasticLights.attach(engine, { lights, quad: false, temporal: false });
   if (config.contact) contact = ContactLights.attach(engine, { lights, ...config.contact });
   if (config.bounce) bounce = LightBounce.attach(engine, { lights, ...config.bounce });
+  if (config.wallModel) {
+    const { doc, bytes } = boxGLTF([0.3, 2.5, 4], [4.15, 1.25, 2]),
+      model = await parseGLTFAsync(engine, doc, [bytes]);
+    patchModel = model;
+    bounce?.add(model);
+  }
   if (config.patchModel === 'materials' || config.patchModel === 'coated') {
     // The same quad as patchGLTF, drawn by @margoengine/materials (a gltf/pbr model underneath, with its capture hook).
     const mesh = createMesh(

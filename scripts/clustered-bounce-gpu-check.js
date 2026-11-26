@@ -277,6 +277,23 @@ try {
     { blocked, open },
   );
 
+  // KB-BOUNCE-OCCLUDE1: the wall as a glTF box added to the bounce occludes as the core wall does: its triangles join the
+  // visibility maps' scene occluders (the same count as the core wall's), and the dark room stays dark.
+  await call('scene', { ...rooms({}), meshes: ['roomsFloor', 'roomsCeiling'], wallModel: true });
+  const wallStats = (await call('settle', 30)).stats,
+    wallBlocked = (await call('probe', dark, floor))[0][0] - roomOff;
+  results.wallModel = { blocked: wallBlocked, share: wallBlocked / open, stats: wallStats, core: roomStats };
+  check(
+    `the glTF wall's triangles are occluders: ${wallStats.occluders} pieces, as the core wall's ${roomStats.occluders}`,
+    wallStats.occluders === roomStats.occluders && wallStats.occluders > 0,
+    { wall: wallStats, core: roomStats },
+  );
+  check(
+    `the glTF wall keeps it out: ${wallBlocked.toExponential(3)} under 2% of ${open.toExponential(3)}`,
+    Math.abs(wallBlocked) < 0.02 * open,
+    { wallBlocked, open },
+  );
+
   const compiled = await call('compile');
   check('WGSL compiles without errors or warnings', !compiled.core.length && !compiled.probe.length, compiled);
   check('no page errors', pageErrors.length === 0, { pageErrors });

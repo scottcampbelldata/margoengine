@@ -450,8 +450,10 @@ glTF floor bounces as a core floor does (the GPU check matches them exactly), an
 source again. A clearcoat, a materials `Material`'s or a glTF one drawn by `materials.install`, keeps the base layer's
 1 - F_coat(n.v) share of the albedo, as the beauty pass does (0.955 of the uncoated patch head on). It returns a
 remover, and `dispose()` releases every added model. A model not added receives the bounce but does not reflect it;
-blended, transmissive and unlit primitives are left out of the capture, as SSR leaves them out; added models do not yet stop it in the visibility maps, which hold core meshes' triangles
-(docs/limits.md). A lamp bounces the light it casts: its IES profile, projector image or cube cookie and its layers
+blended, transmissive and unlit primitives are left out of the capture, as SSR leaves them out. An added gltf/pbr
+model or materials mesh also stops the bounce in the visibility maps: the triangles its captures draw (each instance,
+nodes shown in the scene) join core meshes' as occluders, so a glTF wall no source sees keeps a room dark
+(`bounceModelMeshes`; skinned primitives, terrain and voxel occlude through their captures only, docs/limits.md). A lamp bounces the light it casts: its IES profile, projector image or cube cookie and its layers
 weigh what each captured surface gets, as they weigh its direct light (below). GPU cost per bouncing source: one draw of the core
 meshes per refreshed view at 32 x 32, about 100 KB of targets and readback buffers and 130 KB of storage buffer, and 32 VPLs per
 fragment in the light loop.

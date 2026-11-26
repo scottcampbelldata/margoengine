@@ -17,6 +17,7 @@ export interface BounceCapture {
 
 export interface BounceMesh {
     readonly vertices: Float32Array;
+    readonly stride?: number;
     readonly indices: ArrayLike<number>;
     readonly matrix: ArrayLike<number>;
 }
@@ -25,12 +26,41 @@ export interface BounceModel {
     setCapture(hook: BounceModelCapture): () => void;
     onDispose(callback: () => void): () => void;
     draw(context: PassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+    readonly primitives?: readonly BounceModelPrimitive[];
 }
 
 export interface BounceModelCapture {
     declarations(code: string): string;
     readonly targets: readonly GPUColorTargetState[];
     begin(): GPURenderPassEncoder;
+}
+
+export interface BounceModelPrimitive {
+    readonly vertices: Float32Array;
+    readonly indices: ArrayLike<number>;
+    readonly node: {
+        readonly matrix: ArrayLike<number>;
+        readonly id?: number;
+    };
+    readonly material: {
+        readonly settings: ArrayLike<number>;
+        readonly tint?: unknown;
+        readonly ext?: ArrayLike<number>;
+        readonly extension?: {
+            readonly afterOpaque?: boolean;
+            readonly replacesPhysical?: boolean;
+        };
+    };
+    readonly extension?: {
+        readonly afterOpaque?: boolean;
+        readonly replacesPhysical?: boolean;
+    };
+    readonly instances?: {
+        readonly data: Float32Array;
+        readonly count: number;
+    };
+    readonly deformed?: unknown;
+    readonly topology?: string;
 }
 
 export interface BounceOpening {
@@ -167,6 +197,12 @@ export function basis(n: V3): [[number, number, number], [number, number, number
 export function bounceIrradiance(data: Float32Array, x: V3, n: V3): [number, number, number];
 
 export function bounceLightSource(lights: Pick<Clustered, 'list' | 'ies' | 'projector' | 'layers'>, index: number): BouncePointSource;
+
+export function bounceModelMeshes(model: Pick<BounceModel, 'primitives'>,
+store?: {
+    readonly hidden: ArrayLike<number>;
+    readonly parents?: ArrayLike<number>;
+}): BounceMesh[];
 
 export function bounceViews(source: BounceSource): BounceView[];
 

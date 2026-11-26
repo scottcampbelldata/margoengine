@@ -23,6 +23,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** `OutdoorSound` solves the acoustic path and `OutdoorAudio` applies its delay and broad spectral response.
 - **Regression:** `packages/physics/tests/coupling/outdoor-sound.test.js` checks air, diffraction and reflection.
   `packages/audio/tests/outdoor-sound.browser.mjs` measures the added arrival delay in real PCM.
+### Fixed 2026-11-26: a glTF wall added to LightBounce did not stop the bounce in the visibility maps (KB-BOUNCE-OCCLUDE1, clustered)
+
+- **Repro:** packages/clustered/test/bounce.test.js, the table-by-the-wall room given as gltf/pbr primitives: before, only
+  core meshes' triangles (`occluderMeshes` of the frame's batches) were scene occluders, so a model added with
+  `bounce.add` occluded through its captured texels alone, and the wall the table hides from the lantern let the room's
+  VPLs light the ground outside (over 5% of the unblocked bounce at three receivers, where an exact cast gives 0).
+- **Cause:** `LightBounce.rebuild` built the visibility maps' scene occluders from core's batches only; PR #150 drew added
+  models into the captures but never gave their triangles to `sampleSurfaces` (imperfect shadow maps sample every surface
+  of the scene: Ritschel et al., ACM TOG 27(5), 2008, doi:10.1145/1409060.1409082).
+- **Fix:** `bounceModelMeshes(model, store)` reads an added model's public `primitives` (20-float vertices, node matrix,
+  instance rows; the primitives the capture draws, nodes shown in the transform store), and the rebuild samples them
+  with core's meshes. `BounceMesh.stride` (default 6) lets `sampleSurfaces` read gltf/pbr's vertex layout.
+- **Regression:** the CPU test above (the model's occluders equal the core meshes' to 1e-5, under 2% of unblocked behind
+  the wall, filters for BLEND, tint, after-opaque, unlit, lines, skinned and hidden nodes), and the `wallModel` row of
+  scripts/clustered-bounce-gpu-check.js on WebGPU and `MARGO_COMPAT=1` (the rooms' wall as a glTF box: 36 occluder pieces,
+  the core wall's 36; the dark room 0). Skinned primitives, terrain and voxel still occlude through their captures only
+  (docs/limits.md).
+
 ### Fixed 2026-11-26: a clearcoat from `materials.install` reflected its full base albedo into SSR and LightBounce captures (KB-BOUNCE-CAPTURE2, gltf)
 
 - **Repro:** `node scripts/clustered-bounce-gpu-check.js` with its `installed` row: the LightBounce patch as a glTF quad with

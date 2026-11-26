@@ -6,6 +6,7 @@ import {
   basis,
   bounceIrradiance,
   bounceViews,
+  bounceModelMeshes,
   bounceWgsl,
   buildVisibility,
   crossesOpening,
@@ -776,6 +777,80 @@ test('a wall no source sees still hides the room: the scene triangles are occlud
           assert.ok(Math.abs(got - hit.t) < 1e-4 * hit.t + 1e-5, `VPL ${j} texel ${x},${y}: ${got} vs ${hit.t}`);
       }
   });
+});
+// KB-BOUNCE-OCCLUDE1: a model added to the bounce (gltf/pbr, a materials mesh) occluded only through its captured
+// texels, so a glTF wall no source sees let the room's VPLs light the ground through it, as core walls did before the
+// scene triangles. Its primitives (20 floats a vertex, node matrix, instance rows) now give the same occluders.
+test("an added model's primitives occlude as core meshes do: a glTF wall no source sees hides the room", () => {
+  const scene = [
+      ...box([0, 0, 0], [6, 2.5, 4], [0.6, 0.6, 0.6]),
+      rect([1.5, 0.97, 3.6], [1, 0, 0], [0, 0, 0.4], [0.5, 0.4, 0.3]),
+    ],
+    { vpls, points } = reduceBounce(capture(scene, nearWall, 32), nearWall, { vpls: 32, near: 0.15 }),
+    material = { settings: [0, 0, 0] },
+    // Each rect as a gltf/pbr primitive: positions shifted by -2 m in x, the node moving +1 and an instance row +1.
+    primitive = (r, extra = {}) => {
+      const core = asMesh(r),
+        vertices = new Float32Array(80);
+      for (let i = 0; i < 4; i++) vertices.set([core.vertices[i * 6] - 2, ...core.vertices.subarray(i * 6 + 1, i * 6 + 6)], i * 20);
+      const data = new Float32Array(48);
+      data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1]);
+      // A second, hidden-by-count row far away.
+      data.set([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 50, 0, 0, 1], 24);
+      return {
+        vertices,
+        indices: core.indices,
+        node: { matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1], id: 0 },
+        material,
+        instances: { data, count: 1 },
+        ...extra,
+      };
+    },
+    model = { primitives: scene.map((r) => primitive(r)) },
+    meshes = bounceModelMeshes(model),
+    occluders = sampleSurfaces(meshes, vpls, { resolution: 32 }),
+    expected = sampleSurfaces(scene.map(asMesh), vpls, { resolution: 32 });
+  assert.equal(meshes.length, scene.length, 'one mesh per drawn instance');
+  assert.equal(occluders.length, expected.length);
+  occluders.forEach((o, i) =>
+    o.corners.forEach((c, k) => assert.ok(Math.abs(c - expected[i].corners[k]) < 1e-5, `occluder ${i} corner ${k}`)),
+  );
+  const lit = (o) => packBounce([[1, 1, 1]], vpls, buildVisibility(vpls, points, { resolution: 32, occluders: o }), 32),
+    open = packBounce([[1, 1, 1]], vpls, new Float32Array(vpls.length * 1024).fill(OPEN), 32),
+    [captured, after] = [lit([]), lit(occluders)];
+  for (const x of [
+    [1, 0.05, 5],
+    [1.5, 0.05, 4.5],
+    [2, 0.05, 4.2],
+  ]) {
+    const unblocked = bounceIrradiance(open, x, [0, 1, 0])[0];
+    assert.ok(bounceIrradiance(captured, x, [0, 1, 0])[0] > 0.05 * unblocked, `${x}: the captures alone leak`);
+    assert.ok(bounceIrradiance(after, x, [0, 1, 0])[0] < 0.02 * unblocked, `${x}: the model's wall hides it`);
+  }
+  // What the capture leaves out occludes nothing: BLEND, tinted, after-opaque and unlit materials, points and lines,
+  // skinned primitives, a node hidden in the transform store (or under a hidden parent).
+  const one = scene[0];
+  for (const extra of [
+    { material: { settings: [2, 0, 0] } },
+    { material: { settings: [0, 0, 0], tint: [1, 1, 1] } },
+    { material: { settings: [0, 0, 0], extension: { afterOpaque: true } } },
+    { extension: { afterOpaque: true } },
+    { material: { settings: [0, 0, 0], ext: [1, 1.5, 0, 0] } },
+    { topology: 'line-list' },
+    { deformed: {} },
+  ])
+    assert.equal(bounceModelMeshes({ primitives: [primitive(one, extra)] }).length, 0, JSON.stringify(extra));
+  const store = { hidden: new Uint8Array([0, 1]), parents: new Int32Array([1, -1]) };
+  assert.equal(bounceModelMeshes({ primitives: [primitive(one)] }, store).length, 0, 'hidden parent');
+  store.hidden[1] = 0;
+  assert.equal(bounceModelMeshes({ primitives: [primitive(one)] }, store).length, 1, 'shown again');
+  assert.equal(
+    bounceModelMeshes({ primitives: [primitive(one, { material: { settings: [0, 0, 0], tint: [1, 1, 1], extension: { replacesPhysical: true } } })] }).length,
+    1,
+    'a tint an extension replaces is drawn opaque',
+  );
+  assert.deepEqual(bounceModelMeshes({}), [], 'terrain and voxel give none');
+  assert.throws(() => sampleSurfaces([{ ...asMesh(one), stride: 2 }], vpls, { resolution: 32 }), /stride/);
 });
 // KB-BOUNCE-SHADOWSNOW1, the concave-corner receiver plane: a receiver 0.2 to 0.6 m outside the wall's foot is compared
 // where its tangent plane meets the texel's centre ray, which runs on through the wall's foot into the room; the texel

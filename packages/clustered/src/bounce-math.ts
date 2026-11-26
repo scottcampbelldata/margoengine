@@ -124,9 +124,14 @@ export interface BouncePoint {
   /** A triangle's three corners (9 numbers, world), drawn exactly: each texel's centre ray against it. */
   readonly corners?: readonly number[];
 }
-/** A triangle mesh for {@link sampleSurfaces}: core's interleaved vertices (position then normal, 6 floats each). */
+/**
+ * A triangle mesh for {@link sampleSurfaces}: interleaved vertices, each starting with its position (core's: position
+ * then normal, 6 floats; gltf/pbr's: 20).
+ */
 export interface BounceMesh {
   readonly vertices: Float32Array;
+  /** Floats per vertex, the position first. Default 6 (core's layout). */
+  readonly stride?: number;
   readonly indices: ArrayLike<number>;
   /** Column-major 4 x 4 world matrix. */
   readonly matrix: ArrayLike<number>;
@@ -692,12 +697,15 @@ export function sampleSurfaces(
     worlds = meshes.map((mesh) => {
       const v = mesh.vertices,
         M = mesh.matrix,
-        world = new Float64Array((v.length / 6) * 3),
+        n = mesh.stride ?? 6;
+      if (!Number.isInteger(n) || n < 3)
+        throw new RangeError('Invalid BounceMesh stride; give the floats per vertex, 3 or more (default 6)');
+      const world = new Float64Array(Math.floor(v.length / n) * 3),
         lo = [Infinity, Infinity, Infinity],
         hi = [-Infinity, -Infinity, -Infinity];
       for (let i = 0; i < world.length / 3; i++)
         for (let k = 0; k < 3; k++) {
-          const p = M[k] * v[i * 6] + M[4 + k] * v[i * 6 + 1] + M[8 + k] * v[i * 6 + 2] + M[12 + k];
+          const p = M[k] * v[i * n] + M[4 + k] * v[i * n + 1] + M[8 + k] * v[i * n + 2] + M[12 + k];
           world[i * 3 + k] = p;
           lo[k] = Math.min(lo[k], p);
           hi[k] = Math.max(hi[k], p);

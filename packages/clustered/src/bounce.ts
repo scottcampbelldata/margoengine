@@ -74,6 +74,7 @@ import { termEmission, termState } from './bounce-terms.js';
 import { capturePipeline, frameCapture } from '../../shared/frame-capture.js';
 import { captureModel, drawCapture } from '../../shared/capture.js';
 import { requireCompatTier } from '../../shared/compat.js';
+import { hiddenInTree } from '../../shared/visibility.js';
 import { rectFrame } from '../../shared/rect-frame.js';
 declare const GPUBufferUsage: { STORAGE: number; COPY_DST: number; MAP_READ: number; UNIFORM: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; COPY_SRC: number };
@@ -94,11 +95,82 @@ export interface BounceModelCapture {
   readonly targets: readonly GPUColorTargetState[];
   begin(): GPURenderPassEncoder;
 }
+/**
+ * A primitive of an added model, as gltf/pbr's `PBRPrimitive` holds it (declared here so clustered does not import
+ * gltf): its triangles (20 floats a vertex, position first), its node's world matrix and, when instanced, the instance
+ * rows (24 floats each, the node-space matrix first).
+ */
+export interface BounceModelPrimitive {
+  readonly vertices: Float32Array;
+  readonly indices: ArrayLike<number>;
+  readonly node: { readonly matrix: ArrayLike<number>; readonly id?: number };
+  readonly material: {
+    readonly settings: ArrayLike<number>;
+    readonly tint?: unknown;
+    readonly ext?: ArrayLike<number>;
+    readonly extension?: { readonly afterOpaque?: boolean; readonly replacesPhysical?: boolean };
+  };
+  readonly extension?: { readonly afterOpaque?: boolean; readonly replacesPhysical?: boolean };
+  readonly instances?: { readonly data: Float32Array; readonly count: number };
+  readonly deformed?: unknown;
+  readonly topology?: string;
+}
 /** What `bounce.add` takes: a gltf/pbr `PBRModel` (a materials `createMesh` mesh is one), a `Terrain`, a voxel renderer or anything with the same capture hook. */
 export interface BounceModel {
   setCapture(hook: BounceModelCapture): () => void;
   onDispose(callback: () => void): () => void;
   draw(context: PassContext, mode: 'capture', color: GPUTextureView, depth: GPUTextureView): void;
+  /** A gltf/pbr model's primitives: their triangles occlude in the visibility maps (`bounceModelMeshes`). */
+  readonly primitives?: readonly BounceModelPrimitive[];
+}
+/**
+ * The occluders a model added to the bounce gives the visibility maps besides its captured texels: the triangles of
+ * every primitive its captures draw (opaque and MASK triangles of a visible node, each instance with its world matrix),
+ * as `sampleSurfaces` takes them. Imperfect shadow maps sample every surface of the scene (T. Ritschel, T. Grosch,
+ * M. H. Kim, H.-P. Seidel, C. Dachsbacher and J. Kautz, "Imperfect Shadow Maps for Efficient Computation of Indirect
+ * Illumination", ACM TOG 27(5), 2008, doi:10.1145/1409060.1409082), so a model's wall no source sees still blocks.
+ * Skinned or morphed primitives (`deformed`: their current shape is on the GPU only) and models with no primitives
+ * (terrain, voxel) occlude through their captures alone.
+ */
+export function bounceModelMeshes(
+  model: Pick<BounceModel, 'primitives'>,
+  /** The engine's transform store: a node hidden there, or under a hidden parent, gives nothing. */
+  store?: { readonly hidden: ArrayLike<number>; readonly parents?: ArrayLike<number> },
+): BounceMesh[] {
+  const out: BounceMesh[] = [];
+  for (const p of model.primitives ?? []) {
+    const m = p.material,
+      extension = p.extension ?? m.extension;
+    // As the capture leaves them out: points and lines, BLEND and tinted, after-opaque (transmission) and unlit.
+    if (
+      p.topology ||
+      p.deformed ||
+      (store && p.node.id !== undefined && hiddenInTree(store, p.node.id)) ||
+      !p.indices.length ||
+      m.settings[0] === 2 ||
+      (!!m.tint && !extension?.replacesPhysical) ||
+      extension?.afterOpaque === true ||
+      m.ext?.[0]
+    )
+      continue;
+    const N = p.node.matrix;
+    if (!p.instances) {
+      out.push({ vertices: p.vertices, stride: 20, indices: p.indices, matrix: N });
+      continue;
+    }
+    const rows = p.instances.data;
+    for (let r = 0; r < p.instances.count; r++) {
+      const world = new Float64Array(16);
+      for (let c = 0; c < 4; c++)
+        for (let k = 0; k < 4; k++) {
+          let sum = 0;
+          for (let j = 0; j < 4; j++) sum += N[j * 4 + k] * rows[r * 24 + c * 4 + j];
+          world[c * 4 + k] = sum;
+        }
+      out.push({ vertices: p.vertices, stride: 20, indices: p.indices, matrix: world });
+    }
+  }
+  return out;
 }
 // The model capture's WGSL: gltf/pbr's PBR Surface gets `margoCapture(s, v, k)` (the base layer's share `k` after
 // clearcoat and sheen weighs its albedo), other shaders (terrain, water) `margoSSR(n, v, base, metal, rough)`. The
@@ -795,7 +867,13 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     // Source indices follow this frame's order.
     const vpls = this.states.flatMap((s, index) => s.vpls.map((v) => ({ ...v, source: index }))),
       res = this.visibility,
-      occluders = this.occlusion ? sampleSurfaces(occluderMeshes(batches), vpls, { resolution: res }) : [],
+      occluders = this.occlusion
+        ? sampleSurfaces(
+            [...occluderMeshes(batches), ...[...this.models.keys()].flatMap((m) => bounceModelMeshes(m, this.engine?.store))],
+            vpls,
+            { resolution: res },
+          )
+        : [],
       maps = this.occlusion
         ? buildVisibility(
             vpls,
