@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,206 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,208 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12344,6 +12344,22 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
+
+### Dune and snow transport (EARTH-07)
+
+The solver resolves a single grain material and a mobile surface layer on the uniform `TerrainBed` grid.
+Set `mobileDepth` to the available layer above bedrock. Coarse grids describe dune evolution. For impact ripples,
+supply `ripples.meanHop` and put multiple vertices inside a typical ripple wavelength. The short-hop model uses one
+material and a fixed wind-relative incident angle. Suspension, snow cohesion changes and multi-grain sorting require
+additional models. In an explicit world the latest bed change
+may be in flight for one base step. Other contributors sharing the bed need to coordinate their erodible depths.
+
+Open sides export saltating grains and closed sides retain them. The mass ledger reports mobile bed, airborne grains,
+dust and open-boundary export. Snow uses a seasonal threshold and optional exposure. Wind stress and dust use exported
+surface fields. Atmosphere feedback needs an ATMO-01 momentum sink and ATMO-06 dust receiver on the matching grid.
+The rendering entry uses the current ground and transport field, and maps moving mass to opacity with `referenceMass`.
+The optional physics entry is 5,633 B min+gzip. Its separate plain and shared Wasm variants are each 8,172 B raw.
+The rendering entry, with its live transport route, is 11,061 B min+gzip.
 
 ### Groundwater and springs (HYDRO-06)
 
@@ -28692,6 +28708,13 @@ the event by hand. A physics world with `ModalContactRigidSolver` and `ModalSoun
 an impulse, rolling or scraping excitation, with sound and damping set by the contacted materials.
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
+
+## Fixed: dune and snow rendering lacked a moving surface layer (EARTH-07, PA-46 and PA-63)
+
+A static height seed and a separately prescribed plume could not move terrain or represent an exposed ridge losing
+snow. `AeolianTransport` sends resolved bed change to `TerrainBed`, and `BlownSand` can now draw its moving layer.
+Reproduce with `packages/physics/tests/coupling/aeolian.test.js` and `packages/vfx/test/blown-sand-check.mjs`.
+The [TREE-5 review](physics-demo-review.md) tracks integration into the filmed scene and the atmosphere-side fields.
 
 ## Fixed: soil drainage had no groundwater storage or spring receiver (HYDRO-06)
 
