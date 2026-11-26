@@ -5,6 +5,15 @@
 ```ts
 import { Bed, FlowField, Wind } from "@margoengine/math/fields";
 
+export interface BreachTracerMix {
+    body: number;
+    opening: number;
+    fractions: readonly {
+        material: TracerMaterial | keyof typeof TRACER_MATERIALS;
+        fraction: number;
+    }[];
+}
+
 export interface SubmergedJet {
     height: number;
     diameter: number;
@@ -84,6 +93,7 @@ export interface TracerParams {
     particleMass?: number;
     capacity?: number;
     breaches?: number;
+    breachMixes?: readonly BreachTracerMix[];
     bedJets?: TracerBedJets;
 }
 

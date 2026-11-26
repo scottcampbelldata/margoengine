@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20590605,
+  "total": 20591108,
   "history": [
     {
       "date": "2026-10-24",
@@ -13675,6 +13675,12 @@
       "commit": "FLUID-07-circular-drips",
       "grew": 1,
       "reason": "FLUID-07 adds optional capillary-drop timing, a conservative outlet ledger and registered pose records. Thin-film rises from 6585 to 8264 B gzip; cap changes from 6768 to 8520 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "18728e9817",
+      "grew": 1,
+      "reason": "SEA-15's per-opening grain mixtures move physics/tracers from 7413 to 7916 B gzip. The optional ceiling rises from 7669 to 8172 B. Mixtures share the hull-breach binding and tracer parcel store; a separate entry would duplicate those paths and the mass ledger."
     }
   ],
   "items": {
@@ -14552,7 +14558,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 8520,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 7669,
+    "@margoengine/physics/tracers": 8172,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
