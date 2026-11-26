@@ -10472,6 +10472,10 @@ New entry @margoengine/animation/deformed-points: 4,286 B gzip, ceiling 4,542 B.
 
 New entry @margoengine/animation/instanced-morph: 11,416 B gzip, ceiling 11,759 B, of which the skinned crowd it extends is about 10 KB (an app that loads both entries loads that part once). `@margoengine/animation/instanced-skin` gains the layout parameter and stays inside its recorded 10,303 B ceiling. Core and stage gain zero bytes (24,892 B on this base).
 
+### Passive hull-launch effects
+
+EntryBody.effectsOnly follows the hull for cavity and splash and leaves its fluid force and displacement in HullSolver. Cavity pressure on the seakeeping hull remains a separate coupling. Observed entry events still carry the source body's speed, direction and height on the live surface. The entry moved from 9,033 to 9,053 B gzip under its 9,304 B ceiling. Core and Stage gain zero bytes.
+
 ### Seakeeping full KVLCC2 head-wave benchmark
 
 The measured mean resistance intervals are met at `λ/L = 1.1` and 2.0 on the freely pitching and heaving hull at fixed tow speed with `shortWaveResistance` enabled. The draft-qualified 41 by 13 hull meets the heave and pitch intervals at both wavelengths. At 1.1 it yields 0.75550 and 0.58761 within upper limits of 0.7671 and 0.59368. The volume-matched reference draft is 0.977 mm from nominal. The free-surge case and distributed measured pressure remain open. [Geometry and experiment](clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)

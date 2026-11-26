@@ -4940,6 +4940,10 @@ Run `node --test --test-name-pattern "wake pressure returns" packages/physics/te
 
 For the independent Wigley tank comparison, run `node packages/physics/tests/coupling/measure-wigley-waterline.mjs 0.025` after building Physics. Pass `0.05` for the coarser grid. It reports the observed and predicted nondimensional elevations by station for both towing speeds with fixed trim and sinkage. The near-bow amplitude and phase residual remain open. [Primary data and numerical settings](../clean-room.md#sea-08-independently-measured-wigley-waterline)
 
+### SEA-08 hull-launch cavity and splash
+
+Build Physics and run `node --test --test-name-pattern="observes a launching" packages/physics/tests/coupling/entry.test.js`. The two controlled trajectories and wake records agree exactly. Compare the renderer with `node scripts/run-with-timeout.mjs -- node packages/water/test/hull-entry-splash.browser.mjs`, followed by the same fixture with `MARGO_COMPAT=1`. The live splash and the same frame with its particles removed provide a pixel control.
+
 ### SEA-08 full KVLCC2 head-sea resistance and motion
 
 Build Physics and run `node --test packages/physics/tests/coupling/kvlcc2-long-wave.test.js`. This steps the full rigid carriage model at the published Froude number. It reports both six-encounter force means and the normalized first heave and pitch harmonics from the free body. The near-resonance comparison prints the pressure-only control and checks heave and pitch against their own measured intervals. The refined geometry first matches the published equilibrium draft within its 1 mm uncertainty.

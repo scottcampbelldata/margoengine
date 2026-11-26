@@ -1,11 +1,13 @@
 // Water entry's coupling checks (SEA-14): `EntrySolver` beside `RigidSolver`, held to the harness. A ball dropped in leaves
 // the same state at 24, 30 and 60 frames a second, a seek equals a continuous run, and the effect runs both ways: a
 // faster ball makes a different entry, and the water slows the ball.
+import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { EntrySolver } from '../../dist/entry.js';
-import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
+import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
+import { makeEntryLaunch } from './entry-launch.js';
 
 await Physics.load();
 
@@ -56,3 +58,67 @@ test('EntrySolver: a faster ball makes a different entry, and denser water slows
         ? JSON.stringify(world.probe.entry.splashes().map((e) => e.speed.toFixed(6)))
         : world.probe.ball.linearVelocity[1],
   ));
+
+test('EntrySolver observes a launching HullSolver hull without duplicating loads or wake displacement', async (context) => {
+  await Physics.load({ threads: true });
+  const frameCount = 32;
+
+  function launch(observed, shared) {
+    const { world, physics, vessel, probe, wake, entry } = makeEntryLaunch({
+      observed,
+      probeMesh: sphereMesh(0.05),
+      shared,
+    });
+    using _cleanup = physics;
+    world.advance(3);
+    const snapshot = world.takeSnapshot();
+    const trace = [];
+    let loadsOnProbe = false;
+    let cavity = false;
+    for (let frame = 4; frame <= frameCount; frame++) {
+      world.advance(frame);
+      const values = regionWords(world.arena.memory, entry.exportPorts(frame)[0].region);
+      const at = vessel.row * FORCE_WORDS;
+      assert.ok(
+        values.subarray(at, at + FORCE_WORDS).every((load) => load === 0),
+        'the hull row has no second force',
+      );
+      loadsOnProbe ||= values[probe.row * FORCE_WORDS + 1] !== 0;
+      if (observed) cavity ||= entry.bodyState(vessel.row).cavity;
+      trace.push({
+        motion: [
+          ...vessel.position,
+          ...vessel.rotation,
+          ...vessel.linearVelocity,
+          ...vessel.angularVelocity,
+          ...probe.position,
+          ...probe.rotation,
+          ...probe.linearVelocity,
+          ...probe.angularVelocity,
+        ],
+        wave: wake.sample(0.2, 0.5).height,
+        entrySources: entry.seaSources(),
+      });
+    }
+    assert.ok(loadsOnProbe, 'the same solver still loads a non-observer body');
+    const wakeState = wake.stateRegions().map((region) => regionWords(world.arena.memory, region).slice());
+    const events = entry.splashes();
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(frameCount);
+    assert.equal(world.hash(), hash);
+    assert.deepEqual(entry.splashes(), events);
+    return { trace, observedEvents: events.filter((event) => event.row === vessel.row), cavity, hash, wakeState };
+  }
+
+  const bare = launch(false, false);
+  const observed = launch(true, false);
+  assert.deepEqual(launch(true, true), observed);
+  assert.deepEqual(observed.wakeState, bare.wakeState);
+  for (let frame = 0; frame < bare.trace.length; frame++) assert.deepEqual(observed.trace[frame], bare.trace[frame]);
+  const entry = observed.observedEvents.find((event) => event.kind === 'entry');
+  assert.ok(entry?.cavity && entry.crownHeight > 0 && observed.cavity);
+  const peak = Math.max(...observed.trace.map(({ wave }) => Math.abs(wave)));
+  assert.ok(peak > 0.001, 'the HullSolver still sends a resolved wave');
+  context.diagnostic(JSON.stringify({ entryTime: entry.time, crownHeight: entry.crownHeight, peak }));
+});

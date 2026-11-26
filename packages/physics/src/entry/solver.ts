@@ -56,6 +56,8 @@ export interface EntryBody {
   readonly mesh: HullMesh;
   /** Its surface's contact angle with water, degrees (default 30, a wetting surface; above 90 water-repellent). */
   readonly contactAngle?: number;
+  /** Follow the rigid body for cavity, splash and foam. Another solver supplies its loads and displacement. Default false. */
+  readonly effectsOnly?: boolean;
 }
 
 /** Something that takes foam over a box: a FoamSolver of `@margoengine/physics/foam`. */
@@ -405,7 +407,7 @@ export class EntrySolver implements Solver<EntryParams> {
     if (h <= 0) {
       if (phase !== 0) this.leave(b, body, state, s, t, centre, vr, speed, vn, n, surf.height);
       state[s + PHASE] = 0;
-      this.displace(state, s, 0, centre);
+      if (!body.effectsOnly) this.displace(state, s, 0, centre);
       return;
     }
     const centreUp = n[0] * centre[0] + n[1] * centre[1] + n[2] * centre[2] > level;
@@ -425,6 +427,7 @@ export class EntrySolver implements Solver<EntryParams> {
     // The cavity: sections opened as the widest section passes, and the pinch.
     let cavityVolume = 0;
     if (state[s + CAVITY] === 1) cavityVolume = this.cavity(b, state, s, t, centre, speed, R0, surfaceHeight);
+    if (body.effectsOnly) return;
     const open = state[s + CAVITY] === 1;
     // The sea's pressure over the wetted surface, the air's inside an open cavity: behind the plane through the centre
     // across the body's motion (its widest section, where the contact line is pinned).

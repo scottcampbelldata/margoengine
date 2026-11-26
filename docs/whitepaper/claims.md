@@ -6472,6 +6472,10 @@ A 4 m prismatic hull moving at 0.75 m/s through the water transfers 12.5 L from 
 
 Pressure returned through the SEA-08 and SEA-04 coupling slows a 4 m prism from 1.0 to 0.71653 m/s in 60 ticks. The independent face integrals agree to 1.57 × 10⁻¹¹ N, and the rigid momentum and kinetic work agree within state roundoff. Plain and shared memory replay the exact same state. [Coupling derivation and scope](../clean-room.md#sea-08-pa-13-wake-pressure-returned-to-the-moving-hull)
 
+### SEA-08 hull-launch cavity and splash
+
+The same rigid and wake state is obtained with or without the passive EntrySolver launch observer. The ordinary body in the same EntrySolver still receives water-entry loads. The passive hull emits a cavity and crown event from the live trajectory, with identical replay in plain and shared memory. ShotSplash draws that exact event over the live wake. [Coupling record](../clean-room.md#sea-08-launch-effects-from-the-carried-hull)
+
 ### SEA-08 full KVLCC2 head-sea resistance and motion
 
 The existing solver with the reflection option meets the independent normalized mean resistance intervals for the full model at `λ/L = 2.0` and 1.1. The freely solved heave and pitch amplitudes also meet the experimental intervals at both wavelengths on the draft-qualified hull. The 2.0 case also passes over the coarser geometry. [Geometry, independent measured values and received loads](../clean-room.md#sea-08-measured-resistance-and-motion-on-the-full-kvlcc2-hull)

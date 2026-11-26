@@ -11,6 +11,7 @@ export interface EntryBody {
     readonly row: number;
     readonly mesh: HullMesh;
     readonly contactAngle?: number;
+    readonly effectsOnly?: boolean;
 }
 
 export interface EntryFoam {

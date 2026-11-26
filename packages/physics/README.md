@@ -3103,6 +3103,49 @@ world.advance(96); // a tenth of a second
 console.log(entry.splashes().map((e) => e.kind).join(' ')); // "entry seal": in with a cavity, which pinches
 ```
 
+#### Launch a hull with passive entry effects
+
+Set `effectsOnly: true` on an `EntryBody` when a `HullSolver` handles that body's loads and wake. Entry follows the rigid pose and the local water to produce cavity, splash and foam events. The hull supplies the force and displaced volumes for this row. The default is false, so other bodies in the same EntrySolver retain their usual water-entry loads.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {EntrySolver} from 'margoengine/physics/entry';
+import {SpectralSea, WakeSolver} from 'margoengine/physics/sea';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver, worldMemory} from 'margoengine/physics/world';
+
+await Physics.load();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}, memory: worldMemory(false)});
+using physics = new Physics(null, {fixedTimestep: 1 / 60, arena: world.arena});
+const boat = physics.addBody(null, {
+  position: [-0.5, 0.36, 0], linearVelocity: [0.8, -4, 0],
+  enabledRotations: [false, false, false],
+  colliders: {shape: 'box', halfExtents: [0.5, 0.065, 0.18], mass: 9},
+});
+const mesh = {
+  vertices: Float64Array.of(-0.5, 0, 0, -0.5, 0.13, 0.18, -0.5, 0.13, -0.18,
+    0.5, 0, 0, 0.5, 0.13, 0.18, 0.5, 0.13, -0.18),
+  indices: Uint32Array.of(0, 1, 2, 3, 5, 4, 0, 4, 1, 0, 3, 4, 0, 5, 3,
+    0, 2, 5, 1, 5, 2, 1, 4, 5),
+};
+const hull = new HullSolver('hull', {minimumRadius: 0.12});
+const wake = new WakeSolver('wake', hull.wakeSourceField);
+const sea = new SpectralSea({
+  waves: {
+    frequencies: Float64Array.of(0.1, 0.2, 0.4), directions: Float64Array.of(0, Math.PI),
+    energy: new Float64Array(6), depth: 2, density: 1025,
+  }, patches: [wake],
+});
+const entry = new EntrySolver();
+world.add(new RigidSolver(), {physics})
+  .add(hull, {hulls: [{row: boat.row, mesh}], sea, radiation: false, rollDamping: false, greenWater: false})
+  .add(wake, {cells: [40, 40], cellSize: 0.15, depth: 2, waterBelow: true})
+  .add(entry, {bodies: [{row: boat.row, mesh, contactAngle: 160, effectsOnly: true}], sea})
+  .couple(['hull', 'wake', 'entry', 'rigid'], 'staggered');
+world.advance(14);
+console.log(entry.splashes()[0]?.kind); // entry
+```
+
 ### Water that splashes and pours (`FlipSolver`, `DeckWaterSolver`, `@margoengine/physics/flip`)
 
 `FlipSolver` is FLUID-03: water in a box of cells that collapses, splashes, overturns and pours, as APIC particles
