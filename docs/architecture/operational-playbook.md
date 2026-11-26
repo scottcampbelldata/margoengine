@@ -10338,3 +10338,11 @@ one or more 60 Hz natural SeaSource producers. It imports arena memory, checks t
 module initializer leaves the arena untouched and keeps its registered records stable
 across snapshot restore. The independent cases cover the Ritter fan, rest,
 small-amplitude travel, the wet-patch bottom filter, and a real glacier-to-iceberg bay pulse.
+
+### Thin-disk transport and exterior relativistic trajectories (SPACE-03)
+
+The accretion entry has feature-local plain and shared Rust SIMD builds. The positive tridiagonal solve uses one row
+per annulus and exports density, heat flux and orbital phase through the registry. Both memory modes leave the arena
+intact when instantiated. The Kerr tracer uses pinned elementary functions, signed radial and polar velocities and an
+exterior log radius. Tests cover steady heating, stiff mass balance, circular rates, radial and polar turns, infall,
+frame dragging, a null orbit and exact replay.

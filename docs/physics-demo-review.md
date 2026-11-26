@@ -445,7 +445,7 @@ What it shows: a spinning black hole with a glowing gas disk, seen edge-on, as l
 | EVENTHORIZON-4 | 0:30-0:42 (ray diagram) | Not inspected frame by frame. Uncertain whether the rays are integrated geodesics or drawn curves, and whether the "captured" rays end at the horizon. | Light follows null geodesics. Rays inside the critical impact parameter spiral into the hole. | none | none | Confirm the rays come from the same geodesic integrator as the picture. | OPEN |
 
 Handled acceptably: the lensed disk image (photon ring, far side seen above and below the shadow) looks correct as a still. The disk plane is flat with a single orientation throughout. The camera drift is smooth with no jitter or popping.
-Not in the catalog: relativistic ray tracing and geodesics (lensing as an image effect); accretion-disk physics (magnetorotational turbulence, viscous inflow, relativistic Doppler beaming). SPACE-01 lists only Kepler orbits, SGP4 and spacecraft trajectories.
+SPACE-03 now solves Keplerian shear, the inward viscous mass flux and local disk heating, with separate relativistic geodesics. `packages/physics/tests/accretion.test.js` compares shear and inward flow to a closed-form disk reference. Event Horizon still uses the SPACE-01 emitter path above. Connecting the new annulus fields to rendered transport and emissivity remains open.
 
 ### Inside a Meteorite (inside-a-meteorite)
 What it shows: a Mars meteorite (EET 79001,2) in a glass case, then an X-ray CT slice sweep and a 3D voxel scan whose brightness threshold is raised.

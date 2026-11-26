@@ -344,6 +344,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'accretion-kernel',
+    crate: 'packages/physics/accretion-kernel',
+    blueprint: 'packages/physics/src/accretion/accretion-kernel.wasm',
+    script: 'packages/physics/scripts/build-accretion-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'accretion-kernel-shared',
+    crate: 'packages/physics/accretion-kernel',
+    blueprint: 'packages/physics/src/accretion/accretion-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-accretion-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'room-sound-kernel',
     crate: 'packages/physics/room-sound-kernel',
     blueprint: 'packages/physics/src/room-sound/room-sound-kernel.wasm',

@@ -4023,3 +4023,36 @@ coupling tests drives this route from the real ICE-02 release.
 Read `inundationField` in `TSUNAMI_WORDS` order and use `travelTimes([x, z])` for the static wet
 patch's arrival estimate. `landslideImpulse()` evaluates Heller and Hager's near-field crest
 estimate for a natural subaerial slide in a channel.
+
+## Viscous accretion and Kerr trajectories
+
+Use `@margoengine/physics/accretion` to evolve a thin viscous disk around a fixed star or black hole. Supply its
+annulus edges in metres, mass in kilograms, viscosity in m²/s and initial surface density in kg/m². The inner
+edge defaults to zero torque and accretes gas. The outer edge defaults to sealed and can receive a feed in kg/s.
+`ring(i)` reads its inward mass flow, orbital phase and one-face radiation flux. `budget()` reports kilograms
+and the total luminosity in watts. An optional external field can add a layout-1 f64 feed, in kg/s.
+
+```js
+import { AccretionDiskSolver, KerrGeodesicSolver, kerrCircularOrbit } from '@margoengine/physics/accretion';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const centralMass = 2e35;
+const disk = await AccretionDiskSolver.load();
+const tracer = new KerrGeodesicSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(disk, {
+    centralMass,
+    edges: [1e9, 1.2e9, 1.5e9, 2e9],
+    initialDensity: [3, 7, 2],
+    viscosity: 1e13,
+  })
+  .add(tracer, { ...kerrCircularOrbit(10, 0.3), centralMass, radius: 10, spin: 0.3 });
+world.advance(60);
+console.log(disk.ring(0).heating, tracer.sample().azimuth);
+```
+
+The disk uses Newtonian rotation and a prescribed viscosity. The independent relativistic tracer advances in
+exterior observer time. It supports Kerr, Schwarzschild, inclined and eccentric trajectories and `tracer: 'light'`
+for null geodesics. Its input radii use `GM/c²`. Output distances and proper time use metres and seconds. The
+options default to 60 physics updates per second and an RK4 phase increment of 1/32 at the start of each tick.
+The disk publishes density, heating and orbital phase in increasing radial order.

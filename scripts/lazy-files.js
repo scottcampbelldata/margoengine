@@ -223,6 +223,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/accretion-kernel.wasm',
+    label: 'accretion-kernel.wasm',
+    kind: 'Rust SIMD thin disk mass and heating',
+    measure: 'file',
+    when: 'AccretionDiskSolver.load() from the optional /accretion entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/accretion-kernel-shared.wasm',
+    label: 'accretion-kernel-shared.wasm',
+    kind: 'Rust SIMD thin disk mass and heating, shared world memory',
+    measure: 'file',
+    when: 'AccretionDiskSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/room-sound-kernel.wasm',
     label: 'room-sound-kernel.wasm',
     kind: 'Rust SIMD room acoustic pressure waves',

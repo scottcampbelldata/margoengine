@@ -48,6 +48,9 @@ there, add a line below with the solver ID and what is needed, and build against
   traffic publishers. The road entry already reads real rigid body poses and ATMO-09 wetness, publishes versioned
   drive commands, and applies paired contact impulses through the existing vehicle attachment.
 
+- **SPACE-03:** Register shared annulus geometry and radial density, heating and phase contracts for science
+  visualizations and Event Horizon. The solver publishes layout-1 fields in documented radial order.
+
 - **SOFT-06:** Add versioned per-chamber pressure and volume fields to the soft framework entry for atmospheric pressure
   input and gas feedback. The native soft constraint already uses the rigid contact fields and snapshots the fill.
 
