@@ -21,6 +21,7 @@ import type { EngineKernel, Mesh } from '@margoengine/core';
 import { meshRuntime, type Engine, type EnginePlugin, type FrameGraph } from '@margoengine/core/extension';
 import type { PBRModel } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
+import { onStandIn } from './fade-pattern.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 
 const HELP = '; see https://margoengine.com/errors#lod-occluder-fade';
@@ -412,6 +413,7 @@ export class OccluderFade implements EnginePlugin {
   private values: Float32Array;
   private readonly touched = new Set<number>();
   private buffer?: GPUBuffer;
+  private unlink?: () => void;
   /** Same as `engine.use(new OccluderFade(options))`; returns the OccluderFade. */
   static attach(engine: EngineKernel, options?: OccluderFadeOptions): OccluderFade {
     const value = new OccluderFade(options);
@@ -439,6 +441,23 @@ export class OccluderFade implements EnginePlugin {
     requireWebGPU(engine, 'OccluderFade');
     if (this.engine) throw new MargoError('state', `OccluderFade is in use; make one per engine${HELP}`);
     this.engine = engine;
+    this.unlink = onStandIn(engine, (from, to) => this.adopt(from, to));
+  }
+  /**
+   * `to` starts to draw in place of `from` (the incoming level of an lod/fade cross-fade, or the ghost of an outgoing
+   * geometry): it takes `from`'s fade as it stands, at once, so the pair stays one surface with one opacity instead of
+   * `to` starting solid and fading out again. The next update steps each on its own sight lines.
+   */
+  private adopt(from: object, to: object): void {
+    const amount = this.fades.get(modelOf(from) ?? from)?.amount ?? 0,
+      key = modelOf(to) ?? to;
+    let fade = this.fades.get(key);
+    if (!fade) {
+      if (!amount) return;
+      this.fades.set(key, (fade = this.fading(key)));
+    }
+    fade.amount = amount;
+    fade.set(amount * (1 - this.minOpacity));
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
@@ -593,6 +612,8 @@ export class OccluderFade implements EnginePlugin {
   dispose(): void {
     const engine = this.engine;
     this.finish();
+    this.unlink?.();
+    this.unlink = undefined;
     this.hits = new Set();
     for (const entry of this.effects.values()) {
       entry.remove();

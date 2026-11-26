@@ -6,7 +6,8 @@ import { box } from '../../core/dist/index.js';
 import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { wgsl } from '../../core/src/shaders.ts';
 import { setRenderLayers } from '../../cameras/dist/layers.js';
-import { coreFadeShader } from '@margoengine/lod/fade';
+import { LODSystem } from '@margoengine/lod';
+import { LODFade, coreFadeShader } from '@margoengine/lod/fade';
 import {
   OccluderFade,
   coreOccluderShader,
@@ -174,6 +175,56 @@ test('both tiles hold every rank once, so the kept share is the opacity', () => 
     }
   assert.notDeepEqual([...blue], [...occluderThresholds('bayer')]);
 });
+
+test('a level that cross-fades in, and the ghost of a swapped geometry, take the occluder fade at once (KB-LOD-FADECOMBO1)', () =>
+  scene((engine, { target, wall }) => {
+    // The camera is 10 from the anchors; the levels switch at 20, so `bias` 4 shows level 1.
+    const system = LODSystem.attach(engine),
+      lods = LODFade.attach(engine, system),
+      fade = OccluderFade.attach(engine, { targets: [target], fadeTime: 1, minOpacity: 0.2 }),
+      next = engine
+        .createMesh()
+        .setGeometry(box(2, 2, 0.2))
+        .setPosition([0, 0, 5]),
+      meshes = system.add(engine.createMesh(), [{ object: wall }, { object: next, distance: 20 }], { radius: 1 });
+    system.update();
+    fade.update(0.5);
+    assert.equal(fade.opacityOf(next), 1, 'a hidden level is no occluder');
+    system.bias = 4;
+    system.update();
+    assert.equal(lods.active, 1);
+    assert.ok(Math.abs(fade.opacityOf(next) - 0.6) < 1e-6, `the incoming level: ${fade.opacityOf(next)}`);
+    fade.update(0.25);
+    assert.ok(Math.abs(fade.opacityOf(next) - 0.4) < 1e-6 && fade.opacityOf(next) === fade.opacityOf(wall));
+    // The hidden level fades back unseen; shown again, it takes the opacity of the level it replaces, not its own.
+    lods.finish();
+    fade.update(10);
+    assert.equal(fade.opacityOf(wall), 1);
+    system.bias = 1;
+    system.update();
+    assert.ok(Math.abs(fade.opacityOf(wall) - 0.2) < 1e-6, `the level shown again: ${fade.opacityOf(wall)}`);
+    lods.finish();
+    meshes.remove();
+    wall.visible = next.visible = false;
+    // Geometry levels: the ghost that draws the old geometry is as faded as its mesh.
+    const before = new Set(engine.meshes.values()),
+      shape = engine.createMesh().setPosition([0, 0, 5]);
+    system.add(shape, [{ object: box(2, 2, 0.2) }, { object: box(2, 2, 0.2), distance: 20 }], { radius: 1 });
+    system.update();
+    fade.update(10);
+    assert.ok(Math.abs(fade.opacityOf(shape) - 0.2) < 1e-6);
+    system.bias = 4;
+    system.update();
+    const ghost = [...engine.meshes.values()].find((mesh) => !before.has(mesh) && mesh !== shape && mesh.visible);
+    assert.ok(ghost && Math.abs(fade.opacityOf(ghost) - 0.2) < 1e-6, 'the ghost is faded with its mesh');
+    // The ghost of a solid mesh is solid.
+    lods.finish();
+    fade.targets = [];
+    fade.update(10);
+    system.bias = 1;
+    system.update();
+    assert.equal(fade.active, 0);
+  }));
 
 test('the core patch reads the faded share of the mesh id and composes with lod/fade in either order', () => {
   const code = coreOccluderShader(wgsl);
