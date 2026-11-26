@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Live shell aperture (BREAK-03 / SEA-10, 2026-11-26). A released seam publishes its actual
+  vertices. The exterior breach reads 0.021012 m² on the first open tick and moves 0.030867 m³/s
+  into the dry compartment, within the independent pressure-head bounds. The linked hull
+  settles deeper than the disconnected control. Partial damage stays dry and the event
+  replays across distinct origin cells. [Reproduce](reproduce.md#break-03-live-shell-aperture)
 - Cohesive sheet seams (BREAK-03, 2026-11-26). Two native shell pieces soften along a
   prescribed interface and release the actual mesh edges. The fully released seam absorbs
   9 J of fracture work. The lower-work control unloads and retains its damage with zero

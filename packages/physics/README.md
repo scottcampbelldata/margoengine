@@ -5425,6 +5425,57 @@ Set those from the bounded joint material response. The seam's recoverable and i
 energies are in `readSeam`; `readBudget` continues to report the bulk sheet terms.
 [Seam method and checks](../../docs/whitepaper/reproduce.md#break-03-cohesive-sheet-seams)
 
+Use `CrushShellSolver.loadWithApertures()` to publish released edges and connect them to
+`HullSolver.withShellApertures(shell.apertureField)`. Set an opening's `shellSeam` to its
+zero-based seam index. The live quadrilateral supplies area, depth and the breach position.
+The opening's `normal` selects the outward side for the outflow field. Use matching origin
+cells or give the consumer the common `cellSize` in metres. To combine this with rigid sphere
+contact, call the shell loader with `{ rigid: { rate } }`.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushShellSolver } from '@margoengine/physics/crush';
+import { HULL_BREACHES_FIELD, HullSolver } from '@margoengine/physics/seakeeping';
+import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, -9.81, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const body = physics.addBody(null, {
+  colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 500, sensor: true },
+});
+const shell = await CrushShellSolver.loadWithApertures();
+const hull = HullSolver.withShellApertures(shell.apertureField);
+const vertices = Float64Array.from(
+  [-1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1, -1,-1,1, 1,-1,1, 1,1,1, -1,1,1], value => value * 0.5,
+);
+const mesh = { vertices, indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,4,7, 0,7,3,
+  1,2,6, 1,6,5, 0,1,5, 0,5,4, 3,7,6, 3,6,2] };
+world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
+world.add(shell, {
+  positions: [[-0.3,-0.4,0.5], [0,-0.4,0.5], [0,-0.2,0.5], [0,-0.4,0.5], [0.3,-0.4,0.5], [0,-0.2,0.5]],
+  triangles: [[0,1,2], [3,4,5]],
+  velocities: [[-1.2,0,0], [-1.2,0,0], [-1.2,0,0], [1.2,0,0], [1.2,0,0], [1.2,0,0]],
+  material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
+  seams: [{ sides: [[1,2],[3,5]], stiffness: 4e5, peakTraction: 12e3, toughness: 600 }],
+});
+world.add(hull, {
+  hulls: [{ row: body.row, mesh, compartments: [{ mesh, permeability: 1 }], openings: [{
+    from: 0, to: 'outside', centre: [0,-0.25,0.5], normal: [0,0,1], width: 0.001, height: 0.001, shellSeam: 0,
+  }] }],
+  sea: { density: 1000, elevation: () => 0, pressure: (_x, y) => Math.max(0, -9810 * y) },
+});
+world.couple([shell.id, hull.id, 'rigid'], 'staggered');
+world.advance(8);
+const aperture = world.fields.port(HULL_BREACHES_FIELD.name)!;
+if (Number(regionWords(world.memory, aperture.region)[10]) >= 0) throw new Error('Expected flooding through the seam');
+```
+
+The shell aperture port uses layout 1, with area in square metres followed by four
+xyz vertices in metres in the port's origin cell. `SHELL_APERTURE_WORDS` gives the row width.
+[Aperture method and checks](../../docs/whitepaper/reproduce.md#break-03-live-shell-aperture)
+
 On moving bodies, add the circular plate to `CrushSolver.indentationPatches`. Choose the
 body-local plate anchor, normal and support point as with ordinary patches. The station
 absorbs the available normal energy up to localization. An intact dent stays plastically

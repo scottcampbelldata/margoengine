@@ -12,6 +12,7 @@ import type {
 import { isRateLevel, type RateLevel, rateOf } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_IMPULSES_FIELD } from '../world/solvers/rigid.js';
 import { type CrushVector, triple, ZERO } from './rigid-contact.js';
+import { SHELL_APERTURE_LAYOUT, SHELL_APERTURE_WORDS, shellApertureField } from './shell-aperture.js';
 import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
 import { type CrushShellContact, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
 import {
@@ -92,6 +93,7 @@ interface ShellState {
   readonly rigid?: ShellRigid;
   readonly maxNodeInverseMass: number;
   readonly seams?: Region;
+  readonly apertures?: { readonly region: Region; readonly vertices: Uint32Array };
 }
 
 function finiteVector(v: CrushVector, label: string): CrushVector {
@@ -124,6 +126,8 @@ function coefficients(m: CrushShellMaterial): readonly number[] {
 export class CrushShellSolver implements Solver<CrushShellParams> {
   /** Layout 1 positions, three f64 metre offsets per vertex. */
   readonly positionField: FieldDescriptor;
+  /** Layout 1 seam openings. Published by the aperture-enabled loader. */
+  readonly apertureField: FieldDescriptor;
   private state: ShellState | undefined;
 
   private constructor(
@@ -131,7 +135,9 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     readonly id: string,
     private readonly rigid: boolean,
     private readonly rate: RateLevel,
+    private readonly publishApertures = false,
   ) {
+    this.apertureField = shellApertureField(id);
     this.positionField = {
       name: `${id}:vertices`,
       kind: 'meshVertexSet',
@@ -160,6 +166,26 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     return new CrushShellSolver(await loadShell(options.signal), options.id ?? 'crush-shell', true, rate);
   }
 
+  /** Loads a shell that publishes its released seam geometry for flooding or other readers. */
+  static async loadWithApertures(
+    options: {
+      readonly id?: string;
+      readonly signal?: AbortSignal;
+      /** Enable moving sphere contact at the given rigid world rate. Default disabled. */
+      readonly rigid?: { readonly rate?: RateLevel };
+    } = {},
+  ): Promise<CrushShellSolver> {
+    const rate = options.rigid?.rate ?? 0;
+    if (!isRateLevel(rate)) throw new MargoError('state', 'Choose a shell aperture rate level from 0 to 7.');
+    return new CrushShellSolver(
+      await loadShell(options.signal),
+      options.id ?? 'crush-shell',
+      !!options.rigid,
+      rate,
+      true,
+    );
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
@@ -167,6 +193,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       stableRate: () => 0,
       fields: [
         { field: this.positionField, access: 'write' },
+        ...(this.publishApertures ? [{ field: this.apertureField, access: 'write' as const }] : []),
         ...(this.rigid
           ? ([
               { field: BODIES_FIELD, access: 'read' },
@@ -202,6 +229,8 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const steel = coefficients(material);
     const topology = makeShell(positions, triangles, material);
     const seams = params.seams ?? [];
+    if (this.publishApertures && seams.length === 0)
+      throw new MargoError('state', 'Give an aperture-enabled shell at least one cohesive seam.');
     const cohesive = seams.length
       ? prepareSeams(seams, positions, topology.boundaryEdges, topology.nodeMass, material.thickness)
       : undefined;
@@ -225,6 +254,17 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const hinges = host.allocate('shell-hinges', Math.max(8, topology.hinges.byteLength), 'u8', 1);
     const seamRecords = cohesive && host.allocate('shell-seams', cohesive.packed.byteLength, 'u8', 1);
     const seamState = cohesive && f64('shell-seam-history', SEAM_STATE_WORDS * seams.length);
+    const apertures = this.publishApertures
+      ? {
+          region: host.allocate(
+            'shell-apertures',
+            seams.length * SHELL_APERTURE_WORDS * 8,
+            'f64',
+            SHELL_APERTURE_LAYOUT,
+          ),
+          vertices: Uint32Array.from(seams.flatMap(({ sides: [[a, b], [c, d]] }) => [a, b, d, c])),
+        }
+      : undefined;
     const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount + SEAM_STATE_WORDS * seams.length);
     const descriptor = host.allocate('shell-descriptor', 136, 'u8', 1);
     const memory = host.memory;
@@ -286,6 +326,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       rigid,
       maxNodeInverseMass,
       seams: seamState,
+      apertures,
     };
   }
 
@@ -307,21 +348,28 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
-    const { positions, rigid } = this.requireState();
+    const state = this.requireState();
+    const { positions, rigid, apertures } = state;
     const ports = [{ field: this.positionField.name, region: positions, tick, cell: ZERO }];
     if (rigid)
       ports.push(
         { field: BODY_IMPULSES_FIELD.name, region: rigid.reactions, tick, cell: ZERO },
         { field: BODY_FORCES_FIELD.name, region: rigid.forces, tick, cell: ZERO },
       );
+    if (apertures) {
+      writeApertures(state);
+      ports.push({ field: this.apertureField.name, region: apertures.region, tick, cell: ZERO });
+    }
     return ports;
   }
 
   stateRegions(): readonly Region[] {
-    const { positions, velocities, faceState, applied, reactions, energy, rigid, seams } = this.requireState();
+    const { positions, velocities, faceState, applied, reactions, energy, rigid, seams, apertures } =
+      this.requireState();
     const regions = [positions, velocities, faceState, applied, reactions, energy];
     if (rigid) regions.push(rigid.readings);
     if (seams) regions.push(seams);
+    if (apertures) regions.push(apertures.region);
     return regions;
   }
 
@@ -402,6 +450,22 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
 
 function values(host: SolverHost, region: Region): Float64Array {
   return regionWords(host.memory, region) as Float64Array;
+}
+
+function writeApertures({ host, positions, seams, apertures }: ShellState): void {
+  if (!seams || !apertures) return;
+  const x = values(host, positions);
+  const history = values(host, seams);
+  const out = values(host, apertures.region);
+  const vertexRows = apertures.vertices;
+  for (let i = 0; i < vertexRows.length / 4; i++) {
+    const at = i * SHELL_APERTURE_WORDS;
+    out[at] = history[i * SEAM_STATE_WORDS + 6]!;
+    for (let corner = 0; corner < 4; corner++) {
+      const vertex = vertexRows[4 * i + corner]!;
+      out.set(triple(x, 3 * vertex), at + 1 + 3 * corner);
+    }
+  }
 }
 
 function substeps(dt: number, maxStep: number, resolution: number): number {

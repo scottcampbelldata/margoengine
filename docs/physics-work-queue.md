@@ -137,8 +137,8 @@ there, add a line below with the solver ID and what is needed, and build against
   and air/soil feedback. Publish source-grid geometry where types currently describe only rows. The airborne
   entry reads the existing EARTH-07 dust and SEA-13 whitecap fields on matching geometry and exposes the scoped ports.
 
-- **BREAK-03:** SEA-10 reads the versioned crush and girder fields to activate compartment openings and adds the
-  carried water mass and inertia. The crush entry exchanges normal and angular impulse through the rigid ports.
+- **BREAK-03:** SEA-10 reads the versioned crush, girder and live shell aperture fields to move water into compartments
+  and adds the carried water mass and inertia. The crush entry exchanges normal and angular impulse through the rigid ports.
   Publish a shared effective-inertia port so short contact events can include resolved hydrodynamic added mass.
 
 - **BIO-03:** Register canonical x-fast cell fields for forest burn severity, fuel moisture, live canopy fuel,

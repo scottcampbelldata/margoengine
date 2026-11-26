@@ -45,6 +45,26 @@ oblique plane, an intervening ridge and a cell with one raised corner. The analy
 speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
 The ridge test compares a saved run and its replay in both world memory modes.
 
+## BREAK-03 live shell aperture
+
+Run `node --test packages/physics/tests/coupling/crush-shell-flood.test.js`. The mesh is
+configured in a different origin cell from the hull. The first open area is 0.021012 m² and its
+flux is 0.030867 m³/s. The test derives its upper Bernoulli bound using the deepest corner
+and initial dry compartment. For the lower bound it subtracts the upper possible single-tick
+water rise and corresponding Boyle compression from the shallowest corner's head. Keeping
+the same structural motion without the aperture linkage leaves the hull dry. A separate
+softening control stays closed. Replay checks the breach record, motion and world hash.
+
+The hull splits the opening between the two released shell edges into two triangles.
+Each uses the triangular map `(1-s)A + s((1-t)B + tC)`, with Jacobian proportional to `s`.
+Each parameter cell's geometric area is integrated exactly. Its height range and area feed
+the existing pressure strip integration. The map follows the square-to-triangle construction
+in [Michael G. Duffy, *Quadrature Over a Pyramid or Cube of Integrands with a Singularity at a Vertex* (1982)](https://doi.org/10.1137/0719090).
+Flow and air compression follow the progressive flooding models in
+[Pekka Ruponen, *Progressive flooding of a damaged passenger ship* (2007)](https://research.aalto.fi/en/publications/progressive-flooding-of-a-damaged-passenger-ship/)
+and [Hendrik Dankowski and Stefan Krüger, *Dynamic Extension of a Numerical Flooding Simulation in the Time-Domain* (2015)](https://www.shipstab.org/files/Proceedings/STAB/STAB2015/Papers/7.2-3-Dankowski.pdf).
+The current proof is analytical for the new geometry-to-flow coupling.
+
 ## BREAK-03 cohesive sheet seams
 
 Run `node --test packages/physics/tests/coupling/crush-shell.test.js` and

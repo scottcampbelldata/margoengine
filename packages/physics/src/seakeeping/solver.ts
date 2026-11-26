@@ -57,11 +57,12 @@ import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../wo
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { courseWaveCorrection } from './excitation.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
-import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
+import { AIR_DENSITY, type Compartment, FLOOD_OPENING_GRID, Flooding, type Opening, volumeBelow } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { buildHullMemory, type HullMemory, type HullWaveMemory, stillWaterline } from './memory.js';
 import { surgePanelMass } from './panel-surge.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
+import { isShellApertureField, panelAperture, type ShellAperture, shellApertureRows } from './shell-opening.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import {
@@ -290,6 +291,8 @@ export class HullSolver implements Solver<HullParams> {
   private breaches: Region | null = null;
   private lastCrushPatch = -1;
   private lastGirderJoint = -1;
+  private lastShellSeam = -1;
+  private shellApertures?: { readonly field: FieldDescriptor; readonly cellSize?: number };
 
   /** The hull's signed volume source rows, named from the solver's id. Enabled with the wake option. */
   readonly wakeSourceField: FieldDescriptor;
@@ -324,6 +327,27 @@ export class HullSolver implements Solver<HullParams> {
     });
   }
 
+  /** Connects released shell polygons to the hull's `shellSeam` openings. */
+  static withShellApertures(
+    field: FieldDescriptor,
+    options: {
+      readonly id?: string;
+      readonly cellSize?: number;
+      readonly wake?: HullWake;
+      readonly crushDamage?: FieldDescriptor;
+      readonly girderSeams?: FieldDescriptor;
+    } = {},
+  ): HullSolver {
+    if (!isShellApertureField(field))
+      throw new MargoError('state', 'Pass CrushShellSolver.apertureField to link live shell seams.');
+    const { id, wake, crushDamage, girderSeams, cellSize } = options;
+    if (cellSize !== undefined && !(cellSize > 0 && Number.isFinite(cellSize)))
+      throw new MargoError('state', 'Use a positive finite world cell size when connecting shell apertures.');
+    const hull = new HullSolver(id, wake, crushDamage, girderSeams);
+    hull.shellApertures = { field, cellSize };
+    return hull;
+  }
+
   describe(): SolverDescription {
     const level = this.level;
     return {
@@ -338,6 +362,7 @@ export class HullSolver implements Solver<HullParams> {
         ...(this.wakeRadius !== null ? [{ field: this.wakeSourceField, access: 'write' as const }] : []),
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
         ...(this.girderSeams ? [{ field: this.girderSeams, access: 'read' as const }] : []),
+        ...(this.shellApertures ? [{ field: this.shellApertures.field, access: 'read' as const }] : []),
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -355,9 +380,10 @@ export class HullSolver implements Solver<HullParams> {
       throw new TypeError('A HullSolver needs a sea with elevation(x, z, t): pass {sea}.');
     let lastCrushPatch = -1;
     let lastGirderJoint = -1;
+    let lastShellSeam = -1;
     for (const hull of hulls) {
       if (hull.bilgeKeels !== undefined) validateBilgeKeels(hull.bilgeKeels);
-      for (const { crushPatch, girderJoint } of hull.openings ?? []) {
+      for (const { crushPatch, girderJoint, shellSeam } of hull.openings ?? []) {
         if (crushPatch !== undefined) {
           if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
             throw new MargoError(
@@ -373,6 +399,11 @@ export class HullSolver implements Solver<HullParams> {
               'Pass GirderJointSolver.seamField and a nonnegative girderJoint index for the hull opening.',
             );
           lastGirderJoint = Math.max(lastGirderJoint, girderJoint);
+        }
+        if (shellSeam !== undefined) {
+          if (!this.shellApertures || !Number.isSafeInteger(shellSeam) || shellSeam < 0)
+            throw new MargoError('state', 'Use HullSolver.withShellApertures and a nonnegative shellSeam index.');
+          lastShellSeam = Math.max(lastShellSeam, shellSeam);
         }
       }
       if (!(Number.isInteger(hull.row) && hull.row >= 0))
@@ -423,6 +454,7 @@ export class HullSolver implements Solver<HullParams> {
     this.host = host;
     this.lastCrushPatch = lastCrushPatch;
     this.lastGirderJoint = lastGirderJoint;
+    this.lastShellSeam = lastShellSeam;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     this.wakeSources = null;
     this.wakePlanes.clear();
@@ -647,6 +679,22 @@ export class HullSolver implements Solver<HullParams> {
     const seams = girder && (regionWords(girder.region.memory ?? host.memory, girder.region) as Float64Array);
     if (seams && this.lastGirderJoint * GIRDER_SEAM_WORDS >= seams.length)
       throw new MargoError('state', 'Choose a hull opening girderJoint within the connected seam port.');
+    const aperturePort = this.shellApertures && context.inputs.get(this.shellApertures.field.name);
+    let shellInput: { rows: Float64Array; offset: Vec3 } | undefined;
+    if (aperturePort && this.lastShellSeam >= 0) {
+      const { cell } = aperturePort;
+      const delta = [cell[0] - context.cell[0], cell[1] - context.cell[1], cell[2] - context.cell[2]] as const;
+      const size = this.shellApertures?.cellSize;
+      if (size === undefined && delta.some((value) => value !== 0))
+        throw new MargoError('state', 'Set the common cellSize for shell apertures and hulls in different cells.');
+      const offset = [delta[0] * (size ?? 1), delta[1] * (size ?? 1), delta[2] * (size ?? 1)] as const;
+      if (!offset.every(Number.isFinite))
+        throw new MargoError('state', 'Use a finite metre offset between the hull and shell cells.');
+      shellInput = {
+        rows: shellApertureRows(host.memory, aperturePort, this.lastShellSeam),
+        offset,
+      };
+    }
     const memory = port.region.memory ?? host.memory,
       bodies = new Float32Array(memory.buffer, port.region.byteOffset, port.region.byteLength / 4),
       // The middle of the step the load is held over.
@@ -744,6 +792,7 @@ export class HullSolver implements Solver<HullParams> {
           loads,
           damage,
           seams,
+          shellInput,
         ),
         w = hull.row * FORCE_WORDS,
         held =
@@ -1467,12 +1516,30 @@ export class HullSolver implements Solver<HullParams> {
     loads: WettedLoads,
     damage: Float64Array | undefined,
     seams: Float64Array | undefined,
+    shellInput: { rows: Float64Array; offset: Vec3 } | undefined,
   ): number[] {
     const entry = this.floods.get(hull);
     if (!entry || !this.flood) return [];
     const { flooding, at, record } = entry;
     const state = new Float64Array(this.host!.memory.buffer, this.flood.byteOffset + at * 8, flooding.words);
     const openings = hull.openings ?? [];
+    const live = shellInput ? new Map<number, ShellAperture>() : undefined;
+    if (shellInput && live) {
+      for (const [k, opening] of openings.entries()) {
+        if (opening.shellSeam === undefined) continue;
+        const n = opening.normal;
+        const length = hypot(n[0], n[1], n[2]);
+        const outward = rotate(pose.rotation, [n[0] / length, n[1] / length, n[2] / length]);
+        const aperture = panelAperture(
+          shellInput.rows,
+          opening.shellSeam,
+          shellInput.offset,
+          outward,
+          FLOOD_OPENING_GRID,
+        );
+        if (aperture) live.set(k, aperture);
+      }
+    }
     if (damage || seams) {
       for (let k = 0; k < openings.length; k++) {
         const { crushPatch, girderJoint } = openings[k]!;
@@ -1486,7 +1553,7 @@ export class HullSolver implements Solver<HullParams> {
     const density = this.sea!.density ?? SEA_WATER,
       g = this.gravity,
       magnitude = hypot(g[0], g[1], g[2]),
-      r = flooding.step(state, pose, this.sea!, t, dt, density, magnitude),
+      r = flooding.stepWithShellApertures(state, pose, this.sea!, t, dt, density, magnitude, live),
       points: number[] = [],
       add = (m: number, x: number, y: number, z: number) => {
         if (m === 0) return;
@@ -1510,12 +1577,13 @@ export class HullSolver implements Solver<HullParams> {
     for (let k = 0; k < openings.length; k++) {
       const o = openings[k]!;
       if (o.to !== 'outside') continue;
+      const aperture = live?.get(k);
       const c = rotate(q, o.centre),
         nl = hypot(o.normal[0], o.normal[1], o.normal[2]),
-        normal = rotate(q, [o.normal[0] / nl, o.normal[1] / nl, o.normal[2] / nl]),
-        x = c[0] + pose.position[0],
-        y = c[1] + pose.position[1],
-        z = c[2] + pose.position[2],
+        normal = aperture?.normal ?? rotate(q, [o.normal[0] / nl, o.normal[1] / nl, o.normal[2] / nl]),
+        [x, y, z] = aperture?.centre ?? [c[0] + pose.position[0], c[1] + pose.position[1], c[2] + pose.position[2]],
+        openArea =
+          o.shellSeam === undefined ? r.open[k]! * o.width * o.height : r.open[k] === 1 ? (aperture?.area ?? 0) : 0,
         cargo = flooding.compartments[o.from]!.cargo,
         w = 1 + n * HULL_BREACH_WORDS;
       breaches.set(
@@ -1528,7 +1596,7 @@ export class HullSolver implements Solver<HullParams> {
           normal[0],
           normal[1],
           normal[2],
-          r.open[k]! * o.width * o.height,
+          openArea,
           r.water[k]!,
           r.air[k]!,
           r.air[k]! / AIR_DENSITY,

@@ -9651,8 +9651,14 @@ The distributed seam model opens authored coincident boundaries after both quadr
 points release. It uses the same separation law for tensile and tangential relative motion.
 An already released seam preserves its fracture work even if its physical opening closes.
 The aperture area is the two-triangle surface between the current edge pairs.
-Unilateral lip contact, automatic crack paths, mode-dependent cohesive properties,
-independent measured shell fracture, and SEA-10 flow through the live shell opening remain open.
+SEA-10 converts both live triangles to 16 hydraulic cells each. Their integration preserves
+triangular area and approximates the height density within each strip. The sea level is read
+at the area-weighted centroid. This supplies inflow and adds carried water to the hull.
+The geometry source is the shell's separate world trajectory, so align the panel with the
+compartment and use the same world scale. Closing the geometric gap stops flow while the
+seam remains fractured. Fluid pressure feedback to the shell, unilateral lip contact,
+automatic crack paths, mode-dependent cohesive properties and independent measured
+shell fracture remain open.
 The optional shell loader fetches the 10,030 B plain Wasm asset (4,951 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 

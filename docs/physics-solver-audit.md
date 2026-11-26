@@ -97,8 +97,8 @@ The worst cases, where the gap is closest to the row not being met:
 - **BREAK-03 ductile crushing:** the initial station model lacked sustained support, friction, grounding,
   live plating and SEA-10 linkage. The current package supplies those on its reduced station path
   and provides a distributed triangular shell with bending, plane-stress yielding, reciprocal sphere contact
-  and cohesive breakup along prescribed seams. General shell contact, automatic tearing, live shell openings
-  in SEA-10, and measured full-scale vessel and vehicle response remain open.
+  and cohesive breakup along prescribed seams. SEA-10 consumes the actual live seam polygon for progressive
+  flooding. General shell contact, automatic tearing, and measured full-scale vessel and vehicle response remain open.
 - **SEA-06 tsunamis:** there is no fault source anywhere in the code, although the clean-room record says the solver
   uses Okada deformation; run-up is only asserted to be positive.
 - **ATMO-07 lightning:** no electrification and no breakdown threshold (with no space charge the path ignores the

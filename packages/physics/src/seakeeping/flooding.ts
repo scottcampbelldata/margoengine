@@ -36,6 +36,7 @@
 
 import { hypot, pow } from '@margoengine/math/pinned';
 import { settlingVelocity } from '../tracers.js';
+import type { ShellAperture } from './shell-opening.js';
 import { BREACH_CARGO, type BreachCargo } from '../world/flooding.js';
 import type { HullMesh, Vec3 } from './wetted.js';
 
@@ -109,6 +110,8 @@ export interface Opening {
   readonly crushPatch?: number;
   /** Keep shut by default until this zero-based GirderJointSolver joint releases. */
   readonly girderJoint?: number;
+  /** Read current opening geometry from this zero-based CrushShellSolver seam. */
+  readonly shellSeam?: number;
 }
 
 /** f64 words of a compartment's state: its water (m^3), its air (kg) and its cargo left (kg). */
@@ -151,7 +154,8 @@ interface Surface {
 /** Levels in a compartment's volume table, from its lowest point to its highest along the world's up. */
 const LEVELS = 48;
 /** Cells a side of an opening's grid. */
-const GRID = 4;
+export const FLOOD_OPENING_GRID = 4;
+const GRID = FLOOD_OPENING_GRID;
 /** Air's gas constant times its temperature, p / rho, m^2/s^2 (isothermal). */
 const RT = ATMOSPHERE / AIR_DENSITY;
 /** Gauss-Seidel sweeps at most, and the root's iterations at most. */
@@ -330,6 +334,7 @@ interface OpeningShape {
   readonly opens: number;
   readonly closes: number;
   readonly collapse: number;
+  readonly shellSeam: boolean;
 }
 
 /** A compartment's fixed data. */
@@ -405,6 +410,9 @@ export class Flooding {
     const n = this.compartments.length;
     this.openings = (openings ?? []).map((o, i) => {
       const to = o.to === 'outside' ? -1 : o.to;
+      const shellSeam = o.shellSeam !== undefined;
+      if (shellSeam && (o.crushPatch !== undefined || o.girderJoint !== undefined || o.collapse !== undefined))
+        throw new RangeError('Use the live shell geometry as the sole structural trigger on a shell opening.');
       if (
         !(Number.isInteger(o.from) && o.from >= 0 && o.from < n) ||
         !(to === -1 || (Number.isInteger(to) && to >= 0 && to < n && to !== o.from))
@@ -450,7 +458,17 @@ export class Flooding {
         throw new RangeError(
           `Opening ${i} gives way at ${collapse} m of head; pass a head above 0, and times as numbers.`,
         );
-      return { corners, area: (o.width * o.height) / (GRID * GRID), cd, from: o.from, to, opens, closes, collapse };
+      return {
+        corners,
+        area: (o.width * o.height) / (GRID * GRID),
+        cd,
+        from: o.from,
+        to,
+        opens,
+        closes,
+        collapse,
+        shellSeam,
+      };
     });
     this.tables = new Float64Array(n * LEVELS);
     this.heights = new Float64Array(n * LEVELS);
@@ -563,6 +581,20 @@ export class Flooding {
    * `sea` of density `rho` under gravity `g` (m/s^2, down the world's y). Fills `result`.
    */
   step(state: Float64Array, pose: Pose, sea: Surface, t: number, dt: number, rho: number, g: number): FloodResult {
+    return this.stepWithShellApertures(state, pose, sea, t, dt, rho, g);
+  }
+
+  /** Moves fluids through live fractured polygons at their world positions. */
+  stepWithShellApertures(
+    state: Float64Array,
+    pose: Pose,
+    sea: Surface,
+    t: number,
+    dt: number,
+    rho: number,
+    g: number,
+    live?: ReadonlyMap<number, ShellAperture>,
+  ): FloodResult {
     const q = pose.rotation,
       // The world's up in the body's frame: the conjugate rotation of y.
       u: Vec3 = [2 * (q[0] * q[1] + q[3] * q[2]), 1 - 2 * (q[0] * q[0] + q[2] * q[2]), 2 * (q[1] * q[2] - q[3] * q[0])],
@@ -582,7 +614,9 @@ export class Flooding {
       ];
     };
     // Each opening's cells: their height spans (world), and the sea's level at the opening.
-    const spans = openings.map((o) => {
+    const spans = openings.map((o, index) => {
+      const aperture = o.shellSeam ? live?.get(index) : undefined;
+      if (aperture) return aperture.spans;
       const s = new Float64Array(GRID * GRID * 2);
       for (let c = 0; c < GRID * GRID; c++) {
         let lo = Infinity,
@@ -598,8 +632,10 @@ export class Flooding {
       }
       return s;
     });
-    const seaLevel = openings.map((o) => {
+    const seaLevel = openings.map((o, index) => {
       if (o.to !== -1) return 0;
+      const aperture = o.shellSeam ? live?.get(index) : undefined;
+      if (aperture) return sea.elevation(aperture.centre[0], aperture.centre[2], t);
       const c = o.corners,
         mid = (k: number) => (c[k]! + c[(GRID * GRID * 4 - 1) * 3 + k]!) / 2,
         w = toWorld(mid(0), mid(1), mid(2));
@@ -621,12 +657,16 @@ export class Flooding {
     for (let i = 0; i < n; i++) setSide(i, state[i * COMPARTMENT_WORDS]!, state[i * COMPARTMENT_WORDS + 1]!);
     const base = n * COMPARTMENT_WORDS;
     openings.forEach((o, k) => {
+      if (o.shellSeam) {
+        r.open[k] = live?.has(k) && t >= o.opens && t < o.closes ? 1 : 0;
+        return;
+      }
       if (state[base + k] !== 1 && o.collapse < Infinity) {
         const a = sides[o.from]!,
           b = o.to === -1 ? outside[k]! : sides[o.to]!,
           span = spans[k]!;
         let head = 0;
-        for (let c = 0; c < GRID * GRID * 2; c++) {
+        for (let c = 0; c < span.length; c++) {
           const z = span[c]!,
             d = a.p + rho * g * Math.max(0, a.level - z) - (b.p + rho * g * Math.max(0, b.level - z));
           head = Math.max(head, Math.abs(d) / (rho * g));
@@ -641,10 +681,13 @@ export class Flooding {
       const o = openings[k]!,
         a = sides[o.from]!,
         b = o.to === -1 ? outside[k]! : sides[o.to]!,
-        span = spans[k]!;
+        span = spans[k]!,
+        cellAreas = o.shellSeam ? live?.get(k)?.stripAreas : undefined;
       let sum = 0;
-      for (let c = 0; c < GRID * GRID; c++)
-        sum += stripFlow(span[c * 2]!, span[c * 2 + 1]!, o.area, o.cd, a, b, air, rho, g);
+      for (let c = 0; c < span.length / 2; c++) {
+        const area = cellAreas?.[c] ?? o.area;
+        if (area > 0) sum += stripFlow(span[c * 2]!, span[c * 2 + 1]!, area, o.cd, a, b, air, rho, g);
+      }
       return sum;
     };
     const touching: number[][] = Array.from({ length: n }, () => []);
@@ -732,7 +775,7 @@ export class Flooding {
               other = o.to === -1 ? outside[k]! : sides[o.from === i ? o.to : o.from]!,
               span = spans[k]!;
             let low = Infinity;
-            for (let c = 0; c < GRID * GRID * 2; c++) low = Math.min(low, span[c]!);
+            for (let c = 0; c < span.length; c++) low = Math.min(low, span[c]!);
             if (Number.isFinite(other.p)) hi = Math.max(hi, other.p + rho * g * Math.max(0, other.level - low));
           }
           hi *= 1 + 1e-9;
@@ -777,7 +820,7 @@ export class Flooding {
             other = o.to === -1 ? outside[k]! : sides[o.from === i ? o.to : o.from]!,
             span = spans[k]!;
           let low = Infinity;
-          for (let c = 0; c < GRID * GRID * 2; c++) low = Math.min(low, span[c]!);
+          for (let c = 0; c < span.length; c++) low = Math.min(low, span[c]!);
           hi = Math.max(hi, other.p + rho * g * Math.max(0, other.level - low));
         }
         hi *= 1 + 1e-9;
@@ -817,16 +860,18 @@ export class Flooding {
       const bulk = left / (c.density * c.packing),
         topLevel = this.levelOf(o.from, Math.min(bulk * c.permeability, this.capacity[o.from]!)),
         span = spans[k]!,
-        water = sides[o.from]!.level;
+        water = sides[o.from]!.level,
+        cellAreas = o.shellSeam ? live?.get(k)?.stripAreas : undefined;
       let under = 0,
         wet = 0;
-      for (let cell = 0; cell < GRID * GRID; cell++) {
+      for (let cell = 0; cell < span.length / 2; cell++) {
         const lo = span[cell * 2]!,
           hi = span[cell * 2 + 1]!,
           share = hi - lo > 1e-9 ? Math.min(1, Math.max(0, (topLevel - lo) / (hi - lo))) : topLevel > lo ? 1 : 0,
           wetShare = hi - lo > 1e-9 ? Math.min(share, Math.max(0, (water - lo) / (hi - lo))) : water > lo ? share : 0;
-        under += share * o.area;
-        wet += wetShare * o.area;
+        const area = cellAreas?.[cell] ?? o.area;
+        under += share * area;
+        wet += wetShare * area;
       }
       if (!(under > 0)) return;
       const d = Math.sqrt((4 * under) / Math.PI),
