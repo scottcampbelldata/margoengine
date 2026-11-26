@@ -21,6 +21,8 @@ export const SOIL_PATCH_WORDS = 10;
 
 export const SOIL_RESPONSE_WORDS = 4;
 
+export const SOIL_WHEEL_REACTION_WORDS = 3;
+
 export interface SoilBudget {
     readonly removed: number;
     readonly compacted: number;
@@ -164,6 +166,7 @@ export interface TerramechanicsOptions {
     readonly id?: string;
     readonly input?: FieldDescriptor;
     readonly wheelPhase?: FieldDescriptor;
+    readonly wheelReaction?: FieldDescriptor;
     readonly legged?: boolean;
     readonly tier?: SoilContactTier;
     readonly signal?: AbortSignal;
@@ -207,6 +210,8 @@ export interface WheelSoilBinding {
 export function soilPatchField(name?: string): FieldDescriptor;
 
 export function soilWheelPhaseField(name?: string): FieldDescriptor;
+
+export function soilWheelReactionField(name?: string): FieldDescriptor;
 
 export function wheelSoil(width: number, length: number, material?: SoilMaterial, elliptical?: boolean, resolvedContact?: {
     readonly rounded?: boolean;

@@ -9819,7 +9819,7 @@ Transient digging forces, braking-specific stress shapes and direct tyre torque 
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 12,192 B gzip with a 12,193 B ceiling. Both Wasm assets are 23,755 B raw and 9,375 B gzip each.
+The optional entry is 12,367 B gzip with a 12,739 B ceiling. Both Wasm assets are 25,029 B raw and 9,768 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)

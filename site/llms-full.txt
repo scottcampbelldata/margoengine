@@ -12944,12 +12944,13 @@ wheel option resolves the driven rim's average stress envelope below its axle. E
 individual contact marks from live spin. Their projected strip uses 65 along-track stations. Indexed tread
 triangles can instead intersect the local horizontal bearing plane at configurable resolution (17 by 65
 profile samples by default). Supply three finite coordinates per vertex and three zero-based indices per
-triangle. Wheel camber is outside that phase-only footprint model. Transient digging
-forces, braking-specific stress shapes and direct tyre torque exchange remain open. Supply the same excavation floor
+triangle. Wheel camber is outside that phase-only footprint model. The optional reaction field
+reports vertical and longitudinal force and resisting axle torque for the forward driven arc.
+Transient digging forces, braking-specific stress shapes and direct tyre torque exchange remain open. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 12,192 B gzip with a 12,193 B ceiling. Both Wasm assets are 23,755 B raw and 9,375 B gzip each.
+The optional entry is 12,367 B gzip with a 12,739 B ceiling. Both Wasm assets are 25,029 B raw and 9,768 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -29882,7 +29883,9 @@ The original city, deck, horse and courier shots still need the production bindi
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
 It stamps evenly spaced lugs and indexed triangle treads from live wheel spin. Full wheel tilt and
-terrain-relative torque, measured high-slip digging forces and measured berm profiles remain EARTH-05 work.
+measured high-slip digging forces and measured berm profiles remain EARTH-05 work. The resolved
+rolling arc supplies separate drawbar and axle reaction records. The rigid vehicle still needs
+reciprocal application of those independent loads.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

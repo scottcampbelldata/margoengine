@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20479134,
+  "total": 20479680,
   "history": [
     {
       "date": "2026-10-24",
@@ -13257,6 +13257,12 @@
       "commit": "f6dde0f5d37eca7e1b1c75775697ae45b7a217cd",
       "grew": 1,
       "reason": "SOFT-03 moves the optional strands entry from 4508 to 5313 B gzip for the layout-2 rigid body reader, origin-cell conversion, and reciprocal impulse port. A split would duplicate the native contact and world state machinery. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "55b0f51fbe",
+      "grew": 1,
+      "reason": "EARTH-05 independent drawbar and axle reaction fields take the optional entry from 12192 to 12367 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -14128,7 +14134,7 @@
     "@margoengine/physics/strands": 5569,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 12193,
+    "@margoengine/physics/terramechanics": 12739,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
