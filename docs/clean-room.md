@@ -16574,3 +16574,9 @@ exactly the items a test of every item keeps (packages/materials/tests/batched-l
 node surface area doubled since the build); and the level choice shared with `LODSystem` as `packages/shared/lod-pick.js`
 (coarser at once, finer only below `distance * (1 - hysteresis)` of the level on show). No other engine's source was
 read.
+
+### KB-BVH-SYNCPOSE1 synchronous raycasts on skinned and morphed meshes
+
+Read as inputs: Ingo Wald, Solomon Boulos and Peter Shirley, [*Ray Tracing Deformable Scenes Using Dynamic Bounding Volume Hierarchies*, 2007](https://doi.org/10.1145/1186644.1186650), for refitting a tree of fixed topology bottom-up each frame and for when that holds its quality; Christian Lauterbach, Sung-Eui Yoon, David Tuft and Dinesh Manocha, [*RT-DEFORM: Interactive Ray Tracing of Dynamic Scenes using BVHs*, 2006](https://doi.org/10.1109/RT.2006.280213), for the rebuild test on a node's box against its children's; Daniel Kopta, Thiago Ize, Josef Spjut, Erik Brunvand, Al Davis and Andrew Kensler, [*Fast, Effective BVH Updates for Animated Scenes*, 2012](https://doi.org/10.1145/2159616.2159649), for tree rotations during a refit; and the glTF 2.0 specification, [sections 3.7.2.2 (morph targets) and 3.7.3 (skins)](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html). Only the papers and the specification were read, no code that accompanies them and no other engine's source.
+
+Margo's own: the registry in `packages/shared/pose-source.js`, the CPU evaluation in `packages/animation/src/pose.ts` (written from Margo's deformation shader, `packages/animation/src/shader.ts`, term for term) and the posed entry in `packages/bvh/src/raycaster.ts`, which calls the `MeshBVH.refit` the package already had. The plain refit of the first paper is what is built; the rebuild test and the rotations are not, and docs/limits.md says so.

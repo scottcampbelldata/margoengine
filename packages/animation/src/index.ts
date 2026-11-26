@@ -3,6 +3,8 @@ import { MargoError } from '@margoengine/math/errors';
 import { rangeError } from '../../shared/errors.js';
 import { hiddenInTree } from '../../shared/visibility.js';
 import { vertexValues } from '../../shared/vertex-map.js';
+import { clearPoseSource, setPoseSource, type PoseSource, type PrimitivePose } from '../../shared/pose-source.js';
+import { poseVertices } from './pose.js';
 import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine/gltf/pbr';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
@@ -121,6 +123,23 @@ interface Deformation {
   /** The skin's inverse bind matrices, 16 floats per joint in joint order (joint i's start at i * 16). */
   inverseBind: Float32Array;
   /**
+   * Reads the primitive's skin influences and morph deltas from the asset again, for the CPU pose: the copies made at
+   * setup live on the GPU only, so a model that is never picked synchronously keeps none.
+   */
+  influences: () => Uint32Array;
+  deltas: () => Float32Array;
+  /** The CPU pose registered for synchronous queries (shared/pose-source.js), and what it last evaluated. */
+  pose?: PoseSource;
+  posed?: {
+    vertices: Float32Array;
+    revision: number;
+    bind: Float32Array;
+    influences: Uint32Array;
+    deltas: Float32Array;
+    palette: Float32Array;
+    weights: Float32Array;
+  };
+  /**
    * The record of an earlier primitive of the same skinned node whose bone range this one shares (batch.ts `add`): it
    * computes, checks and uploads the palette for both. Unset for the first primitive of a node, or one placed apart.
    */
@@ -187,6 +206,8 @@ function identities(count: number): Float32Array {
 }
 /** The inverse binds of a primitive with no skin (shared: nothing reads or writes it). */
 const noBinds = new Float32Array(0);
+const noInfluences = () => new Uint32Array(0);
+const noDeltas = () => noBinds;
 /** `a` times the 4x4 matrix at `b[at..at + 16]` into `out`: multiplyMatrices' arithmetic, in its order, with an offset. */
 function multiplyAt(a: ArrayLike<number>, b: Float32Array, at: number, out: Float32Array): void {
   for (let c = 0; c < 4; c++)
@@ -315,7 +336,86 @@ function deformationRecord(p: PBRPrimitive): Deformation {
     uploadArgs: [undefined!, 0, undefined!],
     joints: [],
     inverseBind: noBinds,
+    influences: noInfluences,
+    deltas: noDeltas,
   };
+}
+/**
+ * A skinned primitive's influences as the deformation shader reads them: `stride` words per vertex, four joint indices
+ * then four weights (float bits) for each of JOINTS_0 and, with `stride` 16, JOINTS_1, the weights normalised to sum 1.
+ */
+function packInfluences(
+  asset: PBRModel['asset'],
+  doc: ReturnType<typeof animationDocument>,
+  attributes: ReturnType<typeof morphDefinition>['attributes'],
+  count: number,
+  sourceCount: number,
+  stride: number,
+  jointCount: number,
+  vertexMap: Uint32Array | undefined,
+): Uint32Array {
+  const influenceBytes = new ArrayBuffer(Math.max(32, count * stride * 4)),
+    jointIds = new Uint32Array(influenceBytes),
+    influenceFloats = new Float32Array(influenceBytes),
+    extra = stride === 16;
+  for (const name of Object.keys(attributes))
+    if (/^(JOINTS|WEIGHTS)_/.test(name) && !/^(JOINTS|WEIGHTS)_[01]$/.test(name))
+      throw new RangeError(
+        'More than eight joint influences are unsupported; limit each vertex to JOINTS_0 and JOINTS_1',
+      );
+  const sets: Array<{ ids: Float32Array; weights: Float32Array }> = [];
+  for (let set = 0; set < (extra ? 2 : 1); set++) {
+    const jointIndex = attributes['JOINTS_' + set],
+      weightIndex = attributes['WEIGHTS_' + set];
+    if (jointIndex === undefined || weightIndex === undefined)
+      throw new TypeError('Skin attributes require paired JOINTS_' + set + ' and WEIGHTS_' + set);
+    const allIds = asset.accessor(jointIndex, 'VEC4'),
+      allWeights = asset.accessor(weightIndex, 'VEC4');
+    const jointAccessor = animationAccessor(doc, jointIndex);
+    if (
+      allIds.length !== sourceCount * 4 ||
+      allWeights.length !== sourceCount * 4 ||
+      (jointAccessor?.componentType !== 5121 && jointAccessor?.componentType !== 5123) ||
+      jointAccessor?.normalized
+    )
+      throw new TypeError(
+        'Invalid skin attributes; JOINTS_n must be unsigned byte or short VEC4, WEIGHTS_n VEC4, one per vertex',
+      );
+    const weightAccessor = animationAccessor(doc, weightIndex);
+    if (
+      !weightAccessor ||
+      (weightAccessor.componentType !== 5126 &&
+        weightAccessor.componentType !== 5121 &&
+        weightAccessor.componentType !== 5123) ||
+      (weightAccessor.componentType !== 5126 && !weightAccessor.normalized)
+    )
+      throw new TypeError(
+        'Invalid skin weight component type; use float, or normalized unsigned byte or short weights',
+      );
+    sets.push({ ids: vertexValues(allIds, 4, vertexMap), weights: vertexValues(allWeights, 4, vertexMap) });
+  }
+  for (let i = 0; i < count; i++) {
+    const weights = sets[0].weights;
+    let sum = weights[i * 4] + weights[i * 4 + 1] + weights[i * 4 + 2] + weights[i * 4 + 3];
+    if (extra) {
+      const weights = sets[1].weights;
+      sum += weights[i * 4] + weights[i * 4 + 1] + weights[i * 4 + 2] + weights[i * 4 + 3];
+    }
+    if (sum <= 0) throw new RangeError('Skin weights must have a positive sum');
+    for (let set = 0; set < sets.length; set++)
+      for (let c = 0; c < 4; c++) {
+        const { ids, weights } = sets[set],
+          at = i * 4 + c,
+          base = i * stride + set * 8;
+        if (!Number.isInteger(ids[at]) || ids[at] < 0 || ids[at] >= jointCount || weights[at] < 0)
+          throw new RangeError(
+            'Invalid skin joint/weight; joint indices must address the skin joints and weights must be >= 0',
+          );
+        jointIds[base + c] = ids[at];
+        influenceFloats[base + 4 + c] = weights[at] / sum;
+      }
+  }
+  return jointIds;
 }
 function record(
   pass: GPUComputePassEncoder,
@@ -382,6 +482,11 @@ export class Animation implements EnginePlugin {
   private unsubscribe?: () => void;
   /** The model whose nodes are the joints: this one, or `options.skeleton`. */
   private readonly joints: PBRModel;
+  /**
+   * Set by `MorphWeightPlayer` (morph-gpu.ts) once it writes this Animation's morph weights on the GPU: from then on
+   * `primitive.weights` no longer says what is drawn, so a morphed primitive has no CPU pose.
+   */
+  private gpuWeights = false;
   private readonly prepareDeformation = (context: PBRDeformationContext) => this.deform(context);
   /** The deformation group of the frame graph this Animation's pass is in. */
   private group?: DeformGroup;
@@ -745,9 +850,7 @@ export class Animation implements EnginePlugin {
       const attributes = definition.attributes,
         extra = skinId !== undefined && (attributes.JOINTS_1 !== undefined || attributes.WEIGHTS_1 !== undefined),
         stride = extra ? 16 : 8;
-      const influenceBytes = new ArrayBuffer(Math.max(32, count * stride * 4)),
-        jointIds = new Uint32Array(influenceBytes),
-        influenceFloats = new Float32Array(influenceBytes);
+      let jointIds: Uint32Array = new Uint32Array(8);
       if (skinId !== undefined) {
         const skin = skinDefinition(skinValue, this.model.nodes.length);
         joints = skin.joints;
@@ -762,63 +865,10 @@ export class Animation implements EnginePlugin {
           throw new TypeError('Inverse bind matrices must be Float32; re-export the glTF without quantised matrices');
         if (inverseBind.length !== joints.length * 16)
           throw new RangeError('Inverse bind matrix count mismatch; the skin needs one 4x4 matrix per joint');
-        for (const name of Object.keys(attributes))
-          if (/^(JOINTS|WEIGHTS)_/.test(name) && !/^(JOINTS|WEIGHTS)_[01]$/.test(name))
-            throw new RangeError(
-              'More than eight joint influences are unsupported; limit each vertex to JOINTS_0 and JOINTS_1',
-            );
-        const sets: Array<{ ids: Float32Array; weights: Float32Array }> = [];
-        for (let set = 0; set < (extra ? 2 : 1); set++) {
-          const jointIndex = attributes['JOINTS_' + set],
-            weightIndex = attributes['WEIGHTS_' + set];
-          if (jointIndex === undefined || weightIndex === undefined)
-            throw new TypeError('Skin attributes require paired JOINTS_' + set + ' and WEIGHTS_' + set);
-          const allIds = this.model.asset.accessor(jointIndex, 'VEC4'),
-            allWeights = this.model.asset.accessor(weightIndex, 'VEC4');
-          const jointAccessor = animationAccessor(doc, jointIndex);
-          if (
-            allIds.length !== sourceCount * 4 ||
-            allWeights.length !== sourceCount * 4 ||
-            (jointAccessor?.componentType !== 5121 && jointAccessor?.componentType !== 5123) ||
-            jointAccessor?.normalized
-          )
-            throw new TypeError(
-              'Invalid skin attributes; JOINTS_n must be unsigned byte or short VEC4, WEIGHTS_n VEC4, one per vertex',
-            );
-          const weightAccessor = animationAccessor(doc, weightIndex);
-          if (
-            !weightAccessor ||
-            (weightAccessor.componentType !== 5126 &&
-              weightAccessor.componentType !== 5121 &&
-              weightAccessor.componentType !== 5123) ||
-            (weightAccessor.componentType !== 5126 && !weightAccessor.normalized)
-          )
-            throw new TypeError(
-              'Invalid skin weight component type; use float, or normalized unsigned byte or short weights',
-            );
-          sets.push({ ids: vertexValues(allIds, 4, vertexMap), weights: vertexValues(allWeights, 4, vertexMap) });
-        }
-        for (let i = 0; i < count; i++) {
-          const weights = sets[0].weights;
-          let sum = weights[i * 4] + weights[i * 4 + 1] + weights[i * 4 + 2] + weights[i * 4 + 3];
-          if (extra) {
-            const weights = sets[1].weights;
-            sum += weights[i * 4] + weights[i * 4 + 1] + weights[i * 4 + 2] + weights[i * 4 + 3];
-          }
-          if (sum <= 0) throw new RangeError('Skin weights must have a positive sum');
-          for (let set = 0; set < sets.length; set++)
-            for (let c = 0; c < 4; c++) {
-              const { ids, weights } = sets[set],
-                at = i * 4 + c,
-                base = i * stride + set * 8;
-              if (!Number.isInteger(ids[at]) || ids[at] < 0 || ids[at] >= joints.length || weights[at] < 0)
-                throw new RangeError(
-                  'Invalid skin joint/weight; joint indices must address the skin joints and weights must be >= 0',
-                );
-              jointIds[base + c] = ids[at];
-              influenceFloats[base + 4 + c] = weights[at] / sum;
-            }
-        }
+        const jointCount = joints.length;
+        record.influences = () =>
+          packInfluences(asset, doc, attributes, count, sourceCount, stride, jointCount, vertexMap);
+        jointIds = record.influences();
       }
       const shares = joints.length
         ? this.options.skinning?.share?.((doc.nodes[p.nodeIndex] as { extras?: unknown } | undefined)?.extras)
@@ -835,6 +885,7 @@ export class Animation implements EnginePlugin {
       }
       record.joints = joints;
       record.inverseBind = inverseBind;
+      if (targets.length) record.deltas = () => morphDeltas(asset, targets, count, vertexMap);
       if (!joints.length) {
         record.palette = Float32Array.from(identity);
         record.paletteBits = new Uint32Array(record.palette.buffer);
@@ -850,7 +901,7 @@ export class Animation implements EnginePlugin {
         asset: this.model.asset,
         definition: p.definition,
         skin: skinId,
-        deltas: () => morphDeltas(asset, targets, count, vertexMap),
+        deltas: record.deltas,
         influences: () => jointIds.subarray(0, joints.length ? count * stride : 0),
       });
     }
@@ -891,6 +942,9 @@ export class Animation implements EnginePlugin {
         device.queue.writeBuffer(record.weights, slots[i].weights.offset * 4, weights as Float32Array<ArrayBuffer>);
     });
     this.resources.push(...records);
+    // A skinning mode's blend exists only as WGSL: with one there is no CPU pose, and a synchronous query says so.
+    if (!this.options.skinning)
+      for (const record of records) setPoseSource(record.primitive, (record.pose = () => this.cpuPose(record)));
     for (const record of records)
       if (!this.deformedNodes.includes(record.primitive.node)) this.deformedNodes.push(record.primitive.node);
     this.model.prepareDeformation = this.prepareDeformation;
@@ -1085,6 +1139,66 @@ export class Animation implements EnginePlugin {
     for (const r of this.leaders) if (!r.bonesChanged && r.next === r.spare) this.swap(r);
     return this.resources.length > 0;
   }
+  /**
+   * The primitive's pose on the CPU for synchronous queries (`@margoengine/bvh`), from the node matrices and morph
+   * weights as they are now: the palette arithmetic of `upload` and the shader's blend (pose.ts). Costs one palette
+   * (16 floats per joint) and a comparison per call, and one pass over the vertices when a bone, a weight or the bind
+   * vertices changed. Undefined once another deformer or no deformer writes the primitive.
+   */
+  private cpuPose(r: Deformation): PrimitivePose | undefined {
+    const p = r.primitive,
+      weights = p.weights;
+    if (
+      !p.deformed ||
+      p.deformed !== r.slot.page.output.buffer ||
+      (p.deformedOffset ?? 0) !== r.slot.output.offset * 80 ||
+      (this.gpuWeights && weights.length)
+    )
+      return undefined;
+    const posed = (r.posed ??= {
+      vertices: noBinds,
+      revision: 0,
+      bind: noBinds,
+      influences: r.influences(),
+      deltas: r.deltas(),
+      palette: new Float32Array(r.joints.length * 16),
+      weights: new Float32Array(weights.length),
+    });
+    let changed = posed.bind !== p.vertices;
+    if (changed) {
+      posed.bind = p.vertices;
+      posed.vertices = new Float32Array(p.vertices.length);
+    }
+    if (r.joints.length && !invertMatrixStable(p.node.matrix, this.inverse, this.workspace))
+      throw new RangeError('Singular skinned mesh transform; give the skinned node a non-zero scale');
+    for (let i = 0; i < r.joints.length; i++) {
+      multiplyAt(this.joints.nodes[r.joints[i]].matrix, r.inverseBind, i * 16, this.joint);
+      multiplyMatrices(this.inverse, this.joint, this.product);
+      for (let k = 0; k < 16; k++)
+        if (!Object.is(posed.palette[i * 16 + k], this.product[k])) {
+          posed.palette[i * 16 + k] = this.product[k];
+          changed = true;
+        }
+    }
+    for (let i = 0; i < posed.weights.length; i++)
+      if (!Object.is(posed.weights[i], Math.fround(weights[i]))) {
+        posed.weights[i] = weights[i];
+        changed = true;
+      }
+    if (changed) {
+      poseVertices(
+        posed.bind,
+        posed.vertices,
+        posed.deltas,
+        posed.weights,
+        posed.influences,
+        r.slot.extra ? 16 : 8,
+        posed.palette,
+      );
+      posed.revision++;
+    }
+    return posed;
+  }
   /** True when this Animation's palettes are two or more, in one bone page, back to back in palette-array order. */
   private contiguous(): boolean {
     const leaders = this.leaders;
@@ -1160,6 +1274,7 @@ export class Animation implements EnginePlugin {
       if (this.group) this.arena.drop(this.group.cache);
       for (const slot of this.slots) this.arena.remove(slot);
     }
+    for (const r of this.resources) if (r.pose) clearPoseSource(r.primitive, r.pose);
     this.resources = [];
     this.leaders = [];
     this.deformedNodes = [];

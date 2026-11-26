@@ -32,7 +32,7 @@ Rolldown (Vite's bundler) and nothing external:
 - the probe, run in Node, prints byte-identical output in both orders: every export's kind and its value (a
   primitive) or own keys (an object or class), sorted, and the globals importing added;
 - importing a group adds no globals. The one exception is the state `packages/shared` keeps under
-  `Symbol.for('margoengine.<name>')` keys on `globalThis` (`frame-resources.js`, `mesh-source.js`), on purpose: every
+  `Symbol.for('margoengine.<name>')` keys on `globalThis` (`frame-resources.js`, `mesh-source.js`, `pose-source.js`), on purpose: every
   package bundles its own copy of those modules, and the copies must share one registry per device.
 
 A self-check plants two modules whose state depends on which loads first and that add a global; the check must name
