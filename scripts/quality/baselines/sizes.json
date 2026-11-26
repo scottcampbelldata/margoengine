@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20603809,
+  "total": 20604874,
   "history": [
     {
       "date": "2026-10-24",
@@ -13741,6 +13741,12 @@
       "commit": "feat(physics) flip air and spray",
       "reason": "FlipSolver aeration, foam and spray for SEA-13: a per-step search for the air the liquid closes over (flood fill and the missing water round it, a running maximum in state), aeration() as bubble sources gathered over the base step, foam over cavities, spray(); 12,863 to 14,697 B gzip (this Mac). The search runs inside the solver step on its own grid and particles, so a split entry would have to reach its internals.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fa058693de",
+      "reason": "BREAK-03 plate buckling and sampled mesh positions and normals grows the optional crush entry from 6094 to 7159 B gzip. The ceiling rises from 6350 to 7415 B. The new plate query and mesh coordinates share material validation and remain tree-shakable named exports. A separate entry would require another import for the same structural profile and repeat the numerical preparation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14565,7 +14571,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 6350,
+    "@margoengine/physics/crush": 7415,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
