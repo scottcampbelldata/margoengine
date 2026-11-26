@@ -118,8 +118,9 @@ export interface EntrySplash {
   cavity: boolean;
 }
 
-/** Sea water's surface tension, N/m, and dynamic viscosity, Pa s (about 15 degrees C). */
+/** Sea water's surface tension, N/m (about 15 degrees C). */
 export const WATER_SURFACE_TENSION = 0.072;
+/** Sea water's dynamic viscosity, Pa s (about 15 degrees C). */
 export const WATER_VISCOSITY = 1.0e-3;
 /**
  * The Worthington jet's speed as a share of the entry speed: 9.85, from S. Gekle and J. M. Gordillo's golf ball (20 m/s
