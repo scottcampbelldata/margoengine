@@ -3011,7 +3011,9 @@ boxes it flows round (`solids`; it slips along them as along the box's own sides
 (`open`), where water leaves for the sea
 (`seaSources()`, for a WakeSolver). Each world step takes as many substeps as keep every particle within a cell, and after each the particles that cluster are moved apart by Kugelstadt et al.'s implicit density projection, so the water keeps its volume.
 `positions()` gives the particles for drawing, `velocityAt` and `pressureAt` read the grid. Martin and Moyce's dam
-break is its check: the front within 2 percent of their measurements.
+break is its check: the front within 2 percent of their measurements. In three dimensions, Lobovsky et al.'s tank
+(`node scripts/check-dambreak3d.mjs`) gives the front's speed within the measured range and the bottom of the far
+wall its measured peak pressure (docs/limits.md).
 
 Crashing crests: give a box a `sea` (a `SpectralSea`, or anything with `elevation(x, z, t)` and `water.sample`) and no
 `initial`, and it starts as that sea, its water moving as the sea's does. Its four sides then take the sea's own

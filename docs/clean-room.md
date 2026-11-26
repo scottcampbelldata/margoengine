@@ -14177,6 +14177,9 @@ Written from papers and notes read as text (no code, no companion repositories):
 - G. B. Deane and M. D. Stokes, "Scale dependence of bubble creation mechanisms in breaking waves", Nature 418,
   839-844, 2002: the cavity a plunging jet closes breaks up into the bubbles of a breaker (the box's `aeration()`, the air
   it closes over).
+- M. Lobovsky, E. Botia-Vera, F. Castellana, J. Mas-Soler and A. Souto-Iglesias, "Experimental investigation of dynamic
+  pressure loads during dam break", J. Fluids Struct. 48, 407-434, 2014, arXiv 1308.0115, Tables 1 and 2: the tank,
+  the front's mean speed after t* = 1 and the far wall's peak pressures (the 3-D check, `check-dambreak3d.mjs`).
 - J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns on a rigid horizontal plane",
   Phil. Trans. R. Soc. A 244, 312-324, 1952, table 2 (the check).
 

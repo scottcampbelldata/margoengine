@@ -433,6 +433,41 @@ test('air the liquid closes over is taken in once, at its middle, as a bubble so
   );
 });
 
+test('a dam break in three dimensions runs along the bed as the measured ones do (Lobovsky et al. 2014)', () => {
+  // Their tank, 1.61 x 0.6 x 0.15 m, water 0.3 m deep behind a gate 0.6 m from the end (cells of 3 cm, the gate gone at
+  // once). The front's mean speed along the dry bed after t* = t sqrt(g / H) = 1 lies within the range their Table 1
+  // gathers from the measured dam breaks, 1.14 to 1.74 sqrt(g H) (theirs 1.56, with a gate that lifts in 0.06 to 0.1 s);
+  // the water is all kept. docs/limits.md gives finer cells and the wall pressures (scripts/check-dambreak3d.mjs).
+  const H = 0.3,
+    h = 0.03,
+    liquid = new FlipSolver(),
+    world = new PhysicsWorld({ rate: { num: 120, den: 1 }, gravity: [0, -G, 0] }).add(liquid, {
+      cells: [Math.round(1.61 / h), Math.round(0.6 / h), Math.round(0.15 / h)],
+      cellSize: h,
+      rate: 1,
+      maxSubsteps: 256,
+      initial: (x, y) => x < 0.6 && y < H,
+    }),
+    start = liquid.count,
+    front = [];
+  for (let f = 1; f <= 108; f++) {
+    world.advance(f);
+    const p = liquid.positions();
+    let x = 0;
+    for (let q = 0; q < p.length; q += 3) if (p[q + 1] < 0.05) x = Math.max(x, p[q]);
+    front.push([f / 120, x]);
+  }
+  const run = front.filter(([t, x]) => t * Math.sqrt(G / H) >= 1 && x < Math.round(1.61 / h) * h - 0.05),
+    n = run.length,
+    mt = run.reduce((a, r) => a + r[0], 0) / n,
+    mx = run.reduce((a, r) => a + r[1], 0) / n,
+    v = run.reduce((a, r) => a + (r[0] - mt) * (r[1] - mx), 0) / run.reduce((a, r) => a + (r[0] - mt) * (r[0] - mt), 0),
+    speed = v / Math.sqrt(G * H);
+  assert.ok(n > 10, 'the front crosses the bed');
+  assert.ok(speed >= 1.14 && speed <= 1.74, `front ${speed} sqrt(g H)`);
+  assert.equal(liquid.count, start);
+});
+
 test('bad boxes are refused, each naming its fix', () => {
   const w = new PhysicsWorld({ rate: { num: 60, den: 1 } });
   assert.throws(() => w.add(new FlipSolver('a'), { cells: [0, 4, 4] }), RangeError);
