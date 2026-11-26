@@ -92,6 +92,21 @@ separate fracture-energy law. Table 1 supplies the elastic and shear inputs, and
 strength intervals in Table 2 supply independent axial fixtures.
 [Seeber et al.](https://repository.tudelft.nl/record/uuid%3Afe38cfa8-6c48-4832-8906-bbbc1e87cd89).
 
+The optional progressive law uses their Eqs. 30–33 and 47 and Sandhaas and van de Kuilen's
+Eq. 9. With `h = (6V₀)^(1/3)`, `β = 2EG/(f²h)` is the utilization at zero tensile or
+shear stress. The fraction of stiffness left on the descending branch is
+`(β−κ)/((β−1)κ)`. The uniaxial loading work per area is `hf²β/(2E) = G`.
+Compression follows the separate stress plateau, with remaining stiffness `1/κ`.
+The history is irreversible. The stress sign for each normal axis is held fixed during a
+native substep and refreshed from the undamaged stress after it. Diagonal compliance
+increases implement Eq. 33. If `r` is the vector of remaining normal stiffness fractions,
+scaling the damaged compliance by `diag(sqrt(r))` on both sides makes inversion well
+defined at a fully damaged axis. The volume-derived length is Margo's tetrahedron convention
+for the Bažant–Oh crack band regularization. The cell then separates using the existing
+face topology.
+[Sandhaas and van de Kuilen](https://heronjournal.nl/58-23/5.pdf)
+[Bažant and Oh](https://doi.org/10.1007/BF02486267).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

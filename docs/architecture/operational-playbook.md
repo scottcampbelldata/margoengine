@@ -10042,6 +10042,12 @@ uses the highest active utilization to separate overloaded cells without losing 
 The beech fixtures bracket published axial means and verify all three shear channels, including
 an automatically separated pair of cells.
 
+Progressive timber damage adds crack-band work per area before tensile or shear fracture.
+Native tests integrate the complete shear response at two element lengths and verify that a
+closed tensile crack recovers compressive capacity. The irreversible damage and load signs
+are held fixed during each local solve. Public tests exercise partial damage, fracture and
+snapshot replay during a topology change, with a physical mesh resolution check at creation.
+
 Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
 - **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
   contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is

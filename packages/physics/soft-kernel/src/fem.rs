@@ -136,6 +136,8 @@ pub struct Fem {
     pub(crate) orthotropy: Col<[f32; 18]>,
     /// Orthotropic tension, compression and shear strengths and their nine filtered loads.
     pub(crate) orthotropic_failure: Col<[f32; 18]>,
+    /// Critical band lengths, nine damage variables, load signs and committed fracture.
+    pub(crate) crack_band: Col<[f32; 17]>,
 }
 
 impl Fem {
@@ -201,6 +203,7 @@ impl Fem {
             fiber: Col::new(),
             orthotropy: Col::new(),
             orthotropic_failure: Col::new(),
+            crack_band: Col::new(),
         }
     }
 }
@@ -338,6 +341,9 @@ impl World {
         }
         if !f.orthotropic_failure.is_empty() {
             f.orthotropic_failure.resize(tets);
+        }
+        if !f.crack_band.is_empty() {
+            f.crack_band.resize(tets);
         }
         f.member.resize(members);
         for c in f.rest.iter_mut() {
@@ -932,6 +938,9 @@ impl World {
                 continue;
             }
             self.fem.ratio[best] = 0.0;
+            if let Some(state) = self.fem.crack_band.get_mut(best).filter(|state| state[0] > 0.0) {
+                state[16] = 1.0;
+            }
             self.fem.torn += 1;
             self.spend(body, best_ratio);
             // The cells it was joined to now have an outside face.

@@ -693,6 +693,43 @@ stop();
 These European beech constants follow Seeber et al. (2024), using their measured mean axial
 strengths and published shear inputs. [Experimental study](https://doi.org/10.1016/j.engstruct.2024.117928)
 
+#### Progressive timber damage
+
+Supply `strength.fractureEnergy` in joules per square metre to weaken the material progressively
+under tension and shear. Each triple uses the same axis order as its strength triple. The cell
+tears after that mode spends its fracture work. Compression has a ductile plateau. When a
+tensile crack closes, its axis can carry compressive stress again. The mesh needs cells small
+enough to resolve the authored fracture energy.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { gravity: [0, 0, 0] });
+const soft = await SoftBodies.attach(physics);
+const h = 0.001;
+const coupon = new SoftBodyDesc([[0, 0, 0], [h, 0, 0], [0, h, 0], [0, 0, h]])
+  .setCells([0, 1, 2, 3])
+  .setPinnedParticles([0, 1, 2, 3])
+  .setOrthotropicStiffness({
+    youngsModuli: [12500e6, 2050e6, 810e6],
+    shearModuli: [1640e6, 1080e6, 470e6],
+    poissonRatios: [0.43, 0.58, 0.61],
+    strength: {
+      tensile: [139.4e6, 18.2e6, 8e6],
+      compressive: [61.9e6, 15.5e6, 6.7e6],
+      shear: [14e6, 18e6, 15e6],
+      fractureEnergy: { tensile: [10000, 710, 710], shear: [1200, 1200, 600] },
+    },
+  }).setSolver('vertex-block');
+const body = soft.create(coupon);
+const shear = 1.6 * 15e6 / 470e6;
+body.setParticlePosition(3, [0, h * shear, h * Math.sqrt(1 - shear * shear)]);
+physics.step();
+console.log(body.isCellTorn(0)); // false: the rolling shear is beyond peak strength and still carries load
+```
+
 #### Cut through a tetrahedral solid
 
 `soft.cutPlane(body, origin, normal)` slices through the actual volume in world space. It returns

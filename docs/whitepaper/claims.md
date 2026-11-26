@@ -46,6 +46,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   neighbor. Signed history survives a plane cut, body compaction and replay. Run
   `node --test packages/physics/tests/coupling/volumetric-strength.test.js`.
 
+- Progressive timber damage (SOFT-04, 2026-11-26). Native shear tests integrate the same
+  authored fracture work per area at two different element sizes. The compression closure
+  test restores the compressive tangent while retaining tensile history. A public beech
+  coupon softens under rolling shear, tears at the energy-dependent displacement and
+  retains partial damage through cuts and snapshots. Run the crate's `crack_band` tests
+  and `packages/physics/tests/coupling/volumetric-strength.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

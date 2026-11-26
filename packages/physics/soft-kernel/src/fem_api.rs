@@ -82,6 +82,17 @@ pub extern "C" fn soft_fem_orthotropic_failure_rows() -> u32 {
     if rows.is_empty() { 0 } else { rows.as_mut_ptr() as usize as u32 }
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_crack_band(first: u32, count: u32, x: f32, y: f32, z: f32, xy: f32, xz: f32, yz: f32) {
+    world().set_crack_band(first as usize, count as usize, [x, y, z, xy, xz, yz]);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_crack_band_rows() -> u32 {
+    let rows = &mut world().fem.crack_band;
+    if rows.is_empty() { 0 } else { rows.as_mut_ptr() as usize as u32 }
+}
+
 /// Where a tetrahedron or cluster column starts in the memory.
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_column(id: u32) -> u32 {

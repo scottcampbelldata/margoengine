@@ -77,6 +77,8 @@ export function makePlanePieces(
   const orthotropy = body.orthotropy;
   const strength = body.orthotropicStrength;
   const damage = soft.copyOrthotropicFailure(body);
+  const band = soft.copyCrackBand(body);
+  const bandLimits = body.crackBand;
   const externalForce = body.force;
   const velocity = [old.vx, old.vy, old.vz] as const;
   const positions = [old.x, old.y, old.z] as const;
@@ -146,6 +148,8 @@ export function makePlanePieces(
     desc.fiber = fiber;
     desc.orthotropy = orthotropy;
     desc.orthotropicStrength = strength;
+    desc.crackBand = bandLimits;
+    desc.inheritedBand = bandLimits !== null;
     desc.groups = body.collisionGroups;
     desc.shapeMatching = body.matched;
     desc.dominance = body.dominance;
@@ -202,6 +206,7 @@ export function makePlanePieces(
       f.flowed![row] = data.flowed;
       f.load![row] = data.load;
       if (damage) soft.restoreOrthotropicFailure(row, damage, data.parent);
+      if (band) soft.restoreCrackBand(row, band, data.parent);
     });
     soft.relinkCells(piece);
     const massShare = piece.mass() / totalMass;

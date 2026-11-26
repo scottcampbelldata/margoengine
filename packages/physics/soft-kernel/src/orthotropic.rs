@@ -97,7 +97,7 @@ impl World {
         if row[0] <= 0.0 || !self.has_orthotropy(t) {
             return 0.0;
         }
-        let cell = self.orthotropic_corner(4 * t as u32, h as f64);
+        let cell = self.orthotropic_corner(4 * t as u32, h as f64, false);
         let (strain, _) = cell.strain(self.vertex_deformation(cell.corners, cell.inverse, false));
         let [x, y, z, xy, xz, yz] = cell.stress(strain);
         let loads = [
@@ -119,25 +119,32 @@ impl World {
         };
         let row = &mut self.fem.orthotropic_failure[t];
         let mut maximum = 0.0f32;
+        let mut filtered = [0.0; 9];
         for (i, load) in loads.into_iter().enumerate() {
             let old = row[9 + i] as f64;
             let target = load / row[i] as f64;
             let next = ((1.0 - step) * old + step * target).min(f32::MAX as f64) as f32;
             row[9 + i] = next;
+            filtered[i] = next;
             maximum = maximum.max(next);
         }
-        if self.fem.flags[t] & INTERIOR_TET != 0 {
-            maximum / self.fem.interior[t]
+        let toughness = if self.fem.flags[t] & INTERIOR_TET != 0 {
+            self.fem.interior[t]
         } else {
-            maximum
-        }
+            1.0
+        };
+        let compression =
+            u32::from(x < 0.0) | (u32::from(y < 0.0) << 1) | (u32::from(z < 0.0) << 2);
+        self.evolve_crack_band(t, filtered, compression, toughness)
+            .unwrap_or(maximum / toughness)
     }
 
     /// A body's cells share one material; its incident corners all use the same elastic law.
-    fn orthotropic_corner(&self, link: u32, dt: f64) -> OrthotropicCell {
+    fn orthotropic_corner(&self, link: u32, dt: f64, damaged: bool) -> OrthotropicCell {
         let t = (link / 4) as usize;
         let c = (link % 4) as usize;
         let row = &self.fem.orthotropy[t];
+        let base = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| row[9 + i] as f64);
         let inverse = [0, 1, 2].map(|i| [0, 1, 2].map(|j| self.fem.b[3 * i + j][t] as f64));
         let gradient = if c == 0 {
             [0, 1, 2].map(|i| -inverse[0][i] - inverse[1][i] - inverse[2][i])
@@ -149,7 +156,11 @@ impl World {
             inverse,
             gradient,
             axes: [0, 1, 2].map(|i| [0, 1, 2].map(|j| row[3 * i + j] as f64)),
-            stiffness: [0, 1, 2, 3, 4, 5, 6, 7, 8].map(|i| row[9 + i] as f64),
+            stiffness: if damaged {
+                self.softened_stiffness(t, base)
+            } else {
+                base
+            },
             scale: self.fem.vol0[t] as f64 * dt * dt,
             damping: self.fem.imp.beta[t] as f64 / dt,
         }
@@ -158,7 +169,7 @@ impl World {
     fn orthotropic_energy(&self, mut link: u32, dt: f64) -> f64 {
         let mut energy = 0.0;
         while link != NONE {
-            let m = self.orthotropic_corner(link, dt);
+            let m = self.orthotropic_corner(link, dt, true);
             let f = self.vertex_deformation(m.corners, m.inverse, false);
             let (e, _) = m.strain(f);
             let compression = OrthotropicCell::deficit(f);
@@ -192,7 +203,7 @@ impl World {
         let mut stiffness = [mass, mass, mass, 0.0, 0.0, 0.0];
         let mut link = head;
         while link != NONE {
-            let m = self.orthotropic_corner(link, dt);
+            let m = self.orthotropic_corner(link, dt, true);
             let f = self.vertex_deformation(m.corners, m.inverse, false);
             let (e, z) = m.strain(f);
             let mut stress = m.stress(e);
