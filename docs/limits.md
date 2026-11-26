@@ -2543,8 +2543,12 @@ byte for byte and the whole residual is this base darkening. With the viewer's l
 sRGB_encode(E(n, max(r, 0.25))) the like-for-like absolute falls from 218,842 to 23,113 (0.029 MAE), the rest being
 one-sample edges and text (11,305) and the spheres (11,808). The encode holds the roughness 0.33 to 1 rows (141,533,
 64.7 %); the roughness 0 row (66,004, 30.2 %) needs the lookup floor as well, where the spec's E is 0 and the lobe
-is black in both pictures. That part is open pending acceptance (docs/known-bugs.md, "Batch 160 sheen picture
-loss"). Before KB3297d the
+is black in both pictures. Accepted difference (Scott, 2026-11-26, "Yes, accept it"): cause, the viewer's albedo
+lookup, read through the sRGB encode and at a sheen roughness of at least about 0.25. What Margo does extra: the spec's
+linear E (the cosine-weighted integral of the sheen BRDF, KHR_materials_sheen and Enterprise PBR) with no floor, so the
+base under a sheen loses only the light the sheen lobe reflects, and nothing at roughness 0, where the lobe is black.
+Trade-off: the like-for-like sheen row stays at 218,842 (MAE 0.27827199300130206) against 23,113 for a renderer with
+the viewer's lookup; no setting is changed to chase it. Before KB3297d the
 maximum, 205, sat on two silhouette pixels where gltf/pbr's sheen roughness floor of 0.03 drew a bright rim the
 viewer does not; with no floor and n.h taken from the clamped cosines the maximum is 103, the square 3,061,310 to
 2,944,566, and the absolute rises from 217,478 to 218,842. That rise belongs to this accepted difference: the rise is the Sample Viewer's encoded albedo-table ring (KB3297c), which the old floor hid: the floor's albedo (E(0.05, 0.03) = 0.71) had darkened the base on the ring inside the roughness 0 rims as the viewer's sRGB-encoded lookup darkens it everywhere at roughness 0.
@@ -2766,8 +2770,8 @@ black as the Sample Viewer does. Maximum error 119 (171 before KB3297d, 167 befo
 on two silhouette pixels where the viewer is nearly black is gone (docs/known-bugs.md, KB3297d). Like for like (the
 viewer transfer, one sample) the MAE is 0.27827199300130206, max 103; see "Sample Viewer like for like".
 Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
-The residual is attributed to the viewer's albedo lookup (see "Sample Viewer like for like"); its roughness 0 part
-awaits acceptance. This does not prove physical equivalence.
+The residual is the viewer's albedo lookup, an accepted difference (Scott, 2026-11-26; see "Sample Viewer like for
+like"). This does not prove physical equivalence.
 
 ### Scatter tile input storage (batch 77 audit)
 

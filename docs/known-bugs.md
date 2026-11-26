@@ -12652,7 +12652,7 @@ The root tile solver accepted finite weights such as 1e308 even when weight time
 
 The WFC browser check closed the browser and Vite server independently, which could wait on retained connections without the shared shutdown budget. It now uses closeAll from startup through failure cleanup, matching the other browser suites. Regression: tests/browser-teardown.test.js; the existing bounded-close tests cover stalled shutdowns. The tracked-script gate exposed this after the first feature commit; new files are staged before subsequent landing checks.
 
-### Batch 160 sheen picture loss (attributed 2026-11-26: no Margo cause; acceptance of the roughness-0 part pending)
+### Batch 160 sheen picture loss (closed 2026-11-26: no Margo cause; residual accepted)
 
 Attribution (2026-11-26, gap lane A): the whole like-for-like residual is the Sample Viewer's base darkening under
 the sheen, not a Margo term. Ablated one term at a time on `run.mjs --case=sheen --like-for-like` (218,842):
@@ -12679,8 +12679,12 @@ So the encoded lookup (accepted under KB3297c) holds rows 0.33 to 1 (141,533, 64
 near 0.25 to 0.3 the roughness 0 row (66,004, 30.2 %). The KB3297c/KB3297d text said the encoded lookup darkens the
 base everywhere at roughness 0; measured, the encode alone darkens nothing there (66,003 either way), the floor does.
 A floor on E alone darkens a base whose sheen lobe is invisible at roughness 0 (both pictures draw it black), so
-light is removed that no lobe reflects; Margo keeps the spec's E with no floor. No Margo shader changed. Whether the
-roughness 0 part joins the accepted difference is Scott's call; until then this row stays open.
+light is removed that no lobe reflects; Margo keeps the spec's E with no floor. No Margo shader changed.
+
+- **Scott's ruling (2026-11-26):** "Yes, accept it". The roughness 0 part (the viewer floors its lookup roughness near
+  0.25, where the spec's E is 0) joins the encoded lookup (KB3297c) as an accepted difference, recorded in
+  docs/limits.md "Sample Viewer like for like" and docs/whitepaper/claims.md. The like-for-like budget stays the
+  measured 218,842; nothing is re-pinned.
 
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
