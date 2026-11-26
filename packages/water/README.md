@@ -63,7 +63,8 @@ Water.attach(engine, {
 
 With `sceneColor`, Water traces the Snell-bent ray against opaque depth in the
 current view. The sampled color and attenuation use the same intersection.
-A ray that misses the capture uses the fallback seabed and water-body color.
+A ray that leaves the frame takes the last scene texel it crosses on screen;
+one that misses the capture uses the fallback seabed and water-body color.
 `foamDistance` uses the local contact depth to place foam at the shore or hull.
 See [screen-space water refraction](../../docs/limits.md#above-water-screen-space-refraction)
 for the capture limits.

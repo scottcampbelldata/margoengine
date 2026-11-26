@@ -512,21 +512,48 @@ fn refractionBehind(clip:vec4f,p:vec2i)->bool {
  if(p.x<0){return false;}
  return textureLoad(depth,p,0)>clip.z/clip.w;
 }
+// The hit between a point of the bent ray in front of the scene (lower) and one behind it (upper), or w = -1.
+fn refractionBisect(a:vec4f,b:vec4f,lower:f32,upper:f32)->vec4f {
+ var lo=lower;var hi=upper;
+ for(var j=0;j<10;j++){
+  let t=(lo+hi)*0.5;let at=a+b*t;
+  if(refractionBehind(at,refractionPixel(at))){hi=t;}else{lo=t;}
+ }
+ // A sign change at a silhouette is not a hit. The hit still needs a depth-checked texel on the refracted ray.
+ let hit=refractedScene(a,b,hi);
+ if(hit.w>=lower&&hit.w<=upper){return hit;}
+ // The bisected crossing is itself the hit where the surface is continuous there: the scene's view depth at its
+ // texel lies within the ray's own (McGuire and Mara 2014's thickness test). On a seabed seen at a grazing angle the
+ // texel reprojection above does not settle (its view-depth plane crosses the bed at a shallow angle, so each guess
+ // overshoots the last), and every such pixel drew the flat fallback bottom: a contour maze of hits and misses
+ // (KB-WATER-SEABEDMAZE1). At a silhouette the occluder's depth sits metres in front of the ray and is refused.
+ let at=a+b*hi;let q=refractionPixel(at);
+ if(q.x>=0){let ray=linear(at.z/at.w);if(abs(linear(textureLoad(depth,q,0))-ray)<=max(0.05,0.02*ray)){return vec4f(textureLoad(opaque,q,0).rgb,hi);}}
+ return vec4f(0,0,0,-1);
+}
 fn refractionCrossing(a:vec4f,b:vec4f)->vec4f {
  var lower=0.0;var upper=0.08;var wasBehind=false;
  for(var step=0;step<8;step++){
   let clip=a+b*upper;let p=refractionPixel(clip);
-  if(p.x<0){break;}
+  if(p.x<0){
+   // The bent ray leaves the frame. Find where (bisected to the edge): if it crossed the scene before, that crossing
+   // is the hit; if it is still in front, the frame holds nothing past its edge, so take the last texel it crosses on
+   // screen, the bed nearest the one it would reach, as screen-space tracers clamp to the border (McGuire and Mara
+   // 2014). The flat fallback bottom drew a hard band along the foot of the frame where the near seabed's rays left
+   // it (KB-WATER-SEABEDMAZE1).
+   if(wasBehind){break;}
+   var lo=lower;var hi=upper;
+   for(var j=0;j<10;j++){let t=(lo+hi)*0.5;if(refractionPixel(a+b*t).x<0){hi=t;}else{lo=t;}}
+   let at=a+b*lo;let q=refractionPixel(at);
+   if(q.x<0){break;}
+   if(refractionBehind(at,q)){return refractionBisect(a,b,lower,lo);}
+   if(textureLoad(depth,q,0)>0.0){return vec4f(textureLoad(opaque,q,0).rgb,lo);}
+   break;
+  }
   let behind=refractionBehind(clip,p);
   if(behind&&!wasBehind){
-   var lo=lower;var hi=upper;
-   for(var j=0;j<10;j++){
-    let t=(lo+hi)*0.5;let at=a+b*t;
-    if(refractionBehind(at,refractionPixel(at))){hi=t;}else{lo=t;}
-   }
-   // A sign change at a silhouette is not a hit. The hit still needs a depth-checked texel on the refracted ray.
-   let hit=refractedScene(a,b,hi);
-   if(hit.w>=lower&&hit.w<=upper){return hit;}
+   let hit=refractionBisect(a,b,lower,upper);
+   if(hit.w>=0.0){return hit;}
   }
   if(upper>=50.0){break;}
   wasBehind=behind;lower=upper;upper=min(50.0,upper*2.8);

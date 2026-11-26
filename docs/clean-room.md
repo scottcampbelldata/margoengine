@@ -12703,6 +12703,16 @@ seeds where a depth discontinuity defeats the first estimate. It uses the
 existing Water snapshots, depth convention and Snell normal. The shader and
 regression were written from these descriptions and analytic geometry.
 
+### Grazing refraction onto a shallow bed (2026-11-26, KB-WATER-SEABEDMAZE1)
+- Morgan McGuire and Michael Mara, [Efficient GPU Screen-Space Ray Tracing](https://jcgt.org/published/0003/04/04/), JCGT 3(4), 2014. A ray step counts as a hit when the depth buffer's surface lies within a thickness of the ray's own depth; the march stops at the screen's edge.
+- Yasin Uludag, "Hi-Z Screen-Space Cone-Traced Reflections", GPU Pro 5, 2014. Bracket the crossing coarsely, then refine it by binary search between the last point in front and the first behind.
+- Bart Wronski, [The future of screen space reflections](https://bartwronski.com/2014/01/25/the-future-of-screen-space-reflections/), 2014. Rays that leave the frame have no data past its edge; renderers clamp or fade there rather than draw a fixed colour.
+The texel reprojection kept from 2026-11-21 is a fixed-point iteration; on a
+bed whose view-depth changes faster across the screen than the ray's does it
+diverges. Margo now accepts the bisected crossing with a thickness of 5 cm or
+2% of the distance, and takes the last on-screen texel for a ray that leaves
+the frame in front of the scene. Written from these descriptions.
+
 ## A buried voxel cell and the nearer side (2026-11-25)
 
 `packages/physics/kernel/src/voxel.rs` (`nearer_hidden_side`): when the ghost rule would snap a contact to an exposed face the

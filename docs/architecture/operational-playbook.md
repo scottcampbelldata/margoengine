@@ -177,6 +177,17 @@ Water's ships entry reads each turbulent foam sample from the stern's nearest hi
 
 The CPU regression compares two hull lengths at the same speed. The WebGPU and WebGL2 tests read four GPU foam samples with a 72 m ship at 3 m/s. Their values were 0.553 near the stern, 0.192 farther astern, and zero ahead and outside the trail on both backends. See the [clean-room research](../clean-room.md#stern-foam-history-in-water-2026-11-21).
 
+### Section 5 evidence: grazing refraction onto a shallow bed (2026-11-26)
+The texel reprojection above diverges on a bed seen at a grazing angle, and
+the crossing search used to hand its bracket back to it: 36% of the Kitty Hawk
+s18 water drew the flat fallback bottom, in contour rings (KB-WATER-SEABEDMAZE1).
+A bisected crossing within 5 cm or 2% of the ray's depth is now the hit, and a
+ray that leaves the viewport takes its crossing before the edge or the last
+on-screen texel. packages/water/test/refraction-grazing.browser.mjs paints the
+bed two colours under a rippled sea seen from 6 m: 61.1% of the water missed it
+before, 0.00% after, on the RTX A6000 in WebGPU and the WebGL2 layer.
+See the [clean-room research](../clean-room.md#grazing-refraction-onto-a-shallow-bed-2026-11-26-kb-water-seabedmaze1).
+
 ### Section 5 evidence: above-water refraction depth (2026-11-21)
 Water uses the existing opaque color and reversed depth snapshots. It solves
 the intersection of a Snell-bent ray with a sampled texel's depth plane in
