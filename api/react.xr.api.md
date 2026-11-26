@@ -29,6 +29,10 @@ export interface ControllerProps extends MeshProps {
     onSqueezeEnd?: (event: ControllerEvent) => void;
 }
 
+export function TrackingOrigin(_arg2: TrackingOriginProps): import("react").JSX.Element;
+
+export type TrackingOriginProps = MeshProps;
+
 export function XR(_arg0: XRProps): import("react").JSX.Element;
 
 export interface XRContextValue {
