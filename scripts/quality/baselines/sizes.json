@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20035208,
+  "total": 20040386,
   "history": [
     {
       "date": "2026-10-24",
@@ -12777,6 +12777,12 @@
       "commit": "d2fa3cb303",
       "grew": 2,
       "reason": "EARTH-07 entry sizes, previous record to current: @margoengine/physics/aeolian 0→5633 B (ceiling 0→5889 B); @margoengine/vfx/blown-sand 10561→11061 B (ceiling 10823→11393 B). The aeolian entry integrates the registry and lazily loads the arena solver. The renderer carries live grain mass and local velocity in its existing instance layout. A separate renderer entry would duplicate the terrain sampling and draw machinery."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "2500b97885",
+      "reason": "BIO-04 adds the optional 4922 B gzip ageing entry. The four material models share their patch state, exposure ports and optical outputs. Separate entries would duplicate those pieces. Core and stage gain 0 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13583,6 +13589,7 @@
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 93993,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
     "@margoengine/physics/aeolian": 5889,
+    "@margoengine/physics/ageing": 5178,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,

@@ -1,5 +1,5 @@
 {
-  "commit": "b41f4709e4",
+  "commit": "2500b97885",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -14066,6 +14066,10 @@
       "./aeolian": {
         "raw": 13204,
         "gzip": 5633
+      },
+      "./ageing": {
+        "raw": 10800,
+        "gzip": 4922
       }
     },
     "@margoengine/physics2d": {

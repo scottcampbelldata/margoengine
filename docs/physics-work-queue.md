@@ -273,7 +273,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SOUND-05 | Physics-driven fluid, fire, wind and machine sound | none | Open | OPEN |
 | BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
 | BIO-03 | Forest ecosystem dynamics | sound | Open | OPEN |
-| BIO-04 | Material ageing | none | Codex | BUILDING (codex/physics-lane-3) |
+| BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
