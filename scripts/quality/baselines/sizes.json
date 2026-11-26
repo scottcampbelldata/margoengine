@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20616251,
+  "total": 20616743,
   "history": [
     {
       "date": "2026-10-24",
@@ -13807,6 +13807,12 @@
       "commit": "858f37bcdd",
       "grew": 1,
       "reason": "SEA-08 the attached bilge keel pressure integration grows seakeeping from 28388 to 29592 B gzip. The mesh contour contributes to the same live roll damping force. A split would repeat hull, mesh and water pose registrations. Core plus Stage remains 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d4a7919efc",
+      "grew": 1,
+      "reason": "SEA-15's horizontal scale-dependent dispersion moves physics/tracers from 12184 to 12662 B gzip. The optional ceiling rises from 12550 to 13042 B. The dispersion law shares the particle transport loop and stores its release ages in the tracer snapshot. A split would duplicate the transport loop or require a second solver to track the same particles."
     }
   ],
   "items": {
@@ -14684,7 +14690,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 13395,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 12550,
+    "@margoengine/physics/tracers": 13042,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,

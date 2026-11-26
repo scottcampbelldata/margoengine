@@ -80,6 +80,12 @@ export interface TracerDiffusionKnot {
     diffusivity: number;
 }
 
+export interface TracerHorizontalDispersion {
+    referenceScale: number;
+    exponent?: number;
+    initialScale?: number;
+}
+
 export interface TracerMaterial {
     density: number;
     diameter?: number;
@@ -119,6 +125,7 @@ export interface TracerParams {
     waterDensity?: number;
     viscosity?: number;
     horizontalDiffusivity?: number;
+    horizontalDispersion?: TracerHorizontalDispersion;
     verticalDiffusivity?: number;
     verticalDiffusivityProfile?: readonly TracerDiffusionKnot[];
     particleMass?: number;
