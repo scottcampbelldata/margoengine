@@ -12922,7 +12922,7 @@ The native microstep follows transport and thermal diffusion stability limits an
 
 ### Divergence-free particle liquid (FLUID-01)
 
-The DFSPH entry measures 8,157 B gzip. Each lazy native asset measures 35,566 B raw and 13,676 B gzip.
+The DFSPH entry measures 8,197 B gzip. The plain and shared native assets measure 36,161 and 36,155 B raw, and 14,635 and 14,634 B gzip.
 
 The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
 remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
@@ -12931,6 +12931,9 @@ and inertia. This adds 104 bytes of scratch per registered rigid row to store mo
 Direct liquid–solid contact uses the same rigid mobility to stop inward motion and damp tangential
 slip. Its unilateral impulse preserves the normal constraint. Penetration is corrected on the
 liquid side, and the model has no particle spin. The world owns the separate rigid–rigid solve.
+Dynamic boundaries with viscosity reserve another 192 bytes per registered rigid row. The same
+implicit solve moves the fluid and rigid samples. The conjugate directions preserve the reciprocal
+wrench even when the viscosity iteration cap stops the solve.
 The clock switches to smaller advective substeps above
 0.4 spacings of travel. The support radius, contact radius and arena capacity control resolved detail.
 Plain and shared Wasm preserve the same clocked state and snapshot. Shared memory does not parallelize the
