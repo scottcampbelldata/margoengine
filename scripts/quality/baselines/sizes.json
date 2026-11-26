@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20549724,
+  "total": 20553212,
   "history": [
     {
       "date": "2026-10-24",
@@ -13567,6 +13567,12 @@
       "commit": "4726a5be29",
       "grew": 1,
       "reason": "EARTH-02 grows the optional granular-flow entry from 5545 to 5965 B gzip (ceiling 6221 B) for the live EARTH-08 cross-section and its inertial and friction projections. Splitting that path would repeat the conservative grid and its native binding. Core plus Stage stay 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ee0546999",
+      "reason": "scene/assets: AssetRegistry gained reference counts, preload groups and templates (b37b55e0e), instance userData guard (6b1eb54d6): 4274 to 7762 B baseline (7506 measured) B gzip. The bytes are the feature; splitting refs/groups/templates into a second entry would force every registry user to import both and duplicate the registry's entry map.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14682,7 +14688,7 @@
     "@margoengine/scatter/tiles": 3606,
     "@margoengine/scatter/velocity": 3319,
     "@margoengine/scene": 1974,
-    "@margoengine/scene/assets": 4274,
+    "@margoengine/scene/assets": 7762,
     "@margoengine/scene/bulk": 1718,
     "@margoengine/scene/clone": 1295,
     "@margoengine/scene/container": 3975,
