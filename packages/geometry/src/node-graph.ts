@@ -94,52 +94,148 @@ const MATH1 = ['negate', 'abs', 'floor', 'ceil', 'fract', 'sin', 'cos', 'sqrt', 
 const MATH2 = ['add', 'subtract', 'multiply', 'divide', 'min', 'max', 'pow', 'dot', 'cross', 'distance'] as const;
 
 const TYPES: Record<string, TypeSpec> = {
-  box: { out: 'geometry', inputs: {}, params: { width: size(1), height: size(1), depth: size(1), widthSegments: seg(1), heightSegments: seg(1), depthSegments: seg(1) } },
-  sphere: { out: 'geometry', inputs: {}, params: { radius: size(1), widthSegments: seg(32, 3), heightSegments: seg(16, 2) } },
-  cylinder: { out: 'geometry', inputs: {}, params: { radiusTop: size(1), radiusBottom: size(1), height: size(1), radialSegments: seg(32, 3), heightSegments: seg(1), openEnded: { default: false } } },
-  cone: { out: 'geometry', inputs: {}, params: { radius: size(1), height: size(1), radialSegments: seg(32, 3), heightSegments: seg(1), openEnded: { default: false } } },
-  plane: { out: 'geometry', inputs: {}, params: { width: size(1), height: size(1), widthSegments: seg(1), heightSegments: seg(1) } },
+  box: {
+    out: 'geometry',
+    inputs: {},
+    params: {
+      width: size(1),
+      height: size(1),
+      depth: size(1),
+      widthSegments: seg(1),
+      heightSegments: seg(1),
+      depthSegments: seg(1),
+    },
+  },
+  sphere: {
+    out: 'geometry',
+    inputs: {},
+    params: { radius: size(1), widthSegments: seg(32, 3), heightSegments: seg(16, 2) },
+  },
+  cylinder: {
+    out: 'geometry',
+    inputs: {},
+    params: {
+      radiusTop: size(1),
+      radiusBottom: size(1),
+      height: size(1),
+      radialSegments: seg(32, 3),
+      heightSegments: seg(1),
+      openEnded: { default: false },
+    },
+  },
+  cone: {
+    out: 'geometry',
+    inputs: {},
+    params: {
+      radius: size(1),
+      height: size(1),
+      radialSegments: seg(32, 3),
+      heightSegments: seg(1),
+      openEnded: { default: false },
+    },
+  },
+  plane: {
+    out: 'geometry',
+    inputs: {},
+    params: { width: size(1), height: size(1), widthSegments: seg(1), heightSegments: seg(1) },
+  },
   circle: { out: 'geometry', inputs: {}, params: { radius: size(1), segments: seg(32, 3) } },
-  torus: { out: 'geometry', inputs: {}, params: { radius: size(1), tube: size(0.4), radialSegments: seg(12, 3), tubularSegments: seg(48, 3) } },
-  capsule: { out: 'geometry', inputs: {}, params: { radius: size(1), height: size(1), capSegments: seg(4), radialSegments: seg(8, 3), heightSegments: seg(1) } },
+  torus: {
+    out: 'geometry',
+    inputs: {},
+    params: { radius: size(1), tube: size(0.4), radialSegments: seg(12, 3), tubularSegments: seg(48, 3) },
+  },
+  capsule: {
+    out: 'geometry',
+    inputs: {},
+    params: {
+      radius: size(1),
+      height: size(1),
+      capSegments: seg(4),
+      radialSegments: seg(8, 3),
+      heightSegments: seg(1),
+    },
+  },
   empty: { out: 'geometry', inputs: {}, params: {} },
   input: { out: 'geometry', inputs: {}, params: { name: { default: '' } } },
   // Per-element context: position, normal, uv, colour, vertex or face index, face centre, instance number.
   context: {
     out: 'value',
     inputs: {},
-    params: { field: { default: 'position', values: ['position', 'normal', 'uv', 'color', 'index', 'count', 'faceIndex', 'instanceIndex'] } },
+    params: {
+      field: {
+        default: 'position',
+        values: ['position', 'normal', 'uv', 'color', 'index', 'count', 'faceIndex', 'instanceIndex'],
+      },
+    },
   },
   vec3: { out: 'value', inputs: { x: val(0), y: val(0), z: val(0) }, params: {} },
-  swizzle: { out: 'value', inputs: { value: val(0) }, params: { component: { default: 'x', values: ['x', 'y', 'z'] } } },
+  swizzle: {
+    out: 'value',
+    inputs: { value: val(0) },
+    params: { component: { default: 'x', values: ['x', 'y', 'z'] } },
+  },
   random: { out: 'value', inputs: { min: val(0), max: val(1), seed: val(0), index: val() }, params: {} },
   noise: {
     out: 'value',
     inputs: { position: val([0, 0, 0]), scale: val(1) },
-    params: { octaves: seg(1), lacunarity: num(2, 1, 16), gain: num(0.5, 0, 1), seed: num(0, 0, 4294967295), output: { default: 'float', values: ['float', 'vector'] } },
+    params: {
+      octaves: seg(1),
+      lacunarity: num(2, 1, 16),
+      gain: num(0.5, 0, 1),
+      seed: num(0, 0, 4294967295),
+      output: { default: 'float', values: ['float', 'vector'] },
+    },
   },
   mix: { out: 'value', inputs: { a: val(0), b: val(1), t: val(0.5) }, params: {} },
   clamp: { out: 'value', inputs: { value: val(0), min: val(0), max: val(1) }, params: {} },
   compare: { out: 'bool', inputs: { a: val(0), b: val(0) }, params: { op: { default: '<', values: OPS } } },
-  logic: { out: 'bool', inputs: { a: { kind: 'bool', default: false }, b: { kind: 'bool', default: false } }, params: { op: { default: 'and', values: ['and', 'or', 'not'] } } },
+  logic: {
+    out: 'bool',
+    inputs: { a: { kind: 'bool', default: false }, b: { kind: 'bool', default: false } },
+    params: { op: { default: 'and', values: ['and', 'or', 'not'] } },
+  },
   // Picks `then` or `otherwise` by `condition`; the branch not taken is never evaluated. Geometry or values.
-  conditional: { out: 'any', inputs: { condition: { kind: 'bool', default: false }, then: { kind: 'any' }, otherwise: { kind: 'any' } }, params: {} },
-  setPositions: { out: 'geometry', inputs: { geometry: geo, positions: val() }, params: { recomputeNormals: { default: true } } },
+  conditional: {
+    out: 'any',
+    inputs: { condition: { kind: 'bool', default: false }, then: { kind: 'any' }, otherwise: { kind: 'any' } },
+    params: {},
+  },
+  setPositions: {
+    out: 'geometry',
+    inputs: { geometry: geo, positions: val() },
+    params: { recomputeNormals: { default: true } },
+  },
   setNormals: { out: 'geometry', inputs: { geometry: geo, normals: val() }, params: {} },
   setUVs: { out: 'geometry', inputs: { geometry: geo, uvs: val() }, params: {} },
   setColors: { out: 'geometry', inputs: { geometry: geo, colors: val() }, params: {} },
   setMaterialId: { out: 'geometry', inputs: { geometry: geo, id: val(0) }, params: {} },
-  transform: { out: 'geometry', inputs: { geometry: geo, translation: val([0, 0, 0]), rotation: val([0, 0, 0]), scale: val(1) }, params: {} },
+  transform: {
+    out: 'geometry',
+    inputs: { geometry: geo, translation: val([0, 0, 0]), rotation: val([0, 0, 0]), scale: val(1) },
+    params: {},
+  },
   merge: { out: 'geometry', inputs: { geometries: { kind: 'geometry', list: true } }, params: {} },
   instantiateOnVertices: {
     out: 'geometry',
     inputs: { target: geo, instance: geo, scale: val(1), rotation: val([0, 0, 0]) },
-    params: { alignToNormal: { default: false }, uniqueVertices: { default: true }, every: seg(1), keepTarget: { default: false } },
+    params: {
+      alignToNormal: { default: false },
+      uniqueVertices: { default: true },
+      every: seg(1),
+      keepTarget: { default: false },
+    },
   },
   instantiateOnFaces: {
     out: 'geometry',
     inputs: { target: geo, instance: geo, scale: val(1), rotation: val([0, 0, 0]) },
-    params: { alignToNormal: { default: false }, perFace: seg(1), seed: num(0, 0, 4294967295), every: seg(1), keepTarget: { default: false } },
+    params: {
+      alignToNormal: { default: false },
+      perFace: seg(1),
+      seed: num(0, 0, 4294967295),
+      every: seg(1),
+      keepTarget: { default: false },
+    },
   },
 };
 for (const op of MATH1) TYPES[op] = { out: 'value', inputs: { value: val(0) }, params: {} };
@@ -148,8 +244,21 @@ for (const op of MATH2) TYPES[op] = { out: 'value', inputs: { a: val(0), b: val(
 /** The node types a graph may use. */
 export const GRAPH_NODE_TYPES: readonly string[] = Object.keys(TYPES);
 
-const FIELD_NODES = new Set(['setPositions', 'setNormals', 'setUVs', 'setColors', 'instantiateOnVertices', 'instantiateOnFaces']);
-const DEFAULTS = { maxNodes: 4096, maxDepth: 256, maxVertices: 4_000_000, maxTriangles: 8_000_000, maxEvaluations: 100_000_000 };
+const FIELD_NODES = new Set([
+  'setPositions',
+  'setNormals',
+  'setUVs',
+  'setColors',
+  'instantiateOnVertices',
+  'instantiateOnFaces',
+]);
+const DEFAULTS = {
+  maxNodes: 4096,
+  maxDepth: 256,
+  maxVertices: 4_000_000,
+  maxTriangles: 8_000_000,
+  maxEvaluations: 100_000_000,
+};
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isRef = (v: unknown): v is { node: string } => isObject(v) && typeof v.node === 'string';
@@ -175,37 +284,55 @@ export function parseGeometryGraph(input: string | object, options: GraphOptions
     try {
       doc = JSON.parse(input);
     } catch (e) {
-      throw new TypeError(`Graph JSON is not valid: ${(e as Error).message.slice(0, 80)}`);
+      throw new TypeError(
+        `Graph JSON is not valid: ${(e as Error).message.slice(0, 80)}; pass the graph object or the text of GeometryGraph.stringify()`,
+      );
     }
   }
-  if (!isObject(doc) || doc.format !== 'margo-geometry-graph') throw new TypeError("Graph format must be 'margo-geometry-graph'");
-  if (doc.version !== 1) throw new RangeError(`Graph version ${String(doc.version)} is not supported; this reads version 1`);
+  if (!isObject(doc) || doc.format !== 'margo-geometry-graph')
+    throw new TypeError("Graph format must be 'margo-geometry-graph'");
+  if (doc.version !== 1)
+    throw new RangeError(`Graph version ${String(doc.version)} is not supported; this reads version 1`);
   if (!Array.isArray(doc.nodes)) throw new TypeError('Graph nodes must be an array');
-  if (doc.nodes.length > maxNodes) throw new RangeError(`Graph has ${doc.nodes.length} nodes, past the limit of ${maxNodes}`);
+  if (doc.nodes.length > maxNodes)
+    throw new RangeError(
+      `Graph has ${doc.nodes.length} nodes, past the limit of ${maxNodes}; raise maxNodes or remove nodes`,
+    );
   if (typeof doc.output !== 'string') throw new TypeError('Graph output must be a node id');
   const nodes: GraphNode[] = [];
   const byId = new Map<string, GraphNode>();
   for (const raw of doc.nodes as unknown[]) {
-    if (!isObject(raw) || typeof raw.id !== 'string' || !raw.id || raw.id.length > 256) throw new TypeError('Graph node needs a string id of 1 to 256 characters');
+    if (!isObject(raw) || typeof raw.id !== 'string' || !raw.id || raw.id.length > 256)
+      throw new TypeError('Graph node needs a string id of 1 to 256 characters');
     const id = raw.id;
-    if (byId.has(id)) throw new RangeError(`Graph node id "${id}" is used twice`);
-    if (typeof raw.type !== 'string' || !own(TYPES, raw.type)) throw new RangeError(`Graph node "${id}" has unknown type ${JSON.stringify(raw.type)}`);
+    if (byId.has(id)) throw new RangeError(`Graph node id "${id}" is used twice; give each node its own id`);
+    if (typeof raw.type !== 'string' || !own(TYPES, raw.type))
+      throw new RangeError(
+        `Graph node "${id}" has unknown type ${JSON.stringify(raw.type)}; use a type from GRAPH_NODE_TYPES`,
+      );
     const spec = TYPES[raw.type];
     const node: GraphNode = { id, type: raw.type };
     const params = raw.params === undefined ? {} : raw.params;
     if (!isObject(params)) throw new TypeError(`Graph node "${id}" params must be an object`);
     const outParams: Record<string, GraphParam> = {};
     for (const [k, v] of Object.entries(params)) {
-      if (!own(spec.params, k)) throw new RangeError(`Graph node "${id}" (${raw.type}) has no parameter "${k}"`);
+      if (!own(spec.params, k))
+        throw new RangeError(
+          `Graph node "${id}" (${raw.type}) has no parameter "${k}"; remove it, ${raw.type} takes ${Object.keys(spec.params).join(', ') || 'no parameters'}`,
+        );
       const p = spec.params[k];
       if (typeof p.default === 'boolean') {
         if (typeof v !== 'boolean') throw new TypeError(`Graph node "${id}" parameter ${k} must be a boolean`);
       } else if (typeof p.default === 'string') {
         if (typeof v !== 'string' || (p.values && !p.values.includes(v)))
-          throw new RangeError(`Graph node "${id}" parameter ${k} must be ${p.values ? p.values.map((x) => JSON.stringify(x)).join(', ') : 'a string'}`);
-        if (v.length > 256) throw new RangeError(`Graph node "${id}" parameter ${k} is too long`);
+          throw new RangeError(
+            `Graph node "${id}" parameter ${k} must be ${p.values ? p.values.map((x) => JSON.stringify(x)).join(', ') : 'a string'}`,
+          );
+        if (v.length > 256)
+          throw new RangeError(`Graph node "${id}" parameter ${k} is too long; keep it to 256 characters`);
       } else {
-        if (typeof v !== 'number' || !Number.isFinite(v)) throw new TypeError(`Graph node "${id}" parameter ${k} must be a finite number`);
+        if (typeof v !== 'number' || !Number.isFinite(v))
+          throw new TypeError(`Graph node "${id}" parameter ${k} must be a finite number`);
         if (p.int && !Number.isInteger(v)) throw new TypeError(`Graph node "${id}" parameter ${k} must be an integer`);
         if ((p.min !== undefined && v < p.min) || (p.max !== undefined && v > p.max))
           throw new RangeError(`Graph node "${id}" parameter ${k} must be ${p.min ?? '-inf'} to ${p.max ?? 'inf'}`);
@@ -217,24 +344,38 @@ export function parseGeometryGraph(input: string | object, options: GraphOptions
     if (!isObject(inputs)) throw new TypeError(`Graph node "${id}" inputs must be an object`);
     const outInputs: Record<string, GraphValue | GraphValue[]> = {};
     for (const [k, v] of Object.entries(inputs)) {
-      if (!own(spec.inputs, k)) throw new RangeError(`Graph node "${id}" (${raw.type}) has no input "${k}"`);
+      if (!own(spec.inputs, k))
+        throw new RangeError(
+          `Graph node "${id}" (${raw.type}) has no input "${k}"; remove it, ${raw.type} takes ${Object.keys(spec.inputs).join(', ') || 'no inputs'}`,
+        );
       const check = (x: unknown): GraphValue => {
         if (isRef(x)) return { node: x.node };
         if (typeof x === 'boolean') return x;
         if (typeof x === 'number' && Number.isFinite(x)) return x;
-        if (Array.isArray(x) && x.length >= 2 && x.length <= 4 && x.every((n) => typeof n === 'number' && Number.isFinite(n))) return x.slice();
+        if (
+          Array.isArray(x) &&
+          x.length >= 2 &&
+          x.length <= 4 &&
+          x.every((n) => typeof n === 'number' && Number.isFinite(n))
+        )
+          return x.slice();
         throw new TypeError(`Graph node "${id}" input ${k} must be a number, boolean, vector or { node }`);
       };
       if (spec.inputs[k].list) {
-        if (!Array.isArray(v) || v.length > maxNodes) throw new TypeError(`Graph node "${id}" input ${k} must be a list of nodes`);
+        if (!Array.isArray(v) || v.length > maxNodes)
+          throw new TypeError(`Graph node "${id}" input ${k} must be a list of nodes`);
         outInputs[k] = v.map((x) => {
           if (!isRef(x)) throw new TypeError(`Graph node "${id}" input ${k} must hold only { node } references`);
           return check(x);
         });
       } else {
-        if (Array.isArray(v) && v.length > 0 && v.every(isRef)) throw new TypeError(`Graph node "${id}" input ${k} takes one value, not a list`);
+        if (Array.isArray(v) && v.length > 0 && v.every(isRef))
+          throw new TypeError(
+            `Graph node "${id}" input ${k} takes one value, not a list; wire one value, or merge nodes first`,
+          );
         const checked = check(v);
-        if (spec.inputs[k].kind === 'geometry' && !isRef(checked)) throw new RangeError(`Graph node "${id}" input ${k} needs a geometry node`);
+        if (spec.inputs[k].kind === 'geometry' && !isRef(checked))
+          throw new RangeError(`Graph node "${id}" input ${k} needs a geometry node`);
         outInputs[k] = checked;
       }
     }
@@ -245,7 +386,9 @@ export function parseGeometryGraph(input: string | object, options: GraphOptions
   const outputOf = (n: GraphNode): Kind => TYPES[n.type].out;
   const refs = (n: GraphNode): { name: string; ref: string }[] => {
     const out: { name: string; ref: string }[] = [];
-    for (const [k, v] of Object.entries(n.inputs ?? {})) for (const x of Array.isArray(v) && TYPES[n.type].inputs[k].list ? v : [v]) if (isRef(x)) out.push({ name: k, ref: x.node });
+    for (const [k, v] of Object.entries(n.inputs ?? {}))
+      for (const x of Array.isArray(v) && TYPES[n.type].inputs[k].list ? v : [v])
+        if (isRef(x)) out.push({ name: k, ref: x.node });
     return out;
   };
   // A conditional's kind follows its branches, so kinds are resolved after the references are known.
@@ -270,7 +413,10 @@ export function parseGeometryGraph(input: string | object, options: GraphOptions
   };
   for (const n of nodes)
     for (const { name, ref } of refs(n)) {
-      if (!byId.has(ref)) throw new RangeError(`Graph node "${n.id}" input ${name} names node "${ref}", which does not exist`);
+      if (!byId.has(ref))
+        throw new RangeError(
+          `Graph node "${n.id}" input ${name} names node "${ref}", which does not exist; add that node or fix the id`,
+        );
       const want = TYPES[n.type].inputs[name].kind,
         have = kindOf(ref);
       const ok = want === 'any' || (want === 'value' ? have === 'value' || have === 'bool' : want === have);
@@ -288,7 +434,8 @@ export function parseGeometryGraph(input: string | object, options: GraphOptions
       if (top.at < top.next.length) {
         const ref = top.next[top.at++].ref;
         const s = state.get(ref);
-        if (s === 1) throw new RangeError(`Graph has a cycle through node "${ref}"`);
+        if (s === 1)
+          throw new RangeError(`Graph has a cycle through node "${ref}"; remove the wire that leads back to it`);
         if (!s) {
           state.set(ref, 1);
           stack.push({ id: ref, next: refs(byId.get(ref)!), at: 0 });
@@ -297,14 +444,21 @@ export function parseGeometryGraph(input: string | object, options: GraphOptions
         let d = 0;
         for (const r of top.next) d = Math.max(d, depth.get(r.ref)!);
         depth.set(top.id, d + 1);
-        if (d + 1 > maxDepth) throw new RangeError(`Graph chains ${d + 1} nodes deep, past the limit of ${maxDepth}`);
+        if (d + 1 > maxDepth)
+          throw new RangeError(
+            `Graph chains ${d + 1} nodes deep, past the limit of ${maxDepth}; raise maxDepth or shorten the chain`,
+          );
         state.set(top.id, 2);
         stack.pop();
       }
     }
   }
-  if (!byId.has(doc.output)) throw new RangeError(`Graph output "${doc.output}" is not a node`);
-  if (kindOf(doc.output) !== 'geometry') throw new RangeError(`Graph output "${doc.output}" is not a geometry node`);
+  if (!byId.has(doc.output))
+    throw new RangeError(`Graph output "${doc.output}" is not a node; set the output to the id of a geometry node`);
+  if (kindOf(doc.output) !== 'geometry')
+    throw new RangeError(
+      `Graph output "${doc.output}" is not a geometry node; set the output to the id of a geometry node`,
+    );
   return { format: 'margo-geometry-graph', version: 1, nodes, output: doc.output };
 }
 
@@ -331,7 +485,16 @@ interface Ctx {
   faceIndex: number;
   instance: number;
 }
-const ROOT: Ctx = { index: 0, count: 0, position: [0, 0, 0], normal: [0, 1, 0], uv: [0, 0], color: [1, 1, 1, 1], faceIndex: 0, instance: 0 };
+const ROOT: Ctx = {
+  index: 0,
+  count: 0,
+  position: [0, 0, 0],
+  normal: [0, 1, 0],
+  uv: [0, 0],
+  color: [1, 1, 1, 1],
+  faceIndex: 0,
+  instance: 0,
+};
 
 function hash(a: number, b: number): number {
   let h = (Math.imul(a | 0, 0x9e3779b1) ^ Math.imul((b | 0) + 0x7f4a7c15, 0x85ebca6b)) >>> 0;
@@ -393,7 +556,11 @@ class Perlin {
       BB = p[B + 1] + Z;
     return lerp(
       w,
-      lerp(v, lerp(u, this.grad(p[AA], x, y, z), this.grad(p[BA], x - 1, y, z)), lerp(u, this.grad(p[AB], x, y - 1, z), this.grad(p[BB], x - 1, y - 1, z))),
+      lerp(
+        v,
+        lerp(u, this.grad(p[AA], x, y, z), this.grad(p[BA], x - 1, y, z)),
+        lerp(u, this.grad(p[AB], x, y - 1, z), this.grad(p[BB], x - 1, y - 1, z)),
+      ),
       lerp(
         v,
         lerp(u, this.grad(p[AA + 1], x, y, z - 1), this.grad(p[BA + 1], x - 1, y, z - 1)),
@@ -435,14 +602,21 @@ function rotationMatrix(rx: number, ry: number, rz: number): number[] {
   const [sx, cx, sy, cy, sz, cz] = [Math.sin(rx), Math.cos(rx), Math.sin(ry), Math.cos(ry), Math.sin(rz), Math.cos(rz)];
   // R = Rz * Ry * Rx
   return [
-    cz * cy, cz * sy * sx - sz * cx, cz * sy * cx + sz * sx,
-    sz * cy, sz * sy * sx + cz * cx, sz * sy * cx - cz * sx,
-    -sy, cy * sx, cy * cx,
+    cz * cy,
+    cz * sy * sx - sz * cx,
+    cz * sy * cx + sz * sx,
+    sz * cy,
+    sz * sy * sx + cz * cx,
+    sz * sy * cx - cz * sx,
+    -sy,
+    cy * sx,
+    cy * cx,
   ];
 }
 const mul3 = (a: number[], b: number[]): number[] => {
   const o: number[] = [];
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) o.push(a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c]);
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 3; c++) o.push(a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c]);
   return o;
 };
 /** The rotation taking +Y onto the unit vector `n` along the shortest arc. */
@@ -475,7 +649,10 @@ export class GeometryGraph {
   output = '';
 
   /** Adds a node and returns a reference to wire into other nodes' inputs. `id` defaults to `type_n`. */
-  add(type: string, spec: { id?: string; params?: Record<string, GraphParam>; inputs?: Record<string, GraphValue | GraphValue[]> } = {}): { node: string } {
+  add(
+    type: string,
+    spec: { id?: string; params?: Record<string, GraphParam>; inputs?: Record<string, GraphValue | GraphValue[]> } = {},
+  ): { node: string } {
     const id = spec.id ?? `${type}_${this.nodes.length}`;
     const node: GraphNode = { id, type };
     if (spec.params) node.params = spec.params;
@@ -492,7 +669,10 @@ export class GeometryGraph {
 
   /** The graph as a plain document, checked. */
   toJSON(options: GraphOptions = {}): GeometryGraphJSON {
-    return parseGeometryGraph({ format: 'margo-geometry-graph', version: 1, nodes: this.nodes, output: this.output }, options);
+    return parseGeometryGraph(
+      { format: 'margo-geometry-graph', version: 1, nodes: this.nodes, output: this.output },
+      options,
+    );
   }
 
   /** The graph as JSON text. */
@@ -531,12 +711,19 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
   let evaluations = 0;
   const tick = (n = 1): void => {
     evaluations += n;
-    if (evaluations > maxEvaluations) throw new RangeError(`Graph ran past ${maxEvaluations} evaluations; raise maxEvaluations or simplify it`);
+    if (evaluations > maxEvaluations)
+      throw new RangeError(`Graph ran past ${maxEvaluations} evaluations; raise maxEvaluations or simplify it`);
     if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
   };
   const checkSize = (vertices: number, triangles: number): void => {
-    if (vertices > maxVertices) throw new RangeError(`Graph geometry reaches ${vertices} vertices, past the limit of ${maxVertices}`);
-    if (triangles > maxTriangles) throw new RangeError(`Graph geometry reaches ${triangles} triangles, past the limit of ${maxTriangles}`);
+    if (vertices > maxVertices)
+      throw new RangeError(
+        `Graph geometry reaches ${vertices} vertices, past the limit of ${maxVertices}; raise maxVertices or lower the segments or instances`,
+      );
+    if (triangles > maxTriangles)
+      throw new RangeError(
+        `Graph geometry reaches ${triangles} triangles, past the limit of ${maxTriangles}; raise maxTriangles or lower the segments or instances`,
+      );
   };
 
   // Which nodes read the per-element context, directly or through their inputs.
@@ -550,7 +737,8 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
     if (FIELD_NODES.has(n.type)) d = false;
     else if (!d)
       for (const v of Object.values(n.inputs ?? {}))
-        for (const x of Array.isArray(v) && v.every((y) => isRef(y)) && v.length ? v : [v]) if (isRef(x) && isDynamic(x.node)) d = true;
+        for (const x of Array.isArray(v) && v.every((y) => isRef(y)) && v.length ? v : [v])
+          if (isRef(x) && isDynamic(x.node)) d = true;
     dynamic.set(id, d);
     return d;
   };
@@ -578,7 +766,10 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
     const v = n.inputs?.[name];
     if (!isRef(v as GraphValue)) return bad(`Graph node "${n.id}" needs a geometry on input ${name}`);
     const ref = (v as { node: string }).node;
-    if (isDynamic(ref)) throw new RangeError(`Graph node "${n.id}" input ${name} cannot depend on a per-element context`);
+    if (isDynamic(ref))
+      throw new RangeError(
+        `Graph node "${n.id}" input ${name} cannot depend on a per-element context; wire a value that has no context node behind it`,
+      );
     const g = ev(ref, ROOT, staticMemo);
     return isWork(g) ? g : bad(`Graph node "${n.id}" input ${name} is not a geometry`);
   };
@@ -586,7 +777,9 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
   const constant = (n: GraphNode, name: string): Value => {
     const v = n.inputs?.[name];
     if (isRef(v as GraphValue) && isDynamic((v as { node: string }).node))
-      throw new RangeError(`Graph node "${n.id}" input ${name} cannot depend on a per-element context`);
+      throw new RangeError(
+        `Graph node "${n.id}" input ${name} cannot depend on a per-element context; wire a value that has no context node behind it`,
+      );
     return input(n, name, ROOT, staticMemo);
   };
   const fieldAt = (n: GraphNode, name: string, ctx: Ctx): Value => {
@@ -604,17 +797,48 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
     };
     switch (n.type) {
       case 'box':
-        guard(2 * ((pn('widthSegments') + 1) * (pn('heightSegments') + 1) + (pn('widthSegments') + 1) * (pn('depthSegments') + 1) + (pn('heightSegments') + 1) * (pn('depthSegments') + 1)));
-        return made(boxGeometry(pn('width'), pn('height'), pn('depth'), pn('widthSegments'), pn('heightSegments'), pn('depthSegments')));
+        guard(
+          2 *
+            ((pn('widthSegments') + 1) * (pn('heightSegments') + 1) +
+              (pn('widthSegments') + 1) * (pn('depthSegments') + 1) +
+              (pn('heightSegments') + 1) * (pn('depthSegments') + 1)),
+        );
+        return made(
+          boxGeometry(
+            pn('width'),
+            pn('height'),
+            pn('depth'),
+            pn('widthSegments'),
+            pn('heightSegments'),
+            pn('depthSegments'),
+          ),
+        );
       case 'sphere':
         guard((pn('widthSegments') + 1) * (pn('heightSegments') + 1));
         return made(sphereGeometry(pn('radius'), pn('widthSegments'), pn('heightSegments')));
       case 'cylinder':
         guard((pn('radialSegments') + 1) * (pn('heightSegments') + 1) + 2 * (pn('radialSegments') + 2));
-        return made(cylinderGeometry(pn('radiusTop'), pn('radiusBottom'), pn('height'), pn('radialSegments'), pn('heightSegments'), p('openEnded') as boolean));
+        return made(
+          cylinderGeometry(
+            pn('radiusTop'),
+            pn('radiusBottom'),
+            pn('height'),
+            pn('radialSegments'),
+            pn('heightSegments'),
+            p('openEnded') as boolean,
+          ),
+        );
       case 'cone':
         guard((pn('radialSegments') + 1) * (pn('heightSegments') + 1) + 2 * (pn('radialSegments') + 2));
-        return made(coneGeometry(pn('radius'), pn('height'), pn('radialSegments'), pn('heightSegments'), p('openEnded') as boolean));
+        return made(
+          coneGeometry(
+            pn('radius'),
+            pn('height'),
+            pn('radialSegments'),
+            pn('heightSegments'),
+            p('openEnded') as boolean,
+          ),
+        );
       case 'plane':
         guard((pn('widthSegments') + 1) * (pn('heightSegments') + 1));
         return made(planeGeometry(pn('width'), pn('height'), pn('widthSegments'), pn('heightSegments')));
@@ -626,30 +850,53 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
         return made(torusGeometry(pn('radius'), pn('tube'), pn('radialSegments'), pn('tubularSegments')));
       case 'capsule':
         guard((pn('radialSegments') + 1) * (2 * pn('capSegments') + pn('heightSegments') + 3));
-        return made(capsuleGeometry(pn('radius'), pn('height'), pn('capSegments'), pn('radialSegments'), pn('heightSegments')));
+        return made(
+          capsuleGeometry(pn('radius'), pn('height'), pn('capSegments'), pn('radialSegments'), pn('heightSegments')),
+        );
       case 'empty':
-        return { positions: new Float32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), indices: new Uint32Array(0), material: new Uint32Array(0) };
+        return {
+          positions: new Float32Array(0),
+          normals: new Float32Array(0),
+          uvs: new Float32Array(0),
+          indices: new Uint32Array(0),
+          material: new Uint32Array(0),
+        };
       case 'input': {
         const name = p('name') as string;
         const source = options.inputs && own(options.inputs, name) ? options.inputs[name] : undefined;
-        if (!source) throw new RangeError(`Graph input "${name}" was not passed in options.inputs`);
+        if (!source)
+          throw new RangeError(
+            `Graph input "${name}" was not passed in options.inputs; pass inputs['${name}'] to build()`,
+          );
         checkSize(source.positions.length / 3, source.indices.length / 3);
         return fromData(source);
       }
       case 'context': {
         switch (p('field')) {
-          case 'position': return ctx.position.slice();
-          case 'normal': return ctx.normal.slice();
-          case 'uv': return [ctx.uv[0], ctx.uv[1], 0];
-          case 'color': return ctx.color.slice();
-          case 'index': return ctx.index;
-          case 'count': return ctx.count;
-          case 'faceIndex': return ctx.faceIndex;
-          default: return ctx.instance;
+          case 'position':
+            return ctx.position.slice();
+          case 'normal':
+            return ctx.normal.slice();
+          case 'uv':
+            return [ctx.uv[0], ctx.uv[1], 0];
+          case 'color':
+            return ctx.color.slice();
+          case 'index':
+            return ctx.index;
+          case 'count':
+            return ctx.count;
+          case 'faceIndex':
+            return ctx.faceIndex;
+          default:
+            return ctx.instance;
         }
       }
       case 'vec3':
-        return [scalar(input(n, 'x', ctx, memo), 'x'), scalar(input(n, 'y', ctx, memo), 'y'), scalar(input(n, 'z', ctx, memo), 'z')];
+        return [
+          scalar(input(n, 'x', ctx, memo), 'x'),
+          scalar(input(n, 'y', ctx, memo), 'y'),
+          scalar(input(n, 'z', ctx, memo), 'z'),
+        ];
       case 'swizzle': {
         const v = vec3(input(n, 'value', ctx, memo), 'swizzle');
         return v[{ x: 0, y: 1, z: 2 }[p('component') as 'x' | 'y' | 'z']];
@@ -683,7 +930,9 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
           }
           return sum / norm;
         };
-        return p('output') === 'vector' ? [sample(0, 0, 0), sample(31.416, 47.853, 12.793), sample(-19.337, 5.271, 83.619)] : sample(0, 0, 0);
+        return p('output') === 'vector'
+          ? [sample(0, 0, 0), sample(31.416, 47.853, 12.793), sample(-19.337, 5.271, 83.619)]
+          : sample(0, 0, 0);
       }
       case 'mix': {
         const a = input(n, 'a', ctx, memo),
@@ -701,12 +950,18 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
         const a = scalar(input(n, 'a', ctx, memo), 'a'),
           b = scalar(input(n, 'b', ctx, memo), 'b');
         switch (p('op')) {
-          case '<': return a < b;
-          case '<=': return a <= b;
-          case '>': return a > b;
-          case '>=': return a >= b;
-          case '==': return a === b;
-          default: return a !== b;
+          case '<':
+            return a < b;
+          case '<=':
+            return a <= b;
+          case '>':
+            return a > b;
+          case '>=':
+            return a >= b;
+          case '==':
+            return a === b;
+          default:
+            return a !== b;
         }
       }
       case 'logic': {
@@ -719,27 +974,51 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
         const c = input(n, 'condition', ctx, memo);
         return input(n, c ? 'then' : 'otherwise', ctx, memo);
       }
-      case 'negate': return map1(input(n, 'value', ctx, memo), (x) => -x, n.type);
-      case 'abs': return map1(input(n, 'value', ctx, memo), Math.abs, n.type);
-      case 'floor': return map1(input(n, 'value', ctx, memo), Math.floor, n.type);
-      case 'ceil': return map1(input(n, 'value', ctx, memo), Math.ceil, n.type);
-      case 'fract': return map1(input(n, 'value', ctx, memo), (x) => x - Math.floor(x), n.type);
-      case 'sin': return map1(input(n, 'value', ctx, memo), Math.sin, n.type);
-      case 'cos': return map1(input(n, 'value', ctx, memo), Math.cos, n.type);
-      case 'sqrt': return map1(input(n, 'value', ctx, memo), (x) => Math.sqrt(Math.max(0, x)), n.type);
-      case 'length': return Math.hypot(...vec3(input(n, 'value', ctx, memo), 'length'));
+      case 'negate':
+        return map1(input(n, 'value', ctx, memo), (x) => -x, n.type);
+      case 'abs':
+        return map1(input(n, 'value', ctx, memo), Math.abs, n.type);
+      case 'floor':
+        return map1(input(n, 'value', ctx, memo), Math.floor, n.type);
+      case 'ceil':
+        return map1(input(n, 'value', ctx, memo), Math.ceil, n.type);
+      case 'fract':
+        return map1(input(n, 'value', ctx, memo), (x) => x - Math.floor(x), n.type);
+      case 'sin':
+        return map1(input(n, 'value', ctx, memo), Math.sin, n.type);
+      case 'cos':
+        return map1(input(n, 'value', ctx, memo), Math.cos, n.type);
+      case 'sqrt':
+        return map1(input(n, 'value', ctx, memo), (x) => Math.sqrt(Math.max(0, x)), n.type);
+      case 'length':
+        return Math.hypot(...vec3(input(n, 'value', ctx, memo), 'length'));
       case 'normalize': {
         const v = vec3(input(n, 'value', ctx, memo), 'normalize'),
           l = Math.hypot(v[0], v[1], v[2]) || 1;
         return [v[0] / l, v[1] / l, v[2] / l];
       }
-      case 'add': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => x + y, n.type);
-      case 'subtract': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => x - y, n.type);
-      case 'multiply': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => x * y, n.type);
-      case 'divide': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => (y === 0 ? 0 : x / y), n.type);
-      case 'min': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), Math.min, n.type);
-      case 'max': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), Math.max, n.type);
-      case 'pow': return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => { const r = x ** y; return Number.isFinite(r) ? r : 0; }, n.type);
+      case 'add':
+        return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => x + y, n.type);
+      case 'subtract':
+        return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => x - y, n.type);
+      case 'multiply':
+        return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => x * y, n.type);
+      case 'divide':
+        return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), (x, y) => (y === 0 ? 0 : x / y), n.type);
+      case 'min':
+        return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), Math.min, n.type);
+      case 'max':
+        return lift(input(n, 'a', ctx, memo), input(n, 'b', ctx, memo), Math.max, n.type);
+      case 'pow':
+        return lift(
+          input(n, 'a', ctx, memo),
+          input(n, 'b', ctx, memo),
+          (x, y) => {
+            const r = x ** y;
+            return Number.isFinite(r) ? r : 0;
+          },
+          n.type,
+        );
       case 'dot': {
         const a = vec3(input(n, 'a', ctx, memo), 'dot'),
           b = vec3(input(n, 'b', ctx, memo), 'dot');
@@ -791,7 +1070,12 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
         g.colors = g.colors ? g.colors.slice() : new Float32Array(count * 4).fill(1);
         for (let i = 0; i < count; i++) {
           const v = fieldAt(n, 'colors', vertexCtx(g, i, count));
-          const c = typeof v === 'number' ? [v, v, v, 1] : isVec(v) && v.length >= 3 ? [v[0], v[1], v[2], v.length > 3 ? v[3] : 1] : bad('Graph colors needs a number or a vector of 3 or 4');
+          const c =
+            typeof v === 'number'
+              ? [v, v, v, 1]
+              : isVec(v) && v.length >= 3
+                ? [v[0], v[1], v[2], v.length > 3 ? v[3] : 1]
+                : bad('Graph colors needs a number or a vector of 3 or 4');
           g.colors.set(c, i * 4);
         }
         return g;
@@ -799,7 +1083,8 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
       case 'setMaterialId': {
         const g = clone(geometryInput(n, 'geometry'));
         const id = scalar(constant(n, 'id'), 'id');
-        if (!Number.isInteger(id) || id < 0 || id > 65535) throw new RangeError('Graph material id must be an integer 0 to 65535');
+        if (!Number.isInteger(id) || id < 0 || id > 65535)
+          throw new RangeError('Graph material id must be an integer 0 to 65535');
         g.material.fill(id);
         return g;
       }
@@ -814,7 +1099,10 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
       case 'merge': {
         const list = (n.inputs?.geometries ?? []) as { node: string }[];
         const parts = list.map((ref) => {
-          if (isDynamic(ref.node)) throw new RangeError(`Graph node "${n.id}" cannot merge a per-element value`);
+          if (isDynamic(ref.node))
+            throw new RangeError(
+              `Graph node "${n.id}" cannot merge a per-element value; wire geometry that has no context node behind it`,
+            );
           const g = ev(ref.node, ROOT, staticMemo);
           return isWork(g) ? g : bad(`Graph node "${n.id}" can merge only geometry`);
         });
@@ -849,14 +1137,19 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
               face: 0,
               index: i,
             });
-            if (places.length * Math.max(1, instance.positions.length / 3) > maxVertices) checkSize(places.length * (instance.positions.length / 3), 0);
+            if (places.length * Math.max(1, instance.positions.length / 3) > maxVertices)
+              checkSize(places.length * (instance.positions.length / 3), 0);
           }
         } else {
           const perFace = pn('perFace');
           const rand = mulberry((pn('seed') + seed) >>> 0);
           for (let f = 0; f < targetTriangles; f += every) {
             const [a, b, c] = [target.indices[f * 3], target.indices[f * 3 + 1], target.indices[f * 3 + 2]];
-            const P = (i: number) => [target.positions[i * 3], target.positions[i * 3 + 1], target.positions[i * 3 + 2]];
+            const P = (i: number) => [
+              target.positions[i * 3],
+              target.positions[i * 3 + 1],
+              target.positions[i * 3 + 2],
+            ];
             const pa = P(a),
               pb = P(b),
               pc = P(c);
@@ -878,9 +1171,16 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
               }
               const w = 1 - u - v;
               const mixv = (arr: Float32Array, size: number, i0: number, i1: number, i2: number): number[] =>
-                Array.from({ length: size }, (_, d) => arr[i0 * size + d] * w + arr[i1 * size + d] * u + arr[i2 * size + d] * v);
+                Array.from(
+                  { length: size },
+                  (_, d) => arr[i0 * size + d] * w + arr[i1 * size + d] * u + arr[i2 * size + d] * v,
+                );
               places.push({
-                position: [pa[0] * w + pb[0] * u + pc[0] * v, pa[1] * w + pb[1] * u + pc[1] * v, pa[2] * w + pb[2] * u + pc[2] * v],
+                position: [
+                  pa[0] * w + pb[0] * u + pc[0] * v,
+                  pa[1] * w + pb[1] * u + pc[1] * v,
+                  pa[2] * w + pb[2] * u + pc[2] * v,
+                ],
                 normal,
                 uv: mixv(target.uvs, 2, a, b, c),
                 color: target.colors ? mixv(target.colors, 4, a, b, c) : [1, 1, 1, 1],
@@ -893,9 +1193,21 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
         }
         const iv = instance.positions.length / 3,
           it = instance.indices.length / 3;
-        checkSize(places.length * iv + (p('keepTarget') ? targetVertices : 0), places.length * it + (p('keepTarget') ? targetTriangles : 0));
+        checkSize(
+          places.length * iv + (p('keepTarget') ? targetVertices : 0),
+          places.length * it + (p('keepTarget') ? targetTriangles : 0),
+        );
         const copies: Work[] = places.map((q, k) => {
-          const ctx: Ctx = { index: q.index, count: places.length, position: q.position, normal: q.normal, uv: q.uv, color: q.color, faceIndex: q.face, instance: k };
+          const ctx: Ctx = {
+            index: q.index,
+            count: places.length,
+            position: q.position,
+            normal: q.normal,
+            uv: q.uv,
+            color: q.color,
+            faceIndex: q.face,
+            instance: k,
+          };
           const s = vec3(fieldAt(n, 'scale', ctx), 'scale'),
             r = vec3(fieldAt(n, 'rotation', ctx), 'rotation');
           let m = rotationMatrix(r[0], r[1], r[2]);
@@ -912,7 +1224,7 @@ function runGraph(graph: GeometryGraphJSON, options: GraphOptions): GraphGeometr
   };
 
   const out = ev(graph.output, ROOT, staticMemo);
-  if (!isWork(out)) throw new TypeError('Graph output is not a geometry');
+  if (!isWork(out)) throw new TypeError('Graph output is not a geometry; set the output to the id of a geometry node');
   checkSize(out.positions.length / 3, out.indices.length / 3);
   return finish(out);
 }
@@ -934,7 +1246,11 @@ function fromData(data: GeometryData & { colors?: ArrayLike<number> }): Work {
     material,
   };
   if (data.colors && data.colors.length === nv * 4) w.colors = Float32Array.from(data.colors);
-  for (const i of w.indices) if (i >= nv) throw new RangeError('Graph geometry has an index past its vertices');
+  for (const i of w.indices)
+    if (i >= nv)
+      throw new RangeError(
+        'Graph geometry has an index past its vertices; pass indices below the vertex count in options.inputs',
+      );
   if (w.indices.length % 3) throw new RangeError('Graph geometry indices must be a multiple of 3');
   return w;
 }
@@ -990,8 +1306,16 @@ function recomputeNormals(g: Work): void {
   g.normals.fill(0);
   for (let i = 0; i < g.indices.length; i += 3) {
     const [a, b, c] = [g.indices[i] * 3, g.indices[i + 1] * 3, g.indices[i + 2] * 3];
-    const e1 = [g.positions[b] - g.positions[a], g.positions[b + 1] - g.positions[a + 1], g.positions[b + 2] - g.positions[a + 2]],
-      e2 = [g.positions[c] - g.positions[a], g.positions[c + 1] - g.positions[a + 1], g.positions[c + 2] - g.positions[a + 2]];
+    const e1 = [
+        g.positions[b] - g.positions[a],
+        g.positions[b + 1] - g.positions[a + 1],
+        g.positions[b + 2] - g.positions[a + 2],
+      ],
+      e2 = [
+        g.positions[c] - g.positions[a],
+        g.positions[c + 1] - g.positions[a + 1],
+        g.positions[c + 2] - g.positions[a + 2],
+      ];
     const nx = e1[1] * e2[2] - e1[2] * e2[1],
       ny = e1[2] * e2[0] - e1[0] * e2[2],
       nz = e1[0] * e2[1] - e1[1] * e2[0];

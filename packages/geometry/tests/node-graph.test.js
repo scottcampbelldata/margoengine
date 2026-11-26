@@ -1,6 +1,8 @@
 // The geometry graph: sources, setters, instancing, conditionals, noise, merge, material ids, JSON in and out, limits.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { countNoFix } from '../../../scripts/support/throw-messages.js';
 import { GeometryGraph, buildGeometryGraph, parseGeometryGraph, GRAPH_NODE_TYPES } from '../dist/node-graph.js';
 import { boxGeometry } from '../dist/primitives.js';
 
@@ -68,9 +70,12 @@ test('setPositions displaces per vertex with the context, and recomputes normals
   const moved = g.add('add', { inputs: { a: pos, b: bump } });
   g.setOutput(g.add('setPositions', { inputs: { geometry: sphere, positions: moved } }));
   const mesh = g.build();
-  const radii = Array.from({ length: mesh.positions.length / 3 }, (_, i) => Math.hypot(mesh.positions[i * 3], mesh.positions[i * 3 + 1], mesh.positions[i * 3 + 2]));
+  const radii = Array.from({ length: mesh.positions.length / 3 }, (_, i) =>
+    Math.hypot(mesh.positions[i * 3], mesh.positions[i * 3 + 1], mesh.positions[i * 3 + 2]),
+  );
   assert.ok(radii.every((r) => Math.abs(r - 1.5) < 1e-4)); // every vertex moved 0.5 along its normal
-  for (let i = 0; i < mesh.normals.length; i += 3) near(Math.hypot(mesh.normals[i], mesh.normals[i + 1], mesh.normals[i + 2]), 1, 1e-4);
+  for (let i = 0; i < mesh.normals.length; i += 3)
+    near(Math.hypot(mesh.normals[i], mesh.normals[i + 1], mesh.normals[i + 2]), 1, 1e-4);
 });
 
 test('random: seeded, in range, and changed by the build seed', () => {
@@ -99,7 +104,12 @@ test('instantiateOnVertices puts one instance on each distinct vertex', () => {
   const every = new GeometryGraph();
   const t2 = every.add('box'),
     i2 = every.add('box', { params: { width: 0.1, height: 0.1, depth: 0.1 } });
-  every.setOutput(every.add('instantiateOnVertices', { inputs: { target: t2, instance: i2 }, params: { uniqueVertices: false, keepTarget: true } }));
+  every.setOutput(
+    every.add('instantiateOnVertices', {
+      inputs: { target: t2, instance: i2 },
+      params: { uniqueVertices: false, keepTarget: true },
+    }),
+  );
   assert.equal(every.build().positions.length / 3, 24 + 24 * 24);
   // Scale and rotation are fields: scale each instance by its vertex index.
   const s = new GeometryGraph();
@@ -127,12 +137,21 @@ test('instantiateOnFaces sits on face centres, random points and aligns to the n
   assert.equal(mesh.positions.length / 3, 2 * 24); // a plane has two triangles
   for (let f = 0; f < 2; f++) {
     const c = [0, 0, 0];
-    for (let k = 0; k < 3; k++) for (let d = 0; d < 3; d++) c[d] += target.positions[target.indices[f * 3 + k] * 3 + d] / 3;
+    for (let k = 0; k < 3; k++)
+      for (let d = 0; d < 3; d++) c[d] += target.positions[target.indices[f * 3 + k] * 3 + d] / 3;
     const m = mean(mesh, f * 24, f * 24 + 24);
     for (let d = 0; d < 3; d++) near(m[d], c[d], 1e-5);
   }
   const many = new GeometryGraph();
-  many.setOutput(many.add('instantiateOnFaces', { inputs: { target: many.add('plane'), instance: many.add('box', { params: { width: 0.1, height: 0.1, depth: 0.1 } }) }, params: { perFace: 5, seed: 3 } }));
+  many.setOutput(
+    many.add('instantiateOnFaces', {
+      inputs: {
+        target: many.add('plane'),
+        instance: many.add('box', { params: { width: 0.1, height: 0.1, depth: 0.1 } }),
+      },
+      params: { perFace: 5, seed: 3 },
+    }),
+  );
   const dense = many.build();
   assert.equal(dense.positions.length / 3, 10 * 24);
   assert.deepEqual([...dense.positions], [...many.build().positions]); // seeded
@@ -141,7 +160,12 @@ test('instantiateOnFaces sits on face centres, random points and aligns to the n
   const normalAxis = [...target.normals.slice(0, 3)].map(Math.abs).indexOf(1);
   const tall = (align) => {
     const a = new GeometryGraph();
-    a.setOutput(a.add('instantiateOnFaces', { inputs: { target: a.add('plane'), instance: a.add('box', { params: { width: 0.1, height: 2, depth: 0.1 } }) }, params: { alignToNormal: align } }));
+    a.setOutput(
+      a.add('instantiateOnFaces', {
+        inputs: { target: a.add('plane'), instance: a.add('box', { params: { width: 0.1, height: 2, depth: 0.1 } }) },
+        params: { alignToNormal: align },
+      }),
+    );
     const b = bounds(a.build(), 0, 24);
     return b.hi[normalAxis] - b.lo[normalAxis];
   };
@@ -164,7 +188,13 @@ test('conditional takes one branch and never evaluates the other', () => {
   // A conditional of values: pick a colour.
   const g = new GeometryGraph();
   const plane = g.add('plane');
-  const c = g.add('conditional', { inputs: { condition: g.add('logic', { params: { op: 'not' }, inputs: { a: false } }), then: [1, 0, 0], otherwise: [0, 0, 1] } });
+  const c = g.add('conditional', {
+    inputs: {
+      condition: g.add('logic', { params: { op: 'not' }, inputs: { a: false } }),
+      then: [1, 0, 0],
+      otherwise: [0, 0, 1],
+    },
+  });
   g.setOutput(g.add('setColors', { inputs: { geometry: plane, colors: c } }));
   assert.deepEqual([...g.build().colors.slice(0, 4)], [1, 0, 0, 1]);
 });
@@ -172,7 +202,10 @@ test('conditional takes one branch and never evaluates the other', () => {
 test('compare and logic follow the context: colour by height', () => {
   const g = new GeometryGraph();
   const box = g.add('box', { params: { widthSegments: 1, heightSegments: 2, depthSegments: 1 } });
-  const y = g.add('swizzle', { params: { component: 'y' }, inputs: { value: g.add('context', { params: { field: 'position' } }) } });
+  const y = g.add('swizzle', {
+    params: { component: 'y' },
+    inputs: { value: g.add('context', { params: { field: 'position' } }) },
+  });
   const high = g.add('compare', { params: { op: '>' }, inputs: { a: y, b: 0.1 } });
   const colour = g.add('conditional', { inputs: { condition: high, then: [1, 0, 0], otherwise: [0, 1, 0] } });
   g.setOutput(g.add('setColors', { inputs: { geometry: box, colors: colour } }));
@@ -187,7 +220,13 @@ test('merge, setMaterialId and transform build grouped meshes', () => {
   const make = (first, second) => {
     const g = new GeometryGraph();
     const a = g.add('setMaterialId', { inputs: { geometry: g.add('box'), id: first } });
-    const b = g.add('transform', { inputs: { geometry: g.add('setMaterialId', { inputs: { geometry: g.add('plane'), id: second } }), translation: [0, 5, 0], scale: 2 } });
+    const b = g.add('transform', {
+      inputs: {
+        geometry: g.add('setMaterialId', { inputs: { geometry: g.add('plane'), id: second } }),
+        translation: [0, 5, 0],
+        scale: 2,
+      },
+    });
     g.setOutput(g.add('merge', { inputs: { geometries: [a, b] } }));
     return g.build();
   };
@@ -228,18 +267,45 @@ test('invalid graphs and runaway builds are refused', () => {
   const doc = (nodes, output = 'a') => ({ format: 'margo-geometry-graph', version: 1, nodes, output });
   assert.throws(() => parseGeometryGraph('not json'), TypeError);
   assert.throws(() => parseGeometryGraph({ format: 'x' }), TypeError);
-  assert.throws(() => parseGeometryGraph({ format: 'margo-geometry-graph', version: 2, nodes: [], output: 'a' }), RangeError);
+  assert.throws(
+    () => parseGeometryGraph({ format: 'margo-geometry-graph', version: 2, nodes: [], output: 'a' }),
+    RangeError,
+  );
   assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'teapot' }])), RangeError);
-  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box' }, { id: 'a', type: 'box' }])), RangeError);
+  assert.throws(
+    () =>
+      parseGeometryGraph(
+        doc([
+          { id: 'a', type: 'box' },
+          { id: 'a', type: 'box' },
+        ]),
+      ),
+    RangeError,
+  );
   assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: { girth: 1 } }])), RangeError);
   assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: { width: -1 } }])), RangeError);
   assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: { widthSegments: 1.5 } }])), TypeError);
-  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: { widthSegments: 99999 } }])), RangeError);
-  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', inputs: { bogus: 1 } }])), RangeError);
-  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'transform', inputs: { geometry: { node: 'zzz' } } }])), RangeError);
-  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'transform', inputs: { geometry: 5 } }])), RangeError.prototype.constructor);
   assert.throws(
-    () => parseGeometryGraph(doc([{ id: 'a', type: 'setColors', inputs: { geometry: { node: 'b' }, colors: 1 } }, { id: 'b', type: 'setColors', inputs: { geometry: { node: 'a' }, colors: 1 } }])),
+    () => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: { widthSegments: 99999 } }])),
+    RangeError,
+  );
+  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', inputs: { bogus: 1 } }])), RangeError);
+  assert.throws(
+    () => parseGeometryGraph(doc([{ id: 'a', type: 'transform', inputs: { geometry: { node: 'zzz' } } }])),
+    RangeError,
+  );
+  assert.throws(
+    () => parseGeometryGraph(doc([{ id: 'a', type: 'transform', inputs: { geometry: 5 } }])),
+    RangeError.prototype.constructor,
+  );
+  assert.throws(
+    () =>
+      parseGeometryGraph(
+        doc([
+          { id: 'a', type: 'setColors', inputs: { geometry: { node: 'b' }, colors: 1 } },
+          { id: 'b', type: 'setColors', inputs: { geometry: { node: 'a' }, colors: 1 } },
+        ]),
+      ),
     /cycle/,
   );
   assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'negate' }])), /not a geometry/);
@@ -248,7 +314,10 @@ test('invalid graphs and runaway builds are refused', () => {
   // A chain longer than maxDepth.
   const chain = [{ id: 'n0', type: 'negate' }];
   for (let i = 1; i < 300; i++) chain.push({ id: `n${i}`, type: 'negate', inputs: { value: { node: `n${i - 1}` } } });
-  chain.push({ id: 'a', type: 'setColors', inputs: { geometry: { node: 'b' }, colors: { node: 'n299' } } }, { id: 'b', type: 'box' });
+  chain.push(
+    { id: 'a', type: 'setColors', inputs: { geometry: { node: 'b' }, colors: { node: 'n299' } } },
+    { id: 'b', type: 'box' },
+  );
   assert.throws(() => parseGeometryGraph(doc(chain)), /deep/);
   // Limits while building.
   const big = new GeometryGraph();
@@ -256,19 +325,44 @@ test('invalid graphs and runaway builds are refused', () => {
   assert.throws(() => big.build({ maxVertices: 1000 }), RangeError);
   assert.throws(() => big.build({ maxTriangles: 10 }), RangeError);
   const boom = new GeometryGraph();
-  boom.setOutput(boom.add('instantiateOnFaces', { inputs: { target: boom.add('plane', { params: { widthSegments: 100, heightSegments: 100 } }), instance: boom.add('sphere') }, params: { perFace: 4096 } }));
+  boom.setOutput(
+    boom.add('instantiateOnFaces', {
+      inputs: {
+        target: boom.add('plane', { params: { widthSegments: 100, heightSegments: 100 } }),
+        instance: boom.add('sphere'),
+      },
+      params: { perFace: 4096 },
+    }),
+  );
   assert.throws(() => boom.build({ maxVertices: 100000 }), RangeError); // refused before anything is copied
   const slow = new GeometryGraph();
-  slow.setOutput(slow.add('setPositions', { inputs: { geometry: slow.add('sphere'), positions: slow.add('context') } }));
+  slow.setOutput(
+    slow.add('setPositions', { inputs: { geometry: slow.add('sphere'), positions: slow.add('context') } }),
+  );
   assert.throws(() => slow.build({ maxEvaluations: 10 }), /evaluations/);
-  assert.throws(() => slow.build({ signal: AbortSignal.abort() }), (e) => e.name === 'AbortError');
+  assert.throws(
+    () => slow.build({ signal: AbortSignal.abort() }),
+    (e) => e.name === 'AbortError',
+  );
   assert.throws(() => slow.build({ maxVertices: -1 }), RangeError);
   // A geometry may not depend on the per-element context.
   const bad = new GeometryGraph();
-  bad.setOutput(bad.add('setPositions', { inputs: { geometry: bad.add('setMaterialId', { inputs: { geometry: bad.add('box'), id: bad.add('context', { params: { field: 'index' } }) } }), positions: [0, 0, 0] } }));
+  bad.setOutput(
+    bad.add('setPositions', {
+      inputs: {
+        geometry: bad.add('setMaterialId', {
+          inputs: { geometry: bad.add('box'), id: bad.add('context', { params: { field: 'index' } }) },
+        }),
+        positions: [0, 0, 0],
+      },
+    }),
+  );
   assert.throws(() => bad.build(), RangeError);
   // JSON that carries prototype-shaped keys is just unknown input.
-  assert.throws(() => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: JSON.parse('{"__proto__":1}') }])), RangeError);
+  assert.throws(
+    () => parseGeometryGraph(doc([{ id: 'a', type: 'box', params: JSON.parse('{"__proto__":1}') }])),
+    RangeError,
+  );
 });
 
 test('a setter reads the context in its fields without making its geometry per-element', () => {
@@ -279,4 +373,28 @@ test('a setter reads the context in its fields without making its geometry per-e
   });
   g.setOutput(g.add('merge', { inputs: { geometries: [moved, g.add('box')] } }));
   assert.equal(g.build().positions.length / 3, 4 + 24);
+});
+
+test('a graph error names its fix', () => {
+  const g = new GeometryGraph();
+  g.setOutput(g.add('box', { params: { widthSegments: 4 } }));
+  assert.throws(() => g.build({ maxVertices: 10 }), /past the limit of 10; raise maxVertices/);
+  assert.throws(() => g.build({ maxTriangles: 1 }), /past the limit of 1; raise maxTriangles/);
+  const doc = (nodes) => ({ format: 'margo-geometry-graph', version: 1, nodes, output: 'a' });
+  const refused = (nodes, message) => assert.throws(() => parseGeometryGraph(doc(nodes)), message);
+  assert.throws(() => parseGeometryGraph('not json'), /; pass the graph object or the text of GeometryGraph/);
+  assert.throws(() => buildGeometryGraph('not json'), /; pass the graph object or the text of GeometryGraph/);
+  refused([{ id: 'a', type: 'teapot' }], /unknown type "teapot"; use a type from GRAPH_NODE_TYPES/);
+  refused(
+    [
+      { id: 'a', type: 'box' },
+      { id: 'a', type: 'box' },
+    ],
+    /used twice; give each node its own id/,
+  );
+  refused([{ id: 'a', type: 'box', params: { girth: 1 } }], /no parameter "girth"; remove it, box takes width,/);
+  refused([{ id: 'a', type: 'box', inputs: { bogus: 1 } }], /no input "bogus"; remove it, box takes no inputs/);
+  refused([{ id: 'b', type: 'box' }], /is not a node; set the output to the id of a geometry node/);
+  // Every message the package throws, including those a test cannot easily reach.
+  assert.equal(countNoFix(readFileSync(new URL('../src/node-graph.ts', import.meta.url), 'utf8')), 0);
 });
