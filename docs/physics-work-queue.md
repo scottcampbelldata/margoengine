@@ -333,6 +333,22 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - **Collider:** `BedCollider`, a fixed body holding the kernel's height field, edited in place through
   `PhysicsCollider.setHeights` (the kernel's `refit_grid`): editing the ground every step allocates nothing.
 
+## One solver at a time, start to finish (Scott, 2026-11-26)
+
+Scott: "complete wave all the way start to finish until it's done and passes all eight test and wire it into anything
+that it connects to." Each builder works on ONE row at a time:
+
+1. Take the next row in the order below and set it BUILDING with your name. Hold no other row BUILDING.
+2. Finish every numbered item of its list in `docs/physics-solver-audit.md` and all eight points of the standard,
+   in every package the solver touches: physics, water, weather, shot, renderer, README, limits and examples.
+3. Wire it into every solver and package it connects to, both ways, with a coupling test for each connection.
+4. Set it LANDED with one line per audit item naming its commit and test. The verifier checks it straight away.
+5. Start the next row only when this one is VERIFIED. If the verifier sends it back, fix that before anything else.
+
+Order for Codex, film rows first: SEA-12, SEA-04, SEA-02, SEA-13, SEA-08, SEA-11, SEA-10, SEA-09, SEA-15, SEA-14,
+FLUID-07, BREAK-03, SEA-03, SEA-01, SEA-05, SEA-07, ATMO-04, ATMO-06, LIFE-03, LIFE-04, BIO-01, then every other
+REOPENED row, then the Open rows.
+
 ## Who builds what (Scott, 2026-11-26)
 
 - Codex builds every row in the Open table below, plus the rows it has claimed.
