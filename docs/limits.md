@@ -9677,7 +9677,8 @@ Automatic cracks preflight rounded rest coordinates, basis terms and nodal masse
 editing topology. A candidate below the native resolution remains intact for that step.
 Nucleation can select another eligible cell in the same step. An authored blade still reports
 a geometry error when its exact requested cut cannot be represented.
-With tracked tensile fronts the optional entry measures 141,408 B gzip including a 96,641 B lazy native kernel.
+The optional entry measures 141,595 B gzip with the fracture resolution checks.
+The base is 45,047 B and the lazy native kernel is 96,646 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
