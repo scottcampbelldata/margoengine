@@ -194,6 +194,10 @@
       "types": "./dist/viscoplastic/index.d.ts",
       "import": "./dist/viscoplastic.js"
     },
+    "./tsunami": {
+      "types": "./dist/tsunami/index.d.ts",
+      "import": "./dist/tsunami.js"
+    },
     "./pack-ice": {
       "types": "./dist/pack-ice/index.d.ts",
       "import": "./dist/pack-ice.js"

@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -90,6 +90,7 @@ await build({
         iceberg: resolve(root, 'src/iceberg/index.ts'),
         'thin-film': resolve(root, 'src/thin-film/index.ts'),
         viscoplastic: resolve(root, 'src/viscoplastic/index.ts'),
+        tsunami: resolve(root, 'src/tsunami/index.ts'),
         'pack-ice': resolve(root, 'src/pack-ice/index.ts'),
         underwater: resolve(root, 'src/underwater/index.ts'),
         orbit: resolve(root, 'src/orbit/index.ts'),
@@ -171,6 +172,9 @@ for (const name of ['thin-film-kernel.wasm', 'thin-film-kernel-shared.wasm'])
 
 for (const name of ['viscoplastic-kernel.wasm', 'viscoplastic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/viscoplastic', name), resolve(dist, name));
+
+for (const name of ['tsunami-kernel.wasm', 'tsunami-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/tsunami', name), resolve(dist, name));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

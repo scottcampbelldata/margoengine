@@ -16421,11 +16421,11 @@ through springs and seepage. Connect its recharge port to `GroundwaterSolver` an
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
 
-### General water impulse sources still need SEA-06 (PA-25)
+### Additional natural water-impulse producers still need connections (PA-25)
 
 ICE-02 releases ice at its water-facing cells. ICE-03 turns those volumes into moving bodies and
 exports conservative local wave sources. The general impulse propagation and inundation model,
-the avalanche and lava sources, and the lahar feedback remain open under PA-25.
+the avalanche and lava sources, and the lahar feedback remain open under PA-25. SEA-06 now consumes the live Iceberg source and registered moving bathymetry and reproduces run-up on a dry beach.
 
 ### Ground animal terrain and rig adapters (LIFE-02)
 
@@ -16446,7 +16446,7 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)
 
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
-does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. General run-up and terrain, avalanche and lava sources still need SEA-06.
+does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. SEA-06 supplies natural shoreline run-up from the real calving and terrain fields. The avalanche and lava producers still need the shared displacement binding.
 
 ## Open: canonical fire and alpine canopy links (BIO-03)
 

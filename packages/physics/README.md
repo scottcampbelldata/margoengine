@@ -3957,3 +3957,39 @@ the present points. `solventViscosity` adds implicit Newtonian diffusion to the 
 `VehicleOptions.groundMaterial` samples the collider, point, normal, radius and width from each actual wheel hit. Return `{ grip }` to limit the combined tyre force by the measured friction coefficient times normal load. Return `{ grip, soil: { stiffness, exponent, area } }` to let a loaded wheel sink into yielding ground. These values are pressure stiffness in Pa/m^exponent, the dimensionless exponent and measured footprint area in m². `vehicle.wheelGround(index)` reads the last applied grip and sinkage. `groundReaction: true` includes the moving support's point velocity and exchanges equal and opposite impulses with its dynamic body. The Road driving entry provides registered materials and banked road colliders.
 
 `Vehicle.writeMotionState()` and `readMotionState()` preserve attachment controls, wheel spin and transmission state in a buffer of `motionStateWords` f64 values. RoadDriver stores that buffer in the world arena when bound to a vehicle. Use the methods with a solver-owned arena region for custom vehicle attachments that need deterministic seek.
+
+## Natural long waves and coastal run-up
+
+Use `@margoengine/physics/tsunami` for long gravity waves over a wet and dry bathymetry grid. The
+solver gives water depth, surface height, discharge, maximum depth and the first wet time per cell.
+The same world clock advances the source and the waves over the shore.
+
+```ts
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { TsunamiSolver } from '@margoengine/physics/tsunami';
+
+const pulse = await TsunamiSolver.load();
+const depth = Array.from({ length: 96 }, (_, x) => -1 + Math.max(0, x - 36) / 28);
+const surface = Array.from({ length: 96 }, (_, x) => (x >= 18 && x < 30 ? 0.06 : 0));
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(pulse, {
+  cells: [96, 1],
+  spacing: 0.25,
+  bathymetry: depth,
+  surface,
+  dischargeX: surface.map((h) => Math.sqrt(9.80665) * h),
+  manning: 0.012,
+});
+world.advance(60);
+console.log(pulse.sample(36, 0).depth, pulse.budget.runup);
+```
+
+Pass a live `TerrainBed` geometry or an aligned layout-1 `bottomField` to supply natural seabed
+motion. An optional `bottomFilterDepth` redistributes the rapid bottom response over nearby wet
+cells and preserves water volume. For a calving or slide pulse, pass its 60 Hz `SeaSource` descriptor
+in `sources`. Each fresh publication supplies its signed displacement volume exactly once, while
+the pressure is held over the contributing interval. The glacier and iceberg example in the
+coupling tests drives this route from the real ICE-02 release.
+
+Read `inundationField` in `TSUNAMI_WORDS` order and use `travelTimes([x, z])` for the static wet
+patch's arrival estimate. `landslideImpulse()` evaluates Heller and Hager's near-field crest
+estimate for a natural subaerial slide in a channel.

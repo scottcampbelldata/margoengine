@@ -5692,3 +5692,14 @@ it, and restores the chamber and rigid-body state bit for bit.
 ### Physical road driving
 
 In `packages/road/tests/coupling/road-driver.test.js`, four real wheels move a massive chassis through bank-aware curves, compare wet and dry speed limits against the force balance, and reproduce the engine, tyre and path state after snapshot restore. The road-contact tests separately check opposite deck impulse, pressure equilibrium, and front-axle compression at a 6 cm lip.
+
+### Conservative natural long waves and wet/dry run-up (SEA-06)
+
+The optional long-wave solver reproduces a resting lake, Ritter's wetting fan within its
+derived difference bound, and small-amplitude travel at the analytical gravity-wave
+speed. A real shoreline wets without a volume change. The optional rapid bottom filter
+matches its discrete transfer, and the existing Glacier and Iceberg drive a nonzero wave
+with no net source volume. Identical state is reproduced by restoring and in both
+arena memory modes.
+[Direct tests](../../packages/physics/tests/tsunami.test.js) ·
+[Coupling tests](../../packages/physics/tests/coupling/tsunami.test.js)

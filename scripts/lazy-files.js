@@ -95,6 +95,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/tsunami-kernel.wasm',
+    label: 'tsunami-kernel.wasm',
+    kind: 'Rust SIMD natural long-wave propagation and inundation',
+    measure: 'file',
+    when: 'TsunamiSolver.load() from the optional /tsunami entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/tsunami-kernel-shared.wasm',
+    label: 'tsunami-kernel-shared.wasm',
+    kind: 'Rust SIMD natural long-wave propagation and inundation, shared world memory',
+    measure: 'file',
+    when: 'TsunamiSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/snowpack-kernel.wasm',
     label: 'snowpack-kernel.wasm',
     kind: 'Rust SIMD layered snowpack',

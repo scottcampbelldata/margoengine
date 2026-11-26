@@ -10290,3 +10290,11 @@ world fixture shows actual rigid contact, matching hashes across frame rates and
 ### Physical road driving (DYN-04)
 
 RoadDriver reads registered body poses and ATMO-09 relative wetness and writes its controls on the 60 Hz world clock. The binding carries tyre spin and transmission state in the solver's arena. The banked display mesh is reused for collision and wheel contact. Dimensional checks cover friction-limited curves, deck momentum, pressure-sinkage, a wheel crossing a lip, physical curved-route tracking and weather loads on a massive procedural vehicle. The film fixtures record the contact and motion evidence separately from the original shot reports.
+
+### Natural long waves and moving shorelines (SEA-06)
+
+The optional native solver reads the live TerrainBed or aligned vertical displacement and
+one or more 60 Hz natural SeaSource producers. It imports arena memory, checks that its
+module initializer leaves the arena untouched and keeps its registered records stable
+across snapshot restore. The independent cases cover the Ritter fan, rest,
+small-amplitude travel, the wet-patch bottom filter, and a real glacier-to-iceberg bay pulse.

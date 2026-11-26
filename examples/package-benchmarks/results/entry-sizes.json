@@ -14134,6 +14134,10 @@
       "./seismic": {
         "raw": 14081,
         "gzip": 5646
+      },
+      "./tsunami": {
+        "raw": 15406,
+        "gzip": 6538
       }
     },
     "@margoengine/physics2d": {
@@ -18039,6 +18043,16 @@
       "raw": 2474,
       "gzip": 1122,
       "brotli": 1000
+    },
+    "packages/physics/dist/tsunami-kernel.wasm": {
+      "raw": 13850,
+      "gzip": 6294,
+      "brotli": 5677
+    },
+    "packages/physics/dist/tsunami-kernel-shared.wasm": {
+      "raw": 13850,
+      "gzip": 6294,
+      "brotli": 5677
     }
   },
   "splits": {

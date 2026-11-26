@@ -9510,3 +9510,15 @@ Core plus stage remains 24,820 B gzip.
 ### Wheel contact and lane tracking (DYN-04)
 
 The clocked driver tracks authored open or closed lanes with measured traction. It uses one wetness word per vehicle with the documented bank convention. It brakes smoothly before an open lane ends. The current driver routes an individual car and uses the supplied route around obstacles. Road colliders reuse their rendered triangle tessellation. A calibrated soft patch uses a constant footprint and the measured pressure exponent. EARTH-05 owns wear and terrain-volume feedback. The paired road and dynamics fixtures cover the existing tyres, drivetrain, motorcycles and tracks alongside the new road controls and terrain interface. The optional road driving entry measures 12,776 B minified and 5,373 B gzip. The Physics root measures 1,339,661 B minified and 865,782 B gzip. Core and Stage gain zero bytes.
+
+### Natural long waves, moving bathymetry and run-up (SEA-06)
+
+Use the regular-grid model where wavelength is long compared with depth. It moves a
+wet/dry shoreline, can reflect from closed edges or transmit an open coast's outgoing
+characteristics, and reports signed boundary and source volume. The wet-patch shallow
+Padé approximation of Kajiura's response is intended for rapid bottom movement about one
+representative depth. The dynamic model is depth averaged. Short-wave dispersion,
+three-dimensional impact generation and nested grid corrections require separate models.
+Inland arrival can differ from the linear still-water travel time.
+
+The optional tsunami entry is 6,538 B gzip with a 6,794 B ceiling. Both Wasm assets are 13,850 B raw and each is 6,294 B gzip. Core plus stage remains 24,820 B gzip.

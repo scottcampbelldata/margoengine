@@ -3343,6 +3343,10 @@
       "types": "./dist/physics/viscoplastic.d.ts",
       "import": "./dist/physics/viscoplastic.js"
     },
+    "./physics/tsunami": {
+      "types": "./dist/physics/tsunami.d.ts",
+      "import": "./dist/physics/tsunami.js"
+    },
     "./physics/pack-ice": {
       "types": "./dist/physics/pack-ice.d.ts",
       "import": "./dist/physics/pack-ice.js"

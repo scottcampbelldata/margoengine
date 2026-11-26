@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20224383,
+  "total": 20231177,
   "history": [
     {
       "date": "2026-10-24",
@@ -12957,6 +12957,12 @@
       "commit": "18ded2be7c",
       "reason": "DYN-04 adds a 5373 B gzip optional driving entry for banked surfaces and replayable vehicle controls. Physics root moves from 608696 to 865782 B gzip within its existing ceiling. Core and Stage add zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7280680bcf",
+      "reason": "SEA-06 adds physics/tsunami at 6538 B gzip (cap 6794 B). Long-wave finite volumes, passive shoreline history and the two independent numerical queries are optional and load stateless native assets. Core plus stage is 24820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13816,6 +13822,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
+    "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
     "@margoengine/physics/viscoplastic": 5187,

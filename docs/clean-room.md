@@ -13900,3 +13900,48 @@ Only publications and existing Margo code were consulted.
 - M. G. Bekker, [Introduction to Terrain-Vehicle Systems](https://books.google.com/books/about/Introduction_to_terrain_vehicle_systems.html?id=N694AAAAIAAJ) (1969), and J. Y. Wong, [Theory of Ground Vehicles](https://courses.minia.edu.eg/Attach/9775Theory%20of%20Ground%20Vehicles%20-%20J.%20Y.%20Wong%203rd%20Ed.pdf), Eq. 2.47 and Fig. 2.35 (2001), give `p = (k_c/b + k_phi) z^n` for a fitted plate. The engine supplies this effective stiffness and footprint from measured material data. It finds the pressure force and spring force at the same depth and applies the normal impulse at that contact point.
 
 The collider uses the same visible road and bank geometry. A dynamic deck contributes its full contact-point velocity and inverse effective mass to traction, and receives the same impulse at the same position with the opposite sign. For wind the road assembly passes its chassis and the shared `Wind` field through the existing AirSolver and WindForce pair.
+
+## Natural displacement and shoreline long waves (SEA-06)
+
+- Yoshimitsu Okada, “Surface deformation due to shear and tensile faults in a half-space”
+  (1985). This optional wave solver consumes vertical bottom deformation computed from
+  the natural source model. A registered bed keeps that calculation independent of the wave state.
+  [NIED author paper](https://www.bosai.go.jp/sp/information/pdf/copy_of_Okada_1985_BSSA.pdf)
+- Randall LeVeque, David George and Marsha Berger, “Tsunami modelling with adaptively
+  refined finite volume methods” (2011). The depth-averaged Saint-Venant equations propagate
+  long waves over variable depth and keep the wet boundary mobile. The optional solver
+  uses a regular grid, wet/dry interface fluxes and world-clock substeps.
+  [Author paper](https://faculty.washington.edu/rjl/pubs/AN2011/LeVequeGeorgeBerger-an11.pdf)
+- Emmanuel Audusse, François Bouchut, Marie-Odile Bristeau, Rupert Klein and Benoît Perthame,
+  “A fast and stable well-balanced scheme with hydrostatic reconstruction for shallow
+  water flows” (2004), equations 2.6–2.9 and 3.1. Raise the interface bed to the higher cell
+  bed, integrate the truncated hydrostatic columns and put the omitted hydrostatic pressure
+  back on each cell's own side. The code combines that balance with HLL, minmod on water
+  surface altitude and velocities, and SSP RK2. Ritter's 1892 wet/dry rarefaction checks the
+  no-friction limit independently.
+  [Audusse et al.](https://perso.math.u-pem.fr/bouchut.francois/publications/hydroproj_published.pdf) ·
+  [Castro-Orgaz and Chanson (2017), Ritter benchmark](https://staff.civil.uq.edu.au/h.chanson/reprints/Castro-Orgaz_Chanson_efmc_2017.pdf)
+- Kinjiro Kajiura, “The Leading Wave of a Tsunami” (1963). The rapid bottom-to-surface
+  transfer at depth h is `sech(kh)`. The implementation uses its long-wave Padé approximation
+  `1/(1 + (kh)²/2)`. The equivalent wet-cell Helmholtz system is symmetric and solved by
+  diagonal PCG with zero normal flux. Its correction is evaluated as face divergence so that
+  redistribution contributes zero net volume even with finite solve tolerance.
+  [Author’s papers](https://tsunami-dl.jp/document/107)
+- Hongkai Zhao, “A fast sweeping method for Eikonal equations” (2005), section 2.
+  The static travel query uses alternating upwind sweeps of `|∇T| = 1/sqrt(gh)`, with no
+  paths through dry cells. It estimates travel at the still-water depth. The dynamic
+  inundation history comes from the finite-volume water state.
+  [Author paper](https://www.math.uci.edu/~zhao/homepage/research_files/FSM.pdf)
+- Valentin Heller and Willi H. Hager, “Impulse product parameter in landslide generated
+  impulse waves” (2010). For natural subaerial granular slides in a prismatic channel,
+  `P = F sqrt(S) M^(1/4) sqrt(cos(6α/7))` and `aMax/h = (4/9) P^(4/5)`. The solver exposes
+  this empirical estimate independently of its conservative displacement and pressure
+  input. The density in M is the water density and the length factor is the slide width
+  times the square of the still-water depth.
+  [ASCE paper](https://doi.org/10.1061/(ASCE)WW.1943-5460.0000037) ·
+  [ETH follow-up, equation 2.4](https://ethz.ch/content/dam/ethz/special-interest/baug/vaw/vaw-dam/documents/das-institut/mitteilungen/2010-2019/244.pdf)
+
+Natural source displacement adds or removes water by a normalized compact footprint. A
+volume request outside the water budget is recorded as unplaced. Boundary volume uses the
+same stage-weighted flux as the update. Diagonal native SIMD operations work in arena memory
+without static writes.

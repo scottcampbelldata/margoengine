@@ -134,6 +134,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'tsunami-kernel',
+    crate: 'packages/physics/tsunami-kernel',
+    blueprint: 'packages/physics/src/tsunami/tsunami-kernel.wasm',
+    script: 'packages/physics/scripts/build-tsunami-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'tsunami-kernel-shared',
+    crate: 'packages/physics/tsunami-kernel',
+    blueprint: 'packages/physics/src/tsunami/tsunami-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-tsunami-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',
