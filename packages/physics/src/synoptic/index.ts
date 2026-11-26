@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Bed, FlowSample, Wind } from '@margoengine/math/fields';
-import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
+import { cos, exp, hypot, ln, sin } from '@margoengine/math/pinned';
 import {
   FORCING_WORDS,
   SURFACE_WATER_FIELD,
@@ -24,6 +24,20 @@ export const SYNOPTIC_LAYOUT = 1;
 export const SYNOPTIC_WORDS = 12;
 
 type GridInput = number | ((x: number, z: number) => number);
+
+/** Equal-depth Phillips model for vertically sheared regional flow. */
+export interface SynopticLayers {
+  /** Baroclinic deformation radius in metres. Default 200 km. */
+  readonly deformationRadius?: number;
+  /** Upper-layer mean wind in m/s [east, north]. Defaults to the lower-layer mean wind. */
+  readonly upperMeanWind?: readonly [number, number];
+  /** Initial upper-layer streamfunction in m²/s. Defaults to the initial lower streamfunction. */
+  readonly upperStreamfunction?: GridInput;
+  /** Altitudes used to interpolate wind. Default [1500, 5500] m. */
+  readonly altitudes?: readonly [number, number];
+  /** Pressure levels used for the hypsometric temperature difference. Default [85000, 50000] Pa. */
+  readonly pressureLevels?: readonly [number, number];
+}
 
 /** Grid of a coupled shallow-water surface. Origin is its southwest first cell centre. */
 export interface SynopticWaterTarget {
@@ -50,6 +64,8 @@ export interface SynopticParams {
   readonly timeScale?: number;
   /** Higher-order limited transport, nonlinear pressure and terrain waves, or upwind transport and direct uplift. Default 'high'. */
   readonly fidelity?: 'high' | 'fast';
+  /** Activate coupled lower and upper potential vorticity in the high tier. */
+  readonly layers?: SynopticLayers;
   /** Latitude of the region centre in radians. Default π/4. */
   readonly latitude?: number;
   /** Coriolis parameter at the region centre in s⁻¹. Default 2Ω sin(latitude). */
@@ -108,9 +124,28 @@ export interface SynopticReading {
   readonly ivt: readonly [number, number];
 }
 
+/** Both streamfunctions, layer winds and the thermal anomaly of a layered solve. */
+export interface SynopticLayerReading {
+  readonly lowerStreamfunction: number;
+  readonly upperStreamfunction: number;
+  readonly lowerWind: readonly [number, number];
+  readonly upperWind: readonly [number, number];
+  readonly temperatureAnomaly: number;
+}
+
 type Native = {
   __stack_pointer: WebAssembly.Global;
   filter_orography(geometry: number, modes: number, scratch: number, table: number, nx: number, nz: number): void;
+  advance_synoptic_layers(
+    pv: number,
+    output: number,
+    work: number,
+    vorticity: number,
+    modes: number,
+    table: number,
+    base: number,
+    layers: number,
+  ): number;
   advance_synoptic(
     state: number,
     diagnostic: number,
@@ -120,6 +155,15 @@ type Native = {
     twiddles: number,
     config: number,
   ): number;
+};
+
+type Layers = {
+  state: Region;
+  output: Region;
+  work: Region;
+  modes: Region;
+  config: Region;
+  altitudes: readonly [number, number];
 };
 
 function bad(message: string): never {
@@ -175,6 +219,12 @@ function referenceLift(lapse: number): number {
   return (saturation * moistLapse) / (vaporGas * t * lapse);
 }
 
+function neutralOceanDrag(speed: number): number {
+  const fittedEnd = (0.75 + 0.067 * 21) * 0.001;
+  if (speed <= 21) return (0.75 + 0.067 * speed) * 0.001;
+  return fittedEnd + ((Math.min(speed, 33) - 21) / 12) * (0.0025 - fittedEnd);
+}
+
 /** Regional rotating atmosphere, moisture transport and delayed orographic precipitation. */
 export class SynopticWeather implements Solver<SynopticParams> {
   readonly field: FieldDescriptor;
@@ -201,6 +251,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
   private config!: Region;
   private forcing: Region | undefined;
   private water: SynopticWaterTarget | undefined;
+  private layers: Layers | undefined;
 
   private constructor(
     readonly id: string,
@@ -262,7 +313,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
     if (this.host) bad('Load a new solver before attaching to another world.');
     const [nx, nz] = (params.cells ?? [32, 32]).map(powerOfTwo) as [number, number];
     const count = nx * nz;
-    const bytes = 8 * count * (5 + 8 + 3 + 4 + 7 + 3 * SYNOPTIC_WORDS);
+    const bytes = 8 * count * (5 + 8 + 3 + 4 + 7 + 3 * SYNOPTIC_WORDS + (params.layers ? 21 : 0));
     if (!Number.isSafeInteger(bytes) || bytes >= MAX_MEMORY_PAGES * 65536)
       bad('Reduce the grid to fit the wasm32 world arena.');
     this.nx = nx;
@@ -285,6 +336,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
     const beta = number(params.beta ?? (rotation * cos(latitude)) / 6_371_000, 'Coriolis gradient');
     const fidelity = params.fidelity ?? 'high';
     if (fidelity !== 'high' && fidelity !== 'fast') bad('Choose the high or fast fidelity tier.');
+    if (params.layers && fidelity !== 'high') bad('Choose the high fidelity tier for a two-layer atmosphere.');
     const native =
       isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]'
         ? this.shared
@@ -296,6 +348,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
     this.kernel = new WebAssembly.Instance(native, { env: { memory: host.memory } }).exports as Native;
     if (
       typeof this.kernel.advance_synoptic !== 'function' ||
+      typeof this.kernel.advance_synoptic_layers !== 'function' ||
       typeof this.kernel.filter_orography !== 'function' ||
       !(this.kernel.__stack_pointer instanceof WebAssembly.Global)
     )
@@ -310,6 +363,19 @@ export class SynopticWeather implements Solver<SynopticParams> {
     this.table = area('synoptic-twiddles', 2 * Math.max(nx, nz));
     this.work = area('synoptic-scratch', 7 * count);
     this.config = area('synoptic-parameters', CELL_OFFSET + 3);
+    if (params.layers) {
+      const [lower, upper] = params.layers.altitudes ?? [1500, 5500];
+      if (!(number(lower, 'lower layer altitude') < number(upper, 'upper layer altitude')))
+        bad('Put the upper layer above the lower layer.');
+      this.layers = {
+        state: area('synoptic-layer-vorticities', 2 * count),
+        output: area('synoptic-layer-output', 5 * count),
+        work: area('synoptic-layer-scratch', 10 * count),
+        modes: area('synoptic-layer-modes', 4 * count),
+        config: area('synoptic-layer-parameters', 6),
+        altitudes: [lower, upper],
+      };
+    }
     if (this.water) this.forcing = area('synoptic-water-forcing', this.water.columns * this.water.rows * FORCING_WORDS);
     this.words(this.config).set([
       nx,
@@ -327,7 +393,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
       this.lapse,
       positive(params.pressure ?? SEA_LEVEL, 'base pressure'),
       positive(params.density ?? 1.225, 'base air density'),
-      fidelity === 'high' ? 1 : 0,
+      this.layers ? 2 : fidelity === 'high' ? 1 : 0,
     ]);
     this.words(this.config).set(cell, CELL_OFFSET);
     this.initialize(params);
@@ -410,6 +476,66 @@ export class SynopticWeather implements Solver<SynopticParams> {
           (stream[mod(i + 1, nx) + nx * j]! + stream[mod(i - 1, nx) + nx * j]! - 2 * middle) / (dx * dx) +
           (stream[i + nx * mod(j + 1, nz)]! + stream[i + nx * mod(j - 1, nz)]! - 2 * middle) / (dz * dz);
       }
+    if (this.layers && params.layers) this.initializeLayers(this.layers, params.layers, stream);
+  }
+
+  private initializeLayers(regions: Layers, params: SynopticLayers, lower: Float64Array): void {
+    const { nx, nz, dx, dz, count } = this;
+    const r = positive(params.deformationRadius ?? 200_000, 'baroclinic deformation radius');
+    const stretch = positive(0.5 / (r * r), 'vertical stretching coefficient');
+    const base = this.words(this.config),
+      q = this.words(regions.state),
+      modes = this.words(regions.modes);
+    const laplace = this.words(this.modes),
+      relative = this.words(this.data);
+    const u0 = base[5]!,
+      v0 = base[6]!,
+      u1 = number(params.upperMeanWind?.[0] ?? u0, 'upper east wind');
+    const v1 = number(params.upperMeanWind?.[1] ?? v0, 'upper north wind'),
+      beta = base[8]!;
+    const [p0, p1] = params.pressureLevels ?? [85_000, 50_000];
+    if (!(positive(p0, 'lower pressure level') > positive(p1, 'upper pressure level')))
+      bad('Set the lower pressure level above the upper pressure level in Pa.');
+    const upper = new Float64Array(count);
+    for (let j = 0; j < nz; j++)
+      for (let i = 0; i < nx; i++) {
+        const at = i + nx * j;
+        upper[at] = number(
+          valueOf(params.upperStreamfunction ?? lower[at]!, this.x0 + i * dx, this.z0 + j * dz),
+          'upper streamfunction',
+        );
+      }
+    let bound = 0;
+    for (let j = 0; j < nz; j++)
+      for (let i = 0; i < nx; i++) {
+        const at = i + nx * j,
+          middle = upper[at]!;
+        const lap =
+          (upper[mod(i + 1, nx) + nx * j]! + upper[mod(i - 1, nx) + nx * j]! - 2 * middle) / (dx * dx) +
+          (upper[i + nx * mod(j + 1, nz)]! + upper[i + nx * mod(j - 1, nz)]! - 2 * middle) / (dz * dz);
+        const contrast = stretch * (middle - lower[at]!);
+        q[at] = relative[at]! + contrast;
+        q[count + at] = lap - contrast;
+        const inv = laplace[at]!,
+          invDifference = 1 / ((at ? 1 / inv : 0) - 2 * stretch);
+        const k = (i === nx / 2 ? 0 : sin((2 * Math.PI * i) / nx)) / dx;
+        const l = (j === nz / 2 ? 0 : sin((2 * Math.PI * j) / nz)) / dz;
+        modes[at] = inv;
+        modes[count + at] = invDifference;
+        modes[2 * count + at] = k;
+        modes[3 * count + at] = l;
+        const lowerMode = k * u0 + l * v0,
+          upperMode = k * u1 + l * v1;
+        const coupling = stretch * (lowerMode - upperMode);
+        const norm = 0.5 * (Math.abs(inv + invDifference) + Math.abs(inv - invDifference));
+        bound = Math.max(
+          bound,
+          Math.abs(lowerMode) + Math.abs(k * beta + coupling) * norm,
+          Math.abs(upperMode) + Math.abs(k * beta - coupling) * norm,
+        );
+      }
+    const thicknessToTemperature = base[7]! / (AIR_GAS * ln(p0 / p1));
+    this.words(regions.config).set([u1, v1, stretch, bound, thicknessToTemperature, 0]);
   }
 
   private initializeOrography(params: SynopticParams, f: number): void {
@@ -456,6 +582,21 @@ export class SynopticWeather implements Solver<SynopticParams> {
 
   private advanceNative(seconds: number): void {
     this.words(this.config)[4] = seconds;
+    const layers = this.layers;
+    if (layers) {
+      const count = this.kernel.advance_synoptic_layers(
+        layers.state.byteOffset,
+        layers.output.byteOffset,
+        layers.work.byteOffset,
+        this.data.byteOffset,
+        layers.modes.byteOffset,
+        this.table.byteOffset,
+        this.config.byteOffset,
+        layers.config.byteOffset,
+      );
+      if (!Number.isFinite(count)) bad('Reduce the wind shear or time scale so the layered solve can make progress.');
+      this.words(layers.config)[5]! += count;
+    }
     const work = this.kernel.advance_synoptic(
       this.data.byteOffset,
       this.diagnostic.byteOffset,
@@ -470,6 +611,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
       d = this.words(this.diagnostic),
       result = this.words(this.output),
       n = this.count;
+    const temperatureAnomaly = layers ? this.words(layers.output).subarray(4 * n) : undefined;
     for (let i = 0; i < n; i++) {
       const at = i * SYNOPTIC_WORDS,
         vapour = q[n + i]!,
@@ -481,8 +623,8 @@ export class SynopticWeather implements Solver<SynopticParams> {
       result[at + 1] = u;
       result[at + 2] = v;
       result[at + 3] = d[4 * n + i]!;
-      result[at + 4] = d[6 * n + i]!;
-      result[at + 5] = d[7 * n + i]!;
+      result[at + 4] = d[6 * n + i]! + (temperatureAnomaly?.[i] ?? 0);
+      result[at + 5] = d[7 * n + i]! + (temperatureAnomaly?.[i] ?? 0);
       result[at + 6] = vapour;
       result[at + 7] = q[2 * n + i]!;
       result[at + 8] = q[3 * n + i]!;
@@ -514,6 +656,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
       metres = grid.cellSize!;
     const x0 = grid.origin[0] + (water.cell[0] - context.cell[0]) * metres;
     const z0 = grid.origin[1] + (water.cell[2] - context.cell[2]) * metres;
+    const air: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
     for (let j = 0; j < grid.rows; j++)
       for (let i = 0; i < grid.columns; i++) {
         const index = i + j * grid.columns,
@@ -524,12 +667,19 @@ export class SynopticWeather implements Solver<SynopticParams> {
           z = z0 + j * dz;
         const px = (this.interpolate(x + dx / 2, z, 0) - this.interpolate(x - dx / 2, z, 0)) / dx;
         const pz = (this.interpolate(x, z + dz / 2, 0) - this.interpolate(x, z - dz / 2, 0)) / dz;
-        const u = this.interpolate(x, z, 1),
-          v = this.interpolate(x, z, 2),
-          speed = hypot(u, v);
-        const drag = grid.windStress === false ? 0 : 1.225 * (0.75 + 0.067 * Math.min(speed, 33)) * 0.001 * speed;
-        forces[at] = (drag * u - h * px) / grid.waterDensity!;
-        forces[at + 1] = (drag * v - h * pz) / grid.waterDensity!;
+        let stressX = 0,
+          stressZ = 0;
+        if (grid.windStress !== false) {
+          this.air(x, 10, z, air);
+          const u = air.velocity[0] - depth[3 * index + 1]! / h;
+          const v = air.velocity[2] - depth[3 * index + 2]! / h;
+          const speed = hypot(u, v),
+            drag = air.density * neutralOceanDrag(speed) * speed;
+          stressX = drag * u;
+          stressZ = drag * v;
+        }
+        forces[at] = (stressX - h * px) / grid.waterDensity!;
+        forces[at + 1] = (stressZ - h * pz) / grid.waterDensity!;
       }
   }
 
@@ -544,6 +694,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
 
   stateRegions(): readonly Region[] {
     const regions = [this.data, this.diagnostic, this.geometry, this.modes, this.table, this.output, this.config];
+    if (this.layers) regions.push(this.layers.state, this.layers.output, this.layers.modes, this.layers.config);
     return this.forcing ? [...regions, this.forcing] : regions;
   }
 
@@ -551,7 +702,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
     return [];
   }
 
-  private interpolate(x: number, z: number, column: number): number {
+  private interpolate(x: number, z: number, column: number, region = this.output, stride = SYNOPTIC_WORDS): number {
     if (!this.host) bad('Add the solver to a PhysicsWorld before sampling.');
     const gx = (x - this.x0) / this.dx,
       gz = (z - this.z0) / this.dz,
@@ -563,13 +714,11 @@ export class SynopticWeather implements Solver<SynopticParams> {
       right = mod(i + 1, this.nx),
       bottom = mod(j, this.nz),
       top = mod(j + 1, this.nz);
-    const q = this.words(this.output);
+    const q = this.words(region);
     const south =
-      (1 - a) * q[(bottom * this.nx + left) * SYNOPTIC_WORDS + column]! +
-      a * q[(bottom * this.nx + right) * SYNOPTIC_WORDS + column]!;
+      (1 - a) * q[(bottom * this.nx + left) * stride + column]! + a * q[(bottom * this.nx + right) * stride + column]!;
     const north =
-      (1 - a) * q[(top * this.nx + left) * SYNOPTIC_WORDS + column]! +
-      a * q[(top * this.nx + right) * SYNOPTIC_WORDS + column]!;
+      (1 - a) * q[(top * this.nx + left) * stride + column]! + a * q[(top * this.nx + right) * stride + column]!;
     return (1 - b) * south + b * north;
   }
 
@@ -592,6 +741,22 @@ export class SynopticWeather implements Solver<SynopticParams> {
     };
   }
 
+  /** Samples both solved layers when the world was configured with `layers`. */
+  sampleLayers(x: number, z: number): SynopticLayerReading | undefined {
+    const layers = this.layers;
+    if (!layers) return undefined;
+    number(x, 'east sample coordinate');
+    number(z, 'north sample coordinate');
+    const at = (column: number) => this.interpolate(x, z, column * this.count, layers.output, 1);
+    return {
+      lowerStreamfunction: at(0),
+      upperStreamfunction: at(1),
+      lowerWind: [this.interpolate(x, z, 1), this.interpolate(x, z, 2)],
+      upperWind: [at(2), at(3)],
+      temperatureAnomaly: at(4),
+    };
+  }
+
   private air(x: number, y: number, z: number, out: FlowSample): FlowSample {
     const base = this.interpolate(x, z, 4);
     out.temperature = positive(base - this.lapse * y, 'local absolute air temperature');
@@ -600,6 +765,14 @@ export class SynopticWeather implements Solver<SynopticParams> {
     out.velocity[0] = this.interpolate(x, z, 1);
     out.velocity[1] = this.interpolate(x, z, 3);
     out.velocity[2] = this.interpolate(x, z, 2);
+    if (this.layers) {
+      const [lower, upper] = this.layers.altitudes;
+      const fraction = Math.min(1, Math.max(0, (y - lower) / (upper - lower)));
+      const u = this.interpolate(x, z, 2 * this.count, this.layers.output, 1);
+      const v = this.interpolate(x, z, 3 * this.count, this.layers.output, 1);
+      out.velocity[0] += fraction * (u - out.velocity[0]);
+      out.velocity[2] += fraction * (v - out.velocity[2]);
+    }
     return out;
   }
 
@@ -632,5 +805,10 @@ export class SynopticWeather implements Solver<SynopticParams> {
       precipitation: diagnostic[8 * n + 1]! * area,
       substeps: diagnostic[8 * n + STEPS]!,
     };
+  }
+
+  /** Number of completed layered vorticity substeps since initialization. */
+  get layerSubsteps(): number {
+    return this.layers ? this.words(this.layers.config)[5]! : 0;
   }
 }

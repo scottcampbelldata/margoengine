@@ -30,7 +30,9 @@ first: each names its scope, its evidence file and how to reproduce it.
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water
-  pressure and a live cloud box. Run `node --test packages/physics/tests/coupling/synoptic.test.js` and
+  pressure and a live cloud box. The higher-fidelity pair matches the discrete Phillips shear growth rate and
+  preserves the same state across memory modes and snapshot replay. The real water port reaches the measured
+  high-wind drag plateau. Run `node --test packages/physics/tests/coupling/synoptic.test.js` and
   `node packages/physics/tests/synoptic.browser.mjs` after building Physics and Weather.
 
 - Lightning (ATMO-07, 2026-11-26). The native lattice reproduces the closed-form electric potential in vacuum

@@ -7,6 +7,8 @@ use core::ops::{Deref, DerefMut, Index, IndexMut};
 use core::slice::SliceIndex;
 use margoengine_physics_kernel_common::pinned::exp;
 
+mod layers;
+
 struct ArenaOnly;
 unsafe impl core::alloc::GlobalAlloc for ArenaOnly {
     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
@@ -318,6 +320,7 @@ struct Parameters {
     density: f64,
     courant: f64,
     high: bool,
+    layered: bool,
 }
 
 fn uplift(
@@ -378,7 +381,8 @@ pub unsafe extern "C" fn advance_synoptic(
         base_pressure: input[13],
         density: input[14],
         courant: 0.4,
-        high: input[15] == 1.0,
+        high: input[15] != 0.0,
+        layered: input[15] == 2.0,
     };
     let count = grid.nx * grid.nz;
     let (height, geometry) = unsafe { core::slice::from_raw_parts(geometry, 3 * count) }
@@ -462,7 +466,7 @@ pub unsafe extern "C" fn advance_synoptic(
         if !dt.is_finite() || dt <= 0.0 || remaining - dt >= remaining {
             return f64::NAN;
         }
-        for column in 0..5 {
+        for column in usize::from(p.layered)..5 {
             let q = &mut state[column * count..(column + 1) * count];
             transport(grid, q, first, east, north, dt, p.high);
             if p.high {
@@ -476,14 +480,16 @@ pub unsafe extern "C" fn advance_synoptic(
                 }
             }
         }
-        beta_rotation(
-            grid,
-            &mut state[..count],
-            fft,
-            table,
-            beta_freq,
-            dt * p.beta,
-        );
+        if !p.layered {
+            beta_rotation(
+                grid,
+                &mut state[..count],
+                fft,
+                table,
+                beta_freq,
+                dt * p.beta,
+            );
+        }
         let (ec, ef, transition) = microphysics(dt, p.convert, p.fallout);
         for i in 0..count {
             let (_, w, _, s) = grid.neighbours(i);

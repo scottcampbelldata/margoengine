@@ -323,6 +323,49 @@ test('WIND-2: the live synoptic pressure gradient accelerates real shallow water
   assert.ok(water.sample(0, 0).velocity[0] > 0);
 });
 
+test('Garratt and Donelan 10 m wind stress matches the measured moderate and saturated regimes on water', async () => {
+  for (const [wind, current, measured] of [
+    [12, 2, 0.00142],
+    [42, 2, 0.0025],
+    [82, 2, 0.0025],
+    [0, 10, 0.00142],
+  ]) {
+    const atmosphere = await SynopticWeather.load({ water: true });
+    const world = new PhysicsWorld({ rate });
+    const terrain = new TerrainBed();
+    world.add(terrain, {
+      columns: 2,
+      rows: 2,
+      width: 2 * spacing,
+      depth: 2 * spacing,
+      centre: [spacing, spacing],
+      elevations: Array(9).fill(-2),
+    });
+    const water = new ShallowWaterSolver();
+    world.add(water, {
+      bed: terrain.bed,
+      level: 0,
+      velocity: () => [current, 0],
+      roughness: 0,
+      sides: { minX: 'periodic', maxX: 'periodic', minZ: 'periodic', maxZ: 'periodic' },
+    });
+    world.add(atmosphere, {
+      ...options,
+      meanWind: [wind, 0],
+      water: { columns: 2, rows: 2, spacing: [spacing, spacing], origin: [spacing / 2, spacing / 2] },
+    });
+    world.couple([water.describe().id, atmosphere.id], 'staggered');
+    world.advance(1);
+    const air = atmosphere.wind.sample(spacing / 2, 10, spacing / 2, 0),
+      relative = wind - current;
+    const expected = (air.density * measured * Math.abs(relative) * relative) / 1000;
+    const forcing = regionWords(world.memory, atmosphere.exportPorts(1)[1].region);
+    near(forcing[0], expected, 32 * Number.EPSILON * Math.abs(expected));
+    world.advance(2);
+    assert.ok(Math.sign(water.sample(0, 0).velocity[0] - current) === Math.sign(relative));
+  }
+});
+
 test('SynopticWeather has identical playback, partial snapshot and shared-memory replay', async () => {
   const solvers = await Promise.all(Array.from({ length: 7 }, () => SynopticWeather.load()));
   const params = {
@@ -353,4 +396,85 @@ test('a shifted regional wind cell restores with the snapshot and preserves all 
   world.restoreSnapshot(snapshot.bytes);
   assert.equal(world.hash(), snapshot.hash);
   assert.deepEqual(weather.wind.cell, cell);
+});
+
+test('Phillips shear mode grows at the exact discrete two-layer rate, including thickness and altitude wind', async () => {
+  const upper = -15,
+    lower = 15,
+    radius = 30_000,
+    f = 1e-4,
+    dt = 60,
+    frames = 80;
+  const angle = (2 * Math.PI) / grid[0],
+    k = Math.sin(angle) / spacing;
+  const laplace = (-4 * Math.sin(angle / 2) ** 2) / (spacing * spacing);
+  const stretching = 0.5 / (radius * radius),
+    factor = laplace * (laplace - 2 * stretching);
+  const same = (laplace - stretching) / factor,
+    off = -stretching / factor;
+  const a = k * lower + k * stretching * (lower - upper) * same;
+  const b = k * stretching * (lower - upper) * off;
+  const growthRate = k * lower * Math.sqrt(-(laplace + 2 * stretching) / (laplace - 2 * stretching));
+  const q1 = 1000 * laplace;
+  const q2Re = (-a * q1) / b,
+    q2Im = (growthRate * q1) / b;
+  const lowerRe = same * q1 + off * q2Re,
+    lowerIm = off * q2Im;
+  const upperRe = off * q1 + same * q2Re,
+    upperIm = same * q2Im;
+  const wave = (re, im) => (x) => re * Math.cos((angle * x) / spacing) - im * Math.sin((angle * x) / spacing);
+  const params = {
+    coriolis: f,
+    timeScale: 60 * dt,
+    meanWind: [lower, 0],
+    temperature: 288.15,
+    streamfunction: wave(lowerRe, lowerIm),
+    layers: {
+      deformationRadius: radius,
+      upperMeanWind: [upper, 0],
+      upperStreamfunction: wave(upperRe, upperIm),
+      altitudes: [1000, 5000],
+      pressureLevels: [85_000, 50_000],
+    },
+  };
+  const options = await Promise.all([SynopticWeather.load(), SynopticWeather.load()]);
+  const worlds = options.map((weather, i) => build(weather, params, rate, Boolean(i)));
+  const factorPerStep = (1 + (growthRate * dt) / 2) / (1 - (growthRate * dt) / 2);
+  const gain = factorPerStep ** frames;
+  const savedAt = 39;
+  for (let i = 0; i < worlds.length; i++) {
+    const world = worlds[i],
+      weather = options[i];
+    world.advance(savedAt);
+    const saved = world.takeSnapshot();
+    world.advance(frames);
+    const final = world.hash();
+    world.restoreSnapshot(saved.bytes);
+    assert.equal(world.hash(), saved.hash);
+    world.advance(frames);
+    assert.equal(world.hash(), final);
+    assert.equal(weather.layerSubsteps, frames);
+    for (let j = 0; j < grid[0]; j++) {
+      const x = j * spacing,
+        row = weather.sampleLayers(x, 0);
+      assert.ok(row);
+      const wantLower = wave(lowerRe, lowerIm)(x) * gain,
+        wantUpper = wave(upperRe, upperIm)(x) * gain;
+      // Each time step runs four small 2D FFTs and a 2x2 solve. Bound roundoff by the accumulated operations
+      // times the peak streamfunction and the predicted amplification.
+      const bound =
+        1024 * frames * Number.EPSILON * gain * Math.max(Math.abs(lowerRe), Math.abs(upperRe), Math.abs(upperIm));
+      near(row.lowerStreamfunction, wantLower, bound);
+      near(row.upperStreamfunction, wantUpper, bound);
+      const thickness = f / (287.05 * Math.log(85_000 / 50_000));
+      near(row.temperatureAnomaly, (wantUpper - wantLower) * thickness, 2 * thickness * bound);
+      near(weather.sample(x, 0).seaTemperature, 288.15 + row.temperatureAnomaly, 32 * Number.EPSILON * 288.15);
+      const middle = weather.wind.sample(x, 3000, 0, 0).velocity;
+      near(middle[0], 0.5 * (row.lowerWind[0] + row.upperWind[0]), 64 * Number.EPSILON * Math.abs(upper));
+      near(middle[2], 0.5 * (row.lowerWind[1] + row.upperWind[1]), 64 * Number.EPSILON * Math.abs(upper));
+    }
+    closes(weather);
+  }
+  assert.ok(gain > 2);
+  assert.equal(worlds[0].hash(), worlds[1].hash());
 });

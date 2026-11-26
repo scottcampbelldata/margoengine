@@ -95,6 +95,17 @@ precipitation service uses the land rain-to-snow transition from Aiguo Dai (2008
 [Smith and Barstad](https://doi.org/10.1175/1520-0469%282004%29061%3C1377%3AALTOOP%3E2.0.CO%3B2),
 [Dai](https://doi.org/10.1029/2008GL033295).
 
+Norman Phillips, “Energy Transformations and Meridional Circulations associated with simple Baroclinic Waves
+in a two-level, Quasi-geostrophic Model” (1954), supplies the shear-growth mechanism. Margo solves the mean and
+thickness modes separately in the FFT and integrates their coupled linear tendency with a 2×2 Crank–Nicolson solve.
+Conservative limited fluxes transport both vorticity fields, and the hypsometric relation converts their thickness
+to temperature. J. R. Garratt (1977) supplies the neutral wind-drag coefficients through 21 m/s. M. A. Donelan et al.
+(2004), Figure 2, supplies the measured 0.0025 plateau at 33 m/s and above. The coefficient joins these two domains
+linearly, and the stress uses the relative velocity of air and water.
+[Phillips](https://doi.org/10.1111/j.2153-3490.1954.tb01123.x),
+[Garratt](https://doi.org/10.1175/1520-0493%281977%29105%3C0915%3ARODCOO%3E2.0.CO%3B2),
+[Donelan et al.](https://doi.org/10.1029/2004GL019460).
+
 ### Position-based particle liquids (FLUID-02)
 
 Miles Macklin and Matthias Müller (2013), *Position Based Fluids*, equations 1–14 and 15–17, supplies the

@@ -31,6 +31,7 @@
       const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) }).add(solver, {
         cells: [16, 8], spacing: [10000, 10000], origin: [-80000, -40000], meanWind: [20, 0],
         beta: 0, streamfunction: 0, timeScale: 12000, temperature: 289,
+        layers: { upperMeanWind: [30, -5], upperStreamfunction: x => 12000 * Math.cos(x / 30000) },
         vapour: (x, z) => x >= -40000 && x <= -10000 && Math.abs(z) < 20000 ? 32 : 5,
         cloud: (x, z) => x >= -40000 && x <= -10000 && Math.abs(z) < 20000 ? 2 : 0,
         hydrometeors: (x, z) => x >= -40000 && x <= -10000 && Math.abs(z) < 20000 ? 45 : 0,
@@ -56,9 +57,10 @@
       if (Math.abs(wet[p] - dry[p]) + Math.abs(wet[p + 1] - dry[p + 1]) + Math.abs(wet[p + 2] - dry[p + 2]) > 24) changed++;
     }
     const cold = synopticDrive(solver, () => [0, 3200, 0]).state;
+    const upper = solver.wind.sample(0, 5500, 0, 0), layerSubsteps = solver.layerSubsteps;
     const rendered = { precipitation: precipitation.options.precipitation, intensity: precipitation.options.intensity, cover: sky.options.clouds.coverage };
     drive.dispose();
-    return { before, after, cold, changed, rendered, plain: world.hash(), shared: shared.world.hash(), errors };
+    return { before, after, cold, upper, layerSubsteps, changed, rendered, plain: world.hash(), shared: shared.world.hash(), errors };
   };
 </script>
 </body>

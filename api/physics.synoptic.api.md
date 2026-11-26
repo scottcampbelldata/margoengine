@@ -9,6 +9,22 @@ export const SYNOPTIC_LAYOUT = 1;
 
 export const SYNOPTIC_WORDS = 12;
 
+export interface SynopticLayerReading {
+    readonly lowerStreamfunction: number;
+    readonly upperStreamfunction: number;
+    readonly lowerWind: readonly [number, number];
+    readonly upperWind: readonly [number, number];
+    readonly temperatureAnomaly: number;
+}
+
+export interface SynopticLayers {
+    readonly deformationRadius?: number;
+    readonly upperMeanWind?: readonly [number, number];
+    readonly upperStreamfunction?: GridInput;
+    readonly altitudes?: readonly [number, number];
+    readonly pressureLevels?: readonly [number, number];
+}
+
 export interface SynopticParams {
     readonly cells?: readonly [number, number];
     readonly spacing?: readonly [number, number];
@@ -16,6 +32,7 @@ export interface SynopticParams {
     readonly cell?: Cell;
     readonly timeScale?: number;
     readonly fidelity?: 'high' | 'fast';
+    readonly layers?: SynopticLayers;
     readonly latitude?: number;
     readonly coriolis?: number;
     readonly beta?: number;
@@ -95,6 +112,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
     sample(x: number, z: number): SynopticReading;
+    sampleLayers(x: number, z: number): SynopticLayerReading | undefined;
     rainSource(): {
         rate(x: number, z: number, seconds: number): number;
         readonly peak: number;
@@ -106,6 +124,7 @@ export class SynopticWeather implements Solver<SynopticParams> {
         precipitation: number;
         substeps: number;
     };
+    get layerSubsteps(): number;
 }
 
 // Not exported from this entry, but used by the exports above:

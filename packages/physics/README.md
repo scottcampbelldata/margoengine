@@ -4286,6 +4286,11 @@ correction. The fast tier uses first-order upwind transport, geostrophic pressur
 The default condensed-water conversion and fallout times are 1000 s. Supply a `TerrainBed` for the orographic model.
 Set `timeScale` for a time lapse. Rates and the water ledger refer to physical weather seconds.
 
+Set `layers: { upperMeanWind: [30, 0] }` in the high tier to evolve a sheared atmosphere. `sampleLayers()` reads
+both streamfunctions and winds and the temperature anomaly from pressure-level thickness. The default 200 km
+deformation radius sets the separation of barotropic and baroclinic modes. Wind interpolates between 1500 and 5500 m
+by default. The weather and water readers use the winds from the same physical frame.
+
 `wind` is the existing `Wind` contract for a cloud box or other atmospheric reader. `rainSource()` supplies surface
 mm/h to `PrecipitationField`. Set its `base` just above the ground when the upstream physics has already accounted for
 fallout. Load with `{water: true}` and pass the grid of a `ShallowWaterSolver` to accumulate pressure gradients and wind

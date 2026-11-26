@@ -32,6 +32,7 @@ try {
   assert.equal(proof.before.rain, 0);
   assert.ok(proof.after.rain > 0 && proof.after.cloud > proof.before.cloud);
   assert.ok(proof.after.rain > proof.after.snow && proof.cold.snow > proof.cold.rain);
+  assert.ok(proof.layerSubsteps > 0 && proof.upper.velocity[0] > proof.after.wind + 5);
   assert.ok(proof.rendered.intensity > 0 && proof.rendered.cover > 0);
   assert.ok(proof.changed > 0, 'the physical cloud and precipitation visibly change the fixed-camera frame');
   console.log(`CF-1 regional precipitation: ${proof.changed} changed pixels, replay ${proof.plain}.`);

@@ -4310,6 +4310,9 @@ The plain and shared Wasm import the same world arena with no static data or hea
 columns and performs one flux stage in the fast tier or two in the high tier. Each pressure or wave inversion costs
 one forward and one inverse transform. The optional beta term adds one pair per substep. The moisture ledger reports
 total evaporation and fallout in kg. The same fields drive Weather, a cloud box, runoff and spatial water loads.
+The optional two-layer mode evolves lower and upper vorticity with two nonlinear flux passes in each layer. One
+four-transform inversion recovers both streamfunctions. A further four transforms integrate the coupled linear
+mode matrix each substep. The layered state is stored only when that mode is selected.
 
 ### Electric potential and return paths (ATMO-07)
 
