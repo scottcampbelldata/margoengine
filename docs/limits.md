@@ -10341,4 +10341,4 @@ The 3D axial seakeeping entry is 31,553 B gzip with a 32,500 B ceiling. Core and
 
 A configured `Hull.course` uses the surface sample’s mean current when speed is omitted. This is a surface reference velocity at the hull centre, with no depth average over strong shear. An explicit water-relative speed is supported. The incident phase follows the hull’s actual motion relative to the coordinates in which the wave spectrum is defined.
 
-The current-relative seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.
+The current-relative seakeeping entry is 31,633 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
