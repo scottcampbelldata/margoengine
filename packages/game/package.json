@@ -3835,6 +3835,10 @@
       "types": "./dist/weather/precipitation.d.ts",
       "import": "./dist/weather/precipitation.js"
     },
+    "./weather/surface-energy": {
+      "types": "./dist/weather/surface-energy.d.ts",
+      "import": "./dist/weather/surface-energy.js"
+    },
     "./weather/lava": {
       "types": "./dist/weather/lava.d.ts",
       "import": "./dist/weather/lava.js"

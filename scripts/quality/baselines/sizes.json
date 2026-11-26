@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19164691,
+  "total": 19168307,
   "history": [
     {
       "date": "2026-10-24",
@@ -12477,6 +12477,12 @@
       "commit": "158d4cf95",
       "reason": "physics/hydro is a new optional entry (HYDRO-01): ShallowWaterSolver, conservative shallow water on the terrain bed (hydrostatic reconstruction, HLL with Kurganov-Petrova speeds, WENO-Z and minmod, SSP Runge-Kutta 2, semi-implicit Manning friction, inflows, rain, wind, buildings, open and level sides); its own entry so scenes without a flood pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "93bf3f2435",
+      "reason": "ATMO-09 adds @margoengine/weather/surface-energy at 3360 B gzip, budget 3616 B. The implicit temperature, water storage and dead-fuel update share one coupled step. Keeping the solver as a separate weather entry leaves the weather root, core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13274,6 +13280,7 @@
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/flight": 8719,
+    "@margoengine/physics/hydro": 6567,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/sea": 3437,
@@ -14038,6 +14045,7 @@
     "@margoengine/weather/settings": 9476,
     "@margoengine/weather/snow": 4616,
     "@margoengine/weather/snow-drift": 5806,
+    "@margoengine/weather/surface-energy": 3616,
     "@margoengine/weather/turbulence": 1965,
     "@margoengine/webgl2-compat": 127852,
     "@margoengine/webgl2-compat base (without compute runtime and read-back)": 95009,
@@ -14307,7 +14315,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/hydro": 6567
+    "margoengine/web": 577
   }
 }
