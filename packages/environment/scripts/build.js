@@ -30,6 +30,7 @@ for (const [entry, emptyOutDir] of [
   ['cube-camera', false],
   ['exr-write', false],
   ['exr-tiled', false],
+  ['encoded-hdr', false],
   ['main', false],
   ['loaders', false],
   ['load', false],

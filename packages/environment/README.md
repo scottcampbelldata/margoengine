@@ -939,6 +939,19 @@ P3 2D canvas with HDR on, 252/255 with it off; in-gamut content is 0 to 1 P3 uni
 `rebootDevice()`, with TransparentCanvas (premultiplied) and with a Bloom + Tonemap + FXAA PostStack: same values, no
 validation errors.
 
+## RGBM and LogLuv
+
+`@margoengine/environment/encoded-hdr` decodes HDR colour packed into 8-bit RGBA pictures, and encodes it back. `decodeRGBM(image, {maxRange, gamma})` returns linear `rgb^gamma * a * maxRange` (defaults 6 and 1; Brian Karis, "RGBM Color Encoding", 2009); `encodeRGBM(image, options)` rounds the multiplier up so the stored colour stays within 1, and values past `maxRange` clip. `decodeLogLuv(image)` and `encodeLogLuv(image)` read and write Ward's 32-bit LogLuv (Gregory Ward Larson, "LogLuv Encoding for Full-Gamut, High Dynamic Range Images", JGT 1998) as the RGBA bytes of the big-endian word `LLLLLLLL LLLLLLLL uuuuuuuu vvvvvvvv` (r and g the 15-bit log-luminance with its sign bit, b = u', a = v'), linear Rec. 709 out; use a lossless picture, as JPEG breaks the luminance bytes. `loadRGBM(bytes, {maxRange, gamma, decode, signal})` and `loadLogLuv(bytes, {decode, signal})` decode a PNG, WebP or JPEG file first (`createImageBitmap` and `OffscreenCanvas` by default; pass `decode` in Node). All return a `FloatImage` for `Environment.create`. The HDR JPEG of phones and cameras is a gain-map JPEG: `decodeHDRJPG` (the same function as `decodeUltraHDR`) reads it, and `loadEnvironmentImage` picks it by signature.
+
+```ts
+import { decodeRGBM, encodeRGBM, decodeLogLuv, encodeLogLuv } from '@margoengine/environment/encoded-hdr';
+
+const sky = { width: 2, height: 1, data: new Float32Array([0.5, 3, 5.5, 1, 0.01, 0.02, 0.03, 1]) };
+const rgbm = decodeRGBM({ ...sky, data: encodeRGBM(sky) }); // 8-bit RGBA pictures round trip to within one step
+const logluv = decodeLogLuv({ ...sky, data: encodeLogLuv(sky) }); // 40 stops of range in 32 bits
+console.log(rgbm.data[2].toFixed(1), logluv.data[2].toFixed(1)); // about 5.5 5.5
+```
+
 ## UltraHDR
 
 `decodeUltraHDR(bytes, {decode?, weight?})` reads gain-map JPEGs (Android UltraHDR, Adobe gain maps) with the `hdrgm` XMP metadata: `parseUltraHDR` walks the JPEG segments, takes the next JPEG stream after the primary image as the gain map, and reads `GainMapMin`, `GainMapMax`, `Gamma`, `OffsetSDR`, `OffsetHDR` and `HDRCapacityMin/Max` (single values or per-channel `rdf:Seq`) from either image's XMP. `applyGainMap` then computes `(sdr + offsetSdr) * 2^(weight * mix(min, max, gain^(1/gamma))) - offsetHdr` with the base image decoded from sRGB and the gain map bilinearly upsampled; `weight` defaults to 1 (full HDR, right for lighting). JPEG pixels come from `createImageBitmap` and `OffscreenCanvas` by default; in Node pass `decode`. `loadEnvironmentImage` picks it automatically for JPEG signatures; the synchronous `parseEnvironmentImage` cannot (JPEG decoding is asynchronous). Not supported: ISO 21496-1 binary-only metadata, HDR base renditions, and color-gamut conversion (Display P3 bases are treated as sRGB).

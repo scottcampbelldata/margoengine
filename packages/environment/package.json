@@ -93,6 +93,10 @@
       "types": "./dist/exr-write.d.ts",
       "import": "./dist/exr-write.js"
     },
+    "./encoded-hdr": {
+      "types": "./dist/encoded-hdr.d.ts",
+      "import": "./dist/encoded-hdr.js"
+    },
     "./exr-tiled": {
       "types": "./dist/exr-tiled.d.ts",
       "import": "./dist/exr-tiled.js"
