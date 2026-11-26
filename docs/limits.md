@@ -9609,7 +9609,8 @@ The operation validates all pieces before replacing the body. It builds the edit
 and uses the normal native solve for the fragments. The finite triangle blade in `SoftBodies.cut`
 continues to slice along existing faces. Embedded skins, separate spring or cluster constraints and
 live external bindings need a separate transfer when introducing new cutting vertices. Snapshots
-of a cut restore in worlds with the same cut topology.
+of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
+with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
 
 ### Gas-filled soft shells (SOFT-06)
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20425931,
+  "total": 20428849,
   "history": [
     {
       "date": "2026-10-24",
@@ -13179,6 +13179,12 @@
       "commit": "d8e800d08",
       "reason": "materials/instance-attributes is a new optional entry, before 0 B, 3008 B gzip (ceiling 3264): per-instance attribute storage, checks, dirty-row uploads, its WGSL and the serialization codec. materials/plugins 4461 to 4923 B gzip (ceiling 4715 to 5179): the instance attribute option and row index in every depth pass, plus the output point on unlit, normal and matcap shadings and a new caster id after buffers are freed (two bug fixes). A plugin without attributes does not load the new entry; splitting the plugin hook out would need a second shader composer. Core plus stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "975bdd7f30",
+      "grew": 1,
+      "reason": "SOFT-04 adds through-element planar splitting, conservative particle-state transfer, and the native smoothed tear history needed for replay, moving the soft entry from 128798 to 131482 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 37225 to 40143 B ceiling (38973 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14044,7 +14050,7 @@
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 132662,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 37225,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 40143,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 94583,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
