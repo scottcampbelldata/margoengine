@@ -328,6 +328,9 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - When both lists are built, all 103 solvers are audited against "The standard: the best solver we can build" above
   (`docs/physics-solver-audit.md`). Every row that falls short is REOPENED with its upgrades named, and stays open
   until it is the best on the market.
+- Handed to Codex (Scott, 2026-11-26), so the Claude side stays on the film solvers: DYN-07, AERO-01 to AERO-03
+  and ATMO-01 to ATMO-03. The AERO and ATMO rows are built and REOPENED; build their upgrades from
+  `docs/physics-solver-audit.md`.
 - A REOPENED row stays with its owner while that owner is still building. Once an owner's list is done, the other
   side may claim its REOPENED rows through this file.
 
@@ -410,6 +413,13 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | FIRE-02 | Flame and fireball | stand-in | Open | OPEN |
 | FIRE-03 | Integral plume and thermal model | partial | Open | OPEN |
 | BIO-01 | Plant mechanics under wind and water | modal sway, windthrow and rigid impacts | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed a4d123a968 |
+| DYN-07 | Dynamic character, balance, push response | partial | Codex | OPEN |
+| AERO-01 | Aerodynamic loads on bodies | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
+| AERO-02 | Membrane aerodynamics (FSI) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
+| AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
+| ATMO-01 | Boundary-layer wind field | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
+| ATMO-02 | Atmospheric turbulence and gusts | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
+| ATMO-03 | Moist convection and cloud dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8833dbf0c |
 
 ## Taken
 
@@ -422,12 +432,8 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
 | DYN-06 | Mass properties and collision geometry | partial | Claude | CLAIMED |
-| DYN-07 | Dynamic character, balance, push response | partial | Claude | CLAIMED |
 | SOFT-01 | Cloth and thin shells | partial | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
-| AERO-01 | Aerodynamic loads on bodies | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 48b593a13 |
-| AERO-02 | Membrane aerodynamics (FSI) | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 2f1860412 |
-| AERO-03 | Flight dynamics (wings, rotors, bodies) | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed f9161cc7e |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 33ab69766 |
@@ -441,7 +447,4 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ccbc86285 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
-| ATMO-01 | Boundary-layer wind field | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
-| ATMO-02 | Atmospheric turbulence and gusts | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed c38c25d3d |
-| ATMO-03 | Moist convection and cloud dynamics | none | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8833dbf0c |
 | ATMO-04 | Precipitation microphysics | stand-in | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |
