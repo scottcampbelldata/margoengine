@@ -12925,13 +12925,14 @@ Rigid boxes, spheres and capsules use sampled boundaries and hold their last pub
 fluid substeps. Contact audio represents an impulse on one selected modal track. Capillarity uses one liquid and
 uniform material energies on its solids. The interface spans a three-spacing kernel neighbourhood.
 The capillary force runs before pressure and leaves out the paper's simultaneous nonlinear pressure and friction
-solve. The narrow-channel surge remains early. Bubble acoustics, shallow-water exchange and film production
-bindings are open.
+solve. The coarse and interactive narrow-channel surges arrive early. Bubble acoustics and production
+bindings for crests and shorelines are open.
 
 The parcel interface moves one particle rest-volume per ticket. Fractions remain with the sender.
-It reports all momentum components and resolves origin-cell offsets. Shallow-water and crest adapters
-need to apply the receipts to their own conserved state. The checked second endpoint is a closed test
-reservoir, including capacity refusal, retransmission and replay.
+It reports all momentum components and resolves origin-cell offsets. The live shallow-water test is a
+closed 1 m² periodic wet cell, with reciprocal volume and horizontal momentum and an independent
+vertical ledger. Production wet/dry cells and the breaking crest need owner-side reservation and receipt
+of applied fluxes.
 
 ### Position-based particle water (FLUID-02)
 
@@ -12978,14 +12979,16 @@ triangle. Wheel camber is outside that phase-only footprint model. The optional 
 reports vertical and longitudinal force and resisting axle torque for the forward driven arc.
 Its reciprocal rigid binding applies the previous contact result on the same collider. A tyre provides
 independent wheel spin and lateral grip. Lower actual load and the discrete kinetic-work bound
-limit the paired impulse, while reverse and braking use the tyre response. Transient digging forces
-and measured braking stress shapes remain open. The measured rover comparison covers steady
+limit the paired impulse. A configured skid exponent adds signed two-region shear under forward
+braking, including lockup. A configured shear radius uses actual wheel and ground speed.
+Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
+slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 12,631 B gzip with a 12,739 B ceiling. Both Wasm assets are 25,029 B raw and 9,768 B gzip each.
-The Physics root is 866,709 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+The optional entry is 12,899 B gzip with a 13,286 B ceiling. Both Wasm assets are 26,453 B raw and 10,717 B gzip each.
+The Physics root is 866,724 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
@@ -29927,7 +29930,9 @@ It stamps evenly spaced lugs and indexed triangle treads from live wheel spin, w
 open. The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements.
-Reverse and braking use the ordinary tyre model. A measured soil-specific braking response remains open.
+Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
+brake cases pass. Reverse travel, measured braking across multiple slip angles and sidewall
+bulldozing remain open.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 
@@ -29987,7 +29992,11 @@ original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets
 measured liquid–air tension. The discrete wall correction restores an exact motionless initial lattice.
 Both pressure and physical wall viscosity are included. The original release diaphragm still needs an
 explicit model for a like-for-like comparison. The parcel contract conserves volume and all momentum components against a closed fixture.
-The SEA-04 and HYDRO-01 production endpoints remain open.
+The live HYDRO-01 test also settles whole-particle transfers against a wet periodic cell. Run
+`node --test packages/physics/tests/coupling/dfsph-hydro.test.js` for same-tick transfer,
+capacity refusal, the last wet depth and snapshot replay. General HYDRO-01 needs a reserve/accept
+boundary when its wet/dry limiter can clip signed volume or horizontal momentum. SEA-04 still needs
+a paired volume and momentum receipt.
 
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
 using the interactive iteration limits, which reads 0.328 and 0.569 against the two original measurement

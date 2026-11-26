@@ -106,6 +106,7 @@ export interface SoilRollingWheel {
     readonly lugHeight?: number;
     readonly lugSupport?: number;
     readonly slipExponent?: number;
+    readonly skidExponent?: number;
     readonly peakFraction?: number;
     readonly peakSlip?: number;
     readonly exitFraction?: number;
@@ -204,6 +205,7 @@ export interface WheelSoilBinding {
         readonly length: number;
         readonly width: number;
     }[];
+    readonly shearRadii?: readonly (number | null)[];
     readonly ground?: PhysicsCollider;
     readonly forward?: Point;
 }

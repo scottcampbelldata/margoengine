@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20497014,
+  "total": 20497561,
   "history": [
     {
       "date": "2026-10-24",
@@ -13281,6 +13281,12 @@
       "commit": "filter-graph",
       "reason": "New optional post entry, 0 to 13,446 B gzip: filter-graph (ImageFilterGraph, a graph of image filters run on images, video or a camera with no scene: the graph compiler and pass-fusing optimizer, about 30 built-in blocks in WGSL, and the runtime with its inputs and device restore). Its own entry, loaded only when imported; a saved graph may name any built-in block, so they ship with it. Budget (measured + max(3%, 256 B)): 13,850 B. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "2bd0ab1a39",
+      "grew": 1,
+      "reason": "EARTH-05 signed wheel skid takes the optional entry from 12631 to 12899 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -14152,7 +14158,7 @@
     "@margoengine/physics/strands": 5569,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 12739,
+    "@margoengine/physics/terramechanics": 13286,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
