@@ -21,6 +21,7 @@ import {
   prepareOutlets,
   type ThinFilmDripOutlet,
 } from './drips.js';
+import { FILM_IMPACT_WORDS } from './drop-receiver.js';
 import { bindThinFilmKernel, loadThinFilmBuilds, type ThinFilmBuilds, type ThinFilmKernel } from './kernel.js';
 
 export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
@@ -30,13 +31,12 @@ export {
   type ThinFilmDropFlightOptions,
   type ThinFilmFlyingDrop,
 } from './drop-flight.js';
+export { FILM_IMPACT_WORDS, type ThinFilmDropReceiver } from './drop-receiver.js';
 
 /** Binary version of the optional film layout. */
 export const THIN_FILM_LAYOUT = 1;
 /** A wet cell, f64: u, v, initial substrate coordinate, film depth, emitted drip rate. */
 export const THIN_FILM_WORDS = 5;
-/** An impact row, f64: u, v, footprint radius, water volume, inward normal speed. Zero volume marks an unused row. */
-export const FILM_IMPACT_WORDS = 5;
 const ORIGIN: Cell = [0, 0, 0];
 const F64 = 8;
 const REGISTRY_BODY_LAYOUT = 2;

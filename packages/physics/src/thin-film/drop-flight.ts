@@ -13,7 +13,14 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
-import { advanceDrop, DropDrag, MAX_FLIGHT_DIAMETER } from './drop-drag.js';
+import { advanceDrop, DropDrag, MAX_FLIGHT_DIAMETER, midpointDropDrag } from './drop-drag.js';
+import {
+  FILM_IMPACT_WORDS,
+  type Impact,
+  prepareReceiver,
+  receiverImpact,
+  type ThinFilmDropReceiver,
+} from './drop-receiver.js';
 import { FILM_DROP_WORDS } from './drips.js';
 
 type Vec3 = readonly [number, number, number];
@@ -40,6 +47,8 @@ export interface ThinFilmDropFlightOptions {
   readonly airTemperature?: number;
   /** Live air velocity, temperature and density in the droplet's neighbourhood. Defaults to still air. */
   readonly wind?: Wind;
+  /** Optional absorbing plane, registered at its matching film's free surface. */
+  readonly receiver?: ThinFilmDropReceiver;
 }
 
 export interface ThinFilmFlyingDrop {
@@ -67,6 +76,12 @@ interface FlightState {
   readonly drops: Region;
   readonly candidate: Region;
   readonly meta: Region;
+  readonly impacts: Region;
+  readonly receiver?: {
+    readonly plane: ReturnType<typeof prepareReceiver>;
+    readonly draft: Region;
+    readonly ledger: Region;
+  };
 }
 
 function range(name: string, value: number, min: number, max: number): number {
@@ -86,6 +101,7 @@ function words(s: FlightState, region: Region): Float64Array {
 /** Track the emitted drops from a thin-film rim through the surrounding air. */
 export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
   readonly particleField: FieldDescriptor;
+  readonly impactField: FieldDescriptor;
   private state?: FlightState;
 
   constructor(
@@ -105,6 +121,13 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       unit: 'SI',
       centring: 'particle',
     });
+    this.impactField = Object.freeze({
+      name: `${id}.impacts`,
+      kind: 'surfaceSampleSet',
+      quantity: 'thinFilmImpact',
+      unit: 'SI',
+      centring: 'particle',
+    });
   }
 
   describe(): SolverDescription {
@@ -113,6 +136,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       fields: [
         { field: this.source, access: 'read' },
         { field: this.particleField, access: 'write' },
+        { field: this.impactField, access: 'write' },
       ],
       rate: 0,
       stableRate: () => 0,
@@ -138,6 +162,14 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     const drops = host.allocate('flying-drops', arrayBytes, 'f64', LAYOUT);
     const candidate = host.allocate('working-flying-drops', arrayBytes, 'f64', LAYOUT);
     const meta = host.allocate('flight-ledger', BYTES * 9, 'f64', LAYOUT);
+    const plane = opts.receiver === undefined ? undefined : prepareReceiver(opts.receiver);
+    const impactBytes = BYTES * FILM_IMPACT_WORDS * (plane ? 2 * capacity : 1);
+    const impacts = host.allocate('drop-impacts', impactBytes, 'f64', LAYOUT);
+    const receiver = plane && {
+      plane,
+      draft: host.allocate('working-drop-impacts', impactBytes, 'f64', LAYOUT),
+      ledger: host.allocate('impact-ledger', BYTES * 2, 'f64', LAYOUT),
+    };
     regionWords(host.memory, meta)[1] = -1;
     this.state = {
       memory: host.memory,
@@ -155,6 +187,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       drops,
       candidate,
       meta,
+      impacts,
+      receiver,
     };
   }
 
@@ -163,8 +197,15 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     return this.state;
   }
 
-  private carry(s: FlightState, target: Float64Array, at: number, interval: number, now: number, cell: Cell): void {
-    if (interval === 0) return;
+  private carry(
+    s: FlightState,
+    target: Float64Array,
+    at: number,
+    interval: number,
+    now: number,
+    cell: Cell,
+  ): Impact | undefined {
+    if (interval === 0 && !s.receiver) return;
     const wind = s.wind;
     const air =
       wind?.sample(
@@ -186,7 +227,23 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
           );
     if (!air.velocity.every(Number.isFinite))
       throw invalid('Wind returned invalid drop flight velocity. Supply three finite components.');
-    advanceDrop(target, at, interval, target[at + 7]!, s.gravity, air.velocity, drag);
+    const rate = midpointDropDrag(target, at, interval, target[at + 7]!, s.gravity, air.velocity, drag);
+    if (s.receiver) {
+      const impact = receiverImpact(
+        s.receiver.plane,
+        target,
+        at,
+        interval,
+        s.gravity,
+        air.velocity,
+        drag.buoyancy,
+        rate,
+        cell,
+        s.cellSize,
+      );
+      if (impact) return impact;
+    }
+    advanceDrop(target, at, interval, s.gravity, air.velocity, drag.buoyancy, rate);
     target[at + 8]! += interval;
     for (let i = 0; i < 6; i++)
       if (!Number.isFinite(target[at + i]))
@@ -200,24 +257,40 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     const next = words(s, s.candidate);
     const start = context.tick * dt;
     const origin = context.cell;
+    const receiver = s.receiver;
+    const pending = receiver && words(s, receiver.draft);
+    const capture = receiver && words(s, receiver.ledger);
+    let hits = 0;
+    let totalCaptured = capture?.[0] ?? 0;
     let live = 0;
     let last = meta[1]!;
     let id = meta[2]!;
     let received = meta[3]!;
     let outflow = meta[4]!;
     let airborne = 0;
+    const record = (impact: Impact) => {
+      pending!.set(impact, hits++ * FILM_IMPACT_WORDS);
+      totalCaptured += impact[3];
+    };
     for (let i = 0; i < meta[0]!; i++) {
       const source = FILM_FLIGHT_WORDS * i;
       const age = previous[source + 8]!;
       const volume = previous[source + 6]!;
-      if (age + dt >= s.lifetime) {
+      const expiring = age + dt >= s.lifetime;
+      if (expiring && !receiver) {
         outflow += volume;
         continue;
       }
-      const at = live++ * FILM_FLIGHT_WORDS;
+      const at = live * FILM_FLIGHT_WORDS;
       next.set(previous.subarray(source, source + FILM_FLIGHT_WORDS), at);
       for (let axis = 0; axis < 3; axis++) next[at + axis]! += (meta[6 + axis]! - origin[axis]!) * s.cellSize;
-      this.carry(s, next, at, dt, start, origin);
+      const impact = this.carry(s, next, at, Math.min(dt, s.lifetime - age), start, origin);
+      if (impact || expiring) {
+        if (impact) record(impact);
+        outflow += volume;
+        continue;
+      }
+      live++;
       airborne += volume;
     }
 
@@ -227,6 +300,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       if (region.layout !== LAYOUT || region.type !== 'f64' || region.byteLength % (FILM_DROP_WORDS * BYTES) !== 0)
         throw invalid('Invalid drop flight field layout. Use the layout-1 thin-film drop records.');
       const rows = words(s, region);
+      let emitted = 0;
       for (let i = 0; i < rows.length; i += FILM_DROP_WORDS) {
         const count = rows[i + 9]!;
         if (count === 0) continue;
@@ -248,8 +322,9 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
         )
           throw invalid('Invalid drop flight timing. Use positive thin-film volumes and current-step release offsets.');
         range('drop diameter in metres', diameter, MIN_DIAMETER, MAX_FLIGHT_DIAMETER);
-        const expired = Math.max(0, Math.min(count, Math.floor((dt - s.lifetime - first) / period) + 1));
-        if (count - expired > s.capacity - live || !Number.isSafeInteger(id + count))
+        const expired = receiver ? 0 : Math.max(0, Math.min(count, Math.floor((dt - s.lifetime - first) / period) + 1));
+        emitted += count - expired;
+        if (emitted > s.capacity || count - expired > s.capacity - live || !Number.isSafeInteger(id + count))
           throw new MargoError(
             'failed',
             'Too many flying drops. Increase flight capacity or reduce the flow or flight time.',
@@ -260,7 +335,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
         for (let event = expired; event < count; event++) {
           const age = Math.max(0, dt - (first + event * period));
           id++;
-          const at = live++ * FILM_FLIGHT_WORDS;
+          const at = live * FILM_FLIGHT_WORDS;
           for (let axis = 0; axis < 3; axis++) {
             const velocity = rows[i + 3 + axis]!;
             const position = rows[i + axis]! + (cell[axis]! - origin[axis]!) * s.cellSize;
@@ -271,7 +346,13 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
             next[at + 3 + axis] = velocity;
           }
           next.set([volume, diameter, 0, id], at + 6);
-          this.carry(s, next, at, age, start + dt - age, origin);
+          const impact = this.carry(s, next, at, Math.min(age, s.lifetime), start + dt - age, origin);
+          if (impact || age >= s.lifetime) {
+            if (impact) record(impact);
+            outflow += volume;
+            continue;
+          }
+          live++;
           airborne += volume;
         }
       }
@@ -279,6 +360,12 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     }
     previous.set(next.subarray(0, live * FILM_FLIGHT_WORDS));
     previous.fill(0, live * FILM_FLIGHT_WORDS, meta[0]! * FILM_FLIGHT_WORDS);
+    if (pending && capture) {
+      const impacts = words(s, s.impacts);
+      impacts.set(pending.subarray(0, hits * FILM_IMPACT_WORDS));
+      impacts.fill(0, hits * FILM_IMPACT_WORDS, capture[1]! * FILM_IMPACT_WORDS);
+      capture.set([totalCaptured, hits]);
+    }
     meta.set([live, last, id, received, outflow, airborne, ...origin]);
   }
 
@@ -299,11 +386,17 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     });
   }
 
-  /** Total received, airborne and expired volume in m³. */
+  /** Total received, airborne and departed volume in m³. Departures include impacts. */
   get budget(): { readonly received: number; readonly airborne: number; readonly outflow: number } {
     const s = this.live();
     const meta = regionWords(s.memory, s.meta);
     return { received: meta[3]!, airborne: meta[5]!, outflow: meta[4]! };
+  }
+
+  /** Cumulative volume transferred to the receiver, also included in budget.outflow. */
+  get depositedVolume(): number {
+    const s = this.live();
+    return s.receiver ? words(s, s.receiver.ledger)[0]! : 0;
   }
 
   importPorts(): void {}
@@ -311,12 +404,16 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
   exportPorts(tick: number): readonly Port[] {
     const s = this.live();
     const meta = regionWords(s.memory, s.meta);
-    return [{ field: this.particleField.name, region: s.drops, tick, cell: [meta[6]!, meta[7]!, meta[8]!] }];
+    const cell: Cell = [meta[6]!, meta[7]!, meta[8]!];
+    return [
+      { field: this.particleField.name, region: s.drops, tick, cell },
+      { field: this.impactField.name, region: s.impacts, tick, cell },
+    ];
   }
 
   stateRegions(): readonly Region[] {
     const s = this.live();
-    return [s.drops, s.meta];
+    return s.receiver ? [s.drops, s.meta, s.impacts, s.receiver.ledger] : [s.drops, s.meta];
   }
 
   extraState(): readonly Region[] {

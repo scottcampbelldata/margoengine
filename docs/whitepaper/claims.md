@@ -6173,6 +6173,11 @@ its volume through expiry and restores the same replay hash. Four independently 
 drop sizes agree with the lab velocity bands at each of 1, 3 and 5 m in still air.
 [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+One drop released by the sill arrives at a separate receiving film with the analytic
+contact location and speed. Its volume leaves flight once, enters the film once, and
+its normal impulse reaches a live wake. A turning drop also registers when both end
+positions clear the surface. [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
+
 ### FLUID-07 mounted film weight
 
 A mounted patch puts its integrated normal water weight and moment on the rigid body's

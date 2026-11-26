@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { WakeSolver } from '../../dist/sea.js';
+import { WAKE_SOURCE_WORDS, WakeSolver } from '../../dist/sea.js';
 import {
   FILM_DROP_WORDS,
   FILM_IMPACT_WORDS,
@@ -325,6 +325,35 @@ test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', as
   assert.fail('Expected the moving sill to detach a drop within eight seconds.');
 });
 
+function dropEvents(count, makeRecords) {
+  const field = {
+    name: 'test-drops',
+    kind: 'surfaceSampleSet',
+    quantity: 'detachedWaterDrop',
+    unit: 'SI',
+    centring: 'particle',
+  };
+  let region;
+  let memory;
+  const producer = {
+    describe: () => ({ id: 'drop-source', rate: 0, stableRate: () => 0, fields: [{ field, access: 'write' }] }),
+    init(host) {
+      region = host.allocate('test-drops', 8 * FILM_DROP_WORDS * count, 'f64', THIN_FILM_LAYOUT);
+      memory = host.memory;
+    },
+    step(context, dt) {
+      const rows = regionWords(memory, region);
+      rows.fill(0);
+      if (context.tick === 0) rows.set(makeRecords(dt).flat());
+    },
+    importPorts() {},
+    exportPorts: (tick) => [{ field: field.name, region, tick, cell: [0, 0, 0] }],
+    stateRegions: () => [region],
+    extraState: () => [],
+  };
+  return { field, producer };
+}
+
 test('ThinFilmDropFlight: the transient fall matches independent drop-tower measurements', () => {
   // Hinkle et al. (1987), Tables 1 and 2. Neither measurement column sets the force law.
   const observations = [
@@ -333,32 +362,9 @@ test('ThinFilmDropFlight: the transient fall matches independent drop-tower meas
     { diameter: 0.00452, optical: [4.22, 6.85, 8.13], rings: [4.23, 6.82, 8.14] },
     { diameter: 0.00564, optical: [4.28, 6.91, 8.43], rings: [4.24, 6.91, 8.41] },
   ];
-  const field = {
-    name: 'tower-drops',
-    kind: 'surfaceSampleSet',
-    quantity: 'detachedWaterDrop',
-    unit: 'SI',
-    centring: 'particle',
-  };
-  let records;
-  let rows;
-  const producer = {
-    describe: () => ({ id: 'drop-tower', rate: 0, stableRate: () => 0, fields: [{ field, access: 'write' }] }),
-    init(host) {
-      records = host.allocate('tower-drops', 8 * FILM_DROP_WORDS * observations.length, 'f64', THIN_FILM_LAYOUT);
-      rows = regionWords(host.memory, records);
-    },
-    step(context, dt) {
-      rows.fill(0);
-      if (context.tick !== 0) return;
-      for (const [i, { diameter }] of observations.entries())
-        rows.set([i, 0, 0, 0, 0, 0, (Math.PI / 6) * diameter ** 3, 0, dt, 1], i * FILM_DROP_WORDS);
-    },
-    importPorts() {},
-    exportPorts: (tick) => [{ field: field.name, region: records, tick, cell: [0, 0, 0] }],
-    stateRegions: () => [records],
-    extraState: () => [],
-  };
+  const { field, producer } = dropEvents(observations.length, (dt) =>
+    observations.map(({ diameter }, i) => [i, 0, 0, 0, 0, 0, (Math.PI / 6) * diameter ** 3, 0, dt, 1]),
+  );
   const temperature = 293.15;
   const flight = new ThinFilmDropFlight(field);
   const world = new PhysicsWorld({ rate }).add(producer, {}).add(flight, {
@@ -397,6 +403,89 @@ test('ThinFilmDropFlight: the transient fall matches independent drop-tower meas
     observations.map(() => heights.length),
   );
   assert.equal(flight.budget.received, flight.budget.airborne);
+});
+
+test('ThinFilmDropFlight: a turning drop can hit a bounded plane between positive endpoint distances', () => {
+  const radius = 0.001;
+  const gap = 0.00001;
+  const initial = -0.1;
+  const upward = 100;
+  const volume = (4 * Math.PI * radius ** 3) / 3;
+  const { field, producer } = dropEvents(2, (dt) =>
+    [0.04, 0.2].map((x) => [x, radius + gap + initial * dt, -0.04, 0, initial, 0, volume, 0, dt, 1]),
+  );
+  const flight = new ThinFilmDropFlight(field);
+  const world = new PhysicsWorld({ rate, gravity: [0, upward, 0] })
+    .add(producer, {})
+    .add(flight, { airDensity: 0, receiver: { origin: [0, 0, 0], size: [0.1, 0.1] } });
+  world.advance(1);
+  assert.equal(flight.depositedVolume, volume);
+  assert.equal(flight.budget.airborne, volume);
+  const [outside] = flight.readDrops();
+  assert.ok(outside.position[1] > radius + gap);
+  assert.equal(outside.id, 2);
+  const hit = regionWords(world.memory, world.fields.port(flight.impactField.name).region);
+  const inward = Math.sqrt(initial * initial - 2 * upward * gap);
+  assert.ok(Math.abs(hit[4] - inward) <= 128 * Number.EPSILON);
+});
+
+test('ThinFilmDropFlight: a sill drop transfers volume and normal impulse to a receiving film and wake', async () => {
+  const spacing = 0.03;
+  const lipHeight = 0.04;
+  const wetDepth = 0.0002;
+  const corner = [-0.04, 0, 0.05];
+  const sill = await ThinFilmSolver.load({ id: 'dripping-sill', drops: true });
+  const flight = new ThinFilmDropFlight(sill.dropsField);
+  const receiver = await ThinFilmSolver.load({ id: 'receiving-tray', impacts: flight.impactField, waveSources: true });
+  const wake = new WakeSolver('receiver-wake', receiver.waveField);
+  const world = new PhysicsWorld({ rate });
+  world
+    .add(sill, {
+      cells: [1, 1],
+      spacing,
+      origin: [0, lipHeight + spacing, 0],
+      v: [0, -1, 0],
+      rainRate: 1e-6 / 60 / (spacing * spacing),
+      drains: [false, false, false, true],
+      outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
+    })
+    .add(flight, { airDensity: 0, receiver: { origin: [corner[0], wetDepth, corner[2]], size: [0.12, 0.12] } })
+    .add(receiver, { cells: [6, 6], spacing: 0.02, origin: corner, depth: wetDepth })
+    .add(wake, { cells: [16, 16], cellSize: 0.01, centre: [0.02, -0.01], depth: 0.025, sponge: 0 });
+  const dt = 1 / rate.num;
+  let checkpoint;
+  for (let frame = 1; frame <= 480; frame++) {
+    world.advance(frame);
+    if (!checkpoint && flight.readDrops().length > 0) checkpoint = world.takeSnapshot();
+    if (flight.depositedVolume === 0) continue;
+    const volume = flight.depositedVolume;
+    assert.equal(flight.budget.received, volume);
+    assert.equal(flight.budget.outflow, volume);
+    assert.equal(flight.budget.airborne, 0);
+    assert.equal(receiver.budget.impacts, volume);
+    const row = regionWords(world.memory, world.fields.port(flight.impactField.name).region);
+    const radius = Math.cbrt((3 * volume) / (4 * Math.PI));
+    const velocity = Math.sqrt(2 * -world.gravity[1] * (lipHeight - wetDepth - radius));
+    const expected = [spacing / 2 - corner[0], corner[2], radius, volume, velocity];
+    for (const [i, value] of expected.entries())
+      assert.ok(Math.abs(row[i] - value) <= 128 * Number.EPSILON * Math.max(1, value), `${row[i]} vs ${value}`);
+    const waves = regionWords(world.memory, world.fields.port(receiver.waveField.name).region);
+    const cosineArea = Math.PI * (0.5 - 2 / Math.PI ** 2);
+    let impulse = 0;
+    for (let i = 0; i < waves.length; i += WAKE_SOURCE_WORDS)
+      impulse += waves[i + 2] ** 2 * waves[i + 3] * cosineArea * dt;
+    assert.ok(Math.abs(impulse - 998 * volume * velocity) <= 256 * Number.EPSILON * 998 * volume);
+    balance(receiver, frame);
+    world.advance(frame + 8);
+    assert.equal(receiver.budget.impacts, volume);
+    assert.ok(wake.heights().some((height) => height > 0));
+    const hash = world.hash();
+    world.restoreSnapshot(checkpoint.bytes);
+    world.advance(frame + 8);
+    assert.equal(world.hash(), hash);
+    return;
+  }
+  assert.fail('Expected a drop to reach the wet tray within eight seconds.');
 });
 
 test('ThinFilmSolver: a mounted film transmits its normal weight and moment to the rigid body', async () => {

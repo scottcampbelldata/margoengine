@@ -4517,6 +4517,12 @@ it compares speed against both independent instruments with the paper's two-perc
 transient allowance and half the last printed digit. The releases and atmosphere set the
 inputs before the comparisons. [Hinkle et al. (1987), Tables 1 and 2](https://www.ars.usda.gov/ARSUserFiles/30100000/Publications%201989-1980/189%201987%20Hinkle%20-%20Falling%20water%20drop%20velocitie.pdf)
 
+Run `node --test --test-name-pattern="turning drop|transfers volume and normal impulse" packages/physics/tests/coupling/thin-film.test.js`
+to check continuous capture. The closed-form fall uses the sphere radius to find the exact
+clearance at contact. The flight, film and wake ports track the same drop's volume and
+normal impulse. A separate turning trajectory catches an impact between two positive
+clearances while a companion outside the tray keeps flying.
+
 ### SEA-08 hull-to-wake displacement
 
 Build Physics and run `node --test --test-name-pattern "HullSolver wake source" packages/physics/tests/coupling/seakeeping.test.js`. The rigid hull publishes motion at the world base rate and the actual WakeSolver advances it. The tests measure the waterplane volume, pitch and roll moments, a distant-height gauge and exact replay. Steady surge, fully dry and fully submerged controls check that no volume is injected.

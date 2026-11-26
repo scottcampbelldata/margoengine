@@ -4943,16 +4943,20 @@ import { ThinFilmDropFlight, ThinFilmSolver } from '@margoengine/physics/thin-fi
 const spacing = 0.03;
 const film = await ThinFilmSolver.load({ drops: true });
 const flight = new ThinFilmDropFlight(film.dropsField);
+const tray = await ThinFilmSolver.load({ id: 'tray', impacts: flight.impactField });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   cells: [1, 1],
   spacing,
+  origin: [0, 0.07, 0],
   v: [0, -1, 0],
   rainRate: (1e-6 / 60) / (spacing * spacing),
   drains: [false, false, false, true],
   outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
-}).add(flight, {});
+}).add(flight, {
+  receiver: { origin: [-0.04, 0.0002, 0.05], size: [0.12, 0.12] },
+}).add(tray, { origin: [-0.04, 0, 0.05], cells: [6, 6], spacing: 0.02, depth: 0.0002 });
 world.advance(420);
-console.log(film.heldDripVolume, flight.readDrops(), flight.budget.received);
+console.log(film.heldDripVolume, flight.readDrops(), tray.budget.impacts);
 ```
 
 `dropsField` publishes one timed record per rim in its origin cell. Read its end-of-tick XYZ, the rim's XYZ
@@ -4963,7 +4967,10 @@ edge discharge, while `budget.dripped` counts all water leaving the backing.
 `ThinFilmDropFlight` starts each drop at its release offset and advances it through gravity,
 buoyancy and air drag. Provide a `Wind` field for moving air. The particle field exposes live
 positions, velocities, sizes, ages and stable IDs. `budget` accounts for the received,
-airborne and expired volumes. By default each drop stays in the flight domain for 10 seconds.
+airborne and departed volumes. By default each drop can stay in the flight domain for 10 seconds.
+For an absorbing tray, set `receiver` to its static free-surface plane and extent. Match its UV
+axes and put both solvers in the same world cell. Give the tray `flight.impactField` to receive
+the captured volume and normal speed. `depositedVolume` is the captured share of flight outflow.
 
 To transfer the film's normal weight and moment to a mounted body, enable `hydrostaticLoad`
 and add the rigid solver before the film. Couple the two solvers with the staggered scheme.

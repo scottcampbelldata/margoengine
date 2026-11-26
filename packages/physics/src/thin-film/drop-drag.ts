@@ -78,7 +78,7 @@ export class DropDrag {
 
 type Vec3 = readonly [number, number, number];
 
-export function advanceDrop(
+export function midpointDropDrag(
   drop: Float64Array,
   at: number,
   dt: number,
@@ -86,7 +86,7 @@ export function advanceDrop(
   gravity: Vec3,
   air: Vec3,
   drag: DropDrag,
-): void {
+): number {
   const u = drop[at + 3]! - air[0];
   const v = drop[at + 4]! - air[1];
   const w = drop[at + 5]! - air[2];
@@ -96,10 +96,22 @@ export function advanceDrop(
   const midY = decay * v + exposure * gravity[1] * drag.buoyancy;
   const midZ = decay * w + exposure * gravity[2] * drag.buoyancy;
   const midSpeed = Math.sqrt(midX * midX + midY * midY + midZ * midZ);
-  const [velocityDrag, velocityTime, positionTime] = dragIntegrals(drag.rate(diameter, midSpeed), dt);
+  return drag.rate(diameter, midSpeed);
+}
+
+export function advanceDrop(
+  drop: Float64Array,
+  at: number,
+  dt: number,
+  gravity: Vec3,
+  air: Vec3,
+  buoyancy: number,
+  rate: number,
+): void {
+  const [velocityDrag, velocityTime, positionTime] = dragIntegrals(rate, dt);
   for (let axis = 0; axis < 3; axis++) {
     const wind = air[axis]!;
-    const g = gravity[axis]! * drag.buoyancy;
+    const g = gravity[axis]! * buoyancy;
     const relative = drop[at + 3 + axis]! - wind;
     drop[at + axis]! += wind * dt + relative * velocityTime + g * positionTime;
     drop[at + 3 + axis] = wind + relative * velocityDrag + g * velocityTime;

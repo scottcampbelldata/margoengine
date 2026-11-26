@@ -15253,6 +15253,16 @@ and changes to six, seven and eight half-waves. Those regimes are outside this f
   diameters at 20 °C and 84.1 kPa give fall speeds at 1, 3 and 5 m. Neither instrument's
   output determines the drag coefficients or initial conditions.
   [USDA paper](https://www.ars.usda.gov/ARSUserFiles/30100000/Publications%201989-1980/189%201987%20Hinkle%20-%20Falling%20water%20drop%20velocitie.pdf)
+- Lawrence F. Shampine and Skip Thompson, “Event location for ordinary differential equations”
+  (2000). Find the first root of the receiver clearance along the continuous frozen-drag
+  trajectory. Its normal velocity is monotone, so splitting at its zero also catches a crossing
+  that returns to positive clearance within the same step. At contact, project the spherical centre
+  onto the receiving plane and publish its volume and inward normal speed in the existing impact layout.
+  [Journal](https://doi.org/10.1016/S0898-1221(00)00045-6)
+- Gianpietro E. Cossali, Aldo Coghe and Marco Marengo, “The impact of a single drop on a wetted
+  solid surface” (1997). The optional absorbing receiver represents deposition with conserved liquid
+  volume. The experiments distinguish deposition from a separate splash regime.
+  [Journal](https://doi.org/10.1007/s003480050073)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves
