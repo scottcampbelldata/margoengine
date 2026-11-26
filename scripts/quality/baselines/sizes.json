@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20158390,
+  "total": 20163758,
   "history": [
     {
       "date": "2026-10-24",
@@ -12867,6 +12867,12 @@
       "commit": "014c8749d",
       "reason": "physics/ship is a new optional entry (SEA-09): ShipSolver (MMG manoeuvring on rigid bodies, squat as a drawn-down sea, bow thruster, quay suction, wake sources and the race's boil), Manoeuvring, Propeller with four quadrants and its race field, Holtrop and Mennen resistance and squat laws; 11,202 B gzip, its own entry so scenes without ships pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "eab592cfd1",
+      "reason": "ICE-04 adds physics/pack-ice at 5112 B gzip with lazy no-slot SIMD assets. Water/ice changes from 13079 to 13297 B for the structural SeaIce pose reader. A separate adapter would duplicate matrix code. Core plus stage is 24820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13700,6 +13706,7 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
+    "@margoengine/physics/pack-ice": 5368,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/rogue": 7930,
@@ -13708,6 +13715,7 @@
     "@margoengine/physics/sea": 8001,
     "@margoengine/physics/seakeeping": 16953,
     "@margoengine/physics/sediment": 5512,
+    "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
@@ -14761,7 +14769,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/ship": 11538
+    "margoengine/web": 577
   }
 }

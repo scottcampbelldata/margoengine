@@ -5601,3 +5601,13 @@ LIFE-01 produces quadruped and biped pose from normal support, compressive sprin
 and a gait chosen by measured speed. Tests reproduce variable equine cadence, slower uphill locomotion, bank and
 slip, diagonal trot flight, and transfer of the opposite contact impulse to a rigid platform. The scoped coupling
 harness verifies identical hashes through snapshot and replay.
+
+### Floating pack ice contact and material conservation (ICE-04)
+
+The optional pack-ice entry transfers equal and opposite linear momentum between its discrete
+floes and the existing rigid vessel. Local pile formation preserves ice volume. The coupling
+tests check unequal-mass restitution against its closed form, verify the published rafting
+threshold, account for level, rafted and ridged material, and step the same vessel with SEA-08
+buoyancy enabled. The Water bridge uses that world state to write the rendered instance matrices.
+[Physical tests](../../packages/physics/tests/pack-ice.test.js) · [Coupling tests](../../packages/physics/tests/coupling/pack-ice.test.js) ·
+[Display test](../../packages/physics/tests/coupling/pack-ice-render.test.js)

@@ -9384,3 +9384,15 @@ actual instantaneous stride.
 
 The legged entry measures 29,240 B raw and 11,101 B gzip and shares the ground kernel bytes listed above.
 Horses measures 40,737 B raw and 16,724 B gzip. Its gait utilities measure 2,738 B raw and 1,266 B gzip.
+
+### Pack ice and floe contact (ICE-04)
+
+Planar circular floes have constant mass, a shrinking level-ice footprint and conserved raft and
+ridge volumes. The pile is a subgrid volume on the originating floe. Independent ridge blocks,
+finger rafting, bending under waves, welds between floes and shoreline grounding require explicit
+geometry outside this model. The deterministic contact sweep approximates multiple simultaneous
+contacts. Vessel bounds are horizontal waterline capsules and send XZ impulse and yaw torque to
+the rigid world. The method resolves broken pack ice rather than applying a continuous-sheet
+resistance regression. The Water adapter displays equivalent thickness and a water-surface tangent.
+
+The optional Physics entry measures 5,112 B gzip with a 5,368 B ceiling. Each lazy Wasm asset uses 5,716 B raw and 2,534 B gzip. Water/ice measures 13,297 B gzip with a 13,364 B ceiling. Core plus stage stays at 24,820 B gzip.

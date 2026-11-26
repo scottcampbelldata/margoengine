@@ -31,6 +31,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/pack-ice-kernel.wasm',
+    label: 'pack-ice-kernel.wasm',
+    kind: 'Rust SIMD pack-ice contacts and floe fracture',
+    measure: 'file',
+    when: 'PackIceSolver.load() from the optional /pack-ice entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/pack-ice-kernel-shared.wasm',
+    label: 'pack-ice-kernel-shared.wasm',
+    kind: 'Rust SIMD pack-ice contacts and floe fracture, shared world memory',
+    measure: 'file',
+    when: 'PackIceSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/snowpack-kernel.wasm',
     label: 'snowpack-kernel.wasm',
     kind: 'Rust SIMD layered snowpack',
