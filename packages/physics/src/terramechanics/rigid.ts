@@ -8,7 +8,7 @@ import type { Vehicle } from '../vehicle.js';
 import { regionWords } from '../world/memory.js';
 import type { Cell, FieldDescriptor, Port, Region, SolverHost, StepContext } from '../world/solver.js';
 import { RigidSolver, type RigidSolverParams } from '../world/solvers/rigid.js';
-import { SOIL_LAYOUT, SOIL_PATCH_WORDS } from './index.js';
+import { SOIL_LAYOUT, SOIL_PATCH_WORDS, SOIL_WHEEL_REACTION_WORDS } from './index.js';
 
 type Point = readonly [number, number, number];
 type Pair = readonly [number, number];
@@ -41,6 +41,8 @@ export interface SoilContactRigidOptions {
   readonly id?: string;
   /** Publish live wheel spin in the same order as the soil patch records. Use soilWheelPhaseField. */
   readonly wheelPhase?: FieldDescriptor;
+  /** Apply solved drawbar and axle reactions to wheels on the registered terrain collider. */
+  readonly wheelReaction?: FieldDescriptor;
   /** Read the live bed and update the supplied collider before sampling wheel and belt loads. */
   readonly terrain?: BedShape;
 }
@@ -137,6 +139,7 @@ export class SoilContactRigidSolver extends RigidSolver {
   private lastTick = -1;
   private readonly terrain?: BedShape;
   private readonly phase?: FieldDescriptor;
+  private readonly reaction?: FieldDescriptor;
   private ground?: PhysicsCollider;
   private heights?: Region;
   private phases?: Region;
@@ -148,6 +151,7 @@ export class SoilContactRigidSolver extends RigidSolver {
     super(options.id ?? 'rigid');
     this.terrain = options.terrain && { ...options.terrain, centre: [...options.terrain.centre] };
     this.phase = options.wheelPhase && { ...options.wheelPhase };
+    this.reaction = options.wheelReaction && { ...options.wheelReaction };
   }
 
   override describe() {
@@ -158,16 +162,27 @@ export class SoilContactRigidSolver extends RigidSolver {
         ...base.fields,
         { field: this.soilField, access: 'write' as const },
         ...(this.phase ? [{ field: this.phase, access: 'write' as const }] : []),
+        ...(this.reaction ? [{ field: this.reaction, access: 'read' as const }] : []),
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
       ],
     };
   }
 
   override init(host: SolverHost, params: SoilContactRigidParams): void {
-    this.wheels = (params.wheels ?? []).map((entry) => ({ ...entry, patches: entry.patches.map((p) => ({ ...p })) }));
+    const soilCollider = this.reaction ? params.ground?.collider : undefined;
+    this.wheels = (params.wheels ?? []).map((entry) => ({
+      ...entry,
+      ground: entry.ground ?? soilCollider,
+      patches: entry.patches.map((p) => ({ ...p })),
+    }));
     this.tracks = (params.tracks ?? []).map((entry) => ({ ...entry, patches: entry.patches.map((p) => ({ ...p })) }));
     this.vehicles = [...this.wheels, ...this.tracks].map(({ vehicle }) => vehicle);
     const rows = [...this.wheels, ...this.tracks].reduce((count, binding) => count + binding.patches.length, 0);
+    if (this.reaction && (!soilCollider || !this.wheels.some((binding) => binding.ground === soilCollider)))
+      throw new MargoError(
+        'state',
+        'Wheel reactions need a soil collider and wheel bindings. Provide both on the same bed.',
+      );
     if (
       !rows ||
       new Set(this.vehicles).size !== this.vehicles.length ||
@@ -231,6 +246,39 @@ export class SoilContactRigidSolver extends RigidSolver {
     if (!restore) data[0] = tick;
   }
 
+  private applyReactions(context: StepContext): void {
+    const field = this.reaction;
+    const collider = this.ground;
+    if (!field || !collider) return;
+    const port = context.inputs.get(field.name);
+    if (!port) return;
+    if (
+      port.region.type !== 'f64' ||
+      port.region.layout !== SOIL_LAYOUT ||
+      port.region.byteLength * SOIL_PATCH_WORDS !== this.patches.byteLength * SOIL_WHEEL_REACTION_WORDS ||
+      (port.region.memory ?? this.memory) !== this.memory ||
+      port.cell.some((coordinate, axis) => coordinate !== context.cell[axis])
+    )
+      throw new MargoError(
+        'state',
+        'Wheel reactions do not match the soil bindings. Use the same layout, rows and cell.',
+      );
+    const words = regionWords(this.memory, port.region) as Float64Array;
+    let row = 0;
+    for (const binding of this.wheels) {
+      for (let i = 0; i < binding.patches.length; i++, row++) {
+        const at = row * SOIL_WHEEL_REACTION_WORDS;
+        if (binding.vehicle.valid && binding.ground === collider && words[at] !== 0)
+          binding.vehicle.setWheelGroundTraction(i, {
+            collider,
+            load: words[at]!,
+            drawbar: words[at + 1]!,
+            axleTorque: words[at + 2]!,
+          });
+      }
+    }
+  }
+
   override step(context: StepContext, dt: number): void {
     const current = regionWords(this.memory, this.motion) as Float64Array;
     if (this.lastTick !== current[0]) this.syncMotion(context.tick, true);
@@ -254,6 +302,7 @@ export class SoilContactRigidSolver extends RigidSolver {
         (regionWords(this.memory, this.heights) as Float32Array).set(regionWords(this.memory, port.region));
       }
     }
+    this.applyReactions(context);
     super.step(context, dt);
     this.cell = context.cell;
     const out = regionWords(this.memory, this.patches) as Float64Array;
