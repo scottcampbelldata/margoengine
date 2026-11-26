@@ -227,8 +227,73 @@ test('registry: unload keeps the definition, reload replaces the value and tells
   assert.equal(await registry.load('a'), '/a#3');
   assert.equal(registry.unload('nope'), false);
   await assert.rejects(registry.reload('nope'), /not defined/);
-  assert.deepEqual(await registry.loadMap({ b: '/b', c: { url: '/c', type: 'json' } }), ['b', 'c']);
-  assert.deepEqual(await registry.loadMap(new Blob(['{"d":"/d"}'])), ['d']);
+  const baseURL = 'https://cdn.test/maps/';
+  assert.deepEqual(await registry.loadMap({ b: 'b.png', c: { url: 'c.json', type: 'json' } }, { baseURL }), ['b', 'c']);
+  assert.deepEqual(await registry.loadMap(new Blob(['{"d":"d.png"}']), { baseURL }), ['d']);
   assert.deepEqual(registry.keys, ['a', 'b', 'c', 'd']);
+  assert.deepEqual(registry.toJSON().c, { url: 'https://cdn.test/maps/c.json', type: 'json' });
   await assert.rejects(registry.loadMap(new Blob(['[1]'])), /JSON object/);
+});
+
+test('loadMap: entries resolve against the map URL, through the injected fetch, and cannot leave its directory', async () => {
+  const asked = [];
+  const maps = {
+    'https://cdn.test/game/assets.json': '{"hero":"models/hero.glb","sky":{"url":"sky/day.hdr","type":"binary"},"inline":"data:text/plain,hi"}',
+    'https://cdn.test/game/escape.json': '{"x":"../secret.bin"}',
+    'https://cdn.test/game/other.json': '{"x":"https://evil.test/a.bin"}',
+    'https://cdn.test/game/allowed.json': '{"x":"https://cdn.test/shared/a.bin"}',
+    'https://cdn.test/game/encoded.json': '{"x":"a/%2e%2e/b.bin"}',
+  };
+  const fetchMap = async (url) => {
+    asked.push(url);
+    return { ok: url in maps, status: url in maps ? 200 : 404, url, text: async () => maps[url], body: null };
+  };
+  const registry = new AssetRegistry({ fetch: fetchMap });
+  const keys = await registry.loadMap('https://cdn.test/game/assets.json');
+  assert.deepEqual(keys, ['hero', 'sky', 'inline']);
+  assert.deepEqual(registry.toJSON(), {
+    hero: 'https://cdn.test/game/models/hero.glb',
+    sky: { url: 'https://cdn.test/game/sky/day.hdr', type: 'binary' },
+    inline: 'data:text/plain,hi',
+  });
+  assert.deepEqual(asked, ['https://cdn.test/game/assets.json']);
+  // The same fetch is the registry's loader for the entries.
+  const loader = new AssetRegistry({ fetch: async (url) => ({ ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode(url).buffer }) });
+  loader.define('a', 'https://cdn.test/a.bin');
+  assert.equal(new TextDecoder().decode(await loader.load('a')), 'https://cdn.test/a.bin');
+  // A per-call fetch beats the registry's.
+  const own = new AssetRegistry();
+  await own.loadMap('https://cdn.test/game/assets.json', { fetch: fetchMap });
+  // `a/%2e%2e/b.bin` is normalised by URL parsing to `b.bin` inside the directory, so it is accepted as that file.
+  const normalised = new AssetRegistry({ fetch: fetchMap });
+  await normalised.loadMap('https://cdn.test/game/encoded.json');
+  assert.equal(normalised.toJSON().x, 'https://cdn.test/game/b.bin');
+  for (const name of ['escape', 'other'])
+    await assert.rejects(new AssetRegistry({ fetch: fetchMap }).loadMap(`https://cdn.test/game/${name}.json`), /leaves the model's directory/);
+  const allowed = new AssetRegistry({ fetch: fetchMap });
+  await allowed.loadMap('https://cdn.test/game/allowed.json', { allowedURLs: ['https://cdn.test/shared/'] });
+  assert.equal(allowed.toJSON().x, 'https://cdn.test/shared/a.bin');
+  await assert.rejects(new AssetRegistry({ fetch: fetchMap }).loadMap('https://cdn.test/game/missing.json'), /HTTP 404/);
+  // An object map with relative entries and no base has nothing to resolve against.
+  await assert.rejects(new AssetRegistry().loadMap({ x: 'a.png' }), /Invalid Asset "x" URI|valid URL/);
+});
+
+test('loadMap: a redirect out of the directory, an oversized map and malformed entries are refused with coded errors', async () => {
+  const redirected = async (url) => ({ ok: true, status: 200, url: 'https://evil.test/assets.json', text: async () => '{}', body: null });
+  await assert.rejects(new AssetRegistry({ fetch: redirected }).loadMap('https://cdn.test/game/assets.json'), /redirected/);
+  const big = async (url) => ({ ok: true, status: 200, url, text: async () => `{"a":"${'x'.repeat(200)}"}`, body: null });
+  await assert.rejects(new AssetRegistry({ fetch: big }).loadMap('https://cdn.test/game/assets.json', { maxBytes: 100 }), (e) => e.code === 'failed' && /larger than/.test(e.message));
+  await assert.rejects(new AssetRegistry().loadMap(new Blob(['x'.repeat(50)]), { maxBytes: 10 }), (e) => e.code === 'failed' && /larger than/.test(e.message));
+  const bad = [
+    '{"a":5}',
+    '{"a":{"type":"json"}}',
+    '{"a":{"url":"x","type":7}}',
+    '{"a":null}',
+    '{"":"x"}',
+    '{"__proto__":"x"}',
+    '[1]',
+    'not json',
+  ];
+  for (const text of bad)
+    await assert.rejects(new AssetRegistry().loadMap(new Blob([text]), { baseURL: 'https://cdn.test/' }), (e) => e instanceof TypeError && /see https:\/\/margoengine.com\/errors#arguments/.test(e.message), text);
 });

@@ -1,5 +1,6 @@
 // Asset loading as data: a task queue (typed tasks with per-task success and error, progress, retry and an all-done
 // event) and a registry (assets by key, swapped live, described in JSON, with a callback for the key nobody defined).
+import { assetURL, checkRedirect } from '../../shared/asset-url.js';
 import { fault, typeError } from '../../shared/errors.js';
 
 const bad = (message: string): TypeError => typeError(message, 'arguments');
@@ -330,6 +331,8 @@ export interface AssetRegistryOptions<T> {
    * type `T` is then yours to promise.
    */
   loadURL?(url: string, type: string | undefined, signal: AbortSignal): Promise<T>;
+  /** Custom fetch for the default URL loading and `loadMap`, the option the other Margo loaders take. Default `globalThis.fetch`. */
+  fetch?: typeof fetch;
   /** Called with a value that is replaced by `swap`, removed or disposed with the registry. */
   dispose?(value: T, key: string): void;
   /**
@@ -339,8 +342,46 @@ export interface AssetRegistryOptions<T> {
   onMissing?(key: string, reason: 'undefined' | 'failed', error?: unknown): AssetSource<T> | void | Promise<AssetSource<T> | void>;
 }
 
-const isMap = (value: unknown): value is Record<string, AssetMapEntry> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+/** Options of {@link AssetRegistry.loadMap}. */
+export interface AssetMapOptions {
+  signal?: AbortSignal;
+  /** Custom fetch for a map given as a URL. Default the registry's `fetch`, else `globalThis.fetch`. */
+  fetch?: typeof fetch;
+  /** URL prefixes entries may point to outside the map's directory, as in the glTF loaders. Default none. */
+  allowedURLs?: readonly string[];
+  /** What entries resolve against when the map is an object or a `File` (a URL map uses its own URL). Default none: entries must then be absolute and allowed. */
+  baseURL?: string | URL;
+  /** Largest map in bytes. Default 1 MiB. */
+  maxBytes?: number;
+}
+
+const MAX_MAP_KEYS = 100_000;
+
+function parseMap(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw typeError('the asset map is not valid JSON; check the file', 'arguments');
+  }
+}
+
+/** Refuses a map that is not a plain object of `{key: url | {url, type}}`, naming the first bad entry. */
+function checkMap(value: unknown): Record<string, string | { url: string; type?: string }> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw typeError('an asset map is a JSON object of {key: url | {url, type}}; check the file', 'arguments');
+  const keys = Object.keys(value);
+  if (keys.length > MAX_MAP_KEYS) throw fault('failed', `the asset map has ${keys.length} keys, more than ${MAX_MAP_KEYS}; split the map`);
+  for (const key of keys) {
+    const entry = (value as Record<string, unknown>)[key];
+    if (!key || key.length > 1024 || key === '__proto__')
+      throw typeError(`asset map key "${key.slice(0, 40)}" is not allowed; use a non-empty name up to 1024 characters`, 'arguments');
+    const url = typeof entry === 'string' ? entry : (entry as { url?: unknown } | null)?.url,
+      type = typeof entry === 'object' && entry !== null ? (entry as { type?: unknown }).type : undefined;
+    if (typeof url !== 'string' || !url || (type !== undefined && (typeof type !== 'string' || type.length > 64)))
+      throw typeError(`asset map entry "${key}" must be a URL string or {url, type} with string fields; check the file`, 'arguments');
+  }
+  return value as Record<string, string | { url: string; type?: string }>;
+}
 
 interface Slot<T> {
   source: AssetSource<T>;
@@ -422,7 +463,7 @@ export class AssetRegistry<T = unknown> {
   private async fetchValue(key: string, source: AssetSource<T>, type: string | undefined, signal: AbortSignal): Promise<T> {
     if (typeof source === 'function') return source(key, signal);
     if (this.options.loadURL) return this.options.loadURL(source, type, signal);
-    const response = await fetch(source, { signal });
+    const response = await (this.options.fetch ?? fetch)(source, { signal });
     if (!response.ok) throw fault('failed', `${source}: HTTP ${response.status}; check the URL`);
     return (type === 'json' ? response.json() : type === 'text' ? response.text() : new Uint8Array(await response.arrayBuffer())) as T;
   }
@@ -507,17 +548,34 @@ export class AssetRegistry<T = unknown> {
    * Fills the registry from a JSON asset map given as an object, a URL (fetched), or a `File`/`Blob`. Resolves with the
    * keys it defined or swapped. Without a `fetch`, a URL map needs the global one.
    */
-  async loadMap(source: string | Blob | Record<string, AssetMapEntry>, signal?: AbortSignal): Promise<string[]> {
+  async loadMap(source: string | Blob | Record<string, AssetMapEntry>, options: AssetMapOptions = {}): Promise<string[]> {
     this.live();
-    let map: unknown = source;
+    const { signal, allowedURLs = [], maxBytes = 1 << 20 } = options;
+    let map: unknown = source,
+      base: string | URL | undefined = options.baseURL;
     if (typeof source === 'string') {
-      const response = await fetch(source, { signal });
-      if (!response.ok) throw fault('failed', `${source}: HTTP ${response.status}; check the asset map URL`);
-      map = await response.json();
-    } else if (typeof Blob !== 'undefined' && source instanceof Blob) map = JSON.parse(await source.text());
-    if (!isMap(map)) throw typeError('an asset map is a JSON object of {key: url | {url, type}}; check the file', 'arguments');
-    this.fromJSON(map);
-    return Object.keys(map);
+      // The map's own URL is the base its entries resolve against, as a glTF's URI do against the file.
+      const mapURL = new URL(source, base);
+      base = mapURL;
+      const response = checkRedirect(await (options.fetch ?? this.options.fetch ?? fetch)(mapURL.href, { signal }), mapURL, allowedURLs, 'Asset map');
+      if (!response.ok) throw fault('failed', `${mapURL.href}: HTTP ${response.status}; check the asset map URL`);
+      const text = await response.text();
+      if (text.length > maxBytes) throw fault('failed', `the asset map is larger than ${maxBytes} bytes; raise maxBytes or split the map`);
+      map = parseMap(text);
+    } else if (typeof Blob !== 'undefined' && source instanceof Blob) {
+      if (source.size > maxBytes) throw fault('failed', `the asset map is larger than ${maxBytes} bytes; raise maxBytes or split the map`);
+      map = parseMap(await source.text());
+    }
+    const checked = checkMap(map);
+    const resolved: Record<string, AssetMapEntry> = {};
+    for (const [key, entry] of Object.entries(checked)) {
+      const url = typeof entry === 'string' ? entry : entry.url,
+        // data: URIs carry their bytes and name no host; everything else must stay inside the map's directory (or allowedURLs).
+        absolute = /^data:/i.test(url) ? url : assetURL(url, base, allowedURLs, `Asset "${key}"`).href;
+      resolved[key] = typeof entry === 'string' ? absolute : { ...entry, url: absolute };
+    }
+    this.fromJSON(resolved);
+    return Object.keys(resolved);
   }
 
   /** Disposes the loaded value of a key but keeps its definition, so the next `load` fetches it again. Returns false for an unknown key. */
