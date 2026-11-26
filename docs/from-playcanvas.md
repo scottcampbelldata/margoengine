@@ -129,12 +129,14 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 | `entity.setPosition`, `setLocalScale`, `setLocalEulerAngles` | `mesh.position`, `mesh.scale`, `mesh.rotation` (live views), `setPosition`, `setScale`, `setRotation`, `setQuaternion` | Local transforms; rotation is radians |
 | `entity.enabled = false` | `mesh.visible = false` | |
 | `entity.destroy()` | `mesh.dispose()` | |
-| `entity.findByName`, `findByTag`, `forEach` | `traverse(engine.scene, fn)`, `children(mesh)`, `userData(mesh)` (`@margoengine/scene`) | Match on `mesh.name`; keep your own tag `Set`. `extendMeshes()` adds them as members |
+| `entity.findByName`, `forEach` | `traverse(engine.scene, fn)`, `children(mesh)`, `userData(mesh)` (`@margoengine/scene`) | Match on `mesh.name`. `extendMeshes()` adds them as members |
+| `entity.tags.add('enemy')`, `entity.findByTag('enemy')` | `tags(mesh).add('enemy')`, `findByTag(engine.scene, 'enemy')`, `queryTags(scene, 'a && !b')` (`margoengine/scene/tags`) | OR between arguments, AND inside an array. `TagSet` is an `EventTarget` that fires `add`, `remove` and `change` |
 | `entity.addComponent(...)` | `@margoengine/ecs` `World` and `world.component({...})`, keyed to your meshes | Data-oriented, typed-array fields |
-| `ScriptType`, `Script` class | Your own class; [the example](../examples/from-playcanvas/03-script-lifecycle.html) is 30 lines | No script component |
+| `ScriptType`, `Script` class, `entity.script.create`, script attributes | `defineScript({name, attributes, initialize, postInitialize, update, postUpdate, fixedUpdate, onEnable, onDisable, onAttributeChange, destroy, swap})`; `new Scripts(world)`, `scripts.add(entity, type, {values})` (`margoengine/ecs/scripts`) | Typed attributes (`number`, `vec3`, `color`, `entity`, `asset`...) with `default`, `min`, `max` and `enum` options. Scripts attach to ECS entities, not meshes; see [Scripts](#scripts-and-the-lifecycle) |
 | `entity.on`, `fire`, `app.fire` | `EventTarget`, or your own emitter | |
 | `Application` tween (`entity.tween`) | `@margoengine/tween` (`Tween`, `Timeline`, `Spring`, `to`, `from`, `fromTo`) | |
-| `app.scene.layers`, `Layer`, `camera.layers` | None | See [Not yet](#not-yet) |
+| `camera.layers`, `entity.render.layers`, `app.scene.layers` | `setRenderLayers(mesh, mask)`, `setCameraLayers(camera, mask)`, `layerMask(...layers)` (`margoengine/cameras/layers`) | 32-bit masks: a view draws a mesh when the two share a bit. Picking takes `layers` too (`SpatialPickingOptions`, `AreaPickingOptions`). Draw order of layers and sublayers is not a Margo concept |
+| `camera.rect`, several cameras | `engine.views = [{camera, viewport: [x, y, w, h], scissor?, layers?}]` (core `RenderView`) | Fractions of the canvas, or pixels with `pixels: true`. See [split-screen](../examples/split-screen.html) and [minimap](../examples/minimap.html). `StereoRig` and `HologramRig` (`@margoengine/cameras/stereo`, `/hologram`) build the views for stereo and four-sided displays |
 
 ### Assets, materials and textures
 
@@ -162,7 +164,8 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 
 | PlayCanvas | Margo | Notes |
 | --- | --- | --- |
-| `light` component, type `directional` | `engine.scene.lighting.direction.set([x, y, z, strength])` | One sun per engine. Points **toward** the light |
+| `light` component, type `directional` | `engine.scene.lighting.direction.set([x, y, z, strength])` | Core's one sun. Points **toward** the light |
+| Several `directional` lights | `DirectionalLights.attach(engine, {lights}).setLights([{direction, color, intensity, castShadow}])` (`margoengine/clustered/directional`) | Up to 16, four with shadows (`LocalShadows`). Here `direction` is the way the light **travels**, as in PlayCanvas |
 | `app.scene.ambientLight` | `lighting.radiance.set([r, g, b, ambient])`; `HemisphereLight` (`margoengine/environment`) | `HemisphereLight` has separate sky and ground colours |
 | `light` type `omni`, `spot` | `Clustered.attach(engine)` then `setLights([...])` | Up to 1,024 by default; range in metres |
 | `castShadows`, `shadowResolution`, `shadowDistance` | `Shadows.attach(engine, {resolution})`, `shadows.add(mesh)` | Cascaded, soft edge by default; `cascades` 1 to 4 |
@@ -259,25 +262,39 @@ Runnable: [`02-entity-components`](../examples/from-playcanvas/02-entity-compone
 ## Scripts and the lifecycle
 
 PlayCanvas: a script has `initialize` (once, on enable), `postInitialize` (once, after every `initialize`), `update(dt)`,
-`postUpdate(dt)` (after every `update`) and `swap` (on hot reload), with attributes edited in the Editor. Margo has no
-script component and no Editor, so a script is a class you write and call:
+`postUpdate(dt)` (after every `update`) and `swap` (on hot reload), with attributes edited in the Editor. `Scripts` in
+`@margoengine/ecs` has the same model with typed attributes, minus the Editor: a script type is `defineScript`, and any
+number of instances attach to an ECS entity.
 
 ```ts
-class Spinner {
-  constructor(readonly entity: typeof mesh, readonly speed = 1) {}
-  initialize() {}
-  update(delta: number) { this.entity.rotation.y += this.speed * delta; }
-  destroy() { this.entity.dispose(); }
-}
-const spinner = new Spinner(mesh, 2);
-spinner.initialize();
-const stop = engine.onFrame((time, delta) => spinner.update(delta));
-// later: stop(); spinner.destroy();
+import {World} from 'margoengine/ecs';
+import {Scripts, defineScript} from 'margoengine/ecs/scripts';
+
+const world = new World(64);
+const scripts = new Scripts(world);
+const spinner = defineScript({
+  name: 'spinner',
+  attributes: {speed: {type: 'number', default: 1, min: 0, max: 20}},
+  initialize() { this.state.angle = 0; },
+  update(dt) { this.state.angle += this.attributes.speed * dt; mesh.rotation.y = this.state.angle; },
+  destroy() { mesh.dispose(); },
+});
+scripts.register(spinner);
+const entity = world.create();
+const instance = scripts.add(entity, spinner, {values: {speed: 2}}); // entity.script.create('spinner', {attributes})
+const stop = engine.onFrame((time, delta) => scripts.update(delta));
+instance.attributes.speed = 4; // validated; runs onAttributeChange
+// later: stop(); scripts.dispose();
 ```
 
-Attributes become constructor arguments. The runnable example adds `postInitialize`, `postUpdate` and a host that
-orders them the way PlayCanvas does: [`03-script-lifecycle`](../examples/from-playcanvas/03-script-lifecycle.html). There
-is no `swap`; hot module reloading is the bundler's job.
+The hooks run with the instance as `this` (`entity`, `world`, `attributes`, `state`, `enabled`). `scripts.update(dt)`
+runs every `initialize`, then every `postInitialize`, then every `update`, then every `postUpdate`, ordered by
+`priority`. `fixedUpdate`, `onEnable`, `onDisable` and `onAttributeChange` exist too. `scripts.reload(newType)` is `swap`:
+instances keep their attribute values and `state`, and `swap(previous)` runs on the new type to migrate. `scripts.schema()`
+returns every type's attributes as data for an inspector. An ECS entity is not a mesh, so a script that moves a mesh holds it
+in `state`, in an attribute of type `entity`, or in a map you keep. The runnable example adds two bobbing boxes:
+[`03-script-lifecycle`](../examples/from-playcanvas/03-script-lifecycle.html). The
+[ecs README](../packages/ecs/README.md) has the rest, including `install(schedule)` to run scripts in a frame schedule.
 
 ## Assets and loading glTF
 
@@ -525,17 +542,12 @@ Where there is no Margo equivalent today:
 | --- | --- |
 | The Editor (scene editor, hierarchy panel, inspector, asset panel, attribute editing) | None. Scenes are code. `@margoengine/inspector` is a DOM entity inspector and a frame debugger, not a property editor for every material. |
 | Hosting, publishing and the asset pipeline in the cloud | None. Build with your bundler; `margo-convert` optimises and packages models offline. |
-| The component model on every entity (`entity.addComponent`, `entity.script`) | None on the scene graph. Use `@margoengine/ecs` or your own classes. |
-| Script attributes, `swap` hot reload, script loading order | None. Constructor arguments and your bundler's hot reload. |
-| `AssetRegistry` with tags, events and `asset.ready` | None. Loaders return promises; `AssetCache` caches for offline use. |
-| Template assets and prefab instantiation | None. Build in a function, or `cloneModel` a loaded glTF. |
-| `entity.tags`, `findByTag` | None. Keep your own `Set` and use `traverse`. |
-| Layers and render order (`Layer`, `camera.layers`, `scene.layers`) | None as a user concept. Extra scenes exist for overlays such as a HUD, and `engine.render({camera})` renders from another camera. |
-| More than one directional light | One directional light per engine. Point and spot lights are `Clustered`, with shadows from `@margoengine/clustered/shadows`. |
-| Several cameras as entities with priorities and viewport rects | One engine camera. `engine.render({camera})` and `@margoengine/core/extension` cover split screens ([split-screen](../examples/split-screen.html)). |
+| `AssetRegistry` with tags and `asset.ready` | No registry with tags. Loaders return promises; `AssetQueue` (`margoengine/scene/assets`) loads named assets with progress events and `retryFailed`; `AssetCache` caches for offline use. |
+| Template assets that instantiate into meshes | `cloneSubtree(mesh)` (`margoengine/scene/clone`) and `cloneModel` copy a node tree or a loaded glTF. `@margoengine/save` has prefab definitions with overrides and nesting, resolved to entity data you build meshes from; it does not create meshes itself. |
 | Ammo.js | Margo has its own kernel only. |
 | `EventHandler` on every object | None. Use `addEventListener`, `engine.onFrame` and `Input`. |
 | WebXR | Present (`@margoengine/xr`) but untested on a headset. |
+| `addComponent` on the scene graph, cameras as components with priorities | Meshes are nodes with no component slots; behaviour is `Scripts` or a `World` keyed to your meshes. One engine camera plus `engine.views` for more. Layers have no draw order of their own. |
 | Visual `screen` and `element` UI editing | None. The UI is code, in `@margoengine/ui`. |
 
 Margo-only things worth knowing about, since you will not find them in PlayCanvas: CAD navigation presets, GPU picking
