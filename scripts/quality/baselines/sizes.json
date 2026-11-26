@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20242449,
+  "total": 20245960,
   "history": [
     {
       "date": "2026-10-24",
@@ -12981,6 +12981,12 @@
       "commit": "52b406322",
       "reason": "New optional post entry, 0 to 3,556 B gzip: trail (TrailTexture, a fading trail texture painted by motion). Its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5d44c6f88",
+      "reason": "cameras gains the hologram entry (HologramOutput, HologramRig)",
+      "grew": 1
     }
   ],
   "items": {
@@ -13135,6 +13141,7 @@
     "@margoengine/cad/closed": 508,
     "@margoengine/cad/stage": 10590,
     "@margoengine/cameras": 4022,
+    "@margoengine/cameras/hologram": 3511,
     "@margoengine/cameras/layers": 1135,
     "@margoengine/cameras/offaxis": 2078,
     "@margoengine/cameras/origin": 1514,
