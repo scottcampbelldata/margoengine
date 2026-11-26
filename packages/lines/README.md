@@ -332,6 +332,40 @@ pointer.reset();
 
 Any `LineMaterial` option applies too. The far end is cut exactly at the limit, between two points, so a trail shrinks smoothly, and a target that stops fades out with the rest of its trail. Like every line a trail faces the camera, unless `normal` lays it flat: a strip of world width that holds still as the camera moves, for a tyre track. It lies facing that one direction, so it does not follow a hill, and its segments are not joined at a corner.
 
+## Freehand tubes: /tube-painter
+
+`TubePainter` from `@margoengine/lines/tube-painter` turns freehand 3D strokes into smooth tube meshes. `begin(point)`
+starts a stroke, `add(point, pressure)` extends it (a point closer than `minDistance`, default half the radius, is
+skipped and `add` returns false), `end()` finishes it, `undo()` drops the last stroke and `clear()` drops all. Feed it
+the point under a pointer ray with `rayPoint(origin, direction, distance)`, or an XR controller's tip position each
+frame while its trigger is held. `pressure` scales the radius (default 1), so a pen or a trigger can taper a stroke.
+`data()` returns `{positions, normals, indices}` of every stroke and `toGeometry()` a core `Geometry` for
+`engine.createMesh().setGeometry(...)`; both rebuild in linear time, so call them when a stroke changes, not per frame
+of a long stroke. Options: `radius` 0.01, `sides` 8 (3 to 64), `minDistance` radius / 2, `maxPoints` 4096 per stroke and
+`caps` true (flat discs close the ends). A stroke of fewer than two points draws nothing; a bad option throws a
+RangeError that names the fix.
+
+The tube is framed with rotation-minimizing frames, so it does not twist or flip along a curving path: the
+double-reflection method of Wang, Juettler, Zheng and Liu, "Computation of rotation minimizing frames", ACM Transactions
+on Graphics 27(1), 2008, after the parallel transport frame of Bishop, "There is more than one way to frame a curve",
+American Mathematical Monthly 82(3), 1975.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { TubePainter, rayPoint } from '@margoengine/lines/tube-painter';
+
+const canvas = document.createElement('canvas'); document.body.append(canvas);
+const engine = await Engine.create(canvas, { camera: { position: [0, 0, 4] } });
+const painter = new TubePainter({ radius: 0.05, sides: 12 });
+painter.begin(rayPoint([0, 0, 4], [0, 0, -1], 3));
+for (let i = 1; i <= 20; i++) painter.add([Math.sin(i / 4) * 0.8, i / 20 - 0.5, 1 + Math.cos(i / 4) * 0.3], 0.5 + i / 40);
+painter.end();
+const stroke = engine.createMesh().setGeometry(painter.toGeometry());
+engine.render();
+console.log(painter.strokeCount, stroke ? 'painted' : '');
+engine.dispose(); canvas.remove();
+```
+
 ## Massive batches
 
 `LineBatch` from `margoengine/lines/batch` draws millions of independent segments from one buffer in one draw: wire views of huge models, graphs, flow lines. Each segment is one 6-vertex instance of 32 bytes, where a `Line` segment is 78 vertices with joins, caps and dashes.

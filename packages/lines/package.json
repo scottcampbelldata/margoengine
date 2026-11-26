@@ -67,6 +67,10 @@
       "types": "./dist/debug.d.ts",
       "import": "./dist/debug.js"
     },
+    "./tube-painter": {
+      "types": "./dist/tube-painter.d.ts",
+      "import": "./dist/tube-painter.js"
+    },
     "./tiles": {
       "types": "./dist/tiles.d.ts",
       "import": "./dist/tiles.js"

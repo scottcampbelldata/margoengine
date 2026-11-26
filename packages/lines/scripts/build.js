@@ -26,6 +26,7 @@ await build({
       entry: {
         index: resolve(root, 'src/index.ts'),
         tiles: resolve(root, 'src/tiles.ts'),
+        'tube-painter': resolve(root, 'src/tube-painter.ts'),
         edges: resolve(root, 'src/edges.ts'),
         pick: resolve(root, 'src/pick.ts'),
         trail: resolve(root, 'src/trail.ts'),

@@ -1083,6 +1083,10 @@
       "types": "./dist/lines/debug.d.ts",
       "import": "./dist/lines/debug.js"
     },
+    "./lines/tube-painter": {
+      "types": "./dist/lines/tube-painter.d.ts",
+      "import": "./dist/lines/tube-painter.js"
+    },
     "./lines/tiles": {
       "types": "./dist/lines/tiles.d.ts",
       "import": "./dist/lines/tiles.js"
