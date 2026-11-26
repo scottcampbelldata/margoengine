@@ -441,6 +441,47 @@ void [drag,palm,rays,wall,tag];
 
 Hands report no buttons, so `Manipulator` picks up with a pinch (thumb tip to index tip within `pinch`, default 2 cm) and controllers with the squeeze button. Joint frames follow WebXR Hand Input: -Z toward the fingertips and -Y out of the palm.
 
+## Transform gizmo by controller ray
+
+`@margoengine/xr/gizmo` drives the transform gizmo of `@margoengine/controls/transform` from the controllers' target rays instead of a mouse. Point a controller at a handle and it lights; hold the trigger and the handle follows the ray under the gizmo's own constraints: arrows and scale cubes slide along their axis, plane handles over their plane, rings turn by the angle the ray sweeps on the ring's plane. Press the other controller's trigger during a grab and the two hands scale everything attached by the ratio of their separation. Snapping, modes, spaces, pivots, several objects and the gizmo's events are the gizmo's own, so they match the desktop.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `button` | `'select'` | The action that grabs: `'select'` (trigger, or a hand's pinch) or `'squeeze'` (grip). |
+| `hands` | `['left', 'right', 'none']` | Which input sources drive the gizmo, by handedness. |
+| `twoHandScale` | `true` | A second hand's press during a grab starts a two-hand scale. The one-hand drag ends where it is. |
+| `minSeparation` | `0.02` | Hands closer than this, in metres, at the second press do not start a scale. |
+| `onHover`, `onGrab`, `onRelease` | none | Called with `{controller, handle}`: the handle's name, `'scale'` for a two-hand scale, null when a hover ends. |
+| `signal` | none | Aborting disposes the driver. |
+
+```ts
+import {Engine,PbrMaterial,box as boxGeometry} from 'margoengine/core';
+import {TransformControls} from 'margoengine/controls/transform';
+import {XR} from 'margoengine/xr';
+import {XRGizmo} from 'margoengine/xr/gizmo';
+import {pulse} from 'margoengine/xr/layers';
+
+const canvas=document.createElement('canvas');document.body.append(canvas);
+const engine=await Engine.create(canvas,{backend:'webgpu'});
+const xr=await XR.create(engine);
+const box=engine.createMesh().setGeometry(boxGeometry()).setMaterial(new PbrMaterial({color:'#e8a33d'})).setScale([0.3,0.3,0.3]).setPosition([0,1.2,-1]);
+// A gizmo 25 cm long in the room (fixed: false), with arrows, rings and scale cubes; moves snap to 5 cm, turns to 15 degrees.
+const gizmo=new TransformControls(engine,{mode:'all',fixed:false,size:0.25,translationSnap:0.05,rotationSnap:Math.PI/12});
+gizmo.attach(box);
+// Point at a handle and hold the trigger to drag it; press the other trigger as well to scale with two hands.
+const drive=XRGizmo.attach(xr,gizmo,{
+  onGrab:({controller,handle})=>{console.log(controller.source.handedness,'holds',handle);void pulse(controller,0.4,30);},
+  onRelease:()=>console.log('now at',box.position.x,box.position.y,box.position.z,'scale',box.scale.x),
+});
+const enter=document.createElement('button');enter.textContent='Enter VR';document.body.append(enter);
+enter.onclick=()=>void xr.requestSession('immersive-vr').catch(engine.onError);
+addEventListener('pagehide',()=>{drive.dispose();gizmo.dispose();},{once:true});
+```
+
+`XRGizmo.attach(xr, gizmo, options)` takes the `XR` (any `{session, controllers, onFrame}` host) and any gizmo with `rayHover`, `rayDown`, `rayMove`, `rayUp`, `scaleDown` and `scaleTo`. `drive.grabbing` is the controller holding a handle, `drive.scaling` is true during a two-hand scale, and `dispose()` or `using` lets go and removes every listener. A bad host, gizmo or option throws a `RangeError` that names the fix. Poses are read in the XR reference space and taken as world space. A ray within 2.5 degrees of the arrow it drags has no steady nearest point on it, so there the arrow follows the hand's own travel along the axis and does not jump. A controller that leaves the session, or a session that ends, lets go. After a two-hand scale a hand that is still pressing presses again to grab. Not run on a headset: it is tested with simulated input sources and poses.
+
+Sources: WebXR Device API, W3C (input sources, `targetRaySpace`, select and squeeze events), https://www.w3.org/TR/webxr/; C. Ericson, Real-Time Collision Detection, 2005, section 5.1.8 (closest points of two lines), https://realtimecollisiondetection.net/; M. Mine, F. Brooks and C. Sequin, Moving Objects in Space: Exploiting Proprioception in Virtual-Environment Interaction, SIGGRAPH 1997 (two-handed scaling), https://doi.org/10.1145/258734.258747; D. Bowman and L. Hodges, An Evaluation of Techniques for Grabbing and Manipulating Remote Objects in Immersive Virtual Environments, I3D 1997 (ray-casting and HOMER), https://doi.org/10.1145/253284.253301; D. Mendes, F. Caputo, A. Giachetti, A. Ferreira and J. Jorge, A Survey on 3D Virtual Object Manipulation: From the Desktop to Immersive Virtual Environments, Computer Graphics Forum 2019 (widgets that separate degrees of freedom), https://doi.org/10.1111/cgf.13390.
+
 ## Preview tier refusal
 
 `XR.create` and `XR.attach` reject the small WebGL2 preview with linked `MargoError` code `unsupported`, so an awaited call inside `autoEngine` setup can trigger `loadCompat`. After installing the full layer, WebXR also needs its `/xr` route and browser session support as documented above. An already attached or disposed engine remains a state error.

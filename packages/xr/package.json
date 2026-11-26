@@ -107,6 +107,10 @@
     "./near": {
       "types": "./dist/near.d.ts",
       "import": "./dist/near.js"
+    },
+    "./gizmo": {
+      "types": "./dist/gizmo.d.ts",
+      "import": "./dist/gizmo.js"
     }
   },
   "files": [
