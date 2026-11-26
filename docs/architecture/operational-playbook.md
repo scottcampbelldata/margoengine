@@ -10428,3 +10428,11 @@ soil across each grid face at most once per step. Reported work gives raster-ver
 and the volume moved is auditable without a timer.
 The browser fixture rebuilds the Terrain mesh from the published bed sampler on demand. The same physical relief
 reaches WebGPU and WebGL2 without transferring a solver-specific render texture.
+
+Section 5, Tonemap colour enhancement (2026-11-26): `@margoengine/tonemap/enhance` patches a scene-linear step in front
+of the display curve of both Tonemap shaders (the SDR one clamps its result at 0, the ColorOutput one keeps colours
+below 0): channel mixer, dehaze, tone gains in stops, vibrance. Every step is written as input plus a correction, so
+defaults are bit-for-bit identity, and no option changes the pipeline. Evidence: `packages/tonemap/tests/enhance.test.js`
+and `enhance-browser.mjs` on the Windows workstation, WebGPU and the WebGL2 layer (16 HDR colour bars within 0.5 level
+of a CPU oracle, identity at defaults, same frame after a device restore, ColorOutput path draws without a GPU error);
+owner/lifetime fixture. Missing: GPU time; a Mac run; pixel values of the ColorOutput path against the oracle.

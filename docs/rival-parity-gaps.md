@@ -50,7 +50,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Mesh blending post process: soften seams where separate meshes meet (rocks on terrain), per-mesh tag and radius, depth-slope rejection | Babylon | MISSING | M |  |
 | Single-frame spatial upscaler (FSR 1 style edge-adaptive upscale plus sharpen) for devices without history (`taa/src/upscale.ts` is temporal) | Babylon | PARTIAL | S |  |
 | Mesh data debug view material (page read 2026-11-25): wireframe, vertex dots, both together, a checker on UV set 0 or 1 (colours, scale), vertex colours, a distinct colour per material id, plus a plain camera-lit shading mode. Margo has wireframe and normals only; no vertex dots, UV checker, vertex-colour or material-id view | Babylon MeshDebugPluginMaterial | PARTIAL | S |  |
-| Colour Enhance and channel mixer in the grade: shadows/highlights/midtones, vibrance, dehaze, 3x3 RGB mixer | PlayCanvas CameraFrame | PARTIAL | S |  |
+| Colour Enhance and channel mixer in the grade: shadows/highlights/midtones, vibrance, dehaze, 3x3 RGB mixer | - | DONE (`@margoengine/tonemap/enhance` `ColorEnhance`: shadows, midtones, highlights, vibrance, dehaze, 3x3 RGB mixer) | S |  |
 
 ## Lane B: particles, simulation and physics
 

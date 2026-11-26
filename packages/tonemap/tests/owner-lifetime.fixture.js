@@ -1,6 +1,7 @@
 // Owner/lifetime fixture for @margoengine/tonemap: the Tonemap plugin as an app attaches it, alone (constructor and
 // attach), with every built-in effect and auto exposure, with a Cube LUT, and with each extension (Grade, HueGrade,
-// CustomCurve in WGSL and as a sampled function, LocalExposure), which add their own buffers and textures to the plugin,
+// CustomCurve in WGSL and as a sampled function, LocalExposure,
+// ColorEnhance twice in one list), which add their own buffers and textures to the plugin,
 // with a Grade and a HueGrade in one list (KB-OWN-TONE2) and with a WGSL curve that ignores curveParams (KB-OWN-TONE3).
 // Not entries: parseCube, validateLUT, exportCube, sampleCurve, whiteBalanceGain and the shader builders are pure
 // functions of their input; an extension is owned by the Tonemap it is given to and has no registration of its own.
@@ -12,6 +13,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { HueGrade } = await load('../dist/hue.js');
   const { CustomCurve } = await load('../dist/custom.js');
   const { LocalExposure } = await load('../dist/local.js');
+  const { ColorEnhance } = await load('../dist/enhance.js');
   const entry = (name, make) => ({
     name,
     create({ engine }) {
@@ -63,5 +65,8 @@ export async function fixtures(load = (entry) => import(entry)) {
       Tonemap.attach(engine, { extensions: [new CustomCurve({ curve: (x) => x / (x + 1) })] }),
     ),
     entry('Tonemap.LocalExposure', (engine) => Tonemap.attach(engine, { extensions: [new LocalExposure()] })),
+    entry('Tonemap.ColorEnhance', (engine) =>
+      Tonemap.attach(engine, { extensions: [new ColorEnhance({ dehaze: 0.5 }), new ColorEnhance({ vibrance: 0.5 })] }),
+    ),
   ];
 }

@@ -2479,6 +2479,10 @@
       "types": "./dist/tonemap/3dl.d.ts",
       "import": "./dist/tonemap/3dl.js"
     },
+    "./tonemap/enhance": {
+      "types": "./dist/tonemap/enhance.d.ts",
+      "import": "./dist/tonemap/enhance.js"
+    },
     "./tween": {
       "types": "./dist/tween.d.ts",
       "import": "./dist/tween.js"

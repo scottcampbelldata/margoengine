@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20384777,
+  "total": 20386315,
   "history": [
     {
       "date": "2026-10-24",
@@ -13125,6 +13125,12 @@
       "commit": "d1c604eb12",
       "grew": 1,
       "reason": "EARTH-05 resolved pressure fields, geometric contact widths and native repose take the optional entry from 9206 to 9692 B gzip. Both modes share the existing coupling and native loader inside that tree-shakable entry, a split would duplicate both. Core plus Stage stays 24820 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(tonemap) ColorEnhance",
+      "reason": "new optional entry @margoengine/tonemap/enhance (ColorEnhance: channel mixer, shadows, midtones, highlights, vibrance, dehaze), 1,282 B min+gzip; no existing entry grows",
+      "grew": 1
     }
   ],
   "items": {
@@ -14548,6 +14554,7 @@
     "@margoengine/tonemap": 15124,
     "@margoengine/tonemap/3dl": 2510,
     "@margoengine/tonemap/custom": 1459,
+    "@margoengine/tonemap/enhance": 1538,
     "@margoengine/tonemap/export-cube": 1687,
     "@margoengine/tonemap/grade": 2682,
     "@margoengine/tonemap/hue": 3414,

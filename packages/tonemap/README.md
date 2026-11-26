@@ -324,6 +324,58 @@ The units are Margo's own, so values from another engine's colour curves do not 
 `extensions` takes any `TonemapExtension` (`key`, `patch(shader, binding, extra)` returning the WGSL with its code in,
 an optional `values()` for one uniform buffer at that binding); changing the list rebuilds the pipeline once.
 
+## Colour enhancement and channel mixer: `ColorEnhance`
+
+`@margoengine/tonemap/enhance` (1,282 B min+gzip, its own entry) grades the HDR picture before the display curve: a
+3x3 RGB channel mixer, dehaze, shadows, midtones and highlights in stops, and vibrance. Give it to Tonemap's
+`extensions`, alone or with `Grade`; its options are read every frame and no value rebuilds the pipeline.
+
+```ts
+import {createStage} from 'margoengine';
+import {Tonemap} from 'margoengine/tonemap';
+import {ColorEnhance} from 'margoengine/tonemap/enhance';
+const stage = await createStage('#viewport', {backend: 'webgpu'});
+const enhance = new ColorEnhance({shadows: 0.8, highlights: -0.6, vibrance: 0.3, dehaze: 0.2});
+Tonemap.attach(stage.engine, {curve: 'agx', extensions: [enhance]});
+enhance.options.midtones = 0.15; // stops at middle grey
+enhance.options.hazeColor = [0.7, 0.78, 0.9]; // the colour of a blue haze
+// The channel mixer, a row of input red, green and blue per output channel: a little green moved into red.
+enhance.options.mixer = {red: [0.85, 0.15, 0]};
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `mixer` | identity | `{red, green, blue}`, each `[r, g, b]` of -2 to 2: how much of each input channel goes into that output channel |
+| `shadows` | `0` | Stops for the dark tones, -3 to 3 (1/8 to 8 times the light) |
+| `midtones` | `0` | Stops at middle grey (18%), fading out over 7 stops either side, -1 to 1 |
+| `highlights` | `0` | Stops for the bright tones, -3 to 3 |
+| `vibrance` | `0` | -1 to 1: above 0 boosts dull colours more than saturated ones, below 0 mutes them |
+| `dehaze` | `0` | -1 to 1: above 0 removes haze (deeper shadows, clearer colour), below 0 adds it |
+| `hazeColor` | `[1, 1, 1]` | Colour of the haze after exposure, linear Rec.709, 0.01 to 16 per channel |
+
+A value out of range throws `RangeError`, a value of the wrong shape `TypeError`, at construction and on the frame
+that reads it.
+
+- **Order.** On scene-linear colour after exposure, white balance and `LocalExposure` (wherever it stands in the list),
+  before the curve, so `contrast`, `Grade` and a LUT come after. Inside: mixer, dehaze, tones, vibrance. Several
+  `ColorEnhance` apply in list order.
+- **Mixer.** `out = M in`, linear, so exposure does not change its result. A negative result is no light on an sRGB
+  canvas and a colour outside sRGB under an HDR `ColorOutput`; the other steps work on what is zero or above.
+- **Dehaze.** The haze model `I = J t + A (1 - t)` with the haze colour `A`. Above 0: `J = (I - A) / t + A` per
+  channel below `A`, with `t = 1 - 0.5 amount min(I / A)` over the three channels; channels at or above `A` stay.
+  Below 0: `t = 1 - 0.5 |amount|` and the model runs forwards. It reads one pixel, not a neighbourhood or depth: for
+  haze that follows distance use the fog of `@margoengine/environment`.
+- **Tones.** A gain on all channels, so hue is kept. With `e = log2(Y / 0.18)` (`Y` Rec.709 luma),
+  `low = smoothstep(-7, 0, e)` and `high = smoothstep(0, 7, e)`:
+  `stops = shadows (1 - low) + midtones (low - high) + highlights high`. No allowed setting reverses two tones.
+- **Vibrance.** `out = x + (x - Y) vibrance (1 - S)`, `S = (max - min) / max`: luminance is kept (unless a channel
+  clips at 0) and a fully saturated colour does not move.
+- **Not baked.** `exportCube` and `export3dl` take a display-linear `Grade`; `ColorEnhance` works on scene light and is
+  not in them.
+- **Checked on a real GPU** (`packages/tonemap/tests/enhance-browser.mjs`, WebGPU and the WebGL2 compatibility layer):
+  every control alone, all together and two in a list land within 0.5 of an 8-bit level of a CPU oracle of these
+  formulas; default options leave every pixel as without it.
+
 ## Custom curve: `CustomCurve`
 
 `@margoengine/tonemap/custom` replaces the display curve with your own, written in WGSL or as a JavaScript function.

@@ -9693,3 +9693,18 @@ bedrock. The volume ledger records material crossing the modeled bounds, compact
 
 The optional entry is 9,692 B gzip with a 9,983 B ceiling. Both Wasm assets are 5,820 B raw and 2,684 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+
+## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
+
+Enforced: mixer rows three numbers -2..2; shadows and highlights -3..3 stops; midtones -1..1 stops; vibrance and dehaze
+-1..1; haze colour 0.01..16 per channel. Applies to scene-linear colour after exposure, white balance and local
+exposure and before the display curve; auto exposure meters the source without it. The tone ranges are weights of Rec.709
+luminance over 7 stops each side of middle grey and are not adjustable: diffuse white (2.5 stops up) takes 29% of
+`highlights`, and 8 stops from grey a control has its full effect. Dehaze reads one pixel (no neighbourhood, transmission
+map or depth), is capped at half the haze model's strength, and leaves channels at or above the haze colour as they are
+when removing haze. Under an HDR `ColorOutput` a colour already outside sRGB keeps its part below zero through the
+nonlinear steps. Not baked by `exportCube` or `export3dl` (they take a display-linear `Grade`), and no
+settings-table rows. One 80-byte uniform buffer, one more pipeline when added to the list, no pass or texture; GPU time
+not measured. Measured: new entry 1,282 B min+gzip; tonemap root, grade, hue, core and stage unchanged. GPU frames are
+within 0.5 of an 8-bit level of a CPU oracle on WebGPU and the WebGL2 layer (`tests/enhance-browser.mjs`). Margo's
+units are its own, so values from another engine's colour enhancement do not carry over one to one.
