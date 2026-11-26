@@ -150,9 +150,10 @@ test('HullSolver: driven up and down, a box heaves as Cummins equation in the fr
   // Heave of amplitude F / |C - (m + A(w)) w^2 + i w B(w)| at each driving frequency w (Journee and Massie, Offshore
   // Hydromechanics, 2001, eqs. 6.20-6.31), A(w) and B(w) the box section's added mass and damping (Ursell-Tasai, the same
   // section for every station) times its length: the time-domain solver (its added mass at infinite frequency and its
-  // radiation memory, Cummins 1962) must give the frequency-domain answer. Its own errors: the kernel taken from 40
-  // frequencies with B(w) linear between them, and the step (the load taken at its middle, O((w dt)^2)); measured 0.6, 1.5
-  // and 2.1 percent at 60 steps a second (1 percent at 240), so a bound of 3 percent.
+  // radiation memory, Cummins 1962) must give the frequency-domain answer. Its own errors: the kernel taken from its
+  // frequencies with B(w) linear between them, and the step (the load taken where a held load is energy-neutral, the
+  // radiation carried there, O((w dt)^2)); measured 0.05, 0.57 and 0.35 percent at 60 steps a second, so a bound of 3
+  // percent leaves room for the strips alone.
   const rho = SEA_WATER,
     m = rho * L * B * T,
     C = rho * GRAVITY * L * B,
@@ -251,8 +252,8 @@ test('HullSolver: driven sideways, a box sways and rolls as the coupled frequenc
   // give that. Driven above the roll's resonance (about 1.6 rad/s), the drift sway has no spring to hold is taken out with
   // the fit. The roll's own oscillation near 1.6 rad/s is barely damped (its potential damping is small there), so a drive
   // switched on at once leaves it ringing through the fit, which then moved by 3 to 7 percent with the window; the drive
-  // grows over 10 s instead, and the fit holds within 0.1 percent from 20, 40 or 60 s. Measured 1.1 to 2.3 percent off at
-  // 60 steps a second and 0.2 to 0.5 at 240 (the step's own error, the load at its middle): a bound of 3 percent.
+  // grows over 10 s instead, and the fit holds within 0.1 percent from 20, 40 or 60 s. Measured 0.3 to 1.1 percent off at
+  // 60 steps a second and 0.05 to 0.9 at 240 (the step's own error and the strips' floor): a bound of 3 percent.
   const rho = SEA_WATER,
     m = rho * L * B * T,
     ixx = (m * (D * D + B * B)) / 12,
@@ -297,7 +298,9 @@ test('HullSolver: on a hull uneven fore and aft, heave drives pitch with the sig
   // its centre of mass (no trim) but its sections' added mass and damping are not even about it: heave and pitch couple
   // through A15 = sum a33 x and B15 = sum b33 x. Driven in heave, its pitch must follow with the phase that coupling gives
   // (a coupling of the wrong sign leaves the amplitudes and turns the pitch half a cycle): the coupled 2 by 2 equations, C
-  // taken from the hull's own load (finite differences of wettedLoads).
+  // taken from the hull's own load (finite differences of wettedLoads). Measured 1.2 percent off in heave and 1.0 in pitch
+  // at 60 steps a second (0.6 in pitch at 240): a bound of 3 percent. With the radiation force held from the step's start
+  // while the load is taken 7/16 of the way in, the pitch was 5.2 percent off, an error first order in the step.
   const rho = SEA_WATER,
     lf = Math.sqrt(8),
     [ba, bf] = [3, 1.5],
@@ -383,7 +386,136 @@ test('HullSolver: on a hull uneven fore and aft, heave drives pitch with the sig
     [X5, P5, 'pitch'],
   ])
     assert.ok(
-      Math.hypot(got[0] - want[0], got[1] - want[1]) <= 0.05 * Math.hypot(...want),
+      Math.hypot(got[0] - want[0], got[1] - want[1]) <= 0.03 * Math.hypot(...want),
       `${what}: ${got} against ${want}`,
     );
+});
+
+/** A box hull of `size` alone in still water of `density`, its body of `massProperties`, let go at `position` and `rotation`. */
+function released(size, massProperties, position, rotation, options = {}, density = SEA_WATER) {
+  const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -GRAVITY, 0] }),
+    box = physics.addBody(null, {
+      position,
+      rotation,
+      colliders: { shape: 'box', halfExtents: size.map((s) => s / 2), massProperties },
+    }),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(new HullSolver(), {
+        hulls: [{ row: box.row, mesh: boxMesh(size) }],
+        sea: { density, elevation: () => 0 },
+        ...options,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+  return { world, box };
+}
+
+/** The peaks of |x| in `signal`, one a half cycle (where the sign turns), from the value let go at. */
+function swings(signal, start) {
+  const peaks = [];
+  let best = Math.abs(start),
+    sign = Math.sign(start);
+  for (const x of signal) {
+    if (Math.sign(x) === -sign && x !== 0) {
+      peaks.push(best);
+      best = 0;
+      sign = -sign;
+    }
+    if (Math.sign(x) === sign) best = Math.max(best, Math.abs(x));
+  }
+  return peaks;
+}
+
+test('HullSolver: held up by its buoyancy alone, a hull heaves and rolls on at the amplitude it was let go at', () => {
+  // With neither added mass, radiation nor roll damping, nothing takes energy away: the load must be taken where a load held
+  // through the rigid step neither feeds the motion nor drains it. The rigid step moves a body by (v + F dt (s + 1) /
+  // (2 s m)) dt over its s substeps, so that is (s - 1) / (2 s) of the step, not its middle; taken at the middle, this box
+  // lost 31 percent of its heave in 8 cycles at 60 steps a second (a numerical damping of pi w dt / (2 s) a cycle). Its centre
+  // of mass is off its origin, which the pose taken on must turn about (rolling, the origin moves by w x r too).
+  const [l, d, b, t] = [1, 0.1, 0.3, 0.05],
+    m = 1000 * l * b * t,
+    mass = {
+      mass: m,
+      centerOfMass: [0, 0.0125, 0],
+      principalInertia: [0.236, (m * (l * l + b * b)) / 12, (m * (l * l + d * d)) / 12],
+    },
+    off = { addedMass: false, radiation: false, rollDamping: false },
+    heave = released([l, d, b], mass, [0, d / 2 - t + 0.01, 0], [0, 0, 0, 1], off, 1000),
+    angle = (10 * Math.PI) / 180,
+    roll = released([l, d, b], mass, [0, d / 2 - t, 0], [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)], off, 1000),
+    rest = d / 2 - t,
+    [ys, rs] = [[], []];
+  for (let f = 1; f <= 6 * 60; f++) {
+    heave.world.advance(f);
+    roll.world.advance(f);
+    ys.push(heave.box.position[1] - rest);
+    rs.push(2 * Math.asin(roll.box.rotation[0]));
+  }
+  const up = swings(ys, 0.01).slice(0, 17),
+    over = swings(rs, angle).slice(0, 13);
+  assert.ok(up.length === 17 && over.length === 13, `whole swings: ${up.length}, ${over.length}`);
+  for (const [peaks, from, what] of [
+    [up, 0.01, 'heave'],
+    [over, angle, 'roll'],
+  ])
+    for (const p of peaks) assert.ok(Math.abs(p - from) <= 0.01 * from, `${what} swings at ${p} against ${from}`);
+});
+
+test("HullSolver: a box let go heeled rolls down as Jung, Chang and Jo's measured box did", () => {
+  // Jung, Chang and Jo, "Viscous effect on the roll motion of a rectangular structure", J. Eng. Mech. 132(2), 2006, as Gu et
+  // al. report it (STAB 2015): a box 0.3 m wide, 0.1 m high, at 0.05 m draft in fresh water, let go at 15 degrees, measured
+  // a natural period of 0.93 s, an added roll inertia of 0.124 kg m^2/m and an equivalent linear damping b = 0.519 N m s/m
+  // from the trendline of its decay, d(phi) a swing = K phi_m (Bhattacharyya 1978; b = K T Delta GM / pi^2). Gu et al. give
+  // its roll inertia, 0.236 kg m^2/m; its centre of gravity is not published, so it is the one the measured period gives
+  // (GM = w^2 I' / (m g) = 0.1125 m, KG = 0.0625 m). Nothing here is fitted to the decay: the damping is the radiation
+  // memory and Ikeda's eddy and Kato's friction components (ITTC 7.5-02-07-04.5), from the box's shape alone.
+  // Measured here: K 0.307 against the box's 0.333 (7.7 percent less; Ikeda's eddy formula is an empirical fit to 2-D
+  // models, and Standing 1991 found it low on barges) and a period of 0.900 s (potential flow gives the box 0.097 kg m^2/m
+  // of added roll inertia, the experiment 0.124, Gu et al.'s viscous flow 0.128), so bounds of 12 and 5 percent. Without
+  // the viscous part the box rolls on with K 0.095, under a third of what was measured.
+  const [l, d, b, t] = [1, 0.1, 0.3, 0.05],
+    m = 1000 * l * b * t,
+    gm = 0.1125,
+    mass = {
+      mass: m,
+      centerOfMass: [0, 0.0625 - d / 2, 0],
+      principalInertia: [0.236 * l, (m * (l * l + b * b)) / 12, (m * (l * l + d * d)) / 12],
+    },
+    angle = (15 * Math.PI) / 180,
+    decay = (options) => {
+      const { world, box } = released(
+          [l, d, b],
+          mass,
+          [0, d / 2 - t, 0],
+          [Math.sin(angle / 2), 0, 0, Math.cos(angle / 2)],
+          { viscosity: 1.0e-6, ...options },
+          1000,
+        ),
+        roll = [],
+        times = [];
+      let last = 0;
+      for (let f = 1; f <= 8 * 60; f++) {
+        world.advance(f);
+        const now = 2 * Math.asin(box.rotation[0]);
+        if (last > 0 && now <= 0) times.push(f - now / (now - last));
+        last = now;
+        roll.push(now);
+      }
+      // The trendline through the origin of each swing's loss against its mean, down to 0.5 degrees.
+      const peaks = swings(roll, angle).map((p) => (p * 180) / Math.PI);
+      let xy = 0,
+        xx = 0;
+      for (let i = 0; i + 1 < peaks.length && peaks[i + 1] > 0.5; i++) {
+        const mean = (peaks[i] + peaks[i + 1]) / 2;
+        xy += mean * (peaks[i] - peaks[i + 1]);
+        xx += mean * mean;
+      }
+      return { K: xy / xx, period: (times.at(-1) - times[0]) / (times.length - 1) / 60 };
+    },
+    measured = (0.519 * Math.PI * Math.PI) / (0.93 * m * GRAVITY * gm),
+    full = decay({}),
+    potential = decay({ rollDamping: false });
+  assert.ok(Math.abs(full.K - measured) <= 0.12 * measured, `K ${full.K} against the measured ${measured}`);
+  assert.ok(Math.abs(full.period - 0.93) <= 0.05 * 0.93, `period ${full.period} s against the measured 0.93 s`);
+  assert.ok(potential.K < measured / 3, `without its eddies and friction: K ${potential.K}`);
 });

@@ -16,6 +16,7 @@
 // State: the hulls' motion histories (the radiation's memory). Each step's load and added mass otherwise come from where
 // the bodies are and the sea at that time.
 import { MargoError } from '@margoengine/math/errors';
+import { cos, sin } from '@margoengine/math/pinned';
 import {
   type Port,
   type RateLevel,
@@ -68,10 +69,20 @@ export interface HullParams {
   readonly radiation?: boolean;
   /** Seconds of a hull's motion its radiation remembers (default 20). */
   readonly memory?: number;
+  /**
+   * Damp a hull's roll by its bilge eddies and its skin friction (default true): Ikeda's component method (viscous.ts), the
+   * viscous part of roll damping that potential flow leaves out and that damps a real hull's roll most near its resonance.
+   */
+  readonly rollDamping?: boolean;
+  /** The water's kinematic viscosity, m^2/s (default 1.19e-6, sea water at 15 degrees C; fresh water 1.14e-6). */
+  readonly viscosity?: number;
 }
 
+/** Sea water's kinematic viscosity at 15 degrees C, m^2/s (ITTC 7.5-02-01-03, 2011). */
+export const SEA_VISCOSITY = 1.19e-6;
+
 /** The layout version of the `forces` port region and the state regions. */
-const HULL_LAYOUT = 2;
+const HULL_LAYOUT = 3;
 /** f64 words a hull keeps of its last step: a flag, the body's velocity (six) and the load held (six). */
 const CARRY_WORDS = 20;
 
@@ -90,9 +101,15 @@ export class HullSolver implements Solver<HullParams> {
   private radiation = true;
   private lags = 0;
   private history: Region | null = null;
+  /** Per hull: 1 once it has radiated, then the radiation force of its last step (body frame, force then moment). */
+  private radiated: Region | null = null;
   /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
   private carry: Region | null = null;
   private readonly memories = new Map<Hull, HullMemory>();
+  private rollDamping = true;
+  private viscosity = SEA_VISCOSITY;
+  /** Per hull: its eddy coefficient, its linear (friction) roll damping and its roll inertia with the water it carries. */
+  private readonly rolls = new Map<Hull, { eddy: number; linear: number; inertia: number }>();
 
   constructor(readonly id = 'hull') {}
 
@@ -151,12 +168,19 @@ export class HullSolver implements Solver<HullParams> {
     this.host = host;
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     this.radiation = params.radiation ?? true;
+    this.rollDamping = params.rollDamping ?? true;
+    this.viscosity = params.viscosity ?? SEA_VISCOSITY;
+    if (!(this.viscosity > 0 && Number.isFinite(this.viscosity)))
+      throw new RangeError(`A sea's viscosity is ${this.viscosity} m^2/s; pass a finite number above 0.`);
     const window = params.memory ?? 20;
     if (!(window > 0 && Number.isFinite(window)))
       throw new RangeError(`A hull's radiation memory is ${window} s; pass a finite number of seconds above 0.`);
     // Each hull's velocity (linear then angular), in its body's frame, at each of the last `lags` steps (by tick).
     this.lags = Math.ceil(window * rateOf(level));
-    if (this.radiation) this.history = host.allocate('history', hulls.length * this.lags * 6 * 8, 'f64', HULL_LAYOUT);
+    if (this.radiation) {
+      this.history = host.allocate('history', hulls.length * this.lags * 6 * 8, 'f64', HULL_LAYOUT);
+      this.radiated = host.allocate('radiated', hulls.length * 7 * 8, 'f64', HULL_LAYOUT);
+    }
     if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
   }
 
@@ -176,30 +200,49 @@ export class HullSolver implements Solver<HullParams> {
     for (const hull of this.hulls) {
       const at = hull.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
-      // The pose half a step on (the body's velocity and spin carried over half the step): the load held over a step is the
-      // load at its middle. Taken where the step starts, a restoring force held while the body moves through the step feeds
-      // the motion energy, a negative damping of about w dt / 4 of critical (the update's determinant 1 + (w dt)^2 / 2); at
-      // the middle the determinant is 1.
-      const half = 0.5 / rateOf(context.level),
+      // The pose a fraction of the step on (the body's velocity and spin carried over it), where a load held through the step
+      // neither feeds the motion energy nor takes it. The rigid step moves a body by (v + F dt (s + 1) / (2 s m)) dt over its
+      // s symplectic-Euler substeps (the `bodies` port gives s), so a restoring load -k x taken at x + theta v dt has the
+      // update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), which is 1 at theta = (s - 1) / (2 s): 7/16 of the
+      // step at 8 substeps. Taken at the middle, a hull lost about pi w dt / (2 s) of its amplitude a cycle (4.6 percent for a
+      // box heaving at 14 rad/s at 60 steps a second); taken where the step starts, it gained w dt (s - 1) / (2 s) times that.
+      const substeps = Math.max(1, bodies[at + 24]!),
+        ahead = (substeps - 1) / (2 * substeps) / rateOf(context.level),
         v = [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!],
         spin = [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!],
         start = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!] as const,
-        turned = turn(start, spin, half),
+        turned = turn(start, spin, ahead),
+        centre = [
+          bodies[at + 7]! + v[0]! * ahead,
+          bodies[at + 8]! + v[1]! * ahead,
+          bodies[at + 9]! + v[2]! * ahead,
+        ] as const,
+        // The origin rides with the centre of mass and turns about it.
+        offset = rotate(
+          turned,
+          rotate(
+            [-start[0], -start[1], -start[2], start[3]],
+            [bodies[at]! - bodies[at + 7]!, bodies[at + 1]! - bodies[at + 8]!, bodies[at + 2]! - bodies[at + 9]!],
+          ),
+        ),
         pose = {
-          position: [
-            bodies[at]! + v[0]! * half,
-            bodies[at + 1]! + v[1]! * half,
-            bodies[at + 2]! + v[2]! * half,
-          ] as const,
+          position: [centre[0] + offset[0], centre[1] + offset[1], centre[2] + offset[2]] as const,
           rotation: turned,
         },
-        centre = [
-          bodies[at + 7]! + v[0]! * half,
-          bodies[at + 8]! + v[1]! * half,
-          bodies[at + 9]! + v[2]! * half,
-        ] as const,
         loads = wettedLoads(hull.mesh, pose, this.sea, t, centre, this.loads);
-      if (this.radiation) this.radiate(hull, bodies, at, pose, centre, context.tick, 1 / rateOf(context.level), loads);
+      if (this.radiation)
+        this.radiate(
+          hull,
+          bodies,
+          at,
+          pose,
+          centre,
+          context.tick,
+          1 / rateOf(context.level),
+          ahead * rateOf(context.level),
+          loads,
+        );
+      if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, 1 / rateOf(context.level), loads);
       const w = hull.row * FORCE_WORDS,
         held = this.addedMass
           ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads)
@@ -224,6 +267,90 @@ export class HullSolver implements Solver<HullParams> {
   }
 
   /**
+   * Adds the viscous roll moment to `loads`: -(eddy |p| + linear) p about the body's x axis through its centre of mass, p its
+   * roll rate, taken implicitly in the damping alone (backward Euler against the roll inertia with the water carried), so a
+   * light hull's eddy damping stays stable at any step: -c p / (1 + dt c / I).
+   */
+  private dampRoll(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    dt: number,
+    loads: WettedLoads,
+  ): void {
+    const q = pose.rotation,
+      conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
+      local = rotate(conjugate, [
+        centre[0] - pose.position[0],
+        centre[1] - pose.position[1],
+        centre[2] - pose.position[2],
+      ]),
+      memory = this.memoryOf(hull, bodies, at, local, dt);
+    if (!memory) return;
+    let roll = this.rolls.get(hull);
+    if (!roll) {
+      roll = this.rollOf(hull, bodies, at, q, local, memory);
+      this.rolls.set(hull, roll);
+    }
+    const p = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0],
+      c = roll.eddy * Math.abs(p) + roll.linear,
+      moment = roll.inertia > 0 ? (-c * p) / (1 + (dt * c) / roll.inertia) : -c * p,
+      m = rotate(q, [moment, 0, 0]);
+    for (let k = 0; k < 3; k++) loads.torque[k]! += m[k]!;
+  }
+
+  /**
+   * A hull's roll at its still-water draft: its eddy coefficient, its skin friction at its natural roll frequency (the
+   * restoring moment from its wetted surface heeled a little each way at its still waterline, over its roll inertia with
+   * its added inertia at infinite frequency), and that inertia.
+   */
+  private rollOf(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    q: readonly [number, number, number, number],
+    local: Vec3,
+    memory: HullMemory,
+  ): { eddy: number; linear: number; inertia: number } {
+    const world = invertSymmetric([
+        bodies[at + 17]!,
+        bodies[at + 18]!,
+        bodies[at + 19]!,
+        bodies[at + 20]!,
+        bodies[at + 21]!,
+        bodies[at + 22]!,
+      ]),
+      axis = rotate(q, [1, 0, 0]);
+    let own = 0;
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) own += axis[i]! * world[i * 3 + j]! * axis[j]!;
+    const inertia = own + memory.lateralInfinite[3 * 6 + 3]!,
+      density = this.sea!.density ?? SEA_WATER,
+      still = { density, elevation: () => memory.waterline },
+      h = 1e-3,
+      heeled = (angle: number) => {
+        // Turned about the body's x axis through its centre of mass, which stays put.
+        const r = [sin(angle / 2), 0, 0, cos(angle / 2)] as const,
+          moved = rotate(r, local);
+        return wettedLoads(
+          hull.mesh,
+          { position: [local[0] - moved[0], local[1] - moved[1], local[2] - moved[2]], rotation: r },
+          still,
+          0,
+          local,
+        ).torque[0];
+      },
+      stiffness = -(heeled(h) - heeled(-h)) / (2 * h),
+      natural = stiffness > 0 && inertia > 0 ? Math.sqrt(stiffness / inertia) : 0;
+    return {
+      eddy: memory.rollEddy,
+      linear: memory.rollFriction * Math.sqrt(2 * Math.PI * this.viscosity * natural),
+      inertia,
+    };
+  }
+
+  /**
    * Adds the radiation force to `loads`: the hull's velocity (body frame: linear then angular) goes into its history at this
    * tick, and the force is minus each pair's kernel convolved with the history (trapezoid in time, the oldest lag dropped).
    */
@@ -235,6 +362,7 @@ export class HullSolver implements Solver<HullParams> {
     centre: Vec3,
     tick: number,
     dt: number,
+    theta: number,
     loads: WettedLoads,
   ): void {
     const q = pose.rotation,
@@ -267,6 +395,15 @@ export class HullSolver implements Solver<HullParams> {
       force[i]! -= ij * dt;
       if (i !== j) force[j]! -= ji * dt;
     }
+    // The convolution ends at the step's start (the last velocity the history holds); the load is taken theta of the step on,
+    // so the force is carried there along the line through its last two values. Held from the start, it lagged the load by
+    // theta dt, a phase error of w theta dt that moved a driven hull's damped response first order in the step (a heaving
+    // and pitching hull 9 percent off at 60 steps a second, 1 percent with the force carried on).
+    const last = new Float64Array(this.host!.memory.buffer, this.radiated!.byteOffset + index * 7 * 8, 7),
+      now = force.slice();
+    if (last[0] === 1) for (let k = 0; k < 6; k++) force[k] = now[k]! + theta * (now[k]! - last[1 + k]!);
+    last[0] = 1;
+    last.set(now, 1);
     // Into world axes.
     const f = rotate(q, [force[0]!, force[1]!, force[2]!]),
       m = rotate(q, [force[3]!, force[4]!, force[5]!]);
@@ -389,7 +526,7 @@ export class HullSolver implements Solver<HullParams> {
 
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [this.history, this.carry].filter((r): r is Region => r !== null);
+    return [this.history, this.radiated, this.carry].filter((r): r is Region => r !== null);
   }
 
   extraState(): readonly Region[] {

@@ -41,7 +41,7 @@ export const BODY_FORCES_FIELD: FieldDescriptor;
 
 export const BODY_IMPULSES_FIELD: FieldDescriptor;
 
-export const BODY_WORDS = 24;
+export const BODY_WORDS = 25;
 
 export const BYTES: Readonly<Record<ElementType, number>>;
 

@@ -87,7 +87,7 @@ test('the rigid solver keeps working when another solver added mid-run grows the
   inWorld.physics.dispose();
 });
 
-test('the bodies port holds every body: pose, centre of mass, velocities, inverse mass and world inverse inertia', () => {
+test('the bodies port holds every body: pose, centre of mass, velocities, inverse mass, world inverse inertia and substeps', () => {
   const { physics, capsule } = scene();
   let published = null;
   const reader = {
@@ -115,7 +115,12 @@ test('the bodies port holds every body: pose, centre of mass, velocities, invers
   assert.deepEqual([...record.subarray(3, 7)], capsule.rotation.map(f));
   assert.deepEqual([...record.subarray(10, 13)], capsule.linearVelocity.map(f));
   assert.equal(record[16], f(1 / capsule.mass));
+  // The substeps its last step took: the world's times 2^k for its island's level (a held force moves it by
+  // (v + F dt (s + 1) / (2 s m)) dt, which a solver holding a load from its pose needs).
+  assert.equal(record[24], physics.substeps * 2 ** physics.kernel.columns.substepLevel[capsule.row], 'its substeps');
+  assert.ok(record[24] >= physics.substeps);
   assert.equal(published[0 * BODY_WORDS + 23], 0, 'the fixed floor is not moving');
+  assert.equal(published[0 * BODY_WORDS + 24], 0, 'and takes no substeps');
   physics.dispose();
 });
 

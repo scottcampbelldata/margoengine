@@ -180,6 +180,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   costs more to step: see docs/limits.md. Regression: the test above, `soft-kernel/tests/threads.rs`, and in soft.test.js
   "an inextensible sheet holds its threads within 0.1 percent at any pass count and load".
 
+### Fixed 2026-11-25: a hull's motion lost energy to its own step (KB-SEA-STEPDAMP1, physics seakeeping)
+
+- **Repro:** `packages/physics/tests/coupling/seakeeping.test.js`, "held up by its buoyancy alone, a hull heaves and rolls
+  on at the amplitude it was let go at", and "on a hull uneven fore and aft". A box held up by its buoyancy alone lost 31
+  percent of its heave in 8 cycles at 60 steps a second (half that at 120), and a driven hull's pitch was 5.2 percent off.
+- **Cause:** three errors first order in the step. The hull's load was taken at the middle of the step, energy-neutral
+  only if the rigid step integrated a held force exactly; it takes 8 symplectic-Euler substeps, which move a body by
+  (v + F dt (s + 1) / (2 s m)) dt, so the neutral point is (s - 1) / (2 s) of the step. The pose there moved the body's
+  origin with its centre of mass's velocity, leaving out the spin's w x r when the two differ. And the radiation force,
+  convolved up to the step's start, lagged the load by that fraction of a step.
+- **Fixed:** the rigid solver publishes each body's substeps in the `bodies` port (word 24); the hull takes its load at
+  (s - 1) / (2 s) of the step, turns the origin about the centre of mass, and carries the radiation force to the same
+  point along its last two values (kept as state). Regression: the tests above (the pitch test's bound is 3 percent).
+
 ### Fixed 2026-11-25: a hull's heave drove its pitch the wrong way (KB-SEA-COUPLESIGN1, physics seakeeping)
 
 - **Repro:** `packages/physics/tests/coupling/seakeeping.test.js`, "on a hull uneven fore and aft, heave drives pitch with

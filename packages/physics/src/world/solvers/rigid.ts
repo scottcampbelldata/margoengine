@@ -5,7 +5,10 @@
 // Fields. The solver owns `bodies` and `bodyImpulses`:
 // - `bodies` (a body set, one record of `BODY_WORDS` f32 per kernel body row): the origin's position, the rotation, the
 //   centre of mass, the linear and angular velocity, the inverse mass and the inverse inertia in world axes (its six distinct
-//   entries), and whether the row is a moving body. A reader reads it at the coupling tick.
+//   entries), whether the row is a moving body, and the substeps its last step took (the world's substeps times 2^k for its
+//   island's level, `substepLevel`): a held force (`bodyForces`) moves a body by (v + F dt (s + 1) / (2 s m)) dt over a step of
+//   s symplectic-Euler substeps, so a solver that holds a load from the body's pose takes it where that pose is energy-neutral
+//   (a hull's load at (s - 1) / (2 s) of the step). A reader reads it at the coupling tick.
 // - `bodyImpulses` (a body set, `IMPULSE_WORDS` words per row): what other solvers push the bodies with, as a linear impulse
 //   (N s) and an angular impulse about the body's centre of mass (N m s), world axes. A load at a point p is the pair
 //   (J, (p - c) x J), c the centre of mass in `bodies`: pairs add, so the world sums the contributions by contributor and then
@@ -40,13 +43,13 @@ import {
 } from '../solver.js';
 
 /** f32 words of a body's record in the `bodies` port. */
-export const BODY_WORDS = 24;
+export const BODY_WORDS = 25;
 /** f64 words of a body's record in the `bodyImpulses` port: linear impulse then angular impulse about the centre of mass. */
 export const IMPULSE_WORDS = 6;
 /** f64 words of a body's record in the `bodyForces` port: force then torque about the centre of mass. */
 export const FORCE_WORDS = 6;
 /** The layout version of the `bodies` port (contributors to `bodyImpulses` lay out their own regions as `IMPULSE_WORDS` per row). */
-const BODIES_LAYOUT = 1;
+const BODIES_LAYOUT = 2;
 
 /** The `bodies` field: every rigid body's pose, velocity, mass and inertia. */
 export const BODIES_FIELD: FieldDescriptor = {
@@ -230,6 +233,7 @@ export class RigidSolver implements Solver<RigidSolverParams> {
       out[at + 16] = moving ? c.inverseMass[row]! : 0;
       if (moving) worldInverseInertia(c, row, out, at + 17);
       out[at + 23] = moving;
+      out[at + 24] = moving ? kernel.substeps * (1 << c.substepLevel![row]!) : 0;
     }
     // The world sets the cell of every port to the solver's own.
     return [{ field: BODIES_FIELD.name, region: this.bodies!, tick, cell: [0, 0, 0] }];

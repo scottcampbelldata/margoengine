@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   addedMassInfinite,
+  eddyRollCoefficient,
+  frictionGirth,
   GRAVITY,
   heaveAddedMassInfinite,
   heaveSection,
@@ -300,4 +302,20 @@ test('a swaying and rolling section: its waves give its damping again, its coupl
     'a half circle rolls freely',
   );
   assert.ok(circle.sway.damping > 0 && circle.sway.addedMass > 0, 'and sways against the water');
+});
+
+test("a rolling section's viscous damping: a box sheds eddies at its corners, a half circle about its centre none", () => {
+  // Ikeda's eddy coefficient (ITTC 7.5-02-07-04.5 eqs. 43-44) comes from the pressure of the flow separating where the hull
+  // turns: a half circle rolling about its centre moves no water at all and separates nowhere, while a box's sharp corners
+  // shed the most. Kato's skin friction takes the girth S and its mean distance r from the axis: a half circle of radius R
+  // about its centre has S r^2 = pi R^3.
+  const circle = lewisForm(2, 1, Math.PI / 2),
+    box = lewisForm(0.3, 0.05, 0.015),
+    shed = eddyRollCoefficient(box, 0.3, 0.05, -0.0125);
+  assert.ok(shed > 50, `a box sheds: C_R ${shed}`);
+  assert.ok(eddyRollCoefficient(circle, 2, 1, 0) < 1e-4 * shed, 'a half circle about its centre sheds none');
+  // The deeper the roll axis, the more of the bilge moves across the flow.
+  assert.ok(eddyRollCoefficient(box, 0.3, 0.05, 0.025) > eddyRollCoefficient(box, 0.3, 0.05, -0.0125));
+  const girth = frictionGirth(circle, 0);
+  assert.ok(Math.abs(girth - Math.PI) <= 2e-3 * Math.PI, `S r^2 ${girth} against pi`);
 });

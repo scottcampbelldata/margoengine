@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19146080,
+  "total": 19147987,
   "history": [
     {
       "date": "2026-10-24",
@@ -12459,6 +12459,12 @@
       "commit": "e050200034",
       "reason": "FIRE-06 adds an optional thermal entry at 6674 B gzip. Both SIMD builds are 5,120 B gzip and load on demand. The heat-haze entry grows from 11,008 B to 13299 B gzip for volume upload, voxel ray integration, depth handling and resource ownership. Splitting the thermal entry would duplicate the two build selectors. Splitting the heat-haze entry would duplicate its post-stack, depth and texture handling. Core plus stage stays at 24,820 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "SEA-08 roll damping",
+      "grew": 2,
+      "reason": "@margoengine/physics/seakeeping: each section's viscous roll damping (Ikeda's eddy-making coefficient with its Lewis-form terms, Kato's skin friction on the section's girth), the hull's natural roll frequency for it, the implicit roll moment, and the load taken where a held load is energy-neutral with the radiation force carried there (KB-SEA-STEPDAMP1); measured gzip (Mac build) 10069 B, was 8701; without them a hull rolls on several times longer than a real one and every hull lost energy to its own step. Budget (measured + max(3%, 256 B)): 8962 to 10371 B. @margoengine/physics/world: the rigid solver publishes each body's substeps in the bodies port (one word); measured 16493 B on this Mac after the shared-memory loader (16490 budget), budget 16490 to 16988 B (measured + 3%)."
     }
   ],
   "items": {
@@ -13258,14 +13264,14 @@
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/sea": 3437,
-    "@margoengine/physics/seakeeping": 8962,
+    "@margoengine/physics/seakeeping": 10371,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/waves": 8575,
-    "@margoengine/physics/world": 16490,
+    "@margoengine/physics/world": 16988,
     "@margoengine/physics2d": 21360,
     "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 19183,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,

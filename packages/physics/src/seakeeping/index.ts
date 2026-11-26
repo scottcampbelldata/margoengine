@@ -11,7 +11,8 @@ export {
   type WettedLoads,
   wettedLoads,
 } from './wetted.js';
-export { type Hull, type HullParams, HullSolver } from './solver.js';
+export { type Hull, type HullParams, HullSolver, SEA_VISCOSITY } from './solver.js';
+export { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 export {
   addedMassInfinite,
   heaveAddedMassInfinite,
