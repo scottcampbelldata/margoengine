@@ -500,16 +500,20 @@ Finite instantaneous oil releases now use Fay's three radial laws, with mass con
 snapshot replay checked separately. Stiver–Mackay evaporation uses the integrated Fay area and preserves a separate
 vapour ledger. The integrated exposure matches an independent quadrature of the radius laws at two simulation rates.
 The remaining oil work includes film thickness, dispersion into droplets, and independent measured slick-extent and
-evaporation validation. Scale-dependent dye diffusion remains open.
+evaporation validation.
 
 Vertical tracers now accept a depth profile and include the diffusivity-gradient drift and midpoint variance from
 Visser (1997). For Coastal Mixing and Optics Experiment 4, the independent EPSONDE microstructure samples drive
 the profile. The local simulated broadening falls in the range inferred from separate Rhodamine fluorescence surveys.
-This case does not assess migration caused by solar heating or dispersion across the whole shelf.
+Migration under solar heating and shelf-scale dispersion remain open.
 
 Tracers can use wave-averaged Stokes transport from a fixed directional spectrum and a separate mean current.
 The crossed-wave test checks the directional sum and depth decay in finite and deep water. The normal live-velocity
 mode still follows the SEA-04 wake potential. Independent wave-induced drift measurements remain open.
+
+Horizontal dispersion can now increase with release scale. The benchmark uses Poje et al.'s separate drifter data
+for calibration and Okubo's nine Cape Kennedy dye extents for comparison. Each independent dye extent is closer
+with the scale law than with the constant reference diffusivity. The largest discrepancy is a factor of 2.34 in extent.
 
 ## Verification passes
 

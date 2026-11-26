@@ -266,6 +266,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   the run replays exactly. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after
   building Physics. [Breivik, Janssen and Bidlot (2014), equations 1 and 4](https://doi.org/10.1175/JPO-D-14-0020.1).
 
+- Horizontal tracer dispersion (SEA-15, 2026-11-26). The four-thirds law reproduces cubic radial variance from
+  two release times and replays exactly. A separate calibration on Poje's drifters places all nine held-out Cape
+  Kennedy dye extents closer to observation than constant reference diffusivity. RMS log extent error changes
+  from 1.996 to 0.537. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
+  [Poje et al. (2014), Figure 6](https://doi.org/10.1073/pnas.1402452111),
+  [Okubo (1971), Table 1](https://doi.org/10.1016/0011-7471(71)90046-5).
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes
