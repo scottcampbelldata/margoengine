@@ -563,6 +563,29 @@ export interface LoadedGroup {
     properties?: Record<string, number | number[]>;
 }
 
+export interface LoadedMMD {
+    format: 'PMD' | 'PMX';
+    version: number;
+    name: string;
+    nameEnglish: string;
+    comment: string;
+    commentEnglish: string;
+    geometry: LoadedGeometry;
+    joints: Uint16Array;
+    weights: Float32Array;
+    sdef?: {
+        vertices: Uint32Array;
+        data: Float32Array;
+    };
+    materials: MMDMaterial[];
+    textures: string[];
+    bones: MMDBone[];
+    morphs: MMDMorph[];
+    rigidBodies: MMDRigidBody[];
+    joints_: MMDJoint[];
+    warnings: string[];
+}
+
 export interface LoadedMeshes {
     meshes: Mesh[];
     geometries: Geometry[];
@@ -607,6 +630,43 @@ export interface LoadedTilt {
     version: number;
 }
 
+export interface LoadedVMD {
+    modelName: string;
+    fps: 30;
+    bones: VMDBoneTrack[];
+    morphs: VMDMorphTrack[];
+    camera: VMDCameraTrack | undefined;
+    lights: {
+        frame: number;
+        color: [number, number, number];
+        position: [number, number, number];
+    }[];
+    shadows: {
+        frame: number;
+        mode: number;
+        distance: number;
+    }[];
+    ik: {
+        frame: number;
+        show: boolean;
+        states: {
+            name: string;
+            enabled: boolean;
+        }[];
+    }[];
+    duration: number;
+}
+
+export interface LoadedX {
+    format: 'text' | 'binary';
+    frames: XFrame[];
+    meshes: XMesh[];
+    materials: XMaterial[];
+    animationSets: XAnimationSet[];
+    ticksPerSecond: number;
+    warnings: string[];
+}
+
 export class LoaderError extends Error {
     readonly format: string;
     readonly code: LoaderErrorCode;
@@ -622,6 +682,102 @@ export class LoaderError extends Error {
 export type LoaderErrorCode = 'header' | 'truncated' | 'limit' | 'range' | 'syntax' | 'unsupported' | 'zip' | 'aborted' | 'fetch' | 'url';
 
 export type LoaderFormat = 'ply' | '3mf' | 'pcd' | 'off' | 'xyz' | 'vtk' | 'usda' | 'usdz';
+
+export interface MMDBone {
+    name: string;
+    nameEnglish: string;
+    position: [number, number, number];
+    parent: number;
+    layer: number;
+    rotatable: boolean;
+    translatable: boolean;
+    visible: boolean;
+    type: number;
+    tail: number;
+    tailOffset?: [number, number, number];
+    inheritRotation: boolean;
+    inheritTranslation: boolean;
+    inherit: number;
+    inheritRate: number;
+    afterPhysics: boolean;
+    ik?: {
+        target: number;
+        iterations: number;
+        limitAngle: number;
+        links: {
+            bone: number;
+            limit?: {
+                min: number[];
+                max: number[];
+            };
+        }[];
+    };
+}
+
+export interface MMDJoint {
+    name: string;
+    nameEnglish: string;
+    type: number;
+    bodyA: number;
+    bodyB: number;
+    position: [number, number, number];
+    rotation: [number, number, number];
+    limitPositionMin: [number, number, number];
+    limitPositionMax: [number, number, number];
+    limitRotationMin: [number, number, number];
+    limitRotationMax: [number, number, number];
+    springPosition: [number, number, number];
+    springRotation: [number, number, number];
+}
+
+export interface MMDMaterial {
+    name: string;
+    nameEnglish: string;
+    diffuse: [number, number, number, number];
+    specular: [number, number, number];
+    specularPower: number;
+    ambient: [number, number, number];
+    doubleSided: boolean;
+    edge: boolean;
+    edgeColor: [number, number, number, number];
+    edgeSize: number;
+    texture?: string;
+    sphere?: string;
+    sphereMode: number;
+    toon?: number | string;
+    triangles: number;
+}
+
+export interface MMDMorph {
+    name: string;
+    nameEnglish: string;
+    panel: number;
+    type: 'group' | 'vertex' | 'bone' | 'uv' | 'uv1' | 'uv2' | 'uv3' | 'uv4' | 'material' | 'flip' | 'impulse';
+    offsets: Record<string, unknown>[];
+}
+
+export interface MMDOptions extends ParseLimits {
+    scale?: number;
+    rightHanded?: boolean;
+}
+
+export interface MMDRigidBody {
+    name: string;
+    nameEnglish: string;
+    bone: number;
+    group: number;
+    noCollide: number;
+    shape: 'sphere' | 'box' | 'capsule';
+    size: [number, number, number];
+    position: [number, number, number];
+    rotation: [number, number, number];
+    mass: number;
+    linearDamping: number;
+    angularDamping: number;
+    restitution: number;
+    friction: number;
+    mode: 'bone' | 'physics' | 'physicsBone';
+}
 
 export interface MTLMap {
     file: string;
@@ -946,7 +1102,96 @@ export type USDValue = number | string | boolean | USDValue[] | {
     asset: string;
 };
 
+export interface VMDBoneTrack {
+    name: string;
+    frames: Uint32Array;
+    positions: Float32Array;
+    rotations: Float32Array;
+    interpolation: Uint8Array;
+}
+
+export interface VMDCameraTrack {
+    frames: Uint32Array;
+    distance: Float32Array;
+    position: Float32Array;
+    rotation: Float32Array;
+    fov: Float32Array;
+    perspective: Uint8Array;
+    interpolation: Uint8Array;
+}
+
+export interface VMDMorphTrack {
+    name: string;
+    frames: Uint32Array;
+    weights: Float32Array;
+}
+
+export interface VMDOptions {
+    scale?: number;
+    rightHanded?: boolean;
+    maxKeys?: number;
+}
+
 export interface VTKOptions extends ParseLimits {
+}
+
+export interface XAnimation {
+    frame: string;
+    rotation?: XTrack;
+    scale?: XTrack;
+    position?: XTrack;
+    matrix?: XTrack;
+}
+
+export interface XAnimationSet {
+    name: string;
+    animations: XAnimation[];
+    duration: number;
+}
+
+export interface XBone {
+    name: string;
+    frame: number;
+    inverseBind: number[];
+}
+
+export interface XFrame {
+    name: string;
+    parent: number;
+    matrix: number[];
+    world: number[];
+    meshes: number[];
+}
+
+export interface XMaterial {
+    name: string;
+    color: [number, number, number, number];
+    specularPower: number;
+    specular: [number, number, number];
+    emissive: [number, number, number];
+    texture?: string;
+}
+
+export interface XMesh {
+    name: string;
+    geometry: LoadedGeometry;
+    materials: XMaterial[];
+    joints?: Uint16Array;
+    weights?: Float32Array;
+    joints1?: Uint16Array;
+    weights1?: Float32Array;
+    bones: XBone[];
+}
+
+export interface XOptions extends ParseLimits {
+    rightHanded?: boolean;
+    maxDepth?: number;
+    maxNodes?: number;
+}
+
+export interface XTrack {
+    times: Float64Array;
+    values: Float32Array;
 }
 
 export type XYZLayout = 'auto' | 'xyz' | 'xyz-rgb' | 'xyz-normal' | 'xyz-normal-rgb' | 'xyz-intensity' | 'xyz-intensity-rgb';
@@ -1021,6 +1266,8 @@ export function parseDAE(input: BinaryInput | string, options?: DAEParseOptions)
 
 export function parseDXF(input: BinaryInput, options?: DXFOptions): DXFResult;
 
+export function parseMMD(input: BinaryInput, options?: MMDOptions): LoadedMMD;
+
 export function parseMTL(input: BinaryInput | string, options?: MTLParseOptions): MTLMaterial[];
 
 export function parseOBJ(input: BinaryInput | string, options?: OBJParseOptions): Promise<LoadedOBJ>;
@@ -1034,6 +1281,10 @@ export function parsePCDHeader(input: BinaryInput, options?: ParseLimits): PCDHe
 export function parsePLY(input: BinaryInput, options?: PLYOptions): LoadedGeometry;
 
 export function parsePLYHeader(input: BinaryInput): PLYHeader;
+
+export function parsePMD(input: BinaryInput, options?: MMDOptions): LoadedMMD;
+
+export function parsePMX(input: BinaryInput, options?: MMDOptions): LoadedMMD;
 
 export function parsePRWM(input: BinaryInput, options?: PRWMOptions): PRWMGeometry;
 
@@ -1052,7 +1303,11 @@ export function parseUSDA(input: string | BinaryInput, options?: USDOptions): Lo
 
 export function parseUSDZ(input: BinaryInput, options?: USDOptions): Promise<LoadedGeometry>;
 
+export function parseVMD(input: BinaryInput, options?: VMDOptions): LoadedVMD;
+
 export function parseVTK(input: BinaryInput, options?: VTKOptions): LoadedGeometry;
+
+export function parseX(input: BinaryInput | string, options?: XOptions): LoadedX;
 
 export function parseXYZ(input: BinaryInput, options?: XYZOptions): LoadedGeometry;
 
@@ -1068,6 +1323,11 @@ export function readZipEntry(input: BinaryInput, entry: ZipEntry, options?: ZipO
 
 export function sampleDAESampler(sampler: DAESampler, time: number, out?: Float64Array): Float64Array;
 
+export function sampleVMDBone(track: VMDBoneTrack, frame: number): {
+    position: [number, number, number];
+    rotation: [number, number, number, number];
+} | undefined;
+
 export function splitTriangles(triangles: Uint32Array, vertexCount: number, flat: boolean, limit?: number): {
     start: number;
     count: number;
@@ -1078,6 +1338,8 @@ export function tmxLayerQuads(map: LoadedTMX, layer: TMXTileLayer, options?: Til
 export function toGeometries(loaded: LoadedGeometry, options?: ToGeometryOptions): Geometry[];
 
 export function toGeometry(loaded: LoadedGeometry, options?: ToGeometryOptions): Geometry;
+
+export function vmdBezier(x1: number, y1: number, x2: number, y2: number, t: number): number;
 
 // Not exported from this entry, but used by the exports above:
 

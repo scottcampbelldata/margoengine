@@ -1703,6 +1703,10 @@
       "types": "./dist/geometry/utils.d.ts",
       "import": "./dist/geometry/utils.js"
     },
+    "./geometry/node-graph": {
+      "types": "./dist/geometry/node-graph.d.ts",
+      "import": "./dist/geometry/node-graph.js"
+    },
     "./geometry/extras": {
       "types": "./dist/geometry/extras.d.ts",
       "import": "./dist/geometry/extras.js"
@@ -2374,6 +2378,14 @@
     "./loaders/vrml": {
       "types": "./dist/loaders/vrml.d.ts",
       "import": "./dist/loaders/vrml.js"
+    },
+    "./loaders/mmd": {
+      "types": "./dist/loaders/mmd.d.ts",
+      "import": "./dist/loaders/mmd.js"
+    },
+    "./loaders/xfile": {
+      "types": "./dist/loaders/xfile.d.ts",
+      "import": "./dist/loaders/xfile.js"
     },
     "./loaders/babylon": {
       "types": "./dist/loaders/babylon.d.ts",
