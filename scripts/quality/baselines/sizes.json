@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20460638,
+  "total": 20470502,
   "history": [
     {
       "date": "2026-10-24",
@@ -13221,6 +13221,12 @@
       "commit": "b9293fe8a0",
       "grew": 1,
       "reason": "SOFT-04 adds nine directional stress limits and their independently filtered tear histories in the native solver, moving the soft entry from 131482 to 133213 B gzip. @margoengine/physics/soft: 132662 to 137210 B ceiling (133213 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e3acc7611",
+      "reason": "New optional post entry, 0 to 9,576 B gzip: mesh-blend (MeshBlend, screen-space mesh blending with per-mesh tags and radii and depth-slope rejection). Most of it is the PostStack it attaches to, as in contact-shadows (8,001) and curvature (10,677); its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14153,6 +14159,7 @@
     "@margoengine/post/lut1d": 10009,
     "@margoengine/post/mask": 7322,
     "@margoengine/post/material-decals": 10327,
+    "@margoengine/post/mesh-blend": 9864,
     "@margoengine/post/motion-blur": 9318,
     "@margoengine/post/mrt": 4647,
     "@margoengine/post/outline": 7282,
