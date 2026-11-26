@@ -300,6 +300,7 @@ impl World {
             }
             self.integrate_velocities(h);
             tick(self, 10, inner);
+            self.hold_multibodies();
             self.refresh_joints();
             self.warm_start();
             self.warm_start_joints();
@@ -327,6 +328,7 @@ impl World {
                 // With no relaxing pass the last pushing one is the last word, and friction is always solved in it.
                 self.solve_contacts(h, stiffness, true, substep as usize, least, relaxes == 0 && pass == all);
             }
+            self.spring_multibodies(h);
             self.clamp_speeds();
             tick(self, 9, inner);
             self.integrate_poses(h, substep + 1 == substeps);

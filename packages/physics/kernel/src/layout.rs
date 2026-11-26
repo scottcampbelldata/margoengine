@@ -173,6 +173,20 @@ columns! {
     MB_PREV u32 Body,
     // On a root: nonzero when no two bodies of its tree touch (the tree's self contacts are off).
     MB_NO_SELF u32 Body,
+    // On a root: nonzero while its tree holds (every joint alive, enabled and its link's), found at the start of each substep's
+    // passes, so the joint passes leave its links' JOINT_ELASTIC motors to the tree; 2 when a link has springs or drag.
+    MB_HELD u32 Body,
+    // Drag toward a flow, for a link of a multibody with springs: the flow's velocity at the drag point (m/s), the damping across
+    // the body's own +Y axis and along it (kg/s), and the point in the body's frame. The tree's spring solve takes it as
+    // backward Euler, so a link held still by its joints feels all of c (u - v), and a light link in a hard flow is stable.
+    FLOW_X f32 Body,
+    FLOW_Y f32 Body,
+    FLOW_Z f32 Body,
+    DRAG_ACROSS f32 Body,
+    DRAG_ALONG f32 Body,
+    DRAG_AT_X f32 Body,
+    DRAG_AT_Y f32 Body,
+    DRAG_AT_Z f32 Body,
     // A body's place in the awake list, NONE when it is not there.
     AWAKE_SLOT u32 Body,
     // Islands of this step: the forest, and a body's island.
@@ -556,6 +570,10 @@ columns! {
     JOINT_SOFT_LINEAR_ZETA f32 Joint,
     JOINT_SOFT_ANGULAR_HERTZ f32 Joint,
     JOINT_SOFT_ANGULAR_ZETA f32 Joint,
+    // The axes (bit k for axis k) whose motors a multibody's tree solve holds as implicit springs, in its direct solve of the
+    // joint space, not the joint passes: a stiff chain of them (a rod, a cable) stays stable at any stiffness. Only on a link's
+    // joint to its parent, while the tree holds (MB_HELD), and only a force-model motor with no cap on an axis with no limit.
+    JOINT_ELASTIC u32 Joint,
     // The joints this step solves, densely, in paths: a row with a body in SOLVE_VIA goes on from the row before through it.
     SOLVE_JOINTS u32 JointList,
     // The joint whose scratch keeps the sums of this one's island, for the warm start; NONE with no body to move.
@@ -760,8 +778,8 @@ pub const MAX_COLLIDERS: u32 = 1 << 22;
 pub const COUPLING_WORDS: u32 = (core::mem::size_of::<crate::couplings::Coupling>() / 4) as u32;
 
 /// Words of JOINT_SCRATCH a joint takes: 64 for its rows and measures, then doubles, 36 of inverse, 36 of link, 6 of right side,
-/// 6 of what the pushing pass gave.
-pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4);
+/// 6 of what the pushing pass gave, 4 more, and 18 for a multibody link's implicit springs (multibody.rs, G_AT, V_AT, W_AT).
+pub const JOINT_WORDS: u32 = 64 + 2 * (36 + 36 + 6 + 36 + 6 + 4 + 18);
 /// Most joints one world holds.
 pub const MAX_JOINTS: u32 = 1 << 22;
 /// Pairs the broad phase can hold; its table then fills 2^30 slots and its points 2^31 rows.
@@ -973,8 +991,8 @@ pub const JOINT_IDLE: u32 = JOINT_OFF | JOINT_BROKEN | JOINT_DISABLED;
 /// The columns that hold the order a step solves in, rebuilt every step from the world's state: the pairs and joints it
 /// solves, the impacts it found, the islands it numbered, and the solving joints' scratch, which is indexed by place in
 /// their list. `World::hash` leaves them out; `World::arena_hash` does not.
-pub const SCRATCH: [usize; 39] = [
-    ISLAND_LEVEL, ISLAND_STAMP,
+pub const SCRATCH: [usize; 40] = [
+    ISLAND_LEVEL, ISLAND_STAMP, MB_HELD,
     SOLVE_PAIRS, IMPACTS, ISLAND_BODIES, ISLAND_LEAD, ISLAND_START, ISLAND_COUNT, ISLAND_READY, ISLAND_PASSES, SOLVE_JOINTS,
     SOLVE_LEAD, SOLVE_VIA, SOLVE_SHARE, ISLAND_PAIR_START, ISLAND_PAIR_COUNT, ISLAND_PAIR_CURSOR, JOINT_ORDER, JOINT_TEMP, ISLAND_JOINT_START,
     ISLAND_JOINT_COUNT, ISLAND_JOINT_CURSOR, COUPLING_ORDER, ISLAND_COUPLING_START, ISLAND_COUPLING_COUNT, ISLAND_COUPLING_CURSOR, MB_STAMP,
