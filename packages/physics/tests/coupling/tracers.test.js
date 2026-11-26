@@ -560,6 +560,188 @@ test('SEA-15 fixed evaporative exposure requires a finite positive reference thi
   }
 });
 
+test('SEA-15 emulsion takes up water at the specified half time and thickens the oil film with exact replay', () => {
+  const mass = 0.025;
+  const oilDensity = 870;
+  const waterDensity = 1025;
+  const rate = 60;
+  const wind = {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample: () => ({ velocity: [6, 0, 8], density: 1.2, temperature: 285 }),
+  };
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+    capacity: 4,
+    wind,
+    oilSpills: [
+      {
+        mass,
+        position: [0, 0],
+        spreadingCoefficient: 0,
+        parcels: 4,
+        emulsification: { maximumWaterFraction: 0.6, halfTimeAt10: 1, oilViscosity: 0.02 },
+      },
+    ],
+    horizontalDiffusivity: 0,
+  });
+  assert.equal(tracer.oilEmulsion(0), undefined);
+  world.advance(rate);
+  const emulsion = tracer.oilEmulsion(0);
+  assert.ok(Math.abs(emulsion.waterFraction - 0.3) < 1e-13);
+  assert.ok(Math.abs(emulsion.waterMass - ((mass / oilDensity) * 0.3 * waterDensity) / 0.7) < 1e-14);
+  assert.ok(Math.abs(emulsion.density - (0.3 * waterDensity + 0.7 * oilDensity)) < 1e-10);
+  assert.ok(Math.abs(emulsion.viscosity - 0.02 * Math.exp((2.5 * 0.3) / (1 - 0.654 * 0.3))) < 1e-13);
+  const film = tracer.oilFilm(0);
+  assert.ok(Math.abs(film.meanThickness * Math.PI * film.radius ** 2 - mass / (oilDensity * 0.7)) < 1e-14);
+  assert.equal(tracer.budget.released, mass);
+  assert.equal(tracer.budget.surface, mass);
+  const snapshot = world.takeSnapshot();
+  world.advance(2 * rate);
+  assert.ok(Math.abs(tracer.oilEmulsion(0).waterFraction - 0.45) < 1e-13);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(2 * rate);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 Troll oil reaches the independent late North Sea water content band', (t) => {
+  // Reed et al. (2005), Table 5.3. Winds at half-hour intervals after the Charlie release.
+  const winds = [
+    6.5, 5.9, 6.4, 6.5, 7, 6.8, 6.2, 7.2, 7, 7.5, 7.5, 7, 7.5, 6.6, 6.6, 5.6, 5.2, 4.7, 6.1, 5.6, 5.6, 5.6, 5.6, 5.6,
+    5.2, 5.2, 4.7, 4.7, 4.7, 4.2, 4.7, 5.2, 5.2, 6.1, 6.1, 6.6, 7, 7.5, 8, 7.5, 7, 7.5, 7, 6.1, 6.1, 6.1, 7, 7, 7, 6.6,
+    7.5, 7, 7.5, 7.5, 5.6, 5.6, 5.2, 5.6, 6.1, 5.6, 5.6, 5.6, 5.2, 4.7, 4.7, 4.2, 3.8, 3.3,
+  ];
+  // Table 5.1 water fraction was measured in the field. Table 5.5 supplies the independent laboratory inputs.
+  const measured = [
+    [0.25, 0.05],
+    [0.5, 0.29],
+    [1, 0.66],
+    [2.2, 0.57],
+    [3.8, 0.59],
+    [7.3, 0.74],
+    [11.6, 0.78],
+    [25, 0.73],
+    [33.5, 0.77],
+  ];
+  // Convert the 1989 COZOIL coefficient (Reed, Gundlach and Kana, Eq. 24) to half time.
+  // One simulation second represents one field hour.
+  const halfTimeAt10 = (Math.LN2 * 0.75) / (2e-6 * 121 * 3600);
+  const wind = {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample(_x, _y, _z, time) {
+      const low = Math.min(winds.length - 1, Math.floor(time * 2));
+      const high = Math.min(winds.length - 1, low + 1);
+      return {
+        velocity: [winds[low] + (time * 2 - low) * (winds[high] - winds[low]), 0, 0],
+        density: 1.2,
+        temperature: 286,
+      };
+    },
+  };
+  const rate = 60;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+    capacity: 4,
+    wind,
+    oilSpills: [
+      {
+        mass: 0.025,
+        position: [0, 0],
+        spreadingCoefficient: 0,
+        parcels: 4,
+        emulsification: { maximumWaterFraction: 0.75, halfTimeAt10, oilViscosity: 0.027 },
+      },
+    ],
+    horizontalDiffusivity: 0,
+  });
+  const field = measured.map(([hours, fraction]) => {
+    world.advance(Math.round(hours * rate));
+    return { hours, fraction, residual: tracer.oilEmulsion(0).waterFraction - fraction };
+  });
+  // The original field report describes the 7–34 h samples as near the measured saturation plateau.
+  const late = field.filter(({ hours }) => hours >= 7);
+  const mean = late.reduce((sum, { fraction }) => sum + fraction, 0) / late.length;
+  const scatter = Math.sqrt(late.reduce((sum, { fraction }) => sum + (fraction - mean) ** 2, 0) / (late.length - 1));
+  const lateRms = Math.sqrt(late.reduce((sum, { residual }) => sum + residual ** 2, 0) / late.length);
+  const peak = Math.max(...field.map(({ residual }) => Math.abs(residual)));
+  assert.ok(lateRms <= scatter, `late RMS ${lateRms} vs observed scatter ${scatter}`);
+  t.diagnostic(
+    `Late RMS ${(100 * lateRms).toFixed(2)} vs observed scatter ${(100 * scatter).toFixed(2)} points. All-time peak residual ${(100 * peak).toFixed(2)} points.`,
+  );
+});
+
+test('SEA-15 dry film threshold stops uptake and mixed weathering keeps the vapour and water ledgers separate', () => {
+  const rate = 60;
+  const mass = 0.025;
+  const oil = { maximumWaterFraction: 0.8, halfTimeAt10: 0.02, oilViscosity: 0.015 };
+  const wind = {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample: () => ({ velocity: [10, 0, 0], density: 1.2, temperature: 285 }),
+  };
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+    capacity: 4,
+    wind,
+    oilSpills: [
+      {
+        mass,
+        position: [0, 0],
+        spreadingCoefficient: 0,
+        parcels: 2,
+        emulsification: oil,
+        evaporation: {
+          temperature: 300,
+          initialBoilingPoint: 300,
+          distillationSlope: 0,
+          massTransferCoefficient: 0.0001,
+          referenceThickness: 1e-5,
+        },
+      },
+      {
+        mass,
+        position: [1, 0],
+        spreadingCoefficient: 0,
+        parcels: 2,
+        emulsification: { ...oil, minimumOilThickness: 1 },
+      },
+    ],
+  });
+  world.advance(rate);
+  assert.ok(tracer.oilEmulsion(0).waterMass > 0);
+  assert.equal(tracer.oilEmulsion(1).waterMass, 0);
+  assert.ok(tracer.evaporatedMass > 0);
+  assert.ok(Math.abs(tracer.budget.surface + tracer.evaporatedMass - 2 * mass) < 1e-15);
+  world.advance(6 * rate);
+  assert.equal(tracer.oilEmulsion(0), undefined);
+  assert.equal(tracer.oilEmulsion(1).waterMass, 0);
+  assert.ok(Math.abs(tracer.budget.surface - mass) <= 2 * mass * Number.EPSILON * (6 * rate));
+  assert.equal(tracer.evaporatedMass, mass);
+  assert.equal(tracer.budget.released, 2 * mass);
+});
+
+test('SEA-15 oil emulsification refuses invalid or saturated input fractions', () => {
+  for (const maximumWaterFraction of [-0.1, 1, NaN, Infinity]) {
+    assert.throws(
+      () =>
+        new PhysicsWorld().add(new TracerSolver(), {
+          oilSpills: [
+            {
+              mass: 0.025,
+              position: [0, 0],
+              spreadingCoefficient: 0,
+              parcels: 2,
+              emulsification: { maximumWaterFraction, halfTimeAt10: 1, oilViscosity: 0.02 },
+            },
+          ],
+        }),
+      /a water fraction from zero to less than one/,
+    );
+  }
+});
+
 test('SEA-15 a completely evaporated release clears its parcels and leaves the other slick unchanged', () => {
   const tracer = new TracerSolver();
   const config = { temperature: 300, initialBoilingPoint: 300, distillationSlope: 0, massTransferCoefficient: 3 };

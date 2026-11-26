@@ -532,6 +532,10 @@ snapshot replay checked separately. Stiver–Mackay evaporation uses the integra
 vapour ledger. The integrated exposure matches an independent quadrature of the radius laws at two simulation rates.
 With a prescribed fixed exposure area, the model also agrees with seven independent 0 °C Norman Wells measurements
 within 0.45 percentage points at worst. The atmospheric distillation curve supplies the oil parameters.
+Surface emulsification tracks entrained water separately, increases the displayed film thickness and reports
+mixture density and viscosity. In the independent Troll Charlie samples from 7.3 to 33.5 hours, the uptake curve
+has 2.13 percentage points RMS error against 2.38 points of sample scatter. At one hour it is 36.74 points low.
+Early uptake, changing spreading rheology, dissolution and biodegradation remain open.
 A fixed-volume waxy film now reports its thickness and follows the Brönner Bingham yield force. Nine independent
 tank terminal radii lower the RMS log radius error from 1.056 to 0.480 compared with Fay's unyielded radius at the
 reported 180 s measurement time. The simulated 30% blend under-spreads by a factor of 3.59 against the run that

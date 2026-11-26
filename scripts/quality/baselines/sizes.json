@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20585397,
+  "total": 20585993,
   "history": [
     {
       "date": "2026-10-24",
@@ -14089,6 +14089,12 @@
       "commit": "4f651aecc9",
       "grew": 1,
       "reason": "SEA-08 three-dimensional radiation grows seakeeping from 35043 to 37493 B gzip. Its integration shares the existing implicit inertia and radiation history. Splitting the hull integration would duplicate those runtime paths. The separate 22012 B gzip Rust panel bake remains lazy."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "14c38f2af5",
+      "grew": 1,
+      "reason": "SEA-15 oil emulsification moves physics/tracers from 15886 to 16474 B gzip. The optional ceiling rises from 16373 to 16969 B. The water state shares the existing parcel mass, evaporation, droplet and replay paths. A separate solver would require another field for every slick's component transfer and duplicate oil ownership."
     }
   ],
   "items": {
@@ -14972,7 +14978,7 @@
     "@margoengine/physics/thermal": 6905,
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 16373,
+    "@margoengine/physics/tracers": 16969,
     "@margoengine/physics/tsunami": 5780,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9250,

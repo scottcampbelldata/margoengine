@@ -13398,6 +13398,28 @@ exposure units for plot reading, and half a tick through Eq. 13. The peak discre
 This covers fixed exposure, with a constant-density conversion from volume to mass. An independent measurement
 of evaporation from a freely expanding slick remains open.
 
+Water-in-oil emulsification applies the wind-dependent exponential uptake from M. Reed et al.,
+[“Revision of the OCS Oil-Weathering Model, Phases II and III,” MMS 2005-020, Eqs. 21–23 and 28](https://www.boem.gov/sites/default/files/boem-newsroom/Library/Publications/2005/2005_020.pdf).
+Each step samples the horizontal wind at ten metres above the slick. It normalizes `(1 + U)²` by 121 and
+updates water fraction with the prescribed field half time. The code stores water volume separately from oil
+parcel mass. Evaporation removes only oil. Dispersing oil releases the same share of the emulsion water
+back to the surrounding sea. Resurfacing contributes oil to the parent slick. Oil-only film thickness can
+gate uptake because the minimum effective thickness varied by oil in P. S. Daling et al.,
+[“Norwegian Testing of Emulsion Properties at Sea” (2003), §5](https://doi.org/10.1016/S1353-2561(03)00016-1).
+Mixture density uses additive component volumes. Dynamic viscosity uses Mooney's law with the salt-water
+coefficient 0.654 from [D. Mackay et al., “Oil Spill Processes and Models” (1980), §4.4 and Fig. 4.4](https://publications.gc.ca/collections/collection_2020/eccc/en40/En40-980-1980-eng.pdf).
+
+The Troll benchmark uses the independent Table 5.5 laboratory saturation of 75%. It converts the
+`2 × 10⁻⁶ s⁻¹` coefficient from M. Reed, E. Gundlach and T. Kana,
+[“A Coastal Zone Oil Spill Model” (1989), Eq. 24](https://doi.org/10.1016/S0269-8579(89)80019-X)
+to a field half time at 10 m/s. The coefficient predates the 1995 Charlie oil samples. Table 5.3 supplies
+the measured wind history. All Table 5.1 water measurements
+from the field are separate. Four points from 7.3 to 33.5 h give a water fraction RMS difference of
+2.13 percentage points versus their 2.38-point temporal sample standard deviation. The largest whole-run
+error is 36.74 points at 1 h. This checks late water uptake. Early uptake kinetics, change of oil-only
+viscosity and spreading under coalescence remain open. The model reports mixture thickness and uses the
+existing Fay footprint.
+
 Depth-dependent vertical diffusion uses André W. Visser, [“Using random walk models to simulate the vertical distribution of particles in a turbulent water column” (1997)](https://doi.org/10.3354/meps158275), equation 6.
 The random step includes the diffusivity-gradient drift and evaluates its variance at half that drift. A manufactured
 linear profile verifies the first two moments and the midpoint using a uniform control with the same random input.

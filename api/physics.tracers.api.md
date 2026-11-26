@@ -138,6 +138,20 @@ export interface TracerOilDispersion {
     breaking: TracerBreakerExposure | ((x: number, z: number, time: number) => TracerBreakerExposure);
 }
 
+export interface TracerOilEmulsification {
+    maximumWaterFraction: number;
+    halfTimeAt10: number;
+    oilViscosity: number;
+    minimumOilThickness?: number;
+}
+
+export interface TracerOilEmulsion {
+    waterFraction: number;
+    waterMass: number;
+    density: number;
+    viscosity: number;
+}
+
 export interface TracerOilEvaporation {
     temperature: number;
     initialBoilingPoint: number;
@@ -156,6 +170,7 @@ export interface TracerOilSpill {
     material?: TracerMaterial;
     parcels?: number;
     evaporation?: TracerOilEvaporation;
+    emulsification?: TracerOilEmulsification;
     dispersion?: TracerOilDispersion;
 }
 
@@ -210,6 +225,7 @@ export class TracerSolver implements Solver<TracerParams> {
         meanThickness: number;
         centreThickness: number;
     } | undefined;
+    oilEmulsion(index: number): TracerOilEmulsion | undefined;
     get jetErosion(): number;
     particlesOf(): Generator<{
         position: [number, number, number];

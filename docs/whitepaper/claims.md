@@ -349,6 +349,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   [Brönner et al., Figure 4](https://doi.org/10.1016/j.marpolbul.2018.02.021).
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
+- Surface oil emulsification (SEA-15, 2026-11-26). The water uptake law uses measured wind and separate lab oil
+  properties for Troll crude. Its last four field comparisons have 2.13 percentage points RMS error against
+  2.38 points of measured scatter. The largest error is 36.74 points during early uptake. The solver accounts
+  for entrained water independently of petroleum and exposes mixture thickness, density and viscosity.
+  Reproduce with `node --test --test-name-pattern='Troll oil' packages/physics/tests/coupling/tracers.test.js`.
+  [MMS 2005-020, Tables 5.1, 5.3 and 5.5](https://www.boem.gov/sites/default/files/boem-newsroom/Library/Publications/2005/2005_020.pdf).
+
 - Cohesive tracer growth and breakup (SEA-15, 2026-11-26). The shear-limited closure predicts 15 sampled phases
   of three dilution trials with 6.58 µm RMS error against 6.84 µm of measured temporal scatter. The largest
   mean error is 12.22 µm. The fitted data come from separate constant-concentration runs. Snapshot restore

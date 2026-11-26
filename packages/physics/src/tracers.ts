@@ -47,6 +47,14 @@ import {
   turbulentVerticalStep,
 } from './tracer-diffusion.js';
 import {
+  emulsionParameters,
+  emulsionProperties,
+  emulsionWaterVolume,
+  emulsionWindFactor,
+  type TracerOilEmulsion,
+  type TracerOilEmulsification,
+} from './tracer-emulsion.js';
+import {
   type EvaporationRates,
   evaporatedFraction,
   evaporationRates,
@@ -88,6 +96,7 @@ export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
 export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-diffusion.js';
 export type { TracerBedWash } from './tracer-bed-wash.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
+export type { TracerOilEmulsion, TracerOilEmulsification } from './tracer-emulsion.js';
 export type { TracerFlocConditions, TracerFlocEnvironment } from './tracer-floc.js';
 export type { TracerBreakerExposure, TracerOilDispersion } from './tracer-oil-dispersion.js';
 
@@ -203,6 +212,8 @@ export interface TracerOilSpill {
   parcels?: number;
   /** Stiver–Mackay vapour loss from the expanding slick (default no evaporation). */
   evaporation?: TracerOilEvaporation;
+  /** Wind-dependent water uptake in the floating oil (default none). */
+  emulsification?: TracerOilEmulsification;
   /** Delvigne–Sweeney entrainment under breaking waves, with buoyant resurfacing (default none). */
   dispersion?: TracerOilDispersion;
 }
@@ -318,6 +329,7 @@ interface OilSpillState {
   profile: FayCoefficients;
   waxStoppingRadius?: number;
   evaporation?: EvaporationRates;
+  emulsification?: Required<TracerOilEmulsification>;
   drops?: { first: number; law: OilDispersionLaw; materials: readonly number[] };
 }
 
@@ -394,6 +406,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private spillRadii?: Region;
   private spillVapour?: Region;
   private spillWater?: Region;
+  private spillEmulsion?: Region;
   private dropletOwners?: Map<number, number>;
   private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
   private horizontalLaw?: HorizontalDispersionLaw;
@@ -749,15 +762,16 @@ export class TracerSolver implements Solver<TracerParams> {
         throw new RangeError('Invalid oil yield stress; pass a finite, nonnegative shear yield stress in Pa.');
       if (!(releaseDuration >= 0 && Number.isFinite(releaseDuration)))
         throw new RangeError('Invalid oil release duration; pass a finite, nonnegative duration in seconds.');
-      if (releaseDuration > 0 && (yieldStress || spreadingCoefficient || spill.evaporation || spill.dispersion))
+      const weathering = spill.evaporation || spill.dispersion || spill.emulsification;
+      if (releaseDuration > 0 && (yieldStress || spreadingCoefficient || weathering))
         throw new MargoError(
           'unsupported',
-          'A fed oil patch uses gravity spreading; pass zero tension and yield stress and omit evaporation and dispersion.',
+          'A fed oil patch uses gravity spreading; pass zero tension and yield stress and omit evaporation, dispersion and emulsification.',
         );
-      if (yieldStress > 0 && (spreadingCoefficient || spill.evaporation || spill.dispersion))
+      if (yieldStress > 0 && (spreadingCoefficient || weathering))
         throw new MargoError(
           'unsupported',
-          'Waxy oil uses a fixed-volume gravity-spreading law; use zero spreading coefficient and omit evaporation and dispersion.',
+          'Waxy oil uses a fixed-volume gravity-spreading law; use zero spreading coefficient and omit evaporation, dispersion and emulsification.',
         );
       const profile = fayCoefficients(volume, reducedGravity, waterDensity, viscosity, spreadingCoefficient);
       if (!profile.every(Number.isFinite) || !(fayRadius(profile, 1) > 0))
@@ -781,6 +795,7 @@ export class TracerSolver implements Solver<TracerParams> {
         waxStoppingRadius:
           yieldStress > 0 ? waxLimit(volume, material.density, reducedGravity, yieldStress) : undefined,
         evaporation: spill.evaporation && evaporationRates(spill.evaporation, volume),
+        emulsification: spill.emulsification && emulsionParameters(spill.emulsification, volume, waterDensity),
         drops,
       });
     }
@@ -791,6 +806,8 @@ export class TracerSolver implements Solver<TracerParams> {
       this.spillVapour = this.host.allocate('oil-spill-vapour', 8 * this.oilSpills.length, 'f64', 1);
     if (this.dropletOwners)
       this.spillWater = this.host.allocate('oil-spill-water', 8 * this.oilSpills.length, 'f64', 1);
+    if (this.oilSpills.some((spill) => spill.emulsification))
+      this.spillEmulsion = this.host.allocate('oil-spill-emulsion', 8 * this.oilSpills.length, 'f64', 1);
   }
 
   private reserveOilDrops(options: TracerOilDispersion, material: TracerMaterial, free: number) {
@@ -920,6 +937,18 @@ export class TracerSolver implements Solver<TracerParams> {
     const radii = regionWords(this.host.memory, this.spillRadii) as Float64Array;
     const vapour = this.spillVapour && (regionWords(this.host.memory, this.spillVapour) as Float64Array);
     const immersed = this.spillWater && (regionWords(this.host.memory, this.spillWater) as Float64Array);
+    const emulsion = this.spillEmulsion && (regionWords(this.host.memory, this.spillEmulsion) as Float64Array);
+    const windFactors =
+      emulsion &&
+      this.oilSpills.map((spill, i) => {
+        const age = time - spill.start;
+        if (!spill.emulsification || !(age > 0) || spill.mass <= (vapour?.[i] ?? 0) + (immersed?.[i] ?? 0)) return 0;
+        if (!this.wind) return emulsionWindFactor(0);
+        const [x, z] = radii[i] === 0 ? spill.position : this.oilCentre(spill, words);
+        const midpoint = time - 0.5 * Math.min(age, dt);
+        const velocity = this.wind.sample(x, this.surfaceAt(x, z, midpoint) + 10, z, midpoint, this.flow).velocity;
+        return emulsionWindFactor(hypot(velocity[0], velocity[2]));
+      });
     // Check all supplied breaker conditions before moving any parcels or transferring mass.
     const waves =
       immersed &&
@@ -990,9 +1019,22 @@ export class TracerSolver implements Solver<TracerParams> {
           immersed[i]! += transfer;
           book[1]! += transfer;
           book[2]! -= transfer;
+          if (emulsion && transfer > 0) emulsion[i]! *= (remaining - transfer) / remaining;
           remaining -= transfer;
           changed ||= transfer > 0;
         }
+      }
+      if (emulsion && spill.emulsification) {
+        const oilVolume = remaining / this.materials[spill.material]!.density;
+        const oilThickness = oilVolume / radius / radius / Math.PI;
+        if (!(remaining > 0)) emulsion[i] = 0;
+        else if (oilThickness >= spill.emulsification.minimumOilThickness)
+          emulsion[i] = emulsionWaterVolume(
+            spill.emulsification,
+            oilVolume,
+            emulsion[i]!,
+            windFactors![i]! * (age - priorAge),
+          );
       }
       if (changed) this.setOilMass(spill, remaining, words, (immersed?.[i] ?? 0) > 0);
     }
@@ -1490,6 +1532,7 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.spillRadii) regions.push(this.spillRadii);
     if (this.spillVapour) regions.push(this.spillVapour);
     if (this.spillWater) regions.push(this.spillWater);
+    if (this.spillEmulsion) regions.push(this.spillEmulsion);
     if (this.dispersionAges) regions.push(this.dispersionAges);
     if (this.flocculation) regions.push(this.flocculation.sizes);
     return regions;
@@ -1527,7 +1570,8 @@ export class TracerSolver implements Solver<TracerParams> {
     const words = this.words();
     const mass = this.oilSurfaceMass(spill, words);
     if (!(mass > 0)) return undefined;
-    const volume = mass / this.materials[spill.material]!.density;
+    const water = this.spillEmulsion && (regionWords(this.host.memory, this.spillEmulsion) as Float64Array);
+    const volume = mass / this.materials[spill.material]!.density + (water?.[index] ?? 0);
     const meanThickness = volume / radius / radius / Math.PI;
     return {
       centre: this.oilCentre(spill, words),
@@ -1535,6 +1579,22 @@ export class TracerSolver implements Solver<TracerParams> {
       meanThickness,
       centreThickness: spill.waxStoppingRadius ? meanThickness / WAX_FILM_MEAN : meanThickness,
     };
+  }
+
+  /** Water uptake, mixture density and dynamic viscosity of a floating emulsifying release. */
+  oilEmulsion(index: number): TracerOilEmulsion | undefined {
+    const spill = this.oilSpills[index];
+    if (!spill?.emulsification || !this.spillEmulsion) return undefined;
+    const mass = this.oilSurfaceMass(spill, this.words());
+    if (!(mass > 0)) return undefined;
+    const water = regionWords(this.host.memory, this.spillEmulsion) as Float64Array;
+    return emulsionProperties(
+      mass,
+      this.materials[spill.material]!.density,
+      water[index]!,
+      this.params.waterDensity,
+      spill.emulsification.oilViscosity,
+    );
   }
 
   private oilSurfaceMass(spill: OilSpillState, words: Float64Array): number {

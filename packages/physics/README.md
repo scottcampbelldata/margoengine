@@ -3473,6 +3473,28 @@ world.advance(600);
 console.log(oil.evaporatedMass > 0); // true
 ```
 
+Set `emulsification` to let floating oil take up water. Supply the maximum water fraction by volume, the
+field half time at 10 m/s wind in seconds, and the dry oil viscosity in Pa·s. Wind uses the existing sampler
+at 10 m above the slick, with a calm value of 0 m/s when omitted. The optional `minimumOilThickness`
+halts uptake below the supplied oil-only thickness in metres. The default is zero. `oilEmulsion(index)`
+gives water mass, water fraction, density and dynamic viscosity. `oilFilm(index)` includes the added
+water in the thickness. `budget` continues to count oil mass.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const slick = new TracerSolver();
+const world = new PhysicsWorld().add(slick, {
+  oilSpills: [{
+    position: [0, 0], mass: 5, spreadingCoefficient: 0.001,
+    emulsification: { maximumWaterFraction: 0.75, halfTimeAt10: 1800, oilViscosity: 0.027 },
+  }],
+});
+world.advance(600);
+console.log(slick.oilEmulsion(0)!.waterMass > 0); // true
+```
+
 Set `verticalDiffusivityProfile` to use different mixing rates at different depths. Supply at least two depths in
 ascending order, in metres below the local free surface, with diffusivity in m²/s. The solver interpolates between
 knots, extends the endpoints as constants and includes the drift associated with the diffusivity gradient. Omitting
