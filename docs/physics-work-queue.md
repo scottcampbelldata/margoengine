@@ -339,6 +339,13 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - Handed to Codex (Scott, 2026-11-26), so the Claude side stays on the film solvers: DYN-07, AERO-01 to AERO-03
   and ATMO-01 to ATMO-03. The AERO and ATMO rows are built and REOPENED; build their upgrades from
   `docs/physics-solver-audit.md`.
+- Parity (Scott, 2026-11-26: "I want 100% parity"): every PARTIAL or MISSING row in `docs/rapier-parity.md`,
+  `docs/rapier-parity-2d.md` and `docs/physics-collision-parity.md` is finished to DONE by the owner its Owner column
+  names. Rows with no solver are assigned here:
+  - 2D soft bodies (S2-01 to S2-12, SB-03, and the 2D parts of SB-01, SB-12 and SB-17): Claude, with SOFT-02.
+  - X-60 unified particles: Codex, with FLUID-01 and FLUID-02.
+  - X-81 rollback and X-82 snapshot sync: Claude, with DYN-03.
+  - X-84 record-and-replay debugger, X-85 per-island profiler, X-86 binary shape cache: Claude, with DYN-01.
 - Upgrades (Scott, 2026-11-26): Codex builds every upgrade, on every REOPENED row, whoever first built it. Claude
   finishes the builds it still has CLAIMED, then verifies: each row Codex sets LANDED is checked and set VERIFIED,
   or REOPENED with reasons.
