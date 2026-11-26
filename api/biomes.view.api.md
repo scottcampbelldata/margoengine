@@ -4,6 +4,7 @@
 
 ```ts
 import { EngineKernel } from "@margoengine/core";
+import { PassContext } from "@margoengine/core/extension";
 import { PlantStates } from "@margoengine/scatter/states";
 import { Terrain, TerrainColorOptions, TerrainOptions } from "@margoengine/terrain";
 import { WetGround, WetGroundLook } from "@margoengine/terrain/wet-ground";
@@ -63,6 +64,9 @@ export class BiomeView implements Disposable {
     get water(): Water | undefined;
     get plantStates(): PlantStates | undefined;
     get wetGround(): WetGround | undefined;
+    setCapture(hook: ViewCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(c: ViewPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     get objects(): import('@margoengine/biomes/objects').BiomeObjects | undefined;
     whenIdle(): Promise<void>;
     get streaming(): {
@@ -182,6 +186,12 @@ export interface OverviewWeights {
 export const SEA: Readonly<Required<Pick<WaterOptions, 'segments' | 'waves' | 'foamDistance' | 'color'>>>;
 
 export const VIEW_LAYERS: readonly string[];
+
+export interface ViewCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
 
 export interface ViewTile {
     readonly x: number;
@@ -727,6 +737,10 @@ interface ValleyOptions {
     readonly floor?: number;
     readonly mouth?: number;
 }
+
+type ViewPassContext = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 
 interface WorldState {
     readonly options: BiomeWorldOptions;

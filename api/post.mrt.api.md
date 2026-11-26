@@ -16,7 +16,7 @@ export class SceneTargets implements EnginePlugin {
     view(name: string): GPUTextureView | undefined;
     get depth(): GPUTexture | undefined;
     onResize(listener: () => void): () => void;
-    add(model: SSRModel, { subject }?: SceneTargetsAddOptions): () => void;
+    add(model: SSRModel, { subject, ground }?: SceneTargetsAddOptions): () => void;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
     onDeviceRestored(engine: Engine): void;
@@ -26,6 +26,7 @@ export class SceneTargets implements EnginePlugin {
 
 export interface SceneTargetsAddOptions {
     subject?: boolean;
+    ground?: boolean;
 }
 
 export interface SceneTargetsOptions {
