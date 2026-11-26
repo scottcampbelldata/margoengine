@@ -61,6 +61,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   test of a plant in front of shaded ground; then KB-LOOK-TV-BOUNCE1 (sun to sky-ambient ratio) is measured again.
   Until then the timber-valley bounce, shadowTint and penumbra numbers are not evidence.
 
+### Open 2026-11-26: tall scattered plants sway by their own height and whip at tens of m/s in a gale (KB-LOOK-TV-SHIMMER1, scatter)
+
+- **Repro:** the timber-valley rail-line shot with its camera held still (both keys at the first key's place),
+  `node tools/shot/cli.mjs <that shot> --seconds 1.1 --out <folder>`: `shimmerMoving` reads 15.8 and 20.1 percent
+  (bar 0.5), against 17.7 and 21.1 percent with the camera moving, so the camera and the depth mask are not the cause.
+  95 percent of the changed pixels are in the upper half of the frame: the conifer crowns, which in `probes/mid.png`
+  show as eight separate copies per frame (the shutter's eight sub-frames), tens of pixels apart.
+- **Cause:** scatter's rooted wind (`windBend` in `packages/scatter/src/wind.ts`, used by `pose.ts` and
+  `plant-motion.ts`) moves a vertex sideways by gust x h^2 / (1 + h), h its height above the root in world metres: a
+  shape for a blade about a metre tall, close to h for a tree, so a 25 m conifer's top swings about 24 m times the bend
+  (the blowup's 20 m/s gives bend 1). `windClockRate` then runs the whole sway, trunks included, at U / 5.4 times the
+  calm clock (3.7 at 20 m/s), with gust terms of 1.7 and 0.73 rad/s: a peak tip speed of about 120 m/s, where a
+  conifer's top moves a fraction of a metre to a metre or two in a gale, near its own natural frequency (J. R. Moore
+  and D. A. Maguire, "Natural sway frequencies and damping ratios of trees", Trees 18, 195-203, 2004: 0.1 to 1 Hz,
+  falling with height; E. de Langre, "Effects of wind on plants", Annu. Rev. Fluid Mech. 40, 141-168, 2008; K. R.
+  James, N. Haritos and P. K. Ades, "Mechanical stability of trees under dynamic loads", Am. J. Bot. 93, 1522-1530,
+  2006). Gust and flutter speed with the wind; trunk sway does not.
+- **Owed in scatter** (design first, every scattered plant changes): the bend referred to the plant's own height (the
+  instance's scale times the mesh height) with a tip deflection share that depends on stiffness (a blade bends far, a
+  trunk a few percent), the trunk swaying at a natural frequency that falls with height while only the branch and leaf
+  terms speed up with the wind, a GPU regression test of a tall and a short plant's tip speed and deflection, then the
+  rail-line still-camera shimmer measured again (the remainder is the impostor and fire share).
+
 ### Open 2026-11-26: the night sky dome shows clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
 
 - **Repro:** `node packages/scenes/test/timber-valley-still.mjs --views=fire-line --query=hour=22 --out=<folder>`: the
