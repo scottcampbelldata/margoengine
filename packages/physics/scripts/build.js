@@ -110,6 +110,7 @@ await build({
         'pack-ice': resolve(root, 'src/pack-ice/index.ts'),
         underwater: resolve(root, 'src/underwater/index.ts'),
         orbit: resolve(root, 'src/orbit/index.ts'),
+        rod: resolve(root, 'src/rod/index.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

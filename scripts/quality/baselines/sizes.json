@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20626947,
+  "total": 20632235,
   "history": [
     {
       "date": "2026-10-24",
@@ -13825,6 +13825,12 @@
       "commit": "75e53d5448",
       "grew": 1,
       "reason": "SEA-15's horizontal scale-dependent dispersion moves physics/tracers from 12184 to 12662 B gzip. The optional ceiling rises from 12550 to 13042 B. The dispersion law shares the particle transport loop and stores its release ages in the tracer snapshot. A split would duplicate the transport loop or require a second solver to track the same particles."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "rod",
+      "reason": "New optional entry @margoengine/physics/rod (3,934 B gzip): elastic rods on a multibody, their water loads taken from the loads entry. @margoengine/physics/loads grows 8,342 to 9,696 B for segmentLoads (the per-segment loads a rod solves implicitly), the shared water sampler and wake step, and Reynolds drag below the drag crisis: one copy of the member physics for LoadSolver and rods. A separate entry would duplicate the coefficients and the wake oscillator or make LoadSolver import from it for the same bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14671,7 +14677,7 @@
     "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/lightning": 6117,
-    "@margoengine/physics/loads": 8342,
+    "@margoengine/physics/loads": 9696,
     "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
@@ -14682,6 +14688,7 @@
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/rail": 9964,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/rod": 3934,
     "@margoengine/physics/rogue": 9251,
     "@margoengine/physics/room-sound": 6014,
     "@margoengine/physics/runoff": 4162,

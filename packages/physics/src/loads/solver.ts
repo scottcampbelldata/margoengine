@@ -31,8 +31,9 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
-import { cylinderCoefficients, sphereDrag, tangentialDrag } from './morison.js';
+import { cylinderCoefficients, sphereDrag, tangentialDrag, wakeStep } from './morison.js';
 import { ellipsoidAddedMass, equivalentEllipsoid } from './shapes.js';
+import { waterAcceleration, waterVelocity } from './water.js';
 
 type Vec3 = [number, number, number];
 const LOADS_LAYOUT = 1;
@@ -249,32 +250,14 @@ export class LoadSolver implements Solver<LoadParams> {
     return { spec, axes, frame, centre, volume, addedMass, sphere, box };
   }
 
-  /** The water's velocity at a point and time: the sea's water plus every flow. */
+  /** The water's velocity at a point and time: the sea's water plus every flow (water.ts). */
   private water(x: number, y: number, z: number, t: number, out: Vec3): Vec3 {
-    const s = this.sea.water.sample(x, y, z, t, this.sample);
-    out[0] = s.velocity[0];
-    out[1] = s.velocity[1];
-    out[2] = s.velocity[2];
-    for (const flow of this.flows) {
-      const f = flow.sample(x, y, z, t, this.sample);
-      out[0] += f.velocity[0];
-      out[1] += f.velocity[1];
-      out[2] += f.velocity[2];
-    }
-    return out;
+    return waterVelocity(this.sea, this.flows, x, y, z, t, this.sample, out);
   }
 
-  /** The water's acceleration at a point: a centred difference of its pure velocity over 2 ms. */
+  /** The water's acceleration at a point: a centred difference of its pure velocity over 2 ms (water.ts). */
   private acceleration(x: number, y: number, z: number, t: number, out: Vec3): Vec3 {
-    const a: Vec3 = [0, 0, 0],
-      b: Vec3 = [0, 0, 0],
-      h = 1e-3;
-    this.water(x, y, z, t + h, a);
-    this.water(x, y, z, t - h, b);
-    out[0] = (a[0] - b[0]) / (2 * h);
-    out[1] = (a[1] - b[1]) / (2 * h);
-    out[2] = (a[2] - b[2]) / (2 * h);
-    return out;
+    return waterAcceleration(this.sea, this.flows, x, y, z, t, this.sample, out);
   }
 
   step(context: StepContext, _dt: number): void {
@@ -522,18 +505,7 @@ export class LoadSolver implements Solver<LoadParams> {
       const st = m.vortex.strouhal ?? 0.2,
         cl0 = m.vortex.lift ?? 0.3,
         wf = (2 * Math.PI * st * wetSpeed) / D,
-        eps = 0.3,
-        steps = Math.max(1, Math.ceil((wf * dt) / 0.05)),
-        h = dt / steps;
-      let q = wakes[2 * index]!,
-        dq = wakes[2 * index + 1]!;
-      for (let k = 0; k < steps; k++) {
-        // Semi-implicit Euler: the velocity first, then the position with it.
-        dq += h * (-eps * wf * (q * q - 1) * dq - wf * wf * q);
-        q += h * dq;
-      }
-      wakes[2 * index] = q;
-      wakes[2 * index + 1] = dq;
+        q = wakeStep(wakes, index, wf, 0, dt);
       lift = 0.25 * rho * wetSpeed * wetSpeed * D * cl0 * q;
       for (let k = 0; k < 3; k++) total[k]! += lift * liftSum * across[k]!;
     }
