@@ -13,6 +13,7 @@ import { changedFiles, planContext, planFiles } from './check-merge.mjs';
 import { TARGETS } from './mutation.mjs';
 import { runWithTimeout } from './run-with-timeout.mjs';
 import { startFailureNote } from './support/start-failure.mjs';
+import { testExitEnv } from './support/test-exit-reporter.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 export const DEFAULT_PACKAGE_MINUTES = 15;
@@ -88,13 +89,18 @@ async function main() {
   for (const file of roots) {
     console.log(`
 === node --test ${file} (at most ${minutes} min)`);
-    const { code, timedOut } = await runWithTimeout(`node --test ${file}`, { cwd: root, timeoutMs: minutes * 60_000 });
+    const { code, timedOut } = await runWithTimeout(`node --test ${file}`, {
+      cwd: root,
+      env: testExitEnv(),
+      timeoutMs: minutes * 60_000,
+    });
     if (code !== 0) failed.push(failedStep(file, code, timedOut));
   }
   for (const dir of dirs) {
     console.log(`\n=== npm run test (${dir}, at most ${minutes} min)`);
     const { code, timedOut } = await runWithTimeout('npm run test', {
       cwd: join(root, dir),
+      env: testExitEnv(),
       timeoutMs: minutes * 60_000,
     });
     if (code !== 0) failed.push(failedStep(dir, code, timedOut));
