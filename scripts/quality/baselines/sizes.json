@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20296697,
+  "total": 20302814,
   "history": [
     {
       "date": "2026-10-24",
@@ -13017,6 +13017,12 @@
       "commit": "SEA-10 flooding",
       "grew": 1,
       "reason": "@margoengine/physics/seakeeping: flooding: compartments and openings on a hull (Bernoulli flow through each opening integrated exactly over its height, Boyle air, a backward-Euler Gauss-Seidel solve, cargo out by Beverloo and Wilson et al.), the floodwater as added weight and point masses in the added-mass solve, and the hullBreaches port; measured gzip (Mac build) 22861 B, was 17233; a split into its own entry would need HullSolver to take a flooding factory from the scene (its init cannot await an import), one more thing to wire for every damaged hull. Budget (measured + max(3%, 256 B)): 17750 to 23547 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "51ccc096bc",
+      "grew": 1,
+      "reason": "ATMO-07 adds the optional physics/lightning entry from zero to 5861 B gzip with a lazy SIMD potential solver and timed segments. Sky lightning-bolt moves from 5335 to 5403 B with a supplied channel shared by the renderer and its lights. An additional Sky entry would duplicate the existing bolt pipeline."
     }
   ],
   "items": {
@@ -13854,6 +13860,7 @@
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
+    "@margoengine/physics/lightning": 6117,
     "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
