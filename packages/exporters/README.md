@@ -1292,7 +1292,30 @@ Morph targets of a skinned mesh become UsdSkel blend shapes (OpenUSD UsdSkel, `B
 
 A skin's points are written where the mesh rests in the world, with that move taken back out of `bindTransforms`, as a glTF skin's vertices can sit in any space. So a model stored lying down or in millimetres reads the right size in a tool that does not run the skeleton, and it plays exactly as before. Each `SkelRoot` has an `extent` for every frame.
 
-A GLB goes in as it is, with its nodes, skins, clips and PBR materials. Decode Draco and meshopt first: run this before `compressDraco` or `compressMeshopt`, or on the uncompressed file. A second set of joints (`JOINTS_1`) is written with `elementSize = 8`; a third is refused, so bake it down to eight influences.
+A GLB goes in as it is, with its nodes, skins, clips and PBR materials. One that requires Draco (`KHR_draco_mesh_compression`) or meshopt (`EXT_meshopt_compression`, `KHR_meshopt_compression`) is decoded first with `@margoengine/decoders`, its clean-room `draco-native` decoder and its meshopt decoder: install that package beside this one. Both are imported only for such a file, and the USDZ is the one the uncompressed file writes (a lossy compression keeps its loss). `exportUSDZ` and `measureUSDZ` still take uncompressed files only.
+
+```ts
+import { exportGLB } from 'margoengine/exporters';
+import { compressMeshopt } from 'margoengine/exporters/meshopt';
+import { exportAnimatedUSDZ } from 'margoengine/exporters/usdz-anim';
+
+const quad = {
+  positions: new Float32Array([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]),
+  normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1]),
+  indices: [0, 1, 2, 0, 2, 3],
+};
+const flag = { name: 'Flag', geometry: quad };
+const { glb } = await compressMeshopt(
+  exportGLB({
+    nodes: [flag],
+    animations: [{ name: 'Wave', channels: [{ node: flag, path: 'translation', times: [0, 1], values: [0, 0, 0, 0, 1, 0] }] }],
+  }),
+);
+const { usdz, frames } = await exportAnimatedUSDZ(glb);
+console.log(`${usdz.length} bytes, ${frames} frames from a ${glb.length}-byte compressed GLB`);
+```
+
+A second set of joints (`JOINTS_1`) is written with `elementSize = 8`; a third is refused, so bake it down to eight influences.
 
 Tracks are sampled at `fps`, as USD stores them, and the viewer blends between frames: a STEP key turns over one frame instead of at once, and a clip that ends between two frames holds its last pose on the frame after, so it runs up to one frame longer. `SkelAnimation` keeps scales as half floats, 11 bits, so a joint's scale rounds to about 0.05%.
 
