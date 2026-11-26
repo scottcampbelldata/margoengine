@@ -2693,6 +2693,15 @@ export const entries = [
     fix: 'Save presets with version 1. Pass GPU resources and other live objects by reference: give `references` when saving and `bindings` when loading, so the file holds only the reference. Use numeric typed arrays. For a failed request, check the URL and the response status.',
   },
   {
+    id: 'vfx-node-system',
+    title: '@margoengine/vfx: node particle system graphs',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A node-system graph or its JSON was refused. The `code` of the VFXNodeSystemError says why: format or version (not a margo-vfx-node-system version 1 document), limit (over 512 blocks or 32 systems), duplicate-id, unknown-block or unknown-ref (a repeated id, an unknown type or a wire to a missing block), wrong-type (a wire feeds a block whose output does not fit), bad-param (a literal that is missing, not finite or out of order), cycle (value wires or start and end triggers loop), no-system (no system, or none that starts by itself), trigger (a trigger that does not join two systems, a second event trigger on one system, or a sub-emitter child with a shape, update blocks or triggers) or invalid-options (the compiled options were refused by VFX).',
+    fix: 'Read the code and the block id in the error. Give every block a unique id, wire only to blocks that output what the input needs, keep literals finite and in the range the option documents, break loops, and give sub-emitter children only creation blocks.',
+  },
+  {
     id: 'points',
     title: '@margoengine/points: octree cloud options',
     kind: 'family',

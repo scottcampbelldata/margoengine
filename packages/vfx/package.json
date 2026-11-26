@@ -129,6 +129,10 @@
       "types": "./dist/shapes.d.ts",
       "import": "./dist/shapes.js"
     },
+    "./node-system": {
+      "types": "./dist/node-system.d.ts",
+      "import": "./dist/node-system.js"
+    },
     "./schedule": {
       "types": "./dist/schedule.d.ts",
       "import": "./dist/schedule.js"
