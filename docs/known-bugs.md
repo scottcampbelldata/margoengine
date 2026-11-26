@@ -37,6 +37,21 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stays flat across and rises toward the sun. One colour, one density and one sun angle are on disk; telling its
   model apart needs MagicaVoxel renders at other densities, colours and sun angles, and a view of the side faces.
 
+### Open 2026-11-26: path guiding is wrong on the WebGL2 layer on ANGLE Direct3D 11 (KB-VPT-GUIDE-D3D11, voxel-pathtracer)
+
+- **Repro:** on Windows (Edge 158, RTX A6000), `MARGO_COMPAT=1 node packages/voxel-pathtracer/tests/guiding-browser.mjs`.
+  `MARGO_COMPAT=1` puts the test's first leg on the WebGL2 layer on ANGLE Direct3D 11, and it stops at "guided squared
+  error 807472.092169678 must beat baseline 350.04741706417326 by 2x" after 136 s. The baseline is right and the
+  guided image is far off.
+- **Seen where:** main at adf7d36c5a and the KB1673 commit give the same two numbers to every digit, so KB1673 did
+  not cause it. Without `MARGO_COMPAT` the test passes: WebGPU, and its own WebGL2 leg on ANGLE Vulkan (guided error
+  10.24 against baseline 350.05 on both).
+- **Cause:** not found yet. Ruled out: the layer's staged route as such (ANGLE Vulkan passes the same programs) and
+  the time limits of KB-L5a-10 (this is a wrong value, reached well inside the limit). Next step: compare the guide
+  distribution's stored pages on Direct3D 11 against ANGLE Vulkan after the first training batch.
+- **Impact:** `guiding: true` on a browser that has no WebGPU and runs ANGLE on Direct3D 11 gives a far noisier
+  image than `guiding: false`.
+
 ### Fixed 2026-11-26: a faded occluder turned solid for the length of a level cross-fade (KB-LOD-FADECOMBO1, lod)
 
 - **Repro:** `LODFade` and `OccluderFade` (`@margoengine/lod/fade`, `@margoengine/lod/occluder-fade`) on one engine; a
