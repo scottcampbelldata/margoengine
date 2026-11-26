@@ -284,6 +284,7 @@ const JET_CORE_RINGS = 32;
 const JET_OUTER_RINGS = 16;
 const GAUSS_OFFSET = Math.sqrt(1 / 3) / 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const FLAT_BED_NORMAL = [0, 1, 0] as const;
 
 interface JetBed {
   material: number;
@@ -1287,10 +1288,11 @@ export class TracerSolver implements Solver<TracerParams> {
         'The swim wake port has an incompatible layout; connect the current SwimSolver wake output.',
       );
     const wake = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
-    const { cellSize } = this.params;
+    const { cellSize, bed: bottom } = this.params;
     const wakeX = (port.cell[0] - context.cell[0]) * cellSize;
     const wakeY = (port.cell[1] - context.cell[1]) * cellSize;
     const wakeZ = (port.cell[2] - context.cell[2]) * cellSize;
+    const [bedX, bedY, bedZ] = this.bedOffset;
     const words = this.words(),
       book = this.book(),
       lifted = 4 + this.sources.length,
@@ -1299,20 +1301,35 @@ export class TracerSolver implements Solver<TracerParams> {
       const x = wake[w]! + wakeX,
         y = wake[w + 1]! + wakeY,
         z = wake[w + 2]! + wakeZ,
-        downward = -wake[w + 4]!,
-        radius = wake[w + 6]!,
-        height = y - this.bedAt(x, z);
-      if (!(wake[w + 7]! > 0 && downward > 0 && radius > 0 && height > 0 && y <= this.surfaceAt(x, z, time))) continue;
-      const centreX = x + height * (wake[w + 3]! / downward),
-        centreZ = z + height * (wake[w + 5]! / downward);
+        radius = wake[w + 6]!;
+      if (!(wake[w + 7]! > 0 && radius > 0 && y <= this.surfaceAt(x, z, time))) continue;
+      const sample = typeof bottom === 'number' ? undefined : bottom.sample(x + bedX, z + bedZ);
+      const floor = sample ? sample.elevation - bedY : this.bedAt(x, z);
+      const [normalX, normalY, normalZ] = sample?.normal ?? FLAT_BED_NORMAL;
+      const impulseX = wake[w + 3]!,
+        impulseY = wake[w + 4]!,
+        impulseZ = wake[w + 5]!;
+      const downward = -(normalX * impulseX + normalY * impulseY + normalZ * impulseZ);
+      const height = (y - floor) * normalY;
+      if (!(downward > 0 && height > 0)) continue;
+      // The jet strikes the tangent plane below the source. Its normal impulse supplies the round-jet model.
+      const offsetX = height * (impulseX / downward),
+        offsetZ = height * (impulseZ / downward),
+        centreX = x + offsetX,
+        centreZ = z + offsetZ;
       const rings = height >= 2 * radius ? bed.rings : undefined;
-      const spread = rings ? radius : radius + 0.1 * hypot(height, centreX - x, centreZ - z);
+      const spread = rings ? radius : radius + 0.1 * hypot(height * (impulseY / downward), offsetX, offsetZ);
       const area = Math.PI * spread * spread;
       const rate = rings
         ? this.radialPickup(height, radius, downward / dt, bed, rings)
         : pickupRate((0.05 * downward) / (dt * area), bed) * area;
       const mass = Math.min(rate * dt, bed.limit - book[lifted]!);
       if (!(mass > 0 && Number.isFinite(mass))) continue;
+      // Project the tangent-plane annuli into the bed's x-z sampling coordinates.
+      const denominator = 1 + normalY;
+      const axisX = 1 - (normalX * normalX) / denominator,
+        axisZ = 1 - (normalZ * normalZ) / denominator,
+        crossAxis = (-normalX * normalZ) / denominator;
       for (let parcel = 0; parcel < JET_PARCELS; parcel++) {
         while (free < capacity && words[free * STRIDE + 5] !== FREE) free++;
         if (free === capacity) return free;
@@ -1322,8 +1339,10 @@ export class TracerSolver implements Solver<TracerParams> {
         const distance = rings
           ? pickupRadius(rings, (rate * (parcel + quantile)) / JET_PARCELS)
           : spread * pow(0.0625 + 0.7475 * quantile, 0.5);
-        const px = centreX + distance * cos(angle),
-          pz = centreZ + distance * sin(angle),
+        const u = distance * cos(angle),
+          v = distance * sin(angle),
+          px = centreX + axisX * u + crossAxis * v,
+          pz = centreZ + crossAxis * u + axisZ * v,
           floor = this.bedAt(px, pz),
           surface = this.surfaceAt(px, pz, time);
         // Van Rijn (1984), Part II, Eq. 37: use the suspension reference plane as the parcel release level.
@@ -1372,7 +1391,6 @@ export class TracerSolver implements Solver<TracerParams> {
     const words = this.words();
     const book = this.book();
     const capacity = this.emissionCapacity;
-    const flatNormal = [0, 1, 0] as const;
     for (let row = 0; row < nz; row++) {
       const z = wash.z + (row + 0.5) * dz;
       for (let column = 0; column < nx; column++) {
@@ -1381,7 +1399,7 @@ export class TracerSolver implements Solver<TracerParams> {
         const x = wash.x + (column + 0.5) * dx;
         const sample = typeof bottom === 'number' ? undefined : bottom.sample(x + bedX, z + bedZ);
         const floor = sample ? sample.elevation - bedY : this.bedAt(x, z);
-        const [normalX, normalY, normalZ] = sample?.normal ?? flatNormal;
+        const [normalX, normalY, normalZ] = sample?.normal ?? FLAT_BED_NORMAL;
         const sampleX = x + referenceHeight * normalX;
         const sampleY = floor + referenceHeight * normalY;
         const sampleZ = z + referenceHeight * normalZ;

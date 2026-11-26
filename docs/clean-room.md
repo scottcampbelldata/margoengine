@@ -13261,6 +13261,16 @@ compares the same suspended mass, parcel positions, terrain elevations and repla
 Cargo from hull openings uses the same coordinate conversion. A separate live flooding test compares the released
 pellets and fines in shifted and unshifted tracer cells with a roundoff bound derived from the number of steps.
 
+For an inclined bed the fin wake intersects the tangent plane of the source's terrain triangle. Clearance and
+delivered impulse are normal components. The rotation taking the world up vector to the oriented bed normal
+maps both annulus axes into that plane, retaining their area. Duff et al.,
+[“Building an Orthonormal Basis, Revisited” (2017)](https://jcgt.org/published/0006/01/01/), compares
+stable basis constructions. The upward terrain normal keeps `1 + normalY` away from cancellation. The radial
+pressure closure remains Phares's normal-incidence law. S. Beltaos's
+[“Oblique Impingement of Circular Turbulent Jets” (1976)](https://www.iahr.org/library/infor?pid=7059)
+describes the directional shear outside that assumption. A rigid rotation of the live swimmer and planar bed
+preserves the lifted dry mass and rotates each emitted footprint coordinate.
+
 The optional developing wall layer uses Phares et al. Eq. 2.12 and Fig. 4 for the free-stream half width and
 velocity plateau. Using the plateau as constant edge speed, it integrates their axisymmetric Falkner momentum
 layer (Eqs. 2.34–2.36 with the inverse one-sixth shear dependence) analytically. The zero-gradient

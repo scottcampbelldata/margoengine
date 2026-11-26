@@ -489,6 +489,49 @@ test('SEA-15 a native fin jet lifts and debits the same terrain across three ori
   assert.deepEqual(await run([1, -1, -1]), await run(zero));
 });
 
+test('SEA-15 a rotated fin and planar bed keep normal shear and rotate the pickup footprint', async () => {
+  const depth = -1;
+  const clearance = 0.34;
+  const scenario = async (angle) => {
+    const nx = -Math.sin(angle);
+    const ny = Math.cos(angle);
+    const swimmer = await SwimSolver.load();
+    const terrain = new TerrainBed();
+    const tracer = new TracerSolver('tracers', { bedJets: true });
+    const ray = {
+      ...coast,
+      position: [nx * clearance, depth + ny * clearance, 0],
+      orientation: [0, 0, Math.sin(angle / 2), Math.cos(angle / 2)],
+      tail: noTail,
+      steering: [0, 1, 0],
+      fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+    };
+    const world = put(swimmer, [ray])
+      .add(terrain, { columns: 32, rows: 32, width: 4, depth: 4, elevations: (x) => depth - (nx / ny) * x })
+      .add(tracer, { bed: terrain.bed, horizontalDiffusivity: 0, verticalDiffusivity: 0 })
+      .couple([swimmer.id, 'tracers', 'bed'], 'staggered');
+    world.advance(1);
+    assert.ok(tracer.jetErosion > 0);
+    return { mass: tracer.jetErosion, particles: [...tracer.particlesOf()] };
+  };
+  const angle = Math.atan(0.5);
+  const flat = await scenario(0);
+  const slope = await scenario(angle);
+  close(slope.mass, flat.mass);
+  assert.equal(slope.particles.length, flat.particles.length);
+  for (const [
+    i,
+    {
+      position: [x, , z],
+      mass,
+    },
+  ] of flat.particles.entries()) {
+    close(slope.particles[i].position[0], x * Math.cos(angle));
+    close(slope.particles[i].position[2], z);
+    close(slope.particles[i].mass, mass);
+  }
+});
+
 test('the sediment bed rejects viscosity too small to compute a finite pickup rate', () => {
   const world = new PhysicsWorld({ rate });
   const tracer = new TracerSolver('tracers', { bedJets: true });

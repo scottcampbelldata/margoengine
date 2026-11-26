@@ -10441,6 +10441,7 @@ The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core a
 `turbulentTransition` defaults to false. When enabled, a round jet between two and four nozzle diameters from a flat bed develops a turbulent layer past the constant-pressure plateau if its predicted shear exceeds the laminar shear there. The stationary approximation omits adverse pressure gradients, turbulence history, jet travel time and sub-diameter clearances. The paired render carries suspended sediment 15.9 px downstream. The scoped tracer entry grows from 15,007 B to 15,323 B gzip within its 16,702 B ceiling.
 
 Fin-wake and hull-opening coordinates use the common cell length (4,096 m by default). Translating hull openings replaces the same-cell check and reduces the current entry from 15,368 B to 15,322 B gzip.
+Fin jets use the tangent plane of the terrain triangle under the source. This preserves normal clearance, normal momentum and pickup area over planar slopes. Curved or stepped beds can depart from that local plane, and the annular stress omits the directional shear of an oblique jet. The scoped entry with the plane projection is 15,449 B gzip.
 
 ### Bow tunnel discharge for bed wash (SEA-15)
 

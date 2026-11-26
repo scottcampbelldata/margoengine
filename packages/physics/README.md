@@ -3589,6 +3589,7 @@ console.log(sediment.jetErosion > 0, seabed.volume(-0.5) < 0); // true true
 
 Fin wakes can cross origin cells before lifting grains from the live bed. For custom-size cells, pass
 `cellSize: world.cellSize` to the swimmer and tracer.
+On terrain, the fin jet projects its pickup annuli onto the local bed plane and uses the impulse along the bed normal.
 
 Use `submergedJetWallShear` to sample the steady flat-bed stress from a known nozzle. Its arguments use SI units.
 Set `turbulentTransition: true` on the nozzle probe or in `bedJets` to include the secondary shear rise at
