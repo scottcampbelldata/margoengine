@@ -1,5 +1,5 @@
 // Browser side of reference-check.mjs: the batch 168 five-pane scene (scripts/oit-scene.mjs) through one transparency
-// route, read back as the rival comparison reads it (scripts/rival-oit-page.js): canvas bytes, one common IEC sRGB
+// route, read back as the reference comparison read it: canvas bytes, one common IEC sRGB
 // encoding after readback (the palette is binary, so the display encoding of each source channel is invariant).
 import { waitForPipelines } from '../../../../scripts/support/gpu-ready.js';
 import { Engine } from '../../../core/dist/index.js';

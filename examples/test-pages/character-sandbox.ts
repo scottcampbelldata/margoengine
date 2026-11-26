@@ -1,4 +1,4 @@
-// Character playground test page: stress and edge-case testing for:
+// Character sandbox test page: stress and edge-case testing for:
 // @margoengine/gltf, @margoengine/gltf/pbr, @margoengine/animation, @margoengine/animator,
 // @margoengine/mixer, @margoengine/rigging, @margoengine/kinematics-constraints,
 // @margoengine/controls, @margoengine/cameras,

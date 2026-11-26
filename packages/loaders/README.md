@@ -673,7 +673,7 @@ console.log(model.positions.length, [...model.indices!]); // 9 [0, 1, 2]
 - Babylon is left-handed. `rightHanded` (default true) negates Z in positions, normals, placements, camera and light vectors and swaps each triangle's winding, so the scene lands in the engine's space; false keeps the file's numbers.
 - Skipped with a note in `warnings`: delay-loaded `.babylonbinarymeshdata` meshes, pivot matrices, and light types past the four. Particle systems, sprites, sounds, LODs and post processes are not read. A non-JSON, wrongly shaped, out-of-range or cyclic file, an index past the vertices, a submesh past the indices, more than `maxNodes` nodes, a texture past `maxTextureBytes`, or counts past the vertex and triangle limits throws a `LoaderError` with a `code`.
 
-`flattenBabylon(scene, {onlyVisible})` bakes every visible mesh's world transform (through its parents) into one `LoadedGeometry`, one group per mesh. `@margoengine/exporters/babylon` writes the same format.
+`flattenBabylon(scene, {onlyVisible})` bakes every visible mesh's world transform (through its parents) into one `LoadedGeometry`, one group per mesh.
 
 ```ts
 import { parseBabylon, flattenBabylon } from '@margoengine/loaders/babylon';
