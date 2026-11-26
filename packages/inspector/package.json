@@ -78,6 +78,10 @@
       "types": "./dist/shaders.d.ts",
       "import": "./dist/shaders.js"
     },
+    "./mesh-debug": {
+      "types": "./dist/mesh-debug.d.ts",
+      "import": "./dist/mesh-debug.js"
+    },
     "./remote": {
       "types": "./dist/remote.d.ts",
       "import": "./dist/remote.js"
@@ -138,6 +142,8 @@
     "test:browser:tools": "node test/tools-browser.mjs",
     "test:browser:tools:compat": "node test/tools-browser.mjs --compat",
     "test:browser:shaders": "node test/shaders-browser.mjs",
-    "test:browser:remote": "node test/remote-browser.mjs"
+    "test:browser:remote": "node test/remote-browser.mjs",
+    "test:browser:mesh-debug": "node test/mesh-debug-browser.mjs",
+    "test:browser:mesh-debug:compat": "node test/mesh-debug-browser.mjs --compat"
   }
 }

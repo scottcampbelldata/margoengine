@@ -2019,6 +2019,10 @@
       "types": "./dist/tonemap/3dl.d.ts",
       "import": "./dist/tonemap/3dl.js"
     },
+    "./tonemap/enhance": {
+      "types": "./dist/tonemap/enhance.d.ts",
+      "import": "./dist/tonemap/enhance.js"
+    },
     "./transitions/mask": {
       "types": "./dist/transitions/mask.d.ts",
       "import": "./dist/transitions/mask.js"

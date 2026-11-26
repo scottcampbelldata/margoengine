@@ -2155,6 +2155,10 @@
       "types": "./dist/inspector/shaders.d.ts",
       "import": "./dist/inspector/shaders.js"
     },
+    "./inspector/mesh-debug": {
+      "types": "./dist/inspector/mesh-debug.d.ts",
+      "import": "./dist/inspector/mesh-debug.js"
+    },
     "./inspector/remote": {
       "types": "./dist/inspector/remote.d.ts",
       "import": "./dist/inspector/remote.js"
@@ -5570,6 +5574,10 @@
     "./tonemap/3dl": {
       "types": "./dist/tonemap/3dl.d.ts",
       "import": "./dist/tonemap/3dl.js"
+    },
+    "./tonemap/enhance": {
+      "types": "./dist/tonemap/enhance.d.ts",
+      "import": "./dist/tonemap/enhance.js"
     },
     "./toon": {
       "types": "./dist/toon.d.ts",

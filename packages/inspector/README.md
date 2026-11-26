@@ -438,6 +438,53 @@ With engine views, the debug helpers show in each view for the meshes that view 
 toggles a scene overlay. `dispose()` releases the DOM, timer, GPU resources and
 registered passes; engine disposal also performs this cleanup.
 
+## Mesh data debug view
+
+`margoengine/inspector/mesh-debug` shows the data of the meshes on screen: triangle edges, vertex dots, a checker on
+UV set 0 or 1, vertex colours, one colour per material, or plain camera-lit shading. It changes no material and no
+geometry; `dispose()` gives the scene back its own picture. With no options it draws a wireframe over every mesh.
+
+```ts
+import {MeshDebugView} from 'margoengine/inspector/mesh-debug';
+import {createMesh, Material} from 'margoengine/materials';
+import {boxGeometry} from 'margoengine/geometry';
+import {Engine} from 'margoengine/core';
+const engine = await Engine.create(document.querySelector('canvas')!);
+const crate = createMesh(engine, boxGeometry(1, 1, 1), new Material({color: '#8855cc'}));
+const view = MeshDebugView.attach(engine);          // edges over the material
+view.set({mode: 'wireframe-vertices', wireWidth: 2, vertexRadius: 4});
+view.set({mode: 'uv0', uvScale: 8});                // a lit checker in place of the material
+view.set({mode: 'uv0', multiply: true, uvColors: ['#ffffff', '#808080']});   // the checker over it
+view.set({mode: 'material-ids', multiply: null, materialColors: ['#e04040']});
+view.set({mode: 'shaded', meshes: crate.ownedMeshes});                       // one model only
+engine.render();
+```
+
+| `mode` | Shows | `multiply` default |
+| --- | --- | --- |
+| `'wireframe'` (default) | every triangle edge in `wireColor` (`'#72e8cc'`), `wireWidth` 1 pixel (0 to 64) | true |
+| `'vertices'` | a dot on every vertex in `vertexColor` (`'#ffb326'`), `vertexRadius` 3 pixels (0 to 64) | true |
+| `'wireframe-vertices'` | both | true |
+| `'uv0'`, `'uv1'` | a checker: `uvScale` 10 squares per UV unit (above 0, to 4096), `uvColors` `['#f0f0f0', '#3a6ea5']`, the first at UV (0, 0) | false |
+| `'vertex-colors'` | the vertex colours (white where a mesh has none) | false |
+| `'material-ids'` | one colour per material, given in draw order: `materialColors` (default `[]`) first, then generated hues; `resetMaterialIds()` starts again | false |
+| `'shaded'` | camera-lit shading | false |
+
+`multiply: true` keeps each mesh's own picture: lines and dots draw over it, and the checker, vertex colours, material
+colours or shading multiply it. `false` replaces it: camera-lit shading (`diffuseColor` `'#a0a0a0'`, `specularColor`
+`'#303030'`, `specularPower` 32, 1 to 10000; the light sits at the eye and both faces light alike) under the lines and
+dots, a lit checker or material colour, and unlit vertex colours. `null` returns to the mode's default. `meshes`
+(default `null`: every mesh of the view's scene) limits the view; `enabled: false` (default true) draws nothing and
+frees the buffers. Colours are `'#rgb'`, `'#rrggbb'` (sRGB) or linear `[r, g, b]` in 0..1. `options` reads the settings
+in effect. `set` checks everything before changing anything and throws `TypeError` or `RangeError` with a help link.
+
+Core meshes and glTF, FBX and materials PBR nodes are drawn, with live skinned and morphed vertices
+(`@margoengine/animation`) and instanced meshes. Core geometry has UV set 0 only when a package gave it one, and no
+vertex colours; a mesh without a UV set shows the checker's first colour. Vertices moved in a material's own vertex
+shader, alpha cut-outs and clipping planes are not applied (see [limits](../../docs/limits.md)). It runs on WebGPU and
+the WebGL2 compatibility layer; native WebGL2 throws `MargoError` `'unsupported'`. The panel's wireframe and vertex
+normal overlays (`setDebug`) stay as they are.
+
 ## Live shader editing
 
 `margoengine/inspector/shaders` edits the WGSL of a mesh drawing a `WgslMaterial` from `margoengine/materials` and

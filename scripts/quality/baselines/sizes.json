@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20413532,
+  "total": 20422203,
   "history": [
     {
       "date": "2026-10-24",
@@ -13161,6 +13161,18 @@
       "commit": "FLUID-01",
       "grew": 1,
       "reason": "FLUID-01 adds the optional DFSPH liquid from zero to 6508 B gzip. Its lazy assets contain two pressure passes and implicit viscosity. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(tonemap) ColorEnhance",
+      "reason": "new optional entry @margoengine/tonemap/enhance (ColorEnhance: channel mixer, shadows, midtones, highlights, vibrance, dehaze), 1,282 B min+gzip; no existing entry grows",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(inspector) MeshDebugView",
+      "reason": "New optional entry @margoengine/inspector/mesh-debug: absent to 6877 B gzip (WGSL view shader, option checks, buffer lifetime); it imports only shared helpers, so no other entry grows. One shader draws every view, so splitting modes would duplicate it. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13701,6 +13713,7 @@
     "@margoengine/inspector/gizmo": 2143,
     "@margoengine/inspector/gl": 4760,
     "@margoengine/inspector/history": 1101,
+    "@margoengine/inspector/mesh-debug": 7133,
     "@margoengine/inspector/packages": 4990,
     "@margoengine/inspector/remote": 7773,
     "@margoengine/inspector/remote-relay": 1700,
@@ -14586,6 +14599,7 @@
     "@margoengine/tonemap": 15124,
     "@margoengine/tonemap/3dl": 2510,
     "@margoengine/tonemap/custom": 1459,
+    "@margoengine/tonemap/enhance": 1538,
     "@margoengine/tonemap/export-cube": 1687,
     "@margoengine/tonemap/grade": 2682,
     "@margoengine/tonemap/hue": 3414,
