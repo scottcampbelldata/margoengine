@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20470502,
+  "total": 20471014,
   "history": [
     {
       "date": "2026-10-24",
@@ -13227,6 +13227,12 @@
       "commit": "e3acc7611",
       "reason": "New optional post entry, 0 to 9,576 B gzip: mesh-blend (MeshBlend, screen-space mesh blending with per-mesh tags and radii and depth-slope rejection). Most of it is the PostStack it attaches to, as in contact-shadows (8,001) and curvature (10,677); its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5ffed99450",
+      "grew": 1,
+      "reason": "EARTH-05 phase-resolved wheel lugs take the optional entry from 11340 to 11837 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24820 B."
     }
   ],
   "items": {
@@ -14098,7 +14104,7 @@
     "@margoengine/physics/strands": 4764,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 11681,
+    "@margoengine/physics/terramechanics": 12193,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,
