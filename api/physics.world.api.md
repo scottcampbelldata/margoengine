@@ -2216,6 +2216,8 @@ class SoftBodies implements PhysicsAttachment {
     setVolumeFactorOf(body: SoftBody, factor: number): void;
     surfaceVolume(body: SoftBody): number;
     setVolume(body: SoftBody, factor: number | null): void;
+    setGas(body: SoftBody, gas: number, ambientPressure: number): void;
+    gasState(body: SoftBody): SoftGasState | null;
     attach(soft: SoftBody, index: number, body: PhysicsBody): void;
     release(soft: SoftBody, index: number, body?: PhysicsBody): boolean;
     writeClusterSprings(body: SoftBody): void;
@@ -2337,6 +2339,8 @@ class SoftBody {
     setParticleKinematicTarget(index: number, position: Vec3): this;
     surfaceVolume(): number;
     setVolumeFactor(factor: number | null): this;
+    setGasPressure(options: SoftGasPressure): this;
+    gasState(): SoftGasState | null;
     threadSoftness(edge: number): SoftSoftness | null;
     get canSleep(): boolean;
     set canSleep(value: boolean);
@@ -2411,6 +2415,7 @@ class SoftBodyDesc {
     shift: Vec3;
     shapeMatching: boolean;
     volumeFactor: number | null;
+    gas: SoftGasPressure | null;
     groups: number | undefined;
     selfContacts: boolean;
     selfFriction: number;
@@ -2448,6 +2453,7 @@ class SoftBodyDesc {
         detail?: number;
     }): SoftBodyDesc;
     setVolumeFactor(factor: number | null): this;
+    setGasPressure(options: SoftGasPressure): this;
     setTensionOnly(edges?: boolean | readonly number[]): this;
     setDominanceGroup(group: number): this;
     setCanSleep(on: boolean): this;
@@ -2530,6 +2536,18 @@ interface SoftContact {
 interface SoftDestination {
     body: SoftBody;
     particle: number;
+}
+
+interface SoftGasPressure {
+    readonly pressure: number;
+    readonly volume?: number;
+    readonly ambientPressure?: number;
+}
+
+interface SoftGasState {
+    readonly volume: number;
+    readonly pressure: number;
+    readonly ambientPressure: number;
 }
 
 class SoftMeshBinding {

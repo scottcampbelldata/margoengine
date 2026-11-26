@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,254 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,256 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -3138,6 +3138,13 @@ package or tool that takes you past it. The reference tables are [Scale](#scale)
 column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
+
+- Seismic waves (EARTH-08, 2026-11-26). One plane-strain section resolves in-plane P and SV, with
+  a level, traction-free top. Pick cell spacing for the shortest wavelength in the scene. The world
+  chooses a dyadic rate that keeps the elastic Courant number at or below 0.95. The damped outer strip
+  approximates an open side and bottom, and oblique waves can return a weak reflection. Cyclic stress
+  screening uses configured soil resistance, with no pore-water pressure evolution. A building receiver
+  is one horizontal mode. The optional solver is 5,646 bytes gzip and each lazy SIMD asset is 2,474 bytes raw.
 
 - Outdoor sound (SOUND-01, 2026-11-26). The solver traces one weakly refracted path or one dominant terrain edge
   per link. It estimates ground interference with one locally horizontal reflecting plane. It uses the current
@@ -12617,6 +12624,20 @@ bed entrainment to their own solvers.
 
 The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
 
+### Gas-filled soft shells (SOFT-06)
+
+`@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber
+has uniform pressure and a fixed pressure–volume product between fill changes. A changing external pressure or an
+independent chamber uses an explicit fill or a separate body. The model has no through-mesh gas transport,
+thermodynamic heat solve, or automatic gas loss when an edge constraint tears. Use a valid shell without
+self-intersections, and its existing material, contacts and substeps still determine the membrane's mechanics.
+Geometry uses f64 local coordinates for signed volume and f32 particle positions in the existing native step. The gas
+product and ambient pressure also use f32 state columns. Each constraint pass takes work linear in vertices and
+triangles and allocates no new scratch while stepping. The same optional soft Wasm runs under either renderer.
+The complete optional soft entry measures 110,995 B gzip, up from 108,726 B, within its 111,864 B ceiling.
+The separately loaded kernel chunk is 75,819 B gzip, up from 74,174 B, and the native kernel is 211,555 B raw.
+Core plus stage remains 24,820 B gzip.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12626,6 +12647,16 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-26: simulated earthquake loads lacked a propagating ground field (EARTH-08)
+
+- **Repro:** Trigger a moment below a layered site. Scene shake parameters could move a camera, but the ground
+  did not propagate a wave or supply different site accelerations to structures.
+- **Cause:** The engine had no solver for the site's elastic propagation and free-surface response.
+- **Fix:** `SeismicGround` propagates P and SV waves and publishes surface acceleration, building response,
+  and soil cyclic demand. `SeismicInertialLoad` moves coupled rigid bodies in their support reference frame.
+- **Regression:** `packages/physics/tests/coupling/seismic.test.js` checks the analytic wave branches, a
+  free surface and layered site, live body recoil, and replay in both memory modes.
 
 ### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
 
@@ -29106,6 +29137,13 @@ mass ledger after restore. The existing mud scene still uses its constant source
 depth-averaged effect. Its large-scale breach and soil uptake need the hydraulic source and
 entrainment fields before that scene consumes replayable discharge.
 Run `packages/physics/tests/coupling/viscoplastic.test.js` for the varying-inlet regression.
+
+### Open gas-shell topology and gas-field coupling (SOFT-06)
+
+A closed pressurized shell deforms and transfers impulses through the real rigid contact ports. Tearing an edge
+currently leaves the triangles connected, so the gas stays in its chamber. A pressure vessel that opens dynamically
+will need membrane topology changes and an opening/flow contract. Solver output exposes live recorded pressure and
+volume. A changing atmospheric field requires an application update until the shared pressure ports are available.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
