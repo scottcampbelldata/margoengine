@@ -14780,8 +14780,8 @@
         "gzip": 10901
       },
       "./soft": {
-        "raw": 267471,
-        "gzip": 141779
+        "raw": 267756,
+        "gzip": 141859
       },
       "./meshfiles": {
         "raw": 6444,
@@ -19260,8 +19260,8 @@
     "@margoengine/physics/soft": {
       "entry": "./soft",
       "base": {
-        "raw": 138940,
-        "gzip": 45269
+        "raw": 139225,
+        "gzip": 45366
       },
       "lazy": {
         "name": "soft body kernel (deflated Wasm blueprint and its column table)",

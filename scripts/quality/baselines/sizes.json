@@ -13419,6 +13419,12 @@
       "commit": "b759429b01",
       "grew": 1,
       "reason": "EARTH-05 reading the live triangulated cross grade for cambered cylindrical wheels takes the optional entry from 14023 to 14719 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "95d3b28ef9",
+      "grew": 0,
+      "reason": "SOFT-04 adds paired material lip tracking for prescribed tensile fronts, moving the soft entry from 141779 to 141859 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
