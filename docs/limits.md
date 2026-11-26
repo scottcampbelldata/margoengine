@@ -9227,6 +9227,19 @@ A brittle-fracture producer can publish per-track excitation in the same field l
 The optional entry measures 9,736 bytes gzip. Its plain and shared Wasm files each measure 1,567 bytes
 raw, fetched only when the caller loads the solver.
 
+### Radiation fog and cold-air pooling (ATMO-08)
+
+The cold-air layer resolves one vertical bulk temperature, velocity and droplet population per ground column.
+It models near-surface nocturnal radiation fog, valley pooling and exchange with overlying air. Its pressure and
+ambient weather inputs are held per coupling step. The grey longwave boundary does not resolve spectral radiation.
+The bulk fall speed uses small spherical liquid droplets. Multiple radiative strata, aerosol activation, supercooled
+phase changes and synoptic weather require their own field models. Open edges export the layer. Sealed edges retain
+it while settling and external surface inputs exchange water with the ground.
+
+The visual grid interpolates extinction horizontally and uses the bulk column thickness vertically. Its storage is
+16 bytes per column plus the 48-byte header, limited by the device's storage binding and buffer sizes. Analytic fog
+volumes and the live grid each work as an optional `VolumetricFog` medium.
+
 ### Layered snowpack (ICE-01)
 
 The model resolves a vertical column for each sample, with a fresh surface layer and the configured initial layers.

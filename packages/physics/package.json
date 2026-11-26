@@ -172,6 +172,10 @@
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
     },
+    "./drainage-fog": {
+      "types": "./dist/drainage-fog/index.d.ts",
+      "import": "./dist/drainage-fog.js"
+    },
     "./snowpack": {
       "types": "./dist/snowpack/index.d.ts",
       "import": "./dist/snowpack.js"

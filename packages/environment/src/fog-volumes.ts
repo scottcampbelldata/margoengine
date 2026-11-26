@@ -161,3 +161,107 @@ export class FogVolumes implements VolumetricMediumSource {
     this.dispose();
   }
 }
+
+/** A cell-centred fog field such as `DrainageFog` from `@margoengine/physics/drainage-fog`. */
+export interface FogColumnSource {
+  readonly width: number;
+  readonly depth: number;
+  readonly spacing: readonly [number, number];
+  readonly origin: readonly [number, number];
+  /** Changes when column data changes, including a seek back in time. */
+  readonly revision: number;
+  /** Writes `[baseY, topY, extinction, 0]` into each row of four f32 words, in x-fast order. */
+  writeColumnData(target: Float32Array): void;
+}
+
+/** A resolved live medium for `VolumetricFog`, sampled at each froxel without scrolling a noise field. */
+export class FogGrid implements VolumetricMediumSource {
+  private buffer?: GPUBuffer;
+  private device?: GPUDevice;
+  private entries: GPUBindGroupEntry[] = [];
+  private data = new Float32Array(0);
+  private currentRevision?: number;
+  private geometry = '';
+  private disposed = false;
+  private readonly color: Vec3;
+
+  /** `color` is a linear RGB scattering albedo. Defaults to white. */
+  constructor(
+    readonly source: FogColumnSource,
+    color: Vec3 = [1, 1, 1],
+  ) {
+    if (!source || typeof source.writeColumnData !== 'function')
+      throw new TypeError('Invalid fog grid source. Supply an attached DrainageFog solver or a FogColumnSource.');
+    if (!vec3(color, 0, 1)) throw new RangeError('Invalid fog grid color. Use three linear albedo values in [0, 1].');
+    this.color = [...color];
+  }
+
+  medium(group: number): string {
+    return /* wgsl */ `
+@group(${group}) @binding(0) var<storage,read> fogColumns:array<vec4f>;
+fn fogColumn(i:vec2u,w:u32,y:f32)->f32 {
+  let column=fogColumns[3u+i.x+i.y*w];
+  return select(0.0,column.z,y>=column.x && y<column.y);
+}
+fn fogMedium(p:vec3f)->vec4f {
+  let domain=fogColumns[0];let dims=vec2u(fogColumns[1].xy);let edge=vec2f(dims)-vec2f(0.5);
+  let xy=(p.xz-domain.xy)*domain.zw;
+  if(any(xy<vec2f(-0.5)) || any(xy>=edge)){return vec4f(0.0);}
+  let last=dims-vec2u(1u);let q=clamp(xy,vec2f(0.0),vec2f(last));let a=vec2u(q);let b=min(a+vec2u(1u),last);let t=q-vec2f(a);
+  let north=mix(fogColumn(a,dims.x,p.y),fogColumn(vec2u(b.x,a.y),dims.x,p.y),t.x);
+  let south=mix(fogColumn(vec2u(a.x,b.y),dims.x,p.y),fogColumn(b,dims.x,p.y),t.x);
+  let sigma=mix(north,south,t.y);return vec4f(fogColumns[2].rgb*sigma,sigma);
+}`;
+  }
+
+  /** Uploads the source once per revision and after any device replacement. */
+  bindings(device: GPUDevice): GPUBindGroupEntry[] {
+    if (this.disposed) throw new RangeError('FogGrid is disposed. Create a new FogGrid for the source.');
+    const { width, depth, spacing, origin, revision } = this.source;
+    const [dx, dz] = spacing,
+      [x, z] = origin;
+    const size = (3 + width * depth) * 16;
+    if (
+      !Number.isSafeInteger(width) ||
+      !Number.isSafeInteger(depth) ||
+      width < 1 ||
+      depth < 1 ||
+      !(dx > 0 && dz > 0 && [1 / dx, 1 / dz, x, z, revision].every(finite))
+    )
+      throw new RangeError(
+        'Invalid fog grid geometry. Supply positive column counts and spacing and finite origin and revision.',
+      );
+    if (size > Math.min(device.limits.maxStorageBufferBindingSize, device.limits.maxBufferSize))
+      throw new RangeError('Fog grid exceeds this device storage size. Use fewer fog columns or coarser spacing.');
+    const geometry = [width, depth, dx, dz, x, z].join(',');
+    const changed = !this.buffer || this.device !== device || this.buffer.size !== size;
+    if (changed || this.currentRevision !== revision || this.geometry !== geometry) {
+      if (this.data.byteLength !== size) this.data = new Float32Array(size / 4);
+      this.data.set([x, z, 1 / dx, 1 / dz, width, depth, 0, 0, ...this.color, 0]);
+      this.source.writeColumnData(this.data.subarray(12));
+      if (changed) {
+        this.buffer?.destroy();
+        this.buffer = device.createBuffer({ size, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
+        this.device = device;
+        this.entries = [{ binding: 0, resource: { buffer: this.buffer } }];
+      }
+      device.queue.writeBuffer(this.buffer!, 0, this.data as Float32Array<ArrayBuffer>);
+      this.currentRevision = revision;
+      this.geometry = geometry;
+    }
+    return this.entries;
+  }
+
+  /** Frees the buffer. Detach this medium before disposing it. */
+  dispose(): void {
+    this.disposed = true;
+    this.buffer?.destroy();
+    this.buffer = this.device = undefined;
+    this.entries = [];
+  }
+
+  declare [Symbol.dispose]: () => void;
+  [(Symbol.dispose ?? Symbol()) as symbol](): void {
+    this.dispose();
+  }
+}

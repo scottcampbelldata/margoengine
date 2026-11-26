@@ -16339,6 +16339,13 @@ an impulse, rolling or scraping excitation, with sound and damping set by the co
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
 
+## Fixed: valley fog lacked transported extinction (ATMO-08, PA-34 fog)
+
+A stationary fog box could vary noise without transporting moisture, so it did not resolve a plume carried
+against a slope or across a valley. Bind `FogGrid` to `DrainageFog` as the volumetric medium. Its physics and
+rendered movement are covered by `packages/physics/tests/coupling/drainage-fog.test.js` and
+`packages/environment/tests/drainage-fog.browser.mjs`. PA-34 retains the separate cloud path.
+
 ## Fixed: snow lacked melt energy and dense slides ignored obstacles (ICE-01, PA-33)
 
 The visual snow layer could stay in place after warming. The older avalanche modeled plant damage without taking

@@ -10127,6 +10127,14 @@ cover the analytic impulse and held-force convolution, resting contact, rolling 
 rupture, 44.1 kHz allocation at 120 Hz, frame-rate independence and replay. The Physics README uses
 an actual browser audio destination to verify the rendered signal.
 
+### Drainage fog evidence (ATMO-08)
+
+`DrainageFog` uses the PhysicsWorld arena and pinned thermodynamics. Its coupled tests verify heat and water through
+phase change, Stokes deposition, downhill forcing from `TerrainBed`, real `SurfaceEnergySolver` exchange, open-edge
+export, conservative fog transfer and shared/plain replay. The environment medium exposes the same optical layer to
+the froxel pass. Its browser fixture moves the resolved patch on WebGPU and WebGL2 compatibility and verifies that
+removing the medium restores the clear frame. This covers the fog portion of PA-34.
+
 ### Snowpack evidence (ICE-01)
 
 `Snowpack` keeps mass, enthalpy, geometry and cover in its PhysicsWorld arena. Each Wasm variant has an empty

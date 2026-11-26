@@ -3252,6 +3252,36 @@ scrape power times speed, rolling proxy power in W and rolling power times speed
 has one equivalent impulse in N s per track. The PCM field publishes layout-1 f32 track rows with zero padding.
 Its f64 clock field gives sample rate, first sample, valid samples, row capacity and track count.
 
+## Drainage fog
+
+`DrainageFog` is a shallow moist-air layer over a terrain grid. Clear-sky longwave loss and surface exchange cool the
+air, which releases latent heat as droplets condense. Dense air accelerates downhill, and the wind carries the
+vapour and fog across cell faces. Droplet settling, entrainment and open boundaries have a mass ledger.
+
+```ts
+import { DrainageFog } from '@margoengine/physics/drainage-fog';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const fog = await DrainageFog.load();
+world.add(fog, {
+  width: 4, depth: 2, spacing: [8, 8],
+  terrain: [3, 2, 1, 0, 3, 2, 1, 0], initialHumidity: 1, secondsPerSecond: 60,
+});
+world.advance(60);
+console.log(fog.read(2, 1).extinction, fog.budget.deposited);
+```
+
+Inputs use SI units. `heat` supplies sensible heat to the layer in W/m² and `moisture` supplies water to the air in
+kg/(m² s). Use the corresponding `SurfaceEnergySolver` words with `heat: { field, stride: 5, word: 1 }` and
+`moisture: { field, stride: 3, word: 0 }` at load time. Use `followTerrain` to read a matching `TerrainBed`, or
+provide the elevations directly. `wind` is a background `Wind` field sampled at each layer's centre.
+
+`read(x, z)` gives temperature, motion, vapour and liquid mixing ratios, extinction and deposition. The layout-1 f64
+`columnField` publishes the same cells in x-fast order. `opticalField` is `[ground, top, extinction, 0]` per cell as
+f32. Readers can use the field registry or call `writeColumnData` for direct view binding. Pass the solver as
+the source of Environment's optional `FogGrid`.
+
 ## Layered snowpack
 
 `Snowpack` stores each column's snow mass, enthalpy and depth. Snow settles under its weight, conserves heat
