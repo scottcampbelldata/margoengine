@@ -353,7 +353,7 @@ export function staticAddedMass(infinite: number, kernel: Float64Array, dt: numb
  * limit) to the first sample, linear between samples and 0 past the last, by a fine trapezoid rule; cos(i h t) by the
  * recurrence cos((i + 1) a) = 2 cos(a) cos(i a) - cos((i - 1) a), one pinned cosine a lag.
  */
-function kernelOf(frequencies: Float64Array, table: Float64Array, dt: number, window: number): Float64Array {
+export function kernelOf(frequencies: Float64Array, table: Float64Array, dt: number, window: number): Float64Array {
   const count = frequencies.length,
     length = Math.max(2, Math.ceil(window / dt)),
     fine = 4000,

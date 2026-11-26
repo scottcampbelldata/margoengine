@@ -75,8 +75,10 @@ import {
   volumeBelow,
 } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
-import { buildHullMemory, type HullMemory, type HullWaveMemory, stillWaterline } from './memory.js';
+import { buildHullMemory, type HullMemory, type HullWaveMemory, type RadiationPair, stillWaterline } from './memory.js';
+import { panelDampingKernels, panelDiffraction } from './panel-runtime.js';
 import { surgePanelMass } from './panel-surge.js';
+import type { HullPanelResponse } from './panels.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { isShellApertureField, panelAperture, type ShellAperture, shellApertureRows } from './shell-opening.js';
 import { SHELL_PRESSURE_LAYOUT, SHELL_PRESSURE_WORDS, shellPressureField } from '../crush/shell-aperture.js';
@@ -110,6 +112,8 @@ export interface Hull {
   readonly bilgeKeels?: readonly HullBilgeKeel[];
   /** Carry the 3D high-frequency water inertia along the hull's x axis. Default false. */
   readonly surgeAddedMass?: boolean;
+  /** Optional three-dimensional radiation, infinite inertia and directional diffraction at the reference draft. */
+  readonly panels?: HullPanelResponse;
   /** Add mean axial wave-reflection loads on the hull's waterline. Default false. */
   readonly shortWaveResistance?: boolean;
   /**
@@ -262,6 +266,8 @@ export class HullSolver implements Solver<HullParams> {
   /** Per hull and station: the water's heave and sway velocity at the section, in the body's frame, each of the last `lags` steps. */
   private waves: Region | null = null;
   private diffraction = true;
+  private panelScatter = true;
+  private readonly panelForce = new Float64Array(6);
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   private readonly surfaceSample: SeaSurfaceSample = {
     height: 0,
@@ -274,6 +280,7 @@ export class HullSolver implements Solver<HullParams> {
   /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
   private carry: Region | null = null;
   private readonly memories = new Map<Hull, HullWaveMemory>();
+  private readonly panelMemories = new Map<Hull, readonly RadiationPair[]>();
   private readonly surgeMasses = new Map<Hull, number>();
   private rollDamping = true;
   private viscosity = SEA_VISCOSITY;
@@ -598,6 +605,20 @@ export class HullSolver implements Solver<HullParams> {
     if (this.addedMass || hulls.some((hull) => hull.compartments?.length))
       this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
     this.diffraction = (params.diffraction ?? true) && this.waterOf() !== null;
+    this.panelScatter = (params.diffraction ?? true) && this.wavesOf() !== null;
+    const seaDepth = this.wavesOf()?.stillDepth;
+    for (const hull of hulls) {
+      const table = hull.panels;
+      if (!table) continue;
+      if (hull.surgeAddedMass)
+        throw new MargoError('state', 'Choose either bakeHullPanels or surgeAddedMass for this hull.');
+      if (table.density !== (sea.density ?? SEA_WATER) || table.gravity !== -this.gravity[1] ||
+        (seaDepth !== undefined && seaDepth !== table.depth))
+        throw new MargoError('state', 'Use the same density, gravity and still depth as the world when baking hull panels.');
+      const top = 2 * table.frequencies.at(-1)! - table.frequencies.at(-2)!;
+      if (!(top < Math.PI * rateOf(level)))
+        throw new MargoError('state', 'Choose panel frequencies below the hull tick rate’s Nyquist frequency or increase its rate.');
+    }
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     this.greenWater = params.greenWater ?? true;
     this.slamming = params.slamming ?? true;
@@ -928,7 +949,10 @@ export class HullSolver implements Solver<HullParams> {
           loads,
         );
       if (this.rollDamping) this.dampRoll(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), speed, loads);
-      if (this.diffraction)
+      if (hull.panels?.headings && this.panelScatter) {
+        if (loads.area > 0) this.diffractPanels(hull.panels, pose, t, loads);
+      }
+      else if (this.diffraction)
         this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), speed, loads);
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
       if (this.slamming) this.slamLoad(hull, pose, centre, t, 1 / rateOf(context.level), loads);
@@ -1085,6 +1109,27 @@ export class HullSolver implements Solver<HullParams> {
       this.memories.set(hull, memory);
     }
     return memory;
+  }
+
+  private diffractPanels(
+    table: HullPanelResponse,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    t: number,
+    loads: WettedLoads,
+  ): void {
+    const sea = this.wavesOf()!;
+    if (this.waves32.length < 4 * sea.waveCount) this.waves32 = new Float32Array(4 * sea.waveCount);
+    const count = sea.waveComponents(t, this.waves32);
+    const q = pose.rotation;
+    const forward = rotate(q, [1, 0, 0]);
+    const across = rotate(q, [0, 0, 1]);
+    panelDiffraction(table, this.waves32, count, pose.position, forward, across, this.panelForce);
+    const f = rotate(q, [this.panelForce[0]!, this.panelForce[1]!, this.panelForce[2]!]);
+    const m = rotate(q, [this.panelForce[3]!, this.panelForce[4]!, this.panelForce[5]!]);
+    for (let k = 0; k < 3; k++) {
+      loads.force[k]! += f[k]!;
+      loads.torque[k]! += m[k]!;
+    }
   }
 
   /**
@@ -1919,18 +1964,24 @@ export class HullSolver implements Solver<HullParams> {
         centre[1] - pose.position[1],
         centre[2] - pose.position[2],
       ]),
-      memory = this.memoryOf(hull, bodies, at, local, dt);
-    if (!memory) return;
+      memory = !hull.panels || hull.course ? this.memoryOf(hull, bodies, at, local, dt) : null;
+    if (!(bodies[at + 16]! > 0)) return;
     const lags = this.lags,
       index = this.hulls.indexOf(hull),
       ring = new Float64Array(this.host!.memory.buffer, this.history!.byteOffset + index * lags * 6 * 8, lags * 6),
       velocity = rotate(conjugate, [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!]),
       spin = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!]),
       slot = tick % lags;
+    const last = new Float64Array(this.host!.memory.buffer, this.radiated!.byteOffset + index * 7 * 8, 7);
+    if (hull.panels && loads.area === 0) {
+      if (last[0] === 1) ring.fill(0);
+      last.fill(0);
+      return;
+    }
     const force = [0, 0, 0, 0, 0, 0];
     const course = this.course[index];
-    const diagonal = memory.pairs[0];
-    if (course && diagonal) {
+    const diagonal = memory?.pairs[0];
+    if (course && memory && diagonal) {
       const forward = rotate(q, [1, 0, 0]);
       const up = rotate(q, [0, 1, 0]);
       const horizontal = hypot(forward[0], forward[2]);
@@ -1968,9 +2019,19 @@ export class HullSolver implements Solver<HullParams> {
         memory.heaveInfinite,
         dt,
       );
+      if (hull.panels) velocity[0] -= speed;
     }
     ring.set([...velocity, ...spin], 6 * slot);
-    for (const { i, j, kernel } of memory.pairs) {
+    let pairs = memory?.pairs ?? [];
+    if (hull.panels) {
+      let kernels = this.panelMemories.get(hull);
+      if (!kernels) {
+        kernels = panelDampingKernels(hull.panels, dt, lags);
+        this.panelMemories.set(hull, kernels);
+      }
+      pairs = kernels;
+    }
+    for (const { i, j, kernel } of pairs) {
       const n = Math.min(lags, kernel.length);
       let ij = 0,
         ji = 0;
@@ -1989,8 +2050,7 @@ export class HullSolver implements Solver<HullParams> {
     // so the force is carried there along the line through its last two values. Held from the start, it lagged the load by
     // theta dt, a phase error of w theta dt that moved a driven hull's damped response first order in the step (a heaving
     // and pitching hull 9 percent off at 60 steps a second, 1 percent with the force carried on).
-    const last = new Float64Array(this.host!.memory.buffer, this.radiated!.byteOffset + index * 7 * 8, 7),
-      now = force.slice();
+    const now = force.slice();
     if (last[0] === 1) for (let k = 0; k < 6; k++) force[k] = now[k]! + theta * (now[k]! - last[1 + k]!);
     last[0] = 1;
     last.set(now, 1);
@@ -2035,12 +2095,19 @@ export class HullSolver implements Solver<HullParams> {
       level = this.sea!.elevation(centre[0], centre[2], t),
       waterline = toBody([0, level - pose.position[1], 0])[1],
       density = this.sea!.density ?? SEA_WATER,
-      body = this.addedMass
+      body = this.addedMass && hull.panels && loads.area > 0
+        ? Float64Array.from(hull.panels.infiniteMass)
+        : this.addedMass && !hull.panels
         ? addedMassInfinite(hullSections(hull.mesh, waterline, this.stations), local, density)
         : new Float64Array(36),
-      memory = this.addedMass ? this.memoryOf(hull, bodies, at, local, dt) : null;
+      memory = this.addedMass && (!hull.panels || hull.bilgeKeels?.length)
+        ? this.memoryOf(hull, bodies, at, local, dt)
+        : null;
+    if (hull.panels && hypot(local[0] - hull.panels.centre[0], local[1] - hull.panels.centre[1],
+      local[2] - hull.panels.centre[2]) > 1e-4)
+      throw new MargoError('state', 'Use the rigid body’s local centre of mass when baking hull panels.');
     // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
-    if (memory) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
+    if (memory && !hull.panels) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
     if (memory && hull.surgeAddedMass && loads.area > 0 && !(this.claim & CLAIM_ADDED_MASS)) {
       let surge = this.surgeMasses.get(hull);
       if (surge === undefined) {

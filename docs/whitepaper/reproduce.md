@@ -5117,3 +5117,7 @@ Build packages, then `node --test packages/animation/tests/deformed-points.test.
 
 ## Morph weights per crowd member (animation/instanced-morph)
 Build packages, then `node --test packages/animation/tests/instanced-morph.test.js packages/animation/tests/instanced-skin.test.js`. Run `node packages/animation/tests/instanced-morph-browser.mjs`, then again with `--compat` for the WebGL2 compatibility layer; each prints its measured counts as one JSON line and the backend it ran on.
+
+### SEA-08 three-dimensional radiation and diffraction
+
+Run `node --test packages/physics/tests/coupling/hull-panels.test.js` after building Physics. Run `cargo test --locked --release --manifest-path packages/physics/hull-panel-kernel/Cargo.toml` for refined coefficients, directional diffraction and the two finite-depth boundary conditions. For the coupled render, run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --panel-hull` for WebGPU, then with `MARGO_COMPAT=1` for WebGL2.

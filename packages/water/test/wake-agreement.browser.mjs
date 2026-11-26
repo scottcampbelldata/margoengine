@@ -24,6 +24,7 @@ const modes = [
   ['--hull-advance', 'advance'],
   ['--bilge-keels', 'bilge'],
   ['--surge-panels', 'surge'],
+  ['--panel-hull', 'panel'],
   ['--tidal-course', 'tide'],
   ['--short-wave-reflection', 'reflection'],
   ['--incident-spectrum', 'incident'],
@@ -45,11 +46,12 @@ try {
     const feedback = motion === 'feedback';
     const advance = motion === 'advance' || feedback;
     const surge = motion === 'surge';
+    const panelHull = motion === 'panel';
     const tide = motion === 'tide';
     const reflection = motion === 'reflection';
-    const incident = motion === 'incident' || surge || tide || reflection;
+    const incident = motion === 'incident' || surge || tide || reflection || panelHull;
     const bilge = motion === 'bilge';
-    const forwardCourse = incident || bilge || motion === 'course';
+    const forwardCourse = (incident && !panelHull) || bilge || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { WaterWake } = await import('/packages/water/dist/wake.js');
@@ -84,7 +86,7 @@ try {
     let hash;
     let hullSpeed;
     if (hullMotion) {
-      const { HullSolver } = await import('/packages/physics/dist/seakeeping.js');
+      const { bakeHullPanels, HullSolver } = await import('/packages/physics/dist/seakeeping.js');
       const { Physics } = await import('/packages/physics/dist/index.js');
       await Physics.load();
       const hull = new HullSolver('hull', { minimumRadius: 0.35, advance });
@@ -129,6 +131,9 @@ try {
         for (let i = 0; i < mesh.vertices.length; i += 3) {
           mesh.vertices[i + 2] *= 1 + mesh.vertices[i] * 0.125;
         }
+      const panels = panelHull
+        ? await bakeHullPanels(mesh, { waterline: -0.25, depth: spectrum.depth, frequencies: [0.4, 0.8, 1.2], headings: 8 })
+        : undefined;
       world
         .add(new RigidSolver(), { physics })
         .add(hull, {
@@ -138,6 +143,7 @@ try {
               mesh,
               course: tide ? {} : forwardCourse ? { speed: 1 } : undefined,
               surgeAddedMass: surge,
+              panels,
               shortWaveResistance: reflection,
               bilgeKeels: bilge
                 ? [

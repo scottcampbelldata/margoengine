@@ -2819,7 +2819,7 @@ console.log(Math.abs(u + 0.1 * k * Math.sin(k) * Math.exp(-0.5 * k)) < 0.002); /
 - **Slamming:** a section coming down into the water takes the momentum of the water it sets moving, (dm/dh) V^2 a metre (von Karman 1929), m the added mass of its wetted width with the water's pile-up (Wagner 1932: the wetted half-breadth c solves the mean of the section's height over c sin(theta) equal to its depth), V its speed into the water; past a chine or knuckle the flow leaves the hull and the impact ends. Each station's table comes from the mesh's sections (`slamStations`, `slamSlope`). `slamming: false` leaves it out. Measured: a 30 degree wedge entering at a steady speed takes Wagner's force within 0.02 percent until its chine is wet.
 - **Flooding:** a damaged hull's compartments taking in the sea and spreading it, the air they drive out or trap, the cargo they lose and the list, trim and loss of buoyancy that follow (`compartments` and `openings` on a hull; `Flooding` runs the same on its own). Each compartment is a closed mesh in the body's frame with its `permeability` (default 0.95; machinery 0.85, cargo 0.6 to 0.7, SOLAS II-1 regulation 7-3), its floodwater's surface level square to gravity, so it runs to the low side as the hull heels. Water flows through an opening (a breach, door, hatch, vent or pipe: a rectangle with its centre, normal, width and height) by Bernoulli's equation with a discharge coefficient (default 0.611, a sharp-edged hole), from the pressures on its two sides at each height, its air's and its water's head; an opening part under water and part in the air takes the weir's flow. Each compartment's air keeps its mass, at Boyle's pressure, so a compartment with no vent above its water keeps a pocket of air that stops the sea and floats an upturned hull; it leaves through vents and the dry part of a breach, and bubbles out under water. An opening can open and shut at given times (`opens`, `closes`) or give way under a head of water (`collapse`, a hatch cover or window). Backward Euler on the compartments' water and air keeps every level between its neighbours' at any step. The floodwater is added weight at its centre and moves with the hull in the added-mass solve. A hold's cargo (`cargo`: iron ore, coal, grain, sand, silt, dye or oil, its mass part of the body's) pours out through a breach under its top, by Beverloo's law dry and by Wilson et al.'s under water, while the sea is not coming in. What leaves through each opening to the outside is published in the `hullBreaches` port: `TracerSolver` releases its cargo and `FoamSolver` boils its air when they share the world. Each step reports the sweeps its water and air took (`FloodResult.sweeps`; 200, the limit, means it went on unsettled: take a shorter step). Measured: a box filling through a hole follows Torricelli's law within 6e-4 m of 1.5 m at 60 steps a second (first order in the step); a half-submerged side opening takes the weir's flow to 1e-12; an unvented box stops the sea where Boyle's law says (to 1e-9 m); a barge holed in a wing tank comes to rest at the lost-buoyancy equilibrium within 0.0002 degrees of heel and 0.04 mm of sinkage.
 - **Form drag:** each wet piece facing the way the hull moves through the water takes the stagnation pressure 1/2 rho C (v . n)^2 (Newton's impact law of drag; `dragCoefficient` C, default 1.05, Hoerner's cube face-on), v its velocity relative to the water at the centre of mass, the roll's part left to the roll damping where that is on. It is taken in the share the hull has gone under past the displacement it floats at (0 floating, 1 with all of it under): a floating hull's resistance is its surface models' (the waves it makes, its roll's eddies, a manoeuvring model's resistance). It sets the speed a hull that has lost its buoyancy sinks at and how it turns going down. `drag: false` leaves it out. Measured: a box falling flat under the sea comes to the speed where its drag holds its weight less its buoyancy (to 0.1 percent).
-- **Not yet:** finite-frequency surge radiation, deck structures and bulwarks in the green water, sloshing of the floodwater.
+- **Not yet:** deck structures and bulwarks in the green water, sloshing of the floodwater.
 
 ```ts
 import {Physics} from 'margoengine/physics';
@@ -2939,6 +2939,39 @@ for (let frame = 1; frame <= 30 * 60; frame++) {
   if (frame > 10 * 60) highest = Math.max(highest, box.position[1] - (D / 2 - T));
 }
 console.log(highest > 0.8); // true: it rides the swell's crests
+```
+
+#### Three-dimensional hull panels
+
+`bakeHullPanels(mesh, options)` lazily loads a Rust Wasm solver and bakes coupled radiation and diffraction at the reference waterline. Give the returned table to `Hull.panels`. HullSolver uses its six-axis added mass and radiation kernels, and its heading-dependent diffraction with a `SpectralSea`. The hull's immersed pressure still supplies the incident-wave load. A table can be reused for identical hulls. Use a closed outward-wound mesh, 2 to 64 increasing angular frequencies in rad/s, and wetted edges at most one eighth of the shortest baked wavelength. Set `waterline` and `centre` in body coordinates. `depth`, `density` and `gravity` must match the sea and world. The default is deep water, seawater at 1025 kg/m³, gravity of 9.81 m/s², and 16 evenly spaced diffraction headings. Use `headings: 0` for radiation alone. An `AbortSignal` cancels downloading and can stop the bake between frequencies.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {bakeHullPanels, HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver, worldMemory} from 'margoengine/physics/world';
+
+await Physics.load();
+const mesh = {
+  vertices: Float64Array.of(-0.5,-0.5,-0.5, 0.5,-0.5,-0.5, 0.5,0.5,-0.5, -0.5,0.5,-0.5,
+    -0.5,-0.5,0.5, 0.5,-0.5,0.5, 0.5,0.5,0.5, -0.5,0.5,0.5),
+  indices: Uint32Array.of(0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,1,5, 0,5,4,
+    2,3,7, 2,7,6, 1,2,6, 1,6,5, 0,4,7, 0,7,3),
+};
+const panels = await bakeHullPanels(mesh, {frequencies: [0.6, 1.2, 1.8], depth: 3, headings: 0});
+const world = new PhysicsWorld({rate: {num: 60, den: 1}, memory: worldMemory(false)});
+using physics = new Physics(null, {fixedTimestep: 1 / 60, arena: world.arena});
+const hull = physics.addBody(null, {
+  position: [0, 0.01, 0],
+  colliders: {shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 512.5},
+});
+world.add(new RigidSolver(), {physics})
+  .add(new HullSolver(), {
+    hulls: [{row: hull.row, mesh, panels}], sea: {elevation: () => 0},
+    greenWater: false, slamming: false, rollDamping: false,
+  })
+  .couple(['hull', 'rigid'], 'staggered');
+world.advance(60);
+console.log(panels.panelCount, hull.position[1]);
 ```
 
 #### Ship hull on a steady course

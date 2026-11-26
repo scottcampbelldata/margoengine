@@ -85,6 +85,12 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'hull-panel-kernel',
+    crate: 'packages/physics/hull-panel-kernel',
+    blueprint: 'packages/physics/src/seakeeping/hull-panel-kernel.wasm',
+    script: 'packages/physics/scripts/build-hull-panel-kernel.mjs',
+  },
+  {
     name: 'pbf-kernel',
     crate: 'packages/physics/pbf-kernel',
     blueprint: 'packages/physics/src/pbf/pbf-kernel.wasm',

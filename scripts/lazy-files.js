@@ -71,6 +71,14 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/hull-panel-kernel.wasm',
+    label: 'hull-panel-kernel.wasm',
+    kind: 'Rust three-dimensional hull radiation and diffraction',
+    measure: 'file',
+    when: 'bakeHullPanels() from the optional /seakeeping entry',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/thin-film-kernel-shared.wasm',
     label: 'thin-film-kernel-shared.wasm',
     kind: 'Rust SIMD conservative thin-film flow and capillarity, shared world memory',
