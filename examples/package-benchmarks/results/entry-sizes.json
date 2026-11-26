@@ -14166,6 +14166,10 @@
       "./synoptic": {
         "raw": 13632,
         "gzip": 5911
+      },
+      "./pbf": {
+        "raw": 14209,
+        "gzip": 6021
       }
     },
     "@margoengine/physics2d": {
@@ -18145,6 +18149,16 @@
       "raw": 13821,
       "gzip": 5420,
       "brotli": 4765
+    },
+    "packages/physics/dist/pbf-kernel.wasm": {
+      "raw": 17854,
+      "gzip": 7143,
+      "brotli": 6229
+    },
+    "packages/physics/dist/pbf-kernel-shared.wasm": {
+      "raw": 17854,
+      "gzip": 7143,
+      "brotli": 6237
     }
   },
   "splits": {
