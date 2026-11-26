@@ -20,7 +20,6 @@ import { pathExclusions } from '@margoengine/biomes/splines';
 import { BiomeView, type BiomeViewOptions } from '@margoengine/biomes/view';
 import { PresetScene, sunScene } from '@margoengine/sky/scenes';
 import { degrees, sunPath } from '@margoengine/sky/sun';
-import { moonPosition } from '@margoengine/sky/astro';
 import { VolumetricClouds } from '@margoengine/sky/volumetric-clouds';
 import { applySkySettings } from '@margoengine/sky/settings';
 import { WeatherMachine, WEATHER_PRESETS, type WeatherState } from '@margoengine/weather';
@@ -314,8 +313,10 @@ export async function attach(engine: EngineKernel, settings: TimberValleySetting
     // The moon of that night where it was (`moonPosition`, Meeus): its place and its phase, its lit limb toward the
     // sun. `hour` is local solar time, so universal time is the hour less the longitude's 15 degrees an hour. On the
     // night of the 1910 blowup it was a moon two days past full, 18 degrees up in the south-south-east at 22:00.
+    // The ephemeris loads only for a night.
     if (preset.sky.options.night) {
-      const ut = Date.parse(s.date + 'T00:00:00Z') + (s.hour - s.longitude / 15) * 3600000,
+      const { moonPosition } = await import('@margoengine/sky/astro'),
+        ut = Date.parse(s.date + 'T00:00:00Z') + (s.hour - s.longitude / 15) * 3600000,
         moon = moonPosition(new Date(ut), { latitude: degrees(s.latitude), longitude: degrees(s.longitude) });
       preset.sky.options.night = {
         moonDirection: [...moon.direction] as Vec3,

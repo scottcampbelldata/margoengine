@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20511398,
+  "total": 20511412,
   "history": [
     {
       "date": "2026-10-24",
@@ -13383,6 +13383,12 @@
       "commit": "18a13d3469",
       "grew": 0,
       "reason": "SOFT-04 adds inherited crack-front edges and native tensile advance through existing fracture geometry, moving the soft entry from 140526 to 141408 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "a9827b3f4b",
+      "grew": 1,
+      "reason": "KB-SCENES-NIGHTSUN1: timber-valley picks its sky by sunScene (a moonlit night below the horizon) and places the real moon from a new longitude setting; the ephemeris loads by import() only at night, so the entry grows 5829 to 5843 B gzip (+14 B)."
     }
   ],
   "items": {
@@ -14513,7 +14519,7 @@
     "@margoengine/scenes/library": 4468,
     "@margoengine/scenes/look-family": 809,
     "@margoengine/scenes/shot-settings": 1718,
-    "@margoengine/scenes/timber-valley": 5829,
+    "@margoengine/scenes/timber-valley": 5843,
     "@margoengine/sciviz": 66716,
     "@margoengine/sciviz dist/workers/readers.js": 60265,
     "@margoengine/sciviz/a11y": 6737,

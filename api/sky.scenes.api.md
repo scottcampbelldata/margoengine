@@ -43,6 +43,8 @@ export type ScenePresetName = (typeof scenePresetNames)[number];
 
 export const scenePresetNames: readonly ["noon", "goldenHour", "overcast", "dawn"];
 
+export function sunScene(azimuth: number, elevation: number): ScenePreset;
+
 // Not exported from this entry, but used by the exports above:
 
 interface DayPreset {

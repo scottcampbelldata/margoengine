@@ -127,10 +127,7 @@ export const SKY_LOOKS: {
         readonly 'look.zenithStrength': 0.5;
     };
     readonly animatedFeature: {
-        readonly 'sun.mode': 'angles';
-        readonly timeScale: 0;
         readonly model: 'bruneton';
-        readonly 'sun.elevation': 42;
         readonly 'look.zenithStrength': 0.35;
         readonly 'look.horizonStrength': 0.3;
         readonly 'look.sunDiscSize': 2.2;

@@ -83,6 +83,7 @@ export interface TimberValleySettings {
     readonly date?: string;
     readonly hour?: number;
     readonly latitude?: number;
+    readonly longitude?: number;
     readonly look?: LookFamilyName;
     readonly weather?: 'calm' | 'redFlag' | 'blowup' | 'smoke';
     readonly windFrom?: number;
