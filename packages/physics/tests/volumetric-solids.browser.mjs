@@ -73,6 +73,18 @@ try {
   assert.equal(replayIncision.hash, incision.hash);
   assert.deepEqual(await page.locator('canvas').screenshot(), incisionImage);
   console.log(`LH-4 finite incision, boot y=${incision.boot[1].toFixed(6)} m, ${incision.hash}`);
+  await page.evaluate(() => window.renderRung({ loaded: true, showBoot: true, solver: 'vertex-block', frame: 18 }));
+  const intactRung = await page.locator('canvas').screenshot();
+  const fractured = await page.evaluate(() => window.renderLoadedFracture());
+  const fractureImage = await page.locator('canvas').screenshot();
+  assert.ok(fractured.firstCrack.support > 0 && fractured.fractures > 1);
+  assert.ok(fractured.cells > 240);
+  assert.notDeepEqual(fractureImage, intactRung);
+  assert.deepEqual(await page.evaluate(() => window.renderLoadedFracture()), fractured);
+  assert.deepEqual(await page.locator('canvas').screenshot(), fractureImage);
+  console.log(
+    `LH-4 load-driven fracture, first step ${fractured.firstCrack.step}, ${fractured.fractures} advances, ${fractured.hash}`,
+  );
   assert.deepEqual(errors, []);
 } finally {
   await close();

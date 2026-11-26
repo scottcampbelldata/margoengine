@@ -51,6 +51,8 @@ pub const NUCLEATED_TET: u32 = 32;
 /// The six edge slots that can carry a live crack front.
 pub const CRACK_FRONT_SHIFT: u32 = 6;
 pub const CRACK_FRONT_MASK: u32 = 63 << CRACK_FRONT_SHIFT;
+/// A proposed geometric edit was unrepresentable in this step's f32 mesh.
+pub const UNREPRESENTABLE_TET: u32 = 1 << 12;
 /// No neighbour across a face.
 pub const NONE: u32 = u32::MAX;
 

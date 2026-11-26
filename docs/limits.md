@@ -9673,6 +9673,10 @@ split faces or edges. An existing front advances through an eligible adjacent te
 when its projected principal plane crosses the material. Front edge flags travel with
 their material through cuts and snapshots. General mixed-mode propagation remains open.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
+Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
+editing topology. A candidate below the native resolution remains intact for that step.
+Nucleation can select another eligible cell in the same step. An authored blade still reports
+a geometry error when its exact requested cut cannot be represented.
 With tracked tensile fronts the optional entry measures 141,408 B gzip including a 96,641 B lazy native kernel.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base

@@ -5,6 +5,7 @@ import type { Vec3 } from './math.js';
 import { type SliceCell, type SlicePlan, type SlicePoint, TETRA_EDGES } from './soft-plane-cut.js';
 import { carryCutSurface, type SoftDestination, type SoftSplit } from './soft-split.js';
 import { CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NUCLEATED_CELL } from './soft-tensile-seam.js';
+import { MIN_TET_DETERMINANT, tetDeterminant } from './soft-volume.js';
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 
 type NodeState = {
@@ -32,11 +33,6 @@ function childBasis(cell: SliceCell, state: Record<string, Float32Array>, row: n
     const c = i % 3;
     return Math.fround(r[0] * parentBasis[c]! + r[1] * parentBasis[c + 3]! + r[2] * parentBasis[c + 6]!);
   });
-  if (!basis.every(Number.isFinite))
-    throw new MargoError(
-      'failed',
-      'The cut creates an unrepresentable rest basis. Move it away from a vertex or edge.',
-    );
   return basis;
 }
 
@@ -69,6 +65,7 @@ export function makeCutPieces(
   make: (positions: number[]) => SoftBodyDesc,
   planCut: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
   crackedCell?: number,
+  automatic = false,
 ): SoftSplit | null {
   const current = body.particlePositions();
   const oldCells = body.cells();
@@ -109,9 +106,22 @@ export function makeCutPieces(
   const velocity = [old.vx, old.vy, old.vz] as const;
   const positions = [old.x, old.y, old.z] as const;
   const targets = [old.tx, old.ty, old.tz] as const;
-  const prepared = plan.pieces.map((cells) => {
+  const prepared = [];
+  for (const cells of plan.pieces) {
     const nodes = [...new Set(cells.flatMap(({ nodes }) => nodes))];
     const index = new Map(nodes.map((p, i) => [p, i]));
+    const rest = nodes.flatMap((node) => interpolate(plan.points[node]!, [old.rx!, old.ry!, old.rz!]).map(Math.fround));
+    if (
+      automatic &&
+      cells.some(
+        ({ nodes: [a, b, c, d] }) =>
+          !(
+            Math.abs(tetDeterminant(rest, index.get(a)!, index.get(b)!, index.get(c)!, index.get(d)!)) >
+            MIN_TET_DETERMINANT
+          ),
+      )
+    )
+      return null;
     const masses = new Float64Array(nodes.length);
     const momenta = new Float64Array(nodes.length * 3);
     const forces = body.pointForces.size > 0 ? new Float64Array(nodes.length * 3) : null;
@@ -155,20 +165,31 @@ export function makeCutPieces(
       };
     });
     if (
+      history.some(
+        ({ restBasis, initialBasis }) => !restBasis.every(Number.isFinite) || !initialBasis.every(Number.isFinite),
+      )
+    ) {
+      if (automatic) return null;
+      throw new MargoError(
+        'failed',
+        'The cut creates an unrepresentable rest basis. Move it away from a vertex or edge.',
+      );
+    }
+    if (
       masses.some(
         (mass) =>
           !Number.isFinite(Math.fround(mass)) ||
           !(Math.fround(1 / mass) > 0) ||
           !Number.isFinite(Math.fround(1 / mass)),
       )
-    )
+    ) {
+      if (automatic) return null;
       throw new MargoError(
         'failed',
         'The cut creates an unrepresentable fragment mass. Move the plane away from a vertex or edge.',
       );
-    const desc = make(
-      nodes.flatMap((node) => interpolate(plan.points[node]!, [old.rx!, old.ry!, old.rz!]).map(Math.fround)),
-    );
+    }
+    const desc = make(rest);
     desc.setCells(
       history.flatMap(({ nodes }) => nodes),
       body.cellMaterial,
@@ -227,8 +248,8 @@ export function makeCutPieces(
         force: forces && [forces[3 * i]!, forces[3 * i + 1]!, forces[3 * i + 2]!],
       };
     });
-    return { desc, history, state, restVolume };
-  });
+    prepared.push({ desc, history, state, restVolume });
+  }
 
   const totalMass = body.mass();
   const where = new Map<number, SoftDestination[]>();

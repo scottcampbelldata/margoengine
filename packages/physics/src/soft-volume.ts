@@ -12,6 +12,22 @@ import type { Vec3 } from './math.js';
 
 type V = readonly [number, number, number];
 
+export const MIN_TET_DETERMINANT = 1e-18;
+
+/** Six times the signed volume of a tetrahedron in a flat list of positions. */
+export function tetDeterminant(p: ArrayLike<number>, a: number, b: number, c: number, d: number): number {
+  const ux = p[b * 3]! - p[a * 3]!,
+    uy = p[b * 3 + 1]! - p[a * 3 + 1]!,
+    uz = p[b * 3 + 2]! - p[a * 3 + 2]!,
+    vx = p[c * 3]! - p[a * 3]!,
+    vy = p[c * 3 + 1]! - p[a * 3 + 1]!,
+    vz = p[c * 3 + 2]! - p[a * 3 + 2]!,
+    wx = p[d * 3]! - p[a * 3]!,
+    wy = p[d * 3 + 1]! - p[a * 3 + 1]!,
+    wz = p[d * 3 + 2]! - p[a * 3 + 2]!;
+  return ux * (vy * wz - vz * wy) - uy * (vx * wz - vz * wx) + uz * (vx * wy - vy * wx);
+}
+
 const sub = (a: V, b: V): [number, number, number] => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: V, b: V): [number, number, number] => [
   a[1] * b[2] - a[2] * b[1],

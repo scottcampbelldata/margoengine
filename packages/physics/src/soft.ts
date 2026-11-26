@@ -12,9 +12,23 @@ import { checkVec, type Quat, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
 import { planPlaneCut, type SlicePlan, TETRA_EDGES } from './soft-plane-cut.js';
 import { makeCutPieces } from './soft-plane-pieces.js';
-import { bindSkin, boundaryTriangles, boundsOf, reaches, type Skin } from './soft-volume.js';
+import {
+  bindSkin,
+  boundaryTriangles,
+  boundsOf,
+  MIN_TET_DETERMINANT,
+  reaches,
+  type Skin,
+  tetDeterminant,
+} from './soft-volume.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
-import { bindTensileSeam, type BoundTensileSeam, openTensileSeam, type SoftTensileSeam } from './soft-tensile-seam.js';
+import {
+  bindTensileSeam,
+  type BoundTensileSeam,
+  openTensileSeam,
+  type SoftTensileSeam,
+  UNREPRESENTABLE_CELL,
+} from './soft-tensile-seam.js';
 import { planNucleatedCut, planTriangleCut } from './soft-triangle-cut.js';
 
 export type { SoftDestination, SoftSplit } from './soft-split.js';
@@ -839,20 +853,6 @@ const DEFAULT_CLUSTER_HERTZ = 10;
 
 const NO_CELLS: CellRange = { first: 0, count: 0, clusterFirst: 0, clusterCount: 0, memberFirst: 0, memberCount: 0 };
 
-/** Six times the signed volume of the tetrahedron `a b c d` in a flat list of positions. */
-function tetDeterminant(p: ArrayLike<number>, a: number, b: number, c: number, d: number): number {
-  const ux = p[b * 3]! - p[a * 3]!,
-    uy = p[b * 3 + 1]! - p[a * 3 + 1]!,
-    uz = p[b * 3 + 2]! - p[a * 3 + 2]!,
-    vx = p[c * 3]! - p[a * 3]!,
-    vy = p[c * 3 + 1]! - p[a * 3 + 1]!,
-    vz = p[c * 3 + 2]! - p[a * 3 + 2]!,
-    wx = p[d * 3]! - p[a * 3]!,
-    wy = p[d * 3 + 1]! - p[a * 3 + 1]!,
-    wz = p[d * 3 + 2]! - p[a * 3 + 2]!;
-  return ux * (vy * wz - vz * wy) - uy * (vx * wz - vz * wx) + uz * (vx * wy - vy * wx);
-}
-
 function checkSoftness(softness: SoftSoftness, label: string): void {
   if (!(softness.naturalFrequency >= 0 && Number.isFinite(softness.naturalFrequency)))
     throw new RangeError(`${label}: natural frequency must be 0 (rigid) or a positive number of hertz.`);
@@ -1665,7 +1665,7 @@ export class SoftBodyDesc {
           throw new RangeError(`Cell ${t} uses ${index}, which is not a particle; use 0 to ${this.particleCount - 1}.`);
       if (new Set(four).size !== 4)
         throw new RangeError(`Cell ${t} repeats a particle; a cell needs four different particles.`);
-      if (!(Math.abs(tetDeterminant(this.positions, four[0]!, four[1]!, four[2]!, four[3]!)) > 1e-18))
+      if (!(Math.abs(tetDeterminant(this.positions, four[0]!, four[1]!, four[2]!, four[3]!)) > MIN_TET_DETERMINANT))
         throw new RangeError(`Cell ${t} must be flat: its four particles lie in one plane.`);
       next.push(...four);
     }
@@ -3062,6 +3062,8 @@ export class SoftBodies implements PhysicsAttachment {
         'Authored and nucleated cracks use different opening rules. Clear one fracture mode with null.',
       );
     const fracture = seam ?? nucleus;
+    if (fracture !== null && new Set(desc.cells).size !== desc.particleCount)
+      throw new RangeError('A tensile crack needs every particle in a cell. Build a fully tetrahedralized solid.');
     if (
       fracture !== null &&
       (desc.edgePairs.length ||
@@ -5250,9 +5252,10 @@ export class SoftBodies implements PhysicsAttachment {
     body: SoftBody,
     plan: (current: Float32Array, cells: Uint32Array) => SlicePlan | null,
     crackedCell?: number,
+    automatic = false,
   ): SoftSplit | null {
     return this.transferCutAttachments(body, () =>
-      makeCutPieces(this, body, (positions) => new SoftBodyDesc(positions), plan, crackedCell),
+      makeCutPieces(this, body, (positions) => new SoftBodyDesc(positions), plan, crackedCell, automatic),
     );
   }
 
@@ -5265,25 +5268,49 @@ export class SoftBodies implements PhysicsAttachment {
       }
       const blade = openTensileSeam(fracture, (particle) => body.particlePosition(particle));
       if (!blade || body.tornCells().length > 0) continue;
-      const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
+      const split = this.splitGeometrically(
+        body,
+        (current, cells) => planTriangleCut(current, cells, blade),
+        undefined,
+        true,
+      );
       if (split) this.announce(body, [], [fracture.cell], split);
     }
   }
 
   private nucleateTensileFracture(body: SoftBody, threshold: number): void {
     const { first, count } = body.cellRange;
-    const row = this.exports.soft_fem_tensile_nucleation(first, count, threshold) >>> 0;
-    if (row === NO_NEIGHBOUR || body.tornCells().length > 0) return;
-    const axis = new Float64Array(this.exports.memory.buffer, this.exports.soft_fem_fracture_axis(), 3);
-    const direction: Vec3 = [axis[0]!, axis[1]!, axis[2]!];
-    const cell = row - first;
-    const front = TETRA_EDGES[this.exports.soft_fem_fracture_edge() >>> 0];
-    const split = this.splitGeometrically(
-      body,
-      (current, cells) => planNucleatedCut(current, cells, cell, direction, front),
-      cell,
-    );
-    if (split) this.announce(body, [], [cell], split);
+    const choose = (): number => this.exports.soft_fem_tensile_nucleation(first, count, threshold) >>> 0;
+    const initial = choose();
+    if (initial === NO_NEIGHBOUR || body.tornCells().length > 0) return;
+    const unrepresentable: number[] = [];
+    try {
+      for (let row = initial; row !== NO_NEIGHBOUR; row = choose()) {
+        const axis = new Float64Array(this.exports.memory.buffer, this.exports.soft_fem_fracture_axis(), 3);
+        const direction: Vec3 = [axis[0]!, axis[1]!, axis[2]!];
+        const cell = row - first;
+        const front = TETRA_EDGES[this.exports.soft_fem_fracture_edge() >>> 0];
+        const split = this.splitGeometrically(
+          body,
+          (current, cells) => planNucleatedCut(current, cells, cell, direction, front),
+          cell,
+          true,
+        );
+        if (split) {
+          this.announce(body, [], [cell], split);
+          return;
+        }
+        // This candidate stays intact. Independently loaded cells may still make a valid cut.
+        const flags = this.cellColumns().flags!;
+        flags[row] = flags[row]! | UNREPRESENTABLE_CELL;
+        unrepresentable.push(row);
+      }
+    } finally {
+      if (!body.removed && unrepresentable.length > 0) {
+        const flags = this.cellColumns().flags!;
+        for (const row of unrepresentable) flags[row] = flags[row]! & ~UNREPRESENTABLE_CELL;
+      }
+    }
   }
 
   private checkSolidCut(body: SoftBody): void {

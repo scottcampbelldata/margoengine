@@ -183,6 +183,14 @@ crack direction under stress-intensity loading. The implemented rule uses tensil
 [Graphical Modeling and Animation of Brittle Fracture](https://arxiv.org/pdf/2303.02934)
 [On the Crack Extension in Plates Under Plane Loading and Transverse Shear](https://doi.org/10.1115/1.3656897).
 
+Shewchuk's 1997 work on robust geometric predicates motivates checking the determinant
+in the coordinates that the native kernel will hold. An automatic crack is eligible only
+when the replacement has representable f32 vertex positions, affine rest bases and nodal masses.
+The rung fixture derives its 0.015 strain contrast from the fixed-end moments in Connor and
+Faraji (2016), Table 9.1, and the elastic outer-fiber strain `Mc/(EI)`.
+[Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric Predicates](https://www.cs.cmu.edu/~jrs/jrspapers.html)
+[Fundamentals of Structural Engineering](https://doi.org/10.1007/978-3-319-24331-3).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit
