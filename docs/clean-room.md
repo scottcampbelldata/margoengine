@@ -12745,6 +12745,22 @@ the deep mean direction and the lead component's phase, scaled from the
 spread as Baker et al. describe; the constants are chosen against the s18
 still. Written from these descriptions.
 
+### White water as a lit bubble layer (2026-11-26, KB-WATER-WHITEWATERLIGHT1)
+- C. H. Whitlock, D. S. Bartlett and E. A. Gurganus, [Sea foam reflectance and influence on optimum wavelength for remote sensing of ocean aerosols](https://doi.org/10.1029/GL009i006p00719), GRL 9(6), 1982. Foam reflectance from 0.55 to 2.8 um, about one half in the visible.
+- P. Koepke, [Effective reflectance of oceanic whitecaps](https://doi.org/10.1364/AO.23.001816), Applied Optics 23(11), 1984. Fresh whitecaps reflect about 0.55, thinning and fading as they age; the area-averaged effective value is 0.22.
+- R. Frouin, M. Schwindling and P.-Y. Deschamps, [Spectral reflectance of sea foam in the visible and near-infrared: in situ measurements and remote sensing implications](https://doi.org/10.1029/96JC00629), JGR 101(C6), 1996. Surf-zone foam from the Scripps pier: flat through the visible, falling toward the red and much lower in the near infrared (40% less at 0.85 um than at 0.44 um).
+- A. A. Kokhanovsky, [Spectral reflectance of whitecaps](https://doi.org/10.1029/2003JC002177), JGR 109, C05021, 2004. Foam as a densely packed, weakly absorbing layer of bubbles: a deep layer reflects nearly all visible light, diffusely; absorption by water sets the spectrum.
+- H. M. Dierssen, [Hyperspectral measurements, parameterizations, and atmospheric correction of whitecaps and foam from visible to shortwave infrared for ocean color remote sensing](https://doi.org/10.3389/feart.2019.00014), Frontiers in Earth Science 7, 2019. Whitecaps average about 0.4 in the visible, lower where the layer is thin.
+- P. Kubelka and F. Munk, "Ein Beitrag zur Optik der Farbanstriche", Zeitschrift fur technische Physik 12, 1931. Two-stream reflectance of a scattering layer of finite depth over a substrate.
+Margo's foamLight takes the deep-layer reflectance from Kokhanovsky and the
+Frouin spectrum (0.84, 0.86, 0.87) for dense foam and thins it by the
+Kubelka-Munk layer over black water, the foam amount as optical depth (8 at
+full foam), under the fragment's cover blend; it lights the foam by the sky's
+cosine-weighted radiance on a lumpy normal plus the sun's N.L. The lump sizes
+and slopes, the depth and the hollows' openness (0.95, down to 0.75) are chosen
+against the s18 still, whitecaps.browser.mjs's look and whitecap-coverage's
+count. Written from these descriptions.
+
 ## A buried voxel cell and the nearer side (2026-11-25)
 
 `packages/physics/kernel/src/voxel.rs` (`nearer_hidden_side`): when the ghost rule would snap a contact to an exposed face the

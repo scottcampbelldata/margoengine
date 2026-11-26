@@ -234,7 +234,7 @@ test('water filters short slopes in their own footprint and keeps the distant wi
   assert.match(code, /fresnel\(nv\)\*mix\(1\.0,skyVisible,open\)/);
   water.dispose();
 });
-test('foam takes N.L lighting, and a shadow source shades glints and foam from bind group 1', async () => {
+test('foam is lit by the sky and the shadowed sun, and a shadow source shades glints and foam from bind group 1', async () => {
   const h = optionalGPU(),
     entries = [
       { binding: 1, resource: { buffer: {} } },
@@ -259,8 +259,8 @@ fn shadowVisibility(position:vec3f,normal:vec3f)->f32 {return shadowFrame.x;}`,
   assert.match(code, /\+glint\*shade;/);
   assert.match(
     code,
-    /vec3f\(0\.72,0\.77,0\.74\)\*\(ambient\+frame\.radiance\.rgb\*nl\*frame\.sun\.w\*shade\/3\.14159265\+skyLight\)/,
-    'Foam: ambient plus Lambert N.L, shadowed (plus the sky light, with whitecaps only)',
+    /foamColor=foamLight\(foamAlbedo,n,i\.world\.xz,shown,footprint,grainDetail,skyLight,frame\.radiance\.rgb\*frame\.sun\.w\*shade,frame\.sun\.xyz\)/,
+    'Foam: the sky light (whitecaps or not) and the shadowed sun, through foamLight',
   );
   const shadowGroups = () => h.groups.filter((g) => g.entries === current).length;
   assert.equal(shadowGroups(), 1);

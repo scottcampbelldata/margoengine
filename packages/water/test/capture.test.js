@@ -73,7 +73,7 @@ test("water draws its sky reflection, weight and normal into SSR's capture hook"
   assert.match(code, /@fragment fn fragment\(i:Output\)->MargoSSR\{/);
   assert.match(
     code,
-    /let keep=reflection\*\(1\.0-0\.95\*shown\);_=body;_=glint\*shade;return MargoSSR\(vec4f\(skyColor\(reflect\(-v,n\),rough\)\*keep,rough\),vec4f\(vec3f\(keep\),1\),vec4f\(n\*0\.5\+0\.5,1\)\);/,
+    /let keep=reflection\*\(1\.0-shown\);_=body;_=glint\*shade;return MargoSSR\(vec4f\(skyColor\(reflect\(-v,n\),rough\)\*keep,rough\),vec4f\(vec3f\(keep\),1\),vec4f\(n\*0\.5\+0\.5,1\)\);/,
     'the sky reflection it added, times Fresnel and the foam share, as the specular SSR replaces',
   );
   assert.doesNotMatch(code, /return Result\(/);
@@ -152,7 +152,7 @@ test("water hands any other effect's margoSSR its normal, body colour and roughn
   const code = modules(r.gpu.record(() => r.water.draw(r.view.c, 'capture')))[0];
   assert.match(
     code,
-    /margoPosition=i\.world;return margoSSR\(n,v,mix\(frame\.color\.rgb,vec3f\(0\.72,0\.77,0\.74\),shown\*0\.95\),0\.0,rough\);/,
+    /margoPosition=i\.world;return margoSSR\(n,v,mix\(frame\.color\.rgb,foamColor,shown\),0\.0,rough\);/,
   );
   assert.doesNotMatch(code, /return MargoSSR\(vec4f\(skyColor/, "SSR's sky-replace fields only for SSR");
   // Without margoPosition declared (MeshBlend, LightBounce) the stage does not write it.

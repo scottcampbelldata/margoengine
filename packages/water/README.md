@@ -161,11 +161,17 @@ local band, so a deeply submerged object's silhouette produces no contact foam.
 components passes a threshold that falls as the amount rises, read a little ahead of the crest where spilling foam
 runs down the face, broken into patches by gradient noise, with long foam streaks down-wind toward 1. With
 `terrain`, foam lines ring the land (ground near the sea in a few taps round each point) and drift with the
-backwash, breaker foam grows, and with `spray` more and larger droplets fly from the breakers. While it is above 0,
-foam also takes the light of the sky above it, so whitecaps read at night. `chop` (0 to 1, default 0) roughens the
-normals: the ripple layers grow and a short wind-sea layer joins them. `water.setWhitecaps(amount)` and
+backwash, breaker foam grows, and with `spray` more and larger droplets fly from the breakers. `chop` (0 to 1,
+default 0) roughens the normals: the ripple layers grow and a short wind-sea layer joins them.
+`water.setWhitecaps(amount)` and
 `water.setChop(amount)` change either from the next frame (a storm slider), and both reject values outside 0 to 1
 with RangeError. At 0 both draw exactly as before.
+
+All foam (whitecaps, surf, shoreline and contact foam) is a bright layer of bubbles lit from above by the sky and the
+sun, so it reads at night and under an overcast sky as well as in sun. Dense foam returns up to about 0.85 of the light
+on it, as a deep bubble layer does (Kokhanovsky 2004); thin foam is greyer, the dark water showing through. Its surface
+has the lumps and hollows of a broken bore, about 0.5 and 0.2 m across: lumps facing the sky and the sun are brighter
+and hollows see less of the sky. The relief averages out with distance.
 
 For beaches and inland dips, supply `terrain: {heightmap: () => texture,
 origin: [-80,-80], size: [160,160]}`. The borrowed heightmap must contain world-space

@@ -218,6 +218,17 @@ RTX A6000, WebGPU and the WebGL2 layer). TerrainColors' wind ripples now fade
 with the wetness record's moisture, so the sea floor is smooth (KB-TERRAIN-SANDWET1).
 See the [clean-room research](../clean-room.md#short-crested-surf-and-dry-sand-ripples-2026-11-26-kb-water-surfbands1-kb-terrain-sandwet1).
 
+### Section 5 evidence: white water lit as a bubble layer (2026-11-26)
+Water's foam is lit as a multiple-scattering layer from above: the sky's
+cosine-weighted radiance (foamSky or the HDR irradiance) for every kind of
+foam, a two-stream layer reflectance up to a deep layer's 0.84 to 0.87, and a
+lumpy normal with hollows (KB-WATER-WHITEWATERLIGHT1). Under a uniform grey
+sky of radiance L, dense whitecap foam went from one tone at 0.725 L to
+0.86 L with a variation of 0.061, and surf foam on a sea without whitecaps
+from black to 0.36 (packages/water/test/whitewater-light.browser.mjs,
+RTX A6000, WebGPU and the WebGL2 layer). See the
+[clean-room research](../clean-room.md#white-water-as-a-lit-bubble-layer-2026-11-26-kb-water-whitewaterlight1).
+
 ### Section 5 evidence: grazing refraction onto a shallow bed (2026-11-26)
 The texel reprojection above diverges on a bed seen at a grazing angle, and
 the crossing search used to hand its bracket back to it: 36% of the Kitty Hawk

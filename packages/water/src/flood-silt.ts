@@ -10,7 +10,7 @@ import { fault } from '../../shared/errors.js';
 
 const TRANSMISSION = 'let transmission=exp(-(vec3f(0.38,0.10,0.045)+vec3f(1.4,1.3,1.5)*murk)*optical);';
 const BODY = 'let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)';
-const FOAM = 'color=mix(color,vec3f(0.72,0.77,0.74)*';
+const FOAM = 'let foamAlbedo=FOAM_ALBEDO;';
 
 /** The WGSL the effect adds: its uniform (the terrain's origin and size, world x and z) and the load, bilinear per cell. */
 function declarations(binding: number, channel: 'x' | 'w'): string {
@@ -43,5 +43,5 @@ export function siltShader(code: string, binding: number, channel: 'x' | 'w' = '
       BODY,
       'let body=bottom*transmission+(frame.color.rgb+min(silt,50.0)*0.02*vec3f(0.55,0.42,0.3))*(vec3f(1)-transmission)',
     )
-    .replace(FOAM, 'color=mix(color,mix(vec3f(0.72,0.77,0.74),vec3f(0.62,0.55,0.45),1.0-exp(-silt*0.2))*');
+    .replace(FOAM, 'let foamAlbedo=mix(FOAM_ALBEDO,vec3f(0.62,0.55,0.45),1.0-exp(-silt*0.2));');
 }

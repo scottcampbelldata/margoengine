@@ -311,12 +311,25 @@ const seaOf = (wind: number | WaterWind) => {
 // landNearby(): how much land lies round a point of the coastal grid, ground at or above the sea in 18 taps on three
 // rings of 1.2, 2.4 and 3.6 foam distances, nearer rings weighing more (0 in open water, about 0.5 beside a straight
 // cliff). Wind chop (frame.grid.w): the ripple layers grow and a short wind-sea layer joins them, turned -5 degrees.
-// With whitecaps on, foam also takes the light of the sky above it: a Lambert surface under a sky of radiance L returns
-// about the cosine-weighted mean of L over the sky (irradiance over pi). foamSky() takes that mean over the whole upper
-// sky in eight directions: two rings of four, 30 and 60 degrees up, turned 45 degrees from each other (cosine-weighted
-// quadrature with equal weights: the sines of the elevations are the square roots of 1/4 and 3/4). The zenith alone, or
-// the sky behind the viewer, misses the bright horizon band of an overcast deck lit from one side and leaves foam
-// darker than the water that reflects it.
+// Foam of every kind (whitecaps, surf, shoreline, wakes) takes the light of the sky above it: a diffuse surface under a
+// sky of radiance L returns about the cosine-weighted mean of L over the sky (irradiance over pi). foamSky() takes that
+// mean over the whole upper sky in eight directions: two rings of four, 30 and 60 degrees up, turned 45 degrees from each
+// other (cosine-weighted quadrature with equal weights: the sines of the elevations are the square roots of 1/4 and 3/4).
+// The zenith alone, or the sky behind the viewer, misses the bright horizon band of an overcast deck lit from one side
+// and leaves foam darker than the water that reflects it. Before KB-WATER-WHITEWATERLIGHT1 only whitecaps took it, so surf
+// and shoreline foam on a sea without whitecaps had the scene's ambient alone.
+// foamLight(): foam is a layer of bubbles that scatters light many times and absorbs little in the visible, so a deep
+// layer reflects most of it, about evenly in every direction and a little less toward the red (Kokhanovsky 2004, Frouin
+// et al. 1996). Measured whitecap reflectance is lower, 0.4 to 0.55 for fresh foam (Whitlock et al. 1982, Koepke 1984,
+// Dierssen 2019), because a whitecap is a thin layer over dark water and thins as it ages (Koepke's area-averaged
+// effective value is 0.22). The fragment blends foam over the water by its amount (the cover), and the layer itself
+// thins with it: a two-stream (Kubelka-Munk) layer over a black substrate, R = Rinf (1 - e) / (1 - Rinf^2 e),
+// e = exp(-FOAM_DEPTH foam), Rinf FOAM_ALBEDO, so dense roller foam is near white and sparse lace a little greyer. The
+// bore's lumps (two octaves of drifting gradient noise, 0.5 and 0.2 m, up to about a quarter of slope) turn the layer's
+// normal, so lumps facing the sky and the sun are brighter than their flanks, and hollows between them see less of the
+// sky (FOAM_OPEN on average, down to 0.75). The relief fades out where a pixel covers more than a lump, to its average.
+// Margo tuning, held to whitecaps.browser.mjs's look and whitecap-coverage's count: the lump sizes and slopes,
+// FOAM_DEPTH and FOAM_OPEN.
 const shader =
   waterFrame +
   oceanWaves +
@@ -326,6 +339,11 @@ const HORIZON=false;
 const STILL=false;
 // The most the shoreline term alone makes foam, before the grain.
 const SHORE_FOAM=0.35;
+// Foam (foamLight): the reflectance of a deep layer, its optical depth at full foam and the sky its hollows still see
+// on average.
+const FOAM_ALBEDO=vec3f(0.84,0.86,0.87);
+const FOAM_DEPTH=8.0;
+const FOAM_OPEN=0.95;
 @group(0) @binding(1) var depth:texture_depth_2d;
 @group(0) @binding(2) var history:texture_2d<f32>;
 @group(0) @binding(3) var coast:texture_2d<f32>;
@@ -677,6 +695,16 @@ fn foamSky()->vec3f {
  for(var k=0u;k<8u;k++){let a=f32(k)*0.78539816;let up=select(0.5,0.8660254,(k&1u)==1u);let side=sqrt(1.0-up*up);sum+=incidentSky(vec3f(cos(a)*side,up,sin(a)*side),0.4);}
  return sum*0.125;
 }
+fn foamLight(deep:vec3f,n:vec3f,xz:vec2f,amount:f32,footprint:f32,fine:f32,sky:vec3f,sun:vec3f,toward:vec3f)->vec3f {
+ let t=frame.settings.x;
+ let a=noise(xz*1.9+vec2f(t*0.07,-t*0.05));let b=noise(xz*4.7+vec2f(-t*0.11,3.3));
+ let detail=(1.0-smoothstep(0.15,0.6,footprint))*min(1.0,amount*1.5);
+ let slope=(a.yz*(1.9*0.08)+b.yz*(4.7*0.03*fine))*detail;
+ let lump=normalize(n-vec3f(slope.x,0.0,slope.y));
+ let seen=mix(FOAM_OPEN,clamp(FOAM_OPEN+(a.x*0.6+b.x*0.4*fine)*0.45,0.75,1.0),detail);
+ let layer=exp(-FOAM_DEPTH*amount);let albedo=deep*(1.0-layer)/(vec3f(1.0)-deep*deep*layer);
+ return albedo*(sky*(0.5+0.5*lump.y)*seen+sun*max(dot(lump,toward),0.0)/3.14159265);
+}
 // Eight equally weighted samples in the cosine-weighted hemisphere, stratified in squared radius and azimuth.
 fn hdrDiffuse()->vec3f {
  var sum=vec3f(0);
@@ -819,11 +847,17 @@ ${displayShader}
  let shallowBand=select(0.0,1.0-smoothstep(0.0,frame.shallow.w,opticalGap),frame.shallow.w>0.0);
  let bodyLight=diffuse+frame.radiance.rgb*nl*frame.sun.w*0.12;
  let body=bottom*transmission+frame.color.rgb*(vec3f(1)-transmission)*bodyLight+(frame.shallow.rgb-frame.color.rgb)*shallowBand*(vec3f(1)-transmission)*bodyLight;
+ // Foam (KB-WATER-WHITEWATERLIGHT1): a layer of bubbles that scatters light many times, lit from above by the sky and
+ // the sun (foamLight, under the shader head's notes), with the lumps and hollows of a broken bore.
+ // Surface effects tint the deep layer's reflectance here (flood-silt.ts mud, ships.ts wake tint).
+ let foamAlbedo=FOAM_ALBEDO;
+ var foamColor=vec3f(0);
+ if(shown>0.002){
+  var skyLight=vec3f(ambient);if(hdr){skyLight=max(irradiance,skyLight);}else{skyLight=max(foamSky(),skyLight);}
+  foamColor=foamLight(foamAlbedo,n,i.world.xz,shown,footprint,grainDetail,skyLight,frame.radiance.rgb*frame.sun.w*shade,frame.sun.xyz);
+ }
  var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;
- // Foam is a rough white scatterer: N.L direct light over the water's ambient, Lambert-normalized (albedo/pi) like the
- // scene's diffuse surfaces, so it no longer glows at full light strength on the side away from the moon.
- var skyLight=vec3f(0);if(frame.grid.z>0.0){if(hdr){skyLight=irradiance;}else{skyLight=foamSky();}}
- color=mix(color,vec3f(0.72,0.77,0.74)*(ambient+frame.radiance.rgb*nl*frame.sun.w*shade/3.14159265+skyLight),shown*0.95);
+ color=mix(color,foamColor,shown);
  if(frame.cameraData.w<0.5){color=toDisplay(color);}
  return Result(vec4f(color,1),vec4f(foam,0,0,1));
 }`;
@@ -863,8 +897,8 @@ function captureShader(code: string, declarations: string): string {
   // Any other effect (SceneTargets, MeshBlend, LightBounce) declares its own MargoSSR and `margoSSR(n, v, base, metal,
   // rough)`: the water hands it its surface (normal, body colour with the foam it shows, roughness, not metal).
   const tail = ssrOutputs.test(declarations)
-    ? 'let keep=reflection*(1.0-0.95*shown);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));'
-    : `_=body;_=glint*shade;_=reflection;${declarations.includes('var<private> margoPosition') ? 'margoPosition=i.world;' : ''}return margoSSR(n,v,mix(frame.color.rgb,vec3f(0.72,0.77,0.74),shown*0.95),0.0,rough);`;
+    ? 'let keep=reflection*(1.0-shown);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));'
+    : `_=body;_=glint*shade;_=reflection;${declarations.includes('var<private> margoPosition') ? 'margoPosition=i.world;' : ''}return margoSSR(n,v,mix(frame.color.rgb,foamColor,shown),0.0,rough);`;
   const out = code.replace(captureHead, '@fragment fn fragment(i:Output)->MargoSSR{').replace(captureTail, tail);
   if (!out.includes('->MargoSSR{') || !/return (MargoSSR|margoSSR)\(/.test(out))
     throw margoError('unsupported', 'Water capture needs the water fragment; its shader changed');

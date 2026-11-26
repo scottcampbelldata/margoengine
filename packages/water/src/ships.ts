@@ -997,7 +997,7 @@ function shipShader(code: string, binding: number): string {
   const foamLine = 'var foam=max(fresh,surfFoam);';
   const colorLine = 'var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;';
   const bodyStart = 'let body=bottom*transmission+';
-  const foamAlbedo = 'vec3f(0.72,0.77,0.74)';
+  const foamAlbedo = 'let foamAlbedo=FOAM_ALBEDO;';
   const glintStart = 'fn directionalGlint(';
   for (const needle of [surfaceReturn, foamLine, bodyStart, colorLine, foamAlbedo, glintStart])
     if (!code.includes(needle))
@@ -1039,7 +1039,7 @@ ${WAKE_WGSL}`;
         `body=mix(body,shipSurface.tint.rgb*bodyLight,shipSurface.tint.w);
  ${colorLine}color+=shipLamps(i.world,n,v,rough);`,
       )
-      .replace(foamAlbedo, `mix(${foamAlbedo},shipSurface.tint.rgb,0.75*shipSurface.tint.w)`)
+      .replace(foamAlbedo, 'let foamAlbedo=mix(FOAM_ALBEDO,shipSurface.tint.rgb,0.75*shipSurface.tint.w);')
   );
 }
 
