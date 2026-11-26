@@ -4911,8 +4911,10 @@ lowest rotating triangle at each sample and combines it with the rim profile. Se
 
 Pass the same `soilWheelCamberField()` descriptor as `wheelCamber` to both solvers to tilt the
 indexed tread with the steered wheel. Its f64 row is the vertical component of the wheel's unit
-right axis. Positive values raise that side. The default is level camber. The analytic bearing arc
-remains the load reference.
+right axis. Positive values raise that side. For a cylindrical wheel, the same field lets the
+solver sample the live bed at the two projected rim edges and resolve deeper contact on one side.
+The pressure field integrates to the prescribed wheel load. The analytic bearing arc remains
+the force reference along the wheel. Omitting the field uses an upright wheel profile.
 
 Pass `wheelReaction: soilWheelReactionField()` to `Terramechanics.load` to publish one resolved
 load record per external row. `SOIL_WHEEL_REACTION_WORDS` is the number of f64 values in each

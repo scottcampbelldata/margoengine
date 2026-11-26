@@ -345,6 +345,18 @@ and the trough about 14.74 mm at the central station, giving 0.72 on each side w
 envelopes. This check establishes relative locked-wheel relief at one condition. Absolute
 trench geometry across powered slip and obliquity remains open. [Pavlov (2023), Figure 4.5](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=49).
 
+Ryota Matsumura and Genya Ishigami's 2021 in-wheel imaging measured distinct sinkage across
+a tilted wheel, and Yuankai Li, Liang Ding and Guangjun Liu's 2016 wheel-attitude model
+describes lateral inclination relative to the ground plane. The cylindrical raster projects
+its width by `cos γ`, samples the current triangulated bed at both limits, then adds
+`lateral distance × (bed grade - tan γ)` to nominal depth. The positive-depth mask controls
+pressure and excavation, and the pressure quadrature integrates exactly to normal load.
+The live slope case evaluates level, slope-aligned and oppositely cambered wheels and
+checks the cross-width difference directly from plane geometry. The along-wheel force
+arc uses its cylindrical reference. Full dynamic camber forces remain a separate comparison.
+[Matsumura and Ishigami, “Visualization and analysis of wheel camber angle effect for slope traversability using an in-wheel camera” (2021)](https://doi.org/10.1016/j.jterra.2020.09.002),
+[Li, Ding and Liu, “Attitude-based dynamic and kinematic models for wheels of mobile robot on deformable slope” (2016)](https://doi.org/10.1016/j.robot.2015.10.006).
+
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement
 magnitudes in the shear law and projects the force in the direction of the local slip velocity
 (dissertation Eqs. 5.10–5.14 and 5.20–5.21). The sidewall depth is measured from the chord between

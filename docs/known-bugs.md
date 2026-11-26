@@ -17008,7 +17008,8 @@ and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. Th
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
 It stamps evenly spaced lugs from spin and indexed triangle treads from both live spin and camber.
 The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
-Measured cross-slope camber forces remain open.
+The cylindrical raster resolves across-wheel penetration on the live slope. Measured
+dynamic cross-slope camber forces remain open.
 The steady drawbar and axle torque match the measured 60% tip-slip case. An opt-in wheel
 can excavate beyond its initial bearing cut from the live phase. Its exact swept-volume
 and floor tests pass. Measured transient contact angles and high-slip sinkage remain open. The optional

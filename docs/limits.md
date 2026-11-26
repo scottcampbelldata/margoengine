@@ -9905,7 +9905,9 @@ The optional `grouserDig` uses 16 phase-history bytes per external row. Positive
 excavate more soil as the wheel turns, up to the configured bedrock or the axle depth
 supported by this bearing model. Supply continuous phase samples over two loaded steps.
 The response still reports local bearing sinkage. The changed terrain carries the deeper rut.
-Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
+The cylindrical raster interpolates the cross grade between two bed samples. Its central
+depth uses the normal bearing arc. Camber with no projected width is outside that geometry.
+Reverse travel keeps the tyre response. Transient contact angles and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand and relative
 crest-to-trough relief at one straight locked-wheel condition. Supply the same excavation floor

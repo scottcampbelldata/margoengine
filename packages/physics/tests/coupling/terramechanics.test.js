@@ -365,6 +365,8 @@ async function rollingBench(
     stop = Infinity,
     phaseRate,
     floor,
+    camber,
+    elevations = () => 0,
     wheelReaction,
     wheelSideForce,
     lateral = 0,
@@ -374,18 +376,24 @@ async function rollingBench(
 ) {
   const input = soilPatchField('lab-wheel-assembly');
   const wheelPhase = phaseRate === undefined ? undefined : soilWheelPhaseField('lab-wheel-spin');
-  let memory, region, phase;
+  const wheelCamber = camber === undefined ? undefined : soilWheelCamberField('lab-wheel-camber');
+  let memory, region, phase, tilt;
   const carriage = {
     describe: () => ({
       id: 'carriage',
       rate: 0,
       stableRate: () => 0,
-      fields: [{ field: input, access: 'write' }, ...(wheelPhase ? [{ field: wheelPhase, access: 'write' }] : [])],
+      fields: [
+        { field: input, access: 'write' },
+        ...(wheelPhase ? [{ field: wheelPhase, access: 'write' }] : []),
+        ...(wheelCamber ? [{ field: wheelCamber, access: 'write' }] : []),
+      ],
     }),
     init(host) {
       memory = host.memory;
       region = host.allocate('carriage-load', 80, 'f64', 1);
       if (wheelPhase) phase = host.allocate('carriage-phase', 8, 'f64', 1);
+      if (wheelCamber) tilt = host.allocate('carriage-camber', 8, 'f64', 1);
     },
     step(context) {
       regionWords(memory, region).set([
@@ -401,19 +409,28 @@ async function rollingBench(
         0,
       ]);
       if (phase) regionWords(memory, phase)[0] = (phaseRate * context.tick) / 60;
+      if (tilt) regionWords(memory, tilt)[0] = camber;
     },
     exportPorts: (tick) => [
       { field: input.name, region, tick, cell: [0, 0, 0] },
       ...(wheelPhase ? [{ field: wheelPhase.name, region: phase, tick, cell: [0, 0, 0] }] : []),
+      ...(wheelCamber ? [{ field: wheelCamber.name, region: tilt, tick, cell: [0, 0, 0] }] : []),
     ],
     importPorts() {},
-    stateRegions: () => (phase ? [region, phase] : [region]),
+    stateRegions: () => [region, ...(phase ? [phase] : []), ...(tilt ? [tilt] : [])],
     extraState: () => [],
   };
-  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce, wheelPhase });
+  const soil = await Terramechanics.load({
+    tier: 'resolved',
+    input,
+    wheelReaction,
+    wheelSideForce,
+    wheelPhase,
+    wheelCamber,
+  });
   const bed = new TerrainBed();
   const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
-    .add(bed, { ...terrain, elevations: () => 0, bedrock: floor === undefined ? undefined : () => floor })
+    .add(bed, { ...terrain, elevations, bedrock: floor === undefined ? undefined : () => floor })
     .add(carriage)
     .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel], sidewallGravity, floor })
     .couple(['carriage', 'terramechanics', 'bed'], 'staggered');
@@ -886,6 +903,46 @@ test('a spinning stuck wheel excavates the exact angular sweep and conserves the
   assert.equal(clipped.bed.refusedVolume(), 0);
   close(Math.min(...clipped.bed.elevations()), floor, eps);
   close(clipped.bed.volume(), 0, 2048 * eps * clipped.soil.budget.removed);
+});
+
+test('a cylindrical wheel resolves its bearing depth across the live cross slope', async () => {
+  const terrain = { columns: 128, rows: 128, width: 0.5, depth: 0.5, centre: [0, 0] };
+  const wheel = { radius: 0.12 };
+  const grade = 0.125;
+  const point = 0.0234375;
+  const station = -0.12890625;
+  const load = 80;
+  const material = { cohesiveModulus: 0, frictionalModulus: 800_000, compaction: 0, dustFraction: 0 };
+  for (const [camber, shared] of [
+    [0, false],
+    [grade / Math.hypot(1, grade), true],
+    [-grade / Math.hypot(1, grade), true],
+  ]) {
+    const { world, soil, bed } = await rollingBench(terrain, material, wheel, {
+      width: 0.1,
+      length: 0.16,
+      load,
+      speed: 0,
+      slip: 0,
+      camber,
+      shared,
+      elevations: (x) => grade * x,
+    });
+    world.advance(1);
+    const elevations = bed.elevations();
+    const vertex = (x) =>
+      (x / terrain.width + 0.5) * terrain.columns * (terrain.rows + 1) + (station / terrain.depth + 0.5) * terrain.rows;
+    const right = grade * point - elevations[vertex(point)];
+    const left = -grade * point - elevations[vertex(-point)];
+    assert.ok(left > 0 && right > 0);
+    const expected = 2 * point * (grade - camber / Math.sqrt(1 - camber * camber));
+    close(right - left, expected, 128 * eps * (left + right));
+    const pressure = world.fields.port(soil.pressureField.name).region;
+    const area = bedVertexAreas(terrain);
+    const normal = regionWords(world.memory, pressure).reduce((sum, p, i) => sum + p * area[i], 0);
+    close(normal, load, 2048 * eps * load);
+    close(bed.volume(), 0, 2048 * eps * soil.budget.removed);
+  }
 });
 
 test('a yawed smooth wheel reproduces the sidewall earth pressure integral', async () => {

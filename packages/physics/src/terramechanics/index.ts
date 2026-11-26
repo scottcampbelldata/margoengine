@@ -1,4 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
+import type { Bed } from '@margoengine/math/fields';
 import { exp, hypot, ln, pow } from '@margoengine/math/pinned';
 import {
   BED_CHANGE_FIELD,
@@ -6,6 +7,7 @@ import {
   BED_LAYOUT,
   BedChange,
   type BedShape,
+  bedFromPort,
   bedVertexCount,
   type TerrainBedParams,
 } from '../earth/bed.js';
@@ -555,7 +557,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 56);
+    this.nativePatch = allocate('soil-patch-scratch', 57);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -682,7 +684,16 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     return [(port.cell[0] - this.cell[0]) * this.cellSize, (port.cell[2] - this.cell[2]) * this.cellSize];
   }
 
-  private stamp(patch: Patch, row: number, bed: Region, dt: number, phase = 0, camber = 0, spinTravel = 0): void {
+  private stamp(
+    patch: Patch,
+    row: number,
+    bed: Region,
+    dt: number,
+    phase = 0,
+    camber = 0,
+    spinTravel = 0,
+    bedSurface?: Bed,
+  ): void {
     const [x, z, forwardX, forwardZ, length, width, load, shearX, shearZ, flags] = patch;
     if (finite(load, 'normal load', 0) === 0) return;
     if (
@@ -703,6 +714,19 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const rolling = this.rolling[row - this.fixed.length];
     const mesh = this.meshes[row - this.fixed.length];
     const forward = [forwardX / direction, forwardZ / direction] as const;
+    const camberSine = finite(camber, 'wheel camber sine', -1, 1);
+    let crossGrade = 0;
+    if (bedSurface && rolling && !mesh) {
+      const cosine = Math.sqrt((1 - camberSine) * (1 + camberSine));
+      if (!cosine)
+        throw new MargoError('state', 'The cylindrical wheel has no projected width. Use a camber below 90 degrees.');
+      const span = (width / 2) * cosine;
+      const rightX = forward[1] * span;
+      const rightZ = -forward[0] * span;
+      const right = bedSurface.sample(x + rightX, z + rightZ).elevation;
+      const left = bedSurface.sample(x - rightX, z - rightZ).elevation;
+      crossGrade = finite(((right - left) / width - camberSine) / cosine, 'wheel cross grade');
+    }
     const longitudinalSlip = -(shearX * forward[0] + shearZ * forward[1]) / length;
     const drivingSlip = rolling ? Math.min(1, Math.max(0, longitudinalSlip)) : 0;
     const sweptSoil = rolling?.grouserDig
@@ -822,11 +846,12 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         ? finite((shearX * forward[1] - shearZ * forward[0]) / length, 'lateral wheel slip')
         : 0,
       this.sideWeight,
-      finite(camber, 'wheel camber sine', -1, 1),
+      camberSine,
       rolling?.bermProfile === 'cross-track' ? material.reposeSlope : 0,
       rolling?.grouserFill ?? 0,
       rolling?.grouserFill ? Math.max(-1, Math.min(1, longitudinalSlip)) : 0,
       sweptSoil,
+      crossGrade,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -967,6 +992,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       const [x, z] = this.shift(port);
       const phases = this.readWheelPose(context, this.phase, 'phase', port.cell);
       const cambers = this.readWheelPose(context, this.camber, 'camber', port.cell);
+      const bedSurface = cambers && bedFromPort(this.host.memory, bed, this.terrain);
       const digging = this.diggingPhase && this.words(this.diggingPhase);
       for (let i = 0; i < this.inputRows; i++) {
         const at = i * SOIL_PATCH_WORDS;
@@ -998,6 +1024,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           phases?.[i],
           cambers?.[i],
           spinTravel,
+          bedSurface,
         );
       }
     } else if (this.diggingPhase) {

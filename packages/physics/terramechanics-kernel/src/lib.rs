@@ -78,6 +78,7 @@ struct Patch {
     grouser_fill: f64,
     grouser_slip: f64,
     swept_soil: f64,
+    cross_grade: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -207,7 +208,12 @@ unsafe fn raster(patch: &Patch, halo: f64, dx: f64, dz: f64) -> (f64, f64, f64) 
     let station = (dx * patch.forward_x + dz * patch.forward_z) / patch.half_length;
     let side = (dx * patch.forward_z - dz * patch.forward_x) / patch.half_width;
     if patch.profile_columns != 0.0 {
-        let depth = depth_at(patch, side, station);
+        let mut depth = depth_at(patch, side, station);
+        if depth > 0.0 && patch.cross_grade != 0.0 {
+            let across = patch.half_width * patch.cross_grade;
+            depth = (patch.settlement * depth + side * across).max(0.0)
+                / (patch.settlement + across.abs());
+        }
         if depth > 0.0 {
             return (1.0, depth, 0.0);
         }
@@ -1100,14 +1106,24 @@ unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingC
     p.x += shift * p.forward_x;
     p.z += shift * p.forward_z;
     p.half_length = 0.5 * (fore - rear);
-    p.half_width = across;
+    let projected_width = if have_mesh {
+        across
+    } else {
+        across * root((1.0 - p.camber) * (1.0 + p.camber))
+    };
+    p.half_width = projected_width;
     p.profile = depth.as_ptr() as usize as f64;
     p.profile_columns = columns as f64;
     p.profile_rows = rows as f64;
     p.projected_area = (fore - rear) * (2.0 * p.half_width);
+    p.settlement = cap;
+    let deepest = cap + projected_width * p.cross_grade.abs();
+    if p.cross_grade != 0.0 && deepest > rim {
+        return None;
+    }
     Some(RollingCut {
         rim: rim_cut,
-        deepest: cap,
+        deepest,
     })
 }
 
