@@ -15185,6 +15185,10 @@ For N panels, the bake assembles N² complex panel influences and uses one parti
 
 `physicsGame` keeps a world's whole snapshot as the rollback state, so each simulated frame copies the world's memory twice (a load and a save): 1,661,504 bytes for the test's world of nine bodies, most of it room the world keeps to grow. Its cost follows the world's memory, not what moves, and the session keeps `maxRollback + 2` of them. The world must hold the same bodies, colliders and joints for the whole session, and a world that grows its memory is refused with the sizes. `snapshotDiff` compares 32-bit words, so a change anywhere in a word sends the whole word; a step of one rolling ball in that world is 221 bytes. `BodyInterpolator` moves proxies through `setNextPosition` and `setNextRotation`, so they reach the sampled pose at the end of their next step.
 
+## Motor joint and extra substeps per island (own solver)
+
+A motor joint's six motors solve one axis at a time, each capped alone, and the sliding three and the turning three are then cut back together to their caps as vectors, as Box2D cuts its motor joint's impulse; within a pass the axes do not see each other's cut until the next. Its spring is per kilogram along each row (the `acceleration` motor model), so a body hangs `g / (2 pi frequency)^2` below its target under gravity, and a pull capped far below what the spring asks cannot brake in time: the body overshoots and swings in. `body.additionalSubsteps` holds from 0 to 1024; an island takes the most its bodies ask, so one fine body makes its whole island fine. Stepped phase by phase (`islandMajor: false`, deprecated) there is one count for the world, so every island takes the most any asks.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
