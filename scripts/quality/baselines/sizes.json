@@ -13374,7 +13374,7 @@
     },
     {
       "date": "2026-11-26",
-      "commit": "9f9e2ba564",
+      "commit": "70351f3224",
       "grew": 1,
       "reason": "KB6016d: water's sun glint, ship lamps and FFT ocean write the GGX D denominator over n and h (|n x h|^2 + a2 nh^2) so float32 keeps a narrow lobe's peak; @margoengine/water 34733 to 34759 B gzip. The text is the shared ggxDenominatorOf, already inside the entry's shader strings; no split applies. Core plus Stage unchanged."
     }
