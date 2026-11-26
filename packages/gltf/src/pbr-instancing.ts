@@ -55,6 +55,13 @@ export class PBRInstances {
     this.drawn = n;
     this.stale = true;
   }
+  /**
+   * Bumped by every row write and by `needsUpdate = true` (shared by projections): a reader of `data`, such as shadows'
+   * cascade fit, reads the rows again only when it changes. `count` changes leave it as is.
+   */
+  get version(): number {
+    return this.source ? this.source.revision : this.revision;
+  }
   /** Set true after writing `data` directly: every row is uploaded before the next draw. */
   get needsUpdate(): boolean {
     return this.source ? !this.gpu || this.revision !== this.source.revision : this.high > this.low;
