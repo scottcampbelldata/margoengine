@@ -5960,3 +5960,9 @@ kinetic energy decreases to the constrained minimum. Plain and shared native mem
 The direct moving-solid collision uses the effective contact mass and projected friction. The independent
 light-plate test measures zero normal slip, removal of 40% of the selected tangent slip, the matching
 off-centre rigid torque and lower kinetic energy. [Reproduce](reproduce.md#fluid-01-rigid-recoil)
+
+The viscosity regression holds the sampled boundary geometry constant, then switches its rigid mass from
+fixed to 0.125 kg. The 125 kg liquid sample and plate follow the closed-form implicit exchange in one
+iteration. Their kinetic energy falls from 8.789 to 8.780 J. The earlier fixed-velocity drag solve applied
+a 0.594 N·s impulse to the free plate and raised their energy to 9.980 J.
+[Reproduce](reproduce.md#fluid-01-rigid-recoil)

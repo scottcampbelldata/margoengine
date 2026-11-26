@@ -361,6 +361,61 @@ test('a direct contact on a light plate conserves momentum and dissipates slidin
   }
 });
 
+test('implicit viscosity includes a light rigid plate in the same dissipative solve', async () => {
+  const velocity = 0.375;
+  const bodyMass = 0.125;
+  const halfExtents = [0.035, 0.7, 0.7];
+  const params = {
+    bounds: wide,
+    spacing: 0.5,
+    viscosity: 50,
+    viscosityIterations: 1,
+    friction: 0,
+    densityTolerance: 1,
+    divergenceTolerance: 1000,
+    particles: [{ position: [0.34, 0, 0], velocity: [velocity, 0, 0] }],
+  };
+  const fixed = await solve({ ...params, boundaries: [{ halfExtents }] });
+  fixed.world.advance(1);
+  const fixedSpeed = fixed.liquid.sample(0).velocity[0];
+  // A fixed wall's implicit drag gives v = v0/(1 + w). Reusing that
+  // sampled geometry for a movable wall changes only the kinetic response.
+  const weight = velocity / fixedSpeed - 1;
+  assert.ok(weight > 0);
+  for (const shared of [false, true]) {
+    await Physics.load({ threads: shared });
+    const world = new PhysicsWorld({ rate: RATE, gravity: ZERO, memory: worldMemory(shared) });
+    const rigid = new Physics(null, { arena: world.arena, gravity: ZERO, fixedTimestep: DT });
+    try {
+      const plate = rigid.addBody(null, {
+        colliders: { shape: 'box', halfExtents, mass: bodyMass, sensor: true },
+      });
+      world.add(new RigidSolver(), { physics: rigid, capacity: rigid.kernel.capacity });
+      const liquid = await DfsphSolver.load(world.memory, { rigid: true });
+      world.add(liquid, { ...params, boundaries: [{ body: plate.row, halfExtents }] });
+      world.couple(['rigid', liquid.id], 'implicitPressure');
+      world.advance(1);
+      const bodyPort = world.fields.port(BODIES_FIELD.name);
+      const inverseMass = regionWords(world.memory, bodyPort.region)[plate.row * BODY_WORDS + 16];
+      const point = liquid.sample(0);
+      const expectedImpulse = (point.mass * velocity * weight) / (1 + weight * (1 + point.mass * inverseMass));
+      const forcePort = liquid.exportPorts(0).find(({ field }) => field === BODY_IMPULSES_FIELD.name);
+      const receipt = regionWords(world.memory, forcePort.region).subarray(6 * plate.row, 6 * plate.row + 6);
+      assert.equal(liquid.statistics.viscosityIterations, 1);
+      assert.equal(liquid.statistics.densityIterations + liquid.statistics.divergenceIterations, 0);
+      near(receipt[0], expectedImpulse);
+      near(point.velocity[0], velocity - expectedImpulse / point.mass);
+      near(point.mass * point.velocity[0] + receipt[0], point.mass * velocity);
+      const kineticBefore = (point.mass * velocity ** 2) / 2;
+      const kineticAfter = (point.mass * point.velocity[0] ** 2 + inverseMass * receipt[0] ** 2) / 2;
+      assert.ok(kineticAfter < kineticBefore);
+      for (const value of receipt.subarray(1)) near(value, 0);
+    } finally {
+      rigid.dispose();
+    }
+  }
+});
+
 test('warm pressure and the dual-clock fluid replay bit-for-bit on both memory modes', async () => {
   const particles = pair(0.3, [0.2, 0, 0]);
   const make = async (num, shared) =>

@@ -4683,6 +4683,8 @@ Each pressure iteration evaluates rigid boundary velocities after their reciproc
 impulse. The solver takes inverse mass and world-axis inverse inertia from the rigid body field.
 At a direct contact, friction removes the configured fraction of projected tangent slip while preserving
 the normal contact constraint and applying the matching wrench to the solid.
+Viscous momentum transfer to a moving solid is solved implicitly with the solid's recoil and the
+fluid velocity in the same system.
 
 Use `parcelCapacity` when a second world solver owns a liquid volume and momentum ledger. Register
 `parcelFields.requests` as its output and `parcelFields.receipts` as its input on the same dyadic rate,

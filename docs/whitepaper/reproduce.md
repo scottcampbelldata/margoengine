@@ -4414,3 +4414,11 @@ the rigid translation and (I⁻¹(r × j)) × r. The normal impulse stops approa
 is projected in this mobility metric so the friction step preserves the solved normal velocity.
 The test reconstructs the relative velocity from the returned wrench and independently checks the
 projected 40% slip reduction, conservation of linear momentum and the energy change.
+
+Use the same coupling test file with `--test-name-pattern="viscosity includes a light rigid plate"`.
+The control determines the sample weight w from the fixed plate's v/v₀ = 1/(1+w). The movable plate
+must then receive J = m_f w v₀/(1+w(1+m_f/m_b)), with −J applied to the fluid. The native matrix
+uses the rank-one viscosity form of Weiler et al. (2018), Equations 7–12, and stores rigid generalized
+impulses divided by liquid particle mass. The inner product applies the corresponding rigid
+inverse mass and inertia, so the coupled operator is symmetric on the movable degrees of freedom.
+[Implicit Viscosity for SPH Fluids](https://doi.org/10.1145/3186264) and [Monolith](https://uwspace.uwaterloo.ca/items/8f3fdcaa-9371-41b5-832e-848727f4d824).

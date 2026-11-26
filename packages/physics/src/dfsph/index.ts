@@ -157,6 +157,7 @@ export interface DfsphParams {
 
 // Inverse mass, symmetric world-axis inverse inertia, and native delta velocity.
 const BODY_MOBILITY_WORDS = 13;
+const VISCOUS_BODY_WORDS = 24;
 
 type State = {
   readonly host: SolverHost;
@@ -178,6 +179,7 @@ type State = {
   readonly impulses: Region;
   readonly pressureImpulses: Region;
   readonly bodyMobility: Region;
+  readonly viscosityBodies: Region;
   readonly surfaces: readonly PreparedBoundary[];
   readonly bodyCapacity: number;
   readonly sampleCount: number;
@@ -346,7 +348,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
         ((3 * DFSPH_PARTICLE_WORDS + WORK_WORDS) * words +
           (BOUNDARY_WORDS + Number(capillary)) * sampleCount +
           SOLID_WORDS * surfaces.length +
-          (2 * IMPULSE_WORDS + BODY_MOBILITY_WORDS) * bodyCapacity) +
+          (2 * IMPULSE_WORDS + BODY_MOBILITY_WORDS + (viscosity > 0 ? VISCOUS_BODY_WORDS : 0)) * bodyCapacity) +
       4 * (bucketCount * BUCKET_WORDS + 2 * (capacity + sampleCount)) +
       this.parcelCapacity * DFSPH_PARCEL_WORDS * 8;
     if (bytes >= MAX_MEMORY_PAGES * 65536)
@@ -422,6 +424,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       impulses: f64('dfsph-body-impulses', bodyCapacity * IMPULSE_WORDS),
       pressureImpulses: f64('dfsph-pressure-impulses', bodyCapacity * IMPULSE_WORDS),
       bodyMobility: f64('dfsph-body-mobility', bodyCapacity * BODY_MOBILITY_WORDS),
+      viscosityBodies: f64('dfsph-viscous-bodies', viscosity > 0 ? bodyCapacity * VISCOUS_BODY_WORDS : 0),
     };
     this.state = state;
     if (state.parcels) numbers(state, state.parcels.clock)[0] = -1;
@@ -512,6 +515,7 @@ export class DfsphSolver implements Solver<DfsphParams> {
       state.pressurePairs.byteOffset,
       state.pressurePairCapacity,
       state.bodyMobility.byteOffset,
+      state.viscosityBodies.byteOffset,
     );
     if (error)
       throw new MargoError(

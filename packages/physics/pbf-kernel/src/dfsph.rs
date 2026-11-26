@@ -211,7 +211,7 @@ fn body_velocity(object: &Solid, at: Vec3) -> Vec3 {
 }
 
 #[inline]
-fn pressure_body_velocity(object: &Solid, at: Vec3, mobility: &[BodyMobility]) -> Vec3 {
+fn predicted_body_velocity(object: &Solid, at: Vec3, mobility: &[BodyMobility]) -> Vec3 {
     let velocity = body_velocity(object, at);
     if object.body < 0.0 {
         return velocity;
@@ -601,7 +601,7 @@ fn pressure_error(
                     item(points, j).velocity
                 } else {
                     let b = item(boundary, j - points.len());
-                    pressure_body_velocity(item(shapes, b.shape as usize), b.position, mobility)
+                    predicted_body_velocity(item(shapes, b.shape as usize), b.position, mobility)
                 };
                 derivative += dot(sub(p.velocity, velocity), grad);
             },
@@ -1004,6 +1004,32 @@ fn precondition(v: Vec3, diagonal: Vec3) -> Vec3 {
     [v[0] / diagonal[0], v[1] / diagonal[1], v[2] / diagonal[2]]
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct ViscousBody {
+    impulse: Reaction,
+    residual: Reaction,
+    direction: Reaction,
+    product: Reaction,
+}
+
+const _: () = assert!(core::mem::size_of::<ViscousBody>() == 24 * 8);
+
+#[inline]
+fn add_wrench(row: &mut Reaction, point: Vec3, centre: Vec3, impulse: Vec3) {
+    let torque = cross(sub(point, centre), impulse);
+    for axis in 0..3 {
+        row[axis] += impulse[axis];
+        row[axis + 3] += torque[axis];
+    }
+}
+
+#[inline]
+fn body_inner(body: &BodyMobility, mass: f64, left: &Reaction, right: &Reaction) -> f64 {
+    let (linear, angular) = body.response(right);
+    mass * (dot([left[0], left[1], left[2]], linear) + dot([left[3], left[4], left[5]], angular))
+}
+
 fn diffuse(
     points: &mut [Particle],
     work: &mut [Work],
@@ -1015,9 +1041,21 @@ fn diffuse(
     cache: &[PressurePair],
     dt: f64,
     evaluations: &mut f64,
+    mobility: &mut [BodyMobility],
+    body_work: &mut [ViscousBody],
 ) -> f64 {
-    if settings.viscosity == 0.0 {
+    if settings.viscosity == 0.0 || points.is_empty() {
         return 0.0;
+    }
+    let mass = item(points, 0).mass;
+    let coupled = shapes.iter().any(|shape| shape.body >= 0.0);
+    let mobility = if coupled { mobility } else { &mut [] };
+    let body_work = if coupled { body_work } else { &mut [] };
+    // Body unknowns are impulses divided by particle mass. Their inner
+    // product is the inverse world mass/inertia metric scaled by that mass.
+    body_work.fill(ViscousBody::default());
+    for (body, pending) in mobility.iter_mut().zip(reactions.iter()) {
+        (body.linear, body.angular) = body.response(pending);
     }
     let mut squared = 0.0;
     for (i, p) in points.iter().enumerate() {
@@ -1042,18 +1080,38 @@ fn diffuse(
                     item(points, j).velocity
                 } else {
                     let b = item(boundary, j - points.len());
-                    body_velocity(item(shapes, b.shape as usize), b.position)
+                    predicted_body_velocity(item(shapes, b.shape as usize), b.position, mobility)
                 };
                 for k in 0..3 {
                     diagonal[k] += weight * axis[k] * axis[k];
                 }
-                residual = add(residual, along(axis, sub(v, p.velocity), weight));
+                let change = along(axis, sub(v, p.velocity), weight);
+                residual = add(residual, change);
+                if j >= points.len() {
+                    let b = item(boundary, j - points.len());
+                    let object = item(shapes, b.shape as usize);
+                    if object.body >= 0.0 {
+                        let row = item_mut(body_work, object.body as usize);
+                        add_wrench(
+                            &mut row.residual,
+                            b.position,
+                            object.centre,
+                            scale(change, -1.0),
+                        );
+                    }
+                }
             },
         );
         w.residual = residual;
-        w.diagonal = diagonal;
-        w.direction = precondition(residual, diagonal);
+        // Keep the coupled Krylov directions conservative even when the
+        // configured iteration count stops before the residual is zero.
+        w.diagonal = if coupled { [1.0; 3] } else { diagonal };
+        w.direction = precondition(residual, w.diagonal);
         squared += dot(w.direction, w.residual);
+    }
+    for (body, work) in mobility.iter().zip(body_work.iter_mut()) {
+        work.direction = work.residual;
+        squared += body_inner(body, mass, &work.direction, &work.residual);
     }
     let target = squared * 1e-20;
     let mut used = 0.0;
@@ -1062,6 +1120,12 @@ fn diffuse(
             break;
         }
         let mut denominator = 0.0;
+        for (body, work) in mobility.iter_mut().zip(body_work.iter_mut()) {
+            work.product = work.direction;
+            let (linear, angular) = body.response(&work.direction);
+            body.linear = scale(linear, mass);
+            body.angular = scale(angular, mass);
+        }
         for (i, w) in work.iter().enumerate() {
             let wall_scale = settings.rest / item(points, i).density;
             let drag = settings.viscosity * dt * wall_scale * wall_scale;
@@ -1077,16 +1141,42 @@ fn diffuse(
                 |j, q, grad| {
                     *evaluations += 1.0;
                     let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
-                    let neighbor = if j < points.len() {
-                        item(work, j).direction
+                    if j < points.len() {
+                        product = add(
+                            product,
+                            along(axis, sub(w.direction, item(work, j).direction), weight),
+                        );
                     } else {
-                        ZERO
-                    };
-                    product = add(product, along(axis, sub(w.direction, neighbor), weight));
+                        let sample = item(boundary, j - points.len());
+                        let object = item(shapes, sample.shape as usize);
+                        let direction = if object.body >= 0.0 {
+                            let body = item(mobility, object.body as usize);
+                            add(
+                                body.linear,
+                                cross(body.angular, sub(sample.position, object.centre)),
+                            )
+                        } else {
+                            ZERO
+                        };
+                        let change = along(axis, sub(w.direction, direction), weight);
+                        product = add(product, change);
+                        if object.body >= 0.0 {
+                            let row = item_mut(body_work, object.body as usize);
+                            add_wrench(
+                                &mut row.product,
+                                sample.position,
+                                object.centre,
+                                scale(change, -1.0),
+                            );
+                        }
+                    }
                 },
             );
             denominator += dot(w.direction, product);
             item_mut(points, i).velocity = product;
+        }
+        for (body, work) in mobility.iter().zip(body_work.iter()) {
+            denominator += body_inner(body, mass, &work.direction, &work.product);
         }
         if denominator <= 0.0 {
             break;
@@ -1099,8 +1189,21 @@ fn diffuse(
             w.product = precondition(w.residual, w.diagonal);
             next += dot(w.product, w.residual);
         }
+        for (body, work) in mobility.iter().zip(body_work.iter_mut()) {
+            for axis in 0..6 {
+                work.impulse[axis] += step * work.direction[axis];
+                work.residual[axis] -= step * work.product[axis];
+            }
+            next += body_inner(body, mass, &work.residual, &work.residual);
+        }
+        let beta = next / squared;
         for w in work.iter_mut() {
-            w.direction = add(w.product, scale(w.direction, next / squared));
+            w.direction = add(w.product, scale(w.direction, beta));
+        }
+        for work in body_work.iter_mut() {
+            for axis in 0..6 {
+                work.direction[axis] = work.residual[axis] + beta * work.direction[axis];
+            }
         }
         squared = next;
         used += 1.0;
@@ -1108,31 +1211,10 @@ fn diffuse(
     for (p, w) in points.iter_mut().zip(work.iter()) {
         p.velocity = w.rhs;
     }
-    for (i, p) in points.iter().enumerate() {
-        visit(
-            i,
-            points,
-            boundary,
-            grid,
-            settings,
-            item(work, i),
-            cache,
-            |j, q, grad| {
-                *evaluations += 1.0;
-                if j >= points.len() {
-                    let b = item(boundary, j - points.len());
-                    let object = item(shapes, b.shape as usize);
-                    let relative = sub(p.velocity, body_velocity(object, b.position));
-                    let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
-                    record_impulse(
-                        reactions,
-                        object,
-                        b.position,
-                        along(axis, relative, p.mass * weight),
-                    );
-                }
-            },
-        );
+    for (pending, work) in reactions.iter_mut().zip(body_work.iter()) {
+        for axis in 0..6 {
+            pending[axis] += mass * work.impulse[axis];
+        }
     }
     used
 }
@@ -1276,6 +1358,7 @@ pub unsafe extern "C" fn solve_dfsph(
     pair_cache: *mut PressurePair,
     pair_capacity: usize,
     body_mobility: *mut BodyMobility,
+    viscosity_bodies: *mut ViscousBody,
 ) -> u32 {
     let (points, work, boundary, shapes, reactions, trial, settings, stats) = unsafe {
         (
@@ -1291,6 +1374,16 @@ pub unsafe extern "C" fn solve_dfsph(
     };
     let cache = unsafe { core::slice::from_raw_parts_mut(pair_cache, pair_capacity) };
     let mobility = unsafe { core::slice::from_raw_parts_mut(body_mobility, body_count) };
+    let body_work = unsafe {
+        core::slice::from_raw_parts_mut(
+            viscosity_bodies,
+            if settings.viscosity > 0.0 {
+                body_count
+            } else {
+                0
+            },
+        )
+    };
     let surface = settings
         .liquid_vapor
         .max(settings.solid_liquid)
@@ -1397,6 +1490,8 @@ pub unsafe extern "C" fn solve_dfsph(
             cache,
             step,
             &mut evaluations,
+            mobility,
+            body_work,
         );
         let (rounds, error) = pressure(
             points,
