@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20601975,
+  "total": 20603040,
   "history": [
     {
       "date": "2026-10-24",
@@ -13735,6 +13735,12 @@
       "commit": "0ee0b54faa",
       "grew": 1,
       "reason": "SEA-08 incident-wave encounter correction grows seakeeping from 26195 to 27343 B gzip. It reuses the existing section solves and retains the live water convolution. A split would duplicate strip tables or add a second hull load connection. Core plus Stage remains 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "4ca7841abf",
+      "reason": "BREAK-03 plate buckling and sampled mesh positions and normals grows the optional crush entry from 6094 to 7159 B gzip. The ceiling rises from 6350 to 7415 B. The new plate query and mesh coordinates share material validation and remain tree-shakable named exports. A separate entry would require another import for the same structural profile and repeat the numerical preparation.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14559,7 +14565,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 6350,
+    "@margoengine/physics/crush": 7415,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
