@@ -1,5 +1,5 @@
 {
-  "commit": "2500b97885",
+  "commit": "5628424515",
   "dirty": false,
   "method": "vite minify es2022 + compactOutput (as build-modern), bare imports external, gzip default level",
   "coreStage": {
@@ -404,8 +404,8 @@
         "gzip": 4407
       },
       "./ecosystem": {
-        "raw": 6926,
-        "gzip": 3210
+        "raw": 8057,
+        "gzip": 3652
       },
       "./erosion-wasm": {
         "raw": 4954,
@@ -442,6 +442,10 @@
       "./landscape": {
         "raw": 969,
         "gzip": 614
+      },
+      "./forest": {
+        "raw": 16512,
+        "gzip": 7194
       }
     },
     "@margoengine/blender": {

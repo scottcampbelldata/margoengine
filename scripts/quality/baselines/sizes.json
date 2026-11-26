@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20106219,
+  "total": 20114111,
   "history": [
     {
       "date": "2026-10-24",
@@ -12831,6 +12831,12 @@
       "commit": "7f5ad4a8d2",
       "grew": 2,
       "reason": "ICE-01 entry sizes, previous record to current: @margoengine/physics/snowpack 0→5737 B (ceiling 0→5993 B); @margoengine/weather/avalanche 6738→7195 B (ceiling 6984→7451 B). The snowpack entry integrates the registry and lazily loads the arena solver. Weather adds solid reflection and distributed obstacle drag to the same avalanche flux. A separate wrapper would need to duplicate the main flow step to change its conservative boundary flux."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5628424515",
+      "reason": "BIO-03 shares the annual transition, taking offline ecosystem from 3,210 to 3,652 B gzip. The live forest entry is 7,194 B gzip plus lazily loaded 1,276 B raw kernels. Duplicating the annual model would let offline and live dynamics diverge. Core and stage gain 0 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -12909,12 +12915,13 @@
     "@margoengine/biomes/cover": 3795,
     "@margoengine/biomes/digest": 894,
     "@margoengine/biomes/disturbance": 6548,
-    "@margoengine/biomes/ecosystem": 3466,
+    "@margoengine/biomes/ecosystem": 3908,
     "@margoengine/biomes/editor": 4433,
     "@margoengine/biomes/erosion": 3202,
     "@margoengine/biomes/erosion-wasm": 2649,
     "@margoengine/biomes/far": 4587,
     "@margoengine/biomes/farmland": 5853,
+    "@margoengine/biomes/forest": 7450,
     "@margoengine/biomes/fuel": 3860,
     "@margoengine/biomes/gpu": 21566,
     "@margoengine/biomes/graph": 4246,
