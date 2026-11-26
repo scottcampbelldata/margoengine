@@ -13914,9 +13914,11 @@ require their own state transfer.
 An optional tensile seam opens one authored triangle inside a cell. It samples the cell after
 the soft step, and consumes the seam when the topology changes. Use it with an unskinned tetrahedral
 solid without springs, clusters or other native fracture criteria. The intact body has the usual
-elasticity up to the strain threshold. Normal compression, inverted cells and pure rigid rotation
-cannot trigger the seam. Restore an intact snapshot into the same topology with the same authored
-seam to replay the event.
+elasticity up to the strain threshold. The authored option can combine tension, in-plane
+sliding and tearing along the first edge of the triangle. A shear term is inactive unless
+its limit is supplied. Normal compression contributes zero, pure rigid rotation preserves
+the strain and inverted cells wait until they recover. Restore an intact snapshot into the
+same topology with the same authored seam to replay the event.
 With tensile seams the optional entry is 138,830 B gzip, including 43,642 B in its base.
 
 Unseeded tensile nucleation scans the cells once after the soft step. It selects the largest
@@ -13932,8 +13934,8 @@ Automatic cracks preflight rounded rest coordinates, basis terms and nodal masse
 editing topology. A candidate below the native resolution remains intact for that step.
 Nucleation can select another eligible cell in the same step. An authored blade still reports
 a geometry error when its exact requested cut cannot be represented.
-The optional entry measures 141,595 B gzip with the fracture resolution checks.
-The base is 45,047 B and the lazy native kernel is 96,646 B.
+The optional entry measures 141,760 B gzip with mixed-mode authored seams.
+The base is 45,246 B and the lazy native kernel is 96,646 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -14153,6 +14155,10 @@ with one simultaneous sparse transfer pass per solver step. The solver stores ei
 bytes per grid vertex and a second sparse bitset
 for affected vertices, approximately 0.26 bytes per vertex. Steep loose slopes can take more
 than one step to settle. The separate excavation maximum prevents counting a cut twice.
+The optional `grouserDig` uses 16 phase-history bytes per external row. Positive slip can
+excavate more soil as the wheel turns, up to the configured bedrock or the axle depth
+supported by this bearing model. Supply continuous phase samples over two loaded steps.
+The response still reports local bearing sinkage. The changed terrain carries the deeper rut.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand and relative
@@ -14160,7 +14166,7 @@ crest-to-trough relief at one straight locked-wheel condition. Supply the same e
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 13,754 B gzip with a 14,167 B ceiling. Both Wasm assets are 37,222 B raw and 15,244 B gzip each.
+The optional entry is 14,023 B gzip with a 14,167 B ceiling. Both Wasm assets are 37,526 B raw and 15,333 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -14207,6 +14213,12 @@ The direct solve eliminates one six-by-six block per strand edge in forward and 
 passes. The work and memory grow linearly along each open guide. It reserves 1,104 bytes
 per authored point for solver scratch. The optional local profile uses less scratch, with
 reduced stiffness accuracy as its link count rises.
+
+A 0.28 m inextensible lantern handle matches the finite-amplitude pendulum period within
+one 60 Hz observation interval and lags a moving root under a timed reach. The 120 mm
+leaf test reverses a 0.6 m/s cross-flow, with approximately 0.944 mm deflection to each
+side and exact replay after reversal. This is a beam-and-drag test for narrow
+leaves. Lift-driven leaf flutter and canopy wind shielding need a separate model.
 
 The 720-point tapered and swept fixture moved its selected tip 0.7516 m relative to the
 still-air control and changed 2,907 pixels with the same camera on WebGPU and WebGL2.
@@ -31207,8 +31219,9 @@ sampled projected contours and reproduces the Wh32 rolling sinkage at zero and m
 It stamps evenly spaced lugs from spin and indexed triangle treads from both live spin and camber.
 The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
 Measured cross-slope camber forces remain open.
-The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
-high-slip sinkage and measured berm geometry still need held-out measurements. The optional
+The steady drawbar and axle torque match the measured 60% tip-slip case. An opt-in wheel
+can excavate beyond its initial bearing cut from the live phase. Its exact swept-volume
+and floor tests pass. Measured transient contact angles and high-slip sinkage remain open. The optional
 cross-track depositor conserves independent bank volumes from the actual cut.
 Grouser transport can backfill its solver-owned trench from earlier cuts or feed the opposite bank.
 The straight locked condition matches both measured relative bank crests. Absolute scanned
@@ -31225,7 +31238,8 @@ now runs with a full orthotropic tensor in native vertex blocks. It can tear whe
 tensile, compressive or shear stresses exceed authored strengths. A progressive option softens
 tension and shear before tearing. A prescribed tensile seam can open inside a tetrahedron.
 Unseeded tensile cracks can nucleate inside a cell from its principal strain and extend
-from a tracked front. Mixed-mode propagation with separate sliding and tearing toughness remains open.
+from a tracked front. Authored seams support separate sliding and tearing strains.
+Mixed-mode propagation with separate toughness along an unseeded front remains open.
 Automatic fracture evaluates whether each proposed edit fits the native rest mesh before
 committing the geometry. Regions below its resolution stay intact for that step.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
