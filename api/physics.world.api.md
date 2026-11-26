@@ -2239,6 +2239,9 @@ class SoftBodies implements PhysicsAttachment {
     cellOrthotropicStrength({ cellRange }: SoftBody): readonly number[] | null;
     copyOrthotropicFailure({ cellRange }: SoftBody): Float32Array | null;
     restoreOrthotropicFailure(first: number, history: Float32Array, start?: number, count?: number): void;
+    cellCrackBand({ cellRange }: SoftBody): readonly number[] | null;
+    copyCrackBand({ cellRange }: SoftBody): Float32Array | null;
+    restoreCrackBand(first: number, history: Float32Array, start?: number, count?: number): void;
     cellFiber({ cellRange }: SoftBody): SoftFiber | null;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
@@ -2307,6 +2310,7 @@ class SoftBody {
     get fiber(): SoftFiber | null;
     get orthotropy(): readonly number[] | null;
     get orthotropicStrength(): readonly number[] | null;
+    get crackBand(): readonly number[] | null;
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -2446,6 +2450,8 @@ class SoftBodyDesc {
     fiber: SoftFiber | null;
     orthotropy: readonly number[] | null;
     orthotropicStrength: readonly number[] | null;
+    crackBand: readonly number[] | null;
+    inheritedBand: boolean;
     clusterGroups: number[][];
     clusterHertz: number;
     massGiven: boolean;
@@ -2585,10 +2591,16 @@ class SoftMeshBinding {
     static skinned(): SoftMeshBinding;
 }
 
+interface SoftOrthotropicFractureEnergy {
+    readonly tensile: Vec3;
+    readonly shear: Vec3;
+}
+
 interface SoftOrthotropicStrength {
     readonly tensile: Vec3;
     readonly compressive: Vec3;
     readonly shear: Vec3;
+    readonly fractureEnergy?: SoftOrthotropicFractureEnergy;
 }
 
 interface SoftOrthotropy {
