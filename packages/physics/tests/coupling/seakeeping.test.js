@@ -959,6 +959,128 @@ function oneWave(a, w, seed = 3, direction = 0) {
   });
 }
 
+test('HullSolver forward-course deck contact agrees with a rotating-plane Coulomb calculation', async () => {
+  await Physics.load({ threads: true });
+  const dt = 1 / 60;
+  const halfWidth = 0.08;
+  const contactHeight = D / 2 + halfWidth;
+  const hashes = [];
+  for (const [amplitude, shared] of [
+    [0, false],
+    [0.15, false],
+    [0.15, true],
+  ]) {
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+    using physics = new Physics(null, { arena: world.arena, fixedTimestep: dt, substeps: 8 });
+    const deck = physics.addBody(null, {
+      position: [0, D / 2 - T, 0],
+      linearVelocity: [1, 0, 0],
+      enabledRotations: [true, false, false],
+      enabledTranslations: [true, true, false],
+      colliders: {
+        shape: 'box',
+        halfExtents: [L / 2, D / 2, B / 2],
+        mass: SEA_WATER * L * B * T,
+        friction: 0.95,
+        frictionCombine: 'min',
+      },
+    });
+    const props = [0.03, 0.95].map((friction, i) =>
+      physics.addBody(null, {
+        position: [i - 0.5, D - T + halfWidth, 0],
+        linearVelocity: [1, 0, 0],
+        colliders: {
+          shape: 'box',
+          halfExtents: [halfWidth, halfWidth, halfWidth],
+          mass: 5,
+          friction,
+          frictionCombine: 'min',
+        },
+      }),
+    );
+    world
+      .add(new RigidSolver(), { physics })
+      .add(new HullSolver(), {
+        hulls: [{ row: deck.row, mesh: boxMesh([L, D, B]), course: { speed: 1 } }],
+        sea: oneWave(amplitude, 1.9, 3, 6),
+        drift: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    const peaks = {
+      roll: 0,
+      loose: 0,
+      highFriction: 0,
+      contactHeightError: 0,
+      slipError: 0,
+      referenceSpeed: 0,
+      frictionDemand: 0,
+    };
+    let previous = { verticalSpeed: 0, rate: 0, angle: 0 };
+    let referenceZ = 0;
+    let referenceSpeed = 0;
+    let snapshot;
+    for (let frame = 1; frame <= 360; frame++) {
+      world.advance(frame);
+      if (amplitude && frame === 180) snapshot = world.takeSnapshot();
+      const next = {
+        verticalSpeed: deck.linearVelocity[1],
+        rate: deck.angularVelocity[0],
+        angle: 2 * Math.asin(deck.rotation[0]),
+      };
+      const angle = (previous.angle + next.angle) / 2;
+      const rollRate = (previous.rate + next.rate) / 2;
+      const verticalAcceleration = (next.verticalSpeed - previous.verticalSpeed) / dt;
+      const angularAcceleration = (next.rate - previous.rate) / dt;
+      const effectiveGravity = GRAVITY + verticalAcceleration;
+      // Independent point-mass dynamics on a plane measured from the hull. The rolling frame contributes Euler,
+      // centrifugal and Coriolis acceleration. Normal and tangential equations are projected along the actual deck.
+      const normal =
+        effectiveGravity * Math.cos(angle) -
+        contactHeight * rollRate ** 2 -
+        2 * rollRate * referenceSpeed -
+        angularAcceleration * referenceZ;
+      assert.ok(normal > 0, 'the reference remains on the deck');
+      const drive =
+        effectiveGravity * Math.sin(angle) - contactHeight * angularAcceleration + rollRate ** 2 * referenceZ;
+      const freeSpeed = referenceSpeed + dt * drive;
+      const nextSpeed = Math.sign(freeSpeed) * Math.max(0, Math.abs(freeSpeed) - dt * 0.03 * normal);
+      referenceZ += ((referenceSpeed + nextSpeed) * dt) / 2;
+      referenceSpeed = nextSpeed;
+      previous = next;
+      const [, deckY, deckZ] = deck.position;
+      const cos = Math.cos(next.angle);
+      const sin = Math.sin(next.angle);
+      const relative = props.map(({ position: [, y, z] }) => [
+        cos * (y - deckY) + sin * (z - deckZ),
+        cos * (z - deckZ) - sin * (y - deckY),
+      ]);
+      peaks.roll = Math.max(peaks.roll, Math.abs(next.angle));
+      peaks.loose = Math.max(peaks.loose, Math.abs(relative[0][1]));
+      peaks.highFriction = Math.max(peaks.highFriction, Math.abs(relative[1][1]));
+      peaks.contactHeightError = Math.max(peaks.contactHeightError, Math.abs(relative[1][0] - contactHeight));
+      peaks.slipError = Math.max(peaks.slipError, Math.abs(relative[0][1] - referenceZ));
+      peaks.referenceSpeed = Math.max(peaks.referenceSpeed, Math.abs(referenceSpeed));
+      peaks.frictionDemand = Math.max(peaks.frictionDemand, Math.abs(drive) / normal);
+    }
+    if (amplitude) {
+      assert.ok(peaks.roll > 0.05 && peaks.loose > halfWidth, JSON.stringify(peaks));
+      assert.ok(peaks.frictionDemand > 0.03 && peaks.frictionDemand < 0.95, JSON.stringify(peaks));
+      assert.ok(peaks.slipError <= dt * peaks.referenceSpeed, JSON.stringify(peaks));
+      const hash = world.hash();
+      world.restoreSnapshot(snapshot.bytes);
+      world.advance(360);
+      assert.equal(world.hash(), hash);
+      hashes.push(hash);
+    } else {
+      assert.ok(peaks.roll < 1e-6 && peaks.loose < 1e-6, JSON.stringify(peaks));
+    }
+    assert.ok(peaks.highFriction < 0.00003 && peaks.contactHeightError < 0.00025, JSON.stringify(peaks));
+  }
+  assert.equal(hashes[0], hashes[1]);
+});
+
 test("HullSolver: in head seas a box heaves as strip theory's relative motion principle says, diffraction with it", () => {
   // Journee and Massie eqs. 8.45-8.47: each section takes the Froude-Krylov load (from the pressure over the wetted surface)
   // and the diffraction load M33'(w) z*'' + N33'(w) z*', z* the wave's motion at the depth of the section's mean wave
