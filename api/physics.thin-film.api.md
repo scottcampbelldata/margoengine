@@ -7,6 +7,8 @@ import { Precipitation, Wind } from "@margoengine/math/fields";
 
 export const FILM_DROP_WORDS = 10;
 
+export const FILM_FLIGHT_WORDS = 10;
+
 export const FILM_IMPACT_WORDS = 5;
 
 export const THIN_FILM_LAYOUT = 1;
@@ -35,6 +37,44 @@ export interface ThinFilmDripOutlet {
     readonly edge: 'u0' | 'u1' | 'v0' | 'v1';
     readonly index: number;
     readonly radius: number;
+}
+
+export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
+    readonly particleField: FieldDescriptor;
+    constructor(source: FieldDescriptor, id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, opts?: ThinFilmDropFlightOptions): void;
+    step(context: StepContext, dt: number): void;
+    readDrops(): readonly ThinFilmFlyingDrop[];
+    get budget(): {
+        readonly received: number;
+        readonly airborne: number;
+        readonly outflow: number;
+    };
+    importPorts(): void;
+    exportPorts(tick: number): readonly Port[];
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface ThinFilmDropFlightOptions {
+    readonly capacity?: number;
+    readonly flightTime?: number;
+    readonly originCellSize?: number;
+    readonly waterDensity?: number;
+    readonly surfaceTension?: number;
+    readonly airDensity?: number;
+    readonly airTemperature?: number;
+    readonly wind?: Wind;
+}
+
+export interface ThinFilmFlyingDrop {
+    readonly position: readonly [number, number, number];
+    readonly velocity: readonly [number, number, number];
+    readonly volume: number;
+    readonly diameter: number;
+    readonly age: number;
+    readonly id: number;
 }
 
 export interface ThinFilmLoadOptions {

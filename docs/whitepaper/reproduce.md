@@ -4509,6 +4509,14 @@ volume oracle is Mori's equation. The separately observed 3.09 s cycle correspon
 and supplies the documented model difference.
 [Mori (1990)](https://doi.org/10.1002/aic.690360819) · [Zhang and Basaran (1996), Figure 1](https://doi.org/10.1017/S0022112096008300)
 
+Run `node --test --test-name-pattern="detached LAST-TRAM|transient fall" packages/physics/tests/coupling/thin-film.test.js`
+to track a release from the moving sill and compare fall speeds. The moving sill proof
+uses the closed-form trajectory in vacuum at the true fractional launch age. The tower
+fixture releases water drops at rest from their measured volumes. At each of 1, 3 and 5 m,
+it compares speed against both independent instruments with the paper's two-percent
+transient allowance and half the last printed digit. The releases and atmosphere set the
+inputs before the comparisons. [Hinkle et al. (1987), Tables 1 and 2](https://www.ars.usda.gov/ARSUserFiles/30100000/Publications%201989-1980/189%201987%20Hinkle%20-%20Falling%20water%20drop%20velocitie.pdf)
+
 ### SEA-08 hull-to-wake displacement
 
 Build Physics and run `node --test --test-name-pattern "HullSolver wake source" packages/physics/tests/coupling/seakeeping.test.js`. The rigid hull publishes motion at the world base rate and the actual WakeSolver advances it. The tests measure the waterplane volume, pitch and roll moments, a distant-height gauge and exact replay. Steady surge, fully dry and fully submerged controls check that no volume is injected.

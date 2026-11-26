@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20605808,
+  "total": 20608554,
   "history": [
     {
       "date": "2026-10-24",
@@ -13753,6 +13753,12 @@
       "commit": "c4575331ab",
       "grew": 1,
       "reason": "SEA-15's finite Fay oil spills move physics/tracers from 9469 to 10376 B gzip. The optional ceiling rises from 9754 to 10688 B. The existing surface advection, live sea binding, parcel storage and snapshot ledger all serve the spreading patch, so a split would duplicate those paths or require a second parcel entry point."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-detached-drop-flight",
+      "grew": 1,
+      "reason": "FLUID-07 adds timed drop tracking, transient droplet drag and the replayable flight ledger. Thin-film rises from 9159 to 11825 B gzip; cap changes from 9434 to 12180 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14628,7 +14634,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 9434,
+    "@margoengine/physics/thin-film": 12180,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 10688,
     "@margoengine/physics/tsunami": 6794,

@@ -6162,6 +6162,11 @@ release time of each detached drop, and the test accounts for all water held and
 the rim. The quasistatic prediction lies 2.6% below the independently observed cycle volume.
 [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
 
+The moving sill launches a drop at its fractional tick, and the flight solver conserves
+its volume through expiry and restores the same replay hash. Four independently measured
+drop sizes agree with the lab velocity bands at each of 1, 3 and 5 m in still air.
+[Reproduce](reproduce.md#fluid-07-circular-sill-drops)
+
 ### FLUID-07 mounted film weight
 
 A mounted patch puts its integrated normal water weight and moment on the rigid body's

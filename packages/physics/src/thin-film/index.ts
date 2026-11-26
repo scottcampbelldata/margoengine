@@ -24,6 +24,12 @@ import {
 import { bindThinFilmKernel, loadThinFilmBuilds, type ThinFilmBuilds, type ThinFilmKernel } from './kernel.js';
 
 export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
+export {
+  FILM_FLIGHT_WORDS,
+  ThinFilmDropFlight,
+  type ThinFilmDropFlightOptions,
+  type ThinFilmFlyingDrop,
+} from './drop-flight.js';
 
 /** Binary version of the optional film layout. */
 export const THIN_FILM_LAYOUT = 1;

@@ -15209,6 +15209,24 @@ and changes to six, seven and eight half-waves. Those regimes are outside this f
   1 mL/min input through a 3.2 mm outer diameter and roughly 3.09 s observed cycle imply
   51.5 μL per cycle. The uncalibrated model releases 50.17 μL per cycle.
   [Journal](https://doi.org/10.1017/S0022112096008300)
+- Kenneth V. Beard, “Terminal Velocity and Shape of Cloud and Precipitation Drops Aloft”
+  (1976). Use the Davies-number relation for a steady wake and the Bond number and
+  physical-property number for a deformed drop with an unsteady wake. Both terminal Reynolds
+  relations use volume-equivalent diameter. The maximum modeled diameter is 7 mm.
+  [Journal](https://doi.org/10.1175/1520-0469(1976)033%3C0851:TVASOC%3E2.0.CO;2)
+- Pao K. Wang and Hans R. Pruppacher, “Acceleration to Terminal Velocity of Cloud and
+  Raindrops” (1977). Invert Beard's relation at the instantaneous Reynolds number to get
+  the equivalent terminal drop. Its weight balance gives the drag coefficient. The
+  acceleration on the actual drop follows by dividing the resulting drag force by the
+  actual mass. The available sphere relation handles the creeping-flow limit, and the
+  last deformed-drop coefficient applies above the range of the terminal relation.
+  Freeze the rate at a midpoint predictor and integrate velocity and displacement together.
+  [Journal](https://doi.org/10.1175/1520-0450(1977)016%3C0275:ATTVOC%3E2.0.CO;2)
+- Steven E. Hinkle, Dale F. Heermann and Michael C. Blue, “Falling Water Drop Velocities”
+  (1987), Tables 1 and 2. Four independently measured
+  diameters at 20 °C and 84.1 kPa give fall speeds at 1, 3 and 5 m. Neither instrument's
+  output determines the drag coefficients or initial conditions.
+  [USDA paper](https://www.ars.usda.gov/ARSUserFiles/30100000/Publications%201989-1980/189%201987%20Hinkle%20-%20Falling%20water%20drop%20velocitie.pdf)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves

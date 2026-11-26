@@ -4910,11 +4910,12 @@ For a wet circular sill outlet, open its edge and pass its physical rim radius. 
 its share of the discharge until a drop detaches.
 
 ```ts
-import { PhysicsWorld, regionWords } from '@margoengine/physics/world';
-import { ThinFilmSolver } from '@margoengine/physics/thin-film';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { ThinFilmDropFlight, ThinFilmSolver } from '@margoengine/physics/thin-film';
 
 const spacing = 0.03;
 const film = await ThinFilmSolver.load({ drops: true });
+const flight = new ThinFilmDropFlight(film.dropsField);
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   cells: [1, 1],
   spacing,
@@ -4922,16 +4923,20 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   rainRate: (1e-6 / 60) / (spacing * spacing),
   drains: [false, false, false, true],
   outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
-});
+}).add(flight, {});
 world.advance(420);
-const { region } = world.fields.port(film.dropsField.name);
-console.log(film.heldDripVolume, regionWords(world.memory, region)[9]);
+console.log(film.heldDripVolume, flight.readDrops(), flight.budget.received);
 ```
 
-`dropsField` publishes one timed record per rim in its origin cell. Read XYZ, the rim's XYZ
+`dropsField` publishes one timed record per rim in its origin cell. Read its end-of-tick XYZ, the rim's XYZ
 velocity, volume per drop, first offset from the tick start, interval between drops, and count.
 A zero count means the rim released no water that tick. `dripsField` carries the uncaptured
 edge discharge, while `budget.dripped` counts all water leaving the backing.
+
+`ThinFilmDropFlight` starts each drop at its release offset and advances it through gravity,
+buoyancy and air drag. Provide a `Wind` field for moving air. The particle field exposes live
+positions, velocities, sizes, ages and stable IDs. `budget` accounts for the received,
+airborne and expired volumes. By default each drop stays in the flight domain for 10 seconds.
 
 To transfer the film's normal weight and moment to a mounted body, enable `hydrostaticLoad`
 and add the rigid solver before the film. Couple the two solvers with the staggered scheme.

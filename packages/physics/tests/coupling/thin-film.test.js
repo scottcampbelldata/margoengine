@@ -7,6 +7,7 @@ import {
   FILM_IMPACT_WORDS,
   THIN_FILM_LAYOUT,
   THIN_FILM_WORDS,
+  ThinFilmDropFlight,
   ThinFilmSolver,
 } from '../../dist/thin-film.js';
 import { BODY_FORCES_FIELD, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
@@ -278,6 +279,7 @@ test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', as
     colliders: { shape: 'box', halfExtents: [0.16, 0.16, 0.005], mass: 32 },
   });
   const film = await ThinFilmSolver.load({ rigid: true, drops: true });
+  const flight = new ThinFilmDropFlight(film.dropsField);
   world
     .add(film, {
       bodyRow: body.row,
@@ -288,7 +290,8 @@ test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', as
       drains: [false, false, false, true],
       outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
     })
-    .add(new RigidSolver(), { physics: rigid });
+    .add(new RigidSolver(), { physics: rigid })
+    .add(flight, { airDensity: 0, flightTime: 0.35 });
   for (let frame = 1; frame <= 480; frame++) {
     world.advance(frame);
     const { region } = world.fields.port(film.dropsField.name);
@@ -297,10 +300,103 @@ test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', as
     const [x, y, z] = body.position;
     for (const [i, value] of [x + spacing / 2, y - spacing, z, ...body.linearVelocity].entries())
       assert.ok(Math.abs(row[i] - value) <= 64 * Number.EPSILON * Math.max(1, Math.abs(value)));
+    const drop = flight.readDrops()[0];
+    const dt = 1 / rate.num;
+    const age = dt - row[7];
+    const g = world.gravity[1];
+    assert.equal(flight.readDrops().length, 1);
+    assert.equal(drop.age, age);
+    assert.equal(drop.volume, row[6]);
+    assert.equal(flight.budget.received, row[6]);
+    for (const [i, value] of [row[0], row[1] + 0.5 * g * age * age, row[2]].entries())
+      assert.ok(Math.abs(drop.position[i] - value) < 64 * Number.EPSILON);
+    assert.ok(Math.abs(drop.velocity[1] - g * age) < 64 * Number.EPSILON);
+    const checkpoint = world.takeSnapshot();
+    world.advance(frame + 30);
+    assert.equal(flight.readDrops().length, 0);
+    assert.deepEqual(flight.budget, { received: drop.volume, airborne: 0, outflow: drop.volume });
+    const final = world.hash();
+    world.restoreSnapshot(checkpoint.bytes);
+    world.advance(frame + 30);
+    assert.equal(world.hash(), final);
     balance(film, frame);
     return;
   }
   assert.fail('Expected the moving sill to detach a drop within eight seconds.');
+});
+
+test('ThinFilmDropFlight: the transient fall matches independent drop-tower measurements', () => {
+  // Hinkle et al. (1987), Tables 1 and 2. Neither measurement column sets the force law.
+  const observations = [
+    { diameter: 0.00267, optical: [4.04, 6.22, 7.24], rings: [4.11, 6.26, 7.25] },
+    { diameter: 0.00383, optical: [4.17, 6.64, 7.98], rings: [4.21, 6.67, 7.88] },
+    { diameter: 0.00452, optical: [4.22, 6.85, 8.13], rings: [4.23, 6.82, 8.14] },
+    { diameter: 0.00564, optical: [4.28, 6.91, 8.43], rings: [4.24, 6.91, 8.41] },
+  ];
+  const field = {
+    name: 'tower-drops',
+    kind: 'surfaceSampleSet',
+    quantity: 'detachedWaterDrop',
+    unit: 'SI',
+    centring: 'particle',
+  };
+  let records;
+  let rows;
+  const producer = {
+    describe: () => ({ id: 'drop-tower', rate: 0, stableRate: () => 0, fields: [{ field, access: 'write' }] }),
+    init(host) {
+      records = host.allocate('tower-drops', 8 * FILM_DROP_WORDS * observations.length, 'f64', THIN_FILM_LAYOUT);
+      rows = regionWords(host.memory, records);
+    },
+    step(context, dt) {
+      rows.fill(0);
+      if (context.tick !== 0) return;
+      for (const [i, { diameter }] of observations.entries())
+        rows.set([i, 0, 0, 0, 0, 0, (Math.PI / 6) * diameter ** 3, 0, dt, 1], i * FILM_DROP_WORDS);
+    },
+    importPorts() {},
+    exportPorts: (tick) => [{ field: field.name, region: records, tick, cell: [0, 0, 0] }],
+    stateRegions: () => [records],
+    extraState: () => [],
+  };
+  const temperature = 293.15;
+  const flight = new ThinFilmDropFlight(field);
+  const world = new PhysicsWorld({ rate }).add(producer, {}).add(flight, {
+    airTemperature: temperature,
+    airDensity: 84100 / (287.05 * temperature),
+  });
+  const heights = [1, 3, 5];
+  const hits = new Array(observations.length).fill(0);
+  let previous = observations.map(() => ({ position: [0, 0, 0], velocity: [0, 0, 0] }));
+  for (let frame = 1; frame <= 120; frame++) {
+    world.advance(frame);
+    const current = flight.readDrops();
+    assert.equal(current.length, observations.length);
+    for (const [i, drop] of current.entries()) {
+      const index = hits[i];
+      const height = heights[index];
+      if (-drop.position[1] < height || index === heights.length) continue;
+      const { optical, rings } = observations[i];
+      const before = previous[i];
+      const fraction = (height + before.position[1]) / (before.position[1] - drop.position[1]);
+      const speed = -(before.velocity[1] + fraction * (drop.velocity[1] - before.velocity[1]));
+      // Include both instruments and the paper's stated two-percent transient uncertainty.
+      const minimum = 0.98 * (Math.min(optical[index], rings[index]) - 0.005);
+      const maximum = 1.02 * (Math.max(optical[index], rings[index]) + 0.005);
+      assert.ok(
+        speed >= minimum && speed <= maximum,
+        `drop ${i + 1} at ${height} m: ${speed} vs [${minimum}, ${maximum}]`,
+      );
+      hits[i]++;
+    }
+    previous = current;
+    if (hits.every((count) => count === heights.length)) break;
+  }
+  assert.deepEqual(
+    hits,
+    observations.map(() => heights.length),
+  );
+  assert.equal(flight.budget.received, flight.budget.airborne);
 });
 
 test('ThinFilmSolver: a mounted film transmits its normal weight and moment to the rigid body', async () => {

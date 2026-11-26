@@ -10,7 +10,7 @@ export interface ThinFilmDripOutlet {
   readonly radius: number;
 }
 
-/** A detached-drop record: position XYZ, initial velocity XYZ, m³ per drop, first offset and period in seconds, count. */
+/** A detached-drop record: end-of-tick rim XYZ, rim velocity XYZ, m³ per drop, first offset and period in seconds, count. */
 export const FILM_DROP_WORDS = 10;
 
 interface DripSurface {
