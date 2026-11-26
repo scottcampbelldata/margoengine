@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20327680,
+  "total": 20338560,
   "history": [
     {
       "date": "2026-10-24",
@@ -13041,6 +13041,12 @@
       "commit": "fa79b04868",
       "reason": "DYN-05 adds 9673 B gzip from zero for optional rail contacts, sprung bogies, couplers and catenary. The separate plain and shared 571 B Rust SIMD wire kernels fetch on demand. Core and Stage add zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b3a3d3a6ec",
+      "grew": 3,
+      "reason": "SOFT-04 vertex block descent: soft entry 110995 to 113913 B gzip. @margoengine/physics/soft: 111864 to 117331 B ceiling (113913 B measured); @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 34593 to 35704 B ceiling (34664 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 76400 to 80702 B ceiling (78351 B measured). Native adjacency and the exact 3x3 Hessian work in the existing lazy soft kernel, sharing material state, cuts and rigid contacts. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -13900,9 +13906,9 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 111864,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
+    "@margoengine/physics/soft": 117331,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 80702,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
