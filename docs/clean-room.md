@@ -13253,6 +13253,12 @@ integer sample carry and PCM history survive a snapshot.
   The exposure controls the share of stress acting on snow, so `uStar² - uVegetation² = exposure uStar²`.
   The paper's fixed grain-speed closure uses `2.8 uImpact`. Dividing the flux by that speed gives the equilibrium
   moving column in the same conservative finite-volume solver. Snow's default threshold is 0.2 m/s.
+- R. S. Anderson (1987), [A theoretical model for aeolian impact ripples](https://doi.org/10.1111/j.1365-3091.1987.tb00814.x).
+  Equations 7–8 give the slope-dependent impact rate `max(0, 1 + cot(angle) dh/ds)` and Equation 14 distributes
+  the ejected grains over short downwind hops. The solver integrates exponential hop probability over each grid
+  interval and transfers mass in conservative pairs. The ejection coefficient uses one effective splash grain per
+  mean saltation hop, with the 0.3 m representative saltation length from Kok et al., Table 2.3. Supply the mean
+  short-hop length explicitly to resolve changes in the ripple regime.
 
 The Rust implementation and the renderer integration were written from these equations and descriptions. The
 renderer samples moving mass and grain velocity at the emitter and maps the mass to opacity as `m / (m + referenceMass)`.

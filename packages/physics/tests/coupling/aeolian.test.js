@@ -152,6 +152,33 @@ test('a seeded dune relaxes toward repose by paired downslope motion', async () 
   assert.ok(Math.abs(heights[0] - heights[2] - 0.5) < bound, String(heights));
 });
 
+test('Anderson short hops grow a seeded impact ripple without creating bed mass', async () => {
+  const shape = { columns: 128, rows: 2, width: 3.2, depth: 0.1, centre: [0, 0] };
+  const wavenumber = (2 * Math.PI) / 0.4,
+    amplitude = 0.001;
+  const seed = (x) => amplitude * Math.cos(wavenumber * x);
+  const transport = await AeolianTransport.load();
+  const initialSaltation = (2 * 0.35 * density * (0.4 * 0.4 - 0.24 * 0.24)) / gravity;
+  const params = {
+    grid: shape,
+    initialSaltation,
+    frictionVelocity: [0.4, 0],
+    impactThreshold: 0.24,
+    initiationRatio: 2,
+    grainSpeed: 0.1,
+    avalancheTime: 0,
+  };
+  const { world, bed } = create(transport, { ...params, ripples: { meanHop: 0.065, ejectionsPerSecond: 8 } }, seed);
+  const control = create(await AeolianTransport.load(), params, seed);
+  const initial = mass(transport);
+  world.advance(12);
+  control.world.advance(12);
+  const heights = bed.elevations();
+  assert.ok(heights[64 * 3 + 1] > amplitude, 'near the crest lee-side arrivals exceed local ejection');
+  near(bed.volume(), control.bed.volume());
+  near(mass(transport), initial, 512 * Number.EPSILON * initial);
+});
+
 test('a wind provider moves a ridge downwind while sheltered/resolved still snow stays on the ground', async () => {
   const forSpeed = async (speed, erodibility) => {
     const transport = await AeolianTransport.load();

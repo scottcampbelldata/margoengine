@@ -3163,6 +3163,9 @@ cover or wet areas. Start with `mobileDepth` matching the loose layer above bedr
 for this solver have X increasing fastest. `motionField` yields `[kg/m², m/s, m/s]`; `dustField` yields kg/(m² s)
 and `windDragField` yields `[Pa on X, Pa on Z]`, all f64 layout 1. The optional `vfx/blown-sand` entry can use the
 same solver as its `transport`, with a ground sampler from `terrain.bed`.
+On a fine sand grid, set `ripples: { meanHop }` to include short splash hops that amplify a bed perturbation into an
+impact ripple. `meanHop` is the mean hop length in metres. The other ripple coefficients default to an incident
+cotangent of 4 and an ejection rate of `grainSpeed / 0.3` per second.
 
 ## Groundwater and springs
 

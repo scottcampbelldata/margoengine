@@ -9217,9 +9217,10 @@ raw, fetched only when the caller loads the solver.
 ### Dune and snow transport (EARTH-07)
 
 The solver resolves a single grain material and a mobile surface layer on the uniform `TerrainBed` grid.
-Set `mobileDepth` to the available layer above bedrock. Coarse grids describe dune evolution; resolve a seeded
-ripple with multiple vertices per wavelength. New ripple wavelength selection, suspension inside the air column,
-changes in snow cohesion and multi-grain sorting require additional models. In an explicit world the latest bed change
+Set `mobileDepth` to the available layer above bedrock. Coarse grids describe dune evolution. For impact ripples,
+supply `ripples.meanHop` and put multiple vertices inside a typical ripple wavelength. The short-hop model uses one
+material and a fixed wind-relative incident angle. Suspension, snow cohesion changes and multi-grain sorting require
+additional models. In an explicit world the latest bed change
 may be in flight for one base step. Other contributors sharing the bed need to coordinate their erodible depths.
 
 Open sides export saltating grains and closed sides retain them. The mass ledger reports mobile bed, airborne grains,

@@ -117,6 +117,63 @@ impl Grid {
         let b = word(values, k + self.nx()) * (1.0 - f) + word(values, k + self.nx() + 1) * f;
         a * (1.0 - g) + b * g
     }
+
+    fn deposit(self, values: &mut [f64], x: f64, z: f64, mass: f64) {
+        let x = x.max(0.0).min((self.nx() - 1) as f64);
+        let z = z.max(0.0).min((self.nz - 1) as f64);
+        let i = (x as usize).min(self.nx() - 2);
+        let j = (z as usize).min(self.nz - 2);
+        let f = x - i as f64;
+        let g = z - j as f64;
+        let k = i + self.nx() * j;
+        *word_mut(values, k) += mass * (1.0 - f) * (1.0 - g);
+        *word_mut(values, k + 1) += mass * f * (1.0 - g);
+        *word_mut(values, k + self.nx()) += mass * (1.0 - f) * g;
+        *word_mut(values, k + self.nx() + 1) += mass * f * g;
+    }
+
+    fn hop(self, buffer: &mut [f64], i: usize, delta: (f64, f64), half: f64, mass: f64) -> f64 {
+        let (x, z) = self.coords(i);
+        let (x, z) = (x as f64, z as f64);
+        let (sx, sz) = delta;
+        let (dist_x, x_edge) = if sx > 0.0 {
+            (((self.nx() - 1) as f64 - x) / sx, 2)
+        } else if sx < 0.0 {
+            (-x / sx, 1)
+        } else {
+            (f64::INFINITY, 0)
+        };
+        let (dist_z, z_edge) = if sz > 0.0 {
+            (((self.nz - 1) as f64 - z) / sz, 8)
+        } else if sz < 0.0 {
+            (-z / sz, 4)
+        } else {
+            (f64::INFINITY, 0)
+        };
+        let mut edge = 0;
+        if dist_x <= dist_z {
+            edge |= x_edge;
+        }
+        if dist_z <= dist_x {
+            edge |= z_edge;
+        }
+        let reach = dist_x.min(dist_z);
+        let tail = half * half;
+        *word_mut(buffer, i) += mass * (1.0 - half);
+        let mut left = mass * half;
+        let mut at = 1.0;
+        while at + 0.5 <= reach && left > 0.0 {
+            self.deposit(buffer, x + at * sx, z + at * sz, left * (1.0 - tail));
+            left *= tail;
+            at += 1.0;
+        }
+        if self.open & edge != 0 {
+            left
+        } else {
+            self.deposit(buffer, x + reach * sx, z + reach * sz, left);
+            0.0
+        }
+    }
 }
 
 #[repr(C)]
@@ -138,6 +195,8 @@ struct Settings {
     hill_slope: f64,
     hill_fetch: f64,
     snow: f64,
+    ripple_rate: f64,
+    ripple_cotangent: f64,
 }
 
 fn relax(mass: f64, growth: f64, saturation: f64, source: f64, dt: f64) -> f64 {
@@ -241,6 +300,7 @@ pub unsafe extern "C" fn aeolian_step(
     let ux = unsafe { read_col(wind, n, 0) };
     let uz = unsafe { read_col(wind, n, 1) };
     let air = unsafe { read_col(wind, n, 2) };
+    let hop_tail = unsafe { read_col(wind, n, 3) };
     let height = unsafe { read_col(height, n, 0) };
     let mass = unsafe { write_col(mass, n, 0) };
     let mobile = unsafe { write_col(mobile, n, 0) };
@@ -379,6 +439,36 @@ pub unsafe extern "C" fn aeolian_step(
         });
         for i in 0..n {
             *word_mut(mass, i) = (word(buffer, i) / word(area, i)).max(0.0);
+        }
+        if p.ripple_rate > 0.0 {
+            buffer.fill(0.0);
+            for i in 0..n {
+                let (vx, vz) = (word(vx, i), word(vz, i));
+                let crossing = (vx.abs() / dx).max(vz.abs() / dz);
+                let ejected = if crossing > 0.0 {
+                    let slope = (vx * word(sx, i) + vz * word(sz, i)) / p.grain_speed;
+                    let impacts = (1.0 + p.ripple_cotangent * slope).max(0.0);
+                    (sub_dt
+                        * p.ripple_rate
+                        * word(mass, i)
+                        * impacts
+                        * word(area, i)
+                        * word(cover, i))
+                    .min(word(mobile, i))
+                } else {
+                    0.0
+                };
+                *word_mut(out, i) = ejected;
+                if ejected > 0.0 {
+                    let delta = (vx / (dx * crossing), vz / (dz * crossing));
+                    *word_mut(budget, 0) += grid.hop(buffer, i, delta, word(hop_tail, i), ejected);
+                }
+            }
+            for i in 0..n {
+                let moved = word(buffer, i) - word(out, i);
+                *word_mut(mobile, i) += moved;
+                *word_mut(bed_delta, i) += moved / (p.bulk_density * word(area, i));
+            }
         }
         if p.avalanche_time > 0.0 {
             grid.active_faces(n, |i, j, east, _| {

@@ -459,23 +459,10 @@ function heightOf(ground: BlownSandGround): (x: number, z: number) => number {
  * rule {@link BlownSand} emits by.
  */
 export function sandEmission(
-  options: Pick<
-    BlownSandOptions,
-    'ground' | 'wind' | 'mask' | 'threshold' | 'grainSize' | 'windHeight' | 'transport' | 'referenceMass'
-  >,
+  options: Pick<BlownSandOptions, 'ground' | 'wind' | 'mask' | 'threshold' | 'grainSize' | 'windHeight'>,
   x: number,
   z: number,
 ): { speedUp: number; flux: number; brink: boolean } {
-  if (options.transport) {
-    const motion = options.transport.sample(x, z);
-    if (!motion) return { speedUp: 1, flux: 0, brink: false };
-    const [vx, vz] = motion.velocity;
-    const speed = Math.hypot(vx, vz);
-    if (!(motion.mass > 0 && speed >= 1e-10 && Number.isFinite(speed))) return { speedUp: 1, flux: 0, brink: false };
-    const here = site(heightOf(options.ground), options.mask ?? null, x, z, vx / speed, vz / speed, true);
-    const reference = finite(options.referenceMass, 0.02, 'referenceMass', Number.MIN_VALUE, Number.MAX_VALUE);
-    return { speedUp: 1, flux: here.speedUp / (1 + reference / motion.mass), brink: here.brink };
-  }
   const w = windOf(options.wind),
     threshold = thresholdOf(options),
     here = site(heightOf(options.ground), options.mask ?? null, x, z, Math.sin(w.direction), Math.cos(w.direction));

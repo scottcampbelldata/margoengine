@@ -1447,7 +1447,7 @@ console.log(sand.time); // 0
 
 Pass an attached `AeolianTransport` as `transport` to use the bed's moving mass and velocity. Supply a live terrain
 sampler as `ground`. `referenceMass` sets the moving mass at half visual strength (0.02 kg/m² by default).
-`sandEmission` reports the visual strength at a point when given the same options. Advance the physics world and
+`transport.sample(x, z)` gives the local moving mass and velocity. Advance the physics world and
 set the effect clock to the corresponding time when seeking a shot.
 
 ```ts

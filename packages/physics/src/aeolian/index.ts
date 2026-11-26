@@ -1,7 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, Wind } from '@margoengine/math/fields';
 import { gravityMagnitude } from '@margoengine/math/gravity';
-import { ln } from '@margoengine/math/pinned';
+import { exp, ln } from '@margoengine/math/pinned';
 import { type BedShape, BedChange, BED_CHANGE_FIELD, BED_FIELD, BED_LAYOUT } from '../earth/bed.js';
 import { canShareMemory, isShared, regionWords, STACK_BYTES } from '../world/memory.js';
 import type {
@@ -87,6 +87,15 @@ export interface AeolianParams {
   readonly hillSlope?: number;
   /** Horizontal integration reach for topographic stress, metres. Default 20. */
   readonly hillFetch?: number;
+  /** Short splash hops for resolving impact ripples on a fine sand grid. Disabled when omitted. */
+  readonly ripples?: {
+    /** Mean length of low-energy splash hops, metres. */
+    readonly meanHop: number;
+    /** Cotangent of the incident angle of the saltating grains. Default 4. */
+    readonly impactCotangent?: number;
+    /** Mass ejected per second per kg of the moving population. Default grainSpeed / 0.3 m. */
+    readonly ejectionsPerSecond?: number;
+  };
   /** Open edges which export moving grains. All sides are closed by default. */
   readonly open?: Readonly<Partial<Record<Side, boolean>>>;
 }
@@ -152,6 +161,7 @@ interface State {
   readonly heightOfWind: number;
   readonly windToFriction: number;
   readonly cellSize: number;
+  readonly meanHop: number;
   readonly change: BedChange;
   readonly lifted: Region;
   readonly mobile: Region;
@@ -304,6 +314,8 @@ export class AeolianTransport implements Solver<AeolianParams> {
     const open =
       (aperture?.minX ? 1 : 0) | (aperture?.maxX ? 2 : 0) | (aperture?.minZ ? 4 : 0) | (aperture?.maxZ ? 8 : 0);
     const friction = params.frictionVelocity ?? [0, 0];
+    const ripples = !snow && params.ripples;
+    const meanHop = ripples ? checked('mean ripple hop', ripples.meanHop, Number.MIN_VALUE) : 0;
     const settings = [
       g,
       rho,
@@ -322,6 +334,8 @@ export class AeolianTransport implements Solver<AeolianParams> {
       checked('hill slope', params.hillSlope ?? 0.25, 0),
       checked('hill fetch', params.hillFetch ?? 20, 0),
       snow ? 1 : 0,
+      ripples ? checked('ripple ejection rate', ripples.ejectionsPerSecond ?? grainSpeed / 0.3, 0) : 0,
+      ripples ? checked('ripple incident cotangent', ripples.impactCotangent ?? 4, 0) : 0,
     ];
     const shared =
       isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]';
@@ -355,6 +369,7 @@ export class AeolianTransport implements Solver<AeolianParams> {
       heightOfWind,
       windToFriction: 0.4 / ln(heightOfWind / roughness),
       cellSize,
+      meanHop,
       lifted: allocate('moving-column', n),
       mobile: allocate('mobile-bed', n),
       motion: allocate('motion', 3 * n),
@@ -362,7 +377,7 @@ export class AeolianTransport implements Solver<AeolianParams> {
       drag: allocate('wind-drag', 2 * n),
       budget: allocate('budget', 2),
       height: allocate('bed-input', n),
-      air: allocate('air-input', 3 * n),
+      air: allocate('air-input', 4 * n),
       constants: allocate('area-exposure', 2 * n),
       settings: allocate('settings', settings.length),
       workingChange: allocate('transfer', n),
@@ -446,6 +461,11 @@ export class AeolianTransport implements Solver<AeolianParams> {
       input[i] = checked('friction X', u, -Infinity);
       input[n + i] = checked('friction Z', v, -Infinity);
       input[2 * n + i] = checked('air density', rho, 0);
+      if (s.meanHop > 0) {
+        const crossing = Math.max(Math.abs(u) / s.dx, Math.abs(v) / s.dz);
+        const step = crossing > 0 ? Math.sqrt(u * u + v * v) / crossing : Infinity;
+        input[3 * n + i] = exp((-0.5 * step) / s.meanHop);
+      }
     }
     s.kernel.aeolian_step(
       s.air.byteOffset,
