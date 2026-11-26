@@ -448,6 +448,7 @@ export class SoftBodyDesc {
     orthotropy: readonly number[] | null;
     orthotropicStrength: readonly number[] | null;
     crackBand: readonly number[] | null;
+    tensileSeam: SoftTensileSeam | null;
     inheritedBand: boolean;
     clusterGroups: number[][];
     clusterHertz: number;
@@ -488,6 +489,7 @@ export class SoftBodyDesc {
     static cuboid(centre: Vec3, halfExtents: Vec3, counts: readonly [number, number, number], material?: CellMaterial): SoftBodyDesc;
     static volumetric(vertices: ArrayLike<number>, indices: ArrayLike<number>, size: number, skinned?: boolean, material?: CellMaterial): SoftBodyDesc;
     setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
+    setTensileSeam(seam: SoftTensileSeam | null): this;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
     addCellEdges(): this;
     setSurface(): this;
@@ -626,6 +628,12 @@ export interface SoftTearEvent {
     cells: number[];
     pieces: SoftBody[];
     destination(particle: number): SoftDestination[];
+}
+
+export interface SoftTensileSeam {
+    readonly cell: number;
+    readonly triangle: Triangle;
+    readonly openingStrain: number;
 }
 
 export function fabricShearDamping(shear: FabricShear): number;
@@ -2404,6 +2412,8 @@ interface Skin {
     cell: Uint32Array;
     weight: Float32Array;
 }
+
+type Triangle = readonly [Vec3, Vec3, Vec3];
 
 type Vec3 = readonly [number, number, number];
 ```

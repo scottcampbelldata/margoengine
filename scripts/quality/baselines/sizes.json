@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20508583,
+  "total": 20509908,
   "history": [
     {
       "date": "2026-10-24",
@@ -13335,6 +13335,12 @@
       "commit": "2ce9332ece160b47ddec208d840d2f7fab32d8fb",
       "grew": 1,
       "reason": "SOFT-03 moves the optional strands entry from 5806 to 6262 B gzip for per-link load-bearing sections, masses and projected drag areas. A split would duplicate the native loader and collide with the existing field ownership. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b08ae325c9",
+      "grew": 1,
+      "reason": "SOFT-04 adds material-coordinate tensile strain sampling and automatically opened cut geometry, moving the soft entry from 137978 to 138830 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 43627 to 44952 B ceiling (43642 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14201,7 +14207,7 @@
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 141962,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 43627,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 44952,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 97921,
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,

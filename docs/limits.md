@@ -9679,6 +9679,7 @@ solid without springs, clusters or other native fracture criteria. The intact bo
 elasticity up to the strain threshold. Normal compression, inverted cells and pure rigid rotation
 cannot trigger the seam. Restore an intact snapshot into the same topology with the same authored
 seam to replay the event. Unseeded fracture still follows existing cell faces.
+With tensile seams the optional entry is 138,830 B gzip, including 43,642 B in its base.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
