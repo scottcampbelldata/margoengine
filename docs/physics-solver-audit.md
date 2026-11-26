@@ -610,6 +610,50 @@ failing test on `main` (KB-SOFT-SPLITDENSITY1).
   8. Correct the catalog row and the test names that call the checks in item 1 held out.
   9. Close HORSE-5, COURIER-3 and MAKING-3, still OPEN in the demo review.
 
+## Pass 2, 2026-11-26 (`main` at e998f2989)
+
+VERIFIED 0, REOPENED 1. SEA-07 was the only row set LANDED since pass 1; no Codex row was set LANDED.
+
+### SEA-07 tides, storm surge and currents (`physics/surge`, e5462e9cc), owner Claude: REOPENED
+
+**Checked.** The diff of `src/surge/index.ts`, `src/hydro/index.ts` (forcing potential, Coriolis, `timeScale` substepping, work counts) and `src/world/world.ts` (`checkTimeScales`); `tests/surge.test.js` (11 pass, 7.1 s), `tests/coupling/surge.test.js` (2 pass) and `tests/hydro.test.js` (16 pass), each under `scripts/run-with-timeout.mjs`. It has no GPU tests.
+
+**Validation.** Exact or closed-form solutions with derived bounds:
+- the inverse barometer, well balanced to 1e-12;
+- the wind set-up slope, 1%;
+- Merian's seiche, 1%;
+- the inertial circle, 1e-9;
+- a Kelvin wave, one cell and 8%;
+- Proudman's forced wave, 3% at Fr 0.3, and the linear resonant growth, 1% at Fr 1 (Williams et al. 2020);
+- the quarter-wave co-oscillating M2 tide, 3% with the ghost-cell offset stated;
+- the 600-to-1 time-scale run, within the derived RK2 phase error.
+
+None is checked against a measurement. The Lake Superior test bounds the tilt only to 0.6–1.4 of the flat-box closed form and checks the period against Merian's formula for a flat box, not the 1975 gauge record. The equilibrium-tide test checks the water against the surge's own potential (5%) and only that the tilt exceeds 5 mm; the tide's size is never checked against a published equilibrium amplitude.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7.
+
+**To do before it can be VERIFIED:**
+1. **The cross-scale refusal misses the tide.** `CelestialSolver` takes a `timeScale` parameter (`space/solver.ts:83`, used at line 264) but does not declare `timeScale()` in its description, so the world cannot see its scale. A sped-up water reading the world's tide through the surge is not refused when the celestial solver runs at another scale. `tests/coupling/surge.test.js` builds that very world without an error: the celestial solver at 3600, the water and the surge at 1. Declare the celestial scale, refuse the mismatch with a test, and fix the coupling test's world.
+2. **The surge's pressure and wind run on two clocks.** The surge's `pressure` function gets the water's time, but the water's `wind` is read at the world's time. One storm's pressure and wind therefore drift apart by the time scale unless the caller converts the wind by hand, as `windOf` does in `surge.test.js`. A wind field with no `timeScale` property is accepted silently by a sped-up water. Put both on one clock, or refuse a scaled water given an undeclared wind or rain, with a test.
+3. **Validation against measurements.** Test against published gauge records with a derived bound:
+   - a measured surge, such as the Lake Superior levels of 10 November 1975, or the Hurricane Ike (2008) or Katrina (2005) gauges used by ADCIRC and SLOSH (Jelesnianski et al. 1992; Luettich et al. 1992);
+   - a measured tide, such as M2 amplitude and phase at a published station;
+   - the equilibrium M2 amplitude (0.2442 m times gamma_2) against the celestial potential.
+4. **Model breadth against ADCIRC and Delft3D.** Missing:
+   - wave set-up from radiation stress (SEA-02, Longuet-Higgins and Stewart 1964);
+   - self-attraction and loading (Ray 1998);
+   - nodal corrections f and u for `tidalLevel` (Pugh and Woodworth 2014);
+   - wave-age-dependent wind drag;
+   - spherical coordinates past the beta plane;
+   - a high-fidelity tier, such as an unstructured or nested grid.
+5. **Coupling.** Pressure and wind come from user functions, not from the ATMO-05 or ATMO-10 registry fields that the catalog coupling row names. Nothing couples the surge with SEA-02 waves in either direction.
+6. **Coded errors.** Every `TypeError` and `RangeError` in `surge/index.ts`, and the new ones in `hydro/index.ts`, need a coded `MargoError`.
+7. **Scale and film.** Missing:
+   - Wasm and SIMD or threads for the grid loops;
+   - no per-step allocation (`new Uint8Array(count)` in `SurgeSolver.step`);
+   - no `water.sample` call per cell;
+   - a directable target, for example a surge height at a place and time.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
