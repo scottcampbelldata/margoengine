@@ -2236,6 +2236,9 @@ class SoftBodies implements PhysicsAttachment {
     setCellSolver(body: SoftBody, solver: SoftSolver): void;
     writeCellMaterial(body: SoftBody): void;
     cellOrthotropy({ cellRange }: SoftBody): readonly number[] | null;
+    cellOrthotropicStrength({ cellRange }: SoftBody): readonly number[] | null;
+    copyOrthotropicFailure({ cellRange }: SoftBody): Float32Array | null;
+    restoreOrthotropicFailure(first: number, history: Float32Array, start?: number, count?: number): void;
     cellFiber({ cellRange }: SoftBody): SoftFiber | null;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
@@ -2303,6 +2306,7 @@ class SoftBody {
     set solverKind(solver: SoftSolver);
     get fiber(): SoftFiber | null;
     get orthotropy(): readonly number[] | null;
+    get orthotropicStrength(): readonly number[] | null;
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -2441,6 +2445,7 @@ class SoftBodyDesc {
     cellMaterial: CellMaterial;
     fiber: SoftFiber | null;
     orthotropy: readonly number[] | null;
+    orthotropicStrength: readonly number[] | null;
     clusterGroups: number[][];
     clusterHertz: number;
     massGiven: boolean;
@@ -2580,11 +2585,18 @@ class SoftMeshBinding {
     static skinned(): SoftMeshBinding;
 }
 
+interface SoftOrthotropicStrength {
+    readonly tensile: Vec3;
+    readonly compressive: Vec3;
+    readonly shear: Vec3;
+}
+
 interface SoftOrthotropy {
     readonly youngsModuli: Vec3;
     readonly shearModuli: Vec3;
     readonly poissonRatios: Vec3;
     readonly axes?: readonly [Vec3, Vec3];
+    readonly strength?: SoftOrthotropicStrength;
 }
 
 interface SoftSoftness {

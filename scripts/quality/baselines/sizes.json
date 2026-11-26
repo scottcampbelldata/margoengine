@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20435770,
+  "total": 20440318,
   "history": [
     {
       "date": "2026-10-24",
@@ -13203,6 +13203,12 @@
       "commit": "FLUID-01 parcel fields",
       "grew": 1,
       "reason": "FLUID-01 adds optional clocked volume and momentum exchange, growing its entry from 6649 B to 7863 B gzip. A second adapter entry would still need the same particle-region and clock logic. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "6fb4d565a3",
+      "grew": 1,
+      "reason": "SOFT-04 adds nine directional stress limits and their independently filtered tear histories in the native solver, moving the soft entry from 131482 to 133213 B gzip. @margoengine/physics/soft: 132662 to 137210 B ceiling (133213 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -14067,7 +14073,7 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 132662,
+    "@margoengine/physics/soft": 137210,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 40143,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 94583,
     "@margoengine/physics/strands": 4764,

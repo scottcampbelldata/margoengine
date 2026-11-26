@@ -9618,7 +9618,8 @@ Its failure data adds 18 f32 words per cell when a body authors strength limits.
 the limits and nine store independently filtered utilizations. A cell reaches the tear threshold
 when its largest utilization exceeds one, or its interior-strength factor for an interior cell.
 The event splits the mesh along existing tetrahedral faces. It represents brittle onset without
-a directional fracture-energy or post-peak softening law.
+a directional fracture-energy or post-peak softening law. The optional soft entry measures
+133,213 B gzip, including a 39,450 B base and 93,115 B lazy native kernel.
 
 ### Gas-filled soft shells (SOFT-06)
 
