@@ -100,8 +100,15 @@ export interface SurfParams {
   readonly side?: SurfSide;
   /** The coast along the shore: 'open' (default; waves leave over the ends) or 'periodic', a coast that goes on the same way (give the water periodic sides there too). */
   readonly alongshore?: 'open' | 'periodic';
+  /**
+   * Waves ride the water's currents (default true): they keep their absolute frequency, so a current along them stretches them
+   * and one against them steepens and, past c_g + U = 0, blocks them; the currents' shear turns them.
+   */
+  readonly currents?: boolean;
   /** Wave groups at the offshore side (default true): surf beat and swash. Off, the incoming energy is steady. */
   readonly groups?: boolean;
+  /** The still water level the set-up and run-up are measured from, m (default 0). */
+  readonly level?: number;
   /** Directions over the half-plane the waves come in through, +-90 degrees about the shoreward one (default 36: 5 degrees). */
   readonly directions?: number;
   /** Breaking (Roelvink 1993): gamma (default 0.55), alpha (1) and n (10). */
@@ -144,14 +151,19 @@ export class SurfSolver implements Solver<SurfParams> {
   private n = 10;
   private beta: number | undefined = 0.1;
   private groups = true;
+  private peakPeriod = 10;
+  private height = 1;
+  private stillLevel = 0;
   private wrapX = false;
   private wrapZ = false;
+  private currents = true;
   private components: { a: number; omega: number; kx: number; kz: number; phi: number }[] = [];
   private level: RateLevel = 0;
   private energy!: Region;
   private roller!: Region;
   private shorelines!: Region;
   private wetted!: Region;
+  private swash!: Region;
   /** The time of the last step, s (the wet sand's clock). */
   private clock!: Region;
   private forces!: Region;
@@ -162,6 +174,10 @@ export class SurfSolver implements Solver<SurfParams> {
   private c!: Float64Array;
   private cg!: Float64Array;
   private bed!: Float64Array;
+  /** Per cell: the waves' intrinsic frequency (rad/s) and the water's current along x and z (m/s). */
+  private sig!: Float64Array;
+  private ux!: Float64Array;
+  private uz!: Float64Array;
 
   /** @param id The solver's id (default `'surf'`). */
   constructor(id = 'surf') {
@@ -229,6 +245,11 @@ export class SurfSolver implements Solver<SurfParams> {
       this.beta = beta;
     }
     this.groups = params.groups ?? true;
+    this.currents = params.currents ?? true;
+    const still = params.level ?? 0;
+    if (!Number.isFinite(still))
+      throw new RangeError(`The still water level is a finite height in metres (got ${still}); pass one.`);
+    this.stillLevel = still;
     const alongshore = params.alongshore ?? 'open';
     if (alongshore !== 'open' && alongshore !== 'periodic')
       throw new RangeError(`The coast along the shore is 'open' or 'periodic' (got ${String(alongshore)}); pass one.`);
@@ -246,6 +267,8 @@ export class SurfSolver implements Solver<SurfParams> {
     this.roller = host.allocate('roller', count * 8, 'f64', SURF_LAYOUT);
     const lines = side === 'minX' || side === 'maxX' ? this.nz : this.nx;
     this.shorelines = host.allocate('shorelines', lines * 8, 'f64', SURF_LAYOUT);
+    // Per line: steps seen, and the sum and sum of squares of the shoreline's height above the still water.
+    this.swash = host.allocate('swash', lines * 3 * 8, 'f64', SURF_LAYOUT);
     this.wetted = host.allocate('wetted', count * 8, 'f64', SURF_LAYOUT);
     this.clock = host.allocate('clock', 8, 'f64', SURF_LAYOUT);
     this.forces = host.allocate('forces', count * FORCING_WORDS * 8, 'f64', SURF_LAYOUT);
@@ -257,6 +280,9 @@ export class SurfSolver implements Solver<SurfParams> {
     this.c = new Float64Array(count);
     this.cg = new Float64Array(count);
     this.bed = new Float64Array(count);
+    this.sig = new Float64Array(count);
+    this.ux = new Float64Array(count);
+    this.uz = new Float64Array(count);
   }
 
   /** The incoming sea: its representative period, mean energy, directional share and the wave groups' components. */
@@ -339,6 +365,19 @@ export class SurfSolver implements Solver<SurfParams> {
       throw new RangeError('The incoming sea carries no energy toward the shore; pass waves that come in.');
     this.period = m0 / m1;
     this.sigma = TWO_PI / this.period;
+    // The peak period and the significant height, for the incident swash (Stockdon et al. 2006).
+    let peak = 0,
+      most = -1;
+    for (let i = 0; i < nf; i++) {
+      let sum = 0;
+      for (let j = 0; j < ds.length; j++) if (cos(ds[j]! - inward) > 0) sum += density(i, j);
+      if (sum > most) {
+        most = sum;
+        peak = fs[i]!;
+      }
+    }
+    this.peakPeriod = 1 / peak;
+    this.height = 4 * Math.sqrt(m0);
     this.meanEnergy = this.rho * this.g * m0;
     for (let j = 0; j < nd; j++) this.spread[j] = share[j]! / m0 / dtheta;
     // The wave groups' components: COMPONENTS draws of (frequency, direction) by energy, each of equal variance, with the
@@ -439,21 +478,17 @@ export class SurfSolver implements Solver<SurfParams> {
           s = this.water.sample(this.x0 + (i + 0.5) * this.dx, this.z0 + (j + 0.5) * this.dz);
         this.depth[k] = s.depth;
         this.bed[k] = s.surface - s.depth;
-        if (s.depth > WAVE_DEPTH) {
-          const kk = wavenumber(1 / this.period, s.depth, this.g),
-            kh = kk * s.depth,
-            c = this.sigma / kk;
-          this.k[k] = kk;
-          this.c[k] = c;
-          this.cg[k] = c * (0.5 + (kh < 20 ? kh / sinhOf(2 * kh) : 0));
-        } else {
-          this.k[k] = this.c[k] = this.cg[k] = 0;
-        }
+        const u = this.currents && s.depth > WAVE_DEPTH ? s.velocity[0] : 0,
+          w = this.currents && s.depth > WAVE_DEPTH ? s.velocity[1] : 0;
+        this.ux[k] = u;
+        this.uz[k] = w;
+        if (s.depth > WAVE_DEPTH) this.disperse(k, s.depth, E);
+        else this.k[k] = this.c[k] = this.cg[k] = this.sig[k] = 0;
       }
     // Substeps for the waves' Courant number (space and direction) at most 0.7.
     let fastest = 0;
     for (let k = 0; k < n; k++) {
-      const rate = this.cg[k]! / this.dx + this.cg[k]! / this.dz;
+      const rate = (this.cg[k]! + Math.abs(this.ux[k]!)) / this.dx + (this.cg[k]! + Math.abs(this.uz[k]!)) / this.dz;
       if (rate > fastest) fastest = rate;
     }
     const steps = Math.max(1, Math.ceil((fastest * dt) / 0.5)),
@@ -484,21 +519,88 @@ export class SurfSolver implements Solver<SurfParams> {
     }
   }
 
+  /**
+   * The waves' wavenumber at cell k on water `depth` m deep riding its current: the absolute frequency omega = sigma(k) + k U
+   * is the incoming sea's, U the current along the waves' mean direction there (the Doppler relation, solved by Newton's
+   * method). Where c_g + U falls to 0 the current blocks the waves, and the cell carries none.
+   */
+  private disperse(k: number, depth: number, E: Float64Array): void {
+    const g = this.g,
+      omega = this.sigma,
+      nd = this.nd;
+    let cx = 0,
+      cz = 0;
+    for (let b = 0; b < nd; b++) {
+      cx += E[k * nd + b]! * cos(this.dirs[b]!);
+      cz += E[k * nd + b]! * sin(this.dirs[b]!);
+    }
+    const norm = Math.sqrt(cx * cx + cz * cz),
+      along =
+        norm > 0
+          ? (this.ux[k]! * cx + this.uz[k]! * cz) / norm
+          : this.ux[k]! * cos(this.dirs[nd >> 1]!) + this.uz[k]! * sin(this.dirs[nd >> 1]!);
+    let kk = wavenumber(omega / TWO_PI, depth, g);
+    let blocked = false;
+    for (let it = 0; it < 30 && along !== 0; it++) {
+      const kh = kk * depth,
+        th = kh < 20 ? tanhOf(kh) : 1,
+        sigma = Math.sqrt(g * kk * th),
+        group = (sigma / kk) * (0.5 + (kh < 20 ? kh / sinhOf(2 * kh) : 0)),
+        slope = group + along;
+      if (!(slope > 1e-6)) {
+        blocked = true;
+        break;
+      }
+      const next = kk - (sigma + kk * along - omega) / slope;
+      if (!(next > 0)) {
+        blocked = true;
+        break;
+      }
+      if (Math.abs(next - kk) < 1e-12 * kk) {
+        kk = next;
+        break;
+      }
+      kk = next;
+    }
+    const kh = kk * depth,
+      sigma = Math.sqrt(g * kk * (kh < 20 ? tanhOf(kh) : 1)),
+      cg = (sigma / kk) * (0.5 + (kh < 20 ? kh / sinhOf(2 * kh) : 0));
+    if (blocked || !(sigma > 0) || !(cg + along > 0)) {
+      this.k[k] = this.c[k] = this.cg[k] = this.sig[k] = 0;
+      return;
+    }
+    this.k[k] = kk;
+    this.sig[k] = sigma;
+    this.c[k] = sigma / kk;
+    this.cg[k] = cg;
+  }
+
   /** The waves' energy over `dt`: upwind fluxes in x, z and direction; the offshore side feeds the incoming directions. */
   private propagate(E: Float64Array, dt: number, time: number): void {
     const { nx, nz, nd, dx, dz } = this,
       dtheta = this.dtheta,
-      before = E.slice(),
       cg = this.cg,
+      sig = this.sig,
       depth = this.depth;
+    // Action A = E / sigma is what is carried: with currents, energy is not kept, action is (Bretherton and Garrett 1968).
+    for (let k = 0; k < nx * nz; k++) {
+      const s = sig[k]!;
+      for (let b = 0; b < nd; b++) E[k * nd + b] = s > 0 ? E[k * nd + b]! / s : 0;
+    }
+    const before = E.slice();
     const at = (i: number, j: number, b: number) => (i + nx * j) * nd + b,
-      // The energy beyond the grid in direction b at the edge cell (i, j): the incoming sea on the offshore side, none elsewhere.
+      // The action beyond the grid in direction b at the edge cell (i, j): the incoming sea on the offshore side, none elsewhere.
       ghost = (i: number, j: number, b: number, edge: SurfSide): number => {
         if (edge !== this.side) return 0;
         const x = this.x0 + (i + 0.5) * dx,
-          z = this.z0 + (j + 0.5) * dz;
-        return this.boundaryEnergy(x, z, time) * this.spread[b]!;
-      };
+          z = this.z0 + (j + 0.5) * dz,
+          s = sig[i + nx * j]!;
+        return s > 0 ? (this.boundaryEnergy(x, z, time) * this.spread[b]!) / s : 0;
+      },
+      // The speed of direction b's action at cell k: the group velocity along it plus the current.
+      speedX = (k: number, cx: number) => (cg[k]! > 0 ? cg[k]! * cx + this.ux[k]! : 0),
+      speedZ = (k: number, cz: number) => (cg[k]! > 0 ? cg[k]! * cz + this.uz[k]! : 0),
+      upwind = (vl: number, vr: number, al: number, ar: number) => (vl + vr >= 0 ? vl * al : vr * ar);
     for (let b = 0; b < nd; b++) {
       const cx = cos(this.dirs[b]!),
         cz = sin(this.dirs[b]!);
@@ -508,16 +610,19 @@ export class SurfSolver implements Solver<SurfParams> {
           const left = f - 1,
             right = this.wrapX && f === nx ? 0 : f;
           let flux: number;
-          if (this.wrapX)
-            flux =
-              cx >= 0
-                ? cg[left + nx * j]! * cx * before[at(left, j, b)]!
-                : cg[right + nx * j]! * cx * before[at(right, j, b)]!;
-          else if (cx >= 0) {
-            if (left < 0) flux = cg[right + nx * j]! * cx * ghost(right, j, b, 'minX');
-            else flux = cg[left + nx * j]! * cx * before[at(left, j, b)]!;
-          } else if (right >= nx) flux = cg[left + nx * j]! * cx * ghost(left, j, b, 'maxX');
-          else flux = cg[right + nx * j]! * cx * before[at(right, j, b)]!;
+          if (left < 0) {
+            const v = speedX(right + nx * j, cx);
+            flux = v > 0 ? v * ghost(right, j, b, 'minX') : v * before[at(right, j, b)]!;
+          } else if (right >= nx) {
+            const v = speedX(left + nx * j, cx);
+            flux = v < 0 ? v * ghost(left, j, b, 'maxX') : v * before[at(left, j, b)]!;
+          } else
+            flux = upwind(
+              speedX(left + nx * j, cx),
+              speedX(right + nx * j, cx),
+              before[at(left, j, b)]!,
+              before[at(right, j, b)]!,
+            );
           if (left >= 0) E[at(left, j, b)]! -= (dt / dx) * flux;
           if (right < nx && (this.wrapX || right === f)) E[at(right, j, b)]! += (dt / dx) * flux;
         }
@@ -527,44 +632,65 @@ export class SurfSolver implements Solver<SurfParams> {
             const lo = f - 1,
               hi = this.wrapZ && f === nz ? 0 : f;
             let flux: number;
-            if (this.wrapZ)
-              flux =
-                cz >= 0 ? cg[i + nx * lo]! * cz * before[at(i, lo, b)]! : cg[i + nx * hi]! * cz * before[at(i, hi, b)]!;
-            else if (cz >= 0) {
-              if (lo < 0) flux = cg[i + nx * hi]! * cz * ghost(i, hi, b, 'minZ');
-              else flux = cg[i + nx * lo]! * cz * before[at(i, lo, b)]!;
-            } else if (hi >= nz) flux = cg[i + nx * lo]! * cz * ghost(i, lo, b, 'maxZ');
-            else flux = cg[i + nx * hi]! * cz * before[at(i, hi, b)]!;
+            if (lo < 0) {
+              const v = speedZ(i + nx * hi, cz);
+              flux = v > 0 ? v * ghost(i, hi, b, 'minZ') : v * before[at(i, hi, b)]!;
+            } else if (hi >= nz) {
+              const v = speedZ(i + nx * lo, cz);
+              flux = v < 0 ? v * ghost(i, lo, b, 'maxZ') : v * before[at(i, lo, b)]!;
+            } else
+              flux = upwind(
+                speedZ(i + nx * lo, cz),
+                speedZ(i + nx * hi, cz),
+                before[at(i, lo, b)]!,
+                before[at(i, hi, b)]!,
+              );
             if (lo >= 0) E[at(i, lo, b)]! -= (dt / dz) * flux;
             if (hi < nz && (this.wrapZ || hi === f)) E[at(i, hi, b)]! += (dt / dz) * flux;
           }
     }
-    // Refraction: turning in direction at c_theta = (sigma / sinh 2kh) (h_x sin - h_z cos), upwind between neighbouring bins.
+    // Refraction: turning in direction at c_theta = (sigma / sinh 2kh) (h_x sin - h_z cos), plus the currents' shear
+    // cos (sin u_x - cos u_z) + sin (sin w_x - cos w_z) (the XBeach manual's eq. 10), upwind between neighbouring bins.
     for (let j = 0; j < nz; j++)
       for (let i = 0; i < nx; i++) {
         const k = i + nx * j,
           d = depth[k]!;
         if (!(cg[k]! > 0)) continue;
         const kk = this.k[k]!,
-          kh = kk * d;
-        if (kh > 10) continue;
-        const dhx = (this.depthAt(i + 1, j, d) - this.depthAt(i - 1, j, d)) / (2 * dx),
+          kh = kk * d,
+          dhx = (this.depthAt(i + 1, j, d) - this.depthAt(i - 1, j, d)) / (2 * dx),
           dhz = nz > 1 ? (this.depthAt(i, j + 1, d) - this.depthAt(i, j - 1, d)) / (2 * dz) : 0,
-          factor = this.sigma / sinhOf(2 * kh),
+          factor = kh > 10 ? 0 : sig[k]! / sinhOf(2 * kh),
+          grad = (field: Float64Array, di: number, dj: number, h: number) =>
+            (this.fieldAt(field, i + di, j + dj, field[k]!) - this.fieldAt(field, i - di, j - dj, field[k]!)) / (2 * h),
+          uxx = grad(this.ux, 1, 0, dx),
+          uxz = nz > 1 ? grad(this.ux, 0, 1, dz) : 0,
+          uzx = grad(this.uz, 1, 0, dx),
+          uzz = nz > 1 ? grad(this.uz, 0, 1, dz) : 0,
           flux = new Float64Array(nd + 1);
+        if (factor === 0 && uxx === 0 && uxz === 0 && uzx === 0 && uzz === 0) continue;
         // Face b between bins b - 1 and b, at the direction halfway; the half-plane's edges are closed.
         for (let b = 1; b < nd; b++) {
           const theta = this.dirs[b]! - dtheta / 2,
-            ct = factor * (dhx * sin(theta) - dhz * cos(theta)),
+            cs = cos(theta),
+            sn = sin(theta),
+            ct = factor * (dhx * sn - dhz * cs) + cs * (sn * uxx - cs * uxz) + sn * (sn * uzx - cs * uzz),
             from = ct >= 0 ? b - 1 : b;
           flux[b] = ct * before[k * nd + from]!;
         }
         for (let b = 0; b < nd; b++) E[k * nd + b]! += (dt / dtheta) * (flux[b]! - flux[b + 1]!);
       }
-    // No short waves in water too shallow for them: what reaches the shore is spent there.
+    // Back to energy. No short waves in water too shallow for them, or where a current blocks them: what reaches there is spent.
     for (let k = 0; k < nx * nz; k++)
       if (!(cg[k]! > 0)) for (let b = 0; b < nd; b++) E[k * nd + b] = 0;
-      else for (let b = 0; b < nd; b++) if (E[k * nd + b]! < 0) E[k * nd + b] = 0;
+      else for (let b = 0; b < nd; b++) E[k * nd + b] = E[k * nd + b]! > 0 ? E[k * nd + b]! * sig[k]! : 0;
+  }
+
+  private fieldAt(field: Float64Array, i: number, j: number, fallback: number): number {
+    if (this.wrapX) i = (i + this.nx) % this.nx;
+    if (this.wrapZ) j = (j + this.nz) % this.nz;
+    if (i < 0 || j < 0 || i >= this.nx || j >= this.nz) return fallback;
+    return field[i + this.nx * j]!;
   }
 
   private depthAt(i: number, j: number, fallback: number): number {
@@ -598,7 +724,8 @@ export class SurfSolver implements Solver<SurfParams> {
       }
       const qb = 1 - exp(-pow(hrms / (this.gamma * h), this.n)),
         // D_w / E_w = 2 alpha Q_b H_rms / (T h).
-        rate = (2 * this.alpha * qb * hrms) / (this.period * h),
+        // T the waves' intrinsic period here, 2 pi / sigma.
+        rate = (2 * this.alpha * qb * hrms * this.sig[k]!) / (TWO_PI * h),
         keep = 1 / (1 + rate * dt);
       for (let b = 0; b < nd; b++) E[k * nd + b]! *= keep;
       if (this.beta !== undefined) Er[k]! += ew * (1 - keep);
@@ -697,7 +824,7 @@ export class SurfSolver implements Solver<SurfParams> {
         kh = this.k[k]! * h;
       out[FORCING_WORDS * k + 2] = drift * ex;
       out[FORCING_WORDS * k + 3] = drift * ez;
-      out[FORCING_WORDS * k + 4] = kh < 20 ? (Math.PI * hrms) / (Math.SQRT2 * this.period * sinhOf(kh)) : 0;
+      out[FORCING_WORDS * k + 4] = kh < 20 ? (this.sig[k]! * hrms) / (2 * Math.SQRT2 * sinhOf(kh)) : 0;
     }
     // F = -div S by central differences; a neighbour without waves (dry, or beyond the grid) holds the cell's own stress, so
     // the shore and the grid's edges push only by the gradient inside.
@@ -727,18 +854,32 @@ export class SurfSolver implements Solver<SurfParams> {
       across = this.side === 'minX' || this.side === 'maxX',
       lines = across ? nz : nx,
       length = across ? nx : nz;
+    const swash = this.words(this.swash),
+      reach = this.incidentSwash() / 2;
     for (let k = 0; k < nx * nz; k++) if (this.depth[k]! > WET) wetted[k] = time;
     for (let line = 0; line < lines; line++) {
       // Landward from the offshore side: the last wet cell.
       let last = -1;
-      for (let p = 0; p < length; p++) {
-        const q = this.side === 'minX' || this.side === 'minZ' ? p : length - 1 - p,
-          k = across ? q + nx * line : line + nx * q;
-        if (this.depth[k]! > WET) last = k;
-      }
+      const cellOf = (p: number) => {
+        const q = this.side === 'minX' || this.side === 'minZ' ? p : length - 1 - p;
+        return across ? q + nx * line : line + nx * q;
+      };
+      for (let p = 0; p < length; p++) if (this.depth[cellOf(p)]! > WET) last = p;
       if (last < 0) continue;
-      const level = this.bed[last]! + this.depth[last]!;
-      if (level > high[line]!) high[line] = level;
+      const k = cellOf(last),
+        level = this.bed[k]! + this.depth[k]!,
+        above = level - this.stillLevel;
+      if (level + reach > high[line]!) high[line] = level + reach;
+      swash[3 * line]! += 1;
+      swash[3 * line + 1]! += above;
+      swash[3 * line + 2]! += above * above;
+      // The short waves' uprush, which the shallow water does not resolve, wets the sand up to half the incident swash
+      // height above the shoreline.
+      for (let p = last + 1; p < length; p++) {
+        const c = cellOf(p);
+        if (this.bed[c]! > level + reach) break;
+        wetted[c] = time;
+      }
     }
   }
 
@@ -752,7 +893,7 @@ export class SurfSolver implements Solver<SurfParams> {
   }
 
   stateRegions(): readonly Region[] {
-    return [this.energy, this.roller, this.shorelines, this.wetted, this.clock];
+    return [this.energy, this.roller, this.shorelines, this.wetted, this.clock, this.swash];
   }
 
   extraState(): readonly Region[] {
@@ -763,6 +904,99 @@ export class SurfSolver implements Solver<SurfParams> {
     const i = Math.min(this.nx - 1, Math.max(0, Math.floor((x - this.x0) / this.dx))),
       j = Math.min(this.nz - 1, Math.max(0, Math.floor((z - this.z0) / this.dz)));
     return i + this.nx * j;
+  }
+
+  /**
+   * The long wave bound to the wave groups at a point (x, z) of the offshore side, at time `t`: [elevation m, velocity along x
+   * and z m/s]. The groups' radiation stress pushes the water down under each group and up between them, zeta_b = (2n - 1/2)
+   * (E - mean E) / (rho (c_g^2 - g h)), carried at the groups' speed, u_b = c_g zeta_b / h along the waves (M. S.
+   * Longuet-Higgins and R. W. Stewart, "Radiation stress and mass transport in gravity waves", J. Fluid Mech. 13, 1962, as the
+   * Delft3D manual states it, eqs. B.66 and B.67). Feed it to the water's open sea so the long waves come in with the groups:
+   * `sides: {minX: {sea: 0, incoming: (t, x, z) => surf.boundWave(t, x, z)}}`. Without groups it is nothing.
+   */
+  boundWave(t: number, x: number, z: number): [number, number, number] {
+    if (!this.groups || !this.host) return [0, 0, 0];
+    const h = this.water.sample(x, z).depth;
+    if (!(h > WAVE_DEPTH)) return [0, 0, 0];
+    const kk = wavenumber(1 / this.period, h, this.g),
+      kh = kk * h,
+      ratio = 0.5 + (kh < 20 ? kh / sinhOf(2 * kh) : 0),
+      cg = (this.sigma / kk) * ratio,
+      gap = cg * cg - this.g * h;
+    if (!(gap < 0)) return [0, 0, 0];
+    const zeta = ((2 * ratio - 0.5) * (this.boundaryEnergy(x, z, t) - this.meanEnergy)) / (this.rho * gap);
+    let cx = 0,
+      cz = 0;
+    for (let b = 0; b < this.nd; b++) {
+      cx += this.spread[b]! * cos(this.dirs[b]!);
+      cz += this.spread[b]! * sin(this.dirs[b]!);
+    }
+    const norm = Math.sqrt(cx * cx + cz * cz) || 1,
+      speed = (cg * zeta) / h;
+    return [zeta, (speed * cx) / norm, (speed * cz) / norm];
+  }
+
+  /**
+   * The incident band's swash height, m: S_inc = 0.75 beta_f sqrt(H0 L0) (H. F. Stockdon, R. A. Holman, P. A. Howd and A. H.
+   * Sallenger, "Empirical parameterization of setup, swash, and runup", Coastal Engineering 53, 2006), the short waves' uprush
+   * that a phase-averaged surf does not resolve: H0 the incoming sea deshoaled to deep water, L0 = g T_p^2 / (2 pi), beta_f
+   * the beach's slope at the shoreline.
+   */
+  incidentSwash(at?: readonly [number, number]): number {
+    const slope = this.foreshore(at);
+    if (!(slope > 0)) return 0;
+    const g = this.g,
+      tp = this.peakPeriod,
+      [cx, cz] = this.sideCentre(),
+      h = this.water.sample(cx, cz).depth,
+      deep = (g * tp) / (4 * Math.PI),
+      here = h > 0 ? groupSpeed(TWO_PI / tp, h, g) : deep,
+      offshore = this.height * Math.sqrt(here / deep),
+      wavelength = (g * tp * tp) / TWO_PI;
+    return 0.75 * slope * Math.sqrt(offshore * wavelength);
+  }
+
+  /**
+   * The 2 percent exceedance run-up, m above the still water: R2 = 1.1 (<eta> + S / 2) with S = sqrt(S_inc^2 + S_IG^2)
+   * (Stockdon et al. 2006), <eta> and the infragravity swash S_IG = 4 sigma from this surf's own shoreline record on the line
+   * through `at` ([x, z]; default the middle line), S_inc from {@link incidentSwash}.
+   */
+  runUp2(at?: readonly [number, number]): number {
+    const line = this.lineOf(at),
+      s = this.words(this.swash),
+      count = s[3 * line]!;
+    if (!(count > 0)) return 0;
+    const mean = s[3 * line + 1]! / count,
+      variance = Math.max(0, s[3 * line + 2]! / count - mean * mean),
+      infragravity = 4 * Math.sqrt(variance),
+      incident = this.incidentSwash(at);
+    return 1.1 * (mean + Math.sqrt(incident * incident + infragravity * infragravity) / 2);
+  }
+
+  /** The line of cells across the shore through `at`, or the middle one. */
+  private lineOf(at?: readonly [number, number]): number {
+    const across = this.side === 'minX' || this.side === 'maxX',
+      lines = across ? this.nz : this.nx;
+    if (!at) return lines >> 1;
+    const k = this.cellOf(at[0], at[1]);
+    return across ? (k - (k % this.nx)) / this.nx : k % this.nx;
+  }
+
+  /** The beach's slope at the mean shoreline of the line through `at`: the bed's rise over a cell each side of it. */
+  private foreshore(at?: readonly [number, number]): number {
+    const line = this.lineOf(at),
+      { nx, nz } = this,
+      across = this.side === 'minX' || this.side === 'maxX',
+      length = across ? nx : nz,
+      step = across ? this.dx : this.dz,
+      cellOf = (p: number) => {
+        const q = this.side === 'minX' || this.side === 'minZ' ? p : length - 1 - p;
+        return across ? q + nx * line : line + nx * q;
+      };
+    let last = -1;
+    for (let p = 0; p < length; p++) if (this.depth[cellOf(p)]! > WET) last = p;
+    if (last < 1 || last >= length - 1) return 0;
+    return (this.bed[cellOf(last + 1)]! - this.bed[cellOf(last - 1)]!) / (2 * step);
   }
 
   /** The representative frequency of the incoming waves, 1 / T_m01, Hz: the short waves' frequency in the surf. */
@@ -837,4 +1071,16 @@ export class SurfSolver implements Solver<SurfParams> {
 function sinhOf(x: number): number {
   const e = exp(x);
   return (e - 1 / e) / 2;
+}
+
+function tanhOf(x: number): number {
+  const e = exp(2 * x);
+  return (e - 1) / (e + 1);
+}
+
+/** The group speed of waves of angular frequency sigma on water h m deep. */
+function groupSpeed(sigma: number, h: number, g: number): number {
+  const k = wavenumber(sigma / TWO_PI, h, g),
+    kh = k * h;
+  return (sigma / k) * (0.5 + (kh < 20 ? kh / sinhOf(2 * kh) : 0));
 }

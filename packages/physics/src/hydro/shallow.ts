@@ -38,7 +38,11 @@ export type ShallowSide =
   | 'open'
   | 'periodic'
   | { readonly level: number | ((time: number) => number) }
-  | { readonly sea: number | ((time: number) => number) };
+  | {
+      readonly sea: number | ((time: number) => number);
+      /** A long wave coming in from the open sea at (x, z), [elevation m, velocity x, z m/s] (a surf's bound wave). */
+      readonly incoming?: (time: number, x: number, z: number) => readonly [number, number, number];
+    };
 
 /** The grid the kernel works on: `nx` by `nz` cells of `dx` by `dz` m, cell (i, j) at index i + nx j. */
 export interface ShallowGrid {
@@ -52,6 +56,9 @@ export interface ShallowGrid {
   readonly sides: readonly [ShallowSide, ShallowSide, ShallowSide, ShallowSide];
   /** Gravity's magnitude, m/s^2. */
   readonly g: number;
+  /** The grid's corner, m (default [0, 0]): where an open sea's incoming long wave is asked for. */
+  readonly x0?: number;
+  readonly z0?: number;
 }
 
 /**
@@ -217,8 +224,25 @@ function sweep(
       ] as const)
         copy(L, to, from, false);
     } else {
-      ghost(L, low, 1, 2, 3, time, g);
-      ghost(L, high, cells + 2, cells + 1, cells, time, g);
+      // The edge cells' centres, where an open sea's incoming long wave is asked for.
+      const x0 = grid.x0 ?? 0,
+        z0 = grid.z0 ?? 0,
+        across = (line + 0.5) * (alongX ? grid.dz : grid.dx),
+        first = 0.5 * d,
+        last = (cells - 0.5) * d;
+      ghost(L, low, 1, 2, 3, time, g, alongX, alongX ? x0 + first : x0 + across, alongX ? z0 + across : z0 + first);
+      ghost(
+        L,
+        high,
+        cells + 2,
+        cells + 1,
+        cells,
+        time,
+        g,
+        alongX,
+        alongX ? x0 + last : x0 + across,
+        alongX ? z0 + across : z0 + last,
+      );
     }
     // Face states of every slot (ghosts constant).
     for (let s = 0; s < cells + 4; s++) reconstruct(L, s, cells);
@@ -284,7 +308,18 @@ function sweep(
 }
 
 /** Fills ghost slots `near` and `far` beside edge cell slot `edge` (`inner` the slot behind it) for `side`. */
-function ghost(L: Line, side: ShallowSide, near: number, edge: number, inner: number, time: number, g: number): void {
+function ghost(
+  L: Line,
+  side: ShallowSide,
+  near: number,
+  edge: number,
+  inner: number,
+  time: number,
+  g: number,
+  alongX: boolean,
+  x: number,
+  z: number,
+): void {
   const far = near === 1 ? 0 : near + 1;
   if (side === 'wall') {
     copy(L, near, edge, true);
@@ -304,15 +339,18 @@ function ghost(L: Line, side: ShallowSide, near: number, edge: number, inner: nu
     return;
   } else if ('sea' in side) {
     // Riemann invariants u +- 2 sqrt(g h) along the normal: in from still water at the sea's level, out from the edge cell.
+    // Outside: still water at the sea's level, or with the long wave coming in from it (its elevation and normal velocity).
     const level = typeof side.sea === 'function' ? side.sea(time) : side.sea,
+      wave = side.incoming ? side.incoming(time, x, z) : undefined,
       b = L.b[edge]!,
-      outside = Math.sqrt(g * Math.max(0, level - b)),
+      outside = Math.sqrt(g * Math.max(0, level - b + (wave ? wave[0] : 0))),
+      flow = wave ? (alongX ? wave[1] : wave[2]) : 0,
       inside = Math.sqrt(g * L.h[edge]!),
       u = L.u[edge]!,
       // The low side's outside lies at -x: its incoming invariant is u + 2c from outside, the outgoing u - 2c from inside.
       low = near === 1,
-      plus = low ? 2 * outside : u + 2 * inside,
-      minus = low ? u - 2 * inside : -2 * outside,
+      plus = low ? flow + 2 * outside : u + 2 * inside,
+      minus = low ? u - 2 * inside : flow - 2 * outside,
       c = (plus - minus) / 4,
       depth = c > 0 ? (c * c) / g : 0,
       velocity = depth > DRY ? (plus + minus) / 2 : 0,

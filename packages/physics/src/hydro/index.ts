@@ -261,6 +261,8 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
       bed: new Float64Array(count),
       sides: [side(sides.minX, 'minX'), side(sides.maxX, 'maxX'), side(sides.minZ, 'minZ'), side(sides.maxZ, 'maxZ')],
       g: this.g,
+      x0: this.x0,
+      z0: this.z0,
     };
     const { courant = 0.4, density = WATER_DENSITY, rate = 0 } = params;
     if (!(courant > 0 && courant <= 0.5))

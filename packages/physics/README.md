@@ -2308,7 +2308,7 @@ console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.
 - `bed`: the ground, the world's terrain (`terrain.bed` of a `TerrainBed` added before it, the surface over the elevations it publishes) or a bed of its own (`bedSurface`), read every step, so ground that erosion or a crater changes changes the flood; the water's cells are the bed's, and a cell's bed is the mean over its two triangles, the surface colliders see;
 - the water at the start: a `level` (a height, or a function of (x, z): every cell whose bed is lower fills to it) or a `depth`, and a `velocity` function;
 - `roughness`: Manning's n in s/m^(1/3), a number or a function of (x, z) (default 0.03, a natural channel; 0.013 concrete, 0.05 to 0.1 floodplain with brush);
-- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth), `{level}` (a lake or a sea held at a height in metres, or a function of time: a tide, a surge; long waves reflect from it), `{sea}` (the open sea at a height, which lets waves from inside leave: the characteristic coming in is still water at that height's) or `'periodic'` with its opposite side (a coast or a channel that goes on the same way);
+- `sides`: `minX`, `maxX`, `minZ` and `maxZ`, each `'wall'` (default), `'open'` (the flow goes on past the edge as it is, over the bed's slope carried on, so a river leaves at its normal depth), `{level}` (a lake or a sea held at a height in metres, or a function of time: a tide, a surge; long waves reflect from it), `{sea}` (the open sea at a height, which lets waves from inside leave: the characteristic coming in is still water at that height's, or with `incoming(t, x, z)` a long wave coming in from outside, [elevation, velocity x, z], such as a surf's `boundWave`) or `'periodic'` with its opposite side (a coast or a channel that goes on the same way);
 - `buildings`: `{min: [x, z], max: [x, z], height}` boxes that raise the bed under them (Schubert and Sanders' building blocks), so a flood goes round a town's blocks and over them only when deeper than they are tall;
 - `inflows`: rivers and pipes, `{position: [x, z], discharge}` in m^3/s or a function of time (a flood hydrograph);
 - `rain`, a `Precipitation` field (`@margoengine/weather`'s `PrecipitationField`), falling on water and ground alike; `wind`, a framework `Wind`, whose stress rho_a C_D |U| U drags the water (Garratt's C_D);
@@ -2409,15 +2409,18 @@ This is the phase-averaged "surfbeat" chain of XBeach (Roelvink et al. 2009). Th
 - `water`: the `ShallowWaterSolver`, added to the world first;
 - `incident`: the waves coming in, `{height, period, direction, spreading = 10, gamma = 3.3}` (significant height and peak period of a JONSWAP sea) or `{waves}`, a `WaveSpectrumField` (`WaveSolver.field`) sampled at the offshore side;
 - `side`, the offshore side they come in over (default `'minX'`), and `alongshore`, `'open'` (default) or `'periodic'` for a coast that goes on the same way (give the water periodic sides there too);
-- `groups` (default true): the incoming energy comes in groups, the envelope of the sea's components, so the water answers with surf beat and swash; off, it is steady;
+- `groups` (default true): the incoming energy comes in groups, the envelope of the sea's components, so the water answers with surf beat and swash; off, it is steady. Feed the groups' bound long wave to the water's open sea, `sides: {minX: {sea: 0, incoming: (t, x, z) => surf.boundWave(t, x, z)}}`, so the long waves come in with them (Longuet-Higgins and Stewart's zeta_b = (2n - 1/2)(E - mean E) / (rho (c_g^2 - g h)));
+- `currents` (default true): the waves ride the water's currents, keeping their absolute frequency and their action flux (c_g + U) E / sigma, refracted by the currents' shear and blocked where c_g + U falls to 0, so rips steepen the waves that meet them;
+- `level`, the still water level the set-up and run-up are measured from (default 0);
 - `directions` (default 36 over the incoming half-plane, 5 degrees);
 - `breaking` (`{gamma = 0.55, alpha = 1, n = 10}`), `roller` (`{beta = 0.1}` or `false`), `density` (default 1025) and `rate`.
 
 It publishes the field `surf` (per cell, H_rms, the mean direction and the roller's energy) and adds its forcing to the water's `surfaceWaterForcing`. Reading the surf:
 - `waveHeight(x, z)` (H_rms; H_s is about sqrt 2 times it) and `waveDirection(x, z)`;
 - `rollerEnergy(x, z)`, `stokesDrift(x, z)`, `undertow(x, z)` and `forcing(x, z)`;
-- `runUp(at?)`, the highest the water has reached up the shore on a line or on any line;
-- `wetSand(x, z, window = 600)`, whether a spot was wet within the window.
+- `runUp(at?)`, the highest the water has reached up the shore on a line or on any line, the short waves' uprush included;
+- `runUp2(at?)`, the run-up exceeded by 2 percent of the swash, Stockdon et al.'s R2 = 1.1 (<eta> + sqrt(S_inc^2 + S_IG^2) / 2) with the set-up and the infragravity swash from the water's own shoreline and the short waves' `incidentSwash(at?)` from Stockdon's law;
+- `wetSand(x, z, window = 600)`, whether a spot was wet within the window, the short waves' uprush (half the incident swash above the shoreline) included.
 
 The water's own `sample` gives the set-up and the currents.
 

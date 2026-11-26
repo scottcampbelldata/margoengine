@@ -24,7 +24,9 @@ export interface SurfParams {
     readonly incident: SurfIncident;
     readonly side?: SurfSide;
     readonly alongshore?: 'open' | 'periodic';
+    readonly currents?: boolean;
     readonly groups?: boolean;
+    readonly level?: number;
     readonly directions?: number;
     readonly breaking?: {
         readonly gamma?: number;
@@ -49,6 +51,9 @@ export class SurfSolver implements Solver<SurfParams> {
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+    boundWave(t: number, x: number, z: number): [number, number, number];
+    incidentSwash(at?: readonly [number, number]): number;
+    runUp2(at?: readonly [number, number]): number;
     get meanFrequency(): number;
     forcing(x: number, z: number): {
         force: [number, number];
@@ -132,6 +137,7 @@ type ShallowSide = 'wall' | 'open' | 'periodic' | {
     readonly level: number | ((time: number) => number);
 } | {
     readonly sea: number | ((time: number) => number);
+    readonly incoming?: (time: number, x: number, z: number) => readonly [number, number, number];
 };
 
 interface ShallowWaterParams {

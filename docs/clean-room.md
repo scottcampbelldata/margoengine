@@ -11913,6 +11913,16 @@ or any model was opened):
 - The Riemann invariants u +- 2 sqrt(g h) of the shallow-water equations for the open sea side: a textbook result (and
   `flood.ts`'s Flather boundary).
 
+Added the same day:
+- Wave-current interaction: the absolute frequency omega = sigma + k . u kept and the action E / sigma carried at c_g + u,
+  with the currents' refraction terms (the XBeach manual, eqs. 5 to 10; F. P. Bretherton and C. J. R. Garrett, "Wavetrains in
+  inhomogeneous moving media", Proc. R. Soc. A 302, 1968, known through it).
+- The bound long wave at the offshore side, zeta_b = (2n - 1/2)(E - mean E) / (rho (c_g^2 - g h)) and u_b = c_g zeta_b / h (M.
+  S. Longuet-Higgins and R. W. Stewart, J. Fluid Mech. 13, 1962, as the Delft3D manual's eqs. B.66 and B.67 state it), fed
+  through the open sea's incoming Riemann invariant.
+- The incident swash S_inc = 0.75 beta_f sqrt(H0 L0) and R2 = 1.1 (<eta> + sqrt(S_inc^2 + S_IG^2) / 2) of Stockdon et al.
+  (2006), the infragravity part from the shoreline record.
+
 The wave groups as the envelope of 48 equal-variance components drawn from the incoming sea by energy on the counter-based
 random numbers, the open-sea side by the invariants, the periodic sides with one face's flux taken by both ends, the stress
 force by central differences with a dry neighbour holding the cell's own stress, the run-up and wet-sand record, and the

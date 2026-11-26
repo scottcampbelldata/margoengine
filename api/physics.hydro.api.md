@@ -31,6 +31,8 @@ export interface ShallowGrid {
     readonly bed: Float64Array;
     readonly sides: readonly [ShallowSide, ShallowSide, ShallowSide, ShallowSide];
     readonly g: number;
+    readonly x0?: number;
+    readonly z0?: number;
 }
 
 export interface ShallowInflow {
@@ -50,6 +52,7 @@ export type ShallowSide = 'wall' | 'open' | 'periodic' | {
     readonly level: number | ((time: number) => number);
 } | {
     readonly sea: number | ((time: number) => number);
+    readonly incoming?: (time: number, x: number, z: number) => readonly [number, number, number];
 };
 
 export interface ShallowWaterParams {

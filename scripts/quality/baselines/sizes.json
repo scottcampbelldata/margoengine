@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19457247,
+  "total": 19458535,
   "history": [
     {
       "date": "2026-10-24",
@@ -12699,6 +12699,12 @@
       "commit": "feat(physics) water entry",
       "reason": "New optional physics/entry entry (SEA-14): EntrySolver, the slam (Wagner and the modified Logvinovich model), the impact pressure, the air cavity and its seal, splash events, the wake sources and foam, 9,838 B gzip (this Mac). It carries seakeeping's wettedLoads and the rigid ports it reads; a split would load the same code twice.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "33a9d4228",
+      "reason": "physics/surf ceiling 8,057 to 9,345 B (built 7,801 to 9,072 B): wave-current interaction (Doppler relation and action transport), the groups' bound long wave for the open sea, and Stockdon's incident swash for R2 and the wet sand. In the surf entry because every surf scene with currents, groups or run-up needs them; a split would load with each such scene.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13528,7 +13534,7 @@
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
-    "@margoengine/physics/surf": 8057,
+    "@margoengine/physics/surf": 9345,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/underwater": 5014,
