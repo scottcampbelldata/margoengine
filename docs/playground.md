@@ -58,6 +58,29 @@ blob URL of that file), added beside margoengine's entries before main.js loads.
 other in any order, cycles included; lines are not moved, so an error's line is the line in its own file. A
 `./name.js` that names no file of the project is left as written and fails to load with the browser's own error.
 
+## Embed
+
+Put a project on another page with the embeddable playground, `/playground/embed/`, and a share link's `#code=`:
+
+```html
+<!-- The canvas alone; add ?code to show the code beside it. Paste the #code=... of your share link after the
+     path: the src is the margoengine.com page /playground/embed/ followed by that hash. -->
+<iframe src="https://margoengine.com/playground/embed/?code" width="800" height="500"
+  title="Margo Engine example" loading="lazy"></iframe>
+```
+
+The embed shows Run, the canvas and **Open in Playground** (a new tab of the full playground with the same files in
+its link, kept up to date as the code changes). With `?code` it shows the code, its tabs and the console too, and runs
+edits; without it, the canvas alone. It has no templates, versions, sharing or download, and it saves nothing in the
+browser: it shares the site's storage with the full playground, so a page that frames it can never change what a
+visitor saved there. `?packages=` works as on the full page.
+
+Only `/playground/embed/*` and its own run frame `/playground/embed/frame/*` send `frame-ancestors *`; the full
+playground `/playground/*` and its run frame keep `frame-ancestors 'self'`, so no other site can frame the page that
+holds a visitor's saved work. Otherwise the embed has the same strict page policy and the same sandboxed run frame as
+the full page (`embed/index.html` is the full page's `<main>`, and `embed/frame/index.html` the same file as
+`frame/index.html`; `tests/playground.test.js` keeps both equal).
+
 ## How the API panel reads the types
 
 No TypeScript service and no new dependency: the run frame fetches the `.d.ts` beside each imported entry's `.js`
@@ -122,16 +145,21 @@ parent's Content Security Policy, which would force the page's policy open.
   a decompression bomb, not UTF-8), the version history and full or blocked storage, the run message and the download, the
   policies (no `unsafe-inline` and no `https:` on the page, the loose one on the frame only), the message schema, and
   that every template imports only entries in the import map.
-- `npm run test:playground:browser` (after `npm run build:packages`): in Chromium, the run frame opened on its own is
+- `npm run test:playground:browser` (after `npm run build:packages`): in Chromium, another origin frames the embed
+  (canvas only and with the code), which runs the shared files, links to the full playground with the same files and
+  saves nothing, while the full page refuses to be framed there; the run frame opened on its own is
   sandboxed and runs nothing; framed by a test page without the site's headers, it answers a parent of its own origin,
   stays silent in a parent of another origin and ignores a run message from a sibling frame; a template runs and draws, the frame
   has an opaque origin and cannot reach its parent, a forged message is ignored, an error shows its line and its
   error-help link, a version restores, the page's response policy is strict, a share link opens and runs while the
   saved code stays, Back to my code returns it, Run makes the shared code the saved one, and a damaged link says so.
 
-## Not yet
+## Status
 
-An embed mode is the next piece of this row in [the rival parity list](rival-parity-gaps.md). The limits are in [docs/limits.md](limits.md#playground).
+Left on the row in [the rival parity list](rival-parity-gaps.md): real type checking and member completion in the
+editor (errors as you type, members of a class, inferred types), which needs the TypeScript language service or an
+editor that bundles it, a new dependency waiting on a decision. The API panel above is the part that needs none. The
+limits are in [docs/limits.md](limits.md#playground).
 
 ## Sources
 

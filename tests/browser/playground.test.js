@@ -287,6 +287,51 @@ test('the playground runs templates, reports errors with lines and codes, and op
     assert.deepEqual(await tryFrame('127.0.0.1', 'sibling'), ['ready'], 'a message from a sibling runs nothing');
     await probe.close();
 
+    // Embed: another site (localhost) frames the embed page with a share link. It runs the code, links to the full
+    // playground with the same files, and saves nothing in the playground's storage; the main page refuses that site.
+    const storeBefore = await page.evaluate(() => localStorage.getItem('margo-playground:v1'));
+    const host = await context.newPage();
+    await host.goto(`http://localhost:${port}/test-results/playground-probe/`);
+    const embedLink = new URL(link).hash;
+    const embedBase = `http://127.0.0.1:${port}/site/playground/embed/?packages=/node_modules/`;
+    await host.evaluate(
+      ([canvasOnly, withCode, full]) => {
+        for (const [id, src] of [
+          ['canvas-only', canvasOnly],
+          ['with-code', withCode],
+          ['full', full],
+        ]) {
+          const frame = Object.assign(document.createElement('iframe'), { id, src, width: 800, height: 600 });
+          document.body.append(frame);
+        }
+      },
+      [`${embedBase}${embedLink}`, `${embedBase}&code${embedLink}`, page0],
+    );
+    const frameOf = (id) => host.locator(`#${id}`).contentFrame();
+    for (const id of ['canvas-only', 'with-code']) {
+      const embedded = frameOf(id);
+      await embedded.locator('#run:not([disabled])').waitFor();
+      assert.equal(await embedded.locator('#share').isVisible(), false, `${id}: no full-playground tools`);
+      const open = await embedded.locator('#open-full').getAttribute('href');
+      assert.ok(open.startsWith(`http://127.0.0.1:${port}/site/playground/?packages=`), open);
+      assert.equal(new URL(open).hash, embedLink, `${id}: Open in Playground carries the same files`);
+      // The embed's run frame (embed/frame/) runs the shared code: the error template's error comes back.
+      await embedded.locator('#stage iframe').waitFor({ state: 'attached' });
+      assert.match(await embedded.locator('#stage iframe').getAttribute('src'), /\/site\/playground\/embed\/frame\/$/);
+    }
+    await frameOf('with-code').locator('#console li.error', { hasText: 'Mesh disposed' }).waitFor();
+    assert.equal(await frameOf('canvas-only').locator('#editor').isVisible(), false, 'canvas only');
+    assert.equal(await frameOf('with-code').locator('#editor').isVisible(), true, 'with ?code, the code too');
+    assert.equal(await frameOf('with-code').locator('#editor').inputValue(), errorCode);
+    // The main page sends frame-ancestors 'self': another site's frame of it stays empty.
+    assert.equal(await frameOf('full').locator('#editor').count(), 0, 'the main page is never framed elsewhere');
+    await host.close();
+    assert.equal(
+      await page.evaluate(() => localStorage.getItem('margo-playground:v1')),
+      storeBefore,
+      'an embed saves nothing',
+    );
+
     // Page errors include the frame's: the only ones are the error template's own, on purpose.
     assert.deepEqual(
       errors.filter((message) => !/^Mesh disposed/.test(message)),

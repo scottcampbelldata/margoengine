@@ -20,6 +20,14 @@
 /playground/frame/*
   ! Content-Security-Policy
   Content-Security-Policy: sandbox allow-scripts; default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: blob: data:; worker-src 'self' blob: https://cdn.jsdelivr.net; font-src 'self' https:; media-src 'self' https: blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
+# The embeddable playground, and only it, may be framed by any site: the same strict page policy and the same run frame
+# policy, with frame-ancestors * (docs/playground.md, "Embed"). It saves nothing, so a framing page can change nothing.
+/playground/embed/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-src 'self'; worker-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors *
+/playground/embed/frame/*
+  ! Content-Security-Policy
+  Content-Security-Policy: sandbox allow-scripts; default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: blob: data:; worker-src 'self' blob: https://cdn.jsdelivr.net; font-src 'self' https:; media-src 'self' https: blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors *
 
 # Cache-Control: no-cache above: browsers check every file each visit (an unchanged file costs a 304, nothing is
 # re-downloaded), so a bad copy never sticks. It also overrides the zone's 4-hour Browser Cache TTL on margoengine.com.

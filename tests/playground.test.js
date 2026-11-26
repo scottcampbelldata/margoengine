@@ -228,6 +228,24 @@ test('the playground page keeps a strict policy; only the sandboxed run frame ge
     assert.deepEqual(page['frame-src'], ["'self'"], path);
     assert.deepEqual(page['frame-ancestors'], ["'self'"], `${path}: the main page is never embedded elsewhere`);
   }
+  assert.deepEqual(policy('/playground/frame/')['frame-ancestors'], ["'self'"]);
+  // Only the embed path, and its run frame, may be framed by other sites; both keep their policies otherwise.
+  const embedPage = policy('/playground/embed/');
+  assert.deepEqual(embedPage['frame-ancestors'], ['*']);
+  assert.deepEqual(embedPage['script-src'], ["'self'"]);
+  assert.deepEqual(embedPage['connect-src'], ["'self'"]);
+  assert.ok(!JSON.stringify(embedPage).includes('unsafe-inline'));
+  const embedFrame = policy('/playground/embed/frame/');
+  assert.deepEqual(embedFrame['frame-ancestors'], ['*']);
+  assert.deepEqual(embedFrame.sandbox, ['allow-scripts']);
+  assert.deepEqual(embedFrame['script-src'], policy('/playground/frame/')['script-src']);
+  // The embed page is the playground's own <main>, and its run frame the same file, so the two cannot drift apart.
+  const read = (path) =>
+    readFileSync(new URL(`../site/playground/${path}`, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const main = (html) => html.slice(html.indexOf('<main id='), html.indexOf('</main>'));
+  assert.equal(main(read('embed/index.html')), main(read('index.html')));
+  assert.match(read('embed/index.html'), /<html lang="en" data-embed>/);
+  assert.equal(read('embed/frame/index.html'), read('frame/index.html'));
   const frame = policy('/playground/frame/');
   assert.ok(frame['script-src'].includes('https://cdn.jsdelivr.net') && frame['script-src'].includes('blob:'));
   // The frame is sandboxed by its own header too, so opened directly it is still an opaque origin.

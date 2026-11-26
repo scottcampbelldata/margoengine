@@ -9193,6 +9193,8 @@ The playground page (`site/playground/`, [docs/playground.md](playground.md)), 2
 - The API panel lists top-level exports only (no class members, no full type checking, no inferred types), read from
   at most 120 `.d.ts` files per run, 20 imported entries and 400 names each; a declaration's line is cut at 300
   characters and its doc at its first sentence.
+- The embed (`/playground/embed/`) saves nothing in the browser and has no templates, versions, sharing or download;
+  its Open in Playground link carries the files only while they fit a share link (256 KiB, 64 KiB of link).
 - The glTF template loads the Khronos Box sample from raw.githubusercontent.com, so it needs the network.
 
 ## Contact and modal sound (SOUND-04)

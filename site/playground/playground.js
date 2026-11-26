@@ -2,6 +2,8 @@
 // without allow-same-origin, so it gets an opaque origin: no access to this page, its storage or its cookies. The frame
 // has its own loose policy (site/_headers); this page keeps a strict one, so it loads nothing from another host.
 // A project is files: main.js runs first and imports the others as './name.js'; each file is a tab of the editor.
+// The same script runs the embeddable page (embed/index.html, <html data-embed>): the canvas alone, or with ?code the
+// code too, a link to open the project in the full playground, and nothing saved in the browser.
 import {
   FILE_NAME,
   MAX_FILES,
@@ -38,7 +40,13 @@ let packages = null,
   ownFiles = null,
   store = { current: null, history: [] };
 
+const embed = document.documentElement.hasAttribute('data-embed');
+if (embed) document.documentElement.dataset.view = new URLSearchParams(location.search).has('code') ? 'code' : 'canvas';
+
+// An embed saves nothing: it shares this site's storage with the full playground, and a page that frames it must not
+// be able to change what a visitor saved there.
 const storage = (() => {
+  if (embed) return null;
   try {
     return window.localStorage;
   } catch {
@@ -134,6 +142,22 @@ function changed() {
   adopt();
   store.current = project();
   persist();
+  linkFull();
+}
+
+/** In an embed, points Open in Playground at the full playground with these files in its link. */
+async function linkFull() {
+  if (!embed) return;
+  const url = new URL('../', location.href);
+  const search = new URLSearchParams(location.search);
+  search.delete('code');
+  url.search = search.toString();
+  try {
+    url.hash = `code=${await encodeProject(project())}`;
+  } catch {
+    // Too large for a link: open the playground without it.
+  }
+  $('open-full').href = url.href;
 }
 
 $('add-file').addEventListener('submit', (event) => {
@@ -364,7 +388,8 @@ function run({ keepStatus = false, auto = false } = {}) {
   frame = document.createElement('iframe');
   frame.setAttribute('sandbox', 'allow-scripts');
   frame.title = 'Result of the code';
-  frame.src = new URL('./frame/', import.meta.url).href;
+  // ./frame/ beside the page: the embed has a run frame of its own that other sites may frame (site/_headers).
+  frame.src = new URL('./frame/', location.href).href;
   $('stage').append(frame);
   if (!keepStatus) say('Running.');
 }
@@ -437,7 +462,7 @@ $('share').addEventListener('click', async () => {
 $('download').addEventListener('click', async () => {
   let html;
   try {
-    const response = await fetch(new URL('./frame/', import.meta.url));
+    const response = await fetch(new URL('./frame/', location.href));
     if (!response.ok) throw new Error(`the frame page answered ${response.status}`);
     html = downloadDocument(await response.text(), project(), packages);
   } catch (error) {
@@ -519,6 +544,7 @@ try {
   else {
     say(linked ? 'Shared code loaded.' : 'Ready.');
     run({ keepStatus: true, auto: true });
+    linkFull();
   }
 } catch (error) {
   say(error.message, true);

@@ -324,3 +324,44 @@ button:disabled {
     height: 50vh;
   }
 }
+/* Embed mode (embed/index.html): a bar with Run and Open in Playground, then the canvas, or with ?code the code too. */
+.embed-only {
+  display: none;
+}
+[data-embed] .embed-only {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 6px;
+}
+[data-embed] .full-only,
+[data-embed] .skip {
+  display: none;
+}
+[data-embed] body {
+  background: var(--bg);
+}
+[data-embed] .playground {
+  max-width: none;
+  padding: 8px;
+}
+[data-embed] #status {
+  margin-block: 4px;
+}
+[data-embed] .stage {
+  height: calc(100vh - 120px);
+}
+[data-embed][data-view='canvas'] .panes {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-embed][data-view='canvas'] .code-pane,
+[data-embed][data-view='canvas'] .pane-title,
+[data-embed][data-view='canvas'] .console {
+  display: none;
+}
+[data-embed][data-view='code'] .stage {
+  height: calc(100vh - 360px);
+}
+[data-embed][data-view='code'] .editor {
+  height: calc(100vh - 170px);
+}
