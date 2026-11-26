@@ -11,20 +11,20 @@ other engine code). No new runtime dependency. Margo names. Errors per docs/conv
   FramePass by `order`, main pass order 0 clears (plugin.ts:58-63, 86-88); PassContext gives device, encoder, color,
   depth, format (plugin.ts:30-52). Reverse-Z depth `greater-equal`, depth format depth32float-stencil8 when available
   (core/src/renderer.ts:396-400). MSAA 4 or 1 (core/src/quality.ts:5-7). Closest template for a custom pass:
-  packages/terrain/src/index.ts:254-269, 315-391, 423-446 (prepare at order -6, draw at order 1, drawShadow).
+  packages/terrain/src/index.ts:586-602, 949, 315-391, 423-446 (prepare at order -6, draw at order 1, drawShadow).
 - Lighting composition: follow VAT, not terrain: `addLighting(effect)` with `pbr(1)` hooks composed by `lightPBR`
   (packages/shared/pbr-hooks.js), `layout: 'auto'`, `getBindGroupLayout(1)` (packages/animation/src/vat.ts:473-482,
   569-576, 597-608, 640-643). Shadows.add calls addLighting (shadows/src/index.ts:300-312, 363-373); clustered calls
-  receiver.addLighting (clustered/src/index.ts:71-73, 251-266, 285); Fog via ShaderEffect.add -> addLighting with an
+  receiver.addLighting (clustered/src/index.ts:584-596, 251-266, 285); Fog via ShaderEffect.add -> addLighting with an
   `output` hook on binding 25 (environment/src/lighting.ts:28-38, 84-99, 398-400). The voxel fragment shader must
   contain gltf/pbr's hook points: `direct+ambient(s)`, `var color=...+s.emissive;`, `fn ambient(s:Surface)`, the
   tone-map line keyed on `f.settings.w` (pbr-hooks.js:28-62).
 - Shadow casting: static `drawShadow` source drawn into the cached map, redrawn when `shadowVersion` changes
   (shadows/src/index.ts:80-86, 552-556, 786-797). Day/night: Sky writes the sun into engine.lighting every frame
-  (sky/src/base.ts:338-366); read it as terrain does (terrain/src/index.ts:291-292). Pass orders in use: decals 1.9,
+  (sky/src/base.ts:947, 1015-1024); read it as terrain does (terrain/src/index.ts:645-646). Pass orders in use: decals 1.9,
   sky 2, water 4, sky fog 5, vfx 6, OIT 8, SSAO 10+.
-- Indirect draws: core requests only depth32float-stencil8 + EngineOptions.features (core/src/engine.ts:18-19,
-  renderer.ts:128-131); avoid non-zero firstInstance (needs indirect-first-instance). drawIndexedIndirect already in
+- Indirect draws: core requests only depth32float-stencil8 + EngineOptions.features (core/src/engine.ts:32-33,
+  renderer.ts:353-363; it also requests the adapter's maxBufferSize and maxStorageBufferBindingSize); avoid non-zero firstInstance (needs indirect-first-instance). drawIndexedIndirect already in
   packages/culling/src/index.ts:559. Frustum with reverse-Z: @margoengine/math/frustum (math/src/frustum.ts:38-39).
 - Workers: `src/<name>.worker.ts` -> `dist/workers/<name>.js` classic IIFE (scripts/build-workers.js:8-36), started with
   `new URL('./workers/x.js?no-inline', import.meta.url)` (packages/fbx/src/worker.ts:6); build-optional.js builds
