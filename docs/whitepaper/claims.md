@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Continuous plastic contact (BREAK-03, 2026-11-26). Guided square-tube compression through the live
+  rigid coupling falls within the independent measured work band at two refinements of the driving sequence.
+  Yielding, elastic support and compacted backing transfer reciprocal impulses. Unloading retains permanent
+  stroke and work and replays from the saved state. Run `node --test packages/physics/tests/coupling/crush.test.js`.
 - Elastic plate buckling (BREAK-03, 2026-11-26). The first supported-plate mode predicts three held-out
   early postbuckling loads within 0.02 on Stein’s normalized load axis. The 8.48 mm crest and its normals
   produce stable raster changes at fixed in-plane positions on WebGPU and the WebGL2 layer.

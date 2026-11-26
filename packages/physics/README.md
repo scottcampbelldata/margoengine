@@ -4829,6 +4829,12 @@ Friction uses the normal impulse from each tick to limit the tangential impulse.
 point can stop slipping within that limit and slides otherwise. The impulse accounts for both
 surfaces' angular inertia. The damage ledger continues to report permanent material work.
 
+The default `response: 'impact'` solves the loading and rebound of a discrete event. Set
+`response: 'continuous'` to integrate the material at each contact step. Use it where a member
+keeps yielding under a sustained push. Its most recent contact's peak fields retain the maxima
+from that contact, and `impulse` sums the normal impulse through the contact. Permanent stroke
+and work survive unloading and reach the linked compartment aperture when the seal fails.
+
 ```ts
 import { Physics } from '@margoengine/physics';
 import { CrushSolver } from '@margoengine/physics/crush';
@@ -4847,7 +4853,8 @@ const bodyCapacity = physics.kernel.capacity;
 world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
 world.add(crush, { bodyCapacity, patches: [{
   body: cart.row, anchor: [0.2, 0, 0], normal: [1, 0, 0], radius: 0.12,
-  support: { point: [-0.2, 0, 0] }, material: { stiffness: 400, yieldForce: 40, stroke: 0.4 }, friction: 0.25,
+  support: { point: [-0.2, 0, 0] }, material: { stiffness: 400, yieldForce: 40, stroke: 0.4 },
+  friction: 0.25, response: 'continuous',
 }] });
 world.couple(['rigid', crush.id], 'staggered');
 world.advance(12);

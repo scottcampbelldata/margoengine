@@ -15045,6 +15045,19 @@ actual rigid bodies as well as a fixed support.
 [Stewart and Trinkle](https://www.cse.lehigh.edu/~trink/Papers/STicra00.pdf)
 [Baraff and Witkin](https://graphics.stanford.edu/courses/cs448b-00-winter/papers/baraff_98.pdf)
 
+Continuous plastic contact uses the one-dimensional return map in Juan C. Simo and Thomas J. R.
+Hughes, “Computational Inelasticity” (1998), Chapter 1, together with the backward Euler velocity
+step in Baraff and Witkin (1998), Eq. 4. If `d` is the current total stroke, `v` the closing speed,
+`w` the effective inverse mass and `h` the remaining tick after initial contact, the end stroke
+satisfies `x + h²w F(x) = d + hv`. The material curve is continuous with elastic slope `k`, plastic
+loading slope `kH/(k+H)`, and backing slope `kb` after compaction. Evaluate `x + h²w F(x)` at its two
+breakpoints to select a branch and solve that affine equation. Apply impulse `hF(x)` at the same
+point on both rigid bodies. The material return map computes permanent stroke and work from the
+end stroke, including continuing plastic flow through the same contact. The guided live tube check
+uses the independent prescribed travel and material properties from Yob et al. and two refinement
+levels of the driving sequence at the world's fixed 60 Hz rate.
+[Simo and Hughes (1998)](https://doi.org/10.1007/b98904)
+
 Dry friction minimizes the kinetic-energy change `vₜ · q + 0.5 qᵀ W q` with `|q| ≤ μJₙ` after the normal step.
 Tobias Preclik, Sebastian Eibl and Ulrich Rüde, “The Maximum Dissipation Principle in Rigid-Body Dynamics
 with Purely Inelastic Impacts” (2018), Eqs. 1–3, derive the contact inverse mass and energy objective.
