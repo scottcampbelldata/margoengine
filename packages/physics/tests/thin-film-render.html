@@ -50,21 +50,28 @@
   world.add(new RigidSolver(), { physics });
   world.add(flight, { flightTime: 0.28 });
   const start = world.takeSnapshot();
+  const interior = new URLSearchParams(location.search).has('interior');
+  const sign = interior ? -1 : 1;
   const engine = await Engine.create(document.querySelector('canvas'), {
-    backend: 'webgpu', camera: { position: [0.065, 0.16, -0.73], target: [0, 0.16, 0], near: 0.05, far: 4 },
+    backend: 'webgpu', exactSize: interior,
+    camera: { position: [0.065 * sign, 0.16, -0.73 * sign], target: [0, 0.16, 0], near: 0.05, far: 4 },
   });
   engine.stop();
-  engine.lighting.direction.set([0.25, 0.55, -1, 2.4]);
+  engine.lighting.direction.set(interior ? [0.088, -0.092, 0.992, 2.4] : [0.25, 0.55, -1, 2.4]);
   engine.lighting.radiance.set([1, 0.97, 0.92, 0.28]);
   const errors = [];
   engine.onError = error => errors.push(String(error));
   engine.gpu.addEventListener('uncapturederror', ({ error }) => errors.push(error.message));
   const stack = PostStack.attach(engine, [new Tonemap({ curve: 'neutral' })]);
   const transmission = Transmission.attach(engine);
+  // From inside, the glass must sample the scene after the outer water surface draws.
+  const foregroundGlass = interior ? Transmission.attach(engine, { order: 3.1 }) : null;
   const backing = new Material({ color: '#a4a398', roughness: 0.78 });
   const rib = new Material({ color: '#54636a', roughness: 0.49, metalness: 0.32 });
   const metal = new Material({ color: '#465259', roughness: 0.45, metalness: 0.41 });
-  const glass = new Material({ transmission: 1, ior: 1.5, roughness: 0.11, thickness: glassThickness });
+  const glass = new Material({
+    transmission: 1, ior: 1.5, roughness: interior ? 0.04 : 0.11, thickness: glassThickness,
+  });
   const statics = [];
   function box(sizes, position, material) {
     const mesh = createMesh(engine, boxGeometry(...sizes), material);
@@ -73,11 +80,11 @@
     return mesh;
   }
 
-  box([1.8, 1.25, 0.06], [0, 0.21, 0.39], backing);
-  box([1.3, 0.04, 0.42], [0, -0.09, 0.14], metal);
-  for (let i = -3; i <= 3; i++) box([0.015, 0.48, 0.045], [i * 0.093, 0.21, 0.33], rib);
+  box([1.8, 1.25, 0.06], [0, 0.21, 0.39 * sign], backing);
+  box([1.3, 0.04, 0.42], [0, -0.09, 0.14 * sign], metal);
+  for (let i = -3; i <= 3; i++) box([0.015, 0.48, 0.045], [i * 0.093, 0.21, 0.33 * sign], rib);
   const glazing = box([width, height, glassThickness], [0, 0, 0], glass);
-  transmission.add(glazing);
+  const releaseGlass = (foregroundGlass ?? transmission).add(glazing);
   const frames = [
     ...[-1, 1].map(sign => ({
       mesh: box([0.022, height + 0.034, 0.027], [0, 0, 0], metal),
@@ -94,7 +101,10 @@
   const thickness = new Texture({ data: texels, width: columns, height: rows }, {
     colorSpace: 'linear', flipY: false, mipmaps: false,
   });
-  const water = new Material({ transmission: 1, thicknessMap: thickness, ior: 1.333, roughness: 0.045 });
+  const water = new Material({
+    transmission: 1, thicknessMap: thickness, ior: 1.333, roughness: 0.045,
+    side: interior ? 'back' : 'front',
+  });
   const droplets = [];
   let waterMesh;
   function waterGeometry() {
@@ -119,9 +129,10 @@
       material.dispose();
     }
   }
-  async function draw({ wet = true, drops = true } = {}) {
+  async function draw({ wet = true, drops = true, glaze = true } = {}) {
     clearWater();
     const position = pane.position, rotation = pane.rotation;
+    glazing.root.visible = glaze;
     glazing.root.setPosition(position).setQuaternion(rotation);
     for (const { mesh, offset } of frames) {
       mesh.root.setPosition(rotateByQuaternion(offset, rotation).map((x, i) => x + position[i])).setQuaternion(rotation);
@@ -159,9 +170,11 @@
     },
     dispose() {
       clearWater();
+      releaseGlass();
       for (const mesh of statics) mesh.dispose();
       for (const material of [water, glass, metal, rib, backing]) material.dispose();
       thickness.dispose();
+      foregroundGlass?.dispose();
       transmission.dispose();
       stack.dispose();
       engine.dispose();

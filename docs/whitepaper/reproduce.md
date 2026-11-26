@@ -4898,6 +4898,19 @@ and engine state fixed while hiding each liquid surface in turn. It compares 640
 rendered frames and writes the wet captures under `test-results/fluid07-window/`.
 Snapshot replay compares both the world hash and the exact rendered pixels on each backend.
 
+For the interior control, the fixture uses the same rigid and liquid state with a
+fixed-size capture from the opposite side. It draws the water's back face, then
+captures it in a second `Transmission` pass for the nearer 6 mm glazing. The pane
+uses IOR 1.5 and roughness 0.04 for the interior lighting control. The water uses
+IOR 1.333 and the solver's sampled thickness, following the Khronos Group's
+2021 glTF volume model. At tick 16, keeping the glass and hiding only the water
+changes 1,681 pixels by more than twelve summed RGB levels on each backend. The
+glass changes 1,569 pixels within the exposed runnel footprint compared with the
+same view with the glass hidden. Giving both surfaces a shared scene copy causes
+that check to fail because the water overwrites the glass in that footprint. The wet
+image and simulation hash repeat exactly after seeking. The original EF-4 bridge
+and chart-room shots still need this attachment. [Khronos volume specification](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Khronos/KHR_materials_volume/README.md)
+
 A separate local production check used the `window` probe at 56 s in the archived
 `4858e1dd4d` Last Tram scene. It kept the original 1920 × 1080 framing, moving car
 transforms and 17.28 mm/h WeatherMachine rain. The `surfaceGeometry()` mesh used the

@@ -6385,7 +6385,9 @@ drop sizes agree with the lab velocity bands at each of 1, 3 and 5 m in still ai
 The rolling window fixture draws the live film surface and airborne sill drops on
 WebGPU and WebGL2. Hiding either surface at the same rigid pose changes its pixels.
 Restoring and replaying the coupled world recovers the same simulation hash and every
-rendered pixel on each backend. [Reproduce](reproduce.md#fluid-07-moving-window-render)
+rendered pixel on each backend. The inside view draws the outside film before the
+nearer glazing captures it. Hiding only the film changes 1,681 pixels through the
+intact pane on each backend at the recorded pose. [Reproduce](reproduce.md#fluid-07-moving-window-render)
 The surface adapter exposes the local elevations and normals directly as a mesh and
 covers the full wet patch bounds. A dry patch supplies an empty mesh. Drawing preserves
 the world hash. [Reproduce](reproduce.md#fluid-07-moving-window-render)

@@ -23,15 +23,15 @@ const { page, hardware, close } = await openBrowser({
 const errors = [];
 page.on('pageerror', (error) => errors.push(error.message));
 
+function pixelDelta(a, b, i) {
+  return (
+    Math.abs(a.data[i] - b.data[i]) + Math.abs(a.data[i + 1] - b.data[i + 1]) + Math.abs(a.data[i + 2] - b.data[i + 2])
+  );
+}
+
 function changed(a, b) {
   let count = 0;
-  for (let i = 0; i < a.data.length; i += 4) {
-    const delta =
-      Math.abs(a.data[i] - b.data[i]) +
-      Math.abs(a.data[i + 1] - b.data[i + 1]) +
-      Math.abs(a.data[i + 2] - b.data[i + 2]);
-    count += Number(delta > 12);
-  }
+  for (let i = 0; i < a.data.length; i += 4) count += Number(pixelDelta(a, b, i) > 12);
   return count;
 }
 
@@ -39,8 +39,8 @@ try {
   await page.waitForFunction(() => typeof window.wetWindow?.draw === 'function', null, { timeout: 20_000 });
   const tick = await page.evaluate(() => window.wetWindow.advance());
   assert.ok(tick > 0, 'the live sill must shed an airborne drop');
-  async function frame(wet, drops) {
-    const state = await page.evaluate((options) => window.wetWindow.draw(options), { wet, drops });
+  async function frame(wet, drops, glaze = true) {
+    const state = await page.evaluate((options) => window.wetWindow.draw(options), { wet, drops, glaze });
     const png = await page.locator('canvas').screenshot();
     return { state, png, pixels: await decodePNG(png) };
   }
@@ -60,13 +60,40 @@ try {
   const replay = await frame(true, true);
   assert.equal(replay.state.hash, flight.state.hash);
   assert.deepEqual(replay.pixels.data, flight.pixels.data, 'seeking replays the rendered water');
-  assert.deepEqual([...errors, ...flight.state.errors, ...replay.state.errors], []);
+  assert.deepEqual([...errors, ...replay.state.errors], []);
+  await page.evaluate(() => window.wetWindow.dispose());
+  const inside = new URL(page.url());
+  inside.searchParams.set('interior', '');
+  await page.goto(inside.href);
+  await page.waitForFunction(() => typeof window.wetWindow?.draw === 'function', null, { timeout: 20_000 });
+  await page.evaluate((t) => window.wetWindow.seek(t), tick);
+  const interiorDry = await frame(false, false);
+  const interiorWet = await frame(true, false);
+  const bareDry = await frame(false, false, false);
+  const bareWet = await frame(true, false, false);
+  let glazingPixels = 0;
+  for (let i = 0; i < bareWet.pixels.data.length; i += 4) {
+    if (pixelDelta(bareDry.pixels, bareWet.pixels, i) > 12) {
+      glazingPixels += Number(pixelDelta(interiorWet.pixels, bareWet.pixels, i) > 12);
+    }
+  }
+  const interiorPixels = changed(interiorDry.pixels, interiorWet.pixels);
+  for (const control of [interiorDry, interiorWet, bareDry, bareWet])
+    assert.equal(control.state.hash, flight.state.hash);
+  assert.ok(interiorPixels > 100, `film seen through the interior glazing changed only ${interiorPixels} pixels`);
+  assert.ok(glazingPixels > 100, `the foreground glass changed only ${glazingPixels} exposed runnel pixels`);
+  await page.evaluate((t) => window.wetWindow.seek(t), tick);
+  const interiorReplay = await frame(true, false);
+  assert.equal(interiorReplay.state.hash, flight.state.hash);
+  assert.deepEqual(interiorReplay.pixels.data, interiorWet.pixels.data, 'seeking preserves the two-layer pane');
+  assert.deepEqual([...errors, ...interiorReplay.state.errors], []);
   const output = 'test-results/fluid07-window';
   await mkdir(output, { recursive: true });
   const backend = hardware.compat ? 'WebGL2' : 'WebGPU';
   await writeFile(`${output}/${backend}.png`, flight.png);
+  await writeFile(`${output}/${backend}-interior.png`, interiorWet.png);
   console.log(
-    `${backend} moving window at tick ${tick}: ${filmPixels} wet pixels, ${dropPixels} drop pixels, ${flight.state.hash}.`,
+    `${backend} moving window at tick ${tick}: ${filmPixels} wet pixels, ${dropPixels} drop pixels, ${interiorPixels} pixels seen from inside, ${glazingPixels} runnel pixels changed by glass, ${flight.state.hash}.`,
   );
 } finally {
   try {

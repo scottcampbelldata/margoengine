@@ -5983,9 +5983,11 @@ console.log(tray.linearVelocity[1]);
 ```
 
 The moving-window fixture draws `film.surfaceGeometry()` with a thickness map from
-`film.depths()` and draws `flight.readDrops()` at their simulated size and position. With
-the packages built, run `npm run test:browser:thin-film -w @margoengine/physics`
-to capture both renderer paths and check frame replay.
+`film.depths()` and draws `flight.readDrops()` at their simulated size and position.
+For an interior view, register the outside water first and give the nearer glazing
+a later `Transmission` pass so its scene copy includes the water. With the packages
+built, run `npm run test:browser:thin-film -w @margoengine/physics` to capture both
+views on both renderer paths and check frame replay.
 
 ## Windborne dust, mist and sea spray
 
