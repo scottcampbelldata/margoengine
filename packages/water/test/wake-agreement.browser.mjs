@@ -21,6 +21,7 @@ import { openBrowser } from '../../../scripts/browser.js';
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
 const modes = [
   ['--bilge-keels', 'bilge'],
+  ['--surge-panels', 'surge'],
   ['--incident-spectrum', 'incident'],
   ['--forward-course', 'course'],
   ['--hull-motion', 'hull'],
@@ -37,7 +38,8 @@ try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
   const result = await page.evaluate(async (motion) => {
     const hullMotion = motion !== 'pressure';
-    const incident = motion === 'incident';
+    const surge = motion === 'surge';
+    const incident = motion === 'incident' || surge;
     const bilge = motion === 'bilge';
     const forwardCourse = incident || bilge || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
@@ -101,6 +103,7 @@ try {
               row: body.row,
               mesh,
               course: forwardCourse ? { speed: 1 } : undefined,
+              surgeAddedMass: surge,
               bilgeKeels: bilge
                 ? [
                     { root: [0, -0.45, -1], span: [-0.06, -0.08], length: 3 },

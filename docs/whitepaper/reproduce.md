@@ -4617,3 +4617,7 @@ Build Physics and run `node --test --test-name-pattern "bilge keel damping|bilge
 ### SEA-08 independently measured roll decay
 
 Build Physics and run `node --test --test-name-pattern "held-out Irkal BK10" packages/physics/tests/coupling/seakeeping.test.js`. The recorded mass, shape and bearings are inputs, then the test recovers decay from five positive peaks at 120 and 240 Hz. It checks both against the published repeat standard deviation. Natural-period and bare-damping residuals are recorded alongside the comparison.
+
+### SEA-08 three-dimensional surge panels
+
+Build Physics and run `node --test --test-name-pattern "3D surge mass" packages/physics/tests/coupling/seakeeping.test.js`. The test measures acceleration under a held longitudinal force, infers the virtual mass and compares coarse and refined hemispheres with the published high-frequency limit. It also checks a rigid bed, explicit off and dry cases. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --surge-panels` with WebGPU and with `MARGO_COMPAT=1` for the live wake.

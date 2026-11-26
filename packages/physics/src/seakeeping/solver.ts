@@ -60,6 +60,7 @@ import { type SlamStation, slamSlope, slamStations } from './slamming.js';
 import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { buildHullMemory, type HullMemory, type HullWaveMemory, stillWaterline } from './memory.js';
+import { surgePanelMass } from './panel-surge.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
@@ -83,6 +84,8 @@ export interface Hull {
   readonly course?: HullCourse;
   /** Thin bilateral or single-side plates that add normal viscous roll damping when wet. */
   readonly bilgeKeels?: readonly HullBilgeKeel[];
+  /** Carry the 3D high-frequency water inertia along the hull's x axis. Default false. */
+  readonly surgeAddedMass?: boolean;
   /**
    * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
    * its water at the start and its cargo. The body's mass includes the cargo, not the floodwater.
@@ -235,6 +238,7 @@ export class HullSolver implements Solver<HullParams> {
   /** Per hull: 1 once it has a last step, the body's velocity (linear, angular) then and the load the solver held over it. */
   private carry: Region | null = null;
   private readonly memories = new Map<Hull, HullWaveMemory>();
+  private readonly surgeMasses = new Map<Hull, number>();
   private rollDamping = true;
   private viscosity = SEA_VISCOSITY;
   /** Per hull: its eddy coefficient, its linear (friction) roll damping and its roll inertia with the water it carries. */
@@ -374,6 +378,7 @@ export class HullSolver implements Solver<HullParams> {
     this.capacity = capacity;
     this.hulls = hulls;
     this.courseLimits.clear();
+    this.surgeMasses.clear();
     let courseCount = 0;
     this.course = hulls.map(({ course }) => {
       if (!course) return null;
@@ -1677,6 +1682,14 @@ export class HullSolver implements Solver<HullParams> {
       memory = this.addedMass ? this.memoryOf(hull, bodies, at, local, dt) : null;
     // The lateral block (sway, roll, yaw), from the radiation at the still-water draft.
     if (memory) for (let k = 0; k < 36; k++) body[k]! += memory.lateralInfinite[k]!;
+    if (memory && hull.surgeAddedMass && loads.area > 0 && !(this.claim & CLAIM_ADDED_MASS)) {
+      let surge = this.surgeMasses.get(hull);
+      if (surge === undefined) {
+        surge = surgePanelMass(hull.mesh, memory.waterline, density, this.wavesOf()?.stillDepth);
+        this.surgeMasses.set(hull, surge);
+      }
+      body[0]! += surge;
+    }
     if (memory && hull.bilgeKeels?.length) {
       const roll = this.rollState(hull, bodies, at, q, local, memory);
       const p = toBody([bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0];

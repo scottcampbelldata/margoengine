@@ -917,6 +917,96 @@ test('HullSolver reproduces held-out Irkal BK10 roll damping at two step sizes',
   // That period residual remains open and has no inflated passing tolerance.
 });
 
+test('HullSolver 3D surge mass converges for a floating hemisphere', () => {
+  const radius = 1;
+  const density = 1000;
+  const force = 900;
+  const displaced = (2 * Math.PI * radius ** 3 * density) / 3;
+  const makeHull = (rings, around) => {
+    const vertices = [0, -radius, 0];
+    for (let j = 1; j <= rings; j++) {
+      const theta = (j * Math.PI) / (2 * rings);
+      for (let i = 0; i < around; i++) {
+        const azimuth = (2 * Math.PI * i) / around;
+        vertices.push(
+          radius * Math.sin(theta) * Math.cos(azimuth),
+          j === rings ? 0 : -radius * Math.cos(theta),
+          radius * Math.sin(theta) * Math.sin(azimuth),
+        );
+      }
+    }
+    vertices.push(0, 0, 0);
+    const top = 1 + rings * around;
+    const indices = [];
+    for (let i = 0; i < around; i++) {
+      const j = (i + 1) % around;
+      indices.push(0, 1 + i, 1 + j);
+      for (let row = 0; row < rings - 1; row++) {
+        const lower = 1 + row * around;
+        const upper = lower + around;
+        indices.push(lower + i, upper + i, upper + j, lower + i, upper + j, lower + j);
+      }
+      indices.push(top, top - around + j, top - around + i);
+    }
+    return { vertices: Float64Array.from(vertices), indices: Uint32Array.from(indices) };
+  };
+  const measure = (mesh, surgeAddedMass, y = 0, depth = Infinity) => {
+    using physics = new Physics(null, { fixedTimestep: 1 / 60, substeps: 1 });
+    const mass = density * volumeBelow(mesh, [0, 1, 0], 0);
+    const body = physics.addBody(null, {
+      position: [0, y, 0],
+      enabledTranslations: [true, false, false],
+      lockRotations: true,
+      colliders: { shape: 'box', halfExtents: [radius, radius / 2, radius], mass },
+    });
+    const sea =
+      depth === Infinity
+        ? { density, elevation: () => 0 }
+        : new SpectralSea({
+            waves: {
+              frequencies: new Float64Array([1]),
+              directions: new Float64Array([0]),
+              energy: new Float64Array([0]),
+              depth,
+              density,
+            },
+          });
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(new HullSolver(), {
+        hulls: [{ row: body.row, mesh, surgeAddedMass }],
+        sea,
+        radiation: false,
+        rollDamping: false,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    body.addForce([force, 0, 0]);
+    world.advance(12);
+    const previous = body.linearVelocity[0];
+    world.advance(42);
+    const normalAcceleration = 2 * (body.linearVelocity[0] - previous);
+    return (force / normalAcceleration - body.mass) / displaced;
+  };
+  const coarse = makeHull(6, 18);
+  const fine = makeHull(10, 24);
+  const low = measure(coarse, true);
+  const high = measure(fine, true);
+  // Hulme (1982) equation 5.15: the normalized infinite-frequency surge limit 0.273239.
+  const reference = 0.273239;
+  assert.ok(Math.abs(high - reference) < 0.01 * reference, JSON.stringify({ low, high, reference }));
+  assert.ok(Math.abs(high - reference) < 0.65 * Math.abs(low - reference));
+  assert.ok(Math.abs(measure(coarse, undefined)) < 2e-6, 'the optional impulse path is off by default');
+  assert.ok(Math.abs(measure(coarse, true, 2)) < 2e-6, 'a fully dry hull carries no surge water');
+  const shallow = measure(coarse, true, 0, 1.15);
+  // Independently integrate the same 198 planar faces in a Python/NumPy image solve with a rigid bed.
+  assert.ok(Math.abs(shallow - 0.315714) < 5e-4, JSON.stringify({ shallow, low }));
+  assert.ok(shallow > low, 'the closer bed increases surge inertia in this geometry');
+  assert.throws(() => measure(coarse, true, 0, 0.9), /draft smaller than the local water depth/);
+});
+
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });
