@@ -618,3 +618,59 @@ test('a resting lattice keeps exact discrete density and zero velocity against w
     assert.deepEqual(liquid.sample(index).position, point.position);
   }
 });
+
+test('a viscous liquid near a closed plane follows the implicit wall kernel with no contact event', async () => {
+  const spacing = 0.06;
+  const support = 2 * spacing;
+  const viscosity = 0.02;
+  const speed = 0.15;
+  const { world, liquid } = await solve({
+    viscosity,
+    spacing,
+    support,
+    divergenceTolerance: 10,
+    bounds: [
+      [-0.48, 0, -0.48],
+      [0.48, 0.6, 0.48],
+    ],
+    walls: [false, false, true, false, false, false],
+    particles: [{ position: [0.03, 0.5 * spacing, 0.03], velocity: [speed, 0, 0] }],
+  });
+  let normalizedDrag = 0;
+  let normalizedDensity = CUBIC / 8;
+  for (let x = -1; x <= 1; x++)
+    for (let z = -1; z <= 1; z++) {
+      const q = Math.sqrt(x * x + 1 + z * z) / 2;
+      const cubic = 2 * CUBIC * (1 - q) ** 3;
+      normalizedDensity += cubic / 8;
+      const slope = 6 * CUBIC * (1 - q) ** 2;
+      const xx = (x * x) / (4 * q * q);
+      normalizedDrag += (10 * q * slope * xx) / (8 * support ** 2 * (q * q + 0.01));
+    }
+  const expected = speed / (1 + (DT * viscosity * normalizedDrag) / normalizedDensity ** 2);
+  world.advance(1);
+  near(liquid.sample(0).velocity[0], expected);
+  assert.ok(liquid.sample(0).velocity[0] < speed);
+  near(liquid.sample(0).velocity[1], 0);
+  near(liquid.sample(0).velocity[2], 0);
+});
+
+test('analytic wall shear dissipates tangential motion and vanishes beyond the kernel', async () => {
+  let previous = 0;
+  const initial = 0.1;
+  for (const y of [0.03, 0.06, 0.119, 0.12, 0.18]) {
+    const { world, liquid } = await solve({
+      wallKernel: 'analytic',
+      spacing: 0.06,
+      viscosity: 0.02,
+      walls: [false, false, true, false, false, false],
+      particles: [{ position: [0.5, y, 0.5], velocity: [initial, 0, 0] }],
+    });
+    world.advance(1);
+    const speed = liquid.sample(0).velocity[0];
+    assert.ok(speed >= previous && speed <= initial);
+    if (y < 0.12) assert.ok(speed < initial);
+    else near(speed, initial);
+    previous = speed;
+  }
+});

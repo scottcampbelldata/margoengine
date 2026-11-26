@@ -46,6 +46,7 @@ pub struct Work {
     rhs: Vec3,
     diagonal: Vec3,
     wall_gradient: Vec3,
+    wall_drag: WallDrag,
     surface_slope: f64,
     solid_slope: f64,
 }
@@ -208,6 +209,114 @@ fn wall_terms(position: Vec3, settings: &Settings, support: f64) -> (f64, Vec3) 
     (1.0 - fluid, gradient)
 }
 
+#[repr(C)]
+struct WallDrag {
+    diagonal: Vec3,
+    cross: Vec3,
+}
+
+impl WallDrag {
+    const ZERO: Self = Self {
+        diagonal: ZERO,
+        cross: ZERO,
+    };
+
+    #[inline]
+    fn multiply(&self, v: Vec3) -> Vec3 {
+        [
+            self.diagonal[0] * v[0] + self.cross[0] * v[1] + self.cross[1] * v[2],
+            self.cross[0] * v[0] + self.diagonal[1] * v[1] + self.cross[2] * v[2],
+            self.cross[1] * v[0] + self.cross[2] * v[1] + self.diagonal[2] * v[2],
+        ]
+    }
+
+    #[inline]
+    fn add_sample(&mut self, normal: Vec3, scale: f64) {
+        for axis in 0..3 {
+            self.diagonal[axis] += scale * normal[axis] * normal[axis];
+        }
+        self.cross[0] += scale * normal[0] * normal[1];
+        self.cross[1] += scale * normal[0] * normal[2];
+        self.cross[2] += scale * normal[1] * normal[2];
+    }
+}
+
+fn integrate_pair(f: impl Fn(f64) -> (f64, f64), lower: f64, upper: f64) -> (f64, f64) {
+    let centre = 0.5 * (lower + upper);
+    let radius = 0.5 * (upper - lower);
+    let c = f(centre);
+    let a0 = f(centre - radius * 0.538_469_310_105_683_1);
+    let a1 = f(centre + radius * 0.538_469_310_105_683_1);
+    let b0 = f(centre - radius * 0.906_179_845_938_664);
+    let b1 = f(centre + radius * 0.906_179_845_938_664);
+    let sum = |c, a0, a1, b0, b1| {
+        radius
+            * (0.568_888_888_888_888_9 * c
+                + 0.478_628_670_499_366_5 * (a0 + a1)
+                + 0.236_926_885_056_189_1 * (b0 + b1))
+    };
+    (
+        sum(c.0, a0.0, a1.0, b0.0, b1.0),
+        sum(c.1, a0.1, a1.1, b0.1, b1.1),
+    )
+}
+
+fn half_space_drag(q: f64, support: f64) -> (f64, f64) {
+    if q >= 1.0 {
+        return (0.0, 0.0);
+    }
+    let q = q.max(0.0);
+    let radial = |r: f64| {
+        let x = q / r;
+        let angle = (1.0 - x) / 3.0;
+        let slope = if r < 0.5 {
+            r * (12.0 - 18.0 * r)
+        } else {
+            6.0 * (1.0 - r) * (1.0 - r)
+        };
+        let size = 10.0 * core::f64::consts::PI * CUBIC * slope * r * r * r
+            / ((r * r + 0.01) * support * support);
+        // Angular moments of the wall-facing cone, per tangential direction
+        // and in the face-normal direction, respectively.
+        (
+            size * angle * (1.0 - x) * (2.0 + x),
+            size * 2.0 * angle * (1.0 + x + x * x),
+        )
+    };
+    let (mut tangent, mut normal) = integrate_pair(radial, q.max(0.5), 1.0);
+    if q < 0.5 {
+        let (t, n) = integrate_pair(radial, q, 0.5);
+        tangent += t;
+        normal += n;
+    }
+    (tangent, normal)
+}
+
+fn continuum_drag(position: Vec3, settings: &Settings) -> WallDrag {
+    let mut drag = WallDrag::ZERO;
+    if settings.viscosity == 0.0 {
+        return drag;
+    }
+    let h = settings.support;
+    let mask = settings.walls as u32;
+    for axis in 0..3 {
+        for side in 0..2 {
+            if (mask & (1 << (2 * axis + side))) == 0 {
+                continue;
+            }
+            let distance = if side == 0 {
+                position[axis] - settings.lower[axis]
+            } else {
+                settings.upper[axis] - position[axis]
+            };
+            let (tangent, normal) = half_space_drag(distance / h, h);
+            drag.diagonal = add(drag.diagonal, [tangent; 3]);
+            drag.diagonal[axis] += normal - tangent;
+        }
+    }
+    drag
+}
+
 struct PlanarLattice {
     spacing: Vec3,
     cells: [i64; 3],
@@ -241,7 +350,7 @@ impl PlanarLattice {
         })
     }
 
-    fn at(&self, p: Vec3, settings: &Settings, evaluations: &mut f64) -> (f64, Vec3) {
+    fn at(&self, p: Vec3, settings: &Settings, evaluations: &mut f64) -> (f64, Vec3, WallDrag) {
         let mask = settings.walls as u32;
         let h = settings.support;
         let low_distance = sub(p, settings.lower);
@@ -251,7 +360,7 @@ impl PlanarLattice {
                 || ((mask & (1 << (2 * axis + 1))) != 0 && high_distance[axis] < h)
         });
         if !near {
-            return (0.0, ZERO);
+            return (0.0, ZERO, WallDrag::ZERO);
         }
         // A coordinate beyond the representable local lattice uses the continuous half-space.
         if low_distance
@@ -259,7 +368,8 @@ impl PlanarLattice {
             .chain(high_distance.iter())
             .any(|d| !d.is_finite())
         {
-            return wall_terms(p, settings, h);
+            let (density, gradient) = wall_terms(p, settings, h);
+            return (density, gradient, continuum_drag(p, settings));
         }
         let centre = [
             low_distance[0] / self.spacing[0],
@@ -267,7 +377,8 @@ impl PlanarLattice {
             low_distance[2] / self.spacing[2],
         ];
         if centre.iter().any(|x| x.abs() > 4_503_599_627_370_496.0) {
-            return wall_terms(p, settings, h);
+            let (density, gradient) = wall_terms(p, settings, h);
+            return (density, gradient, continuum_drag(p, settings));
         }
         let low = [0, 1, 2].map(|i| floor(centre[i] - h / self.spacing[i]) as i64);
         let high = [0, 1, 2].map(|i| floor(centre[i] + h / self.spacing[i]) as i64);
@@ -278,6 +389,7 @@ impl PlanarLattice {
         let inverse_h = 1.0 / h;
         let mut weight = 0.0;
         let mut derivative = ZERO;
+        let mut drag = WallDrag::ZERO;
         for z in low[2]..=high[2] {
             for y in low[1]..=high[1] {
                 let row = outside(2, z) || outside(1, y);
@@ -290,16 +402,19 @@ impl PlanarLattice {
                             *evaluations += 1.0;
                             let distance = sqrt(distance2);
                             weight += self.volume * cubic(distance);
-                            derivative = add(
-                                derivative,
-                                scale(gradient(q, distance), self.volume * inverse_h),
-                            );
+                            let grad = scale(gradient(q, distance), self.volume * inverse_h);
+                            derivative = add(derivative, grad);
+                            if settings.viscosity > 0.0 && distance > 0.0 {
+                                let strength =
+                                    10.0 * distance * length(grad) * inverse_h / (distance2 + 0.01);
+                                drag.add_sample(scale(q, 1.0 / distance), strength);
+                            }
                         }
                     }
                 }
             }
         }
-        (weight, derivative)
+        (weight, derivative, drag)
     }
 }
 
@@ -316,12 +431,17 @@ fn prepare(
     let lattice = PlanarLattice::new(settings);
     for i in 0..points.len() {
         let particle = item(points, i);
-        let (wall_density, wall_gradient) = if settings.wall_pressure == 0.0 {
-            (0.0, ZERO)
+        let (wall_density, wall_gradient, wall_drag) = if settings.wall_pressure == 0.0 {
+            (0.0, ZERO, WallDrag::ZERO)
         } else if let Some(samples) = &lattice {
             samples.at(particle.position, settings, evaluations)
         } else {
-            wall_terms(particle.position, settings, settings.support)
+            let (density, gradient) = wall_terms(particle.position, settings, settings.support);
+            (
+                density,
+                gradient,
+                continuum_drag(particle.position, settings),
+            )
         };
         let mut density = particle.mass * mass_scale * CUBIC + wall_density;
         let mut centre = wall_gradient;
@@ -338,6 +458,7 @@ fn prepare(
         let denominator = diagonal + norm2(centre);
         let w = item_mut(work, i);
         w.wall_gradient = wall_gradient;
+        w.wall_drag = wall_drag;
         w.inverse = if denominator > 0.0 {
             1.0 / denominator
         } else {
@@ -672,8 +793,10 @@ fn diffuse(
     for (i, p) in points.iter().enumerate() {
         let w = item_mut(work, i);
         w.rhs = p.velocity;
-        w.residual = ZERO;
-        w.diagonal = [1.0; 3];
+        let wall_scale = settings.rest / p.density;
+        let drag = settings.viscosity * dt * wall_scale * wall_scale;
+        w.residual = scale(w.wall_drag.multiply(p.velocity), -drag);
+        w.diagonal = add([1.0; 3], scale(w.wall_drag.diagonal, drag));
         visit(i, points, boundary, grid, settings, |j, q, grad, _| {
             *evaluations += 1.0;
             let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);
@@ -699,7 +822,9 @@ fn diffuse(
         }
         let mut denominator = 0.0;
         for (i, w) in work.iter().enumerate() {
-            let mut product = w.direction;
+            let wall_scale = settings.rest / item(points, i).density;
+            let drag = settings.viscosity * dt * wall_scale * wall_scale;
+            let mut product = add(w.direction, scale(w.wall_drag.multiply(w.direction), drag));
             visit(i, points, boundary, grid, settings, |j, q, grad, _| {
                 *evaluations += 1.0;
                 let (axis, weight) = diffusion(points, i, j, settings, dt, q, grad);

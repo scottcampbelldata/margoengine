@@ -18173,14 +18173,14 @@
       "brotli": 6237
     },
     "packages/physics/dist/dfsph-kernel.wasm": {
-      "raw": 30394,
-      "gzip": 11399,
-      "brotli": 9682
+      "raw": 33256,
+      "gzip": 12480,
+      "brotli": 10622
     },
     "packages/physics/dist/dfsph-kernel-shared.wasm": {
-      "raw": 30394,
-      "gzip": 11399,
-      "brotli": 9728
+      "raw": 33256,
+      "gzip": 12480,
+      "brotli": 10623
     },
     "packages/physics/dist/strand-kernel.wasm": {
       "raw": 16163,

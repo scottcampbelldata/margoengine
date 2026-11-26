@@ -4573,6 +4573,7 @@ The box's closed faces sample the pressure kernel beyond their planes on the res
 contacts alone, or per-face `walls` settings for open edges. The optional `surfaceTension` applies a
 separate liquid–air surface energy in N/m. Use `solidLiquidTension` and `solidVaporTension` in the same units
 to select wetting. A larger solid–air value favours wetting and a larger solid–liquid value repels.
+The implicit viscosity applies at closed planar walls as well as sampled solid shapes.
 
 A fixed or rigid-body box, sphere or capsule uses sampled pressure at its moving surface. For live rigid
 exchange, load with `rigid: true`, set the boundary's `body` row and use

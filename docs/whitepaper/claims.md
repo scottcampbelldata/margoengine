@@ -5847,3 +5847,10 @@ The boxed rest lattice checks the exact discrete cubic kernel density at every s
 edges and corners. The continuous wall-volume default raised corner density by 7.1% and launched a
 motionless film at 0.354 m/s in one step. The matching lattice complement gives zero velocity and
 the same kernel density at the wall and in the interior.
+
+### FLUID-01 implicit planar wall shear
+
+The lattice wall test evaluates an independent radial viscous weight for each exterior sample and predicts
+the exact backward-Euler tangential speed. The analytic wall test measures monotonic dissipation inside
+the support and zero change outside. Both start without a hard collision, so the tests exercise viscous
+stress exclusively.

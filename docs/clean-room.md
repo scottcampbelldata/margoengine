@@ -239,6 +239,12 @@ edge and corner samples each enter the sum once. The closed-box regression forms
 kernel sum independently and measures zero change of velocity and position in the absence of forces.
 [Akhunov and Kolb](https://doi.org/10.1007/s00371-023-03212-2).
 
+For viscosity, the same exterior lattice contributes the Weiler et al. boundary matrix with solid
+velocity zero. Each sample adds a positive rank-one tensor in its radial direction. The analytic limit
+integrates the tangential and normal angular moments of the kernel cap. Its radial integral uses a
+five-point Gauss rule on each cubic spline piece. These tensors enter the backward-Euler system
+before its conjugate-gradient solve.
+
 Timo Probst and Matthias Teschner (2025), *Unified Pressure, Surface Tension and Friction for SPH Fluids*,
 equations 5–12 and section 5.2, supplies the capillary surface energy gradient. Margo uses the recommended
 cubic surface kernel of three spacings, interface smoothing of 0.05 and rest area of π/4 times the spacing
