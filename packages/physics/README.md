@@ -1132,7 +1132,9 @@ await world.useThreads(4);
 await world.stepAsync(1 / 60);
 console.log(world.threadCount); // 4
 world.endThreads();
-``` Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 8 substeps (`world.substeps`) of 2 solver passes (`world.iterations`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
+```
+
+Gravity defaults to `[0, -9.81, 0]` (`world.setGravity(x, y, z)`) and each step runs 8 substeps (`world.substeps`) of 2 solver passes (`world.iterations`). A force in `forceX` and the columns beside it stays until you clear it and reaches every substep; an impulse in `impulseX` lands once, before the first. A body's mass, centre of mass and inertia come from its colliders; write `additionalMass` and call `world.updateMass(body)` to add weight, which is spread as the colliders are, so it scales the inertia too. A dynamic body with no mass does not fall. `world.removeBody(body)` and `world.removeCollider(box)` free their rows, and a later add takes the last one freed; a collider's row comes back after the next step.
 
 Each step finds pairs: `world.pairCount`, and `world.pairs()` for the collider rows, the lower first. A pair means two fat boxes overlap, where a fat box holds everything the step can reach plus 0.04 m, so a pair is near, not yet touching. Colliders of one body or of two fixed bodies are no pair. A step can grow the world, so read views after it, and call `world.touch(body)` after writing a fixed or sleeping body's pose by hand.
 
@@ -2173,6 +2175,7 @@ const host: SolverHost = {
   resize: arena.resize.bind(arena),
   free: arena.free.bind(arena),
   port: () => undefined,
+  bodyRows: () => 0,
 };
 const fall = new Fall();
 fall.init(host, {height: 10});
@@ -4611,7 +4614,7 @@ world.advance(30);
 const sources = lightning.thunder();
 const sound = new OutdoorSound();
 const acoustics = new PhysicsWorld({ rate }).add(sound, {
-  links: sources.map(({ position }) => ({ source: position, listener: [2000, 2, 480] })),
+  links: sources.map(({ position }) => ({ source: position, listener: [2000, 2, 480] as [number, number, number] })),
 });
 acoustics.advance(1);
 const arrivals = sources.map(({ emissionTime }, index) => emissionTime + sound.read(index).delaySeconds);
@@ -4642,7 +4645,7 @@ import { LavaSolver } from '@margoengine/physics/lava';
 import { TsunamiSolver } from '@margoengine/physics/tsunami';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const cells = [16, 2];
+const cells: [number, number] = [16, 2];
 const bed = Array.from({ length: 32 }, (_, i) => (i % 16 < 6 ? 0.2 : -0.75));
 const lava = await LavaSolver.load();
 const sea = await TsunamiSolver.load({ sources: [lava.seaSourceField] });
@@ -5015,17 +5018,17 @@ import { PhysicsWorld } from '@margoengine/physics/world';
 const sand = await GranularMpmSolver.load({ projectBed: true });
 const surface = new TerrainBed();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-world.add(surface, { rows: 2, columns: 2, width: 1, depth: 1, centre: [0, 0], elevations: () => 0.1 });
+world.add(surface, { rows: 2, columns: 2, width: 1, depth: 1, centre: [0, 0] as const, elevations: () => 0.1 });
 world.add(sand, {
   points: Array.from({ length: 12 }, (_, i) => ({
-    position: [(i % 4) * 0.04, 0.16 + Math.floor(i / 4) * 0.04, 0],
-    velocity: [0.12, 0, 0],
+    position: [(i % 4) * 0.04, 0.16 + Math.floor(i / 4) * 0.04, 0] as [number, number, number],
+    velocity: [0.12, 0, 0] as [number, number, number],
     volume: 0.000064,
   })),
   floor: 0,
   bedSurface: surface.bed,
 });
-world.couple([sand.id, surface.id], 'staggered');
+world.couple([sand.describe().id, surface.describe().id], 'staggered');
 world.advance(10);
 console.log(sand.sample(0).position, surface.bed.elevations);
 ```
@@ -5145,7 +5148,7 @@ import { TerrainBed } from '@margoengine/physics/earth';
 import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const grid = { columns: 16, rows: 4, width: 16, depth: 4, centre: [8, 2] };
+const grid = { columns: 16, rows: 4, width: 16, depth: 4, centre: [8, 2] as const };
 const flow = await GranularFlowSolver.load({ liveTerrain: true });
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
   .add(new TerrainBed(), { ...grid, elevations: (x) => -0.125 * x })
