@@ -624,6 +624,93 @@ test('HullSolver forward speed roll follows the ITTC lift, friction and eddy ter
   }
 });
 
+test('HullSolver bilge keel damping follows the ITTC normal force, wet span and forward lift', () => {
+  const dt = 1 / 60;
+  const mesh = boxMesh([L, D, B]);
+  const mass = SEA_WATER * L * B * T;
+  const frequency = (2 * Math.PI) / 2.4;
+  const rootDepth = 0.45;
+  const armSide = 0.68;
+  const length = 3;
+  const breadth = 0.1;
+  const keels = [-1, 1].map((side) => ({
+    root: [0, -rootDepth, side * armSide],
+    span: [-0.06, side * 0.08],
+    length,
+    rollFrequency: frequency,
+  }));
+  const portMass = 1 / Math.fround(1 / mass);
+  const inertia = 1 / Math.fround(12 / (mass * (D * D + B * B)));
+  const mem = hullMemory(mesh, portMass, [0, 0, 0], SEA_WATER, dt);
+  const rollInertia = inertia + mem.lateralInfinite[21];
+  const arm = 0.6 * rootDepth + 0.8 * armSide;
+  const run = (y, rate, bilgeKeels, speed = 0, rollDamping = true) => {
+    using physics = new Physics(null, { fixedTimestep: dt, substeps: 1 });
+    const body = physics.addBody(null, {
+      position: [0, y, 0],
+      angularVelocity: [rate, 0, 0],
+      linearVelocity: [speed, 0, 0],
+      colliders: { shape: 'box', halfExtents: [L / 2, D / 2, B / 2], mass },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh, bilgeKeels, course: speed ? { speed } : undefined }],
+        sea: { elevation: () => 0 },
+        addedMass: speed > 0,
+        radiation: speed > 0,
+        rollDamping,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    const forces = new Float64Array(world.memory.buffer, region.byteOffset, region.byteLength / 8);
+    return forces[body.row * FORCE_WORDS + 3];
+  };
+  for (const [y, rate, fraction, speed = 0] of [
+    [D / 2 - T, 0.125, 1],
+    [D / 2 - T, -0.125, 1],
+    [0.5, 0.125, 1 / 6],
+    [2, 0.125, 0],
+    [D / 2 - T, 0.125, 1, 1],
+  ]) {
+    const f = 1.3;
+    const effectiveWidth = breadth * fraction;
+    const amplitude = Math.abs(rate) / frequency;
+    const kc = (Math.PI * arm * amplitude * f) / effectiveWidth;
+    const cd = 22.5 / kc + 2.4;
+    const cDrag = SEA_WATER * length * effectiveWidth * f * f * arm ** 3 * cd * Math.abs(rate);
+    const liftArm = arm + breadth / 2;
+    const transverse = liftArm * Math.abs(rate);
+    const relative = Math.hypot(speed, transverse);
+    const attack = Math.atan2(transverse, speed);
+    const normalLift = (Math.PI * SEA_WATER * effectiveWidth ** 2 * attack * speed * relative) / 2;
+    const cKeel = cDrag + (2 * normalLift * liftArm) / Math.abs(rate);
+    const added = mem.lateralInfinite;
+    const fold = speed ? inertia / (rollInertia - (added[15] * added[20]) / (portMass + added[14])) : 1;
+    const inviscid = run(y, rate, undefined, speed, false);
+    // Remove the unchanged inviscid force and invert the solver's held-time impulse. This isolates the plate
+    // coefficient from the bare hull's damping without using the plates in the reference.
+    const viscous = (held) => {
+      const moment = (held - inviscid) / fold;
+      return -moment / (rate + (dt * moment) / rollInertia);
+    };
+    const bare = run(y, rate, undefined, speed);
+    const fitted = run(y, rate, keels, speed);
+    const actual = viscous(fitted) - viscous(bare);
+    assert.ok(
+      Math.abs(actual - cKeel) < 1e-5 * Math.max(1, cKeel),
+      JSON.stringify({ y, rate, speed, fraction, actual, expected: cKeel }),
+    );
+    if (fraction) assert.ok((fitted - bare) * rate < 0, 'bilge drag removes roll energy');
+  }
+  assert.throws(() => run(D / 2 - T, 0.125, [{ root: [0, -0.4, 0.7], span: [0, 0], length }]), /nonzero finite span/);
+});
+
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });

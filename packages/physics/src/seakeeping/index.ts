@@ -14,6 +14,7 @@ export {
   wettedLoads,
 } from './wetted.js';
 export { type Hull, type HullParams, type HullWake, HullSolver, SEA_VISCOSITY } from './solver.js';
+export type { HullBilgeKeel } from './bilge-keel.js';
 export type { HullCourse } from './course.js';
 export { type Deck, deckOf, stepDeck } from './deck.js';
 export { type SlamStation, slamSlope, slamStations } from './slamming.js';

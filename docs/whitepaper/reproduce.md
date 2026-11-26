@@ -4547,3 +4547,7 @@ Build Physics and run `node --test --test-name-pattern "forward-course deck cont
 ### SEA-08 forward incident-wave loads
 
 Build Physics and run `node --test --test-name-pattern "forward encounter correction" packages/physics/tests/coupling/seakeeping.test.js`. The held-hull fixture compares identical water fields with and without a spectral component list, then checks the difference in heave and pitch against the section equations. The taper has an independent integrated added-mass gradient. The live wake uses `waterBelow: true` and an odd potential so the held hull's centre waterline stays fixed for the comparison. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --incident-spectrum`, then repeat with `MARGO_COMPAT=1`.
+
+### SEA-08 bilge keel plates
+
+Build Physics and run `node --test --test-name-pattern "bilge keel damping" packages/physics/tests/coupling/seakeeping.test.js`. The test isolates the plate moment through the rigid solver and checks it against the ITTC’s normal and forward-lift formulas. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --bilge-keels` on WebGPU and again with `MARGO_COMPAT=1` for the rendered wake and restored replay.

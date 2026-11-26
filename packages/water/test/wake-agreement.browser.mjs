@@ -19,13 +19,13 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
-const motion = process.argv.includes('--incident-spectrum')
-  ? 'incident'
-  : process.argv.includes('--forward-course')
-    ? 'course'
-    : process.argv.includes('--hull-motion')
-      ? 'hull'
-      : 'pressure';
+const modes = [
+  ['--bilge-keels', 'bilge'],
+  ['--incident-spectrum', 'incident'],
+  ['--forward-course', 'course'],
+  ['--hull-motion', 'hull'],
+];
+const motion = modes.find(([flag]) => process.argv.includes(flag))?.[1] ?? 'pressure';
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
 const { page, hardware } = browser,
   errors = [];
@@ -38,7 +38,8 @@ try {
   const result = await page.evaluate(async (motion) => {
     const hullMotion = motion !== 'pressure';
     const incident = motion === 'incident';
-    const forwardCourse = incident || motion === 'course';
+    const bilge = motion === 'bilge';
+    const forwardCourse = incident || bilge || motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { WaterWake } = await import('/packages/water/dist/wake.js');
@@ -95,7 +96,19 @@ try {
       world
         .add(new RigidSolver(), { physics })
         .add(hull, {
-          hulls: [{ row: body.row, mesh, course: forwardCourse ? { speed: 1 } : undefined }],
+          hulls: [
+            {
+              row: body.row,
+              mesh,
+              course: forwardCourse ? { speed: 1 } : undefined,
+              bilgeKeels: bilge
+                ? [
+                    { root: [0, -0.45, -1], span: [-0.06, -0.08], length: 3 },
+                    { root: [0, -0.45, 1], span: [-0.06, 0.08], length: 3 },
+                  ]
+                : undefined,
+            },
+          ],
           sea: loadSea,
           drift: false,
           greenWater: false,
