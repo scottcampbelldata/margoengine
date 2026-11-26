@@ -12954,6 +12954,10 @@ Built from papers and public procedures only; no other engine's or tool's code w
   (the tracers' own `settlingVelocity`).
 - Checked against: Torricelli's draining law, the weir's flow, Boyle's law with hydrostatics, and the lost-buoyancy
   equilibrium of a holed barge (computed independently from the hull's and the tank's volumes under the sea).
+- A sinking hull's form drag: Newton's impact law (I. Newton, *Philosophiae Naturalis Principia Mathematica*, 1687, book
+  II, proposition 34: the pressure of a stream on a surface as the square of its speed normal to it), with the drag
+  coefficient of a cube face-on, 1.05 (S. F. Hoerner, *Fluid-Dynamic Drag*, 1965, chapter 3; a disk 1.17, a sphere
+  0.47); integrated over the same wet pieces as the Froude-Krylov pressure.
 
 ### A hull's slamming: Wagner's wetted width and the momentum of the water (`@margoengine/physics/seakeeping`, SEA-11, 2026-11-26)
 

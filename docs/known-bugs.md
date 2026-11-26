@@ -72,13 +72,19 @@ test.
   `soft.ts` computes pressure as nRT/V, so it holds by construction; the public "conserves pV" claim rests on it.
   Also, doc comments in `soft.ts` and `soft-split.ts` say a cloth is never split, while `splitOnTear: 'all'` splits it.
 
-### Open 2026-11-26: a hull that has lost its buoyancy sinks with no drag (KB-SEA-SINKDRAG1, physics seakeeping)
+### Fixed 2026-11-26: a hull that has lost its buoyancy sank with no drag (KB-SEA-SINKDRAG1, physics seakeeping)
 
 - **Repro:** a 20 by 4 by 8 m box barge floating at 2 m with one compartment filling most of it, holed at the bow and
   vented (`HullSolver` with `compartments` and `openings`): it settles as it floods and goes under at about 25 s, then
   falls faster and faster (17.7 m/s at 50 s) and pitches over, where a hull this shape falls at about 4 m/s.
 - **Cause:** the hull solver's loads model a floating hull (the waves it makes, its roll's bilge eddies); nothing takes
   the form drag of a hull moving through the water once it is under, which sets a sinking hull's speed.
+- **Fix:** each wet piece facing the way the hull moves takes the stagnation pressure 1/2 rho C (v . n)^2 (Newton's impact
+  law, C = 1.05, Hoerner's cube), v relative to the water at the centre of mass, the roll's part left to the roll damping,
+  in the share the hull has gone under past the displacement it floats at (a floating hull's surface models keep theirs).
+  The barge now sinks at about 4 m/s flat, then pitches bow down and falls edge-first at about 10 m/s.
+- **Regression:** `packages/physics/tests/coupling/seakeeping.test.js`, "a box going down under the sea falls at the speed
+  its form drag allows" (terminal speed to 0.1 percent; without the drag, ever faster).
 
 ### Fixed 2026-11-26: a demo page marked ready after it had shown an error (KB-DEMO-STATUS1, examples)
 

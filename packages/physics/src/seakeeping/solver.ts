@@ -32,7 +32,7 @@ import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../wor
 import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
-import { AIR_DENSITY, type Compartment, Flooding, type Opening } from './flooding.js';
+import { AIR_DENSITY, type Compartment, Flooding, type Opening, volumeBelow } from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { type HullMemory, hullMemory } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
@@ -43,6 +43,8 @@ import {
   SEA_WATER,
   type SeaQuery,
   type Vec3,
+  FORM_DRAG,
+  type WettedDrag,
   type WettedLoads,
   wettedLoads,
 } from './wetted.js';
@@ -114,6 +116,15 @@ export interface HullParams {
    * into the water (slamming.ts).
    */
   readonly slamming?: boolean;
+  /**
+   * Take the form drag of the hull moving through the water (default true): on each wet piece facing the way it moves,
+   * the stagnation pressure 1/2 rho C (v . n)^2, v its velocity relative to the water at the centre of mass (the sea's
+   * `water` there, when it gives it), the roll's part left to the roll damping where that is on. It sets the speed a
+   * hull that has lost its buoyancy sinks at, and how it turns as it goes down.
+   */
+  readonly drag?: boolean;
+  /** The drag coefficient C (default 1.05, Hoerner's cube face-on; a flat disk is 1.17). */
+  readonly dragCoefficient?: number;
   /** The deck's grid, cells along the hull and across it (default [32, 12]). */
   readonly deckCells?: readonly [number, number];
   /**
@@ -183,6 +194,10 @@ export class HullSolver implements Solver<HullParams> {
   private waves32 = new Float32Array(0);
   private greenWater = true;
   private slamming = true;
+  private drag = true;
+  private dragCoefficient = FORM_DRAG;
+  /** Per hull: its mesh's whole volume. */
+  private readonly volumes = new Map<Hull, number>();
   /** Per hull: a flag, then each station's depth of entry a step ago. */
   private slam: Region | null = null;
   private readonly slams = new Map<Hull, SlamStation[]>();
@@ -277,6 +292,10 @@ export class HullSolver implements Solver<HullParams> {
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
     this.greenWater = params.greenWater ?? true;
     this.slamming = params.slamming ?? true;
+    this.drag = params.drag ?? true;
+    this.dragCoefficient = params.dragCoefficient ?? FORM_DRAG;
+    if (!(this.dragCoefficient >= 0 && Number.isFinite(this.dragCoefficient)))
+      throw new RangeError(`A hull's drag coefficient is ${this.dragCoefficient}; pass a finite number of 0 or more.`);
     if (this.slamming) this.slam = host.allocate('slam', hulls.length * (this.stations + 1) * 8, 'f64', HULL_LAYOUT);
     this.deckCells = params.deckCells ?? [32, 12];
     const [cx, cz] = this.deckCells;
@@ -316,6 +335,62 @@ export class HullSolver implements Solver<HullParams> {
       const state = new Float64Array(host.memory.buffer, this.flood.byteOffset, words);
       for (const { flooding, at } of this.floods.values()) flooding.initialise(state.subarray(at, at + flooding.words));
     }
+  }
+
+  /**
+   * The hull's form drag for `wettedLoads`: a point's velocity from the body's velocity `v` and spin `spin` (the roll's
+   * part about the body's x taken out where the roll damping takes it), less the water's at the centre of mass.
+   */
+  private dragOf(
+    hull: Hull,
+    inverseMass: number,
+    v: readonly number[],
+    spin: readonly number[],
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    t: number,
+  ): WettedDrag | undefined {
+    if (!this.drag || !(this.dragCoefficient > 0) || !(inverseMass > 0)) return undefined;
+    // How far the hull has gone under: 0 at the displacement it floats at (its mass over the water's density), 1 with all
+    // of it under. A floating hull's resistance is its surface models' (the waves it makes, its roll's eddies, a
+    // manoeuvring model's resistance); the form drag takes over as it goes under, where they do not reach.
+    const rotation = pose.rotation,
+      q = rotation,
+      up: Vec3 = [
+        2 * (q[0] * q[1] + q[3] * q[2]),
+        1 - 2 * (q[0] * q[0] + q[2] * q[2]),
+        2 * (q[1] * q[2] - q[3] * q[0]),
+      ],
+      density = this.sea!.density ?? SEA_WATER,
+      floating = 1 / inverseMass / density;
+    let whole = this.volumes.get(hull);
+    if (whole === undefined) {
+      whole = volumeBelow(hull.mesh, [0, 1, 0], Infinity);
+      this.volumes.set(hull, whole);
+    }
+    const under = volumeBelow(hull.mesh, up, this.sea!.elevation(centre[0], centre[2], t) - pose.position[1]),
+      share = whole > floating ? Math.min(1, Math.max(0, (under - floating) / (whole - floating))) : 1;
+    if (!(share > 0)) return undefined;
+    const water = this.waterOf(),
+      flow = water ? water.sample(centre[0], centre[1], centre[2], t, this.flow).velocity : [0, 0, 0],
+      w = [spin[0]!, spin[1]!, spin[2]!];
+    if (this.rollDamping) {
+      const x = rotate(rotation, [1, 0, 0]),
+        along = w[0]! * x[0] + w[1]! * x[1] + w[2]! * x[2];
+      for (let k = 0; k < 3; k++) w[k]! -= along * x[k]!;
+    }
+    const u = [v[0]! - flow[0]!, v[1]! - flow[1]!, v[2]! - flow[2]!];
+    return {
+      coefficient: this.dragCoefficient * share,
+      velocity: (x, y, z, out) => {
+        const r0 = x - centre[0],
+          r1 = y - centre[1],
+          r2 = z - centre[2];
+        out[0] = u[0]! + w[1]! * r2 - w[2]! * r1;
+        out[1] = u[1]! + w[2]! * r0 - w[0]! * r2;
+        out[2] = u[2]! + w[0]! * r1 - w[1]! * r0;
+      },
+    };
   }
 
   /** The sea's waves, when it gives them (`SpectralSea`'s `waveComponents`, its count and its depth). */
@@ -394,6 +469,7 @@ export class HullSolver implements Solver<HullParams> {
           t,
           centre,
           this.loads,
+          this.dragOf(hull, bodies[at + 16]!, v, spin, pose, centre, t),
         );
       if (this.radiation)
         this.radiate(

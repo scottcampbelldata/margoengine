@@ -197,6 +197,7 @@ function floatingHull(quayZ) {
       addedMass: false,
       radiation: false,
       greenWater: false,
+      drag: false,
       rollDamping: false,
     });
     world.add(crush, {
