@@ -665,3 +665,119 @@ test('strand section counts and effective section properties name their fixes', 
     /Pass a finite positive torsion constant/,
   );
 });
+
+test('a lantern on an inextensible handle swings at the finite-amplitude period', async () => {
+  const length = 0.28;
+  const angle = 0.35;
+  const gravity = 9.81;
+  const { solver, world } = await attach(
+    [{ points: [zero, [length * Math.sin(angle), -length * Math.cos(angle), 0]], radius: 0.006, drag: 0 }],
+    { fidelity: 'follow', damping: 0, friction: 0 },
+    [0, -gravity, 0],
+  );
+  // NIST DLMF 22.19(i). The complete elliptic integral K is pi divided by twice the AGM.
+  let a = 1;
+  let b = Math.cos(angle / 2);
+  while (a - b > Number.EPSILON) [a, b] = [(a + b) / 2, Math.sqrt(a * b)];
+  const period = (2 * Math.PI * Math.sqrt(length / gravity)) / a;
+  const measured = [];
+  let last = solver.sample(0, 1).position[0];
+  for (let frame = 1; frame <= Math.ceil(90 * period); frame++) {
+    world.advance(frame);
+    const tip = solver.sample(0, 1);
+    near(distance(zero, tip.position), length, 32 * Number.EPSILON);
+    if (last > 0 && tip.position[0] <= 0) measured.push((frame - 1 + last / (last - tip.position[0])) / 60);
+    last = tip.position[0];
+  }
+  assert.equal(measured.length, 2);
+  // Each crossing lies within a 60 Hz observation interval.
+  near(measured[1] - measured[0], period, 1 / 60);
+  assert.deepEqual(solver.sample(0, 0).position, zero);
+});
+
+test('thin leaves bend against a light reversing breeze with the beam solution', async () => {
+  const length = 0.12;
+  const width = 0.024;
+  const thickness = 0.002;
+  const young = 1e7;
+  const speed = 0.6;
+  const drag = 1.2;
+  const density = 1.225;
+  const inertia = (width * thickness ** 3) / 12;
+  const load = 0.5 * density * drag * width * speed * speed;
+  const bending = young * inertia;
+  const n = 24;
+  const points = Array.from({ length: n + 1 }, (_, i) => [0, 0, (length * i) / n]);
+  const strand = {
+    points,
+    radius: thickness / 2,
+    area: width * thickness,
+    secondMoment: inertia,
+    dragWidth: width,
+    young,
+    drag,
+  };
+  const wind = {
+    medium: 'air',
+    cell: zero,
+    sample: (x, y, z, time) => ({ velocity: [0, time <= 3 ? speed : -speed, 0], density, temperature: 289 }),
+  };
+  const { solver, world } = await attach([strand], { wind, damping: 22, selfCollision: false }, zero);
+  world.advance(180);
+  // The drag update integrates the relative speed exactly over one 240 Hz
+  // substep. Its mean load at rest is the initial load divided by 1 + k U dt.
+  const lineMass = 1300 * strand.area;
+  const dragRate = (0.5 * density * drag * width * speed) / lineMass;
+  const discreteLoad = load / (1 + dragRate / 240);
+  const deflection = (discreteLoad * length ** 4 * (1 - 1 / n) ** 2) / (8 * bending);
+  const angle = (load * length ** 3) / (6 * bending);
+  // Cross-flow drag changes by at most theta^2/2. The same-order term covers
+  // bending kinematics and the shear contribution is bounded independently.
+  const shear = (load * length * length) / (2 * (young / 2.6) * strand.area);
+  const bound = 2 * deflection * angle * angle + shear;
+  near(solver.sample(0, n).position[1], deflection, bound);
+  const snapshot = world.takeSnapshot();
+  world.advance(360);
+  near(solver.sample(0, n).position[1], -deflection, bound);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(360);
+  assert.equal(world.hash(), hash);
+});
+
+test('a hand-driven lantern lags the end of its carrier’s smooth reach', async () => {
+  const length = 0.28;
+  const gravity = 9.81;
+  const travel = 0.035;
+  const reach = 0.18;
+  const move = (time) => 0.5 * travel * (1 - Math.cos((Math.PI * Math.min(time, reach)) / reach));
+  const { solver, world } = await attach(
+    [
+      {
+        points: [zero, [0, -length, 0]],
+        radius: 0.006,
+        drag: 0,
+        anchor: (time) => ({ position: [move(time), 0, 0] }),
+      },
+    ],
+    { fidelity: 'follow', damping: 0, friction: 0 },
+    [0, -gravity, 0],
+  );
+  // Linearize the relative tangential coordinate u, with u'' + (g/L)u = -pivot''.
+  const frame = Math.ceil(reach * 60) - 1;
+  const time = frame / 60;
+  const natural = Math.sqrt(gravity / length);
+  const drive = Math.PI / reach;
+  const amplitude = (0.5 * travel * drive ** 2) / (drive ** 2 - natural ** 2);
+  const relative = amplitude * (Math.cos(drive * time) - Math.cos(natural * time));
+  // The tip speed bound controls one 240 Hz drive sample. The sine linearization
+  // contributes a relative (2 amplitude / length)^2 / 6 over the same displacement.
+  const bound = (amplitude * (drive + natural)) / 240 + (2 * amplitude * ((2 * amplitude) / length) ** 2) / 6;
+  world.advance(frame);
+  const root = solver.sample(0, 0).position;
+  const tip = solver.sample(0, 1).position;
+  near(root[0], move(time), 32 * Number.EPSILON);
+  near(tip[0] - root[0], relative, bound);
+  near(distance(root, tip), length, 32 * Number.EPSILON);
+  assert.ok(tip[0] < root[0] - bound);
+});

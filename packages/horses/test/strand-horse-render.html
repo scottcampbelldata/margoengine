@@ -23,14 +23,14 @@
     return (await readPixels(engine)).data;
   };
   const pose = horse => [...horse.pose.jointTranslations].map(([node, xyz]) => [node, xyz, horse.pose.rotations[node]]);
-  async function ride(flow) {
+  async function ride(flow, gaitName, targetSpeed) {
     const horse = await addStrandHorse(engine, { coat: 'chestnut', type: 'riding', detail: 1, strands: { wind: flow } });
     try {
       const chains = horse.skeleton.strandChains, t = chains[0].length - 1,
         m = chains[4].length - 1, f = chains[9].length - 1;
       const tip = (guide, index) => horse.strandSolver.sample(guide, index).position;
-      horse.speed = 4;
-      horse.gait = 'trot';
+      horse.speed = targetSpeed;
+      horse.gait = gaitName;
       horse.heading = -0.29;
       for (let i = 0; i < 45; i++) horse.advanceTime(1 / 30);
       const first = horse.strandWorld.hash(), firstPose = pose(horse), pixels = await capture();
@@ -45,8 +45,9 @@
       horse.dispose();
     }
   }
-  window.runStrandHorse = async () => {
-    const still = await ride(undefined), gusted = await ride(wind);
+  window.runStrandHorse = async (gait) => {
+    const speed = gait === 'trot' ? 4 : 1.4;
+    const still = await ride(undefined, gait, speed), gusted = await ride(wind, gait, speed);
     let changed = 0;
     for (let i = 0; i < still.pixels.length; i += 4) {
       if ([0, 1, 2].reduce((sum, j) => sum + Math.abs(still.pixels[i + j] - gusted.pixels[i + j]), 0) > 20) changed++;

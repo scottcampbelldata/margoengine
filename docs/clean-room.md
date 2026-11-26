@@ -15055,6 +15055,26 @@ test measures every length during a wind reversal and contact with a live terrai
 browser fixture draws the solved centreline and frame in a fixed view and repeats the same
 gust against a still-air control.
 
+### Lantern and low-wind leaf response
+
+The courier lantern's single inextensible handle is validated against the finite-amplitude
+pendulum. NIST's [*Digital Library of Mathematical Functions*](https://dlmf.nist.gov/22.19.i)
+(Olver et al., 2010–present), equation 22.19.2, gives the period
+`4 sqrt(L/g) K(sin(alpha/2))`; [section 19.8](https://dlmf.nist.gov/19.8.i) evaluates
+`K` with the arithmetic-geometric mean. A separate reach differentiates the prescribed
+hand path and checks the tip lag against the linear forced pendulum with a drive sampling
+and small-angle error bound.
+
+Frédérick P. Gosselin and Emmanuel de Langre, [*Drag reduction by reconfiguration of a
+poroelastic system*](https://doi.org/10.1016/j.jfluidstructs.2011.05.007) (2011), relates
+bend and drag through the local flow and exposed section. The low-deflection fixture
+uses a fixed air density and a 0.6 m/s reversing cross-flow. Its independent beam
+reference starts with the distributed-load tip deflection `qL⁴/(8EI)`. The 24-link
+reference accounts for the clamped first link and the exact quadratic-drag mean force
+over each substep. The error combines the small-angle projection terms and a bound on
+shear. This addresses motion of a narrow flexible leaf; the assets from the original
+planter and workshop shots are separate.
+
 ### Feather and tapered strand sections
 
 - Thomas Bachmann, Jens Emmerlich, Werner Baumgartner, Jochen M. Schneider and Hermann Wagner,

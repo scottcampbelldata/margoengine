@@ -9955,6 +9955,12 @@ passes. The work and memory grow linearly along each open guide. It reserves 1,1
 per authored point for solver scratch. The optional local profile uses less scratch, with
 reduced stiffness accuracy as its link count rises.
 
+A 0.28 m inextensible lantern handle matches the finite-amplitude pendulum period within
+one 60 Hz observation interval and lags a moving root under a timed reach. The 120 mm
+leaf test reverses a 0.6 m/s cross-flow, with approximately 0.944 mm deflection to each
+side and exact replay after reversal. This is a beam-and-drag test for narrow
+leaves. Lift-driven leaf flutter and canopy wind shielding need a separate model.
+
 The 720-point tapered and swept fixture moved its selected tip 0.7516 m relative to the
 still-air control and changed 2,907 pixels with the same camera on WebGPU and WebGL2.
 Plain, shared and restored native state all hash to `9245de2188de6730` in the fixture. The optional entry
