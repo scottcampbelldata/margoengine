@@ -15,7 +15,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: scripts/lint.mjs checks the files changed since the merge base with origin/main, which a
+      # depth-1 checkout (a pull request's merge commit) does not have (tests/ci-checkout.test.js).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -26,9 +30,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: npm run quality compares baselines and document readers with the merge base with origin/main,
+      # and without it they skipped those checks on every pull request (tests/ci-checkout.test.js).
       - uses: actions/checkout@v4
         with:
           lfs: true
+          fetch-depth: 0
       # The repository's minimum Node (root package.json engines; scripts/check-engines.mjs keeps the two equal).
       - uses: actions/setup-node@v4
         with:

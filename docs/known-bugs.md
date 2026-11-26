@@ -19,6 +19,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   unknown: it is the third page the same browser opens in that check, and the first without a sky.
 - **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
 
+### Fixed 2026-11-26: GitHub CI's lint failed every pull request, and quality checked less there (KB-CI-MERGEBASE1, .github/workflows/ci.yml)
+
+- **Repro:** any pull request (PR 68, job 139720307693): `npm run lint` stops with `fatal: Not a valid object name
+  origin/main`.
+- **Cause:** `actions/checkout@v4` checks out a pull request's merge commit at depth 1 with no origin/main, and
+  scripts/lint.mjs diffs against the merge base with origin/main. The test job's `npm run quality` has two readers of
+  the same merge base (scripts/quality/ratchet.js `droppedHistory`, scripts/support/unit-readers.mjs
+  `changedAgainstMain`) that treat a missing one as nothing to check, so a pull request's dropped baseline history and
+  changed documents' readers went unchecked.
+- **Fixed:** the lint and test jobs check out the whole history (`fetch-depth: 0`). Regression: tests/ci-checkout.test.js
+  follows each CI job's npm scripts through their imports and fails on a job that reaches `git merge-base` without a
+  full checkout (it named `lint` and `test` on the old ci.yml).
+
 ### Fixed 2026-11-26: the branches of a multibody under a fixed root were islands that walked each other's links (KB-PHYS-MBISLAND1, physics kernel)
 
 - **Repro:** `packages/physics/tests/next-multibody.test.js`, "two branches under a fixed root are one island, and swing as
