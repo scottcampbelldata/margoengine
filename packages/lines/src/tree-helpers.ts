@@ -69,13 +69,22 @@ export class BVHHelper extends Line {
   /** Depth first from the root; `visit(node, level)` returns true to stop descending. Left child is node + 1. */
   private walk(visit: (node: number, level: number) => boolean): void {
     const data = this.bvh.nodeData,
+      count = data.length / 8,
       stack: number[] = [0, 0];
+    let visited = 0;
     while (stack.length) {
       const level = stack.pop()!,
         node = stack.pop()!;
+      // A right child lies after the left subtree's first node and inside the storage; every node is reached once.
+      if (++visited > count || level > 64 || node >= count)
+        throw new RangeError('Invalid BVH node links; pass the unmodified nodeBounds and nodeData of a MeshBVH');
       if (visit(node, level)) continue;
-      const word = data[node * 8 + 7];
-      if (word & 0x80000000) stack.push(data[node * 8 + 6], level + 1, node + 1, level + 1);
+      if (data[node * 8 + 7] & 0x80000000) {
+        const right = data[node * 8 + 6];
+        if (!(right > node + 1 && right < count))
+          throw new RangeError('Invalid BVH node links; pass the unmodified nodeBounds and nodeData of a MeshBVH');
+        stack.push(right, level + 1, node + 1, level + 1);
+      }
     }
   }
   private rebuild(): this {
@@ -134,9 +143,15 @@ export class OctreeHelper extends Line {
     return this.rebuild();
   }
   private walk(visit: (node: OctreeNodeShape, level: number) => boolean): void {
-    const stack: [OctreeNodeShape, number][] = [[this.root, 0]];
+    const stack: [OctreeNodeShape, number][] = [[this.root, 0]],
+      seen = new Set<OctreeNodeShape>();
     while (stack.length) {
       const [node, level] = stack.pop()!;
+      if (level > 64 || seen.has(node))
+        throw new RangeError(
+          'Invalid octree: a node repeats or the tree is deeper than 64 levels; pass an octree whose children form a tree',
+        );
+      seen.add(node);
       if (visit(node, level)) continue;
       for (const child of node.children) if (child) stack.push([child, level + 1]);
     }

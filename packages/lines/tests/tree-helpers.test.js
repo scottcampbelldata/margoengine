@@ -61,3 +61,27 @@ test('RaycasterHelper draws the ray to the farthest hit with a cross and a norma
   assert.deepEqual(points(helper).slice(3, 6), [10, 0, 0], 'no hit and far Infinity: the default length');
   assert.throws(() => helper.set({ origin: [0, 0], direction: [1, 0, 0] }), /ray origin/);
 });
+
+test('a cyclic or shared BVH layout throws instead of hanging', () => {
+  const bounds = new Float32Array(8 * 3),
+    cyclic = new Uint32Array(8 * 3);
+  cyclic[7] = 0x80000000;
+  cyclic[6] = 2;
+  cyclic[8 + 7] = 0x80000000;
+  cyclic[8 + 6] = 0; // Points back at the root.
+  assert.throws(() => new BVHHelper({ nodeBounds: bounds, nodeData: cyclic }), /Invalid BVH node links/);
+  const shared = new Uint32Array(8 * 3);
+  shared[7] = 0x80000000;
+  shared[6] = 1; // Right child equal to the left child.
+  assert.throws(() => new BVHHelper({ nodeBounds: bounds, nodeData: shared }), /Invalid BVH node links/);
+});
+
+test('a cyclic or shared octree throws instead of hanging', () => {
+  const bounds = [0, 0, 0, 1, 1, 1],
+    root = { bounds, children: [] },
+    child = { bounds, children: [root] };
+  root.children.push(child);
+  assert.throws(() => new OctreeHelper(root), /Invalid octree/);
+  const leaf = { bounds, children: [] };
+  assert.throws(() => new OctreeHelper({ bounds, children: [leaf, leaf] }), /Invalid octree/);
+});
