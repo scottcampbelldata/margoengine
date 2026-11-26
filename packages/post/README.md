@@ -2152,7 +2152,7 @@ every pass, and `planFilterGraph(graph)` gives the same plan, with each pass's W
 | --- | --- | --- |
 | `device` | its own | A device to run on. An owned one restores itself after a loss; for yours call `restore(newDevice)` |
 | `canvas` | none | Shown here, with premultiplied alpha; without it the picture is `output` |
-| `target` | none | Your texture to draw into (`RENDER_ATTACHMENT`; `read` also needs `COPY_SRC`) |
+| `target` | none | Your texture to draw into (`RENDER_ATTACHMENT`; `read` also needs `COPY_SRC`). It belongs to your `device` and is never destroyed here; after a loss call `restore(newDevice, {target: textureOnNewDevice})` |
 | `size` | follows | `[width, height]`; else the canvas's or the first image's, each frame (`resize()`). A `target` is drawn at its own size |
 | `format` | `'rgba8unorm'` | Format of the runtime's own output texture |
 | `optimize` | `true` | False draws one pass a block |

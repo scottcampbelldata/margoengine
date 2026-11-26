@@ -41,7 +41,11 @@ export interface ImageFilterGraphOptions {
   device?: GPUDevice;
   /** Canvas shown on, configured with premultiplied alpha. Default none: the result is {@link ImageFilterGraph.output}. */
   canvas?: HTMLCanvasElement | OffscreenCanvas;
-  /** Caller's texture drawn into (straight alpha, `RENDER_ATTACHMENT` usage) instead of a canvas or own output. */
+  /**
+   * Caller's texture drawn into (straight alpha, `RENDER_ATTACHMENT` usage) instead of a canvas or own output. It belongs
+   * to `device` and is never destroyed or moved to another device here: after a loss {@link ImageFilterGraph.restore}
+   * takes the new device's texture as its `target`.
+   */
   target?: GPUTexture;
   /** Output [width, height]. Default the target's, else the canvas's, else the first image input's size, each frame. */
   size?: readonly [number, number];
@@ -743,14 +747,24 @@ export class ImageFilterGraph {
   /**
    * Rebuilds after a device loss: on `device` for a runtime that was given one, else on a freshly requested device (an
    * owned device does this by itself). Images are copied again; borrowed textures and closed frames belong to the old
-   * device, so those inputs empty.
-   * @throws MargoError `state` when `device` is given to an owner or left out otherwise.
+   * device, so those inputs empty. A graph made with a `target` draws into `options.target` from then on: the old
+   * one belonged to the lost device.
+   * @throws MargoError `state` when `device` is given to an owner or left out otherwise, or when `options.target` is
+   * missing for a graph that has a target or given to one that has none.
    */
-  async restore(device?: GPUDevice, options: { signal?: AbortSignal } = {}): Promise<void> {
+  async restore(device?: GPUDevice, options: { signal?: AbortSignal; target?: GPUTexture } = {}): Promise<void> {
     this.alive();
     options.signal?.throwIfAborted();
     if (!device !== this.owned)
       throw fault('state', this.owned ? 'owns its device; call restore() with none' : 'restore needs the new device');
+    if (!this.options.target !== !options.target)
+      throw fault(
+        'state',
+        this.options.target
+          ? "draws a target that belongs to the lost device; pass the new device's texture as restore(device, { target })"
+          : 'has no target; restore it without one',
+      );
+    if (options.target) this.options.target = options.target;
     this.release();
     const epoch = ++this.epoch;
     if (this.owned) this.gpu.destroy();

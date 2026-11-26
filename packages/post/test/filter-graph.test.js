@@ -261,6 +261,30 @@ test('an owned device restores itself after a loss; a borrowed one is restored b
   assert.deepEqual(f.live(), []);
 });
 
+test("a caller target belongs to its device: a restore takes the new device's texture and never keeps the lost one", async () => {
+  const f = fake(),
+    graph = chain('invert'),
+    mine = f.make(),
+    next = f.make(),
+    texture = (device) =>
+      device.createTexture({ size: [4, 4], format: 'rgba8unorm', usage: GPUTextureUsage.RENDER_ATTACHMENT });
+  globalThis.GPUTextureUsage ??= { RENDER_ATTACHMENT: 16, TEXTURE_BINDING: 4, COPY_SRC: 1, COPY_DST: 2 };
+  const old = texture(mine.device),
+    filter = await ImageFilterGraph.create(graph, { device: mine.device, target: old });
+  filter.setImage('a', picture);
+  assert.equal(filter.output, old);
+  await assert.rejects(filter.restore(next.device), { code: 'state', message: /restore\(device, \{ target \}\)/ });
+  assert.equal(filter.output, old, 'a refused restore leaves the graph as it was');
+  const fresh = texture(next.device);
+  await filter.restore(next.device, { target: fresh });
+  assert.equal(filter.output, fresh);
+  assert.equal(filter.render(), true);
+  filter.dispose();
+  const plain = await ImageFilterGraph.create(graph, { device: mine.device });
+  await assert.rejects(plain.restore(next.device, { target: fresh }), { code: 'state', message: /no target/ });
+  plain.dispose();
+});
+
 test('creation and loads abort, and a missing GPU is a coded error', async () => {
   const f = fake(),
     reason = new Error('stop');

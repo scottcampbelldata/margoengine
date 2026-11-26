@@ -637,6 +637,10 @@
       "status": "ruled",
       "source": "packages/post/src/decals.ts"
     },
+    "post:ImageFilterGraphOptions.target": {
+      "status": "exempt",
+      "reason": "a per-call argument (rule 6): the graph draws the caller's texture only on the device it was given with and never destroys it, and ImageFilterGraph.restore(device, { target }) takes the new device's texture, refusing a restore that has none"
+    },
     "post:LUT1DOptions.lut": {
       "status": "ruled",
       "source": "packages/post/src/lut1d.ts"

@@ -131,6 +131,7 @@ export class ImageFilterGraph {
     }>;
     restore(device?: GPUDevice, options?: {
         signal?: AbortSignal;
+        target?: GPUTexture;
     }): Promise<void>;
     dispose(): void;
     [Symbol.dispose]: () => void;
