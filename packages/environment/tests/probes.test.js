@@ -796,6 +796,24 @@ test('disposal during readback rejects the bake without publishing a stale snaps
   assert.ok(owned.every((resource) => resource.destroyed));
 });
 
+test('a device lost during the bake readback rejects with the coded interruption, not the aborted map', async () => {
+  // Regression (KB-SHOT-COMPATLOST1): the map of a device lost before its restore rejects with an AbortError while
+  // this.gpu is still that device, and the raw DOMException left bake() for the page to print.
+  const h = pooledProbes();
+  await h.probes.bake();
+  const previous = h.probes.texels;
+  h.probes.captureResources.read.mapAsync = () =>
+    Promise.reject(
+      new DOMException(
+        'The device was lost before the buffer mapped; map it again on the restored device',
+        'AbortError',
+      ),
+    );
+  await assert.rejects(h.probes.bake(), (error) => error.name === 'MargoError' && error.code === 'state');
+  assert.strictEqual(h.probes.texels, previous);
+  h.probes.dispose();
+});
+
 test('a readback failure preserves the previous public snapshot, unmaps completed reads, and can retry with the same owned buffer', async () => {
   const h = pooledProbes();
   await h.probes.bake();
