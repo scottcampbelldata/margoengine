@@ -271,7 +271,7 @@ test('selection outlines selected model primitives with an equal-depth mask, nod
   assert.ok(!engine.hasPlugin('selection'));
 });
 
-test('instanced primitives: the micro pass draws instances near the pixel with their own IDs, outlines mark every instance in one draw', async () => {
+test('instanced primitives: the micro pass draws every instance through the pick shader with one ID per row, outlines mark every instance in one draw', async () => {
   const w = await world(),
     { engine, c, draws } = w,
     model = quads(engine, [[0, 0, 0]]),
@@ -286,16 +286,18 @@ test('instanced primitives: the micro pass draws instances near the pixel with t
   model.primitives[0].instances = inst;
   const picking = Picking.attach(engine);
   draws.length = 0;
-  w.setPixel(capacity + 1 + 2); // the second instance near the pixel: one primitive slot, no proxies
+  // Instance IDs follow the one primitive slot (no proxies): row k writes capacity + 2 + k (KB-PICK-INSTMOVE1).
+  w.setPixel(capacity + 2 + 2);
   const hit = await picking.pick(64, 48),
     picked = draws.filter((d) => d.pipeline?.vertex?.buffers?.[0]?.arrayStride === 80);
-  assert.equal(picked.length, 2, 'instances off the pick frustum are culled');
-  assert.deepEqual(
-    picked.map((d) => d.instances),
-    [1, 1],
+  assert.equal(picked.length, 1, 'one instanced draw');
+  assert.equal(picked[0].instances, 4, 'every row is drawn, as the colour pass draws it');
+  assert.equal(picked[0].pipeline.vertex.buffers[1]?.arrayStride, 96, 'with the instance rows as a vertex buffer');
+  assert.equal(
+    new Float32Array(picked[0].group.entries.find((e) => e.binding === 0).resource.buffer.data)[44],
+    capacity + 2,
+    'the first row ID',
   );
-  const words = w.storage();
-  assert.deepEqual([words[16], words[36]], [capacity + 2, capacity + 3], 'one ID per drawn instance');
   assert.ok(
     hit.instanceId === 2 && hit.mesh === model.nodes[1] && hit.primitiveIndex === 0,
     'the hit names the node, primitive and instance',

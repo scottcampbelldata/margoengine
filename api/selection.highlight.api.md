@@ -82,6 +82,11 @@ interface PickingPrimitive {
     clip?: GPUBufferBinding;
     doubleSided?: boolean;
     side?: 'front' | 'back' | 'double';
+    instances?: {
+        readonly count: number;
+        readonly mirrored?: boolean;
+        upload(device: GPUDevice): GPUBuffer;
+    };
 }
 
 interface PickingSource {

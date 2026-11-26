@@ -2064,8 +2064,10 @@ through a built-in added to the caster's vertex entry. Rules that follow: a pass
 a primitive's instances in row order from instance 0; a culler or sorter that reorders rows must skip a material whose
 `shading.instanceRows` is true (`shared/instances.js` `readsRows`); the beauty shader names `f.model` so plain meshes are
 never merged into one instanced draw whose batch position would read as a row. Evidence:
-`packages/materials/test/instance-attributes-browser.mjs` (WebGPU and the WebGL2 layer). Missing: adapters without
-vertex-stage storage buffers (compatibility mode), instanced GPU picking (KB-PICK-INSTMOVE1), instance velocity for TAA,
+`packages/materials/test/instance-attributes-browser.mjs` (WebGPU and the WebGL2 layer). GPU picking draws gltf/pbr
+instances through the same caster code (`instancedDepth` after the vertex move, one ID per row; evidence
+`packages/selection/test/instanced-move.browser.mjs`, both back ends). Missing: adapters without
+vertex-stage storage buffers (compatibility mode), instance velocity for TAA,
 GPU runs of the shadow atlas and contact shadows.
 
 ## GPU work runs directly (Scott, 2026-11-16)

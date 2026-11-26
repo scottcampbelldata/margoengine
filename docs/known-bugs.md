@@ -153,15 +153,33 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/rebase-main.test.js`: a two-commit branch replays without running any git hook; a replay never
   overwrites an untracked file that main adds.
 
-### Open 2026-11-26: GPU picking of an instanced mesh tests the instances where its vertex shader did not move them (KB-PICK-INSTMOVE1, selection)
+### Open 2026-11-26: the selection outline of an instanced mesh marks its instances where its vertex shader did not move them (KB-SEL-INSTMOVE1, selection)
 
-- **Repro:** `createInstancedMesh` with a material whose `materialPlugin` vertex point (or a `displacementMap`) moves the
-  quad 1.5 units; `Picking.attach(engine)`, then `pick` where it draws answers null (the `picking` check of
-  `packages/materials/test/instance-attributes.html` logs `instancedThere: false` on WebGPU and the WebGL2 layer).
-- **Cause:** `packages/selection/src/picking.ts` draws instanced model primitives through its model pipeline from each
-  instance's world matrix and the geometry's bounding sphere; it never takes the primitive's `displacement` caster, which
-  plain primitives and every shadow pass draw through. A fix needs a caster variant of the picking pass drawn per
-  instance with ids per row.
+- **Repro:** the scene of `packages/selection/test/instanced-move.browser.mjs`, then `Selection.attach(engine)` and
+  `selection.set([mesh])`: the outline mask is drawn at x = 0, not where the quads draw at x = 1.5.
+- **Cause:** `packages/selection/src/index.ts` `drawModels` marks gltf/pbr instanced primitives through `ModelDraws`
+  `addInstances` (CPU world matrices, unmoved vertices) and its `mark` filter keeps them out of `PickingPrimitives`,
+  which since KB-PICK-INSTMOVE1 draws instances with the colour pass's vertex move. A fix routes them through
+  `PickingPrimitives` with the mask, with a GPU check that the equal-depth mask matches the drawn instances.
+
+### Fixed 2026-11-26: GPU picking of an instanced mesh tested the instances where its vertex shader did not move them (KB-PICK-INSTMOVE1, selection)
+
+- **Repro:** `createInstancedMesh` of two 0.8 wide quads stood at y = +1.5 and -1.5 by their instance matrices, whose
+  material plugin moves every vertex 1.5 units right; `Picking.attach(engine)`, then `pick` where they draw answered
+  null and `pick` where they would stand unmoved answered the instances (WebGPU and the WebGL2 layer).
+- **Cause:** `packages/selection/src/picking.ts` drew gltf/pbr instanced primitives through its own model pipeline, one
+  CPU-built world matrix per instance near the pixel and the unmoved vertex position; gltf/pbr's `pickingPrimitives`
+  left out the instances, so the pick shader the plain primitives and every shadow pass draw through (the
+  `displacement` caster) never saw them.
+- **Fix:** gltf/pbr `pickingPrimitives` carry the primitive's `instances`; `PickingPrimitives` draws such a primitive
+  once over all its rows through the shadow casters' `instancedDepth` transform after the material's vertex move (the
+  same order as the shadow passes), with a flat row so row k writes the primitive's first ID + k (the `margoRow` a
+  row-reading material plugin already names). Picking reserves one ID run per instanced primitive and decodes the
+  instance from it; a primitive with mirrored rows is picked from both sides, as the colour pass draws it unculled.
+  Hit details read the instance's world matrix for the normal.
+- **Regression:** `packages/selection/test/instanced-move.browser.mjs` (both back ends: the drawn places hit instances
+  0 and 1, the unmoved places miss); `packages/materials/test/instance-attributes-browser.mjs` now asserts
+  `instancedThere`; `packages/selection/test/models.test.js` (one instanced draw, one ID per row).
 
 ### Fixed 2026-11-26: GPU picking missed a mesh its shader moved past its geometry's bounds (KB-PICK-MOVED1, selection)
 

@@ -61,7 +61,7 @@ class Surface implements PickSurface {
     code = code
       .replace(/->@location\(0\) u32\s*\{/, '->SurfacePixel {')
       .replace(
-        /return (i\.id\+1u|i\.info\.x|u32\(f\.info\.x\));/,
+        /return (i\.id\+1u|i\.info\.x|u32\(f\.info\.x\)(?:\+i\.pickRow)?);/,
         'return SurfacePixel($1,vec4f(normalize(i.surfaceNormal),i.clip.z),i.surfaceUV);',
       );
     return (

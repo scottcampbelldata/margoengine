@@ -101,6 +101,7 @@ interface PickTile {
   width: number;
   height: number;
   candidates: Map<Mesh, PickingSource[]> | undefined;
+  /** Instance ID runs in ID order: [model, primitive, first instance, first ID]; ID n of a run is instance first + n - first ID. */
   instances: number[][];
   matrix?: Float32Array;
   eye?: readonly number[];
@@ -271,6 +272,8 @@ export class Picking implements EnginePlugin {
   private readonly proxyMatrix = new Float32Array(16);
   private readonly instanceWorld = new Float32Array(16);
   protected instanceHits: number[][] = [];
+  /** First instance ID of each gltf/pbr instanced primitive drawn through `primitives` in the current pass. */
+  private readonly instanceIds = new Map<object, number>();
   private ids?: GPUTexture;
   private idsView?: GPUTextureView;
   private micro?: GPUTexture;
@@ -705,7 +708,11 @@ export class Picking implements EnginePlugin {
       const slot = Math.floor((id - overlayBase) / overlayIds);
       hit = (this.overlays[slot]?.pickHit(id - overlayBase - slot * overlayIds) ?? null) as PickHit | null;
     } else if (id > capacity + total + list.length) {
-      const [m, i, k] = tile.instances[id - capacity - total - list.length - 1] ?? [],
+      const runs = tile.instances;
+      let r = runs.length - 1;
+      while (r > 0 && runs[r][3] > id) r--;
+      const [m, i, first, start] = runs[r] ?? [],
+        k = first + id - start,
         model = models[m],
         primitive = model?.primitives[i];
       if (primitive && !model.disposed)
@@ -970,20 +977,32 @@ export class Picking implements EnginePlugin {
       starts = this.models.starts;
     draws.reset();
     this.instanceHits = [];
+    this.instanceIds.clear();
+    // Instance IDs follow the pick proxies' IDs.
+    let next = e.store.capacity + this.models.total + list.length + 1;
     for (let m = 0; m < models.length; m++) {
       const model = models[m];
       if (model.disposed) continue;
       for (let i = 0; i < model.primitives.length; i++) {
         const p = model.primitives[i],
-          inst = p.instances;
-        if (!p.buffers || !shown(p.node) || (!inst && meshTriangles(p.node)?.kind === 'pbr')) continue;
-        // Instances meeting the micro frustum get IDs after the pick proxies' (one slot per hit candidate, not per instance).
+          inst = p.instances,
+          pbr = meshTriangles(p.node)?.kind === 'pbr';
+        if (!p.buffers || !shown(p.node) || (pbr && !inst?.count)) continue;
+        // gltf/pbr instances draw through `primitives` with the colour pass's instance transform and vertex move: one
+        // ID per instance (KB-PICK-INSTMOVE1).
+        if (pbr) {
+          this.instanceHits.push([m, i, 0, next]);
+          this.instanceIds.set(p, next);
+          next += inst!.count;
+          continue;
+        }
+        // Other models' instances meeting the micro frustum: one ID per hit candidate.
         if (inst) {
           for (let k = 0; k < inst.count; k++) {
             const w = instanceMatrix(p.node.matrix, inst.data, k, this.instanceWorld);
             if (intersects(matrix, w, sphere(p), this.clip)) {
-              this.instanceHits.push([m, i, k]);
-              draws.add(p, e.store.capacity + this.models.total + list.length + this.instanceHits.length, w);
+              this.instanceHits.push([m, i, k, next]);
+              draws.add(p, next++, w);
             }
           }
           continue;
@@ -1023,14 +1042,16 @@ export class Picking implements EnginePlugin {
           format: 'r32uint',
           surface: this.surface,
           depthFormat: 'depth32float',
-          filter: (node, _primitive, source, index) => {
+          filter: (node, primitive, source, index) => {
             const owner = models.indexOf(source as unknown as ModelLike),
               p = owner < 0 ? undefined : models[owner].primitives[index];
             return (
               inView(scope, node) &&
-              !p?.instances &&
+              // Instance IDs are given to model primitives only.
+              (p ? !p.instances === !this.instanceIds.has(p) : !primitive.instances) &&
               // A shader that moves vertices (displacement, material plugins) leaves the geometry's sphere.
               (!p ||
+                !!p.instances ||
                 !!p.deformed ||
                 !!(p.material as { displacement?: unknown }).displacement ||
                 intersects(matrix, node.matrix, sphere(p), this.clip))
@@ -1038,7 +1059,9 @@ export class Picking implements EnginePlugin {
           },
           id: (node, source, index) => {
             const owner = models.indexOf(source as unknown as ModelLike);
-            return owner < 0 ? node.id + 1 : e.store.capacity + 1 + starts[owner] + index;
+            return owner < 0
+              ? node.id + 1
+              : (this.instanceIds.get(models[owner].primitives[index]) ?? e.store.capacity + 1 + starts[owner] + index);
           },
         });
     this.overlays.forEach((overlay, slot) =>
