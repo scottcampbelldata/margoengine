@@ -477,46 +477,121 @@ impl Film {
         true
     }
 
-    unsafe fn precondition_planar(&self, rhs: *const f64, out: *mut f64, lines: bool) {
+    unsafe fn substitute_face_axis(&self, out: *mut f64, axis: usize) {
         let grid = self.grid;
         let w = &self.work;
-        if !lines {
-            for i in 0..2 * grid.n {
-                out.add(i).write(*rhs.add(i) * *w.diagonal.add(i));
-            }
-            return;
-        }
         let center = w.edges;
         let one = center.add(2 * grid.n);
         let two = w.flux;
+        let (step, count) = if axis == 0 {
+            (2, grid.cols)
+        } else {
+            (2 * grid.cols, grid.rows)
+        };
         for i in 0..grid.n {
-            let x = i.checked_rem(grid.cols).unwrap_or_else(|| unreachable());
-            let y = i.checked_div(grid.cols).unwrap_or_else(|| unreachable());
-            for (axis, (index, step)) in [(x, 2), (y, 2 * grid.cols)].into_iter().enumerate() {
-                let f = 2 * i + axis;
-                let mut value = *rhs.add(f);
-                if index > 1 {
-                    value -= *two.add(f) * *out.add(f - 2 * step);
-                }
-                if index > 0 {
-                    value -= *one.add(f) * *out.add(f - step);
-                }
-                out.add(f).write(value / *center.add(f));
+            let index = if axis == 0 {
+                i.checked_rem(grid.cols).unwrap_or_else(|| unreachable())
+            } else {
+                i.checked_div(grid.cols).unwrap_or_else(|| unreachable())
+            };
+            let f = 2 * i + axis;
+            let mut value = *out.add(f);
+            if index > 1 {
+                value -= *two.add(f) * *out.add(f - 2 * step);
             }
+            if index > 0 {
+                value -= *one.add(f) * *out.add(f - step);
+            }
+            out.add(f).write(value / *center.add(f));
         }
         for i in (0..grid.n).rev() {
-            let x = grid.cols - 1 - i.checked_rem(grid.cols).unwrap_or_else(|| unreachable());
-            let y = grid.rows - 1 - i.checked_div(grid.cols).unwrap_or_else(|| unreachable());
-            for (axis, (index, step)) in [(x, 2), (y, 2 * grid.cols)].into_iter().enumerate() {
-                let f = 2 * i + axis;
-                let mut value = *out.add(f);
-                if index > 0 {
-                    value -= *one.add(f + step) * *out.add(f + step);
-                }
-                if index > 1 {
-                    value -= *two.add(f + 2 * step) * *out.add(f + 2 * step);
-                }
-                out.add(f).write(value / *center.add(f));
+            let index = if axis == 0 {
+                i.checked_rem(grid.cols).unwrap_or_else(|| unreachable())
+            } else {
+                i.checked_div(grid.cols).unwrap_or_else(|| unreachable())
+            };
+            let remaining = count - 1 - index;
+            let f = 2 * i + axis;
+            let mut value = *out.add(f);
+            if remaining > 0 {
+                value -= *one.add(f + step) * *out.add(f + step);
+            }
+            if remaining > 1 {
+                value -= *two.add(f + 2 * step) * *out.add(f + 2 * step);
+            }
+            out.add(f).write(value / *center.add(f));
+        }
+    }
+
+    unsafe fn sweep_face_axes(
+        &self,
+        rhs: *const f64,
+        out: *mut f64,
+        k: f64,
+        dt: f64,
+        contact_norm: *const f64,
+        first: usize,
+    ) {
+        let w = &self.work;
+        let n = self.grid.n;
+        let second = 1 - first;
+        for i in 0..n {
+            out.add(2 * i + first).write(*rhs.add(2 * i + first));
+            out.add(2 * i + second).write(0.0);
+        }
+        self.substitute_face_axis(out, first);
+        self.matrix(out, w.result, k, dt, contact_norm);
+        for i in 0..n {
+            let face = 2 * i + second;
+            out.add(face).write(*rhs.add(face) - *w.result.add(face));
+        }
+        self.substitute_face_axis(out, second);
+        for i in 0..n {
+            let face = 2 * i + first;
+            w.donor.add(i).write(*out.add(face));
+            out.add(face).write(0.0);
+        }
+        self.matrix(out, w.result, k, dt, contact_norm);
+        for i in 0..n {
+            let face = 2 * i + first;
+            out.add(face).write(-*w.result.add(face));
+        }
+        self.substitute_face_axis(out, first);
+        for i in 0..n {
+            *out.add(2 * i + first) += *w.donor.add(i);
+        }
+    }
+
+    unsafe fn precondition_planar(
+        &self,
+        rhs: *const f64,
+        out: *mut f64,
+        k: f64,
+        dt: f64,
+        contact_norm: *const f64,
+        lines: bool,
+        coupled: bool,
+    ) {
+        let w = &self.work;
+        let n = self.grid.n;
+        if !lines {
+            for i in 0..2 * n {
+                out.add(i).write(*rhs.add(i) * *w.diagonal.add(i));
+            }
+        } else if !coupled {
+            out.copy_from_nonoverlapping(rhs, 2 * n);
+            self.substitute_face_axis(out, 0);
+            self.substitute_face_axis(out, 1);
+        } else {
+            self.sweep_face_axes(rhs, out, k, dt, contact_norm, 0);
+            for i in 0..n {
+                w.pressure.add(i).write(*out.add(2 * i));
+                w.trial.add(i).write(*out.add(2 * i + 1));
+            }
+            self.sweep_face_axes(rhs, out, k, dt, contact_norm, 1);
+            for i in 0..n {
+                *out.add(2 * i) = 0.5 * (*out.add(2 * i) + *w.pressure.add(i));
+                *out.add(2 * i + 1) = 0.5 * (*out.add(2 * i + 1) + *w.trial.add(i));
             }
         }
     }
@@ -563,7 +638,17 @@ impl Film {
         if lines && !warm && !self.factor_planar_lines(k, dt, contact_norm) {
             return false;
         }
-        self.precondition_planar(work.residual, work.direction, lines);
+        // At this stiffness the diagonal scale times roundoff reaches the pressure residual target.
+        let coupled = lines && (0..len).any(|i| *work.diagonal.add(i) < f64::EPSILON * 1e11);
+        self.precondition_planar(
+            work.residual,
+            work.direction,
+            k,
+            dt,
+            contact_norm,
+            lines,
+            coupled,
+        );
         // PCG on the original face operator with a block for each row or column.
         let mut rz = dot(work.residual, work.direction, len);
         for _ in 0..len {
@@ -580,7 +665,7 @@ impl Film {
             if dot(work.residual, work.residual, len) <= tolerance2 {
                 return true;
             }
-            self.precondition_planar(work.residual, work.z, lines);
+            self.precondition_planar(work.residual, work.z, k, dt, contact_norm, lines, coupled);
             let next_rz = dot(work.residual, work.z, len);
             let beta = next_rz / rz;
             rz = next_rz;

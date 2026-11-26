@@ -4694,6 +4694,12 @@ Check positive depths, volume, downhill first moment and exact replay. Independe
 17 × 12 patch checks decay `1 / (1 + dt M σ (λx + λy)^2)` for the product of discrete
 horizontal and vertical cosines. The cap test has authored geometry, forcing and contact
 angles and checks convergence.
+
+Run the same file with `--test-name-pattern="strongly coupled pressure"` for the higher
+stiffness water cap. It uses the same radial profile with 20 μL excess volume over a
+20 μm precursor. Advance a level 24 × 24 patch and an inclined 16 × 16 patch with
+contact-angle hysteresis for two ticks each. Test finite positive depth, volume,
+and the direction of the first moment. This exercises the full solver at its normal physics tick.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
 ### FLUID-07 measured inclined film

@@ -15580,7 +15580,10 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   principal five-band blocks along each grid axis with Cholesky factorization. The
   capillary contribution coupling consecutive faces contains the shared cell's grid
   degree plus two, and their second-neighbour coupling comes from one Laplacian edge.
-  The remaining couplings are applied by the full operator at every iteration.
+  The remaining couplings are applied by the full operator at every iteration. For strong
+  stiffness, two opposite symmetric block Gauss–Seidel sweeps include the perpendicular
+  coupling inside the preconditioner as well. Each sweep is a positive factorization of
+  an approximate block matrix. Their mean remains positive and weights both axes equally.
   [Author preprint](https://arxiv.org/abs/1307.2036)
 - Shuo Zhang and Jinchao Xu, “Optimal solvers for fourth-order PDEs discretized on
   unstructured grids” (2014), section 2. Their analysis distinguishes the eigenvalue
