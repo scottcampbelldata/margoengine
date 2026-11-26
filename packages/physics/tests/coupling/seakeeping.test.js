@@ -2,7 +2,9 @@
 // a regular wave, held to the harness (the same state at 24, 30 and 60 frames a second, a seek equal to a continuous run),
 // the load reaching the hull it names, and a box let go above its draft heaving at the period its buoyancy gives it.
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { hostMath } from '../../../../scripts/check-pinned-math.mjs';
 import { Physics } from '../../dist/index.js';
 import {
   GRAVITY,
@@ -1064,6 +1066,11 @@ test('HullSolver infers its forward course through the mean current while retain
   const throughGround = held(0.25, 1);
   assert.ok(Math.abs(predicted[1] - throughGround[1]) > 5 && Math.abs(predicted[3] - throughGround[3]) > 1);
   assert.deepEqual(held(1, undefined), held(1, 0), 'a hull that drifts with the tide has zero advective course');
+});
+
+test('HullSolver short-wave reflection uses pinned operations in the force helper', () => {
+  const source = readFileSync(new URL('../../src/seakeeping/wave-reflection.ts', import.meta.url), 'utf8');
+  assert.deepEqual(hostMath(source), []);
 });
 
 test('HullSolver short-wave reflection loads the wetted bow in the rigid force port', () => {

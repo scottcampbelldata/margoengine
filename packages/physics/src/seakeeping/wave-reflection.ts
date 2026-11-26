@@ -64,7 +64,10 @@ export function reflectingWaterline({ vertices, indices }: HullMesh, height: num
 
 /** Ursell's squared wall reflectance in Kuroda et al. (2008), with x = encounter wavenumber times draft. */
 export function wallReflectance(x: number): number {
-  if (x < 1e-6) return (Math.PI * Math.PI * x ** 4) / 4;
+  if (x < 1e-6) {
+    const leading = (Math.PI * x * x) / 2;
+    return leading * leading;
+  }
   if (x >= 12) return 1;
   const xSquared = 0.25 * x * x;
   // DLMF 10.25.2 and 10.31.1 share the I1 terms. The integer arguments of

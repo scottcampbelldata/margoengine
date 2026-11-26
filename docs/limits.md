@@ -10393,7 +10393,7 @@ The independent Wigley tank comparison at 25 mm grid spacing gives 31.5 and 33.0
 
 `Hull.shortWaveResistance` defaults to false. It uses the mean reference waterline, a projected bow or stern incidence, the absolute forward Froude number and a linear spectral energy sum. It supplies a horizontal axial force through the body centre. Its wall-sided reflection approximation leaves motion-induced head-wave drag, nonlinear breaking and pressure distribution along the hull outside its scope. The conventional speed curve was measured at `λ/L = 0.3`, and finite-depth, large-Froude and strongly following sea extensions are unqualified. The hull must be surface-piercing and the supplied sea must expose spectral wave components.
 
-The short-wave seakeeping entry is 32,716 B gzip with a 33,698 B ceiling. Core and Stage gain zero bytes.
+The short-wave seakeeping entry is 32,715 B gzip with a 33,698 B ceiling. Core and Stage gain zero bytes.
 
 ## Points on a deforming mesh (animation/deformed-points, 2026-11-26)
 
