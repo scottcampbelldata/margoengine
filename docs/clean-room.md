@@ -14229,3 +14229,12 @@ The marine output uses the exact geometric difference of consecutive occupied su
   railways* (2020), records the experimental association of detachment and powered arcing.
   The documented option emits a brief visual event after mechanically measured contact loss.
   [Dataset](https://pmc.ncbi.nlm.nih.gov/articles/PMC7378579/)
+
+## Watertight inside test of a closed mesh (KB-SOFT-HOLLOWBOX1)
+
+`packages/physics/src/soft-volume.ts`, `insideMesh` and `side`: a point is inside a closed mesh when a ray along +x crosses an odd number of triangles, each triangle tested by the sign of the point against its three edges seen along the ray.
+
+- Sven Woop, Carsten Benthin and Ingo Wald, [*Watertight Ray/Triangle Intersection*](https://jcgt.org/published/0002/01/05/), Journal of Computer Graphics Techniques 2(1), 2013. The edge of two triangles is measured in one fixed direction so they get exactly opposite answers, and no ray passes between them.
+- Herbert Edelsbrunner and Ernst Peter Muecke, [*Simulation of Simplicity: A Technique to Cope with Degenerate Cases in Geometric Algorithms*](https://doi.org/10.1145/77635.77639), ACM Transactions on Graphics 9(1), 1990. A ray exactly on an edge is moved by (d, d squared) in (y, z) for a vanishing d, so it lies on one side of every edge it touches.
+
+The implementation was written from the papers.
