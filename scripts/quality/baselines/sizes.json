@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19476527,
+  "total": 19483202,
   "history": [
     {
       "date": "2026-10-24",
@@ -12747,6 +12747,12 @@
       "commit": "fix(physics) deck water added mass",
       "reason": "physics/flip 8,443 to 9,163 B gzip (this Mac): DeckWaterSolver carries its deck water as rigid added mass in an implicit 6 by 6 solve (the water's mass, first moment and inertia about the hull's centre), so water heavier than its hull no longer diverges. The solve and its two small helpers are the hull solver's scheme; importing seakeeping for them would load far more.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "52421d6d09",
+      "reason": "LIFE-02: 6419 B gzip for the optional limbless and legged locomotion entry and its terrain and contact ports. Core and stage add zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13566,6 +13572,7 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
+    "@margoengine/physics/locomotion": 6675,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
