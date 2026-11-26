@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Girder-triggered flooding (BREAK-03 / SEA-10, 2026-11-26). A strained seam releases two floating
+  hull pieces and opens a compartment. The first inflow falls within independently derived
+  hydrostatic bounds, the water adds draft against a control with the same fracture, and replay
+  matches the original state. [Reproduce](reproduce.md#break-03-breakable-girder-seam)
 - Breakable girder seam (BREAK-03, 2026-11-26). Two rigid parts exchange a bending couple and
   off-axis point impulse that match the analytical elastic section and point mobility. Applied
   differential torques release the seam at the authored strain. The restored state repeats

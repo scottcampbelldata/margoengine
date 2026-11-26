@@ -15267,6 +15267,14 @@ mobility. Both reactions are reciprocal. The tensile limit releases both.
 [Crisfield (1990)](https://doi.org/10.1016/0045-7825(90)90106-V)
 [Kugelstadt and Schömer (2016)](https://diglib.eg.org/items/eb5dd4ac-529c-4d6b-86ab-454cec714272)
 
+The fracture flag can release a connected compartment opening. Its fixed aperture enters
+the existing pressure-head flooding model in the same tick. Hendrik Dankowski's “A Fast
+and Explicit Method for Simulating Flooding and Sinkage Scenarios of Ships” (2013) describes
+the compartment connection and hydrostatic head. The coupled test bounds the first inflow
+using the dry orifice's Bernoulli discharge above and the maximum air and floodwater head
+that one step could build below. The control repeats the same fracture with its aperture shut.
+[Dankowski (2013)](https://tore.tuhh.de/entities/publication/c9f6ab74-3ae3-4dae-8aa1-ff7bf96a86b2)
+
 Manuel Stein, “Loads and Deformations of Buckled Rectangular Plates” (1959), NASA TR R-40, Eqs. 1–3
 and Fig. 1, gives the von Kármán plate equations and longitudinal mode selection. Pai C. Hu, Eugene
 E. Lundquist and S. B. Batdorf, “Effect of Small Deviations from Flatness on Effective Width and

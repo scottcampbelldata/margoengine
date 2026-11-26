@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { GirderJointSolver } from '../../dist/crush.js';
 import { Physics } from '../../dist/index.js';
-import { PhysicsWorld, RigidSolver, worldMemory } from '../../dist/world.js';
+import { ATMOSPHERE, HULL_BREACHES_FIELD, HULL_BREACH_WORDS, HullSolver } from '../../dist/seakeeping.js';
+import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 
 const zero = [0, 0, 0];
 const step = 1 / 60;
@@ -185,6 +186,151 @@ test('a differential load bends and releases two freely integrated hull parts', 
     world.advance(frame + 5);
     assert.ok(bothSpin() < before, 'after release the external torques rotate independent rigid bodies');
     assert.equal(seam.read(0).bendingMoment, 0);
+  } finally {
+    physics.dispose();
+  }
+});
+
+async function floatingPair(girderJoint = 0, connected = true) {
+  await Physics.load({ threads: false });
+  const gravity = [0, -9.81, 0];
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+  const physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: step });
+  const size = 0.2;
+  const mesh = {
+    vertices: Float64Array.from(
+      [-1, -1, -1, 1, -1, -1, 1, 1, -1, -1, 1, -1, -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1],
+      (value) => value * size,
+    ),
+    indices: Uint32Array.from([
+      0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2,
+    ]),
+  };
+  const capacity = physics.kernel.capacity;
+  const makeBody = (x) =>
+    physics.addBody(null, {
+      position: [x, 0.1, 0],
+      colliders: { shape: 'box', halfExtents: [size, size, size], mass: 16, sensor: true },
+    });
+  const a = makeBody(-size);
+  const b = makeBody(size);
+  const seam = new GirderJointSolver();
+  const hull = new HullSolver('hull', undefined, undefined, connected ? seam.seamField : undefined);
+  const width = 0.02;
+  const discharge = 0.6;
+  world.add(new RigidSolver(), { physics, capacity });
+  world.add(seam, {
+    bodyCapacity: capacity,
+    joints: [
+      {
+        first: { body: a.row, anchor: [size, 0, 0] },
+        second: { body: b.row, anchor: [-size, 0, 0] },
+        axis: [0, 0, 1],
+        gaugeLength,
+        anchorStiffness,
+        failureStrain,
+        fibers,
+      },
+    ],
+  });
+  world.add(hull, {
+    hulls: [
+      {
+        row: a.row,
+        mesh,
+        compartments: [{ mesh, permeability: 1 }],
+        openings: [
+          {
+            from: 0,
+            to: 'outside',
+            centre: [0, -size, 0],
+            normal: [0, -1, 0],
+            width,
+            height: width,
+            discharge,
+            girderJoint: connected ? girderJoint : undefined,
+            opens: connected ? undefined : Infinity,
+          },
+        ],
+      },
+      { row: b.row, mesh },
+    ],
+    sea: { density: 1000, elevation: () => 0, pressure: (_x, y) => Math.max(0, -9810 * y) },
+    gravity,
+    addedMass: false,
+    radiation: false,
+    drag: false,
+    rollDamping: false,
+  });
+  world.couple(['rigid', seam.id, hull.id], 'staggered');
+  const opening = () => {
+    const port = world.fields.port(HULL_BREACHES_FIELD.name);
+    const values = regionWords(world.memory, port.region);
+    assert.equal(values[0], 1);
+    return Array.from(values.slice(1, 1 + HULL_BREACH_WORDS));
+  };
+  return { physics, world, seam, a, b, opening, discharge, size, width };
+}
+
+test('an actual girder break latches a native flooding aperture and carries water into the hull', async () => {
+  const { physics, world, seam, a, b, opening, discharge, size, width } = await floatingPair();
+  const angle = (radians) => [0, 0, Math.sin(radians / 2), Math.cos(radians / 2)];
+  try {
+    world.advance(1);
+    const saved = world.takeSnapshot();
+    const partial = () => {
+      b.setRotation(angle(0.12));
+      world.advance(2);
+      assert.ok(seam.read(0).peakTension > 0);
+      assert.equal(seam.read(0).broken, false);
+      assert.equal(opening()[8], 0);
+      assert.equal(opening()[9], 0);
+    };
+    const broken = () => {
+      partial();
+      b.setRotation(angle(0.36));
+      world.advance(3);
+      assert.equal(seam.read(0).broken, true);
+      const record = opening();
+      near(record[8], width ** 2);
+      const head = record[14];
+      const initial = discharge * width ** 2 * Math.sqrt(2 * 9.81 * head);
+      const volume = initial * step;
+      const backHead = volume / (2 * size) ** 2 + (ATMOSPHERE * volume) / (9810 * ((2 * size) ** 3 - volume));
+      const minimum = initial * Math.sqrt((head - backHead) / head);
+      const inflow = -record[9];
+      assert.ok(inflow >= minimum && inflow <= initial, `expected ${minimum} to ${initial}, got ${inflow}`);
+      world.advance(65);
+      assert.ok(opening()[9] < 0);
+      return a.position[1];
+    };
+    const wet = broken();
+    const hash = world.hash();
+    world.restoreSnapshot(saved.bytes);
+    assert.equal(broken(), wet);
+    assert.equal(world.hash(), hash);
+    const control = await floatingPair(0, false);
+    try {
+      control.world.advance(1);
+      control.b.setRotation(angle(0.12));
+      control.world.advance(2);
+      control.b.setRotation(angle(0.36));
+      control.world.advance(65);
+      assert.equal(control.seam.read(0).broken, true);
+      assert.ok(wet < control.a.position[1], 'the retained water increases the draft after the same break');
+      assert.equal(control.opening()[9], 0);
+    } finally {
+      control.physics.dispose();
+    }
+  } finally {
+    physics.dispose();
+  }
+});
+
+test('a hull opening must name a seam row in its connected field', async () => {
+  const { physics, world } = await floatingPair(2);
+  try {
+    assert.throws(() => world.advance(2), { code: 'state', message: /girderJoint within the connected seam port/ });
   } finally {
     physics.dispose();
   }

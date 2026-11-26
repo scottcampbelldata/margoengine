@@ -5121,6 +5121,54 @@ world.advance(60);
 if (!seam.read(0).broken) throw new Error('Expected the girder seam to release under differential bending');
 ```
 
+Pass `GirderJointSolver.seamField` as the fourth argument to `HullSolver` and give the compartment
+opening a zero-based `girderJoint` index. The authored rectangle starts shut and opens permanently
+when that seam releases. Each rigid half can carry its own watertight mesh and compartments.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { GirderJointSolver } from '@margoengine/physics/crush';
+import { HULL_BREACHES_FIELD, HullSolver } from '@margoengine/physics/seakeeping';
+import { PhysicsWorld, RigidSolver, regionWords, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, -9.81, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity });
+const mesh = {
+  vertices: [-1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1, -1,-1,1, 1,-1,1, 1,1,1, -1,1,1].map(v => 0.2 * v),
+  indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,4,7, 0,7,3, 1,2,6, 1,6,5, 0,1,5, 0,5,4, 3,7,6, 3,6,2],
+};
+const makeHalf = (x: number) => physics.addBody(null, {
+  position: [x, 0.1, 0], colliders: { shape: 'box', halfExtents: [0.2, 0.2, 0.2], mass: 16, sensor: true },
+});
+const fore = makeHalf(-0.2);
+const aft = makeHalf(0.2);
+const seam = new GirderJointSolver();
+const hull = new HullSolver('hull', undefined, undefined, seam.seamField);
+const bodyCapacity = physics.kernel.capacity;
+const curve = [{ strain: -0.2, stress: -400 }, { strain: 0, stress: 0 }, { strain: 0.2, stress: 400 }];
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(seam, { bodyCapacity, joints: [{
+  first: { body: fore.row, anchor: [0.2, 0, 0] }, second: { body: aft.row, anchor: [-0.2, 0, 0] },
+  axis: [0, 0, 1], gaugeLength: 0.6, anchorStiffness: 900, failureStrain: 0.045,
+  fibers: [-0.1, 0.1].map(offset => ({ offset, area: 0.01, curve })),
+}] });
+world.add(hull, { hulls: [
+  { row: fore.row, mesh, compartments: [{ mesh, permeability: 1 }], openings: [{
+    from: 0, to: 'outside', centre: [0, -0.2, 0], normal: [0, -1, 0], width: 0.02, height: 0.02, girderJoint: 0,
+  }] },
+  { row: aft.row, mesh },
+], sea: { elevation: () => 0 }, gravity, addedMass: false, radiation: false });
+world.couple(['rigid', seam.id, hull.id], 'staggered');
+world.advance(1);
+aft.setRotation([0, 0, Math.sin(0.18), Math.cos(0.18)]);
+world.advance(4);
+const port = world.fields.port(HULL_BREACHES_FIELD.name);
+if (!port || !seam.read(0).broken || regionWords(world.memory, port.region)[10]! >= 0)
+  throw new Error('Expected water to enter the fractured fore compartment');
+```
+
 Use `resolvePlateBuckling` for the first elastic mode of a simply supported rectangular plate.
 Specify dimensions, Young's modulus, Poisson's ratio (default `0.3`) and a signed initial crest
 (default `0`, in metres). Pass the end shortening in metres. Optional rest-plane XY pairs

@@ -107,6 +107,8 @@ export interface Opening {
   readonly collapse?: number;
   /** Keep shut by default until this zero-based CrushSolver patch loses its seal. */
   readonly crushPatch?: number;
+  /** Keep shut by default until this zero-based GirderJointSolver joint releases. */
+  readonly girderJoint?: number;
 }
 
 /** f64 words of a compartment's state: its water (m^3), its air (kg) and its cargo left (kg). */
@@ -440,7 +442,9 @@ export class Flooding {
       if (!(cd > 0 && cd <= 1))
         throw new RangeError(`Opening ${i}'s discharge coefficient is ${cd}; pass one above 0, at most 1.`);
       const collapse = o.collapse ?? Infinity,
-        opens = o.opens ?? (o.collapse === undefined && o.crushPatch === undefined ? 0 : Infinity),
+        opens =
+          o.opens ??
+          (o.collapse === undefined && o.crushPatch === undefined && o.girderJoint === undefined ? 0 : Infinity),
         closes = o.closes ?? Infinity;
       if (!(collapse > 0) || Number.isNaN(opens) || Number.isNaN(closes))
         throw new RangeError(
