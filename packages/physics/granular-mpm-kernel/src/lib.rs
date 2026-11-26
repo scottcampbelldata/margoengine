@@ -219,7 +219,8 @@ unsafe extern "C" fn mpm_move(
         let Some(trial) = Spectrum::of(deformation) else {
             return -3;
         };
-        let (elastic, plastic) = at(materials, point.material as usize).project(&trial);
+        let (elastic, plastic) =
+            at(materials, point.material as usize).project(&trial, point.plastic, dt);
         *candidate = Point {
             position,
             velocity,

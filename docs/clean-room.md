@@ -15150,10 +15150,20 @@ varying for fragment points, and cullers that leave row-indexed materials in pla
   stress, compression and stretch limits on the principal elastic stretches,
   and the determinant ratio for plastic hardening.
 - Sachith Dunatunga and Ken Kamrin, [*Continuum modelling and simulation of granular flows
-  through their many phases*](https://doi.org/10.1017/jfm.2015.383) (2015), sections 2
-  and 4. The rate-dependent friction law distinguishes static and fast flow on an
-  inclined plane. The initial kernel uses the rate-independent return above. This
-  source defines a separate inertial-flow validation target.
+  through their many phases*](https://doi.org/10.1017/jfm.2015.383) (2015), sections 2,
+  3.2 and 4.4, and Pierre Jop, Yoël Forterre and Olivier Pouliquen,
+  [*A constitutive law for dense granular flows*](https://doi.org/10.1038/nature04801)
+  (2006), equation 2 and Figure 1. Use `I = d γ̇ₚ / sqrt(p/ρg)` and
+  `μ(I) = μs + (μ2 − μs) I / (I0 + I)`. In the finite-strain adaptation, the
+  Hencky elastic trace fixes pressure during plastic return. Kirchhoff pressure
+  and shear have the same stress ratio as Cauchy pressure and shear. Divide
+  Kirchhoff pressure by the full point volume ratio before evaluating `I`.
+  Equations 25–29 give a quadratic for the updated shear. Shifting by the
+  static yield `μs p` gives `x² − (a + b + c)x + ab = 0`, with `a` the trial
+  excess, `b` the friction interval times pressure, and `c` the stress scale
+  corresponding to `I0`. The scaled, rationalized smaller root is evaluated
+  on loaded grains. The independent one-point oracle substitutes the realized
+  shear and plastic rate into the original law and checks volume and restart.
 
 The one-point manufactured tests evaluate the exact spline stress update followed by
 the independent sand and snow returns. Free-fall uses the semi-implicit Euler
@@ -15169,6 +15179,14 @@ and linear-position moments of a cube exact. This regular midpoint quadrature
 uses the known voxel volume. The simulations in section 5.7 initialize positions
 with Poisson disk sampling. The source cells are removed after registration and
 all edits are applied before notifying voxel observers.
+
+Éric Lajeunesse, Anne Mangeney-Castelnau and Jean-Paul Vilotte,
+[*Spreading of a granular mass on a horizontal plane*](https://doi.org/10.1063/1.1736611)
+(2004), Figure 3, reports independent axisymmetric deposit profiles. The first
+untuned comparison uses their low-aspect-ratio geometry and mass with the Jop
+friction coefficients. It remains outside the observed central height at the
+12 mm grid resolution. The manufactured constitutive test establishes the
+implicit constitutive relation. Measured pile reconstruction remains open.
 
 The shallow-layer output projects each particle's current volume
 `V₀ det(F_E) det(F_P)` onto the three vertices of the existing terrain triangle.

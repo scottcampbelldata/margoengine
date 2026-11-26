@@ -4332,6 +4332,11 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+The optional EARTH-01 granular kernel has an implicit rate-dependent shear return
+for dense dry material. A manufactured trial stress checks the realized friction,
+plastic incompressibility and exact replay in plain and shared Wasm memory. The
+held-out glass-bead collapse still needs a converged pile-height comparison.
+
 The optional SOFT-03 strand solver runs its rod and follow-the-leader constraints in a
 Rust SIMD module that imports the world's memory. Centreline and material-frame rows use
 the world's clock, region allocator and snapshot path. A fixed-camera fixture exercises

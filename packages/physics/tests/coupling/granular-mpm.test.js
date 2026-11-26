@@ -175,6 +175,78 @@ test('the snow material clamps elastic snow stretches and retains the rejected c
   assert.ok(solver.sample(0).logPlasticVolume < 0);
 });
 
+test('the implicit inertial return satisfies the final shear law and conserves volume on both memories', async () => {
+  const dt = 1 / 60;
+  const young = 1000;
+  const bulkDensity = 1600;
+  const poisson = 0.2;
+  const shear = young / (2 * (1 + poisson));
+  const bulk = young / (3 * (1 - 2 * poisson));
+  const grainDensity = 2500;
+  const staticFriction = 0.38;
+  const highRateFriction = 0.64;
+  const referenceInertialNumber = 0.28;
+  const original = [-0.07, -0.011, 0.026];
+  const originalTrace = original.reduce((sum, value) => sum + value, 0);
+  const priorPlastic = 0.004;
+  const trial = original.map((strain) => {
+    const stress = 2 * shear * (strain - originalTrace / 3) + bulk * originalTrace;
+    const stretch = Math.exp(strain) * (1 - (4 * stress * dt * dt) / bulkDensity);
+    return Math.log(stretch);
+  });
+  const trace = trial.reduce((sum, strain) => sum + strain, 0);
+  const pressure = -bulk * trace;
+  const actualPressure = pressure / Math.exp(trace + priorPlastic);
+  const equivalentShear = (strains) => {
+    const mean = strains.reduce((sum, value) => sum + value, 0) / 3;
+    return Math.SQRT2 * shear * Math.hypot(...strains.map((strain) => strain - mean));
+  };
+  const trialShear = equivalentShear(trial);
+  const strainTolerance = 4096 * Number.EPSILON;
+  const run = async (grainDiameter, shared) => {
+    const inertial = { grainDiameter, grainDensity, staticFriction, highRateFriction, referenceInertialNumber };
+    const { world, solver } = await attach(
+      [{ position: zero, volume: 0.04 }],
+      { spacing: 1, rate: 0, materials: [{ young, density: bulkDensity, poisson, inertial }] },
+      zero,
+      shared,
+    );
+    const [port] = solver.exportPorts(0);
+    const data = regionWords(world.memory, port.region);
+    for (const [index, strain] of original.entries()) data[15 + 4 * index] = Math.exp(strain);
+    data[26] = priorPlastic;
+    const snapshot = world.takeSnapshot();
+    world.advance(1);
+    const after = regionWords(world.memory, port.region);
+    const logStretch = [15, 19, 23].map((index) => Math.log(after[index]));
+    const correctedShear = equivalentShear(logStretch);
+    const plasticShearRate = (trialShear - correctedShear) / (shear * dt);
+    const number = (plasticShearRate * grainDiameter) / Math.sqrt(actualPressure / grainDensity);
+    const friction =
+      staticFriction + ((highRateFriction - staticFriction) * number) / (referenceInertialNumber + number);
+    assert.ok(plasticShearRate > 0);
+    assert.ok(pressure * staticFriction < correctedShear && correctedShear < pressure * highRateFriction);
+    near(correctedShear, pressure * friction, strainTolerance * 2 * shear);
+    near(
+      logStretch.reduce((sum, value) => sum + value, 0),
+      trace,
+      strainTolerance,
+    );
+    near(solver.sample(0).logPlasticVolume, priorPlastic, strainTolerance);
+    assert.equal(solver.sample(0).mass, 64);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(1);
+    assert.equal(world.hash(), hash);
+    return { correctedShear, hash };
+  };
+  const fine = await run(0.00035, false);
+  const gravel = await run(0.042, false);
+  assert.deepEqual(await run(0.00035, true), fine);
+  assert.deepEqual(await run(0.042, true), gravel);
+  assert.ok(gravel.correctedShear > fine.correctedShear);
+});
+
 test('the granular contact shot is independent of the presentation frame rate', async () => {
   const points = block([-0.08, 0.28, -0.04], 0.04, [3, 4, 2]);
   const solvers = await Promise.all([0, 1, 2].map(() => GranularMpmSolver.load()));

@@ -15,6 +15,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   The browser fixture observes the stiffer skin change the whole native surface. Run
   `packages/physics/tests/coupling/tissue-layers.test.js` and `packages/physics/tests/tissue.browser.mjs`.
 
+- Dense granular friction (EARTH-01, 2026-11-26). The implicit rate-dependent
+  return matches the constitutive relation for two grain diameters while
+  preserving the point mass and compressed volume. Both memory modes replay
+  identically. Run `packages/physics/tests/coupling/granular-mpm.test.js`.
+  The independent pile-height comparison remains open.
+
 - Skeletal tissue boundary (SOFT-05, 2026-11-26). A real kinematic bone translates and rotates a tetrahedral
   insertion through the rigid bodies field. The sliding variant matches the small-extension normal solution
   and produces the same particle positions under an additional 0.5 m tangential shift. An independent world

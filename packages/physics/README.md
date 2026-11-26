@@ -5147,6 +5147,31 @@ zero cohesion. Snow defaults to 400 kg/m³, 140 kPa and the same Poisson ratio,
 with 2.5% compressive yield, 0.75% tensile yield and a hardening coefficient of 10.
 Supply measured material parameters where available. The defaults are illustrative.
 
+For dense dry grains with a measured rate-dependent friction curve, supply
+`materials[].inertial`. It takes the grain diameter and true grain density, the
+low- and high-rate stress ratios, and the reference inertial number. This uses
+implicit μ(I) shear friction in place of the static `frictionAngle`. Use zero
+cohesion for this material. The example uses the glass-bead friction curve from
+[Jop, Forterre and Pouliquen (2006), Figure 1](https://doi.org/10.1038/nature04801).
+
+```ts
+import { GranularMpmSolver } from '@margoengine/physics/granular-mpm';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grains = await GranularMpmSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(grains, {
+  points: [{ position: [0, 0.2, 0], volume: 0.000064 }],
+  materials: [{ inertial: {
+    grainDiameter: 0.00053, grainDensity: 2500,
+    staticFriction: 0.3819, highRateFriction: 0.6435, referenceInertialNumber: 0.279,
+  } }],
+  floor: 0,
+});
+world.advance(6);
+console.log(grains.sample(0).position); // the material point falls in metres
+```
+
 The grid spacing defaults to 0.08 m and APIC retains local affine motion. Set
 `transfer: 'pic'` for the more dissipative profile. A caller can set a dyadic clock
 `rate`; otherwise the solver chooses a level from the initial material stiffness,

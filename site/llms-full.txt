@@ -14608,8 +14608,8 @@ changed 3,771 pixels and dropped the tracked point 0.2205 m on both WebGPU and
 WebGL2. Plain, shared and restored state hash to `032e9f9a1ed80ade`. The sparse
 grid visits only the occupied nodes, with storage sized for the maximum support
 of the input points. The kernel uses one deterministic scatter and gather order.
-The optional JavaScript entry is 5,961 B gzip against a 6,217 B budget. The
-plain and shared native assets are each 16,082 B raw and 6,348 B gzip.
+The optional JavaScript entry is 6,162 B gzip against a 6,217 B budget. Both
+native assets are 16,409 B raw, at 6,501 B gzip for plain memory and 6,502 B for shared memory.
 Core and Stage gain zero bytes.
 
 The optional layer projection deposits each material point's current volume on
@@ -14620,12 +14620,21 @@ bedrock. The projection represents the volume in each ground column, including
 particles above its surface. Use it for a shallow layer. Separating suspended
 material and reconstructing overhangs need a different output.
 
-The first increment covers dry or cohesive granular material and snow. The BB-7 reference fixture now drives the live bed with the actual pectoral wake.
+The optional dense dry sand profile uses an implicit μ(I) friction return.
+This requires material-specific grain properties and a stress-ratio curve.
+The manufactured test verifies the friction relation and unchanged compressed
+volume in both memory modes. At 12 mm grid spacing, the untuned Lajeunesse et al.
+Figure 3(a) pilot reached a central sample height of 0.464 initial radii at 0.65 s.
+Their deposit retains the initial central height near 0.56 radii. The unresolved
+height difference and the lack of a steady-incline comparison keep independent
+validation open. Dilute collisional granular flow needs a separate constitutive law.
+
+The BB-7 reference fixture drives the live bed with the actual pectoral wake.
 At 45 frames the fin-on case cuts about 49.6 μm and raises an adjacent region by
 about 73.0 μm relative to the still-fin case. This is a reduced one-way bed-shear
 model. It tracks the received horizontal impulse and preserves each grain's mass.
 The field does not return unresolved water momentum or pore pressure. Explicit
-pore-water transport, reciprocal dynamic contact and measured inertial flow remain open.
+pore-water transport and reciprocal dynamic contact remain open.
 
 The voxel handoff samples complete solid cubes into a newly loaded solver at a
 world step boundary. The sum of reference volumes equals the original selected

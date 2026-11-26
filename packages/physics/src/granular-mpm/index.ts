@@ -22,7 +22,7 @@ import { GranularLayer, type LayerRaster } from './layer.js';
 import { GranularWake, type WakeKernel } from './wake.js';
 
 const GRID_WORDS = 6;
-const MODEL_WORDS = 8;
+const MODEL_WORDS = 11;
 const POINT_BYTES = 28 * 8;
 const ZERO: Vec3 = [0, 0, 0];
 const EYE = [1, 0, 0, 0, 1, 0, 0, 0, 1];
@@ -30,6 +30,20 @@ const EYE = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 export const GRANULAR_MPM_LAYOUT = 1;
 /** f64 values per material point. Position, velocity, two column-major tensors, mass, rest volume, log plastic volume, material index. */
 export const GRANULAR_MPM_WORDS = POINT_BYTES / 8;
+
+/** Dense, dry granular friction measured in an independent material test. */
+export interface GranularInertialRheology {
+  /** Characteristic grain diameter in metres. */
+  readonly grainDiameter: number;
+  /** True grain density in kg/m³. The material density describes the bulk packing. */
+  readonly grainDensity: number;
+  /** Low-rate stress ratio μs. */
+  readonly staticFriction: number;
+  /** High-rate stress ratio μ2, greater than staticFriction. */
+  readonly highRateFriction: number;
+  /** Inertial number at the midpoint of the two stress ratios. */
+  readonly referenceInertialNumber: number;
+}
 
 export interface GranularMaterial {
   /** Frictional granular continuum or cohesive compressible snow. Default 'sand'. */
@@ -44,6 +58,8 @@ export interface GranularMaterial {
   readonly frictionAngle?: number;
   /** Cohesion in Pa, default 0. Applies to sand. */
   readonly cohesion?: number;
+  /** Enable implicit μ(I) friction for dry sand. Omitting this uses rate-independent Drucker–Prager. */
+  readonly inertial?: GranularInertialRheology;
   /** Snow compression yield strain. Default 0.025. */
   readonly compressiveYield?: number;
   /** Snow tensile yield strain. Default 0.0075. */
@@ -181,6 +197,20 @@ function material(data: GranularMaterial) {
   const sine = sin(theta);
   const alpha = (Math.sqrt(2 / 3) * 2 * sine) / (3 - sine);
   const cohesion = inRange(data.cohesion ?? 0, 'cohesion', 0);
+  let inertialScale = 0;
+  let staticFriction = 0;
+  let frictionRange = 0;
+  if (data.inertial) {
+    if (snow || cohesion > 0) invalid('Use inertial friction on dry sand with zero cohesion.');
+    const settings = data.inertial;
+    const diameter = positive(settings.grainDiameter, 'grain diameter');
+    const grainDensity = positive(settings.grainDensity, 'grain density');
+    const reference = positive(settings.referenceInertialNumber, 'reference inertial number');
+    staticFriction = inRange(settings.staticFriction, 'static friction ratio', 0);
+    frictionRange = positive(settings.highRateFriction - staticFriction, 'increase in friction at high rates');
+    if (grainDensity < density) invalid('Use a true grain density at least as large as the bulk density.');
+    inertialScale = positive(reference / Math.sqrt(grainDensity) / diameter, 'inertial scale');
+  }
   const values = [
     shear,
     lambda,
@@ -190,6 +220,9 @@ function material(data: GranularMaterial) {
     inRange(data.compressiveYield ?? 0.025, 'compressive yield strain', 0, 0.99),
     inRange(data.tensileYield ?? 0.0075, 'tensile yield strain', 0),
     inRange(data.hardening ?? 10, 'hardening coefficient', 0),
+    staticFriction,
+    frictionRange,
+    inertialScale,
   ];
   return { values, density, speed: Math.sqrt((2 * shear + lambda) / density) };
 }
