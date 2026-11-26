@@ -252,7 +252,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
 | ATMO-06 | Airborne particle transport | stand-in | Open | OPEN |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
-| ATMO-08 | Fog and cold-air drainage | stand-in | Open | OPEN |
+| ATMO-08 | Fog and cold-air drainage | stand-in | Codex | BUILDING (codex/physics-atmo-08) |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | LANDED 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Open | OPEN |
