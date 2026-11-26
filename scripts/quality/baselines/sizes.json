@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20593298,
+  "total": 20594315,
   "history": [
     {
       "date": "2026-10-24",
@@ -13687,6 +13687,12 @@
       "commit": "805a3e1dda",
       "grew": 1,
       "reason": "SEA-15's live surface and depth-flow binding move physics/tracers from 7916 to 8246 B gzip. The optional ceiling rises from 8172 to 8502 B. Wave-following parcels share the existing motion update; a separate entry would duplicate parcel stepping and the mass ledger."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c5e9da4a40",
+      "grew": 1,
+      "reason": "SEA-08 bare-hull forward roll damping grows seakeeping from 25160 to 25505 B gzip. The Ikeda lift, friction and eddy terms reuse the hull geometry and the existing implicit roll impulse. A separate entry would repeat the hull setup or add another solver and load-fold connection. Core plus Stage remains 24846 B."
     }
   ],
   "items": {
@@ -14549,7 +14555,7 @@
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 8001,
-    "@margoengine/physics/seakeeping": 25254,
+    "@margoengine/physics/seakeeping": 26271,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 14951,

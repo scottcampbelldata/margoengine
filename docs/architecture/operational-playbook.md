@@ -10750,3 +10750,7 @@ The optional Rust SIMD kernel keeps depth, discharge and sampled bed in world-ow
 ### SEA-08 to SEA-04 waterplane flux
 
 An opted-in `HullSolver` writes signed waterplane volume at the same world rate as `WakeSolver` can read it. The producer ignores a fully submerged or dry hull. Its optional layout-1 source rows reside in the world arena and retain the public state on replay. One-way volume transport, pitch and roll dipoles, and propagation beyond the hull footprint have direct coupling cases.
+
+### SEA-08 forward-speed viscous roll
+
+`HullSolver` caches a bare hull's geometry-dependent forward roll coefficients from the same still-water stations as radiation. It uses the course's water-relative longitudinal speed in the lift, friction, and eddy terms before folding them through the existing angular impulse. The analytical torque comparison checks inferred speed and an explicit current-relative override. The production browser fixture checks the moving course hull and deformed wake on both backends.

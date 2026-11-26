@@ -40,6 +40,7 @@ import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/f
 import { type HullMemory, hullMemory, stillWaterline } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
+import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import {
   GRAVITY,
   type HullMesh,
@@ -56,7 +57,7 @@ import {
 export interface Hull {
   readonly row: number;
   readonly mesh: HullMesh;
-  /** Include ordinary-strip forward-speed terms in heave and pitch. Omit for the zero-speed radiation model. */
+  /** Enable forward-speed strip loads in heave and pitch and the bare-hull roll corrections. */
   readonly course?: HullCourse;
   /**
    * Its spaces that can flood (flooding.ts): closed meshes in the body's frame inside the hull, each with its permeability,
@@ -157,6 +158,7 @@ export const SEA_VISCOSITY = 1.19e-6;
 interface Roll {
   readonly eddy: number;
   readonly linear: number;
+  readonly forward?: ForwardRoll;
   readonly inertia: number;
   readonly own: number;
   readonly stiffness: number;
@@ -1282,9 +1284,22 @@ export class HullSolver implements Solver<HullParams> {
       roll = this.rollOf(hull, bodies, at, q, local, memory);
       this.rolls.set(hull, roll);
     }
-    const p = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0],
-      c = roll.eddy * Math.abs(p) + roll.linear,
-      moment = roll.inertia > 0 ? (-c * p) / (1 + (dt * c) / roll.inertia) : -c * p,
+    const p = rotate(conjugate, [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!])[0];
+    const course = this.course[this.hulls.indexOf(hull)];
+    let c = roll.eddy * Math.abs(p) + roll.linear;
+    if (course && roll.forward) {
+      const forward = rotate(q, [1, 0, 0]);
+      const horizontal = hypot(forward[0], forward[2]);
+      const seen = horizontal > 0 ? (bodies[at + 10]! * forward[0] + bodies[at + 12]! * forward[2]) / horizontal : 0;
+      const speed = Math.max(0, course.speed ?? seen);
+      const { liftPerSpeed, frictionPerSpeed, eddySpeed } = roll.forward;
+      const reduced = speed / eddySpeed;
+      c =
+        (roll.eddy * Math.abs(p)) / (1 + reduced * reduced) +
+        roll.linear * (1 + speed * frictionPerSpeed) +
+        speed * liftPerSpeed;
+    }
+    const moment = roll.inertia > 0 ? (-c * p) / (1 + (dt * c) / roll.inertia) : -c * p,
       m = rotate(q, [moment, 0, 0]);
     for (let k = 0; k < 3; k++) loads.torque[k]! += m[k]!;
   }
@@ -1334,6 +1349,7 @@ export class HullSolver implements Solver<HullParams> {
     return {
       eddy: memory.rollEddy,
       linear: memory.rollFriction * Math.sqrt(2 * Math.PI * this.viscosity * natural),
+      forward: hull.course ? forwardRollOf(memory, density, natural) : undefined,
       inertia,
       own,
       stiffness,

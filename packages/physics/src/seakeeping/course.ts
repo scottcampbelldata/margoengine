@@ -1,6 +1,6 @@
 import type { HullMemory } from './memory.js';
 
-/** A near-steady course for the vertical forward-speed terms of ordinary strip theory. */
+/** A near-steady course for forward-speed heave, pitch and viscous roll loads. */
 export interface HullCourse {
   /** Constant longitudinal water-relative speed, m/s. Default the hull's horizontal forward velocity. */
   readonly speed?: number;

@@ -6,6 +6,8 @@ import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import {
   GRAVITY,
+  hullMemory,
+  SEA_VISCOSITY,
   FORM_DRAG,
   HULL_BREACH_WORDS,
   HULL_BREACHES_FIELD,
@@ -555,6 +557,70 @@ test('HullSolver forward speed rejects a broad hull beyond its longitudinal rest
     })
     .couple(['hull', 'rigid'], 'staggered');
   assert.throws(() => world.advance(1), /ordinary-strip pitch stability range\. Use a speed below 1\.[0-9]+ m\/s/);
+});
+
+test('HullSolver forward speed roll follows the ITTC lift, friction and eddy terms', () => {
+  const [length, depth, breadth, draft] = [8, 1, 1.5, 0.5];
+  const mass = SEA_WATER * length * breadth * draft;
+  const mesh = boxMesh([length, depth, breadth]);
+  const p = 0.125;
+  const dt = 1 / 60;
+  const inertiaOwn = (mass * (depth ** 2 + breadth ** 2)) / 12;
+  const memory = hullMemory(mesh, mass, [0, 0, 0], SEA_WATER, dt);
+  const added = memory.lateralInfinite;
+  const inertia = inertiaOwn + added[21];
+  const gm = breadth ** 2 / (12 * draft) - draft / 2;
+  const frequency = Math.sqrt((mass * GRAVITY * gm) / inertia);
+  const friction = memory.rollFriction * Math.sqrt(2 * Math.PI * SEA_VISCOSITY * frequency);
+  const normalizedLift = (2 * Math.PI * draft) / length + 0.3 * ((4.1 * breadth) / length - 0.045);
+  // At this draft the centre of gravity is on the waterline. Eq. 33's lever bracket is one.
+  const lift = 0.5 * SEA_WATER * length * draft ** 3 * normalizedLift * 0.3 * 0.5;
+  const theorizedMoment = (speed) => {
+    const k = 0.04 * frequency * length;
+    const c =
+      (memory.rollEddy * p * k ** 2) / (speed ** 2 + k ** 2) +
+      friction * (1 + (4.1 * speed) / (frequency * length)) +
+      lift * speed;
+    return (-c * p) / (1 + (dt * c) / inertia);
+  };
+  const held = (velocity, course) => {
+    using physics = new Physics(null, { fixedTimestep: dt, substeps: 1 });
+    const body = physics.addBody(null, {
+      linearVelocity: [velocity, 0, 0],
+      angularVelocity: [p, 0, 0],
+      colliders: { shape: 'box', halfExtents: [length / 2, depth / 2, breadth / 2], mass },
+    });
+    const hull = new HullSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh, course }],
+        sea: { elevation: () => 0 },
+        greenWater: false,
+        slamming: false,
+        drag: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    world.advance(1);
+    const { region } = hull.exportPorts(1)[0];
+    const forces = new Float64Array(world.memory.buffer, region.byteOffset, region.byteLength / 8);
+    return forces[body.row * FORCE_WORDS + 3];
+  };
+  const still = held(0, { speed: 0 });
+  // Eliminate the freely coupled sway row of the added-mass solve, then compare the change in held torque.
+  const fold = inertiaOwn / (inertia - (added[15] * added[20]) / (mass + added[14]));
+  for (const [actual, speed] of [
+    [held(1, {}), 1],
+    [held(1.5, { speed: 1 }), 1],
+    [held(2, {}), 2],
+    [held(-1, {}), 0],
+  ]) {
+    const expected = fold * (theorizedMoment(speed) - theorizedMoment(0));
+    assert.ok(
+      Math.abs(actual - still - expected) < 1e-5 * Math.max(1, Math.abs(expected)),
+      'at ' + speed + ' m/s, held torque change ' + (actual - still) + ' against ' + expected,
+    );
+  }
 });
 
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {

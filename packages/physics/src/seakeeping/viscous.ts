@@ -9,9 +9,10 @@
 //   (T nu))^-0.5, so B = (4 / (3 pi)) (1.328 / sqrt 3.22) rho S r^2 sqrt(2 pi nu w), linear in the roll rate, taken at the
 //   hull's natural roll frequency (eq. 29's assumption). S and r are the section's wetted girth and the mean distance of its
 //   girth from the roll axis, integrated on its Lewis contour (Kato's regressions in S and r are for a whole ship's lines).
-// The wave component is the radiation's (radiation.ts, memory.ts), never counted twice. Forward speed (the lift component,
-// eq. 33, and the speed corrections, eqs. 41 and 45) and bilge keels (eqs. 47-55) are not here.
+// The wave component is the radiation's (radiation.ts, memory.ts). At forward speed the lift component (eq. 33),
+// skin friction (eq. 41), and eddy attenuation (eq. 45) are evaluated at the small-amplitude natural roll frequency.
 import { cos, exp, hypot, sin } from '@margoengine/math/pinned';
+import type { HullMemory } from './memory.js';
 import type { LewisForm } from './strips.js';
 
 /**
@@ -115,3 +116,44 @@ export function frictionGirth(form: LewisForm, pivot: number, points = 64): numb
 
 /** Kato's laminar skin-friction factor: B = FRICTION * rho * (S r^2) * sqrt(2 pi nu w). */
 export const FRICTION = ((4 / (3 * Math.PI)) * 1.328) / Math.sqrt(3.22);
+
+/** The geometry-dependent terms of the bare hull's forward-speed viscous roll damping. */
+export interface ForwardRoll {
+  readonly liftPerSpeed: number;
+  readonly frictionPerSpeed: number;
+  readonly eddySpeed: number;
+}
+
+export function forwardRollOf(memory: HullMemory, density: number, rollFrequency: number): ForwardRoll | undefined {
+  const first = memory.strips[0];
+  const last = memory.strips.at(-1);
+  if (!first || !last || !(rollFrequency > 0)) return;
+  const start = first.x - first.width / 2;
+  const end = last.x + last.width / 2;
+  const length = end - start;
+  const midships = (start + end) / 2;
+  let middle = first;
+  let breadth = 0;
+  let draft = 0;
+  for (const strip of memory.strips) {
+    const form = memory.stripForms[strip.form]!;
+    const { scale, a1, a3 } = form.lewis;
+    breadth = Math.max(breadth, form.breadth);
+    draft = Math.max(draft, scale * (1 - a1 + a3));
+    if (Math.abs(strip.x - midships) < Math.abs(middle.x - midships)) middle = strip;
+  }
+  if (!(length > 0 && draft > 0 && breadth > 0)) return;
+  const cm = (middle.heaveDepth * memory.stripForms[middle.form]!.breadth) / (breadth * draft);
+  const hullForm = cm <= 0.92 ? 0 : cm <= 0.97 ? 0.1 : 0.3;
+  const kn = Math.max(0, (2 * Math.PI * draft) / length + hullForm * ((4.1 * breadth) / length - 0.045));
+  const l0 = 0.3 * draft;
+  const lr = 0.5 * draft;
+  const og = memory.pivot;
+  const lever = 1 - (1.4 * og) / lr + (0.7 * og * og) / (l0 * lr);
+  const frequencyLength = rollFrequency * length;
+  return {
+    liftPerSpeed: 0.5 * density * length * draft * kn * l0 * lr * lever,
+    frictionPerSpeed: 4.1 / frequencyLength,
+    eddySpeed: 0.04 * frequencyLength,
+  };
+}

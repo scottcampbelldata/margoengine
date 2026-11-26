@@ -6152,3 +6152,7 @@ Forward-course heave and pitch amplitudes and phase agree with the ordinary-stri
 ### SEA-08 hull motion launches waves in SEA-04
 
 Heave, pitch and roll publish signed volume to the dispersive wake. The rectangular hull fixture transfers 0.0333333333 m³ from the first heave tick and produces reciprocal roll and pitch dipoles with zero net volume. A wave reaches a gauge outside the hull footprint, with exact plain and shared replay. The WebGPU and WebGL2 captures agree with the same wake at 1,362 vertices. The largest height and normal errors are 0.038% and 0.029% of the established f32 bounds, and the distant gauge reads 12.956 mm. The closure is linearized about the mean draft. Physical amplitudes and production film placement remain pending. See `packages/physics/tests/coupling/seakeeping.test.js`.
+
+### SEA-08 forward viscous roll terms
+
+The inferred and prescribed 1 m/s courses and an inferred 2 m/s course reproduce the published bare-hull forward-speed roll formulas in a rectangular control. The absolute differences in the held torque are below 0.00009 N m. A forward course with roll, heave and pitch publishes the same state on both browser backends at replay hash `0e4b9d11e73c4230`. Independent sustained roll-decay validation is pending.

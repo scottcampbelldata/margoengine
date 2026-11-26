@@ -19,7 +19,11 @@ import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 
 process.chdir(fileURLToPath(new URL('../../../', import.meta.url)));
-const hullMotion = process.argv.includes('--hull-motion');
+const motion = process.argv.includes('--forward-course')
+  ? 'course'
+  : process.argv.includes('--hull-motion')
+    ? 'hull'
+    : 'pressure';
 const browser = await openBrowser({ port: 'free', startPath: '/tests/modern-game.html' });
 const { page, hardware } = browser,
   errors = [];
@@ -29,7 +33,9 @@ page.on('console', (m) => {
 });
 try {
   console.log('adapter', JSON.stringify(hardware.webgpu), hardware.compat ? '(WebGL2 compatibility)' : '');
-  const result = await page.evaluate(async (hullMotion) => {
+  const result = await page.evaluate(async (motion) => {
+    const hullMotion = motion !== 'pressure';
+    const forwardCourse = motion === 'course';
     const { EngineKernel } = await import('/packages/core/dist/index.js');
     const { Water } = await import('/packages/water/dist/index.js');
     const { WaterWake } = await import('/packages/water/dist/wake.js');
@@ -68,7 +74,7 @@ try {
       const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
       const body = physics.addBody(null, {
         position: [0, 0.25, 0],
-        linearVelocity: [0, -0.5, 0],
+        linearVelocity: [forwardCourse ? 1 : 0, -0.5, 0],
         angularVelocity: [0.1, 0, 0.125],
         colliders: { shape: 'box', halfExtents: [2, 0.75, 1], mass: 4100 },
       });
@@ -83,7 +89,7 @@ try {
       world
         .add(new RigidSolver(), { physics })
         .add(hull, {
-          hulls: [{ row: body.row, mesh }],
+          hulls: [{ row: body.row, mesh, course: forwardCourse ? { speed: 1 } : undefined }],
           sea: { elevation: () => 0 },
           greenWater: false,
           slamming: false,
@@ -168,9 +174,9 @@ try {
       origin,
       error: error?.message ?? null,
     };
-  }, hullMotion);
+  }, motion);
   assert.equal(result.error, null);
-  if (hullMotion) {
+  if (motion !== 'pressure') {
     assert.ok(Math.abs(result.radiated) > 1e-4, 'the radiated wave reaches a distant gauge');
     console.log('Hull-and-wake replay', result.hash, 'distant gauge', result.radiated);
   }
