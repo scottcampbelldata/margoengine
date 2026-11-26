@@ -2,14 +2,15 @@ import { fitHorseHooves, poseHooves, type HorsePose, type HorseSkeleton } from '
 
 type PathFrame = { x: number; z: number; heading: number; bank?: number };
 type Point = [number, number];
-type Plant = { anchor?: Point; release?: { time: number; offset: Point } };
+type Release = { time: number; duration: number; offset: Point };
+type Plant = { anchor?: Point; release?: Release };
 
 const smooth = (u: number) => {
   const t = Math.min(1, Math.max(0, u));
   return t * t * (3 - 2 * t);
 };
 const slope = (rise: number, span: number) => Math.min(0.45, Math.max(-0.45, Math.atan2(rise, span)));
-const releaseWeight = (time: number, from: number) => 1 - smooth((time - from) / 0.18);
+const releaseWeight = (time: number, release: Release) => 1 - smooth((time - release.time) / release.duration);
 
 /** Evaluates the four contact points in world space and remembers plants between fixed steps. */
 export function horseGrounding(skeleton: HorseSkeleton, ground: (x: number, z: number) => number) {
@@ -25,7 +26,13 @@ export function horseGrounding(skeleton: HorseSkeleton, ground: (x: number, z: n
   const lateral = Math.max(skeleton.body.chestWidth, skeleton.body.hipWidth) * 0.55;
   const sample = (frame: PathFrame, x: number, z: number) => ground(...toWorld(frame, x, z));
 
-  const advance = (frame: PathFrame, time: number, support: readonly boolean[], readPose: () => HorsePose) => {
+  const advance = (
+    frame: PathFrame,
+    time: number,
+    support: readonly boolean[],
+    readPose: () => HorsePose,
+    swingDuration: number,
+  ) => {
     const changing = plants.some((plant, i) => Boolean(plant.anchor) !== support[i]);
     if (!changing) return;
     const pads = poseHooves(skeleton, readPose());
@@ -37,14 +44,20 @@ export function horseGrounding(skeleton: HorseSkeleton, ground: (x: number, z: n
       if (stance) {
         // A gait may change while a liftoff is still easing. Replant the position the viewer saw.
         if (plant.release) {
-          const weight = releaseWeight(time, plant.release.time);
+          const weight = releaseWeight(time, plant.release);
           current[0] += plant.release.offset[0] * weight;
           current[1] += plant.release.offset[1] * weight;
         }
         plant.anchor = current;
         plant.release = undefined;
       } else if (plant.anchor) {
-        plant.release = { time, offset: [plant.anchor[0] - current[0], plant.anchor[1] - current[1]] };
+        // Rejoin the moving swing target during the actual swing. A fixed release
+        // time briefly adds a second rapid protraction when the cadence changes.
+        plant.release = {
+          time,
+          duration: swingDuration,
+          offset: [plant.anchor[0] - current[0], plant.anchor[1] - current[1]],
+        };
         plant.anchor = undefined;
       }
     });
@@ -67,7 +80,7 @@ export function horseGrounding(skeleton: HorseSkeleton, ground: (x: number, z: n
         pad[0] = anchor[0];
         pad[1] = anchor[1];
       } else if (release) {
-        const ease = releaseWeight(time, release.time);
+        const ease = releaseWeight(time, release);
         pad[0] += release.offset[0] * ease;
         pad[1] += release.offset[1] * ease;
       }
