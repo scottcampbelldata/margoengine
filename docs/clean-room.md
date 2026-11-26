@@ -1,5 +1,31 @@
 # Clean room
 
+### Cyclone and compact-vortex forcing (ATMO-05)
+
+Greg J. Holland, “An Analytic Model of the Wind and Pressure Profiles in Hurricanes” (1980), gives the
+radial surface pressure and gradient balance. Willoughby, Darling and Rahn, “Parametric Representation
+of the Primary Hurricane Vortex, Part II” (2006), compares radial decay and secondary wind maxima.
+Margo keeps the existing pressure-balanced Holland profile and can include the existing Sky secondary
+eyewall. Compact vortices retain the combined Rankine or Burgers–Rott velocity and its integrated
+cyclostrophic pressure. The E1 pressure integral is shared with Sky. Fiedler and Rotunno (1986) and
+Orf et al. (2017) describe the vertical structure and nonaxisymmetric flow missing from a prescribed
+axisymmetric vortex. Margo adds a logarithmic surface profile and tapered vertical velocity.
+[Holland](https://impacts.ucar.edu/en/publications/an-analytic-model-of-the-wind-and-pressure-profiles-in-hurricanes/),
+[Willoughby et al.](https://doi.org/10.1175/MWR3106.1),
+[Fiedler and Rotunno](https://doi.org/10.1175/1520-0469(1986)043%3C2328:ATOTMW%3E2.0.CO;2),
+and [Orf et al.](https://doi.org/10.1175/BAMS-D-15-00073.1).
+
+John D. Holmes, “Trajectories of spheres in strong winds with application to wind-borne debris” (2004),
+supplies quadratic relative drag. The rigid adapter analytically averages that drag over a world
+tick with frozen wind and a fixed pressure lever. The surface-water source uses the pressure-gradient
+term from Luettich, Westerink and Scheffner's ADCIRC formulation (1992). Garratt (1977) supplies
+the linear 10 m drag fit and Donelan et al. (2004) motivate its saturation above 33 m/s. The plateau
+uses the value of the linear closure at the transition.
+[Holmes](https://doi.org/10.1016/j.jweia.2003.09.031),
+[ADCIRC](https://adcirc.org/home/documentation/adcirc-related-publications/),
+[Garratt](https://journals.ametsoc.org/view/journals/mwre/105/7/1520-0493_1977_105_0915_rodcoo_2_0_co_2.xml),
+and [Donelan et al.](https://doi.org/10.1029/2004GL019460).
+
 ### Seismic waves and ground shaking (EARTH-08)
 
 Jean Virieux, “P-SV wave propagation in heterogeneous media: Velocity-stress finite-difference method”

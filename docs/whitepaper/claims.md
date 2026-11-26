@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Cyclone and compact vortices (ATMO-05, 2026-11-26). The physical 10 m wind and pressure match the moving
+  Sky hurricane, including an eyewall above 60 m/s. Exact quadratic drag moves a rigid body. Pressure and
+  wind transfer momentum to a real shallow-water grid while its volume stays conserved, and the gale bends
+  a live pine. Run `node --test packages/physics/tests/coupling/vortices.test.js` after building.
+
 - Seismic waves (EARTH-08, 2026-11-26). Propagated P and SV waves match the closed-form discrete
   dispersion law. Reflected velocity adds at the free top, an elastic low-impedance layer amplifies the
   first arrival, and the ground field moves a real rigid body. The building response obeys the Newmark

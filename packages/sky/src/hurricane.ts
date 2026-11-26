@@ -40,6 +40,8 @@
 // - A. Vlachos, "Water flow in Portal 2", SIGGRAPH 2010 Advances in Real-Time Rendering: two texture phases advected by a
 //   flow field half a period apart and cross-faded, so the cloud turns with the wind without shearing apart.
 
+import { hollandDeficit, hollandGradient } from '../../shared/vortex-balance.js';
+
 /** {@link Hurricane} settings, read live. Lengths are metres, speeds metres per second, angles degrees unless named. */
 export interface HurricaneOptions {
   /** Storm centre at time 0, world `[x, z]`. Default [0, 0]. */
@@ -124,7 +126,7 @@ export interface HurricaneWind {
 export interface HurricaneWeather {
   /** How much of the storm is here, 0 to 1 (1 inside, 0 past its extent). */
   weight: number;
-  /** Mean wind, m/s, at most 60 (the weather's range; {@link Hurricane.windAt} has the true speed). */
+  /** Mean surface wind in m/s. */
   wind: number;
   /** Gustiness 0 to 1: 0 in the calm eye, 1 in the eyewall. */
   gust: number;
@@ -276,16 +278,11 @@ export function resolveHurricane(o: HurricaneOptions = {}): ResolvedHurricane {
  * 0 at the centre; its peak lies at R without the Coriolis term and just inside it with.
  */
 export function hollandWind(r: number, s: ResolvedHurricane = resolveHurricane()): number {
-  if (!(r > 0)) return 0;
-  const x = Math.min((s.rmax / r) ** s.b, 80),
-    half = (r * s.f) / 2;
-  return Math.sqrt((s.b * s.dp * x * Math.exp(-x)) / s.rho + half * half) - half;
+  return hollandGradient(r, s.rmax, s.b, s.dp, s.rho, s.f);
 }
 /** Holland's (1980) surface pressure at radius `r`, hPa: pc + dp exp(-(R/r)^B), with the ambient at 1010. */
 export function hollandPressure(r: number, s: ResolvedHurricane = resolveHurricane()): number {
-  const dp = s.dp / 100,
-    x = r > 0 ? (s.rmax / r) ** s.b : Infinity;
-  return AMBIENT - dp + dp * Math.exp(-x);
+  return AMBIENT - hollandDeficit(r, s.rmax, s.b, s.dp) / 100;
 }
 /** Holland's (1980) peak gradient wind without the Coriolis term, sqrt(B dp / (rho e)), m/s. */
 export function hollandMaxWind(s: ResolvedHurricane = resolveHurricane()): number {
@@ -433,7 +430,7 @@ export class Hurricane {
     return list.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
   }
   /**
-   * The storm's weather at `(x, z)` on the weather's scales, for `WeatherRegions`' `storms`: mean wind (at most 60 m/s),
+   * The storm's weather at `(x, z)` on the weather's scales, for `WeatherRegions`' `storms`: mean wind in m/s,
    * gustiness (0 in the eye, 1 in the eyewall), direction, rain, cloud overhead, lightning and humidity, and the
    * `weight` of the storm there (1 inside, fading to 0 over the last fifth of its extent).
    */
@@ -451,7 +448,7 @@ export class Hurricane {
       );
     return {
       weight: 1 - smoothstep(0.8 * s.extent, s.extent, r),
-      wind: Math.min(60, wind.speed),
+      wind: wind.speed,
       gust: clamp01((1 - eye) * (0.45 + 0.55 * convective)),
       windDirection: wind.direction,
       rain: Math.min(1, Math.cbrt(rate / 80)),
