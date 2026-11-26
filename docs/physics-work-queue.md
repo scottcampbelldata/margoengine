@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **BIO-02:** Promote branch topology and geometry rows to a shared growth contract, and expose an obstacle field
+  and cell extent contract for moving scene geometry. The optional entry publishes a versioned geometry graph, reads
+  the live HYDRO-02 field, and runs its slot-free occupancy test in both memory modes.
+
 - **ATMO-06:** Promote the environmental source flux and deposited/vapour mass fields for EARTH-05 footstep dust
   and air/soil feedback. Publish source-grid geometry where types currently describe only rows. The airborne
   entry reads the existing EARTH-07 dust and SEA-13 whitecap fields on matching geometry and exposes the scoped ports.

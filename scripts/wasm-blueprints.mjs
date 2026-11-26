@@ -377,6 +377,20 @@ export const BLUEPRINTS = [
     script: 'packages/biomes/scripts/build-erosion.mjs',
   },
   {
+    name: 'growth-kernel',
+    crate: 'packages/biomes/growth-kernel',
+    blueprint: 'packages/biomes/src/growth-kernel.wasm',
+    script: 'packages/biomes/scripts/build-growth.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'growth-kernel-shared',
+    crate: 'packages/biomes/growth-kernel',
+    blueprint: 'packages/biomes/src/growth-kernel-shared.wasm',
+    script: 'packages/biomes/scripts/build-growth.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'forest-kernel',
     crate: 'packages/biomes/forest-kernel',
     blueprint: 'packages/biomes/src/forest-kernel.wasm',

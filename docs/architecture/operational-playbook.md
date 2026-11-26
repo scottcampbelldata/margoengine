@@ -10244,3 +10244,7 @@ order. Host-side queries supply each particle's local Wind conditions, then the 
 arena state. Both native module initializations leave sentinel-filled world memory untouched. Direct checks cover
 the closed-form Stokes trajectory, exact droplet mass changes, source buffering and two real producers through
 the field registry. A production Vite build preserves both lazy Wasm files.
+
+### Developmental plant growth (BIO-02)
+
+The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.

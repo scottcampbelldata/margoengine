@@ -9445,3 +9445,7 @@ specified variance from a zero initial fluctuation. The wet-droplet evaporation 
 prescribed humidity and a salt-dependent equilibrium diameter. It conserves the dry sea salt remaining after water loss. Mixed atmospheric chemistry,
 collisions between droplets and two-way air heating need separate fields. Deposition tests use heightfield
 subdivision at half the smallest horizontal cell width; the aggregate ledger retains the mass.
+
+### Developmental wood growth (BIO-02)
+
+The parametric solver places shoots on 60 Hz season boundaries and stores permanent branch structure. The initialization footprint follows the supplied productive seasons and the minimum extension per new branch. The light grid uses cubic voxels with a vertical, distance-attenuated penumbra and horizontal light-seeking gradient. Sites outside the supplied grid receive open light. Roots use a measured water threshold and the mean storage in their own supplied HYDRO-02 cell. The model has no water extraction, leaf anatomy, root branching or moving obstructors. Renderer-adapted coordinates are f32 within an origin cell. The optional growth entry measures 12,370 B minified and 5,469 B gzip. The selected lazy SIMD kernel is 601 B raw in either memory mode. Core and Stage gain zero bytes.

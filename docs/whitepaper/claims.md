@@ -5647,3 +5647,7 @@ The homogeneous turbulence fixture compares the sample mean and variance with th
 `packages/physics/tests/coupling/airborne.test.js` drives dust from a real aeolian bed, passes active SEA-13
 whitecaps into three airborne bands and reproduces a wind-advected ground dust pulse. It checks mass closure,
 frame-rate invariance and exact replay. These are solver and source-link checks.
+
+### Developmental wood growth
+
+Plants sharing the Biomes growth field give different branch extension when their measured local soil water differs. The reported angle, branch area and depth attenuation agree with analytical cases in `packages/biomes/tests/coupling/growth.test.js`. The resulting three-internode fixture meshes to 36 triangles in Chromium and replays bit for bit after restore.

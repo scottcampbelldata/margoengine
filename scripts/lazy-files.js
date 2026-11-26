@@ -905,6 +905,20 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/growth-kernel.wasm',
+    label: 'growth-kernel.wasm',
+    kind: 'Rust SIMD growth penumbra',
+    measure: 'file',
+  },
+  {
+    package: '@margoengine/biomes',
+    file: 'packages/biomes/dist/growth-kernel-shared.wasm',
+    label: 'growth-kernel-shared.wasm',
+    kind: 'Rust SIMD growth penumbra, shared world memory',
+    measure: 'file',
+  },
+  {
+    package: '@margoengine/biomes',
     file: 'packages/biomes/dist/forest-kernel.wasm',
     label: 'forest-kernel.wasm',
     kind: 'Rust SIMD forest crown competition',
