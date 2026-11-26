@@ -8,6 +8,9 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
+[dependencies]
+margoengine-physics-kernel-common = { path = "../kernel-common" }
+
 [profile.release]
 opt-level = 3
 lto = "fat"

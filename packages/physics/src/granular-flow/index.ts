@@ -1,4 +1,5 @@
 import { MargoError } from '@margoengine/math/errors';
+import { cos, sin } from '@margoengine/math/pinned';
 import { BED_FIELD, BED_LAYOUT, bedVertexCount, type BedShape } from '../earth/bed.js';
 import { regionWords } from '../world/memory.js';
 import type { FieldDescriptor, FieldUse, Port, Region, Solver, SolverHost, StepContext } from '../world/solver.js';
@@ -26,6 +27,24 @@ export interface GranularFlowLoadOptions {
 /** Scalar or one value per cell in row-major order (X varies fastest). */
 type GridValues = number | ArrayLike<number>;
 
+/** Pouliquen–Forterre start/stop fit. Angles are in degrees and thickness is in metres. */
+export interface GranularRoughness {
+  /** Limiting thick-layer stopping angle. */
+  readonly thickStopAngle: number;
+  /** Limiting thin-layer stopping angle. */
+  readonly thinStopAngle: number;
+  /** Limiting thick-layer starting angle. */
+  readonly thickStartAngle: number;
+  /** Stopping-curve transition length, metres. */
+  readonly thickness: number;
+  /** Froude slope of the steady uniform laboratory fit. */
+  readonly beta: number;
+  /** Stopping-curve form. Default 'rational' (2002). Use 'exponential' for the 1999 fits. */
+  readonly curve?: 'rational' | 'exponential';
+  /** Interpolation exponent below beta. Default 0.001. */
+  readonly slowExponent?: number;
+}
+
 export interface GranularFlowOptions {
   /** Rectangular grid. When coupled, use the shape and world cell of TerrainBed. */
   readonly grid: BedShape;
@@ -35,11 +54,13 @@ export interface GranularFlowOptions {
   readonly depth?: GridValues;
   /** Initial horizontal X and Z speeds in metres per second. Default [0, 0]. */
   readonly velocity?: readonly [GridValues, GridValues];
-  /** Dry basal Coulomb coefficient. Default 0.35. */
+  /** Dry basal Coulomb coefficient. Default 0.35 without roughness. */
   readonly friction?: number;
+  /** Depth and speed dependent basal stress, or the measured 0.5 mm glass-bead fit. Optional. */
+  readonly roughness?: 'glass-beads' | GranularRoughness;
   /** Fraction of basal normal stress supported by prescribed pore pressure. Default 0 (dry). */
   readonly poreSupport?: number;
-  /** Voellmy turbulent coefficient in metres per second squared. Default 2000. Use Infinity for Coulomb alone. */
+  /** Voellmy turbulent coefficient in metres per second squared. Default 2000 without roughness and Infinity with roughness. */
   readonly turbulence?: number;
   /** Constant bulk density in kilograms per cubic metre. Default 1600. */
   readonly density?: number;
@@ -62,6 +83,8 @@ interface State {
   readonly gravity: number;
   readonly friction: number;
   readonly turbulence: number;
+  readonly roughness?: Region;
+  readonly grainLoad: number;
   readonly density: number;
   readonly state: Region;
   readonly working: Region;
@@ -74,6 +97,38 @@ function finite(value: number, label: string, lower = -Infinity): number {
   if (!Number.isFinite(value) || value < lower)
     throw new RangeError(`Invalid granular ${label}. Use finite values in the documented SI range.`);
   return value;
+}
+
+const GLASS_BEADS: GranularRoughness = {
+  thickStopAngle: 21,
+  thinStopAngle: 30.7,
+  thickStartAngle: 22.2,
+  thickness: 0.00065,
+  beta: 0.136,
+};
+
+function roughnessWords(profile: GranularRoughness): readonly number[] {
+  const low = finite(profile.thickStopAngle, 'thick-layer stopping angle', 0);
+  const high = finite(profile.thinStopAngle, 'thin-layer stopping angle', low);
+  const start = finite(profile.thickStartAngle, 'thick-layer starting angle', low);
+  if (high >= 90 || start >= 90)
+    throw new RangeError('Invalid granular roughness angles. Use values below 90 degrees.');
+  const tangent = (degrees: number) => {
+    const radians = degrees * (Math.PI / 180);
+    return sin(radians) / cos(radians);
+  };
+  const curve = profile.curve ?? 'rational';
+  if (curve !== 'rational' && curve !== 'exponential')
+    throw new RangeError('Invalid granular stopping curve. Choose rational or exponential.');
+  return [
+    tangent(low),
+    tangent(high),
+    tangent(start),
+    finite(profile.thickness, 'roughness thickness', Number.MIN_VALUE),
+    finite(profile.beta, 'roughness Froude coefficient', Number.MIN_VALUE),
+    finite(profile.slowExponent ?? 0.001, 'low-speed roughness exponent', Number.MIN_VALUE),
+    curve === 'exponential' ? 1 : 0,
+  ];
 }
 
 function optionAt(values: GridValues, i: number, name: string, lower = -Infinity): number {
@@ -141,9 +196,16 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     const gravity = finite(-host.gravity[1], 'downward gravity', 0);
     const poreSupport = finite(options.poreSupport ?? 0, 'pore pressure fraction', 0);
     if (poreSupport > 1) throw new RangeError('Invalid granular pore support. Set the fraction between zero and one.');
-    const friction = finite(options.friction ?? 0.35, 'friction', 0) * (1 - poreSupport);
+    if (options.roughness && options.friction !== undefined)
+      throw new RangeError('Granular basal resistance has two models. Choose roughness or constant friction.');
+    const profile =
+      options.roughness === undefined
+        ? undefined
+        : roughnessWords(options.roughness === 'glass-beads' ? GLASS_BEADS : options.roughness);
+    const friction = finite(options.friction ?? 0.35, 'friction', 0);
+    const requestedTurbulence = options.turbulence ?? (profile ? Infinity : 2000);
     const turbulence =
-      options.turbulence === Infinity ? Infinity : finite(options.turbulence ?? 2000, 'turbulence', Number.MIN_VALUE);
+      requestedTurbulence === Infinity ? Infinity : finite(requestedTurbulence, 'turbulence', Number.MIN_VALUE);
     const density = finite(options.density ?? 1600, 'bulk density', Number.MIN_VALUE);
     const depth = options.depth ?? 0;
     const bed = options.bed ?? 0;
@@ -172,6 +234,14 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     const working = allocate('granular-flow-working');
     const trial = allocate('granular-flow-trial');
     const ledger = host.allocate('granular-flow-ledger', Float64Array.BYTES_PER_ELEMENT, 'f64', GRANULAR_FLOW_LAYOUT);
+    const roughness = profile
+      ? host.allocate(
+          'granular-roughness',
+          profile.length * Float64Array.BYTES_PER_ELEMENT,
+          'f64',
+          GRANULAR_FLOW_LAYOUT,
+        )
+      : undefined;
     const s: State = {
       host,
       kernel,
@@ -182,14 +252,17 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       gravity,
       friction,
       turbulence,
+      roughness,
+      grainLoad: 1 - poreSupport,
       density,
       state,
       working,
       trial,
       ledger,
-      regions: [state, ledger],
+      regions: roughness ? [state, ledger, roughness] : [state, ledger],
     };
     words(s, state).set(initial);
+    if (roughness && profile) words(s, roughness).set(profile);
     this.runtime = s;
   }
 
@@ -240,6 +313,8 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
       s.gravity,
       s.friction,
       s.turbulence,
+      s.roughness?.byteOffset ?? 0,
+      s.grainLoad,
     );
     if (substeps < 0)
       throw new RangeError(

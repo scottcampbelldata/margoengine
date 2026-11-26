@@ -21,7 +21,18 @@
         return { hash: world.hash(), initial, mass: flow.mass, advance: flow.sample(6, 2).depth,
           barrier: flow.sample(12, 2), isShared: memory.buffer instanceof SharedArrayBuffer };
       };
-      return { plain: await simulate(false), shared: await simulate(true) };
+      const rough = async (sharedMemory) => {
+        const solver = await GranularFlowSolver.load();
+        const angle = 23.3 * Math.PI / 180;
+        const grid = { columns: 65, rows: 3, width: 0.65, depth: 0.03, centre: [0, 0] };
+        const bed = Float64Array.from({ length: 195 }, (_, i) => -Math.tan(angle) * (i % 65 - 32) * 0.01);
+        const depth = 0.0035 / Math.cos(angle);
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(sharedMemory) })
+          .add(solver, { grid, bed, depth, roughness: 'glass-beads', velocity: [0.02 * Math.cos(angle), 0] });
+        world.advance(6);
+        return { hash: world.hash(), velocity: solver.sample(32, 1).discharge[0] / depth };
+      };
+      return { plain: await simulate(false), shared: await simulate(true), roughPlain: await rough(false), roughShared: await rough(true) };
     };
   </script>
 </body>

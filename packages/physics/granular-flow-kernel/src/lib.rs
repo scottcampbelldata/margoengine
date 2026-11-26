@@ -4,6 +4,19 @@ use core::arch::wasm32::{
     f64x2, f64x2_extract_lane, f64x2_mul, f64x2_splat, f64x2_sqrt, unreachable,
 };
 
+use margoengine_physics_kernel_common::pinned::{exp, pow};
+
+struct ArenaOnly;
+unsafe impl core::alloc::GlobalAlloc for ArenaOnly {
+    unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
+        core::ptr::null_mut()
+    }
+    unsafe fn dealloc(&self, _: *mut u8, _: core::alloc::Layout) {}
+}
+
+#[global_allocator]
+static NO_HEAP: ArenaOnly = ArenaOnly;
+
 #[panic_handler]
 fn abort(_: &core::panic::PanicInfo<'_>) -> ! {
     unreachable()
@@ -51,12 +64,50 @@ impl Column {
     }
 }
 
-struct Model {
+#[repr(C)]
+struct Roughness {
+    low: f64,
+    high: f64,
+    start: f64,
+    thickness: f64,
+    beta: f64,
+    exponent: f64,
+    exponential: f64,
+}
+
+impl Roughness {
+    fn stop(&self, depth: f64) -> f64 {
+        let normalised = depth / self.thickness;
+        let shape = if self.exponential == 0.0 {
+            1.0 / (1.0 + normalised)
+        } else {
+            exp(-normalised)
+        };
+        self.low + (self.high - self.low) * shape
+    }
+
+    fn friction(&self, depth: f64, speed: f64, gravity: f64) -> f64 {
+        let stop = self.stop(depth);
+        let gap = self.start - self.low;
+        if speed == 0.0 {
+            return stop + gap;
+        }
+        let turnover = self.beta * sqrt(gravity * depth);
+        if speed >= turnover {
+            return self.stop(depth * (turnover / speed));
+        }
+        stop + gap * (1.0 - pow(speed / turnover, self.exponent))
+    }
+}
+
+struct Model<'a> {
     gravity: f64,
     dx: f64,
     dz: f64,
     friction: f64,
     turbulence: f64,
+    roughness: Option<&'a Roughness>,
+    grain_load: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -79,28 +130,48 @@ fn apparent_step(
     dt: f64,
     model: &Model,
     x: bool,
+    transverse_bed_slope: f64,
+    transverse_surface_slope: f64,
 ) -> f64 {
-    if model.friction == 0.0 || model.gravity == 0.0 {
+    if model.grain_load == 0.0 || model.gravity == 0.0 {
         return step;
     }
     let weight = low.depth + high.depth;
     let time = model.gravity * dt;
     let average_x = (low.discharge_x + high.discharge_x) / weight;
     let average_z = (low.discharge_z + high.discharge_z) / weight;
+    let mut friction = model.friction;
+    if let Some(roughness) = model.roughness {
+        let rise = step / width;
+        let (slope_x, slope_z) = if x {
+            (rise, transverse_bed_slope)
+        } else {
+            (transverse_bed_slope, rise)
+        };
+        let metric = sqrt(1.0 + slope_x * slope_x + slope_z * slope_z);
+        let vertical = slope_x * average_x + slope_z * average_z;
+        let speed = length(length(average_x, average_z), vertical);
+        friction = roughness.friction(0.5 * weight / metric, speed, model.gravity);
+    }
+    let friction = friction * model.grain_load;
+    if friction == 0.0 {
+        return step;
+    }
     let slope_impulse = ((low.depth - high.depth) - step) * (time / width);
+    let cross_impulse = -transverse_surface_slope * time;
     let (trial_x, trial_z) = if x {
-        (average_x + slope_impulse, average_z)
+        (average_x + slope_impulse, average_z + cross_impulse)
     } else {
-        (average_x, average_z + slope_impulse)
+        (average_x + cross_impulse, average_z + slope_impulse)
     };
     let normal = if x { trial_x } else { trial_z };
-    let limit = model.friction * time;
+    let limit = friction * time;
     let magnitude = length(trial_x, trial_z);
     if magnitude <= limit {
         // At exact rest this also avoids roundoff in reconstructing a static free surface.
         return low.depth - high.depth + (if x { average_x } else { average_z }) * (width / time);
     }
-    step + (normal / magnitude) * model.friction * width
+    step + (normal / magnitude) * friction * width
 }
 
 fn face(
@@ -112,13 +183,41 @@ fn face(
     width: f64,
     model: &Model,
     x: bool,
+    neighbours: (usize, usize, usize),
 ) {
     let a = unsafe { *state.get_unchecked(left) };
     let b = unsafe { *state.get_unchecked(right) };
     if a.depth == 0.0 && b.depth == 0.0 {
         return;
     }
-    let offset = apparent_step(a, b, b.bed - a.bed, width, dt, model, x);
+    let mut bed_cross = 0.0;
+    let mut surface_cross = 0.0;
+    if model.roughness.is_some() {
+        let (before, after, stride) = neighbours;
+        let span = (before + after) / stride;
+        if span > 0 {
+            let cross_width = if x { model.dz } else { model.dx };
+            let a_low = unsafe { state.get_unchecked(left - before) };
+            let b_low = unsafe { state.get_unchecked(right - before) };
+            let a_high = unsafe { state.get_unchecked(left + after) };
+            let b_high = unsafe { state.get_unchecked(right + after) };
+            let derivative = 0.5 / (span as f64 * cross_width);
+            bed_cross = ((a_high.bed - a_low.bed) + (b_high.bed - b_low.bed)) * derivative;
+            surface_cross = bed_cross
+                + ((a_high.depth - a_low.depth) + (b_high.depth - b_low.depth)) * derivative;
+        }
+    }
+    let offset = apparent_step(
+        a,
+        b,
+        b.bed - a.bed,
+        width,
+        dt,
+        model,
+        x,
+        bed_cross,
+        surface_cross,
+    );
     let ha = (a.depth - offset.max(0.0)).max(0.0);
     let hb = (b.depth - (-offset).max(0.0)).max(0.0);
     let [ax, az] = a.velocity();
@@ -176,7 +275,21 @@ fn advance(
         let last = start + nx - 1;
         wall(state, next, start, dt / model.dx, model.gravity, true);
         for i in start..last {
-            face(state, next, i, i + 1, dt, model.dx, model, true);
+            face(
+                state,
+                next,
+                i,
+                i + 1,
+                dt,
+                model.dx,
+                model,
+                true,
+                (
+                    if z > 0 { nx } else { 0 },
+                    if z + 1 < nz { nx } else { 0 },
+                    nx,
+                ),
+            );
         }
         wall(state, next, last, -dt / model.dx, model.gravity, true);
     }
@@ -185,7 +298,17 @@ fn advance(
         wall(state, next, x, dt / model.dz, model.gravity, false);
         for z in 0..nz - 1 {
             let i = x + z * nx;
-            face(state, next, i, i + nx, dt, model.dz, model, false);
+            face(
+                state,
+                next,
+                i,
+                i + nx,
+                dt,
+                model.dz,
+                model,
+                false,
+                (usize::from(x > 0), usize::from(x + 1 < nx), 1),
+            );
         }
         wall(state, next, last, -dt / model.dz, model.gravity, false);
     }
@@ -225,6 +348,8 @@ pub extern "C" fn granular_step(
     gravity: f64,
     friction: f64,
     turbulence: f64,
+    roughness: *const f64,
+    grain_load: f64,
 ) -> i32 {
     let count = nx * nz;
     let work = unsafe { core::slice::from_raw_parts_mut(work.cast::<Column>(), count) };
@@ -235,6 +360,8 @@ pub extern "C" fn granular_step(
         dz,
         friction,
         turbulence,
+        roughness: unsafe { roughness.cast::<Roughness>().as_ref() },
+        grain_load,
     };
     let mut remaining = dt;
     let mut steps = 0;

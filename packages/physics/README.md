@@ -5162,3 +5162,23 @@ console.log(flow.sample(5, 2).depth, flow.mass);
 ```
 
 The boundary is closed. The grid cells hold vertical depth in metres, X and Z discharge in m²/s and bed elevation in metres. `mass` reports kilograms from the material's constant density. `flowField` publishes the same row-major values through `GRANULAR_FLOW_LAYOUT`. The world stores the state, and its snapshots capture the runout and step count. Pass the same rectangular shape and world cell to the `TerrainBed` and the flow. For a fixed bed, omit `liveTerrain` and give the bed elevations in `bed`. The dry basal friction coefficient defaults to 0.35. `poreSupport` is a prescribed fraction of grain contact load taken by pore pressure, from zero (dry) to one. The Voellmy coefficient defaults to 2,000 m/s². Set `turbulence: Infinity` for pure Coulomb. Bulk density defaults to 1,600 kg/m³. The world provides downward gravity.
+
+For rough dry granular beds, use `roughness: 'glass-beads'` in place of `friction`. The default roughness option is absent, which selects the constant-friction Voellmy tier. The named profile is measured for 0.5 mm glass beads and uses the 2002 rational stopping curve. Pass a `GranularRoughness` with the measured start and stop angles, characteristic thickness and `beta` for a different rough bed. Set `curve: 'exponential'` for the 1999 stopping fit. The low-speed exponent defaults to 0.001, and turbulent drag defaults to disabled for this tier. A static layer uses the starting curve, while faster layers use the stopping curve at a Froude-adjusted thickness.
+
+```js
+import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 65, rows: 3, width: 0.65, depth: 0.03, centre: [0, 0] };
+const angle = 23.3 * Math.PI / 180;
+const flow = await GranularFlowSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(flow, {
+  grid,
+  bed: Float64Array.from({ length: 195 }, (_, i) => -Math.tan(angle) * (i % 65 - 32) * 0.01),
+  depth: 0.0035 / Math.cos(angle),
+  roughness: 'glass-beads',
+  velocity: [0.02 * Math.cos(angle), 0],
+});
+world.advance(6);
+console.log(flow.sample(32, 1).discharge);
+```

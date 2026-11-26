@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "margoengine-granular-flow-kernel"
 version = "0.1.0"
+dependencies = [
+ "margoengine-physics-kernel-common",
+]
+
+[[package]]
+name = "margoengine-physics-kernel-common"
+version = "0.1.0"

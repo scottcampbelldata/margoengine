@@ -117,3 +117,98 @@ test('EARTH-02 repeats native hashes and exact checkpoint restore in both memory
   assert.equal(await run(false), await run(false));
   assert.equal(await run(false), await run(true));
 });
+
+function plane(columns, rows, spacing, angle, direction) {
+  const radians = (angle * Math.PI) / 180;
+  const rise = Math.tan(radians);
+  const bed = Float64Array.from({ length: columns * rows }, (_, i) => {
+    const x = ((i % columns) - Math.floor(columns / 2)) * spacing;
+    const z = (Math.floor(i / columns) - Math.floor(rows / 2)) * spacing;
+    return -rise * (x * direction[0] + z * direction[1]);
+  });
+  return { bed, grid: grid(columns, rows, spacing), cos: Math.cos(radians), rise };
+}
+
+test('EARTH-02 Pouliquen–Forterre reproduces start-stop hysteresis at the same rough-plane depth', async () => {
+  const { cos, rise, grid, bed } = plane(129, 3, 0.01, 23.3, [1, 0]);
+  const normalDepth = 0.0035;
+  const angleTan = (degrees) => Math.tan((degrees * Math.PI) / 180);
+  const shape = (angleTan(30.7) - angleTan(21)) / (1 + normalDepth / 0.00065);
+  const muStop = angleTan(21) + shape;
+  const muStart = angleTan(22.2) + shape;
+  assert.ok(muStop < rise && rise < muStart);
+  const horizontalSpeed = 0.02 * cos;
+  const common = { grid, bed, depth: normalDepth / cos, roughness: 'glass-beads' };
+  const rest = await simulate(common);
+  const moving = await simulate({ ...common, velocity: [horizontalSpeed, 0] });
+  rest.world.advance(12);
+  moving.world.advance(12);
+  const stationary = rest.flow.sample(64, 1);
+  assert.equal(stationary.depth, common.depth);
+  assert.equal(stationary.discharge[0], 0);
+  const ongoing = moving.flow.sample(64, 1);
+  assert.ok(ongoing.discharge[0] / ongoing.depth > horizontalSpeed);
+});
+
+test('EARTH-02 rational roughness keeps the measured-flow-law equilibrium on rotated beds', async () => {
+  for (const [angle, multiple, direction] of [
+    [23, 2, [1, 0]],
+    [25, 3, [0, 1]],
+    [26, 4, [0.6, 0.8]],
+  ]) {
+    const { cos, rise, grid, bed } = plane(41, 41, 0.02, angle, direction);
+    const angleTan = (degrees) => Math.tan((degrees * Math.PI) / 180);
+    const low = angleTan(21);
+    const high = angleTan(30.7);
+    const stopDepth = 0.00065 * ((high - low) / (rise - low) - 1);
+    const normalDepth = multiple * stopDepth;
+    const speed = 0.136 * multiple * Math.sqrt(g * normalDepth) * cos;
+    const velocity = [speed * direction[0], speed * direction[1]];
+    const depth = normalDepth / cos;
+    const { world, flow } = await simulate({ grid, bed, depth, velocity, roughness: 'glass-beads' });
+    world.advance(4);
+    const center = flow.sample(20, 20);
+    // Heights and tangents are independently rounded and differ across faces. At most eight
+    // surface differences contribute per step before the pressure and discharge projections.
+    const bound = (8 * 4 * 64 * Number.EPSILON * grid.width * g * dt) / (grid.width / grid.columns);
+    near(center.discharge[0] / center.depth, velocity[0], bound);
+    near(center.discharge[1] / center.depth, velocity[1], bound);
+    near(center.depth, depth, 4 * 64 * Number.EPSILON * depth);
+  }
+});
+
+test('EARTH-02 exponential roughness predicts held-out front speed on two measured bead beds', async () => {
+  // Pouliquen (1999), Table I sets the stopping curves. Section III.B reports the separate
+  // 24 degree, h/d = 7 speed measurements, scaled by sqrt(g*d) for systems 1 and 3.
+  for (const { diameter, low, high, length, measured } of [
+    { diameter: 0.0005, low: 20.7, high: 32.8, length: 1.96, measured: 1 },
+    { diameter: 0.00115, low: 22.9, high: 30.4, length: 1.5, measured: 0.9 },
+  ]) {
+    const { cos, rise, grid, bed } = plane(129, 3, 0.01, 24, [1, 0]);
+    const angleTan = (degrees) => Math.tan((degrees * Math.PI) / 180);
+    const threshold = (rise - angleTan(low)) / (angleTan(high) - angleTan(low));
+    const stopDepth = -length * diameter * Math.log(threshold);
+    const normalDepth = 7 * diameter;
+    const speed = 0.136 * Math.sqrt(g * normalDepth) * (normalDepth / stopDepth);
+    const { world: running, flow } = await simulate({
+      grid,
+      bed,
+      depth: normalDepth / cos,
+      velocity: [speed * cos, 0],
+      roughness: {
+        thickStopAngle: low,
+        thinStopAngle: high,
+        thickStartAngle: low,
+        thickness: length * diameter,
+        beta: 0.136,
+        curve: 'exponential',
+      },
+    });
+    running.advance(10);
+    const center = flow.sample(64, 1);
+    const result = center.discharge[0] / center.depth / (cos * Math.sqrt(g * diameter));
+    // Article Section II estimates front-speed uncertainty at less than 10 percent.
+    near(result, measured, 0.1 * measured);
+    near(result, speed / Math.sqrt(g * diameter), 4096 * Number.EPSILON * result);
+  }
+});

@@ -21,6 +21,7 @@ export interface GranularFlowOptions {
     readonly depth?: GridValues;
     readonly velocity?: readonly [GridValues, GridValues];
     readonly friction?: number;
+    readonly roughness?: 'glass-beads' | GranularRoughness;
     readonly poreSupport?: number;
     readonly turbulence?: number;
     readonly density?: number;
@@ -52,6 +53,16 @@ export class GranularFlowSolver implements Solver<GranularFlowOptions> {
     sample(x: number, z: number): GranularFlowSample;
     get mass(): number;
     get lastSubsteps(): number;
+}
+
+export interface GranularRoughness {
+    readonly thickStopAngle: number;
+    readonly thinStopAngle: number;
+    readonly thickStartAngle: number;
+    readonly thickness: number;
+    readonly beta: number;
+    readonly curve?: 'rational' | 'exponential';
+    readonly slowExponent?: number;
 }
 
 // Not exported from this entry, but used by the exports above:

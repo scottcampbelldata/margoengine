@@ -15032,8 +15032,8 @@
         "gzip": 6103
       },
       "./granular-flow": {
-        "raw": 7702,
-        "gzip": 3378
+        "raw": 9761,
+        "gzip": 4206
       }
     },
     "@margoengine/physics2d": {
@@ -19143,14 +19143,14 @@
       "brotli": 5144
     },
     "packages/physics/dist/granular-flow-kernel.wasm": {
-      "raw": 3707,
-      "gzip": 1578,
-      "brotli": 1422
+      "raw": 6129,
+      "gzip": 2716,
+      "brotli": 2515
     },
     "packages/physics/dist/granular-flow-kernel-shared.wasm": {
-      "raw": 3707,
-      "gzip": 1578,
-      "brotli": 1431
+      "raw": 6129,
+      "gzip": 2716,
+      "brotli": 2514
     }
   },
   "splits": {

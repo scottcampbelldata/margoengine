@@ -19,6 +19,8 @@ export interface GranularFlowKernel {
     gravity: number,
     friction: number,
     turbulence: number,
+    roughness: number,
+    grainLoad: number,
   ): number;
 }
 

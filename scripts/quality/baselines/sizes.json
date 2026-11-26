@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20536668,
+  "total": 20537496,
   "history": [
     {
       "date": "2026-10-24",
@@ -13487,6 +13487,12 @@
       "commit": "da1aa77fac",
       "reason": "KB-WEATHER-FIREHAZE1 entry size, previous record to current: @margoengine/weather/drive 7289 ceiling to 7481 B measured (ceiling 7737 B). The drive lights the smoke haze with the fires below it (fireHazeLight, the fireLight option and its check) inside the fog tint it already writes; a separate entry would need its own copy of the fire list and the tint.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b33cf08098",
+      "grew": 1,
+      "reason": "EARTH-02 grows the optional granular-flow entry from 3378 to 4206 B gzip (ceiling 4462 B) for measured start-stop friction and a terrain-relative Froude number. Both closures share conservative transport and the live bed, which a split would duplicate. Core plus Stage stay 24846 B."
     }
   ],
   "items": {
@@ -14322,7 +14328,7 @@
     "@margoengine/physics/flip": 11699,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
-    "@margoengine/physics/granular-flow": 3634,
+    "@margoengine/physics/granular-flow": 4462,
     "@margoengine/physics/granular-mpm": 5370,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
