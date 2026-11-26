@@ -4,13 +4,13 @@
 // Each (kind, mode, distance) renders the same 40-frame orbit + dolly; every frame is compared with the same kind
 // rendered by core near the origin. Per frame: silhouette centroid offset (px, sub-pixel) and pixels whose coverage
 // differs (XOR of the masks). Jitter = largest frame-to-frame change of the centroid offset. Results:
-// examples/package-benchmarks/results/large-coordinates-gpu.json, frame 0 PNGs in test-results/large-coordinates-*.png.
+// test-results/large-coordinates-gpu.json (with --record, the tracked results/large-coordinates-gpu.json), frame 0 PNGs in test-results/large-coordinates-*.png.
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { DISTANCES, FRAMES } from './large-coordinates-scene.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 assert.notEqual(ac(), 'False', 'measure on AC power only');
 const context = await openBrowser({ startPath: '/examples/package-benchmarks/large-coordinates.html', port: 5233 }),
@@ -115,8 +115,5 @@ try {
   await context.close();
 }
 assert.notEqual(ac(), 'False', 'still on AC power');
-writeFileSync(
-  'examples/package-benchmarks/results/large-coordinates-gpu.json',
-  JSON.stringify(result, (k, v) => (Number.isNaN(v) ? null : v), 2) + '\n',
-);
+writeReport('large-coordinates-gpu.json', JSON.stringify(result, (k, v) => (Number.isNaN(v) ? null : v), 2) + '\n');
 console.log('large coordinates GPU check done');

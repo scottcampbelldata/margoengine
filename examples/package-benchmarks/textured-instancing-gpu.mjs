@@ -6,13 +6,12 @@
 //    meshes and as one instanced mesh. The canvases must match within noise.
 // 2. GPU picking reports the instance under the cursor.
 // 3. Timings for 1,000-10,000 textured boxes: CPU ms of engine.render() and ms to onSubmittedWorkDone, N meshes vs instanced.
-// Writes results/textured-instancing-gpu.json and the frames to test-results/textured-instancing-*.png.
+// Writes test-results/textured-instancing-gpu.json (with --record, the tracked results/textured-instancing-gpu.json) and the frames to test-results/textured-instancing-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'measure on AC power only');
@@ -109,8 +108,5 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-await writeFile(
-  resolve(import.meta.dirname, 'results/textured-instancing-gpu.json'),
-  JSON.stringify(report, null, 2) + '\n',
-);
+writeReport('textured-instancing-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('textured instancing GPU check passed');

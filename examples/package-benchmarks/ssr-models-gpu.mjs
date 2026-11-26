@@ -13,13 +13,13 @@
 // with a glossy glTF floor filling most of the view (12 boxes, worst case) and with SciFiHelmet, each added vs not
 // added, at 1280x720 and 1920x1080, 4x and 1x.
 // Run `node scripts/quiet-gate.mjs` first for publishable timings; --diagnostic labels them as taken on a busy machine.
-// Writes examples/package-benchmarks/results/ssr-models-gpu.json, frames to test-results/ssr-models-*.png.
+// Writes test-results/ssr-models-gpu.json (with --record, the tracked results/ssr-models-gpu.json), frames to test-results/ssr-models-*.png.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { acPower } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const arg = (name, fallback) => {
   const a = process.argv.find((v) => v.startsWith(`--${name}`));
@@ -249,5 +249,5 @@ try {
 }
 report.acPowerAfter = acPower();
 assert.equal(report.acPowerAfter, true, 'ended on battery: discard this run');
-writeFileSync('examples/package-benchmarks/results/ssr-models-gpu.json', JSON.stringify(report, null, 1) + '\n');
-console.log('SSR model capture GPU check passed; wrote examples/package-benchmarks/results/ssr-models-gpu.json');
+const written = writeReport('ssr-models-gpu.json', JSON.stringify(report, null, 1) + '\n');
+console.log(`SSR model capture GPU check passed; wrote ${written}`);

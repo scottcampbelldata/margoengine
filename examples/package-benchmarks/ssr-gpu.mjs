@@ -9,13 +9,13 @@
 // 4. With TAA and with SSAO in the stack: no errors, reflection present. No black (NaN) pixels anywhere.
 // Timing: own GPU passes of SSR at 1280x720 and 1920x1080, 4x and 1x MSAA (bench scene: 14 boxes), alternating rounds.
 // Run `node scripts/quiet-gate.mjs` first for publishable timings; --diagnostic labels them as taken on a busy machine.
-// Writes examples/package-benchmarks/results/ssr-gpu.json, frames to test-results/ssr-*.png.
+// Writes test-results/ssr-gpu.json (with --record, the tracked results/ssr-gpu.json), frames to test-results/ssr-*.png.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { acPower } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const arg = (name, fallback) => {
   const a = process.argv.find((v) => v.startsWith(`--${name}`));
@@ -226,5 +226,5 @@ try {
 }
 report.acPowerAfter = acPower();
 assert.equal(report.acPowerAfter, true, 'ended on battery: discard this run');
-writeFileSync('examples/package-benchmarks/results/ssr-gpu.json', JSON.stringify(report, null, 1) + '\n');
-console.log('SSR GPU check passed; wrote examples/package-benchmarks/results/ssr-gpu.json');
+const written = writeReport('ssr-gpu.json', JSON.stringify(report, null, 1) + '\n');
+console.log(`SSR GPU check passed; wrote ${written}`);

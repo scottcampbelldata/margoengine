@@ -7,16 +7,15 @@
 //   off       no tint draw at all. Wrong for all glass; it is here to price the draw.
 // Arms take turns inside each round so clock and heat drift falls on all of them alike. Each row is the median of the
 // rounds. Rendered frames must differ the expected way, or the patch did nothing and the run fails.
-// TINT_ROUNDS=1 gives a quick trial. Writes results/tint-pass-gpu.json.
+// TINT_ROUNDS=1 gives a quick trial. Writes test-results/tint-pass-gpu.json (with --record, the tracked results/tint-pass-gpu.json).
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { acPower } from './parts/power.mjs';
 import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
 import { assertPatchedOnce, patchChunk } from './parts/bundle-patch.mjs';
+import { writeReport } from './results-output.mjs';
 
 const ROUNDS = Number(process.env.TINT_ROUNDS ?? 5),
   FRAMES = 240,
@@ -143,5 +142,5 @@ for (const [width, height] of SIZES)
   }
 report.powerOnlineAfter = acPower();
 assert.deepEqual(problems, [], 'an arm did not change the frame the expected way');
-await writeFile(resolve(import.meta.dirname, 'results/tint-pass-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('tint-pass-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('tint pass benchmark done');

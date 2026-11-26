@@ -17,7 +17,7 @@ const STEPS = [
   ['post-stack', `${bench}/gates/post-stack.mjs`],
   ['loaders-memory', `${bench}/gates/memory.mjs`],
   ['shadow-shimmer', `${bench}/shadow-shimmer.mjs`],
-  ['textured-instancing-gpu', `${bench}/textured-instancing-gpu.mjs`],
+  ['textured-instancing-gpu', `${bench}/textured-instancing-gpu.mjs`, '--record'],
   ['atlas-vat', `${bench}/atlas-vat/check.mjs`],
   ['workers', `${bench}/workers/run.mjs`],
   ['browser-tests', `${bench}/gates/run-browser-tests.mjs`],

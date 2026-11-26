@@ -12,10 +12,8 @@
 // 6. units (@margoengine/clustered/units): an 800 lm spot's centre pixel at base/pi x candelaToLux(lumensToCandela(...));
 // 7. SH light probe (@margoengine/environment SHLight): the sphere and box lit by nine RGB coefficients alone,
 //    base x SHLight.irradiance(n).
-// Writes results/light-features-gpu.json and the frames to test-results/light-features-*.png.
+// Writes test-results/light-features-gpu.json (with --record, the tracked results/light-features-gpu.json) and the frames to test-results/light-features-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { parseIES, iesCandela } from '../../packages/clustered/dist/ies.js';
@@ -23,6 +21,7 @@ import { lumensToCandela, candelaToLux, exposureFromEV100 } from '../../packages
 import { iesFile, range } from '../../packages/clustered/test/ies-reference.js';
 import { projectorColor, image } from '../../packages/clustered/test/projector-reference.js';
 import { SHLight } from '../../packages/environment/dist/index.js';
+import { writeReport } from './results-output.mjs';
 
 const base = 0.6,
   tolerance = 3;
@@ -315,8 +314,5 @@ try {
 } finally {
   await context.close();
 }
-await writeFile(
-  resolve(import.meta.dirname, 'results/light-features-gpu.json'),
-  JSON.stringify(report, null, 2) + '\n',
-);
+writeReport('light-features-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('light features GPU check passed');

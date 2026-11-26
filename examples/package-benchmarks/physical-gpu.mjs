@@ -10,15 +10,14 @@
 //    the same pixels without refraction as a control.
 // 4. Lit: each preset, both kinds, refracting, with shadows, IBL, fog and clustered lights + LocalShadows: renders with 0
 //    validation errors or throws gltf/pbr's named texture-limit error (a glTF physical material has 13 textures of its own).
-// Every frame is checked for 0 WebGPU validation errors. Writes results/physical-gpu.json and test-results/physical-*.png.
+// Every frame is checked for 0 WebGPU validation errors. Writes test-results/physical-gpu.json (with --record, the tracked results/physical-gpu.json) and test-results/physical-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { invertMatrix } from '../../packages/math/dist/mat4.js';
 import * as ref from '../../packages/materials/test/physical-reference.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'run on AC power only');
@@ -326,10 +325,7 @@ try {
 } finally {
   report.powerOnline.after = ac();
   report.pageErrors = pageErrors;
-  await writeFile(
-    resolve('examples/package-benchmarks/results/physical-gpu.json'),
-    JSON.stringify(report, null, 2) + '\n',
-  );
+  writeReport('physical-gpu.json', JSON.stringify(report, null, 2) + '\n');
   await context.close();
 }
 assert.deepEqual(pageErrors, []);

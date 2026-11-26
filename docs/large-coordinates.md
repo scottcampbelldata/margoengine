@@ -75,7 +75,8 @@ model (gltf/pbr shading), at each distance, with and without the plugin. Every f
 kind rendered by core near the origin: silhouette centroid offset (sub-pixel), pixels whose coverage differs (XOR of
 the masks) and mean colour difference (0-255). Jitter = largest frame-to-frame change of the centroid offset. The pick
 is `engine.pick` on a pixel inside the reference silhouette (core meshes: plain `engine.pick`; gltf/pbr: selection's
-`Picking` plugin). Results: `examples/package-benchmarks/results/large-coordinates-gpu.json`; frame 0 images in
+`Picking` plugin). Results: `test-results/large-coordinates-gpu.json` (with `--record`, the tracked
+`examples/package-benchmarks/results/large-coordinates-gpu.json`); frame 0 images in
 `test-results/large-coordinates-*.png`.
 
 | Distance | Core alone: offset / jitter (px) | XOR px (of ~3,940) | Colour | Pick | Plugin: offset / jitter (px) | XOR px | Colour | Pick |

@@ -621,17 +621,17 @@ route is a clone because 1.0.0 is not on npm yet.
 | Post stack per effect, SSAO + IBL | `node examples/package-benchmarks/gates/post-stack.mjs` | yes | `results/gates-post-stack.json` | |
 | DOF before/after | `node examples/package-benchmarks/gates/dof.mjs --baseline=5b9dbbd` | yes | `results/gates-dof.json` | Builds the baseline. |
 | Loaders + memory cycles | `node examples/package-benchmarks/gates/memory.mjs` | yes | `results/gates-memory.json` | |
-| Native glass tint draw cost | `node scripts/run-with-timeout.mjs run -- node examples/package-benchmarks/tint-pass-gpu.mjs` | yes | `results/tint-pass-gpu.json` | Patches the served gltf/pbr build for its comparison arms; fails if an arm leaves the frame unchanged. About 10 minutes. |
-| Precise maths against the WGSL builtins | `node scripts/run-with-timeout.mjs run -- node examples/package-benchmarks/precise-math-gpu.mjs` | yes | `results/precise-math-gpu.json` | Compute functions and path tracer lenses. |
+| Native glass tint draw cost | `node scripts/run-with-timeout.mjs run -- node examples/package-benchmarks/tint-pass-gpu.mjs --record` | yes | `results/tint-pass-gpu.json` | Patches the served gltf/pbr build for its comparison arms; fails if an arm leaves the frame unchanged. About 10 minutes. |
+| Precise maths against the WGSL builtins | `node scripts/run-with-timeout.mjs run -- node examples/package-benchmarks/precise-math-gpu.mjs --record` | yes | `results/precise-math-gpu.json` | Compute functions and path tracer lenses. |
 | Growable ECS worlds against fixed ones | `node examples/package-benchmarks/ecs-growable.mjs` | no | console | |
 | Workgroup sizes of the compute package's own kernels | `node scripts/run-with-timeout.mjs run -- node packages/compute/tests/compute-browser.mjs`, line `tuneCompute, 16M elements` | no | console | perf-history entry 77 |
 | Subgroup kernels against the default compute kernels | `node examples/package-benchmarks/compute-subgroups.mjs` | yes | `examples/package-benchmarks/results/compute-subgroups.json` | |
 | Shadow shimmer | `node examples/package-benchmarks/shadow-shimmer.mjs` | yes | `results/shadow-shimmer.json` | |
-| Textured instancing on GPU | `node examples/package-benchmarks/textured-instancing-gpu.mjs` | yes | `results/textured-instancing-gpu.json` | |
+| Textured instancing on GPU | `node examples/package-benchmarks/textured-instancing-gpu.mjs --record` | yes | `results/textured-instancing-gpu.json` | |
 | Atlas + VAT | `node examples/package-benchmarks/atlas-vat/check.mjs` | yes | `test-results/atlas-vat-check.json` | Result is not committed today. |
 | Workers / OffscreenCanvas | `node examples/package-benchmarks/workers/run.mjs` | yes | `results/workers.json` | Edge and Chrome. |
-| VFX 100k/1M particles | `node examples/package-benchmarks/vfx-gpu.mjs --a=<dist> --b=packages/vfx/dist` | yes | `results/vfx-gpu-*.json` | A/B of two builds: snapshot a baseline dist first (header of the script). Not in the features suite. |
-| Scatter cull, atomic against ordered (LIM-034) | `node examples/package-benchmarks/scatter-cull-gpu.mjs --a=test-results/scatter-base --b=packages/scatter/dist` | yes | `results/scatter-cull-gpu-*.json` | A/B of two builds: snapshot a baseline dist first (header of the script). Asserts both builds hold the same instances. |
+| VFX 100k/1M particles | `node examples/package-benchmarks/vfx-gpu.mjs --a=<dist> --b=packages/vfx/dist --record` | yes | `results/vfx-gpu-*.json` | A/B of two builds: snapshot a baseline dist first (header of the script). Not in the features suite. |
+| Scatter cull, atomic against ordered (LIM-034) | `node examples/package-benchmarks/scatter-cull-gpu.mjs --a=test-results/scatter-base --b=packages/scatter/dist --record` | yes | `results/scatter-cull-gpu-*.json` | A/B of two builds: snapshot a baseline dist first (header of the script). Asserts both builds hold the same instances. |
 | Island demo with VFX | `node examples/package-benchmarks/vfx-island.mjs --variants=...` | yes | `results/vfx-island-*.json` | Needs variant builds. Not in the features suite. |
 | Pipeline toggles | `node examples/package-benchmarks/pipeline-toggles/toggle.mjs [stall|pixels|gpu|override]` | yes | `results/pipeline-toggles.json` | Not in the features suite (needs `old-gltf.mjs` first for `pixproof`). |
 | Every real-browser test | `node examples/package-benchmarks/gates/run-browser-tests.mjs` | yes | `results/gates-browser-tests.json` | 41 scripts; `modern-hardware-gpu-tests.js` needs `GPU_VENDOR` and a discrete GPU. |

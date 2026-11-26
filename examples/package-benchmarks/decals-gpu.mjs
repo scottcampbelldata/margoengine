@@ -9,14 +9,13 @@
 // 3. Atlas: an 'over' decal addressing the red quadrant of an 8 x 8 atlas shows exactly tonemap(0.6, 0, 0) inside.
 // 4. Camera inside a decal box: still drawn (back faces, no depth test).
 // 5. No Decals equals an empty Decals.
-// Writes results/decals-gpu.json and test-results/decals-*.png.
+// Writes test-results/decals-gpu.json (with --record, the tracked results/decals-gpu.json) and test-results/decals-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const bench = process.argv.includes('--bench');
 const powerBefore = ac();
@@ -293,5 +292,5 @@ for (const msaa of ['4', '1']) {
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 assert.deepEqual(problems, [], 'decal checks failed');
-await writeFile(resolve(import.meta.dirname, 'results/decals-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('decals-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('decals GPU check passed');

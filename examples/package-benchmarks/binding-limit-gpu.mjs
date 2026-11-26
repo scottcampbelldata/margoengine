@@ -5,7 +5,7 @@
 // named-combination error (17 sampled textures). 2. The same at the adapter's raised limits is the reference. 3. The working
 // tree (BRDF LUT in a storage buffer) on a default-limits device renders with no error and must match the reference.
 // 4. Karis's analytic fit in place of the LUT, measured only (whole frame, and per sphere: centre vs rim, i.e. grazing).
-// Writes results/binding-limit-gpu.json and the frames to test-results/binding-limit-*.png.
+// Writes test-results/binding-limit-gpu.json (with --record, the tracked results/binding-limit-gpu.json) and the frames to test-results/binding-limit-*.png.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -14,9 +14,10 @@ import { build } from 'vite';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
-  ref = process.argv[2] ?? 'e017d50',
+  ref = process.argv.slice(2).find((a) => !a.startsWith('--')) ?? 'e017d50',
   slash = (v) => v.replaceAll('\\', '/');
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'measure on AC power only');
@@ -176,5 +177,5 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-await writeFile(resolve(import.meta.dirname, 'results/binding-limit-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('binding-limit-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('binding limit GPU check passed');

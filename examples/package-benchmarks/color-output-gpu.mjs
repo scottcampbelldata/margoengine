@@ -1,11 +1,11 @@
 // Real-GPU check of ColorOutput (Display P3 / HDR canvas) from @margoengine/environment, after npm run build:packages,
 // on AC power. Headed by default so matchMedia reports the real display (HEADLESS=1 to skip):
 //   node scripts/run-with-timeout.mjs -- node examples/package-benchmarks/color-output-gpu.mjs
-// MARGO_BROWSER=chrome for Chrome (default Edge on Windows, see docs/benchmarking.md). Writes examples/package-benchmarks/results/color-output-gpu-<channel>.json.
+// MARGO_BROWSER=chrome for Chrome (default Edge on Windows, see docs/benchmarking.md). Writes test-results/color-output-gpu-<channel>.json (with --record, the tracked results/color-output-gpu-<channel>.json).
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { openBrowser } from '../../scripts/browser.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 assert.notEqual(ac(), 'False', 'run on AC power only');
 const context = await openBrowser({
@@ -98,9 +98,8 @@ report.identical = {
 };
 console.log('in-gamut difference P3 on vs off (8-bit P3 units)', JSON.stringify(report.identical));
 assert.ok(report.identical.plainPatch <= 2 && report.identical.coreBox <= 2, 'sRGB content looks the same with P3 on');
-mkdirSync(new URL('./results/', import.meta.url), { recursive: true });
-writeFileSync(
-  new URL(`./results/color-output-gpu-${hardware.requestedChannel ?? hardware.browserName}.json`, import.meta.url),
+writeReport(
+  `color-output-gpu-${hardware.requestedChannel ?? hardware.browserName}.json`,
   JSON.stringify(report, null, 2) + '\n',
 );
 console.log('color output GPU check passed');

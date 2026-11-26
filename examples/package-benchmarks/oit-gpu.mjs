@@ -10,14 +10,13 @@
 //    pixels that change sharply between frames beyond what the reference itself changes (popping).
 // 5. GPU time (Stats timestamp profiler, median) at 1280x720 and 1920x1080, MSAA 4x: opaque only, sorted, OIT; after
 //    scripts/quiet-gate.mjs (numbers without a quiet machine are marked diagnostic).
-// Writes results/oit-gpu.json and frames to test-results/oit-*.png.
+// Writes test-results/oit-gpu.json (with --record, the tracked results/oit-gpu.json) and frames to test-results/oit-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'measure on AC power only');
@@ -338,5 +337,5 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-await writeFile(resolve(import.meta.dirname, 'results/oit-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('oit-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('OIT GPU check passed');

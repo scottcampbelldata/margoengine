@@ -4,17 +4,17 @@
 // Every sample launches a fresh browser (fresh profile: cold shader caches, as on a first visit). Runs the quiet gate
 // first unless --no-quiet (then, or if it times out, the numbers are diagnostic). The final frame of each warm sample is compared with the
 // cold sample of the same feature (delta 0 everywhere, so the images should match): `image` = max RGB difference and
-// share of differing pixels. Writes examples/package-benchmarks/results/warm-up-gpu.json.
+// share of differing pixels. Writes test-results/warm-up-gpu.json (with --record, the tracked results/warm-up-gpu.json).
 import { browserLabel, launchBrowser } from '../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
 import { noFileWatcher } from '../../scripts/support/no-file-watcher.js';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { waitForQuiet, onAC } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
 import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
+import { writeReport } from './results-output.mjs';
 
 const root = resolve(import.meta.dirname, '../..'),
   arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -153,5 +153,4 @@ const report = {
   summary,
   samples,
 };
-mkdirSync(resolve(import.meta.dirname, 'results'), { recursive: true });
-writeFileSync(resolve(import.meta.dirname, 'results/warm-up-gpu.json'), JSON.stringify(report, null, 1) + '\n');
+writeReport('warm-up-gpu.json', JSON.stringify(report, null, 1) + '\n');

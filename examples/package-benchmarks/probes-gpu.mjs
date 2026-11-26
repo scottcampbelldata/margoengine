@@ -21,10 +21,8 @@
 //    where it is off screen the floor keeps the probe reflection (equal to the frame without SSR).
 // Environment scene (?scene=env, no walls): the volume's SH equals the Environment's own SH, and spheres lit by
 // LightProbes({environment}) match EnvironmentLighting.
-// Writes results/probes-gpu.json and test-results/probes-*.png.
+// Writes test-results/probes-gpu.json (with --record, the tracked results/probes-gpu.json) and test-results/probes-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
@@ -32,6 +30,7 @@ import { materialRoughness, output } from './parts/display.mjs';
 import { mirrorWallTruth, probeLevelBlend, room, splitSum, wallAt } from './parts/probe-truth.mjs';
 import { halfToFloat, shBasis, SH_IRRADIANCE_BANDS } from '../../packages/environment/dist/index.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const bench = process.argv.includes('--bench');
 const powerBefore = ac();
@@ -577,5 +576,5 @@ const report = {
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
 assert.deepEqual(failures, [], 'probe checks failed');
-await writeFile(resolve(import.meta.dirname, 'results/probes-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('probes-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('probes GPU check passed');

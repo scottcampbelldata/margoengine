@@ -7,13 +7,12 @@
 // 2. GPU pass time (timestamp queries, median of 40 profiled frames) at 1280x720 for 8 clustered point lights (maxLights 8)
 //    with 0/1/4/8 shadowed, maps cached (static casters) and re-rendered every frame (one dynamic caster), plus 8 shadowed
 //    spot lights; the unshadowed baseline first and last. 19 box casters plus the floor.
-// Writes results/local-shadows-gpu.json and the frames to test-results/local-shadows-*.png.
+// Writes test-results/local-shadows-gpu.json (with --record, the tracked results/local-shadows-gpu.json) and the frames to test-results/local-shadows-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'measure on AC power only');
@@ -105,5 +104,5 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-await writeFile(resolve(import.meta.dirname, 'results/local-shadows-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('local-shadows-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('local shadows GPU check passed');

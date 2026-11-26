@@ -12,16 +12,15 @@
 // 3. Two-sided: a light facing away from the floor leaves it black; twoSided lights it exactly like the light turned down.
 //    A window's light set back in its wall with a sill (`recess`, `sill`) equals the CPU mirror's clipped rectangle.
 // 4. --bench: GPU pass time (timestamp queries, median) at 1280x720 with no AreaLights, an empty one, and 1/4/16 lights.
-// Writes the frames to test-results/area-lights-*.png, and with --bench results/area-lights-gpu.json.
+// Writes the frames to test-results/area-lights-*.png, and with --bench test-results/area-lights-gpu.json (with --record too, the tracked results/area-lights-gpu.json).
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { decodePNG } from '../../tests/support/png.js';
 import { pbrNeutral } from '../../packages/shared/display.js';
 import { AreaLights } from '../../packages/clustered/dist/area.js';
 import { ltc, bruteForce } from '../../packages/clustered/test/ltc-reference.js';
 import { cpuLoad, powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const bench = process.argv.includes('--bench') && !process.argv.includes('--no-timing'),
   benchOnly = process.argv.includes('--bench-only') && !process.argv.includes('--no-timing');
@@ -304,6 +303,5 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-if (bench)
-  await writeFile(resolve(import.meta.dirname, 'results/area-lights-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+if (bench) writeReport('area-lights-gpu.json', JSON.stringify(report, null, 2) + '\n');
 console.log('area lights GPU check passed');

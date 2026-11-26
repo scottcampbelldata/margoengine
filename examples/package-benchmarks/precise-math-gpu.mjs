@@ -6,7 +6,7 @@
 // the ray generation's precise calls swapped for the builtins in the served shader text. The repository's code is not
 // changed. Arms take turns inside each round so clock and heat drift falls on both alike; each row is the median of the
 // rounds, each round the mean of its faster half of trials. The camera lens makes no precise call: it is the control.
-// PRECISE_ROUNDS=1 gives a quick trial. Writes results/precise-math-gpu.json.
+// PRECISE_ROUNDS=1 gives a quick trial. Writes test-results/precise-math-gpu.json (with --record, the tracked results/precise-math-gpu.json).
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
@@ -15,6 +15,7 @@ import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { acPower } from './parts/power.mjs';
 import { median as nearestMedian } from '../../scripts/lib/percentile.mjs';
+import { writeReport } from './results-output.mjs';
 
 const ROUNDS = Number(process.env.PRECISE_ROUNDS ?? 5),
   COUNT = 1 << 24,
@@ -126,9 +127,10 @@ try {
     console.table(report.tracer[`${bounces} bounces`]);
   }
   assert.deepEqual(pageErrors, []);
-  const out = process.env.PRECISE_OUT ?? 'examples/package-benchmarks/results/precise-math-gpu.json';
-  await writeFile(resolve(out), `${JSON.stringify(report, null, 2)}\n`);
-  console.log(`wrote ${out}`);
+  const body = `${JSON.stringify(report, null, 2)}\n`,
+    out = process.env.PRECISE_OUT;
+  if (out) await writeFile(resolve(out), body);
+  console.log(`wrote ${out ?? writeReport('precise-math-gpu.json', body)}`);
 } finally {
   await context.close();
 }

@@ -10,14 +10,13 @@
 // 5. (4x) Flicker: frame-to-frame change with a still camera and over a slow pan, fog against no fog.
 // 6. GPU cost (timestamp queries, Stats profiler): fog variants and grid sizes at 1280x720 and 1920x1080, after
 //    scripts/quiet-gate.mjs (labelled diagnostic when the machine did not get quiet).
-// Writes results/volumetric-gpu.json and frames to test-results/volumetric-*.png.
+// Writes test-results/volumetric-gpu.json (with --record, the tracked results/volumetric-gpu.json) and frames to test-results/volumetric-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { decodePNG } from '../../tests/support/png.js';
 import { powerOnlineText as ac } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 const powerBefore = ac();
 assert.notEqual(powerBefore, 'False', 'measure on AC power only');
@@ -297,6 +296,6 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-await writeFile(resolve(import.meta.dirname, 'results/volumetric-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('volumetric-gpu.json', JSON.stringify(report, null, 2) + '\n');
 for (const check of deferred) check();
 console.log('volumetric GPU check passed');

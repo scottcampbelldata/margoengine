@@ -8,14 +8,13 @@
 // The scene: unlit boxes on three LOD meshes (fade bands on) over a 512 x 512 heightmap of hills, 4 candidates per
 // square metre, the camera 2 m above the ground looking along the field, drawn at 4x MSAA. The compute pass and the
 // draw pass are timed with timestamp queries (--enable-webgpu-developer-features turns off Chrome's quantization).
-// Writes examples/package-benchmarks/results/scatter-cull-gpu-<label>.json.
+// Writes test-results/scatter-cull-gpu-<label>.json (with --record, the tracked results/scatter-cull-gpu-<label>.json).
 import { deferSpeedEntry } from '../../scripts/support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { acPower } from './parts/power.mjs';
+import { writeReport } from './results-output.mjs';
 
 if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/scatter-cull-gpu.mjs')) {
   const arg = (name, fallback) =>
@@ -56,8 +55,7 @@ if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/scatter-cull-
     }
     report.acPowerAfter = acPower();
     assert.notEqual(report.acPowerAfter, false, 'Power dropped to battery during the run; discard it');
-    const out = resolve(import.meta.dirname, `results/scatter-cull-gpu-${config.label}.json`);
-    writeFileSync(out, JSON.stringify(report, null, 1) + '\n');
+    const out = writeReport(`scatter-cull-gpu-${config.label}.json`, JSON.stringify(report, null, 1) + '\n');
     console.log('wrote', out);
   } finally {
     await browser?.close();

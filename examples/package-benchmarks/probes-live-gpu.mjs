@@ -9,14 +9,13 @@
 // 2. Per-frame GPU cost (--bench, quiet-gated): timestamp queries on every pass the capture encodes, per frame, for
 //    frames with only faces and frames with the prefilter; the main frame's own passes (Stats); and one bake (six faces
 //    plus the full-source convolution) for comparison.
-// Writes examples/package-benchmarks/results/probes-live-gpu.json and test-results/probes-live-*.png.
+// Writes test-results/probes-live-gpu.json (with --record, the tracked results/probes-live-gpu.json) and test-results/probes-live-*.png.
 import assert from 'node:assert/strict';
-import { writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { cpuLoad, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { powerOnlineText as ac } from './parts/power.mjs';
 import { distribution } from '../../scripts/lib/percentile.mjs';
+import { writeReport } from './results-output.mjs';
 
 const bench = process.argv.includes('--bench');
 const powerBefore = ac();
@@ -134,6 +133,6 @@ try {
 }
 report.powerOnline.after = ac();
 assert.notEqual(report.powerOnline.after, 'False', 'still on AC power');
-await writeFile(resolve(import.meta.dirname, 'results/probes-live-gpu.json'), JSON.stringify(report, null, 2) + '\n');
+writeReport('probes-live-gpu.json', JSON.stringify(report, null, 2) + '\n');
 assert.deepEqual(failures, [], 'live probe checks failed');
 console.log('live probes GPU check passed');

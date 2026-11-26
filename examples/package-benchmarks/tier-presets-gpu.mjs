@@ -9,7 +9,6 @@
 import { deferSpeedEntry } from '../../scripts/support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createServer } from 'vite';
 import { noFileWatcher } from '../../scripts/support/no-file-watcher.js';
@@ -17,6 +16,7 @@ import { cpuLoad, onAC, waitForQuiet } from '../../scripts/quiet-gate.mjs';
 import { launchBrowser } from '../../scripts/lib/browser.mjs';
 import { closeAll } from '../../scripts/support/shutdown.mjs';
 import { nearestRank } from '../../scripts/lib/percentile.mjs';
+import { writeReport } from './results-output.mjs';
 
 if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/tier-presets-gpu.mjs')) {
   const root = resolve(import.meta.dirname, '../..'),
@@ -221,8 +221,7 @@ if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/tier-presets-
         };
       }
     console.log(JSON.stringify(report.summary, null, 1));
-    const out = resolve(import.meta.dirname, `results/tier-presets-${config.label}.json`);
-    writeFileSync(out, JSON.stringify(report, null, 1) + '\n');
+    const out = writeReport(`tier-presets-${config.label}.json`, JSON.stringify(report, null, 1) + '\n');
     console.log('wrote', out);
   } finally {
     await closeAll({ browser, servers });

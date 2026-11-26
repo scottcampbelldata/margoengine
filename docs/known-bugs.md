@@ -7421,6 +7421,22 @@ Release exception: Windows OpenSSH session: browser launch sometimes gets no Web
   views (baselines are per machine) and any batch 160 budget that holds such a surface outside gltf/pbr are re-recorded
   there.
 
+### Fixed 2026-11-26: the other GPU checks rewrote tracked result files on every run (KB-L4-trw)
+
+- **Repro:** run one of the `examples/package-benchmarks/*-gpu.mjs` checks (for example
+  `npm run test:gpu:area -w packages/clustered -- --bench`, or `binding-limit-gpu.mjs` with no flag): the tracked
+  report under `examples/package-benchmarks/results/` is rewritten with that run's machine, date and commit, so the
+  tree is not clean, the next rebase stops, and a record the docs cite is replaced.
+- **Cause:** 21 scripts besides post-effects-gpu.mjs (hunt K1, below) wrote their report straight into `results/`;
+  a check run and a record run were the same command.
+- **Fix:** every report goes through `writeReport` (`examples/package-benchmarks/results-output.mjs`):
+  `test-results/<file>` (ignored) unless the run passes `--record`. `PRECISE_OUT` of precise-math-gpu.mjs still names
+  any other file. The `features` bench suite passes `--record` to textured-instancing-gpu.mjs, whose report it
+  copies into its run folder before it restores the committed one. `docs/whitepaper/reproduce.md` shows `--record`
+  in the commands that name a results file.
+- **Regression:** `tests/benchmark-record.test.js` (both paths against a temporary root, and no script text naming a
+  tracked report), which fails on the old scripts; no GPU.
+
 ### Fixed 2026-11-12: post's GPU check rewrote a tracked result file on every run (hunt K1)
 
 - **Repro:** `npm run test:gpu:flare -w packages/post` on any machine leaves

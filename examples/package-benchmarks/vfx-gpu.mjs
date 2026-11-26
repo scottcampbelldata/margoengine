@@ -7,15 +7,14 @@
 // Light tier = 1x MSAA at DPR 1, full tier = 4x MSAA at DPR 1 (core caps 4x at DPR 1); 1432x768 is the laptop's
 // maximized browser canvas. Rounds alternate A/B order; every rounds/4 rounds both effects are recreated (odd
 // sessions create B first). --enable-webgpu-developer-features turns off Chrome's timestamp quantization. Particles use the Afterlight island options and camera; depth is cleared to far, so
-// nothing occludes them (worst case). Writes examples/package-benchmarks/results/vfx-gpu-<label>.json.
+// nothing occludes them (worst case). Writes test-results/vfx-gpu-<label>.json (with --record, the tracked results/vfx-gpu-<label>.json).
 import { deferSpeedEntry } from '../../scripts/support/speed-phase.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { openBrowser } from '../../scripts/browser.js';
 import { acPower } from './parts/power.mjs';
 import { summarizeTiming } from './parts/vfx-timing.mjs';
+import { writeReport } from './results-output.mjs';
 
 if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/vfx-gpu.mjs')) {
   const arg = (name, fallback) =>
@@ -74,8 +73,7 @@ if (!deferSpeedEntry(import.meta.url, 'examples/package-benchmarks/vfx-gpu.mjs')
     }
     report.acPowerAfter = power();
     assert.ok(report.acPowerAfter, 'Power dropped to battery during the run; discard it');
-    const out = resolve(import.meta.dirname, `results/vfx-gpu-${config.label}.json`);
-    writeFileSync(out, JSON.stringify(report, null, 1) + '\n');
+    const out = writeReport(`vfx-gpu-${config.label}.json`, JSON.stringify(report, null, 1) + '\n');
     console.log('wrote', out);
   } finally {
     await browser?.close();
