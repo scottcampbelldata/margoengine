@@ -1893,6 +1893,7 @@ import {PhysicsWorld} from 'margoengine/physics/world';
 import {BoundaryLayerWind} from 'margoengine/weather/boundary-layer';
 
 // A gale of 18 m/s across a deep lake, from its western shore, ten hours in.
+// The wind and depth are uniform across the lake, so one periodic row represents the same fetch.
 const wind = new BoundaryLayerWind({speed: 18, turbulence: false});
 const waves = new WaveSolver();
 new PhysicsWorld({rate: {num: 24, den: 1}}).add(waves, {
@@ -2086,3 +2087,83 @@ Apache-2.0 licensed. The solver is Margo's own, written clean room from public p
 ## Content Security Policy
 
 Wasm initialization needs `'wasm-unsafe-eval'` in `script-src` on restricted pages and worker responses. Blocked compilation rejects with MargoError code `failed` and a help link. See [the exact header and package requirements](../../docs/csp.md).
+
+### Heat conduction and phase change
+
+Use [the physics world](#the-solver-contract-margoenginephysicsworld) to advance heat diffusion independently of the frame rate.
+`HeatConduction` loads a SIMD Wasm kernel from the optional `@margoengine/physics/thermal` entry.
+It supports plain and shared world memory. The browser loads the shared build only when the page can use shared memory.
+It simulates a cell-centred grid with one material or a palette of materials.
+Insulated faces are the default. Set a fixed temperature, convection, radiation, or an inward heat flux at each exterior face.
+
+```ts
+import { HeatConduction } from '@margoengine/physics/thermal';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const heat = await HeatConduction.load();
+const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
+world.add(heat, {
+  dimensions: [8, 1, 1],
+  cellSize: [0.01, 0.05, 0.05],
+  materials: { conductivity: 1.8, heatCapacity: 1_600_000 },
+  initialTemperature: 900,
+  integration: 'implicit',
+  boundaries: { xMin: { kind: 'convection', kelvin: 293.15, coefficient: 24 } },
+});
+world.advance(240);
+const temperatures = heat.readTemperature();
+console.log(temperatures[0], temperatures[7]);
+```
+
+Temperatures are in K. The convection coefficient is in W/(m² K). A radiation boundary sets diffuse-grey emissivity from 0 to 1. It can combine radiation with a convection film at the same ambient temperature. A `flux` boundary uses W/m²,
+positive into the grid. A material's optional `phaseChange` supplies the melting temperature in K
+and volumetric latent heat in J/m³. Give `liquidHeatCapacity` when the phases have different capacities.
+`initialTemperature`, `initialLiquidFraction`, and `materialIndices` accept one value per cell in x-fastest order.
+
+Time integration defaults to forward Euler. Set `integration: 'implicit'` for backward Euler, which uses the
+new temperature for conductive and radiative fluxes. Both methods may choose a finer dyadic world rate.
+
+The temperature, enthalpy, and liquid-fraction fields are f64 grids in that same order.
+A coupled solver can add J per tick per cell into `heat.enthalpyField`. Sources and readers must use
+the same grid and origin cell. The world snapshots geometry, material coefficients, and state.
+`HeatConduction.load({ signal })` accepts cancellation, and an optional `id` gives each grid independent field names.
+
+### Thermal stress in a solid
+
+`Thermoelasticity` reads a heat grid's temperature port and solves small-strain mechanical equilibrium. Give it
+the same cell counts and sizes as the heat grid. Each material supplies Young's modulus in Pa, Poisson's ratio,
+and its linear thermal expansion coefficient in 1/K. The stress-free temperature defaults to 293.15 K.
+
+```ts
+import { HeatConduction, Thermoelasticity, type ThermoelasticRestraint } from '@margoengine/physics/thermal';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const dimensions = [2, 1, 1] as const;
+const cellSize = [0.1, 0.1, 0.1] as const;
+const heat = await HeatConduction.load();
+const solid = await Thermoelasticity.load({ temperatureField: heat.temperatureField });
+const restraints: ThermoelasticRestraint[] = [];
+for (const x of [0, dimensions[0]]) {
+  for (const y of [0, 1]) {
+    for (const z of [0, 1]) restraints.push({ node: [x, y, z], displacement: [0, null, null] });
+  }
+}
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+world.add(heat, {
+  dimensions, cellSize, initialTemperature: 333.15,
+  materials: { conductivity: 210, heatCapacity: 2_400_000 },
+});
+world.add(solid, {
+  dimensions, cellSize, restraints,
+  materials: { youngModulus: 69e9, poissonRatio: 0.33, expansionCoefficient: 23e-6 },
+});
+world.advance(1);
+console.log(solid.readStress()[0]); // axial compression in Pa
+```
+
+A node restraint fixes each supplied displacement in metres. A `null` component is free. The solver adds
+the minimal coordinate restraints needed to remove rigid translation and rotation. Read node displacement in metres,
+cell-average stress in [xx, yy, zz, xy, yz, zx] order in Pa, and reactions at user restraints in N. All arrays are
+x-fastest. Set `relativeTolerance` to control the residual (default 1e-9) and `maxIterations` for the solve
+(default twice the number of free nodal degrees of freedom, at least one). Supply `liquidFractionField` to reject cells that begin
+to melt. The elastic model assumes bonded solid cells and uses one-way coupling from heat to deformation.

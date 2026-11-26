@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19136489,
+  "total": 19145882,
   "history": [
     {
       "date": "2026-10-24",
@@ -12441,6 +12441,18 @@
       "commit": "feat(physics) the sea surface query",
       "reason": "New optional physics/sea entry: 0 to 3,437 B gzip budget, SpectralSea (the sea-surface query of height, normal, velocity at the surface and at depth, pressure and density) with the wave solver's wavenumber and band widths it shares. Nothing to split: it is one class, and the waves entry it reads is shared.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "7a8a0014ab",
+      "reason": "New optional FIRE-06 heat conduction entry measures 4,054 B gzip, and its 2,491 B Wasm loads on demand. Creative/post already grew on main from the published 7,190 B to 7,536 B after the per-view grading and scissored presentation fix in 5ffd9e6da6. That fix needs independent view bounds and uniforms, while splitting the shared shader would duplicate the presentation path. Core plus stage unchanged.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "954d88eca7",
+      "reason": "FIRE-06 thermal JS grows from 4,054 B to 6,476 B gzip and its shared Wasm from 2,491 B to 5,056 B for the tetrahedral thermoelastic solve and its field API. The heat-haze entry grows from 11,008 B to 13,299 B gzip for volume upload, exact per-voxel ray integration and GPU resource ownership. Splitting either entry would duplicate its shared loader or post-stack and depth handling. Core plus stage stays at 24,820 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13244,6 +13256,7 @@
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
+    "@margoengine/physics/thermal": 6732,
     "@margoengine/physics/tracers": 4952,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 16490,
@@ -13286,7 +13299,7 @@
     "@margoengine/post/glitch": 7455,
     "@margoengine/post/gtao": 14241,
     "@margoengine/post/halftone": 7290,
-    "@margoengine/post/heat-haze": 11037,
+    "@margoengine/post/heat-haze": 13698,
     "@margoengine/post/image": 14412,
     "@margoengine/post/lens": 8456,
     "@margoengine/post/lens-flare": 9203,

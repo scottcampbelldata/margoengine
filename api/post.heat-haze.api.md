@@ -29,11 +29,20 @@ export class HeatHaze implements EnginePlugin {
 
 export interface HeatHazeOptions {
     sources?: readonly HeatSource[] | (() => Iterable<HeatSource>);
+    temperatureVolume?: HeatHazeVolume | (() => HeatHazeVolume | undefined);
     strength?: number;
     turbulence?: number;
     ambient?: number;
     steps?: number;
     enabled?: boolean;
+}
+
+export interface HeatHazeVolume {
+    readonly origin: Axes;
+    readonly dimensions: Axes;
+    readonly cellSize: Axes;
+    readonly kelvin: ArrayLike<number>;
+    readonly pressure?: number;
 }
 
 export interface HeatPlume {
@@ -62,6 +71,8 @@ export function plumeBend(plume: HeatPlume, origin: Vec3, dir: Vec3, options?: {
 export function plumeExcess(height: number, length: number, ambient?: number): number;
 
 // Not exported from this entry, but used by the exports above:
+
+type Axes = readonly [number, number, number];
 
 type Vec3 = readonly [number, number, number];
 ```

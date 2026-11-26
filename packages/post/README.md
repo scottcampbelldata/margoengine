@@ -959,6 +959,43 @@ const flame = Flame.attach(engine, {position: [0, 0, 0], length: 4});
 PostStack.attach(engine, [new HeatHaze({sources: [flame]})]);
 ```
 
+### Heat haze from a temperature field
+
+Set `temperatureVolume` to a cell-centred air temperature grid, or a callback that returns the latest grid once per frame.
+Use a world-space lower corner in metres, the cell counts and cell sizes on each axis, and Kelvin values in x-fastest order.
+The pressure defaults to 101325 Pa. The renderer converts the values to air refractivity at that pressure, interpolates between
+the cell centres, and joins the field to ambient air over a cell interval at the boundary. The interpolation reaches ambient
+at the ghost centre half a cell past the outside face. Rays integrate the transverse gradient through the volume and stop at
+the nearest opaque surface. The grid can sit alongside plumes from separate fires. Its temperature already includes
+resolved fluctuations, so the analytic plume's eddies are not added to it.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {HeatConduction} from '@margoengine/physics/thermal';
+import {PhysicsWorld} from '@margoengine/physics/world';
+import {HeatHaze} from 'margoengine/post/heat-haze';
+const engine = await Engine.create(document.querySelector('canvas')!, {backend: 'webgpu'});
+const heat = await HeatConduction.load();
+const world = new PhysicsWorld({rate: {num: 24, den: 1}});
+const origin = [-0.15, 0, 0] as const;
+const dimensions = [3, 1, 1] as const;
+const cellSize = [0.1, 0.4, 0.4] as const;
+world.add(heat, {
+  dimensions, cellSize,
+  materials: {conductivity: 0.026, heatCapacity: 1206},
+  initialTemperature: [293.15, 800, 293.15],
+});
+HeatHaze.attach(engine, {
+  temperatureVolume: () => ({origin, dimensions, cellSize, kelvin: heat.readTemperature()}),
+});
+world.advance(24);
+```
+
+The renderer uploads a 32-bit refractivity value per cell and visits the interpolation cells a ray crosses, so draw
+cost depends on the grid resolution and its projected area. The maximum dimension is the GPU's 3D texture limit.
+This models the optics of an air temperature field at uniform pressure. The supplying solver sets the heat transport and
+air motion.
+
 ## Subsurface scattering: `SSS`
 
 `@margoengine/post/sss` (6,945 B min+gzip, its own entry; it carries the stack) softens skin, wax and marble: light that enters such a surface leaves it a little way off, so

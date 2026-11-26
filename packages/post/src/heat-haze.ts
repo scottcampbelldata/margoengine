@@ -43,10 +43,14 @@ import { invertMatrixStable } from '@margoengine/math/mat4';
 import { MargoError } from '@margoengine/math/errors';
 import type { StackHost, StackStage, StageOutput } from '../../shared/stack.js';
 import { displayFor, displayShader, premultipliedCanvas } from '../../shared/display.js';
+import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import { valueNoiseWgsl } from '../../shared/noise-wgsl.js';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
+import { type HeatHazeVolume, HeatHazeVolumeTexture, heatHazeVolumeWgsl } from './heat-haze-volume.js';
 import { PostStack } from './stack.js';
+
+export type { HeatHazeVolume } from './heat-haze-volume.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 type Vec3 = readonly [number, number, number];
@@ -112,6 +116,8 @@ export type HeatSource = HeatPlume | { readonly plume: HeatPlume };
 export interface HeatHazeOptions {
   /** The hot plumes: a list, or a function called every frame (`() => front.flameVolumes`). Default none. */
   sources?: readonly HeatSource[] | (() => Iterable<HeatSource>);
+  /** Simulated air temperature. A callback is read once per frame. Defaults to no grid. */
+  temperatureVolume?: HeatHazeVolume | (() => HeatHazeVolume | undefined);
   /** The bend as a multiple of the physical, 0 to 100. Default 1: the refraction of real hot air, about a pixel at a telephoto's field of view and less at a wide one. */
   strength?: number;
   /** Root-mean-square temperature fluctuation over the mean rise, 0 to 1 (George et al. 1977). Default 0.4. */
@@ -130,7 +136,7 @@ const HEAD = 40;
 // fn excess and fn plume: The plume at local q (footprint axes, the lean taken out): x the mean change of n, y the eddies' change. McCaffrey's centreline rise at height h, and Heskestad's Gaussian half-width there.
 // the march: At least two steps across the plume's narrowest half-width along the ray (it widens upward), up to 4 x steps.
 // the draw: The shift is the difference of two projections, so no bend moves no pixel by any rounding.
-const shader = (encode: boolean) => `${fullscreen}${encode ? displayShader : ''}
+const shader = (encode: boolean, volume: boolean) => `${fullscreen}${encode ? displayShader : ''}
 struct P {a:vec4f,b:vec4f,c:vec4f,d:vec4f}
 struct U {view:mat4x4f,inverse:mat4x4f,look:vec4f,misc:vec4f,plumes:array<P,${HEAT_HAZE_MAX_PLUMES}>}
 @group(0) @binding(0) var<uniform> u:U;
@@ -138,6 +144,7 @@ struct U {view:mat4x4f,inverse:mat4x4f,look:vec4f,misc:vec4f,plumes:array<P,${HE
 @group(0) @binding(2) var depth:texture_depth_2d;
 @group(0) @binding(3) var bilinear:sampler;
 ${valueNoiseWgsl}
+${volume ? heatHazeVolumeWgsl : ''}
 fn eddies(p:vec3f)->f32 {return (0.7*vnoise3(p)+0.3*vnoise3(p*2.03+vec3f(17.1,3.7,9.2))-0.5)/${HEAT_HAZE_NOISE_RMS};}
 fn excess(k:P,h:f32)->f32 {
  let z=max(0.235*max(h,0.0)/k.a.w,1e-6);let c=u.look.w/(2.0*9.80665)/0.81;
@@ -173,6 +180,7 @@ fn world(ndc:vec2f,d:f32)->vec3f {let p=u.inverse*vec4f(ndc,d,1.0);return p.xyz/
  var tb=1e30;
  if(dz>0.0){tb=max(dot(world(ndc,dz)-o,dir),1e-4);}
  var bend=vec3f(0.0);var first=1e30;
+ ${volume ? 'let grid=gridBend(o,dir,tb);bend=grid.xyz;first=grid.w;' : ''}
  let count=i32(u.misc.x);let steps=u.misc.y;
  for(var j=0;j<count;j++){
   let k=u.plumes[j];
@@ -230,6 +238,7 @@ const plumeOf = (s: HeatSource): HeatPlume => ('plume' in s && s.plume ? s.plume
 export class HeatHaze implements EnginePlugin {
   readonly name = 'heat-haze';
   private engine?: Engine;
+  private device?: GPUDevice;
   private host?: StackHost;
   private stack?: PostStack;
   private stacked = false;
@@ -241,8 +250,10 @@ export class HeatHaze implements EnginePlugin {
   private readonly workspace = new Float64Array(52);
   private readonly pipelines = new Map<string, GPURenderPipeline>();
   private readonly list: HeatPlume[] = [];
-  private bindings?: GPUBindGroup;
+  private bindings?: ReturnType<typeof uniformGroups<GPUBindGroup>>;
   private bound: readonly unknown[] = [];
+  private volume?: HeatHazeVolumeTexture;
+  private volumeCurrent = false;
 
   constructor(readonly options: HeatHazeOptions = {}) {
     this.validate();
@@ -272,12 +283,19 @@ export class HeatHaze implements EnginePlugin {
   }
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
+    this.volumeCurrent = false;
   }
   private validate(): void {
     const o = this.options,
       within = (v: number | undefined, lo: number, hi: number) => v === undefined || (v >= lo && v <= hi);
     if (o.sources !== undefined && typeof o.sources !== 'function' && !Array.isArray(o.sources))
       throw new TypeError('HeatHaze sources must be a list of plumes or flames, or a function returning them');
+    if (
+      o.temperatureVolume !== undefined &&
+      typeof o.temperatureVolume !== 'function' &&
+      (!o.temperatureVolume || typeof o.temperatureVolume !== 'object')
+    )
+      throw new TypeError('HeatHaze temperatureVolume must be a grid or a callback; pass a cell-centred grid');
     if (o.enabled !== undefined && typeof o.enabled !== 'boolean')
       throw new TypeError('HeatHaze enabled must be a boolean; pass true or false');
     if (!within(o.strength, 0, 100) || !within(o.turbulence, 0, 1) || !within(o.ambient, 200, 340))
@@ -302,6 +320,7 @@ export class HeatHaze implements EnginePlugin {
     if (!engine.gpu)
       throw new MargoError('unsupported', 'HeatHaze requires a GPU device (WebGPU or the WebGL2 compatibility layer)');
     this.engine = engine;
+    this.device = engine.gpu;
     this.uniform = engine.gpu.createBuffer({
       size: this.values.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -365,43 +384,69 @@ export class HeatHaze implements EnginePlugin {
       m = c.camera.matrix,
       ambient = o.ambient ?? 293.15,
       plumes = (o.enabled ?? true) ? this.gather() : [];
+    const view = c.view ?? c;
+    currentFrame(device, view);
+    if (!this.volumeCurrent) {
+      const source = (o.enabled ?? true) ? o.temperatureVolume : undefined;
+      const volume = typeof source === 'function' ? source() : source;
+      if (volume !== undefined) {
+        if (!volume || typeof volume !== 'object')
+          throw new TypeError('HeatHaze temperatureVolume callback must return a cell-centred grid or undefined');
+        const refractivity = airRefractivity(ambient, volume.pressure);
+        (this.volume ??= new HeatHazeVolumeTexture(device)).update(volume, ambient, refractivity);
+      } else {
+        this.volume?.dispose();
+        this.volume = undefined;
+      }
+      this.volumeCurrent = true;
+    }
+    const volume = this.volume?.resources;
     v.set(m);
     if (!invertMatrixStable(m, v.subarray(16, 32), this.workspace))
       throw new MargoError('state', 'Invalid HeatHaze camera; give the camera a finite, invertible projection');
     v.set([o.strength ?? 1, o.turbulence ?? 0.4, airRefractivity(ambient), ambient], 32);
     v.set([plumes.length, o.steps ?? 24, 0, 0], 36);
     plumes.forEach((p, i) => writePlume(p, ambient, this.clock, v, HEAD + i * PLUME_FLOATS));
-    device.queue.writeBuffer(this.uniform!, 0, v, 0, HEAD + plumes.length * PLUME_FLOATS);
-    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}:${premultipliedCanvas(this.engine)}`;
+    const copy = writeUniform(device, this.uniform!, v.subarray(0, HEAD + plumes.length * PLUME_FLOATS), view);
+    const key = `${output.format}:${output.multisample?.count ?? 1}:${+output.hdr}:${premultipliedCanvas(this.engine)}:${!!volume}`;
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
-      pipeline = render(device, displayFor(this.engine, shader(!output.hdr)), output.format, {
+      pipeline = render(device, displayFor(this.engine, shader(!output.hdr, !!volume)), output.format, {
         multisample: output.multisample,
       });
       this.pipelines.set(key, pipeline);
     }
     const depth = this.host!.depthTexture!,
-      parts = [pipeline, input, depth];
+      parts = [pipeline, input, depth, volume?.[0], volume?.[1]];
     if (parts.some((part, i) => part !== this.bound[i])) {
       this.bound = parts;
-      this.bindings = group(device, pipeline, [
-        { buffer: this.uniform! },
-        input,
-        depth.createView({ aspect: 'depth-only' }),
-        this.sampler!,
-      ]);
+      const depthView = depth.createView({ aspect: 'depth-only' });
+      const activePipeline = pipeline;
+      this.bindings = uniformGroups(this.uniform!, (uniform) =>
+        group(device, activePipeline, [
+          uniform,
+          input,
+          depthView,
+          this.sampler!,
+          ...(volume ? [volume[0], { buffer: volume[1] }] : []),
+        ]),
+      );
     }
     const pass = c.encoder.beginRenderPass({
       colorAttachments: [{ view: output.view, loadOp: viewLoadOp(c, 'clear'), storeOp: 'store' }],
     });
     pass.setPipeline(pipeline);
-    pass.setBindGroup(0, this.bindings!);
+    pass.setBindGroup(0, this.bindings!.get(copy));
     applyView(pass, c);
     pass.draw(3);
     pass.end();
   }
   private release(): void {
-    this.uniform?.destroy();
+    if (this.device) retire(this.device, this.uniform);
+    this.device = undefined;
+    this.volume?.dispose();
+    this.volume = undefined;
+    this.volumeCurrent = false;
     this.uniform = this.bindings = this.sampler = undefined;
     this.pipelines.clear();
     this.bound = [];

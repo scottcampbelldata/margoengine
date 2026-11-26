@@ -390,6 +390,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/shadows/test/cache.test.js`, "a caster moving every frame leaves the cached map instead of redrawing it
   every frame".
 
+### Open: the original kiln and turbofan shots await FIRE-06 scene integrations
+
+- The physics coupling tests evolve the heat grid and read its temperature for ceramic emission and gas expansion. The heat-haze renderer accepts the temperature volume. A thermoelastic solver reads the same thermal field to compute solid stresses.
+- THE-KILN-SHIFT-3, THE-KILN-SHIFT-5 and INSIDE-A-TURBOFAN-4 remain open in the demo review. Their source scenes are absent from the engine checkout. The turbofan also needs the reaction and advecting gas fields from FIRE-02 and FLUID-04. [Physics demo review](physics-demo-review.md)
+
 ### Fixed 2026-11-25: a port big enough to grow the world's memory at its first publish crashed the field registry (KB-PHYS-REGISTRYGROW1, physics world)
 
 - **Repro:** a `FieldRegistry` over a memory of one page; publish a 24 KiB port of a field (its two mirrors do not fit), or
@@ -15956,4 +15961,3 @@ point stopped and the cube turning about it, an equally valid answer of the same
 more firmly. The exact block solve of each manifold (`blockSolver`) gives the stop to all the points at once. Fixed by the
 block solver's default, which waits on KB-PHYS-BLOCK1; the test bounds the sweeps at 0.2 m until then. (The 2.2 cm sink that
 was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to its open bottom.)
-

@@ -52,6 +52,10 @@
       "types": "./dist/robots.d.ts",
       "import": "./dist/robots.js"
     },
+    "./thermal": {
+      "types": "./dist/thermal.d.ts",
+      "import": "./dist/thermal.js"
+    },
     "./world": {
       "types": "./dist/world/index.d.ts",
       "import": "./dist/world.js"

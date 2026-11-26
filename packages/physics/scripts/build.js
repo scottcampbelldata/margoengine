@@ -1,5 +1,6 @@
 import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
+import { copyFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -39,6 +40,7 @@ await build({
         sea: resolve(root, 'src/sea/index.ts'),
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         tracers: resolve(root, 'src/tracers.ts'),
+        thermal: resolve(root, 'src/thermal.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,
@@ -53,6 +55,8 @@ execFileSync(
 );
 // Copy the shared declarations the emitted .d.ts files reference into dist, so the packed package type-checks.
 await packageDeclarations(root);
+await copyFile(resolve(root, 'src/thermal/thermal-kernel.wasm'), resolve(dist, 'thermal-kernel.wasm'));
+await copyFile(resolve(root, 'src/thermal/thermal-kernel-shared.wasm'), resolve(dist, 'thermal-kernel-shared.wasm'));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

@@ -8890,3 +8890,27 @@ a 64 x 48 clip and a four-frame `renderFrames` sequence back within 1 level of t
 bytes, and a quarter-size draw of a black and white checker reads 188 (the linear-light average);
 `frames-check.mjs` draws the frames on WebGPU and the WebGL2 layer within 2 levels, as a map and as a glowing screen.
 UV transform centre (`uvTransform.center`, `@margoengine/materials`, 2026-11-25): applies to `new Material({ uvTransform })` and `setUVTransform`; it folds into the offset, so `transformUVs`, the atlas packer and `setUVTransformAt` on instances still take a plain `KHR_texture_transform` without `center`. Metaballs (`Metaballs`, `@margoengine/procedural`, 2026-11-25): each `geometry()` call re-polygonizes the whole grid on the CPU (resolution up to 128 per axis, the marching-cubes limit), so a 40-cube grid per frame is fine and a 128-cube grid is not; the pull is the finite-support cubic of Wyvill et al., not three.js's 1/d^2, so a ball's surface radius is under its `radius`. 3MF layered textures (`multiproperties` with several texture layers) are still not read: one texture per group.
+
+### Thermal conduction (`@margoengine/physics/thermal`, FIRE-06)
+
+The heat grid is Cartesian and cell-centred, with isotropic conductivity and piecewise constant sensible heat capacity. Phase change is isothermal and of fixed volume. Exterior faces support insulation, fixed temperature, convection using half-cell and film resistances in series, diffuse-grey radiation to fixed-temperature surroundings, and prescribed heat flux.
+
+The solver and scratch regions occupy 136 bytes per cell and a 40-byte geometry record in world memory. Backward Euler adds 8 bytes of scratch per cell. A grid with radiating faces adds another 8 bytes per cell and 40 bytes per radiating face. The field registry adds its mirrors and any accumulated sources. The solver supports plain and shared Wasm memory with SIMD. Each solver instance uses a 64 KiB stack region in world memory. The solver chooses the world rate from the finite-volume diffusion bound and subdivides a tick when needed. The numerical limits follow the world's Wasm address space and the kernel's u32 subdivision count. Forward Euler uses a step diffusion number at most 1/2. Backward Euler subdivides above 2 to bound the stationary iteration's convergence rate. Very stiff large grids still need a scalable sparse solve. The optional entry measures 6,674 B gzip. Each of its two lazy Wasm builds measures 12,160 B raw and 5,120 B gzip. A browser without shared memory support loads the plain build.
+
+Thermoelasticity solves quasistatic small-strain equilibrium in a bonded solid on the same Cartesian grid. Each
+cell is decomposed into six tetrahedra, with a common per-cell temperature and isotropic elastic properties. The
+solid takes prescribed nodal displacements and has zero traction on free surfaces. Coupling is one-way from the
+heat grid. A supplied liquid-fraction field rejects any positive melt fraction. Plastic flow, fracture and stresses
+within a fluid are outside this elastic model.
+
+Before alignment and the registry's mirrors, the elastic solver uses 136 bytes per cell, 65 bytes per nodal degree
+of freedom, and a 72-byte geometry record. The grid count is limited by the Wasm address space. A solve fails before
+publishing new mechanical results when the residual remains above the requested tolerance after its iteration budget.
+
+Heat haze accepts a temperature volume with the device's 3D texture dimension limit and one r32float texel per
+cell. The field fades to ambient at its exterior sample centres. The optional path uses a single reference
+wavelength, fixed local pressure, small-angle deflection along the camera ray, and the frame's existing colour
+and opaque depth. The effect samples the displaced colour inside the frame. Off-screen background
+and light paths that require large-angle or multiple refraction are outside this screen-space model. The heat-haze entry grows from 11,008 B to 13,299 B gzip for volume upload, ray integration and lifetime management.
+
+The shared sparse solver for stiff heat grids and the original kiln and turbofan scene integrations remain open.

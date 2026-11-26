@@ -44,10 +44,17 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
-- (none yet)
+- FIRE-06 needs sharable temperature-grid metadata and the framework's K12 sparse linear solver for very stiff heat grids. The optional thermal entry provides backward Euler using a matrix-free stationary solve. Its solid solver reads the temperature and optional phase port using explicitly supplied matching geometry.
 
 - RESOLVED (2026-11-25, see the commit that adds this note): The framework owners are needed for the API diagnostic quality gate for FIRE-06. On public main c62096b0a4, the API gate reports 12 missing repair instructions in `packages/physics/src/world/scheduler.ts`, one in `snapshot.ts`, and two in `world.ts`. Please give callers an actionable remedy for invalid accelerator and rate options, a corrupt snapshot, and incomplete implicit-pressure coupling declarations. The protected framework paths remain owner-managed.
   Every framework throw in `scheduler.ts`, `snapshot.ts` and `world.ts` now names its fix.
+
+- RESOLVED. The former 15,475 B gzip limit blocked FIRE-06 after the diagnostic fix.
+  The framework owner updated the world entry's limit to 16,490 B when the shared module layout landed
+  in d0a3529504. FIRE-06 with the plain and shared thermal builds measures 16,470 B for the world entry.
+
+- FIRE-06 uses module slot 2 for the plain and shared thermal builds. Please reserve this in the central
+  module table when production solvers join it.
 
 ## Research notes for open solvers
 
@@ -195,7 +202,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ICE-05 | Ice thermodynamics | none | Open | OPEN |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
-| FIRE-06 | Heat conduction and phase change | none | Codex | BUILDING (codex/physics-solvers) |
+| FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | BUILDING (codex/physics-solvers) |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
 | SOUND-02 | Enclosed and urban acoustics | partial | Open | OPEN |

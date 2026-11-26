@@ -100,7 +100,7 @@ await postBrowser(
       ripple: diff(strong, later),
     };
     console.log(JSON.stringify(result));
-    await t(() => window.t.engine.dispose());
+
     assert.equal(result.zeroDiffers, 0, 'strength 0 draws the frame of the effect off');
     assert.ok(result.real > 50, `real hot air moves the bars behind the plume: ${result.real} pixels`);
     assert.ok(result.strong > 2 * result.real, `a stronger bend moves more of them: ${result.strong}`);
@@ -108,5 +108,54 @@ await postBrowser(
     assert.ok(result.boxPixels > 4, `the box in front of the plume is in view: ${result.boxPixels} pixels`);
     assert.equal(result.boxChanged, 0, 'the box in front of the plume keeps every pixel');
     assert.ok(result.ripple > 50, `the eddies rise and the picture ripples: ${result.ripple} pixels`);
+
+    // THE-KILN-SHIFT-3: the former plume-only path had no way to read the simulated air temperature.
+    const bounds = await t(async () => {
+      const { HeatConduction } = await import('/packages/physics/dist/thermal.js');
+      const { PhysicsWorld } = await import('/packages/physics/dist/world.js');
+      const heat = await HeatConduction.load();
+      const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
+      const origin = [-1.2, 0, -1.6],
+        dimensions = [8, 8, 8],
+        cellSize = [0.3, 0.5, 0.4];
+      world.add(heat, {
+        dimensions,
+        cellSize,
+        materials: { conductivity: 0.026, heatCapacity: 1206 },
+        initialTemperature: 293.15,
+        boundaries: { xMin: { kind: 'flux', wattsPerSquareMetre: 100000 } },
+      });
+      window.t.haze.options.sources = [];
+      window.t.haze.options.temperatureVolume = () => ({
+        origin,
+        dimensions,
+        cellSize,
+        kelvin: heat.readTemperature(),
+      });
+      window.t.world = world;
+      const near = origin[2] + (dimensions[2] + 0.5) * cellSize[2];
+      const left = window.t.project([origin[0] - 0.5 * cellSize[0], 0, near])[0];
+      const right = window.t.project([origin[0] + (dimensions[0] + 0.5) * cellSize[0], 0, near])[0];
+      return [left, right];
+    });
+    const ambient = await frame({ haze: { strength: 20 }, time: 0 });
+    await t(() => window.t.world.advance(24 * 4));
+    const heated = await frame({ haze: {}, time: 0 });
+    const heatedOff = await frame({ haze: { enabled: false }, time: 0 });
+    const volume = {
+      compat: compatRun(),
+      ambient: diff(off, ambient),
+      heated: diff(ambient, heated, undefined, 4),
+      disabled: diff(off, heatedOff),
+      outside: diff(ambient, heated, (x) => x < bounds[0] - 1 || x > bounds[1] + 1),
+      foreground: diff(ambient, heated, onBox),
+    };
+    console.log(JSON.stringify({ temperatureVolume: volume }));
+    assert.equal(volume.ambient, 0, 'a uniform ambient field has zero optical displacement');
+    assert.ok(volume.heated > 25, 'the evolved temperature field moves the background pattern');
+    assert.equal(volume.disabled, 0, 'disabling the haze removes the temperature volume');
+    assert.equal(volume.outside, 0, 'no bend outside the field');
+    assert.equal(volume.foreground, 0, 'foreground surfaces are in front of the heated air');
+    await t(() => window.t.engine.dispose());
   },
 );

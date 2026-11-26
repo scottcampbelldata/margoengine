@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'thermal-kernel',
+    crate: 'packages/physics/thermal-kernel',
+    blueprint: 'packages/physics/src/thermal/thermal-kernel.wasm',
+    script: 'packages/physics/scripts/build-thermal-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'thermal-kernel-shared',
+    crate: 'packages/physics/thermal-kernel',
+    blueprint: 'packages/physics/src/thermal/thermal-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-thermal-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'physics2d-kernel',
     crate: 'packages/physics2d/kernel',
     blueprint: 'packages/physics2d/src/physics2d-kernel.wasm',

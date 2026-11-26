@@ -14,6 +14,13 @@ await root.Physics.load();
 console.warn = warn;
 await next.Physics.load();
 
+test('the optional thermal module is available through its package export', async () => {
+  const { HeatConduction } = await import('@margoengine/physics/thermal');
+  assert.equal(Object.hasOwn(root, 'HeatConduction'), false);
+  const solver = await HeatConduction.load({ id: 'entry-check' });
+  assert.equal(solver.describe().id, 'entry-check');
+});
+
 const entries = { rapier: root.Physics, own: next.Physics };
 const G = 9.81,
   DT = 1 / 60;

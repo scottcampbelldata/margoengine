@@ -9889,3 +9889,17 @@ SSAO's normal reconstruction (`extractShader`, KB-SSAO-SILHOUETTE1, same date): 
 a surface, so a silhouette pixel takes the depth step to its covered side and a one-pixel tip faces the camera.
 Evidence: `packages/post/test/ssao-silhouette-browser.mjs` (SSAO and GTAO, 12 turns, both backends, no occluded pixel
 on a lone face; 4 pixels down to 0.78 on WebGPU and down to 0.72 on the WebGL2 layer before).
+
+### Section 5 evidence: conduction and phase change (FIRE-06, 2026-11-25)
+
+The optional thermal entry loads a Rust Wasm SIMD kernel into the world's linear memory. Its cell-centred finite-volume method gives paired interior fluxes and keeps material coefficients with state for snapshot and restore. Both builds link in module slot 2 and allocate each instance's stack through the host. Sentinel tests verify that both builds leave the live arena intact, and the plain and shared worlds produce bit-identical conduction results.
+
+`packages/physics/tests/coupling/thermal.test.js` compares diffusion to a slab's Fourier mode, tests conservation and the layered-wall equilibrium, and checks melting and freezing against the Stefan front. A grey-face test checks the combined conductive, radiative and convective energy balance against a prescribed surface temperature. The kiln regression establishes the temperature gradient and heat loss after exposing a hot surface to a cooler fluid. Coupling tests cover source accumulation, arena growth, frame-rate independence and bit-identical replay.
+
+The backward Euler path shares the stencil and tests the exact discrete eigenmode at a stiff step, an enthalpy plateau during melt and freeze, and a grey face balanced at the new temperature. It also passes the replay and frame-rate tests.
+
+The production thermoelastic solver reads the same temperature port in the PhysicsWorld. Its tests verify affine free expansion, the axial stress and support reactions of a restrained bar, stress continuity in bonded materials, and hydrostatic stress under full restraint. Frame-rate and snapshot tests exercise the heat-to-stress path. A failed equilibrium keeps the preceding published output. Browser checks verify that importing the optional entry leaves its Wasm unloaded and that the browser fetches the module when a solver loads, on both rendering backends.
+
+In `packages/post/test/heat-haze-browser.mjs`, a changing thermal field displaces 2,123 native WebGPU and 2,131 WebGL2 compatibility fixture pixels by more than four RGB levels. The ambient, disabled, outside-volume and foreground cases each displace zero. The physics coupling tests verify a cooling gradient in photopic ceramic emission and the density decrease and expansion of heated gas at fixed pressure. The gas fixture supplies the pressure and mass balance while the flow and combustion solvers remain separate.
+
+Remaining evidence includes scalability for stiff heat grids with the shared sparse kernel and new renders of the original kiln and turbofan shots.

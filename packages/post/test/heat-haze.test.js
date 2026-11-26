@@ -13,6 +13,7 @@ import {
   plumeBend,
   plumeExcess,
 } from '../dist/heat-haze.js';
+import { harness } from './support.js';
 
 const near = (got, want, rel, label) =>
   assert.ok(Math.abs(got - want) <= rel * Math.abs(want), `${label}: ${got} against ${want} (within ${rel * 100}%)`);
@@ -122,4 +123,100 @@ test('HeatHaze options: ranges, kinds, and a stack is needed to set up', () => {
   assert.throws(() => new HeatHaze({ sources: 4 }), TypeError);
   assert.throws(() => new HeatHaze({ enabled: 'yes' }), TypeError);
   assert.throws(() => new HeatHaze().setup({ gpu: {} }), /PostStack/);
+});
+
+test('a cell-centred temperature field uploads air refractivity and releases its resources on disable', async () => {
+  const h = harness();
+  h.gpu.device.limits.maxTextureDimension3D = 16;
+  const ambient = 293.15;
+  const kelvin = new Float64Array([ambient, 2 * ambient, ambient / 2, ambient]);
+  let reads = 0;
+  const uploads = [];
+  const write = h.gpu.device.queue.writeTexture;
+  h.gpu.device.queue.writeTexture = (destination, data, layout, size) => {
+    if (destination.texture.dimension === '3d') uploads.push({ values: Array.from(data), layout, size });
+    write(destination, data, layout, size);
+  };
+  const haze = HeatHaze.attach(h.engine, {
+    temperatureVolume: () => {
+      reads++;
+      return { origin: [-0.5, 0, 0], dimensions: [2, 2, 1], cellSize: [0.5, 0.25, 1], kelvin };
+    },
+  });
+  try {
+    h.frame();
+    const refractivity = airRefractivity(ambient);
+    assert.equal(reads, 1);
+    assert.deepEqual(uploads, [
+      {
+        values: [0, Math.fround(-refractivity / 2), Math.fround(refractivity), 0],
+        layout: { bytesPerRow: 8, rowsPerImage: 2 },
+        size: [2, 2, 1],
+      },
+    ]);
+    assert.equal(h.live().filter((resource) => resource.dimension === '3d').length, 1);
+    haze.options.enabled = false;
+    h.frame();
+    await Promise.resolve();
+    assert.equal(reads, 1, 'disabled haze does not sample or upload the field');
+    assert.equal(h.live().filter((resource) => resource.dimension === '3d').length, 0);
+  } finally {
+    haze.dispose();
+  }
+});
+
+test('temperature volumes reject invalid grids before creating a 3D texture', () => {
+  const h = harness();
+  h.gpu.device.limits.maxTextureDimension3D = 3;
+  const grid = { origin: [0, 0, 0], dimensions: [1, 1, 1], cellSize: [1, 1, 1], kelvin: [293.15] };
+  const haze = HeatHaze.attach(h.engine);
+  try {
+    for (const bad of [
+      { dimensions: [4, 1, 1] },
+      { origin: [2 ** 30, 0, 0] },
+      { cellSize: [0, 1, 1] },
+      { kelvin: [0] },
+      { kelvin: [NaN] },
+      { kelvin: [] },
+    ]) {
+      haze.options.temperatureVolume = { ...grid, ...bad };
+      assert.throws(() => h.frame(), RangeError);
+      assert.equal(h.live().filter((resource) => resource.dimension === '3d').length, 0);
+    }
+  } finally {
+    haze.dispose();
+  }
+});
+
+test('temperature volume textures release on resize and are rebuilt after device restoration', async () => {
+  const h = harness();
+  h.gpu.device.limits.maxTextureDimension3D = 16;
+  const first = { origin: [0, 0, 0], dimensions: [1, 1, 1], cellSize: [0.5, 1, 1], kelvin: [800] };
+  const haze = HeatHaze.attach(h.engine, { temperatureVolume: first });
+  try {
+    h.frame();
+    const texture = h.live().find((resource) => resource.dimension === '3d');
+    assert.ok(texture);
+    haze.options.temperatureVolume = { ...first, dimensions: [2, 1, 1], kelvin: [800, 900] };
+    h.frame();
+    await Promise.resolve();
+    assert.ok(texture.destroyed, 'the previous shape retires its 3D texture');
+    const resized = h.live().find((resource) => resource.dimension === '3d');
+    assert.ok(resized);
+    const restored = h.lose();
+    restored.device.limits.maxTextureDimension3D = 16;
+    await Promise.resolve();
+    assert.ok(resized.destroyed, 'a device loss releases its own volume');
+    const frames = restored.record(() => h.frame());
+    assert.ok(
+      frames.some((entry) => entry[0] === 'texture' && entry[2]?.dimension === '3d'),
+      'the restored device allocates its own volume',
+    );
+    assert.ok(
+      frames.some((entry) => entry[0] === 'writeTexture'),
+      'the restored device receives the current field',
+    );
+  } finally {
+    haze.dispose();
+  }
 });

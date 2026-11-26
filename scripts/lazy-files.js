@@ -14,6 +14,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 /** @type {{package: string, file: string, label: string, kind: string, measure: 'file' | 'bundle', external?: RegExp[], when: string}[]} */
 export const LAZY_FILES = [
   {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/thermal-kernel.wasm',
+    label: 'thermal-kernel.wasm',
+    kind: 'Rust SIMD heat conduction',
+    measure: 'file',
+    when: 'HeatConduction.load() or Thermoelasticity.load() from the optional /thermal entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/thermal-kernel-shared.wasm',
+    label: 'thermal-kernel-shared.wasm',
+    kind: 'Rust SIMD heat conduction, shared world memory',
+    measure: 'file',
+    when: 'The optional /thermal entry loads a kernel on a host with shared memory support',
+  },
+  {
     package: '@margoengine/compute',
     file: 'packages/compute/dist/onnx-kernel.wasm',
     label: 'onnx-kernel.wasm',
