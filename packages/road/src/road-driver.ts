@@ -352,7 +352,8 @@ export class RoadDriver implements Solver<RoadDriverParams> {
     const table = this.port.regionWords(state.host.memory, state.commands) as Float64Array;
     const bodies = this.port.regionWords(state.host.memory, region) as Float32Array;
     const wet = weather ? (this.port.regionWords(state.host.memory, weather.region) as Float64Array) : undefined;
-    for (let i = 0; i < state.drivers.length; i++) controller(state.drivers[i]!, state, i, table, bodies, wet, offset, this.port.BODY_WORDS);
+    for (let i = 0; i < state.drivers.length; i++)
+      controller(state.drivers[i]!, state, i, table, bodies, wet, offset, this.port.BODY_WORDS);
   }
 
   exportPorts(tick: number): readonly Port[] {
@@ -392,7 +393,8 @@ export class RoadDriver implements Solver<RoadDriverParams> {
       if (!attachment.valid) return;
       const commands = world.fields.port(this.commandsField.name);
       attachment.readMotionState(this.motion(state, driver));
-      if (commands) attachment.setInput(output(this.port.regionWords(world.memory, commands.region) as Float64Array, index));
+      if (commands)
+        attachment.setInput(output(this.port.regionWords(world.memory, commands.region) as Float64Array, index));
     });
     const after = physics.on('afterstep', () => {
       if (attachment.valid) attachment.writeMotionState(this.motion(state, driver));

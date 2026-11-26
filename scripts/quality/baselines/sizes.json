@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20218754,
+  "total": 20224383,
   "history": [
     {
       "date": "2026-10-24",
@@ -12951,6 +12951,12 @@
       "commit": "1ab54b0c57",
       "grew": 1,
       "reason": "KB-BOUNCE-OCCLUDE1 clustered/bounce grows from 15,427 to 15,818 B gzip: bounceModelMeshes turns an added model's primitives (filters, node visibility, instance matrices) into visibility-map occluders, and sampleSurfaces reads a vertex stride. It runs in every rebuild beside core's occluders; a lazy entry would add an await to a synchronous rebuild for about 400 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "18ded2be7c",
+      "reason": "DYN-04 adds a 5373 B gzip optional driving entry for banked surfaces and replayable vehicle controls. Physics root moves from 608696 to 865782 B gzip within its existing ceiling. Core and Stage add zero bytes.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13995,6 +14001,7 @@
     "@margoengine/rigging/vrma": 7100,
     "@margoengine/road": 1979,
     "@margoengine/road/banking": 1297,
+    "@margoengine/road/driving": 5629,
     "@margoengine/road/geojson": 5381,
     "@margoengine/road/graph": 921,
     "@margoengine/road/intersections": 2421,

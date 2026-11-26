@@ -409,6 +409,8 @@ export interface DrivenWheel {
 export class Drivetrain {
     gear: number;
     constructor(options: DrivetrainOptions);
+    writeMotionState(output: Float64Array): void;
+    readMotionState(source: Float64Array): void;
     get rpm(): number;
     get torque(): number;
     get engaged(): boolean;
@@ -1953,6 +1955,10 @@ export class Vehicle implements PhysicsAttachment {
     setInput(input: VehicleInput): this;
     get speed(): number;
     wheel(index: number): WheelState;
+    get motionStateWords(): number;
+    writeMotionState(output: Float64Array): void;
+    readMotionState(source: Float64Array): void;
+    wheelGround(index: number): WheelGroundState;
     wheelLocalPose(index: number, position?: number[], quaternion?: number[]): {
         position: number[];
         quaternion: number[];
@@ -1985,10 +1991,34 @@ export interface VehicleOptions {
     wheelCast?: 'ray' | 'shape';
     groups?: number;
     predicate?: (collider: PhysicsCollider) => boolean;
+    groundMaterial?: (contact: WheelGroundContact) => WheelGroundMaterial | undefined;
+    groundReaction?: boolean;
     forward?: Vec3;
 }
 
 export type VoxelFill = 'surface' | 'filled';
+
+export interface WheelGroundContact {
+    readonly collider: PhysicsCollider;
+    readonly point: Vec3;
+    readonly normal: Vec3;
+    readonly radius: number;
+    readonly width: number;
+}
+
+export interface WheelGroundMaterial {
+    readonly grip: number;
+    readonly soil?: {
+        readonly stiffness: number;
+        readonly exponent: number;
+        readonly area: number;
+    };
+}
+
+export interface WheelGroundState {
+    readonly grip: number | null;
+    readonly sinkage: number;
+}
 
 export interface WheelJoint {
     readonly joint: PhysicsJoint;

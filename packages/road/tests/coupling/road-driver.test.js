@@ -267,7 +267,12 @@ test('procedural car dimensions become a massive chassis and receive the actual 
 
 test('four real wheels steer the chassis through the curved road collider', async () => {
   const radius = 20;
-  const { world, physics, vehicle, driver, chassis, unbind, ground } = assemble(await RoadDriver.create(), frame60, false, radius);
+  const { world, physics, vehicle, driver, chassis, unbind, ground } = assemble(
+    await RoadDriver.create(),
+    frame60,
+    false,
+    radius,
+  );
   try {
     world.advance(210);
     assert.equal(vehicle.wheel(0).ground?.body, ground);

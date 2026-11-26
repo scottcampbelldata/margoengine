@@ -237,7 +237,7 @@ One page per package: every exported name with its declaration, generated from t
 - [@margoengine/water API](https://margoengine.com/llms/api/water.md): 22 entry points
 - [@margoengine/scatter API](https://margoengine.com/llms/api/scatter.md): 17 entry points
 - [@margoengine/scenes API](https://margoengine.com/llms/api/scenes.md): 10 entry points
-- [@margoengine/road API](https://margoengine.com/llms/api/road.md): 11 entry points
+- [@margoengine/road API](https://margoengine.com/llms/api/road.md): 12 entry points
 - [@margoengine/tilemap API](https://margoengine.com/llms/api/tilemap.md): 10 entry points
 - [@margoengine/vfx API](https://margoengine.com/llms/api/vfx.md): 36 entry points
 - [@margoengine/creative API](https://margoengine.com/llms/api/creative.md): 14 entry points

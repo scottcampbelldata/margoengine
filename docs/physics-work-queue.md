@@ -313,7 +313,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Codex | BUILDING (codex/physics-accretion) |
-| DYN-04 | Wheeled vehicles on roads | partial | Codex | BUILDING (codex/physics-dyn04) |
+| DYN-04 | Wheeled vehicles on roads | partial | Codex | LANDED 18ded2be7c (physical road contact, wet grip, yielding soil and replayable lane controls) |
 | DYN-05 | Rail vehicle dynamics | none | Open | OPEN |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
 | SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |

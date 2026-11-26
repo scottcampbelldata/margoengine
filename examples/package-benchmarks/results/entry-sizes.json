@@ -13960,8 +13960,8 @@
     },
     "@margoengine/physics": {
       ".": {
-        "raw": 984591,
-        "gzip": 608696
+        "raw": 1339661,
+        "gzip": 865782
       },
       "./decomposition": {
         "raw": 26661,
@@ -14866,6 +14866,10 @@
       "./structures": {
         "raw": 8238,
         "gzip": 3652
+      },
+      "./driving": {
+        "raw": 12776,
+        "gzip": 5373
       }
     },
     "@margoengine/robot-planning": {
