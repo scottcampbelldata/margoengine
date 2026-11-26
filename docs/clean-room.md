@@ -15005,6 +15005,12 @@ For unit normal `n` and contact arm `r`, the point's inverse mass along `n` is `
   and water-equivalent precipitation. The surface converts the horizontal flux to its
   own area by the ratio of inward relative normal speed to still-air fall speed.
   [Journal](https://doi.org/10.1175/1520-0469(1949)006%3C0243:TTVOFF%3E2.0.CO;2)
+- Ruiqi Wang, Haijun Jia and Riqiang Duan, “Experimental Observation of Flow Reversal in
+  Thin Liquid Film Flow Falling on an Inclined Plate” (2020). Section 2, Table 2 and the
+  Reynolds numbers label the independently calibrated inlet and glycerol properties. The
+  published PIV/PLIF error bars in Figure 9(a–c) supply the held-out depth check. The
+  fixture starts dry and uses the 20° plate and 350 mm probe from the experimental setup.
+  [Journal and original figure](https://doi.org/10.3390/coatings10060599)
 
 The clean-room face system uses the cell-to-face gradient G, the lagged diagonal mobility M, and
 the symmetric cell pressure operator K. It solves

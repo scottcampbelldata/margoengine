@@ -119,6 +119,87 @@ test('ThinFilmSolver: LAST-TRAM-8 moving pane drives a runnel across the pane an
   balance(train.film, 30);
 });
 
+const pumpField = {
+  name: 'inclined-film-pump',
+  kind: 'uniformGrid',
+  quantity: 'rain',
+  unit: 'm/s',
+  centring: 'cell',
+};
+
+async function runPumpedFilm(reynolds, spacing) {
+  // Wang, Jia and Duan (2020), §2 and Table 2. Discharge per width = Re × kinematic viscosity.
+  const density = 1120;
+  const viscosity = 0.008103;
+  const discharge = (reynolds * viscosity) / density;
+  const inclination = Math.PI / 9;
+  const columns = Math.round(0.5 / spacing);
+  let inlet;
+  const pump = {
+    describe: () => ({
+      id: pumpField.name,
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: pumpField, access: 'write' }],
+    }),
+    init(host) {
+      inlet = host.allocate('inlet', 8 * columns, 'f64', THIN_FILM_LAYOUT);
+      regionWords(host.memory, inlet)[0] = discharge / spacing;
+    },
+    step() {},
+    importPorts() {},
+    exportPorts: (tick) => [{ field: pumpField.name, region: inlet, tick, cell: [0, 0, 0] }],
+    stateRegions: () => [inlet],
+    extraState: () => [],
+  };
+  const film = await ThinFilmSolver.load({ rainField: pumpField });
+  const world = new PhysicsWorld({ rate })
+    .add(film, {
+      cells: [columns, 1],
+      spacing,
+      u: [Math.cos(inclination), -Math.sin(inclination), 0],
+      v: [0, 0, -1],
+      density,
+      viscosity,
+      surfaceTension: 0.0654,
+      drains: [false, true, false, false],
+    })
+    .add(pump, {});
+  const probe = Math.round(0.35 / spacing);
+  const depth = () => (film.sample(probe - 1, 0).depth + film.sample(probe, 0).depth) * 0.5;
+  world.advance(1200);
+  const established = depth();
+  world.advance(2400);
+  balance(film, 2400);
+  assert.ok(film.budget.dripped > 0);
+  assert.ok(Math.abs(depth() - established) <= 256 * Number.EPSILON * depth());
+  return depth();
+}
+
+test('ThinFilmSolver: film depth from a calibrated inlet matches three held-out PLIF bands', async () => {
+  // Fig. 9(a–c) of https://doi.org/10.3390/coatings10060599, original 3305 × 1207 raster.
+  // Re labels are independent pump inputs. The four Y pixels are the 0 and 1 mm ticks
+  // and the lower and upper caps of the highest measured PIV/PLIF point. Do not read the blue theory curve.
+  const observations = [
+    { re: 1.6068, zero: 910, oneMillimetre: 58, lower: 557, upper: 514 },
+    { re: 2.2221, zero: 907, oneMillimetre: 61, lower: 514, upper: 469 },
+    { re: 2.7709, zero: 906, oneMillimetre: 58, lower: 515, upper: 468 },
+  ];
+  const digitizationPixels = 2;
+  for (const { re, zero, oneMillimetre, lower, upper } of observations) {
+    const metresPerPixel = 0.001 / (zero - oneMillimetre);
+    const minimum = (zero - lower - digitizationPixels) * metresPerPixel;
+    const maximum = (zero - upper + digitizationPixels) * metresPerPixel;
+    for (const spacing of [0.01, 0.005]) {
+      const depth = await runPumpedFilm(re, spacing);
+      assert.ok(
+        depth >= minimum && depth <= maximum,
+        `Re ${re}, Δx ${spacing}: ${depth} m vs [${minimum}, ${maximum}]`,
+      );
+    }
+  }
+});
+
 const input = {
   name: 'platform-impacts',
   kind: 'surfaceSampleSet',

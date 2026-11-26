@@ -4443,3 +4443,15 @@ from a built physics entry. The first fixture compares a cosine perturbation to 
 implicit decay with stiffness `2 σ (1 − cos θ) / h*²`. The second integrates the capillary and
 wetting energies of a positive film while checking water volume and snapshot replay.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
+
+### FLUID-07 measured inclined film
+
+Run `node --test --test-name-pattern="calibrated inlet" packages/physics/tests/coupling/thin-film.test.js`
+from a built physics entry. A one-row strip models the spanwise-uniform centre of the reported
+0.5 m glass plate at 10 and 5 mm cell spacing. The pump rate per unit width is the case Reynolds
+number times the listed kinematic viscosity. A dry start and the published fluid properties set
+the input. The test checks the depth at 350 mm after the flow has settled, at 20 and 40 s.
+Digitize only the uppermost measured PIV/PLIF point's vertical error bar in each panel of
+Figure 9. The test records both caps in the original 3305 × 1207 raster and includes two pixels
+of digitization allowance. The published theory lines and measured depths never enter the solve.
+[Wang, Jia and Duan (2020), Figure 9](https://www.mdpi.com/2079-6412/10/6/599#coatings-10-00599-f009)

@@ -9545,6 +9545,10 @@ Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to 
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
 water balance. Measured spreading, contact-angle hysteresis and airborne drops remain open.
+For fully developed glycerol flow on a 20° glass plate, the modeled depths at the 350 mm probe
+are 0.422, 0.470 and 0.506 mm for the three calibrated flows of Wang, Jia and Duan (2020).
+Each falls in the independent PIV/PLIF depth band on two grid resolutions. These measurements
+cover steady laminar flow. [Reproduce](whitepaper/reproduce.md#fluid-07-measured-inclined-film)
 
 The optional thin-film entry is 6,512 B gzip with a 6,768 B ceiling. Both Wasm assets are 9,624 B raw and each is 4,197 B gzip.
 
