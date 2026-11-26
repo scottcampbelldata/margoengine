@@ -3,6 +3,8 @@
 // main thread's: this instance only reads its handle from the kernel's statics and solves islands on a view of its own
 // (`world_solve_islands`), so it never grows the world, filters a pair or modifies a contact.
 
+import { MargoError } from '@margoengine/math/errors';
+
 /** What the main thread sends: the module and memory to start on, then runs of islands. */
 type Message =
   | { readonly module: WebAssembly.Module; readonly memory: WebAssembly.Memory; readonly stack: number }
@@ -12,8 +14,9 @@ type Message =
 type Reply = { readonly ok: true } | { readonly ok: false; readonly message: string };
 
 const mainOnly = (what: string) => (): never => {
-  throw new Error(
-    `A kernel thread only solves islands; ${what} is the main thread's work, so a thread never calls it.`,
+  throw new MargoError(
+    'state',
+    `A kernel thread only solves islands; ${what} is the main thread's work: step the world with stepAsync from the main thread.`,
   );
 };
 
@@ -34,7 +37,11 @@ function handle(message: Message): Reply {
       (exports.__stack_pointer as WebAssembly.Global).value = message.stack;
       solve = exports.world_solve_islands as (first: number, last: number, dt: number) => void;
     } else {
-      if (!solve) throw new Error('A kernel thread was asked to solve before it was started; send the module first.');
+      if (!solve)
+        throw new MargoError(
+          'state',
+          'A kernel thread was asked to solve before it was started; send the module first.',
+        );
       solve(message.first, message.last, message.dt);
     }
     return { ok: true };
