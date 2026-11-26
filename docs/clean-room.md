@@ -269,6 +269,17 @@ stations against the same wheel without transport, net volume, zero export and s
 in plain and shared memory. The measured scan profiles remain a separate comparison.
 [Pavlov and Johnson (2019)](https://www.andrew.cmu.edu/user/amj1/papers/ICRA2019_Wheel.pdf).
 
+The cross-track banks settle with a conservative face flux from a common elevation state.
+The dry granular finite-volume treatments by Roger P. Denlinger and Richard M. Iverson (2004)
+and A. Mangeney-Castelnau et al. (2003) motivated equal and opposite transfers that stop at a
+Coulomb slope threshold. The solver divides each equalizing transfer and the donor's available
+loose volume by the four possible outgoing faces. It applies the resulting transfers
+together and saves the touched neighborhood for the next step. The original moving-carriage
+case reached 21 mm of numerical left-right difference. The mirrored case now compares the
+full interior at roundoff, settles after unloading and preserves the volume ledger and replay.
+[Denlinger and Iverson, “Granular avalanches across irregular three-dimensional terrain,” §4](https://doi.org/10.1029/2003JF000085),
+[Mangeney-Castelnau et al., “Numerical modeling of avalanches based on Saint Venant equations using a kinetic scheme,” §3](https://doi.org/10.1029/2002JB002024).
+
 Pavlov and Johnson's oblique contact combines the longitudinal and transverse displacement
 magnitudes in the shear law and projects the force in the direction of the local slip velocity
 (dissertation Eqs. 5.10–5.14 and 5.20–5.21). The sidewall depth is measured from the chord between

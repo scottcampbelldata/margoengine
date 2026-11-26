@@ -389,6 +389,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private reactions?: Region;
   private sides?: Region;
   private trackRelief?: Region;
+  private reposePending?: Region;
   private sideWeight = 0;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
@@ -549,11 +550,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
     if (this.reaction) this.reactions = allocate('soil-wheel-reactions', this.inputRows * SOIL_WHEEL_REACTION_WORDS);
     if (this.sideForce) this.sides = allocate('soil-wheel-side-forces', this.inputRows);
-    if (
-      this.material.reposeSlope > 0 &&
-      rolling.some((wheel) => wheel?.bermProfile === 'cross-track' && (wheel.grouserFill ?? 0) > 0)
-    )
-      this.trackRelief = allocate('soil-track-relief', count);
+    const crossTrack =
+      this.material.reposeSlope > 0 && this.rolling.some((wheel) => wheel?.bermProfile === 'cross-track');
+    if (crossTrack) this.trackRelief = allocate('soil-track-relief', count);
     if (this.pressureField) {
       this.pressure = allocate('soil-pressure', count);
       this.workRegion = allocate('soil-work', 3);
@@ -564,6 +563,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         words += level;
       }
       this.faces = host.allocate('soil-repose-faces', words * 4, 'u32', SOIL_LAYOUT);
+      if (crossTrack) this.reposePending = host.allocate('soil-repose-pending', words * 4, 'u32', SOIL_LAYOUT);
     }
     this.profiles = profiles.map((profile, row) => {
       if (!profile) return null;
@@ -916,7 +916,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       this.words(this.pressure).fill(0);
       this.words(this.workRegion).fill(0);
       const faceWords = regionWords(this.host.memory, this.faces);
-      faceWords[faceWords.length - 1] = 0;
+      if (!this.reposePending) faceWords[faceWords.length - 1] = 0;
     }
     const bed = context.inputs.get(BED_FIELD.name);
     if (
@@ -972,7 +972,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     }
     const feet = this.legged && context.inputs.get(LEGGED_CONTACT_FIELD.name);
     if (feet) this.footsteps(feet, this.fixed.length + this.inputRows, bed.region, dt);
-    if (this.pressure && this.workRegion && this.faces && this.words(this.workRegion)[0]! > 0) {
+    if (this.pressure && this.workRegion && this.faces && (this.reposePending || this.words(this.workRegion)[0]! > 0)) {
       const { columns, rows, width, depth } = this.terrain;
       const slope = this.material.reposeSlope;
       const moved = this.kernel.repose(
@@ -987,6 +987,10 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         (slope * width) / columns,
         (slope * depth) / rows,
         this.trackRelief?.byteOffset ?? 0,
+        this.reposePending?.byteOffset ?? 0,
+        this.rim.byteOffset,
+        this.floor,
+        this.floorGrid?.byteOffset ?? 0,
       );
       this.words(this.workRegion)[2] = moved;
     }
@@ -1021,6 +1025,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       ...(this.reactions ? [this.reactions] : []),
       ...(this.sides ? [this.sides] : []),
       ...(this.trackRelief ? [this.trackRelief] : []),
+      ...(this.reposePending && this.faces ? [this.faces] : []),
       ...(this.floorGrid ? [this.floorGrid] : []),
       ...(this.thicknessGrid ? [this.thicknessGrid] : []),
       ...this.meshes.flatMap((mesh) => (mesh ? [mesh.geometry] : [])),

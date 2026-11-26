@@ -356,7 +356,19 @@ async function rollingBench(
   terrain,
   material,
   wheel,
-  { width, length, load, speed, slip, wheelReaction, wheelSideForce, lateral = 0, sidewallGravity, shared },
+  {
+    width,
+    length,
+    load,
+    speed,
+    slip,
+    stop = Infinity,
+    wheelReaction,
+    wheelSideForce,
+    lateral = 0,
+    sidewallGravity,
+    shared,
+  },
 ) {
   const input = soilPatchField('lab-wheel-assembly');
   let memory, region;
@@ -369,12 +381,12 @@ async function rollingBench(
     step(context) {
       regionWords(memory, region).set([
         0,
-        -0.16 + (speed * context.tick) / 60,
+        -0.16 + (speed * Math.min(context.tick, stop)) / 60,
         0,
         1,
         length,
         width,
-        load,
+        context.tick <= stop ? load : 0,
         lateral * length,
         -slip * length,
         0,
@@ -600,6 +612,48 @@ test('turning grousers return a bounded share of the cut while locked grousers c
   assert.ok(oppositeBank > 0);
   assert.equal(leadingBank, 0);
   close(oblique.bed.volume(), 0, 2048 * eps * oblique.soil.budget.removed);
+});
+
+test('cross-track banks keep mirror symmetry and settle after the wheel load ends', async () => {
+  const terrain = { columns: 128, rows: 240, width: 0.32, depth: 1.2, centre: [0, 0] };
+  const wheel = { radius: 0.048, lugHeight: 0.005, skidExponent: 0, bermProfile: 'cross-track' };
+  const slope = Math.tan((29 * Math.PI) / 180);
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 8_000_000,
+    exponent: 1.46,
+    cohesion: 0,
+    friction: slope,
+    shearLength: 0.021,
+    dustFraction: 0,
+    compaction: 0.0576,
+    reposeSlope: slope,
+  };
+  const rig = { width: 0.05, length: 0.07, load: 9.78314, speed: 0.03, slip: -1, stop: 120 };
+  for (const shared of [false, true]) {
+    const { world, soil, bed } = await rollingBench(terrain, material, wheel, { ...rig, shared });
+    world.advance(121);
+    const initialCrest = bed.elevations().reduce((highest, value) => Math.max(highest, value), 0);
+    const stopped = soil.budget;
+    const snapshot = world.takeSnapshot();
+    world.advance(240);
+    assert.deepEqual(soil.budget, stopped);
+    assert.ok(soil.work.relaxedVolume > 0);
+    const elevations = bed.elevations();
+    const crest = elevations.reduce((highest, value) => Math.max(highest, value), 0);
+    assert.ok(crest > 0 && crest < 0.5 * initialCrest);
+    const stride = terrain.rows + 1;
+    for (let x = 1; x < terrain.columns / 2; x++) {
+      for (let z = 1; z < terrain.rows; z++) {
+        close(elevations[x * stride + z], elevations[(terrain.columns - x) * stride + z], 64 * eps * initialCrest);
+      }
+    }
+    close(bed.volume(), -stopped.compacted, 2048 * eps * stopped.removed);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(240);
+    assert.equal(world.hash(), hash);
+  }
 });
 
 test('rolling grousers reuse older trailing cut capacity without excavating it twice', async () => {

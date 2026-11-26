@@ -4933,9 +4933,9 @@ to 9.81 m/s². The rigid wheel applies the force at the contact and limits it to
 
 Set a rolling wheel's `bermProfile` to `'cross-track'` to form two soil banks beside its path.
 The projected wheel geometry splits the uncompacted material at oblique angles. Material is
-placed using the prepared soil's repose slope and the exact terrain vertex areas. A bank
-outside the modeled terrain is accounted as exported soil. The default `'ring'` is a compact
-local deposit and also applies at zero repose slope.
+placed using the prepared soil's repose slope and the exact terrain vertex areas. The banks
+continue settling after the wheel passes. A bank outside the modeled terrain is accounted as
+exported soil. The default `'ring'` is a compact local deposit and also applies at zero repose slope.
 
 Set `grouserFill` on a cross-track wheel to the effective fraction of its lug envelope carrying
 soil. The default is zero. The turning lugs return part of the loose cut into the rear footprint.

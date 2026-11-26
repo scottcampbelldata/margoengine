@@ -112,7 +112,7 @@ impl FaceQueue {
         Self { words, levels, top }
     }
 
-    unsafe fn add(&self, face: usize) {
+    unsafe fn add(&self, face: usize) -> bool {
         let mut path = [0; 7];
         path[0] = face / 32;
         // A wasm32 grid needs at most seven levels: one bit per face and a factor of 32 per level.
@@ -120,29 +120,40 @@ impl FaceQueue {
             *path.get_unchecked_mut(level) = *path.get_unchecked(level - 1) / 32;
         }
         for level in (1..=self.top).rev() {
-            let parent = self.words.add(self.levels[level] + path[level]);
-            let bit = 1 << (path[level - 1] % 32);
+            let parent = self
+                .words
+                .add(*self.levels.get_unchecked(level) + *path.get_unchecked(level));
+            let child = *path.get_unchecked(level - 1);
+            let bit = 1 << (child % 32);
             if *parent & bit == 0 {
-                *self.words.add(self.levels[level - 1] + path[level - 1]) = 0;
+                *self
+                    .words
+                    .add(*self.levels.get_unchecked(level - 1) + child) = 0;
                 *parent |= bit;
             }
         }
-        *self.words.add(path[0]) |= 1 << (face % 32);
+        let word = self.words.add(path[0]);
+        let bit = 1 << (face % 32);
+        let fresh = *word & bit == 0;
+        *word |= bit;
+        fresh
     }
 
     unsafe fn next(&self) -> Option<usize> {
-        if *self.words.add(self.levels[self.top]) == 0 {
+        if *self.words.add(*self.levels.get_unchecked(self.top)) == 0 {
             return None;
         }
         let mut face = 0;
         for level in (0..=self.top).rev() {
-            let bits = *self.words.add(self.levels[level] + face);
+            let bits = *self.words.add(*self.levels.get_unchecked(level) + face);
             face = face * 32 + bits.trailing_zeros() as usize;
         }
         let mut child = face;
         for level in 0..=self.top {
             let word_index = child / 32;
-            let word = self.words.add(self.levels[level] + word_index);
+            let word = self
+                .words
+                .add(*self.levels.get_unchecked(level) + word_index);
             *word &= !(1 << (child % 32));
             if *word != 0 {
                 break;
@@ -537,6 +548,23 @@ unsafe fn add_bed_change(deltas: *mut f64, track_relief: *mut f64, vertex: usize
     if !track_relief.is_null() {
         *track_relief.add(vertex) += amount;
     }
+}
+
+unsafe fn cut_capacity(
+    vertex: usize,
+    height: f32,
+    delta: f64,
+    floor: f64,
+    floor_grid: *const f64,
+) -> f64 {
+    // The exact bed is f64. Its f32 publication's lower rounding boundary keeps cuts above bedrock.
+    let lower = (height as f64 + height.next_down() as f64) * 0.5;
+    let bedrock = if floor_grid.is_null() {
+        floor
+    } else {
+        *floor_grid.add(vertex)
+    };
+    (lower + delta - bedrock).max(0.0)
 }
 
 unsafe fn deposit_backfill(
@@ -1186,16 +1214,7 @@ pub unsafe extern "C" fn stamp(
                     crest_pressure * coverage * pow(profile, p.exponent)
                 };
             }
-            // The bed's exact heights are f64, but the registry publishes f32. Use the lower
-            // rounding boundary so we never request a cut the exact bedrock would refuse.
-            let height = *heights.add(i);
-            let lower = (height as f64 + height.next_down() as f64) * 0.5;
-            let bedrock = if floor_grid.is_null() {
-                floor
-            } else {
-                *floor_grid.add(i)
-            };
-            let room = (lower + *deltas.add(i) - bedrock).max(0.0);
+            let room = cut_capacity(i, *heights.add(i), *deltas.add(i), floor, floor_grid);
             let cut = (settlement * depth_shape * coverage - *peak.add(i))
                 .max(0.0)
                 .min(room);
@@ -1291,9 +1310,19 @@ pub unsafe extern "C" fn repose(
     limit_x: f64,
     limit_z: f64,
     track_relief: *mut f64,
+    pending_words: *mut u32,
+    pending_delta: *mut f64,
+    floor: f64,
+    floor_grid: *const f64,
 ) -> f64 {
     let mut moved = 0.0;
     let queue = FaceQueue::new(faces, nx * nz);
+    let pending = (!pending_words.is_null()).then(|| {
+        let touched = FaceQueue::new(pending_words, nx * nz);
+        // A wasm32 grid has at most seven levels, as established by FaceQueue::new.
+        *pending_words.add(*touched.levels.get_unchecked(touched.top)) = 0;
+        touched
+    });
     let mut examined = 0;
     while let Some(face) = queue.next() {
         examined += 1;
@@ -1310,18 +1339,54 @@ pub unsafe extern "C" fn repose(
         let hb = *heights.add(b) as f64 + *deltas.add(b);
         let (source, target) = if ha > hb { (a, b) } else { (b, a) };
         let gradient = (ha - hb).abs() - limit;
-        if gradient <= 0.0 || *deltas.add(source) <= 0.0 {
+        let loose = if pending.is_some() {
+            let delta = *deltas.add(source);
+            delta.max(*track_relief.add(source)).min(cut_capacity(
+                source,
+                *heights.add(source),
+                delta,
+                floor,
+                floor_grid,
+            ))
+        } else {
+            *deltas.add(source)
+        };
+        if gradient <= 0.0 || loose <= 0.0 {
             continue;
         }
         let source_area = *areas.add(source);
         let target_area = *areas.add(target);
-        let volume = (gradient / (1.0 / source_area + 1.0 / target_area))
-            .min(*deltas.add(source) * source_area);
-        add_bed_change(deltas, track_relief, source, -volume / source_area);
-        add_bed_change(deltas, track_relief, target, volume / target_area);
-        moved += volume;
-        if *deltas.add(target) > 0.0 {
-            queue.around(target, nx, nz, face + 1);
+        let volume = (gradient / (1.0 / source_area + 1.0 / target_area)).min(loose * source_area);
+        if let Some(touched) = &pending {
+            // Each vertex has at most four faces. Limit every outgoing flux to a quarter of
+            // its equalizing transfer and loose volume so concurrent faces cannot overdraw it.
+            let share = 0.25 * volume;
+            for (vertex, delta) in [
+                (source, -share / source_area),
+                (target, share / target_area),
+            ] {
+                let slot = pending_delta.add(vertex);
+                if touched.add(2 * vertex) {
+                    *slot = delta;
+                } else {
+                    *slot += delta;
+                }
+            }
+            moved += share;
+        } else {
+            add_bed_change(deltas, track_relief, source, -volume / source_area);
+            add_bed_change(deltas, track_relief, target, volume / target_area);
+            moved += volume;
+            if *deltas.add(target) > 0.0 {
+                queue.around(target, nx, nz, face + 1);
+            }
+        }
+    }
+    if let Some(touched) = pending {
+        while let Some(index) = touched.next() {
+            let vertex = index / 2;
+            add_bed_change(deltas, track_relief, vertex, *pending_delta.add(vertex));
+            queue.around(vertex, nx, nz, 0);
         }
     }
     *work.add(1) = examined as f64;

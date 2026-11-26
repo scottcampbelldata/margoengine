@@ -42,6 +42,10 @@ export interface NativeSoil {
     dx: number,
     dz: number,
     trackRelief: number,
+    pendingFaces: number,
+    pendingDelta: number,
+    floor: number,
+    floorGrid: number,
   ): number;
 }
 
