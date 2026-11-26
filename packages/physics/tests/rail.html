@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Rail suspension and contact wire</title></head>
+<body style="margin:0"><canvas id="rail" width="720" height="405"></canvas>
+<script type="module">
+  import { createStage } from '/packages/stage/dist/index.js';
+  import { toGeometry } from '/packages/geometry/dist/utils.js';
+  import { generateWagon } from '/packages/procedural/dist/vehicles.js';
+  import { RailRoute, RailSolver } from '/packages/physics/dist/rail.js';
+  import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+
+  const errors = [];
+  const stage = await createStage(document.querySelector('canvas'), {
+    controls: false, autoStart: false, background: '#a4bac7', exactSize: [720, 405],
+    camera: { position: [21, 5, 11], target: [22, 1.3, 0], near: 0.1, far: 90 },
+    onError: error => errors.push(String(error.message ?? error)),
+  });
+  const stock = generateWagon();
+  const wheelbase = stock.wheels[1].x - stock.wheels[0].x;
+  const spacing = Math.abs(stock.wheels[2].x + stock.wheels[3].x - stock.wheels[0].x - stock.wheels[1].x) * 0.5;
+  const radius = stock.wheels[0].diameter * 0.5;
+  const track = new RailRoute(Array.from({ length: 49 }, (_, i) => ({
+    centre: [2 * i, 0, 0], leftHeight: i === 12 ? 0.012 : 0, rightHeight: i === 12 ? 0.012 : 0,
+  })));
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(true) });
+  const solver = await RailSolver.load(world.memory);
+  world.add(solver, {
+    cars: [{ track, distance: 17, speed: 4, centreHeight: stock.deck, gauge: stock.gauge,
+      wheelRadius: radius, bogieWheelbase: wheelbase, bogieSpacing: spacing }],
+    wire: { track, pantographs: [{ car: 0, restHeight: 4.0, energized: true }] },
+  });
+
+  const hex = (c) => '#' + c.map((v) => Math.round(255 * (v <= 0.0031308 ? 12.92 * v :
+    1.055 * v ** (1 / 2.4) - 0.055)).toString(16).padStart(2, '0')).join('');
+  const meshes = Object.entries(stock.parts).map(([name, data]) => {
+    const material = stock.palette[name];
+    return [name, stage.mesh(toGeometry(data), {
+      color: hex(material.color), roughness: material.roughness, metalness: material.metalness,
+    })];
+  });
+  stage.box({ size: [90, 0.3, 28], position: [40, -0.59, 0], color: '#6a7166', roughness: 0.93 });
+  stage.box({ size: [85, 0.2, 3.5], position: [40, -0.29, 0], color: '#747672', roughness: 0.92 });
+  for (let x = 9; x <= 43; x += 0.54)
+    stage.box({ size: [0.18, 0.14, 2.44], position: [x, -0.14, 0], color: '#554a3d', roughness: 0.86 });
+  for (const z of [-0.5 * stock.gauge, 0.5 * stock.gauge])
+    stage.box({ size: [55, 0.065, 0.075], position: [28, -0.033, z], color: '#8899a4', metalness: 0.8, roughness: 0.38 });
+  const cableStart = 12, dx = 1.3;
+  const wire = Array.from({ length: 22 }, () => stage.box({ size: [dx + 0.045, 0.032, 0.032], color: '#6d5c49', roughness: 0.43 }));
+  const contactHead = stage.box({ size: [0.14, 0.055, 0.86], color: '#827362', roughness: 0.41 });
+  stage.box({ size: [0.15, 5.55, 0.16], position: [32, 2.76, -2.9], color: '#728087' });
+  stage.box({ size: [0.1, 0.10, 2.95], position: [32, 5.18, -1.45], color: '#728087' });
+  const contactArm = stage.box({ size: [0.095, 1, 0.095], color: '#7b5b48', metalness: 0.4 });
+
+  window.railFrame = async (frame) => {
+    world.advance(frame);
+    const car = solver.read(0);
+    const baseY = car.position[1] - stock.deck;
+    for (const [name, mesh] of meshes) {
+      const running = name === 'trucks';
+      const rise = running ? (car.bogieHeave[0] + car.bogieHeave[1]) * 0.5 : baseY;
+      mesh.setPosition([car.position[0], rise, car.position[2]]);
+      mesh.setRotation(running ? [0, (car.bogieYaw[0] + car.bogieYaw[1]) * 0.5, 0] : [car.roll, 0, car.pitch]);
+    }
+    const panto = solver.readPantograph(0);
+    contactHead.setPosition([panto.arclength, panto.headHeight, car.position[2]]);
+    const roof = stock.size[1] + baseY;
+    const height = panto.headHeight - roof;
+    const run = 0.4;
+    contactArm.setPosition([panto.arclength + run * 0.5, panto.headHeight - height * 0.5, car.position[2]]);
+    contactArm.setRotation([0, 0, Math.atan2(run, height)]);
+    contactArm.setScale([1, Math.hypot(run, height), 1]);
+    for (let i = 0; i < wire.length; i++) {
+      const x = cableStart + dx * i;
+      const a = solver.readWire(x), b = solver.readWire(x + dx);
+      wire[i].setPosition([x + dx * 0.5, (a.height + b.height) * 0.5, -(a.lateralOffset + b.lateralOffset) * 0.5]);
+      wire[i].setRotation([0, Math.atan2(b.lateralOffset - a.lateralOffset, dx), Math.atan2(b.height - a.height, dx)]);
+    }
+    await stage.engine.render({ delta: 0 });
+    await stage.engine.render({ delta: 0 });
+    return { distance: car.distance, wheelTravel: car.wheelsets[0].angle * radius, uptake: panto.contactForce,
+      headHeight: panto.headHeight, errors, shared: world.memory.buffer instanceof SharedArrayBuffer };
+  };
+  window.closeRail = () => stage.dispose();
+</script></body></html>
