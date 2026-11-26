@@ -6373,3 +6373,7 @@ A 4 m prismatic hull moving at 0.75 m/s through the water transfers 12.5 L from 
 ### SEA-08 short-wave axial reflection
 
 A wall-sided hull receives the analytic head- and quartering-wave mean loads through the rigid force port. A slender diamond checks the small-bluntness advance term from its exact waterline projection. A rotated hull turns the applied force with the waterline, and a steady drift gives the same load as its corresponding through-water course. The analytical force cases leave tank performance open. [Source equations and experimental hold-out](../clean-room.md#sea-08-mean-axial-load-from-short-wave-reflection)
+
+### Points on a deforming mesh (animation/deformed-points)
+
+`DeformedPoints` draws a skinned or morphed triangle mesh as one point per vertex, instanced from the deformation pass's own output buffer, on native WebGPU and on the WebGL2 compatibility layer. Proof: `packages/animation/tests/deformed-points-browser.mjs` hides a skinned strip and a morphed triangle and finds every vertex's point on the pixel its analytic pose projects to at three clip times and three morph weights (18 of 18 and 3 of 3 on both backends), with 449.6 of 450 expected pixels covered at 5 x 5 pixels a point, world-sized squares within 10 percent of their projected area and discs at pi / 4 of their squares within 0.08. The CPU test checks the size maths against direct projection for centred, off-axis and orthographic projections, and that a hidden model deforms only while points read it. No speed claim.

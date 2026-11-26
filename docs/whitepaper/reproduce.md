@@ -4710,3 +4710,6 @@ For the independent Wigley tank comparison, run `node packages/physics/tests/cou
 ### SEA-08 axial resistance in short waves
 
 Build Physics and run `node --test --test-name-pattern "short-wave reflection" packages/physics/tests/coupling/seakeeping.test.js`. The box and diamond waterlines give closed axial projections. A separate evaluation of the modified Bessel functions supplies the target forces. Run `node scripts/run-with-timeout.mjs -- node packages/water/test/wake-agreement.browser.mjs --short-wave-reflection` on WebGPU and with `MARGO_COMPAT=1` for the moving-hull proof.
+
+## Points on a deforming mesh (animation/deformed-points)
+Build packages, then `node --test packages/animation/tests/deformed-points.test.js`. Run `node packages/animation/tests/deformed-points-browser.mjs`, then again with `--compat` for the WebGL2 compatibility layer; each prints its measured counts as one JSON line and the backend it ran on.

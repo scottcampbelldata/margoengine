@@ -7,6 +7,7 @@ import type { PBRModel, PBRPrimitive, PBRDeformationContext } from '@margoengine
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { ordinaryWeightBuffer } from './weight-buffer.js';
+import { deformReaders } from './deform-readers.js';
 import { multiplyMatrices } from '@margoengine/math/mat4';
 import type { Interpolation } from './sampling.js';
 import { sampleCursor } from './key-cursor.js';
@@ -973,8 +974,9 @@ export class Animation implements EnginePlugin {
   ): context is Extract<PassContext, { backend: 'webgpu' }> | PBRDeformationContext {
     if (context.backend !== 'webgpu' || this.model.disposed) return false;
     // A level of detail not on show, or another hidden model: no draw reads its vertices, so they wait until it shows.
+    // A model drawn as points (deformed-points.ts) is read while hidden.
     const { store } = this.model.root.engine;
-    let shown = false;
+    let shown = deformReaders.has(this.model);
     for (let i = 0; !shown && i < this.deformedNodes.length; i++)
       if (!hiddenInTree(store, this.deformedNodes[i].id)) shown = true;
     if (!shown) return false;
