@@ -23,6 +23,8 @@
     "pipeline/audio.js",
     "pipeline/meshopt-encode.js",
     "pipeline/playable.js",
-    "pipeline/playable-runtime.js"
+    "pipeline/playable-runtime.js",
+    "pipeline/mobile.js",
+    "pipeline/mobile-runtime.js"
   ]
 }

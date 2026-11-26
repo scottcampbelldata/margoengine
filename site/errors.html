@@ -66,6 +66,11 @@
       <p><strong>Fix.</strong> Release the first owner (call its <code>dispose()</code> or the function it returned) before attaching another, or create a separate target for the second. The message names what is already attached.</p>
     </section>
     <h2>Messages</h2>
+    <section id="mobile">
+      <h2><a href="#mobile">margo-convert mobile: Capacitor project from a built app</a></h2>
+      <p><strong>Cause.</strong> buildMobile (margo-convert mobile) stopped: the appId is not a reverse-DNS id (two or more dot-separated words that start with a letter, letters, digits and underscores), the input folder has no index.html, the output folder is the input or inside it, an icon or splash image does not exist, or an option (orientation, status bar style, a colour, the splash duration) is out of range.</p>
+      <p><strong>Fix.</strong> Pass an appId like com.example.game, build the app first (vite build) and pass its output folder, choose an out folder outside the input, and use portrait, landscape or any, default, light or dark, and #rgb, #rrggbb or #rrggbbaa colours.</p>
+    </section>
     <section id="playable">
       <h2><a href="#playable">margo-convert playable: one-file playable-ad build</a></h2>
       <p><strong>Cause.</strong> buildPlayable (margo-convert playable) stopped: the file is over its network budget (a MargoError with code failed and the report on error.report), a page, stylesheet or module loads something from the network or names a file outside the root, a module imports a package by name (code unsupported: the input was not bundled), the page has no module entry, or a stylesheet uses @import.</p>

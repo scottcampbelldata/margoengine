@@ -8,6 +8,7 @@ npx margo-convert build ./assets --out dist                  # web preset (defau
 npx margo-convert build ./assets --out dist --preset mobile
 npx margo-convert optimize helmet.glb                       # one model -> helmet.optimized.glb
 npx margo-convert playable dist --out playable.html          # one-file playable ad: MRAID hooks, size budget
+npx margo-convert mobile dist --app-id com.example.game      # Capacitor project: safe area, orientation
 ```
 
 ## Build and optimize
@@ -217,6 +218,71 @@ Not done: Web Workers that import other modules (a worker script is a blob of it
 reads), `XMLHttpRequest`, CSS `@import`, and minification (bundle minified first). Limits:
 [docs/limits.md](../../docs/limits.md#scale).
 
+## Mobile apps: a Capacitor project
+
+`margo-convert mobile` turns a built app folder into a [Capacitor](https://capacitorjs.com/) project, ready for
+`npx cap add android` and `npx cap add ios`. It installs nothing and makes no native folders.
+
+```sh
+npx vite build
+npx margo-convert mobile dist --app-id com.example.game --app-name "Space Game" --orientation landscape --out mobile
+cd mobile && npm install && npx cap add android && npx cap sync
+```
+
+The project holds `capacitor.config.json` (`appId`, `appName`, `webDir: "www"`, background, splash and status bar
+plugin settings), a `package.json` that lists `@capacitor/core`, `cli`, `android`, `ios`, `splash-screen` and
+`status-bar` (not installed), `www/` (your files without dotfiles, source maps and `node_modules`), a `README.md` with
+the native steps and `resources/icon.png` when you pass an icon.
+
+- **Orientation** (`portrait`, `landscape`, `any`, default `any`): written to the config (`margo.orientation`; Capacitor
+  has no orientation key) and as the native keys to set after `cap add`: Android `screenOrientation` (`portrait`,
+  `sensorLandscape`, `fullSensor`) and iOS `UISupportedInterfaceOrientations`, both in the project README. The page
+  also calls `screen.orientation.lock` where the web view allows it (`lockOrientation` returns false where it does not).
+- **Safe area**: `viewport-fit=cover` is added to the page's viewport meta, and an injected module sets
+  `--safe-area-top|right|bottom|left` (px) on `<html>` and keeps them current on resize and rotation. With a `canvas` in
+  the page it is fixed inside the insets and its drawing buffer follows its size times `devicePixelRatio`
+  (`--canvas none` skips that). From code: `getSafeArea()`, `watchSafeArea()`, `fitCanvasToSafeArea()` and
+  `lockOrientation()` from `margo-convert/mobile-runtime`.
+- **Look**: `--background` (default `#000000`), `--splash-color`, `--splash-duration` (500 ms), `--status-bar
+  default|light|dark` (Capacitor's `style`: `dark` is light text on a dark page), `--status-bar-color`, `--icon`,
+  `--splash-image`.
+- **App id**: reverse DNS, two or more words that start with a letter and hold letters, digits and underscores (Android's
+  package rule, stricter than iOS's). Anything else fails with a MargoError `failed` and the help link.
+
+```js
+import { buildMobile } from 'margo-convert/mobile';
+
+const report = await buildMobile({
+  input: 'dist',
+  out: 'mobile',
+  appId: 'com.example.game',
+  appName: 'Space Game',
+  orientation: 'portrait',
+  statusBar: { style: 'dark' },
+  signal: AbortSignal.timeout(60_000),
+});
+console.log(report.native.androidScreenOrientation, report.files.length); // 'portrait', files written
+```
+
+In the app, fit your own canvas and follow rotation:
+
+```js
+import { fitCanvasToSafeArea, lockOrientation } from 'margo-convert/mobile-runtime';
+
+declare const canvas: HTMLCanvasElement;
+await lockOrientation('portrait'); // false where the web view has no lock
+using fit = fitCanvasToSafeArea(canvas, { onResize: (width, height) => console.log(width, height) });
+console.log(fit.insets.top);
+```
+
+Not done: native folders, icon and splash resizing (use `npx @capacitor/assets generate` on `resources/`), signing,
+store upload, and writing the manifest or Info.plist (the README gives the keys). Sources: Capacitor configuration
+schema (capacitorjs.com/docs/config) and the SplashScreen and StatusBar plugin pages; W3C [Screen
+Orientation](https://www.w3.org/TR/screen-orientation/); W3C [CSS Environment Variables Module Level
+1](https://www.w3.org/TR/css-env-1/) (`safe-area-inset-*`); Android [`<activity>` `screenOrientation`](https://developer.android.com/guide/topics/manifest/activity-element#screen);
+Apple [`UISupportedInterfaceOrientations`](https://developer.apple.com/documentation/bundleresources/information-property-list/uisupportedinterfaceorientations).
+Limits: [docs/limits.md](../../docs/limits.md#scale).
+
 ## Thumbnail
 
 Render one model to a PNG with no page, for server thumbnails and asset checks.
@@ -242,6 +308,6 @@ with meshopt, which decodes in Node. Lighting is core's default.
 
 ## Tests
 
-`node --test tests/margo-convert-pipeline.test.js tests/margo-convert-textures.test.js tests/margo-convert-audio.test.js tests/margo-convert-paths.test.js tests/margo-convert-playable.test.js` from the repository root (part of `npm run verify`).
+`node --test tests/margo-convert-pipeline.test.js tests/margo-convert-textures.test.js tests/margo-convert-audio.test.js tests/margo-convert-paths.test.js tests/margo-convert-playable.test.js tests/margo-convert-mobile.test.js` from the repository root (part of `npm run verify`).
 
 Apache-2.0 licensed.

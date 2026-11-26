@@ -31,6 +31,8 @@
   },
   "exports": {
     "./build": "./pipeline/build.js",
+    "./mobile": "./pipeline/mobile.js",
+    "./mobile-runtime": "./pipeline/mobile-runtime.js",
     "./optimize": "./pipeline/optimize.js",
     "./playable": "./pipeline/playable.js",
     "./playable-runtime": "./pipeline/playable-runtime.js",

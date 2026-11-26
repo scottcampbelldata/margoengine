@@ -8,6 +8,15 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'mobile',
+    title: 'margo-convert mobile: Capacitor project from a built app',
+    kind: 'family',
+    messages: [],
+    cause:
+      'buildMobile (margo-convert mobile) stopped: the appId is not a reverse-DNS id (two or more dot-separated words that start with a letter, letters, digits and underscores), the input folder has no index.html, the output folder is the input or inside it, an icon or splash image does not exist, or an option (orientation, status bar style, a colour, the splash duration) is out of range.',
+    fix: 'Pass an appId like com.example.game, build the app first (vite build) and pass its output folder, choose an out folder outside the input, and use portrait, landscape or any, default, light or dark, and #rgb, #rrggbb or #rrggbbaa colours.',
+  },
+  {
     id: 'playable',
     title: 'margo-convert playable: one-file playable-ad build',
     kind: 'family',

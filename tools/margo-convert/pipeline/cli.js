@@ -15,6 +15,7 @@ export const USAGE = `Usage:
   margo-convert optimize <model.glb|.gltf> [output.glb] [--preset web] [options]
   margo-convert sequence <folder> [--out sequence.mgc] [--fps 24] (margo-convert sequence --help)
   margo-convert playable <folder|page.html|entry.js> [--out playable.html] [--budget unity] (margo-convert playable --help)
+  margo-convert mobile <folder> --app-id com.example.game [--out mobile] [--orientation any] (margo-convert mobile --help)
 
 build walks a folder (or takes one file), optimises every model, texture and audio file for the preset, and writes
 the results with margo-manifest.json (hashes and sizes) and margo-size-report.txt to --out (default ./dist).
