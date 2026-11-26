@@ -44,6 +44,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   root that does not move do not move each other, so the physics is unchanged: the replay scenes' state hashes are the same.
 - **Regression:** the test above (two islands before).
 
+### Open 2026-11-26: check:rust-kernels builds the physics kernels with flags they no longer ship with (KB-RUST-KERNELFLAGS1, scripts)
+
+- **Repro:** `node --test tests/rust-kernel-tests.test.js`: "every kernel that ships as Wasm is built for wasm32 with the
+  shipped flags" fails, `WASM_RUSTFLAGS` (`-C target-feature=+simd128`) against the 3D kernel blueprint's `RUSTFLAGS`,
+  which since 8fbdc409d4 (K05) add the world-memory link flags (`--import-memory`, the slot's `--global-base` and the
+  exported stack and data symbols). The test runs in hygiene, so hygiene is red on main.
+- **Cause:** each physics kernel is now built with its own slot's link flags (packages/physics/scripts/build-*-kernel.mjs,
+  `rustFlags(slot, shared)`), while scripts/rust-kernel-tests.mjs builds every kernel that ships as Wasm with the one
+  `WASM_RUSTFLAGS` of scripts/support/wasm-kernel.mjs, so check:rust-kernels no longer checks the build that ships.
+- **Fix to make:** take each kernel's shipped flags from its build script (the blueprint's `RUSTFLAGS` for the 3D
+  kernel, the 2D kernel's own variant flags) in check:rust-kernels and in the test, owned by the physics kernel work.
+
+
 ### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
 
 - **Repro:** `packages/voxel/tests/debris.test.js`, "with physics a piece is a dynamic body of its cells mass that falls onto
