@@ -672,7 +672,10 @@ export class PhysicsWorld {
    */
   private check(): void {
     for (const f of this.fields.list())
-      if (f.owner === undefined)
+      if (
+        f.owner === undefined &&
+        (f.contributors.length > 0 || f.readers.some((reader) => !f.optionalReaders.includes(reader)))
+      )
         throw new MargoError(
           'state',
           `No solver writes field "${f.descriptor.name}", which ${[...f.readers, ...f.contributors].join(', ')} use; add the solver that owns it.`,
@@ -754,7 +757,15 @@ export class PhysicsWorld {
   private nodes() {
     return this.entries.map((e) => {
       const of = (access: string) => e.description.fields.filter((u) => u.access === access).map((u) => u.field.name);
-      return { id: e.id, writes: of('write'), reads: of('read'), accumulates: of('accumulate') };
+      return {
+        id: e.id,
+        writes: of('write'),
+        reads: of('read'),
+        optionalReads: e.description.fields
+          .filter((u) => u.access === 'read' && u.optional === true)
+          .map((u) => u.field.name),
+        accumulates: of('accumulate'),
+      };
     });
   }
 

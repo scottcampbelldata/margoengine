@@ -212,13 +212,10 @@ Geometry is written into the save, so a large static mesh is better as a glTF mo
 ```ts
 import {diffSave, applyDelta, SaveRecorder} from 'margoengine/save/delta';
 
-const base = {
-  format: 'margo-save' as const, version: 1,
-  entities: [{id: 'door', transform: {position: [1, 0, 0]}, components: {hinge: {angle: 0}}}, {id: 'crate'}],
-};
-const edited = structuredClone(base);
-edited.entities[0].components.hinge.angle = 90; // the player opened the door
-edited.entities.pop();                          // and smashed the crate
+const door = {id: 'door', transform: {position: [1, 0, 0] as const}, components: {hinge: {angle: 0}}};
+const base = {format: 'margo-save' as const, version: 1, entities: [door, {id: 'crate'}]};
+// The player opened the door and smashed the crate.
+const edited = {...base, entities: [{...door, components: {hinge: {angle: 90}}}]};
 
 const delta = diffSave(base, edited);
 console.log(JSON.stringify(delta.changed), delta.removed); // {"door":{"components":{"hinge":{"angle":90}}}} ["crate"]

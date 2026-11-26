@@ -6,6 +6,8 @@ import { freeSection } from './coupling/sections.js';
 import test from 'node:test';
 import {
   addedMassInfinite,
+  deckOf,
+  stepDeck,
   eddyRollCoefficient,
   frictionGirth,
   GRAVITY,
@@ -347,4 +349,67 @@ test('a section in a beam wave sends some back and lets the rest through, and a 
       assert.ok(Math.abs(energy - 1) <= 1e-3, `free, ${w} rad/s: |R|^2 + |T|^2 = ${energy}`);
     }
   }
+});
+
+test("the water on a deck: a dam breaks as Ritter's, a lake on a sloped deck stays still, the sea comes over a dry edge at Ritter's flux", () => {
+  const g = 9.81;
+  // Ritter's dam break on a dry bed (Stoker 1957): h = (2 c - x / t)^2 / (9 g) between -c t and 2 c t, c = sqrt(g h1). A
+  // first-order scheme smears the front and the corner: 1.8, 1.1 and 0.7 percent of the moving water's size at 200, 400
+  // and 800 cells; walls all round keep every drop.
+  const h1 = 0.5,
+    c = Math.sqrt(g * h1),
+    nx = 400,
+    dam = { nx, nz: 1, x0: -1, z0: -0.05, dx: 2 / nx, dz: 0.1, height: new Float64Array(nx) },
+    w = new Float64Array(3 * nx);
+  for (let i = 0; i < nx; i++) if (-1 + ((i + 0.5) * 2) / nx < 0) w[i] = h1;
+  const before = w.slice(0, nx).reduce((a, b) => a + b, 0);
+  for (let s = 0; s < 20; s++) stepDeck(dam, w, [0, -g, 0], () => [Number.NaN, 0, 0], 0.01);
+  let error = 0,
+    after = 0;
+  for (let i = 0; i < nx; i++) {
+    const x = -1 + ((i + 0.5) * 2) / nx,
+      t = 0.2,
+      exact = x < -c * t ? h1 : x > 2 * c * t ? 0 : (2 * c - x / t) ** 2 / (9 * g);
+    error += (Math.abs(w[i] - exact) * 2) / nx;
+    after += w[i];
+  }
+  assert.ok(error <= 0.02 * h1 * 3 * c * 0.2, `Ritter: ${error / (h1 * 3 * c * 0.2)} of the moving water`);
+  assert.ok(Math.abs(after - before) <= 1e-8 * before, 'the walls keep every drop');
+  // A lake at rest on a sloped deck, half of it dry, stays at rest (the hydrostatic reconstruction).
+  const lx = 50,
+    lake = {
+      nx: lx,
+      nz: 4,
+      x0: 0,
+      z0: 0,
+      dx: 1 / lx,
+      dz: 0.25,
+      height: Float64Array.from(
+        { length: lx * 4 },
+        (_, k) => (0.1 * ((k % lx) + 0.5)) / lx + 0.02 * Math.floor(k / lx),
+      ),
+    },
+    still = new Float64Array(3 * lx * 4);
+  for (let k = 0; k < lx * 4; k++) still[k] = Math.max(0, 0.08 - lake.height[k]);
+  const resting = still.slice(0, lx * 4);
+  for (let s = 0; s < 60; s++) stepDeck(lake, still, [0, -g, 0], () => [Number.NaN, 0, 0], 1 / 60);
+  for (let k = 0; k < lx * 4; k++) {
+    assert.ok(Math.abs(still[k] - resting[k]) < 1e-12, 'the lake keeps its level');
+    assert.ok(Math.abs(still[lx * 4 + k]) < 1e-12 && Math.abs(still[2 * lx * 4 + k]) < 1e-12, 'and does not move');
+  }
+  // The sea standing 0.1 m over a dry deck edge comes aboard as a dam breaks: Ritter's depth 4/9 h and speed 2/3 sqrt(g h) at
+  // the dam, (8/27) sqrt(g) h^1.5 a metre of edge (the edge's critical flow).
+  const edge = { nx: 1, nz: 80, x0: 0, z0: 0, dx: 1, dz: 1 / 80, height: new Float64Array(80) },
+    flood = new Float64Array(3 * 80);
+  let total = 0;
+  for (let s = 0; s < 24; s++)
+    total += stepDeck(edge, flood, [0, -g, 0], (_x, z) => (z < 1e-9 ? [0.1, 0, 0] : [Number.NaN, 0, 0]), 1 / 240);
+  const ritter = (8 / 27) * Math.sqrt(g) * 0.1 ** 1.5;
+  assert.ok(Math.abs(total / 0.1 - ritter) <= 1e-3 * ritter, `inflow ${total / 0.1} m^2/s against Ritter's ${ritter}`);
+  // A box's deck is its top, over all its plan.
+  const deck = deckOf(box([4, 1, 2], 4), -0.25, 8, 4);
+  assert.ok(
+    deck.height.every((y) => Math.abs(y - 0.5) < 1e-12),
+    'the deck is the top',
+  );
 });

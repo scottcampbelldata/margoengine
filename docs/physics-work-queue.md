@@ -118,6 +118,10 @@ there, add a line below with the solver ID and what is needed, and build against
   per-tick marine and dry ice-release volumes (m³) for HYDRO-02 and SEA-06. ICE-02 publishes these descriptors
   in the optional glacier entry, couples discharge to HYDRO-01 and exercises a wave-source reader.
 
+- **ICE-03:** Promote layout-1 f64 SeaSource patch rows and marine release-volume fields into the shared contracts.
+  The optional Physics entries use the existing contract type, match ICE-02 and the wake through declared ports, and
+  use no static module window. A canonical per-body contact impulse port would support iceberg grounding and ship contact.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.
@@ -248,7 +252,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ATMO-05 | Tropical cyclones and large vortices | partial | Open | OPEN |
 | ATMO-06 | Airborne particle transport | stand-in | Open | OPEN |
 | ATMO-07 | Lightning and atmospheric electricity | none | Open | OPEN |
-| ATMO-08 | Fog and cold-air drainage | stand-in | Open | OPEN |
+| ATMO-08 | Fog and cold-air drainage | stand-in | Codex | BUILDING (codex/physics-atmo-08) |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | LANDED 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Open | OPEN |
@@ -257,10 +261,10 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | EARTH-08 | Seismic waves and ground shaking | none | Open | OPEN |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Open | OPEN |
-| ICE-01 | Snowpack | partial | Codex | BUILDING (codex/physics-ice-01) |
+| ICE-01 | Snowpack | physics/snowpack and weather/avalanche | Codex | LANDED 7f5ad4a8d2 |
 | ICE-02 | Glacier and ice-sheet flow | physics/glacier | Codex | LANDED 096242cb21 |
-| ICE-03 | Iceberg rigid-body dynamics and calving | stand-in | Codex | BUILDING (codex/physics-lane-2) |
-| ICE-04 | Pack ice and floes | stand-in | Open | OPEN |
+| ICE-03 | Iceberg rigid-body dynamics and calving | physics/iceberg | Codex | LANDED 7dbf9e06ee |
+| ICE-04 | Pack ice and floes | stand-in | Codex | BUILDING (codex/physics-lane-2) |
 | ICE-05 | Ice thermodynamics | physics/ice | Codex | LANDED 7b64dddf4f |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
@@ -322,7 +326,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Claude | LANDED 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Claude | LANDED 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Claude | LANDED 33ab69766 |
-| SEA-08 | Ship seakeeping | stand-in | Claude | CLAIMED |
+| SEA-08 | Ship seakeeping | stand-in | Claude | LANDED d865c4c8f |
 | SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | CLAIMED |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Claude | CLAIMED |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Claude | CLAIMED |

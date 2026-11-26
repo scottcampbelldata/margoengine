@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20081843,
+  "total": 20106219,
   "history": [
     {
       "date": "2026-10-24",
@@ -12801,6 +12801,36 @@
       "commit": "046ee7e0d",
       "reason": "physics/rogue is a new optional entry (SEA-03): NonlinearSea, the second-order random sea (Dalzell's sum and difference kernels over equal-variance components), the ECMWF freak-wave statistics, rogue waves as constrained NewWaves placed or drawn, and the SeaSurface contract; 7,674 B gzip, its own entry so scenes without nonlinear seas pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d",
+      "reason": "New optional entry @margoengine/input/body, 0 to 3,533 B gzip measured (budget 3,789): the hand and pose landmark to humanoid skeleton driver with joint limits and smoothing. Core plus stage unchanged.",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "8d00b3f47",
+      "reason": "vfx node-system: new optional entry (4,703 B gzip), a block-graph particle system compiled into VFX options with versioned JSON, coded errors and a clock that chains systems; the root VFX is imported, not bundled, and no existing entry grows",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fdac6c12cc",
+      "reason": "ICE-03 adds physics/iceberg at 5162 B gzip (cap 5418 B) with lazy stateless Wasm. Physics/sea goes from its recorded 7361 B to 7745 B gzip (cap 7361 to 8001 B) for its typed SeaSource registry reader and checked coordinates. Splitting the reader would duplicate WakeSolver’s source stamping and add another entry. Core plus stage remains 24820 B.",
+      "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "SEA-08 green water",
+      "grew": 1,
+      "reason": "@margoengine/physics/seakeeping: green water: the deck found from the mesh, a two-dimensional shallow-water solver on it (Rusanov with the hydrostatic reconstruction, characteristic edges with the critical-flow limit), the deck water's load and the deckInflow records; measured gzip (Mac build) 16459 B, was 13440; without it the sea over a hull's deck takes no weight onto it, and a split would load one hull solve from two entries. Budget (measured + max(3%, 256 B)): 13843 to 16953 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7f5ad4a8d2",
+      "grew": 2,
+      "reason": "ICE-01 entry sizes, previous record to current: @margoengine/physics/snowpack 0→5737 B (ceiling 0→5993 B); @margoengine/weather/avalanche 6738→7195 B (ceiling 6984→7451 B). The snowpack entry integrates the registry and lazily loads the arena solver. Weather adds solid reflection and distributed obstacle drag to the same avalanche flux. A separate wrapper would need to duplicate the main flow step to change its conservative boundary flux."
     }
   ],
   "items": {
@@ -13317,6 +13347,7 @@
     "@margoengine/ifc/worker": 1828,
     "@margoengine/ifc/write": 10300,
     "@margoengine/input": 5722,
+    "@margoengine/input/body": 3789,
     "@margoengine/input/face": 3737,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
@@ -13624,6 +13655,7 @@
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
+    "@margoengine/physics/iceberg": 5418,
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/locomotion": 6675,
@@ -13632,11 +13664,13 @@
     "@margoengine/physics/orbit": 4273,
     "@margoengine/physics/pedestrians": 4846,
     "@margoengine/physics/robots": 5127,
+    "@margoengine/physics/rogue": 7930,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
-    "@margoengine/physics/sea": 7361,
-    "@margoengine/physics/seakeeping": 13843,
+    "@margoengine/physics/sea": 8001,
+    "@margoengine/physics/seakeeping": 16953,
     "@margoengine/physics/sediment": 5512,
+    "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
@@ -14263,6 +14297,7 @@
     "@margoengine/vfx/json": 2860,
     "@margoengine/vfx/lit": 2369,
     "@margoengine/vfx/mesh": 3449,
+    "@margoengine/vfx/node-system": 4959,
     "@margoengine/vfx/nodes": 3349,
     "@margoengine/vfx/obstacles": 1311,
     "@margoengine/vfx/over-life": 1831,
@@ -14395,7 +14430,7 @@
     "@margoengine/water/wake": 1680,
     "@margoengine/weather": 8762,
     "@margoengine/weather/audio": 1908,
-    "@margoengine/weather/avalanche": 6984,
+    "@margoengine/weather/avalanche": 7451,
     "@margoengine/weather/boundary-layer": 2596,
     "@margoengine/weather/cover": 1795,
     "@margoengine/weather/data": 2788,
@@ -14687,7 +14722,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/rogue": 7930
+    "margoengine/web": 577
   }
 }

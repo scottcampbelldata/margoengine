@@ -290,6 +290,30 @@ its budget, seek and step and the drawn field after every button.
 
 ## Avalanches with a powder cloud
 
+`Avalanche` accepts a layered `Snowpack` from `@margoengine/physics/snowpack` as `snow`. At release, it reads the
+current cover, slab water-equivalent mass and stability. `blocked` marks impermeable building footprints with one
+zero or one per height sample. `obstacleDrag` gives one value or an array of distributed drag coefficients in
+m⁻¹, equal to half the drag coefficient times the frontal area per volume. These options act on the dense flow.
+
+```ts
+import { Avalanche } from '@margoengine/weather/avalanche';
+import { Snowpack } from '@margoengine/physics/snowpack';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const snow = await Snowpack.load();
+world.add(snow, {
+  width: 3, depth: 3, cellSize: 4, ground: [8, 8, 8, 4, 4, 4, 0, 0, 0],
+  layers: [{ mass: 120, density: 300, cohesion: 50 }],
+});
+world.advance(60);
+const slide = new Avalanche({
+  snow, obstacleDrag: 0.1, blocked: [0, 0, 0, 0, 0, 0, 0, 1, 0], cloud: false,
+});
+slide.seek(2);
+console.log(slide.budget());
+```
+
 `Avalanche` from `margoengine/weather/avalanche` is a snow avalanche on a terrain grid, deterministic over film time
 with no physics engine. At `releaseTime` a slab breaks away (a rectangle across the slope, or with a `SnowDrift` as
 `snow` every sample whose slide state is under 1); the dense core flows down the ground as a depth-averaged layer

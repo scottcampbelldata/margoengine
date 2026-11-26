@@ -1559,6 +1559,10 @@
       "types": "./dist/input/face.d.ts",
       "import": "./dist/input/face.js"
     },
+    "./input/body": {
+      "types": "./dist/input/body.d.ts",
+      "import": "./dist/input/body.js"
+    },
     "./lighting2d/sdf": {
       "types": "./dist/lighting2d/sdf.d.ts",
       "import": "./dist/lighting2d/sdf.js"
@@ -2275,9 +2279,17 @@
       "types": "./dist/physics/glacier.d.ts",
       "import": "./dist/physics/glacier.js"
     },
+    "./physics/iceberg": {
+      "types": "./dist/physics/iceberg.d.ts",
+      "import": "./dist/physics/iceberg.js"
+    },
     "./physics/runoff": {
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
+    },
+    "./physics/snowpack": {
+      "types": "./dist/physics/snowpack.d.ts",
+      "import": "./dist/physics/snowpack.js"
     },
     "./physics/aeolian": {
       "types": "./dist/physics/aeolian.d.ts",

@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Snowpack } from '@margoengine/physics/snowpack';
+import { PhysicsWorld } from '@margoengine/physics/world';
 import { Avalanche, voellmySpeed, voellmyRunout, validateAvalanche } from '../dist/avalanche.js';
 import { SnowDrift } from '../dist/snow-drift.js';
 
@@ -16,6 +18,53 @@ function slope({ deg = 35, length = 2000, cell = 4, across = 3, flatFrom = Infin
   return { width: across, depth, cellSize: cell, ground };
 }
 const sum = (a) => a.reduce((s, v) => s + v, 0);
+
+test('an impermeable building reflects the dense avalanche and conserves the released snow', () => {
+  const terrain = slope({ length: 240, across: 5, cell: 2 });
+  const wall = 36 * terrain.width;
+  const blocked = new Uint8Array(terrain.width * terrain.depth);
+  blocked.fill(1, wall, wall + terrain.width);
+  const options = { ...terrain, cover: 0.5, release: { at: [4, 40], size: [8, 14] }, cloud: false, entrainment: 0 };
+  const barrier = new Avalanche({ ...options, blocked });
+  const clear = new Avalanche(options);
+  for (const control of [clear, barrier]) control.seek(30);
+  const past = (flow) => sum(flow.flowDepth().slice(wall)) + sum(flow.depositDepth().slice(wall));
+  assert.ok(past(clear) > 0);
+  assert.equal(past(barrier), 0);
+  const budget = barrier.budget();
+  assert.ok(Math.abs(budget.flowing + budget.deposited - budget.released) < budget.released * 512 * Number.EPSILON);
+});
+
+test('distributed vegetation extracts momentum from an otherwise identical avalanche', () => {
+  const terrain = slope({ length: 280, across: 5, cell: 2 });
+  const options = { ...terrain, cover: 0.75, release: { at: [4, 50], size: [8, 20] }, cloud: false, entrainment: 0 };
+  const forest = new Avalanche({ ...options, obstacleDrag: 0.15 });
+  const clear = new Avalanche(options);
+  for (const control of [clear, forest]) control.seek(4);
+  assert.ok(Math.max(...forest.flowSpeed()) < Math.max(...clear.flowSpeed()));
+  assert.ok(Math.max(...forest.peakPressure()) < Math.max(...clear.peakPressure()));
+});
+
+test('a real snowpack supplies the freshly melted cover and unstable slab mass at release', async () => {
+  const terrain = slope({ deg: 42, length: 36, across: 3, cell: 2 });
+  const count = terrain.width * terrain.depth;
+  const rates = { num: 60, den: 1 };
+  const world = new PhysicsWorld({ rate: rates });
+  const pack = await Snowpack.load();
+  world.add(pack, {
+    ...terrain,
+    layers: [{ mass: 10, cohesion: 0, temperature: 273.15 }],
+    retention: 0,
+    topHeat: 333700,
+  });
+  const avalanche = new Avalanche({ snow: pack, releaseTime: 1, cloud: false, entrainment: 0 });
+  world.advance(60);
+  const layer = pack.read(1, 1);
+  assert.ok(layer.stability < 1);
+  assert.ok(layer.mass < 10 && layer.mass > 0);
+  avalanche.seek(1);
+  assert.ok(Math.abs(avalanche.budget().released - count * terrain.cellSize * terrain.cellSize * layer.mass) < 1e-5);
+});
 
 test('Voellmy steady speed and Voellmy-Salm run-out formulas', () => {
   // sqrt(2000 x 1 x (sin 35 - 0.2 cos 35)) = 28.63 m/s.

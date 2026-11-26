@@ -473,7 +473,7 @@ page, test command and measured integration boundaries.
 
 ## Declarative actions (`margoengine/selection/actions`)
 
-A trigger-to-action layer over picking, in the style of Babylon.js's ActionManager (public docs only). Register what should happen when a node is picked, hovered, touched by another node, or a key goes down, and chain the steps with `then()`. It has no GPU code: you give it a pick function and feed it events, so it works with `Picking`, `Raycaster` or anything that answers "which node is here".
+A declarative trigger-to-action layer over picking. Register what should happen when a node is picked, hovered, touched by another node, or a key goes down, and chain the steps with `then()`. It has no GPU code: you give it a pick function and feed it events, so it works with `Picking`, `Raycaster` or anything that answers "which node is here".
 
 Triggers: `pick`, `doublePick`, `longPick` (`{ type: 'longPick', delay }`, default 0.5 s), `pickDown`, `pickUp`, `pointerOver`, `pointerOut`, `intersectEnter` / `intersectExit` (`{ type, other }`, world AABB overlap, touching counts), `everyFrame`, `keyDown` / `keyUp` (`{ type, key }`, one key or a list; no key matches all; `event.repeat` is ignored). Actions: `setValue`, `increment`, `interpolate` (a number or a vector, optional easing), `wait`, `play` / `stop` (any object with those methods), `run(callback)`. A condition (`when(target, 'on', '==', true)` or your own function) guards a link; a false condition ends that firing. All times are seconds.
 

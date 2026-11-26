@@ -20,6 +20,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/rebase-main.test.js`: a branch that adds entries builds no report and the merged surface holds
   both sides; a report both sides changed builds its own package only.
 
+### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
+
+- **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh
+  water, `HullSolver` writing `deckInflow` and `DeckWaterSolver` (inflow on, the deck box on the deck, cells [20, 6, 10] of
+  0.1 m). The deck volume takes the inflow and settles at 0.438 m^3 (4,297 N), but its load on the hull (its forces region,
+  y) settles at -2,198 N after 6 s. KB-FLIP-DECKLOAD1's fix brought the same case from +1,124 N; its regression (0.3 m of
+  water placed at the start, no inflow) takes the full weight.
+- **Cause:** not yet found, in how the deck volume's load treats water made by the inflow on a held hull. The hull
+  solver's side is right: it sees the claim and leaves its own deck load out (`packages/physics/tests/deck-water.test.js`,
+  "the deck volume claims its hull").
+
 ### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
 
 - **Repro:** a dynamic hull held by locks (or by contacts, joints, a mooring) with a `DeckWaterSolver` on it: 0.3 m of
@@ -16296,6 +16307,13 @@ an impulse, rolling or scraping excitation, with sound and damping set by the co
 The drop, silent resting support, rolling/sliding and joint-break cases live in
 `packages/physics/tests/coupling/modal-sound.test.js`.
 
+## Fixed: snow lacked melt energy and dense slides ignored obstacles (ICE-01, PA-33)
+
+The visual snow layer could stay in place after warming. The older avalanche modeled plant damage without taking
+momentum from the dense flow. Bind Weather's snow cover to `Snowpack` and give `Avalanche` the live pack,
+obstacle drag or building footprints. Reproduce the former faults with `packages/physics/tests/coupling/snowpack.test.js`,
+`packages/weather/tests/snowpack-check.mjs` and `packages/weather/tests/avalanche.test.js`.
+
 ## Fixed: dune and snow rendering lacked a moving surface layer (EARTH-07, PA-46 and PA-63)
 
 A static height seed and a separately prescribed plume could not move terrain or represent an exposed ridge losing
@@ -16310,12 +16328,11 @@ through springs and seepage. Connect its recharge port to `GroundwaterSolver` an
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
 
-### Glacier calving still needs the water impulse solver (PA-25)
+### General water impulse sources still need SEA-06 (PA-25)
 
-Advance `GlacierSolver` with a submerged grounded front and its adjacent open-water cell. The
-glacier publishes detached volume and its drainage independently. A live wave requires SEA-06
-to convert the released ice volume and location into a water-source impulse, so the current
-registry observer proves delivery only. The avalanche, lava and lahar cases remain open in PA-25.
+ICE-02 releases ice at its water-facing cells. ICE-03 turns those volumes into moving bodies and
+exports conservative local wave sources. The general impulse propagation and inundation model,
+the avalanche and lava sources, and the lahar feedback remain open under PA-25.
 
 ### Ground animal terrain and rig adapters (LIFE-02)
 
@@ -16332,3 +16349,9 @@ and sea fields leave out those quantities. A fixed `AgeingExposure` or a publish
 `ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
 `packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
 See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.
+
+### Ice impacts and long-wave inundation (PA-15 and PA-25)
+
+A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
+does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
+and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.

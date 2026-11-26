@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { DeckWaterSolver } from '../dist/flip.js';
+import { HullSolver } from '../dist/seakeeping.js';
 import {
   BODIES_FIELD,
   BODY_FORCES_FIELD,
@@ -165,35 +166,71 @@ test("the sea's inflow becomes the volume its flux brings, and water over an ope
   assert.ok(Math.abs(left + out - 0.1) <= (2 * 0.1 ** 3) / 8, `${left} m^3 on deck and ${out} gone, of 0.1`);
 });
 
-test('the deck volume claims its hull, so the hull carries one deck load, not two, and the same load', () => {
-  // The exceedance solver's simplified quasi-static load is the weight of the water on deck. With the deck volume it
-  // sees the claim and leaves its own out, and the deck volume's load is that weight within the grid's bound; without the
-  // deck volume it carries the load itself.
-  let water = 0;
-  const withDeck = new Exceedance(
-      () => [],
-      () => water,
-    ),
-    a = hull({ exceedance: withDeck, initial: (x, y) => y < 0.3 });
-  water = (a.deck.count * 0.1 ** 3) / 8;
-  a.world.advance(90);
-  const deckLoad = a.deck['words'](a.deck['forcesRegion'])[1];
-  assert.equal(withDeck.claimed, true);
-  assert.equal(withDeck.load, 0, 'the exceedance solver leaves its load out');
+test('the deck volume claims its hull, so the hull carries one deck load, not two', () => {
+  // The hull solver (SEA-08) as the exceedance solver: a box hull held with its deck 0.2 m under still water, the sea
+  // coming over its edges into the deck volume through \`deckInflow\`. The deck volume claims the hull, so the hull solver
+  // leaves its own deck load out: it holds only the sea's pressure on the hull's sides and bottom, and the deck volume
+  // carries the water's weight. Without the deck volume the hull solver carries the deck load itself: the whole submerged
+  // box's buoyancy.
+  const [l, d, b] = [2, 1, 1],
+    sink = 0.2,
+    run = (withDeck) => {
+      const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -G, 0] }),
+        body = physics.addBody(null, {
+          position: [0, -d / 2 - sink, 0],
+          colliders: { shape: 'box', halfExtents: [l / 2, d / 2, b / 2], mass: 500 },
+        });
+      body.enabledTranslations = [false, false, false];
+      body.enabledRotations = [false, false, false];
+      const hull = new HullSolver(),
+        deck = new DeckWaterSolver('deckWater', { inflow: true }),
+        world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] })
+          .add(new RigidSolver(), { physics })
+          .add(hull, {
+            hulls: [{ row: body.row, mesh: boxMesh([l, d, b]) }],
+            sea: { density: RHO, elevation: () => 0 },
+            gravity: [0, -G, 0],
+            addedMass: false,
+            radiation: false,
+            rollDamping: false,
+          });
+      if (withDeck)
+        world.add(deck, { row: body.row, offset: [-l / 2, d / 2, -b / 2], cells: [20, 6, 10], cellSize: 0.1 });
+      world.advance(360);
+      const held = new Float64Array(world.memory.buffer, hull.exportPorts(0)[0].region.byteOffset, (body.row + 1) * 6)[
+        body.row * 6 + 1
+      ];
+      return { held, water: withDeck ? deck.count : 0 };
+    },
+    shared = run(true),
+    alone = run(false),
+    sides = RHO * G * (d + sink) * l * b,
+    whole = RHO * G * d * l * b;
   assert.ok(
-    Math.abs(deckLoad + RHO * G * water) <= RHO * G * 2 * 1 * 0.05,
-    `deck load ${deckLoad} N, simplified ${-RHO * G * water} N`,
+    Math.abs(shared.held - sides) <= 1e-4 * sides,
+    `claimed: the hull solver holds ${shared.held} N, sides ${sides}`,
   );
-  const alone = new Exceedance(() => [], water, false),
-    physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -G, 0] });
-  physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5] } });
-  const w = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] })
-    .add(new RigidSolver(), { physics })
-    .add(alone);
-  w.advance(30);
-  assert.notEqual(alone.claimed, true);
-  assert.equal(alone.load, -RHO * G * water, 'alone, it carries the load');
+  // The deck volume took the sea's inflow (its own load on the hull is the still-water test's above; KB-FLIP-DECKLOAD2
+  // tracks its size on a held dynamic hull fed by the inflow).
+  assert.ok(shared.water > 0, 'the deck volume took the inflow');
+  assert.ok(
+    Math.abs(alone.held - whole) <= 1e-4 * whole,
+    `alone: the hull solver holds ${alone.held} N, ${whole} with the deck`,
+  );
 });
+
+/** A box hull of \`size\` (x, y, z), twelve triangles wound outward. */
+function boxMesh([sx, sy, sz]) {
+  const v = [];
+  for (const x of [-sx / 2, sx / 2])
+    for (const y of [-sy / 2, sy / 2]) for (const z of [-sz / 2, sz / 2]) v.push(x, y, z);
+  return {
+    vertices: Float64Array.from(v),
+    indices: Uint32Array.from([
+      0, 1, 3, 0, 3, 2, 4, 6, 7, 4, 7, 5, 0, 4, 5, 0, 5, 1, 2, 3, 7, 2, 7, 6, 0, 2, 6, 0, 6, 4, 1, 5, 7, 1, 7, 3,
+    ]),
+  };
+}
 
 test('a snapshot restores the deck water bit for bit', () => {
   const make = () =>

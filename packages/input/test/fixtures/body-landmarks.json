@@ -1,0 +1,44 @@
+{
+  "comment": "Hand-written Pose Landmarker world points (metres about the hips' centre, x to the subject's left in an unmirrored frame, y down, z away from the camera) as [x, y, z, visibility], and Hand Landmarker world points of the subject's left hand as [x, y, z]. 'tpose' stands as the test skeleton's rest pose; 'bent' drops both arms, bends the left elbow forward and hides the right knee; 'hand' is the left hand flat in the T-pose; 'curl' bends its index finger down at the knuckle. The test fills unlisted points with visibility 0. No model produced them.",
+  "tpose": {
+    "7": [0.07, -0.62, 0, 0.99],
+    "8": [-0.07, -0.62, 0, 0.99],
+    "11": [0.17, -0.45, 0, 0.99],
+    "12": [-0.17, -0.45, 0, 0.99],
+    "13": [0.44, -0.45, 0, 0.99],
+    "14": [-0.44, -0.45, 0, 0.99],
+    "15": [0.69, -0.45, 0, 0.99],
+    "16": [-0.69, -0.45, 0, 0.99],
+    "23": [0.09, 0.04, 0, 0.99],
+    "24": [-0.09, 0.04, 0, 0.99],
+    "25": [0.09, 0.45, -0.01, 0.99],
+    "26": [-0.09, 0.45, -0.01, 0.99],
+    "27": [0.09, 0.87, 0, 0.99],
+    "28": [-0.09, 0.87, 0, 0.99],
+    "29": [0.09, 0.9, 0.03, 0.99],
+    "30": [-0.09, 0.9, 0.03, 0.99],
+    "31": [0.09, 0.93, -0.13, 0.99],
+    "32": [-0.09, 0.93, -0.13, 0.99]
+  },
+  "bent": {
+    "13": [0.17, -0.18, 0, 0.99],
+    "15": [0.17, -0.18, -0.25, 0.99],
+    "14": [-0.17, -0.18, 0, 0.99],
+    "16": [-0.17, 0.07, 0, 0.99],
+    "26": [-0.3, 0.3, -0.3, 0.1]
+  },
+  "hand": {
+    "0": [0, 0, 0],
+    "5": [0.085, 0, -0.02],
+    "6": [0.125, 0, -0.02],
+    "7": [0.15, 0, -0.02],
+    "8": [0.17, 0, -0.02],
+    "9": [0.09, 0, 0],
+    "17": [0.075, 0, 0.03]
+  },
+  "curl": {
+    "6": [0.085, 0.04, -0.02],
+    "7": [0.085, 0.065, -0.02],
+    "8": [0.085, 0.085, -0.02]
+  }
+}

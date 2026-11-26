@@ -29,6 +29,8 @@ import {
   type StepContext,
 } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_WORDS, FORCE_WORDS } from '../world/solvers/rigid.js';
+import { DECK_CLAIMS_FIELD, DECK_INFLOW_FIELD, DECK_INFLOW_WORDS } from '../world/deck.js';
+import { type Deck, deckOf, stepDeck } from './deck.js';
 import { type HullMemory, hullMemory } from './memory.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { addedMassInfinite, hullSections } from './strips.js';
@@ -89,6 +91,15 @@ export interface HullParams {
    * pressure over the moving wetted surface already gives, over the waves by Newman's approximation.
    */
   readonly drift?: boolean;
+  /**
+   * Take the sea coming over the deck (default true): shallow water on each hull's deck in its moving frame, coming in where
+   * the sea stands above a deck edge and running off where it does not, its weight (rho G h) on the deck (deck.ts). The
+   * deck's own faces then take no Froude-Krylov pressure, so the water over them is counted once. Where a liquid solver
+   * owns a hull's on-deck load (`deckClaims`), the hull solver leaves its own out.
+   */
+  readonly greenWater?: boolean;
+  /** The deck's grid, cells along the hull and across it (default [32, 12]). */
+  readonly deckCells?: readonly [number, number];
   /**
    * Damp a hull's roll by its bilge eddies and its skin friction (default true): Ikeda's component method (viscous.ts), the
    * viscous part of roll damping that potential flow leaves out and that damps a real hull's roll most near its resonance.
@@ -154,6 +165,15 @@ export class HullSolver implements Solver<HullParams> {
   /** Per hull: its drift coefficient (N per m of hull and square metre of wave amplitude, summed along it) by frequency. */
   private readonly drifts = new Map<Hull, { frequencies: Float64Array; coefficient: Float64Array }>();
   private waves32 = new Float32Array(0);
+  private greenWater = true;
+  private deckCells: readonly [number, number] = [32, 12];
+  /** Per hull: the water on its deck (h, h u, h w a cell, body frame), then its velocity a step ago (flag, linear). */
+  private deckWater: Region | null = null;
+  /** The `deckInflow` port: a count word, then `DECK_INFLOW_WORDS` f64 a record, room for `inflowRecords` a hull. */
+  private inflow: Region | null = null;
+  private inflowRecords = 0;
+  /** Per hull: its deck, and its mesh without the deck's faces (for the Froude-Krylov load). */
+  private readonly decks = new Map<Hull, { deck: Deck; wet: HullMesh }>();
 
   constructor(readonly id = 'hull') {}
 
@@ -164,6 +184,8 @@ export class HullSolver implements Solver<HullParams> {
       fields: [
         { field: BODIES_FIELD, access: 'read' },
         { field: BODY_FORCES_FIELD, access: 'accumulate' },
+        { field: DECK_INFLOW_FIELD, access: 'write' },
+        { field: DECK_CLAIMS_FIELD, access: 'read', optional: true },
       ],
       rate: level,
       // Asked after init, which sets the level (describe comes first, before the Physics is known).
@@ -228,6 +250,20 @@ export class HullSolver implements Solver<HullParams> {
     if (this.addedMass) this.carry = host.allocate('carry', hulls.length * CARRY_WORDS * 8, 'f64', HULL_LAYOUT);
     this.diffraction = (params.diffraction ?? true) && this.waterOf() !== null;
     this.drift = (params.drift ?? true) && this.wavesOf() !== null;
+    this.greenWater = params.greenWater ?? true;
+    this.deckCells = params.deckCells ?? [32, 12];
+    const [cx, cz] = this.deckCells;
+    if (!(Number.isInteger(cx) && Number.isInteger(cz) && cx >= 2 && cz >= 2 && cx * cz <= 65536))
+      throw new RangeError(`A deck's cells are ${cx} by ${cz}; pass whole numbers of 2 or more, at most 65,536 cells.`);
+    this.inflowRecords = 4 * (cx + cz);
+    this.inflow = host.allocate(
+      'deckInflow',
+      (1 + hulls.length * this.inflowRecords * DECK_INFLOW_WORDS) * 8,
+      'f64',
+      HULL_LAYOUT,
+    );
+    if (this.greenWater)
+      this.deckWater = host.allocate('deckWater', hulls.length * (3 * cx * cz + 4) * 8, 'f64', HULL_LAYOUT);
     if (this.diffraction)
       this.waves = host.allocate('waves', hulls.length * this.stations * this.lags * 2 * 8, 'f64', HULL_LAYOUT);
   }
@@ -250,7 +286,9 @@ export class HullSolver implements Solver<HullParams> {
     const host = this.host;
     if (!host || !this.sea || !this.forces)
       throw new MargoError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
-    const out = new Float64Array(host.memory.buffer, this.forces.byteOffset, this.capacity * FORCE_WORDS);
+    const out = new Float64Array(host.memory.buffer, this.forces.byteOffset, this.capacity * FORCE_WORDS),
+      records = new Float64Array(host.memory.buffer, this.inflow!.byteOffset, this.inflow!.byteLength / 8);
+    records.fill(0);
     out.fill(0);
     const cell = (this.sea as Partial<SeaSurface>).cell;
     if (cell && (cell[0] !== context.cell[0] || cell[1] !== context.cell[1] || cell[2] !== context.cell[2]))
@@ -297,7 +335,14 @@ export class HullSolver implements Solver<HullParams> {
           position: [centre[0] + offset[0], centre[1] + offset[1], centre[2] + offset[2]] as const,
           rotation: turned,
         },
-        loads = wettedLoads(hull.mesh, pose, this.sea, t, centre, this.loads);
+        loads = wettedLoads(
+          this.greenWater ? this.deckFor(hull, bodies, at, pose, centre, 1 / rateOf(context.level)).wet : hull.mesh,
+          pose,
+          this.sea,
+          t,
+          centre,
+          this.loads,
+        );
       if (this.radiation)
         this.radiate(
           hull,
@@ -314,6 +359,7 @@ export class HullSolver implements Solver<HullParams> {
       if (this.diffraction)
         this.diffract(hull, bodies, at, pose, centre, context.tick, t, 1 / rateOf(context.level), loads);
       if (this.drift) this.driftLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads);
+      if (this.greenWater) this.deckLoad(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), context, loads);
       const w = hull.row * FORCE_WORDS,
         held = this.addedMass
           ? this.carried(hull, bodies, at, pose, centre, t, 1 / rateOf(context.level), loads)
@@ -646,6 +692,181 @@ export class HullSolver implements Solver<HullParams> {
     return { frequencies: Float64Array.from(frequencies), coefficient };
   }
 
+  /** A hull's deck and its mesh without the deck's faces (upward faces above its still waterline), made at its first step. */
+  private deckFor(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    dt: number,
+  ): { deck: Deck; wet: HullMesh } {
+    let found = this.decks.get(hull);
+    if (found) return found;
+    const q = pose.rotation,
+      local = rotate(
+        [-q[0], -q[1], -q[2], q[3]],
+        [centre[0] - pose.position[0], centre[1] - pose.position[1], centre[2] - pose.position[2]],
+      ),
+      memory = this.memoryOf(hull, bodies, at, local, dt),
+      { vertices: v, indices } = hull.mesh;
+    let waterline = memory?.waterline;
+    if (waterline === undefined) {
+      // A body of no mass: its deck is whatever faces up above its lowest point.
+      waterline = Infinity;
+      for (let i = 1; i < v.length; i += 3) waterline = Math.min(waterline, v[i]!);
+    }
+    const [nx, nz] = this.deckCells,
+      deck = deckOf(hull.mesh, waterline, nx, nz),
+      kept: number[] = [];
+    for (let k = 0; k + 2 < indices.length; k += 3) {
+      const a = 3 * indices[k]!,
+        b = 3 * indices[k + 1]!,
+        c = 3 * indices[k + 2]!,
+        ux = v[b]! - v[a]!,
+        uy = v[b + 1]! - v[a + 1]!,
+        uz = v[b + 2]! - v[a + 2]!,
+        wx = v[c]! - v[a]!,
+        wy = v[c + 1]! - v[a + 1]!,
+        wz = v[c + 2]! - v[a + 2]!,
+        ny = uz * wx - ux * wz,
+        length = hypot(hypot(uy * wz - uz * wy, ny), ux * wy - uy * wx),
+        lowest = Math.min(v[a + 1]!, v[b + 1]!, v[c + 1]!);
+      if (length > 0 && ny > 0.5 * length && lowest > waterline) continue;
+      kept.push(indices[k]!, indices[k + 1]!, indices[k + 2]!);
+    }
+    found = { deck, wet: { vertices: v, indices: Uint32Array.from(kept) } };
+    this.decks.set(hull, found);
+    return found;
+  }
+
+  /**
+   * Moves the water on a hull's deck over the step and adds its weight to `loads` (deck.ts): the frame's gravity in the
+   * body's axes (the world's less the body's acceleration over its last step); the sea beyond each deck edge its height
+   * over the edge and the water's velocity relative to it; the deck's pressure rho G h on each cell, down the deck, about
+   * the centre of mass, unless a liquid solver owns the hull's on-deck load (`deckClaims`). What came aboard goes into the
+   * `deckInflow` port, a record an edge face.
+   */
+  private deckLoad(
+    hull: Hull,
+    bodies: Float32Array,
+    at: number,
+    pose: { readonly position: Vec3; readonly rotation: readonly [number, number, number, number] },
+    centre: Vec3,
+    t: number,
+    dt: number,
+    context: StepContext,
+    loads: WettedLoads,
+  ): void {
+    const { deck } = this.deckFor(hull, bodies, at, pose, centre, dt),
+      [nx, nz] = this.deckCells,
+      cells = nx * nz,
+      index = this.hulls.indexOf(hull),
+      words = 3 * cells + 4,
+      memory = this.host!.memory.buffer,
+      water = new Float64Array(memory, this.deckWater!.byteOffset + index * words * 8, 3 * cells),
+      last = new Float64Array(memory, this.deckWater!.byteOffset + (index * words + 3 * cells) * 8, 4),
+      q = pose.rotation,
+      conjugate = [-q[0], -q[1], -q[2], q[3]] as const,
+      v: Vec3 = [bodies[at + 10]!, bodies[at + 11]!, bodies[at + 12]!],
+      spin: Vec3 = [bodies[at + 13]!, bodies[at + 14]!, bodies[at + 15]!],
+      // The body's acceleration over its last step, the frame's.
+      a: Vec3 = last[0] === 1 ? [(v[0] - last[1]!) / dt, (v[1] - last[2]!) / dt, (v[2] - last[3]!) / dt] : [0, 0, 0],
+      g = this.gravity,
+      gravity = rotate(conjugate, [g[0] - a[0], g[1] - a[1], g[2] - a[2]]),
+      water3 = this.waterOf(),
+      flow = this.flow,
+      sea = this.sea!,
+      outside = (x: number, z: number, b: number): readonly [number, number, number] => {
+        const r = rotate(q, [x, b, z]),
+          p: Vec3 = [pose.position[0] + r[0], pose.position[1] + r[1], pose.position[2] + r[2]],
+          height = sea.elevation(p[0], p[2], t) - p[1];
+        if (!(height > 0)) return [0, 0, 0];
+        // The water's velocity there (its orbital motion, where the sea gives it) less the deck's, in the body's axes.
+        let u: Vec3 = [0, 0, 0];
+        if (water3) {
+          water3.sample(p[0], p[1], p[2], t, flow);
+          u = [flow.velocity[0], flow.velocity[1], flow.velocity[2]];
+        }
+        const arm: Vec3 = [p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]],
+          deckVelocity: Vec3 = [
+            v[0] + spin[1] * arm[2] - spin[2] * arm[1],
+            v[1] + spin[2] * arm[0] - spin[0] * arm[2],
+            v[2] + spin[0] * arm[1] - spin[1] * arm[0],
+          ],
+          relative = rotate(conjugate, [u[0] - deckVelocity[0], u[1] - deckVelocity[1], u[2] - deckVelocity[2]]);
+        return [height, relative[0], relative[2]];
+      },
+      came: number[] = [];
+    stepDeck(deck, water, gravity, outside, dt, came);
+    last.set([1, v[0], v[1], v[2]]);
+    // The inflow records: each edge face that took water in, as a segment across the face.
+    const records = new Float64Array(memory, this.inflow!.byteOffset, this.inflow!.byteLength / 8),
+      room = (records.length - 1) / DECK_INFLOW_WORDS;
+    for (let r = 0; r * 8 < came.length && records[0]! < room; r++) {
+      const [x, z, nX, nZ, h, u, w, flux] = came.slice(8 * r, 8 * r + 8) as [
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+          number,
+        ],
+        // The face runs across its normal, half a cell each way.
+        hx = nZ !== 0 ? deck.dx / 2 : 0,
+        hz = nX !== 0 ? deck.dz / 2 : 0,
+        i = Math.min(nx - 1, Math.max(0, Math.floor((x - nX * 1e-6 - deck.x0) / deck.dx))),
+        j = Math.min(nz - 1, Math.max(0, Math.floor((z - nZ * 1e-6 - deck.z0) / deck.dz))),
+        b = deck.height[j * nx + i] ?? 0,
+        o = 1 + records[0]! * DECK_INFLOW_WORDS;
+      records.set([hull.row, x - hx, b, z - hz, x + hx, b, z + hz, nX, 0, nZ, h, u, 0, w, flux, context.tick], o);
+      records[0]! += 1;
+    }
+    // The deck's load, unless a liquid solver owns it.
+    const claims = context.inputs.get(DECK_CLAIMS_FIELD.name);
+    if (claims) {
+      const owned = new Float64Array(
+        claims.region.memory?.buffer ?? memory,
+        claims.region.byteOffset,
+        claims.region.byteLength / 8,
+      );
+      if (owned[hull.row] === 1) return;
+    }
+    const G = -gravity[1];
+    if (!(G > 0)) return;
+    const local = rotate(conjugate, [
+        centre[0] - pose.position[0],
+        centre[1] - pose.position[1],
+        centre[2] - pose.position[2],
+      ]),
+      density = sea.density ?? SEA_WATER,
+      area = deck.dx * deck.dz,
+      body = [0, 0, 0, 0, 0, 0];
+    for (let j = 0; j < nz; j++)
+      for (let i = 0; i < nx; i++) {
+        const c = j * nx + i,
+          h = water[c]!;
+        if (!(h > 0)) continue;
+        const f = -density * G * h * area,
+          rx = deck.x0 + (i + 0.5) * deck.dx - local[0],
+          ry = deck.height[c]! - local[1],
+          rz = deck.z0 + (j + 0.5) * deck.dz - local[2];
+        body[1]! += f;
+        // r x (0, f, 0).
+        body[3]! += -rz * f;
+        body[5]! += rx * f;
+        void ry;
+      }
+    const force = rotate(q, [body[0]!, body[1]!, body[2]!]),
+      moment = rotate(q, [body[3]!, body[4]!, body[5]!]);
+    for (let k = 0; k < 3; k++) {
+      loads.force[k]! += force[k]!;
+      loads.torque[k]! += moment[k]!;
+    }
+  }
+
   /**
    * Adds the viscous roll moment to `loads`: -(eddy |p| + linear) p about the body's x axis through its centre of mass, p its
    * roll rate, taken implicitly in the damping alone (backward Euler against the roll inertia with the water carried), so a
@@ -901,14 +1122,17 @@ export class HullSolver implements Solver<HullParams> {
   exportPorts(tick: number): readonly Port[] {
     if (!this.forces)
       throw new MargoError('state', 'HullSolver is not in a world yet; add it with world.add(solver, {hulls, sea}).');
-    return [{ field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] }];
+    return [
+      { field: BODY_FORCES_FIELD.name, region: this.forces, tick, cell: [0, 0, 0] },
+      { field: DECK_INFLOW_FIELD.name, region: this.inflow!, tick, cell: [0, 0, 0] },
+    ];
   }
 
   importPorts(_tick: number): void {}
 
   /** The hulls' motion histories, which their radiation remembers. */
   stateRegions(): readonly Region[] {
-    return [this.history, this.radiated, this.waves, this.carry].filter((r): r is Region => r !== null);
+    return [this.history, this.radiated, this.waves, this.carry, this.deckWater].filter((r): r is Region => r !== null);
   }
 
   extraState(): readonly Region[] {

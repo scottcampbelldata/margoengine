@@ -1,7 +1,7 @@
 {
   "gate": "clean-room",
   "about": "three.js / Babylon / graphics-library mentions per file in packages/**; third-party runtime dependencies",
-  "total": 248,
+  "total": 247,
   "history": [
     {
       "date": "2026-10-24",
@@ -46,6 +46,6 @@
     "mention packages/margoengine/package.json": 6,
     "mention packages/margoengine/src/exporters/babylon.ts": 1,
     "mention packages/margoengine/src/loaders/babylon.ts": 1,
-    "mention packages/selection/README.md": 3
+    "mention packages/selection/README.md": 2
   }
 }

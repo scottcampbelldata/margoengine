@@ -15,7 +15,15 @@ import {
 } from '../../dist/seakeeping.js';
 import { SpectralSea } from '../../dist/sea.js';
 import { freeSection } from './sections.js';
-import { BODY_FORCES_FIELD, FORCE_WORDS, PhysicsWorld, RigidSolver } from '../../dist/world.js';
+import {
+  BODY_FORCES_FIELD,
+  DECK_CLAIMS_FIELD,
+  DECK_INFLOW_FIELD,
+  DECK_INFLOW_WORDS,
+  FORCE_WORDS,
+  PhysicsWorld,
+  RigidSolver,
+} from '../../dist/world.js';
 import { effectBothWays, frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 await Physics.load();
@@ -772,3 +780,87 @@ test('HullSolver: moored in beam waves, a box drifts with the waves it sends bac
     else assert.ok(Math.abs(mean - far) <= 0.03 * wall, `at ${w} rad/s: mean drift ${mean} N against ${far} N`);
   }
 });
+
+test("HullSolver: held with its deck under still water, a box's deck fills to the sea, and a liquid that claims the deck takes its load", () => {
+  // Green water's quasi-static case: a box held 0.2 m deeper than its deck. The sea comes over its edges (Ritter's dam break
+  // at each), fills the deck to the still-water level, and stands there: the hull then takes the whole submerged box's
+  // buoyancy, rho g D L B, the deck water's weight standing in for the pressure its deck would have from the sea (the deck's
+  // faces take none of their own while there is deck water to count). The water coming aboard is published in
+  // `deckInflow`. A liquid solver that owns the deck (`deckClaims` 1 at the box's row) takes the on-deck load itself, and
+  // the hull solver leaves its own out: the hull then holds only the sea's pressure on its sides and bottom.
+  const [l, d, b] = [4, 1, 2],
+    sink = 0.2,
+    run = (claimed) => {
+      const physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -GRAVITY, 0] }),
+        body = physics.addBody(null, {
+          position: [0, -d / 2 - sink, 0],
+          colliders: { shape: 'box', halfExtents: [l / 2, d / 2, b / 2], mass: 1000 },
+        });
+      body.enabledTranslations = [false, false, false];
+      body.enabledRotations = [false, false, false];
+      const hull = new HullSolver(),
+        world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(hull, {
+          hulls: [{ row: body.row, mesh: boxMesh([l, d, b]) }],
+          sea: { density: SEA_WATER, elevation: () => 0 },
+          addedMass: false,
+          radiation: false,
+          rollDamping: false,
+        });
+      if (claimed) world.add(claimer(body.row), {}).couple(['claims', 'hull', 'rigid'], 'staggered');
+      else world.couple(['hull', 'rigid'], 'staggered');
+      let came = 0,
+        row = -1;
+      for (let f = 1; f <= 600; f++) {
+        world.advance(f);
+        const port = hull.exportPorts(0)[1],
+          records = new Float64Array(world.memory.buffer, port.region.byteOffset, port.region.byteLength / 8);
+        for (let r = 0; r < records[0]; r++) {
+          const o = 1 + r * DECK_INFLOW_WORDS;
+          came += records[o + 14] / 60;
+          row = records[o];
+        }
+      }
+      const held = new Float64Array(
+        world.memory.buffer,
+        hull.exportPorts(0)[0].region.byteOffset + body.row * 48,
+        6,
+      )[1];
+      return { held, came, row, row0: body.row };
+    },
+    open = run(false),
+    owned = run(true),
+    whole = SEA_WATER * GRAVITY * d * l * b,
+    sides = SEA_WATER * GRAVITY * (d + sink) * l * b;
+  assert.ok(Math.abs(open.held - whole) <= 1e-4 * whole, `the hull holds ${open.held} N against ${whole} N`);
+  assert.ok(open.row === open.row0, 'the inflow names the hull');
+  // The port counts what came over the edges, and some ran back out before the deck settled: at least what it holds.
+  assert.ok(open.came >= 0.999 * sink * l * b, `${open.came} m^3 came aboard, the deck holds ${sink * l * b}`);
+  assert.ok(Math.abs(owned.held - sides) <= 1e-4 * sides, `claimed: the hull holds ${owned.held} N against ${sides} N`);
+});
+
+/** A stand-in for a liquid solver that owns hull `row`'s on-deck load: it writes 1 into `deckClaims` there. */
+function claimer(row) {
+  let region, host;
+  return {
+    describe: () => ({
+      id: 'claims',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [
+        { field: DECK_CLAIMS_FIELD, access: 'write' },
+        { field: DECK_INFLOW_FIELD, access: 'read' },
+      ],
+    }),
+    init(h) {
+      host = h;
+      region = h.allocate('claims', (row + 1) * 8, 'f64', 1);
+    },
+    step() {
+      new Float64Array(host.memory.buffer, region.byteOffset, row + 1)[row] = 1;
+    },
+    exportPorts: (tick) => [{ field: 'deckClaims', region, tick, cell: [0, 0, 0] }],
+    importPorts() {},
+    stateRegions: () => [region],
+    extraState: () => [],
+  };
+}

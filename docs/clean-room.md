@@ -1,5 +1,9 @@
 # Clean room
 
+### Webcam hands and body to a skeleton in Input (2026-11-26)
+
+Michael Gleicher, Retargetting Motion to New Characters (SIGGRAPH 1998, https://doi.org/10.1145/280814.280820), and Jean-Sebastien Monzani, Paolo Baerlocher, Ronan Boulic and Daniel Thalmann, Using an Intermediate Skeleton and Inverse Kinematics for Motion Retargeting (Computer Graphics Forum 19(3), 2000, https://doi.org/10.1111/1467-8659.00393), for retargeting through an intermediate humanoid: `BodyDriver` maps the landmarks onto VRM humanoid bones (VRM 1.0 humanoid specification, https://github.com/vrm-c/vrm-specification/blob/master/specification/VRMC_vrm-1.0/humanoid.md) and rotates each bone so its rest direction (toward its child, from the skeleton or a calibration T-pose or A-pose) lies along the landmark direction: the shortest-arc quaternion for one direction, the change of orthonormal frame for a direction plus a side direction (hips, chest, hands). Joint limits clamp the turn from the rest rotation relative to the parent (a cone about the rest pose, the joint constraint of Andreas Aristidou and Joan Lasenby, FABRIK: A fast, iterative solver for the Inverse Kinematics problem, Graphical Models 73(5), 2011, https://doi.org/10.1016/j.gmod.2011.05.003). Point orders are the Pose Landmarker (Bazarevsky et al., BlazePose, 2020, https://arxiv.org/abs/2006.10204) and Hand Landmarker (Zhang et al., MediaPipe Hands, 2020, https://arxiv.org/abs/2006.10214) maps. Smoothing is the one-euro filter on each landmark direction. No detector, model or weights are shipped or fetched; no rival source was read.
+
 ### Webcam face to morph targets in Input (2026-11-26)
 
 Apple's ARKit documentation, ARFaceAnchor.BlendShapeLocation (https://developer.apple.com/documentation/arkit/arfaceanchor/blendshapelocation), gives the 52 blendshape names `ARKIT_BLENDSHAPES` lists and their left/right meaning (the subject's side). Tereza Soukupova and Jan Cech, Real-Time Eye Blink Detection using Facial Landmarks (CVWW 2016, https://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf), give the eye aspect ratio (|p2 - p6| + |p3 - p5|) / (2 |p1 - p4|) that `measureFace` uses for blinks and wide eyes; the jaw, mouth and brow measures are the same kind of scale-free distance ratio (over the face height or the outer-eye distance), measured against a calibrated neutral face. The point indices come from the published Face Landmarker landmark map (https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker) and Kartynnik et al. 2019 (https://arxiv.org/abs/1907.06724). The head rotation is the orthonormal frame of the outer eye corners and the forehead-to-chin line, relative to the calibrated face; smoothing is the one-euro filter (Casiez, Roussel and Vogel 2012) per weight and per quaternion component on the hemisphere of the last value. No detector, model or weights are shipped or fetched; no rival source was read.
@@ -12606,6 +12610,36 @@ These are this package's own, derived and checked:
   with the mean of the two waves' coefficients, so a coefficient of either sign is taken.
 - **Oblique waves** by their share across the hull squared. That scaling is assumed, not derived.
 
+### A hull's green water: shallow water on its deck (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-26)
+
+`packages/physics/src/seakeeping/deck.ts` (`deckOf`, `stepDeck`) moves the water on a hull's deck, and `solver.ts`
+(`deckLoad`) couples it to the hull and the sea. Written from:
+- S. Zhang and A. M. Reed, "Green water effect on ship motions and loads via dam breaking model", 39th IWWWFB, 2024
+  (https://sites.dundee.ac.uk/iwwwfb2024/wp-content/uploads/sites/197/2024/04/IWWWFB39_57.pdf): the shallow-water
+  equations in the deck's frame, gravity replaced by the frame's effective acceleration, the deck's pressure hydrostatic,
+  the sea coming aboard as a dam that breaks;
+- J. J. Stoker, *Water Waves*, 1957, known through the paper and the literature: Ritter's dam break on a dry bed;
+- E. Audusse, F. Bouchut, M.-O. Bristeau, R. Klein and B. Perthame, "A fast and stable well-balanced scheme with hydrostatic
+  reconstruction for shallow water flows", SIAM J. Sci. Comput. 25(6), 2004: the hydrostatic reconstruction;
+- E. F. Toro, *Shock-Capturing Methods for Free-Surface Shallow Flows*, Wiley, 2001, known through the literature:
+  Rusanov's flux and boundary conditions by Riemann invariants.
+
+These are this package's own, each checked (`packages/physics/tests/seakeeping.test.js` and
+`tests/coupling/seakeeping.test.js`):
+- **A two-dimensional deck grid**, where the paper solves one-dimensional strips along the waves.
+- **Every edge takes the sea in or lets the water go**, by the characteristic state between the deck's water and the sea,
+  clamped to critical flow from upstream where it would be supercritical. Over a dry edge from still sea that is
+  Ritter's state at the dam (4/9 of the height, 2/3 of sqrt(g h)): measured equal to (8/27) sqrt(g) h^1.5 within 1e-4.
+  Into the air it is critical depth at the brink. Rusanov's flux at the dry edge instead passed 1.4 times that.
+- **The deck from the mesh**, the highest upward face over each cell above the still waterline.
+- **The deck's faces taken out of the Froude-Krylov integration** while the deck water counts their sea: a box held
+  with its deck under still water takes the whole submerged box's buoyancy within 1e-4.
+- **The `deckInflow` and `deckClaims` fields**, so a liquid solver on the deck takes the water that comes aboard and
+  owns its load once.
+
+Also checked: Ritter's dam break within 1.8, 1.1 and 0.7 percent at 200, 400 and 800 cells, mass kept to 1e-9, and a lake
+on a sloped, half-dry deck at rest to rounding. No constant is calibrated.
+
 ### A hull's viscous roll damping (`@margoengine/physics/seakeeping`, SEA-08, 2026-11-25)
 
 `packages/physics/src/seakeeping/viscous.ts` gives each section's eddy-making and skin-friction roll damping, and the
@@ -13275,6 +13309,45 @@ The implementation uses separately built plain and shared SIMD Wasm against the 
 sine, cosine and exponential setup use the pinned math entry. Track phases, modal state, input ticks,
 integer sample carry and PCM history survive a snapshot.
 
+### Layered snowpack and dense avalanche obstacles (ICE-01)
+
+- P. Bartelt and M. Lehning (2002), [A physical SNOWPACK model for the Swiss avalanche warning, Part I](https://doi.org/10.1016/S0165-232X%2802%2900074-5).
+  Equations 45–48 couple sensible heat and water/ice mass through fusion. The solver integrates layer enthalpy
+  relative to melting ice, with `333700 J/kg` of latent heat and equal and opposite conduction between adjacent
+  layers. Its scalar backward-Euler interface solve keeps mass and energy balanced through the melting plateau.
+- M. Lehning, P. Bartelt, R. L. Brown, C. Fierz and P. Satyawali (2002), [Part II, Snow microstructure](https://doi.org/10.1016/S0165-232X%2802%2900073-3).
+  Equation 36 gives the fresh-snow effective viscosity `0.007 rho^(4.75 - T_C / 40)`. This implementation uses
+  that bulk relation until the caller provides a measured viscosity for an older or crusted layer. Mid-layer
+  overburden compresses the volume, limited by the volume of the ice itself. Part III describes the operational
+  surface forcing and settling balance. [Part III, meteorological forcing](https://doi.org/10.1016/S0165-232X%2802%2900072-1).
+- N. R. Hedstrom and J. W. Pomeroy (1998), [Measurements and modelling of snow interception in the boreal forest](https://research-groups.usask.ca/hydrology/documents/pubs/papers/hedstrom_pomeroy_1998.pdf).
+  Their new-snow density relation is `67.92 + 51.25 exp(T_C / 2.59)` kg/m³, evaluated at a freezing temperature
+  or below. This closure sets the layer's added volume from its snowfall mass.
+- M. Sturm, J. Holmgren, M. König and K. Morris (1997), [The thermal conductivity of seasonal snow](https://doi.org/10.3189/S0022143000002781).
+  The linear and quadratic branches use density in g/cm³, with the switch at 0.156. From 0.60 to solid ice the
+  implementation interpolates to 2.2 W/(m K). A volume-weighted contribution from retained water uses 0.56 W/(m K).
+- S. C. Colbeck (1974), [The capillary effects on water percolation in homogeneous snow](https://doi.org/10.3189/S002214300002339X).
+  The default retained water fills 7% of the pore volume. Excess falls to the next layer, where it can refreeze,
+  or leaves as runoff if there is no next layer. This is a gravity storage balance with immediate drainage.
+- M. Lehning, H. Löwe, M. Ryser and N. Raderschall (2008), [Inhomogeneous precipitation distribution and snow transport in steep terrain](https://doi.org/10.1029/2007WR006545).
+  Their comparison separates wind redistribution at short scales from preferential precipitation at ridge scale.
+  Here the Pomeroy and Gray (1990) Equation 11 exposed-snow flux is passed conservatively to adjacent downwind
+  columns. The lee sides with smaller transport capacity accumulate the deficit. Surface snowfall is an independent
+  forcing. [Pomeroy and Gray, Saltation of snow](https://doi.org/10.1029/WR026i007p01583).
+- H. Yu, G. Li, B. Walter, M. Lehning, J. Zhang and N. Huang (2023), [Wind conditions for snow cornice formation in a wind tunnel](https://doi.org/10.5194/tc-17-639-2023).
+  Equation 9 relates the caught mass per unit ridge width to incident mass flux. This implementation tags that
+  fraction of the crossing mass at a steep lee break. With rectangular cross-section it converts the mass to
+  overhang length using density and thickness. The default accretion window from one to two threshold speeds
+  follows their observed range. Above that range the tagged overhang snow is exposed to scouring.
+- J. Schweizer, J. B. Jamieson and M. Schneebeli (2003), [Snow avalanche formation](https://doi.org/10.1029/2002RG000123).
+  The local stability diagnostic compares the overburden's slope-parallel stress to the interface cohesion and
+  friction from its normal stress. Measured strengths are inputs. Root support adds an interface stress.
+- M. Teich, J.-T. Fischer, T. Feistl, P. Bebi, M. Christen and A. Grêt-Regamey (2014), [Computational snow avalanche simulation in forested terrain](https://doi.org/10.5194/nhess-14-2233-2014).
+  Their depth-averaged momentum balance shows that obstacles matter to runout. The dense-flow implementation
+  applies distributed quadratic resistance using H. M. Nepf (1999), [Drag, turbulence, and diffusion in flow through emergent vegetation](https://doi.org/10.1029/1998WR900069),
+  with user-supplied `Cd * frontalArea / 2` per unit volume. Impermeable cells reflect the normal velocity in the
+  neighboring ghost state and exchange zero mass.
+
 ### Aeolian transport and blowing snow (EARTH-07)
 
 - G. Sauermann, K. Kroy and H. J. Herrmann (2001), [Continuum saltation model for sand dunes](https://doi.org/10.1103/PhysRevE.64.031305).
@@ -13432,3 +13505,31 @@ geometry and controller gains describe a generic starting point for each gait.
   (1988), and Paul A. Baedecker et al., [*Effects of acidic deposition on the erosion of carbonate stone*](https://doi.org/10.1016/0957-1272(92)90018-N)
   (1992), distinguish clean-rain dissolution, acidity and dry deposition. In the solver's ideal acid
   balance, two excess moles of protons dissolve one mole of CaCO₃, converted to depth by density.
+
+## Iceberg rigid-body dynamics and calving (ICE-03)
+
+- J. C. Burton, J. M. Amundson, D. S. Abbot, A. Boghosian, L. M. Cathles, S. Correa-Legisos, K. N. Darnell,
+  N. Guttenberg, D. M. Holland and D. R. MacAyeal,
+  [Laboratory investigations of iceberg capsize dynamics, energy dissipation and tsunamigenesis](https://doi.org/10.1029/2011JF002055), 2012. The submerged fraction is ρᵢ/ρw and the
+  critical aspect ratio is √(6 α (1 − α)) for α = ρᵢ/ρw (equations 19, 27 and 29).
+  The buoyant force and torque here are integrated exactly on the wetted cuboid faces.
+  The velocity and orientation evolve continuously, with no imposed quarter turn.
+- Till J. W. Wagner, Alon A. Stern, Rebecca W. Dell and Ian Eisenman,
+  [On the representation of capsizing in iceberg models](https://doi.org/10.1016/j.ocemod.2017.07.003),
+  2017. Their corrected stability sign and small-angle result agree with two-sided torque checks.
+  The pressure integral remains applicable after the top face crosses the waterline.
+- Till J. W. Wagner, Rebecca W. Dell and Ian Eisenman,
+  [An analytical model of iceberg drift](https://doi.org/10.1175/JPO-D-16-0262.1), 2017.
+  We retain the opposing water and air drag in a time-dependent body model and distinguish basal
+  from sidewall recession following appendix A. This implementation accepts SI recession rates
+  and scales their contribution by wetted face area.
+- Jerry Tessendorf, [Simulating Ocean Water](https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2002.pdf),
+  2001–2004. The existing wake works with the linear pressure and volume input in the modal surface
+  calculation. We use equal-and-opposite raised-cosine volume patches to represent a local outward
+  displacement without a mean water gain. The patch scale comes from the projected body area.
+
+The exact heave check derives g/(α H) directly from the waterplane stiffness ρw g A and the
+body mass ρᵢ A H. It distinguishes the continuous oscillator from the discrete leapfrog phase.
+The capsize fixture contrasts a restoring wide box and an unstable narrow box under the same heel.
+The real registry chain transfers a calved glacier column to a free-floating iceberg and the signed
+wetted-volume change to a WakeSolver, where crest and trough travel away from the source.

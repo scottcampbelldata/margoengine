@@ -20,7 +20,11 @@ test('a rope draws an edge a segment, stress colours a stretched rope red and a 
   const pulled = soft.debugRender({ stress: true, stressRange: 0.5 });
   const lastEdge = pulled.colors.slice((7 - 1) * 8, (7 - 1) * 8 + 4);
   assert.ok(lastEdge[0] > lastEdge[1], `the stretched end edge is red (${[...lastEdge]})`);
-  assert.equal(soft.debugRender({ edges: false, particles: true }).vertices.length / 6, 8 * 3, 'a cross of three lines a particle');
+  assert.equal(
+    soft.debugRender({ edges: false, particles: true }).vertices.length / 6,
+    8 * 3,
+    'a cross of three lines a particle',
+  );
   assert.equal(soft.debugRender({ edges: false }).vertices.length, 0);
   assert.throws(() => soft.debugRender({ stressRange: 0 }), /positive fraction/);
   physics.dispose();
@@ -28,7 +32,11 @@ test('a rope draws an edge a segment, stress colours a stretched rope red and a 
 
 test('a rope lying on a floor shows a tick along the normal where a particle touches it', async () => {
   const physics = new Physics(null);
-  physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [5, 0.5, 5] },
+  });
   const soft = await SoftBodies.attach(physics);
   soft.create(SoftBodyDesc.rope([-1, 0.3, 0], [1, 0.3, 0], 8));
   for (let i = 0; i < 90; i++) physics.step();

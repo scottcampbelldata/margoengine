@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'iceberg-kernel',
+    crate: 'packages/physics/iceberg-kernel',
+    blueprint: 'packages/physics/src/iceberg/iceberg-kernel.wasm',
+    script: 'packages/physics/scripts/build-iceberg-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'iceberg-kernel-shared',
+    crate: 'packages/physics/iceberg-kernel',
+    blueprint: 'packages/physics/src/iceberg/iceberg-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-iceberg-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',
@@ -75,6 +89,20 @@ export const BLUEPRINTS = [
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel-shared.wasm',
     script: 'packages/physics/scripts/build-glacier-kernel.mjs',
+    args: ['shared'],
+  },
+  {
+    name: 'snowpack-kernel',
+    crate: 'packages/physics/snowpack-kernel',
+    blueprint: 'packages/physics/src/snowpack/snowpack-kernel.wasm',
+    script: 'packages/physics/scripts/build-snowpack-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'snowpack-kernel-shared',
+    crate: 'packages/physics/snowpack-kernel',
+    blueprint: 'packages/physics/src/snowpack/snowpack-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-snowpack-kernel.mjs',
     args: ['shared'],
   },
   {

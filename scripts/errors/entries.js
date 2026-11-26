@@ -8,6 +8,23 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'body-driver',
+    title: '@margoengine/input/body: webcam hands and body to a skeleton',
+    kind: 'family',
+    messages: [
+      'Body minVisibility and minScore must be in 0..1; see https://margoengine.com/errors#body-driver',
+      'Body hold must be seconds >= 0; see https://margoengine.com/errors#body-driver',
+      'Body aspect must be a finite width / height above 0; see https://margoengine.com/errors#body-driver',
+      'BodyDriver needs a skeleton with names, parents, getPose and setPose; see https://margoengine.com/errors#body-driver',
+      'No humanoid bone of the targets is in the skeleton; pass a bones map; see https://margoengine.com/errors#body-driver',
+      'Calibrate on a frame where the body or hands are visible; see https://margoengine.com/errors#body-driver',
+      'The body driver is disposed; create a new BodyDriver; see https://margoengine.com/errors#body-driver',
+    ],
+    cause:
+      'The body driver was given an option out of range (visibility or score outside 0..1, a negative hold, an aspect that is not above 0), something that is not a skeleton, a skeleton with none of the VRM humanoid bone names it drives, a calibration frame where no driven point is visible, or was used after dispose (a MargoError with code disposed).',
+    fix: 'Pass a `Skeleton` from `@margoengine/animation` (or an object with names, parents, getPose and setPose), map its bone names with `bones` (for example `humanoidBones(skeleton.names, detectSkeleton(skeleton.names).preset)` from `@margoengine/rigging/retarget`), calibrate on a frame where the person stands in the rest pose in view, and create a new BodyDriver after dispose.',
+  },
+  {
     id: 'face-driver',
     title: '@margoengine/input/face: webcam face to morph targets',
     kind: 'family',

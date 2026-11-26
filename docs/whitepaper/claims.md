@@ -5530,6 +5530,14 @@ agree between 24 and 60 frame-per-second views of one world, and snapshots repro
 plain and shared memory. Reproduce with the SOUND-04 coupling tests and the Physics README's contact
 and modal sound example.
 
+### Layer heat, meltwater and snow obstacles (ICE-01)
+
+The two-layer conduction fixture matches the closed-form backward-Euler temperature difference and preserves
+enthalpy. A warmed layer converts its surplus heat to melt and supplies the corresponding liquid volume to
+the existing water and runoff solvers. The rendered cover changes after melt on WebGPU and WebGL2 compatibility.
+The dense avalanche loses momentum as obstacle drag increases and admits zero snow through an impermeable
+building face. See `packages/physics/tests/coupling/snowpack.test.js` and `packages/weather/tests/snowpack-check.mjs`.
+
 ### Resolved saltation and snow transport (EARTH-07)
 
 The surface model transfers mass conservatively between the loose bed, moving layer, dust and the open-boundary
@@ -5567,3 +5575,11 @@ Outdoor and immersed material patches evolve with exposure on the world clock. T
 check first-year and multi-year corrosion, immersion loss, rot activation, marine coverage, carbonate
 recession and layered reflectance. The same exposure sequence yields the same snapshot hash during
 normal advance, film-rate changes and seek. PBR data changes with the computed layers and coverage.
+
+### Hydrostatic iceberg roll and calving waves (ICE-03)
+
+For homogeneous cuboids, the native solver recovers the Archimedean draft and the analytic
+small-amplitude heave and stability signs. A tall block rolls under pressure torque. A real
+glacier release gives a proportional ice body, and the wake receives two zero-sum displacement
+patches. Reproduce after building Physics with `node --test packages/physics/tests/iceberg.test.js
+packages/physics/tests/coupling/iceberg.test.js`.

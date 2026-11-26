@@ -33,6 +33,10 @@ export const WAKE_HEIGHT_FIELD: FieldDescriptor;
 
 export const WAKE_LAYOUT = 1;
 
+export const WAKE_SOURCE_LAYOUT = 1;
+
+export const WAKE_SOURCE_WORDS = 5;
+
 export interface WakeParams {
     cells?: readonly [number, number];
     cellSize?: number;
@@ -52,7 +56,7 @@ export interface WakeSample {
 }
 
 export class WakeSolver implements Solver<WakeParams> {
-    constructor(id?: string);
+    constructor(id?: string, sourceField?: FieldDescriptor);
     describe(): SolverDescription;
     init(host: SolverHost, params?: WakeParams): void;
     step(context: StepContext, dt: number): void;
@@ -92,6 +96,7 @@ type FieldKind = 'uniformGrid' | 'sparseGrid' | 'heightfield' | 'particleSet' | 
 interface FieldUse {
     readonly field: FieldDescriptor;
     readonly access: FieldAccess;
+    readonly optional?: boolean;
 }
 
 interface Port {
