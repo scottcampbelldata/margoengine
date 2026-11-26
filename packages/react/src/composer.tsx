@@ -14,6 +14,8 @@ import type { SMAA as SMAAEffect, SMAAOptions } from '@margoengine/post/smaa';
 import type { FXAA as FXAAEffect } from '@margoengine/post/fxaa';
 import type { Glitch as GlitchEffect, GlitchOptions } from '@margoengine/post/glitch';
 import type { Afterimage as AfterimageEffect, AfterimageOptions } from '@margoengine/post/afterimage';
+import type { Pixelate as PixelateEffect, PixelateOptions } from '@margoengine/post/pixelate';
+import type { DotScreen as DotScreenEffect, HalftoneOptions } from '@margoengine/post/halftone';
 import type { PostStack } from '@margoengine/post/stack';
 import { inScene } from './scene-owner.js';
 import { useScene, useCommit, useResourceEffect, type Scene } from './internal.js';
@@ -32,6 +34,8 @@ const order = [
   'lensFlare',
   'afterimage',
   'tonemap',
+  'pixelate',
+  'dotScreen',
   'smaa',
   'fxaa',
   'glitch',
@@ -53,7 +57,9 @@ type Effect =
   | SMAAEffect
   | FXAAEffect
   | GlitchEffect
-  | AfterimageEffect;
+  | AfterimageEffect
+  | PixelateEffect
+  | DotScreenEffect;
 /** Options of one effect. */
 type Options = Record<string, unknown>;
 /** `onReady` and `onError` of an effect component. */
@@ -97,8 +103,14 @@ export interface FXAAProps extends Callbacks<FXAAEffect> {}
 export interface GlitchProps extends GlitchOptions, Callbacks<GlitchEffect> {}
 /** Props of `<Afterimage>`: frames fade into the next. */
 export interface AfterimageProps extends AfterimageOptions, Callbacks<AfterimageEffect> {}
+/** Props of `<Pixelate>`: pixel-art downsample with depth silhouettes and normal creases (an LDR stage). */
+export interface PixelateProps extends PixelateOptions, Callbacks<PixelateEffect> {}
+/** Props of `<DotScreen>`: monochrome dot screening (an LDR stage). Always grayscale, with one `angle`. */
+export interface DotScreenProps extends Omit<HalftoneOptions, 'grayscale' | 'angles'>, Callbacks<DotScreenEffect> {}
 interface Pass {
   kind: Kind;
+  /** Sets options of the composer's `<Tonemap>` instead of owning an effect (`<Vignette>`, `<FilmGrain>`, `<ChromaticAberration>`). */
+  partial?: boolean;
   /** Imports the effect class: the component brings it, so the composer imports no effect package. */
   load: () => Promise<EffectClass>;
   options: Options;
@@ -142,7 +154,7 @@ export interface EffectClass {
 }
 const priority = Object.fromEntries(order.map((kind, index) => [kind, index])) as Record<Kind, number>;
 // Effects that add each PBR model as a source.
-const modelKinds = new Set<Kind>(['ssao', 'gtao', 'ssr', 'ssgi', 'taa']);
+const modelKinds = new Set<Kind>(['ssao', 'gtao', 'ssr', 'ssgi', 'taa', 'pixelate']);
 // Effects whose constructor fills unset options from the quality-tier preset of the same key (shared/preset.js).
 const presetReaders = new Set<Kind>(['ssao', 'gtao', 'ssr', 'ssgi']);
 declare const GPUBufferUsage: { VERTEX: number; STORAGE: number; COPY_DST: number };
@@ -265,6 +277,13 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
     scheduled = false,
     queue = Promise.resolve(),
     stack: PostStack | null = null;
+  // The one Tonemap pass: <Tonemap> with the options of every <Vignette>, <FilmGrain> and <ChromaticAberration>. Stable,
+  // so adding or removing one of those updates the live Tonemap instead of rebuilding it.
+  const tonemapPass: Pass = {
+    kind: 'tonemap',
+    load: () => Promise.reject(new Error('Tonemap is not loaded')),
+    options: {},
+  };
   const live = (current = lease) =>
     !!current && current === lease && current.active && !current.closed && !scene.engine.disposed;
   const report = (failure: unknown, pass?: Pass) => {
@@ -334,6 +353,34 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
         }
     }
   };
+  const withTonemap = (all: Pass[]) => {
+    const full = all.filter((pass) => pass.kind === 'tonemap' && !pass.partial),
+      parts = all.filter((pass) => pass.partial);
+    if (full.length > 1)
+      throw fault(
+        'state',
+        'EffectComposer cannot attach duplicate tonemap passes; keep one of each kind',
+        'react-usage',
+      );
+    if (!full.length) {
+      if (parts.length)
+        throw fault(
+          'state',
+          '<Vignette>, <FilmGrain> and <ChromaticAberration> set options of the Tonemap stage; add <Tonemap> to the same EffectComposer',
+          'react-usage',
+        );
+      return all;
+    }
+    const [base] = full;
+    Object.assign(tonemapPass, {
+      load: base.load,
+      lut: base.lut,
+      onReady: base.onReady,
+      onError: base.onError,
+      options: Object.assign({}, base.options, ...parts.map((pass) => pass.options)),
+    });
+    return [...all.filter((pass) => pass.kind !== 'tonemap'), tonemapPass];
+  };
   const validate = (desired: Pass[]) => {
     const kinds = new Set<Kind>();
     for (const pass of desired) {
@@ -396,9 +443,9 @@ function composer(scene: Scene, error: () => EffectComposerProps['onError']) {
   const reconcile = async (version: number) => {
     const current = lease;
     if (!live(current) || version !== revision) return;
-    const desired = [...passes].sort((a, b) => priority[a.kind] - priority[b.kind]);
     let attaching: Pass | undefined;
     try {
+      const desired = withTonemap([...passes]).sort((a, b) => priority[a.kind] - priority[b.kind]);
       if (desired.length && (scene.engine.backend !== 'webgpu' || !scene.engine.gpu))
         throw fault(
           'unsupported',
@@ -564,10 +611,11 @@ export function usePass<T extends Effect>(
   options: Options,
   callbacks: Callbacks<T>,
   lut?: CubeLUT | string | null,
+  partial = false,
 ) {
   const manager = useContext(Context);
   if (!manager) throw fault('state', 'Post effects require <EffectComposer>; render them inside one', 'react-usage');
-  const pass = useMemo<Pass>(() => ({ kind, load, options: {} }), [manager, kind]);
+  const pass = useMemo<Pass>(() => ({ kind, load, options: {}, partial }), [manager, kind, partial]);
   pass.load = load;
   pass.options = options;
   pass.lut = lut;

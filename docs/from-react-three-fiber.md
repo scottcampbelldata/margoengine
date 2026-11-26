@@ -226,7 +226,7 @@ path such as `/controls` means `@margoengine/react/controls`; no path means the 
 | `ToneMapping` | `Tonemap` (`/tonemap`) | |
 | temporal antialiasing | `TAA` (`/taa`) | |
 | `Selection`, `Select`, `Outline` | `Outline` (`/selection`) | The selected meshes are a `selection` prop (meshes or refs), not wrapper components. |
-| `Vignette`, `Noise`, `ChromaticAberration`, `DotScreen`, `Pixelation` | No equivalent | |
+| `Vignette`, `Noise`, `ChromaticAberration`, `DotScreen`, `Pixelation` | `Vignette`, `FilmGrain`, `ChromaticAberration`, `DotScreen`, `Pixelate` (`/post`) | `Vignette`, `FilmGrain` and `ChromaticAberration` set options of the composer's `Tonemap` (`amount`, and for `Vignette` `radius`, `softness`, `color`), so keep a `Tonemap` in the same `EffectComposer`. `DotScreen` and `Pixelate` are stages after it. |
 
 ### Physics
 

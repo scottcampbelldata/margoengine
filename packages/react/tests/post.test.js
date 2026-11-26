@@ -188,6 +188,8 @@ for (const [file, name, kind] of [
   ['fxaa', 'FXAA', 'fxaa'],
   ['glitch', 'Glitch', 'glitch'],
   ['afterimage', 'Afterimage', 'afterimage'],
+  ['pixelate', 'Pixelate', 'pixelate'],
+  ['halftone', 'DotScreen', 'dot-screen'],
 ]) {
   const Native = (await import(`../../post/dist/${file}.js`))[name];
   mock.module(`@margoengine/post/${file}`, { namedExports: { [name]: implementation(kind, Native) } });
@@ -202,7 +204,22 @@ for (const key of ['window', 'document', 'HTMLElement', 'HTMLCanvasElement', 'na
   Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key] });
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const { Context } = await import('../dist/internal.js');
-const { EffectComposer, Bloom, SSAO, GTAO, SSR, MotionBlur, SMAA, FXAA, Glitch } = await import('../dist/post.js');
+const {
+  EffectComposer,
+  Bloom,
+  SSAO,
+  GTAO,
+  SSR,
+  MotionBlur,
+  SMAA,
+  FXAA,
+  Glitch,
+  Pixelate,
+  DotScreen,
+  Vignette,
+  FilmGrain,
+  ChromaticAberration,
+} = await import('../dist/post.js');
 const { DepthOfField } = await import('../dist/dof.js');
 const { Tonemap } = await import('../dist/tonemap.js');
 const { TAA } = await import('../dist/taa.js');
@@ -266,18 +283,23 @@ test('post subpaths hold only their effect components, each importing only its o
       names: [
         'Afterimage',
         'Bloom',
+        'ChromaticAberration',
         'DepthTexture',
+        'DotScreen',
         'EffectComposer',
+        'FilmGrain',
         'FXAA',
         'GTAO',
         'Glitch',
         'LensFlare',
         'MotionBlur',
+        'Pixelate',
         'SMAA',
         'SSAO',
         'SSGI',
         'SSR',
         'SceneTargets',
+        'Vignette',
       ],
       imports: [
         '@margoengine/post/bloom',
@@ -291,6 +313,8 @@ test('post subpaths hold only their effect components, each importing only its o
         '@margoengine/post/fxaa',
         '@margoengine/post/glitch',
         '@margoengine/post/afterimage',
+        '@margoengine/post/pixelate',
+        '@margoengine/post/halftone',
       ],
     },
     dof: { names: ['DepthOfField'], imports: ['@margoengine/dof'] },
@@ -762,6 +786,103 @@ test('any combination of capture effects stacks: SSAO, DOF, Bloom, Tonemap, SSR,
   assert.deepEqual([...value.engine.plugins.get('ssr').sources], [first], 'SSR gets the PBR models too');
   const blur = value.engine.plugins.get('motion-blur');
   assert.equal(blur.options.velocity(), value.engine.plugins.get('taa').velocity, 'MotionBlur reads TAA vectors');
+});
+
+test('Pixelate and DotScreen are LDR stages after Tonemap, and Pixelate takes the PBR models', async () => {
+  const value = scene(),
+    first = model();
+  value.resources.models.add(first);
+  render(
+    tree(value, [
+      h(DotScreen, { key: 'd', cellSize: 12 }),
+      h(Pixelate, { key: 'p', pixelSize: 4 }),
+      h(Tonemap, { key: 't' }),
+      h(Bloom, { key: 'b' }),
+    ]),
+  );
+  await flush();
+  assert.deepEqual(
+    stacks.at(-1).effects.map((effect) => effect.name),
+    ['bloom', 'tonemap', 'pixelate', 'dot-screen'],
+  );
+  assert.deepEqual([...value.engine.plugins.get('pixelate').sources], [first]);
+  assert.equal(value.engine.plugins.get('pixelate').options.pixelSize, 4);
+  assert.equal(value.engine.plugins.get('dot-screen').options.cellSize, 12);
+  assert.deepEqual(value.errors, []);
+});
+
+test('a lone Pixelate attaches on its own and reports its native range error', async () => {
+  const value = scene(),
+    before = effects.length,
+    view = render(tree(value, [h(Pixelate, { key: 'p' })]));
+  await flush();
+  assert.equal(effects.length, before + 1);
+  assert.equal(value.engine.plugins.get('pixelate').options.pixelSize, undefined, 'the native default applies');
+  view.unmount();
+  const bad = scene();
+  render(tree(bad, [h(DotScreen, { key: 'd', cellSize: 1 })]));
+  await flush();
+  assert.match(bad.errors[0].message, /cellSize from 2 to 256/);
+});
+
+test('Vignette, FilmGrain and ChromaticAberration set options of the one Tonemap and update it in place', async () => {
+  const value = scene(),
+    before = effects.length,
+    child = (extras) => [h(Tonemap, { key: 't', exposure: 1, vignetteRadius: 0.3 }), ...extras];
+  const view = render(tree(value, child([])));
+  await flush();
+  const tone = effects.at(-1);
+  assert.equal(tone.name, 'tonemap');
+  assert.equal(effects.length, before + 1);
+  view.rerender(
+    tree(
+      value,
+      child([
+        h(Vignette, { key: 'v', amount: 0.7, color: [0, 0, 0.2] }),
+        h(FilmGrain, { key: 'g' }),
+        h(ChromaticAberration, { key: 'c', amount: 0.5 }),
+      ]),
+    ),
+  );
+  await flush();
+  assert.equal(effects.length, before + 1, 'the live Tonemap is updated, not rebuilt');
+  assert.deepEqual(
+    { ...tone.options },
+    {
+      exposure: 1,
+      vignetteRadius: 0.3,
+      vignette: 0.7,
+      vignetteColor: [0, 0, 0.2],
+      grain: 0.35,
+      chromaticAberration: 0.5,
+    },
+  );
+  view.rerender(tree(value, child([h(Vignette, { key: 'v', amount: 0.2, radius: 0.6 })])));
+  await flush();
+  assert.equal(effects.length, before + 1);
+  assert.deepEqual({ ...tone.options }, { exposure: 1, vignetteRadius: 0.6, vignette: 0.2 }, 'a removed one is unset');
+  view.rerender(tree(value, child([])));
+  await flush();
+  assert.equal(effects.length, before + 1);
+  assert.deepEqual({ ...tone.options }, { exposure: 1, vignetteRadius: 0.3 });
+  assert.deepEqual(value.errors, []);
+});
+
+test('Vignette, FilmGrain and ChromaticAberration need a Tonemap, and one Tonemap only', async () => {
+  for (const [children, pattern] of [
+    [[h(Vignette, { key: 'v' })], /set options of the Tonemap stage; add <Tonemap>/],
+    [[h(FilmGrain, { key: 'g' }), h(Bloom, { key: 'b' })], /set options of the Tonemap stage; add <Tonemap>/],
+    [[h(Tonemap, { key: 'a' }), h(Tonemap, { key: 'b' })], /duplicate tonemap/],
+  ]) {
+    const value = scene(),
+      view = render(tree(value, children));
+    await flush();
+    assert.equal(value.engine.plugins.size, 0);
+    assert.equal(value.errors.length, 1);
+    assert.match(value.errors[0].message, pattern);
+    view.unmount();
+    await flush();
+  }
 });
 
 test('one anti-aliasing and one occlusion effect per composer, and MotionBlur needs TAA vectors', async () => {

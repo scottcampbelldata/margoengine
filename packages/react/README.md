@@ -2336,6 +2336,48 @@ export function ShaderArt() {
 }
 ```
 
+### Print and screen looks: Pixelate, DotScreen, Vignette, FilmGrain, ChromaticAberration
+
+`@margoengine/react/post` holds the composer's effects. These five are the look effects (install `@margoengine/post` and `@margoengine/tonemap`; WebGPU):
+
+- `<Pixelate>` (`@margoengine/post/pixelate`) draws square cells of `pixelSize` pixels (default 6, a whole number 1 to 128), with `depthEdgeStrength` (0 to 1, default 0.4) silhouettes and `normalEdgeStrength` (0 to 1, default 0.3) creases. Every PBR model of the Canvas joins its capture.
+- `<DotScreen>` (`@margoengine/post/halftone`) is monochrome dot screening: `cellSize` pixels per cell (2 to 256, default 8), `angle` in degrees (default 45), `shape` (`'dot'`, `'ellipse'`, `'line'`, `'square'`; default `'dot'`), `scale`, `scatter`, `blend`, `intensity` (0 to 1, default 1).
+- `<Vignette>`, `<FilmGrain>` and `<ChromaticAberration>` set the vignette, `grain` and `chromaticAberration` options of the composer's `<Tonemap>`, so they sit in the same `<EffectComposer>` as one (without it the composer reports a coded error). `<Vignette>` takes `amount` (default 0.5), `radius`, `softness`, `color`, `center`, `roundness` and `blend`; one it leaves unset keeps the `<Tonemap>`'s value. `<FilmGrain amount>` defaults to 0.35 and `<ChromaticAberration amount>` to 0.25, each 0 to 1. Removing one returns its option to the `<Tonemap>`'s.
+
+`<Pixelate>` and `<DotScreen>` are LDR stages: they run after `<Tonemap>`, before `<SMAA>` or `<FXAA>`.
+
+```tsx
+import { Canvas, Mesh, BoxGeometry, PbrMaterial } from '@margoengine/react';
+import {
+  EffectComposer,
+  Pixelate,
+  DotScreen,
+  Vignette,
+  FilmGrain,
+  ChromaticAberration,
+} from '@margoengine/react/post';
+import { Tonemap } from '@margoengine/react/tonemap';
+
+export function Looks() {
+  return (
+    <Canvas>
+      <Mesh position={[0, 0, -3]}>
+        <BoxGeometry />
+        <PbrMaterial color="#e4572e" />
+      </Mesh>
+      <EffectComposer>
+        <Tonemap exposure={0.5} />
+        <Vignette amount={0.6} softness={0.4} />
+        <FilmGrain amount={0.25} />
+        <ChromaticAberration amount={0.3} />
+        <Pixelate pixelSize={4} />
+        <DotScreen cellSize={10} angle={30} intensity={0.35} />
+      </EffectComposer>
+    </Canvas>
+  );
+}
+```
+
 ## Component tests and offscreen scenes
 
 `/test` requires a browser DOM or a caller-installed jsdom, and optional `@margoengine/headless`.
