@@ -161,7 +161,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Orbit camera behaviours: elastic bounce at radius limits, idle auto-rotation, animated framing of a mesh | Babylon camera behaviors | DONE (`OrbitBehaviors`, `@margoengine/controls/behaviors`) | S | 05ced2d88 |
 | Hotspot on a deformed mesh: a fixed point inside a triangle of a skinned or morphed mesh, projected to screen | Babylon Hotspot | DONE (`Hotspot`, `@margoengine/labels`) | S | 9d2ff0cb9 |
 | Coroutines (page read 2026-11-25): a generator stepped once per frame; a bare `yield` waits one frame, yielding a promise waits for it, yielding another coroutine's promise waits for that coroutine; an async run form returns a promise that resolves on completion and rejects on cancel | Babylon | DONE (`Coroutines`, `@margoengine/ecs/coroutines`) | S | 3ddcd1643 |
-| Single-file / playable-ad publish: one inlined HTML with scripts, Wasm and assets, ad-network size budgets and MRAID hooks | PlayCanvas | MISSING | M |  |
+| Single-file / playable-ad publish: one inlined HTML with scripts, Wasm and assets, ad-network size budgets and MRAID hooks | PlayCanvas | DONE (`margo-convert playable`, `margo-convert/playable`, `margo-convert/playable-runtime`) | M | 48d01e498 |
 | Mobile app wrapper publish (Capacitor-style project from a built scene, safe area and orientation) | PlayCanvas | MISSING | M |  |
 
 ## Needs a maintainer decision or hardware first
