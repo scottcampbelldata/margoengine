@@ -42,7 +42,7 @@ export interface ThinFilmDripOutlet {
 export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     readonly particleField: FieldDescriptor;
     readonly impactField: FieldDescriptor;
-    constructor(source: FieldDescriptor, id?: string);
+    constructor(source: FieldDescriptor, id?: string, { rigid }?: ThinFilmDropFlightConnections);
     describe(): SolverDescription;
     init(host: SolverHost, opts?: ThinFilmDropFlightOptions): void;
     step(context: StepContext, dt: number): void;
@@ -57,6 +57,10 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     exportPorts(tick: number): readonly Port[];
     stateRegions(): readonly Region[];
     extraState(): readonly Region[];
+}
+
+export interface ThinFilmDropFlightConnections {
+    readonly rigid?: boolean;
 }
 
 export interface ThinFilmDropFlightOptions {
@@ -77,6 +81,7 @@ export interface ThinFilmDropReceiver {
     readonly u?: readonly [number, number, number];
     readonly v?: readonly [number, number, number];
     readonly cell?: readonly [number, number, number];
+    readonly bodyRow?: number;
 }
 
 export interface ThinFilmFlyingDrop {

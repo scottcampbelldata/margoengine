@@ -5345,11 +5345,13 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(
 const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60 });
 const mount = physics.addBody(null, {
   gravityScale: 0,
+  lockRotations: true,
+  linearVelocity: [0, 0.002, 0],
   colliders: { shape: 'box', halfExtents: [0.08, 0.01, 0.08], mass: 1 },
 });
 const spacing = 0.03;
 const film = await ThinFilmSolver.load({ drops: true });
-const flight = new ThinFilmDropFlight(film.dropsField);
+const flight = new ThinFilmDropFlight(film.dropsField, 'tray-flight', { rigid: true });
 const tray = await ThinFilmSolver.load({ id: 'tray', rigid: true, impactRecoil: true, impacts: flight.impactField });
 world.add(new RigidSolver(), { physics });
 world.add(film, {
@@ -5361,10 +5363,11 @@ world.add(film, {
   drains: [false, false, false, true],
   outlets: [{ edge: 'v1', index: 0, radius: 0.0016 }],
 }).add(flight, {
-  receiver: { origin: [-0.04, 0.0002, 0.05], size: [0.12, 0.12] },
+  receiver: { bodyRow: mount.row, origin: [-0.04, 0.0002, 0.05], size: [0.12, 0.12] },
 }).add(tray, { bodyRow: mount.row, origin: [-0.04, 0, 0.05], cells: [6, 6], spacing: 0.02, depth: 0.0002 });
-world.couple(['rigid', 'tray'], 'staggered');
+world.couple(['rigid', 'tray-flight', 'tray'], 'staggered');
 world.advance(420);
+if (tray.budget.impacts <= 0) throw new Error('Expected the moving tray to catch a sill drop.');
 console.log(tray.budget.impacts, mount.linearVelocity[1]);
 ```
 
@@ -5377,9 +5380,13 @@ edge discharge, while `budget.dripped` counts all water leaving the backing.
 buoyancy and air drag. Provide a `Wind` field for moving air. The particle field exposes live
 positions, velocities, sizes, ages and stable IDs. `budget` accounts for the received,
 airborne and departed volumes. By default each drop can stay in the flight domain for 10 seconds.
-For an absorbing tray, set `receiver` to its static free-surface plane and extent. Match its UV
-axes and put both solvers in the same world cell. Give the tray `flight.impactField` to receive
-the captured volume and normal speed. `depositedVolume` is the captured share of flight outflow.
+For an absorbing tray, set `receiver` to its free-surface plane and extent. Match its UV axes
+and give the tray `flight.impactField` to receive the captured volume and normal speed.
+`depositedVolume` is the captured share of flight outflow. For a translating mount, set the
+flight's `rigid` connection and the receiver's `bodyRow`. Give the plane in that body's local
+coordinates and hold its orientation fixed. Add the rigid solver first, then order the rigid,
+flight and receiving film in the staggered group when receiving recoil. The flight sweeps the
+tray between consecutive poses and reports normal speed relative to the moving surface.
 An absorbing film mounted on a rigid body can use `impactRecoil: true` to send each impulse and
 its torque to the mount. This is off by default. Use either the mount or a wake as the impact
 momentum receiver.

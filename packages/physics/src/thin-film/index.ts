@@ -28,6 +28,7 @@ export { FILM_DROP_WORDS, type ThinFilmDripOutlet } from './drips.js';
 export {
   FILM_FLIGHT_WORDS,
   ThinFilmDropFlight,
+  type ThinFilmDropFlightConnections,
   type ThinFilmDropFlightOptions,
   type ThinFilmFlyingDrop,
 } from './drop-flight.js';

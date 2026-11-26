@@ -13,13 +13,18 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import { BODIES_FIELD } from '../world/solvers/rigid.js';
 import { advanceDrop, DropDrag, MAX_FLIGHT_DIAMETER, midpointDropDrag } from './drop-drag.js';
 import {
   FILM_IMPACT_WORDS,
   type Impact,
   prepareReceiver,
+  RECEIVER_POSE_WORDS,
   receiverImpact,
+  receiverPose,
+  type ReceiverSweep,
   type ThinFilmDropReceiver,
+  translateReceiver,
 } from './drop-receiver.js';
 import { FILM_DROP_WORDS } from './drips.js';
 
@@ -29,6 +34,11 @@ const BYTES = 8;
 
 /** Position xyz, velocity xyz, volume, diameter, age and stable ID, all f64. Zero volume denotes an empty row. */
 export const FILM_FLIGHT_WORDS = 10;
+
+export interface ThinFilmDropFlightConnections {
+  /** Read registered rigid poses for a mounted film receiver. Defaults to false. */
+  readonly rigid?: boolean;
+}
 
 export interface ThinFilmDropFlightOptions {
   /** Simultaneously tracked drops. Defaults to 256. */
@@ -81,6 +91,7 @@ interface FlightState {
     readonly plane: ReturnType<typeof prepareReceiver>;
     readonly draft: Region;
     readonly ledger: Region;
+    readonly pose?: Region;
   };
 }
 
@@ -102,11 +113,13 @@ function words(s: FlightState, region: Region): Float64Array {
 export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
   readonly particleField: FieldDescriptor;
   readonly impactField: FieldDescriptor;
+  private readonly rigid: boolean;
   private state?: FlightState;
 
   constructor(
     private readonly source: FieldDescriptor,
     private readonly id = 'thin-film-drop-flight',
+    { rigid = false }: ThinFilmDropFlightConnections = {},
   ) {
     if (
       source?.kind !== 'surfaceSampleSet' ||
@@ -114,6 +127,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       source.centring !== 'particle'
     )
       throw invalid('Drop flight needs a film drop source. Pass the ThinFilmSolver dropsField.');
+    this.rigid = rigid;
     this.particleField = Object.freeze({
       name: `${id}.particles`,
       kind: 'surfaceSampleSet',
@@ -135,6 +149,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       id: this.id,
       fields: [
         { field: this.source, access: 'read' },
+        ...(this.rigid ? [{ field: BODIES_FIELD, access: 'read' as const }] : []),
         { field: this.particleField, access: 'write' },
         { field: this.impactField, access: 'write' },
       ],
@@ -158,18 +173,25 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       temperature: range('air temperature', opts.airTemperature ?? STANDARD_TEMPERATURE, 200, 340),
     };
     const gravityLength = hypot(...host.gravity);
+    const plane = opts.receiver === undefined ? undefined : prepareReceiver(opts.receiver);
+    const mountedRow = plane?.bodyRow;
+    if ((mountedRow !== undefined) !== this.rigid)
+      throw invalid('Mounted drop flight needs its rigid connection and receiver bodyRow. Provide both or omit both.');
+    const initialPose =
+      mountedRow === undefined ? undefined : receiverPose(host.memory, host.port(BODIES_FIELD.name), mountedRow);
     const arrayBytes = BYTES * FILM_FLIGHT_WORDS * capacity;
     const drops = host.allocate('flying-drops', arrayBytes, 'f64', LAYOUT);
     const candidate = host.allocate('working-flying-drops', arrayBytes, 'f64', LAYOUT);
     const meta = host.allocate('flight-ledger', BYTES * 9, 'f64', LAYOUT);
-    const plane = opts.receiver === undefined ? undefined : prepareReceiver(opts.receiver);
     const impactBytes = BYTES * FILM_IMPACT_WORDS * (plane ? 2 * capacity : 1);
     const impacts = host.allocate('drop-impacts', impactBytes, 'f64', LAYOUT);
     const receiver = plane && {
       plane,
       draft: host.allocate('working-drop-impacts', impactBytes, 'f64', LAYOUT),
       ledger: host.allocate('impact-ledger', BYTES * 2, 'f64', LAYOUT),
+      pose: initialPose ? host.allocate('receiver-pose', BYTES * RECEIVER_POSE_WORDS, 'f64', LAYOUT) : undefined,
     };
+    if (receiver?.pose && initialPose) regionWords(host.memory, receiver.pose).set(initialPose);
     regionWords(host.memory, meta)[1] = -1;
     this.state = {
       memory: host.memory,
@@ -204,6 +226,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     interval: number,
     now: number,
     cell: Cell,
+    sweep?: ReceiverSweep,
+    elapsed?: number,
   ): Impact | undefined {
     if (interval === 0 && !s.receiver) return;
     const wind = s.wind;
@@ -230,7 +254,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     const rate = midpointDropDrag(target, at, interval, target[at + 7]!, s.gravity, air.velocity, drag);
     if (s.receiver) {
       const impact = receiverImpact(
-        s.receiver.plane,
+        sweep?.plane ?? s.receiver.plane,
         target,
         at,
         interval,
@@ -240,6 +264,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
         rate,
         cell,
         s.cellSize,
+        sweep?.velocity,
+        elapsed,
       );
       if (impact) return impact;
     }
@@ -260,6 +286,9 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
     const receiver = s.receiver;
     const pending = receiver && words(s, receiver.draft);
     const capture = receiver && words(s, receiver.ledger);
+    const pose = receiver?.pose && words(s, receiver.pose);
+    const endPose = pose && receiverPose(s.memory, context.inputs.get(BODIES_FIELD.name), receiver!.plane.bodyRow!);
+    const sweep = pose && endPose && translateReceiver(receiver!.plane, pose, endPose, dt, s.cellSize);
     let hits = 0;
     let totalCaptured = capture?.[0] ?? 0;
     let live = 0;
@@ -284,7 +313,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       const at = live * FILM_FLIGHT_WORDS;
       next.set(previous.subarray(source, source + FILM_FLIGHT_WORDS), at);
       for (let axis = 0; axis < 3; axis++) next[at + axis]! += (meta[6 + axis]! - origin[axis]!) * s.cellSize;
-      const impact = this.carry(s, next, at, Math.min(dt, s.lifetime - age), start, origin);
+      const impact = this.carry(s, next, at, Math.min(dt, s.lifetime - age), start, origin, sweep);
       if (impact || expiring) {
         if (impact) record(impact);
         outflow += volume;
@@ -346,7 +375,8 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
             next[at + 3 + axis] = velocity;
           }
           next.set([volume, diameter, 0, id], at + 6);
-          const impact = this.carry(s, next, at, Math.min(age, s.lifetime), start + dt - age, origin);
+          const elapsed = dt - age;
+          const impact = this.carry(s, next, at, Math.min(age, s.lifetime), start + dt - age, origin, sweep, elapsed);
           if (impact || age >= s.lifetime) {
             if (impact) record(impact);
             outflow += volume;
@@ -366,6 +396,7 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
       impacts.fill(0, hits * FILM_IMPACT_WORDS, capture[1]! * FILM_IMPACT_WORDS);
       capture.set([totalCaptured, hits]);
     }
+    if (pose && endPose) pose.set(endPose);
     meta.set([live, last, id, received, outflow, airborne, ...origin]);
   }
 
@@ -413,7 +444,11 @@ export class ThinFilmDropFlight implements Solver<ThinFilmDropFlightOptions> {
 
   stateRegions(): readonly Region[] {
     const s = this.live();
-    return s.receiver ? [s.drops, s.meta, s.impacts, s.receiver.ledger] : [s.drops, s.meta];
+    const receiver = s.receiver;
+    if (!receiver) return [s.drops, s.meta];
+    const regions = [s.drops, s.meta, s.impacts, receiver.ledger];
+    if (receiver.pose) regions.push(receiver.pose);
+    return regions;
   }
 
   extraState(): readonly Region[] {

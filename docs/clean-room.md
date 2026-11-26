@@ -15425,6 +15425,14 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   that returns to positive clearance within the same step. At contact, project the spherical centre
   onto the receiving plane and publish its volume and inward normal speed in the existing impact layout.
   [Journal](https://doi.org/10.1016/S0898-1221(00)00045-6)
+- Christer Ericson, *Real-Time Collision Detection* (2005), §§5.5.3–5.5.5. Use a signed
+  radius offset to find sphere–plane contact and subtract the receiver's translation
+  from both drop and wind velocities. The frozen drag rate and buoyed gravity carry into
+  that frame unchanged. The plane translates linearly between registered rigid endpoint
+  poses. The receiver transforms the hit back into its UV coordinates and publishes the
+  relative inward speed for the normal recoil. Save the prior rigid pose in the flight
+  snapshot to replay a sweep including fractional births.
+  [Publisher](https://shop.elsevier.com/books/real-time-collision-detection/ericson/978-1-55860-732-3)
 - Gianpietro E. Cossali, Aldo Coghe and Marco Marengo, “The impact of a single drop on a wetted
   solid surface” (1997). The optional absorbing receiver represents deposition with conserved liquid
   volume. The experiments distinguish deposition from a separate splash regime.

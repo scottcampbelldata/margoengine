@@ -1,12 +1,19 @@
 import { hypot } from '@margoengine/math/pinned';
-import { cross, dot, scale, sub } from '@margoengine/math/vec3';
+import { normalizeQuaternion, rotateByQuaternion } from '@margoengine/math/quat';
+import { add, cross, dot, scale, sub } from '@margoengine/math/vec3';
 import { dragIntegrals } from '../airborne/environment.js';
+import { regionWords } from '../world/memory.js';
+import type { Port } from '../world/solver.js';
+import { BODY_WORDS } from '../world/solvers/rigid.js';
 
 type V3 = readonly [number, number, number];
+type Rotation = readonly [number, number, number, number];
+const STILL: V3 = [0, 0, 0];
+export const RECEIVER_POSE_WORDS = 11;
 
 /** An absorbing plane with the same UV frame and extents as the receiving thin film. */
 export interface ThinFilmDropReceiver {
-  /** Lower UV corner of the free surface in metres from the origin cell. */
+  /** Lower UV corner in metres, local to bodyRow when mounted or relative to the origin cell. */
   readonly origin: readonly [number, number, number];
   /** Width and height along U and V, in metres. */
   readonly size: readonly [number, number];
@@ -16,6 +23,8 @@ export interface ThinFilmDropReceiver {
   readonly v?: readonly [number, number, number];
   /** Origin cell of the plane. Defaults to [0, 0, 0]. */
   readonly cell?: readonly [number, number, number];
+  /** Rigid body carrying a translating, fixed-orientation plane. Use the flight's rigid option. */
+  readonly bodyRow?: number;
 }
 
 /** An impact row, f64: u, v, footprint radius, water volume, inward normal speed. Zero volume marks an unused row. */
@@ -29,6 +38,12 @@ interface PreparedReceiver {
   readonly v: V3;
   readonly n: V3;
   readonly cell: V3;
+  readonly bodyRow?: number;
+}
+
+export interface ReceiverSweep {
+  readonly plane: PreparedReceiver;
+  readonly velocity: V3;
 }
 
 function vector(value: V3): boolean {
@@ -64,6 +79,9 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
   const v = unit(sub(rawV, scale(u, dot(rawV, u))));
   const n = cross(u, v);
   if (!(dot(n, n) > 0)) throw new RangeError('Drop receiver tangents have no area. Use two nonparallel directions.');
+  const bodyRow = opts.bodyRow;
+  if (bodyRow !== undefined && (!Number.isSafeInteger(bodyRow) || bodyRow < 0 || opts.cell !== undefined))
+    throw new RangeError('Invalid mounted drop receiver. Use a live body row and omit the plane origin cell.');
   return {
     origin: [...opts.origin],
     size: [opts.size[0]!, opts.size[1]!],
@@ -71,6 +89,58 @@ export function prepareReceiver(opts: ThinFilmDropReceiver): PreparedReceiver {
     v,
     n,
     cell: [cell[0]!, cell[1]!, cell[2]!],
+    bodyRow,
+  };
+}
+
+export function receiverPose(memory: WebAssembly.Memory, port: Port | undefined, row: number): number[] {
+  const region = port?.region;
+  if (!port || region?.layout !== 2 || region.type !== 'f32' || region.byteLength < (row + 1) * BODY_WORDS * 4)
+    throw new RangeError('Missing mounted-drop pose. Add the layout-2 RigidSolver with a valid body row first.');
+  const at = row * BODY_WORDS;
+  const pose = Array.from(regionWords(memory, region).subarray(at, at + 7));
+  if (!pose.every(Number.isFinite) || pose.slice(3).every((x) => x === 0))
+    throw new RangeError('Mounted drop receiver has no live body pose. Use a live body row.');
+  return [...pose, ...port.cell, port.tick];
+}
+
+function rotation(pose: ArrayLike<number>): Rotation {
+  return normalizeQuaternion([pose[3]!, pose[4]!, pose[5]!, pose[6]!]);
+}
+
+export function translateReceiver(
+  plane: PreparedReceiver,
+  before: ArrayLike<number>,
+  after: ArrayLike<number>,
+  dt: number,
+  cellSize: number,
+): ReceiverSweep {
+  if (after[10]! <= before[10]!)
+    throw new RangeError('Mounted-drop pose did not advance. Step the rigid solver before its staggered flight.');
+  const q = rotation(before);
+  const endRotation = rotation(after);
+  const sign =
+    q[0] * endRotation[0] + q[1] * endRotation[1] + q[2] * endRotation[2] + q[3] * endRotation[3] < 0 ? -1 : 1;
+  const rotationQuantum = 8 / 16_777_216; // Rigid poses are stored as f32 components.
+  if (q.some((x, k) => Math.abs(x - sign * endRotation[k]!) > rotationQuantum))
+    throw new RangeError('Mounted drop receiver rotated during translation. Hold the receiver orientation fixed.');
+  const cell: V3 = [after[7]!, after[8]!, after[9]!];
+  const start: V3 = [
+    before[0]! + (before[7]! - cell[0]) * cellSize,
+    before[1]! + (before[8]! - cell[1]) * cellSize,
+    before[2]! + (before[9]! - cell[2]) * cellSize,
+  ];
+  const end: V3 = [after[0]!, after[1]!, after[2]!];
+  return {
+    plane: {
+      ...plane,
+      origin: add(start, rotateByQuaternion(plane.origin, q)),
+      u: rotateByQuaternion(plane.u, q),
+      v: rotateByQuaternion(plane.v, q),
+      n: rotateByQuaternion(plane.n, q),
+      cell,
+    },
+    velocity: scale(sub(end, start), 1 / dt),
   };
 }
 
@@ -122,25 +192,28 @@ export function receiverImpact(
   rate: number,
   cell: V3,
   cellSize: number,
+  sweepVelocity: V3 = STILL,
+  elapsed = 0,
 ): Impact | undefined {
   const { n, u, v, size } = receiver;
-  const x = drop[at]! - receiver.origin[0] + (cell[0] - receiver.cell[0]) * cellSize;
-  const y = drop[at + 1]! - receiver.origin[1] + (cell[1] - receiver.cell[1]) * cellSize;
-  const z = drop[at + 2]! - receiver.origin[2] + (cell[2] - receiver.cell[2]) * cellSize;
-  const vx = drop[at + 3]!;
-  const vy = drop[at + 4]!;
-  const vz = drop[at + 5]!;
+  const x = drop[at]! - receiver.origin[0] + (cell[0] - receiver.cell[0]) * cellSize - sweepVelocity[0] * elapsed;
+  const y = drop[at + 1]! - receiver.origin[1] + (cell[1] - receiver.cell[1]) * cellSize - sweepVelocity[1] * elapsed;
+  const z = drop[at + 2]! - receiver.origin[2] + (cell[2] - receiver.cell[2]) * cellSize - sweepVelocity[2] * elapsed;
+  const vx = drop[at + 3]! - sweepVelocity[0];
+  const vy = drop[at + 4]! - sweepVelocity[1];
+  const vz = drop[at + 5]! - sweepVelocity[2];
+  const relativeWind = sub(wind, sweepVelocity);
   const radius = 0.5 * drop[at + 7]!;
   const normalVelocity = n[0] * vx + n[1] * vy + n[2] * vz;
-  const normalWind = dot(n, wind);
+  const normalWind = dot(n, relativeWind);
   const normalGravity = dot(n, gravity) * buoyancy;
   const h = n[0] * x + n[1] * y + n[2] * z - radius;
   const time = firstContact(h, normalVelocity, normalWind, normalGravity, rate, dt);
   if (time === undefined) return undefined;
   const [decay, velocityTime, positionTime] = dragIntegrals(rate, time);
-  const gx = x + wind[0] * time + (vx - wind[0]) * velocityTime + buoyancy * gravity[0] * positionTime;
-  const gy = y + wind[1] * time + (vy - wind[1]) * velocityTime + buoyancy * gravity[1] * positionTime;
-  const gz = z + wind[2] * time + (vz - wind[2]) * velocityTime + buoyancy * gravity[2] * positionTime;
+  const gx = x + relativeWind[0] * time + (vx - relativeWind[0]) * velocityTime + buoyancy * gravity[0] * positionTime;
+  const gy = y + relativeWind[1] * time + (vy - relativeWind[1]) * velocityTime + buoyancy * gravity[1] * positionTime;
+  const gz = z + relativeWind[2] * time + (vz - relativeWind[2]) * velocityTime + buoyancy * gravity[2] * positionTime;
   const atU = u[0] * gx + u[1] * gy + u[2] * gz;
   const atV = v[0] * gx + v[1] * gy + v[2] * gz;
   const inward = -(normalWind + decay * (normalVelocity - normalWind) + normalGravity * velocityTime);

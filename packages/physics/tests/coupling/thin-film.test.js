@@ -336,7 +336,7 @@ test('ThinFilmSolver: detached LAST-TRAM drops inherit the moving sill pose', as
   assert.fail('Expected the moving sill to detach a drop within eight seconds.');
 });
 
-function dropEvents(count, makeRecords) {
+function dropEvents(count, makeRecords, releaseTick = 0) {
   const field = {
     name: 'test-drops',
     kind: 'surfaceSampleSet',
@@ -355,7 +355,7 @@ function dropEvents(count, makeRecords) {
     step(context, dt) {
       const rows = regionWords(memory, region);
       rows.fill(0);
-      if (context.tick === 0) rows.set(makeRecords(dt).flat());
+      if (context.tick === releaseTick) rows.set(makeRecords(dt).flat());
     },
     importPorts() {},
     exportPorts: (tick) => [{ field: field.name, region, tick, cell: [0, 0, 0] }],
@@ -497,6 +497,86 @@ test('ThinFilmDropFlight: a sill drop transfers volume and normal impulse to a r
     return;
   }
   assert.fail('Expected a drop to reach the wet tray within eight seconds.');
+});
+
+test('ThinFilmDropFlight: a translating rigid film catches drops in its own UV and receives one recoil per drop', async () => {
+  await Physics.load();
+  const dt = 1 / rate.num;
+  const gravity = [0, 0, 0];
+  const wetDepth = 0.0002;
+  const radius = 0.002;
+  const volume = (4 * Math.PI * radius ** 3) / 3;
+  const speed = 0.6;
+  const sideways = 0.2;
+  const density = 998;
+  const mass = 10;
+  const gaps = [0.003, 0.013];
+  const x = 0.06;
+  const z = -0.07;
+  async function make(normalVelocity) {
+    const { field, producer } = dropEvents(
+      gaps.length,
+      (step) => gaps.map((gap) => [x, wetDepth + radius + speed * dt + gap, z, 0, 0, 0, volume, step / 8, step, 1]),
+      1,
+    );
+    const world = new PhysicsWorld({ rate, gravity, memory: worldMemory(false) });
+    const rigid = new Physics(null, { arena: world.arena, fixedTimestep: dt, gravity });
+    const body = rigid.addBody(null, {
+      lockRotations: true,
+      linearVelocity: [sideways, normalVelocity, 0],
+      colliders: { shape: 'box', halfExtents: [0.3, 0.04, 0.3], mass },
+    });
+    const flight = new ThinFilmDropFlight(field, 'moving-flight', { rigid: true });
+    const film = await ThinFilmSolver.load({ rigid: true, impacts: flight.impactField, impactRecoil: true });
+    world
+      .add(new RigidSolver(), { physics: rigid })
+      .add(producer, {})
+      .add(flight, { airDensity: 0, receiver: { bodyRow: body.row, origin: [0, wetDepth, 0], size: [0.12, 0.12] } })
+      .add(film, { bodyRow: body.row, cells: [6, 6], spacing: 0.02, depth: wetDepth, density });
+    world.couple(['rigid', 'moving-flight', 'thin-film'], 'staggered');
+    return { world, body, flight, film };
+  }
+  const { world, body, flight, film } = await make(speed);
+  world.advance(1);
+  const checkpoint = world.takeSnapshot();
+  const inwardAfterFirst = speed * (1 - (density * volume) / mass);
+  const bound = 8 * 2 ** -24;
+  let incoming = 0;
+  for (const [index, gap] of gaps.entries()) {
+    const start = body.position;
+    world.advance(2 + index);
+    const end = body.position;
+    incoming = (end[1] - start[1]) / dt;
+    if (index === 0) assert.ok(Math.abs(incoming - speed) <= bound * speed);
+    const t = (speed * dt + gap - start[1]) / (end[1] - start[1]);
+    assert.ok(t > 0 && t < 1);
+    const want = [x - (start[0] + t * (end[0] - start[0])), -z, radius, volume, incoming];
+    const region = world.fields.port(flight.impactField.name).region;
+    const hit = regionWords(world.memory, region).subarray(0, FILM_IMPACT_WORDS);
+    for (const [axis, value] of want.entries()) {
+      // Position and speed use the published f32 rigid endpoints. Radius and volume are f64.
+      const tolerance = axis === 0 || axis === 4 ? bound : 32 * Number.EPSILON;
+      assert.ok(Math.abs(hit[axis] - value) <= tolerance * Math.abs(value), `${hit[axis]} vs ${value}`);
+    }
+    assert.equal(flight.readDrops().length, 1 - index);
+    assert.equal(flight.depositedVolume, (1 + index) * volume);
+    assert.equal(film.budget.impacts, (1 + index) * volume);
+    balance(film, 2 + index);
+  }
+  world.advance(4);
+  const twice = inwardAfterFirst - (density * volume * incoming) / mass;
+  assert.ok(Math.abs(body.linearVelocity[1] - twice) <= bound * twice);
+  world.advance(6);
+  assert.equal(film.budget.impacts, 2 * volume);
+  assert.equal(flight.budget.airborne, 0);
+  const hash = world.hash();
+  world.restoreSnapshot(checkpoint.bytes);
+  world.advance(6);
+  assert.equal(world.hash(), hash);
+  const control = await make(0);
+  control.world.advance(6);
+  assert.equal(control.flight.readDrops().length, gaps.length);
+  assert.equal(control.film.budget.impacts, 0);
 });
 
 test('ThinFilmSolver: a mounted film transmits its normal weight and moment to the rigid body', async () => {

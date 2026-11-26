@@ -6228,6 +6228,11 @@ An absorbed drop on a tilted mount sends its normal and angular impulse through 
 rigid body force port. A live box receives the predicted changes of velocity once.
 [Reproduce](reproduce.md#fluid-07-mounted-film-weight)
 
+A fixed-orientation translating tray intercepts a newly emitted drop and an older airborne
+drop at the analytical UV contacts. The stationary trial catches neither. The mounted film
+receives the exact volume, transfers each relative normal impulse once, and replays the
+same state after restore. [Reproduce](reproduce.md#fluid-07-circular-sill-drops)
+
 ### FLUID-07 mounted film weight
 
 A mounted patch puts its integrated normal water weight and moment on the rigid body's

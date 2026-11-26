@@ -4549,6 +4549,12 @@ clearance at contact. The flight, film and wake ports track the same drop's volu
 normal impulse. A separate turning trajectory catches an impact between two positive
 clearances while a companion outside the tray keeps flying.
 
+Run `node --test --test-name-pattern="translating rigid film" packages/physics/tests/coupling/thin-film.test.js`
+to check a live translating tray with fixed orientation. The intersection of each sphere
+with the interpolated rigid endpoint poses gives its UV coordinates and approach speed.
+The two drops cover a fractional birth and a later step carrying an already airborne drop.
+The tray body receives both relative normal impulses, and the stationary tray catches neither.
+
 ### FLUID-07 moving window render
 
 With the packages built, run `npm run test:browser:thin-film -w @margoengine/physics`.

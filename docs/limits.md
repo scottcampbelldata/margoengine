@@ -9634,10 +9634,12 @@ per drop, 2.6% below the 51.5 μL cycle volume from Zhang and Basaran (1996). Ea
 the rim pose and velocity. `ThinFilmDropFlight` uses that velocity as constant over the source
 tick to recover the release position, then advances the drop relative to the air. It tracks
 diameters from 1 μm to 7 mm at a configurable capacity and expires each drop by age. An
-optional static, planar receiver absorbs incoming drops in its UV bounds. It sends volume
-and normal momentum to the receiving film in the same tick and can drive its wake. The
-receiver covers deposition. Moving receivers, splashing, rebound, satellite breakup and free
-pinch-off away from a configured outlet remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
+optional planar receiver absorbs incoming drops in its UV bounds. Static planes deposit
+volume and send normal momentum to a receiving film or wake. A rigidly mounted receiver
+follows the linear translation between consecutive rigid poses and sends relative normal
+momentum to its mounted film. It holds its orientation fixed. Rotation within an interval,
+splashing, rebound, satellite breakup and free pinch-off away from a configured outlet
+remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
 The optional `hydrostaticLoad` adds the film's normal gravitational force and moment to
 its rigid mount. The coupled test checks both a supported tray and an off-centre underside
 patch. The optional `impactRecoil` sends the resolved volume's incoming normal impulse
@@ -9653,7 +9655,7 @@ uses spherical drop geometry. It compares the same rigid pose with each liquid m
 hidden in turn. Interior camera attachment, full layered water–glass optics and production
 shot review remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-The optional thin-film entry is 13,202 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 14,185 B gzip with a 14,611 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

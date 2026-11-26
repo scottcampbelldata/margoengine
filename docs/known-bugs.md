@@ -17319,8 +17319,10 @@ thin-film gravity-drain test leaves the patch without spawning airborne ligament
 atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
 general sea keeps its existing wind-wave damping because heterogeneous rain suppression
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
-The thin-film precursor model now supplies an equilibrium contact angle. Dynamic hysteresis
-and comparison against independent measured drop spreading remain open.
+The thin-film precursor model supplies an equilibrium contact angle and advancing and receding
+thresholds. Independent measurements of partially wetting slip and absolute radius history
+remain open. A translating fixed-orientation tray absorbs drops and receives their normal
+recoil. Capture by a turning tray and secondary splash drops remain open.
 The reversed-gravity film test reproduces the growth of a long underside disturbance.
 A configured circular sill now publishes timed detached drops. Finite depth columns still require
 a separate free-surface representation to pinch off a drop away from a rim.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20636962,
+  "total": 20638178,
   "history": [
     {
       "date": "2026-10-24",
@@ -13843,6 +13843,12 @@
       "commit": "f557d21525",
       "grew": 1,
       "reason": "SEA-15's breaker-driven oil droplet transfer moves physics/tracers from 12662 to 13982 B gzip. The optional ceiling rises from 13042 to 14402 B. Droplet entrainment shares the existing Fay profile, vapour, particle motion and snapshot mass accounting. A separate entry would need a second parcel store and a conservative transfer contract."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-translating-receiver",
+      "grew": 1,
+      "reason": "FLUID-07 sweeps the receiving plane across rigid endpoint poses and reuses continuous drop contact and the existing recoil field. Thin-film rises from 13202 to 14185 B gzip; cap changes from 13395 to 14611 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14720,7 +14726,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 13395,
+    "@margoengine/physics/thin-film": 14611,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 14402,
     "@margoengine/physics/tsunami": 6794,
