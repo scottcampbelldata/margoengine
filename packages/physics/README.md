@@ -3035,8 +3035,11 @@ console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.
 ```
 
 For a ray, enable `bedJets` to couple swimming impulses to the erodible bed. A downward fin impulse spreads
-as it reaches the bed. It lifts `sand` (default) or `silt` when the footprint-averaged shear exceeds the
-Soulsby–Whitehouse threshold for the grain size, water density and viscosity. The default van Rijn pick-up
+as it reaches the bed. The default `shear: 'wall-jet'` computes a radial submerged-jet wall stress with zero
+shear at stagnation, an off-centre peak and an outward decay. Eroded mass is integrated over the affected annuli.
+Use `shear: 'footprint'` for an average stress over a single footprint. Clearances shorter than one nozzle diameter
+use this simpler model. Sand (default) or silt lifts where shear exceeds the Soulsby–Whitehouse threshold for the
+grain size, water density and viscosity. The default van Rijn pick-up
 rate increases with the three-halves power of relative excess stress. Give `criticalShields` to override onset,
 or set `erodibility` to use a linear rate in kg/m²/s at unit excess stress for a prescribed bed. `availableMass`
 defaults to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
@@ -3059,6 +3062,15 @@ const sediment = new TracerSolver('sand', { bedJets: true });
 world.add(sediment, { bed: 0.5, bedJets: { availableMass: 0.023 } });
 world.advance(1);
 console.log(sediment.jetErosion > 0, sediment.budget.water > 0); // true true
+```
+
+Use `submergedJetWallShear` to sample the steady flat-bed stress from a known nozzle. Its arguments use SI units.
+
+```ts
+import { submergedJetWallShear } from 'margoengine/physics/tracers';
+
+const jet = { height: 0.2, diameter: 0.1, speed: 0.426, density: 1000, viscosity: 1e-6 };
+console.log(submergedJetWallShear(jet, 0), submergedJetWallShear(jet, 0.4) > 0); // 0 true
 ```
 
 ### Rivers, floods and dam breaks (`@margoengine/physics/hydro`)

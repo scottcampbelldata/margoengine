@@ -13135,15 +13135,25 @@ For positive relative excess shear, the flux per bed area is `0.00033 ρ_s sqrt(
 where `s = ρ_s/ρ_w` and `D_* = d [((s−1) g)/ν²]^(1/3)`. The cited 1984 data cover low-flow noncohesive sand
 of roughly 100 to 1,500 μm. The 40 μm silt setting extrapolates the relation to noncohesive silt.
 
-Margo's reduced model spreads the wake radius by 0.1 m per metre of travel and applies 5% of
-the incident normal momentum flux as a footprint-averaged shear. These jet constants are modelling
-choices. An explicitly prescribed linear erosion option is available for a specified bed.
-Four stratified parcels sample the wall-jet footprint.
+The radial model reconstructs a uniform nozzle speed from normal impulse per step and nozzle area. It uses
+Phares et al.'s Eq. 2.31 and the theoretical circular jet curves in Fig. 5b (clearance/diameter 1, 2, 4, 6 and 8),
+with the exact fully developed maximum from Eq. 2.33. Linear interpolation of the plotted curve nodes supplies
+the impingement-region shear. Beyond its peak, the Poreh et al. wall-jet law (Phares Eq. 2.37) limits the shear.
+The last tabulated core value carries through the join if the outer law is still above it. The turbulent
+transition jump is unresolved. Two-point Gauss–Legendre quadrature integrates the mass flux in squared radius,
+with 32 core and 16 outer annuli. Four stratified parcels sample the mass-weighted radial distribution.
+The downstream stress test reads four submerged electrochemical observations of Alekseenko and Markovich
+(1994) from Phares Fig. 10 (H/D = 2, Re = 42,600), with both log axes bounded by the marker sizes.
+Those observations were separate from the Poreh law's calibration and the Fig. 5b theoretical samples.
+
+For clearances shorter than a diameter, or explicitly prescribed footprint shear, the reduced model spreads
+the wake radius by 0.1 m per metre of travel and uses 5% of incident normal momentum flux. These jet constants
+are modelling choices. An explicitly prescribed linear erosion option is available for a specified bed.
 They settle by the SEA-15 grain law. In the render fixture, their optical cross section is twice the
 projected geometric area in the large-particle limit (van de Hulst, *Light Scattering by Small
 Particles*, 1957, extinction paradox). The mass, source placement, and replay assertions use the
 same packed wake from the live swimmer. Manufactured stresses verify onset, dry mass flux and grain
-size dependence through the live ray path. Independent pickup measurements remain to be checked.
+size dependence through the live ray path. Independent dry mass pickup measurements remain to be checked.
 
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 

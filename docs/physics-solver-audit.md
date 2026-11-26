@@ -467,8 +467,10 @@ carries a ship race's air as parcels):
 
 BB-7 now uses the Soulsby–Whitehouse grain-specific Shields curve and van Rijn's three-halves-power
 pick-up rate by default. A manufactured bed-stress test runs through the real swimmer and checks both
-grain classes, below and above onset, against the published equations. Independent bed measurements,
-the Phares wall-stress profile, and the original shot's plume and bed binding still need verification.
+grain classes, below and above onset, against the published equations. The ray uses radial Phares wall
+shear and annular pickup where clearance reaches its nozzle diameter. Four independent electrochemical
+points check the downstream wall-stress law. Independent lifted mass, the short-gap jet and turbulent
+transition, and the original shot's plume and bed binding still need verification.
 
 ## Verification passes
 

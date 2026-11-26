@@ -26,6 +26,7 @@ import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.js';
 import { MargoError } from '@margoengine/math/errors';
+import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
 import { regionWords } from './world/memory.js';
 import type {
@@ -39,6 +40,8 @@ import type {
   SolverHost,
   StepContext,
 } from './world/solver.js';
+
+export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
 
 /** The registry field of the tracers: each particle's position (x, y, z) and mass, owned by {@link TracerSolver}. */
 export const TRACER_FIELD: FieldDescriptor = {
@@ -102,6 +105,8 @@ export interface TracerSource {
 export interface TracerBedJets {
   /** The mobile fraction of the bed. Default 'sand'. */
   material?: 'sand' | 'silt';
+  /** Wall stress model. Default 'wall-jet', with 'footprint' for clearances below one jet diameter. */
+  shear?: 'wall-jet' | 'footprint';
   /** Shields threshold for initiation of motion. Default: the Soulsby–Whitehouse curve for the selected grain. */
   criticalShields?: number;
   /** Optional linear erosion rate at unit excess stress, kg/m²/s. Default: van Rijn's grain-dependent pick-up. */
@@ -152,6 +157,38 @@ const SURFACE = 2;
 const BED = 3;
 const ORIGIN: Cell = [0, 0, 0];
 const JET_PARCELS = 4;
+const JET_CORE_RINGS = 32;
+const JET_OUTER_RINGS = 16;
+const GAUSS_OFFSET = Math.sqrt(1 / 3) / 2;
+
+interface JetBed {
+  material: number;
+  threshold: number;
+  pickupScale: number;
+  pickupExponent: number;
+  limit: number;
+  rings?: Float64Array;
+}
+
+function pickupRate(shear: number, bed: JetBed): number {
+  const excess = (shear - bed.threshold) / bed.threshold;
+  return excess > 0 ? bed.pickupScale * pow(excess, bed.pickupExponent) : 0;
+}
+
+/** Invert the cumulative ring weights and sample an area inside the selected ring. */
+function pickupRadius(rings: Float64Array, target: number): number {
+  let innerSquared = 0;
+  let accumulated = 0;
+  for (let i = 0; i < rings.length; i += 2) {
+    const outerSquared = rings[i]!;
+    const next = rings[i + 1]!;
+    if (target < next)
+      return Math.sqrt(innerSquared + ((target - accumulated) / (next - accumulated)) * (outerSquared - innerSquared));
+    innerSquared = outerSquared;
+    accumulated = next;
+  }
+  return Math.sqrt(innerSquared);
+}
 
 /** Ferguson and Church's settling speed, m/s, of a grain of `material` in water of `density` and viscosity `nu` (negative rises). */
 export function settlingVelocity(
@@ -189,7 +226,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private random!: RandomStream;
   private particles!: Region;
   private ledger!: Region;
-  private jetBed?: { material: number; threshold: number; pickupScale: number; pickupExponent: number; limit: number };
+  private jetBed?: JetBed;
   /** Breaches it takes cargo from, and each breach cargo's material (by its code in BREACH_CARGO, -1 for none). */
   private breachSlots = 0;
   private breachMaterials: number[] = [];
@@ -292,15 +329,22 @@ export class TracerSolver implements Solver<TracerParams> {
       this.sources.push({ material: this.materialIndex(material), source });
     });
     if (this.useBedJets) {
-      const { material = 'sand', criticalShields, erodibility, availableMass = Infinity } = params.bedJets ?? {};
+      const {
+        material = 'sand',
+        shear = 'wall-jet',
+        criticalShields,
+        erodibility,
+        availableMass = Infinity,
+      } = params.bedJets ?? {};
       if (
         (material !== 'sand' && material !== 'silt') ||
+        (shear !== 'wall-jet' && shear !== 'footprint') ||
         (criticalShields !== undefined && !(criticalShields > 0 && Number.isFinite(criticalShields))) ||
         (erodibility !== undefined && !(erodibility >= 0 && Number.isFinite(erodibility))) ||
         !(availableMass >= 0)
       )
         throw new RangeError(
-          'Invalid erodible tracer bed; pass sand or silt with positive Shields and non-negative erosion and mass.',
+          'Invalid erodible tracer bed; pass sand or silt, wall-jet or footprint shear, positive Shields and non-negative erosion and mass.',
         );
       const grains = TRACER_MATERIALS[material];
       if (!(waterDensity < grains.density && this.g > 0))
@@ -325,6 +369,7 @@ export class TracerSolver implements Solver<TracerParams> {
         pickupScale,
         pickupExponent: erodibility === undefined ? 1.5 : 1,
         limit: availableMass,
+        rings: shear === 'wall-jet' ? new Float64Array(2 * (JET_CORE_RINGS + JET_OUTER_RINGS)) : undefined,
       };
     }
     // Each breach cargo's material, registered here so a particle's material index means the same after a restore.
@@ -497,7 +542,7 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.jetBed) this.entrainBed(context, dt, free, this.jetBed);
   }
 
-  private entrainBed(context: StepContext, dt: number, free: number, bed: NonNullable<TracerSolver['jetBed']>): void {
+  private entrainBed(context: StepContext, dt: number, free: number, bed: JetBed): void {
     const port = context.inputs.get(SWIM_WAKE_FIELD.name);
     if (!port) return;
     const { region } = port;
@@ -520,21 +565,23 @@ export class TracerSolver implements Solver<TracerParams> {
       if (!(wake[w + 7]! > 0 && downward > 0 && radius > 0 && height > 0 && y <= waterLevel)) continue;
       const centreX = x + height * (wake[w + 3]! / downward),
         centreZ = z + height * (wake[w + 5]! / downward);
-      // The jet expands on the way down. Take an effective shear over the wall-jet footprint.
-      const spread = radius + 0.1 * hypot(height, centreX - x, centreZ - z);
+      const rings = height >= 2 * radius ? bed.rings : undefined;
+      const spread = rings ? radius : radius + 0.1 * hypot(height, centreX - x, centreZ - z);
       const area = Math.PI * spread * spread;
-      const shear = (0.05 * downward) / (dt * area);
-      const excess = (shear - bed.threshold) / bed.threshold;
-      if (!(excess > 0)) continue;
-      const pickup = bed.pickupScale * pow(excess, bed.pickupExponent);
-      const mass = Math.min(pickup * area * dt, bed.limit - book[lifted]!);
+      const rate = rings
+        ? this.radialPickup(height, radius, downward / dt, bed, rings)
+        : pickupRate((0.05 * downward) / (dt * area), bed) * area;
+      const mass = Math.min(rate * dt, bed.limit - book[lifted]!);
       if (!(mass > 0 && Number.isFinite(mass))) continue;
       for (let parcel = 0; parcel < JET_PARCELS; parcel++) {
         while (free < capacity && words[free * STRIDE + 5] !== FREE) free++;
         if (free === capacity) return;
         const random = this.random.block(context.tick, w / SWIM_WAKE_WORDS, parcel + 1);
         const angle = (2 * Math.PI * (parcel + (random[0]! + 0.5) / 4294967296)) / JET_PARCELS;
-        const distance = spread * pow(0.0625 + (0.7475 * (random[1]! + 0.5)) / 4294967296, 0.5);
+        const quantile = (random[1]! + 0.5) / 4294967296;
+        const distance = rings
+          ? pickupRadius(rings, (rate * (parcel + quantile)) / JET_PARCELS)
+          : spread * pow(0.0625 + 0.7475 * quantile, 0.5);
         const px = centreX + distance * cos(angle),
           pz = centreZ + distance * sin(angle),
           floor = this.bedAt(px, pz);
@@ -552,6 +599,35 @@ export class TracerSolver implements Solver<TracerParams> {
         book[1]! += amount;
       }
     }
+  }
+
+  private radialPickup(height: number, radius: number, force: number, bed: JetBed, rings: Float64Array): number {
+    const { waterDensity, viscosity } = this.params;
+    // Match the delivered normal momentum to a top-hat circular jet at the source.
+    const speed = Math.sqrt(force / (waterDensity * Math.PI * radius * radius));
+    const jet = wallJetProfile(height, 2 * radius, speed, waterDensity, viscosity);
+    const outer = Math.max(1, pow((jet.scale * jet.outer) / bed.threshold, 1 / 2.3));
+    if (!Number.isFinite(outer)) return 0;
+
+    let innerSquared = 0;
+    let rate = 0;
+    const stretch = pow(outer, 1 / JET_OUTER_RINGS);
+    let wallRadius = 1;
+    for (let i = 1; i <= JET_CORE_RINGS + JET_OUTER_RINGS; i++) {
+      const radial = i <= JET_CORE_RINGS ? i / JET_CORE_RINGS : (wallRadius *= stretch);
+      const outerSquared = height * radial * (height * radial);
+      const widthSquared = outerSquared - innerSquared;
+      // Integrate in squared radius, where the area element is constant, with two-point Gauss–Legendre quadrature.
+      const near = Math.sqrt(innerSquared + (0.5 - GAUSS_OFFSET) * widthSquared) / height;
+      const far = Math.sqrt(innerSquared + (0.5 + GAUSS_OFFSET) * widthSquared) / height;
+      const flux = pickupRate(evaluateWallJet(jet, near), bed) + pickupRate(evaluateWallJet(jet, far), bed);
+      rate += flux * (Math.PI * widthSquared * 0.5);
+      const ring = 2 * (i - 1);
+      rings[ring] = outerSquared;
+      rings[ring + 1] = rate;
+      innerSquared = outerSquared;
+    }
+    return rate;
   }
 
   /** Three standard normal numbers for particle `i` at `tick`, by Box-Muller from the counter-based stream. */

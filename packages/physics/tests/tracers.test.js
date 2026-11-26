@@ -3,9 +3,10 @@
 // breach in a moving hull leaves a red plume of iron ore along its track; mass is accounted for exactly.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { settlingVelocity, TRACER_MATERIALS, TracerSolver } from '../dist/tracers.js';
+import * as tracersEntry from '../dist/tracers.js';
 import { PhysicsWorld } from '../dist/world.js';
 
+const { settlingVelocity, TRACER_MATERIALS, TracerSolver } = tracersEntry;
 const DT = 1 / 60;
 
 /** A world with one tracer solver. */
@@ -44,6 +45,34 @@ function moments(solver, axis, state = 'water') {
 
 /** Ten thousand particles of `material` released in the first step at `at`. */
 const burst = (material, at) => ({ material, position: at, rate: 10000 / DT, start: 0, stop: DT });
+
+test('submerged jet wall stress matches independent downstream electrochemical observations', () => {
+  // Alekseenko & Markovich's H/D=2 triangles in Phares et al. (2000), Figure 10.
+  // The plotted marker supplies ±8 x and ±10 y pixels on the 4x render. Propagate both through the log axes.
+  const reynolds = 42600;
+  const jet = { height: 0.2, diameter: 0.1, viscosity: 1e-6, density: 1000, speed: (reynolds * 1e-6) / 0.1 };
+  const fromX = (x) => 10 ** (-2 + (3 * (x - 103)) / 735);
+  const fromY = (y) => 10 ** (2 - (3 * (y - 36)) / 824);
+  const normalizer = (Math.sqrt(reynolds) * 4) / (jet.density * jet.speed ** 2);
+  assert.equal(typeof tracersEntry.submergedJetWallShear, 'function');
+  const scaled = (x) => normalizer * tracersEntry.submergedJetWallShear(jet, jet.height * fromX(x));
+  for (const [x, y] of [
+    [649, 608],
+    [663, 646],
+    [676, 680],
+    [698, 737],
+  ]) {
+    assert.ok(scaled(x + 8) <= fromY(y - 10) && scaled(x - 8) >= fromY(y + 10), `marker (${x}, ${y})`);
+  }
+  assert.equal(tracersEntry.submergedJetWallShear(jet, 0), 0);
+
+  // Phares Eq. 2.33 gives the independent exact high-clearance maximum and its radial position.
+  const deep = { ...jet, height: 0.8 };
+  const wallStress = (r) => tracersEntry.submergedJetWallShear(deep, deep.height * r);
+  const peak = (44.6 * deep.density * deep.speed ** 2) / (Math.sqrt(reynolds) * 64);
+  assert.ok(Math.abs(wallStress(0.09) - peak) <= 8 * Number.EPSILON * peak);
+  assert.ok(wallStress(0.05) < peak && wallStress(0.18) < peak);
+});
 
 test('a dye cloud spreads as the diffusion equation says: variance 2 K t on each axis', () => {
   const { solver, run } = tracers({

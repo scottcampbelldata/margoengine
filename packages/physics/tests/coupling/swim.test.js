@@ -10,7 +10,7 @@ import {
 } from '@margoengine/physics/life';
 import { SchoolSolver } from '@margoengine/physics/schooling';
 import { SpectralSea } from '@margoengine/physics/sea';
-import { TracerSolver } from '@margoengine/physics/tracers';
+import { submergedJetWallShear, TracerSolver } from '@margoengine/physics/tracers';
 import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
@@ -272,7 +272,7 @@ test('BB-7 a pectoral beat lifts sand above a near bed and the plume drifts and 
   const water = { medium: 'water', cell: zero, sample: () => ({ velocity: [0.5, 0, 0], density, temperature: 280 }) };
   const world = put(swimmer, [ray]).add(tracer, {
     bed: depth,
-    bedJets: { availableMass: 0.023, criticalShields: 0.05, erodibility: 0.02 },
+    bedJets: { shear: 'footprint', availableMass: 0.023, criticalShields: 0.05, erodibility: 0.02 },
     water,
     horizontalDiffusivity: 0,
     verticalDiffusivity: 0,
@@ -329,7 +329,11 @@ test('BB-7 sediment starts at the grain-specific Shields stress and follows van 
       fins: { area, strokeAmplitude, strokeFrequency: 1 },
       steering: [0, 1, 0],
     };
-    const world = put(swimmer, [ray]).add(tracer, { bed: depth, viscosity: fluidViscosity, bedJets: { material } });
+    const world = put(swimmer, [ray]).add(tracer, {
+      bed: depth,
+      viscosity: fluidViscosity,
+      bedJets: { material, shear: 'footprint' },
+    });
     world.advance(1);
 
     const dStar = diameter * Math.cbrt(submergedGravity / fluidViscosity ** 2);
@@ -341,6 +345,60 @@ test('BB-7 sediment starts at the grain-specific Shields stress and follows van 
     close(tracer.budget.water, tracer.jetErosion);
     assert.equal([...tracer.particlesOf()].length, excess > 0 ? 4 : 0);
   }
+});
+
+test('BB-7 the live pectoral wall jet integrates annular pickup and replays its grain parcels', async () => {
+  const swimmer = await SwimSolver.load();
+  const tracer = new TracerSolver('tracers', { bedJets: true });
+  const area = 0.05;
+  const amplitude = 0.2;
+  const radius = Math.sqrt(area / Math.PI);
+  const ray = {
+    ...coast,
+    position: [0, -0.2, 0],
+    tail: noTail,
+    fins: { area, strokeAmplitude: amplitude, strokeFrequency: 1 },
+    steering: [0, 1, 0],
+  };
+  const world = put(swimmer, [ray]).add(tracer, { bed: 0.5, horizontalDiffusivity: 0, verticalDiffusivity: 0 });
+  world.advance(1);
+
+  const speed = (2 * Math.PI * amplitude * Math.cos(Math.PI * sec)) / Math.SQRT2;
+  const jet = { height: 0.3, diameter: 2 * radius, speed, density, viscosity: 1e-6 };
+  const sedimentDensity = 2650;
+  const diameter = 2.5e-4;
+  const reducedGravity = (sedimentDensity / density - 1) * -gravity;
+  const dStar = diameter * Math.cbrt(reducedGravity / jet.viscosity ** 2);
+  const critical =
+    (0.3 / (1 + 1.2 * dStar) + 0.055 * (1 - Math.exp(-0.02 * dStar))) * density * reducedGravity * diameter;
+  const massScale = 0.00033 * sedimentDensity * Math.sqrt(reducedGravity * diameter) * dStar ** 0.3;
+  const integrate = (dr) => {
+    let mass = 0;
+    for (let radius = dr / 2; radius < 3; radius += dr) {
+      const stress = submergedJetWallShear(jet, radius);
+      const excess = Math.max(0, stress / critical - 1);
+      mass += 2 * Math.PI * radius * dr * sec * massScale * excess ** 1.5;
+    }
+    return mass;
+  };
+  // A separate uniform-radius quadrature bounds the error of the variable annuli used by the solver.
+  const reference = integrate(1 / 2048);
+  const coarseError = Math.abs(reference - integrate(1 / 32));
+  assert.ok(reference > 0 && coarseError > 0);
+  close(tracer.jetErosion, reference, coarseError);
+  const particles = [...tracer.particlesOf()];
+  assert.equal(particles.length, 4);
+  close(
+    particles.reduce((mass, particle) => mass + particle.mass, 0),
+    tracer.jetErosion,
+  );
+  assert.ok(particles.every(({ position }) => Math.hypot(position[0], position[2]) > 0));
+  const start = world.takeSnapshot();
+  world.advance(20);
+  const hash = world.hash();
+  world.restoreSnapshot(start.bytes);
+  world.advance(20);
+  assert.equal(world.hash(), hash);
 });
 
 test('the sediment bed rejects viscosity too small to compute a finite pickup rate', () => {
