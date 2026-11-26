@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20114111,
+  "total": 20127168,
   "history": [
     {
       "date": "2026-10-24",
@@ -12837,6 +12837,12 @@
       "commit": "5628424515",
       "reason": "BIO-03 shares the annual transition, taking offline ecosystem from 3,210 to 3,652 B gzip. The live forest entry is 7,194 B gzip plus lazily loaded 1,276 B raw kernels. Duplicating the annual model would let offline and live dynamics diverge. Core and stage gain 0 B.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e6403e5f16",
+      "reason": "LIFE-01: 11101 B gzip for the optional biped and quadruped entry with rigid deck impulses, variable stance, and the reused ground kernel. Horses now use loaded slope, traction and live phase. Core and stage add zero bytes.",
+      "grew": 3
     }
   ],
   "items": {
@@ -13326,7 +13332,7 @@
     "@margoengine/headless/stage": 3972,
     "@margoengine/headless/tiles": 2829,
     "@margoengine/headless/video": 13452,
-    "@margoengine/horses": 16111,
+    "@margoengine/horses": 17226,
     "@margoengine/horses/anatomy": 1097,
     "@margoengine/horses/crowd": 12397,
     "@margoengine/horses/gaits": 1467,
@@ -13664,8 +13670,9 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/iceberg": 5418,
     "@margoengine/physics/landscape": 4603,
+    "@margoengine/physics/legged": 11435,
     "@margoengine/physics/life": 7542,
-    "@margoengine/physics/locomotion": 6675,
+    "@margoengine/physics/locomotion": 7182,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 10029,
     "@margoengine/physics/orbit": 4273,
