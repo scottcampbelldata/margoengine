@@ -5674,8 +5674,12 @@ byte for byte and the whole residual is this base darkening. With the viewer's l
 sRGB_encode(E(n, max(r, 0.25))) the like-for-like absolute falls from 218,842 to 23,113 (0.029 MAE), the rest being
 one-sample edges and text (11,305) and the spheres (11,808). The encode holds the roughness 0.33 to 1 rows (141,533,
 64.7 %); the roughness 0 row (66,004, 30.2 %) needs the lookup floor as well, where the spec's E is 0 and the lobe
-is black in both pictures. That part is open pending acceptance (docs/known-bugs.md, "Batch 160 sheen picture
-loss"). Before KB3297d the
+is black in both pictures. Accepted difference (Scott, 2026-11-26, "Yes, accept it"): cause, the viewer's albedo
+lookup, read through the sRGB encode and at a sheen roughness of at least about 0.25. What Margo does extra: the spec's
+linear E (the cosine-weighted integral of the sheen BRDF, KHR_materials_sheen and Enterprise PBR) with no floor, so the
+base under a sheen loses only the light the sheen lobe reflects, and nothing at roughness 0, where the lobe is black.
+Trade-off: the like-for-like sheen row stays at 218,842 (MAE 0.27827199300130206) against 23,113 for a renderer with
+the viewer's lookup; no setting is changed to chase it. Before KB3297d the
 maximum, 205, sat on two silhouette pixels where gltf/pbr's sheen roughness floor of 0.03 drew a bright rim the
 viewer does not; with no floor and n.h taken from the clamped cosines the maximum is 103, the square 3,061,310 to
 2,944,566, and the absolute rises from 217,478 to 218,842. That rise belongs to this accepted difference: the rise is the Sample Viewer's encoded albedo-table ring (KB3297c), which the old floor hid: the floor's albedo (E(0.05, 0.03) = 0.71) had darkened the base on the ring inside the roughness 0 rims as the viewer's sRGB-encoded lookup darkens it everywhere at roughness 0.
@@ -5897,8 +5901,8 @@ black as the Sample Viewer does. Maximum error 119 (171 before KB3297d, 167 befo
 on two silhouette pixels where the viewer is nearly black is gone (docs/known-bugs.md, KB3297d). Like for like (the
 viewer transfer, one sample) the MAE is 0.27827199300130206, max 103; see "Sample Viewer like for like".
 Native WebGL2 rejects PBR. Exact integer budgets and hashes: whitepaper/results/batch-160-sheen.json.
-The residual is attributed to the viewer's albedo lookup (see "Sample Viewer like for like"); its roughness 0 part
-awaits acceptance. This does not prove physical equivalence.
+The residual is the viewer's albedo lookup, an accepted difference (Scott, 2026-11-26; see "Sample Viewer like for
+like"). This does not prove physical equivalence.
 
 ### Scatter tile input storage (batch 77 audit)
 
@@ -13105,6 +13109,42 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Open 2026-11-26: ship lamp glints read the sea's roughness as GGX alpha, the sun glint as perceptual (KB-SHIPLAMP1, water)
+
+- **Repro:** packages/water/src/ships.ts `shipLamps` writes `a2 = max(rough^2, 1e-4)`, so its lobe has alpha = rough;
+  packages/water/src/index.ts `directionalGlint` writes alpha = rough^2, a2 = alpha^2 + the waves' slope variance
+  (`frame.foam.y`). With `lampRoughness: null` the lamps take the same `rough` as the sun glitter, so on one sea at
+  roughness 0.08 a lamp's lobe has alpha 0.08 and the sun's 0.0064 plus the variance. No test pins either width
+  (test/ships.browser.mjs checks only that a lamp adds a glint on the mirror line and a rougher sea spreads it).
+- **Cause:** two conventions for one roughness on one surface; the `lampRoughness` row (0.02 to 1) was written as an
+  alpha, while "null follows the Water's glitter" hands it the glitter's perceptual roughness.
+- **Plan:** the lamp lobe takes the sun glint's mapping and variance (one lobe per surface), with a GPU test comparing a
+  lamp's glint width with the sun glint's at equal roughness; the `lampRoughness` row's meaning follows the engine's
+  perceptual roughness. Found while fixing KB6016d.
+
+### Fixed 2026-11-26: seven GGX D sites still cancelled in float32 near a narrow lobe's peak (KB6016d)
+
+- **Repro (before):** the `nh^2 (a2 - 1) + 1` denominator in float32 at roughness 0.03 (a2 = 8.1e-7), with the half
+  vector 2e-5 to 8e-4 rad off the normal: D off by more than 10 % against f64 (tests/smith-shaders.test.js, "in float32
+  the vector GGX denominator keeps D"; KB6016c measured +28 % for core's copy on the GPU).
+- **Cause:** KB6016c moved core and the shared `ggxD` / `ggxDOf` to `|n x h|^2 + a2 nh^2`, but seven sites kept the
+  scalar form: shared `ggxDenominator(nh)` (environment probe prefilter, environment cube prefilter pdf, voxel-pathtracer
+  `ggxD`, water directional glints), shared `ggxNamed` (materials' lobes), and two written by hand (water ship lamp
+  glints, FFT ocean glint). Near the peak 1 - nh^2 is a few float32 steps of nh^2 while a2 is about 8e-7, so the
+  rounding of nh alone moved D.
+- **Fix:** shared `ggxDenominatorOf(n, h, nh, a2)` writes `max(|n x h|^2, step(nh, 0)) + a2 nh^2` over the vectors (the
+  scalar export is gone) and `ggxNamed` takes `n` and `h`; every site passes its vectors. The environment cube prefilter
+  passes its tangent-space sample (n = (0, 0, 1)), whose sin is computed without cancellation by `importanceGGX`; the
+  voxel-pathtracer's `ggxD(a2, n, h)` clamps n.h itself. Where n.h >= 0 the value is unchanged in exact arithmetic.
+- **Regression:** tests/smith-shaders.test.js: no package or shared source writes the cancelling form (literal or
+  template, which also fails on the parent's `${nh}*${nh}*(${a2}-1)+1`), the scalar export is gone, each former caller
+  passes n and h, `ggxDenominatorOf` and the `ggxNamed` D equal the textbook D (and a2 / pi where h faces away), and the
+  float32 evaluation of both forms. GPU: the test:gpu and browser chains of environment, materials, voxel-pathtracer and
+  water on WebGPU and the WebGL2 layer.
+- Sources: as KB6016c (Walter, Marschner, Li and Torrance 2007, eq. 33; Guy and Agopian, "Physically Based Rendering in
+  Filament", section 4.4.1; Goldberg 1991); Karis 2013, "Real Shading in Unreal Engine 4" (the GGX importance sample the
+  cube prefilter draws).
 
 ### Open 2026-11-26: an instanced caster keeps the cascades unfitted, so textured-instancing-gpu.mjs fails (KB-SHADOW-INSTFIT1, shadows)
 
@@ -21253,8 +21293,8 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
   core"; core 22,207 B -> 22,225 B, core + stage 24,808 B -> 24,825 B) and the shared `ggxD` / new `ggxDOf(n, h)` in
   packages/shared/light-terms.js, used by animation (VAT), clustered, gltf/pbr, lod imposters, materials (base, coat,
   eye, skin), post material decals, terrain, voxel and the WebGL2 preview. After the fix the worst error is 6e-5. Where the half vector faces away (dot(n, h) < 0, nh clamped to 0) the identity holds for the raw dot only: |n x h|^2 fell below 1 and reached 0 as h turned to -n, so D was unbounded on back-facing shading normals lit from the front (found by terrain's crest check on the WebGL2 layer, "weightedUncapped: 9 specks uncapped"); the term is max(|n x h|^2, step(nh, 0)), so D is a2 / pi there as before (+10 B, core 22,225 B).
-- **Still open (KB6016d):** the scalar `ggxDenominator(nh)` callers (environment prefilter and probes, water glints,
-  voxel-pathtracer) and materials' `ggxNamed` lobes keep the old form; they need the vectors passed in.
+- **Fixed since (KB6016d, 2026-11-26, above):** the scalar `ggxDenominator(nh)` callers (environment prefilter and probes, water glints,
+  voxel-pathtracer) and materials' `ggxNamed` lobes, and water's ship lamps and FFT ocean, kept the old form; they now pass the vectors.
 - **Regression:** packages/core/tests/ggx-precision.browser.mjs (core's own D statements on the GPU against f64, bound
   0.2 %, in core's test:gpu, native and WebGL2 layer, back-facing half vectors included); packages/core/tests/smith.test.js and
   tests/smith-shaders.test.js (D = a2 / pi where dot(n, h) < 0, for core and the shared ggxD, ggxDFloat, ggxDOf).
@@ -25752,7 +25792,7 @@ The root tile solver accepted finite weights such as 1e308 even when weight time
 
 The WFC browser check closed the browser and Vite server independently, which could wait on retained connections without the shared shutdown budget. It now uses closeAll from startup through failure cleanup, matching the other browser suites. Regression: tests/browser-teardown.test.js; the existing bounded-close tests cover stalled shutdowns. The tracked-script gate exposed this after the first feature commit; new files are staged before subsequent landing checks.
 
-### Batch 160 sheen picture loss (attributed 2026-11-26: no Margo cause; acceptance of the roughness-0 part pending)
+### Batch 160 sheen picture loss (closed 2026-11-26: no Margo cause; residual accepted)
 
 Attribution (2026-11-26, gap lane A): the whole like-for-like residual is the Sample Viewer's base darkening under
 the sheen, not a Margo term. Ablated one term at a time on `run.mjs --case=sheen --like-for-like` (218,842):
@@ -25779,8 +25819,12 @@ So the encoded lookup (accepted under KB3297c) holds rows 0.33 to 1 (141,533, 64
 near 0.25 to 0.3 the roughness 0 row (66,004, 30.2 %). The KB3297c/KB3297d text said the encoded lookup darkens the
 base everywhere at roughness 0; measured, the encode alone darkens nothing there (66,003 either way), the floor does.
 A floor on E alone darkens a base whose sheen lobe is invisible at roughness 0 (both pictures draw it black), so
-light is removed that no lobe reflects; Margo keeps the spec's E with no floor. No Margo shader changed. Whether the
-roughness 0 part joins the accepted difference is Scott's call; until then this row stays open.
+light is removed that no lobe reflects; Margo keeps the spec's E with no floor. No Margo shader changed.
+
+- **Scott's ruling (2026-11-26):** "Yes, accept it". The roughness 0 part (the viewer floors its lookup roughness near
+  0.25, where the spec's E is 0) joins the encoded lookup (KB3297c) as an accepted difference, recorded in
+  docs/limits.md "Sample Viewer like for like" and docs/whitepaper/claims.md. The like-for-like budget stays the
+  measured 218,842; nothing is re-pinned.
 
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,

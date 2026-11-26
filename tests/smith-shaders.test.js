@@ -156,10 +156,10 @@ test('no package source writes the cancelling GGX denominator nh^2 (a2 - 1) + 1'
     'packages/water/src/ships.ts',
     'packages/water/src/fft-shaders.ts',
   ])
-    assert.match(read(file), /ggxDenominatorOf\('[^']+', '[^']+'/, `${file} passes n and h`);
+    assert.match(read(file), /ggxDenominatorOf\(\s*'[^']+',\s*'[^']+'/, `${file} passes n and h`);
   assert.match(
     read('packages/materials/src/lobe-shader.ts'),
-    /ggxNamed\('materialA2', 'materialNH', 'materialNV', 'materialNL', 's\.n', 'materialH'\)/,
+    /ggxNamed\(\s*'materialA2',\s*'materialNH',\s*'materialNV',\s*'materialNL',\s*'s\.n',\s*'materialH',?\s*\)/,
   );
 });
 

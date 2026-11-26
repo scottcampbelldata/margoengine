@@ -5556,7 +5556,7 @@ logs differ in the uniform buffer's size, the length of its frame writes (880 B:
 864 B before it) and the shader module text. packages/water/test/sea-agreement.browser.mjs shows the drawn sea's change.
 Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
-Proof capture (2026-11-26, KB6016d): the water-ssr --current proof advances to 6f8fe1b74b, whose sun glint, ship
+Proof capture (2026-11-26, KB6016d): the water-ssr --current proof advances to 9f9e2ba564, whose sun glint, ship
 lamps and FFT ocean glint write the GGX D denominator over n and h (|n x h|^2 + a2 nh^2, shared ggxDenominatorOf) in
 place of nh^2 (a2 - 1) + 1. The call logs differ only in the text of 12 shader modules (4 in each of the three
 stories); every other call and argument is the same. tests/smith-shaders.test.js holds the precision claim.
