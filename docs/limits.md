@@ -9666,7 +9666,7 @@ cells whose strain is too low. Other cells remain eligible after the topology ch
 remesher subdivides the selected tetrahedron and only the original neighbors that share its
 split faces or edges. Crack-front tracking and mixed-mode propagation remain open. Use tensile nucleation
 as the fracture rule on unskinned cells without independent springs or clusters.
-The optional entry measures 140,330 B gzip including a 96,131 B lazy native kernel.
+With local remeshing the optional entry measures 140,526 B gzip including a 96,131 B lazy native kernel.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.

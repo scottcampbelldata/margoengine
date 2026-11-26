@@ -13359,6 +13359,12 @@
       "commit": "178da11aea",
       "grew": 0,
       "reason": "SOFT-04 adds native principal-strain selection and exact tensile nucleation with inherited fracture flags, moving the soft entry from 138830 to 140330 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "be044b9c37",
+      "grew": 0,
+      "reason": "SOFT-04 adds local retriangulation of tensile nuclei and their incident neighbors, moving the soft entry from 140330 to 140526 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
