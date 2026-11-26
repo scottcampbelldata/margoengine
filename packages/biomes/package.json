@@ -58,6 +58,10 @@
       "types": "./dist/erosion.d.ts",
       "import": "./dist/erosion.js"
     },
+    "./landscape": {
+      "types": "./dist/landscape.d.ts",
+      "import": "./dist/landscape.js"
+    },
     "./valley": {
       "types": "./dist/valley.d.ts",
       "import": "./dist/valley.js"
@@ -173,6 +177,7 @@
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
+    "@margoengine/physics": "^1.0.0",
     "@margoengine/terrain": "^1.0.0",
     "@margoengine/scatter": "^1.0.0",
     "@margoengine/procedural": "^1.0.0",
@@ -180,6 +185,9 @@
   },
   "peerDependenciesMeta": {
     "@margoengine/core": {
+      "optional": true
+    },
+    "@margoengine/physics": {
       "optional": true
     },
     "@margoengine/terrain": {

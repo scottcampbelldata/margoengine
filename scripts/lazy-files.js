@@ -15,6 +15,22 @@ const core = [/^@margoengine\/core(\/|$)/];
 export const LAZY_FILES = [
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/landscape-kernel.wasm',
+    label: 'landscape-kernel.wasm',
+    kind: 'Rust SIMD landscape evolution',
+    measure: 'file',
+    when: 'LandscapeEvolution.load() from the optional /landscape entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/landscape-kernel-shared.wasm',
+    label: 'landscape-kernel-shared.wasm',
+    kind: 'Rust SIMD landscape evolution, shared world memory',
+    measure: 'file',
+    when: 'LandscapeEvolution.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/falling-kernel.wasm',
     label: 'falling-kernel.wasm',
     kind: 'Rust SIMD plate and grain dynamics',

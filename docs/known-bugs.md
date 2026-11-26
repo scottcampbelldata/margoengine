@@ -16112,3 +16112,11 @@ CITY-TO-STREET-2 still needs vehicle and rail actors. Run
 `node --test packages/physics/tests/coupling/pedestrians.test.js` after building Physics and NavMesh
 to reproduce the measured contact impulses, doorway release and real route grade.
 See LIFE-05 in [Framework requests](physics-work-queue.md#framework-requests).
+
+## Fixed: geological erosion lacked physical time and multidirectional routing (PA-39)
+
+Fractional passes through the original biome erosion tool routed each cell to one receiver and did not describe
+physical rainfall, duration, uplift or grain mobility. The physical path is `LandscapeEvolution` and the
+`evolveRelief` biome adapter. Reproduce the divergent catchment and two-grain threshold fixtures with
+`node --test packages/physics/tests/coupling/landscape.test.js` after building Physics. The legacy static relief
+operation still reproduces existing authored terrain.

@@ -5507,3 +5507,12 @@ Proof in [the coupling fixtures](../../packages/physics/tests/coupling/falling.t
 [the hail browser fixture](../../packages/weather/tests/browser-check.mjs). Model scope is in
 [engine limits](../limits.md#falling-plates-winged-seeds-and-hail-aero-05) and the
 [clean-room record](../clean-room.md#falling-plates-winged-seeds-and-hail-aero-05).
+
+### Landscape runoff, incision and material balance (HYDRO-04)
+
+A divergent unit catchment divides runoff over multiple receivers and recovers the full rainfall at its outlet.
+The linear-slope incision step and hillslope face exchange match their closed forms. Separate grains deposit or
+leave according to their Shields threshold and travel length. The evolved bed changes rigid heightfield samples,
+and its world replays bit-for-bit across 24, 30 and 60 fps in both memory modes.
+Proof in [the landscape coupling tests](../../packages/physics/tests/coupling/landscape.test.js) and
+[the relief snapshot test](../../packages/biomes/tests/landscape.test.js).

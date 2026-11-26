@@ -10043,3 +10043,15 @@ encounter, the normal and tangential contact impulses against closed forms, equa
 loads for unequal masses, rotational clearance, wall loads, queue release, input ports and
 replay across frame rates and memory variants. The NavMesh regressions check weight in the
 existing ORCA planner and preserve covered-target and wall guidance behavior.
+
+### Geological landscape evidence (HYDRO-04)
+
+The optional landscape kernel uses the world clock and occupies native module slot 12 in plain and shared memory.
+It reads the canonical terrain height and held forcing ports, routes catchment discharge through a downhill graph,
+solves the linear-slope stream-power equation downstream first and transfers grain volumes between vertices and
+outlets. The same triangle areas define bed change, rain capture, and the sediment and uplift ledger. Optional
+HYDRO-03 shear and root pressure alter mechanical thresholds. The bed applies each change on the following tick.
+
+The fixtures compare the numerical step against the closed-form incision and pair-diffusion solutions, measure
+sediment sorting and conservation, replay both memory modes, and read the updated heightfield of a live rigid collider.
+The biome adapter samples the same bed triangles when preparing a geological snapshot for terrain rendering.

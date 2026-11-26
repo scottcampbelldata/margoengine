@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -63,6 +63,7 @@ await build({
         hydro: resolve(root, 'src/hydro/index.ts'),
         runoff: resolve(root, 'src/runoff/index.ts'),
         sediment: resolve(root, 'src/sediment/index.ts'),
+        landscape: resolve(root, 'src/landscape/index.ts'),
         vegetation: resolve(root, 'src/vegetation.ts'),
         ice: resolve(root, 'src/ice/index.ts'),
         underwater: resolve(root, 'src/underwater/index.ts'),
@@ -95,6 +96,11 @@ await copyFile(resolve(root, 'src/sediment/sediment-kernel.wasm'), resolve(dist,
 await copyFile(resolve(root, 'src/sediment/sediment-kernel-shared.wasm'), resolve(dist, 'sediment-kernel-shared.wasm'));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel.wasm'), resolve(dist, 'orbit-kernel.wasm'));
 await copyFile(resolve(root, 'src/orbit/orbit-kernel-shared.wasm'), resolve(dist, 'orbit-kernel-shared.wasm'));
+await copyFile(resolve(root, 'src/landscape/landscape-kernel.wasm'), resolve(dist, 'landscape-kernel.wasm'));
+await copyFile(
+  resolve(root, 'src/landscape/landscape-kernel-shared.wasm'),
+  resolve(dist, 'landscape-kernel-shared.wasm'),
+);
 await copyFile(resolve(root, 'src/vegetation-kernel.wasm'), resolve(dist, 'vegetation-kernel.wasm'));
 await copyFile(resolve(root, 'src/vegetation-kernel-shared.wasm'), resolve(dist, 'vegetation-kernel-shared.wasm'));
 

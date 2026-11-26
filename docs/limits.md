@@ -9099,3 +9099,21 @@ per tick stays inside half the shortest footprint radius. Multi-floor surfaces u
 walkable route guidance with a height sampler. Injury, fall and ragdoll transitions use external
 consumers of the force/pose ports. Doorway and terrain fixtures use simulated actors and route geometry.
 The optional JavaScript entry is 4,590 B gzip. The plain and shared Wasm assets are 12,041 B and 12,129 B raw.
+
+### Landscape evolution (HYDRO-04)
+
+`LandscapeEvolution` uses one rectangular TerrainBed, a linear stream-power slope exponent and a fixed downhill
+graph within each step. Closed depressions trap incoming sediment. Route floodwater, lake overtopping and rapid
+flows with the shallow-water solver. Specified open edges supply fixed elevations and accept downhill export.
+
+The solver can estimate equilibrium Manning depth or consume a time-averaged shear field. Its independently
+transported size classes share one bed porosity. The model tracks changing loose material and parent fractions,
+with no hiding or exposure correction between grain classes. Thermal erosional transfer uses a parameterised
+repose slope and coefficient. Weathering rates and rooted cohesion vary by terrain and must be supplied for
+site predictions. The loose sediment field excludes material brought by external bed writers unless it is
+initially supplied.
+
+Bed changes are accrued in f64 and become TerrainBed elevations on the following tick. The geometry used to
+choose downhill directions comes from the shared f32 bed field. The biomes snapshot rounds the current terrain
+to millimetres and keeps the relief's authored river lines. Use fixed boundary elevations if a snapshot must join
+unchanged terrain outside the simulated rectangle.

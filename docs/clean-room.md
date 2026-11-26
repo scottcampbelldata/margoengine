@@ -12840,3 +12840,50 @@ speed by 1+μ·dt·κ·δ′, where δ′ is the remaining compression after sol
 A pair receives opposite impulses. The Rust kernel uses world-owned row storage, sorted neighbor
 cells, normalized elliptical projection and SIMD products, floors and square roots. Shape contact
 uses the two support radii along the line separating body centres. No companion code was used.
+
+### Landscape evolution (HYDRO-04)
+
+- Jean Braun and Sean D. Willett, [A very efficient O(n), implicit and parallel method to solve the stream power equation governing fluvial incision and landscape evolution](https://doi.org/10.1016/j.geomorph.2012.10.008), 2013,
+  use a backward difference in time and solve downstream elevations first. Guillaume Cordonnier, Jean Braun,
+  Marie-Paule Cani, Bedřich Beneš, Éric Galin, Adrien Peytavie and Eric Guérin, [Large Scale Terrain Generation from Tectonic Uplift and Fluvial Erosion](https://cs.purdue.edu/homes/bbenes/papers/Cordonier16CGF.pdf), 2016, equation 2,
+  show the closed-form update with uplift for the linear slope case. With weights \(w_{ij}\) over receivers and
+  physical edge lengths \(d_{ij}\), the mesh uses \(a_{ij}=\Delta t K Q_i^m w_{ij}/d_{ij}\) and solves
+  \(h_i'=(h_i+\Delta t U_i+\sum a_{ij}h_j')/(1+\sum a_{ij})\). Shields thresholds and the sediment balance are
+  applied as separate physical constraints.
+- Thomas G. Freeman, [Calculating catchment area with divergent flow based on a regular grid](https://doi.org/10.1016/0098-3004(91)90048-I), 1991,
+  apportions discharge to descending neighbours by the 1.1 power of the slope. Shashank Kumar Anand, Milad
+  Hooshyar and Amilcare Porporato, [Linear layout of multiple flow-direction networks for landscape-evolution simulations](https://arxiv.org/abs/1909.03176),
+  2020, section 4, give the downstream-first ordering by receiver count for a directed acyclic terrain graph.
+  Hugo Schott, Axel Paris, Lucie Fournier, Eric Guérin and Éric Galin, [Large-scale Terrain Authoring through Interactive Erosion Simulation](https://doi.org/10.1145/3592787),
+  2023, section 4.1, add local rainfall before passing runoff down the slope. Their steepest receiver and parallel
+  approximation were compared with the exact multidirectional graph. The graph here distributes the actual local
+  rainfall in m³/s using the bed's triangle support areas. It processes donors before receivers for routing.
+- Philippe Davy and Dimitri Lague, [Fluvial erosion/transport equation of landscape evolution models revisited](https://doi.org/10.1029/2008JF001146),
+  2009, equations 3–8, balance erosion and deposition with a travel length. A constant length within a reach gives
+  exponential survival over that reach. Miguel Wong and Gary Parker, [Reanalysis and Correction of Bed-Load Relation of Meyer-Peter and Müller Using Their Own Database](https://doi.org/10.1061/(ASCE)0733-9429(2006)132:11(1159)),
+  2006, give dimensionless transport \(3.97(\theta-\theta_c)_+^{3/2}\) with \(\theta_c=0.0495\). This caps
+  the volume sent downstream per class, from local Shields stress, wetted width and geological time. Incoming
+  material above capacity deposits in the loose layer. The layer keeps its transported fractions on subsequent steps.
+- Guillaume Cordonnier, Éric Galin, James Gain, Bedřich Beneš, Eric Guérin, Adrien Peytavie and Marie-Paule Cani,
+  [Authoring Landscapes by Combining Ecosystem and Terrain Erosion Simulation](https://people.cs.uct.ac.za/~jgain/wp-content/papercite-data/pdf/cordonnier2017.pdf),
+  2017, separate vegetation's root stabilisation and climate-driven weathering from runoff. Bedřich Beneš and Rafael
+  Forsbach, [Layered Data Representation for Visual Simulation of Terrain Erosion](https://www.computer.org/csdl/proceedings-article/sccg/2001/12150080/12OmNxvwoYe),
+  2001, transfer loose material above a repose slope. Joshua Roering, James Kirchner and William Dietrich,
+  [Evidence for nonlinear, diffusive sediment transport on hillslopes and implications for landscape morphology](https://doi.org/10.1029/1998WR900090),
+  1999, equations 1–2, give the small-slope diffusion law and its conservation equation. This solver combines
+  linear creep and a second flux proportional to the excess above repose. For each face, its two elevation values
+  have a conserved weighted mean and an exactly solvable exponential height difference. If the difference crosses
+  repose, the rest of the step continues with creep alone. The symmetric face sweeps compose those fluxes.
+- Tien H. Wu, William P. McKinnell III and Douglas N. Swanston, [Strength of tree roots and landslides on Prince of Wales Island, Alaska](https://doi.org/10.1139/t79-003),
+  1979, treat roots as an added shear strength. The solver adds supplied root pressure to the mechanical thresholds.
+  For rooted loose soil the small-slope overburden closure increases the repose slope by root stress divided by
+  the soil's weight per support area.
+- Xing Mei, Philippe Decaudin and Bao-Gang Hu, [Fast Hydraulic Erosion Simulation and Visualization on GPU](https://www-evasion.imag.fr/Publications/2007/MDH07/FastErosion_PG07.pdf),
+  2007, and Ondřej Šťava, Bedřich Beneš, Matthew Brisbin and Jaroslav Křivánek, [Interactive Terrain Modeling Using Hydraulic Erosion](https://dcgi.fel.cvut.cz/publications/2008/stava-sca-erosion/),
+  2008, evolve a resolved water column and use its velocity to transfer bed material. Here discharge is a
+  catchment average and the world can receive time-averaged stress from HYDRO-03. The hydraulic event path
+  remains the shallow-water and sediment solvers.
+
+The Rust and TypeScript implementation follows the equations and this repository's terrain and registry contracts.
+The coupling tests cover the implicit result, exact face diffusion, rainfall and sediment balances, the linked
+sediment shear field, the rigid heightfield and deterministic playback.

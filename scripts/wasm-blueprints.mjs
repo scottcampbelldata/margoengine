@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'landscape-kernel',
+    crate: 'packages/physics/landscape-kernel',
+    blueprint: 'packages/physics/src/landscape/landscape-kernel.wasm',
+    script: 'packages/physics/scripts/build-landscape-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'landscape-kernel-shared',
+    crate: 'packages/physics/landscape-kernel',
+    blueprint: 'packages/physics/src/landscape/landscape-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-landscape-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'sediment-kernel',
     crate: 'packages/physics/sediment-kernel',
     blueprint: 'packages/physics/src/sediment/sediment-kernel.wasm',

@@ -124,6 +124,10 @@
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"
     },
+    "./landscape": {
+      "types": "./dist/landscape/index.d.ts",
+      "import": "./dist/landscape.js"
+    },
     "./sediment": {
       "types": "./dist/sediment/index.d.ts",
       "import": "./dist/sediment.js"

@@ -2754,3 +2754,46 @@ f64 row per walker. Readers can use `PEDESTRIAN_KINEMATICS_FIELD` for motion and
 stride distance, and `PEDESTRIAN_CONTACT_FIELD` for [fx, fz, normalLoad, density,
 anticipatoryFx, anticipatoryFz]. All four use `PEDESTRIAN_LAYOUT`. Use different `fields` names for
 multiple groups within one world. The same kernel runs in plain and shared world memory.
+
+## Landscape evolution
+
+`@margoengine/physics/landscape` routes rainfall in multiple directions, cuts streams with an implicit
+stream-power step, moves size-classified sediment and redistributes downhill soil. It publishes elevation
+changes to the same TerrainBed used by water, landslides and rigid colliders. The native solver loads on
+demand and supports plain and shared world memory.
+
+```js
+import { TerrainBed } from '@margoengine/physics/earth';
+import { LandscapeEvolution } from '@margoengine/physics/landscape';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const grid = { columns: 10, rows: 5, width: 100, depth: 50, centre: [0, 0] };
+const bed = new TerrainBed();
+const landscape = await LandscapeEvolution.load();
+world.add(bed, { ...grid, elevations: (x, z) => 8 - 0.12 * x + 0.006 * z * z });
+world.add(landscape, {
+  grid,
+  secondsPerSecond: 31_557_600 * 60,
+  uplift: 0.0004 / 31_557_600,
+  outlets: { maxX: true },
+  grains: [{ diameter: 0.0003, fraction: 3 }, { diameter: 0.004, fraction: 1 }],
+});
+world.advance(60);
+console.log(landscape.read(5, 2).discharge, landscape.budget.exported, bed.elevations()[0]);
+```
+
+The default time scale is real-time. Rainfall defaults to one metre per Julian year, uplift to zero,
+erodibility to `1e-11` with discharge exponent 0.5 and a linear slope law. Use SI units even when accelerating
+geological time. The Manning roughness is 0.03, fluid density 1,000 kg/m³, bed porosity 0.4, mobile soil depth
+0.1 m and default grain diameter 0.0003 m. Unspecified grains have density 2,650 kg/m³, critical Shields number
+0.0495 and zero extra travel length. Linear and thermal diffusivities default to `1e-8` and `1e-7` m²/s.
+Thermal transfer starts above a slope of tan(30°). The rock stress threshold is zero unless supplied.
+
+Outlets default to closed. An open edge keeps its elevation and exports arriving water and sediment. Provide
+the same `floor` to the landscape and `bedrock` to TerrainBed if there is a minimum elevation. Optional
+`rainField`, `shearField` and `rootCohesionField` accept layout-1 cell or vertex scalars in m/s, Pa and Pa.
+Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic forcing. `load` also accepts
+`id` (default `landscape`) and `signal`. Discharge, gross incision and sediment flux are layout-1 f64 vertex
+fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
+calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.

@@ -143,6 +143,34 @@ const plain = erode(grid);
 console.log(young.outflow, worn.outflow, plain.outflow);
 ```
 
+## Evolve a relief through physical time
+
+`@margoengine/biomes/landscape` samples an existing relief into the physics TerrainBed. It returns the world
+timeline, the landscape solver and a snapshot function. The snapshot is an ordinary `Relief` in millimetres that
+can supply the height function of a biome map or terrain build. Outside the simulated rectangle it samples the
+original relief.
+
+```js
+import { evolveRelief } from '@margoengine/biomes/landscape';
+import { createRelief } from '@margoengine/biomes/relief';
+
+const relief = createRelief({ seed: 7, size: [512, 512] });
+const mountain = await evolveRelief(relief, {
+  step: 32,
+  secondsPerSecond: 31_557_600 * 300,
+  uplift: 0.0004 / 31_557_600,
+  outlets: { maxX: true },
+});
+mountain.world.advance(60);
+const evolved = mountain.snapshotRelief();
+console.log(evolved.height(256_000, 256_000), mountain.landscape.budget.exported);
+```
+
+`step` defaults to 128 m and `frameRate` to 60/1. All other physical defaults come from
+[`LandscapeEvolution`](../physics/README.md#landscape-evolution). The optional `forcing` options supply
+registry fields and an abort signal. Take a fresh snapshot when preparing a new geological time slice.
+Snapshots use the existing bed triangles and preserve the relief's authored river lines and settings.
+
 ## Anchored terrain and horizon
 
 `BiomeView` anchors both terrain and horizon rings at the starting camera's world XZ. The surface keeps its
