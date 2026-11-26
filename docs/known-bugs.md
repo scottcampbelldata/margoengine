@@ -16937,7 +16937,11 @@ original 0.71–1.14 trial span and measurement allowance 0.149. Their thin jets
 measured liquid–air tension. The discrete wall correction restores an exact motionless initial lattice.
 Both pressure and physical wall viscosity are included. The original release diaphragm still needs an
 explicit model for a like-for-like comparison. The parcel contract conserves volume and all momentum components against a closed fixture.
-The SEA-04 and HYDRO-01 production endpoints remain open.
+The live HYDRO-01 test also settles whole-particle transfers against a wet periodic cell. Run
+`node --test packages/physics/tests/coupling/dfsph-hydro.test.js` for same-tick transfer,
+capacity refusal, the last wet depth and snapshot replay. General HYDRO-01 needs a reserve/accept
+boundary when its wet/dry limiter can clip signed volume or horizontal momentum. SEA-04 still needs
+a paired volume and momentum receipt.
 
 At 18 rows, `--refined` passes both intervals in the accurate profile. Add `--interactive` for the same mesh
 using the interactive iteration limits, which reads 0.328 and 0.569 against the two original measurement

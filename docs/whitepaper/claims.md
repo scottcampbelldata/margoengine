@@ -5880,6 +5880,14 @@ edges and corners. The continuous wall-volume default raised corner density by 7
 motionless film at 0.354 m/s in one step. The matching lattice complement gives zero velocity and
 the same kernel density at the wall and in the interior.
 
+### FLUID-01 wet shallow-water exchange
+
+A live closed wet HYDRO-01 cell and the particle region preserve 0.625 m³ and each momentum component
+through two-way transfers. The cell takes both horizontal components, with the vertical component held
+in a separate receipt ledger. The mixed cell velocities match momentum-weighted predictions. The
+capacity refusal, wet-depth reserve and snapshot replay are also tested.
+[Reproduce](reproduce.md#fluid-01-parcel-receipts)
+
 ### FLUID-01 implicit planar wall shear
 
 The lattice wall test evaluates an independent radial viscous weight for each exterior sample and predicts

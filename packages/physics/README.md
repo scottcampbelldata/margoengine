@@ -4658,6 +4658,10 @@ A negative volume of the same magnitude withdraws the indicated row and returns 
 opposite momentum. Receipts use a zero volume when the requested row or capacity is unavailable.
 The other endpoint reserves each transfer and settles it once from the matching receipt. Outgoing transfers
 may change other particle row indices. Read the current particle field before requesting another batch.
+In the [wet-cell integration test](tests/coupling/dfsph-hydro.test.js), a live shallow-water solver applies
+the matching signed volume through its inflow and horizontal momentum through its forcing field on the
+same tick. Vertical momentum stays in the receipt ledger. Keep donor and receiver cells wet throughout
+that step. The shoreline case needs a receipt for what its wet/dry update accepts.
 
 ### Rail running gear and contact wire
 
