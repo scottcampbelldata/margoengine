@@ -755,14 +755,42 @@ const isPluginCloud = (v: unknown): v is PluginCloud =>
   isObject(v.material) &&
   typeof v.material.size === 'number' &&
   v.material.color instanceof Float32Array;
+/** A batch of a `LineBatches` plugin: packed segments of 32 bytes, x, y, z and sRGB rgba8 at each end. */
+interface PluginBatch {
+  visible?: boolean;
+  matrix: Float32Array;
+  attachedMesh: Mesh | null;
+  data: ArrayBuffer;
+  count: number;
+  color: Float32Array;
+  opacity: number;
+  width: number;
+  worldUnits: boolean;
+}
+const isPluginBatch = (v: unknown): v is PluginBatch =>
+  isObject(v) &&
+  v.data instanceof ArrayBuffer &&
+  v.matrix instanceof Float32Array &&
+  v.color instanceof Float32Array &&
+  typeof v.count === 'number' &&
+  v.data.byteLength >= v.count * 32 &&
+  typeof v.width === 'number';
 /** sRGB-encoded 0..1 to linear (IEC 61966-2-1:1999). */
 const srgbToLinear = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 
-/** The lines of a `Lines` plugin (its `lines`) and the clouds of a `PointsPlugin` (its `pointClouds`). */
+/**
+ * The lines of a `Lines` plugin (its `lines`), the batches of a `LineBatches` plugin (its `batches`) and the clouds of
+ * a `PointsPlugin` (its `pointClouds`). A `DebugLines` plugin's batches are one frame's debug drawing, so none is read.
+ */
 function pluginItems(plugin: unknown): PluginItem[] {
   if (!isObject(plugin)) return [];
   const out: PluginItem[] = [],
-    { lines, pointClouds } = plugin as { lines?: unknown; pointClouds?: unknown };
+    { lines, batches, pointClouds, drawLine } = plugin as {
+      lines?: unknown;
+      batches?: unknown;
+      pointClouds?: unknown;
+      drawLine?: unknown;
+    };
   if (lines instanceof Set)
     for (const line of lines)
       if (isPluginLine(line))
@@ -774,6 +802,18 @@ function pluginItems(plugin: unknown): PluginItem[] {
           topology: 'lines',
           bytes: line.count * 40,
           part: () => linePart(line),
+        });
+  if (batches instanceof Set && typeof drawLine !== 'function')
+    for (const batch of batches)
+      if (isPluginBatch(batch))
+        out.push({
+          object: batch,
+          visible: batch.visible !== false,
+          matrix: batch.matrix,
+          mesh: batch.attachedMesh ?? null,
+          topology: 'lines',
+          bytes: batch.count * 64,
+          part: () => batchPart(batch),
         });
   if (pointClouds instanceof Set)
     for (const cloud of pointClouds)
@@ -835,6 +875,39 @@ function linePart(line: PluginLine): Part | null {
     geometry,
     material: pluginMaterial(m.color, m.opacity, true, translucent, { value: m.width, units, kind: 'lines' }),
     extras: { lineWidth: m.width, lineWidthUnits: units },
+  };
+}
+
+/** A batch's segments as a line list, its colours linear RGBA and left out when all are white. */
+function batchPart(batch: PluginBatch): Part | null {
+  const n = batch.count * 2;
+  if (!n) return null;
+  const floats = new Float32Array(batch.data, 0, n * 4),
+    bytes = new Uint8Array(batch.data, 0, n * 16),
+    positions = new Float32Array(n * 3),
+    colors = new Float32Array(n * 4);
+  let plain = true,
+    translucent = false;
+  for (let i = 0; i < n; i++) {
+    for (let k = 0; k < 3; k++) positions[i * 3 + k] = floats[i * 4 + k];
+    for (let k = 0; k < 4; k++) {
+      const byte = bytes[i * 16 + 12 + k];
+      colors[i * 4 + k] = k < 3 ? srgbToLinear(byte / 255) : byte / 255;
+      if (byte < 255) plain = false;
+      if (k === 3 && byte < 255) translucent = true;
+    }
+  }
+  const data: GeometryData = { positions, indices: Uint32Array.from({ length: n }, (_, i) => i) };
+  if (!plain) data.colors = colors;
+  const units = batch.worldUnits ? 'world' : 'pixels';
+  return {
+    geometry: normalizeGeometry(data, 'lines'),
+    material: pluginMaterial(batch.color, batch.opacity, true, translucent, {
+      value: batch.width,
+      units,
+      kind: 'lines',
+    }),
+    extras: { lineWidth: batch.width, lineWidthUnits: units },
   };
 }
 
@@ -1751,8 +1824,9 @@ export function collect(
         fail('root must be a live mesh of this engine');
       roots = [options.root];
     }
-    // @margoengine/lines and @margoengine/points draw through plugins, not meshes: their lines and clouds are read by
-    // public fields, without importing either package, and go with the mesh they follow or as nodes of their own.
+    // @margoengine/lines and @margoengine/points draw through plugins, not meshes: their lines, line batches and clouds
+    // are read by public fields, without importing either package, and go with the mesh they follow or as nodes of their
+    // own.
     const plugged = new Map<Mesh | null, PluginItem[]>();
     for (const plugin of (source as { plugins?: ReadonlyMap<string, unknown> }).plugins?.values() ?? [])
       for (const item of pluginItems(plugin)) {

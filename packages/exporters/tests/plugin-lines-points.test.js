@@ -9,6 +9,8 @@ import { Engine, Geometry, PbrMaterial } from '@margoengine/core';
 import { Lines, Line } from '@margoengine/lines';
 import { Stroke } from '@margoengine/lines/stroke';
 import { PointsPlugin, PointCloud } from '@margoengine/points';
+import { LineBatches, LineBatch } from '@margoengine/lines/batch';
+import { DebugLines } from '@margoengine/lines/debug';
 import { parseGLTFAsync } from '@margoengine/gltf/pbr';
 import { GLTFAsset } from '@margoengine/gltf/asset';
 import { parseOBJ, readZipDirectory, readZipEntry } from '@margoengine/loaders';
@@ -207,4 +209,54 @@ test('OBJ writes them as l and p elements; STL warns once for the mesh and once 
       [null, cloud],
     ],
   );
+});
+
+test('LineBatches batches are written as line lists with colours and widths; debug lines are not', async () => {
+  const { engine, box } = await scene(),
+    batches = LineBatches.attach(engine),
+    debug = DebugLines.attach(engine);
+  debug.drawLine([0, 0, 0], [9, 9, 9], { width: 7 });
+  // Two separate segments, a colour per point at 8 bits sRGB, an alpha below 1, world widths and a matrix.
+  const wire = batches.add(
+    new LineBatch({
+      positions: [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0],
+      colors: [1, 0, 0, 1, 1, 0, 0, 1, 0, 0.25, 0, 0.5, 0, 0, 1, 1],
+      color: [1, 0.5, 1],
+      opacity: 0.75,
+      width: 0.02,
+      worldUnits: true,
+      matrix: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 3, 1]),
+    }),
+  );
+  // White points take no COLOR_0; attached to the box, the batch goes into its mesh.
+  batches.add(new LineBatch({ positions: [0, 0, 1, 1, 0, 1], width: 5, mesh: box }));
+  const warnings = [],
+    glb = exportGLB(engine, { onWarning: (w) => warnings.push(w) }),
+    report = await validate(glb);
+  assert.deepEqual(warnings, []);
+  assert.equal(report.errors, 0, JSON.stringify(report.messages));
+  assert.equal(report.warnings, 0, JSON.stringify(report.messages));
+  const { json, bin } = readGLB(glb),
+    asset = new GLTFAsset(json, [bin]),
+    all = primitivesOf(json);
+  assert.ok(!all.some((p) => p.extras?.lineWidth === 7), 'a debug queue is no part of the scene');
+  const attached = all.find((p) => p.extras?.lineWidth === 5);
+  assert.equal(json.meshes[attached.mesh].primitives[0].mode, 4, 'after the box triangle');
+  assert.equal(attached.attributes.COLOR_0, undefined);
+  const part = all.find((p) => p.extras?.lineWidth === 0.02);
+  assert.equal(part.mode, 1);
+  assert.deepEqual(part.extras, { lineWidth: 0.02, lineWidthUnits: 'world' });
+  assert.deepEqual(Array.from(asset.accessor(part.indices)), [0, 1, 2, 3]);
+  assert.deepEqual(Array.from(asset.accessor(part.attributes.POSITION)), [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]);
+  // The stored bytes are sRGB of the linear input; decoded they are within a byte step of it.
+  const colors = Array.from(asset.accessor(part.attributes.COLOR_0)),
+    want = [1, 0, 0, 1, 1, 0, 0, 1, 0, 0.25, 0, 0.5, 0, 0, 1, 1];
+  colors.forEach((v, i) => assert.ok(Math.abs(v - want[i]) < 0.005, `colour ${i}: ${v} vs ${want[i]}`));
+  assert.equal(colors[11], Math.fround(128 / 255));
+  const material = json.materials[part.material];
+  assert.equal(material.alphaMode, 'BLEND');
+  assert.deepEqual(material.pbrMetallicRoughness.baseColorFactor, [1, 0.5, 1, 0.75]);
+  assert.deepEqual(json.nodes.find((n) => n.mesh === part.mesh).translation, [0, 0, 3]);
+  wire.visible = false;
+  assert.ok(!primitivesOf(readGLB(exportGLB(engine)).json).some((p) => p.extras?.lineWidth === 0.02));
 });

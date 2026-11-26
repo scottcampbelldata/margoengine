@@ -128,9 +128,9 @@ const stl = exportSTL(engine, {onWarning: (warning) => console.log(warning.code,
 
 ### Lines and point clouds of `@margoengine/lines` and `@margoengine/points`
 
-Every scene writer above also exports the lines of a `Lines` plugin and the clouds of a `PointsPlugin` used on the
-engine. It reads them through `engine.plugins` by their public fields (`lines`, `pointClouds`), so exporters imports
-neither package and adds nothing to a page that does not use them. A line or cloud that follows a mesh (`mesh: box`,
+Every scene writer above also exports the lines of a `Lines` plugin, the batches of a `LineBatches` plugin and the
+clouds of a `PointsPlugin` used on the engine. It reads them through `engine.plugins` by their public fields (`lines`,
+`batches`, `pointClouds`), so exporters imports neither package and adds nothing to a page that does not use them. A line or cloud that follows a mesh (`mesh: box`,
 `cloud.attach(box)`) goes into that mesh after its triangles and is left out with it when hidden; one that follows
 none is a node of its own at its `matrix` (whole-scene exports only, not a `root` export). Hidden ones are left out
 unless `onlyVisible: false`.
@@ -138,28 +138,33 @@ unless `onlyVisible: false`.
 | Written | glTF | USD |
 | --- | --- | --- |
 | a line | its centre polyline as LINES (a strip's run, a loop closed), unlit | linear `BasisCurves` |
+| a `LineBatch` | its segments as LINES, unlit; vertex colours (stored at 8 bits sRGB) only when one is not white | linear `BasisCurves` |
 | a cloud | its finite points as POINTS, unlit unless `shading: 'sphere'`, sRGB colours decoded to linear | `Points` |
 | line width, point diameter | primitive `extras`: `lineWidth` and `lineWidthUnits`, `pointSize` and `pointSizeUnits` (`'pixels'` or `'world'`) | world units as `widths`; pixels keep `lineWidth` (0.01) |
 | a `Stroke`'s `widths`, a cloud's `sizes` | `_WIDTH`, a float per vertex multiplying the width | per-vertex `widths` |
 
 glTF gives a point or line no size and recommends 1 px (glTF 2.0 section 3.9.7), and no Khronos extension holds one,
 so another viewer draws them 1 px wide; Godot 4.7.2 keeps the POINTS and LINES surfaces unshaded with `point_size` 1.
-Dashes, joins, caps, point shapes and textures are not written. STL, 3MF and Roblox call `onWarning` once for a
+Dashes, joins, caps, point shapes, textures and a batch's `onTop` are not written. A `DebugLines` queue is one frame's
+debug drawing and is never written. STL, 3MF and Roblox call `onWarning` once for a
 mesh's items and once for each free one, with `node: null` and `item` set to the line or cloud.
 
 ```ts
 import {Engine} from 'margoengine/core';
 import {Lines, Line} from 'margoengine/lines';
+import {LineBatches, LineBatch} from 'margoengine/lines/batch';
 import {PointsPlugin, PointCloud} from 'margoengine/points';
 import {exportGLB} from 'margoengine/exporters';
 
 const engine = await Engine.create(document.querySelector<HTMLCanvasElement>('canvas')!);
 const lines = Lines.attach(engine);
 lines.add(new Line({positions: [0, 0, 0, 1, 0, 0, 1, 1, 0], width: 4, color: '#ff6600'}));
+const batches = LineBatches.attach(engine);
+batches.add(new LineBatch({positions: [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1], width: 2}));
 const points = new PointsPlugin();
 engine.use(points);
 points.add(new PointCloud({positions: [0, 0, 0, 0, 1, 0, 0, 0, 1], material: {size: 6}}));
-// One LINES primitive with extras {lineWidth: 4, lineWidthUnits: 'pixels'}, one POINTS with {pointSize: 6, ...}.
+// Two LINES primitives with extras {lineWidth: 4 or 2, lineWidthUnits: 'pixels'}, one POINTS with {pointSize: 6, ...}.
 const glb = exportGLB(engine);
 ```
 
@@ -1415,7 +1420,7 @@ console.log(`${file.length} bytes`);
 
 A scene of several nodes is one object whose mesh holds every part where the scene put it, each part a shell of its own, so a slicer keeps the parts together and prints their union. Slicers read each build item as an object to move and scale on its own, components included, and PrusaSlicer 2.9.7 crashes on overlapping ones; a model is one thing to them. A part drawn fifty times is stored fifty times this way. With `assembly: false` each geometry and material pair is one object and each node a build item that places it, so a part is stored once, for a plate of separate prints that do not overlap. Vertices are welded by position within a part, in the file's unit and at Float32, because a slicer needs triangles that share their edges; a triangle that leaves with no area goes. A reflection is written into the triangles, so no item carries one and nothing turns inside out.
 
-Base colours become `basematerials` and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. A material's base colour texture is written as the materials extension's `texture2d` (the image under `/3D/Textures/`, its wrap as `tilestyleu` and `tilestylev`, a nearest magnification filter as `filter`) and a `texture2dgroup` of coordinates for each corner, with the glTF texture transform applied and v turned to point up as 3MF's origin is the lower left. It needs the geometry to carry the UV set the texture names (`texCoord`); without it the mesh keeps its colours. On a mesh with a texture, the texture wins over vertex colours (a triangle holds one property group). The base colour factor is not multiplied into the image, and other maps (normal, metallic, emissive) are not written, so a textured model exports as its shape, skin and morphs applied, with its picture where the slicer or viewer reads the extension. A material without a texture keeps its flat colour. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so. A model with parts floating over the bed needs supports on, as on any slicer: with nothing on the first layer PrusaSlicer stops at "no extrusions in the first layer".
+Base colours become `basematerials` and vertex colours a `colorgroup`, corner by corner, both in sRGB with alpha when it is not 1. A material's base colour texture is written as the materials extension's `texture2d` (the image under `/3D/Textures/`, its wrap as `tilestyleu` and `tilestylev`, a nearest magnification filter as `filter`) and a `texture2dgroup` of coordinates for each corner, with the glTF texture transform applied and v turned to point up as 3MF's origin is the lower left. It needs the geometry to carry the UV set the texture names (`texCoord`); without it the mesh keeps its colours. A base colour factor or vertex colours that are not white become a `colorgroup` under the texture, multiplied with it in a `multiproperties` (materials extension section 5), so the image is stored as it is and a tinted texture keeps its tint in `parse3MFMaterials`, `create3MFMesh` and any reader of the extension. The tint's alpha is left out, as the extension takes the first layer as opaque. Other maps (normal, metallic, emissive) are not written, so a textured model exports as its shape, skin and morphs applied, with its picture where the slicer or viewer reads the extension. A material without a texture keeps its flat colour. Welding closes seams but does not repair a mesh: an open one is written as it is, and a slicer will say so. A model with parts floating over the bed needs supports on, as on any slicer: with nothing on the first layer PrusaSlicer stops at "no extrusions in the first layer".
 
 ## Collision and UV animation per engine
 
