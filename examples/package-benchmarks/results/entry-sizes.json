@@ -14130,6 +14130,10 @@
       "./viscoplastic": {
         "raw": 11755,
         "gzip": 4931
+      },
+      "./seismic": {
+        "raw": 14081,
+        "gzip": 5646
       }
     },
     "@margoengine/physics2d": {
@@ -18021,6 +18025,16 @@
       "raw": 16986,
       "gzip": 6744,
       "brotli": 6052
+    },
+    "packages/physics/dist/seismic-kernel.wasm": {
+      "raw": 2474,
+      "gzip": 1121,
+      "brotli": 985
+    },
+    "packages/physics/dist/seismic-kernel-shared.wasm": {
+      "raw": 2474,
+      "gzip": 1122,
+      "brotli": 1000
     }
   },
   "splits": {

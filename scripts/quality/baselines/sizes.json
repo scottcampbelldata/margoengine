@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20212461,
+  "total": 20218363,
   "history": [
     {
       "date": "2026-10-24",
@@ -12939,6 +12939,12 @@
       "commit": "2d9301c6e9",
       "reason": "FLUID-06 adds physics/viscoplastic at 4931 B gzip (cap 5187 B). The finite-strain APIC solver, implicit solvent and live inlet are optional and load independent stateless native assets. Core plus stage is 24820 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "32c933e9d0",
+      "grew": 1,
+      "reason": "EARTH-08 adds the optional physics/seismic entry, 5646 B gzip from zero. It publishes ground and building fields, adds rigid support loads, and lazily loads the SIMD wave kernel. General world users do not import it."
     }
   ],
   "items": {
@@ -13788,6 +13794,7 @@
     "@margoengine/physics/sea": 8001,
     "@margoengine/physics/seakeeping": 16953,
     "@margoengine/physics/sediment": 5512,
+    "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
