@@ -14922,3 +14922,21 @@ The implementation minimizes the squared separation over the interior and bounda
 two segment parameters. The corresponding XPBD contact correction distributes by barycentric
 inverse mass. The static test places a sphere completely between guide endpoints. The dynamic
 test uses the published contact reaction to close the momentum of a moving rigid sphere.
+
+### Direct strain solve for thin strands
+
+Crispin Deul, Tassilo Kugelstadt, Marcel Weiler and Jan Bender, [*Direct Position-Based Solver
+for Stiff Rods*](https://animation.rwth-aachen.de/media/papers/2018-CGF-Rods.pdf) (2018),
+equations 18–20 and section 4.2, solve the coupled XPBD strain equation and alternate the
+elastic system with contact. Margo eliminates the position and rotation updates first.
+For a simple chain the resulting weighted gradient Gram matrix is block tridiagonal.
+Its six-row Schur blocks are normalized and factored by Cholesky, with one forward solve
+and one backward substitution per Newton pass. The compliant shear and axial strains and
+rest quaternion bends are unchanged.
+
+A repeated test uses Fujita and Tohmyoh's measured 3.45 GPa modulus for a cylindrical
+30 mm fibre under its weight. The small-angle discrete bending response is the
+Euler–Bernoulli uniform-load tip deflection times `(1 − 1/n)²` for `n` equally spaced
+links with a clamped first segment and half endpoint mass. The test compares four
+independent subdivisions against this discrete result with a bound for geometric
+nonlinearity and shear. Its tip converges to the continuum solution.

@@ -119,7 +119,14 @@ export async function addStrandHorse(engine: Engine, options: StrandHorseOptions
       end: anchored[headJoint]!.position,
       radius: 0.073 * body.withers,
     });
-    world.add(solver, { ...params, strands: drafts, rate: 2, damping: params.damping ?? 5, colliders: [barrel, neck] });
+    world.add(solver, {
+      ...params,
+      strands: drafts,
+      rate: 2,
+      damping: params.damping ?? 5,
+      rodSolve: params.rodSolve ?? 'local',
+      colliders: [barrel, neck],
+    });
     const initialState = world.takeSnapshot();
     const frameToBone = chains.map((chain, g) =>
       chain.map((joint, j) =>

@@ -4844,7 +4844,9 @@ world.advance(30);
 console.log(strand.sample(0, 2).position);
 ```
 
-The default `'rod'` tier resolves stretch, shear, bend, and twist with XPBD. The `'follow'`
+The default `'rod'` tier resolves stretch, shear, bend, and twist with XPBD. Its direct
+projection solves all linked constraints together in a banded system. Set `rodSolve: 'local'`
+to select the sequential profile. The `'follow'`
 tier keeps the authored segment lengths with one dynamic follow-the-leader pass. Use it for
 dense guide sets when elastic frames and point self contact are unnecessary.
 
@@ -4852,7 +4854,8 @@ dense guide sets when elastic frames and point self contact are unnecessary.
   modulus of E / 2.6. The default projected drag width is the diameter, with a coefficient of 1.2.
   Supply measured values for a shaft, bundle, or specific fibre. Wider vanes can use a separate
   `dragWidth`.
-- The default rate is level 2 (240 Hz), with 12 rod passes, 2/s damping, 0.9 follower correction
+- The default rate is level 2 (240 Hz), with six direct rod passes or twelve sequential
+  passes, 2/s damping, 0.9 follower correction
   and a Coulomb contact coefficient of 0.25. The rod tier defaults to point self contact.
 - `wind` takes the common air field; the default is still air at 1.225 kg/m³. `bed` takes
   the common terrain surface; omitting it leaves ground contact disabled. Each `colliders`

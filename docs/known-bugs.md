@@ -16968,9 +16968,10 @@ The optional physical rig also binds the weighted VRM reference ponytail. The na
 
 ### Refined thin strand bending (SOFT-03)
 
-A horizontal 30 mm cylindrical guide with an 80 μm diameter, 1,300 kg/m³ density and a
-3.45 GPa Young modulus sags about 10.55 mm in the eight-edge test at 60 constraint passes and
-240 Hz. Linear beam theory gives approximately 0.94 mm under its own weight. Explicit
-resolution of more links worsens the error, and more local projection passes reduce it.
-Simultaneous rod constraints are needed to retain the measured fibre stiffness on fine
-guides. The independently validated axial extension remains effective.
+Fixed for the default rod solve. A 30 mm fibre with an 80 μm diameter and a 3.45 GPa
+Young modulus sagged about 10.55 mm with eight guide links and 60 local constraint passes.
+The expected continuum deflection under its own weight is 0.936 mm. Direct banded
+constraint projection follows the discrete analytical deflection at 8, 16, 32 and 64 links
+within the derived small-angle error. At 64 links it gives 0.906 mm. The regression is
+`packages/physics/tests/coupling/strands.test.js`. The optional local profile remains
+sensitive to constraint count and is intended for shorter guides.

@@ -6,6 +6,8 @@ use core::arch::wasm32::{
 };
 use margoengine_physics_kernel_common::pinned::{cos, sin};
 
+mod direct;
+
 struct NoHeap;
 unsafe impl core::alloc::GlobalAlloc for NoHeap {
     unsafe fn alloc(&self, _: core::alloc::Layout) -> *mut u8 {
@@ -783,6 +785,7 @@ unsafe extern "C" fn advance_strands(
     hits: *mut Hit,
     reactions: *mut Reaction,
     reaction_count: usize,
+    direct_blocks: *mut direct::Block,
 ) -> f64 {
     let cfg = unsafe { &*config };
     let nodes = unsafe { core::slice::from_raw_parts_mut(nodes, count) };
@@ -834,6 +837,10 @@ unsafe extern "C" fn advance_strands(
     }
     let iterations = cfg.iterations as usize;
     let contacts = cfg.contact_flags as u8;
+    let blocks = unsafe {
+        core::slice::from_raw_parts_mut(direct_blocks, if contacts & 4 != 0 { count } else { 0 })
+    };
+    direct::clear(blocks);
     let mut checked = 0.0;
     if iterations == 0 {
         for root in roots {
@@ -869,6 +876,19 @@ unsafe extern "C" fn advance_strands(
             for root in roots {
                 let start = root.start as usize;
                 let end = start + root.count as usize;
+                if !blocks.is_empty() {
+                    if !direct::project(nodes, material, blocks, start, end, dt) {
+                        for (i, node) in nodes.iter_mut().enumerate() {
+                            *node = slot(scratch, i).old;
+                        }
+                        for reaction in reactions {
+                            reaction.impulse = V::ZERO;
+                            reaction.angular = V::ZERO;
+                        }
+                        return -1.0;
+                    }
+                    continue;
+                }
                 for i in start..end - 1 {
                     let (a, b) = pair(nodes, i, i + 1);
                     let ma = slot(material, i);

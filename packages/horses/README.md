@@ -337,7 +337,8 @@ console.log(horse.strandSolver.sample(0, 7).position);
 `seek(time)` replays the gait commands and native strand state together. `flickTail` drives the
 dock and the following joints respond through the solve. Supply `strands.bed` for ground contact
 and use the normal `ground` option to place the horse's hooves on that surface. The default
-strand tier is `'rod'` at 240 Hz with 5/s damping. `strands.fidelity: 'follow'` selects the
+strand tier uses sequential `'rod'` projections at 240 Hz with 5/s damping. Select
+`strands.rodSolve: 'direct'` for finely divided authored guides. `strands.fidelity: 'follow'` selects the
 inextensible model. Both use animated barrel and neck capsules.
 
 The default tail bundle uses 18 mm effective radius, 1150 kg/m³ effective density, 32 MPa Young

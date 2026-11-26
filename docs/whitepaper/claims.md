@@ -5864,8 +5864,8 @@ memories and snapshot restore.
 The optional strand solver has a Cosserat tier and an inextensible fast tier. The hanging-rod
 test compares axial extension with the exact weight and stiffness of a half-cylinder tip
 mass. The fast tier preserves authored link lengths through a wind reversal and moving roots.
-A fixed-camera 720-point proof measures a 0.4825 m tip difference from the still-air control
-and 3,107 changed pixels per backend with the same solved-state replay hash.
+A fixed-camera 720-point proof measures a 0.4884 m tip difference from the still-air control
+and 3,106 changed pixels per backend with the same solved-state replay hash.
 [Reproduce](reproduce.md#strand-guides-soft-03)
 
 ### FLUID-01 resting liquid at solid corners

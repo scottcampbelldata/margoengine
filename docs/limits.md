@@ -9872,9 +9872,14 @@ coupling rate for both solvers. Mixed contact surfaces share the point contact b
 Optional segment geometry resolves capsule intersections along each guide edge at substep
 boundaries. Self contact still uses point geometry. Swept-volume collision remains open.
 
-The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
-changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 5,373 B gzip
+The direct solve eliminates one six-by-six block per strand edge in forward and backward
+passes. The work and memory grow linearly along each open guide. It reserves 1,104 bytes
+per authored point for solver scratch. The optional local profile uses less scratch, with
+reduced stiffness accuracy as its link count rises.
+
+The 720-point fixture moved its selected tip 0.4884 m relative to the still-air control and
+changed 3,106 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
+native state all hash to `64c531bd4b6c08c2` in the fixture. The optional entry is 5,373 B gzip
 with a 5,569 B ceiling. Each lazy Wasm variant is 21,184 B raw and 8,599 B gzip. Core and
 Stage gain zero bytes.
 
@@ -9889,7 +9894,7 @@ entries measure 17,283 B and 12,180 B gzip. The optional strand horse measures 1
 
 The weighted avatar binding accepts positive uniform transforms. Its offline replay uses the
 same time-sampled anchor and wind functions. On the Seed-san reference avatar the fixed
-camera test measured 0.0946 m of ponytail-tip movement and 395 changed pixels on both
-backends. Its restored simulation hash is `7b5d4e76865419a4`. The manual rig uses a 240 Hz
+camera test measured 0.0942 m of ponytail-tip movement and 436 changed pixels on both
+backends. Its restored simulation hash is `0bf6500c22b9e929`. The manual rig uses a 240 Hz
 world clock. The automatic adapter advances that clock after the Animator pose. The optional
 rigging entry measures 1,991 B gzip with a 2,247 B ceiling.

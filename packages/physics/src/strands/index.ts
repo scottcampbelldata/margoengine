@@ -27,6 +27,7 @@ const CAPSULE_WORDS = 7;
 const RIGID_CAPSULE_WORDS = 17;
 const BODY_INDEX = RIGID_CAPSULE_WORDS - 1;
 const CAPSULE_HIT_WORDS = 4;
+const DIRECT_BLOCK_WORDS = 138;
 
 /** Field layout 1 stores centreline position, velocity, material frame and angular velocity. */
 export const STRAND_LAYOUT = 1;
@@ -87,9 +88,11 @@ export interface StrandParams {
   readonly strands: readonly StrandSpec[];
   /** Cosserat rod projection with bending and twist, or a single inextensible follow-the-leader pass. Default 'rod'. */
   readonly fidelity?: 'rod' | 'follow';
+  /** Rod constraint solve. Default 'direct'. Select 'local' for the sequential projection profile. */
+  readonly rodSolve?: 'local' | 'direct';
   /** Solver rate level, 60 × 2^level Hz, default 2 (240 Hz). */
   readonly rate?: RateLevel;
-  /** Rod constraint passes per substep. Default 12. */
+  /** Rod constraint passes per substep. Default 6 for direct and 12 for local. */
   readonly iterations?: number;
   /** Additional viscous damping per second, default 2. */
   readonly damping?: number;
@@ -140,6 +143,7 @@ type Native = {
     capsuleHits: number,
     reactions: number,
     reactionCount: number,
+    directBlocks: number,
   ): number;
 };
 
@@ -252,6 +256,7 @@ export class StrandSolver implements Solver<StrandParams> {
   private capsuleHits?: Region;
   private reactions?: Region;
   private rigidRows = 0;
+  private directBlocks?: Region;
 
   private constructor(
     readonly id: string,
@@ -309,8 +314,6 @@ export class StrandSolver implements Solver<StrandParams> {
     this.clock = params.rate ?? 2;
     if (!Number.isInteger(this.clock) || this.clock < 0 || this.clock > 7)
       invalid('Choose a world clock level from 0 through 7.');
-    const iterations = params.iterations ?? 12;
-    if (!Number.isSafeInteger(iterations) || iterations < 1) invalid('Use a whole positive rod iteration count.');
     const follow = finite(params.followDamping ?? 0.9, 'follower damping', 0);
     if (follow > 1) invalid('Set follower damping between zero and one.');
     const self = params.selfCollision ?? fidelity === 'rod';
@@ -319,6 +322,12 @@ export class StrandSolver implements Solver<StrandParams> {
     if (contactGeometry !== 'points' && contactGeometry !== 'segments')
       invalid('Choose point or segment body contact.');
     if (contactGeometry === 'segments' && fidelity !== 'rod') invalid('Use the rod tier for segment body contact.');
+    const rodSolve = params.rodSolve ?? (fidelity === 'rod' ? 'direct' : 'local');
+    if (rodSolve !== 'local' && rodSolve !== 'direct') invalid('Choose a local or direct rod constraint solve.');
+    const direct = rodSolve === 'direct';
+    if (direct && fidelity !== 'rod') invalid('Use the rod tier with the direct constraint solve.');
+    const iterations = params.iterations ?? (direct ? 6 : 12);
+    if (!Number.isSafeInteger(iterations) || iterations < 1) invalid('Use a whole positive rod iteration count.');
     this.damping = finite(params.damping ?? 2, 'damping per second', 0);
     this.cellSize = positive(params.cellSize ?? 4096, 'origin cell length');
     this.wind = params.wind;
@@ -328,6 +337,7 @@ export class StrandSolver implements Solver<StrandParams> {
     const bytes =
       this.count * 8 * (3 * STRAND_WORDS + MATERIAL_WORDS + ENVIRONMENT_WORDS + SCRATCH_WORDS + ROOT_WORDS + 4) +
       (this.colliders.length * CAPSULE_WORDS +
+        (direct ? this.count * DIRECT_BLOCK_WORDS : 0) +
         (this.rigidRows
           ? this.count * CAPSULE_HIT_WORDS +
             this.rigidCapsules.length * RIGID_CAPSULE_WORDS +
@@ -355,6 +365,7 @@ export class StrandSolver implements Solver<StrandParams> {
     this.ledger = area('strand-contact-work-and-cell', 4);
     this.links = host.allocate('strand-grid-links', this.count * 16, 'i32', STRAND_LAYOUT);
     this.buckets = host.allocate('strand-grid-buckets', this.bucketCount * 4, 'i32', STRAND_LAYOUT);
+    if (direct) this.directBlocks = area('strand-direct-rod-blocks', this.count * DIRECT_BLOCK_WORDS);
     if (this.rigidRows) {
       this.movingCapsules = area('strand-dynamic-body-capsules', this.rigidCapsules.length * RIGID_CAPSULE_WORDS);
       this.capsuleHits = area('strand-rigid-contact-witness', this.count * CAPSULE_HIT_WORDS);
@@ -382,7 +393,7 @@ export class StrandSolver implements Solver<StrandParams> {
       fidelity === 'rod' ? iterations : 0,
       follow,
       finite(params.friction ?? 0.25, 'contact friction', 0),
-      Number(self) + 2 * Number(contactGeometry === 'segments'),
+      Number(self) + 2 * Number(contactGeometry === 'segments') + 4 * Number(direct),
       2 * maxRadius,
     ]);
     this.anchorAndColliders(0);
@@ -591,7 +602,13 @@ export class StrandSolver implements Solver<StrandParams> {
       this.capsuleHits?.byteOffset ?? this.config.byteOffset,
       this.reactions?.byteOffset ?? this.config.byteOffset,
       this.rigidRows,
+      this.directBlocks?.byteOffset ?? this.config.byteOffset,
     );
+    if (checks < 0)
+      throw new MargoError(
+        'failed',
+        'The direct rod constraint matrix became singular. Increase the solver rate or use fewer points on this guide.',
+      );
     const ledger = this.words(this.ledger);
     ledger[0]! += checks;
     ledger.set(context.cell, 1);

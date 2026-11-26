@@ -330,3 +330,38 @@ test('a moving sphere receives the full impulse from a contact in the middle of 
     rigid.dispose();
   }
 });
+
+test('direct Cosserat bending follows a measured hair modulus as the guide is refined', async () => {
+  // Fujita and Tohmyoh (2020) measured 3.45 GPa at small strain. Gravity supplies a distributed load.
+  const length = 0.03,
+    radius = 40e-6,
+    density = 1300,
+    young = 3.45e9,
+    g = 9.81;
+  const area = Math.PI * radius * radius,
+    inertia = (area * radius * radius) / 4;
+  const weight = density * area * g,
+    bending = young * inertia;
+  const continuous = (weight * length ** 4) / (8 * bending);
+  const angleBound = (weight * length ** 3) / (6 * bending);
+  const shear = (2.6 * weight * length * length) / (2 * young * area);
+  let previous = Infinity;
+  for (const n of [8, 16, 32, 64]) {
+    const points = Array.from({ length: n + 1 }, (_, i) => [0, 0, (length * i) / n]);
+    const { solver, world } = await attach(
+      [{ points, radius, density, young, drag: 0 }],
+      { rodSolve: 'direct', iterations: 6, damping: 27, selfCollision: false },
+      [0, -g, 0],
+    );
+    world.advance(120);
+    const tip = -solver.sample(0, n).position[1];
+    // The half mass at the free tip makes the discrete joint moment q * (L - x)^2 / 2.
+    // The cubic moment sum with the clamped first segment yields (1 - 1/n)^2 times the continuum solution.
+    const discrete = continuous * (1 - 1 / n) ** 2;
+    // Curvature changes the moment arm by at most theta^2/2 and the rise per edge by theta^2/6.
+    // An additional theta^2/3 covers the quaternion angle linearization and their product.
+    near(tip, discrete, discrete * angleBound * angleBound + shear + 64 * Number.EPSILON);
+    assert.ok(continuous - tip < previous);
+    previous = continuous - tip;
+  }
+});
