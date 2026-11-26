@@ -225,6 +225,7 @@ export interface ScatterVariation {
 
 export interface ScatterVelocityParts {
     readonly values: Float32Array;
+    readonly windBefore: Float32Array;
     readonly instances: readonly GPUBuffer[];
     readonly commands: GPUBuffer;
     readonly vertices: readonly GPUBuffer[];

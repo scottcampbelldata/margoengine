@@ -18,6 +18,12 @@ export interface TraceScatterSource {
     readonly rings: readonly {
         readonly geometry: Geometry;
         readonly transforms: Float32Array;
+        readonly posed?: {
+            readonly positions: Float32Array;
+            readonly normals: Float32Array;
+            readonly previousPositions: Float32Array;
+            readonly indices: Uint32Array;
+        };
     }[];
     readonly color: readonly [number, number, number];
     readonly roughness: number;

@@ -6,13 +6,22 @@
 import { EngineKernel, Geometry, PbrMaterial } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 
+export interface ScatterPosedRing {
+    readonly positions: Float32Array;
+    readonly normals: Float32Array;
+    readonly previousPositions: Float32Array;
+    readonly indices: Uint32Array;
+}
+
 export interface ScatterReadOptions {
     readonly signal?: AbortSignal;
+    readonly pose?: boolean;
 }
 
 export interface ScatterReadRing {
     readonly geometry: Geometry;
     readonly transforms: Float32Array;
+    readonly posed?: ScatterPosedRing;
 }
 
 export interface ScatterReadout {
@@ -24,7 +33,11 @@ export interface ScatterReadout {
 
 export function instanceMatrix(floats: ArrayLike<number>, f: number, align: number, out: Float32Array, o?: number): void;
 
-export function readScatter(engine: EngineKernel, scatter: Scatter, { signal }?: ScatterReadOptions): Promise<ScatterReadout>;
+export function poseFrame(values: ArrayLike<number>, windBefore: ArrayLike<number>, vertices: number): ArrayBuffer;
+
+export const poseKernel: (pose: (code: string, binding: number) => string) => string;
+
+export function readScatter(engine: EngineKernel, scatter: Scatter, { signal, pose }?: ScatterReadOptions): Promise<ScatterReadout>;
 
 // Not exported from this entry, but used by the exports above:
 
@@ -204,6 +217,7 @@ interface ScatterVariation {
 
 interface ScatterVelocityParts {
     readonly values: Float32Array;
+    readonly windBefore: Float32Array;
     readonly instances: readonly GPUBuffer[];
     readonly commands: GPUBuffer;
     readonly vertices: readonly GPUBuffer[];
