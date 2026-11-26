@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20513298,
+  "total": 20514292,
   "history": [
     {
       "date": "2026-10-24",
@@ -13413,6 +13413,12 @@
       "commit": "f3e276205b",
       "grew": 0,
       "reason": "SOFT-04 adds retirement of consumed crack front edges across all incident child tetrahedra, moving the soft entry from 141760 to 141779 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b759429b01",
+      "grew": 1,
+      "reason": "EARTH-05 reading the live triangulated cross grade for cambered cylindrical wheels takes the optional entry from 14023 to 14719 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24846 B."
     }
   ],
   "items": {
@@ -14284,7 +14290,7 @@
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 14167,
+    "@margoengine/physics/terramechanics": 15161,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tracers": 5872,

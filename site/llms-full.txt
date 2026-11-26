@@ -14533,14 +14533,16 @@ The optional `grouserDig` uses 16 phase-history bytes per external row. Positive
 excavate more soil as the wheel turns, up to the configured bedrock or the axle depth
 supported by this bearing model. Supply continuous phase samples over two loaded steps.
 The response still reports local bearing sinkage. The changed terrain carries the deeper rut.
-Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
+The cylindrical raster interpolates the cross grade between two bed samples. Its central
+depth uses the normal bearing arc. Camber with no projected width is outside that geometry.
+Reverse travel keeps the tyre response. Transient contact angles and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand and relative
 crest-to-trough relief at one straight locked-wheel condition. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 14,023 B gzip with a 14,167 B ceiling. Both Wasm assets are 37,526 B raw and 15,333 B gzip each.
+The optional entry is 14,719 B gzip with a 15,161 B ceiling. Both Wasm assets are 37,818 B raw and 15,369 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -31636,7 +31638,8 @@ and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. Th
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
 It stamps evenly spaced lugs from spin and indexed triangle treads from both live spin and camber.
 The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
-Measured cross-slope camber forces remain open.
+The cylindrical raster resolves across-wheel penetration on the live slope. Measured
+dynamic cross-slope camber forces remain open.
 The steady drawbar and axle torque match the measured 60% tip-slip case. An opt-in wheel
 can excavate beyond its initial bearing cut from the live phase. Its exact swept-volume
 and floor tests pass. Measured transient contact angles and high-slip sinkage remain open. The optional
