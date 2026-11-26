@@ -431,6 +431,150 @@ test('a crack releases an exactly coincident bonded face without sliver cells', 
   bound(volume, 5 / 3, 5 / 3);
 });
 
+test('coplanar fracture uses individual and combined toughness from the live lip displacement', async () => {
+  const toughness = [0.5, 1.1, 1.4];
+  assert.throws(() => tetrahedron().setCoplanarFractureToughness([0, 1, 1]), /positive mode energies/);
+  await assert.rejects(
+    specimen(
+      tetrahedron().setOrthotropicStiffness(wood).setSolver('vertex-block').setCoplanarFractureToughness(toughness),
+    ),
+    /isotropic elastic cells/,
+  );
+  const young = 200e3;
+  const poisson = 0.25;
+  const effective = young / (1 - poisson ** 2);
+  const shear = young / (2 * (1 + poisson));
+  const material = Object.assign(new CellMaterial(), { youngsModulus: young, poissonRatio: poisson });
+  const setup = async (radius, rotate, matched = true) => {
+    const nodes = [
+      [-1, 0, 0],
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0, 1],
+      [0, matched ? -radius : -radius * 1.25, 0],
+      [0, -radius, 0],
+      [0, 0, -1],
+    ];
+    const desc = new SoftBodyDesc(nodes.map(rotate))
+      .setCells([0, 1, 2, 3, 0, 1, 3, 4, 0, 1, 5, 6, 0, 1, 6, 2], material)
+      .setSurface()
+      .setParticleRadius(0)
+      .setSolver('vertex-block')
+      .setPinnedParticles(nodes.map((_, i) => i))
+      .setCoplanarFractureToughness(toughness);
+    const { soft, body, world } = await specimen(desc);
+    const flags = soft.cellColumns().flags;
+    for (let i = 0; i < body.cellRange.count; i++) flags[body.cellRange.first + i] |= 1 << 6;
+    const events = [];
+    soft.onTear((event) => events.push(event));
+    world.advance(1);
+    assert.equal(events.length, 0);
+    return { body, world, events, nodes };
+  };
+  const cases = [
+    [[0.49, 0, 0], false],
+    [[0.51, 0, 0], true],
+    [[0, 1.09, 0], false],
+    [[0, 1.11, 0], true],
+    [[0, 0, 1.39], false],
+    [[0, 0, 1.41], true],
+    [[0.29, 0.32, 0.35], false],
+    [[0.34, 0.38, 0.42], true],
+    [[0.7, 0, 0], false, -1],
+  ];
+  for (const [radius, rotate] of [
+    [0.25, (v) => v],
+    [0.5, ([x, y, z]) => [z, x, y]],
+  ]) {
+    for (const [[opening, sliding, tearing], shouldCrack, sign = 1] of cases) {
+      const { body, world, events, nodes } = await setup(radius, rotate);
+      // Published traction-free plane-strain tip fields, inverted to get the imposed lip jumps.
+      const normal = sign * Math.sqrt((32 * radius * opening) / (Math.PI * effective));
+      const slide = Math.sqrt((32 * radius * sliding) / (Math.PI * effective));
+      const tear = Math.sqrt((16 * radius * tearing) / (Math.PI * shear));
+      const displaceLips = (body) => {
+        for (const [particle, side] of [
+          [4, 0.5],
+          [5, -0.5],
+        ]) {
+          const [x, y, z] = nodes[particle];
+          body.setParticleKinematicTarget(particle, rotate([x + side * tear, y + side * slide, z + side * normal]));
+        }
+      };
+      const snapshot = world.takeSnapshot();
+      displaceLips(body);
+      world.advance(2);
+      assert.equal(Boolean(events.length), shouldCrack, `${opening}, ${sliding}, ${tearing} at ${radius} m`);
+      if (!shouldCrack) continue;
+      assert.equal(events[0].pieces.length, 2);
+      for (const piece of events[0].pieces) closed(piece);
+      const replay = await setup(radius, rotate);
+      replay.world.restoreSnapshot(snapshot.bytes);
+      displaceLips(replay.body);
+      replay.world.advance(2);
+      assert.equal(replay.world.hash(), world.hash(), 'restoring paired lip topology reproduces its fracture');
+    }
+  }
+  const unpaired = await setup(0.25, (point) => point, false);
+  for (const [particle, z] of [
+    [4, 0.02],
+    [5, -0.02],
+  ]) {
+    const [x, y] = unpaired.nodes[particle];
+    unpaired.body.setParticleKinematicTarget(particle, [x, y, z]);
+  }
+  unpaired.world.advance(2);
+  assert.equal(unpaired.events.length, 0, 'two boundary faces at different material coordinates cannot be paired');
+});
+
+test('a finite blade supplies real bonded fronts to the coplanar toughness option', async () => {
+  const desc = tetrahedron().setPinnedParticles([0, 1, 2, 3]).setCoplanarFractureToughness([0.1, 0.2, 0.3]);
+  const { body, soft, world } = await specimen(desc);
+  const [cut] = soft.cutTriangle(body, [
+    [0.5, 0.25, 0.25],
+    [0.5, 0.625, 0.25],
+    [0.5, 0.25, 0.625],
+  ]).pieces;
+  const lips = new Map();
+  for (let p = 0; p < cut.particles; p++) {
+    const point = cut.particlePosition(p);
+    if (point[0] !== 0.5) continue;
+    const key = point.join(',');
+    const pair = lips.get(key) ?? [];
+    pair.push(p);
+    lips.set(key, pair);
+  }
+  const cells = cut.cells();
+  let separatedPairs = 0;
+  for (const pair of lips.values()) {
+    if (pair.length !== 2) continue;
+    const signs = pair.map((id) => {
+      const [x] = cut.particlePosition(id);
+      for (let i = 0; i < cells.length; i += 4) {
+        const tet = cells.subarray(i, i + 4);
+        if (!tet.includes(id)) continue;
+        for (const vertex of tet) {
+          const offset = cut.particlePosition(vertex)[0] - x;
+          if (offset !== 0) return Math.sign(offset);
+        }
+      }
+      return 0;
+    });
+    assert.equal(signs[0] * signs[1], -1);
+    pair.forEach((id, i) => {
+      const [x, y, z] = cut.particlePosition(id);
+      cut.setParticleKinematicTarget(id, [x + signs[i] * 0.002, y, z]);
+    });
+    separatedPairs++;
+  }
+  assert.ok(separatedPairs > 0);
+  const events = [];
+  soft.onTear((event) => events.push(event));
+  world.advance(1);
+  assert.equal(events.length, 1, 'the actual cut lip displacement advances the fracture without tensile nucleation');
+  assert.ok(events[0].pieces.every((piece) => piece.mass() > 0));
+});
+
 test('a finite blade that misses the solid leaves all state alone', async () => {
   const { world, soft, body } = await specimen(tetrahedron());
   const before = world.hash();

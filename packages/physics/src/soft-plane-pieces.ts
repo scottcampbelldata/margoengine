@@ -209,6 +209,7 @@ export function makeCutPieces(
     desc.orthotropicStrength = strength;
     desc.crackBand = bandLimits;
     desc.tensileNucleation = body.tensileNucleation;
+    desc.coplanarToughness = body.coplanarToughness;
     desc.inheritedBand = bandLimits !== null;
     desc.groups = body.collisionGroups;
     desc.shapeMatching = body.matched;

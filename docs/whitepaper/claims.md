@@ -116,6 +116,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   be selected as a new crack. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`
   and `cargo test --manifest-path packages/physics/soft-kernel/Cargo.toml --lib tensile_nucleation`.
 
+- Coplanar mixed-mode toughness (SOFT-04, 2026-11-26). Manufactured pairs of material
+  lips reproduce independent Mode I, II and III thresholds, the combined critical energy
+  and compression at two sample radii with rotated axes. Replaying the precrack snapshot
+  reproduces the release. A separate test applies displacement to an actual finite cut.
+  Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Load-driven tensile fracture (SOFT-04, 2026-11-26). A 35 kg rigid boot initiates a tensile
   crack on step 4 with a measured 122.86 N boot reaction. At step 18 the fixture has advanced
   15 fracture events and both renderers replay state hash `67aefc4a2ce1fed7`. Every marked

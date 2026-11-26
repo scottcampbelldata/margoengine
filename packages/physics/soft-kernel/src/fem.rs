@@ -66,6 +66,8 @@ pub struct Fem {
     pub(crate) fracture_axis: [f64; 3],
     pub(crate) fracture_edge: u32,
     pub(crate) fracture_face: u32,
+    pub(crate) fracture_heads: Col<u32>,
+    pub(crate) fracture_links: Col<u32>,
     /// Rayleigh-style damping of the elastic constraints, 1 / s: the share of the relative speed along a constraint that they remove.
     pub damping: f32,
     /// The four corners, B = Dm^-1 row by row, rest volume.
@@ -158,6 +160,8 @@ impl Fem {
             fracture_axis: [0.0; 3],
             fracture_edge: NONE,
             fracture_face: NONE,
+            fracture_heads: Col::new(),
+            fracture_links: Col::new(),
             damping: 0.0,
             p: [U; 4],
             b: [F; 9],

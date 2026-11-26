@@ -36,6 +36,16 @@ export type { SoftTensileSeam } from './soft-tensile-seam.js';
 
 interface SoftExports extends WebAssembly.Exports {
   soft_fem_tensile_nucleation(first: number, count: number, threshold: number): number;
+  soft_fem_coplanar_fracture(
+    first: number,
+    count: number,
+    firstParticle: number,
+    particles: number,
+    threshold: number,
+    opening: number,
+    sliding: number,
+    tearing: number,
+  ): number;
   soft_fem_fracture_axis(): number;
   soft_fem_fracture_edge(): number;
   soft_fem_fracture_face(): number;
@@ -1015,6 +1025,7 @@ export class SoftBodyDesc {
   /** @internal */ crackBand: readonly number[] | null = null;
   /** @internal */ tensileSeam: SoftTensileSeam | null = null;
   /** @internal */ tensileNucleation: number | null = null;
+  /** @internal */ coplanarToughness: readonly [opening: number, sliding: number, tearing: number] | null = null;
   /** @internal A split inherits the validated reference volumes from the original cells. */
   inheritedBand = false;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
@@ -1652,6 +1663,25 @@ export class SoftBodyDesc {
   }
 
   /**
+   * Continues a straight crack at an existing bonded face under opening, sliding or tearing.
+   * The three mode toughnesses are in J/m². Use an elastic isotropic solid in its small-strain
+   * range. Supply a finite cut or enable tensile nucleation to start the crack. Pass null to clear.
+   */
+  setCoplanarFractureToughness(toughness: readonly [opening: number, sliding: number, tearing: number] | null): this {
+    if (
+      toughness !== null &&
+      (!Array.isArray(toughness) ||
+        toughness.length !== 3 ||
+        [0, 1, 2].some((i) => !(toughness[i]! > 0 && Number.isFinite(toughness[i]))))
+    )
+      throw new RangeError(
+        'A coplanar crack needs three finite positive mode energies in J/m². Pass opening, sliding and tearing toughness.',
+      );
+    this.coplanarToughness = toughness && [toughness[0], toughness[1], toughness[2]];
+    return this;
+  }
+
+  /**
    * Gives the body tetrahedral cells: four particle indices per cell, the shape the particles stand in now as the cell's rest
    * shape. A cell listed left-handed has its last two corners swapped. The cells carry the body's elasticity (and its plastic
    * flow and tearing, see {@link CellMaterial}), and when no mass was set they give each particle its share of their density.
@@ -2007,6 +2037,7 @@ export class SoftBody {
   /** @internal */ cellsTornSeen = new Set<number>();
   /** @internal The principal-strain limit inherited by uncracked regions of a split body. */
   tensileNucleation: number | null = null;
+  /** @internal */ coplanarToughness: readonly [opening: number, sliding: number, tearing: number] | null = null;
   /** @internal The skin, and the cells (four particle indices each) it was bound against. */ skin: Skin | null = null;
   /** @internal */ skinCells = new Uint32Array(0);
   /** @internal Where each particle stood when the last step began (x, y, z), for drawing between steps. */ previous =
@@ -2648,6 +2679,10 @@ export class SoftBody {
     checkCellMaterial(material);
     checkSolverModel(this.solverKind, CELL_MODEL[material.model]);
     checkStrengthModel(this.orthotropicStrength, material);
+    if (this.coplanarToughness && (material.model === 'volume' || material.yieldStrain > 0 || material.tearStrain > 0))
+      throw new RangeError(
+        'Coplanar fracture toughness needs isotropic elastic cells. Use an elastic material without plastic flow or another tear rule.',
+      );
     this.cellMaterial = material.clone();
     this.owner.writeCellMaterial(this);
     return this;
@@ -3058,11 +3093,23 @@ export class SoftBodies implements PhysicsAttachment {
       throw new RangeError(
         'Tensile nucleation needs cells and a positive strain resolvable in f32. Build a solid and increase openingStrain.',
       );
-    if (seam && nucleus !== null)
+    const toughness = desc.coplanarToughness;
+    if (
+      toughness &&
+      (!desc.cells.length ||
+        desc.orthotropy ||
+        fiber ||
+        desc.cellMaterial.model === 'volume' ||
+        desc.cellMaterial.yieldStrain > 0)
+    )
+      throw new RangeError(
+        'Coplanar fracture toughness needs isotropic elastic cells. Build tetrahedra without fibers or plastic flow.',
+      );
+    if (seam && (nucleus !== null || toughness))
       throw new RangeError(
         'Authored and nucleated cracks use different opening rules. Clear one fracture mode with null.',
       );
-    const fracture = seam ?? nucleus;
+    const fracture = seam ?? nucleus ?? (toughness ? 0 : null);
     if (fracture !== null && new Set(desc.cells).size !== desc.particleCount)
       throw new RangeError('A tensile crack needs every particle in a cell. Build a fully tetrahedralized solid.');
     if (
@@ -3298,6 +3345,7 @@ export class SoftBodies implements PhysicsAttachment {
     // a second time.
     if (desc.surfaceSettings) this.createSurfaceCollider(body, desc.surfaceSettings);
     body.tensileNucleation = nucleus;
+    body.coplanarToughness = toughness;
     if (fracture !== null) this.tensileFractures.set(body, fracture);
     return body;
   }
@@ -5245,7 +5293,7 @@ export class SoftBodies implements PhysicsAttachment {
     if (!Array.isArray(blade) || blade.length !== 3)
       throw new RangeError('A finite blade needs three points. Supply the corners of one world-space triangle.');
     for (const point of blade) checkVec(point, 'Blade point');
-    const trackFront = body.tensileNucleation === null ? undefined : true;
+    const trackFront = body.tensileNucleation !== null || body.coplanarToughness ? true : undefined;
     const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade, trackFront));
     return this.announce(body, [], [], split);
   }
@@ -5282,7 +5330,18 @@ export class SoftBodies implements PhysicsAttachment {
 
   private nucleateTensileFracture(body: SoftBody, threshold: number): void {
     const { first, count } = body.cellRange;
-    const choose = (): number => this.exports.soft_fem_tensile_nucleation(first, count, threshold) >>> 0;
+    const toughness = body.coplanarToughness;
+    const choose = (): number =>
+      (toughness
+        ? this.exports.soft_fem_coplanar_fracture(
+            first,
+            count,
+            body.firstParticle,
+            body.particles,
+            threshold,
+            ...toughness,
+          )
+        : this.exports.soft_fem_tensile_nucleation(first, count, threshold)) >>> 0;
     const initial = choose();
     if (initial === NO_NEIGHBOUR || body.tornCells().length > 0) return;
     const unrepresentable: number[] = [];

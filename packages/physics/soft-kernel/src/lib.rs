@@ -25,6 +25,7 @@ pub mod face;
 mod volume;
 pub mod fem;
 mod implicit;
+mod mixed_fracture;
 mod orthotropic;
 mod tensile_nucleation;
 mod projective;

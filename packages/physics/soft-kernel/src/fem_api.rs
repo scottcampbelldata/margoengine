@@ -8,6 +8,11 @@ pub extern "C" fn soft_fem_tensile_nucleation(first: u32, count: u32, threshold:
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_coplanar_fracture(first: u32, count: u32, first_particle: u32, particles: u32, threshold: f64, opening: f64, sliding: f64, tearing: f64) -> u32 {
+    world().coplanar_fracture(first as usize, count as usize, first_particle as usize, particles as usize, threshold, [opening, sliding, tearing])
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_fracture_axis() -> u32 {
     world().fem.fracture_axis.as_ptr() as usize as u32
 }

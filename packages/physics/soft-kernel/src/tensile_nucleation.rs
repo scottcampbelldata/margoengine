@@ -6,7 +6,7 @@ use crate::fem::{CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NONE, NUCLEATED_TET, TORN_
 use crate::math::sqrt64;
 use crate::vertex_block::{Columns, Vec3, cross, dot};
 
-const EDGES: [(usize, usize, usize, usize); 6] = [
+pub(crate) const EDGES: [(usize, usize, usize, usize); 6] = [
     (0, 1, 2, 3), (0, 2, 1, 3), (0, 3, 1, 2), (1, 2, 0, 3), (1, 3, 0, 2), (2, 3, 0, 1),
 ];
 

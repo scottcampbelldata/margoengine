@@ -9680,6 +9680,14 @@ An authored finite blade seeds eligible tensile fronts where its paired lips sha
 particles. Complete separation leaves no bonded lip edge. A candidate still needs a current
 principal plane that crosses adjacent cell material or coincides with a bonded face. A plane
 that only touches an exposed face cannot advance.
+Coplanar fracture toughness uses a small-strain isotropic displacement correlation.
+It needs two actual boundary lips with a shared front edge and matching detached
+material positions, ahead of which there is a coplanar bonded facet. An unmatched
+or inverted candidate is ineligible. The option fits the leading linear-elastic
+plane-strain term at one matched radius. It leaves crack kinking, large-strain and
+orthotropic toughness outside this mode. Snapshot replay needs the same authored
+material and toughness. If tensile nucleation is enabled, it starts a new crack when
+there is no recorded front and the strain threshold is exceeded.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
 Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
 editing topology. A candidate below the native resolution remains intact for that step.
