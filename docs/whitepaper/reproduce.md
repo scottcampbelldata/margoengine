@@ -1,5 +1,34 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 staged rail crush
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-staged.test.js`.
+The authors' 2003 component study found 21 in of shortening in a full-scale drop test
+of the primary absorber. The full-scale coach trial is a different physical test.
+It uses a pretest lower folding load between trigger peaks. In the solver test,
+the only loading inputs are piecewise-linear readings of the dashed design trace
+in Figure 4, the pretest impact stiffness from Appendix C, the 71,650 lb test mass
+from Appendix C, and the trial's 34.1 mph entry speed from Table 1. The single-mass
+model uses the published pretest barrier stiffness as its unloading scale.
+The red modified design trace and the post-test force histories are excluded from
+all material inputs. [Mayville et al., *The Development of a Rail Passenger Coach Car Crush Zone* (2003)](https://ntlrepository.blob.core.windows.net/lib/47000/47400/47474/rail_cw_2003_2.pdf)
+
+The held-out measurements are the cyan carbody velocity trace in Figure 14
+and the measured displacement in Figure E9. The 960/1920 Hz runs give 1.098/1.104 mph
+RMS over six fixed loading instants from 30 to 110 ms, with the first stop at
+120.09/120.01 ms versus about 114 ms measured. Peak strokes are 3.196/3.205 ft
+versus about 3.31 ft measured. Rebound is 1.49/1.61 mph against about 3.3 mph measured.
+Several body masses and elastic joints in the experiment contribute to the recoil
+history. These figures qualify longitudinal compression of the one coach and the
+rebound residual remains open. [Jacobsen et al., *Crash Energy Management: One- and Two-Car Passenger Rail Impact Tests* (2016)](https://rosap.ntl.bts.gov/view/dot/12397)
+
+For unloading stiffness `k`, each loading point `(x,F)` corresponds to permanent
+shortening `p = x − F/k`. The work crossing a segment is the trapezoid under the
+force curve. The plastic share integrates `F dp` and the elastic share is `F²/(2k)`
+until the backing engages. The implicit continuous contact solves `x + h² w F(x)`
+on each active segment for time step `h` and inverse normal mass `w`. A falling branch
+that makes this quantity nonmonotone gives a coded rate error.
+
 ## BREAK-03 wet contact inertia
 
 Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run

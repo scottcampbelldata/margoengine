@@ -192,7 +192,15 @@ export function crushPrepared(
   prior: number,
 ): CrushResult {
   const energy = 0.5 * effectiveMass * closingSpeed * closingSpeed;
-  const peak = peakLoad(material, prior, energy);
+  return crushResultAtPeak(energy, effectiveMass, closingSpeed, peakLoad(material, prior, energy));
+}
+
+export function crushResultAtPeak(
+  energy: number,
+  effectiveMass: number,
+  closingSpeed: number,
+  peak: PeakLoad,
+): CrushResult {
   const elasticEnergy = Math.min(peak.elastic, energy);
   const reboundSpeed = Math.sqrt((2 * elasticEnergy) / effectiveMass); // float division: energy returned to relative motion
   const impulse = effectiveMass * (closingSpeed + reboundSpeed);

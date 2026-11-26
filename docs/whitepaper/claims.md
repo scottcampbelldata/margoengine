@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Staged passenger-rail crush (BREAK-03, 2026-11-26). The pretest design envelope
+  predicts the independent full-scale coach's loading velocity with 1.10 mph RMS
+  error at 960 and 1920 Hz. Peak longitudinal strokes are 3.196 and 3.205 ft
+  compared with the measured 3.31 ft. Predicted rebound is 1.49–1.61 mph
+  against about 3.3 mph measured. [Reproduce](reproduce.md#break-03-staged-rail-crush)
 - Wet contact inertia (BREAK-03, 2026-11-26). A live hull carrying 250 kg of water
   exchanges 3,000 N·s with a fixed contact and rebounds at its original speed. An off-axis
   load and a sticking contact match the coupled linear and angular impulse calculation.

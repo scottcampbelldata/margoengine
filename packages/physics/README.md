@@ -5221,6 +5221,60 @@ const energyAt100mm = loaded.absorbedEnergy + loaded.elasticEnergy;
 if (energyAt100mm < 900 || energyAt100mm > 1000) throw new Error('Expected progressive tube folding work');
 ```
 
+Use a `CrushEnvelope` when a crush zone has several trigger peaks and lower folding loads.
+Give the first point at `force / stiffness` and subsequent points in increasing total stroke.
+Each point must leave more permanent shortening after elastic release than the previous
+one. The final point starts the elastic backing. The default backing stiffness is the
+unloading stiffness. Use `resolveCrushEnvelopeStroke` for guided compression or
+`resolveCrushEnvelope` for the turning point of one normal impact.
+
+```ts
+import { resolveCrushEnvelope, resolveCrushEnvelopeStroke } from '@margoengine/physics/crush';
+
+const staged = { stiffness: 1e5, loading: [
+  { stroke: 0.02, force: 2000 }, { stroke: 0.07, force: 4500 }, { stroke: 0.15, force: 3500 },
+] };
+const loading = resolveCrushEnvelopeStroke(staged, 0.12);
+const impact = resolveCrushEnvelope(staged, 100, 3);
+if (loading.force >= 4500 || impact.peakForce !== 4500) throw new Error('Expected a trigger and falling load');
+```
+
+For live progressive contact, add a station to `envelopePatches` with this `material`
+and set `response: 'continuous'`. Omit the support and radius for a live terrain station. In `new CrushSolver({ rate })`, level 0 is 60 Hz and each
+increase doubles that rate up to level 7 at 7,680 Hz. Use the same fixed timestep on
+the rigid solver. Use a higher rate level when a falling load changes too steeply within a step.
+The existing one-event impact path also accepts the envelope.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: 1 / 120 });
+const body = physics.addBody(null, {
+  linearVelocity: [3, 0, 0],
+  colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 100, sensor: true },
+});
+const crush = new CrushSolver({ rate: 1 });
+const bodyCapacity = physics.kernel.capacity;
+world.add(new RigidSolver(), { physics, capacity: bodyCapacity });
+world.add(crush, { bodyCapacity, patches: [], envelopePatches: [{
+  body: body.row, anchor: [0.5, 0, 0], normal: [1, 0, 0], radius: 0.5,
+  support: { point: [0.5, 0, 0] }, response: 'continuous',
+  material: { stiffness: 1e5, loading: [
+    { stroke: 0.02, force: 2000 }, { stroke: 0.07, force: 4500 }, { stroke: 0.15, force: 3500 },
+  ] },
+}] });
+world.couple([crush.id, 'rigid'], 'staggered');
+world.advance(10);
+if (crush.read(0).permanentStroke <= 0.025) throw new Error('Expected to fold beyond the trigger');
+```
+
+[Full-scale rail compression comparison](../../docs/whitepaper/reproduce.md#break-03-staged-rail-crush)
+
 Pair `CrushSolver.withContactInertia(channel)` with `HullSolver.withContactInertia(channel)`
 to include the hull's instantaneous exterior added mass and carried water in station contact.
 Create the shared channel with `crushInertiaChannel()` (default name `wet-crush`). Tell

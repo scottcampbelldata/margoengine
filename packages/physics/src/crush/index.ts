@@ -7,6 +7,7 @@ import type {
   Cell,
   FieldDescriptor,
   Port,
+  RateLevel,
   Region,
   Solver,
   SolverDescription,
@@ -26,6 +27,13 @@ import {
   wetPush,
   wetRow,
 } from './contact-inertia.js';
+import {
+  type CrushEnvelope,
+  type PreparedEnvelope,
+  envelopeImpact,
+  prepareEnvelope,
+  stepEnvelope,
+} from './envelope.js';
 import { traceGround } from './ground.js';
 import {
   CircularPlateIndentation,
@@ -33,7 +41,7 @@ import {
   type CircularPlateParams,
   type CircularPlateReading,
 } from './indentation.js';
-import { crushMaterial, crushPrepared, positive, type CrushMaterial } from './material.js';
+import { crushMaterial, crushPrepared, positive, type CrushMaterial, type CrushResult } from './material.js';
 import { resolvePlateBuckling, type CrushPlate, type CrushPlateResponse } from './plate.js';
 import { CRUSH_DAMAGE_QUANTITY, CRUSH_LAYOUT, CRUSH_SEAL_LOSS_WORD, CRUSH_WORDS } from './port.js';
 import {
@@ -56,6 +64,12 @@ import {
 
 export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
 export { type CrushInertiaChannel, crushInertiaChannel } from './contact-inertia.js';
+export {
+  resolveCrushEnvelope,
+  resolveCrushEnvelopeStroke,
+  type CrushEnvelope,
+  type CrushLoadingPoint,
+} from './envelope.js';
 export { CircularPlateIndentation, type CircularPlateParams, type CircularPlateReading } from './indentation.js';
 export {
   GirderJointSolver,
@@ -135,6 +149,12 @@ export interface CrushPatch {
 /** A hull or chassis station that automatically finds a support on the world terrain bed. */
 export type CrushGroundPatch = Omit<CrushPatch, 'support' | 'radius'>;
 
+/** A supported station with a multi-stage crushing envelope. */
+export type CrushEnvelopePatch = Omit<CrushPatch, 'material'> & { readonly material: CrushEnvelope };
+
+/** A staged station that finds its support on the live terrain. */
+export type CrushEnvelopeGroundPatch = Omit<CrushEnvelopePatch, 'support' | 'radius'>;
+
 /** A circular membrane station loaded by a smooth spherical support. */
 export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | 'plate' | 'sealStroke'> & {
   readonly indentation: CircularPlateParams;
@@ -144,6 +164,8 @@ export type CrushIndentationPatch = Omit<CrushPatch, 'material' | 'response' | '
 export interface CrushOptions {
   /** Solver ID and output prefix. Default 'crush'. */
   readonly id?: string;
+  /** Rate level 0 (60 Hz) through 7 (7,680 Hz). Match the rigid solver's fixed timestep. Default 0. */
+  readonly rate?: RateLevel;
   /** Grid shape of the live TerrainBed to read when a ground patch is configured. */
   readonly terrain?: BedShape;
 }
@@ -160,6 +182,8 @@ export interface CrushParams {
   readonly groundPatches?: readonly CrushGroundPatch[];
   /** Optional membrane stations. Their damage records follow the ordinary and ground patches. */
   readonly indentationPatches?: readonly CrushIndentationPatch[];
+  /** Staged stations whose damage records follow the other patches. Omit support and radius for ground contact. */
+  readonly envelopePatches?: readonly (CrushEnvelopePatch | CrushEnvelopeGroundPatch)[];
 }
 
 /** State of one contact patch. Peak and impulse fields describe its most recent impact. */
@@ -184,10 +208,14 @@ export interface CrushPlateState {
   readonly buckling?: CrushPlateResponse;
 }
 
-type PatchInput = CrushPatch | (CrushGroundPatch & { readonly terrain: true });
+type PatchInput =
+  | CrushPatch
+  | CrushEnvelopePatch
+  | ((CrushGroundPatch | CrushEnvelopeGroundPatch) & { readonly terrain: true });
+type PatchGeometry = Omit<CrushPatch, 'material'> | (Omit<CrushGroundPatch, 'material'> & { readonly terrain: true });
 type Patch =
-  | (PatchInput & {
-      readonly material: Required<CrushMaterial>;
+  | (PatchGeometry & {
+      readonly material: Required<CrushMaterial> | PreparedEnvelope;
       readonly response: 'impact' | 'continuous';
       readonly friction: number;
       readonly sealStroke: number;
@@ -499,11 +527,17 @@ function impact(
     }
     return;
   }
-  const step = continuous
-    ? stepCompression(patch.material, permanent, Math.max(permanent, -gap), closing, inverse, dt - delay)
-    : undefined;
-  const result =
-    continuous || latched[index] ? undefined : crushPrepared(patch.material, 1 / inverse, closing, permanent); // float division
+  const material = patch.material;
+  let step: CompressionStep | undefined;
+  let result: CrushResult | undefined;
+  if ('points' in material) {
+    if (continuous) step = stepEnvelope(material, permanent, Math.max(permanent, -gap), closing, inverse, dt - delay);
+    else if (!latched[index]) result = envelopeImpact(material, 1 / inverse, closing, permanent); // float division
+  } else if (continuous) {
+    step = stepCompression(material, permanent, Math.max(permanent, -gap), closing, inverse, dt - delay);
+  } else if (!latched[index]) {
+    result = crushPrepared(material, 1 / inverse, closing, permanent); // float division
+  }
   const normalImpulse = continuous
     ? (step?.impulse ?? 0)
     : (result?.impulse ?? supportImpulse(-clearance, closing, inverse, patch.material.backingStiffness, dt));
@@ -536,11 +570,15 @@ export class CrushSolver implements Solver<CrushParams> {
   readonly id: string;
   readonly damageField: FieldDescriptor;
   private readonly terrain: BedShape | undefined;
+  private readonly rate: RateLevel;
   private wet?: CrushInertiaChannel;
   private state: State | undefined;
 
-  constructor({ id = 'crush', terrain }: CrushOptions = {}) {
+  constructor({ id = 'crush', terrain, rate = 0 }: CrushOptions = {}) {
     this.id = id;
+    if (!Number.isInteger(rate) || rate < 0 || rate > 7)
+      throw new MargoError('state', 'Choose a crush rate level from 0 (60 Hz) to 7 (7,680 Hz).');
+    this.rate = rate;
     if (terrain) {
       bedVertexCount(terrain);
       this.terrain = { ...terrain, centre: [terrain.centre[0], terrain.centre[1]] };
@@ -564,8 +602,8 @@ export class CrushSolver implements Solver<CrushParams> {
   describe(): SolverDescription {
     return {
       id: this.id,
-      rate: 0,
-      stableRate: () => 0,
+      rate: this.rate,
+      stableRate: () => this.rate,
       fields: [
         { field: BODIES_FIELD, access: 'read' },
         { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
@@ -586,7 +624,12 @@ export class CrushSolver implements Solver<CrushParams> {
     if (
       !Number.isSafeInteger(capacity) ||
       capacity < 1 ||
-      !(params.patches?.length || params.groundPatches?.length || params.indentationPatches?.length)
+      !(
+        params.patches?.length ||
+        params.groundPatches?.length ||
+        params.indentationPatches?.length ||
+        params.envelopePatches?.length
+      )
     )
       throw new MargoError(
         'state',
@@ -596,8 +639,8 @@ export class CrushSolver implements Solver<CrushParams> {
       ...(params.patches ?? []),
       ...(params.groundPatches ?? []).map((patch) => ({ ...patch, terrain: true as const })),
     ];
-    const patches = all.map((patch): Patch => {
-      const material = crushMaterial(patch.material);
+    const prepareStation = (patch: PatchInput): Patch => {
+      const material = 'loading' in patch.material ? prepareEnvelope(patch.material) : crushMaterial(patch.material);
       const response = patch.response ?? 'impact';
       if (response !== 'impact' && response !== 'continuous')
         throw new MargoError('state', 'Choose impact or continuous for the crush patch response.');
@@ -633,7 +676,8 @@ export class CrushSolver implements Solver<CrushParams> {
         radius: positive(patch.radius, 'contact radius'),
         support: preparedSupport(patch.support, body, capacity),
       };
-    });
+    };
+    const patches = all.map(prepareStation);
     for (const patch of params.indentationPatches ?? []) {
       const body = rowIndex(patch.body, capacity);
       const normal = vector(patch.normal, 'indentation normal');
@@ -648,6 +692,8 @@ export class CrushSolver implements Solver<CrushParams> {
         indentation: new CircularPlateIndentation(patch.indentation),
       });
     }
+    for (const patch of params.envelopePatches ?? [])
+      patches.push(prepareStation('support' in patch ? patch : { ...patch, terrain: true }));
     this.state = {
       host,
       patches,

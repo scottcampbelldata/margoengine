@@ -10652,6 +10652,14 @@ Coulomb sticking, and schedule and replay behaviour. The channel is local to the
 optional solvers.
 
 
+Staged crush envelopes extend the same contact path with trigger peaks followed by
+folding at lower loads. Their increasing permanent offsets separate return work from
+elastic recoil. The continuous contact uses the rigid rate and rejects an active
+unresolved negative tangent with a rate remedy. The full-scale 34.1 mph rail coach
+test uses a published pretest design input and holds out the measured gross
+displacement and velocity during compression. Rebound remains underpredicted.
+
+
 ### Thin films on rigid panes and open ground (FLUID-07)
 
 The thin-film module imports world memory and reserves no static data. Film and input buffers are

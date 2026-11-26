@@ -98,7 +98,7 @@ The worst cases, where the gap is closest to the row not being met:
   live plating and SEA-10 linkage. The current package supplies those on its reduced station path
   and provides a distributed triangular shell with bending, plane-stress yielding, reciprocal sphere contact
   and cohesive breakup along prescribed seams. SEA-10 consumes the actual live seam polygon for progressive
-  flooding. General shell contact, automatic tearing, and measured full-scale vessel and vehicle response remain open.
+  flooding. A pretest staged rail design also predicts the independent measured full-scale coach's longitudinal compression. Its rebound is low. General shell contact, automatic tearing, full-scale vessel response and road-vehicle NCAP runs remain open.
 - **SEA-06 tsunamis:** there is no fault source anywhere in the code, although the clean-room record says the solver
   uses Okada deformation; run-up is only asserted to be positive.
 - **ATMO-07 lightning:** no electrification and no breakdown threshold (with no space charge the path ignores the
