@@ -21,13 +21,16 @@ if (south !== -90 || north !== 90 || west !== 0 || east !== 360 || dlat !== 0.25
 if (heights.length !== ROWS * COLUMNS || !heights.every(Number.isFinite))
   throw new Error(`${source}: ${heights.length} heights, expected ${ROWS * COLUMNS} finite values`);
 const bytes = Buffer.alloc(ROWS * COLUMNS * 2);
+// Min and max in the same pass: spreading the 1,038,961 heights into Math.min overflows the call stack.
+let min = Infinity,
+  max = -Infinity;
 heights.forEach((m, i) => {
   const cm = Math.round(m * 100);
   if (cm < -32768 || cm > 32767) throw new Error(`${source}: ${m} m does not fit int16 centimetres`);
   bytes.writeInt16LE(cm, i * 2);
+  if (m < min) min = m;
+  if (m > max) max = m;
 });
 await mkdir(dirname(out), { recursive: true });
 await writeFile(out, bytes);
-console.log(
-  `${out}: ${bytes.length} bytes, ${ROWS} x ${COLUMNS}, min ${Math.min(...heights)} m, max ${Math.max(...heights)} m`,
-);
+console.log(`${out}: ${bytes.length} bytes, ${ROWS} x ${COLUMNS}, min ${min} m, max ${max} m`);
