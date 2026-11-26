@@ -510,3 +510,65 @@ test('nearRadius draws shrubs past 300 m when asked, and the default keeps them 
     RangeError,
   );
 });
+
+// KB-LOOK-MASKOCCLUDE1: SceneTargets, SSR and LightBounce take BiomeObjects as one capture model. Before it the masks
+// drew the ground through the grass and the trees (they could not add the objects at all), so a shaded patch under a
+// fern counted as shaded ground. Here every lit child scatter shares the hook at its first capture and draws into it;
+// the GPU side (a captured plant hides the ground and is not ground) is proved by post scene-targets-scatter-browser.
+test('setCapture shares the hook with every lit part and detail scatter, releases it and runs onDispose once', async () => {
+  const attached = [],
+    engine = { camera: { position: [0, 0, 0] }, use: (p) => attached.push(p) },
+    placement = {
+      tile() {},
+      species: [{ key: 'shrub', mesh: 'procedural:shrub', layer: 0 }],
+      details: [{ id: 'grass', mesh: 'procedural:grass', density: 40 }],
+      tileSize: 256,
+    },
+    objects = await BiomeObjects.attach(engine, placement, {
+      heightmap: () => undefined,
+      bounds: [-512, -512, 512, 512],
+    });
+  const key = Symbol.for('margoengine.capture'),
+    hook = { targets: [{ format: 'r8unorm' }], declarations: (code) => `// mine ${code}`, begin() {} },
+    drawn = [];
+  for (const bad of [undefined, {}, { declarations() {}, begin() {} }, { targets: [], begin() {} }])
+    assert.throws(() => objects.setCapture(bad), TypeError);
+  assert.throws(() => objects.onDispose(1), TypeError);
+  // Every lit scatter the objects attached: the shrub's part and the grass.
+  const lit = attached.filter((s) => s.options?.material);
+  assert.ok(lit.length >= 2 && lit.some((s) => !objects.casters.includes(s)), 'a species part and a detail scatter');
+  objects.draw({}, 'capture');
+  for (const s of lit) assert.equal(s[key], undefined, 'no hook: no part takes one');
+  const stop = objects.setCapture(hook);
+  objects.draw({}, 'capture');
+  for (const s of lit) {
+    assert.ok(s[key], 'each part shares the hook after its first capture');
+    assert.equal(s.capture.declarations('x'), '// mine x', 'and its hook forwards to the objects hook');
+  }
+  // A part's own draw is reached through drawCapture with the hook current.
+  for (const s of lit) s.draw = (c, mode) => drawn.push(mode);
+  objects.draw({}, 'capture');
+  assert.equal(drawn.length, lit.length, 'every species part and the grass draw once');
+  assert.ok(drawn.every((mode) => mode === 'capture'));
+  stop();
+  for (const s of lit) assert.equal(s[key], undefined, 'the remover gives every part its hook back');
+  drawn.length = 0;
+  objects.draw({}, 'capture');
+  assert.equal(drawn.length, 0, 'no hook: nothing drawn');
+  objects.setCapture(hook);
+  objects.draw({}, 'capture');
+  // A part disposed under the objects (a tile streamed out) gives its share back at the next capture.
+  const grass = lit.find((s) => !objects.casters.includes(s));
+  assert.ok(grass[key]);
+  grass.dispose();
+  objects.draw({}, 'capture');
+  assert.equal(grass[key], undefined, 'a disposed part is not kept');
+  let calls = 0;
+  objects.onDispose(() => calls++);
+  objects.onDispose(() => calls++)();
+  objects.dispose();
+  objects.dispose();
+  assert.equal(calls, 1);
+  for (const s of lit) assert.equal(s[key], undefined);
+  assert.throws(() => objects.setCapture(hook), TypeError);
+});

@@ -255,6 +255,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `BiomeView.setCapture` forwarding to the terrain and its objects, so a page adds the whole view once; a regression
   test of a plant in front of shaded ground; then KB-LOOK-TV-BOUNCE1 (sun to sky-ambient ratio) is measured again.
   Until then the timber-valley bounce, shadowTint and penumbra numbers are not evidence.
+- **Progress 2026-11-26:** `Scatter.setCapture` (every subclass, `ScatterTiles` included), `SceneTargets.add(model,
+  {ground: false})`, `BiomeObjects.setCapture` and `BiomeView.setCapture` landed, with the timber-valley page adding
+  `view.objects` as not ground; post `test/scene-targets-scatter-browser.mjs` proves a plant over shaded ground on
+  WebGPU and the WebGL2 layer. Still owed: `ScatterInstances` capture, `scenes/test/timber-valley-masks-check.mjs` on the
+  rail-line shot, then BOUNCE1 and PENUMBRA1 measured again.
 
 ### Open 2026-11-26: tall scattered plants sway by their own height and whip at tens of m/s in a gale (KB-LOOK-TV-SHIMMER1, scatter)
 

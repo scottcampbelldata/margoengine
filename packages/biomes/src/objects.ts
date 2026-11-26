@@ -11,6 +11,9 @@ import type { ScatterStateSource, ScatterTextures } from '@margoengine/scatter';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 import type { BiomePlacement, PlacedTile } from './placement.js';
 import { captureScene } from '../../shared/scene-scope.js';
+import { drawCapture, shareCapture } from '../../shared/capture.js';
+import type { ScatterCapture } from '@margoengine/scatter';
+import type { PassContext } from '@margoengine/core/extension';
 import type { BiomeSeasons } from './seasons.js';
 import type { BiomeWorld } from './world.js';
 
@@ -341,6 +344,7 @@ function partsOf(
 }
 
 /** One detail kind: its scatter, its density map's CPU copy and the texture of the device it was last made on. */
+type ObjectsPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 type Detail = { id: string; scatter: Scatter; texture?: GPUTexture; device?: GPUDevice; data: Uint8Array };
 
 /**
@@ -369,6 +373,10 @@ export class BiomeObjects implements Disposable {
   readonly #held = new Map<string, number>();
   #far?: import('@margoengine/biomes/far').FarForest;
   #disposed = false;
+  /** `setCapture`'s hook, each child scatter's share of it, and the dispose listeners. */
+  #capture?: ScatterCapture;
+  readonly #shared = new Map<Scatter, () => void>();
+  readonly #disposers = new Set<() => void>();
 
   private constructor(engine: EngineKernel, placement: BiomePlacement, options: BiomeObjectsOptions, modules: Modules) {
     this.#engine = engine;
@@ -622,6 +630,73 @@ export class BiomeObjects implements Disposable {
   }
 
   /**
+   * Lets a capture hook (`@margoengine/post` SSR, SceneTargets, LightBounce: `targets.add(objects, {ground: false})`)
+   * draw every scattered object with its own material: the species parts, snags, detail (grass, ferns) and the far
+   * stand-ins, each through `Scatter.setCapture`. Parts made later (tiles streamed in) join at their first capture.
+   * Returns a remover. Without a hook nothing changes.
+   * @throws TypeError for a bad hook or disposed objects.
+   */
+  setCapture(hook: ScatterCapture): () => void {
+    if (
+      this.#disposed ||
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
+      throw new TypeError(
+        'Invalid biome objects capture hook; pass an object with declarations() and begin() functions and a targets array to live BiomeObjects.',
+      );
+    this.#release();
+    this.#capture = hook;
+    return () => {
+      if (this.#capture !== hook) return;
+      this.#release();
+      this.#capture = undefined;
+    };
+  }
+
+  /** Calls `callback` once when the objects are disposed; returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('BiomeObjects onDispose needs a function');
+    this.#disposers.add(callback);
+    return () => this.#disposers.delete(callback);
+  }
+
+  /**
+   * `mode` 'capture': draws every lit scattered object into the capture hook's pass (`setCapture`); `color` and `depth`
+   * are unused. Does nothing without a hook or after disposal.
+   */
+  draw(c: ObjectsPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
+    const hook = this.#capture;
+    if (mode !== 'capture' || !hook || this.#disposed) return;
+    void color;
+    void depth;
+    // Tiles streamed out dispose their scatters: their shares go, so the map holds only live parts.
+    for (const [scatter, restore] of this.#shared)
+      if (scatter.disposed) {
+        restore();
+        this.#shared.delete(scatter);
+      }
+    for (const scatter of this.#scatters()) {
+      if (scatter.disposed || !scatter.options.material) continue;
+      if (!this.#shared.has(scatter)) this.#shared.set(scatter, shareCapture(scatter, hook));
+      drawCapture(scatter, hook, c);
+    }
+  }
+
+  /** Every scatter this draws: species parts, snags, detail and far stand-ins. */
+  #scatters(): Scatter[] {
+    return [...this.casters, ...this.#details.map((d) => d.scatter), ...(this.#far?.scatters ?? [])];
+  }
+
+  /** Gives the children's hooks back. */
+  #release(): void {
+    for (const restore of this.#shared.values()) restore();
+    this.#shared.clear();
+  }
+
+  /**
    * Every stored-object mesh: each species' parts (trunk and canopy) and the snags. `BiomeView`'s `shadows` option adds
    * them to a `Shadows` as casters; detail (grass, ferns) receives shadows but does not cast.
    */
@@ -832,6 +907,8 @@ export class BiomeObjects implements Disposable {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#release();
+    this.#capture = undefined;
     this.#offSeasons?.();
     this.#far?.dispose();
     // Sharing parts first, then the part whose buffers they read.
@@ -841,6 +918,9 @@ export class BiomeObjects implements Disposable {
       d.scatter.dispose();
       d.texture?.destroy();
     }
+    const listeners = [...this.#disposers];
+    this.#disposers.clear();
+    for (const listener of listeners) listener();
   }
 
   [Symbol.dispose](): void {
