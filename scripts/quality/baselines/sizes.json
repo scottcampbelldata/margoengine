@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20531988,
+  "total": 20532586,
   "history": [
     {
       "date": "2026-10-24",
@@ -13469,6 +13469,12 @@
       "grew": 1,
       "added": 0,
       "reason": "EARTH-01 increases the optional granular entry from 4066 to 5114 B gzip for the conservative bed-volume projection and its readback. A split would duplicate the terrain registry binding. Core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "a7ff48e5db",
+      "grew": 4,
+      "reason": "KB-PICK-INSTMOVE1: GPU picking draws gltf/pbr instances through the shared pick shader (instance transform after the vertex move, one ID per row) in PickingPrimitives, which every selection entry carries; ceilings hit-details 16055 to 16163, xray 13225 to 13398, area 16230 to 16394, highlight 14000 to 14153 B gzip (headroom included). A split would put a second copy of the pick shader in each entry. Core plus Stage unchanged at 24846 B."
     }
   ],
   "items": {
@@ -14687,11 +14693,11 @@
     "@margoengine/sciviz/xdmf": 19832,
     "@margoengine/selection": 23571,
     "@margoengine/selection/actions": 2943,
-    "@margoengine/selection/area": 16230,
-    "@margoengine/selection/highlight": 14000,
-    "@margoengine/selection/hit-details": 16055,
+    "@margoengine/selection/area": 16394,
+    "@margoengine/selection/highlight": 14153,
+    "@margoengine/selection/hit-details": 16163,
     "@margoengine/selection/spatial": 2313,
-    "@margoengine/selection/xray": 13225,
+    "@margoengine/selection/xray": 13398,
     "@margoengine/shader": 19769,
     "@margoengine/shader/black-hole": 26010,
     "@margoengine/shader/compute-texture": 4761,

@@ -16,6 +16,7 @@ import {
   solidVertexDepth,
 } from '../../shared/caster.js';
 import { displacedDepth } from '../../shared/displacement.js';
+import { instancedDepth } from '../../shared/instances.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { TEXTURE_BINDING: number; COPY_DST: number };
@@ -51,6 +52,12 @@ export interface PickingPrimitive {
   clip?: GPUBufferBinding;
   doubleSided?: boolean;
   side?: 'front' | 'back' | 'double';
+  /**
+   * The instances the colour pass draws of this primitive (gltf/pbr `PBRInstances`): one draw of `count` rows from row
+   * 0 through the same instance transform and vertex move as the colour pass. Row k writes the primitive's ID + k. A
+   * primitive with a `mirrored` row is picked from both sides, as the colour pass then draws it without face culling.
+   */
+  instances?: { readonly count: number; readonly mirrored?: boolean; upload(device: GPUDevice): GPUBuffer };
 }
 /** Optional geometry (a model loader) that `Picking` and `Selection` draw besides core meshes; register it with `add(source)`. `disposed` sources are skipped. */
 export interface PickingSource {
@@ -83,6 +90,7 @@ interface Draw {
   displacement?: PickingPrimitive['displacement'];
   displaced?: GPUBindGroup;
   clip?: GPUBuffer;
+  instanced: boolean;
 }
 const identityUV = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0]);
 const budget = 65536;
@@ -276,7 +284,8 @@ export class PickingPrimitives {
           hiddenInTree(this.engine!.store, node.id) ||
           (options.filter && !options.filter(node, p, source, sourceIndex)) ||
           (options.mask && !options.mask(node)) ||
-          !p.count
+          !p.count ||
+          p.instances?.count === 0
         )
           continue;
         if (primitives.length >= budget)
@@ -321,9 +330,10 @@ export class PickingPrimitives {
     for (let index = 0; index < primitives.length; index++) {
       const p = primitives[index],
         { opacity, animation, displacement, clip } = p,
+        instanced = !!p.instances,
         variant =
-          opacity || animation || displacement || clip || p.vertexAlpha === false
-            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, displacement, !!clip, !!animation)
+          opacity || animation || displacement || clip || instanced || p.vertexAlpha === false
+            ? this.pipeline(options, !!opacity, p.vertexAlpha === false, displacement, !!clip, !!animation, instanced)
             : pipeline;
       let record = draws[index];
       if (
@@ -355,6 +365,7 @@ export class PickingPrimitives {
             displacement,
             displaced: displacementGroup(this.device!, () => variant.getBindGroupLayout(1), displacement),
             clip: clip?.buffer,
+            instanced,
             groups: uniformGroups(uniform, (binding) =>
               this.device!.createBindGroup({
                 layout: variant.getBindGroupLayout(0),
@@ -388,7 +399,15 @@ export class PickingPrimitives {
       );
       values.set(p.alphaTransform ?? identityUV, 36);
       values[44] = ids[index];
-      values[45] = p.side === 'back' ? 2 : p.side === 'double' ? 1 : p.side === 'front' ? 0 : +(p.doubleSided ?? false);
+      values[45] = p.instances?.mirrored
+        ? 1
+        : p.side === 'back'
+          ? 2
+          : p.side === 'double'
+            ? 1
+            : p.side === 'front'
+              ? 0
+              : +(p.doubleSided ?? false);
       record.slice = writeUniform(this.device, record.uniform, values as Float32Array<ArrayBuffer>, c.view ?? c);
     }
     for (const record of draws.splice(primitives.length)) retire(this.device!, record.uniform);
@@ -413,14 +432,17 @@ export class PickingPrimitives {
         if (draws[index].displaced) pass.setBindGroup(1, draws[index].displaced!);
         pass.setVertexBuffer(0, p.vertex, p.vertexOffset || undefined);
         pass.setIndexBuffer(p.index, 'uint32');
-        pass.drawIndexed(p.count);
+        if (p.instances) {
+          pass.setVertexBuffer(1, p.instances.upload(this.device));
+          pass.drawIndexed(p.count, p.instances.count);
+        } else pass.drawIndexed(p.count);
       }
     } finally {
       pass.end();
     }
     return candidates;
   }
-  /** The pipeline of `options`; a primitive with an opacity map, moving UVs, no vertex alpha, displacement or planes takes its own shader. */
+  /** The pipeline of `options`; a primitive with an opacity map, moving UVs, no vertex alpha, displacement, planes or instances takes its own shader. */
   private pipeline(
     options: DrawOptions,
     opacity = false,
@@ -428,6 +450,7 @@ export class PickingPrimitives {
     displacement?: PickingPrimitive['displacement'],
     clipped = false,
     animated = false,
+    instanced = false,
   ): GPURenderPipeline {
     const mask = !!options.mask,
       displaced = !!displacement,
@@ -443,6 +466,7 @@ export class PickingPrimitives {
         displacement?.key ?? displaced,
         clipped,
         animated,
+        instanced,
       ].join(':');
     let pipeline = this.pipelines.get(key);
     if (!pipeline) {
@@ -452,20 +476,23 @@ export class PickingPrimitives {
         );
       let code = shader(mask);
       if (displaced) code = displacedDepth(code, 1, displacement);
+      // The shadow casters' order: the vertex move in mesh space, then the instance and node transforms.
+      if (instanced) code = instancedPick(code, mask);
       if (solid) code = solidVertexDepth(code);
       if (opacity) code = opacityDepth(code, 0);
       if (animated) code = animatedDepth(code, 0);
       if (clipped) code = clippedDepth(code, 3, 'materialClip');
       if (options.surface) code = options.surface.shader(code, 'primitive');
-      const module = this.device!.createShaderModule({ code });
+      if (instanced)
+        code = code.replace('surfaceNormal(f.model,', 'surfaceNormal(f.model*mat4x4f(i.m0,i.m1,i.m2,i.m3),');
+      const module = this.device!.createShaderModule({ code }),
+        buffers = casterBuffers(80, displaced, instanced);
       pipeline = this.device!.createRenderPipeline({
         layout: 'auto',
         vertex: {
           module,
           entryPoint: 'vertex',
-          buffers: options.surface
-            ? options.surface.buffers(casterBuffers(80, displaced), 'primitive')
-            : casterBuffers(80, displaced),
+          buffers: options.surface ? options.surface.buffers(buffers, 'primitive') : buffers,
         },
         fragment: {
           module,
@@ -520,4 +547,20 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alp
  let uv=vec2f(dot(f.uv0.xy,i.uv)+f.uv0.z,dot(f.uv1.xy,i.uv)+f.uv1.z);let alpha=textureSample(alphaMap,alphaSampler,uv).a*f.settings.x*i.alpha;
  let facing=front==(f.settings.w>0.0);if((!facing&&f.info.y<0.5)||(facing&&f.info.y>1.5)||alpha<f.settings.y){discard;}return ${mask ? 'vec4f(1,0,0,1)' : 'u32(f.info.x)'};
 }`;
+}
+
+/**
+ * The pick shader drawn per instance: shared/instances.js `instancedDepth` (the shadow casters' instance transform) and
+ * a flat row, so row k writes the primitive's ID + k. A material plugin that reads rows names the same `margoRow`.
+ */
+function instancedPick(code: string, mask: boolean): string {
+  const row = '@builtin(instance_index) margoRow:u32';
+  let out = instancedDepth(code)
+    .replace('@location(1) alpha:f32}', '@location(1) alpha:f32,@location(2) @interpolate(flat) pickRow:u32}')
+    .replace('var o:Out;', 'var o:Out;o.pickRow=margoRow;');
+  if (!out.includes(row)) out = out.replace('@vertex fn vertex(', `@vertex fn vertex(${row},`);
+  if (!mask) out = out.replace('return u32(f.info.x);', 'return u32(f.info.x)+i.pickRow;');
+  if (!out.includes('mat4x4f(i.m0,i.m1,i.m2,i.m3)') || !out.includes('o.pickRow=margoRow;'))
+    throw new TypeError('Instanced picking needs the 80-byte PBR pick shader; draw instances with it.');
+  return out;
 }

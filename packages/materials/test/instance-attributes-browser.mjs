@@ -88,6 +88,7 @@ for (const compat of compatRun() ? [true] : [false, true]) {
 
     const s = await check('picking');
     assert.deepEqual([s.there, s.centre, s.back, s.left], [true, false, true, false], 'picking follows the move');
+    assert.equal(s.instancedThere, true, 'picking an instanced mesh follows the move (KB-PICK-INSTMOVE1)');
 
     const v = await check('velocity');
     assert.ok(v.moved > 0, 'TAA compiled a velocity shader that loads the row');

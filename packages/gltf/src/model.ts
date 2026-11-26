@@ -3821,6 +3821,8 @@ export class PBRModel implements EnginePlugin {
           ...((m.vertexAlpha === false || opaqueDraw(r)) && cutoff > 0 ? { vertexAlpha: false } : {}),
           ...(m.displacement ? { displacement: m.displacement } : {}),
           ...(m.surfaceClip ? { clip: m.surfaceClip } : {}),
+          // Picked where the colour pass draws each instance (KB-PICK-INSTMOVE1).
+          ...(r.primitive.instances ? { instances: r.primitive.instances } : {}),
         };
       });
   }

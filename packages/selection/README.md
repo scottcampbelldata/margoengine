@@ -148,7 +148,10 @@ ancestors, mirrored winding, front/back/double-sided materials, alpha masks, opa
 (materials `alphaMap`, `PickingPrimitive.opacity`), displaced surfaces (`displacement`), clipping planes (`clip`, whatever
 `clipShadows` says), vertex alpha (left out with `vertexAlpha: false`),
 UV1, texture transforms and implicit mip filtering. Blended PBR surfaces are
-pickable when their sampled alpha is at least 0.001, materials meshes included. GPU picking chooses the
+pickable when their sampled alpha is at least 0.001, materials meshes included. Instanced meshes
+(`PickingPrimitive.instances`, gltf/pbr instances and materials `createInstancedMesh`) are picked where the colour
+pass draws each instance, after the instance transform and the material's vertex move, and the hit names the
+`instanceId`. GPU picking chooses the
 nearest visible surface; CPU BVH queries remain geometric triangle queries.
 
 Outlines replay the same current PBR buffers against scene depth, with both
