@@ -14,7 +14,7 @@ use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, MassMode, 
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
 /// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step, a version below 12 the default continuous collision tolerances, a version below 13 no extra substeps, a version below 14 no combine rules (read as the average, the default), a version below 15 no contact skin, a version below 16 no mass mode (read as by density), a version below 17 the default warm start, allowed penetration, prediction distance and static contact spring.
-const VERSION: u32 = 17;
+const VERSION: u32 = 18;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -240,6 +240,18 @@ impl World {
             for v in numbers {
                 w.f32(v);
             }
+            // Its seams (version 18): which edges are cuts, and each outline corner's two normals and turn.
+            w.bool(sh.seams.is_some());
+            if let Some(seams) = &sh.seams {
+                w.u8(seams.cut);
+                for corner in seams.corner {
+                    w.bool(corner.is_some());
+                    let (from, to, convex) = corner.unwrap_or((V2::ZERO, V2::ZERO, false));
+                    w.v2(from);
+                    w.v2(to);
+                    w.bool(convex);
+                }
+            }
             w.bool(sh.dead);
             // The fat box the broad phase keeps for it, which only changes when the shape leaves it.
             let fat = if sh.dead { None } else { self.broad_fat(index as u32) };
@@ -460,6 +472,16 @@ impl World {
             } else {
                 MassMode::Density
             };
+            let seams = if r.version >= 18 && r.bool()? {
+                let mut seams = crate::seams::Seams { cut: r.u8()?, ..Default::default() };
+                for corner in &mut seams.corner {
+                    let (some, from, to, convex) = (r.bool()?, r.v2()?, r.v2()?, r.bool()?);
+                    *corner = if some { Some((from, to, convex)) } else { None };
+                }
+                Some(alloc::boxed::Box::new(seams))
+            } else {
+                None
+            };
             let dead = r.bool()?;
             let has_fat = r.bool()?;
             let f = [r.f32()?, r.f32()?, r.f32()?, r.f32()?];
@@ -478,7 +500,7 @@ impl World {
             if has_fat {
                 world.broad_place_exact(id as u32, &Bounds { min: [f[0], f[1]], max: [f[2], f[3]] });
             }
-            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, friction_rule, restitution_rule, skin, mass_mode, grid, dead });
+            world.shapes.push(Shape { body, core, density, friction, restitution, ghosts, seams, chain, groups, solver_groups, sensor, events, active_types, force_threshold, one_sided, hooks, friction_rule, restitution_rule, skin, mass_mode, grid, dead });
         }
         let n = r.count(40)?;
         for _ in 0..n {

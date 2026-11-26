@@ -947,7 +947,18 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     const parts = describeShapes(options, this.scale);
     const ids: number[] = [];
     try {
-      for (const d of parts) ids.push(...this.createShapes(body, d));
+      const seams: number[] = [];
+      for (const d of parts) {
+        const made = this.createShapes(body, d);
+        ids.push(...made);
+        if (d.seam) seams.push(...made);
+      }
+      // The triangles of a trimesh with fixInternalEdges become one solid for contacts.
+      if (seams.length > 1) {
+        const { kernel } = this;
+        kernel.io(seams.length).u.set(seams, 0);
+        kernel.ok(kernel.exports.shapes_join_seams(this.handle, seams.length));
+      }
     } catch (error) {
       for (const id of ids) this.kernel.exports.shape_remove(this.handle, id);
       throw error;

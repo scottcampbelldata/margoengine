@@ -546,6 +546,20 @@ pub extern "C" fn shape_mass(handle: i32, shape: u32) -> i32 {
     })
 }
 
+/// io: `count` shape handles, polygons of one body, joined into one solid for contacts (`World::join_seams`, seams.rs).
+#[unsafe(no_mangle)]
+pub extern "C" fn shapes_join_seams(handle: i32, count: u32) -> i32 {
+    with_world!(handle, |w| {
+        let count = count as usize;
+        if count > io().len() {
+            return Err(PhysicsError::InvalidParameter);
+        }
+        let ids: Vec<u32> = io()[..count].to_vec();
+        w.join_seams(&ids)?;
+        Ok(0)
+    })
+}
+
 /// io: the move, in the body's frame: x, y and the angle, so each point p goes to rotate(angle) p + (x, y).
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_move(handle: i32, shape: u32) -> i32 {

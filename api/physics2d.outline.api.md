@@ -111,6 +111,11 @@ type ShapeOptions2D = {
     shape: 'trimesh';
     vertices: readonly Vec2D[];
     indices: ArrayLike<number>;
+    fixInternalEdges?: boolean;
+    mergeDuplicateVertices?: boolean;
+    deleteDegenerateTriangles?: boolean;
+    deleteDuplicateTriangles?: boolean;
+    deleteBadTopologyTriangles?: boolean;
 } | {
     shape: 'heightfield';
     heights: ArrayLike<number>;

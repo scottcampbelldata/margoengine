@@ -64,7 +64,7 @@ Build and unit tests: npm test --workspace @margoengine/physics2d
 | Shapes | ball, cuboid, capsule, segment | `box`, `circle`, `capsule`, `segment` colliders | full |
 | Shapes | convex polygon, convex decomposition of concave or large input | `polygon` (convex hull to 8 corners; concave or larger split by ear clipping and Hertel-Mehlhorn) | full |
 | Shapes | polyline | `polyline` (chains with ghost vertices: bodies slide over the joins) | full |
-| Shapes | triangle, round (border radius) cuboid, triangle and convex polygon, trimesh | `triangle`, `borderRadius` on `box`, `polygon` and `triangle`, `trimesh` (triangles by index) | full |
+| Shapes | triangle, round (border radius) cuboid, triangle and convex polygon, trimesh with its flags | `triangle`, `borderRadius` on `box`, `polygon` and `triangle`, `trimesh` (triangles by index, `fixInternalEdges` and the clean-up flags) | full |
 | Shapes | heightfield, halfspace, compound, voxels, shared shapes | `heightfield` (a smooth chain), `halfspace` (a polygon 200,000 units across), `compound` (parts with their own placement), `voxels` (merged outlines for contact, the cells themselves for queries); shape options are plain values, so one can be reused on any number of colliders | full, with the accepted differences in limits |
 | Shapes | oriented (one-sided) polyline | `polyline` with `oneSided: true` | full |
 | Collision | broad phase, narrow phase, manifolds, islands, sleeping | kernel box tree, SAT and clipping, SIMD solver | full |
@@ -172,6 +172,37 @@ for (let i = 0; i < 30; i++) physics.step();
 const {awake, islands, contactsSolved, steps} = physics.counts;
 console.log(awake, islands, contactsSolved > 0, steps); // 4 1 true 30
 console.log(physics.timing.step >= physics.timing.solver); // true
+physics.dispose();
+```
+
+## Triangle meshes
+
+A `trimesh` collider takes triangles by index into its vertices. Each triangle collides alone, so a body sliding over the
+edge two triangles share can catch on it; `fixInternalEdges: true` joins them into one solid for contacts (Rapier's
+`TriMeshFlags.FIX_INTERNAL_EDGES`, which in Rapier 2D changes nothing: its box catches on the same strip with the flag or
+without it). A shared edge then makes no contact, and a contact on a triangle takes only the normals the mesh's outline has
+there, so boxes and balls slide across the joins and still meet the mesh's real corners. Shared edges are found by exact
+positions. The clean-up flags run first, in Rapier's order: `mergeDuplicateVertices`, `deleteDegenerateTriangles` (a flat
+triangle otherwise collides along its line, as in Rapier), `deleteDuplicateTriangles` and `deleteBadTopologyTriangles`.
+All are off by default.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 100 });
+const vertices: [number, number][] = [],
+  indices: number[] = [];
+for (let i = 0; i <= 20; i++) vertices.push([i * 50, 0], [i * 50, 100]);
+for (let i = 0; i < 20; i++) indices.push(2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2);
+physics.addBody(null, { type: 'fixed', colliders: { shape: 'trimesh', vertices, indices, friction: 0, fixInternalEdges: true } });
+const box = physics.addBody(null, {
+  position: [30, -10],
+  linearVelocity: [200, 0],
+  colliders: { shape: 'box', width: 20, height: 20, friction: 0 },
+});
+for (let i = 0; i < 120; i++) physics.step();
+console.log(Math.round(box.linearVelocity[0]), Math.abs(box.rotation) < 0.05); // 200 true
 physics.dispose();
 ```
 

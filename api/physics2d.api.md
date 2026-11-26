@@ -672,6 +672,11 @@ export type ShapeOptions2D = {
     shape: 'trimesh';
     vertices: readonly Vec2D[];
     indices: ArrayLike<number>;
+    fixInternalEdges?: boolean;
+    mergeDuplicateVertices?: boolean;
+    deleteDegenerateTriangles?: boolean;
+    deleteDuplicateTriangles?: boolean;
+    deleteBadTopologyTriangles?: boolean;
 } | {
     shape: 'heightfield';
     heights: ArrayLike<number>;
@@ -784,6 +789,7 @@ interface Described {
     geometry: Uint32Array;
     area: number;
     convex: boolean;
+    seam?: boolean;
 }
 
 interface Exports {
@@ -835,6 +841,7 @@ interface Exports {
     shape_set(world: number, shape: number): number;
     shape_set_core(world: number, shape: number, kind: number): number;
     shape_move(world: number, shape: number): number;
+    shapes_join_seams(world: number, count: number): number;
     shape_set_mass(world: number, shape: number, mode: number): number;
     shape_mass(world: number, shape: number): number;
     shape_read(world: number, shape: number): number;

@@ -16,6 +16,7 @@ use crate::manifold::{Manifold, collide_coherent_trusted, collide_four_trusted, 
 use crate::mass::{MassData, checked_mass_of};
 use crate::math::{Rot, V2, Xf, sqrt, v2};
 use crate::shape::{Core, LINEAR_SLOP};
+use crate::seams::fit_to_seams;
 use crate::smooth::{CHAIN_WELD, collide_smooth_trusted};
 use crate::solver;
 
@@ -318,6 +319,8 @@ pub struct Shape {
     /// For a segment of a chain: the far vertices of the segments before and after it, in the body's frame (smooth.rs);
     /// `None` at a chain's open end, and for every other shape.
     pub ghosts: [Option<V2>; 2],
+    /// For a polygon of a mesh joined with `join_seams`: which of its edges are shared and the outline's corners (seams.rs).
+    pub seams: Option<alloc::boxed::Box<crate::seams::Seams>>,
     pub chain: bool,
     pub groups: u32,
     pub solver_groups: u32,
@@ -865,7 +868,7 @@ impl World {
         if def.density < 0.0 || def.friction < 0.0 || def.restitution < 0.0 || def.force_threshold.is_nan() || def.force_threshold < 0.0 || def.events > 3 || def.active_types > ACTIVE_ALL || def.friction_rule > COMBINE_LAST || def.restitution_rule > COMBINE_LAST { return Err(PhysicsError::InvalidParameter); }
         if !def.skin.is_finite() { return Err(PhysicsError::NotFinite); }
         if def.skin < 0.0 { return Err(PhysicsError::InvalidParameter); }
-        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, skin: def.skin, mass_mode: MassMode::Density, grid: None, dead: false };
+        let shape = Shape { body, core, density: def.density, friction: def.friction, restitution: def.restitution, ghosts: [None; 2], seams: None, chain: false, groups: def.groups, solver_groups: def.solver_groups, sensor: def.sensor, events: def.events, active_types: def.active_types, force_threshold: def.force_threshold, one_sided: def.one_sided, hooks: def.hooks, friction_rule: def.friction_rule, restitution_rule: def.restitution_rule, skin: def.skin, mass_mode: MassMode::Density, grid: None, dead: false };
         let reused = self.free_shapes.pop();
         let id = match reused {
             Some(id) => {
@@ -1071,13 +1074,11 @@ impl World {
         Ok(())
     }
 
-    /// Takes a shape out of its body and the broad phase, ends its contacts (reporting a stop where a pair was touching)
-    /// and wakes what it touched; the body's mass is worked out again.
     /// Replaces a shape's outline with `core`, keeping its material, filtering and flags: a circle, capsule, segment, box or
     /// convex polygon, not a chain's segment or a voxel grid (those are made again whole). The body's mass follows the new
     /// outline, the shape's broad-phase box is refitted, and its contacts keep their pairs (so no collision event is made by
-    /// the change alone) but drop their points and warm start, so the next step builds them from the new outline. Wakes the
-    /// body. A refused change leaves the shape as it was.
+    /// the change alone) but drop their points and warm start, so the next step builds them from the new outline. A seamed
+    /// polygon (`join_seams`) loses its seams, which no longer fit. Wakes the body. A refused change leaves the shape as it was.
     pub fn set_shape_core(&mut self, id: u32, core: Core) -> Result<(), PhysicsError> {
         let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
         if shape.dead {
@@ -1093,6 +1094,7 @@ impl World {
             self.shapes[id as usize].core = before;
             return Err(error);
         }
+        self.shapes[id as usize].seams = None;
         self.broad.remove(id);
         self.broad.place(id, &bounds.grown(self.shapes[id as usize].skin), BOX_MARGIN);
         for contact in self.contacts.iter_mut().filter(|c| c.a == id || c.b == id) {
@@ -1102,6 +1104,32 @@ impl World {
             contact.primed = false;
         }
         self.wake(body)
+    }
+
+    /// Joins polygons `ids` of one body into one solid for contacts (Rapier's `TriMeshFlags::FIX_INTERNAL_EDGES` in 2D,
+    /// seams.rs): an edge two of them share, matched by exact vertex positions, is inside the union and makes no contact, and a
+    /// contact on a polygon takes only the normals the union's outline has there, so shapes slide over the joins without
+    /// catching. Each must be a live, sharp convex polygon (no radius), not a chain's segment or a voxel grid, and each given once.
+    /// Joining again replaces the seams of the polygons given. A refused call changes nothing.
+    pub fn join_seams(&mut self, ids: &[u32]) -> Result<(), PhysicsError> {
+        let mut cores = Vec::with_capacity(ids.len());
+        let mut body = None;
+        for (at, &id) in ids.iter().enumerate() {
+            let shape = self.shapes.get(id as usize).filter(|s| !s.dead).ok_or(PhysicsError::InvalidHandle)?;
+            if shape.chain || shape.grid.is_some() || body.is_some_and(|b| b != shape.body) || ids[..at].contains(&id) {
+                return Err(PhysicsError::InvalidParameter);
+            }
+            body = Some(shape.body);
+            cores.push(shape.core);
+        }
+        let seams = crate::seams::find_seams(&cores)?;
+        for (&id, seams) in ids.iter().zip(seams) {
+            self.shapes[id as usize].seams = Some(alloc::boxed::Box::new(seams));
+        }
+        for contact in self.contacts.iter_mut().filter(|c| ids.contains(&c.a) || ids.contains(&c.b)) {
+            contact.manifold.count = 0;
+        }
+        Ok(())
     }
 
     /// Moves a shape on its body by `delta` (in the body's frame: each point p goes to `delta.q` p + `delta.p`), as when a
@@ -1127,6 +1155,14 @@ impl World {
             core.normals[i] = delta.q.apply(core.normals[i]);
         }
         let ghosts = shape.ghosts.map(|g| g.map(|v| delta.apply(v)));
+        // A seamed polygon's corner normals turn with it.
+        let seams = shape.seams.as_ref().map(|seams| {
+            let mut moved = **seams;
+            for corner in moved.corner.iter_mut().flatten() {
+                (corner.0, corner.1) = (delta.q.apply(corner.0), delta.q.apply(corner.1));
+            }
+            alloc::boxed::Box::new(moved)
+        });
         let bounds = bounds_of(&core, self.bodies[body as usize].xf)?;
         let (before_core, before_ghosts) = (shape.core, shape.ghosts);
         (self.shapes[id as usize].core, self.shapes[id as usize].ghosts) = (core, ghosts);
@@ -1134,6 +1170,7 @@ impl World {
             (self.shapes[id as usize].core, self.shapes[id as usize].ghosts) = (before_core, before_ghosts);
             return Err(error);
         }
+        self.shapes[id as usize].seams = seams;
         self.broad.remove(id);
         self.broad.place(id, &bounds.grown(self.shapes[id as usize].skin), BOX_MARGIN);
         for contact in self.contacts.iter_mut().filter(|c| c.a == id || c.b == id) {
@@ -1184,6 +1221,9 @@ impl World {
         Ok((shape_mass_data(shape)?, checked_mass_of(&shape.core, 1.0)?.mass))
     }
 
+    /// Takes a shape out of its body and the broad phase, ends its contacts (reporting a stop where a pair was touching)
+    /// and wakes what it touched; the body's mass is worked out again.
+    /// A shape of a seamed mesh leaves its neighbours' seams as they were: remove the mesh whole.
     pub fn remove_shape(&mut self, id: u32) -> Result<(), PhysicsError> {
         let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
         if shape.dead { return Err(PhysicsError::InvalidHandle); }
@@ -1712,7 +1752,7 @@ impl World {
             let skin = sa.skin + sb.skin;
             let reach = self.settings.prediction_distance;
             let spec = reach.max(ba.soft_ccd).max(bb.soft_ccd) + skin;
-            if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 && spec == reach {
+            if !sa.chain && !sb.chain && sa.seams.is_none() && sb.seams.is_none() && sa.core.count == 4 && sb.core.count == 4 && spec == reach {
                 inputs[queued] = Some((&sa.core, xa, &sb.core, xb, reference_flip(&contact.manifold)));
                 pending[queued] = Some(contact);
                 queued += 1;
@@ -1746,6 +1786,13 @@ impl World {
                 collide_coherent_trusted(&sa.core, xa, &sb.core, xb, spec, reference_flip(&contact.manifold))?
             };
             let mut manifold = manifold;
+            // A polygon of a seamed mesh keeps only the normals the mesh's outline has (seams.rs).
+            if let Some(seams) = &sa.seams {
+                fit_to_seams(&mut manifold, &sa.core, seams, xa, true, sb.core.radius);
+            }
+            if let Some(seams) = &sb.seams {
+                fit_to_seams(&mut manifold, &sb.core, seams, xb, false, sa.core.radius);
+            }
             if skin > 0.0 {
                 for point in &mut manifold.points[..manifold.count] {
                     point.separation -= skin;

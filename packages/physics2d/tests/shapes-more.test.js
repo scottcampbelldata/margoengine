@@ -76,15 +76,16 @@ test('a trimesh takes triangles by index and refuses bad ones', () => {
     () => physics.addBody(null, { colliders: { shape: 'trimesh', vertices: [[0, 0]], indices: [0, 1, 2] } }),
     RangeError,
   );
+  // A mesh of nothing but a flat triangle is a segment, as in Rapier (trimesh-flags.test.js); one of a single point is nothing.
   assert.throws(
     () =>
       physics.addBody(null, {
         colliders: {
           shape: 'trimesh',
           vertices: [
-            [0, 0],
             [1, 1],
-            [2, 2],
+            [1, 1],
+            [1, 1],
           ],
           indices: [0, 1, 2],
         },

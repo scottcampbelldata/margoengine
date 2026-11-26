@@ -21,6 +21,7 @@ pub mod joint;
 pub mod manifold;
 pub mod mass;
 pub mod query;
+pub mod seams;
 pub mod math;
 pub mod shape;
 pub mod smooth;

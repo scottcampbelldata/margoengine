@@ -1,3 +1,4 @@
+import { cleanTrimesh2D } from './mesh-clean.js';
 import { cellOutlines } from './tilemap.js';
 
 /** A 2D point or vector [x, y]. */
@@ -52,10 +53,27 @@ export type ShapeOptions2D =
       shapes: readonly CompoundPart2D[];
     }
   | {
-      /** Triangles from `indices` (three to a triangle) into `vertices`: a mesh as one collider. */
+      /**
+       * Triangles from `indices` (three to a triangle) into `vertices`: a mesh as one collider. A flat triangle collides along
+       * its line, as Rapier's does; one whose three corners are one point is left out.
+       */
       shape: 'trimesh';
       vertices: readonly Vec2D[];
       indices: ArrayLike<number>;
+      /**
+       * Joins the triangles into one solid for contacts, so shapes slide over the edges they share without catching on them
+       * (Rapier's `TriMeshFlags.FIX_INTERNAL_EDGES`; in Rapier 2D the flag changes nothing, here it does). Shared edges are found
+       * by exact positions, so it needs no `mergeDuplicateVertices`. Default false, as in Rapier.
+       */
+      fixInternalEdges?: boolean;
+      /** Joins vertices at the same position into one before anything else (Rapier's `MERGE_DUPLICATE_VERTICES`). Default false. */
+      mergeDuplicateVertices?: boolean;
+      /** Leaves out flat triangles and those with a repeated vertex (Rapier's `DELETE_DEGENERATE_TRIANGLES`). Default false. */
+      deleteDegenerateTriangles?: boolean;
+      /** Leaves out a triangle whose three vertices another already has, in any order (`DELETE_DUPLICATE_TRIANGLES`). Default false. */
+      deleteDuplicateTriangles?: boolean;
+      /** Leaves out triangles that would give an edge a third triangle, later ones first (`DELETE_BAD_TOPOLOGY_TRIANGLES`). Default false. */
+      deleteBadTopologyTriangles?: boolean;
     }
   | {
       /**
@@ -231,6 +249,8 @@ export interface Described {
   area: number;
   /** Whether a query can use it: the kernel's convex shapes only. */
   convex: boolean;
+  /** A triangle of a trimesh joined with `fixInternalEdges`: the kernel joins these into one solid for contacts. */
+  seam?: boolean;
 }
 
 /** Words that read as floats and as integers, so a count sits beside the numbers it counts. */
@@ -464,20 +484,40 @@ function describePieces(options: ColliderOptions2D, scale: number): Described[] 
       const { vertices, indices } = options;
       if (!Array.isArray(vertices) || !indices || indices.length === 0 || indices.length % 3 !== 0)
         throw new TypeError('A trimesh needs vertices and an index list with three indices to a triangle.');
+      for (let i = 0; i < indices.length; i++) {
+        const k = indices[i];
+        if (!Number.isInteger(k) || k < 0 || k >= vertices.length)
+          throw new RangeError(`trimesh index ${k} is outside its ${vertices.length} vertices; fix the indices.`);
+      }
+      const { vertices: points, triangles } = cleanTrimesh2D(vertices, indices, options);
       const out: Described[] = [];
-      for (let i = 0; i < indices.length; i += 3) {
-        const tri = [indices[i], indices[i + 1], indices[i + 2]].map((k) => {
-          if (!Number.isInteger(k) || k < 0 || k >= vertices.length)
-            throw new RangeError(`trimesh index ${k} is outside its ${vertices.length} vertices; fix the indices.`);
-          return vertices[k];
-        });
+      for (let i = 0; i < triangles.length; i += 3) {
+        const tri = [points[triangles[i]!]!, points[triangles[i + 1]!]!, points[triangles[i + 2]!]!];
         const area = Math.abs(
           (tri[1][0] - tri[0][0]) * (tri[2][1] - tri[0][1]) - (tri[2][0] - tri[0][0]) * (tri[1][1] - tri[0][1]),
         );
-        if (area > 1e-9) out.push(describeShape(rest({ shape: 'polygon', points: tri }), scale));
+        if (area > 1e-9) {
+          const d = describeShape(rest({ shape: 'polygon', points: tri }), scale);
+          if (options.fixInternalEdges) d.seam = true;
+          out.push(d);
+        } else if (!options.deleteDegenerateTriangles) {
+          // A flat triangle is the segment between its two farthest corners; three corners at one point make nothing.
+          let [from, to, far] = [tri[0], tri[1], -1];
+          for (const [p, q] of [
+            [tri[0], tri[1]],
+            [tri[1], tri[2]],
+            [tri[2], tri[0]],
+          ] as const) {
+            const d = Math.hypot(q[0] - p[0], q[1] - p[1]);
+            if (d > far) [from, to, far] = [p, q, d];
+          }
+          if (far > 0) out.push(describeShape(rest({ shape: 'segment', from, to }), scale));
+        }
       }
       if (!out.length)
-        throw new RangeError('trimesh has no triangle with an area; give it triangles that are not flat.');
+        throw new RangeError(
+          'trimesh has no triangle left with an area or a length; give it triangles whose corners are not all one point.',
+        );
       return out;
     }
     case 'heightfield': {
