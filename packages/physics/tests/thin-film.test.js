@@ -373,6 +373,72 @@ test('ThinFilmSolver: complete wetting has the measured capillary spreading expo
   }
 });
 
+test('ThinFilmSolver: a fixed-volume gravity current predicts the measured absolute spreading radius', async () => {
+  // Huppert (1982), Table 1(a), run ×. The measured radius fit is the output oracle only.
+  const volume = 406e-6;
+  const releaseRadius = 0.045;
+  const kinematicViscosity = 13.2e-4;
+  const gravity = 9.80665;
+  const density = 970;
+  const times = [120, 240, 480];
+  const quadrantWidth = 0.34;
+  let coarse;
+  for (const [n, secondsPerStep] of [
+    [24, 4],
+    [48, 2],
+  ]) {
+    const spacing = quadrantWidth / n;
+    const radiusSquared = [];
+    const fillFraction = [];
+    // Reflecting boundaries on the axes solve one quadrant of the cylindrical release.
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const u = (x + 0.5) * spacing;
+        const v = (y + 0.5) * spacing;
+        radiusSquared.push(u * u + v * v);
+        let covered = 0;
+        for (let j = 0; j < 8; j++) {
+          for (let i = 0; i < 8; i++) {
+            const us = (x + (i + 0.5) / 8) * spacing;
+            const vs = (y + (j + 0.5) / 8) * spacing;
+            if (us * us + vs * vs < releaseRadius ** 2) covered++;
+          }
+        }
+        fillFraction.push(covered / 64);
+      }
+    }
+    const fill = volume / (4 * spacing ** 2 * fillFraction.reduce((sum, part) => sum + part, 0));
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate: { num: 1, den: secondsPerStep }, gravity: [0, -gravity, 0] }).add(film, {
+      cells: [n, n],
+      spacing,
+      depth: fillFraction.map((part) => part * fill),
+      density,
+      viscosity: density * kinematicViscosity,
+      surfaceTension: 0,
+    });
+    const radii = times.map((time) => {
+      const frame = time / secondsPerStep;
+      world.advance(frame);
+      let water = 0;
+      let moment = 0;
+      for (const [i, h] of film.depths().entries()) {
+        water += h;
+        moment += radiusSquared[i] * h;
+      }
+      close(4 * spacing ** 2 * water, volume, 64 * frame * Number.EPSILON * volume);
+      // Huppert's late-time profile h ∝ (1 − r²/R²)^(1/3) gives ⟨r²⟩ = 3R²/7.
+      const radius = Math.sqrt((7 * moment) / (3 * water));
+      const measured = 0.9 * ((gravity * volume ** 3) / (3 * kinematicViscosity)) ** (1 / 8) * time ** 0.12;
+      close(radius, measured, 0.05 * measured);
+      return radius;
+    });
+    if (coarse) {
+      for (const [i, radius] of radii.entries()) close(radius, coarse[i], spacing);
+    } else coarse = radii;
+  }
+});
+
 test('ThinFilmSolver: malformed wetting parameters report the range and its fix', async () => {
   const options = { cells: [4, 1], spacing: 0.001 };
   await assert.rejects(() => patch({ ...options, wetting: null }), {

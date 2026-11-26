@@ -15473,6 +15473,15 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   zero-gravity limit of the film equations. Multiplying the viscosity and clock by the
   same factor preserves those equations. No measured radii or exponents set the model.
   [Cazabat and Cohen Stuart](https://doi.org/10.1021/j100280a075) · [Ehrhard](https://doi.org/10.1017/S0022112093003167)
+- Herbert E. Huppert, “The propagation of two-dimensional and axisymmetric viscous gravity
+  currents over a rigid horizontal surface” (1982), §3 and Table 1(a), run ×. The input is
+  the measured 406 mL release and 13.2 cm²/s kinematic viscosity in the 45 mm radius cylinder.
+  In the gravity-dominated limit, density cancels between pressure and dynamic viscosity.
+  Integrating the late-time profile in equation 2.28 gives a radial mass moment of `3R²/7`.
+  The measured radius fit `0.900 (g V³ / (3 ν))^(1/8) t^0.120` is used only to check the
+  simulated radii. The release starts from the gate geometry without a similarity profile.
+  The gravity-only approximation omits the experimental surface-tension effects near the front.
+  [Journal](https://doi.org/10.1017/S0022112082001797)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
   Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to
   pressure. Equation 10 brackets the stationary contact front by the advancing and receding

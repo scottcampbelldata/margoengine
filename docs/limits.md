@@ -9657,8 +9657,11 @@ Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to 
 free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
 thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
 water balance. The complete-wetting capillary limit matches the independently measured
-0.094–0.125 radius exponent on 40 × 40 and 80 × 80 grids. Absolute contact-line traces
-and measured partially wetting slip remain open.
+0.094–0.125 radius exponent on 40 × 40 and 80 × 80 grids. A separate gravity-dominated release
+on horizontal Perspex predicts the measured absolute radius history within 3% on two grids.
+This comparison uses the bulk radius inferred from the radial mass moment. Absolute capillary
+contact-line traces and measured partially wetting slip remain open.
+[Reproduce](whitepaper/reproduce.md#fluid-07-measured-horizontal-spreading)
 The optional backing angle map adds one f64 value per film cell. Its pressure and
 implicit stiffness both vary by cell, and the exact two-cell check covers conservative
 motion toward the more wettable side and snapshot replay.

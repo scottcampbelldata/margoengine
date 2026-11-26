@@ -6233,6 +6233,15 @@ Complete wetting gives a capillary spreading exponent within the independently m
 grid refinement. The reduced calculation uses a fixed smooth cap and tests the exponent.
 [Reproduce](reproduce.md#fluid-07-precursor-wetting)
 
+### FLUID-07 measured horizontal spreading
+
+A gravity-dominated 406 mL silicone oil release on horizontal Perspex predicts the absolute
+spreading radius within 3% of Huppert's measured radius fit at 120, 240 and 480 s on two grids.
+At the finer resolution the predicted radii are 231.5, 252.4 and 275.2 mm against measured
+fit values of 227.1, 246.8 and 268.2 mm. Inputs come from the gate geometry, released volume
+and separately measured viscosity. The calculation uses the bulk radial mass moment in the
+shallow, gravity-dominated phase. [Reproduce](reproduce.md#fluid-07-measured-horizontal-spreading)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings

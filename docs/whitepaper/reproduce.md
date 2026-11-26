@@ -4547,6 +4547,17 @@ It checks both exponent intervals against the independent observations and repea
 cell size. The experiment's absolute radius history supplies no initialization.
 [Cazabat and Cohen Stuart (1986)](https://doi.org/10.1021/j100280a075) · [Ehrhard (1993), Table 2](https://doi.org/10.1017/S0022112093003167)
 
+### FLUID-07 measured horizontal spreading
+
+Run `node --test --test-name-pattern="fixed-volume gravity current" packages/physics/tests/thin-film.test.js`
+from a built physics entry. Initialize a quarter of Huppert's cylindrical 406 mL release on a
+340 mm square with reflecting symmetry axes. The 24 × 24 and 48 × 48 grids use 4 and 2 s
+steps respectively. At 120, 240 and 480 s, compare the radius inferred from the radial mass
+moment to the experimental fit for run × in Table 1(a). The output tolerance is 5% and the
+test checks water conservation and agreement within one refined cell. The measured fit sets
+no simulation input. The sharp front shape and surface-tension-dominated spreading are outside
+this check. [Huppert (1982), Table 1(a) and Figure 6](https://doi.org/10.1017/S0022112082001797)
+
 ### FLUID-07 measured inclined film
 
 Run `node --test --test-name-pattern="calibrated inlet" packages/physics/tests/coupling/thin-film.test.js`
