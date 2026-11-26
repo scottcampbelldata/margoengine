@@ -2,7 +2,7 @@
 // these from `beforestep`: no `Math`, only + - * / on values the kernel then rounds, and the same in every browser.
 import { MargoError } from '@margoengine/math/errors';
 import type { Mesh } from '@margoengine/core';
-import { BODY_CCD, BODY_DISABLED, BODY_NO_GYROSCOPIC, type KernelWorld } from './kernel.js';
+import { BODY_CCD, BODY_DISABLED, BODY_NO_GYROSCOPIC, BODY_SMOOTH_PATH, type KernelWorld } from './kernel.js';
 import { checkVec, matrixOf, multiplyQuat, quatFromTurn, rotateVec, type Quat, type Vec3 } from './math.js';
 import type { ColliderOptions } from './shapes.js';
 import type { PhysicsCollider } from './collider.js';
@@ -238,6 +238,44 @@ export class PhysicsBody {
     const { targetX, targetY, targetZ } = this.columns,
       { row } = this;
     this.world().setTarget(row, [targetX[row], targetY[row], targetZ[row]], rotation);
+    return this;
+  }
+  /**
+   * Kinematic position-based bodies: the velocity (m/s) and spin (rad/s, world axes) to reach the next target with. The body
+   * then moves through the step along the cubic of its pose, its target and its speeds at both ends, so its speed changes
+   * smoothly through the step and across steps, and what rides on it (props on a deck, a crate in a lift) feels its
+   * acceleration spread through the step instead of all at the step's start. Give it each step with the target, as the
+   * motion's own derivative. `null` returns the body to moving at one speed a step.
+   * @throws TypeError for a body that is not kinematicPosition.
+   */
+  setNextVelocity(linear: Vec3 | null, angular: Vec3 = [0, 0, 0]): this {
+    if (this.type !== 'kinematicPosition')
+      throw new TypeError('A next velocity is for a kinematicPosition body; set its type to kinematicPosition first.');
+    const c = this.columns,
+      { row } = this;
+    if (linear === null) {
+      c.flags[row] &= ~BODY_SMOOTH_PATH;
+      return this;
+    }
+    checkVec(linear, 'Velocity');
+    checkVec(angular, 'Angular velocity');
+    if (!(c.flags[row] & BODY_SMOOTH_PATH)) {
+      // The first smooth step begins at the speeds the body moves at now.
+      c.startLinearX[row] = c.linearX[row];
+      c.startLinearY[row] = c.linearY[row];
+      c.startLinearZ[row] = c.linearZ[row];
+      c.startAngularX[row] = c.angularX[row];
+      c.startAngularY[row] = c.angularY[row];
+      c.startAngularZ[row] = c.angularZ[row];
+      c.flags[row] |= BODY_SMOOTH_PATH;
+    }
+    c.targetLinearX[row] = linear[0];
+    c.targetLinearY[row] = linear[1];
+    c.targetLinearZ[row] = linear[2];
+    c.targetAngularX[row] = angular[0];
+    c.targetAngularY[row] = angular[1];
+    c.targetAngularZ[row] = angular[2];
+    this.world().wake(row);
     return this;
   }
 

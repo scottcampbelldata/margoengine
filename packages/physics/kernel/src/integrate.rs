@@ -316,6 +316,7 @@ impl World {
     /// read at the pose of the substep's stage (see `Window`), and leaves moving them to `integrate_kinematics`.
     fn run_substeps(&mut self, h: f32, substeps: u32, stiffness: Soft, inner: &mut f64, staged: bool) {
         for substep in 0..substeps {
+            self.window.substep = substep;
             if staged {
                 self.window.kin = Some(substep);
             }
@@ -352,7 +353,7 @@ impl World {
             self.spring_multibodies(h);
             self.clamp_speeds();
             tick(self, 9, inner);
-            self.integrate_poses(h, substep + 1 == substeps);
+            self.integrate_poses(h, substep, substeps);
             if staged {
                 self.window.kin = Some(substep + 1);
             }
@@ -400,6 +401,7 @@ impl World {
                 substeps: 0,
                 impacts: 0,
                 mb_call: 0,
+                substep: 0,
             }
         } else {
             let end = |start: usize, count: usize| start + count;
@@ -414,8 +416,102 @@ impl World {
                 substeps: 0,
                 impacts: 0,
                 mb_call: 0,
+                substep: 0,
             }
         }
+    }
+
+    /// A body's velocity and spin over substep `substep`: its columns' (`linear`, `angular`), or for a kinematicPosition body on
+    /// a smooth path, its chord over that substep (`smooth_velocity`).
+    #[inline(always)]
+    pub fn kinematic_velocity(&self, at: usize, substep: u32, substeps: u32, linear: V3, angular: V3) -> (V3, V3) {
+        if self.flags(at) & (KIND | SMOOTH_PATH) == KINEMATIC_POSITION | SMOOTH_PATH {
+            self.smooth_velocity(at, substep, substeps)
+        } else {
+            (linear, angular)
+        }
+    }
+
+    /// A kinematicPosition body's chord velocity and spin over substep `substep` of its step, on the cubic Hermite path from its
+    /// pose at the step's start (PREVIOUS) at the speeds it began with (START_LINEAR, START_ANGULAR) to its target at the speeds
+    /// it is to reach it with (TARGET_LINEAR, TARGET_ANGULAR). With tau the step's share gone and dt the step, the path from
+    /// its start is D h01(tau) + dt (v0 h10(tau) + v1 h11(tau)), h01 = 3 tau^2 - 2 tau^3, h10 = tau^3 - 2 tau^2 + tau,
+    /// h11 = tau^3 - tau^2, D the move to the target; the turn the same on the rotation vector of the step's turn. Its speed
+    /// changes through the step and is the same across a step's end, so a prop riding it takes its acceleration through the
+    /// step and not all in the step's first substep (KB-PHYS-KINJUMP1).
+    ///
+    /// The spin is the turn the poses of `kinematic_pose` make over the substep, exp(b) exp(a)^-1 for the path's rotation
+    /// vectors a and b at the substep's ends, and the velocity is its centre's. Where the spin's axis swings through a step (a
+    /// deck that rolls and pitches at once), that turn is not b - a: rotations do not commute, and the rest is the Baker,
+    /// Campbell and Hausdorff series, b - a + (a x b) / 2 + (a + b) x (a x b) / 12 to third order (the bracket of rotation
+    /// vectors is their cross product). Spun at b - a, a prop's friction followed a deck that went elsewhere: a block 57 m
+    /// aft on a rolling, pitching deck slid 1.4 mm in 36 s, where the same loads on a still floor moved it 0.02 mm. The
+    /// series is taken in place of the turn read off the two poses' quaternions, whose f32 rounding is a ten millionth of a
+    /// radian, 6 microns at 60 m every substep.
+    pub fn smooth_velocity(&self, at: usize, substep: u32, substeps: u32) -> (V3, V3) {
+        let dt = self.header().step_dt;
+        let h = dt / substeps as f32;
+        let n = substeps as f32;
+        let (a, b) = (substep as f32 / n, (substep + 1) as f32 / n);
+        let basis = |t: f32| (t * t * (3.0 - 2.0 * t), t * (t * t - 2.0 * t + 1.0), t * t * (t - 1.0));
+        let ((pa, sa, ea), (pb, sb, eb)) = (basis(a), basis(b));
+        let (dp, ds, de) = (pb - pa, (sb - sa) * dt, (eb - ea) * dt);
+        let along = |d: V3, v0: V3, v1: V3| d.scale(dp).add(v0.scale(ds)).add(v1.scale(de));
+        let moved = self.v(TARGET_X, at).sub(self.v(PREVIOUS_X, at));
+        let mut turn = self.q(TARGET_ROTATION_X, at).mul(self.q(PREVIOUS_ROTATION_X, at).conjugate());
+        if turn.w < 0.0 {
+            turn = Q { x: -turn.x, y: -turn.y, z: -turn.z, w: -turn.w };
+        }
+        let turn = turn.to_rotation_vector();
+        let (spin_start, spin_end) = (self.v(START_ANGULAR_X, at), self.v(TARGET_ANGULAR_X, at));
+        // The rotation vector at the substep's start, and its change over the substep.
+        let from = turn.scale(pa).add(spin_start.scale(sa * dt)).add(spin_end.scale(ea * dt));
+        let step = along(turn, spin_start, spin_end);
+        let bend = from.cross(step);
+        let spun = step.add(bend.scale(0.5)).add(from.add(from).add(step).cross(bend).scale(1.0 / 12.0));
+        let mut shift = along(moved, self.v(START_LINEAR_X, at), self.v(TARGET_LINEAR_X, at));
+        // The centre off the body's origin is carried round by the substep's turn as well.
+        let local = self.v(LOCAL_CENTER_X, at);
+        if local.dot(local) > 0.0 {
+            let arm = self.kinematic_pose(at, substep, substeps).2.rotate(local);
+            shift = shift.add(spun.cross(arm).sub(spun.cross(spun.cross(arm)).scale(0.5)));
+        }
+        (shift.scale(1.0 / h), spun.scale(1.0 / h))
+    }
+
+    /// A kinematicPosition body's pose at the end of substep `substep` of its step, from its pose at the step's start
+    /// (PREVIOUS) along its path: the straight move and turn toward its target, or on a smooth path (SMOOTH_PATH) the cubic of
+    /// `smooth_velocity`, its turn as the rotation vector so far applied to the start in one product. Built up substep by
+    /// substep instead, the f32 products of its turns drifted from its target by a few millionths of a radian over 64
+    /// substeps, and its snap onto the target at the step's end moved a deck point 60 m out by 0.4 mm in one substep, which
+    /// no friction on it can hold (`a_plate_rides_a_deck_on_a_smooth_path_for_minutes_at_any_substeps`).
+    pub fn kinematic_pose(&self, at: usize, substep: u32, substeps: u32) -> (V3, V3, Q) {
+        let local = self.v(LOCAL_CENTER_X, at);
+        if substep + 1 >= substeps {
+            let (position, rotation) = (self.v(TARGET_X, at), self.q(TARGET_ROTATION_X, at));
+            return (position, position.add(rotation.rotate(local)), rotation);
+        }
+        let t = (substep + 1) as f32 / substeps as f32;
+        let (start, start_rotation) = (self.v(PREVIOUS_X, at), self.q(PREVIOUS_ROTATION_X, at));
+        let moved = self.v(TARGET_X, at).sub(start);
+        let mut turn = self.q(TARGET_ROTATION_X, at).mul(start_rotation.conjugate());
+        if turn.w < 0.0 {
+            turn = Q { x: -turn.x, y: -turn.y, z: -turn.z, w: -turn.w };
+        }
+        let turn = turn.to_rotation_vector();
+        let (shift, spun) = if self.flags(at) & SMOOTH_PATH != 0 {
+            let dt = self.header().step_dt;
+            let (p, sv, ev) = (t * t * (3.0 - 2.0 * t), t * (t * t - 2.0 * t + 1.0) * dt, t * t * (t - 1.0) * dt);
+            (
+                moved.scale(p).add(self.v(START_LINEAR_X, at).scale(sv)).add(self.v(TARGET_LINEAR_X, at).scale(ev)),
+                turn.scale(p).add(self.v(START_ANGULAR_X, at).scale(sv)).add(self.v(TARGET_ANGULAR_X, at).scale(ev)),
+            )
+        } else {
+            (moved.scale(t), turn.scale(t))
+        };
+        let rotation = Q::from_rotation_vector(spun).mul(start_rotation).normalized();
+        let position = start.add(shift);
+        (position, position.add(rotation.rotate(local)), rotation)
     }
 
     /// The pose of a kinematic body at the stage of the substep being solved (`Window::kin`): what `integrate_poses` has made of
@@ -428,6 +524,9 @@ impl World {
             return None;
         }
         let substeps = if self.window.substeps > 0 { self.window.substeps } else { self.header().substeps };
+        if kind == KINEMATIC_POSITION {
+            return Some(self.kinematic_pose(at, stage - 1, substeps));
+        }
         let h = self.header().step_dt / substeps as f32;
         let (linear, angular, local) = (self.v(LINEAR_X, at), self.v(ANGULAR_X, at), self.v(LOCAL_CENTER_X, at));
         let (mut position, mut center, mut rotation) = (self.v(POSITION_X, at), self.v(CENTER_X, at), self.q(ROTATION_X, at));
@@ -438,6 +537,7 @@ impl World {
                 center = position.add(rotation.rotate(local));
                 continue;
             }
+            let (linear, angular) = self.kinematic_velocity(at, step - 1, substeps, linear, angular);
             center = center.add(linear.scale(h));
             let turn = Q::from_rotation_vector(angular.scale(h));
             rotation = turn.mul(rotation).normalized();
@@ -467,10 +567,11 @@ impl World {
     /// substeps, as `integrate_poses` does in a step that solves phase by phase.
     fn integrate_kinematics(&mut self, h: f32, substeps: u32) {
         for substep in 0..substeps {
+            self.window.substep = substep;
             for slot in 0..self.header().awake as usize {
                 let at = self.uu(AWAKE, slot) as usize;
                 if self.flags(at) & KIND != DYNAMIC {
-                    self.integrate_pose(at, h, substep + 1 == substeps);
+                    self.integrate_pose(at, h, substep, substeps);
                 }
             }
         }
@@ -643,28 +744,45 @@ impl World {
 
     /// Semi-implicit Euler's position half, with the velocities just updated, so the velocity a body reports is the one
     /// that moved it. A kinematicPosition body lands exactly on its target on the last substep.
-    pub fn integrate_poses(&mut self, h: f32, last: bool) {
+    pub fn integrate_poses(&mut self, h: f32, substep: u32, substeps: u32) {
         let (list, from, to) = self.window.bodies;
         for slot in from..to {
             let at = self.uu(list, slot) as usize;
-            self.integrate_pose(at, h, last);
+            self.integrate_pose(at, h, substep, substeps);
         }
     }
 
     /// One body's pose after a substep's velocities.
     #[inline(always)]
-    pub fn integrate_pose(&mut self, at: usize, h: f32, last: bool) {
+    pub fn integrate_pose(&mut self, at: usize, h: f32, substep: u32, substeps: u32) {
+        let last = substep + 1 == substeps;
         let kind = self.flags(at) & KIND;
+        if kind == KINEMATIC_POSITION && !last {
+            // On its path from the step's start, not built up from the substeps before (`kinematic_pose`).
+            let (position, center, rotation) = self.kinematic_pose(at, substep, substeps);
+            let turn = rotation.mul(self.q(ROTATION_X, at).conjugate());
+            self.set_s(TURNED, at, self.s(TURNED, at) + 2.0 * sqrt(turn.x * turn.x + turn.y * turn.y + turn.z * turn.z));
+            self.set_q(ROTATION_X, at, rotation);
+            self.set_v(POSITION_X, at, position);
+            self.set_v(CENTER_X, at, center);
+            return;
+        }
         if last && kind == KINEMATIC_POSITION {
             let rotation = self.q(TARGET_ROTATION_X, at);
             let position = self.v(TARGET_X, at);
             self.set_q(ROTATION_X, at, rotation);
             self.set_v(POSITION_X, at, position);
             self.set_v(CENTER_X, at, position.add(rotation.rotate(self.v(LOCAL_CENTER_X, at))));
+            // A smooth path begins the next step at the speeds it reached this target with.
+            if self.flags(at) & SMOOTH_PATH != 0 {
+                self.set_v(START_LINEAR_X, at, self.v(TARGET_LINEAR_X, at));
+                self.set_v(START_ANGULAR_X, at, self.v(TARGET_ANGULAR_X, at));
+            }
             return;
         }
-        let center = self.v(CENTER_X, at).add(self.v(LINEAR_X, at).scale(h));
-        let spin = self.v(ANGULAR_X, at).scale(h);
+        let (linear, angular) = self.kinematic_velocity(at, substep, substeps, self.v(LINEAR_X, at), self.v(ANGULAR_X, at));
+        let center = self.v(CENTER_X, at).add(linear.scale(h));
+        let spin = angular.scale(h);
         self.set_s(TURNED, at, self.s(TURNED, at) + sqrt(spin.dot(spin)));
         let turn = Q::from_rotation_vector(spin);
         let rotation = turn.mul(self.q(ROTATION_X, at)).normalized();
