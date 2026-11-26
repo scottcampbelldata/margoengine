@@ -19,7 +19,7 @@ import { isModel, type ModelLike, type ModelPrimitiveLike } from '../../shared/m
 import { hiddenInTree } from '../../shared/visibility.js';
 import { applyView, inView } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
-import { beginScenePass, sceneAttachments } from '../../shared/scene-pass.js';
+import { beginScenePass } from '../../shared/scene-pass.js';
 import { positionRings } from './rings.js';
 export { positionRings } from './rings.js';
 declare const GPUBufferUsage: { STORAGE: number; UNIFORM: number; COPY_DST: number };
@@ -187,7 +187,14 @@ export class ModelOutlines implements EnginePlugin {
   /** Plain front-culling, plain mirrored, smooth, smooth mirrored. */
   private pipelines?: GPURenderPipeline[];
   private key = '';
-  private readonly attachments = sceneAttachments();
+  private readonly colorAttachment: GPURenderPassColorAttachment = {
+    view: undefined as unknown as GPUTextureView,
+    loadOp: 'load',
+    storeOp: 'store',
+  };
+  private readonly depthAttachment: GPURenderPassDepthStencilAttachment = {
+    view: undefined as unknown as GPUTextureView,
+  };
   private disposed = false;
   constructor({
     outline = 0.025,
@@ -414,7 +421,7 @@ export class ModelOutlines implements EnginePlugin {
     this.outlineFrame(v, c);
     const copy = writeUniform(device, this.uniform!, v as Float32Array<ArrayBuffer>, c.view ?? c);
     device.queue.writeBuffer(this.storage!, base * 80, this.rows as Float32Array<ArrayBuffer>, 0, rows * 20);
-    const pass = beginScenePass(c, this.attachments.color, this.attachments.depth);
+    const pass = beginScenePass(c, this.colorAttachment, this.depthAttachment);
     applyView(pass, c);
     pass.setBindGroup(0, this.groups!.get(copy));
     let bound: GPURenderPipeline | undefined;
