@@ -24,7 +24,7 @@ await build({
     target: 'es2022',
     lib: {
       entry: Object.fromEntries(
-        ['index', 'las', 'laz', 'e57', 'octree', 'copc', 'surfels', 'potree', 'pick', 'clip', 'style'].map((name) => [
+        ['index', 'las', 'laz', 'e57', 'octree', 'copc', 'surfels', 'potree', 'pick', 'clip', 'style', 'depth-video'].map((name) => [
           name,
           resolve(root, `src/${name}.ts`),
         ]),

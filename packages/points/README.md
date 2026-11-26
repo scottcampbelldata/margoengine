@@ -606,6 +606,36 @@ relative `data/` files. The package test requires it and checks every coordinate
 RGB value of all 341,989 points across 77 nodes against their raw records. This
 establishes complete-file reading, not surveyed accuracy or production rendering quality.
 
+## Depth video (`margoengine/points/depth-video`)
+
+`depthVideoPoints(frame, options, depth?)` turns one RGB + depth frame into points; `DepthVideoCloud` keeps a `PointCloud` that follows a video, one rewrite per frame. Each pixel is unprojected through a pinhole camera looking down -Z with Y up: `x = (u - cx) z / fx`, `y = (cy - v) z / fy`, `z = -depth` (Hartley and Zisserman, Multiple View Geometry, section 6.1). The frame is RGBA bytes (an `ImageData` fits, from `canvas.getContext('2d').getImageData` after `drawImage(video)`).
+
+```ts
+import { depthVideoPoints, DepthVideoCloud } from 'margoengine/points/depth-video';
+
+// A 4 x 4 side-by-side frame: colour on the left half, grey depth on the right half (8 x 4 pixels).
+const frame = {width: 8, height: 4, data: new Uint8Array(8 * 4 * 4).fill(128)};
+const {positions, colors, count} = depthVideoPoints(frame, {near: 0.5, far: 4, fov: 60});
+console.log(count, positions.length, colors.length); // 16 points, xyz and rgb each
+
+// A cloud for a live video: the point count is fixed, holes and flying pixels get size 0.
+const cloud = new DepthVideoCloud({width: 4, height: 4, near: 0.5, far: 4});
+console.log(cloud.update(frame)); // points showing
+// plugin.add(cloud.cloud) draws it; call cloud.update(imageData) every video frame.
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `layout` | `'side-by-side'` | Where the depth sits: `'side-by-side'` (colour left), `'top-bottom'`, or `'separate'` (a second picture, which may differ in size) |
+| `encoding` | `'gray'` | `'gray'` (red channel), `'rg16'` (red high byte, green low byte) or `'millimeters'` (16 bits read as mm); a stored 0 is a hole |
+| `near`, `far` | 0.3, 5 | Metres at the lowest and highest stored values; points outside are dropped |
+| `invert` | false | The highest stored value is near (`gray` and `rg16`) |
+| `fov`, `intrinsics` | 60, none | Vertical field of view in degrees, or `{fx, fy, cx, cy}` in pixels of the colour picture |
+| `stride` | 1 | Keep every n-th pixel |
+| `maxJump` | 0.05 | Drop a pixel whose depth differs from a neighbour's by more than this share of its own (flying pixels at edges); 0 keeps all |
+
+Use a lossless or high-bitrate depth video: video compression bends gray depth, and `'rg16'` needs lossless frames. Reading frames from a `<video>` is left to the app (it is one `drawImage` and one `getImageData`).
+
 ## Surfels (`margoengine/points/surfels`)
 
 `SurfelPlugin` draws clouds as small blended discs, so a scan reads as one continuous surface instead of overlapping dots. It runs three passes: every disc writes depth pushed back a little, discs within that push of the front add colour and weight into a float target, and a full-screen pass divides one by the other and draws it over the scene. The weight is Gaussian across the disc and falls with depth behind the front surface, so a wall does not bleed through the floor in front of it. Discs share the scene's depth, so meshes and surfels hide each other.

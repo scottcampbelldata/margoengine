@@ -65,6 +65,10 @@
       "types": "./dist/potree.d.ts",
       "import": "./dist/potree.js"
     },
+    "./depth-video": {
+      "types": "./dist/depth-video.d.ts",
+      "import": "./dist/depth-video.js"
+    },
     "./pick": {
       "types": "./dist/pick.d.ts",
       "import": "./dist/pick.js"
