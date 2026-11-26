@@ -2319,6 +2319,10 @@
       "types": "./dist/physics/snowpack.d.ts",
       "import": "./dist/physics/snowpack.js"
     },
+    "./physics/airborne": {
+      "types": "./dist/physics/airborne.d.ts",
+      "import": "./dist/physics/airborne.js"
+    },
     "./physics/aeolian": {
       "types": "./dist/physics/aeolian.d.ts",
       "import": "./dist/physics/aeolian.js"

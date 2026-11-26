@@ -984,6 +984,7 @@ export * as e_margoengine_game_physics_pack_ice from '@margoengine/game/physics/
 export * as e_margoengine_game_physics_runoff from '@margoengine/game/physics/runoff';
 export * as e_margoengine_game_physics_drainage_fog from '@margoengine/game/physics/drainage-fog';
 export * as e_margoengine_game_physics_snowpack from '@margoengine/game/physics/snowpack';
+export * as e_margoengine_game_physics_airborne from '@margoengine/game/physics/airborne';
 export * as e_margoengine_game_physics_aeolian from '@margoengine/game/physics/aeolian';
 export * as e_margoengine_game_physics_groundwater from '@margoengine/game/physics/groundwater';
 export * as e_margoengine_game_physics_landscape from '@margoengine/game/physics/landscape';
@@ -4175,6 +4176,7 @@ export * as e_margoengine_physics_pack_ice from 'margoengine/physics/pack-ice';
 export * as e_margoengine_physics_runoff from 'margoengine/physics/runoff';
 export * as e_margoengine_physics_drainage_fog from 'margoengine/physics/drainage-fog';
 export * as e_margoengine_physics_snowpack from 'margoengine/physics/snowpack';
+export * as e_margoengine_physics_airborne from 'margoengine/physics/airborne';
 export * as e_margoengine_physics_aeolian from 'margoengine/physics/aeolian';
 export * as e_margoengine_physics_groundwater from 'margoengine/physics/groundwater';
 export * as e_margoengine_physics_landscape from 'margoengine/physics/landscape';
@@ -5076,6 +5078,7 @@ export * as e_margoengine_physics_pack_ice_2 from '@margoengine/physics/pack-ice
 export * as e_margoengine_physics_runoff_2 from '@margoengine/physics/runoff';
 export * as e_margoengine_physics_drainage_fog_2 from '@margoengine/physics/drainage-fog';
 export * as e_margoengine_physics_snowpack_2 from '@margoengine/physics/snowpack';
+export * as e_margoengine_physics_airborne_2 from '@margoengine/physics/airborne';
 export * as e_margoengine_physics_aeolian_2 from '@margoengine/physics/aeolian';
 export * as e_margoengine_physics_groundwater_2 from '@margoengine/physics/groundwater';
 export * as e_margoengine_physics_landscape_2 from '@margoengine/physics/landscape';
