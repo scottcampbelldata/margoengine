@@ -4,7 +4,8 @@
 import { sampleTrackInto, type Interpolation } from '@margoengine/animation/sampling';
 import { composeMatrix, invertMatrix, multiplyMatrices } from '@margoengine/math/mat4';
 import { multiplyQuaternions } from '@margoengine/math/quat';
-import { sceneOfGLB } from './glb-scene.js';
+import { splitGLB } from './glb.js';
+import { sceneOfParts } from './glb-scene.js';
 import {
   collect,
   decompose,
@@ -671,6 +672,15 @@ function reachOf(
   return { rest: restBox, clip, extents };
 }
 
+/** The scene of a GLB, with Draco and meshopt decoded first for a file that requires them. */
+async function readScene(bytes: Uint8Array, signal: AbortSignal | undefined): Promise<ReturnType<typeof sceneOfParts>> {
+  const parts = splitGLB(bytes),
+    required = (parts.json as { extensionsRequired?: string[] }).extensionsRequired;
+  if (!required?.some((name) => /draco|meshopt/i.test(name))) return sceneOfParts(parts);
+  const { plainGLBParts } = await import('./glb-plain.js');
+  return sceneOfParts(await plainGLBParts(parts, signal));
+}
+
 /**
  * Writes one clip of a scene or a GLB as USDZ: skins as UsdSkel with a `SkelAnimation`, and animated nodes as `Xform` prims
  * with time samples, so the model plays in AR Quick Look. Materials and shared meshes are as {@link exportUSDZ} writes them.
@@ -687,7 +697,10 @@ function reachOf(
  * const { usdz, clip, frames, size, skipped } = await exportAnimatedUSDZ(glb, { clip: 'Walk', height: 0.45, ground: true });
  * ```
  *
- * @throws TypeError for bytes that are not a GLB or that need decompressing, or a bad option; RangeError for a scene with no
+ * A GLB that requires Draco or meshopt is decoded first with `@margoengine/decoders` (its clean-room `draco-native` and
+ * `meshopt` entries, imported only for such a file), so install that package to write one.
+ *
+ * @throws TypeError for bytes that are not a GLB, a malformed compressed block, or a bad option; RangeError for a scene with no
  * meshes or animations, an unknown clip, a clip past 100,000 frames, a joint not in the scene or that USD's joint form cannot
  * hold; what {@link exportUSDZ} throws for a material; the signal's reason on an abort.
  */
@@ -703,7 +716,7 @@ export async function exportAnimatedUSDZ(
   if (typeof width !== 'number' || !(width > 0) || !Number.isFinite(width))
     throw new RangeError('lineWidth must be a positive finite number of scene units');
   signal?.throwIfAborted();
-  const read = source instanceof Uint8Array ? sceneOfGLB(source) : { scene: source, skipped: [] },
+  const read = source instanceof Uint8Array ? await readScene(source, signal) : { scene: source, skipped: [] },
     { scene } = read,
     skipped: AnimatedUSDZSkip[] = read.skipped.map(({ kind, index }) => ({ kind, target: index })),
     animations = scene.animations ?? [];

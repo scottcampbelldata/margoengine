@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19416172,
+  "total": 19418348,
   "history": [
     {
       "date": "2026-10-24",
@@ -12681,6 +12681,12 @@
       "commit": "b41f4709e4",
       "reason": "SOUND-04 adds the optional 9736 B gzip modal sound entry. It shares one Rust loop and world clock between impact, sliding, rolling, and fracture. Splitting these paths would duplicate the mode and PCM state. Core and stage gain zero bytes.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "7a5fc90bc0",
+      "reason": "exporters/usdz-anim reads GLBs that require Draco or meshopt (gzip 26542 to 27881 B): the extra 1339 B is the glb-plain step behind import(), downloaded only for such a file; the decoders themselves stay in the optional peer @margoengine/decoders. A separate entry would make every caller route compressed files to a second function for the same output.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13079,7 +13085,7 @@
     "@margoengine/exporters/unreal-precision": 28787,
     "@margoengine/exporters/unreal-precision-importer": 17145,
     "@margoengine/exporters/usdz": 22472,
-    "@margoengine/exporters/usdz-anim": 26542,
+    "@margoengine/exporters/usdz-anim": 28718,
     "@margoengine/exporters/webp": 3661,
     "@margoengine/fbx": 24529,
     "@margoengine/fbx dist/workers/fbx.js": 132202,
