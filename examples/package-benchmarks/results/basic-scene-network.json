@@ -1,5 +1,5 @@
 {
-  "commit": "3b81be0630",
+  "commit": "cf5b84a980",
   "dirty": false,
   "browser": "msedge 158.0.4370.33 headless",
   "buildManifest": {
@@ -395,7 +395,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-D2K9K7p6.js",
+      "file": "assets/index-B1qo3zSE.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -460,13 +460,13 @@
       "brotli": 1858
     },
     {
-      "path": "assets/index-D2K9K7p6.js",
+      "path": "assets/index-B1qo3zSE.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27181,
-      "raw": 64983,
-      "gzip": 26799,
-      "brotli": 23628
+      "transferred": 27207,
+      "raw": 65026,
+      "gzip": 26825,
+      "brotli": 23647
     },
     {
       "path": "assets/node-matrix-DeiKheBW-Cj_xL6KP.js",
@@ -510,7 +510,7 @@
       "encoding": "identity",
       "transferred": 969,
       "raw": 719,
-      "gzip": 412,
+      "gzip": 411,
       "brotli": 261
     },
     {
@@ -525,10 +525,10 @@
   ],
   "total": {
     "requests": 12,
-    "transferred": 46088,
-    "raw": 96119,
-    "gzip": 40541,
-    "brotli": 35781
+    "transferred": 46114,
+    "raw": 96162,
+    "gzip": 40566,
+    "brotli": 35800
   },
   "notFetched": [
     {
