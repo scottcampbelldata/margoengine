@@ -122,6 +122,10 @@ export interface FloodSediment {
     settling?: number;
     soil?: (x: number, z: number) => number | undefined;
     tint?: boolean;
+    source?: {
+        readonly concentrationSize: readonly [number, number];
+        copyConcentrations(out: Float32Array): void;
+    };
 }
 
 export interface FloodSource {

@@ -14026,6 +14026,10 @@
       "./falling": {
         "raw": 14435,
         "gzip": 6259
+      },
+      "./sediment": {
+        "raw": 12757,
+        "gzip": 5256
       }
     },
     "@margoengine/physics2d": {
@@ -16950,8 +16954,8 @@
         "gzip": 4200
       },
       "./flood": {
-        "raw": 39753,
-        "gzip": 14174
+        "raw": 40556,
+        "gzip": 14457
       },
       "./flood-bake": {
         "raw": 10165,
@@ -17727,6 +17731,16 @@
       "raw": 10109,
       "gzip": 4273,
       "brotli": 3824
+    },
+    "packages/physics/dist/sediment-kernel.wasm": {
+      "raw": 12483,
+      "gzip": 5224,
+      "brotli": 4691
+    },
+    "packages/physics/dist/sediment-kernel-shared.wasm": {
+      "raw": 12571,
+      "gzip": 5279,
+      "brotli": 4747
     }
   },
   "splits": {

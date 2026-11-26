@@ -9063,3 +9063,6 @@ local near-bank velocity relative to the wet reach mean with user-supplied erodi
 The vertex reserve covers the mobile layer the caller declares. Set it to the bedrock clearance when TerrainBed
 has a floor. Fluid momentum and bed evolution exchange one field update per world tick. An open boundary exports
 sediment; external inflow at that edge carries clear water. Use the source grid's same rectangle for Flood tint.
+
+The optional sediment entry measures 5,256 B min+gzip. The plain and shared SIMD Wasm files are 12,483 B and
+12,571 B before HTTP compression. The Flood entry measures 14,457 B min+gzip with the concentration upload.

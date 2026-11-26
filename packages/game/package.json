@@ -2199,6 +2199,10 @@
       "types": "./dist/physics/runoff.d.ts",
       "import": "./dist/physics/runoff.js"
     },
+    "./physics/sediment": {
+      "types": "./dist/physics/sediment.d.ts",
+      "import": "./dist/physics/sediment.js"
+    },
     "./physics/underwater": {
       "types": "./dist/physics/underwater.d.ts",
       "import": "./dist/physics/underwater.js"

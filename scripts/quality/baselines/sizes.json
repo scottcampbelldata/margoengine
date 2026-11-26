@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19228224,
+  "total": 19233736,
   "history": [
     {
       "date": "2026-10-24",
@@ -12561,6 +12561,12 @@
       "commit": "c82d68bf98",
       "reason": "AERO-05, @margoengine/physics/falling 0 to 6259 B gzip, @margoengine/weather/hail 4901 to 5443 B gzip, @margoengine/weather/hail-physics 0 to 1056 B gzip. The falling solver shares one Wasm loader across plates, seeds and spheres. Hail shares one WebGPU overlay and compatible lighting for both trajectory sources. Splitting the source renderer would duplicate the draw and its ownership. Core and stage gain zero bytes.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "db1950c88f",
+      "reason": "HYDRO-03 entry sizes, previous record to current: @margoengine/physics/sediment 0→5256 B (ceiling 0→5512 B); @margoengine/water/flood 14174→14457 B (ceiling 14600→14600 B). The optional sediment entry owns conservative routing and Exner coupling with lazy Wasm. Flood adds live concentration upload and reuses its existing tint shader and texture lifetime. Splitting the upload would add a lazy request to that same existing texture path.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13371,6 +13377,7 @@
     "@margoengine/physics/schooling": 5254,
     "@margoengine/physics/sea": 3437,
     "@margoengine/physics/seakeeping": 10371,
+    "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 76400,
