@@ -203,7 +203,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ICE-02 | Glacier and ice-sheet flow | none | Open | OPEN |
 | ICE-03 | Iceberg rigid-body dynamics and calving | stand-in | Open | OPEN |
 | ICE-04 | Pack ice and floes | stand-in | Open | OPEN |
-| ICE-05 | Ice thermodynamics | none | Open | OPEN |
+| ICE-05 | Ice thermodynamics | none | Codex | BUILDING (codex/physics-lane-2) |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
 | FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED e497def90e |
