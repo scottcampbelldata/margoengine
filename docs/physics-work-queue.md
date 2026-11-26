@@ -378,7 +378,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SPACE-03 | Accretion disks and motion near compact objects | physics/accretion with viscous transport and geodesics | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 0c11fd27f7 |
 | DYN-04 | Wheeled vehicles on roads | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 18ded2be7c |
 | DYN-05 | Rail vehicle dynamics | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed fa79b04868 |
-| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
+| SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Codex | BUILDING (codex/physics-strands) |
 | SOFT-05 | Muscle, fat and skin soft tissue | none | Open | OPEN |
 | BREAK-01 | Brittle and ductile fracture, destruction | stand-in | Open | OPEN |
 | BREAK-02 | Structural collapse and load path | stand-in | Open | OPEN |
