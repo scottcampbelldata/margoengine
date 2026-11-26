@@ -16477,3 +16477,11 @@ To connect dynamic EARTH-02 tunnel or canyon geometry, the solver needs a canoni
 field. The opening fixture proves shadow diffraction with explicit geometry. The concert-hall fixture verifies
 early arrival cutaway points and the README plays the actual convolved response. The filmed scene still needs
 to read those paths and room material inputs. See [Framework requests](physics-work-queue.md#framework-requests).
+
+### Viscoplastic deposits and established mud scenes (PA-60)
+
+The optional 3D solver accepts a time-varying inlet, collides with a live bed and replays its
+mass ledger after restore. The existing mud scene still uses its constant source and
+depth-averaged effect. Its large-scale breach and soil uptake need the hydraulic source and
+entrainment fields before that scene consumes replayable discharge.
+Run `packages/physics/tests/coupling/viscoplastic.test.js` for the varying-inlet regression.

@@ -10263,3 +10263,11 @@ trace and its sample counter, so alternating buffers and the published trace sur
 Both modules have no static data. Instantiation over sentinel-filled shared or plain arena memory must
 leave all existing bytes intact. Scoped tests check rigid standing modes, wall dissipation, exact arrival
 around a doorway, sample-timed excitation and browser packaging of both lazy kernels.
+
+### Viscoplastic material points (FLUID-06)
+
+The isolated SIMD module has no static writes on instantiation. The world hashes the live
+material rows, reference-volume ledger and published fields. The 27-node APIC transfer,
+local plastic return and optional occupied-node PCG step run in arena memory. The coupling
+fixture joins a registered inlet to a real TerrainBed and checks the exact mass ledger and
+matching restore. It compares both memory modes at actual shared and plain instantiation.

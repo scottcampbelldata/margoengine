@@ -5666,3 +5666,12 @@ The same test suite solves a rigid closed-axis standing wave in both memory mode
 eigenfrequency and checks analytical reverberation and energy-decay references.
 `packages/physics/tests/coupling/room-sound.test.js` routes receiver pressure around an opening after the exact
 shortest number of lattice links, checks absorption and verifies registry excitation and snapshot replay.
+
+### Three-dimensional Bingham and Herschel–Bulkley material (FLUID-06)
+
+Finite-strain APIC preserves translation and mass in the free-fall case. Computed Bingham
+and Herschel–Bulkley shear agree with independent closed forms for exponents 1 and 1/2, and
+the implicit solvent case agrees with a discrete occupied-node shear solution. A varying
+inlet on a live terrain bed has the same state across frame rates, restore and memory modes.
+[Direct tests](../../packages/physics/tests/viscoplastic.test.js) ·
+[Coupling tests](../../packages/physics/tests/coupling/viscoplastic.test.js)

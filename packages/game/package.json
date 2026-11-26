@@ -2319,6 +2319,10 @@
       "types": "./dist/physics/thin-film.d.ts",
       "import": "./dist/physics/thin-film.js"
     },
+    "./physics/viscoplastic": {
+      "types": "./dist/physics/viscoplastic.d.ts",
+      "import": "./dist/physics/viscoplastic.js"
+    },
     "./physics/pack-ice": {
       "types": "./dist/physics/pack-ice.d.ts",
       "import": "./dist/physics/pack-ice.js"

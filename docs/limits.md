@@ -9471,3 +9471,17 @@ geometry or a richer material boundary. For an axis wave resolved with ten cells
 sinusoidal stencil bounds numerical phase speed from below by 1 − π²/600 of the configured speed.
 Use a finer grid for higher frequencies. The data-free plain and shared variants each measure 753 B raw.
 The optional entry measures 5,758 B gzip. Core plus stage stays at 24,820 B gzip.
+
+### Three-dimensional viscoplastic material (FLUID-06)
+
+The material point field follows finite strain and plastic shear in a uniform three-dimensional
+grid. Longitudinal elastic waves limit its internal step. Rest density is fixed, while current
+volume changes with the volumetric strain `J`. Coulomb contact applies on closed box faces
+and a triangulated sampled terrain bed. The optional implicit solvent diffusion is on occupied
+grid nodes. Resolve strong gradients with several points per cell. Very thin stretched
+filaments can become under-resolved until an adaptive particle split/merge pass is available.
+Bulk elastic stress is weakly compressible, with no incompressible pressure projection. The
+entry emits positions and stresses for a separate renderer and leaves grain segregation and
+bed entrainment to their own solvers.
+
+The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
