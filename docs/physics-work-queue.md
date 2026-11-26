@@ -453,7 +453,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 5d2524732 |
 | SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 12b84154b |
-| SEA-15 | Tracers and slicks in water | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed ccbc86285 |
+| SEA-15 | Tracers and slicks in water | stand-in | Codex | BUILDING (codex/physics-sand-puff-pass1) |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
 | HYDRO-01 | Conservative shallow water | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 9a189c4eb |
 | ATMO-04 | Precipitation microphysics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed acbc53c7e |
