@@ -160,6 +160,15 @@ At full slip with constant cohesion and zero internal friction, the shear expone
 axle moment and sine/cosine force integrals, which the tests compare to the native midpoint error bound.
 [Ding et al. (2009)](https://vigir.missouri.edu/~gdesouza/Research/Conference_CDs/IEEE_IROS_2009/papers/0739.pdf).
 
+The held-out Wh2 high-slip comparison uses the 10 mm lug at 80 N and 10 mm/s in Fig. 6(a,c).
+Equation 8 converts the 0.6 tip slip to 0.58768 at the model's half-lug effective radius.
+The bounds come from the plotted red marker edges (216.54–217.92 and 308.58–310.217 PDF
+points) divided by the labelled tick scales. They give approximately 24.37–25.19 N and
+7.22–7.45 N·m. The solver predicts 24.67 N and 7.39 N·m. These points were held out from
+the 2010 slip-sinkage fit and use the same soil family and wheel dimensions. The test
+also checks a permanent rut. The source's high-slip sinkage and transient digging force
+remain separate comparisons.
+
 Blake Hannaford and Jee-Hwan Ryu, “Time-Domain Passivity Control of Haptic Interfaces” (2002),
 Eq. 12, motivates accounting for work across all ports in a sampled coupling. For longitudinal
 contact impulse `J`, signed axle impulse `L`, tangential relative speed `v`, angular speed `w`,

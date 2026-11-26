@@ -497,6 +497,37 @@ test('native rolling reactions resolve asymmetric normal drag and full-slip axle
   }
 });
 
+test('held-out Ding et al. Wh2 drawbar and torque at 60% tip slip', async () => {
+  const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
+  const radius = 0.15735;
+  const lugHeight = 0.01;
+  const wheelReaction = soilWheelReactionField('wh2-reaction');
+  // Eq. 8 converts the test's 0.6 tip slip to our r + h/2 shearing radius.
+  const slip = 1 - (0.4 * (radius + lugHeight)) / (radius + 0.5 * lugHeight);
+  const { world, bed } = await rollingBench(
+    terrain,
+    {
+      cohesiveModulus: 15_600,
+      frictionalModulus: 2_407_400,
+      exponent: 0.84,
+      cohesion: 251,
+      friction: Math.tan((31.9 * Math.PI) / 180),
+      shearLength: 0.0114,
+      dustFraction: 0,
+    },
+    { radius, lugHeight, lugSupport: 0.0015, slipExponent: 0.72 },
+    { width: 0.165, length: 0.12, load: 80, speed: 0.01, slip, wheelReaction },
+  );
+  world.advance(120);
+  const [, drawbar, torque] = regionWords(world.memory, world.fields.port(wheelReaction.name).region);
+  // Figure 6(a) and (c), projected marker edges and corresponding labelled ticks in PDF points.
+  const pull = (y) => 30 - ((y - 208.38) * 40) / (276.18 - 208.38);
+  const moment = (y) => ((361.26 - y) * 8) / (361.26 - 304.68);
+  assert.ok(drawbar >= pull(217.92) && drawbar <= pull(216.54), `Wh2 drawbar ${drawbar} N`);
+  assert.ok(torque >= moment(310.217) && torque <= moment(308.58), `Wh2 torque ${torque} N·m`);
+  assert.ok(bed.bed.sample(0, -0.145).elevation < 0);
+});
+
 test('live spin phase cuts with a discrete grouser and repeats at one tooth pitch', async (t) => {
   const terrain = { columns: 100, rows: 100, width: 0.2, depth: 0.2, centre: [0, 0] };
   const input = soilPatchField('grouser-load');

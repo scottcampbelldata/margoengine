@@ -5828,6 +5828,9 @@ quadrature error bound. Seek reproduces both reactions and the coupled bed state
 The live powered wheel fixture checks independent chassis and axle impulses against the previous
 resolved reaction. It verifies kinetic energy decreases, rejects a force sample with no source of
 work and reproduces the complete coupled hash after restoration.
+The Wh2 carriage reproduces the held-out 60% tip-slip drawbar and axle torque in
+Ding et al. (2009), Fig. 6. The test converts the slip between lug-tip and shear radii and
+uses the edges of the observed PDF graph markers as its force and torque bounds.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

@@ -9833,7 +9833,8 @@ reports vertical and longitudinal force and resisting axle torque for the forwar
 Its reciprocal rigid binding applies the previous contact result on the same collider. A tyre provides
 independent wheel spin and lateral grip. Lower actual load and the discrete kinetic-work bound
 limit the paired impulse, while reverse and braking use the tyre response. Transient digging forces
-and measured braking stress shapes remain open. Supply the same excavation floor
+and measured braking stress shapes remain open. The measured rover comparison covers steady
+drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
