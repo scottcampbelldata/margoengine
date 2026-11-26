@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20369554,
+  "total": 20370637,
   "history": [
     {
       "date": "2026-10-24",
@@ -13095,6 +13095,12 @@
       "commit": "KB-PHYS-BODYROWS1 body rows",
       "grew": 1,
       "reason": "@margoengine/physics/flip: the deck-water solver sizes its body-set ports by the world body rows through the shared check (bodyRowsOf, with its coded error naming the fix), so it can share a world with the soft, air and rigid solvers; measured gzip (Mac build) 10307 B, was about 10188; the check is the one every body-pushing solver uses, and a copy per entry would let the rule drift. Budget (measured + max(3%, 256 B)): 10188 to 10616 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "KB-PHYS-BODYROWS1 body rows",
+      "grew": 1,
+      "reason": "@margoengine/physics/flip: the deck-water solver sizes its body-set ports by the world body rows through the shared check (bodyRowsOf, with its coded error naming the fix), so it can share a world with the soft, air and rigid solvers; measured gzip (Mac build) 11358 B, was 11232 (after the crests commit); the check is the one every body-pushing solver uses, and a copy per entry would let the rule drift. Budget (measured + max(3%, 256 B)): 11232 to 11699 B."
     }
   ],
   "items": {
@@ -13922,7 +13928,7 @@
     "@margoengine/physics/entry": 10205,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 10616,
+    "@margoengine/physics/flip": 11699,
     "@margoengine/physics/foam": 8022,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/groundwater": 4195,
