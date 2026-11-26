@@ -3,7 +3,8 @@
 // on a hull held heeled its surface lies level in the world, not in the box; the sea's inflow from the `deckInflow`
 // port becomes the volume its flux brings; water over an open side goes to the sea as `seaSources()`; it claims its hull
 // in `deckClaims`, so an exceedance solver that honours the claim leaves its own deck load out and the hull carries one
-// load, not two.
+// load, not two. Slack water keeps its free surface: heeled, it moves to the low side and cuts the righting moment by
+// rho g i tan(theta) (the free-surface correction of GM), and it sloshes at the tank's natural period.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
@@ -232,4 +233,100 @@ test('a light hull carrying three times its mass of water falls freely at g and 
   world.advance(60);
   const v = hull.linearVelocity[1];
   assert.ok(Math.abs(v + G) < 0.05 * G, `after 1 s the hull falls at ${v} m/s, against ${-G}`);
+});
+
+test("slack deck water cuts the righting moment by the free surface's rho g i tan(theta) (the free-surface effect)", () => {
+  // A deck tank 2 m long and 1 m across (z), 0.2 m of water, on a hull held heeled 8 degrees about x. At rest the water's
+  // surface lies level, so its centre moves to the low side by B^2 tan(theta) / (12 d) across the tank (i / V, i = L B^3 / 12
+  // the free surface's second moment), and up by B^2 tan^2(theta) / (24 d): its moment about the hull's centre is
+  // m g (y_c sin(theta) + z_c cos(theta)), against m g y0 sin(theta) for the same water held rigid. The difference is the
+  // free-surface effect, which takes rho i g tan(theta) off the righting moment (the free-surface correction of GM).
+  const theta = (8 * Math.PI) / 180,
+    B = 1,
+    d = 0.2,
+    h = 0.05,
+    physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -G, 0] }),
+    hull = physics.addBody(null, {
+      type: 'fixed',
+      rotation: [Math.sin(theta / 2), 0, 0, Math.cos(theta / 2)],
+      colliders: { shape: 'box', halfExtents: [1, 0.3, 0.5] },
+    }),
+    deck = new DeckWaterSolver('deckWater', { inflow: false }),
+    world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, -G, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(deck, {
+        row: hull.row,
+        offset: [-1, -0.3, -0.5],
+        cells: [40, 12, 20],
+        cellSize: h,
+        initial: (x, y) => y < d,
+      });
+  world.advance(240);
+  const m = (RHO * deck.count * h ** 3) / 8,
+    torque = deck['words'](deck['forcesRegion'])[3],
+    y0 = -0.3 + d / 2,
+    yc = y0 + (B * B * Math.tan(theta) ** 2) / (24 * d),
+    zc = (B * B * Math.tan(theta)) / (12 * d),
+    // Rotating about x by theta takes body (y, z) to world z = y sin + z cos; the weight -m g y on a lever z gives
+    // tau_x = r_y F_z - r_z F_y = m g z_world.
+    slack = m * G * (yc * Math.sin(theta) + zc * Math.cos(theta)),
+    rigid = m * G * y0 * Math.sin(theta),
+    // The grid places the surface within half a cell: the centre within h / 2 across, so the moment within m g h / 2.
+    bound = (m * G * h) / 2;
+  assert.ok(Math.abs(slack - rigid) > 2 * bound, 'the effect is larger than the bound, so the check can tell');
+  assert.ok(
+    Math.abs(torque - slack) <= bound,
+    `moment ${torque} N m against ${slack} (rigid water would give ${rigid})`,
+  );
+});
+
+test("deck water sloshes at the tank's natural period, sqrt(g k tanh(k d)) with k = pi / L", () => {
+  // 2 m long, 0.2 m deep, the first mode started as a surface 0.02 m up at one end and down at the other.
+  const L = 2,
+    d = 0.2,
+    a = 0.025,
+    h = 0.025,
+    physics = new Physics(null, { fixedTimestep: 1 / 60, gravity: [0, -G, 0] }),
+    hull = physics.addBody(null, { type: 'fixed', colliders: { shape: 'box', halfExtents: [1, 0.3, 0.0125] } }),
+    deck = new DeckWaterSolver('deckWater', { inflow: false }),
+    world = new PhysicsWorld({ rate: { num: 120, den: 1 }, gravity: [0, -G, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(deck, {
+        row: hull.row,
+        offset: [-1, -0.3, -0.0125],
+        cells: [80, 24, 1],
+        cellSize: h,
+        initial: (x, y) => y < d + a * Math.cos((Math.PI * x) / L),
+        rate: 1,
+      });
+  const k = Math.PI / L,
+    period = (2 * Math.PI) / Math.sqrt(G * k * Math.tanh(k * d)),
+    ends = [];
+  for (let f = 1; f <= Math.round(3.2 * period * 120); f++) {
+    world.advance(f);
+    // The surface's height at the left end: its highest particle within the first cell.
+    const p = deck.positions();
+    let top = -Infinity;
+    for (let i = 0; i < p.length; i += 3) if (p[i] < -1 + h) top = Math.max(top, p[i + 1]);
+    ends.push(top);
+  }
+  // The period from the main crests at the left end: the highest point of each run of the surface above half-way from
+  // its mean to its top (the steeper secondary waves riding on the slosh stay below that), spread over the crests seen.
+  const mean = ends.reduce((s, v) => s + v, 0) / ends.length,
+    high = mean + 0.5 * (Math.max(...ends) - mean),
+    crests = [];
+  for (let i = 0, run = -1; i <= ends.length; i++) {
+    const up = i < ends.length && ends[i] > high;
+    if (up && run < 0) run = i;
+    if (!up && run >= 0) {
+      let best = run;
+      for (let k = run; k < i; k++) if (ends[k] > ends[best]) best = k;
+      if (crests.length === 0 || (best - crests.at(-1)) / 120 > 0.5 * period) crests.push(best);
+      else if (ends[best] > ends[crests.at(-1)]) crests[crests.length - 1] = best;
+      run = -1;
+    }
+  }
+  const measured = (crests.at(-1) - crests[0]) / (crests.length - 1) / 120;
+  assert.ok(crests.length >= 3, `crests at ${crests.map((c) => c / 120)}`);
+  assert.ok(Math.abs(measured - period) <= 0.05 * period, `period ${measured} s against ${period} s`);
 });
