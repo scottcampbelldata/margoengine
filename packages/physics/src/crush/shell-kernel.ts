@@ -36,7 +36,7 @@ export async function loadShell(signal?: AbortSignal): Promise<ShellBuilds> {
 }
 
 interface ShellExports extends WebAssembly.Exports {
-  crush_shell_advance(descriptor: number, seconds: number, count: number): number;
+  crush_shell_advance(descriptor: number, seconds: number, count: number, work: number): number;
 }
 
 export function instanceFor(host: SolverHost, builds: ShellBuilds): { kernel: ShellExports; stack: Region } {

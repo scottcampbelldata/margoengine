@@ -9693,6 +9693,13 @@ shell fracture remain open.
 The optional shell loader fetches the 18,799 B plain Wasm asset (8,743 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 
+The optional native shell work record holds six f64 words per solver. Counts
+report interval work at the chosen resolution. Candidate face checks include
+the AABB visits even when a sphere misses and the repeated manifold friction
+checks. Pressure face visits include unassigned faces. At fixed element size
+the 32/128-face shell fixtures use 1,152/4,608 membrane evaluations.
+[Work counts](whitepaper/reproduce.md#break-03-native-shell-work)
+
 Staged contact can use a positive piecewise-linear virgin loading envelope with increasing total
 and recoverable-adjusted permanent stroke. The only supported unloading law is one linear
 stiffness followed by elastic backing at compaction. Continuous contact requires a rigid

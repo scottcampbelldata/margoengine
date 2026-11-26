@@ -1,5 +1,20 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 native shell work
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.
+The native solver records the work of the last successful interval with
+`recordWork: true`. It visits each membrane face and hinge once before its
+first kick and once after every drift. Each seam visit evaluates two
+Gauss points. Optional sphere manifolds redo the geometry bounds on both
+friction kicks for each sphere with friction.
+
+At fixed element size and a 60 Hz world rate, the 32- and 128-face fixtures
+both use 35 substeps. They perform 1,152 and 4,608 membrane evaluations,
+respectively, and 576 and 2,304 hinge evaluations. The counts replay exactly
+and agree between plain and shared memory. Contact and pressure counts
+are checked in the opposed-slip and flooding fixtures, respectively.
+
 ## BREAK-03 hydrostatic shell feedback
 
 Build Physics and run `node --test packages/physics/tests/coupling/crush-shell-flood.test.js`.

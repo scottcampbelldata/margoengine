@@ -60,6 +60,8 @@ export interface CrushShellParams {
   readonly velocities?: readonly CrushVector[];
   /** Raise the automatically chosen explicit substep count by an integer factor. Default 1. */
   readonly resolution?: number;
+  /** Record deterministic native work counts. Default false. */
+  readonly recordWork?: boolean;
   /** Centered rigid spheres, available after calling `CrushShellSolver.loadRigid()`. */
   readonly spheres?: readonly CrushShellSphere[];
   /** Resolve separate local sphere contacts on folded or disconnected sheets. Default false. */
@@ -91,6 +93,18 @@ export interface CrushShellBudget {
   readonly appliedWork: number;
 }
 
+/** Native work in the last completed shell interval. Empty before the first interval. */
+export interface CrushShellWork {
+  readonly substeps: number;
+  readonly membraneEvaluations: number;
+  readonly hingeEvaluations: number;
+  readonly seamQuadraturePoints: number;
+  /** Bounding-box tests for sphere contacts, including the optional friction manifold passes. */
+  readonly sphereFaceChecks: number;
+  /** Face visits for the optional pressure load, including visits to unassigned faces. */
+  readonly pressureFaceVisits: number;
+}
+
 interface ShellState {
   readonly host: SolverHost;
   readonly kernel: ReturnType<typeof instanceFor>['kernel'];
@@ -101,6 +115,7 @@ interface ShellState {
   readonly applied: Region;
   readonly reactions: Region;
   readonly energy: Region;
+  readonly work?: Region;
   readonly triangles: Uint32Array;
   readonly maxStep: number;
   readonly resolution: number;
@@ -329,6 +344,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const pressure = this.pressureFeedback
       ? { region: f64('shell-pressure-faces', 4 * faceCount), pairs, cellSize: params.cellSize }
       : undefined;
+    const work = params.recordWork ? f64('shell-work-counts', 6) : undefined;
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
@@ -376,7 +392,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       (regionWords(memory, contactTopology) as Uint32Array).set(incidence);
       new DataView(memory.buffer).setUint32(descriptor.byteOffset + 172, contactTopology.byteOffset, true);
     }
-    if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
+    if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0, 0) !== 1)
       throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
     this.state = {
       host,
@@ -388,6 +404,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       reactions,
       faceState,
       energy,
+      work,
       triangles: Uint32Array.from(triangles.flat()),
       maxStep,
       resolution,
@@ -412,6 +429,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       maxNodeInverseMass,
       contactBound,
       pressure,
+      work,
     } = this.requireState();
     if (pressure) this.stagePressure(pressure, host, _context);
     const contactStep =
@@ -419,7 +437,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const n = substeps(dt, Math.min(maxStep, contactStep), resolution);
     if (!Number.isFinite(n) || n > MAX_SUBSTEPS || n < 1)
       throw new MargoError('state', 'Use a positive shell step within the explicit integration budget.');
-    if (kernel.crush_shell_advance(descriptor.byteOffset, dt, n) !== 1)
+    if (kernel.crush_shell_advance(descriptor.byteOffset, dt, n, work?.byteOffset ?? 0) !== 1)
       throw new MargoError(
         'failed',
         'The loaded shell lost finite geometry. Reduce the load or use a finer time step.',
@@ -479,13 +497,14 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
   }
 
   stateRegions(): readonly Region[] {
-    const { positions, velocities, faceState, applied, reactions, energy, rigid, seams, apertures } =
+    const { positions, velocities, faceState, applied, reactions, energy, rigid, seams, apertures, work } =
       this.requireState();
     const regions = [positions, velocities, faceState, applied, reactions, energy];
     if (rigid) regions.push(rigid.readings);
     if (rigid?.frictionReadings) regions.push(rigid.frictionReadings);
     if (seams) regions.push(seams);
     if (apertures) regions.push(apertures.region);
+    if (work) regions.push(work);
     return regions;
   }
 
@@ -516,6 +535,21 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const { host, reactions } = this.requireState();
     const index = indexIn(vertex, reactions.byteLength / 24, 'shell vertex');
     return triple(values(host, reactions), 3 * index);
+  }
+
+  /** Copies the recorded native work counts for this completed interval. */
+  readWork(): CrushShellWork {
+    const { host, work } = this.requireState();
+    if (!work) throw new MargoError('state', 'Enable recordWork before reading native shell work.');
+    const counts = values(host, work);
+    return {
+      substeps: counts[0]!,
+      membraneEvaluations: counts[1]!,
+      hingeEvaluations: counts[2]!,
+      seamQuadraturePoints: counts[3]!,
+      sphereFaceChecks: counts[4]!,
+      pressureFaceVisits: counts[5]!,
+    };
   }
 
   /** Returns the last integrated sphere reaction and compliant interface state. */

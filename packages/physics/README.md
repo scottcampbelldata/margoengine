@@ -5773,6 +5773,7 @@ world.add(shell, {
   material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
   seams: [{ sides: [[1,2],[3,5]], stiffness: 4e5, peakTraction: 12e3, toughness: 600 }],
   pressurePatches: [{ seam: 0, faces: [0, 1] }],
+  recordWork: true,
 });
 world.add(hull, {
   hulls: [{ row: body.row, mesh, compartments: [{ mesh, permeability: 1 }], openings: [{
@@ -5787,9 +5788,15 @@ const aperture = world.fields.port(HULL_BREACHES_FIELD.name)!;
 if (Number(regionWords(world.memory, aperture.region)[10]) >= 0) throw new Error('Expected flooding through the seam');
 const head = world.fields.port(shell.aperturePressureField.name)!;
 if (Number(regionWords(world.memory, head.region)[3]) <= 0) throw new Error('Expected air compression in the flooded compartment');
+if (shell.readWork().pressureFaceVisits === 0) throw new Error('Expected native pressure visits');
 ```
 
 [Flooding and return-pressure checks](../../docs/whitepaper/reproduce.md#break-03-hydrostatic-shell-feedback)
+
+Use `recordWork: true` to call `readWork()` after a completed shell interval.
+It reports native substeps, membrane and hinge evaluations, seam quadrature
+points, sphere face checks and pressure face visits.
+[Deterministic work counts](../../docs/whitepaper/reproduce.md#break-03-native-shell-work)
 
 The shell aperture port uses layout 1, with area in square metres followed by four
 xyz vertices in metres in the port's origin cell. `SHELL_APERTURE_WORDS` gives the row width.

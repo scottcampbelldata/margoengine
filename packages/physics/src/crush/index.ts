@@ -89,6 +89,7 @@ export {
   type CrushShellMaterial,
   type CrushShellParams,
   CrushShellSolver,
+  type CrushShellWork,
 } from './shell.js';
 export {
   resolveGirder,
