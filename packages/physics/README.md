@@ -3522,6 +3522,8 @@ console.log(tracer.particlesOf().next().value!.position[1] < -1); // true
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.
+Openings can publish from a different origin cell. Pass `cellSize: world.cellSize` to the tracer when the world uses
+a custom cell length.
 
 ```ts
 import { TracerSolver } from 'margoengine/physics/tracers';

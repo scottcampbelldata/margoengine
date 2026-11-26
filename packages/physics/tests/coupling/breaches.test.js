@@ -36,15 +36,16 @@ const frequencies = new Float64Array(8).map((_, i) => 0.06 * 1.3 ** i),
  * hold (x -9 to -2), half full of iron ore and flooded above the waterline, is holed low in its side: its water drains
  * out, and the ore with it. The tracers take the ore and the foam the air.
  */
-function damaged(rate = { num: 60, den: 1 }, mixedOre = false) {
-  const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
+function damaged(rate = { num: 60, den: 1 }, mixedOre = false, tracerCell = [0, 0, 0]) {
+  const cellSize = 4096,
+    physics = new Physics(null, { fixedTimestep: 1 / 60 }),
     body = physics.addBody(null, {
       colliders: { shape: 'box', halfExtents: [10, 2, 4], mass: 1025 * 20 * 8 * 2 },
     }),
     hull = new HullSolver(),
     tracers = new TracerSolver(),
     foam = new FoamSolver(),
-    world = new PhysicsWorld({ rate })
+    world = new PhysicsWorld({ rate, cellSize })
       .add(new RigidSolver(), { physics })
       .add(hull, {
         hulls: [
@@ -77,6 +78,8 @@ function damaged(rate = { num: 60, den: 1 }, mixedOre = false) {
       .add(tracers, {
         particleMass: mixedOre ? 5 : 50,
         bed: 40,
+        cellSize,
+        waterLevel: -cellSize * tracerCell[1],
         horizontalDiffusivity: mixedOre ? 0 : undefined,
         verticalDiffusivity: mixedOre ? 0 : undefined,
         breachMixes: mixedOre
@@ -96,6 +99,7 @@ function damaged(rate = { num: 60, den: 1 }, mixedOre = false) {
           : undefined,
       })
       .add(foam, { waves: calm, cells: [32, 32], cellSize: 1, statistics: 32 })
+      .setCell('tracers', tracerCell)
       .couple(['hull', 'rigid'], 'staggered');
   return Object.assign(world, { body, hull, tracers, foam });
 }
@@ -176,4 +180,36 @@ test('EF-11 coarse pellets settle out of a fine plume from the same active hold'
   world.restoreSnapshot(snapshot.bytes);
   world.advance(180);
   assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 mixed ore from a live breach enters an independently located tracer cell', () => {
+  const cell = [1, -1, -1];
+  const frames = 120;
+  const origin = damaged(undefined, true);
+  const shifted = damaged(undefined, true, cell);
+  for (const world of [origin, shifted]) world.advance(frames);
+  assert.ok(origin.tracers.budget.released > 25);
+  assert.deepEqual(shifted.tracers.budget, origin.tracers.budget);
+  const regular = [...origin.tracers.particlesOf()];
+  const rebased = [...shifted.tracers.particlesOf()];
+  assert.equal(rebased.length, regular.length);
+  // One rounded addition per simulation step, plus conversion in both directions.
+  const tolerance = (frames + 2) * Number.EPSILON * origin.cellSize;
+  for (const [index, particle] of regular.entries()) {
+    const expected = rebased[index];
+    assert.equal(expected.material, particle.material);
+    assert.equal(expected.mass, particle.mass);
+    assert.equal(expected.state, particle.state);
+    for (const [axis, value] of particle.position.entries()) {
+      const offset = cell[axis] * origin.cellSize;
+      const translated = expected.position[axis] + offset;
+      assert.ok(Math.abs(translated - value) <= tolerance, `${index}:${axis} ${translated} against ${value}`);
+    }
+  }
+  const snapshot = shifted.takeSnapshot();
+  shifted.advance(123);
+  const end = shifted.hash();
+  shifted.restoreSnapshot(snapshot.bytes);
+  shifted.advance(123);
+  assert.equal(shifted.hash(), end);
 });

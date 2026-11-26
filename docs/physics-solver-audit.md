@@ -487,7 +487,8 @@ the short-gap jet and the original shot's plume and bed binding remain open.
 
 EF-11 can now release coarse taconite pellets and suspended ore fines through the same live hull opening.
 The two grain classes account for the hull's cargo flux separately, including fractional parcels, and the
-pellets settle farther than the fines. The measured sediment plume and original EF-11 playback remain open.
+pellets settle farther than the fines. The traced cargo keeps its mass, physical position and replay when the hull
+and tracer step in separate origin cells. The measured sediment plume and original EF-11 playback remain open.
 
 The tracer entry can now query a live `SeaSurface`: the slick follows wave height and surface velocity,
 and submerged dye follows the sea's depth flow in a different origin cell. The test checks live SEA-02

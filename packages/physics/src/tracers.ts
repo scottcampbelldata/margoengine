@@ -1149,12 +1149,10 @@ export class TracerSolver implements Solver<TracerParams> {
     // The breaches' cargo: each record's outflow over the step, at its centre, as its cargo's material.
     const breaches = context.inputs.get(HULL_BREACHES_FIELD.name);
     if (breaches && this.breachSlots > 0) {
-      const c = breaches.cell;
-      if (c[0] !== this.cell[0] || c[1] !== this.cell[1] || c[2] !== this.cell[2])
-        throw new MargoError(
-          'state',
-          `The hull breaches come from origin cell [${c.join(', ')}] and the tracers step in [${this.cell.join(', ')}]; step the hull solver and the tracers in one cell.`,
-        );
+      const [hullX, hullY, hullZ] = breaches.cell;
+      const dx = (hullX - context.cell[0]) * cellSize;
+      const dy = (hullY - context.cell[1]) * cellSize;
+      const dz = (hullZ - context.cell[2]) * cellSize;
       const memory = breaches.region.memory ?? this.host.memory,
         rec = new Float64Array(memory.buffer, breaches.region.byteOffset, breaches.region.byteLength / 8),
         base = 4 + this.sources.length + Number(this.jetBed !== undefined),
@@ -1164,7 +1162,7 @@ export class TracerSolver implements Solver<TracerParams> {
           rate = rec[r + 12]!,
           material = this.breachMaterials[rec[r + 13]!] ?? -1;
         if (!(rate > 0 && Number.isFinite(rate)) || material < 0) continue;
-        const at = [rec[r + 2]!, rec[r + 3]!, rec[r + 4]!] as const;
+        const at = [rec[r + 2]! + dx, rec[r + 3]! + dy, rec[r + 4]! + dz] as const;
         const mixture = this.breachMixes?.get(`${rec[r]}/${rec[r + 1]}`);
         const mass = rate * dt;
         if (mixture) {

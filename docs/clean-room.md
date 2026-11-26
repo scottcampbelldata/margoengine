@@ -13258,6 +13258,8 @@ Those observations were separate from the Poreh law's calibration and the Fig. 5
 The swimmer's wake uses the framework `Port.cell` convention. The tracer converts the position into its own cell
 before it reads water depth or terrain. The test repeats a native fin stroke with different cell coordinates and
 compares the same suspended mass, parcel positions, terrain elevations and replay.
+Cargo from hull openings uses the same coordinate conversion. A separate live flooding test compares the released
+pellets and fines in shifted and unshifted tracer cells with a roundoff bound derived from the number of steps.
 
 The optional developing wall layer uses Phares et al. Eq. 2.12 and Fig. 4 for the free-stream half width and
 velocity plateau. Using the plateau as constant edge speed, it integrates their axisymmetric Falkner momentum
