@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20473261,
+  "total": 20478329,
   "history": [
     {
       "date": "2026-10-24",
@@ -13245,6 +13245,12 @@
       "commit": "58ab0ecb56",
       "grew": 0,
       "reason": "SOFT-04 adds native crack-band softening, irreversible mode state, and a damaged compliance solve with a finite limit at complete separation, moving the soft entry from 133213 to 134833 B gzip. . It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e69a6486d",
+      "reason": "New optional post entry, 0 to 5,068 B gzip: upscale (SpatialUpscale, a single-frame edge-adaptive upscale plus contrast-adaptive sharpen). Its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14197,6 +14203,7 @@
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,
     "@margoengine/post/trail": 3812,
+    "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
     "@margoengine/procedural/building-plans": 17803,
     "@margoengine/procedural/building-rules": 13427,
