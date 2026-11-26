@@ -499,8 +499,7 @@ confirms submerged dye follows the analytical potential gradient through `Spectr
 Finite instantaneous oil releases now use Fay's three radial laws, with mass conservation, current transport and
 snapshot replay checked separately. Stiver–Mackay evaporation uses the integrated Fay area and preserves a separate
 vapour ledger. The integrated exposure matches an independent quadrature of the radius laws at two simulation rates.
-The remaining oil work includes film thickness, dispersion into droplets, and independent measured slick-extent and
-evaporation validation.
+The remaining oil work includes film thickness and independent measured slick-extent and evaporation validation.
 
 Vertical tracers now accept a depth profile and include the diffusivity-gradient drift and midpoint variance from
 Visser (1997). For Coastal Mixing and Optics Experiment 4, the independent EPSONDE microstructure samples drive
@@ -514,6 +513,11 @@ mode still follows the SEA-04 wake potential. Independent wave-induced drift mea
 Horizontal dispersion can now increase with release scale. The benchmark uses Poje et al.'s separate drifter data
 for calibration and Okubo's nine Cape Kennedy dye extents for comparison. Each independent dye extent is closer
 with the scale law than with the constant reference diffusivity. The largest discrepancy is a factor of 2.34 in extent.
+
+Breaker energy and turnover can now entrain a finite slick into buoyant droplets using Delvigne–Sweeney. The
+model integrates the diameter classes, returns resurfacing oil to the slick, and keeps the vapour ledger separate.
+Independent measurements of absolute entrainment and intrusion depth remain open. The modern untreated-oil slope
+and its upper-size transition differ from the original law, as recorded in the clean-room notes.
 
 ## Verification passes
 

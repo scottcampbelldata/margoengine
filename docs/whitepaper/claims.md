@@ -277,6 +277,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   [Poje et al. (2014), Figure 6](https://doi.org/10.1073/pnas.1402452111),
   [Okubo (1971), Table 1](https://doi.org/10.1016/0011-7471(71)90046-5).
 
+- Oil droplet entrainment (SEA-15, 2026-11-26). One breaker reproduces the Delvigne–Sweeney mass flux and
+  droplet number moment. A pulsed release completes buoyant resurfacing with exact snapshot replay and conserves
+  the combined water, surface and vapour mass within 10⁻¹⁵ kg. Reproduce with
+  `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
+  [Delvigne and Sweeney (1988)](https://doi.org/10.1016/S0269-8579(88)80003-0).
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes

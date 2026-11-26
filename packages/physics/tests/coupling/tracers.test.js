@@ -556,3 +556,138 @@ test('SEA-15 Poje drifter calibration improves nine held-out Cape Kennedy dye ex
     `RMS log extent error ${rms(constant).toFixed(3)} fixed, ${rms(scaled).toFixed(3)} scaled. Worst scale-law ratio ${Math.exp(Math.max(...scaled)).toFixed(2)}.`,
   );
 });
+
+test('SEA-15 a breaker entrains the Delvigne–Sweeney mass and number moments by diameter class', () => {
+  const mass = 0.025;
+  const dt = 1 / 60;
+  const minimum = 20e-6;
+  const maximum = 400e-6;
+  const coefficient = 840;
+  const count = 8;
+  const height = 0.3;
+  const energy = 15;
+  const turnover = 0.5;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+    capacity: 2 * count,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    oilSpills: [
+      {
+        mass,
+        position: [0, 0],
+        spreadingCoefficient: 0,
+        parcels: count,
+        dispersion: {
+          minimumDiameter: minimum,
+          maximumDiameter: maximum,
+          entrainmentCoefficient: coefficient,
+          classes: count,
+          breaking: { energy, height, turnover },
+        },
+      },
+    ],
+  });
+  world.advance(1);
+  const drops = [...tracer.particlesOf()].filter((parcel) => parcel.state === 'water');
+  const inertialRadiusScale = 1.14 * ((9.80665 * (1 - 870 / 1025) * mass) / 870) ** 0.25;
+  const areaTime = 0.5 * Math.PI * inertialRadiusScale ** 2 * dt ** 2;
+  const expected = (areaTime * coefficient * energy ** 0.57 * turnover * (maximum ** 1.7 - minimum ** 1.7)) / 1.7;
+  assert.equal(drops.length, count);
+  assert.ok(Math.abs(tracer.budget.water - expected) < 1e-12 * expected);
+  assert.ok(Math.abs(tracer.budget.surface + tracer.budget.water - mass) < 1e-15);
+  let numberMoment = 0;
+  for (const [index, drop] of drops.entries()) {
+    const diameter = tracer.materialList[drop.material].diameter;
+    const lo = minimum * (maximum / minimum) ** (index / count);
+    const hi = minimum * (maximum / minimum) ** ((index + 1) / count);
+    assert.ok(lo < diameter && diameter < hi);
+    assert.ok(-1.5 * height < drop.position[1] && drop.position[1] < 0);
+    numberMoment += drop.mass / diameter ** 3;
+  }
+  const exactNumber = (areaTime * coefficient * energy ** 0.57 * turnover * (minimum ** -1.3 - maximum ** -1.3)) / 1.3;
+  assert.ok(Math.abs(numberMoment - exactNumber) < 1e-12 * exactNumber);
+});
+
+test('SEA-15 submerged oil resurfaces into its parent slick while vapour and ordinary dye stay accounted', () => {
+  const mass = 0.025;
+  const dt = 1 / 60;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+    capacity: 17,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    sources: [{ material: 'dye', position: [0, -0.1, 0], rate: 60, stop: dt }],
+    oilSpills: [
+      {
+        mass,
+        position: [0, 0],
+        spreadingCoefficient: 0.0003,
+        parcels: 8,
+        evaporation: {
+          temperature: 290,
+          initialBoilingPoint: 400,
+          distillationSlope: 650,
+          massTransferCoefficient: 0.003,
+        },
+        dispersion: {
+          minimumDiameter: 0.001,
+          maximumDiameter: 0.002,
+          classes: 8,
+          entrainmentCoefficient: 840,
+          breaking: (_x, _z, time) => ({ energy: 15, height: 0.05, turnover: time < dt ? 1 : 0 }),
+        },
+      },
+    ],
+  });
+  world.advance(1);
+  assert.ok(tracer.budget.water > 1);
+  assert.ok(tracer.evaporatedMass > 0);
+  const saved = world.takeSnapshot();
+  world.advance(2400);
+  assert.equal([...tracer.particlesOf()].length, 9);
+  assert.ok(Math.abs(tracer.budget.water - 1) < 1e-15);
+  assert.ok(Math.abs(tracer.budget.surface + tracer.evaporatedMass - mass) < 1e-15);
+  const hash = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  world.advance(2400);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 an invalid breaker sample leaves both slicks ready to retry the same tick', () => {
+  const make = (energy) => {
+    const tracer = new TracerSolver();
+    const dispersion = {
+      minimumDiameter: 20e-6,
+      maximumDiameter: 50e-6,
+      classes: 2,
+      entrainmentCoefficient: 840,
+      breaking: { energy: 10, height: 0.2, turnover: 0.8 },
+    };
+    const release = { mass: 0.025, spreadingCoefficient: 0, parcels: 2 };
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+      capacity: 8,
+      oilSpills: [
+        { ...release, position: [0, 0], dispersion },
+        {
+          ...release,
+          position: [1, 0],
+          dispersion: {
+            ...dispersion,
+            breaking: () => ({ ...dispersion.breaking, energy: energy() }),
+          },
+        },
+      ],
+    });
+    return { tracer, world };
+  };
+  let energy = -1;
+  const trial = make(() => energy);
+  assert.throws(() => trial.world.advance(1), /supply finite nonnegative energy/);
+  assert.equal(trial.tracer.budget.released, 0);
+  energy = 10;
+  trial.world.advance(1);
+  const control = make(() => 10);
+  control.world.advance(1);
+  assert.equal(trial.world.hash(), control.world.hash());
+});

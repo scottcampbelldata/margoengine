@@ -18,7 +18,7 @@
 //
 // Finite oil spills add Fay's axisymmetric spreading and optional Stiver–Mackay evaporation. Use a depth profile for
 // vertical turbulence where mixing varies with depth. Horizontal mixing can use a constant or a scale law.
-// Settled parcels remain in the bed ledger. Dispersion into oil droplets and flocculation are unresolved.
+// Settled parcels remain in the bed ledger. Breaking waves can entrain buoyant oil droplets from a finite slick.
 
 import type {
   Bed,
@@ -51,7 +51,13 @@ import {
   evaporationRates,
   type TracerOilEvaporation,
 } from './tracer-evaporation.js';
-import { type FayCoefficients, fayCoefficients, fayRadius } from './tracer-fay.js';
+import { type FayCoefficients, fayAreaTime, fayCoefficients, fayRadius } from './tracer-fay.js';
+import {
+  oilBreaking,
+  type OilDispersionLaw,
+  oilDispersionLaw,
+  type TracerOilDispersion,
+} from './tracer-oil-dispersion.js';
 import { stokesAt, type StokesProfile, stokesProfile } from './tracer-stokes.js';
 import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
@@ -71,6 +77,7 @@ import type {
 export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
 export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-diffusion.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
+export type { TracerBreakerExposure, TracerOilDispersion } from './tracer-oil-dispersion.js';
 
 /** The registry field of the tracers: each particle's position (x, y, z) and mass, owned by {@link TracerSolver}. */
 export const TRACER_FIELD: FieldDescriptor = {
@@ -172,6 +179,8 @@ export interface TracerOilSpill {
   parcels?: number;
   /** Stiver–Mackay vapour loss from the expanding slick (default no evaporation). */
   evaporation?: TracerOilEvaporation;
+  /** Delvigne–Sweeney entrainment under breaking waves, with buoyant resurfacing (default none). */
+  dispersion?: TracerOilDispersion;
 }
 
 /** Settings of a {@link TracerSolver}; each has a default. */
@@ -259,6 +268,7 @@ interface OilSpillState {
   start: number;
   profile: FayCoefficients;
   evaporation?: EvaporationRates;
+  drops?: { first: number; law: OilDispersionLaw; materials: readonly number[] };
 }
 
 function pickupRate(shear: number, bed: JetBed): number {
@@ -330,6 +340,8 @@ export class TracerSolver implements Solver<TracerParams> {
   private readonly oilSpills: OilSpillState[] = [];
   private spillRadii?: Region;
   private spillVapour?: Region;
+  private spillWater?: Region;
+  private dropletOwners?: Map<number, number>;
   private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
   private horizontalLaw?: HorizontalDispersionLaw;
   private dispersionAges?: Region;
@@ -598,8 +610,11 @@ export class TracerSolver implements Solver<TracerParams> {
           'Oil spill radius is outside numeric range; use physical oil mass, buoyancy, viscosity and tension.',
         );
       first -= parcels;
+      const surfaceFirst = first;
+      const drops = spill.dispersion && this.reserveOilDrops(spill.dispersion, material, first);
+      if (drops) first = drops.first;
       this.oilSpills.push({
-        first,
+        first: surfaceFirst,
         count: parcels,
         material: this.materialIndex(material),
         position,
@@ -607,6 +622,7 @@ export class TracerSolver implements Solver<TracerParams> {
         start,
         profile,
         evaporation: spill.evaporation && evaporationRates(spill.evaporation, volume),
+        drops,
       });
     }
     this.emissionCapacity = first;
@@ -614,6 +630,19 @@ export class TracerSolver implements Solver<TracerParams> {
       this.spillRadii = this.host.allocate('fay-spill-radii', 8 * this.oilSpills.length, 'f64', 1);
     if (this.oilSpills.some((spill) => spill.evaporation))
       this.spillVapour = this.host.allocate('oil-spill-vapour', 8 * this.oilSpills.length, 'f64', 1);
+    if (this.dropletOwners)
+      this.spillWater = this.host.allocate('oil-spill-water', 8 * this.oilSpills.length, 'f64', 1);
+  }
+
+  private reserveOilDrops(options: TracerOilDispersion, material: TracerMaterial, free: number) {
+    const law = oilDispersionLaw(options, free);
+    const first = free - law.classes.length;
+    this.dropletOwners ??= new Map();
+    const materials = law.classes.map(({ diameter }, i) => {
+      this.dropletOwners!.set(first + i, this.oilSpills.length);
+      return this.materialIndex({ ...material, diameter, floats: false, shape: 0.4 });
+    });
+    return { first, law, materials };
   }
 
   private initBreachMixes(mixes: readonly BreachTracerMix[], firstSlot: number): number {
@@ -727,10 +756,20 @@ export class TracerSolver implements Solver<TracerParams> {
     return this.params.waterLevel - dy + (this.sea?.elevation(x + dx, z + dz, time) ?? 0);
   }
 
-  private spreadOil(time: number, words: Float64Array, book: Float64Array): void {
+  private spreadOil(time: number, dt: number, tick: number, words: Float64Array, book: Float64Array): void {
     if (!this.spillRadii) return;
     const radii = regionWords(this.host.memory, this.spillRadii) as Float64Array;
     const vapour = this.spillVapour && (regionWords(this.host.memory, this.spillVapour) as Float64Array);
+    const immersed = this.spillWater && (regionWords(this.host.memory, this.spillWater) as Float64Array);
+    // Check all supplied breaker conditions before moving any parcels or transferring mass.
+    const waves =
+      immersed &&
+      this.oilSpills.map((spill, i) => {
+        const age = time - spill.start;
+        if (!spill.drops || !(age > 0) || spill.mass <= (vapour?.[i] ?? 0) + immersed[i]!) return undefined;
+        const centre = radii[i] === 0 ? spill.position : this.oilCentre(spill, words);
+        return { centre, ...oilBreaking(spill.drops.law, centre[0], centre[1], time - 0.5 * Math.min(age, dt)) };
+      });
     for (let i = 0; i < this.oilSpills.length; i++) {
       const spill = this.oilSpills[i]!;
       const age = time - spill.start;
@@ -747,28 +786,113 @@ export class TracerSolver implements Solver<TracerParams> {
         book[0]! += spill.mass;
         book[2]! += spill.mass;
       } else {
-        this.expandOil(spill, radius / previous, words);
+        this.expandOil(spill, radius / previous, words, waves?.[i]?.centre ?? this.oilCentre(spill, words));
       }
       radii[i] = radius;
+      const priorAge = Math.max(0, age - dt);
+      let remaining = Math.max(0, spill.mass - (vapour?.[i] ?? 0) - (immersed?.[i] ?? 0));
+      let changed = false;
       if (vapour && spill.evaporation) {
         const previousMass = vapour[i]!;
-        const evaporated = spill.mass * evaporatedFraction(spill.evaporation, spill.profile, age);
+        const exposed = spill.mass * evaporatedFraction(spill.evaporation, spill.profile, age);
+        const evaporated = spill.drops
+          ? previousMass +
+            Math.min(remaining, exposed - spill.mass * evaporatedFraction(spill.evaporation, spill.profile, priorAge))
+          : exposed;
         if (evaporated > previousMass) {
           vapour[i] = evaporated;
-          book[2]! -= evaporated - previousMass;
-          this.setOilMass(spill, spill.mass - evaporated, words);
+          const transfer = evaporated - previousMass;
+          book[2]! -= transfer;
+          remaining = Math.max(0, spill.mass - evaporated - (immersed?.[i] ?? 0));
+          changed = true;
         }
       }
+      const wave = waves?.[i];
+      if (immersed && wave && remaining > 0) {
+        const { rate, depth } = wave;
+        if (rate > 0 && depth > 0) {
+          const areaTime = fayAreaTime(spill.profile, age) - fayAreaTime(spill.profile, priorAge);
+          const amount = Math.min(remaining, rate * areaTime);
+          const transfer = this.entrainOil(spill, words, time, tick, amount, depth);
+          immersed[i]! += transfer;
+          book[1]! += transfer;
+          book[2]! -= transfer;
+          remaining -= transfer;
+          changed ||= transfer > 0;
+        }
+      }
+      if (changed) this.setOilMass(spill, remaining, words, (immersed?.[i] ?? 0) > 0);
     }
   }
 
-  private setOilMass(spill: OilSpillState, mass: number, words: Float64Array): void {
+  private entrainOil(
+    spill: OilSpillState,
+    words: Float64Array,
+    time: number,
+    tick: number,
+    amount: number,
+    depth: number,
+  ): number {
+    const drops = spill.drops!;
+    const bins = drops.law.classes;
+    let assigned = 0;
+    for (let i = 0; i < bins.length; i++) {
+      const slot = drops.first + i;
+      const p = slot * STRIDE;
+      const surfaceParcel = (spill.first + (i % spill.count)) * STRIDE;
+      const x = words[surfaceParcel]!;
+      const z = words[surfaceParcel + 2]!;
+      const surface = this.surfaceAt(x, z, time);
+      const intrusion = Math.min(depth, surface - this.bedAt(x, z));
+      if (!(intrusion > 0)) continue;
+      const mass = Math.min(amount - assigned, amount * bins[i]!.share);
+      if (!(mass > 0)) continue;
+      const y = surface - intrusion * ((this.random.block(tick, slot, 1)[0]! + 0.5) / 4294967296);
+      const existing = words[p + 3]!;
+      if (existing > 0) {
+        const mix = mass / (existing + mass);
+        words[p]! += (x - words[p]!) * mix;
+        words[p + 1]! += (y - words[p + 1]!) * mix;
+        words[p + 2]! += (z - words[p + 2]!) * mix;
+      } else {
+        words[p] = x;
+        words[p + 1] = y;
+        words[p + 2] = z;
+        if (this.dispersionAges) (regionWords(this.host.memory, this.dispersionAges) as Float64Array)[slot] = 0;
+      }
+      words[p + 3] = existing + mass;
+      words[p + 4] = drops.materials[i]!;
+      words[p + 5] = WATER;
+      assigned += mass;
+    }
+    return assigned;
+  }
+
+  private setOilMass(spill: OilSpillState, mass: number, words: Float64Array, keepPatch: boolean): void {
     const share = mass / spill.count;
     const last = (spill.first + spill.count - 1) * STRIDE;
     for (let p = spill.first * STRIDE; p <= last; p += STRIDE) {
       words[p + 3] = p === last ? mass - share * (spill.count - 1) : share;
-      if (mass === 0) words[p + 5] = FREE;
+      if (mass === 0 && !keepPatch) words[p + 5] = FREE;
     }
+  }
+
+  private resurfaceOil(owner: number, p: number, words: Float64Array, book: Float64Array): void {
+    const immersed = regionWords(this.host.memory, this.spillWater!) as Float64Array;
+    const vapour = this.spillVapour && (regionWords(this.host.memory, this.spillVapour) as Float64Array);
+    const returned = words[p + 3]!;
+    const spill = this.oilSpills[owner]!;
+    immersed[owner] = Math.max(0, immersed[owner]! - returned);
+    book[1]! -= returned;
+    book[2]! += returned;
+    words[p + 3] = 0;
+    words[p + 5] = FREE;
+    this.setOilMass(
+      spill,
+      Math.max(0, spill.mass - (vapour?.[owner] ?? 0) - immersed[owner]!),
+      words,
+      immersed[owner]! > 0,
+    );
   }
 
   private seedOil(spill: OilSpillState, radius: number, words: Float64Array): void {
@@ -789,7 +913,7 @@ export class TracerSolver implements Solver<TracerParams> {
     }
   }
 
-  private expandOil(spill: OilSpillState, scale: number, words: Float64Array): void {
+  private oilCentre(spill: OilSpillState, words: Float64Array): readonly [number, number] {
     const first = spill.first * STRIDE;
     const end = first + spill.count * STRIDE;
     let cx = 0;
@@ -798,8 +922,17 @@ export class TracerSolver implements Solver<TracerParams> {
       cx += words[p]! - words[first]!;
       cz += words[p + 2]! - words[first + 2]!;
     }
-    cx = words[first]! + cx / spill.count;
-    cz = words[first + 2]! + cz / spill.count;
+    return [words[first]! + cx / spill.count, words[first + 2]! + cz / spill.count];
+  }
+
+  private expandOil(
+    spill: OilSpillState,
+    scale: number,
+    words: Float64Array,
+    [cx, cz]: readonly [number, number],
+  ): void {
+    const first = spill.first * STRIDE;
+    const end = first + spill.count * STRIDE;
     for (let p = first; p < end; p += STRIDE) {
       words[p] = cx + (words[p]! - cx) * scale;
       words[p + 2] = cz + (words[p + 2]! - cz) * scale;
@@ -823,7 +956,7 @@ export class TracerSolver implements Solver<TracerParams> {
       book = this.book(),
       { capacity, horizontalDiffusivity: kh, verticalDiffusivity: kv, waterLevel } = this.params;
     const [seaX, seaY, seaZ] = this.seaOffset;
-    this.spreadOil(time, words, book);
+    this.spreadOil(time, dt, context.tick, words, book);
     // Release: each source's mass this step, in particles of the set mass, the remainder carried to the next step.
     let free = 0;
     for (let s = 0; s < this.sources.length; s++) {
@@ -937,9 +1070,17 @@ export class TracerSolver implements Solver<TracerParams> {
       const nz = z + uz * dt + sh * n2;
       // The surface reflects what is in the water; the bed keeps what reaches it.
       const surface = this.surfaceAt(nx, nz, time);
-      if (ny > surface) ny = 2 * surface - ny;
       const floor = this.bedAt(nx, nz);
-      if (ny <= floor) {
+      const parentSlick = this.dropletOwners?.get(i);
+      if (parentSlick !== undefined) {
+        if (ny < floor) ny = 2 * floor - ny;
+        if (ny >= surface || floor >= surface) {
+          this.resurfaceOil(parentSlick, p, words, book);
+          continue;
+        }
+      }
+      if (ny > surface) ny = 2 * surface - ny;
+      if (parentSlick === undefined && ny <= floor) {
         ny = floor;
         words[p + 5] = BED;
         book[1]! -= words[p + 3]!;
@@ -1068,6 +1209,7 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.bedExchange) regions.push(...this.bedExchange.regions());
     if (this.spillRadii) regions.push(this.spillRadii);
     if (this.spillVapour) regions.push(this.spillVapour);
+    if (this.spillWater) regions.push(this.spillWater);
     if (this.dispersionAges) regions.push(this.dispersionAges);
     return regions;
   }
@@ -1105,7 +1247,7 @@ export class TracerSolver implements Solver<TracerParams> {
     for (let i = 0; i < this.params.capacity; i++) {
       const p = i * STRIDE,
         state = words[p + 5]!;
-      if (state === FREE) continue;
+      if (state === FREE || words[p + 3] === 0) continue;
       yield {
         position: [words[p]!, words[p + 1]!, words[p + 2]!],
         mass: words[p + 3]!,
