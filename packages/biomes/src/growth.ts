@@ -16,6 +16,7 @@ import {
   type StepContext,
 } from '@margoengine/physics/world';
 import type { Branches } from '@margoengine/procedural/lsystem';
+import { umod } from './fixed.js';
 
 const F64 = Float64Array.BYTES_PER_ELEMENT;
 const LAYOUT = 1;
@@ -683,7 +684,7 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
       const water = words(state, state.soil);
       for (let i = 0; i < water.length; i++) water[i] = water[i]! + state.fallback;
     }
-    if ((context.tick + 1) % state.interval === 0) {
+    if (umod(context.tick + 1, state.interval) === 0) {
       develop(state, nodes, nodes[1]! + 1);
       nodes[1] = nodes[1]! + 1;
     }
