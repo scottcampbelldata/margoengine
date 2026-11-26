@@ -6,6 +6,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: rebase:main wrote a size-history row twice when upstream already had it (KB-REBASE-HISTORYDUP1, scripts)
+
+- **Repro:** a branch commit whose `scripts/quality/baselines/sizes.json` carries a `history` row that `main` also has
+  and the commit's parent lacks (the same change landed twice, or a commit made on a file taken from `main`), plus a
+  row of its own; `npm run rebase:main`. The shared row is in the settled file twice. `main` held three such rows
+  (commit `200b488af`), and `34e7aeb91` landed a fourth (`c32e306e0`) that `feaf75203` removed by hand.
+- **Cause:** `mergeSizes` in `scripts/rebase-main.mjs` appended every row of the replayed commit that the commit's
+  parent lacked, compared as `JSON.stringify` text. It never looked at upstream's rows, and the same row with its keys
+  in another order counted as new.
+- **Fix:** rows are compared by date, commit and reason (the key of `historyMissing` in `scripts/quality/ratchet.js`)
+  against the parent's and upstream's rows, so the result is upstream's rows, then the commit's new ones, each once.
+  The quality gate now fails on a baseline that holds a row twice (`historyRepeated`), and the three rows on `main`
+  are single again. The other files the script settles take upstream's copy or merge by key (`docs/api-surface.md`),
+  so they cannot repeat a row.
+- **Regression:** `tests/rebase-main.test.js` ("sizes.json history merges by identity"), which also proves
+  `droppedHistory` still reports a lost row; `tests/quality-gate.test.js` ("no baseline holds a history entry twice").
+
 ### Fixed 2026-11-26: one terrain or water in two capture effects draws the first effect's outputs (KB-CAPTURE-TWOEFFECTS1, terrain, water)
 
 - **Repro:** add one `Terrain` to SSR and to `SceneTargets` (`ssr.add(terrain); targets.add(terrain)`): the second
