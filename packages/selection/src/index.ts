@@ -459,10 +459,6 @@ export class Selection implements EnginePlugin {
           sampleCount: this.sampleCount,
           mask: (node) => this.flags[node.id] === 1,
           depthCompare: xray ? 'always' : 'equal',
-          filter: (node) =>
-            !this.models
-              .update(this.engine!)
-              .some((model) => model.primitives.some((p) => p.node === node && p.instances)),
         });
     } finally {
       c.color = color;
@@ -530,7 +526,14 @@ export class Selection implements EnginePlugin {
     draws.reset();
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
-      if (p.buffers && !hidden(e, p.node.id) && (meshLayers(p.node) & this.layerBits) !== 0 && (p.instances || meshTriangles(p.node)?.kind !== 'pbr'))
+      // gltf/pbr primitives, instanced ones included, are marked by `sources` through the pick shader with the colour
+      // pass's instance transform and vertex move (KB-SEL-INSTMOVE1).
+      if (
+        p.buffers &&
+        !hidden(e, p.node.id) &&
+        (meshLayers(p.node) & this.layerBits) !== 0 &&
+        meshTriangles(p.node)?.kind !== 'pbr'
+      )
         if (!p.instances) draws.add(p, 1);
         else if (p.instances.count) draws.addInstances(p, 1, p.node.matrix);
     }
