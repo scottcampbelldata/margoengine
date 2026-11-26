@@ -191,6 +191,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/lightning-kernel.wasm',
+    label: 'lightning-kernel.wasm',
+    kind: 'Rust SIMD electric potential relaxation',
+    measure: 'file',
+    when: 'LightningSolver.load() from the optional /lightning entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/lightning-kernel-shared.wasm',
+    label: 'lightning-kernel-shared.wasm',
+    kind: 'Rust SIMD electric potential relaxation, shared world memory',
+    measure: 'file',
+    when: 'LightningSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/seismic-kernel.wasm',
     label: 'seismic-kernel.wasm',
     kind: 'Rust SIMD elastodynamic waves',

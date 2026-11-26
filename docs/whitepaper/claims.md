@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Lightning (ATMO-07, 2026-11-26). The native lattice reproduces the closed-form electric potential in vacuum
+  and under uniform volume charge. A return stroke touches the actual terrain and produces a timed acoustic
+  source along each segment. The browser regression draws the same solved channel in plain and shared worlds.
+  After building Physics and Sky, run `node --test packages/physics/tests/coupling/lightning.test.js` and
+  `node packages/physics/tests/lightning.browser.mjs`.
+
 - Cyclone and compact vortices (ATMO-05, 2026-11-26). The physical 10 m wind and pressure match the moving
   Sky hurricane, including an eyewall above 60 m/s. Exact quadratic drag moves a rigid body. Pressure and
   wind transfer momentum to a real shallow-water grid while its volume stays conserved, and the gale bends

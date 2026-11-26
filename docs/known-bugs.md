@@ -16620,3 +16620,11 @@ Vehicles now sink into a calibrated yielding surface and feel the resulting susp
 The Event Horizon scene still uses its established SPACE-01 emitter paths. Bind its emissivity and radial transport
 to the new annulus fields to show heating and density. A disk crossing the strongly relativistic inner region needs
 a relativistic stress and heat equation. The test-geodesic solve covers that region in the exterior observer chart.
+
+### Continuous lightning weather and calibrated thunder (ATMO-07)
+
+`LightningSolver` handles one supplied cloud-to-ground flash. Weather can draw its actual path and light it, and
+`OutdoorSound` computes the travel times of its segment sources. The automatic Weather scheduler still uses the
+procedural bolt, and the acoustic sources carry relative weights. A storm queue would need evolving cloud charge,
+and sound-pressure calibration would need a defined return current and acoustic source model. The combined
+regressions are `packages/physics/tests/coupling/lightning.test.js` and `packages/physics/tests/lightning.browser.mjs`.

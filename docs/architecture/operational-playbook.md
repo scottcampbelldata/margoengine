@@ -4303,6 +4303,15 @@ and amplification through a softer site. A registered ground reader applies the 
 to an actual rigid body. Building and soil states share the solver's world clock. Native Chromium and
 Node replay identical f64 worlds in both memory modes.
 
+### Electric potential and return paths (ATMO-07)
+
+Plain and shared worlds load optional slot-free Rust Wasm to relax a seven-point Poisson stencil. The SIMD kernel
+imports the existing arena and has no initialized data or static slot. Channel and acoustic buffers have fixed
+capacity; layout 1 carries active counts in their first rows. The world RNG controls stochastic growth and a
+snapshot recovers the same partially grown leader and final return path. A live TerrainBed terminates the return
+channel and the same path drives Sky's renderer and lights. The acoustic fixture checks segment emission and
+OutdoorSound travel time. Absolute acoustic pressure and evolving cloud fields still need separate models.
+
 ### Vortex wind and pressure (ATMO-05)
 
 Sky and Physics share the Holland and compact-vortex radial balances. Physics reuses the ordinary rigid body-force

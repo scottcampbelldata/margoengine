@@ -23,6 +23,7 @@ export class LightningBolt implements EnginePlugin {
 
 export interface LightningBoltAttachOptions {
     weather: LightningBoltSource;
+    channel?: (strike: LightningStrike) => LightningChannel | undefined;
     coreRadiance?: number;
     glowRadiance?: number;
 }

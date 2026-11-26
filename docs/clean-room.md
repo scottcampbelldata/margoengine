@@ -1,5 +1,30 @@
 # Clean room
 
+### Atmospheric lightning (ATMO-07)
+
+Luciano Niemeyer, Luciano Pietronero and Hans J. Wiesmann, “Fractal Dimension of Dielectric Breakdown”
+(1984), supplies the field-powered stochastic growth law. Theodore Kim and Ming C. Lin, “Physically Based
+Animation and Rendering of Lightning” (2004), §4, supplies the potential boundary and growth weighting and
+extends Laplace to Poisson for volume charge. Margo uses a cubic seven-point finite difference and native
+masked Jacobi with insulating side faces. A leader bond is eligible where its cloud-normalized potential
+drop is positive and is drawn with probability proportional to that drop raised to `exponent`. The first
+grounded path is traced back to the cloud before the side branches are packed for Sky.
+[Niemeyer et al.](https://doi.org/10.1103/PhysRevLett.52.1033),
+[Kim and Lin](https://www.cs.jhu.edu/~misha/ReadingSeminar/Papers/Kim04.pdf).
+
+Vladimir A. Rakov and Martin A. Uman, *Lightning: Physics and Effects* (2003), describes the downward leader and
+upward return stroke. James D. Hill, Martin A. Uman and Douglas M. Jordan, “High-speed video observations of
+a lightning stepped leader” (2011), gives the measured order of leader speed. J. Jerauld et al., “Electric and
+magnetic fields and field derivatives from lightning stepped leaders and first return strokes measured at distances
+from 100 to 1000 m” (2008), gives the initial order of return speed. Arthur A. Few, “Power spectrum of thunder”
+(1969), motivates treating the tortuous return channel as separate acoustic line sources. Margo timestamps each
+segment at its midpoint arc length divided by the return speed. Its acoustic weights and light envelope are
+relative, with propagation and arrival handled by the outdoor acoustics solver.
+[Rakov and Uman](https://assets.cambridge.org/97805215/83275/sample/9780521583275ws.pdf),
+[Hill et al.](https://doi.org/10.1029/2011JD015818),
+[Jerauld et al.](https://doi.org/10.1029/2008JD010171),
+[Few](https://doi.org/10.1029/JC074i028p06926).
+
 ### Cyclone and compact-vortex forcing (ATMO-05)
 
 Greg J. Holland, “An Analytic Model of the Wind and Pressure Profiles in Hurricanes” (1980), gives the

@@ -92,6 +92,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'lightning-kernel',
+    crate: 'packages/physics/lightning-kernel',
+    blueprint: 'packages/physics/src/lightning/lightning-kernel.wasm',
+    script: 'packages/physics/scripts/build-lightning-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'lightning-kernel-shared',
+    crate: 'packages/physics/lightning-kernel',
+    blueprint: 'packages/physics/src/lightning/lightning-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-lightning-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'seismic-kernel-shared',
     crate: 'packages/physics/seismic-kernel',
     blueprint: 'packages/physics/src/seismic/seismic-kernel-shared.wasm',

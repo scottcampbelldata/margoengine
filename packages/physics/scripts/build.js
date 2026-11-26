@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -50,6 +50,7 @@ await build({
         world: resolve(root, 'src/world/index.ts'),
         earth: resolve(root, 'src/earth/index.ts'),
         seismic: resolve(root, 'src/seismic/index.ts'),
+        lightning: resolve(root, 'src/lightning/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
         falling: resolve(root, 'src/falling.ts'),
         ageing: resolve(root, 'src/ageing.ts'),
@@ -107,6 +108,8 @@ for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
 for (const name of ['seismic-kernel.wasm', 'seismic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/seismic', name), resolve(dist, name));
+for (const name of ['lightning-kernel.wasm', 'lightning-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/lightning', name), resolve(dist, name));
 for (const name of ['swim-kernel.wasm', 'swim-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/life', name), resolve(dist, name));
 for (const name of ['locomotion-kernel.wasm', 'locomotion-kernel-shared.wasm'])

@@ -313,6 +313,8 @@ export interface LightningBoltSource {
 export interface LightningBoltAttachOptions {
   /** The weather whose strikes are drawn. */
   weather: LightningBoltSource;
+  /** Supply an immutable physical channel per strike. An absent channel uses procedural growth. */
+  channel?: (strike: LightningStrike) => LightningChannel | undefined;
   /** Radiance of the core at its peak, linear, before `bolt.scale`. Default 80. */
   coreRadiance?: number;
   /** Radiance of the glow at its peak, linear, before `bolt.scale`. Default 6. */
@@ -396,6 +398,7 @@ export class LightningBolt implements EnginePlugin {
   private readonly values = new Float32Array(16 + 4 * 5 + 4 * MAX_BOLTS);
   private readonly channels = new Map<number, { shape: string; channel: LightningChannel }>();
   private uploaded = '';
+  private uploadedSegments: Float32Array[] = [];
 
   constructor(readonly options: LightningBoltAttachOptions) {
     if (
@@ -424,6 +427,8 @@ export class LightningBolt implements EnginePlugin {
 
   /** The channel of `strike` under the bolt's settings now, grown on first use and kept while the settings hold. */
   channelOf(strike: LightningStrike): LightningChannel {
+    const supplied = this.options.channel?.(strike);
+    if (supplied) return supplied;
     const o = this.options.weather.options.lightning,
       b = o?.bolt ?? {},
       top = b.top ?? o?.cloud?.base ?? DEFAULT_TOP,
@@ -516,7 +521,10 @@ export class LightningBolt implements EnginePlugin {
     const sig = bolts
       .map((x, i) => x.strike.id + ':' + channels[i].count + ':' + (channels[i].segments[0] + channels[i].segments[5]))
       .join('|');
-    if (sig !== this.uploaded) {
+    if (
+      sig !== this.uploaded ||
+      (this.options.channel && channels.some((channel, index) => channel.segments !== this.uploadedSegments[index]))
+    ) {
       const data = new Float32Array(total * CHANNEL_STRIDE);
       let at = 0;
       channels.forEach((ch, slot) => {
@@ -526,6 +534,7 @@ export class LightningBolt implements EnginePlugin {
       });
       device.queue.writeBuffer(this.storage, 0, data as Float32Array<ArrayBuffer>);
       this.uploaded = sig;
+      this.uploadedSegments = channels.map((channel) => channel.segments);
     }
     const key = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil?.format;
     if (this.key !== key) {
@@ -610,6 +619,7 @@ export class LightningBolt implements EnginePlugin {
     this.key = '';
     this.capacity = 0;
     this.uploaded = '';
+    this.uploadedSegments = [];
   }
 
   onDeviceRestored(engine: Engine): void {

@@ -40,6 +40,33 @@ const regions=img=>({deck:band(img,0.05,0.3),ground:band(img,0.8,0.98)});
 // Bright pixels (HDR luminance above 8), their count, the rows they cover and the brightest, over the whole frame.
 const stats=img=>{let n=0,max=0,top=img.h,bottom=0,sum=0;for(let y=0;y<img.h;y++)for(let x=0;x<img.w;x++){const i=(y*img.w+x)*4,l=0.2126*img.data[i]+0.7152*img.data[i+1]+0.0722*img.data[i+2];if(l>8){n++;top=Math.min(top,y);bottom=Math.max(bottom,y);}max=Math.max(max,l);sum+=l;}return {bright:n,rows:n?bottom-top+1:0,max,sum,h:img.h};};
 window.check={samples:sceneSamples,
+ async runPhysical(){
+  device.pushErrorScope('validation');
+  const [{ LightningSolver }, { PhysicsWorld, worldMemory }] = await Promise.all([
+   import('/packages/physics/dist/lightning.js'), import('/packages/physics/dist/world.js')
+  ]);
+  const simulate = async shared => {
+   const solver = await LightningSolver.load();
+   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) }).add(solver, {
+    size: [7, 17, 7], spacing: 80, origin: [-240, 0, -3240],
+   });
+   world.advance(18);
+   return { channel: solver.channel(), flash: solver.flash, hash: world.hash() };
+  };
+  const plain = await simulate(false), shared = await simulate(true);
+  const weather = new Weather({ intensity: 0, lightning: { strength: 0, hold: 0, cloud: { base: 1280 } } });
+  engine.use(weather);
+  const bolt = LightningBolt.attach(engine, { weather, channel: () => plain.channel });
+  weather.strike({ distance: 3000, azimuth: Math.PI, strength: 1 });
+  await shot();
+  const dark = stats(await shot());
+  weather.options.lightning.hold = 1;
+  await shot();
+  const lit = stats(await shot());
+  bolt.dispose(); weather.dispose();
+  const validation = (await device.popErrorScope())?.message ?? null;
+  return { plain, shared, lit, dark, validation, errors: errors.splice(0) };
+ },
  async run(){
   const out={};device.pushErrorScope('validation');
   const weather=new Weather({intensity:0,lightning:{strength:0,seed:3,bolt:{top:1200},cloud:{base:1500}}});engine.use(weather);

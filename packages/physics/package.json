@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs",
     "test:browser:seismic": "cd ../.. && node packages/physics/tests/seismic.browser.mjs",
     "build:airborne": "node scripts/build-airborne-kernel.mjs",
     "build:accretion": "node scripts/build-accretion-kernel.mjs",
@@ -71,6 +72,10 @@
     "./seismic": {
       "types": "./dist/seismic/index.d.ts",
       "import": "./dist/seismic.js"
+    },
+    "./lightning": {
+      "types": "./dist/lightning/index.d.ts",
+      "import": "./dist/lightning.js"
     },
     "./clouds": {
       "types": "./dist/clouds/index.d.ts",

@@ -4095,3 +4095,41 @@ exterior observer time. It supports Kerr, Schwarzschild, inclined and eccentric 
 for null geodesics. Its input radii use `GM/c²`. Output distances and proper time use metres and seconds. The
 options default to 60 physics updates per second and an RK4 phase increment of 1/32 at the start of each tick.
 The disk publishes density, heating and orbital phase in increasing radial order.
+
+## Natural lightning and thunder
+
+`LightningSolver` advances a single cloud-to-ground leader in the electric field above a flat plane or a sampled
+`TerrainBed`. It publishes the return path, forks and timed thunder segments when the leader makes contact.
+Pass the resulting channel to Sky's `LightningBolt` and pass the source positions to `OutdoorSound` for propagation.
+
+```ts
+import { LightningSolver } from '@margoengine/physics/lightning';
+import { OutdoorSound } from '@margoengine/physics/outdoor-sound';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const rate = { num: 60, den: 1 };
+const lightning = await LightningSolver.load();
+const world = new PhysicsWorld({ rate }).add(lightning, {});
+world.advance(30);
+const sources = lightning.thunder();
+const sound = new OutdoorSound();
+const acoustics = new PhysicsWorld({ rate }).add(sound, {
+  links: sources.map(({ position }) => ({ source: position, listener: [2000, 2, 480] })),
+});
+acoustics.advance(1);
+const arrivals = sources.map(({ emissionTime }, index) => emissionTime + sound.read(index).delaySeconds);
+console.log(lightning.flash, lightning.channel().trunk, Math.min(...arrivals));
+```
+
+The default grid is `13 × 19 × 13` with 80 m spacing above the origin and an upper plane at −100 MV. The cloud seed
+starts at the centre of the top plane at world time zero. The default leader and return speeds are 200,000 and
+100,000,000 m/s. Growth weights scale with the square of the normalized voltage difference. `charge` samples a
+static free charge density in C/m³. The dimension-dependent default sweep count targets a normalized potential
+correction of `1e-6`, exposed as `residual`. `brightness(time)` gives the relative return envelope with a 10 µs
+rise and a 50 ms fade by default. A `bed` in another cell uses `cell` and `cellSize` (default 4096 m) to align the
+samples. Pass the same initial `cell` to `world.add()` if the grid is outside the origin cell.
+
+`channelField` has a header `[segment count, trunk count, ...]` in one `LIGHTNING_CHANNEL_WORDS` f32 row, followed by
+the trunk polyline and branches. `thunderField` has one `LIGHTNING_THUNDER_WORDS` f64 header row with the source count,
+followed by source XYZ (m), emission time (s), relative weight and segment length (m). Apply source emission time
+before acoustic flight time. `channel()` and `thunder()` return copies of their active data.

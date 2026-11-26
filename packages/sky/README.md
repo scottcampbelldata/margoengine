@@ -1641,6 +1641,11 @@ const channel = lightningChannel({seed: 7, start: [0, 1500, 800], end: [0, 0, 80
 console.log(channel.count, 'segments,', channel.trunk, 'on the main channel');
 ```
 
+For a simulated strike, save `LightningSolver.channel()` from `@margoengine/physics/lightning` when the leader
+grounds. Pass `channel: strike => channels.get(strike.id)` to `LightningBolt.attach`, with the immutable channel
+stored under the corresponding Weather strike ID. The same channel drives the visible bolt and its lighting.
+If the callback returns `undefined`, Weather uses the usual procedural channel for that strike.
+
 - Shape: the channel grows a step at a time from the cloud base to the strike, each step picked among random
   candidates in a cone around the field (toward the ground, with a slow sideways drift) by its alignment with the
   field to the power `eta`, less the shielding of channel already grown beside it: the stochastic growth law of the

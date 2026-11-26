@@ -9580,3 +9580,13 @@ requires a separate light-transport stage and an emissivity source.
 
 The optional TypeScript entry is 6,095 B gzip. Each Wasm variant is 1,657 B raw and 919 B gzip. Neither uses
 a shared static window. Core and stage add zero bytes.
+
+### Cloud-to-ground discharge (ATMO-07)
+
+The optional lightning solver follows one natural strike in a homogeneous dielectric with insulating sides, a
+prescribed cloud plane and a grounded bed sampled at initialization. Resolve terrain and charge gradients with
+several lattice cells. The leader is voxelized, optical strength is relative, and the charge field is fixed for
+one flash. Use the electric potential and timed segment outputs for visualization and relative acoustic delays.
+Predicting strike locations, current waveforms and absolute sound pressure requires storm observations and
+additional plasma and atmospheric models. Grid capacity follows available wasm32 arena space, including each
+published field's two mirrors. Both native modules measure 2,357 B raw and load only with the optional entry.
