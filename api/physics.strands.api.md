@@ -38,7 +38,7 @@ export interface StrandParams {
     readonly followDamping?: number;
     readonly friction?: number;
     readonly selfCollision?: boolean;
-    readonly contactGeometry?: 'points' | 'segments';
+    readonly contactGeometry?: 'points' | 'segments' | 'swept';
     readonly wind?: Wind;
     readonly bed?: Bed;
     readonly colliders?: readonly (StrandCapsule | ((time: number) => StrandCapsule))[];

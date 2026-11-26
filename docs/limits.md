@@ -9917,10 +9917,9 @@ reduced stiffness accuracy as its link count rises.
 
 The 720-point swept fixture moved its selected tip 0.4698 m relative to the still-air
 control and changed 3,040 pixels with the same camera on WebGPU and WebGL2. Plain, shared
-and restored native state all hash to `82f4cdeb4915b090` in the fixture. The optional entry is 5,557 B gzip
-with a 5,569 B ceiling. The lazy Wasm variants are 34,655 B raw each and 13,675 B
-plain or 13,676 B shared gzip. Core and
-Stage gain zero bytes.
+and restored native state all hash to `82f4cdeb4915b090` in the fixture. The optional entry
+is 5,806 B gzip with a 6,062 B ceiling. Both lazy Wasm variants are 43,921 B raw and
+17,445 B gzip. Core and Stage gain zero bytes.
 
 The optional horse adapter drives eight tail joints and ten five-point mane and forelock
 guides on the existing gait clock. It represents the rest of the strands through hair cards

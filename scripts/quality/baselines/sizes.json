@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20506093,
+  "total": 20506586,
   "history": [
     {
       "date": "2026-10-24",
@@ -13305,6 +13305,12 @@
       "commit": "3ea3c16663",
       "grew": 1,
       "reason": "EARTH-05 coupled oblique wheel shear and sidewall force take the optional entry from 12899 to 13328 B gzip. Projection and the running rim share the same native stamp and rigid coupling, so a separate entry would duplicate them. Core plus Stage stays 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "353704a4b2ffc8b52ac4e711838717dbf07de872",
+      "grew": 1,
+      "reason": "SOFT-03 moves the optional strands entry from 5557 to 5806 B gzip for swept link and capsule contact plus the retained rigid capsule poses. A split would duplicate the native loader and collide with the existing field ownership. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -14173,7 +14179,7 @@
     "@margoengine/physics/soft": 141962,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 43627,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 97921,
-    "@margoengine/physics/strands": 5569,
+    "@margoengine/physics/strands": 6062,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 13728,
