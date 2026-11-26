@@ -4951,14 +4951,22 @@ the wheel. On nearly straight passes, the deepest part fills first to form a lev
 At intermediate angles, the projected trailing lug edge makes a step within the trench.
 Later passes can fill earlier cuts, and the same pressure footprint counts each excavation depth only once.
 
+Enable `grouserDig: true` to let a spinning wheel excavate beyond its initial bearing cut.
+It defaults to false. Set a positive `lugHeight` and `grouserFill`, and connect the same
+`wheelPhase` field to the rigid and soil solvers. Pass each wheel's continuous spin angle in
+radians. Only spin travel under positive slip contributes. The cut respects bedrock and
+uses the existing compaction, airborne fines and berm ledger.
+[Executable spinning-wheel example](tests/coupling/terramechanics.test.js).
+
 ```ts
-import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
+import { SoilContactRigidSolver, soilPatchField, soilWheelPhaseField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
 
 const terrain = { columns: 64, rows: 64, width: 4, depth: 4, centre: [0, 0] as const };
 const input = soilPatchField();
+const wheelPhase = soilWheelPhaseField();
 const wheelReaction = soilWheelReactionField();
-const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction });
-const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction });
+const soil = await Terramechanics.load({ tier: 'resolved', input, wheelPhase, wheelReaction });
+const rigid = new SoilContactRigidSolver(input, { terrain, wheelPhase, wheelReaction });
 console.log(rigid.describe().id, soil.describe().id);
 ```
 

@@ -363,6 +363,8 @@ async function rollingBench(
     speed,
     slip,
     stop = Infinity,
+    phaseRate,
+    floor,
     wheelReaction,
     wheelSideForce,
     lateral = 0,
@@ -371,12 +373,19 @@ async function rollingBench(
   },
 ) {
   const input = soilPatchField('lab-wheel-assembly');
-  let memory, region;
+  const wheelPhase = phaseRate === undefined ? undefined : soilWheelPhaseField('lab-wheel-spin');
+  let memory, region, phase;
   const carriage = {
-    describe: () => ({ id: 'carriage', rate: 0, stableRate: () => 0, fields: [{ field: input, access: 'write' }] }),
+    describe: () => ({
+      id: 'carriage',
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: input, access: 'write' }, ...(wheelPhase ? [{ field: wheelPhase, access: 'write' }] : [])],
+    }),
     init(host) {
       memory = host.memory;
       region = host.allocate('carriage-load', 80, 'f64', 1);
+      if (wheelPhase) phase = host.allocate('carriage-phase', 8, 'f64', 1);
     },
     step(context) {
       regionWords(memory, region).set([
@@ -391,18 +400,22 @@ async function rollingBench(
         -slip * length,
         0,
       ]);
+      if (phase) regionWords(memory, phase)[0] = (phaseRate * context.tick) / 60;
     },
-    exportPorts: (tick) => [{ field: input.name, region, tick, cell: [0, 0, 0] }],
+    exportPorts: (tick) => [
+      { field: input.name, region, tick, cell: [0, 0, 0] },
+      ...(wheelPhase ? [{ field: wheelPhase.name, region: phase, tick, cell: [0, 0, 0] }] : []),
+    ],
     importPorts() {},
-    stateRegions: () => [region],
+    stateRegions: () => (phase ? [region, phase] : [region]),
     extraState: () => [],
   };
-  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce });
+  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce, wheelPhase });
   const bed = new TerrainBed();
   const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
-    .add(bed, { ...terrain, elevations: () => 0 })
+    .add(bed, { ...terrain, elevations: () => 0, bedrock: floor === undefined ? undefined : () => floor })
     .add(carriage)
-    .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel], sidewallGravity })
+    .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel], sidewallGravity, floor })
     .couple(['carriage', 'terramechanics', 'bed'], 'staggered');
   return { world, bed, soil };
 }
@@ -829,6 +842,52 @@ test('rolling grousers reuse older trailing cut capacity without excavating it t
   }
 });
 
+test('a spinning stuck wheel excavates the exact angular sweep and conserves the moved soil', async () => {
+  const terrain = { columns: 100, rows: 200, width: 0.4, depth: 0.8, centre: [0, 0] };
+  const wheel = { radius: 0.12, lugHeight: 0.012, bermProfile: 'cross-track', grouserFill: 0.6, grouserDig: true };
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 800_000,
+    compaction: 0,
+    dustFraction: 0,
+    reposeSlope: 0.55,
+  };
+  const phaseRate = (10 * Math.PI) / 180;
+  const loaded = { width: 0.1, length: 0.16, load: 100, speed: 0, slip: 1, phaseRate };
+  for (const shared of [false, true]) {
+    const { world, soil, bed } = await rollingBench(terrain, material, wheel, { ...loaded, shared });
+    world.advance(1);
+    const start = soil.budget.removed;
+    const snapshot = world.takeSnapshot();
+    world.advance(121);
+    const expected = wheel.radius * (2 * phaseRate) * loaded.width * wheel.lugHeight * wheel.grouserFill;
+    close(soil.budget.removed - start, expected, 4096 * eps * expected);
+    assert.equal(soil.budget.deposited, soil.budget.removed);
+    assert.equal(soil.budget.exported, 0);
+    close(bed.volume(), 0, 2048 * eps * soil.budget.removed);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(121);
+    assert.equal(world.hash(), hash);
+  }
+  for (const rig of [
+    { ...loaded, phaseRate: 0 },
+    { ...loaded, slip: 0 },
+  ]) {
+    const { world, soil } = await rollingBench(terrain, material, wheel, rig);
+    world.advance(1);
+    const start = soil.budget.removed;
+    world.advance(121);
+    assert.equal(soil.budget.removed, start);
+  }
+  const floor = -0.012;
+  const clipped = await rollingBench(terrain, material, wheel, { ...loaded, floor });
+  clipped.world.advance(121);
+  assert.equal(clipped.bed.refusedVolume(), 0);
+  close(Math.min(...clipped.bed.elevations()), floor, eps);
+  close(clipped.bed.volume(), 0, 2048 * eps * clipped.soil.budget.removed);
+});
+
 test('a yawed smooth wheel reproduces the sidewall earth pressure integral', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const radius = 0.14;
@@ -1188,14 +1247,15 @@ for (const tier of ['mean', 'resolved']) {
     coupledVehicles(tier));
 }
 
-async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0) {
+async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0, digging = false) {
   await Physics.load({ threads: true });
   const terrain = { columns: 72, rows: 96, width: 1.8, depth: 2.4, centre: [0, 0] };
   const input = soilPatchField();
   const wheelReaction = soilWheelReactionField();
   const wheelSideForce = sideSpeed ? soilWheelSideForceField() : undefined;
-  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce });
-  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction, wheelSideForce });
+  const wheelPhase = digging ? soilWheelPhaseField() : undefined;
+  const soil = await Terramechanics.load({ tier: 'resolved', input, wheelReaction, wheelSideForce, wheelPhase });
+  const rigid = new SoilContactRigidSolver(input, { terrain, wheelReaction, wheelSideForce, wheelPhase });
   const world = new PhysicsWorld({ rate, memory: worldMemory(true) });
   const bed = new TerrainBed();
   world.add(bed, { ...terrain, elevations: () => 0 });
@@ -1208,7 +1268,7 @@ async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0
     type: 'dynamic',
     position: [0, 0.28, 0],
     lockRotations: true,
-    enabledTranslations: [sideSpeed !== 0, false, true],
+    enabledTranslations: [sideSpeed !== 0, false, !digging],
     colliders: { shape: 'box', halfExtents: [0.1, 0.05, 0.1], mass },
   });
   chassis.setLinearVelocity([sideSpeed, 0, initialSpeed]);
@@ -1240,11 +1300,49 @@ async function withWheelReaction(initialSpin, initialSpeed, check, sideSpeed = 0
           shearLength: 0.021,
           compaction: 1,
         },
-    rollingWheels: [{ radius, skidExponent: 0.55 }],
+    rollingWheels: [
+      digging
+        ? { radius, lugHeight: 0.012, bermProfile: 'cross-track', grouserFill: 0.6, grouserDig: true }
+        : { radius, skidExponent: 0.55 },
+    ],
   });
   world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
-  check({ physics, world, ground, chassis, vehicle, mass, radius, inertia, wheelReaction, wheelSideForce, seed });
+  check({
+    physics,
+    world,
+    ground,
+    chassis,
+    vehicle,
+    mass,
+    radius,
+    inertia,
+    wheelReaction,
+    wheelSideForce,
+    seed,
+    soil,
+    bed,
+  });
 }
+
+test('a live held chassis transfers real wheel rotation to a deeper soil rut', async () => {
+  await withWheelReaction(
+    10,
+    0,
+    ({ world, vehicle, soil, bed }) => {
+      world.advance(1);
+      const before = soil.budget.removed;
+      const phase = vehicle.wheel(0).rotation;
+      world.advance(6);
+      const cut = soil.budget.removed;
+      assert.equal(vehicle.speed, 0);
+      assert.ok(vehicle.wheel(0).rotation > phase && cut > before);
+      assert.equal(bed.refusedVolume(), 0);
+      close(bed.volume(), -cut, 2048 * eps * cut);
+    },
+    0,
+    true,
+  );
+});
 
 test('a powered wheel consumes the native drawbar force and axle moment without adding kinetic energy', async () => {
   await withWheelReaction(

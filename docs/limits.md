@@ -9900,6 +9900,10 @@ with one simultaneous sparse transfer pass per solver step. The solver stores ei
 bytes per grid vertex and a second sparse bitset
 for affected vertices, approximately 0.26 bytes per vertex. Steep loose slopes can take more
 than one step to settle. The separate excavation maximum prevents counting a cut twice.
+The optional `grouserDig` uses 16 phase-history bytes per external row. Positive slip can
+excavate more soil as the wheel turns, up to the configured bedrock or the axle depth
+supported by this bearing model. Supply continuous phase samples over two loaded steps.
+The response still reports local bearing sinkage. The changed terrain carries the deeper rut.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand and relative

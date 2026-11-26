@@ -139,6 +139,8 @@ export interface SoilRollingWheel {
   readonly bermProfile?: 'ring' | 'cross-track';
   /** Effective fraction of the lug envelope carrying soil, in [0, 1]. Default zero. */
   readonly grouserFill?: number;
+  /** Excavate soil from positive slip over actual spin travel. Default false. Requires wheelPhase and grouserFill. */
+  readonly grouserDig?: boolean;
 }
 
 /** Indexed tread geometry centred on the axle. Coordinates are across, up and forward, in metres. */
@@ -326,6 +328,10 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
   const bermProfile = wheel.bermProfile ?? 'ring';
   if (bermProfile !== 'ring' && bermProfile !== 'cross-track')
     throw new MargoError('state', 'The wheel berm profile is invalid. Choose ring or cross-track.');
+  const grouserFill = finite(wheel.grouserFill ?? 0, 'grouser fill fraction', 0, 1);
+  const grouserDig = wheel.grouserDig ?? false;
+  if (typeof grouserDig !== 'boolean' || (grouserDig && !(lugHeight > 0 && grouserFill > 0)))
+    throw new MargoError('state', 'Invalid grouser digging options. Use a boolean and positive lug height and fill.');
   return {
     radius,
     lugHeight,
@@ -339,7 +345,8 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
     lugCount,
     lugWidth,
     bermProfile,
-    grouserFill: finite(wheel.grouserFill ?? 0, 'grouser fill fraction', 0, 1),
+    grouserFill,
+    grouserDig,
   };
 }
 
@@ -390,6 +397,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private sides?: Region;
   private trackRelief?: Region;
   private reposePending?: Region;
+  private diggingPhase?: Region;
   private sideWeight = 0;
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
@@ -524,6 +532,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.rolling = rolling.map((wheel) => wheel && rollingWheel(wheel));
     if (!this.phase && rolling.some((wheel) => wheel && (wheel.lugCount || wheel.treadMesh)))
       throw new MargoError('state', 'Moving wheel treads need a phase port. Provide a soil wheel phase reader.');
+    const digging = this.rolling.some((wheel) => wheel?.grouserDig);
+    if (digging && !this.phase)
+      throw new MargoError('state', 'Grouser digging needs actual spin travel. Provide a soil wheel phase reader.');
     if (profiles.length && (!this.pressureField || profiles.length !== responses))
       throw new MargoError(
         'state',
@@ -544,7 +555,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 55);
+    this.nativePatch = allocate('soil-patch-scratch', 56);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -553,6 +564,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const crossTrack =
       this.material.reposeSlope > 0 && this.rolling.some((wheel) => wheel?.bermProfile === 'cross-track');
     if (crossTrack) this.trackRelief = allocate('soil-track-relief', count);
+    if (digging) this.diggingPhase = allocate('soil-digging-phase', 2 * this.inputRows);
     if (this.pressureField) {
       this.pressure = allocate('soil-pressure', count);
       this.workRegion = allocate('soil-work', 3);
@@ -670,7 +682,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     return [(port.cell[0] - this.cell[0]) * this.cellSize, (port.cell[2] - this.cell[2]) * this.cellSize];
   }
 
-  private stamp(patch: Patch, row: number, bed: Region, dt: number, phase = 0, camber = 0): void {
+  private stamp(patch: Patch, row: number, bed: Region, dt: number, phase = 0, camber = 0, spinTravel = 0): void {
     const [x, z, forwardX, forwardZ, length, width, load, shearX, shearZ, flags] = patch;
     if (finite(load, 'normal load', 0) === 0) return;
     if (
@@ -693,6 +705,13 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const forward = [forwardX / direction, forwardZ / direction] as const;
     const longitudinalSlip = -(shearX * forward[0] + shearZ * forward[1]) / length;
     const drivingSlip = rolling ? Math.min(1, Math.max(0, longitudinalSlip)) : 0;
+    const sweptSoil = rolling?.grouserDig
+      ? finite(
+          rolling.radius * spinTravel * drivingSlip * width * rolling.lugHeight * rolling.grouserFill,
+          'grouser swept soil volume',
+          0,
+        )
+      : 0;
     const skid = rolling?.skidExponent === undefined ? 0 : Math.max(-1, Math.min(0, longitudinalSlip));
     const exponent = positive(
       material.exponent + (rolling?.slipExponent ?? 0) * drivingSlip - (rolling?.skidExponent ?? 0) * skid,
@@ -807,6 +826,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       rolling?.bermProfile === 'cross-track' ? material.reposeSlope : 0,
       rolling?.grouserFill ?? 0,
       rolling?.grouserFill ? Math.max(-1, Math.min(1, longitudinalSlip)) : 0,
+      sweptSoil,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -947,8 +967,18 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       const [x, z] = this.shift(port);
       const phases = this.readWheelPose(context, this.phase, 'phase', port.cell);
       const cambers = this.readWheelPose(context, this.camber, 'camber', port.cell);
+      const digging = this.diggingPhase && this.words(this.diggingPhase);
       for (let i = 0; i < this.inputRows; i++) {
         const at = i * SOIL_PATCH_WORDS;
+        let spinTravel = 0;
+        if (digging && this.rolling[i]?.grouserDig) {
+          const phase = finite(phases![i]!, 'wheel phase');
+          const loaded = data[at + 6]! > 0;
+          if (loaded && digging[2 * i + 1] === 1)
+            spinTravel = finite(Math.abs(phase - digging[2 * i]!), 'wheel spin travel', 0);
+          digging[2 * i] = phase;
+          digging[2 * i + 1] = Number(loaded);
+        }
         this.stamp(
           [
             data[at]! + x,
@@ -967,8 +997,11 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
           dt,
           phases?.[i],
           cambers?.[i],
+          spinTravel,
         );
       }
+    } else if (this.diggingPhase) {
+      this.words(this.diggingPhase).fill(0);
     }
     const feet = this.legged && context.inputs.get(LEGGED_CONTACT_FIELD.name);
     if (feet) this.footsteps(feet, this.fixed.length + this.inputRows, bed.region, dt);
@@ -1026,6 +1059,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       ...(this.sides ? [this.sides] : []),
       ...(this.trackRelief ? [this.trackRelief] : []),
       ...(this.reposePending && this.faces ? [this.faces] : []),
+      ...(this.diggingPhase ? [this.diggingPhase] : []),
       ...(this.floorGrid ? [this.floorGrid] : []),
       ...(this.thicknessGrid ? [this.thicknessGrid] : []),
       ...this.meshes.flatMap((mesh) => (mesh ? [mesh.geometry] : [])),

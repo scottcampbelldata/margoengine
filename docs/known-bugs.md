@@ -16965,8 +16965,9 @@ sampled projected contours and reproduces the Wh32 rolling sinkage at zero and m
 It stamps evenly spaced lugs from spin and indexed triangle treads from both live spin and camber.
 The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
 Measured cross-slope camber forces remain open.
-The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
-high-slip sinkage and measured berm geometry still need held-out measurements. The optional
+The steady drawbar and axle torque match the measured 60% tip-slip case. An opt-in wheel
+can excavate beyond its initial bearing cut from the live phase. Its exact swept-volume
+and floor tests pass. Measured transient contact angles and high-slip sinkage remain open. The optional
 cross-track depositor conserves independent bank volumes from the actual cut.
 Grouser transport can backfill its solver-owned trench from earlier cuts or feed the opposite bank.
 The straight locked condition matches both measured relative bank crests. Absolute scanned

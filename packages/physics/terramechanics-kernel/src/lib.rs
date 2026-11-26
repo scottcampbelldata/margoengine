@@ -77,6 +77,7 @@ struct Patch {
     berm_slope: f64,
     grouser_fill: f64,
     grouser_slip: f64,
+    swept_soil: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -674,6 +675,7 @@ unsafe fn deposit_cross_track(
     halo: f64,
     depth: f64,
     loose: f64,
+    returnable: f64,
     cut_bounds: (usize, usize, usize, usize),
     areas: *const f64,
     deltas: *mut f64,
@@ -708,7 +710,7 @@ unsafe fn deposit_cross_track(
     } else {
         1.0 - right_share
     };
-    let requested = loose * grouser_share(p, section + face).min(source_share);
+    let requested = returnable * grouser_share(p, section + face).min(source_share);
     let backfill = if front_aligned {
         0.0
     } else {
@@ -1168,6 +1170,7 @@ pub unsafe extern "C" fn stamp(
     let mut settlement = p.settlement;
     let mut crest_pressure = 0.0;
     let mut pressure_scale = 1.0;
+    let mut swept_depth = 0.0;
     let mut layered = false;
     if resolved {
         // Integrate F = sum K (z_max profile)^n dA, then solve once for the peak
@@ -1189,6 +1192,10 @@ pub unsafe extern "C" fn stamp(
         *work += visit;
         if contact_area == 0.0 {
             return 0.0;
+        }
+        swept_depth = p.swept_soil / contact_area;
+        if !swept_depth.is_finite() {
+            return f64::NAN;
         }
         crest_pressure = p.load / contact_area;
         settlement = pow(crest_pressure / p.stiffness, 1.0 / p.exponent);
@@ -1264,6 +1271,7 @@ pub unsafe extern "C" fn stamp(
         }
     }
     let mut removed = 0.0;
+    let mut dug = 0.0;
     let mut rim_area = 0.0;
     for x in x_start..x_end {
         let rx = origin_x + x as f64 * dx - p.x;
@@ -1273,17 +1281,33 @@ pub unsafe extern "C" fn stamp(
             let i = x * nz + z;
             let area = *areas.add(i);
             let depth_shape = if resolved { profile } else { 1.0 };
+            let pressure_shape = if resolved {
+                pow(profile, p.exponent)
+            } else {
+                0.0
+            };
             if resolved {
                 *pressure.add(i) += if layered {
                     layered_pressure(p, settlement * profile).0 * coverage * pressure_scale
                 } else {
-                    crest_pressure * coverage * pow(profile, p.exponent)
+                    crest_pressure * coverage * pressure_shape
                 };
             }
             let room = cut_capacity(i, *heights.add(i), *deltas.add(i), floor, floor_grid);
             let cut = (settlement * depth_shape * coverage - *peak.add(i))
                 .max(0.0)
                 .min(room);
+            let extra = if swept_depth > 0.0 {
+                let axle_room = (p.wheel_radius - *peak.add(i) - cut).max(0.0);
+                let additional = (swept_depth * pressure_shape * coverage)
+                    .min(room - cut)
+                    .min(axle_room);
+                dug += additional * area;
+                additional
+            } else {
+                0.0
+            };
+            let cut = cut + extra;
             *peak.add(i) += cut;
             add_bed_change(deltas, track_relief, i, -cut);
             *dust.add(i) += cut * p.dust_flux;
@@ -1308,6 +1332,7 @@ pub unsafe extern "C" fn stamp(
     let compacted = removed * p.compaction;
     let suspended = removed * p.dust;
     let loose = removed - compacted - suspended;
+    let returnable = (loose - dug * (1.0 - p.compaction - p.dust)).max(0.0);
     let berm_depth = rolling_depth.filter(|_| p.berm_slope > 0.0 && loose > 0.0);
     let deposited = if let Some(depth) = berm_depth {
         deposit_cross_track(
@@ -1323,6 +1348,7 @@ pub unsafe extern "C" fn stamp(
             halo,
             depth.rim,
             loose,
+            returnable,
             (x_start, x_end, z_start, z_end),
             areas,
             deltas,

@@ -303,6 +303,20 @@ band reaches the original terrain. A mirrored ±22.5° test verifies the plateau
 boundary, the projected face-plus-rim transport volume and conservation.
 [Pavlov (2023), Figure 4.2 and §4.2](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=42).
 
+The optional phase-driven excavation applies the angular sweep as a volume budget. Over a
+wheel's angular change `Δθ`, Pavlov's Eq. 4.3 gives `r b h_g ζ μ |Δθ|` independently of
+translation, because the forward travel cancels in the volume integral. Ibrahim et al.'s
+relative rotation construction uses actual rotation minus the rotation implied by travel.
+In the solver this gives a multiplier equal to positive slip. The normal-contact weights
+distribute that cut. Bedrock and the modeled axle depth limit the volume actually removed.
+The swept soil joins the external loose deposit rather than filling the same cut on the same
+step. Omura and Ishigami's test provides the 10°/s control rate for the exact-volume fixture.
+A real held vehicle also sends its rigid wheel phase to create a deeper rut. The measured
+time history of contact angles remains a separate comparison.
+[Pavlov (2023), Eq. 4.3](https://www.andrew.cmu.edu/user/amj1/papers/Pavlov2023.pdf#page=43),
+[Ibrahim et al., “The Effect of Assistive Anchor-Like Grousers on Wheeled Rover Performance over Unconsolidated Sandy Dune Inclines” (2016), Figure 10](https://doi.org/10.3390/s16091507),
+[Omura and Ishigami, “Wheel Slip Classification Method for Mobile Robot in Sandy Terrain Using In-Wheel Sensor” (2017), §3](https://doi.org/10.20965/jrm.2017.p0902).
+
 The cross-track banks settle with a conservative face flux from a common elevation state.
 The dry granular finite-volume treatments by Roger P. Denlinger and Richard M. Iverson (2004)
 and A. Mangeney-Castelnau et al. (2003) motivated equal and opposite transfers that stop at a
