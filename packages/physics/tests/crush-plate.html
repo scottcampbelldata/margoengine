@@ -4,7 +4,7 @@
 <body style="margin:0"><canvas width="480" height="320"></canvas>
 <script type="module">
   import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
-  import { CrushSolver, resolvePlateBuckling } from '../dist/crush.js';
+  import { CircularPlateIndentation, CrushSolver, resolvePlateBuckling } from '../dist/crush.js';
   import { Physics } from '../dist/index.js';
   import { PhysicsWorld, RigidSolver } from '../dist/world.js';
 
@@ -28,8 +28,8 @@
     }
   }
 
-  async function drawSurface(surface) {
-    panel.setGeometry(new Geometry(surface.positions, surface.normals, triangles));
+  async function drawSurface(surface, indices = triangles) {
+    panel.setGeometry(new Geometry(surface.positions, surface.normals, indices));
     await engine.render({ delta: 0 });
     await engine.gpu.queue.onSubmittedWorkDone();
   }
@@ -78,6 +78,37 @@
     const { stroke, buckling } = crush.readPlate(0, points);
     await drawSurface(buckling.surface);
     return { stroke, crest: buckling.crest, hash: world.hash(), visible: engine.stats.visible };
+  };
+
+  const circleRadius = 0.1114;
+  const circular = new CircularPlateIndentation({
+    radius: circleRadius, thickness: 0.001, indenterRadius: 0.025, strength: 497e6, hardening: 0.19,
+  });
+  const radialRest = [0, 0];
+  const radialFaces = [];
+  const rings = 12;
+  const sectors = 32;
+  for (let ring = 0; ring < rings; ring++) {
+    const radius = circleRadius * ((ring + 1) / rings);
+    for (let sector = 0; sector < sectors; sector++) {
+      const ang = 2 * Math.PI * sector / sectors;
+      radialRest.push(radius * Math.cos(ang), radius * Math.sin(ang));
+      const near = 1 + ring * sectors + sector;
+      const far = 1 + ring * sectors + ((sector + 1) % sectors);
+      if (ring === 0) radialFaces.push(0, near, far);
+      else radialFaces.push(near - sectors, near, far, near - sectors, far, far - sectors);
+    }
+  }
+
+  window.drawIndentedPlate = async (flat) => {
+    const stroke = flat ? 0 : 0.8 * circular.fractureStroke;
+    const { surface, force } = circular.read(stroke, radialRest);
+    for (let i = 0; i < surface.positions.length; i += 3) {
+      surface.positions[i] += 0.3;
+      surface.positions[i + 1] += 0.14;
+    }
+    await drawSurface(surface, radialFaces);
+    return { stroke, force, visible: engine.stats.visible, rim: surface.positions.at(-1) };
   };
 </script>
 </body>

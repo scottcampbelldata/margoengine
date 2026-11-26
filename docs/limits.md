@@ -9600,7 +9600,16 @@ for one coupling tick. The first intersected face supplies the reaction normal t
 tick. Each station has its own authored anchor and material. The bed acts as an immovable
 support. Deforming sediment, obstructions with overhangs, and distributed plate tearing around
 a rock require additional models. The oblique and cross-grid tests use analytical terrain input.
-The measured grounding-force and rupture histories remain open.
+Measured time histories of a grounded hull and plate tearing during raking remain open.
+
+The circular indentation law covers a thin clamped sheet loaded centrally by a smooth
+sphere. It treats the plate as an axisymmetric membrane with plane-strain plastic flow.
+Initial elastic bending, edge sliding, unloading, and post-rupture force and crack growth
+remain outside this law. The solver prepares a 96-interval loading table and uses 48
+log-radius midpoint panels for the deformation integral. The rendered shape retains the
+fixed edge. Against four measured circular sheets, rupture stroke differs by at most 5.5%
+and work up to rupture by at most 11.8%. The 13 mm case has the largest energy deficit.
+This law currently evaluates an imposed stroke.
 
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 28524 B minified and 11206 B gzip under its 11543 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
 

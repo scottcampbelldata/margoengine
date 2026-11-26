@@ -5229,6 +5229,27 @@ if (loaded.halfWaves !== 2 || !loaded.surface || loaded.surface.positions[5] <= 
 }
 ```
 
+Use `CircularPlateIndentation` for a thin circular plate pushed out of its plane by a smooth
+sphere at its centre. Supply the held radius, undeformed thickness, sphere radius and the
+uniaxial true-stress coefficients from a tensile coupon. The solver prepares a table for the
+intact loading branch and its first force peak. `read(stroke, xy)` returns the normal force,
+work, contact radius and optional deformed XYZ samples and normals. When the stroke reaches
+localization, `fractured` is true and the shape and work stay at that point. Use the intact
+branch for quasi-static indentation before a localized tear.
+
+```ts
+import { CircularPlateIndentation } from '@margoengine/physics/crush';
+
+const hullPlate = new CircularPlateIndentation({
+  radius: 0.1114, thickness: 0.001, indenterRadius: 0.025,
+  strength: 497e6, hardening: 0.19,
+});
+const dent = hullPlate.read(0.03, [0, 0, 0.04, 0, 0.1114, 0]);
+if (!dent.force || !dent.surface || dent.surface.positions[2] !== dent.stroke) {
+  throw new Error('Expected a deformed steel membrane with an intact reaction');
+}
+```
+
 `CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable

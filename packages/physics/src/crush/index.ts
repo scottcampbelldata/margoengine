@@ -38,6 +38,7 @@ import {
 } from './rigid-contact.js';
 
 export { CRUSH_LAYOUT, CRUSH_WORDS } from './port.js';
+export { CircularPlateIndentation, type CircularPlateParams, type CircularPlateReading } from './indentation.js';
 export {
   GirderJointSolver,
   type GirderJoint,

@@ -45,6 +45,15 @@ oblique plane, an intervening ridge and a cell with one raised corner. The analy
 speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
 The ridge test compares a saved run and its replay in both world memory modes.
 
+## BREAK-03 measured circular plate indentation
+
+Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run
+`node --test packages/physics/tests/crush-indentation.test.js`. Simonsen and Lauridsen's Table 1
+provides four held-out circular failure displacements and work values. Geometry and the Table 2
+coupon coefficients define the predictions. The browser test `node packages/physics/tests/crush-plate.browser.mjs`
+and the same command with `--compat` compare the deformed disc with its flat control, using the
+same rest coordinates and camera. [Simonsen and Lauridsen (2000)](https://doi.org/10.1016/S0734-743X(00)00024-5)
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard

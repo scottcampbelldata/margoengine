@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Circular plate indentation (BREAK-03, 2026-11-26). Four measured rupture strokes differ from
+  predictions by at most 5.5% and work by at most 11.8%, using geometry and independent tensile
+  coefficients. Both rendering backends draw the same 33.44 mm imposed dent with its fixed rim.
+  [Reproduce](reproduce.md#break-03-measured-circular-plate-indentation)
 - Terrain grounding (BREAK-03, 2026-11-26). A native hull station exchanges the exact elastic oblique
   impulse with the bed. It catches an intervening ridge and the second triangle of an individual cell.
   Both memory modes give the same contact record and bit-exact snapshot replay.

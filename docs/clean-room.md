@@ -15311,6 +15311,31 @@ stroke gives the first support. Use the same triangles as the terrain's ordinary
 [Simonsen (1997)](https://doi.org/10.1016/S0951-8339(98)00002-1)
 [Amanatides and Woo (1987)](https://doi.org/10.2312/egtp.19871000)
 
+Bo Cerup Simonsen and Lars Peder Lauridsen, “Energy absorption and ductile failure in
+metal sheets under lateral indentation by a sphere” (2000), Eqs. 1, 8, 12–15 and 18,
+formulate the axisymmetric membrane with vertical displacement and conserved volume.
+Let `s = sin θ` and `c = cos θ`. The radial strain is `ε = −ln c` and the deformed
+thickness is `t c`. Rodney Hill's *The Mathematical Theory of Plasticity* (1950) gives
+associated von Mises flow in plane strain. Under zero hoop strain and zero thickness
+stress, `σθ = σr/2`, `σeq = √3 σr/2`, and `εeq = 2 ε/√3`. Transforming the
+uniaxial Hollomon law into this state multiplies radial stress by `(2/√3)^(1+n)`.
+This conversion uses the coupon's parameters directly. The shape solves vertical
+equilibrium `r c s ε^n = rC cC sC εC^n` on the outward, low-slope branch and integrates
+`tan θ` in logarithmic radius. The spherical-contact radius uses the physical sphere
+plus half the sheet thickness. Localization is the first maximum of
+`F = 2π C t rC cC sC εC^n (2/√3)^(1+n)`. Work integrates the force–stroke relation.
+For render samples, the measured rest plane is held on its outer edge.
+[Simonsen and Lauridsen (2000)](https://doi.org/10.1016/S0734-743X(00)00024-5)
+[Hill (1950)](https://books.google.com/books/about/The_Mathematical_Theory_of_Plasticity.html?hl=en&id=DIDOuwEACAAJ)
+
+The four measured circular specimens are held out from this calculation. Table 1 gives
+the stroke and work at localization. Geometry (radius 111.4 mm, thickness 1 mm, tip radii
+10, 13, 25 and 50 mm) and separate uniaxial coupon values (497 MPa, exponent 0.19, Table 2)
+are the inputs. The predictions are 25.47, 29.49, 41.80 and 57.39 mm versus measured
+26.84, 31.20, 41.84 and 60.00 mm. Predicted work is 150.3, 224.3, 605.1 and 1654.7 J
+versus measured 159.17, 254.24, 575.20 and 1687.30 J. The lower work on the two smaller
+tips remains visible. The regime is quasi-static, axisymmetric, and ends at localization.
+
 Manuel Stein, “Loads and Deformations of Buckled Rectangular Plates” (1959), NASA TR R-40, Eqs. 1–3
 and Fig. 1, gives the von Kármán plate equations and longitudinal mode selection. Pai C. Hu, Eugene
 E. Lundquist and S. B. Batdorf, “Effect of Small Deviations from Flatness on Effective Width and
