@@ -140,6 +140,21 @@ fn inverse(mut a: M6, n: usize, whisper: f64) -> M6 {
     }
     out
 }
+/// Makes the leading `n` by `n` of `a` symmetric, each pair of entries their mean. The articulated inertias of a tree are
+/// symmetric, and the pass from the last link to the first (A - A S D^-1 S^T A, then P^T A P) keeps a symmetric matrix symmetric
+/// but grows any asymmetry rounding leaves: about 3.5 times a link in a chain of 24 slender links, so the rotational block of
+/// the links near the root became as asymmetric as it was large, D = S^T A S no longer the matrix of the least change of
+/// energy, and the projection put energy in (a chain of 24 or more links falling under gravity ran away within two seconds).
+/// Kept symmetric at every link, the pass is the Schur complement of a symmetric positive definite matrix, which is stable.
+fn symmetric(a: &mut M6, n: usize) {
+    for i in 0..n {
+        for j in i + 1..n {
+            let mean = 0.5 * (a[i][j] + a[j][i]);
+            a[i][j] = mean;
+            a[j][i] = mean;
+        }
+    }
+}
 fn whisper_of(a: &M6, n: usize) -> f64 {
     let mut biggest = 0.0f64;
     for i in 0..n {
@@ -299,13 +314,18 @@ impl World {
         let mass = 1.0 / inverse as f64;
         let frame = self.pose_rotation(body).mul(self.q(INERTIA_FRAME_X, body));
         let principal = d3(self.v(INERTIA_X, body));
-        for k in 0..3 {
-            m[k][k] = mass;
-            let e = frame.unrotate(UNIT[k]);
-            let col = d3(frame.rotate(v3(e.x * principal[0] as f32, e.y * principal[1] as f32, e.z * principal[2] as f32)));
-            // The columns of R diag(I) R^T in doubles, from the f32 rotation of each unit vector.
-            for j in 0..3 {
-                m[3 + j][3 + k] = col[j];
+        // R diag(I) R^T in doubles from the principal axes in the world, R's columns, each entry once and mirrored, so the
+        // matrix is symmetric to the last bit (see `symmetric`).
+        let axes = [d3(frame.rotate(UNIT[0])), d3(frame.rotate(UNIT[1])), d3(frame.rotate(UNIT[2]))];
+        for j in 0..3 {
+            m[j][j] = mass;
+            for k in j..3 {
+                let mut sum = 0.0;
+                for i in 0..3 {
+                    sum += axes[i][j] * principal[i] * axes[i][k];
+                }
+                m[3 + j][3 + k] = sum;
+                m[3 + k][3 + j] = sum;
             }
         }
         m
@@ -378,6 +398,7 @@ impl World {
                     }
                 }
             }
+            symmetric(&mut dm, k);
             let dinv = if k > 0 { inverse(dm, k, whisper_of(&dm, k)) } else { [[0.0; 6]; 6] };
             let (mut hat_a, mut hat_r) = (a, r);
             for c in 0..k {
@@ -403,7 +424,9 @@ impl World {
                 *d.add(K_AT) = k as f64;
             }
             let p = transport(sub(center, d3(self.pose_center(parent))));
-            let (pt, back) = (transposed(&p), mul6(&mul6(&transposed(&p), &hat_a), &p));
+            symmetric(&mut hat_a, 6);
+            let (pt, mut back) = (transposed(&p), mul6(&mul6(&transposed(&p), &hat_a), &p));
+            symmetric(&mut back, 6);
             let up = apply6(&pt, &hat_r);
             if parent == root {
                 for i in 0..6 {
