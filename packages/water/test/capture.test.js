@@ -91,3 +91,40 @@ test("water draws its sky reflection, weight and normal into SSR's capture hook"
   assert.equal(disposed, 1);
   assert.equal(r.drawn.filter((d) => d[0] === 'draw').length, 1, 'nothing after disposal');
 });
+
+test('one water in two effects: each keeps its own capture stage and pipeline, built once', () => {
+  const r = rig();
+  r.frame();
+  const hook = (tag, formats) => ({
+    targets: formats.map((format) => ({ format })),
+    declarations: () =>
+      `// effect ${tag}\nstruct MargoSSR {@location(0) specular:vec4f,@location(1) weight:vec4f,@location(2) normal:vec4f}\n`,
+    begin: () => r.hook.begin(),
+  });
+  const a = hook('a', ['rgba16float', 'rgb10a2unorm', 'rgb10a2unorm']),
+    b = hook('b', ['rgba16float', 'rgb10a2unorm', 'rgb10a2unorm']),
+    c = hook('c', ['rgba16float', 'rgba16float', 'rgb10a2unorm']);
+  const draw = (h) => {
+    r.water.setCapture(h);
+    r.drawn.length = 0;
+    const log = r.gpu.record(() => r.water.draw(r.view.c, 'capture'));
+    return { codes: modules(log), pipeline: r.drawn.find((d) => d[0] === 'pipeline')?.[1] };
+  };
+  const first = draw(a),
+    second = draw(b),
+    third = draw(c);
+  assert.match(first.codes[0], /^\/\/ effect a\n/);
+  assert.equal(second.codes.length, 1, 'same targets, other declarations: its own stage');
+  assert.match(second.codes[0], /^\/\/ effect b\n/);
+  assert.match(third.codes[0], /^\/\/ effect c\n/);
+  assert.notEqual(first.pipeline, second.pipeline);
+  for (const [h, before] of [
+    [a, first],
+    [b, second],
+    [c, third],
+  ]) {
+    const again = draw(h);
+    assert.equal(again.codes.length, 0, 'alternating effects rebuild nothing');
+    assert.equal(again.pipeline, before.pipeline);
+  }
+});

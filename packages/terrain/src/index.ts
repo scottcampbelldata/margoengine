@@ -819,11 +819,14 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     if (mode !== 'capture' || !hook || this.disposed || !this.rings.length) return;
     void color;
     void depth;
-    const lit = this.shader();
-    let code = this.captureCode.get(lit);
+    const lit = this.shader(),
+      // Keyed by the declarations this draw's effect returns as well as the lit stage: one terrain captured by two
+      // effects (SSR and SceneTargets) gets each effect's own MargoSSR outputs.
+      declarations = hook.declarations(lit),
+      cacheKey = declarations + '\0' + lit;
+    let code = this.captureCode.get(cacheKey);
     if (code === undefined) {
-      const declarations = hook.declarations(lit),
-        head = '@fragment fn fragment(i:Output)->@location(0) vec4f {';
+      const head = '@fragment fn fragment(i:Output)->@location(0) vec4f {';
       if (lit.split(head).length !== 2)
         throw margoError(
           'unsupported',
@@ -834,7 +837,7 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
         lit.replace(head, 'fn margoShade(i:Output)->vec4f {') +
         `\n@fragment fn capture(i:Output)->MargoSSR {${terrainOutside}${this.textures?.holes ? terrainHole : ''}${terrainShading(this.surface())}let v=normalize(frame.eye.xyz-i.position);${declarations.includes('var<private> margoPosition:') ? 'margoPosition=i.position;' : ''}return margoSSR(n,v,base,i.material.y,i.material.x);}\n`;
       if (this.captureCode.size >= 16) this.captureCode.clear();
-      this.captureCode.set(lit, code);
+      this.captureCode.set(cacheKey, code);
     }
     const entries = this.lightingEntries;
     entries.length = 0;
