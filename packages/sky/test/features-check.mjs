@@ -1018,6 +1018,10 @@ checks.settings = async (page, samples) => {
       'tornado.centerZ': 600,
       'tornado.debrisHeight': 700,
       'tornado.touchdown': 0,
+      // The base's turn rate (wind over radius) shows in a still frame only as the angle it has turned by the check's
+      // clock: at 35.5 m/s (the row's mid value) that moved 7 pixels by at most 3 levels, and 2 once the cloud sheet's
+      // rims thinned (KB-SKY-HOLES-KH1). The row's top, 60 m/s, turns it far enough to see.
+      'tornado.mesocycloneWind': 60,
     },
     running = { timeScale: 0.5, 'clouds.speed': 40, 'volumetric.evolution': 20 };
   const cloudsOn = (on) => page.evaluate((v) => window.check.clouds(v), on);

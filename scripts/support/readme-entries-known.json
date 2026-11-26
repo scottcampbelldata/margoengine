@@ -1,5 +1,5 @@
 {
-  "animation": ["./vat","./mixer","./playback","./discrete-tracks"],
+  "animation": ["./vat","./playback","./discrete-tracks"],
   "animator": ["./layers","./blend-trees","./masks"],
   "audio": ["./pan","./binaural","./voices","./sprites"],
   "behavior": ["./subtrees","./inspect","./fuzzy","./text","./triggers"],
@@ -38,7 +38,7 @@
   "post": ["./selective-bloom","./mask","./halftone","./stylize","./curvature"],
   "procedural": ["./tree-mesh"],
   "quality": ["./demand","./events","./knobs"],
-  "react": ["./sky","./post","./dof","./tonemap","./taa","./jsx-runtime","./jsx-dev-runtime"],
+  "react": ["./sky","./dof","./taa","./jsx-runtime","./jsx-dev-runtime"],
   "rigging": ["./vrm-constraints","./vrma","./pose-tracking"],
   "road": ["./intersections","./lanes","./geojson","./structures"],
   "save": ["./scene-state","./materials"],
