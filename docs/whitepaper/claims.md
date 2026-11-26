@@ -994,7 +994,7 @@ or in Safari. [docs/limits.md](../limits.md) lists what is untested.
 
 | Claim | Where | Evidence | Command | Status |
 | --- | --- | --- | --- | --- |
-| Core + stage is 24,820 B gzip (61,038 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `npm run measure:size` printed 24,820 B / 61,038 B on main at the core `late` option (3edea7a71f, 2026-11-25) and 24,797 B / 60,984 B in the KB-GLTFA B1 core fix (2026-11-19); `examples/package-benchmarks/results/entry-sizes.json` (`coreStage`, record at `0e71a9024`, dirty: false); `npm run measure:size` printed the same on main at `38ce7fbaa` (2026-11-12) | `npm run build:packages && npm run measure:size` | PROVEN |
+| Core + stage is 24,846 B gzip (61,081 B raw), Wasm kernel and WebGPU backend included | README, site, docs/limits.md | `npm run measure:size` printed 24,846 B / 61,081 B at the core `antialias` option (GAP-FILM-MSAA, 2026-11-26), 24,820 B / 61,038 B on main at the core `late` option (3edea7a71f, 2026-11-25) and 24,797 B / 60,984 B in the KB-GLTFA B1 core fix (2026-11-19); `examples/package-benchmarks/results/entry-sizes.json` (`coreStage`, record at `0e71a9024`, dirty: false); `npm run measure:size` printed the same on main at `38ce7fbaa` (2026-11-12) | `npm run build:packages && npm run measure:size` | PROVEN |
 | The build fails at 25,000 B gzip for core + stage | README, site | `scripts/core-budget.js`, run by `build:packages` and `measure:size` | `npm run build:packages` | PROVEN |
 | Every other package is optional and has its own size | README | `entry-sizes.json` (every exports entry and worker) | `npm run build:site` | PROVEN |
 | An engine starts with 1,024 entity slots and doubles up to 8,388,608 | site | `packages/core/src/kernel.ts`; `tests/core-dirty-transforms.test.js` (1,000,000 entities) | `npm test` | PROVEN |
@@ -1011,7 +1011,7 @@ Sizes are gzip bytes of the bundled, minified output of each engine, installed f
 
 | Engine | Version | (a) minimal lit-box scene, gzip B | (b) whole package, gzip B | WebGPU / WebGL2 | PBR | Lights |
 | --- | --- | --- | --- | --- | --- | --- |
-| Margo (`createStage` + box) | main at 38ce7fbaa (2026-11-12); (b) at the core `late` option (3edea7a71f, 2026-11-25) | 24,763 | 24,820 | WebGPU / fallback is a separate package | yes | yes |
+| Margo (`createStage` + box) | main at 38ce7fbaa (2026-11-12); (b) at the core `antialias` option (GAP-FILM-MSAA, 2026-11-26) | 24,763 | 24,846 | WebGPU / fallback is a separate package | yes | yes |
 | ClayGL | 1.3.0 | 81,424 | 113,711 | no / yes (WebGL1 and 2) | yes | yes |
 | Hilo3d | 1.19.1 | 112,039 | 111,842 | no / yes (WebGL1 and 2) | yes | yes |
 | three.js, WebGLRenderer | 0.187.0 | 130,100 | 186,538 | no / yes | yes | yes |
@@ -1111,7 +1111,7 @@ backs them yet:
 
 | ID | Claim | Evidence | Command | Status | Note |
 | --- | --- | --- | --- | --- | --- |
-| LIM-001 | "core plus the stage facade is 24,820 B gzip"; the build fails at 25,000 bytes; core alone is 22,202 B of its 22,227 B cap (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage.gzip` 24797, `packages["@margoengine/core"]["."].gzip` 22224, at the commit the record names); `scripts/build-modern.js` (`CORE_ONLY_CEILING`); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves with changes to core; the record names its commit. |
+| LIM-001 | "core plus the stage facade is 24,846 B gzip"; the build fails at 25,000 bytes; core alone is 22,225 B of its 22,227 B cap (docs/limits.md, intro) | `examples/package-benchmarks/results/entry-sizes.json` (`coreStage.gzip` 24797, `packages["@margoengine/core"]["."].gzip` 22224, at the commit the record names); `scripts/build-modern.js` (`CORE_ONLY_CEILING`); `scripts/core-budget.js` (`CORE_STAGE_GZIP_LIMIT`) | `npm run build:packages && npm run measure:size` | PROVEN | The figure moves with changes to core; the record names its commit. |
 | LIM-002 | Entities: "8,388,608 slots (2^23)", starts at `capacity` (default 1,024) and doubles; `RangeError: Capacity` / `Capacity: 1..8388608`; a failed growth leaves the store as it was (docs/limits.md, Scale) | `packages/core/src/kernel.ts` (`create`, `grow`), `engine.ts` `createMesh` and `Engine.create` (`capacity ?? 1024`); `tests/core-dirty-transforms.test.js` asserts `/Capacity/` at 2^23 + 1 and growth from 1,024 (in verify) | `node --test tests/core-dirty-transforms.test.js` | PROVEN | See also S-04. |
 | LIM-003 | "352.1 B of kernel memory per slot at 1,048,576 slots (351 B by layout)" (docs/limits.md, Scale) | `examples/package-benchmarks/parts/results-scale-node.json` (`kernelBytesPerSlot` 352.1 at 1,000,012 entities; Node 24, AC, quiet-gated at 8% CPU, not diagnostic); layout in `packages/kernel/src/lib.rs` (86 float columns + 7 flag bytes) | `node --expose-gc examples/package-benchmarks/parts/scale-node.mjs` | PROVEN | - |
 | LIM-004 | "a static kernel tick costs 3.3 ms at 100,006 entities, 20.2 ms at 499,992 and 41.5 ms at 1,000,012"; "about 41 ns per entity per frame even when nothing moves"; above 1,048,576 slots "not measured" (docs/limits.md, Scale) | Same JSON (`tickStaticMs` 3.328 / 20.153 / 41.461); 41.461 ms / 1,000,012 = 41 ns | same | PROVEN | Node CPU timings, same Wasm as the browser, fake renderer. |

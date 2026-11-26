@@ -36,9 +36,15 @@ export interface EngineOptions {
    * `true`, the canvas's own `width` and `height` attributes), with no device-pixel-ratio scaling and no MSAA. Zoom by
    * an integer with CSS (`width: 4 * w px; image-rendering: pixelated`); `engine.pick` still takes CSS pixels. Set
    * `canvas.width`/`height` to resize. Default false: the backbuffer follows the CSS size times the pixel ratio.
-   * A v1.0.0 option.
+   * Add `antialias: true` for a fixed-size frame with MSAA (a film or capture at an exact resolution). A v1.0.0 option.
    */
   exactSize?: boolean | readonly [number, number];
+  /**
+   * MSAA of the scene passes: `true` gives the quality tier's samples (4 on desktop, 1 on phones and the light tier),
+   * `false` 1. With `exactSize`, `true` keeps the fixed backbuffer and its size and antialiases the frame. Also used
+   * when the device is restored. Default `true`, and `false` with `exactSize`.
+   */
+  antialias?: boolean;
   /** Aborts `Engine.create`: it rejects with `signal.reason` (no fallback) and releases what it made. Default none. */
   signal?: AbortSignal;
   /**
@@ -476,7 +482,8 @@ export class Engine {
   // Weak both ways: a disposed scene is not kept by the batches it was drawn with.
   private readonly claims = new WeakMap<Batch, WeakMap<Scene, [boolean?, Batch['redirect']?]>>();
   /** @internal Features requested at creation, requested again when the device is restored. */ features?: GPUFeatureName[];
-  /** @internal 1 for `exactSize` (no MSAA, no resize), else undefined (the quality tier's samples). */ exact?: 1;
+  /** @internal 1 for single-sampled scenes (`exactSize`, or `antialias: false`), else undefined (the tier's samples). */ exact?: 1;
+  /** @internal 1 for `exactSize`: frames never resize the backbuffer. */ fixed?: 1;
   /** @internal `powerPreference` from creation, asked again when the device is restored. */ power?: GPUPowerPreference;
   get frameGraph(): FrameGraph {
     return this.active.frameGraph;
@@ -497,7 +504,7 @@ export class Engine {
     const backend = options.backend ?? 'auto';
     if (!['auto', 'webgpu', 'webgl2'].includes(backend)) throw typeError('Unknown backend', 'arguments');
     const size = options.exactSize,
-      exact = size ? 1 : undefined;
+      exact = (options.antialias ?? !size) ? undefined : 1;
     if (Array.isArray(size)) {
       if (size.length !== 2 || !size.every((v) => Number.isInteger(v) && v > 0 && v <= 8192))
         throw rangeError('Invalid exactSize', 'pixel-exact');
@@ -528,6 +535,7 @@ export class Engine {
       const engine = new Engine(canvas, store, renderer, options.camera, fallbackReason);
       engine.features = options.features;
       engine.exact = exact;
+      engine.fixed = size ? 1 : undefined;
       engine.power = options.powerPreference;
       return engine;
     } catch (error) {
@@ -1064,9 +1072,9 @@ export class Engine {
     );
   }
   private resize(): void {
-    if (this.exact) return; // exactSize: the caller owns canvas.width and canvas.height
+    if (this.fixed) return; // exactSize: the caller owns canvas.width and canvas.height
     // Avoid multiplying desktop 4x MSAA by another 4x in HiDPI backing pixels; the light tier caps DPR at margoLow.
-    const dpr = Math.min(globalThis.devicePixelRatio ?? 1, globalThis.margoLow || 2, 4 / sceneSamples()),
+    const dpr = Math.min(globalThis.devicePixelRatio ?? 1, globalThis.margoLow || 2, 4 / sceneSamples(this)),
       wide = Math.round(this.canvas.clientWidth * dpr) || this.canvas.width,
       tall = Math.round(this.canvas.clientHeight * dpr) || this.canvas.height,
       // One scale for both sides keeps the CSS aspect when the longer side passes the device's largest 2D texture (the

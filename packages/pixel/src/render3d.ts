@@ -42,7 +42,7 @@ export interface Render3DOptions {
   scene?: Scene;
   /** Render-layer bits of the view. Default every layer. */
   layers?: number;
-  /** The engine's samples per pixel: 1 with `exactSize`, else its quality tier's. Default 1. */
+  /** The engine's samples per pixel, `sceneSamples(engine)`: 1 with `exactSize` (unless `antialias: true`) or `antialias: false`, else its quality tier's. Default 1. */
   samples?: number;
   /** Frame-graph order of the outline pass, before a compositor (30). Default 20. */
   order?: number;

@@ -202,7 +202,7 @@ export interface MSAAKnob {
   apply(level: number): void;
   /**
    * Apply the public quality tier before the next Engine.create, with no live engines. Returns effective samples:
-   * phones stay at 1; exactSize also forces 1 at engine creation. This page-wide tier persists for device restore.
+   * phones stay at 1; exactSize (without antialias) or antialias: false also force 1 at engine creation. This page-wide tier persists for device restore.
    * Rebuild the scene and plugins after disposing/recreating an existing engine. No live hardware change.
    */
   prepare(options?: Omit<QualityOptions, 'search'>): 1 | 4;

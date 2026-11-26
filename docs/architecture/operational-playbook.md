@@ -2867,7 +2867,10 @@ The backbuffer's per-side cap is the device's `maxTextureDimension2D` (the canva
 Core requests an adapter without a power preference on Windows and with `high-performance` elsewhere. Requested
 features are filtered against adapter support. Desktop scenes default to 4x MSAA; phones, the light tier, and exact
 size use 1x. `Engine.create` records the native failure before invoking an app-supplied fallback. `exactSize` fixes the
-canvas dimensions, disables resizing, and forces one sample.
+canvas dimensions, disables resizing, and forces one sample unless `antialias: true` (2026-11-26, GAP-FILM-MSAA:
+`engine.fixed` holds "no resize" and `engine.exact` "one sample", so a fixed-size film frame keeps the tier's 4x MSAA;
+evidence `packages/core/tests/exact-antialias.browser.mjs` on WebGPU and the WebGL2 layer). `antialias: false` makes any
+engine single-sampled.
 
 **Device destroy (2026-11-06).** A frame on the page is an ImageBitmap of the device's own WebGL2 context, so `destroy()` copies it
 into a 2D context of the page before it loses the context. Chrome 157 on macOS crashed the tab otherwise. Evidence:

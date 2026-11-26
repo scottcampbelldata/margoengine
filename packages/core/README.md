@@ -56,6 +56,7 @@ engine.start();
 | `fallback` | none | Builds the non-WebGPU renderer, for example `webglRenderer` from `@margoengine/webgl2-compat/preview`. |
 | `features` | `[]` | Extra WebGPU features to request when the adapter offers them, such as `['timestamp-query']`. |
 | `exactSize` | `false` | `[width, height]` or `true`: pixel-exact backbuffer with no pixel-ratio scaling and no MSAA ([Pixel-perfect rendering](#pixel-perfect-rendering)). |
+| `antialias` | `true`, `false` with `exactSize` | MSAA of the scene: `true` is the quality tier's samples (4 on desktop, 1 on phones and the light tier), `false` 1. With `exactSize` it gives a fixed-size frame with MSAA ([Fixed-size frames with MSAA](#fixed-size-frames-with-msaa)). |
 | `signal` | none | An `AbortSignal` that cancels creation; it rejects with the signal's reason and never falls back ([Startup that never finishes](#startup-that-never-finishes)). |
 | `startupWarning` | `8000` | Milliseconds a startup step may take before one `console.warn` names it. |
 | `startupTimeout` | `30000` | Milliseconds before a startup step that never settles rejects with a `timeout` error. |
@@ -271,6 +272,24 @@ canvas.style.imageRendering = 'pixelated'; // nearest-neighbour scaling, no blur
   match.
 - `engine.pick(x, y)` still takes CSS pixels and maps them to backbuffer pixels.
 - The WebGL2 fallback keeps its own context antialiasing; pass `exactSize` to WebGPU engines.
+
+## Fixed-size frames with MSAA
+
+A film or capture at an exact resolution wants the fixed backbuffer of `exactSize` but antialiased edges. Add
+`antialias: true`: the backbuffer stays the requested size and the scene draws with the quality tier's 4x MSAA.
+
+```ts
+import { Engine } from '@margoengine/core';
+
+const canvas = document.querySelector('canvas')!;
+const engine = await Engine.create(canvas, { exactSize: [1920, 1080], antialias: true });
+canvas.style.width = '100%'; // the CSS size never changes the 1920 x 1080 backbuffer
+```
+
+- `sceneSamples(engine)` is 4 on desktop, so packages with their own pipelines match; phones and the light tier stay
+  at 1 sample.
+- `antialias: false` without `exactSize` draws single-sampled at the normal CSS-times-pixel-ratio size; with one sample
+  the pixel ratio may go up to 2 on desktop too.
 
 ## Startup that never finishes
 

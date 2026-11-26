@@ -49,6 +49,41 @@ test('exactSize sets the backbuffer once and frames never resize it to the CSS s
   }
 });
 
+test('antialias separates the sample count from the fixed size (GAP-FILM-MSAA)', async (t) => {
+  const previous = globalThis.devicePixelRatio;
+  globalThis.devicePixelRatio = 2;
+  t.after(() => (globalThis.devicePixelRatio = previous));
+  // exactSize with antialias: true keeps the fixed backbuffer and takes the tier's samples (4 on this desktop tier).
+  const film = canvas(),
+    fixed = await Engine.create(film, { backend: 'webgl2', fallback, exactSize: [1920, 1080], antialias: true });
+  try {
+    fixed.render();
+    assert.deepEqual([film.width, film.height], [1920, 1080], 'no CSS x pixel-ratio resize');
+    assert.equal(sceneSamples(fixed), sceneSamples(), 'the quality tier samples');
+    assert.equal(sceneSamples(), 4);
+  } finally {
+    fixed.dispose();
+  }
+  // antialias: false without exactSize is single-sampled and still follows the CSS size; with one sample the 4x MSAA
+  // pixel-ratio cap does not apply, so a ratio of 2 gives 2560 x 1440.
+  const plain = canvas(),
+    single = await Engine.create(plain, { backend: 'webgl2', fallback, antialias: false });
+  try {
+    single.render();
+    assert.equal(sceneSamples(single), 1, 'single-sampled');
+    assert.deepEqual([plain.width, plain.height], [2560, 1440], 'follows the CSS size times the pixel ratio');
+  } finally {
+    single.dispose();
+  }
+  // exactSize with antialias: false is the same as exactSize alone.
+  const off = await Engine.create(canvas(), { backend: 'webgl2', fallback, exactSize: [16, 8], antialias: false });
+  try {
+    assert.equal(sceneSamples(off), 1);
+  } finally {
+    off.dispose();
+  }
+});
+
 test('an invalid exactSize is a RangeError linked to its help entry', async () => {
   for (const exactSize of [[0, 10], [10.5, 10], [10], [9000, 10]])
     await assert.rejects(

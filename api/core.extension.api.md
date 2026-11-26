@@ -89,6 +89,7 @@ export class Engine {
     unshadowed: number;
     features?: GPUFeatureName[];
     exact?: 1;
+    fixed?: 1;
     power?: GPUPowerPreference;
     get frameGraph(): FrameGraph;
     get lighting(): Scene['lighting'];
@@ -133,6 +134,7 @@ export interface EngineOptions {
     fallback?: (canvas: HTMLCanvasElement) => Renderer;
     features?: GPUFeatureName[];
     exactSize?: boolean | readonly [number, number];
+    antialias?: boolean;
     signal?: AbortSignal;
     startupWarning?: number;
     startupTimeout?: number;
