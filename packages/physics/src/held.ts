@@ -1,5 +1,5 @@
-// Loads of the air held on rigid bodies (flight.ts, fields.ts): as forces through the whole step, and taken implicitly in
-// the body's motion so a light body in a strong air load stays stable at the world's step.
+// Loads of the air on rigid bodies (flight.ts, fields.ts), taken implicitly in the body's motion so a light body in a strong
+// air load stays stable at the world's step; air-hold.ts holds them as forces through the step.
 import type { PhysicsBody } from './body.js';
 import { scale, solve, sub } from './lattice.js';
 import type { Vec3 } from './math.js';
@@ -60,30 +60,4 @@ export function implicitWrench(body: PhysicsBody, wrench: Wrench, dt: number, gr
     [held[0]!, held[1]!, held[2]!],
     [held[3]!, held[4]!, held[5]!],
   ];
-}
-
-/**
- * A load held on a body as a force through the whole step (`addForce`, `addTorque`), changed each step by the difference
- * from the last, so it acts as a force does. An impulse at the start of a step would let gravity pull back through it, and a
- * hovering drone would creep up half g dt^2 a step (the soft attachments' finding, docs/known-bugs.md).
- */
-export class HeldLoad {
-  private readonly force: [number, number, number] = [0, 0, 0];
-  private readonly torque: [number, number, number] = [0, 0, 0];
-
-  /** Holds `force` (N) and `torque` (N m, about the centre of mass) on `body` from now on. An unchanged load leaves it asleep. */
-  set(body: PhysicsBody, force: Vec3, torque: Vec3, wakeUp = true): void {
-    if (body.type !== 'dynamic') return;
-    const df: Vec3 = [force[0] - this.force[0], force[1] - this.force[1], force[2] - this.force[2]],
-      dt: Vec3 = [torque[0] - this.torque[0], torque[1] - this.torque[1], torque[2] - this.torque[2]];
-    if (df[0] !== 0 || df[1] !== 0 || df[2] !== 0) body.addForce(df, undefined, wakeUp);
-    if (dt[0] !== 0 || dt[1] !== 0 || dt[2] !== 0) body.addTorque(dt, wakeUp);
-    [this.force[0], this.force[1], this.force[2]] = force;
-    [this.torque[0], this.torque[1], this.torque[2]] = torque;
-  }
-
-  /** Takes the load off (waking the body unless `wakeUp` is false). */
-  clear(body: PhysicsBody, wakeUp = true): void {
-    this.set(body, [0, 0, 0], [0, 0, 0], wakeUp);
-  }
 }

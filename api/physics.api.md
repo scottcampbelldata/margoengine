@@ -2043,9 +2043,10 @@ export interface WheelState {
 export const WindField: typeof WindForce;
 export type WindField = WindForce;
 
-export class WindForce implements PhysicsAttachment {
+export class WindForce implements PhysicsAttachment, AirLoad {
     constructor(physics: Physics, options: WindOptions);
     beforeStep(dt: number): void;
+    load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
@@ -2131,6 +2132,10 @@ export function voxelsFromPoints(points: ArrayLike<number>, size?: number | Vec3
 };
 
 // Not exported from this entry, but used by the exports above:
+
+interface AirLoad {
+    load(dt: number): void;
+}
 
 interface BodyOwner {
     readonly kernel: KernelWorld;

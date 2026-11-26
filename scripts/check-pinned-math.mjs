@@ -23,6 +23,7 @@ export const ALWAYS = [
   'packages/physics/src/lattice.ts',
   'packages/physics/src/flight.ts',
   'packages/physics/src/held.ts',
+  'packages/physics/src/air-hold.ts',
   'packages/math/src/atmosphere.ts',
   'packages/weather/src/boundary-layer.ts',
   'packages/weather/src/turbulence.ts',

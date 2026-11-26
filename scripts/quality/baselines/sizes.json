@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19123868,
+  "total": 19125186,
   "history": [
     {
       "date": "2026-10-24",
@@ -12423,6 +12423,12 @@
       "commit": "feat(physics) solver modules share one memory",
       "reason": "The shared-memory module loader in physics/world (loadSolverModule, instantiateSolverModule, worldMemory, the layout constants and the placement check with its coded messages): budget 15,475 to 16,490 measured on this Mac: 16,223 with the loader on the base it was written on, the rest the world entry's own growth on main since (its error messages with their fixes), which had fitted the old headroom. It is the framework's memory layer that every solver module loads through; a separate entry would only move the same bytes behind a second import for every world that runs a module.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "526cc95c9",
+      "reason": "physics/flight ceiling 7,401 to 8,719 B (built 8,463 B): AirSolver, the air's loads as a framework solver through bodyForces, and the hold that sums each body's air loads for one step and takes them off exactly (KB-AERO-FORCERESIDUE1). In the flight entry rather than the world entry, so a world without air loads pays nothing; a split of its own would load with every flight scene that uses a world. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13217,7 +13223,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/earth": 3456,
-    "@margoengine/physics/flight": 7401,
+    "@margoengine/physics/flight": 8719,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/seakeeping": 8962,

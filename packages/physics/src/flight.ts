@@ -27,7 +27,11 @@ import { DRY_AIR_GAS_CONSTANT, standardAtmosphere } from '@margoengine/math/atmo
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import { cos, exp, hypot, pow, sin } from '@margoengine/math/pinned';
 import type { PhysicsBody } from './body.js';
-import { HeldLoad, implicitWrench, type Wrench } from './held.js';
+import { type AirHold, type AirLoad, airHoldOf } from './air-hold.js';
+import { implicitWrench, type Wrench } from './held.js';
+
+/** The air's loads in a `PhysicsWorld`: `world.add(new AirSolver(), {physics})`, coupled air before rigid. */
+export { AirSolver, type AirSolverParams } from './world/solvers/air.js';
 import { add, crossOf, dot, flatPlate, latticeLoads, scale, sub } from './lattice.js';
 import { checkVec, rotateVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment } from './physics.js';
@@ -189,7 +193,7 @@ function standardAirDensity(height: number): number {
  * A wing on a rigid body: a vortex lattice solved every step from the body's motion, the wing's flapping and the wind, its
  * load applied to the body. Separated panels take the quasi-steady flat-wing coefficients of Su et al.
  */
-export class WingForce implements PhysicsAttachment {
+export class WingForce implements PhysicsAttachment, AirLoad {
   /** The wing's total aerodynamic force in the last step, N. */
   readonly force: [number, number, number] = [0, 0, 0];
   /** Its moment about the body's centre of mass in the last step, N m. */
@@ -197,7 +201,7 @@ export class WingForce implements PhysicsAttachment {
   /** Each panel's circulation in the last step, m^2/s, chord first then span from the left tip. */
   circulation: Float64Array = new Float64Array(0);
   private released = false;
-  private readonly held = new HeldLoad();
+  private readonly hold: AirHold;
   private readonly forward: Vec3;
   private readonly up: Vec3;
   private readonly side: Vec3;
@@ -248,6 +252,8 @@ export class WingForce implements PhysicsAttachment {
     this.side = scale(side, 1 / length);
     this.air = new AirSampler(wind, density);
     [this.nc, this.perInterval] = panels;
+    this.hold = airHoldOf(physics);
+    this.hold.loads.add(this);
     physics.attach(this);
   }
 
@@ -293,11 +299,16 @@ export class WingForce implements PhysicsAttachment {
     return { corners: columns.flat(), stations: columns.length };
   }
 
-  /** @internal */
+  /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
   beforeStep(dt: number): void {
+    if (!this.hold.driven) this.load(dt);
+  }
+
+  /** @internal This step's load, held for the step. */
+  load(dt: number): void {
     if (this.released) return;
     const body = this.body,
-      time = this.physics.stepCount * this.physics.fixedTimestep,
+      time = this.hold.now(),
       { corners, stations } = this.geometry(time),
       nc = this.nc,
       ns = stations - 1,
@@ -378,7 +389,7 @@ export class WingForce implements PhysicsAttachment {
     this.circulation = circulation;
     [this.force[0], this.force[1], this.force[2]] = force;
     [this.torque[0], this.torque[1], this.torque[2]] = torque;
-    this.held.set(body, force, torque);
+    this.hold.hold(body, force, torque);
   }
 
   /** @internal */
@@ -390,13 +401,14 @@ export class WingForce implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
-    this.held.clear(this.body);
+    this.hold.loads.delete(this);
     this.physics.detach(this);
   }
 
   /** @internal */
   dispose(): void {
     this.released = true;
+    this.hold.loads.delete(this);
   }
 }
 
@@ -433,7 +445,7 @@ export interface RotorOptions {
 }
 
 /** A rotor or propeller on a rigid body: blade-element momentum theory every step; thrust along its axis, torque against it. */
-export class RotorForce implements PhysicsAttachment {
+export class RotorForce implements PhysicsAttachment, AirLoad {
   /** Thrust in the last step, N (along the axis; negative pulls the other way). */
   thrust = 0;
   /** Torque the air puts on the blades in the last step, N m (the body turns the other way). */
@@ -441,7 +453,7 @@ export class RotorForce implements PhysicsAttachment {
   /** Power the rotor gives the air in the last step, W. */
   power = 0;
   private released = false;
-  private readonly held = new HeldLoad();
+  private readonly hold: AirHold;
   private readonly axis: Vec3;
   private readonly air: AirSampler;
 
@@ -474,6 +486,8 @@ export class RotorForce implements PhysicsAttachment {
     this.axis = unit(options.axis ?? [0, 1, 0], "The rotor's axis");
     if (options.hub !== undefined) checkVec(options.hub, "The rotor's hub");
     this.air = new AirSampler(options.wind ?? [0, 0, 0], options.density);
+    this.hold = airHoldOf(physics);
+    this.hold.loads.add(this);
     physics.attach(this);
   }
 
@@ -531,11 +545,16 @@ export class RotorForce implements PhysicsAttachment {
     return { thrust, torque: omega < 0 ? -torque : torque, power: torque * spin };
   }
 
-  /** @internal */
+  /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
   beforeStep(dt: number): void {
+    if (!this.hold.driven) this.load(dt);
+  }
+
+  /** @internal This step's load, held for the step. */
+  load(dt: number): void {
     if (this.released) return;
     const body = this.body,
-      time = this.physics.stepCount * this.physics.fixedTimestep,
+      time = this.hold.now(),
       q = body.rotation,
       axis = rotateVec(q, this.axis),
       hub = add(body.position, rotateVec(q, this.options.hub ?? [0, 0, 0])),
@@ -559,7 +578,7 @@ export class RotorForce implements PhysicsAttachment {
     this.thrust = thrust;
     this.torque = torque;
     this.power = power;
-    this.held.set(body, force, add(pushMoment, scale(axis, -torque)));
+    this.hold.hold(body, force, add(pushMoment, scale(axis, -torque)));
   }
 
   /** @internal */
@@ -571,13 +590,14 @@ export class RotorForce implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
-    this.held.clear(this.body);
+    this.hold.loads.delete(this);
     this.physics.detach(this);
   }
 
   /** @internal */
   dispose(): void {
     this.released = true;
+    this.hold.loads.delete(this);
   }
 }
 
@@ -602,11 +622,11 @@ export interface LiftingGasOptions {
 }
 
 /** The buoyancy of a gas envelope on a rigid body: (rho_air - rho_gas) V g up, at the standard atmosphere's air. */
-export class LiftingGas implements PhysicsAttachment {
+export class LiftingGas implements PhysicsAttachment, AirLoad {
   /** The net lift in the last step, N. */
   lift = 0;
   private released = false;
-  private readonly held = new HeldLoad();
+  private readonly hold: AirHold;
 
   /** @throws RangeError for a volume or temperature that is not finite and above 0, or an unknown gas. */
   constructor(
@@ -624,6 +644,8 @@ export class LiftingGas implements PhysicsAttachment {
         `Hot air's temperature is a finite number of kelvin above 0 (got ${temperature}); pass one.`,
       );
     if (options.centre !== undefined) checkVec(options.centre, "The envelope's centre");
+    this.hold = airHoldOf(physics);
+    this.hold.loads.add(this);
     physics.attach(this);
   }
 
@@ -637,15 +659,19 @@ export class LiftingGas implements PhysicsAttachment {
     return (air - inside) * volume * g;
   }
 
-  /** @internal */
-  beforeStep(_dt: number): void {
+  /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
+  beforeStep(dt: number): void {
+    if (!this.hold.driven) this.load(dt);
+  }
+
+  /** @internal This step's buoyancy, held for the step. */
+  load(_dt: number): void {
     if (this.released) return;
     const body = this.body,
       gravity = this.physics.gravity,
       g = hypot(gravity[0], gravity[1], gravity[2]);
     if (!(g > 0)) {
       this.lift = 0;
-      this.held.clear(body);
       return;
     }
     const centre = add(body.position, rotateVec(body.rotation, this.options.centre ?? [0, 0, 0])),
@@ -653,7 +679,7 @@ export class LiftingGas implements PhysicsAttachment {
       up = scale(gravity, -lift / g),
       moment = crossOf(sub(centre, body.worldCenterOfMass), up);
     this.lift = lift;
-    this.held.set(body, up, moment);
+    this.hold.hold(body, up, moment);
   }
 
   /** @internal */
@@ -665,12 +691,13 @@ export class LiftingGas implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
-    this.held.clear(this.body);
+    this.hold.loads.delete(this);
     this.physics.detach(this);
   }
 
   /** @internal */
   dispose(): void {
     this.released = true;
+    this.hold.loads.delete(this);
   }
 }

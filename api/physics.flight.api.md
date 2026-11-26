@@ -9,11 +9,29 @@ import { FlowField } from "@margoengine/math/fields";
 
 export type Air = Vec3 | ((point: Vec3, time: number) => Vec3) | FlowField;
 
-export class LiftingGas implements PhysicsAttachment {
+export class AirSolver implements Solver<AirSolverParams> {
+    readonly id: string;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: AirSolverParams): void;
+    step(context: StepContext, dt: number): void;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(_tick: number): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export interface AirSolverParams {
+    readonly physics: Physics;
+    readonly capacity?: number;
+}
+
+export class LiftingGas implements PhysicsAttachment, AirLoad {
     lift: number;
     constructor(physics: Physics, body: PhysicsBody, options: LiftingGasOptions);
     liftAt(height: number, g: number): number;
-    beforeStep(_dt: number): void;
+    beforeStep(dt: number): void;
+    load(_dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
@@ -28,7 +46,7 @@ export interface LiftingGasOptions {
     seaLevelTemperature?: number;
 }
 
-export class RotorForce implements PhysicsAttachment {
+export class RotorForce implements PhysicsAttachment, AirLoad {
     thrust: number;
     torque: number;
     power: number;
@@ -39,6 +57,7 @@ export class RotorForce implements PhysicsAttachment {
         power: number;
     };
     beforeStep(dt: number): void;
+    load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
@@ -61,12 +80,13 @@ export interface RotorOptions {
     density?: number;
 }
 
-export class WingForce implements PhysicsAttachment {
+export class WingForce implements PhysicsAttachment, AirLoad {
     readonly force: [number, number, number];
     readonly torque: [number, number, number];
     circulation: Float64Array;
     constructor(physics: Physics, body: PhysicsBody, options: WingOptions);
     beforeStep(dt: number): void;
+    load(dt: number): void;
     bodyRemoved(body: PhysicsBody): void;
     remove(): void;
     dispose(): void;
@@ -102,6 +122,10 @@ export function angleOf(y: number, x: number): number;
 export function flatWingCoefficients(alpha: number): [number, number];
 
 // Not exported from this entry, but used by the exports above:
+
+interface AirLoad {
+    load(dt: number): void;
+}
 
 interface BodyOptions {
     type?: BodyType;
@@ -141,6 +165,10 @@ interface BodyOwner {
 }
 
 type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
+
+type Cell = readonly [number, number, number];
+
+type Centring = 'cell' | 'face' | 'vertex' | 'particle';
 
 interface CharacterCollision {
     collider: PhysicsCollider;
@@ -500,7 +528,26 @@ interface DynamicCharacterOptions {
     };
 }
 
+type ElementType = 'f32' | 'f64' | 'i32' | 'u32' | 'u8';
+
 type FeatureType = 'vertex' | 'edge' | 'face' | 'unknown';
+
+type FieldAccess = 'read' | 'write' | 'accumulate';
+
+interface FieldDescriptor {
+    readonly name: string;
+    readonly kind: FieldKind;
+    readonly quantity: string;
+    readonly unit: string;
+    readonly centring: Centring;
+}
+
+type FieldKind = 'uniformGrid' | 'sparseGrid' | 'heightfield' | 'particleSet' | 'meshVertexSet' | 'surfaceSampleSet' | 'bodySet' | 'scalarSeries';
+
+interface FieldUse {
+    readonly field: FieldDescriptor;
+    readonly access: FieldAccess;
+}
 
 interface HalfEdgeTopology {
     vertex: Uint32Array;
@@ -1638,6 +1685,13 @@ interface PointProjection {
     readonly featureId: number | undefined;
 }
 
+interface Port {
+    readonly field: string;
+    readonly region: Region;
+    readonly tick: number;
+    readonly cell: Cell;
+}
+
 interface QuarantineEvent {
     type: 'quarantine';
     body: PhysicsBody;
@@ -1660,6 +1714,8 @@ interface QueryFilter {
     predicate?: (body: PhysicsBody, collider: PhysicsCollider) => boolean;
 }
 
+type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
 interface RaycastHit {
     body: PhysicsBody;
     mesh: Mesh | null;
@@ -1669,6 +1725,15 @@ interface RaycastHit {
     normal: [number, number, number];
     readonly featureType?: FeatureType;
     readonly featureId?: number | undefined;
+}
+
+interface Region {
+    readonly name: string;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+    readonly type: ElementType;
+    readonly layout: number;
+    readonly memory?: WebAssembly.Memory;
 }
 
 type RotationMotorOptions = Pick<MotorOptions, 'stiffness' | 'damping' | 'model' | 'maxForce'> & {
@@ -1802,6 +1867,40 @@ type ShapeOptions = {
     shape: 'halfSpace';
     normal?: Vec3;
 };
+
+interface Solver<Params = unknown> {
+    describe(): SolverDescription;
+    init(host: SolverHost, params: Params): void;
+    step(context: StepContext, dt: number): void;
+    exportPorts(tick: number): readonly Port[];
+    importPorts(tick: number): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+    iterate?(context: StepContext, dt: number): void;
+    rollback?(): void;
+}
+
+interface SolverDescription {
+    readonly id: string;
+    readonly fields: readonly FieldUse[];
+    readonly rate: RateLevel;
+    stableRate(): RateLevel;
+}
+
+interface SolverHost {
+    readonly memory: WebAssembly.Memory;
+    readonly gravity: readonly [number, number, number];
+    allocate(name: string, byteLength: number, type: ElementType, layout: number): Region;
+    port(field: string): Port | undefined;
+}
+
+interface StepContext {
+    readonly tick: number;
+    readonly level: RateLevel;
+    readonly seed: number;
+    readonly inputs: ReadonlyMap<string, Port>;
+    readonly cell: Cell;
+}
 
 type Vec3 = readonly [number, number, number];
 ```

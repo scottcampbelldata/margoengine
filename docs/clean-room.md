@@ -11941,6 +11941,15 @@ descent, the arctangent from arithmetic (`angleOf`), the load held as a force th
 load (a finite-difference Jacobian of the force and torque in the body's velocity and spin, then the backward Euler step of
 the load and gravity) are this package's own arrangement. Proof: `packages/physics/tests/flight.test.js`.
 
+#### The air's loads in a world (`AirSolver` of `@margoengine/physics/flight`, `air-hold.ts`, 2026-11-25)
+
+No outside source: the framework's own `bodyForces` contract (docs/physics-framework.md, section 4) and the rigid solver's
+rule of taking off exactly what the f32 columns took, which the soft solver's fix KB-SOFT-FORCERESIDUE1 set down. One hold per
+Physics sums every air load on a body in f64 in the order the loads were made, adds the sum to the columns once (as the rigid
+solver adds a summed port) and takes the columns' difference off after the step; in a world the `AirSolver` writes the same
+sums into `bodyForces` and gives the loads the world's tick as their clock. Proof: `packages/physics/tests/world-air-solver.test.js`
+and `tests/coupling/air.test.js`.
+
 ### Sails and flags, a vortex lattice on the cloth (AERO-02, `SailForce` in `@margoengine/physics/soft`, 2026-11-25)
 
 `packages/physics/src/sail.ts` solves a vortex lattice on a cloth's grid every step. Written from M. Klein and others, "Direct

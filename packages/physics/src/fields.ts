@@ -7,7 +7,8 @@ import { hypot } from '@margoengine/math/pinned';
 import type { FlowField, FlowSample } from '@margoengine/math/fields';
 import { colliderSurface, type Surface } from './aero.js';
 import type { PhysicsBody } from './body.js';
-import { HeldLoad, implicitWrench, type Wrench } from './held.js';
+import { type AirHold, type AirLoad, airHoldOf } from './air-hold.js';
+import { implicitWrench, type Wrench } from './held.js';
 import { checkVec, rotateVec, type Vec3 } from './math.js';
 import type { Physics, PhysicsAttachment, QueryFilter } from './physics.js';
 
@@ -93,8 +94,9 @@ export interface WindOptions {
  * world's time (its steps times the fixed step), so a wind shared with the rest of a scene is felt where and when the rest
  * feels it. Sleeping bodies are woken only by a wind strong enough to move them.
  */
-export class WindForce implements PhysicsAttachment {
+export class WindForce implements PhysicsAttachment, AirLoad {
   private released = false;
+  private readonly hold: AirHold;
   private readonly sample: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
   constructor(
     private readonly physics: Physics,
@@ -114,11 +116,18 @@ export class WindForce implements PhysicsAttachment {
           "A wind force samples its flow field in the physics world's frame; pass a field whose cell is [0, 0, 0].",
         );
     } else if (typeof velocity !== 'function') checkVec(velocity, 'Wind velocity');
+    this.hold = airHoldOf(physics);
+    this.hold.loads.add(this);
     physics.attach(this);
   }
 
-  /** @internal */
+  /** @internal Stepped alone, the Physics's step computes the load; in a world, an `AirSolver` does. */
   beforeStep(dt: number): void {
+    if (!this.hold.driven) this.load(dt);
+  }
+
+  /** @internal This step's load on every body the wind reaches, held for the step. */
+  load(dt: number): void {
     if (this.released) return;
     const {
         drag: normalCoefficient = 1.17,
@@ -129,9 +138,8 @@ export class WindForce implements PhysicsAttachment {
       } = this.options,
       min: Vec3 = region?.min ?? [-1e9, -1e9, -1e9],
       max: Vec3 = region?.max ?? [1e9, 1e9, 1e9],
-      time = this.physics.stepCount * this.physics.fixedTimestep,
-      flow = isFlow(velocity) ? velocity : undefined,
-      loaded = new Set<PhysicsBody>();
+      time = this.hold.now(),
+      flow = isFlow(velocity) ? velocity : undefined;
     for (const body of this.physics.intersectAabb(min, max, filter)) {
       if (body.type !== 'dynamic') continue;
       const p = body.position;
@@ -152,10 +160,7 @@ export class WindForce implements PhysicsAttachment {
         density = this.options.density ?? standardDensity(p[1]);
       }
       const surface = this.surfaceOf(body);
-      if (!surface) {
-        this.release(body);
-        continue;
-      }
+      if (!surface) continue;
       const { centres, normals, areas } = surface,
         q = body.rotation,
         pos = body.position,
@@ -246,34 +251,15 @@ export class WindForce implements PhysicsAttachment {
       // A sleeping body is woken only by a wind that would push it a tenth of a metre a second squared.
       if (body.sleeping) {
         const [f] = wrench([0, 0, 0], [0, 0, 0]);
-        if (!(hypot(f[0], f[1], f[2]) >= 0.1 * body.mass)) {
-          this.release(body, false);
-          continue;
-        }
+        if (!(hypot(f[0], f[1], f[2]) >= 0.1 * body.mass)) continue;
       }
       const [force, torque] = implicitWrench(body, wrench, dt, this.physics.gravity);
-      let load = this.held.get(body);
-      if (!load) this.held.set(body, (load = new HeldLoad()));
-      load.set(body, force, torque);
-      loaded.add(body);
+      this.hold.hold(body, force, torque);
     }
-    // Bodies the wind no longer reaches lose its load.
-    for (const body of [...this.held.keys()]) if (!loaded.has(body)) this.release(body);
-  }
-
-  /** The load held on each body the wind reaches. */
-  private readonly held = new Map<PhysicsBody, HeldLoad>();
-
-  private release(body: PhysicsBody, wakeUp = true): void {
-    const load = this.held.get(body);
-    if (!load) return;
-    load.clear(body, wakeUp);
-    this.held.delete(body);
   }
 
   /** @internal */
   bodyRemoved(body: PhysicsBody): void {
-    this.held.delete(body);
     this.surfaces.delete(body);
   }
 
@@ -325,13 +311,14 @@ export class WindForce implements PhysicsAttachment {
   remove(): void {
     if (this.released) return;
     this.released = true;
-    for (const body of [...this.held.keys()]) this.release(body);
+    this.hold.loads.delete(this);
     this.physics.detach(this);
   }
 
   /** @internal */
   dispose(): void {
     this.released = true;
+    this.hold.loads.delete(this);
   }
 }
 

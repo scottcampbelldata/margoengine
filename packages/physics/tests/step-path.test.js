@@ -30,6 +30,7 @@ const stepFiles = [
   'flight.ts',
   // The air's loads held on bodies through the step, implicitly in their motion (wind, wings, rotors).
   'held.ts',
+  'air-hold.ts',
 ];
 const banned = /(?:(?<![\w$.])|(?<=\bglobalThis\.))(Math|Date|performance|crypto)\b/g;
 

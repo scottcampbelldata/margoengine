@@ -66,6 +66,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Regression:** `tests/node-apis.test.js` (the build script and everything it imports pass the Node 22.12 API scan).
   Not run on Node 22.12 here; CI's 22.12.0 jobs are that proof.
 
+### Open 2026-11-25: a world's restore does not rewind `Physics.stepCount` (KB-PHYS-STEPCOUNTSEEK1, physics world, rigid solver)
+
+- **Repro:** a `PhysicsWorld` with a `RigidSolver`; advance 12 ticks, `takeSnapshot()`, advance 48, `restoreSnapshot()`:
+  `physics.stepCount` is 60, not 12. Anything inside the Physics that reads its clock as `stepCount * fixedTimestep` then
+  reads the wrong time after a seek: a `SailForce` whose wind is a function of time, `Physics.advance(frame, fps)`.
+- **Cause:** the rigid solver's state is the kernel's columns; `stepCount` is a field of the Physics object, not in a region,
+  so a restore leaves it where the run had reached.
+- **Done so far:** the air's loads on bodies (`WindForce`, `WingForce`, `RotorForce`) take the world's tick from the
+  `AirSolver` in a world, so they seek bit for bit (`packages/physics/tests/coupling/air.test.js`). The rigid solver's own
+  fix (its step count as state, read back each step) is open with the rigid solver's owner.
+
+### Fixed 2026-11-25: an air load left a stray force on a body when it stopped (KB-AERO-FORCERESIDUE1, physics fields and flight)
+
+- **Repro:** three boxes with their own `addForce([0.3, 0, -0.17])` in a gusty `WindForce` for 90 steps, then
+  `wind.remove()` and one step: each box's force column read about (0.300001, -1.4e-7, -0.1700003) and a torque of 1e-8,
+  not its own force.
+- **Cause:** `HeldLoad` changed the force it held by the difference from the last step's, so the f32 columns re-rounded the
+  running sum every step and taking the last load off left that rounding behind (the class of KB-SOFT-FORCERESIDUE1).
+- **Fixed:** the air's loads (`WindForce`, `WingForce`, `RotorForce`, `LiftingGas`) are summed by body in f64 and held for
+  one step only: the sum goes into the columns before the step and exactly what the columns took (the difference of two
+  f32 values) comes off after it (`packages/physics/src/air-hold.ts`). In a world the same sums go through `bodyForces`
+  (`AirSolver`), which the rigid solver adds and takes off the same way, so a world and Physics alone are the same bits.
+  Results of a scene with air loads change at f32 rounding from before; the physics is unchanged. Regression:
+  `packages/physics/tests/world-air-solver.test.js`, "stepped alone, an air load comes off exactly when it stops".
+
 ### Open 2026-11-25, narrowed the same day: a strong wind still grows the sea somewhat fast (KB-SEA-GROWTH1, physics waves)
 
 - **Repro (as first filed):** `WaveSolver` with `cells: [30, 1]`, `cellSize: 4000`, `periodic: ['z']`, a steady 20 m/s wind
