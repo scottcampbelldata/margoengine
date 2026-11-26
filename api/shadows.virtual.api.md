@@ -17,6 +17,7 @@ export interface VirtualShadowOptions {
     samples?: number;
     blockerSamples?: number;
     focus?: number;
+    jitter?: boolean;
     bias?: number;
     normalBias?: number;
     casterMargin?: number;
@@ -114,6 +115,7 @@ interface ShadowOptions {
     samples?: number;
     blockerSamples?: number;
     focus?: number;
+    jitter?: boolean;
     bias?: number;
     normalBias?: number;
     casterMargin?: number;

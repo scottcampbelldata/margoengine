@@ -51,6 +51,7 @@ import {
   moveEffects,
   validEffects,
   checkSoft,
+  jitterTurn,
   type ShadowEffect,
   type ShadowEffectFrame,
   type ShadowFilter,
@@ -112,6 +113,8 @@ export interface VirtualShadowOptions {
    * penumbra is sharpest. Default 0: sharpest where a caster touches the receiver. Live.
    */
   focus?: number;
+  /** The `'soft'` filter's noise turned a golden-ratio step each frame, as `Shadows`. Default true. Live. */
+  jitter?: boolean;
   /**
    * Extra constant depth bias along the light, world units, 0 or more. Default 0. Every receiver already compares 2^-20
    * of the depth range nearer the light, and the range follows the default reach, so any model scale works without it.
@@ -527,6 +530,8 @@ export class VirtualShadows implements EnginePlugin {
     return hooks;
   }
   private elapsed = 0;
+  // Frames whose clock moved since time 0: the soft filter's noise turn (`jitter`).
+  private jitterFrames = 0;
   /** Seconds of frame time the effects' own clocks have moved by (a `lightPattern`'s scroll). A fresh one reads 0. */
   get time(): number {
     return this.elapsed;
@@ -534,6 +539,7 @@ export class VirtualShadows implements EnginePlugin {
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.elapsed = 0;
+    this.jitterFrames = 0;
     for (const effect of this.effects) effect.resetTime?.();
   }
   /**
@@ -543,6 +549,7 @@ export class VirtualShadows implements EnginePlugin {
   advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid shadow delta; pass finite seconds >= 0');
     this.elapsed += delta;
+    if (delta > 0) this.jitterFrames++;
     for (const effect of this.effects) effect.advanceTime?.(delta);
   }
   onPreUpdate(delta: number): void {
@@ -1172,6 +1179,7 @@ export class VirtualShadows implements EnginePlugin {
     values[116] = o.samples ?? 32;
     values[117] = o.blockerSamples ?? 16;
     values[118] = o.focus ?? 0;
+    values[119] = jitterTurn(o, this.jitterFrames);
     c.device.queue.writeBuffer(this.uniform!, 0, values as Float32Array<ArrayBuffer>);
     const serial = ++this.serial,
       section = sectionState(c);

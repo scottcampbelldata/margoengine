@@ -24,6 +24,7 @@ import { cascadeSplits, fitCascades } from './cascades.js';
 import {
   shadowSampling,
   checkSoft,
+  jitterTurn,
   shadowDepth,
   nearestDepth,
   effectEntries,
@@ -116,6 +117,14 @@ export interface ShadowOptions {
    * receiver, as a real area light. Live.
    */
   focus?: number;
+  /**
+   * Turns the `'soft'` filter's per-pixel noise by a golden-ratio step each frame (`time` moving), so frames that are
+   * averaged (temporal antialiasing, a shot's motion-blur sub-frames, accumulation) integrate a new tap pattern each
+   * and the penumbra converges instead of keeping one frame's grain (KB-LOOK-TV-PENUMBRA1). A still frame (delta 0)
+   * keeps its pattern, and `resetTime` and a seek replay give the same patterns again. Default true; false gives the
+   * same pattern every frame. Live.
+   */
+  jitter?: boolean;
   /**
    * Extra constant depth bias, as a fraction of the map's depth range, 0 or more. Default 0. Every receiver already
    * compares one texel nearer the light, with the texel's world size, so any model scale works without it.
@@ -950,6 +959,8 @@ export class Shadows implements EnginePlugin {
     return hooks;
   }
   private elapsed = 0;
+  // Frames whose clock moved since time 0: the soft filter's noise turn (`jitter`).
+  private jitterFrames = 0;
   /** Seconds of frame time the effects' own clocks have moved by (a `lightPattern`'s scroll). A fresh one reads 0. */
   get time(): number {
     return this.elapsed;
@@ -957,6 +968,7 @@ export class Shadows implements EnginePlugin {
   /** Back to time 0 and a fresh one's state, history dropped (GAP-FILM-RESET; `resetClocks` in `@margoengine/cutscene/seek`). */
   resetTime(): void {
     this.elapsed = 0;
+    this.jitterFrames = 0;
     for (const effect of this.effects) effect.resetTime?.();
   }
   /**
@@ -966,6 +978,7 @@ export class Shadows implements EnginePlugin {
   advanceTime(delta: number): void {
     if (!Number.isFinite(delta) || delta < 0) throw new RangeError('Invalid shadow delta; pass finite seconds >= 0');
     this.elapsed += delta;
+    if (delta > 0) this.jitterFrames++;
     for (const effect of this.effects) effect.advanceTime?.(delta);
   }
   onPreUpdate(delta: number): void {
@@ -1387,6 +1400,7 @@ export class Shadows implements EnginePlugin {
     this.values[92] = this.options.samples ?? 32;
     this.values[93] = this.options.blockerSamples ?? 16;
     this.values[94] = this.options.focus ?? 0;
+    this.values[95] = jitterTurn(this.options, this.jitterFrames);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.stats.staticDraws = this.stats.dynamicDraws = 0;
     // Before any depth pass opens: a caster's shared per-cascade work, on the frames it draws (a static one only when the

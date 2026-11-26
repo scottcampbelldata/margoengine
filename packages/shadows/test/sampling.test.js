@@ -62,13 +62,13 @@ test('each pixel turns the spiral by interleaved gradient noise of its screen po
     ),
   );
   assert.ok(source.includes('let noise=shadowNoise(position);'));
-  assert.ok(source.includes('let angle=noise.x*6.2831853;let turn=vec2f(cos(angle),sin(angle));'));
+  assert.ok(source.includes('let angle=(noise.x+shadowFrame.soft.w)*6.2831853;let turn=vec2f(cos(angle),sin(angle));'));
   assert.ok(
     source.includes('var blockers=0.0;var sum=0.0;var direction=turn;'),
     'the blocker search starts at the turn',
   );
   assert.ok(source.includes('var visibility=0.0;direction=turn;'), 'the filter restarts from the same turn');
-  assert.doesNotMatch(source, /time|random/i, 'the same view renders the same pixels every frame');
+  assert.doesNotMatch(source, /time|random/i, 'the same view and frame turn render the same pixels');
   // Neighbouring pixels get well-spread angles: each 8 x 8 block uses every eighth of a turn about equally.
   for (const [ox, oy] of [
     [0, 0],
@@ -307,6 +307,64 @@ test('the soft filter reduces each layer to its nearest depth once the map chang
         again.some((e) => e[0] === 'beginRenderPass'),
       'a re-rendered map is reduced again, after its depth passes',
     );
+  } finally {
+    shadows.dispose();
+    engine.dispose();
+  }
+});
+
+// KB-LOOK-TV-PENUMBRA1: the soft filter's noise was the same every frame, so a shot's 8 motion-blur sub-frames (or TAA)
+// averaged one tap pattern and the tree-shadow penumbrae kept their grain. Each frame whose clock moves now turns it by
+// the golden-ratio step; a paused frame, resetTime and jitter false keep the pattern.
+test('jitter turns the soft noise a golden-ratio step per moving frame, reset by resetTime, held by delta 0 and false', async () => {
+  const source = shadowSampling(0);
+  assert.ok(source.includes('let angle=(noise.x+shadowFrame.soft.w)*6.2831853;'), 'the turn reaches the spiral start');
+  const gpu = mockGPU(),
+    store = await TransformStore.create(4),
+    engine = new Engine(
+      { width: 128, height: 96, clientWidth: 128, clientHeight: 96 },
+      store,
+      { backend: 'webgpu', gpu: gpu.device, add() {}, remove() {}, render() {}, dispose() {} },
+      { position: [0, 2, 6], target: [0, 0, 0] },
+      null,
+    ),
+    view = context(gpu, { samples: 1, shader: 'let linear=direct*vec3f(1);' }),
+    shadows = new Shadows({ resolution: 64 });
+  let frame = 0;
+  const turn = () => {
+    store.tick(false);
+    view.begin(frame++);
+    const write = gpu
+      .record(() => passes(shadows)(view.c))
+      .find((e) => e[0] === 'writeBuffer' && e[3].length === 384 * 2);
+    return new Float32Array(Uint8Array.from(Buffer.from(write[3], 'hex')).buffer)[95];
+  };
+  const golden = (n) => f32(n * 0.6180339887498949 - Math.floor(n * 0.6180339887498949));
+  try {
+    shadows.setup(engine);
+    assert.equal(turn(), 0, 'a fresh one starts unturned');
+    const seen = [];
+    for (let n = 1; n <= 8; n++) {
+      shadows.advanceTime(1 / 240);
+      const t = turn();
+      assert.equal(t, golden(n));
+      seen.push(t);
+    }
+    // Eight frames spread round the circle: every eighth of a turn holds one, the R1 sequence's even spread.
+    const bins = new Array(8).fill(0);
+    for (const t of [0, ...seen.slice(0, 7)]) bins[Math.floor(t * 8)]++;
+    assert.ok(Math.max(...bins) <= 2, `turns ${bins}`);
+    shadows.advanceTime(0);
+    assert.equal(turn(), golden(8), 'a paused frame keeps its pattern');
+    shadows.resetTime();
+    assert.equal(turn(), 0, 'resetTime replays the patterns from the start');
+    shadows.advanceTime(1 / 30);
+    assert.equal(turn(), golden(1));
+    shadows.options.jitter = false;
+    shadows.advanceTime(1 / 30);
+    assert.equal(turn(), 0, 'jitter false keeps one pattern');
+    shadows.options.jitter = 'yes';
+    assert.throws(() => turn(), TypeError);
   } finally {
     shadows.dispose();
     engine.dispose();

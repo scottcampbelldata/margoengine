@@ -10,7 +10,7 @@ import { effectDeclarations, effectLight, pcss, type ShadowEffect, type ShadowFi
 // `pcss`, `samples`, `blockerSamples` and `focus` in the frame's soft vec4f).
 const filters: Record<ShadowFilter, string> = {
   soft: pcss({
-    start: /* wgsl */ `let noise=shadowNoise(position);let angle=noise*6.2831853;let turn=vec2f(cos(angle),sin(angle));
+    start: /* wgsl */ `let noise=shadowNoise(position);let angle=(noise+shadowFrame.soft.w)*6.2831853;let turn=vec2f(cos(angle),sin(angle));
   let size=shadowFrame.levels[level].w;let lightSize=shadowFrame.settings.x;
   let search=clamp(lightSize*max(reference-shadowFrame.nearest[level/4u][level%4u],0.0)*range,found.z,size);
   let dimensions=vec2f(textureDimensions(shadowMap));`,
