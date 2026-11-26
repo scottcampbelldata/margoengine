@@ -47,6 +47,7 @@
     "test:gpu:plugins": "cd ../.. && node packages/materials/test/plugins-browser.mjs",
     "test:gpu:native-glass": "cd ../.. && node packages/materials/test/native-glass-browser.mjs && node packages/materials/test/native-glass-browser.mjs --compat",
     "test:gpu:portal": "cd ../.. && node packages/materials/test/portal-browser.mjs",
+    "test:gpu:batched-lod": "cd ../.. && node packages/materials/test/batched-lod-browser.mjs && node packages/materials/test/batched-lod-browser.mjs --compat",
     "test:gpu:instance-attributes": "cd ../.. && node packages/materials/test/instance-attributes-browser.mjs"
   },
   "sideEffects": false,
@@ -70,6 +71,10 @@
     "./batched": {
       "types": "./dist/batched.d.ts",
       "import": "./dist/batched.js"
+    },
+    "./batched-lod": {
+      "types": "./dist/batched-lod.d.ts",
+      "import": "./dist/batched-lod.js"
     },
     "./mips": {
       "types": "./dist/mips.d.ts",
