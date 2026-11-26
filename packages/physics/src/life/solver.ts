@@ -31,6 +31,9 @@ import {
   type SwimSpinePoint,
   type SwimTail,
 } from './model.js';
+import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './wake.js';
+
+export { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT } from './wake.js';
 
 const ORIGIN: Cell = [0, 0, 0];
 const BODY_WORDS = 19;
@@ -39,20 +42,8 @@ const MEDIUM_WORDS = 28;
 const COMMAND_WORDS = 6;
 const CONTACT_WORDS = 6;
 const KINEMATICS_WORDS = 6;
-const WAKE_WORDS = 8;
 const LOG_10 = ln(10);
 const RESOLUTION = 32;
-
-/** Layout of the swimming wake port. Two f64 rows per body, tail then pectoral fins, ordered by body index. */
-export const SWIM_WAKE_LAYOUT = 1;
-/** A water-side momentum source. Each row contains [x,y,z, ix,iy,iz, radius, wetFraction]. */
-export const SWIM_WAKE_FIELD: FieldDescriptor = Object.freeze({
-  name: 'swimWakeImpulse',
-  kind: 'particleSet',
-  centring: 'particle',
-  quantity: 'position, linear impulse, smoothing radius and wetted fraction',
-  unit: 'm, N s, m, 1',
-});
 
 /** Layout of the swimmer contact port. One row of six f64 components per swimmer. */
 export const SWIM_CONTACT_LAYOUT = 1;
@@ -324,8 +315,8 @@ function allocate(
     command: rows('swim-commands', COMMAND_WORDS),
     kinematics: rows('swim-kinematics', KINEMATICS_WORDS, SCHOOL_LAYOUT),
     nextKinematics: rows('swim-kinematics-next', KINEMATICS_WORDS, SCHOOL_LAYOUT),
-    wake: rows('swim-wake', 2 * WAKE_WORDS, SWIM_WAKE_LAYOUT),
-    nextWake: rows('swim-wake-next', 2 * WAKE_WORDS, SWIM_WAKE_LAYOUT),
+    wake: rows('swim-wake', 2 * SWIM_WAKE_WORDS, SWIM_WAKE_LAYOUT),
+    nextWake: rows('swim-wake-next', 2 * SWIM_WAKE_WORDS, SWIM_WAKE_LAYOUT),
   };
 }
 

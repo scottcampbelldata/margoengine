@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Ray fin and seabed coupling (BB-7, 2026-11-26). The live swimming port entrains sand from the near bed
+  and leaves a distant bed or still fins clear. The mass ledger closes as the plume settles. The rendered
+  fixture moves 14.1 pixels downstream on WebGPU and the WebGL2 compatibility backend before clearing.
+  Reproduce with `node --test packages/physics/tests/coupling/swim.test.js` and
+  `node packages/environment/tests/swim-sediment.browser.mjs` with and without `--compat` after building.
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes

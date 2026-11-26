@@ -10063,8 +10063,10 @@ solver instance its own stack. Unchanged slots and dynamic memory are checked at
 `packages/physics/tests/coupling/swim.test.js` verifies the exact thrust and drag reference models,
 a physical bank, a centreline with conserved transverse mass centroid, pectoral station-keeping, hydrostatic
 ballast and a breach. It exercises the actual SEA-02 surface, actual LIFE-04 intent and kinematics, and
-identical replay across frame rates, snapshots and plain/shared memory. Wake and contact consumers use
-documented stand-ins while production sediment, wake and articulated contacts are still being integrated.
+identical replay across frame rates, snapshots and plain/shared memory. The BB-7 regression feeds the live
+wake into `TracerSolver` and checks threshold, mass, current advection, settling and replay. The
+`packages/environment/tests/swim-sediment.browser.mjs` fixture uses the active tracer mass for local
+extinction on both graphics backends. The tail-wake render and articulated contacts still need integration.
 
 ### Section 5 evidence for light-bodies aerodynamics (AERO-05)
 

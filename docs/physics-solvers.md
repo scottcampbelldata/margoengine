@@ -325,6 +325,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 | SEA-08 ↔ SEA-09 | Thrust, rudder and resistance forces; motion changes inflow | two-way |
 | SEA-08 ↔ SEA-10 | Flooded mass shifts weight and stability; heel changes flooding | two-way |
 | SEA-10 → SEA-15 | Cargo carried out of a breached hold by the flooding flow (iron ore, coal, grain, oil) becomes a tracer source at the breach | one-way |
+| LIFE-03 → SEA-15 | Downward swimming impulses spread over the bed and entrain sand or silt above its Shields threshold. Tracers carry, diffuse, and settle the resulting plume. | one-way |
 | SEA-10 → SEA-13 | Air escaping a flooding or sinking hull becomes a bubble plume and boil at the surface | one-way |
 | BREAK-04/05, FIRE-05 → SEA-10, SEA-08 | Hit location, impulse, hole area | one-way into SEA-10 |
 | FIRE-07 → SEA-10 | Burnt-through hull, mass loss | one-way |

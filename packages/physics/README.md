@@ -2350,6 +2350,31 @@ const cell = plume.mass.findIndex((m) => m > 0);
 console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
 ```
 
+For a ray, enable `bedJets` to couple swimming impulses to the erodible bed. A downward fin impulse spreads
+as it reaches the bed. It lifts `sand` (default) or `silt` where its estimated shear passes the critical Shields
+number (default 0.05). `erodibility` defaults to 0.02 kg/m²/s at unit excess shear, and `availableMass` defaults
+to an unlimited layer. The active parcels drift with `water` and settle at their grain speed. Read `jetErosion`
+for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. The rest of the bed stays solid.
+The [rendered coupling fixture](../environment/tests/swim-sediment.html) shows the sand rise, drift, and settle.
+
+```ts
+import { SwimSolver } from 'margoengine/physics/life';
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const rays = await SwimSolver.load();
+world.add(rays, { bodies: [{
+  position: [0, -0.2, 0], length: 1, width: 0.2, height: 0.2, mass: Math.PI * 0.2 * 0.2 * 1025 / 6,
+  tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
+  fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+}] });
+const sediment = new TracerSolver('sand', { bedJets: true });
+world.add(sediment, { bed: 0.5, bedJets: { availableMass: 0.023 } });
+world.advance(1);
+console.log(sediment.jetErosion > 0, sediment.budget.water > 0); // true true
+```
+
 ### Rivers, floods and dam breaks (`@margoengine/physics/hydro`)
 
 `ShallowWaterSolver` is the physics framework's water on the ground (HYDRO-01): conservative shallow water over the terrain bed. Water runs downhill over the world's terrain bed (or a bed of its own), wets and dries the ground as it goes, loses speed to Manning's bed friction, and takes in rivers, rain and the wind's drag; a dam breaks, a river finds its normal depth, a wave runs up a beach and leaves it dry again. The scheme is the one `@margoengine/water/flood` runs on the GPU, here on the CPU in f64: Chen and Noelle's hydrostatic reconstruction (a lake stays at rest over any bed, and depths stay at or above 0), the HLL flux with Kurganov and Petrova's speeds, WENO-Z where the water is deep and minmod at shorelines, two-stage SSP Runge-Kutta, and semi-implicit Manning friction, in as many substeps a tick as the Courant bound needs. Every face's flux leaves one cell and enters the next, so the water's volume changes only by what the inflows and rain add and the sides take: to rounding, as `budget` shows. Its settings:

@@ -12153,6 +12153,21 @@ The particle columns in world memory, the source's carried remainder, the exact 
 the absorbing bed, the floating state, and the concentration grid with mass-weighted colour are this package's own
 arrangement. Proof: `packages/physics/tests/tracers.test.js` and `tests/coupling/tracers.test.js`.
 
+For the ray's bed jet (BB-7), D. J. Phares, G. T. Smedley, and R. C. Flagan, “The wall shear stress
+produced by the normal impingement of a jet on a flat surface” (2000), describes the off-centre wall
+jet and wall-stress dependence on jet height. Read §§2–3 and the submerged-jet evidence in §5.
+<https://doi.org/10.1017/S002211200000121X>. L. C. van Rijn, “Sediment Transport, Part II:
+Suspended Load Transport” (1984), uses the excess bed shear term relative to the critical stress.
+<https://doi.org/10.1061/(ASCE)0733-9429(1984)110:11(1613)>.
+
+Margo's reduced model spreads the wake radius by 0.1 m per metre of travel and applies 5% of
+the incident normal momentum flux as a footprint-averaged shear. These constants and the linear
+excess-stress erosion are modelling choices. Four stratified parcels sample the wall-jet footprint.
+They settle by the SEA-15 grain law. In the render fixture, their optical cross section is twice the
+projected geometric area in the large-particle limit (van de Hulst, *Light Scattering by Small
+Particles*, 1957, extinction paradox). The mass, source placement, and replay assertions use the
+same packed wake from the live swimmer.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

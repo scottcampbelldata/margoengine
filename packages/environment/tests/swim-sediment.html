@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ray fin wake and suspended sediment</title>
+  <style>body { margin: 0; } canvas { display: block; }</style>
+</head>
+<body>
+  <canvas width="320" height="192"></canvas>
+  <script type="module">
+    import { Engine, Geometry, PbrMaterial, box } from '/packages/core/dist/index.js';
+    import { FogVolumes } from '/packages/environment/dist/fog-volumes.js';
+    import { VolumetricFog } from '/packages/environment/dist/volumetric.js';
+    import { SwimSolver } from '/packages/physics/dist/life.js';
+    import { TracerSolver } from '/packages/physics/dist/tracers.js';
+    import { PhysicsWorld } from '/packages/physics/dist/world.js';
+    import { Bloom } from '/packages/post/dist/bloom.js';
+
+    const engine = await Engine.create(document.querySelector('canvas'), {
+      backend: 'webgpu', camera: { position: [0, -0.02, 1.38], target: [0.14, -0.32, 0], near: 0.015, far: 8 },
+    });
+    engine.stop();
+    Bloom.attach(engine, { strength: 0 });
+    engine.scene.background = '#173c4b';
+    const sand = new PbrMaterial({ color: '#626455', roughness: 0.96 });
+    engine.createMesh().setGeometry(box(8, 0.1, 8)).setPosition([0, -0.55, 0]).setMaterial(sand);
+    const silhouette = new PbrMaterial({ color: '#24383a', doubleSided: true, roughness: 0.58 });
+    const wing = (side) => engine.createMesh().setMaterial(silhouette).setGeometry(new Geometry(
+      [0, 0.015, -0.16, 0, 0.005, 0.18, side * 0.2, 0, 0.12, side * 0.38, -0.025, -0.03, side * 0.19, -0.005, -0.12],
+      [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+      side < 0 ? [0, 2, 1, 0, 3, 2, 0, 4, 3] : [0, 1, 2, 0, 2, 3, 0, 3, 4],
+    ));
+    const left = wing(-1);
+    const right = wing(1);
+    const errors = [];
+    engine.gpu.addEventListener('uncapturederror', (event) => errors.push(event.error.message));
+
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+    const swim = await SwimSolver.load();
+    const tracers = new TracerSolver('tracers', { bedJets: true });
+    world.add(swim, { bodies: [{
+      position: [0, -0.2, 0], length: 1, width: 0.2, height: 0.2, mass: Math.PI * 0.2 * 0.2 * 1025 / 6,
+      tail: { amplitude: 0, span: 0.16, wavelength: 0.85 }, wettedArea: 0, steering: [0, 1, 0],
+      fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+    }] });
+    const water = {
+      medium: 'water', cell: [0, 0, 0],
+      sample(_x, _y, _z, _time, out) {
+        out.velocity[0] = 0.65;
+        out.velocity[1] = 0;
+        out.velocity[2] = 0;
+        out.density = 1025;
+        return out;
+      },
+    };
+    world.add(tracers, {
+      bed: 0.5, water, bedJets: { availableMass: 0.023 },
+      horizontalDiffusivity: 0.001, verticalDiffusivity: 0,
+    });
+    const medium = new FogVolumes();
+    const fog = VolumetricFog.attach(engine, {
+      density: 0, temporal: 0, grid: [56, 34, 44], range: 3.5, ambient: [0.64, 0.72, 0.7],
+    });
+    const plumeRadius = 0.11;
+    const volume = 4 * Math.PI * plumeRadius ** 3 / 3;
+    window.step = async (frame, show) => {
+      world.advance(frame);
+      const ray = swim.read(0);
+      for (const mesh of [left, right]) mesh.setPosition(ray.position);
+      left.setRotation([0, 0, -ray.finDisplacement]);
+      right.setRotation([0, 0, ray.finDisplacement]);
+      medium.volumes = [...tracers.particlesOf()].filter((particle) => particle.state === 'water').map((particle) => {
+        const material = tracers.materialList[particle.material];
+        // A grain's projected cross-section per kilogram, with an extinction efficiency of two.
+        const massExtinction = 3 / (material.density * material.diameter);
+        return { shape: 'sphere', center: particle.position, radius: plumeRadius, color: material.colour,
+          density: massExtinction * particle.mass / volume, edge: plumeRadius * 0.48 };
+      });
+      fog.options.volumes = show ? medium : undefined;
+      engine.render({ delta: 0 });
+      await engine.gpu.queue.onSubmittedWorkDone();
+      return { mass: tracers.budget.water, eroded: tracers.jetErosion, errors: errors.splice(0) };
+    };
+    window.ready = true;
+  </script>
+</body>
+</html>
