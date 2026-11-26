@@ -13382,3 +13382,31 @@ geometry and controller gains describe a generic starting point for each gait.
   (1988), and Paul A. Baedecker et al., [*Effects of acidic deposition on the erosion of carbonate stone*](https://doi.org/10.1016/0957-1272(92)90018-N)
   (1992), distinguish clean-rain dissolution, acidity and dry deposition. In the solver's ideal acid
   balance, two excess moles of protons dissolve one mole of CaCO₃, converted to depth by density.
+
+## Iceberg rigid-body dynamics and calving (ICE-03)
+
+- J. C. Burton, J. M. Amundson, D. S. Abbot, A. Boghosian, L. M. Cathles, S. Correa-Legisos, K. N. Darnell,
+  N. Guttenberg, D. M. Holland and D. R. MacAyeal,
+  [Laboratory investigations of iceberg capsize dynamics, energy dissipation and tsunamigenesis](https://doi.org/10.1029/2011JF002055), 2012. The submerged fraction is ρᵢ/ρw and the
+  critical aspect ratio is √(6 α (1 − α)) for α = ρᵢ/ρw (equations 19, 27 and 29).
+  The buoyant force and torque here are integrated exactly on the wetted cuboid faces.
+  The velocity and orientation evolve continuously, with no imposed quarter turn.
+- Till J. W. Wagner, Alon A. Stern, Rebecca W. Dell and Ian Eisenman,
+  [On the representation of capsizing in iceberg models](https://doi.org/10.1016/j.ocemod.2017.07.003),
+  2017. Their corrected stability sign and small-angle result agree with two-sided torque checks.
+  The pressure integral remains applicable after the top face crosses the waterline.
+- Till J. W. Wagner, Rebecca W. Dell and Ian Eisenman,
+  [An analytical model of iceberg drift](https://doi.org/10.1175/JPO-D-16-0262.1), 2017.
+  We retain the opposing water and air drag in a time-dependent body model and distinguish basal
+  from sidewall recession following appendix A. This implementation accepts SI recession rates
+  and scales their contribution by wetted face area.
+- Jerry Tessendorf, [Simulating Ocean Water](https://jtessen.people.clemson.edu/reports/papers_files/coursenotes2002.pdf),
+  2001–2004. The existing wake works with the linear pressure and volume input in the modal surface
+  calculation. We use equal-and-opposite raised-cosine volume patches to represent a local outward
+  displacement without a mean water gain. The patch scale comes from the projected body area.
+
+The exact heave check derives g/(α H) directly from the waterplane stiffness ρw g A and the
+body mass ρᵢ A H. It distinguishes the continuous oscillator from the discrete leapfrog phase.
+The capsize fixture contrasts a restoring wide box and an unstable narrow box under the same heel.
+The real registry chain transfers a calved glacier column to a free-floating iceberg and the signed
+wetted-volume change to a WakeSolver, where crest and trough travel away from the source.

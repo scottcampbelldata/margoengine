@@ -5567,3 +5567,11 @@ Outdoor and immersed material patches evolve with exposure on the world clock. T
 check first-year and multi-year corrosion, immersion loss, rot activation, marine coverage, carbonate
 recession and layered reflectance. The same exposure sequence yields the same snapshot hash during
 normal advance, film-rate changes and seek. PBR data changes with the computed layers and coverage.
+
+### Hydrostatic iceberg roll and calving waves (ICE-03)
+
+For homogeneous cuboids, the native solver recovers the Archimedean draft and the analytic
+small-amplitude heave and stability signs. A tall block rolls under pressure torque. A real
+glacier release gives a proportional ice body, and the wake receives two zero-sum displacement
+patches. Reproduce after building Physics with `node --test packages/physics/tests/iceberg.test.js
+packages/physics/tests/coupling/iceberg.test.js`.

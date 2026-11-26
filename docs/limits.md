@@ -9310,3 +9310,19 @@ The material consumes linear PBR values. Multi-spectral gloss, grain, individual
 pits and run-off streak geometry require authored patch variation or other algorithms.
 
 The optional Physics ageing entry measures 4,922 bytes gzip.
+
+### Iceberg rigid-body dynamics and calving (ICE-03)
+
+The optional 60 Hz solver handles homogeneous rectangular solids with exact planar hydrostatic
+loads, six degrees of freedom, quadratic normal-pressure drag and prescribed wet-face recession.
+It uses dyadic substeps from hydrostatic stiffness, rotation, and drag. The ablation step moves the
+centre of mass with the shape. It preserves lost solid volume in the freshwater budget at
+1000 kg/m³. Release sources and WakeSolver must publish at the same 60 Hz and use one origin cell.
+A WakeSolver receives two area-scaled patches per changing body and gives the linear wave response.
+
+Wind and water currents are each uniform and use the still-water plane. The model excludes large
+wave feedback on the body, fragment collisions, grounding and sea-ice resistance. Calving sites
+have explicitly allocated body rows, with queued volumes retained across snapshots when full.
+The optional iceberg entry measures 5,162 B gzip with a 5,418 B ceiling. The plain and shared
+assets each measure 9,128 B raw and 4,318 B gzip. Physics/sea measures 7,745 B gzip
+with the field reader, with an 8,001 B ceiling. Core plus stage remains 24,820 B gzip.

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20073913,
+  "total": 20079971,
   "history": [
     {
       "date": "2026-10-24",
@@ -12795,6 +12795,12 @@
       "commit": "fix(physics) deck load on a held hull",
       "reason": "physics/flip 9,163 to 9,249 B gzip (this Mac): the deck volume's added-mass solve carries every other load on the hull, seen in its last step, so a hull held by locks, contacts or joints takes its water's weight (KB-FLIP-DECKLOAD1).",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "fdac6c12cc",
+      "reason": "ICE-03 adds physics/iceberg at 5162 B gzip (cap 5418 B) with lazy stateless Wasm. Physics/sea goes from its recorded 7361 B to 7745 B gzip (cap 7361 to 8001 B) for its typed SeaSource registry reader and checked coordinates. Splitting the reader would duplicate WakeSolver’s source stamping and add another entry. Core plus stage remains 24820 B.",
+      "grew": 2
     }
   ],
   "items": {
@@ -13618,6 +13624,7 @@
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,
     "@margoengine/physics/ice": 4099,
+    "@margoengine/physics/iceberg": 5418,
     "@margoengine/physics/landscape": 4603,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/locomotion": 6675,
@@ -13628,7 +13635,7 @@
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,
-    "@margoengine/physics/sea": 7361,
+    "@margoengine/physics/sea": 8001,
     "@margoengine/physics/seakeeping": 13843,
     "@margoengine/physics/sediment": 5512,
     "@margoengine/physics/soft": 111864,

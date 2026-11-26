@@ -152,6 +152,10 @@
       "types": "./dist/glacier/index.d.ts",
       "import": "./dist/glacier.js"
     },
+    "./iceberg": {
+      "types": "./dist/iceberg/index.d.ts",
+      "import": "./dist/iceberg.js"
+    },
     "./runoff": {
       "types": "./dist/runoff/index.d.ts",
       "import": "./dist/runoff.js"

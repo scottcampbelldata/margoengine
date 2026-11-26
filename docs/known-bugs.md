@@ -16296,12 +16296,11 @@ through springs and seepage. Connect its recharge port to `GroundwaterSolver` an
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
 
-### Glacier calving still needs the water impulse solver (PA-25)
+### General water impulse sources still need SEA-06 (PA-25)
 
-Advance `GlacierSolver` with a submerged grounded front and its adjacent open-water cell. The
-glacier publishes detached volume and its drainage independently. A live wave requires SEA-06
-to convert the released ice volume and location into a water-source impulse, so the current
-registry observer proves delivery only. The avalanche, lava and lahar cases remain open in PA-25.
+ICE-02 releases ice at its water-facing cells. ICE-03 turns those volumes into moving bodies and
+exports conservative local wave sources. The general impulse propagation and inundation model,
+the avalanche and lava sources, and the lahar feedback remain open under PA-25.
 
 ### Ground animal terrain and rig adapters (LIFE-02)
 
@@ -16318,3 +16317,9 @@ and sea fields leave out those quantities. A fixed `AgeingExposure` or a publish
 `ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
 `packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
 See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.
+
+### Ice impacts and long-wave inundation (PA-15 and PA-25)
+
+A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
+does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
+and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.

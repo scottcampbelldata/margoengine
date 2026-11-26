@@ -14070,6 +14070,14 @@
       "./ageing": {
         "raw": 10800,
         "gzip": 4922
+      },
+      "./iceberg": {
+        "raw": 11554,
+        "gzip": 5162
+      },
+      "./sea": {
+        "raw": 19649,
+        "gzip": 7745
       }
     },
     "@margoengine/physics2d": {
@@ -17861,6 +17869,16 @@
       "raw": 8172,
       "gzip": 3574,
       "brotli": 3228
+    },
+    "packages/physics/dist/iceberg-kernel.wasm": {
+      "raw": 9128,
+      "gzip": 4318,
+      "brotli": 3792
+    },
+    "packages/physics/dist/iceberg-kernel-shared.wasm": {
+      "raw": 9128,
+      "gzip": 4318,
+      "brotli": 3792
     }
   },
   "splits": {

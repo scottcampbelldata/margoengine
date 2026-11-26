@@ -105,8 +105,12 @@ test('GlacierSolver: coupled snapshots and frame-rate changes preserve the exact
 
 test('GlacierSolver: plain and shared kernels give the same hashes after drainage and release', async () => {
   const make = await factory(2);
-  const plain = make(rate, worldMemory({ shared: false }));
-  const shared = make(rate, worldMemory({ shared: true }));
+  const plainMemory = worldMemory(false);
+  const sharedMemory = worldMemory(true);
+  assert.ok(plainMemory.buffer instanceof ArrayBuffer);
+  assert.ok(sharedMemory.buffer instanceof SharedArrayBuffer);
+  const plain = make(rate, plainMemory);
+  const shared = make(rate, sharedMemory);
   plain.advance(90);
   shared.advance(90);
   assert.equal(shared.hash(), plain.hash());
