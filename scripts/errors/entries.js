@@ -29,6 +29,26 @@ export const entries = [
     fix: 'Pass a `Skeleton` from `@margoengine/animation` (or an object with names, parents, getPose and setPose), map its bone names with `bones` (for example `humanoidBones(skeleton.names, detectSkeleton(skeleton.names).preset)` from `@margoengine/rigging/retarget`), calibrate on a frame where the person stands in the rest pose in view, and create a new BodyDriver after dispose.',
   },
   {
+    id: 'materials-portal',
+    title: '@margoengine/materials/portal: stencil portals and windows into other scenes',
+    kind: 'family',
+    messages: [
+      'Portal inverse must be a boolean; set true or false; see https://margoengine.com/errors#materials-portal',
+      'Invalid portal references; pass integers 1 <= first <= last <= 255; see https://margoengine.com/errors#materials-portal',
+      'Portals are disposed; create new Portals; see https://margoengine.com/errors#materials-portal',
+      'Portal mask and contents must be material meshes (createMesh); pass at least one mask; see https://margoengine.com/errors#materials-portal',
+      'Portal camera must be a Camera; pass one or leave it out; see https://margoengine.com/errors#materials-portal',
+      'A second-scene portal draws that scene; put its contents in the scene, not contents; see https://margoengine.com/errors#materials-portal',
+      'Portal meshes share a material with each other or another portal; give each mesh its own material; see https://margoengine.com/errors#materials-portal',
+      'Portal stencil references <first>-<last> are all in use; remove a portal or widen first and last; see https://margoengine.com/errors#materials-portal',
+      'Invalid portal delta; pass finite seconds >= 0; see https://margoengine.com/errors#materials-portal',
+      'Second-scene portals need WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#materials-portal',
+    ],
+    cause:
+      'Portals was given a reference range outside 1..255 (or first above last), a mask that is not a material mesh from createMesh, a material shared between portal meshes or already in another portal (code state), contents next to a second scene, a camera that is not a Camera, a non-boolean inverse or a negative delta; every reference in the range is in use (code state); a second-scene portal was drawn without WebGPU or the WebGL2 compatibility layer (code unsupported); or Portals were used after dispose (code disposed).',
+    fix: "Give every portal mesh its own Material (`material.clone()`), keep `first` and `last` within 1..255, remove a portal you no longer need (or widen the range) to free its reference, put a second scene's meshes in that scene, and create new Portals after dispose.",
+  },
+  {
     id: 'camera-hologram',
     title: '@margoengine/cameras/hologram: four-view pyramid display',
     kind: 'family',

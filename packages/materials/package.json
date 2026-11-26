@@ -45,7 +45,8 @@
     "test:gpu:transmission-layers": "cd ../.. && node packages/materials/test/transmission-background-browser.mjs",
     "test:gpu:fur": "cd ../.. && node packages/materials/test/fur-browser.mjs",
     "test:gpu:plugins": "cd ../.. && node packages/materials/test/plugins-browser.mjs",
-    "test:gpu:native-glass": "cd ../.. && node packages/materials/test/native-glass-browser.mjs && node packages/materials/test/native-glass-browser.mjs --compat"
+    "test:gpu:native-glass": "cd ../.. && node packages/materials/test/native-glass-browser.mjs && node packages/materials/test/native-glass-browser.mjs --compat",
+    "test:gpu:portal": "cd ../.. && node packages/materials/test/portal-browser.mjs"
   },
   "sideEffects": false,
   "exports": {
@@ -140,6 +141,10 @@
     "./settings": {
       "types": "./dist/settings.d.ts",
       "import": "./dist/settings.js"
+    },
+    "./portal": {
+      "types": "./dist/portal.d.ts",
+      "import": "./dist/portal.js"
     }
   },
   "files": [

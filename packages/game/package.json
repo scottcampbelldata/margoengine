@@ -1939,6 +1939,10 @@
       "types": "./dist/materials/settings.d.ts",
       "import": "./dist/materials/settings.js"
     },
+    "./materials/portal": {
+      "types": "./dist/materials/portal.d.ts",
+      "import": "./dist/materials/portal.js"
+    },
     "./mixer": {
       "types": "./dist/mixer.d.ts",
       "import": "./dist/mixer.js"

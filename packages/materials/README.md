@@ -628,6 +628,71 @@ Beauty, auxiliary and shadow passes use the same edges, including deformed verti
 face culling and polygon offset. Directional casters explicitly registered with `{static: true}` keep their
 manual update policy: call `Shadows.invalidate()` after changing the native flag.
 
+## Stencil portals: optional /portal
+
+`Portals` turns the stencil state of the next section into one call per window. `portals.add({mask, contents})` pairs mask meshes
+(the window's shape) with content meshes that draw only inside it; each portal gets its own stencil reference, so
+several windows show different contents side by side. The mask draws no colour and writes its reference where it is
+visible (after the opaque meshes of render order 0, so whatever stands in front of the window keeps it covered); the
+contents draw after the mask and test that reference. `inverse: true` (live as `portal.inverse`) draws the contents
+only outside the window instead.
+
+`scene` makes a window onto another scene (`engine.createScene()`): `portals.render(delta)` draws that scene with the
+same camera (or the portal's `camera`) into a picture at the canvas size, and the mask's surface shows it, so the
+window is depth-tested like any surface. Call `portals.render` in place of `engine.render` while such a portal exists.
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `Portals` `first`, `last` | 1, 255 | The stencil references handed out; when all are in use `add` throws a coded `state` error |
+| `mask` | required | One material mesh (`createMesh`) or several |
+| `contents` | none | Meshes drawn only inside (or outside) the mask; not with `scene` |
+| `inverse` | false | Contents draw only outside the mask |
+| `scene` | none | Another scene seen through the mask, drawn by `portals.render` |
+| `camera` | the `render` camera | Camera for `scene` |
+
+The portal edits its meshes' materials and render order and puts them back on `portal.remove()` (or `using`), so
+give each portal mesh its own Material: a material shared between portal meshes, or already in another portal, is
+refused with a coded `state` error. `Portals` attaches a `StencilBuffer` when the scene has none and disposes it with
+itself. A second-scene picture uses one canvas-sized texture per portal and replaces the mask's material while the
+portal lives.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {Material, createMesh} from '@margoengine/materials';
+import {Portals} from '@margoengine/materials/portal';
+import {planeGeometry} from '@margoengine/geometry';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 320; canvas.height = 240;
+const engine = await Engine.create(canvas, {backend: 'webgpu', camera: {position: [0, 0, 5], target: [0, 0, 0]}});
+const window1 = createMesh(engine, planeGeometry(1, 1), new Material());
+window1.root.setPosition([-1, 0, 0]);
+const window2 = createMesh(engine, planeGeometry(1, 1), new Material());
+window2.root.setPosition([1, 0, 0]);
+const red = createMesh(engine, planeGeometry(8, 6), new Material({color: '#ff0000'}));
+red.root.setPosition([0, 0, -1]);
+using portals = Portals.attach(engine);
+const left = portals.add({mask: window1, contents: [red]});
+console.log(left.ref); // 1
+// A window onto another scene.
+const other = engine.createScene('other');
+other.background = '#3366cc';
+other.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#ffcc00'}));
+portals.add({mask: window2, scene: other});
+portals.render(1 / 60);
+left.inverse = true; // red everywhere except inside the left window
+portals.render(1 / 60);
+```
+
+Sources: the WebGPU specification's depth-stencil state, https://www.w3.org/TR/webgpu/#depth-stencil-state (compare
+functions and stencil operations); M. J. Kilgard, "Improving Shadows and Reflections via the Stencil Buffer", NVIDIA,
+1999 (masking a region with a reference value, then drawing only where it matches); D. Luebke and C. Georges,
+"Portals and Mirrors: Simple, Fast Evaluation of Potentially Visible Sets", I3D 1995,
+https://doi.org/10.1145/199404.199422 (a portal as a screen region through which another cell is drawn).
+
+`npm run test:gpu:portal --workspace @margoengine/materials` checks two windows with their own contents, inverse,
+the reference limit, the shared-material refusal, restoring on remove, a second-scene window against that scene drawn
+alone, resize, device restore and disposal; add `-- --compat` for the WebGL2 compatibility layer.
+
 ## Polygon offset and stencil
 
 `polygonOffset`, `polygonOffsetFactor`, `polygonOffsetUnits` and `polygonOffsetClamp` are live.

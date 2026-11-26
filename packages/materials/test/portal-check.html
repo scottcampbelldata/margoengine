@@ -1,0 +1,41 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Stencil portal correctness</title></head><body style="margin:0">
+<canvas width="320" height="240" style="width:320px;height:240px;display:block"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {Material,createMesh} from '/packages/materials/dist/index.js';
+import {Portals} from '/packages/materials/dist/portal.js';
+import {planeGeometry} from '/packages/geometry/dist/index.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,0,5],target:[0,0,0]}});
+engine.stop();engine.scene.background='#000000';
+const device=engine.gpu,errors=[];device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const unlit=color=>new Material({shading:'basic',color});
+const place=(mesh,p)=>{mesh.root.setPosition(p);return mesh;};
+// Two windows, left and right, each with a full-screen backdrop of its own colour behind it.
+const maskA=place(createMesh(engine,planeGeometry(1,1),unlit('#ffffff')),[-1,0,0]);
+const maskB=place(createMesh(engine,planeGeometry(1,1),unlit('#ffffff')),[1,0,0]);
+const red=place(createMesh(engine,planeGeometry(8,6),unlit('#ff0000')),[0,0,-1]);
+const green=place(createMesh(engine,planeGeometry(8,6),unlit('#00ff00')),[0,0,-1.5]);
+const portals=Portals.attach(engine,{first:1,last:3});
+let a=portals.add({mask:maskA,contents:[red]}),b=portals.add({mask:maskB,contents:[green]});
+const frame=async()=>{device.pushErrorScope('validation');portals.render(0);await device.queue.onSubmittedWorkDone();return {validation:(await device.popErrorScope())?.message??null,errors:errors.splice(0)};};
+let other,scenePortal,maskC;
+window.check={
+ refs:()=>[a.ref,b.ref],
+ frame,
+ async inverse(v){a.inverse=v;return frame();},
+ limit(){const c=portals.add({mask:place(createMesh(engine,planeGeometry(0.1,0.1),unlit('#ffffff')),[0,2,0])});let code;try{portals.add({mask:place(createMesh(engine,planeGeometry(0.1,0.1),unlit('#ffffff')),[0,2,0])});}catch(e){code=e.code;}c.remove();return [c.ref,code];},
+ shared(){let code;try{portals.add({mask:maskA});}catch(e){code=e.code;}return code;},
+ async remove(){a.remove();b.remove();return {mask:[maskA.material.colorWrite,maskA.material.stencilWrite,maskA.renderOrder],content:[red.material.stencilWrite,red.material.stencilFunc,red.renderOrder],...await frame()};},
+ async scene(){
+  other=engine.createScene('other');other.background='#3366cc';
+  other.createMesh().setGeometry(box(1.2,1.2,1.2)).setMaterial(new PbrMaterial({color:'#ffcc00'}));
+  maskC=place(createMesh(engine,planeGeometry(2,1.6),unlit('#ffffff')),[0,0,0]);
+  scenePortal=portals.add({mask:maskC,scene:other});return frame();
+ },
+ async reference(){device.pushErrorScope('validation');engine.render({views:[{camera:engine.camera,viewport:[0,0,1,1],scene:other}]});await device.queue.onSubmittedWorkDone();return (await device.popErrorScope())?.message??null;},
+ async resize(){canvas.width=400;canvas.height=300;canvas.style.width='400px';canvas.style.height='300px';const r=await frame();return {...r,size:[scenePortal.texture.width,scenePortal.texture.height]};},
+ async restore(){await engine.rebootDevice();return frame();},
+ dispose(){const before=maskC.material;portals.dispose();portals.dispose();let code;try{portals.add({mask:maskC});}catch(e){code=e.code;}return [before!==maskC.material,code];}
+};window.ready=true;
+</script></body></html>

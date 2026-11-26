@@ -2695,6 +2695,10 @@
       "types": "./dist/materials/settings.d.ts",
       "import": "./dist/materials/settings.js"
     },
+    "./materials/portal": {
+      "types": "./dist/materials/portal.d.ts",
+      "import": "./dist/materials/portal.js"
+    },
     "./math": {
       "types": "./dist/math.d.ts",
       "import": "./dist/math.js"
