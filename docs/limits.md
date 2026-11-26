@@ -9669,5 +9669,5 @@ The ground is a height field with peak indentation per vertex. Buried layers, ov
 and accumulated subgrade fatigue remain open. The optional uniform excavation floor should match TerrainBed's
 bedrock. The volume ledger records material crossing the modeled bounds, compaction and lofted mineral dust.
 
-The optional entry is 9,683 B gzip with a 9,974 B ceiling. Both Wasm assets are 5,820 B raw and 2,684 B gzip each.
+The optional entry is 9,692 B gzip with a 9,983 B ceiling. Both Wasm assets are 5,820 B raw and 2,684 B gzip each.
 The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
