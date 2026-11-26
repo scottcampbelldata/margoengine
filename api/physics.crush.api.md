@@ -215,6 +215,7 @@ export interface CrushShellParams {
     readonly pinned?: readonly number[];
     readonly velocities?: readonly CrushVector[];
     readonly resolution?: number;
+    readonly recordWork?: boolean;
     readonly spheres?: readonly CrushShellSphere[];
     readonly contactManifold?: boolean;
     readonly cellSize?: number;
@@ -262,6 +263,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         triangles: Uint32Array;
     };
     supportReaction(vertex: number): CrushVector;
+    readWork(): CrushShellWork;
     readSphereContact(index: number): CrushShellContact;
     readSphereFriction(index: number): CrushShellFriction;
     readSeam(index: number): CrushSheetSeamReading;
@@ -274,6 +276,15 @@ export interface CrushShellSphere {
     readonly radius: number;
     readonly contactModulus: number;
     readonly friction?: number;
+}
+
+export interface CrushShellWork {
+    readonly substeps: number;
+    readonly membraneEvaluations: number;
+    readonly hingeEvaluations: number;
+    readonly seamQuadraturePoints: number;
+    readonly sphereFaceChecks: number;
+    readonly pressureFaceVisits: number;
 }
 
 export class CrushSolver implements Solver<CrushParams> {

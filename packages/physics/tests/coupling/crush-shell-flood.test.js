@@ -71,6 +71,7 @@ async function setup({
       velocities: worldPositions.map((_, index) => [pinned.includes(index) ? 0 : index < 3 ? -speed : speed, 0, 0]),
       pinned,
       cellSize: widthOfCell,
+      recordWork: pressure,
       pressurePatches: pressure ? [{ seam: 0, faces: [0, 1] }] : undefined,
       material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
       seams: [
@@ -236,6 +237,9 @@ test('SEA-10 returns two-sided hydrostatic head to an intact shell across cells'
   const centroid = (0.4 + 0.4 + 0.2) / 3;
   near(total, 9810 * 0.06 * centroid, 1e-10);
   near(reactions[2], (9810 * 0.03 * (centroid + 0.2 / 3)) / 4, 1e-10);
+  const work = scene.shell.readWork();
+  assert.equal(work.pressureFaceVisits, 2 * (work.substeps + 1));
+  assert.equal(work.seamQuadraturePoints, 2 * (work.substeps + 1));
   assert.equal(scene.shell.readSeam(0).broken, false);
   assert.equal(scene.opening()[9], 0);
 });

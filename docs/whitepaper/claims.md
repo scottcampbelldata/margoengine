@@ -9,6 +9,10 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Native shell work (BREAK-03, 2026-11-26). With fixed element size and 35
+  substeps, the 32/128-face specimens use 1,152/4,608 membrane and 576/2,304
+  hinge evaluations. The plain and shared builds agree exactly.
+  [Reproduce](reproduce.md#break-03-native-shell-work)
 - Hydrostatic shell feedback (BREAK-03 / SEA-10, 2026-11-26). The fixed hull
   returns water levels and compartment pressure to the live shell. The intact
   panel reactions sum to the analytic 196.2 N. After a common 0.02769 m²

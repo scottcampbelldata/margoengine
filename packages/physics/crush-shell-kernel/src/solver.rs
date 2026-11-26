@@ -580,6 +580,7 @@ unsafe extern "C" fn crush_shell_advance(
     descriptor: *const Shell,
     seconds: f64,
     count: u32,
+    work_counts: *mut [f64; 6],
 ) -> u32 {
     let shell = unsafe { &*descriptor };
     let (nodes, faces) = (shell.node_count as usize, shell.face_count as usize);
@@ -659,6 +660,35 @@ unsafe extern "C" fn crush_shell_advance(
             );
         }
         shell.ledger.write(budget);
+    }
+    if !work_counts.is_null() {
+        let steps = f64::from(count);
+        let faces = f64::from(shell.face_count);
+        let force_evaluations = steps + 1.0;
+        let sphere_checks = f64::from(shell.sphere_count) * force_evaluations;
+        let friction_checks = if shell.friction.is_null() || shell.contact_topology.is_null() {
+            0.0
+        } else {
+            let active = (0..shell.sphere_count as usize)
+                .filter(|index| unsafe { (*shell.friction.add(*index)).coefficient } > 0.0)
+                .count();
+            2.0 * steps * active as f64
+        };
+        let pressure_visits = if shell.pressure.is_null() {
+            0.0
+        } else {
+            faces * force_evaluations
+        };
+        unsafe {
+            work_counts.write([
+                steps,
+                faces * force_evaluations,
+                f64::from(shell.hinge_count) * force_evaluations,
+                2.0 * f64::from(shell.seam_count) * force_evaluations,
+                faces * (sphere_checks + friction_checks),
+                pressure_visits,
+            ]);
+        }
     }
     1
 }

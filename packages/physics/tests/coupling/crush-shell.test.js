@@ -60,6 +60,42 @@ test('free sheet follows analytic gravity motion without artificial strain or wo
   assert.deepEqual(await run(false), await run(true));
 });
 
+test('native shell work scales with the number of faces at fixed element size', async (t) => {
+  const grid = async (copies, shared) => {
+    const mesh = { positions: [], triangles: [] };
+    for (let panel = 0; panel < copies; panel++) {
+      const row = mesh.positions.length;
+      const x = 2 * panel;
+      mesh.positions.push([x, 0, 0], [x + 1, 0, 0], [x + 1, 1, 0], [x, 1, 0]);
+      mesh.triangles.push([row, row + 1, row + 2], [row, row + 2, row + 3]);
+    }
+    const { shell, world } = await model({ ...mesh, recordWork: true }, zero, shared);
+    assert.equal(shell.readWork().substeps, 0);
+    world.advance(1);
+    const saved = world.takeSnapshot();
+    const work = shell.readWork();
+    assert.ok(work.substeps > 0);
+    assert.equal(work.membraneEvaluations, 2 * copies * (work.substeps + 1));
+    assert.equal(work.hingeEvaluations, copies * (work.substeps + 1));
+    assert.equal(work.seamQuadraturePoints, 0);
+    assert.equal(work.sphereFaceChecks, 0);
+    assert.equal(work.pressureFaceVisits, 0);
+    world.advance(2);
+    world.restoreSnapshot(saved.bytes);
+    assert.deepEqual(shell.readWork(), work);
+    return work;
+  };
+  const small = await grid(16, false);
+  const large = await grid(64, false);
+  assert.equal(large.substeps, small.substeps);
+  assert.equal(large.membraneEvaluations, 4 * small.membraneEvaluations);
+  assert.equal(large.hingeEvaluations, 4 * small.hingeEvaluations);
+  assert.deepEqual(await grid(64, true), large);
+  t.diagnostic(
+    `32/128 faces, ${large.substeps} substeps, ${small.membraneEvaluations}/${large.membraneEvaluations} membrane and ${small.hingeEvaluations}/${large.hingeEvaluations} hinge evaluations.`,
+  );
+});
+
 test('real vertex loads exercise J2 hardening, fixed reaction, irreversible work and exact replay', async () => {
   const { shell, world } = await model({ pinned: [0, 2] });
   const volume = material.thickness / 2;
@@ -160,6 +196,7 @@ async function sphereModel({
   presentationHz = 60,
   mesh = { positions, triangles },
   contactManifold,
+  recordWork,
 }) {
   await Physics.load({ threads: shared });
   const world = new PhysicsWorld({ rate: { num: presentationHz, den: 1 }, gravity: zero, memory: worldMemory(shared) });
@@ -187,6 +224,7 @@ async function sphereModel({
     cellSize: 2,
     spheres: [{ body: sphere.row, radius, contactModulus, friction }],
     contactManifold,
+    recordWork,
   });
   world.setCell('rigid', sphereCell);
   world.couple([shell.id, 'rigid'], 'staggered');
@@ -313,6 +351,7 @@ test('opposite shell contacts dissipate sliding even when their normal impulses 
       mesh,
       contactManifold: true,
       friction: 0.025,
+      recordWork: true,
       shared,
       presentationHz: 480,
     });
@@ -327,6 +366,7 @@ test('opposite shell contacts dissipate sliding even when their normal impulses 
       world.advance(2);
       const hit = shell.readSphereContact(0);
       const friction = shell.readSphereFriction(0);
+      const work = shell.readWork();
       const sliding = sphere.linearVelocity[1];
       near(hit.impulse[0], 0, 1e-12);
       near(hit.impulse[1], -frictionForce / 480, 1e-8);
@@ -342,7 +382,8 @@ test('opposite shell contacts dissipate sliding even when their normal impulses 
         -0.025 * force,
         1e-6,
       );
-      return { hit, friction, sliding };
+      assert.equal(work.sphereFaceChecks, 2 * (3 * work.substeps + 1));
+      return { hit, friction, sliding, work };
     };
     const expected = measure();
     world.restoreSnapshot(saved.bytes);

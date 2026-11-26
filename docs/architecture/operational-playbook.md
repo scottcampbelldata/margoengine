@@ -10687,6 +10687,11 @@ the current face normals. The support-reaction and vented/unvented fixtures
 verify the feedback and catch reversed tick order. Dynamic rigid attachments
 and fully coupled fluid stress are still open.
 
+The shell's opt-in work record stores the native interval's force-pass counts.
+The test at 32 and 128 faces uses identical element size and substeps, and
+checks linear membrane and hinge work and exact shared-memory replay.
+[Work-count recipe](../whitepaper/reproduce.md#break-03-native-shell-work)
+
 Staged crush envelopes extend the same contact path with trigger peaks followed by
 folding at lower loads. Their increasing permanent offsets separate return work from
 elastic recoil. The continuous contact uses the rigid rate and rejects an active
