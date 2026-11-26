@@ -27,6 +27,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   modulus into a second world, which then reproduces the same state and retains it through cuts.
   Run the crate's `axial_fiber` case and `packages/physics/tests/coupling/volumetric-solids.test.js`.
 
+- Orthotropic elasticity (SOFT-04, 2026-11-26). The native vertex blocks match three independent
+  axial equations, distinguish all three engineering shear moduli and leave a rotated rest state
+  stress-free. The LH-4 rung carries the same material frame through snapshots and cuts.
+  After building Physics, run `node --test packages/physics/tests/coupling/volumetric-orthotropy.test.js`
+  and `node packages/physics/tests/volumetric-solids.browser.mjs` for the loaded, rendered rung.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

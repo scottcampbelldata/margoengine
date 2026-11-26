@@ -28,6 +28,26 @@ try {
     assert.notEqual(reinforced.y, loaded.y);
     assert.notDeepEqual(await page.locator('canvas').screenshot(), after);
     console.log(`LH-4 ${solver} with grain, y=${reinforced.y.toFixed(6)} m, ${reinforced.hash}`);
+    if (solver === 'vertex-block') {
+      const settings = {
+        loaded: true,
+        solver,
+        orthotropy: {
+          youngsModuli: [12e6, 816e3, 600e3],
+          shearModuli: [768e3, 936e3, 84e3],
+          poissonRatios: [0.292, 0.449, 0.39],
+        },
+      };
+      const timber = await page.evaluate((settings) => window.renderRung(settings), settings);
+      const image = await page.locator('canvas').screenshot();
+      assert.ok(Number.isFinite(timber.y) && timber.support > 0);
+      assert.notEqual(timber.y, loaded.y);
+      assert.notDeepEqual(image, after);
+      const timberReplay = await page.evaluate((settings) => window.renderRung(settings), settings);
+      assert.equal(timberReplay.hash, timber.hash);
+      assert.deepEqual(await page.locator('canvas').screenshot(), image);
+      console.log(`LH-4 orthotropic timber y=${timber.y.toFixed(6)} m, ${timber.hash}`);
+    }
   }
   assert.deepEqual(errors, []);
 } finally {

@@ -36,6 +36,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_fem_reserve(tets: number, clusters: number, members: number): void;
   soft_fem_fiber(first: number, count: number, x: number, y: number, z: number, modulus: number): void;
   soft_fem_fiber_rows(): number;
+  soft_fem_orthotropy(first: number, count: number, ...words: number[]): void;
+  soft_fem_orthotropy_rows(): number;
   soft_fem_column(id: number): number;
   soft_tet_set(
     t: number,
@@ -536,6 +538,33 @@ export interface SoftFiber {
   readonly modulus: number;
 }
 
+/** Nine independent elastic constants in the orthotropic material frame. */
+export interface SoftOrthotropy {
+  /** Young's moduli of X, Y and Z in pascals. */
+  readonly youngsModuli: Vec3;
+  /** Shear moduli XY, XZ and YZ in pascals. */
+  readonly shearModuli: Vec3;
+  /** Ratios XY, XZ and YZ. For XY, X stress gives Y contraction. */
+  readonly poissonRatios: Vec3;
+  /** Optional X axis and a direction in its XY plane, in the rest vertices' coordinates. */
+  readonly axes?: readonly [Vec3, Vec3];
+}
+
+const ORTHOTROPY_WORDS = 18;
+const NO_ORTHOTROPY = Array<number>(ORTHOTROPY_WORDS).fill(0);
+
+function unitDirection(direction: Vec3, label: string): Vec3 {
+  checkVec(direction, label);
+  const scale = Math.max(Math.abs(direction[0]), Math.abs(direction[1]), Math.abs(direction[2]));
+  if (scale === 0)
+    throw new RangeError(`${label} must be nonzero. Supply a rest-space direction with a nonzero component.`);
+  const x = direction[0] / scale;
+  const y = direction[1] / scale;
+  const z = direction[2] / scale;
+  const length = Math.sqrt(x * x + y * y + z * z);
+  return [x / length, y / length, z / length];
+}
+
 function softFiber(direction: Vec3, modulus: number): SoftFiber | null {
   checkVec(direction, 'Soft fiber direction');
   const stored = Math.fround(modulus);
@@ -544,15 +573,61 @@ function softFiber(direction: Vec3, modulus: number): SoftFiber | null {
       'Soft fiber modulus is outside the supported range. Use a finite nonnegative float32 value in Pa.',
     );
   if (modulus === 0) return null;
-  const scale = Math.max(Math.abs(direction[0]), Math.abs(direction[1]), Math.abs(direction[2]));
-  if (scale === 0)
-    throw new RangeError('Soft fiber needs a rest-space direction. Supply at least one nonzero component.');
-  const x = direction[0] / scale;
-  const y = direction[1] / scale;
-  const z = direction[2] / scale;
-  const length = Math.sqrt(x * x + y * y + z * z);
-  const axis: Vec3 = Object.freeze([x / length, y / length, z / length] as const);
+  const axis = Object.freeze(unitDirection(direction, 'Soft fiber direction'));
   return Object.freeze({ direction: axis, modulus: stored });
+}
+
+function orthotropicWords(material: SoftOrthotropy): readonly number[] {
+  const { youngsModuli, shearModuli, poissonRatios, axes } = material;
+  checkVec(youngsModuli, 'Orthotropic Young’s moduli');
+  checkVec(shearModuli, 'Orthotropic shear moduli');
+  checkVec(poissonRatios, 'Orthotropic Poisson ratios');
+  if (
+    [...youngsModuli, ...shearModuli].some((value) => !Number.isFinite(Math.fround(value)) || Math.fround(value) <= 0)
+  )
+    throw new RangeError(
+      'Orthotropic stiffness needs positive moduli. Supply Young’s and shear moduli in the positive float32 range.',
+    );
+  const [ex, ey, ez] = youngsModuli;
+  const a = -poissonRatios[0] * Math.sqrt(ey / ex);
+  const b = -poissonRatios[1] * Math.sqrt(ez / ex);
+  const c = -poissonRatios[2] * Math.sqrt(ez / ey);
+  const det = 1 + 2 * a * b * c - a * a - b * b - c * c;
+  if (!(1 - a * a > 0 && det > 0))
+    throw new RangeError(
+      'Orthotropic compliance is not positive definite. Use a consistent set of moduli and Poisson ratios.',
+    );
+  const tensor = [
+    (ex * (1 - c * c)) / det,
+    (ey * (1 - b * b)) / det,
+    (ez * (1 - a * a)) / det,
+    (Math.sqrt(ex * ey) * (b * c - a)) / det,
+    (Math.sqrt(ex * ez) * (a * c - b)) / det,
+    (Math.sqrt(ey * ez) * (a * b - c)) / det,
+    ...shearModuli,
+  ].map(Math.fround);
+  const [xx, yy, zz, xy, xz, yz] = tensor as [number, number, number, number, number, number, ...number[]];
+  const u = xy / Math.sqrt(xx * yy);
+  const v = xz / Math.sqrt(xx * zz);
+  const w = yz / Math.sqrt(yy * zz);
+  if (
+    tensor.some((value) => !Number.isFinite(value)) ||
+    [xx, yy, zz, ...tensor.slice(6)].some((value) => value <= 0) ||
+    !(1 - u * u > 0 && 1 + 2 * u * v * w - u * u - v * v - w * w > 0)
+  )
+    throw new RangeError(
+      'Orthotropic stiffness cannot be represented by the native solver. Use more moderate moduli and ratios.',
+    );
+  const x = unitDirection(axes?.[0] ?? [1, 0, 0], 'Orthotropic X axis');
+  const tangent = unitDirection(axes?.[1] ?? [0, 1, 0], 'Orthotropic XY direction');
+  const cross = (a: Vec3, b: Vec3): Vec3 => [
+    a[1] * b[2] - a[2] * b[1],
+    a[2] * b[0] - a[0] * b[2],
+    a[0] * b[1] - a[1] * b[0],
+  ];
+  const z = unitDirection(cross(x, tangent), 'Orthotropic material-plane normal');
+  const y = cross(z, x);
+  return Object.freeze([...x, ...y, ...z, ...tensor]);
 }
 
 /** The elastic model of a body's cells: see {@link CellMaterial.model}. */
@@ -862,6 +937,7 @@ export class SoftBodyDesc {
   /** @internal Four particle indices per tetrahedron. */ cells: number[] = [];
   /** @internal */ cellMaterial = new CellMaterial();
   /** @internal */ fiber: SoftFiber | null = null;
+  /** @internal */ orthotropy: readonly number[] | null = null;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
   /** @internal */ clusterHertz = 0;
   /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
@@ -1550,6 +1626,11 @@ export class SoftBodyDesc {
     this.fiber = softFiber(direction, modulus);
     return this;
   }
+  /** Uses a full orthotropic elastic law in the vertex-block solver. Pass null to clear it. */
+  setOrthotropicStiffness(material: SoftOrthotropy | null): this {
+    this.orthotropy = material ? orthotropicWords(material) : null;
+    return this;
+  }
   /** Replaces the cells' material (copied). */
   setCellMaterial(material: CellMaterial): this {
     checkCellMaterial(material);
@@ -1650,6 +1731,7 @@ export class SoftBodyDesc {
     if (other.cells.length && !this.cells.length) {
       this.cellMaterial = other.cellMaterial.clone();
       this.fiber = other.fiber;
+      this.orthotropy = other.orthotropy;
     }
     for (const p of other.cells) this.cells.push(p + base);
     for (const group of other.clusterGroups) this.clusterGroups.push(group.map((p) => p + base));
@@ -1840,6 +1922,11 @@ export class SoftBody {
   get fiber(): SoftFiber | null {
     this.check();
     return this.owner.cellFiber(this);
+  }
+  /** @internal The native axes and stiffness copied through a cut. */
+  get orthotropy(): readonly number[] | null {
+    this.check();
+    return this.owner.cellOrthotropy(this);
   }
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
   /** @internal */ force: Vec3 = [0, 0, 0];
@@ -2847,6 +2934,10 @@ export class SoftBodies implements PhysicsAttachment {
     const mode = checkedSolver(desc.solver);
     checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
     const fiber = desc.fiber && softFiber(desc.fiber.direction, desc.fiber.modulus);
+    if (desc.orthotropy && (mode !== 'vertex-block' || fiber))
+      throw new RangeError(
+        'Orthotropic stiffness uses vertex blocks. Select vertex-block and supply either the orthotropic tensor or a separate fiber.',
+      );
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
@@ -3042,6 +3133,7 @@ export class SoftBodies implements PhysicsAttachment {
     }
     this.bodies.push(body);
     this.writeFiber(range, fiber);
+    this.writeOrthotropy(range, desc.orthotropy);
     body.remember();
     this.setCellSolver(body, mode);
     this.writeMaterial(body);
@@ -3453,6 +3545,10 @@ export class SoftBodies implements PhysicsAttachment {
     const f = this.cellColumns();
     const { first, count } = body.cellRange;
     if (count > 0) checkSolverModel(solver, f.model![first]!);
+    if (solver !== 'vertex-block' && this.cellOrthotropy(body))
+      throw new RangeError(
+        'A body with orthotropic stiffness needs vertex-block. Choose vertex-block to retain its tensor.',
+      );
     const flags = this.columns().pflags;
     flags[body.firstParticle] =
       (flags[body.firstParticle]! & ~SOLVER_MODE_MASK) | (SOLVER_CODE[solver] << SOLVER_MODE_SHIFT);
@@ -3471,6 +3567,8 @@ export class SoftBodies implements PhysicsAttachment {
       [baseMu, baseLambda] = m.lame(),
       flags = f.flags as unknown as Uint32Array,
       mode = cellSolverFlag(body.solverKind, CELL_MODEL[m.model]),
+      orthotropy = this.cellOrthotropy(body),
+      referenceShear = orthotropy ? Math.max(orthotropy[15]!, orthotropy[16]!, orthotropy[17]!) : baseMu,
       sets = body.clusterInfo.map((info) => new Set(info.members));
     for (let t = first; t < first + count; t++) {
       let stiffness = 1,
@@ -3495,7 +3593,7 @@ export class SoftBodies implements PhysicsAttachment {
       f.interior![t] = m.interiorStrength;
       // A cell's shear wave crosses it in size / sqrt(mu / density): damping 2 zeta of that frequency.
       const size = Math.cbrt(6 * f.vol0![t]!),
-        wave = Math.sqrt(mu / m.density) / size;
+        wave = Math.sqrt((referenceShear * stiffness) / m.density) / size;
       const rate = (m.deformationDamping ?? this.cellDamping) + 2 * m.elasticDampingRatio * wave;
       f.damp![t] = rate;
       // The implicit solver damps by a factor on the stiffness: the rate over the square of the cell's wave frequency.
@@ -3510,6 +3608,24 @@ export class SoftBodies implements PhysicsAttachment {
     } else {
       this.exports.soft_fem_fiber(first, count, 0, 0, 0, 0);
     }
+  }
+
+  private writeOrthotropy({ first, count }: CellRange, words: readonly number[] | null): void {
+    this.exports.soft_fem_orthotropy(first, count, ...(words ?? NO_ORTHOTROPY));
+  }
+
+  private orthotropyWords(): Float32Array | undefined {
+    const at = this.exports.soft_fem_orthotropy_rows();
+    if (at !== 0 && this.cellTotal > 0)
+      return new Float32Array(this.exports.memory.buffer, at, this.cellTotal * ORTHOTROPY_WORDS);
+  }
+
+  /** @internal The material coefficients of a body's first cell, shared by every cell in the body. */
+  cellOrthotropy({ cellRange }: SoftBody): readonly number[] | null {
+    const view = this.orthotropyWords();
+    const at = cellRange.first * ORTHOTROPY_WORDS;
+    if (!view || cellRange.count === 0 || view[at + 9] === 0) return null;
+    return Array.from(view.subarray(at, at + ORTHOTROPY_WORDS));
   }
 
   private fiberWords(): Float32Array | undefined {
@@ -3637,6 +3753,7 @@ export class SoftBodies implements PhysicsAttachment {
     // Keep the rows of the other bodies, in order, and write them back without the removed one.
     const keep = this.bodies.filter((b) => b !== body),
       fiberSaved = keep.map((b) => this.cellFiber(b)),
+      orthotropySaved = keep.map((b) => this.cellOrthotropy(b)),
       c = this.columns(),
       cols = [
         'x',
@@ -3839,6 +3956,7 @@ export class SoftBodies implements PhysicsAttachment {
       }
       b.cellRange = next;
       this.writeFiber(next, fiberSaved[k]!);
+      this.writeOrthotropy(next, orthotropySaved[k]!);
       this.cellTotal += r.count;
       this.clusterTotal += r.clusterCount;
       this.memberTotal += r.memberCount;
@@ -3924,6 +4042,14 @@ export class SoftBodies implements PhysicsAttachment {
     const fiber = this.fiberWords();
     if (fiber && this.bodies.some(({ cellRange }) => cellRange.count > 0 && fiber[4 * cellRange.first + 3]! > 0))
       out.push(['cell.fiber', fiber]);
+    const orthotropy = this.orthotropyWords();
+    if (
+      orthotropy &&
+      this.bodies.some(
+        ({ cellRange }) => cellRange.count > 0 && orthotropy[ORTHOTROPY_WORDS * cellRange.first + 9]! > 0,
+      )
+    )
+      out.push(['cell.orthotropy', orthotropy]);
     return out;
   }
 

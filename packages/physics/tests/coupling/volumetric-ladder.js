@@ -4,7 +4,7 @@ import { PhysicsWorld, RigidSolver, SoftSolver } from '../../dist/world.js';
 
 export async function ladder(
   rate = { num: 60, den: 1 },
-  { mass = 35, stiffness = 2e6, solver = 'vertex-block', fiber } = {},
+  { mass = 35, stiffness = 2e6, solver = 'vertex-block', fiber, orthotropy } = {},
 ) {
   const physics = new Physics(null, { fixedTimestep: 1 / 60 });
   const projective = solver === 'projective';
@@ -18,6 +18,7 @@ export async function ladder(
   });
   const desc = SoftBodyDesc.box([-0.35, 0.84, -0.07], [0.7, 0.14, 0.14], [10, 2, 2], material);
   if (fiber) desc.setFiberStiffness(fiber.direction, fiber.modulus);
+  if (orthotropy) desc.setOrthotropicStiffness(orthotropy);
   const fixed = [];
   let center = -1;
   for (let i = 0; i < desc.particleCount; i++) {

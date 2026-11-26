@@ -617,6 +617,45 @@ tension and compression along that axis. It accompanies the body through cuts an
 For directional timber, the isotropic material gives the across-grain base stiffness. The fiber
 adds the chosen extra stiffness along the grain.
 
+#### Orthotropic timber
+
+`setOrthotropicStiffness` gives every tetrahedron in a vertex-block body a complete directional
+elastic law. Give the Young's moduli in X, Y, Z order and the shear moduli and Poisson ratios
+in XY, XZ, YZ order. Moduli are in pascals. For example, XY means that tension along X
+causes contraction along Y. The solver derives the reciprocal ratios from the same elastic energy.
+By default the material axes are the rest-coordinate axes. To turn the material, supply
+`axes` with a longitudinal direction and a second direction in the longitudinal–radial plane.
+The directions must span a plane. Pass `null` to clear the tensor on the descriptor.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const soft = await SoftBodies.attach(physics, { substeps: 4, iterations: 8 });
+const material = new CellMaterial();
+material.density = 520;
+const beam = SoftBodyDesc.box([0, 0.5, 0], [0.8, 0.2, 0.2], [8, 2, 2], material);
+const pins: number[] = [];
+for (let i = 0; i < beam.particleCount; i++) {
+  if (beam.positions[3 * i] === 0) pins.push(i);
+}
+const rung = soft.create(beam.setPinnedParticles(pins).setOrthotropicStiffness({
+  youngsModuli: [12e9, 816e6, 600e6],
+  shearModuli: [768e6, 936e6, 84e6],
+  poissonRatios: [0.292, 0.449, 0.39],
+}).setSolver('vertex-block'));
+physics.step();
+console.log(rung.volume());
+```
+
+This example uses Douglas-fir ratios from the [Wood Handbook](https://research.fs.usda.gov/treesearch/62244).
+The constants describe small-strain elasticity. Green strain supplies the geometric response as the
+body rotates. The tensor supplies the entire elastic law. Use it by itself and keep the
+`CellMaterial` for density, damping, yield and cohesion. Snapshots and cuts carry the authored axes
+and all the stiffness coefficients.
+
 Not in this entry yet: collision through a skin (see `docs/physics-collision-parity.md` for each row).
 
 - **Sails and flags in the wind (AERO-02).** `new SailForce(physics, cloth, {wind, grid: [nu, nv], chord = 'u', density, stall = 0.35, drag = 1.17})` loads a cloth made by `SoftBodyDesc.cloth` with a vortex lattice on its own grid, solved again every step from where its particles are: each cell carries a horseshoe vortex (bound on its quarter chord, trailing from the leech along the apparent wind), the circulations stop the air passing through the sail at every cell's three-quarter chord, and each cell takes the Kutta-Joukowski force of its circulation, shared by its four corners. A cell the air meets more steeply than `stall` radians has separated and takes the flat plate's normal force instead (the `WindForce` law). So a sail's camber, twist and angle to the wind decide its lift (a flat sail of aspect ratio 6 has the lift slope of a wing of that aspect ratio), a sail run square before the wind is pushed, and the load reaches whatever holds the cloth. `chord` names the grid direction from the leading edge to the trailing edge; `wind` is a vector, a function of the point and the time, or a flow field such as `@margoengine/weather`'s `BoundaryLayerWind`; `sail.force` is the last step's total (the load that went into the cloth over the step) and `sail.circulation` each cell's. The load leans on the cloth's own speed through the air, so each corner takes it damped implicitly (backward Euler), and a sail of real sailcloth weight stays steady at the world's step. It is quasi-steady (no wake memory) and one surface thick. While attached it supplies the cloth's air loads: the cloth's own flat-plate drag (`setAirDrag`) is off for that cloth until `remove()`. It loads the cloth's particles, never a rigid body directly, so in a world the `SoftSolver` steps the cloth with the sail's load in it to the same bits as alone, and the load reaches the boat through what holds the cloth (the soft solver's `bodyImpulses` and `bodyForces`).

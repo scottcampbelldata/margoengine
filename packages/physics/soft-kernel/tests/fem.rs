@@ -544,3 +544,44 @@ fn axial_fiber_matches_the_published_parallel_and_cross_grain_stiffness_ratio() 
         }
     }
 }
+
+#[test]
+fn orthotropic_vertex_block_matches_axial_implicit_equilibrium_in_rotated_frames() {
+    use margoengine_soft_kernel::fem::{STABLE_NEO_HOOKEAN, VERTEX_BLOCK_TET};
+    let h = 1.0f32 / 30.0;
+    let initial = 1.13f32;
+    let tensor = [12_000.0, 800.0, 1800.0, 160.0, 220.0, 90.0, 800.0, 1200.0, 150.0];
+    for (axes, normal) in [
+        ([1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0], tensor[2]),
+        ([0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0], tensor[0]),
+    ] {
+        let mut w = World::new();
+        w.reserve(4, 0, 1, 0);
+        w.fem_reserve(1, 0, 0);
+        w.particles = 4;
+        w.bodies = 1;
+        w.x[1] = 1.0;
+        w.y[2] = 1.0;
+        w.z[3] = 1.0;
+        w.w[3] = 0.5;
+        assert!(w.set_tet(0, [0, 1, 2, 3], 1.0, 0.0, STABLE_NEO_HOOKEAN));
+        w.fem.flags[0] |= VERTEX_BLOCK_TET;
+        let mut row = [0.0; 18];
+        row[..9].copy_from_slice(&axes);
+        row[9..].copy_from_slice(&tensor);
+        w.set_orthotropy(0, 1, row);
+        w.z[3] = initial;
+        w.step(h, 1, 12, [0.0; 3]);
+        let mut lo = 1.0;
+        let mut hi = f64::from(initial);
+        let k = f64::from(normal) * f64::from(h) * f64::from(h) / 6.0;
+        for _ in 0..55 {
+            let z = 0.5 * (lo + hi);
+            let gradient = 2.0 * (z - f64::from(initial)) + 0.5 * k * z * (z * z - 1.0);
+            if gradient < 0.0 { lo = z; } else { hi = z; }
+        }
+        let exact = 0.5 * (lo + hi);
+        assert!((f64::from(w.z[3]) - exact).abs() < 8.0 * f64::from(f32::EPSILON), "{} vs {exact}", w.z[3]);
+        assert_eq!([w.x[3], w.y[3]], [0.0, 0.0]);
+    }
+}

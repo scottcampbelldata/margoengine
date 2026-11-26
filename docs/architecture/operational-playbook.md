@@ -9970,6 +9970,15 @@ diagonal to its surrogate Hessian. Both use the optional native rest-space axis 
 Snapshot restore, body compaction and fracture retain those rows. Isotropic worlds retain their
 earlier state layout.
 
+Full orthotropic elasticity (`soft-kernel/src/orthotropic.rs`) uses the three normal and three
+engineering shear components of Green strain in the authored material frame. A symmetric tensor
+maps strain to stress. Each vertex block applies the strain derivatives, adds a determinant-based
+compression force and backtracks against the full local objective. Each accepted update lowers
+or preserves that objective at the stored precision. The five public tests compare the axial and
+shear responses to independent equations, recover an inverted tetrahedron, reject malformed material
+inputs and check snapshot and cut retention. The LH-4 browser fixture renders a loaded orthotropic
+rung, with the rigid reaction and deterministic replay through the same world ports.
+
 Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
 - **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
   contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is

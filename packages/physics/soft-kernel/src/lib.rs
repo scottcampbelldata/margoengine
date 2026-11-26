@@ -24,6 +24,7 @@ pub mod face;
 mod volume;
 pub mod fem;
 mod implicit;
+mod orthotropic;
 mod projective;
 mod vertex_block;
 mod fem_api;

@@ -38,7 +38,7 @@ pub(crate) fn fiber_target(image: Vec3, axis: Vec3) -> Vec3 {
 }
 
 /// A symmetric LDL^T solve. Block inertia and shear are strictly positive for every moving vertex.
-fn solve([xx, yy, zz, xy, xz, yz]: [f64; 6], b: Vec3) -> Vec3 {
+pub(crate) fn solve([xx, yy, zz, xy, xz, yz]: [f64; 6], b: Vec3) -> Vec3 {
     let yx = xy / xx;
     let zx = xz / xx;
     let dyy = yy - yx * xy;
@@ -88,7 +88,7 @@ impl World {
     }
 
     /// D_s D_m^-1, computed with local f64 edges. Each entry in the result is a column.
-    fn vertex_deformation(&self, corners: [usize; 4], b: [Vec3; 3], previous: bool) -> Columns {
+    pub(crate) fn vertex_deformation(&self, corners: [usize; 4], b: [Vec3; 3], previous: bool) -> Columns {
         let at = |i| {
             if previous {
                 [self.px[i] as f64, self.py[i] as f64, self.pz[i] as f64]
@@ -110,6 +110,10 @@ impl World {
         for i in 0..self.particles {
             let mut linked = self.fem.vertex_block.head[i];
             if linked == NONE || self.w[i] == 0.0 || self.bsleep[self.pbody[i] as usize] != 0 {
+                continue;
+            }
+            if self.has_orthotropy((linked / 4) as usize) {
+                self.solve_orthotropic_vertex(i, linked, h);
                 continue;
             }
             let mass = 1.0 / self.w[i] as f64;

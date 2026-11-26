@@ -50,6 +50,23 @@ pub extern "C" fn soft_fem_fiber_rows() -> u32 {
     if fiber.is_empty() { 0 } else { fiber.as_mut_ptr() as usize as u32 }
 }
 
+/// Stores a uniform nine-constant orthotropic law and its three material axes on a body.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_orthotropy(
+    first: u32, count: u32,
+    ax: f32, ay: f32, az: f32, bx: f32, by: f32, bz: f32, cx: f32, cy: f32, cz: f32,
+    xx: f32, yy: f32, zz: f32, xy: f32, xz: f32, yz: f32, gxy: f32, gxz: f32, gyz: f32,
+) {
+    world().set_orthotropy(first as usize, count as usize,
+        [ax, ay, az, bx, by, bz, cx, cy, cz, xx, yy, zz, xy, xz, yz, gxy, gxz, gyz]);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_orthotropy_rows() -> u32 {
+    let rows = &mut world().fem.orthotropy;
+    if rows.is_empty() { 0 } else { rows.as_mut_ptr() as usize as u32 }
+}
+
 /// Where a tetrahedron or cluster column starts in the memory.
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_column(id: u32) -> u32 {

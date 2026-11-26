@@ -264,6 +264,7 @@ function carry(
   desc.setMaterial(body.material);
   desc.setCellMaterial(body.cellMaterial);
   desc.fiber = body.fiber;
+  desc.orthotropy = body.orthotropy;
   desc.groups = body.collisionGroups;
   desc.shapeMatching = body.matched;
   desc.solver = body.solverKind;

@@ -132,6 +132,8 @@ pub struct Fem {
     pub(crate) vertex_block: crate::vertex_block::VertexBlock,
     /// Optional immutable rest-space reinforcement (axis x/y/z and additional axial modulus).
     pub(crate) fiber: Col<[f32; 4]>,
+    /// Optional orthotropic axes and stiffness in the cell's rest coordinates.
+    pub(crate) orthotropy: Col<[f32; 18]>,
 }
 
 impl Fem {
@@ -195,6 +197,7 @@ impl Fem {
             imp: crate::implicit::Implicit::new(),
             vertex_block: crate::vertex_block::VertexBlock::new(),
             fiber: Col::new(),
+            orthotropy: Col::new(),
         }
     }
 }
@@ -326,6 +329,9 @@ impl World {
         f.vertex_block.next.resize(4 * tets);
         if !f.fiber.is_empty() {
             f.fiber.resize(tets);
+        }
+        if !f.orthotropy.is_empty() {
+            f.orthotropy.resize(tets);
         }
         f.member.resize(members);
         for c in f.rest.iter_mut() {
