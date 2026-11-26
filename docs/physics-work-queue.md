@@ -308,7 +308,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BIO-04 | Material ageing | material exposure, decay and PBR appearance | Codex | LANDED 9632f2731c |
 | SPACE-01 | N-body and orbital dynamics | physics/orbit | Codex | LANDED 56f09d5d54 |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
-| SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
+| SPACE-03 | Accretion disks and motion near compact objects | none | Codex | BUILDING (codex/physics-accretion) |
 | DYN-04 | Wheeled vehicles on roads | partial | Codex | BUILDING (codex/physics-dyn04) |
 | DYN-05 | Rail vehicle dynamics | none | Open | OPEN |
 | SOFT-03 | Hair, fur, mane, tail, feathers, spring bones | stand-in | Open | OPEN |
