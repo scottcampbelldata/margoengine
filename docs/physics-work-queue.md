@@ -268,7 +268,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | SEA-06 | Tsunami and impulse waves | none | Open | OPEN |
 | SEA-07 | Tides, storm surge and currents | none | Claude | CLAIMED |
 | FLUID-05 | Compressible flow, shock and blast | none | Open | OPEN |
-| FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | BUILDING (codex/physics-lane-2) |
+| FLUID-06 | Viscoplastic fluids at small scale | partial | Codex | LANDED (a540dd915c) |
 | FLUID-07 | Thin films and droplets on surfaces | stand-in | Codex | LANDED (75f931cd2c) |
 | HYDRO-02 | Rainfall-runoff and infiltration | soil wetting, watershed hydrographs and flood coupling | Codex | LANDED 9f6f7e9004 |
 | HYDRO-04 | Landscape evolution | implicit incision, soil transfer and physical Biomes relief | Codex | LANDED dc75a47d35 |

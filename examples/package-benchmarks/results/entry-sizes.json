@@ -14126,6 +14126,10 @@
       "./room-sound": {
         "raw": 13687,
         "gzip": 5758
+      },
+      "./viscoplastic": {
+        "raw": 11755,
+        "gzip": 4931
       }
     },
     "@margoengine/physics2d": {
@@ -18007,6 +18011,16 @@
       "raw": 753,
       "gzip": 474,
       "brotli": 423
+    },
+    "packages/physics/dist/viscoplastic-kernel.wasm": {
+      "raw": 16986,
+      "gzip": 6744,
+      "brotli": 6051
+    },
+    "packages/physics/dist/viscoplastic-kernel-shared.wasm": {
+      "raw": 16986,
+      "gzip": 6744,
+      "brotli": 6052
     }
   },
   "splits": {

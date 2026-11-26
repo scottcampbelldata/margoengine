@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20207274,
+  "total": 20212461,
   "history": [
     {
       "date": "2026-10-24",
@@ -12933,6 +12933,12 @@
       "commit": "99d284f401",
       "reason": "SOUND-02 adds the optional 5758 B gzip enclosed acoustics entry. Early path analysis, pressure-driven audio and the wave grid share the room API. Splitting them would duplicate validation and consumer setup. Core plus stage gains 0 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "2d9301c6e9",
+      "reason": "FLUID-06 adds physics/viscoplastic at 4931 B gzip (cap 5187 B). The finite-strain APIC solver, implicit solvent and live inlet are optional and load independent stateless native assets. Core plus stage is 24820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13793,6 +13799,7 @@
     "@margoengine/physics/tracers": 5872,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
+    "@margoengine/physics/viscoplastic": 5187,
     "@margoengine/physics/waves": 8575,
     "@margoengine/physics/world": 17737,
     "@margoengine/physics2d": 21360,
