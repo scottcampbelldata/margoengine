@@ -24,6 +24,7 @@
     "kitty-hawk/*.ts",
     "molten-words/*.ts",
     "orrery/*.ts",
+    "from-babylon/*.ts",
     "quickstart/*.ts",
     "cabin-hearth/*.ts",
     "storm-light/*.ts",
