@@ -879,6 +879,8 @@ test('size budget', async (t) => {
 test('axis triad size budget: the axes entry over the cube it imports', async (t) => {
   const gzip = await gzipOf(t, 'axes.js', true);
   console.log(`viewcube/axes gzip, without the root entry: ${gzip} B`);
-  // Measured 1,127 B (2026-11-08).
-  assert.ok(gzip < 1200, `${gzip} B`);
+  // Measured 1,127 B (2026-11-08). Scott's version-guard allowance, as for the root entry above: the build puts the core
+  // guard into this entry too, which costs 56 B here (1,163 B without it, 1,219 B with it, measured 2026-11-26), so the
+  // ceiling gains exactly that: 1,200 B to 1,256 B. A split would not drop it: every entry that attaches checks the core.
+  assert.ok(gzip < 1256, `${gzip} B`);
 });
