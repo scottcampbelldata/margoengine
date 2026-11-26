@@ -148,7 +148,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | --- | --- | --- | --- | --- |
 | Webcam face tracking driving morph targets (landmarks to ARKit-style blendshapes, webcam driver) | three.js, drei `FaceControls`/`FaceLandmarker` | MISSING | L |  |
 | Webcam hand and pose landmarks from a camera stream outside WebXR, for AR and body overlays | drei, MediaPipe examples | MISSING | L |  |
-| Tube painter for freehand 3D strokes (pointer or XR controller paint) | three.js | DONE (`TubePainter`, `@margoengine/lines/tube-painter`) | S | TUBEHASH |
+| Tube painter for freehand 3D strokes (pointer or XR controller paint) | three.js | DONE (`TubePainter`, `@margoengine/lines/tube-painter`) | S | a857a045d |
 | Infinite shader grid with cell and section sizes and distance fade (`GridHelper` is finite) | drei `Grid` | DONE (`@margoengine/lines/infinite-grid`) | S | f144ef66b |
 | Shadow map viewer: debug view of cascade, spot and point shadow maps | three.js | MISSING | S |  |
 | Light probe helper and positional-audio cone helper | three.js | MISSING | S |  |
