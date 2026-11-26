@@ -1275,6 +1275,183 @@ Missing: measured ray or propeller lifted mass, field oil spreading, absolute en
 6. Add a SEA-12 two-way coupling test, and a Domenici and Blake 1997 fast-start radius check.
 7. Add a SIMD Rust hot loop (`grep` finds no `v128` in `lib.rs`) or record the work counts. Correct limits.md (it does not state the 3 Hz cap or the missing wake consumer).
 
+### LIFE-04 Collective animal motion (`@margoengine/physics/schooling`, `behavior/src/steering.ts`, commits d50e1fb72, 8f568e67d, de25a7f79, 006faf636, ba4efdc15), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/schooling/solver.ts`, `kernel.ts`, `ports.ts`, the docs/limits.md "Collective animal motion" section, the audit and demo-review rows. `git log --since=2026-11-25` for the schooling paths shows only the 25 Nov fix commits that the audit already covered. No change since the audit adds noise, seeds, or any validation. Ran under run-with-timeout: `node --test packages/physics/tests/coupling/schooling.test.js packages/behavior/tests/steering.test.js`: 28 pass, 0 fail. The browser test (`packages/physics/tests/physics-browser.js` has a school run at 24/30/60 fps) was not run; no `test:browser:school` script exists.
+
+**Validation.** Every test is exact or self-consistent, and none uses a published measurement. The "topological ranking" test checks a hand-built four-body tie ordering. The curvature test checks a lateral-acceleration bound (an exact kinematic identity). The coast test checks a closed-form quadratic-drag law. The BB-6 test (`schooling.test.js:188`) only asserts that spread rises and then falls (a trend, no number). The AVIARY-3 test checks the bank ratio a/g. The steering tests check analytic speed and drag laws. Missing: Couzin et al. 2002 order parameters (polarization, angular momentum) across swarm, torus and parallel regimes; Ballerini et al. 2008 anisotropy; Katz et al. 2011 interaction forces; Cavagna et al. 2010 correlations. No test is on a school of hundreds.
+
+**Fails points** 1, 2, 3, 4, 5, 6, 7.
+
+**Audit list.**
+1. Topological neighbours (k about 6.5) as the default: PARTIAL. A rank limit exists (`neighbours`, solver.ts:259-262), but the default is all neighbours inside the sensing zone (metric), and `neighbours` is an integer with no anisotropy or k=6.5 default.
+2. Noise and seeds: NOT DONE. No random or seed in the solver, kernel or ports.
+3. Validation against Couzin 2002 order parameters: NOT DONE.
+4. Ballerini 2008 anisotropy, Katz 2011, Cavagna 2010: NOT DONE.
+5. Reef schools of hundreds hold, scatter before the shark and re-form (BB-6): PARTIAL. The test uses a small reef fixture and a trend assertion; the film scene is not wired (demo-review says OPEN).
+6. Member defaults with a basis (thrust 1 N, lateral 2 m/s², radius 0.2 m, solver.ts:283-286): NOT DONE. They are unchanged.
+7. Herds wired to LIFE-01: NOT DONE.
+8. Rival capability, GPU boids at 10^5 agents: NOT DONE. The Wasm SIMD kernel uses a grid, but no work counts or scale test at large N.
+9. Fish tail-beat and fin banking verified in a shot (BB-4): PARTIAL. LIFE-03 coupling test exists, shot playback is open.
+10. Coded errors: PARTIAL. Most validation throws plain `RangeError` (solver.ts:106-263), not `MargoError`.
+
+**To do before it can be VERIFIED:**
+1. Add a noise model with seeds (Vicsek et al. 1995) and make topological neighbours (Ballerini 2008, k about 6.5, anisotropic) the default.
+2. Validate against Couzin et al. 2002 phase-diagram order parameters, plus Ballerini 2008, Katz 2011 and Cavagna 2010 measurements, with derived bounds.
+3. Document the sources of the member defaults, or replace them with species data.
+4. Wire herds to LIFE-01 with a coupling test.
+5. Add a 10^4 to 10^5 agent scale test and recorded work counts.
+6. Convert `RangeError` throws in solver.ts to coded `MargoError`s that name the fix.
+7. Wire the film reef scene (hundreds of fish, shark) and check real frames.
+
+### BIO-01 Plant mechanics under wind and water (`@margoengine/physics/vegetation`, `@margoengine/scatter/plant-motion`, commits a4d123a96, f4eef9b63), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/vegetation/model.ts`, `src/vegetation.ts` (grep), `tests/vegetation.test.js`, `tests/coupling/vegetation.test.js`, docs/limits.md "Rooted plant mechanics", the audit row, the design in the work queue and the demo-review reproductions. No commit has touched the vegetation source or tests since the audit (only a comment move in f4eef9b63, before it). Under run-with-timeout: `node --test packages/physics/tests/vegetation.test.js packages/physics/tests/coupling/vegetation.test.js` 9 pass, 0 fail; `packages/scatter/test/plant-motion.test.js` 1 pass, 0 fail; `scatter/test/states.browser.mjs` ran (plant states compose, fire, ground, flood and the rest compiled, 20 WGSL modules, 0 errors; it prints no assertion count, so it checks shader compilation, not plant poses). `--compat` and the flood variants not run.
+
+**Validation.** One test is validated against an exact solution: "resolves both analytic cantilever frequencies" checks the uniform clamped-free Euler-Bernoulli frequencies (beta 1.8751 and 4.6941) to 2e-12 (the quadrature error, derived) and the midpoint-rule phase error. That tests the dry uniform stem and nothing else. The gust-delay, Airy-wave, impact, rupture/uprooting and replay tests are qualitative orderings or exact-replay checks: sign changes, "shallower reed moves farther", an arrival order, and a root moment compared with the code's own formula. No published measurement is used. Missing: Moore and Maguire tree frequencies, Gardiner ForestGALES critical wind speeds, Luhar and Nepf blade reconfiguration or flume data, a tapered, wet or crowned frequency reference.
+
+**Fails points** 1, 2, 3, 4, 5 (partly), 6 (partly), 7, 8 (partly).
+
+**Audit list.**
+1. Large-deflection blades and reconfiguration (Luhar and Nepf 2011; the designed Vogel scaling) — NOT DONE. The model is two small-angle modes. limits.md says it has no finite-angle reconfiguration, and `grep` finds no Vogel code.
+2. Branch hierarchy (Habel et al. 2009) — NOT DONE (limits.md: no branch topology).
+3. Turbulence spectrum (Stam 1997) — NOT DONE; wind is whatever the FlowField supplies.
+4. Windthrow computed ForestGALES-style — NOT DONE; `anchorMoment` is a user number (`model.ts:55`), and the test compares it with a hand-built moment.
+5. Validate against Moore and Maguire tree frequencies and Gardiner critical wind speeds — NOT DONE.
+6. Taper, wet and rupture validation — PARTIAL: wet and rupture have qualitative tests only; taper has none.
+7. Self-weight P-delta in air; Cd = 1 default — NOT DONE (default still `model.ts` `dragCoefficient ?? 1`).
+8. FIRE-04 and EARTH-02 coupling tests — NOT DONE; the coupling file covers only the rigid and flow ports.
+9. Film: seagrass, kelp, anemones and tentacles swaying with orbital surge (BS-1, BB-1, BB-2) — PARTIAL: the Airy-field reed test in `tests/coupling/vegetation.test.js` exists, but there are no fish-body contacts, tentacle chains or real SEA-02 field coupling.
+10. Gust-front grass and trampling by hooves (HORSE-6, TREE-1) — PARTIAL: the downwind arrival test exists, but trampling and a travelling-gust grass patch do not.
+11. Open bug: time-zero snapshot restore rejects (known-bugs.md, BIO-01) — NOT DONE; only a test workaround.
+12. Scale (SIMD Wasm kernel, replay hash, shared memory) — DONE (`vegetation-kernel*.wasm`, tests "same hash on plain and shared world memory" and "replay exactly").
+13. Coded errors — PARTIAL: it throws RangeError and TypeError, not MargoError (`model.ts:73-85`).
+
+**To do before it can be VERIFIED:**
+1. Add finite-angle reconfiguration (Vogel exponent, Luhar and Nepf 2011) and test it against their flume data.
+2. Add branch topology (Habel et al. 2009) and a turbulent wind spectrum.
+3. Compute windthrow from a ForestGALES-style critical moment and test it against Gardiner et al. 2000.
+4. Validate taper, crown and wet frequencies against Moore and Maguire 2004 and a published kelp or seagrass measurement.
+5. Add FIRE-04 and EARTH-02 coupling tests and fish-contact and trampling tests.
+6. Throw MargoError with fix text, and fix the time-zero snapshot bug in the field registry.
+
+### FLUID-07 Thin films and droplets (`physics/thin-film`, commits 75f931cd2 through 3cb9cb3eb, 25 commits tagged FLUID-07), owner Codex: not VERIFIED, status left BUILDING
+
+**Checked.** Read `packages/physics/src/thin-film/{index,drips,drop-flight,drop-receiver,surface}.ts`, `thin-film-kernel/src/lib.rs` (by commit stat), `tests/thin-film.test.js`, `tests/coupling/thin-film.test.js`, the catalog row, the audit rows, `docs/limits.md` and the FLUID-07 and PA-23 parts of `docs/known-bugs.md`. Under run-with-timeout: `node --test` on the two test files gave 43 tests, 43 pass on packages built from current main, including "a pendant drop matches held-out thinning on tilted glass" (`thin-film.test.js:891`: peak amplitude against the measured 1.01 mm within 0.05 mm, a held-out measurement); a first run on an older build failed it. `thin-film.browser.mjs` ran on WebGPU and with `--compat` (WebGL2) and completed: 4041 and 4069 wet pixels, 72 drop pixels, runnels seen from inside, 0 shader errors. It prints no pass counts.
+
+**Validation.**
+- "complete wetting has the measured capillary spreading exponent" (`thin-film.test.js:612`): measured exponent range 0.094 to 0.125 (Cazabat and Cohen Stuart 1986, via Ehrhard 1993). It is not fitted. The mesh-refinement bound is a width/40 comparison.
+- "fixed-volume gravity current predicts the measured absolute spreading radius" (`:668`): Huppert 1982 Table 1 run x, within 5% of his empirical radius fit. The 0.9 coefficient comes from his measurements, and the model has no free parameter that was tuned to it.
+- "gated incline retains Huppert's cube-root front history" (`:734`): exact similarity solution within 5%, plus a digitized movie increment ratio of 0.78 to 1.06. This is a digitization of Huppert 2006, not a lab table.
+- "level cap width predicts the independently measured SLIC retention angle" (`:350`): Vallabhuneni 2023 gives a release tilt of 3 degrees. The test passes both the measured advancing and receding angles and a measured volume.
+- "shallow strip retains or slides under a bracket of the Furmidge force" (`:148`): the Furmidge 1962 force balance, bracketed by two chosen angle limits. It is self-consistent and not measured.
+- "film depth ... three held-out PLIF bands" (coupling `:199`): Wang, Jia and Duan 2020, pixel-digitized depth bands. Steady flow, the inlet is calibrated, three flows are held out.
+- "transient fall matches drop-tower measurements" (coupling `:370`): Hinkle 1987 speeds within 2% plus 5 mm/s. This validates the airborne drop, not the film.
+- The Fermigier underside-instability wavelength and the Zhang and Basaran drop volume (2.6% low) appear only in `docs/limits.md`. Only a Mori-based sill model is tested.
+- Still missing: a measured contact-line trace, partial-wetting slip, steep contact slopes, measured sliding of a drop on glass, and measured rain-on-glass runoff.
+
+**Fails points** 2, 3, 5, 6, 7 (point 4 is mostly met).
+
+**Audit list.**
+1. Contact-angle beading via precursor and disjoining pressure (Schwartz and Eley 1998) replaces the scalar deadband — PARTIAL. Done in `lib.rs` through commit e81431f3a, with the tests at `thin-film.test.js:389`, `:420` and `:504`. It is limited to shallow slopes, and the docs list steep contact lines as open.
+2. Advancing and receding hysteresis — DONE. Commit fec3c5104, test `:504`, and the 32 by 32 tilted case at `:547`.
+3. Drop detachment: pendant drops detach (Wang, Mucha and Turk 2005 drop particles) — PARTIAL. Timed release from a configured sill is built (`drips.ts`, `drop-flight.ts`, coupling `:223`). There is no pinch-off away from an outlet, and `limits.md` says so.
+4. Splash, rebound and satellite drops on impact — NOT DONE (limits.md).
+5. Film mass loads its rigid body — DONE. Commit 299205b5c, test coupling `:811`.
+6. Drop impact recoil on the mount — DONE (coupling `:894`, `:947`).
+7. Rain interception on moving glass (EF-4, LAST-TRAM-8) — DONE for the solver (coupling `:108`, `:122`, `:972`, browser test). The original bridge and chart-room shots remain open.
+8. Validation against Huppert 1982, Tanner and Furmidge — DONE for Huppert and Tanner. Furmidge is self-consistent plus one SLIC point.
+9. Measured partial-wetting dynamics (sliding drop speed, contact-line trace) — NOT DONE.
+10. Two-tier fast and high-fidelity models behind one API — NOT DONE. There is one lubrication model.
+11. Extreme-range refusals with a coded MargoError — PARTIAL. Many inputs throw a plain `RangeError` with a `code` (`index.ts:239-295`, `drips.ts:34`), not a MargoError.
+12. Scaling — PARTIAL. There is a Rust/Wasm kernel, but no threads or SIMD evidence and no recorded work counts.
+13. Rival comparison — NOT DONE. No three.js or Babylon rain-glass comparison was found.
+
+**To do before it can be VERIFIED:**
+1. Add free pinch-off and detachment of drops from the film (Wang et al. 2005, with measured pendant breakoff volumes), plus splash and rebound (Mundo 1995 or Yarin and Weiss 1995 thresholds).
+2. Add a measured partial-wetting drop slide, for example Podgorski, Flesselles and Limat 2001.
+3. Move all `RangeError` throws to MargoError with a code and a fix.
+4. Record work counts and thread or SIMD evidence, and add a fast tier.
+5. Add a rival comparison row.
+
+### ATMO-06 Airborne particle transport (`physics/airborne`, commits 965fab2df, 615b8daae), owner Codex: REOPENED
+
+**Checked.** Read `packages/physics/src/airborne/index.ts` (707 lines), `environment.ts` (86), `airborne-kernel/src/lib.rs` (66), `tests/airborne.test.js`, `tests/coupling/airborne.test.js`, the catalog row, the audit rows (audit table line 80, solver row line 139) and the ATMO-06 section of `docs/known-bugs.md`. The only commit touching its source or tests since the audit is the original landing 965fab2df (no commit since 2026-11-25 changes the code; 615b8daae only refreshes pins). Ran `node scripts/run-with-timeout.mjs --max=15 -- node --test` on both test files: 10 tests, 10 pass, 0 fail (4 solver tests including a production-build check, 4 coupling tests plus the 24/30/60 fps replay test). No airborne browser or GPU test exists, so none was run.
+
+**Validation.**
+- "Stokes and buoyancy give the analytic settling and relaxation trajectories": exact solution (exponential relaxation with Cunningham slip), 1024 ulp bound derived from float precision. Exact, but the closed form is the integrator's own formula.
+- "droplet diameter squared obeys diffusion-limited evaporation...": re-derives the code's own d-squared law with the code's constants. Self-consistent. Salt residue uses the published kappa 1.12 constant (Petters and Kreidenweis 2007).
+- "one stochastic step has the exact homogeneous OU mean and variance": exact solution, 6-sigma sampling bound, derived. Homogeneous case only.
+- Coupling tests (PA-54, PA-61, PA-55, PA-21, PA-04): wiring and conservation checks (mass ledger, replay, frame-rate independence). No measured data.
+- Missing: any independent measurement. No Gunn and Kinzer 1949 terminal velocities, no Prairie Grass dispersion (Barad 1958), no measured evaporation or deposition data.
+
+**Fails points** 1, 2, 3, 4 (partial), 5, 6 (partial), 7 (partial).
+
+**Audit list.**
+1. Snow with Bohm 1989 fall speeds — NOT DONE (kinds are only `mineral-dust`, `freshwater-mist`, `sea-spray`, `environment.ts:3`; no snow code).
+2. Spume torn from SEA-13 crests in high wind (Andreas 1998) — PARTIAL (whitecap spray source via `coupling/airborne.test.js` "PA-21 and RITS-4"; no spume tearing model or wind-speed spume flux).
+3. Thomson 1987 inhomogeneous well-mixed model with drift — NOT DONE (uniform RMS per axis, `index.ts:449`; no ATMO-01 turbulence field).
+4. Haider and Levenspiel 1989 non-spherical drag — NOT DONE (spheres only, `environment.ts:44-53`).
+5. Heymsfield and Westbrook 2010 snow fall speed — NOT DONE.
+6. Sardoy 2007 embers (burning, mass loss, landing temperature) and Costa 2006 ash — NOT DONE (known-bugs lists them as out of scope).
+7. Ranz and Marshall 1952 ventilation and wet-bulb evaporation — NOT DONE (`environment.ts:63-68`: no ventilation factor, saturation at air temperature).
+8. Temperature-dependent vapour diffusivity — NOT DONE (fixed 2.5e-5, `environment.ts:67`).
+9. Validate against Gunn and Kinzer 1949 and Prairie Grass — NOT DONE (no test cites either).
+10. Bounce and resuspension — NOT DONE.
+11. Spray moisture and cooling returned to the air — NOT DONE (known-bugs: needs output layouts; vapour is only in the mass ledger).
+12. Seeds and small debris — NOT DONE.
+13. Film rows EF-12, EF-7, RITS-4 — PARTIAL (spray bands tested from live whitecaps; renderer binding still open per demo review).
+14. Rival comparison to HYSPLIT or FLEXPART — NOT DONE.
+
+**To do before it can be VERIFIED:**
+1. Add independent measured validation: Gunn and Kinzer 1949 terminal velocities across drop sizes, and Prairie Grass (Barad 1958) crosswind-integrated concentration for dispersion.
+2. Build Thomson 1987 inhomogeneous turbulence with drift, fed from the ATMO-01 and ATMO-02 field (`index.ts:449` is uniform).
+3. Add ventilated, wet-bulb evaporation with temperature-dependent diffusivity (`environment.ts:63-68`) and check it against measured droplet evaporation (Ranz and Marshall 1952).
+4. Add snow (Bohm 1989, Heymsfield and Westbrook 2010), non-spherical drag (Haider and Levenspiel 1989), ash (Costa 2006) and embers (Sardoy 2007), plus bounce and resuspension.
+5. Replace the plain `RangeError`s (`index.ts:207-536`, `environment.ts:27,50`) with coded `MargoError`s naming the fix.
+6. Return spray moisture and cooling to the air, and add a threaded or large-N scaling work count (one 66-line kernel, no recorded scaling).
+7. Add the spume source (Andreas 1998) for the EF-12 film and a rival comparison note in `docs/limits.md`.
+
+### BREAK-03 Ductile crushing: hulls, car bodies, rail cars (`physics/crush`, commits 25759ed00 9ef07dff9 28668a645 b7472cd5b da07f5d54 f1e1145da dc0dfa8ef a0325f916 116d3054e 408e506ac 64367a884 168006e3c 1b1a25c61 0fc03c638 24e67d6ff e5a8d911a f39137bee 6fbbf8e86 fa058693d dd6d4b7f2 f82be85af 8300fcbe0 3701ff631 ecd6f501f cf8fb2938), owner Codex: not VERIFIED, status left BUILDING
+
+**Checked.** Read `packages/physics/src/crush/{index,shell,material,girder,indentation,ground,envelope}.ts`, the crush tests, the README crush section, the catalog row, the audit row and the KB-PHYS-AUDIT1 bullets. Ran under run-with-timeout: `node --test` on `tests/crush*.test.js` and `tests/coupling/crush*.test.js`: 82 tests, 82 pass on packages built from current main (a first run on an older build failed three shell friction tests for want of `readSphereFriction`, added in 9ef07dff9). `crush-plate.browser.mjs` passes on WebGPU and with `--compat` (WebGL2), 0 shader errors.
+
+**Validation.**
+- `crush.test.js` "elastic barrier… quarter-period peak": exact closed form (Huang 2002), derived bound.
+- `crush.test.js` "square tube work falls within five independent measured compression replicates" (Yob et al. 2016, Table 4): published measurement. The inputs are the tube dimensions and tensile data, and the bound is the replicate mean plus or minus one sample standard deviation.
+- `crush-indentation.test.js` "circular marine plate predicts four measured rupture strokes and work" (Simonsen and Lauridsen 2000): published measurement, with inputs from the specimen table and coupon data. Printed errors are about 5% on stroke and up to 7.6% on work (150.3 J against 159.17 J, 224.3 J against 254.24 J). The tolerances were not re-read in full.
+- `crush-plate.test.js` first-mode buckling against Stein's measured bay: published measurement, early loading only.
+- `coupling/crush-staged.test.js` FRA full-scale passenger coach: loading velocity RMSE 1.10 mph against a 2.0 mph bound, stop time within 0.01 s of 0.114 s, stroke within 0.15 ft of 3.31 ft. Held-out measurement, but the bounds are chosen by hand and the rebound is not asserted tightly.
+- `coupling/crush-staged.test.js` NHTSA 8104 coupe NCAP pulse: held-out measurement, RMS about 4.3 g against a 5 g bound, speed RMS 0.38 m/s against 0.5, stroke within 0.02 m, rebound within 0.5 m/s. The bounds are hand-chosen and loose against a roughly 35 g peak.
+- `coupling/crush-ship-model.test.js` two measured wet model-ship trials: measured work off by 1% to 7%, stroke off by 5% to 6%, force off by 5% to 12%.
+- Shell tests: Hertz load, momentum exchange and exact replay. These are self-consistency checks, not data.
+- Missing: any full-scale ship collision or grounding record, Minorsky energy against damaged volume, and super-folding mean force across several tubes.
+
+**Fails points** 2 (partly), 3, 4 (partly), 5 (partly), 6, 7 (partly), 8 (partly).
+
+**Audit list.**
+1. Pedersen and Zhang friction and sliding — PARTIAL. Dry Coulomb friction is built (`coupling/crush.test.js` "crush sliding minimizes contact kinetic energy… friction bound") and native shell friction is built (9ef07dff9), and its tests pass on a fresh build. No Pedersen and Zhang comparison exists.
+2. Sustained contact / latched pass-through (KB-PHYS-AUDIT1) — DONE. A unilateral damped support step is in `index.ts` around 434-566. The test "a pressed crush patch supports a sustained load" passes, and `known-bugs.md:955` records the fix. README text at `README.md:5733` still tells users to use sensors.
+3. Single-radius gate around one point — PARTIAL. Shell contact and grounding trace the bed, but station patches are still preset points.
+4. Seal loss is a linear stroke ratio (`index.ts:390,561`) — NOT DONE as a mechanism. Measured membrane rupture (indentation) and live seam apertures exist, which is partial.
+5. Smith progressive-collapse hull girder — PARTIAL. `girder.ts:162` balances a section and the girder-joint test passes. It is validated only on elastic reloading slope, with no collapse data.
+6. SEA-10 flooding and deformed-mesh output — DONE. `crush-shell-flood.test.js` and the coupling test pass.
+7. Grounding (Simonsen) — PARTIAL. Terrain-bed tracing passes `crush-ground.test.js` against derived plane impulses, with no grounding measurement.
+8. Wierzbicki and Abramowicz super-folding — PARTIAL. `material.ts:101` uses the equation, checked on one tube family.
+9. Amdahl 1983 and Minorsky energy against damaged volume — NOT DONE.
+10. FEM shells as the strong tier — PARTIAL. `shell.ts` and its Wasm kernel are built, but there is no general shell contact or automatic tearing (docs admit this).
+11. NCAP 56 km/h pulses — DONE as a held-out test, though with loose bounds.
+12. Automatic contact detection — NOT DONE.
+13. Wasm hot loop — DONE for the shell kernel, with no recorded work counts.
+
+**To do before it can be VERIFIED:**
+1. Build a ship collision and grounding model (Pedersen and Zhang 1998, Simonsen 1997) with a published full-scale or model-scale validation. Add Minorsky 1959 energy against damaged volume.
+2. Derive the NCAP and FRA bounds from measurement scatter and rate-tier convergence instead of 5 g, 2 mph and 0.5 m/s, and validate on several vehicles.
+3. Replace the linear seal-loss ratio (`index.ts:390,561`) with a rupture criterion, and add general shell contact, automatic contact detection and automatic tearing.
+4. Add a coupling test to SEA-08 where contact energy deforms the hull (catalog edge), plus fluid pressure on the shell.
+5. Record work counts for the shell kernel scaling, and add film direction inputs for seeded placed breakups.
+6. Update `docs/limits.md`, which has no BREAK-03 limits entry, and the README sensor advice.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
