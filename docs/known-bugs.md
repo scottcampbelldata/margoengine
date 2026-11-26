@@ -145,6 +145,17 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   capture whose scene depth changed since that draw. Regression: water `test/capture.test.js` (a new depth is bound
   once, before the capture draws) and the GPU proof above.
 
+### Fixed 2026-11-26: a ScatterTiles capture after its rings grew bound the destroyed ring buffers (KB-SCATTER-CAPTURESTALE1, scatter)
+
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1` failed every
+  run with "[Buffer (unlabeled)] used in submit while destroyed" once the page added `view.objects` to SceneTargets.
+- **Cause:** `ScatterTiles` grows a ring by replacing its instance buffer and calling `instancesChanged()`, which made
+  the colour, shadow and cull bind groups again but kept the capture ring groups, so the next capture bound the
+  destroyed buffer. The WebGL2 route's arrival also kept capture stages built before the route counted its rings.
+- **Fix:** `instancesChanged()` clears the capture ring groups, and the route's arrival forgets the capture stages and
+  groups. Regression: scatter `test/capture.test.js` (a replaced ring is bound in the next capture); the rail-line
+  shot runs with no GPU error.
+
 ### Fixed 2026-11-26: water beside a solid box ran faster than beside the liquid box's own sides (KB-FLIP-SOLIDSLIP1, physics, flip)
 
 - **Repro:** Martin and Moyce's dam break (`packages/physics/tests/flip.test.js`) on a floor of two solid rows instead of
@@ -385,6 +396,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `view.objects` as not ground; post `test/scene-targets-scatter-browser.mjs` proves a plant over shaded ground on
   WebGPU and the WebGL2 layer. Still owed: `ScatterInstances` capture, `scenes/test/timber-valley-masks-check.mjs` on the
   rail-line shot, then BOUNCE1 and PENUMBRA1 measured again.
+- **Measured again 2026-11-26** (rail-line shot, `--once --seconds 1.1`, plants in the masks, after
+  KB-SCATTER-CAPTURESTALE1): bounce 104.8% early and 121.1% mid (bound 10 to 35), shadowTint 0.29 and -1.41 b* (bound
+  3 or more), penumbra 0.804 code early (bound 0.7) and 0.445 mid (pass). Plants in the masks did not bring bounce into
+  range, so BOUNCE1 stays open on its own cause; `ScatterInstances` capture and the masks check are still owed.
 
 ### Open 2026-11-26: tall scattered plants sway by their own height and whip at tens of m/s in a gale (KB-LOOK-TV-SHIMMER1, scatter)
 
