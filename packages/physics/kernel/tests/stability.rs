@@ -201,6 +201,11 @@ struct Web {
     gain: f64,
     /// The kinematic bodies' work over the run, in joules.
     work: f64,
+    /// The most any dynamic body's speed stood against the most the ledger lets it have, sqrt(2 K / m) for its own mass m: K is
+    /// the energy the bodies started with, plus the test's own moves and the kinematic bodies' work so far (and the ledger's
+    /// 1e-6 of that work for rounding), less the bodies' height energy now, all of which one body could at most hold as motion.
+    /// At most 1 when the ledger holds.
+    share: f64,
 }
 
 /// `web` at `substeps`, keeping only some of its bodies and the joints between them when `keep` names them: the bodies by
@@ -271,7 +276,20 @@ fn web_run(seed: u32, steps: u32, substeps: u32, keep: Option<(&[u32], &[usize])
     // The energy ledger: what the bodies hold, less what the test's own moves and the kinematic bodies gave them.
     let total = |w: &World| rows.iter().map(|&r| energy(w, r as usize)).sum::<f64>();
     let (start, work) = (total(&w), driven());
-    let (mut moved, mut gain) = (0.0f64, 0.0f64);
+    let (mut moved, mut gain, mut share) = (0.0f64, 0.0f64, 0.0f64);
+    let heights = |w: &World| {
+        rows.iter()
+            .map(|&r| {
+                let at = r as usize;
+                if w.flags(at) & KIND != DYNAMIC {
+                    return 0.0;
+                }
+                let (g, p) = (w.header().gravity, w.v(POSITION_X, at));
+                let height = -(g[0] as f64 * p.x as f64 + g[1] as f64 * p.y as f64 + g[2] as f64 * p.z as f64) * w.s(GRAVITY_SCALE, at) as f64;
+                height / w.s(INVERSE_MASS, at) as f64
+            })
+            .sum::<f64>()
+    };
     for i in 0..steps {
         for &row in &rows {
             let at = row as usize;
@@ -295,6 +313,17 @@ fn web_run(seed: u32, steps: u32, substeps: u32, keep: Option<(&[u32], &[usize])
         let started: Vec<V3> = (0..64).map(|b| w.v(POSITION_X, b)).collect();
         w.step(DT);
         gain = gain.max(total(&w) - start - moved - (driven() - work));
+        let given = driven() - work;
+        let motion = start + moved + given * (1.0 + 1e-6) - heights(&w);
+        for &row in &rows {
+            let at = row as usize;
+            if w.flags(at) & KIND != DYNAMIC {
+                continue;
+            }
+            let most = (2.0 * motion.max(0.0) * w.s(INVERSE_MASS, at) as f64).sqrt();
+            let s = speed(&w, row) as f64;
+            share = share.max(if most > 0.0 { s / most } else if s > 0.0 { f64::INFINITY } else { 0.0 });
+        }
         for &row in &joints {
             let (a, b) = (w.uu(JOINT_A, row) as usize, w.uu(JOINT_B, row) as usize);
             let on = |body: usize, anchor: V3| w.v(POSITION_X, body).add(w.q(ROTATION_X, body).rotate(anchor));
@@ -326,7 +355,7 @@ fn web_run(seed: u32, steps: u32, substeps: u32, keep: Option<(&[u32], &[usize])
             }
         }
     }
-    Web { top, spin, open, gain, work: driven() - work }
+    Web { top, spin, open, gain, work: driven() - work, share }
 }
 
 /// A kinematic body that turns 1.287 rad in one step, then holds, with a dynamic box held by `flags` from `r` m out along its
@@ -385,16 +414,20 @@ fn a_web_of_joints_stays_in_the_numbers() {
     // bodies did not give it. So the speeds are those the kinematic bodies' work gives, which has no bound of its own: seed 1's
     // drivers do 1.7e12 J of work on its sliders, and a body runs out to 172 km/s (this test bounded the speed at 1e5 m/s, a
     // figure with no derivation, until the solve order became the world's own and seed 1 took that path). What a step can work
-    // with is bounded: every speed stays a number under the range a step refuses past (RANGE).
-    let (mut worst, mut widest) = (0.0f32, 0.0f32);
+    // with is bounded: every speed stays a number under the range a step refuses past (RANGE). And the ledger bounds each body:
+    // no body moves faster than sqrt(2 K / m), K the energy the scene and its kinematic bodies have given the bodies so far,
+    // less their height energy (`Web::share`), as no body holds more motion than all of them were given.
+    let (mut worst, mut widest, mut nearest) = (0.0f32, 0.0f32, 0.0f64);
     for seed in 1..=60 {
         let run = web_run(seed, 2000, 1, None);
         assert!(run.top < RANGE, "seed {seed} reached {} m/s", run.top);
         assert!(run.gain <= 1e-6 * run.work, "seed {seed} gained {} J over the {} J its kinematic bodies did", run.gain, run.work);
+        assert!(run.share <= 1.0, "seed {seed}: a body ran at {} times the speed the energy given lets it have", run.share);
+        nearest = nearest.max(run.share);
         worst = worst.max(run.top);
         widest = widest.max(run.open);
     }
-    println!("fastest in the webs: {worst:.0} m/s, widest joint: {widest:.2} m");
+    println!("fastest in the webs: {worst:.0} m/s, widest joint: {widest:.2} m, nearest the energy bound: {nearest:.3}");
 }
 
 #[test]
