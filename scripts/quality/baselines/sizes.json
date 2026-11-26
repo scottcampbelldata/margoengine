@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20591108,
+  "total": 20592229,
   "history": [
     {
       "date": "2026-10-24",
@@ -13681,6 +13681,12 @@
       "commit": "18728e9817",
       "grew": 1,
       "reason": "SEA-15's per-opening grain mixtures move physics/tracers from 7413 to 7916 B gzip. The optional ceiling rises from 7669 to 8172 B. Mixtures share the hull-breach binding and tracer parcel store; a separate entry would duplicate those paths and the mass ledger."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "8300fcbe01",
+      "reason": "BREAK-03 square tube folding and imposed-stroke work grows the optional crush entry from 3977 to 5098 B gzip. The ceiling rises from 4233 to 5354 B. The material constructor and stroke query share the existing hardening, compaction and elastic accounting. Splitting them would make the measured curve less direct to use from a patch and would duplicate normalization and constitutive constants.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14505,7 +14511,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 4233,
+    "@margoengine/physics/crush": 5354,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
