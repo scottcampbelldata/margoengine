@@ -12142,6 +12142,12 @@ power. EARTH-10 can connect using the layouts requested in the [work queue](phys
 
 Fixed the missing clock-driven celestial fields used by the sea, boundary layer and tracker calculations. The optional physics/celestial solver now publishes Earth-fixed tidal forcing and insolation and locates solar and lunar eclipses. Regression tests reproduce uniform tracking and adjacent shading from SOLARFIELD-2 and SOLARFIELD-3 and verify slope-aware backtracking, per-row tolerance and wind stow. See [physics-solvers.md](physics-solvers.md) and the [package README](../packages/physics/README.md#celestial-ephemeris-tides-and-insolation-margoenginephysicscelestial).
 
+### Fixed 2026-11-26: `GPUSceneBVH`'s buffers were missing from the borrowed GPU object registry, so hygiene failed (bvh)
+
+- **Repro:** `node --test tests/borrowed-gpu.test.js` on f9634050e1: five `bvh:GPUSceneBVH` members are unlisted.
+- **Cause:** the new class exposes the buffers it creates, and its push added no rows to `scripts/borrowed-registry.json`.
+- **Fix:** five exempt rows (the package makes them; no caller object is held). Regression: `tests/borrowed-gpu.test.js`.
+
 ### Fixed 2026-11-25: native glass with the shared scene depth or a sciviz volume left the glass's own picture on screen (materials, KB-FILM-NEST2)
 
 - **Repro:** a transmissive glTF material in a scene that also holds water, `html`, clustered contact shadows (the
