@@ -9886,7 +9886,8 @@ The optional cross-track berm mode places the loose soil in separate triangular 
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
 [0, 1], rotating lugs fill the solver's cumulative rear depression or transfer loose soil between
-banks at large obliquity. Cross-track banks settle with one simultaneous sparse transfer pass
+banks at large obliquity. For travel angles under 10°, partial backfill forms a flat bottom
+from the deepest part of the rear depression. Cross-track banks settle with one simultaneous sparse transfer pass
 per solver step. The solver stores eight history bytes per grid vertex and a second sparse bitset
 for affected vertices, approximately 0.26 bytes per vertex. Steep loose slopes can take more
 than one step to settle. The separate excavation maximum prevents counting a cut twice.

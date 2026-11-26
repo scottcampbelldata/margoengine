@@ -573,6 +573,7 @@ unsafe fn deposit_backfill(
     (x_start, x_end, z_start, z_end): (usize, usize, usize, usize),
     (travel_x, travel_z): (f64, f64),
     volume: f64,
+    bottom_first: bool,
     areas: *const f64,
     track_relief: *mut f64,
     deltas: *mut f64,
@@ -581,19 +582,52 @@ unsafe fn deposit_backfill(
     if volume <= 0.0 || track_relief.is_null() {
         return 0.0;
     }
-    let mut rear_volume = 0.0;
-    for x in x_start..x_end {
-        let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
-        for z in z_start..z_end {
-            let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
-            let i = x * lattice.nz + z;
-            if along < 0.0 {
-                rear_volume += (-*track_relief.add(i)).max(0.0) * *areas.add(i);
+    let capacity = |level: f64| {
+        let mut volume = 0.0;
+        let mut wet_area = 0.0;
+        for x in x_start..x_end {
+            let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
+            for z in z_start..z_end {
+                let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
+                let i = x * lattice.nz + z;
+                let thickness = level - *track_relief.add(i);
+                if along < 0.0 && thickness > 0.0 {
+                    let area = *areas.add(i);
+                    volume += thickness * area;
+                    wet_area += area;
+                }
             }
         }
-    }
+        (volume, wet_area)
+    };
+    let mut level = 0.0;
+    let (mut rear_volume, mut wet_area) = capacity(level);
+    let mut sweeps = 1;
     let returned = volume.min(rear_volume);
     if returned > 0.0 {
+        // In nearly straight travel the same volume raises the deepest rear stations to a
+        // common bottom. Capacity is convex and piecewise linear in that bottom's elevation.
+        // Newton from the flat ground stays above the root and drops wet area at each break.
+        for _ in 0..f64::MANTISSA_DIGITS {
+            if !bottom_first || rear_volume <= returned {
+                break;
+            }
+            let next = level - (rear_volume - returned) / wet_area;
+            if next >= level {
+                break;
+            }
+            let (new_volume, new_area) = capacity(next);
+            sweeps += 1;
+            if new_volume == 0.0 {
+                break;
+            }
+            level = next;
+            rear_volume = new_volume;
+            if new_area == wet_area {
+                break;
+            }
+            wet_area = new_area;
+        }
         let scale = returned / rear_volume;
         for x in x_start..x_end {
             let along_x = (lattice.origin_x + x as f64 * lattice.dx - p.x) * travel_x;
@@ -601,13 +635,14 @@ unsafe fn deposit_backfill(
                 let along = along_x + (lattice.origin_z + z as f64 * lattice.dz - p.z) * travel_z;
                 let i = x * lattice.nz + z;
                 if along < 0.0 {
-                    let thickness = (-*track_relief.add(i)).max(0.0) * scale;
+                    let thickness = (level - *track_relief.add(i)).max(0.0) * scale;
                     add_bed_change(deltas, track_relief, i, thickness);
                 }
             }
         }
+        sweeps += 1;
     }
-    *work += (1.0 + f64::from(returned > 0.0)) * ((x_end - x_start) * (z_end - z_start)) as f64;
+    *work += (sweeps as f64) * ((x_end - x_start) * (z_end - z_start)) as f64;
     returned
 }
 
@@ -672,6 +707,7 @@ unsafe fn deposit_cross_track(
             cut_bounds,
             (travel_x, travel_z),
             requested,
+            centred,
             areas,
             track_relief,
             deltas,

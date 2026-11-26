@@ -4941,8 +4941,9 @@ Set `grouserFill` on a cross-track wheel to the effective fraction of its lug en
 soil. The default is zero. The turning lugs return part of the loose cut into the rear footprint.
 At large obliquity, they move that share to the opposite bank instead. A locked wheel carries no soil.
 The returned amount is limited to the loose cut and the solver's remaining depression behind
-the wheel. Later passes can fill earlier cuts, and the same pressure footprint counts each
-excavation depth only once.
+the wheel. On nearly straight passes, the deepest part fills first to form a level bottom.
+Later passes can fill earlier cuts, and the same pressure footprint counts each excavation
+depth only once.
 
 ```ts
 import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
