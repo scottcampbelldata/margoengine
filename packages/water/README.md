@@ -582,6 +582,11 @@ the ripples bending its edges) and at the mirrored centre its green falls (143 t
 the sky's, it could not have added green), at 4x and 1x MSAA. Limits: only the water's own reflection term is
 replaced (refraction, foam and glints stay); SSR's `maxRoughness` fades reflections on rough, rippled water.
 
+Other capture effects take the water too: `SceneTargets.add(water, {ground: false})` (`@margoengine/post/mrt`),
+`meshBlend.tag(water, radius)` and LightBounce get their own `margoSSR` with the water's surface (its normal, its body
+colour with the foam it shows, its roughness, not metal) instead of SSR's reflection fields, and its depth. One water
+can be in several effects at once; each keeps its own capture pipeline.
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

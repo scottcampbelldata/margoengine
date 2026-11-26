@@ -829,14 +829,17 @@ function horizonDepthShader(code: string): string {
     )
     .replace(discard, `if(i.clip.z==0.0&&(frame.camera*vec4f(i.world,1)).z>0.0){discard;}\n ${discard}`);
 }
+// SSR's own outputs (post ssr.ts): only for it does the water write the sky reflection SSR replaces.
+const ssrOutputs =
+  /struct MargoSSR \{\s*@location\(0\) specular:vec4f,\s*@location\(1\) weight:vec4f,\s*@location\(2\) normal:vec4f\s*\}/;
 function captureShader(code: string, declarations: string): string {
-  const out = code
-    .replace(captureHead, '@fragment fn fragment(i:Output)->MargoSSR{')
-    .replace(
-      captureTail,
-      'let keep=reflection*(1.0-0.95*shown);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));',
-    );
-  if (!out.includes('->MargoSSR{') || !out.includes('return MargoSSR('))
+  // Any other effect (SceneTargets, MeshBlend, LightBounce) declares its own MargoSSR and `margoSSR(n, v, base, metal,
+  // rough)`: the water hands it its surface (normal, body colour with the foam it shows, roughness, not metal).
+  const tail = ssrOutputs.test(declarations)
+    ? 'let keep=reflection*(1.0-0.95*shown);_=body;_=glint*shade;return MargoSSR(vec4f(skyColor(reflect(-v,n),rough)*keep,rough),vec4f(vec3f(keep),1),vec4f(n*0.5+0.5,1));'
+    : `_=body;_=glint*shade;_=reflection;${declarations.includes('var<private> margoPosition') ? 'margoPosition=i.world;' : ''}return margoSSR(n,v,mix(frame.color.rgb,vec3f(0.72,0.77,0.74),shown*0.95),0.0,rough);`;
+  const out = code.replace(captureHead, '@fragment fn fragment(i:Output)->MargoSSR{').replace(captureTail, tail);
+  if (!out.includes('->MargoSSR{') || !/return (MargoSSR|margoSSR)\(/.test(out))
     throw margoError('unsupported', 'Water capture needs the water fragment; its shader changed');
   return declarations + out;
 }
@@ -2033,42 +2036,7 @@ export class Water implements EnginePlugin {
       this.coastal?.step(c.encoder);
       this.spray?.step(c.encoder);
     }
-    if (this.sampledDepth !== depth) {
-      this.sampledDepth = depth;
-      this.built++;
-    }
-    if (this.copyBuilt !== this.built) {
-      this.depthView = depth.createView({ aspect: 'depth-only' });
-      this.copyGroup = group(c.device, this.copyPipeline!, [this.depthView]);
-      this.copyBuilt = this.built;
-    }
-    if (view.built !== this.built) {
-      view.groups = [];
-      view.resources = [];
-      view.captureGroups.clear();
-      for (let i = 0; i < 2; i++)
-        for (let j = 0; j < (this.coastal ? 2 : 1); j++) {
-          const resources: GPUBindingResource[] = [
-            { buffer: this.uniform! },
-            this.depthView!,
-            view.foamViews[i],
-            this.coastal?.views[j] ?? view.foamViews[i],
-            reflection?.createView() ?? view.foamViews[i],
-            this.skySampler!,
-            this.capturedView ?? view.foamViews[i],
-            { buffer: this.coastal?.connected ?? this.uniform! },
-          ];
-          if (fog) resources.push({ buffer: this.fogBuffer! });
-          view.groups.push(
-            c.device.createBindGroup({
-              layout: this.pipeline!.getBindGroupLayout(0),
-              entries: [...resources.map((resource, binding) => ({ binding, resource })), ...this.effectBindings],
-            }),
-          );
-          view.resources.push(resources);
-        }
-      view.built = this.built;
-    }
+    this.bindDepth(c, view, depth);
     // The shadow source owns its entries; a new array (resize, restoration) rebuilds group 1.
     const shadowEntries = shadows?.bindings();
     if (shadowEntries && this.shadowEntries !== shadowEntries) {
@@ -2147,6 +2115,49 @@ export class Water implements EnginePlugin {
       if (this.capture === hook) this.capture = undefined;
     };
   }
+  /**
+   * The bind groups that read the scene depth (`depth`): made again when the depth texture changes. The surface draw
+   * calls it each frame; a capture that runs before it in a frame (SceneTargets, order -4.5) calls it too, so after
+   * the post stack that owns the depth is replaced it never binds the destroyed texture of the stack before.
+   */
+  private bindDepth(c: Context, view: WaterView, depth: GPUTexture): void {
+    if (this.sampledDepth !== depth) {
+      this.sampledDepth = depth;
+      this.built++;
+    }
+    if (this.copyBuilt !== this.built) {
+      this.depthView = depth.createView({ aspect: 'depth-only' });
+      this.copyGroup = group(c.device, this.copyPipeline!, [this.depthView]);
+      this.copyBuilt = this.built;
+    }
+    if (view.built !== this.built) {
+      view.groups = [];
+      view.resources = [];
+      view.captureGroups.clear();
+      for (let i = 0; i < 2; i++)
+        for (let j = 0; j < (this.coastal ? 2 : 1); j++) {
+          const resources: GPUBindingResource[] = [
+            { buffer: this.uniform! },
+            this.depthView!,
+            view.foamViews[i],
+            this.coastal?.views[j] ?? view.foamViews[i],
+            this.reflected?.createView() ?? view.foamViews[i],
+            this.skySampler!,
+            this.capturedView ?? view.foamViews[i],
+            { buffer: this.coastal?.connected ?? this.uniform! },
+          ];
+          if (this.fogSource) resources.push({ buffer: this.fogBuffer! });
+          view.groups.push(
+            c.device.createBindGroup({
+              layout: this.pipeline!.getBindGroupLayout(0),
+              entries: [...resources.map((resource, binding) => ({ binding, resource })), ...this.effectBindings],
+            }),
+          );
+          view.resources.push(resources);
+        }
+      view.built = this.built;
+    }
+  }
   /** Calls `callback` once when the water is disposed; returns a remover. */
   onDispose(callback: () => void): () => void {
     if (typeof callback !== 'function')
@@ -2167,6 +2178,9 @@ export class Water implements EnginePlugin {
     if (mode !== 'capture' || !hook || this.disposed || !view?.groups.length || !this.shaderCode) return;
     void color;
     void depth;
+    // This frame's scene depth, when it changed since the surface last drew (a replaced post stack): rebind it first.
+    const scene = this.source!();
+    if (scene && scene !== this.sampledDepth) this.bindDepth(c, view, scene);
     const shadows = this.options.shadows,
       declarations = hook.declarations(this.shaderCode),
       key =

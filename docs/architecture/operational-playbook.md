@@ -9824,6 +9824,15 @@ plants before, 0 and 0 with `{ground: false}`, 823 plant pixels, mean height 0.6
 4x multisampled frame). Missing: `ScatterInstances` capture, the timber-valley masks check on a real shot, and the
 cost on a forest (one draw per ring per scatter per effect).
 
+**Water in every capture effect (KB-WATER-TARGETS1, KB-WATER-STALEDEPTH1, 2026-11-26).** Water writes SSR's three
+fields only for SSR's own `MargoSSR` and otherwise returns the hook's `margoSSR` with its surface, so SceneTargets,
+MeshBlend and LightBounce take it; SceneTargets and MeshBlend recognise gltf's `Surface` by its `base` field (water has
+its own `Surface`), and SceneTargets reads the sun from a Frame's `light` or water's `sun`. A capture that runs before
+the water's own draw rebinds a scene depth that changed since (a replaced post stack). Evidence: water
+test/capture.test.js, post test/scene-targets.test.js and test/mesh-blend.test.js, post
+test/scene-targets-water-browser.mjs (WebGPU and the WebGL2 layer). Missing: water's shadow visibility in `t.shadow`
+(it reads 1 on water).
+
 **Sky occlusion (KB-LOOK-POST-SKYOCC1, 2026-11-17, GPU maths).** GTAO's kernel gains `sky()`: with `skyRadius` above 0
 (frame `size.zw` = reach and steps, both 0 when off) the slices search their horizons again out to the reach, samples
 spaced by the square of their index from 1 pixel out (4 before KB-GTAO-OPENFLOOR1), each sample slid into the slice, and the

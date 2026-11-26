@@ -1299,7 +1299,7 @@ value (`albedo`, `normal` (world), `position` (world), `distance` (from the came
 (roughness, metalness, occlusion)) or your WGSL `vec4f` expression over `t: TargetSurface` (the same values, all world
 space), with its own float or normalised colour format. Core meshes always draw (a replay of core's shader with the
 lighting left out); add gltf/pbr models, materials meshes and a `Terrain` with `targets.add(model)` so their own maps,
-skinning and instances write the outputs, and a lit `Scatter` with `targets.add(scatter, {ground: false})`. The pass runs after the passes at -5 that change core's shader and draw
+skinning and instances write the outputs, a lit `Scatter` with `targets.add(scatter, {ground: false})` and a `Water` the same way (`@margoengine/water`). The pass runs after the passes at -5 that change core's shader and draw
 shadow maps (`Shadows`, sections), whatever order they were attached in, and before the main pass (`order: -4.5` by
 default), so materials can read this frame's targets; a material that reads a target must not be added. Its own depth
 is `targets.depth`. Textures follow the drawing size and are replaced on resize (`onResize`). WebGPU only (and the
@@ -1983,7 +1983,7 @@ untag();
 | `order` | `20` | Frame graph order of the tag pass, after the main pass (0) and before the stack composes (30) |
 
 `tag(target, radius)` returns a remover; `untag(target)` and `tags` (a copy) manage the set. A target is a core
-mesh, a gltf/pbr model (`loadGLTF`), a materials mesh or a `Terrain`; models and terrain are drawn with their own
+mesh, a gltf/pbr model (`loadGLTF`), a materials mesh, a `Terrain`, a lit `Scatter` or a `Water`; models and terrain are drawn with their own
 materials, so a rock model's alpha-masked edge or a terrain's holes blend where they are drawn:
 
 ```ts
