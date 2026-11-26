@@ -13223,6 +13223,17 @@ For positive relative excess shear, the flux per bed area is `0.00033 ρ_s sqrt(
 where `s = ρ_s/ρ_w` and `D_* = d [((s−1) g)/ν²]^(1/3)`. The cited 1984 data cover low-flow noncohesive sand
 of roughly 100 to 1,500 μm. The 40 μm silt setting extrapolates the relation to noncohesive silt.
 
+For clean, densely packed sand, van Rijn, Bisschop and van Rhee (2019), Eq. 5, adds a damping factor `1/Θ`
+above grain Shields number `Θ=1`. The optional damping uses the same measured diameter and grain density as the
+threshold, with no changes below `Θ=1`. [“High-Velocity Erosion of Sand,” O. A. Heijmeijer, A. J. Nobel, G. Keetels,
+and C. van Rhee (2022)](https://doi.org/10.1061/(ASCE)HY.1943-7900.0001949) supplies the independent BOKA
+flume wall stresses and bed retreat rates (Tables 2–3, Fig. 11). A live TerrainBed with 125 µm Geba sand gets the
+four measured stresses through the wash sampler. Quartz density and the central test porosity of 0.43 convert loss
+of dry mass to retreat speed. The initial clean-water check compares pickup with net retreat while deposition is
+negligible in the model. None of the BOKA retreat rates set an input or a fitted constant. The RMS log retreat error
+falls from 1.734 to 0.734, with the largest shortfall a factor of 2.81. This is a stress-to-pickup test, with no claim
+to reproduce the flume's evolving flow or a ray's wake.
+
 The radial model reconstructs a uniform nozzle speed from normal impulse per step and nozzle area. It uses
 Phares et al.'s Eq. 2.31 and the theoretical circular jet curves in Fig. 5b (clearance/diameter 1, 2, 4, 6 and 8),
 with the exact fully developed maximum from Eq. 2.33. Linear interpolation of the plotted curve nodes supplies

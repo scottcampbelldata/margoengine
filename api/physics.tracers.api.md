@@ -65,10 +65,12 @@ export const TRACER_MATERIALS: {
 
 export interface TracerBedJets {
     material?: 'sand' | 'silt';
+    grains?: TracerMaterial;
     shear?: 'wall-jet' | 'footprint';
     suspensionReferenceHeight?: number;
     criticalShields?: number;
     erodibility?: number;
+    denseSand?: boolean;
     availableMass?: number;
     mobileLayer?: {
         thickness: number;

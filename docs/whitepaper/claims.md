@@ -269,6 +269,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   Reproduce with `node --test packages/physics/tests/coupling/swim.test.js` and
   `node packages/environment/tests/swim-sediment.browser.mjs` with and without `--compat` after building.
 
+- Dense sand pickup (SEA-15, 2026-11-26). With four independently measured shear stresses, the damped pickup
+  law reduces RMS log bed retreat error from 1.734 to 0.734 on 125 µm Geba sand. The largest error is a factor
+  of 2.81. The coupled test also balances dry mass with the simulated packed-volume change.
+  Reproduce with `node --test --test-name-pattern='dense sand' packages/physics/tests/coupling/tracers.test.js`.
+  [Heijmeijer et al. (2022), Tables 2–3](https://doi.org/10.1061/(ASCE)HY.1943-7900.0001949).
+
 - Finite oil release (SEA-15, 2026-11-26). An instantaneous surface release recovers Fay's three
   circular spreading radii from the parcel second moment, conserves its prescribed mass, and replays from a
   snapshot. A delayed release shares a world with an ordinary dye source and moves with the given current.

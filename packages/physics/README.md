@@ -3462,9 +3462,10 @@ const tracer = new TracerSolver();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
   bed: 1,
   bedWash: {
-    water: { medium: 'water', cell: [0, 0, 0], sample: () => ({ velocity: [0.6, 0, 0], density: 1025, temperature: 285 }) },
+    water: { medium: 'water', cell: [0, 0, 0], sample: () => ({ velocity: [2, 0, 0], density: 1025, temperature: 285 }) },
     bounds: [-0.5, -0.5, 0.5, 0.5], cells: [2, 2], referenceHeight: 0.05, roughnessLength: 0.001,
   },
+  bedJets: { grains: { density: 2650, diameter: 125e-6, colour: [0.7, 0.6, 0.4] }, denseSand: true },
 });
 world.advance(1);
 console.log(tracer.jetErosion > 0); // true
@@ -3526,6 +3527,11 @@ for kilograms lifted, and `particlesOf()` or `concentration()` for a renderer. `
 above bedrock and use one sediment writer on it. The layer loses the mass carried in the puff and receives it when
 the grains settle. Both modes are off by default. The [rendered coupling fixture](../environment/tests/swim-sediment.html)
 uses the moving bed mesh as well as the rising, drifting and settling sand.
+
+Give `bedJets.grains` a sinking `TracerMaterial` with a diameter in metres and density in kg/m³ to match a measured
+grain size. For clean, densely packed sand under strong forcing, set `bedJets.denseSand` to `true` (default `false`).
+This applies van Rijn et al.'s high-stress damping above a grain Shields number of one. It uses the nonlinear
+pickup law and applies to both fin jets and wash. The paper's tested sands were 51–562 µm at porosity near 0.4.
 
 ```ts
 import { TerrainBed } from 'margoengine/physics/earth';

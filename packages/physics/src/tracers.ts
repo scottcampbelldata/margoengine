@@ -152,6 +152,8 @@ export interface TracerSource {
 export interface TracerBedJets {
   /** The mobile fraction of the bed. Default 'sand'. */
   material?: 'sand' | 'silt';
+  /** Override the preset with measured grain properties, including a positive diameter and sinking density. */
+  grains?: TracerMaterial;
   /** Wall stress model. Default 'wall-jet', with 'footprint' for clearances below one jet diameter. */
   shear?: 'wall-jet' | 'footprint';
   /** Half the bedform height or the equivalent roughness height, m. The fin-jet default and minimum are 1% of local water depth. */
@@ -160,6 +162,8 @@ export interface TracerBedJets {
   criticalShields?: number;
   /** Optional linear erosion rate at unit excess stress, kg/m²/s. Default: van Rijn's grain-dependent pick-up. */
   erodibility?: number;
+  /** Apply van Rijn et al. (2019) high-stress damping for clean, densely packed sand (default false). */
+  denseSand?: boolean;
   /** Total erodible bed mass in this simulation cell, kg. Default Infinity. */
   availableMass?: number;
   /** Mobile layer for {@link TracerSolver.withBedChange}. Its thickness must fit above the terrain's bedrock. */
@@ -282,6 +286,7 @@ interface JetBed {
   threshold: number;
   pickupScale: number;
   pickupExponent: number;
+  dampingStress: number;
   limit: number;
   suspensionReferenceHeight: number;
   rings?: Float64Array;
@@ -308,7 +313,8 @@ interface OilSpillState {
 
 function pickupRate(shear: number, bed: JetBed): number {
   const excess = (shear - bed.threshold) / bed.threshold;
-  return excess > 0 ? bed.pickupScale * pow(excess, bed.pickupExponent) : 0;
+  if (!(excess > 0)) return 0;
+  return (bed.pickupScale * pow(excess, bed.pickupExponent)) / Math.max(1, shear / bed.dampingStress);
 }
 
 /** Invert the cumulative ring weights and sample an area inside the selected ring. */
@@ -543,38 +549,52 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.useBedJets || this.bedWash) {
       const {
         material = 'sand',
+        grains: customGrains,
         shear = 'wall-jet',
         suspensionReferenceHeight = 0,
         criticalShields,
         erodibility,
+        denseSand = false,
         availableMass = Infinity,
       } = params.bedJets ?? {};
+      const grains: TracerMaterial = customGrains ?? TRACER_MATERIALS[material];
+      const diameter = grains?.diameter;
       if (
         (material !== 'sand' && material !== 'silt') ||
+        !grains ||
+        grains.floats ||
+        diameter === undefined ||
+        !(diameter > 0 && Number.isFinite(diameter) && Number.isFinite(grains.density)) ||
         (shear !== 'wall-jet' && shear !== 'footprint') ||
         (criticalShields !== undefined && !(criticalShields > 0 && Number.isFinite(criticalShields))) ||
         (erodibility !== undefined && !(erodibility >= 0 && Number.isFinite(erodibility))) ||
         !(availableMass >= 0)
       )
         throw new RangeError(
-          'Invalid erodible tracer bed; pass sand or silt, wall-jet or footprint shear, positive Shields and non-negative erosion and mass.',
+          'Invalid erodible tracer bed; pass sinking grains with a finite diameter, supported shear, positive Shields and nonnegative erosion and mass.',
         );
       if (!(suspensionReferenceHeight >= 0 && Number.isFinite(suspensionReferenceHeight)))
         throw new RangeError(
           'Invalid tracer bed reference height; pass a finite, nonnegative suspensionReferenceHeight in metres.',
         );
-      const grains = TRACER_MATERIALS[material];
+      if (
+        typeof denseSand !== 'boolean' ||
+        (denseSand && ((!customGrains && material === 'silt') || erodibility !== undefined))
+      )
+        throw new RangeError(
+          'Dense-sand damping applies to van Rijn sand pickup; pass a boolean and omit linear erodibility and the silt preset when enabled.',
+        );
       if (!(waterDensity < grains.density && this.g > 0))
         throw new RangeError(
           'The tracer bed requires sinking grains under gravity; use water less dense than the grains and nonzero gravity.',
         );
       const reducedGravity = ((grains.density - waterDensity) / waterDensity) * this.g;
-      const grainSize = grains.diameter * pow(reducedGravity / viscosity / viscosity, 1 / 3);
+      const grainSize = diameter * pow(reducedGravity / viscosity / viscosity, 1 / 3);
       // Soulsby–Whitehouse (1997) onset and van Rijn (1984) dry sediment mass flux per bed area.
       const shields = criticalShields ?? 0.3 / (1 + 1.2 * grainSize) + 0.055 * (1 - exp(-0.02 * grainSize));
-      const threshold = shields * (grains.density - waterDensity) * this.g * grains.diameter;
+      const threshold = shields * (grains.density - waterDensity) * this.g * diameter;
       const pickupScale =
-        erodibility ?? 0.00033 * grains.density * Math.sqrt(reducedGravity * grains.diameter) * pow(grainSize, 0.3);
+        erodibility ?? 0.00033 * grains.density * Math.sqrt(reducedGravity * diameter) * pow(grainSize, 0.3);
       if (!(threshold > 0 && Number.isFinite(threshold) && Number.isFinite(pickupScale)))
         throw new MargoError(
           'unsupported',
@@ -585,6 +605,8 @@ export class TracerSolver implements Solver<TracerParams> {
         threshold,
         pickupScale,
         pickupExponent: erodibility === undefined ? 1.5 : 1,
+        // Van Rijn et al. (2019), Eq. 5: divide by the grain Shields number once it exceeds one.
+        dampingStress: denseSand ? (grains.density - waterDensity) * this.g * diameter : Infinity,
         limit: availableMass,
         suspensionReferenceHeight,
         rings:

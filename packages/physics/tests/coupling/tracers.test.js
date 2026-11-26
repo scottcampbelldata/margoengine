@@ -952,6 +952,80 @@ test('SEA-15 bed wash uses the true sloping bed area and the tangential flow in 
   assert.ok(Math.abs(tracer.jetErosion - mass) < 1e-14, `${tracer.jetErosion} vs ${mass} kg`);
 });
 
+test('SEA-15 dense sand pickup reduces error against independent high-velocity flume erosion', (t) => {
+  // Heijmeijer et al. (2022), Tables 2–3 and Figure 11. Independent shear and bed retreat in the BOKA flume.
+  const observations = [
+    [3.5, 4],
+    [10, 7],
+    [43, 28],
+    [62, 29],
+  ];
+  const material = { density: 2650, diameter: 125e-6, colour: [0.7, 0.6, 0.4] };
+  const waterDensity = 1000;
+  const porosity = 0.43;
+  const bulkDensity = material.density * (1 - porosity);
+  const referenceHeight = 0.02;
+  const roughnessLength = 0.0001;
+  const width = 0.1;
+  const area = width * width;
+  const measure = (shear, denseSand) => {
+    const terrain = new TerrainBed();
+    const tracer = TracerSolver.withBedWash();
+    const speed = (Math.sqrt(shear / waterDensity) * Math.log(referenceHeight / roughnessLength)) / 0.4;
+    const fluid = {
+      medium: 'water',
+      cell: [0, 0, 0],
+      sample: () => ({ velocity: [speed, 0, 0], density: waterDensity, temperature: 293 }),
+    };
+    const bottom = -0.3;
+    const thickness = 0.08;
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(terrain, {
+      columns: 8,
+      rows: 8,
+      width: 0.4,
+      depth: 0.4,
+      elevations: () => bottom,
+      bedrock: () => bottom - thickness,
+    });
+    world.add(tracer, {
+      bed: terrain.bed,
+      waterDensity,
+      viscosity: 1e-6,
+      bedWash: {
+        water: fluid,
+        bounds: [-width / 2, -width / 2, width / 2, width / 2],
+        cells: [1, 1],
+        referenceHeight,
+        roughnessLength,
+      },
+      bedJets: { grains: material, denseSand, mobileLayer: { thickness, porosity } },
+    });
+    world.couple(['tracers', 'bed'], 'staggered');
+    const before = terrain.volume(bottom);
+    world.advance(1);
+    assert.equal(terrain.refusedVolume(), 0);
+    assert.ok(Math.abs((before - terrain.volume(bottom)) * bulkDensity - tracer.jetErosion) < 1e-12);
+    return ((tracer.jetErosion * 60) / area / bulkDensity) * 1000;
+  };
+  const grainStress = (material.density - waterDensity) * 9.80665 * material.diameter;
+  assert.equal(measure(grainStress / 2, true), measure(grainStress / 2, false));
+  let baseline = 0;
+  let damped = 0;
+  let worst = 1;
+  for (const [stress, rate] of observations) {
+    const original = measure(stress, false);
+    const updated = measure(stress, true);
+    assert.ok(Math.abs(original / updated - stress / grainStress) < 1e-12);
+    baseline += Math.log(original / rate) ** 2;
+    damped += Math.log(updated / rate) ** 2;
+    worst = Math.max(worst, rate / updated, updated / rate);
+  }
+  assert.ok(damped < baseline, 'damping must reduce the pooled error, including the highest shear runs');
+  t.diagnostic(
+    `RMS log erosion error ${Math.sqrt(baseline / observations.length).toFixed(3)} → ${Math.sqrt(damped / observations.length).toFixed(3)}. Worst ratio ${worst.toFixed(2)}.`,
+  );
+});
+
 function estuarineFlocSpeed(diameter) {
   const primary = 40e-6;
   const stokes = ((2650 / 1025 - 1) * 9.80665 * primary * diameter) / 18e-6;

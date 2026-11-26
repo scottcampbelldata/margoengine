@@ -496,6 +496,10 @@ The original shot binding, independent lifted mass and multi-writer bedrock acce
 Fin-jet parcels now enter at the van Rijn Part II Eq. 37 reference level using measured bedform height or
 roughness when supplied and a minimum of 1% of the local depth. The fixture checks explicit and default levels
 through the live ray. The rough-bed render moves 17.1 px downstream and leaves 674.8 µm of bed relief on both backends.
+The pickup closure now accepts measured grain properties and the optional high-stress damping of van Rijn et al.
+(2019). Four held-out BOKA sand retreat rates give a lower pooled RMS log error, 1.734 to 0.734, when forced by
+the independently measured bed stress. The strongest underprediction is a factor of 2.81. The ray's directly
+measured lifted mass and short-clearance wake remain open.
 
 The SEA-15 consumer is rebased on Lane D's `4ec0717e8a`. A calm-spectrum test with a real `WakeSolver`
 confirms submerged dye follows the analytical potential gradient through `SpectralSea.water`.
