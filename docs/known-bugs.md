@@ -757,7 +757,9 @@ test.
 - **Regression:** the test above (600 steps, three wake orders shuffled again every 50 steps, and a snapshot restored at step
   300, bit for bit). The joint web's seed 1 now takes another path, on which its drivers do 1.7e12 J of work and a body
   reaches 172 km/s with no energy gained; `a_web_of_joints_stays_in_the_numbers` bounded speeds at 1e5 m/s, a figure with
-  no derivation, and now bounds them by the range a step refuses past (RANGE), the energy ledger holding the physics.
+  no derivation, and now bounds them by the range a step refuses past (RANGE) and, from the energy ledger, each body's speed by
+  sqrt(2 K / m): K the energy the bodies were given so far less their height energy, m its own mass (seeds 1 to 60 reach at
+  most 0.792 of it).
 
 ### Fixed 2026-11-26: a held hull's deck volume fed by the sea's inflow took about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
