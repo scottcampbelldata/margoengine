@@ -1990,7 +1990,9 @@ rock.root.setPosition([0, 0.4, 0]);
 const blend = MeshBlend.attach(engine);
 blend.tag(rock, 0.15); // a terrain from @margoengine/terrain is tagged the same way: blend.tag(terrain, 0.1)
 engine.render();
-``` `meshBlendWeight` and `meshBlendGap` are the
+```
+
+`meshBlendWeight` and `meshBlendGap` are the
 shader's weight and depth-slope test on the CPU, for tuning. `MeshBlend` is disposable (`using blend = ...`), runs on
 WebGPU and the WebGL2 layer, and costs a redraw of the core meshes into a tag target each frame. Limits are in
 [docs/limits.md](../../docs/limits.md#mesh-blending-margoenginepostmesh-blend-2026-11-26); sources in
