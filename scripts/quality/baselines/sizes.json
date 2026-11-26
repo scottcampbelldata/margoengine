@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20681584,
+  "total": 20685430,
   "history": [
     {
       "date": "2026-10-24",
@@ -13969,6 +13969,12 @@
       "commit": "eec7eb93d",
       "reason": "KB-LOD-FADECOMBO1 lod/fade grows from 2542 to 2597 B gzip: LODFade tells lod/occluder-fade which mesh, model or ghost now draws in place of the outgoing level, so a faded occluder stays faded through a cross-fade. The call must sit where the switch starts; a lazy split would add an await to a synchronous level switch for 55 B. Core plus stage stays 24892 B.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3de9ed49e8",
+      "grew": 1,
+      "reason": "New optional materials/batched-lod entry (BatchedLOD: per-item frustum culling through a refitted bounding volume hierarchy and up to 8 distance levels with hysteresis for BatchedMesh items), before 0 B; 3590 B gzip, ceiling 3846 B. It imports BatchedMesh as a type only, so it adds none of the Material code that materials/batched carries; materials/batched gains boundsInto inside its ceiling and lod shares its level pick as packages/shared/lod-pick.js inside its ceiling."
     }
   ],
   "items": {
@@ -14640,6 +14646,7 @@
     "@margoengine/materials/alpha-hash": 1615,
     "@margoengine/materials/atlas": 2014,
     "@margoengine/materials/batched": 41223,
+    "@margoengine/materials/batched-lod": 3846,
     "@margoengine/materials/eye": 4661,
     "@margoengine/materials/fake-shadows": 39249,
     "@margoengine/materials/fur": 4113,
