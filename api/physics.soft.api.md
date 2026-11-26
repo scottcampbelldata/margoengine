@@ -298,6 +298,7 @@ export class SoftBody {
     cellMaterial?: CellMaterial);
     removed: boolean;
     cellsTornSeen: Set<number>;
+    tensileNucleation: number | null;
     skin: Skin | null;
     skinCells: Uint32Array<ArrayBuffer>;
     previous: Float32Array<ArrayBuffer>;
@@ -449,6 +450,7 @@ export class SoftBodyDesc {
     orthotropicStrength: readonly number[] | null;
     crackBand: readonly number[] | null;
     tensileSeam: SoftTensileSeam | null;
+    tensileNucleation: number | null;
     inheritedBand: boolean;
     clusterGroups: number[][];
     clusterHertz: number;
@@ -490,6 +492,7 @@ export class SoftBodyDesc {
     static volumetric(vertices: ArrayLike<number>, indices: ArrayLike<number>, size: number, skinned?: boolean, material?: CellMaterial): SoftBodyDesc;
     setSkin(vertices: ArrayLike<number>, indices: ArrayLike<number>): this;
     setTensileSeam(seam: SoftTensileSeam | null): this;
+    setTensileNucleation(openingStrain: number | null): this;
     setCells(tets: ArrayLike<number>, material?: CellMaterial): this;
     addCellEdges(): this;
     setSurface(): this;

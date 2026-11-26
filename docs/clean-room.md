@@ -157,7 +157,7 @@ specified material plane. The option does not emulate the paper's cohesive crack
 [Stable Orthotropic Materials](https://viterbi-web.usc.edu/~jbarbic/orthotropic/LiBarbicStableOrthotropicMaterials-SCA2014.pdf)
 [The effect of crack orientation on the mode I fracture resistance of pinewood](https://doi.org/10.1007/s10704-024-00798-z).
 
-O'Brien and Hodgins (1999), §3.2, use local directions computed from FEM stresses to guide
+O'Brien and Hodgins (1999), §4.2, use local directions computed from FEM stresses to guide
 crack nucleation. Margo's brittle tensile option instead diagonalizes the current
 `F Fᵀ` after a native step. Its spectrum equals that of `Fᵀ F` in Li and Barbič (2014), §3,
 and `(largest eigenvalue − 1)/2` is the maximum elastic Green strain. The eigenvector is a

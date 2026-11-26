@@ -13353,6 +13353,12 @@
       "commit": "5ffed9945",
       "reason": "post/mesh-blend tags gltf/pbr models, materials meshes and terrain through the shared capture hook: 9,576 to 10,428 B gzip, ceiling 9864 to 10741. The hook, its WGSL and the model bookkeeping are the feature itself (rocks are usually models); a separate entry would split one tag API in two. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "178da11aea",
+      "grew": 0,
+      "reason": "SOFT-04 adds native principal-strain selection and exact tensile nucleation with inherited fracture flags, moving the soft entry from 138830 to 140330 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
