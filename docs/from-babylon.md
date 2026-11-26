@@ -114,6 +114,9 @@ npm install @margoengine/stage                   # the createStage facade plus c
 npm install margoengine                          # every feature package
 ```
 
+These commands work once 1.0.0 is published to npm; the packages are not on npm yet. Until then, build them from a
+checkout and use the routes in the [kits guide](guides/kits.md).
+
 ## API mapping
 
 Names in the Margo column exist in the built packages; the examples run them. "None" means Margo has nothing equivalent
