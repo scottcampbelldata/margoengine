@@ -1,5 +1,5 @@
 // Cloudflare Pages / Netlify `_headers` files: parse the rules and work out a path's headers. Used by
-// scripts/csp-check.mjs, scripts/serve-playground.mjs and the tests that read site/_headers.
+// scripts/csp-check.mjs and the tests that read site/_headers.
 /** _headers rules: [pattern RegExp, [[name, value] | ['!', name]]]. `*` is a splat, `:name` one path segment. */
 export function parseHeaders(text) {
   const rules = [];

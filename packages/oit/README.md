@@ -472,7 +472,7 @@ CPU at 45-100 %):
 
 ## Reference measurement
 
-From the built repository run `node scripts/run-with-timeout.mjs -- node packages/oit/scripts/rival-bench.mjs`.
+The comparison was measured with a rival harness that was removed on 2026-11-26.
 The external depth-peeling install stays in engine-bench/batch-168 (setup and versions in
 [reproduce](../../docs/whitepaper/reproduce.md)). Five binary-colour panes are compared against exact
 ray-sorted emission/coverage transport, with common sRGB encoding after readback. The measured picture

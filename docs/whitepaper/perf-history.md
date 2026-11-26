@@ -2717,7 +2717,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   GaussianSplats3D 4.500 to 7.470). Against the photograph, Margo PSNR 12.226 dB (MAE 52.272) and the rival 9.994 dB
   (MAE 60.646). Camera-to-world was also scored for Margo (10.672 dB) and lost to world-to-camera. Neither picture
   matches the photograph. Busy machine, diagnostic. Tracked in known-bugs.md. Publishing the number does not close it.
-- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
+- **Rerun:** the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
   Citation in clean-room.md.
 
 ### 104. quadtree screen-space error against 3DTilesRendererJS (diagnostic, win)
@@ -2729,7 +2729,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
 - **Result:** the selected sets are equal, 1,120 tiles, checksum 121586381 (992 at level 5, 128 at level 6).
   Frame time is a win. Margo 0.300 ms, 3DTilesRendererJS 2.300 ms. The rounds do not overlap (Margo 0.300 to
   0.900, 3DTilesRendererJS 2.300 to 3.100). Diagnostic until a quiet rerun.
-- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/tiles/scripts/rival-bench.mjs`.
+- **Rerun:** the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
   Citation in clean-room.md. The Margo set is `packages/tiles/tests/sse-scene.test.js`.
 
 ### 105. 10 million points against potree-core (diagnostic, loss)
@@ -2742,7 +2742,7 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   overlap (Margo 9.000 to 12.400, potree-core 5.400 to 7.600). The rival's seven frames were 7 draw calls and
   70,000,000 points. Diagnostic until a quiet rerun. Tracked in known-bugs.md. Publishing the number does not
   close it.
-- **Rerun:** `node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
+- **Rerun:** the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
   Citation in clean-room.md. The grid is `packages/points/tests/points-10m.test.js`.
 
 ### 106. Flat 2D support-planner buffers: fewer allocation requests, speed loss still open
@@ -2849,14 +2849,14 @@ measured on the corrected accuracy baseline before any improvement or Box2D-pari
   RTX A6000, busy machine, diagnostic. Different completion costs include a one-pixel rival readback.
   Image loss: MAE 1.567519 versus 0.048151; PSNR 35.388 versus 61.305 dB. Max byte errors 15 versus 1.
   Weighted averaging cannot reproduce general ordered coverage. Publishing does not close the loss.
-- **Reproduce:** `node scripts/run-with-timeout.mjs -- node packages/oit/scripts/rival-bench.mjs`.
+- **Reproduce:** the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
   Oracle tests: `node --test packages/oit/test/oit-reference.test.js`. Dependencies stay in engine-bench/batch-168.
 
 The closing independent Cycles path trace (Blender 5.3.0 Beta, 1024 samples, seed 168) confirms entry 109:
 Margo MAE 1.632960 versus Babylon 0.132651, PSNR 33.630 versus 38.261 dB. Exact oracle versus Cycles
 MAE 0.094812, identical centre RGB (198,163,103); reference noise and silhouette sampling produce max
 125 in each comparison. No additional timing claim. [Raw Cycles comparison](results/batch-168-oit-cycles.json).
-Command: `node scripts/run-with-timeout.mjs --max=6 -- node scripts/rival-oit-cycles.mjs`.
+Command: the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 ### 110. Preetham angular radiance against Mitsuba sunsky
 
@@ -3012,11 +3012,11 @@ These are measured but not fixed. Each is tracked in [known-bugs.md](../known-bu
 - **Truck 7k prefix against GaussianSplats3D 0.4.7 (entry 103).** 10.765 ms against 4.500 ms for one still frame of
   699,050 degree-3 splats. The rounds do not overlap. The picture loss (12.226 dB) was a projection bug, fixed in
   entry 115 (20.882 dB on the full cloud); the timed rerun uses the full cloud at the camera-to-world pose.
-  Rerun: `node scripts/run-with-timeout.mjs -- node packages/splats/scripts/rival-bench.mjs`.
+  Rerun: the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 - **10 million points against potree-core 2.0.17 (entry 105).** 9.000 ms against 5.400 ms for one settled frame.
   Both draw every point. The rounds do not overlap. Rerun:
-  `node scripts/run-with-timeout.mjs -- node packages/points/scripts/rival-bench.mjs`.
+  the rival harness (removed on 2026-11-26: no script in this repository loads a rival library any more; the figures are the recorded run).
 
 - **Cornell box irradiance against Cycles (entries 108 and 116).** Mean absolute error 0.024863 per channel
   (relative 0.087125) over 881 texels at one indirect bounce on both sides; 0.012063 over 8 seeds. Blender 5.3.0
