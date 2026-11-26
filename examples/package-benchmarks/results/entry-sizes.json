@@ -18415,14 +18415,14 @@
       "brotli": 5677
     },
     "packages/physics/dist/terramechanics-kernel.wasm": {
-      "raw": 35619,
-      "gzip": 14244,
-      "brotli": 12428
+      "raw": 37222,
+      "gzip": 15244,
+      "brotli": 13285
     },
     "packages/physics/dist/terramechanics-kernel-shared.wasm": {
-      "raw": 35619,
-      "gzip": 14244,
-      "brotli": 12450
+      "raw": 37222,
+      "gzip": 15244,
+      "brotli": 13261
     },
     "packages/physics/dist/lava-kernel.wasm": {
       "raw": 9735,

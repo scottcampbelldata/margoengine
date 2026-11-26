@@ -9905,7 +9905,7 @@ crest-to-trough relief at one straight locked-wheel condition. Supply the same e
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 13,754 B gzip with a 14,167 B ceiling. Both Wasm assets are 35,619 B raw and 14,244 B gzip each.
+The optional entry is 13,754 B gzip with a 14,167 B ceiling. Both Wasm assets are 37,222 B raw and 15,244 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
