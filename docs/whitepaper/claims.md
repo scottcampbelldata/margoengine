@@ -5863,6 +5863,9 @@ and plain Wasm. An actual wheel consumes the separate side force and slows its l
 The cross-track depositor closes the volume on both berms of a centered wheel. A second
 fixture cuts the same rolling footprint next to an open boundary and confirms that only
 the supported bank's half is deposited. Both cases replay exactly.
+Lug transport fills part of the rear cut at full powered slip, is exactly zero at lockup,
+and changes banks when the projected corners align. The physical terrain closes its volume
+in all three cases.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.

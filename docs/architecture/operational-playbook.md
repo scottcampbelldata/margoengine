@@ -10610,6 +10610,8 @@ contact velocity. The lateral impulse respects the available grip and stops at z
 The optional cross-track depositor reweights the actual loose cut volume into separate
 repose-slope banks. It enumerates only their projected node bounds, schedules their faces
 for the same conservative repose sweep and records the share of each missing bank as export.
+Grouser transport takes its volume from the same cut ledger. It uses the rear area's current
+excavation capacity and sends it to the opposite bank when the projected corners align.
 
 ### Divergence-free particle pressure
 
