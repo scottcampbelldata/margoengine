@@ -575,6 +575,11 @@ export interface Physics2DSolverOptions {
     minCcdDt?: number;
     ccdTolerance?: number;
     ccdMaxAdvances?: number;
+    warmStart?: number;
+    allowedPenetration?: number;
+    predictionDistance?: number;
+    staticContactHertz?: number | null;
+    staticContactDamping?: number | null;
 }
 
 export class PidController2D {

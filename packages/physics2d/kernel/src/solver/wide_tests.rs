@@ -28,7 +28,7 @@ fn constraint(scale: f32, count: u8, coupled: bool, old: [f32; 2]) -> Constraint
         points: [super::super::Point::default(); 2],
         count,
         block: coupled,
-        eighth: false,
+        spring: 0,
         pushed: 0,
     };
     for (i, x) in [-0.5, 0.5].into_iter().enumerate() {

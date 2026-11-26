@@ -501,6 +501,19 @@ pub struct Settings {
     pub ccd_tolerance: f32,
     /// The most advances the sweep takes for a pair of shapes (default 32, at most 4096); the time reached after them is before any touch.
     pub ccd_max_advances: u32,
+    /// The share, 0 to 1, of each contact's impulses from the last step it starts the step with (Rapier's
+    /// `warmstart_coefficient`; default 1).
+    pub warm_start: f32,
+    /// How deep, in metres, a contact may overlap before the solver pushes it out (Rapier's allowed linear error; default 0:
+    /// every depth is pushed out). Shapes at rest overlap by it.
+    pub allowed_penetration: f32,
+    /// How far apart, in metres, two shapes may be and still get contact points (Rapier's prediction distance; default
+    /// `SPECULATIVE`, 0.02 m).
+    pub prediction_distance: f32,
+    /// The contact spring for contacts with a fixed or kinematic body, hertz and damping ratio (Rapier's static contact
+    /// softness); `None` (the default) takes `contact_hertz` and `contact_damping`.
+    pub static_contact_hertz: Option<f32>,
+    pub static_contact_damping: Option<f32>,
 }
 
 /// The broad phase. Both give the same pairs in the same order, so the same step to the bit; they differ in work.
@@ -580,6 +593,11 @@ impl Default for Settings {
             min_ccd_dt: 0.0,
             ccd_tolerance: crate::shape::LINEAR_SLOP,
             ccd_max_advances: 32,
+            warm_start: 1.0,
+            allowed_penetration: 0.0,
+            prediction_distance: SPECULATIVE,
+            static_contact_hertz: None,
+            static_contact_damping: None,
         }
     }
 }
@@ -1497,6 +1515,9 @@ impl World {
         let settings = &self.settings;
         if [dt, settings.gravity.x, settings.gravity.y, settings.contact_hertz, settings.contact_damping, settings.contact_max_push, settings.restitution_threshold, settings.sleep_threshold, settings.sleep_time, settings.joint_hertz, settings.joint_damping, settings.joint_max_push].into_iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
         if settings.contact_max_push < 0.0 || settings.joint_max_push < 0.0 { return Err(PhysicsError::InvalidParameter); }
+        let extra = [settings.warm_start, settings.allowed_penetration, settings.prediction_distance, settings.static_contact_hertz.unwrap_or(0.0), settings.static_contact_damping.unwrap_or(0.0)];
+        if extra.iter().any(|v| !v.is_finite()) { return Err(PhysicsError::NotFinite); }
+        if !(0.0..=1.0).contains(&settings.warm_start) || extra[1..].iter().any(|v| *v < 0.0) { return Err(PhysicsError::InvalidParameter); }
         self.shape_marks.resize(self.shapes.len(), false);
         for (mark, shape) in self.shape_marks.iter_mut().zip(&self.shapes) {
             *mark = shape.dead;
@@ -1689,13 +1710,14 @@ impl World {
             // Contact skins: the pair's points start the skins farther out and read that much nearer, so the solver holds the
             // shapes the sum of their skins apart (Rapier's contact skin).
             let skin = sa.skin + sb.skin;
-            let spec = SPECULATIVE.max(ba.soft_ccd).max(bb.soft_ccd) + skin;
-            if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 && spec == SPECULATIVE {
+            let reach = self.settings.prediction_distance;
+            let spec = reach.max(ba.soft_ccd).max(bb.soft_ccd) + skin;
+            if !sa.chain && !sb.chain && sa.core.count == 4 && sb.core.count == 4 && spec == reach {
                 inputs[queued] = Some((&sa.core, xa, &sb.core, xb, reference_flip(&contact.manifold)));
                 pending[queued] = Some(contact);
                 queued += 1;
                 if queued == 4 {
-                    let manifolds = collide_four_trusted(inputs.map(Option::unwrap), SPECULATIVE)?;
+                    let manifolds = collide_four_trusted(inputs.map(Option::unwrap), reach)?;
                     for (slot, manifold) in pending.iter_mut().zip(manifolds) {
                         cold += slot.take().unwrap().refresh(manifold);
                     }
@@ -1734,7 +1756,7 @@ impl World {
         // Fewer than four remaining quads keep the scalar path, with the same per-contact frame and last face.
         for (slot, input) in pending.into_iter().zip(inputs).take(queued) {
             let (a, xa, b, xb, last) = input.unwrap();
-            cold += slot.unwrap().refresh(collide_coherent_trusted(a, xa, b, xb, SPECULATIVE, last)?);
+            cold += slot.unwrap().refresh(collide_coherent_trusted(a, xa, b, xb, self.settings.prediction_distance, last)?);
         }
         self.counts.manifolds = built;
         self.counts.cold_points = cold;

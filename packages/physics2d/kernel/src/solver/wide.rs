@@ -42,6 +42,8 @@ pub(super) struct Block {
     two: M4,
     block: M4,
     eighth: M4,
+    /// Lanes whose pair has a fixed or kinematic body: the static spring.
+    fixed: M4,
     write_a: u32,
     write_b: u32,
     /// Whether every contact of the block has two points; whether every one takes the block solve. A step that touches
@@ -130,17 +132,19 @@ impl Blocks {
                 mut two,
                 mut block,
                 mut eighth,
+                mut fixed,
                 mut write_a,
                 mut write_b,
                 mut pushed0,
                 mut pushed1,
-            ) = (0, 0, 0, 0, 0, 0, 0);
+            ) = (0, 0, 0, 0, 0, 0, 0, 0);
             for (k, (c, surface)) in group.iter().map(|&i| (&constraints[i as usize], surfaces.get(i as usize).copied().unwrap_or(0.0))).enumerate() {
                 a[k] = c.a;
                 b[k] = c.b;
                 two |= ((c.count == 2) as u32) << k;
                 block |= ((c.count == 2 && c.block) as u32) << k;
-                eighth |= (c.eighth as u32) << k;
+                eighth |= ((c.spring & 1) as u32) << k;
+                fixed |= ((c.spring >> 1 & 1) as u32) << k;
                 write_a |= ((c.inv_mass_a > 0.0 || c.inv_i_a > 0.0) as u32) << k;
                 write_b |= ((c.inv_mass_b > 0.0 || c.inv_i_b > 0.0) as u32) << k;
                 pushed0 |= (c.pushed as u32 & 1) << k;
@@ -201,6 +205,7 @@ impl Blocks {
                 two: M4::from_bits(two),
                 block: M4::from_bits(block),
                 eighth: M4::from_bits(eighth),
+                fixed: M4::from_bits(fixed),
                 write_a,
                 write_b,
                 all_two: two == (1 << group.len()) - 1,
@@ -363,6 +368,9 @@ pub(super) fn warm_start(bodies: &mut [SolverBody], blocks: &[Block]) {
 pub(super) struct Springs {
     pub(super) quarter: Soft,
     pub(super) eighth: Soft,
+    /// The same for a pair with a fixed or kinematic body.
+    pub(super) quarter_static: Soft,
+    pub(super) eighth_static: Soft,
 }
 
 /// `row`: the bias and the soft scales of one row in each lane, from its gap `s`.
@@ -410,6 +418,7 @@ pub(super) fn solve(
         )
     };
     let (q, e) = (lanes(&springs.quarter), lanes(&springs.eighth));
+    let (qs, es) = (lanes(&springs.quarter_static), lanes(&springs.eighth_static));
     let (mut block_count, mut sequential_count) = (0u64, 0u64);
     let mut begin = 0;
     for &end in &blocks.ends {
@@ -425,6 +434,8 @@ pub(super) fn solve(
                 max_push,
                 q,
                 e,
+                qs,
+                es,
             )?;
             block_count += b;
             sequential_count += s;
@@ -440,6 +451,8 @@ pub(super) fn solve(
                 max_push,
                 q,
                 e,
+                qs,
+                es,
             )?;
             block_count += b;
             sequential_count += s;
@@ -462,6 +475,8 @@ fn visit<const N: usize>(
     max_push: F4,
     q: Lanes4,
     e: Lanes4,
+    qs: Lanes4,
+    es: Lanes4,
 ) -> Result<(u64, u64), PhysicsError> {
     let mut ma: [Motion4; N] = core::array::from_fn(|j| gather(bodies, &cs[j].a));
     let mut mb: [Motion4; N] = core::array::from_fn(|j| gather(bodies, &cs[j].b));
@@ -485,6 +500,8 @@ fn visit<const N: usize>(
         max_push,
         q,
         e,
+        qs,
+        es,
         &mut blocks,
         &mut sequential,
     )?;
@@ -573,17 +590,17 @@ fn normal_n<const N: usize>(
     max_push: F4,
     q: Lanes4,
     e: Lanes4,
+    qs: Lanes4,
+    es: Lanes4,
     blocks: &mut u64,
     sequential: &mut u64,
 ) -> Result<(), PhysicsError> {
     for j in 0..N {
         let c = &mut *cs[j];
-        let spring = (
-            F4::select(c.eighth, e.0, q.0),
-            F4::select(c.eighth, e.1, q.1),
-            F4::select(c.eighth, e.2, q.2),
-        );
-        let ratio = F4::select(c.eighth, e.3, q.3);
+        // Each lane's spring: the eighth or quarter rate, of the static spring where the pair has a fixed or kinematic body.
+        let pick = |x: F4, y: F4, xs: F4, ys: F4| F4::select(c.fixed, F4::select(c.eighth, ys, xs), F4::select(c.eighth, y, x));
+        let spring = (pick(q.0, e.0, qs.0, es.0), pick(q.1, e.1, qs.1, es.1), pick(q.2, e.2, qs.2, es.2));
+        let ratio = pick(q.3, e.3, qs.3, es.3);
         let (b, s) = normal(
             c, &mut ma[j], &mut mb[j], g[j], biased, inv_h, max_push, spring, ratio,
         )?;
@@ -825,7 +842,7 @@ fn capped_lanes(
             points: [point(0), point(1)],
             count: if c.two.bits() >> lane & 1 != 0 { 2 } else { 1 },
             block: c.block.bits() >> lane & 1 != 0,
-            eighth: false,
+            spring: 0,
             pushed: ((push0 >> lane & 1) | ((push1 >> lane & 1) << 1)) as u8,
         };
         let mut a = super::Motion {

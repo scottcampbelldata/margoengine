@@ -130,8 +130,10 @@ struct Constraint {
     count: u8,
     /// Whether K is well conditioned for the block solve.
     block: bool,
-    /// Whether the pair takes the eighth-rate spring in the biased passes (else the quarter).
-    eighth: bool,
+    /// Which spring the pair takes in the biased passes, an index into the step's four: bit 0 the eighth rate (else the
+    /// quarter), bit 1 the static contact spring for a pair with a fixed or kinematic body (`Settings::static_contact_*`).
+    /// One byte, so a constraint stays 128 bytes.
+    spring: u8,
     /// Bit k: whether point k has pushed in any substep (restitution needs it).
     pushed: u8,
 }
@@ -407,7 +409,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32, substeps: u32) -> Resu
             points: [Point::default(); 2],
             count: m.count as u8,
             block: false,
-            eighth: false,
+            spring: ((ba.kind != crate::world::Kind::Dynamic || bb.kind != crate::world::Kind::Dynamic) as u8) << 1,
             pushed: 0,
         };
         let mut bounce = Bounce {
@@ -454,9 +456,11 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32, substeps: u32) -> Resu
             c.points[k] = Point {
                 anchor_a: ra,
                 anchor_b: rb,
-                base,
-                normal_impulse: contact.normal_impulse[k],
-                tangent_impulse: contact.tangent_impulse[k],
+                // An allowed penetration reads each gap that much larger, so the shapes rest overlapping by it.
+                base: base + settings.allowed_penetration,
+                // The share of last step's impulses the step starts with (warm starting).
+                normal_impulse: contact.normal_impulse[k] * settings.warm_start,
+                tangent_impulse: contact.tangent_impulse[k] * settings.warm_start,
                 normal_mass: if kn > 0.0 { 1.0 / kn } else { 0.0 },
                 tangent_mass: if kt > 0.0 { 1.0 / kt } else { 0.0 },
             };
@@ -485,7 +489,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32, substeps: u32) -> Resu
             && bb.kind == Kind::Dynamic
             && load * ima.max(imb) < chain_limit
         {
-            c.eighth = true;
+            c.spring |= 1;
         }
         let (centre, p) = (ba.exact_center, c.points[0].anchor_a);
         keys.push(float_key(
@@ -535,7 +539,14 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32, substeps: u32) -> Resu
             );
         }
     }
-    let wide_springs = wide::Springs { quarter, eighth };
+    // Contacts with a fixed or kinematic body take the static spring, the contact spring's own unless set.
+    let (static_hertz, static_damping) = (
+        settings.static_contact_hertz.unwrap_or(settings.contact_hertz),
+        settings.static_contact_damping.unwrap_or(settings.contact_damping),
+    );
+    let quarter_static = soft(static_hertz.min(quarter_rate), static_damping, h);
+    let eighth_static = soft(static_hertz.min(0.125 * inv_h), static_damping, h);
+    let wide_springs = wide::Springs { quarter, eighth, quarter_static, eighth_static };
     let joints = !world.joints.is_empty();
 
     let g = settings.gravity;
@@ -551,7 +562,7 @@ pub(crate) fn solve_validated(world: &mut World, dt: f32, substeps: u32) -> Resu
         spring: joint::joint_spring(settings.joint_hertz, settings.joint_damping, h),
         max_push: settings.joint_max_push,
     };
-    let springs = [quarter, eighth];
+    let springs = [quarter, eighth, quarter_static, eighth_static];
     let max_push = settings.contact_max_push;
     let mut support = core::mem::take(&mut world.scratch.support);
     let mut support_plan = path_support::plan(world, &ids, &constraints, &bounces, &mut support);
@@ -832,7 +843,7 @@ fn run_extra(
     sync: Option<(&mut Blocks, &[u32])>,
     pass: &Pass,
     max_push: f32,
-    springs: &[Soft; 2],
+    springs: &[Soft; 4],
 ) -> Result<(u64, u64), PhysicsError> {
     let (mut block, mut sequential) = (0u64, 0u64);
     let mut sync = sync;
@@ -1008,7 +1019,7 @@ fn solve_contact(
     biased: bool,
     inv_h: f32,
     max_push: f32,
-    springs: &[Soft; 2],
+    springs: &[Soft; 4],
 ) -> Result<(u64, u64), PhysicsError> {
     let (mut ma, mut mb) = motions(bodies, c);
     let mut gaps = [0.0f32; 2];
@@ -1018,7 +1029,7 @@ fn solve_contact(
     if biased {
         friction(c, &mut ma, &mut mb, surface);
     }
-    let spring = &springs[c.eighth as usize];
+    let spring = &springs[c.spring as usize];
     let counts = normal(c, &mut ma, &mut mb, gaps, biased, inv_h, max_push, spring)?;
     if !biased {
         friction(c, &mut ma, &mut mb, surface);
@@ -1692,7 +1703,7 @@ mod support_cap_tests {
             points: [Point::default(); 2],
             count: 2,
             block: true,
-            eighth: false,
+            spring: 0,
             pushed: 0,
         };
         for (p, x) in c.points.iter_mut().zip([-0.5, 0.5]) {

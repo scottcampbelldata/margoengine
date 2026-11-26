@@ -13,8 +13,8 @@ use crate::shape::{Core, MAX_VERTICES};
 use crate::world::{Body, BroadPhase, Contact, Event, EventKind, Kind, MassMode, Settings, Shape, World};
 
 const MAGIC: u32 = 0x3253_4e50; // "PNS2"
-/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step, a version below 12 the default continuous collision tolerances, a version below 13 no extra substeps, a version below 14 no combine rules (read as the average, the default), a version below 15 no contact skin, a version below 16 no mass mode (read as by density).
-const VERSION: u32 = 16;
+/// The version written. Versions 5 to 8 are still read: a version 5 motor has no per-mass word, a version below 7 no extra solid, a version below 8 no enabled flag, a version below 9 no angular speed limit, a version below 10 no extra solver passes, a version below 11 one continuous collision impact a step, a version below 12 the default continuous collision tolerances, a version below 13 no extra substeps, a version below 14 no combine rules (read as the average, the default), a version below 15 no contact skin, a version below 16 no mass mode (read as by density), a version below 17 the default warm start, allowed penetration, prediction distance and static contact spring.
+const VERSION: u32 = 17;
 
 struct Writer(Vec<u8>);
 impl Writer {
@@ -162,6 +162,11 @@ impl World {
         w.f32(s.min_ccd_dt);
         w.f32(s.ccd_tolerance);
         w.u32(s.ccd_max_advances);
+        w.f32(s.warm_start);
+        w.f32(s.allowed_penetration);
+        w.f32(s.prediction_distance);
+        w.f32(s.static_contact_hertz.unwrap_or(-1.0));
+        w.f32(s.static_contact_damping.unwrap_or(-1.0));
         w.u64(self.steps);
         w.u32(self.bodies.len() as u32);
         for b in &self.bodies {
@@ -365,7 +370,13 @@ impl World {
         let contact_lanes = r.bool()?;
         let max_ccd_substeps = if r.version >= 11 { r.u32()? } else { 1 };
         let (min_ccd_dt, ccd_tolerance, ccd_max_advances) = if r.version >= 12 { (r.f32()?, r.f32()?, r.u32()?) } else { (0.0, crate::shape::LINEAR_SLOP, 32) };
-        let settings = Settings { gravity, substeps, passes, contact_hertz, contact_damping, contact_max_push, restitution_threshold, sleep_threshold, sleep_time, sleep, block_solver, joint_hertz, joint_damping, joint_max_push, joint_geometric_stiffness, broad_phase, contact_lanes, max_ccd_substeps, min_ccd_dt, ccd_tolerance, ccd_max_advances };
+        let (warm_start, allowed_penetration, prediction_distance, static_contact_hertz, static_contact_damping) = if r.version >= 17 {
+            let v = [r.f32()?, r.f32()?, r.f32()?, r.f32()?, r.f32()?];
+            (v[0], v[1], v[2], (v[3] >= 0.0).then_some(v[3]), (v[4] >= 0.0).then_some(v[4]))
+        } else {
+            (1.0, 0.0, crate::world::SPECULATIVE, None, None)
+        };
+        let settings = Settings { gravity, substeps, passes, contact_hertz, contact_damping, contact_max_push, restitution_threshold, sleep_threshold, sleep_time, sleep, block_solver, joint_hertz, joint_damping, joint_max_push, joint_geometric_stiffness, broad_phase, contact_lanes, max_ccd_substeps, min_ccd_dt, ccd_tolerance, ccd_max_advances, warm_start, allowed_penetration, prediction_distance, static_contact_hertz, static_contact_damping };
         let mut world = World::new(settings);
         world.steps = r.u64()?;
         let n = r.count(60)?;

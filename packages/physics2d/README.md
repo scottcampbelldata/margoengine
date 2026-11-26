@@ -114,7 +114,7 @@ moon.dispose();
 
 ## Solver settings
 
-`physics.setSolver(options)` changes the solver and `physics.solver` reads it, with the names the 3D world uses: `substeps` a step (default 4), `iterations` (pushing passes a substep, each followed by as many relaxing ones, default 1), the contact spring `contactHertz` and `contactDamping`, `contactMaxPush` (the fastest a depth is pushed out), `restitutionThreshold` (under this approach speed a contact does not bounce), `sleepThreshold` and `sleepTime` with `canSleep`, `blockSolver` (Rapier's block solver: the two points of a contact solved together as one 2 by 2 problem, on by default; off, one point at a time), the joint spring `jointHertz`, `jointDamping`, `jointMaxPush` with `jointGeometricStiffness`, `maxCcdSubsteps` (how many impacts continuous collision handles in a step: default 1, 0 for off; see below), and the sweep's `minCcdDt`, `ccdTolerance` and `ccdMaxAdvances` with the 3D world's names and meanings. Speeds are in world units a second. A name left out keeps its value, and a refused one (a count that is not a whole number from 1 to 65535 (0 to 65535 for `maxCcdSubsteps`), a negative or non-finite number) throws a `RangeError` and changes nothing. The settings are part of a snapshot.
+`physics.setSolver(options)` changes the solver and `physics.solver` reads it, with the names the 3D world uses: `substeps` a step (default 4), `iterations` (pushing passes a substep, each followed by as many relaxing ones, default 1), the contact spring `contactHertz` and `contactDamping`, `contactMaxPush` (the fastest a depth is pushed out), `restitutionThreshold` (under this approach speed a contact does not bounce), `sleepThreshold` and `sleepTime` with `canSleep`, `blockSolver` (Rapier's block solver: the two points of a contact solved together as one 2 by 2 problem, on by default; off, one point at a time), the joint spring `jointHertz`, `jointDamping`, `jointMaxPush` with `jointGeometricStiffness`, `maxCcdSubsteps` (how many impacts continuous collision handles in a step: default 1, 0 for off; see below), the sweep's `minCcdDt`, `ccdTolerance` and `ccdMaxAdvances` with the 3D world's names and meanings, `warmStart` (the share of last step's contact impulses a step starts from, 0 to 1, default 1), `allowedPenetration` (how deep a contact may overlap before it is pushed apart, default 0), `predictionDistance` (how far apart two colliders get contact points, default 2 cm) and a contact spring for contacts with fixed and kinematic bodies, `staticContactHertz` and `staticContactDamping` (default `null`: the contact spring; a softer one lets bodies settle into the ground while stacks keep the stiff spring). Speeds and distances are in world units. A name left out keeps its value, and a refused one (a count that is not a whole number from 1 to 65535 (0 to 65535 for `maxCcdSubsteps`), a negative or non-finite number, a `warmStart` outside 0 to 1) throws a `RangeError` and changes nothing. The settings are part of a snapshot.
 
 ```ts
 import {Physics2D} from 'margoengine/physics2d';
@@ -123,10 +123,10 @@ await Physics2D.load();
 const physics = new Physics2D(null);
 physics.addBody(null, {type: 'fixed', position: [0, 100], colliders: {shape: 'box', width: 1000, height: 20}});
 physics.addBody(null, {position: [0, 80], colliders: {shape: 'box', width: 20, height: 20}});
-physics.setSolver({substeps: 8, blockSolver: false});
+physics.setSolver({substeps: 8, blockSolver: false, allowedPenetration: 0.5, staticContactHertz: 10});
 for (let i = 0; i < 30; i++) physics.step();
-const {substeps, blockSolver} = physics.solver;
-console.log(substeps, blockSolver, physics.counts.blockSolves); // 8 false 0
+const {substeps, blockSolver, staticContactDamping} = physics.solver;
+console.log(substeps, blockSolver, staticContactDamping, physics.counts.blockSolves); // 8 false null 0
 physics.dispose();
 ```
 

@@ -32,8 +32,16 @@ test('a new world reads its defaults back', () => {
     `ccdTolerance is 5 mm: ${solver.ccdTolerance}`,
   );
   assert.equal(solver.ccdMaxAdvances, 32);
+  assert.equal(solver.warmStart, 1);
+  assert.equal(solver.allowedPenetration, 0);
+  assert.ok(
+    Math.abs(solver.predictionDistance - 0.02 / physics.scale) < 1e-6 / physics.scale,
+    `predictionDistance is 2 cm: ${solver.predictionDistance}`,
+  );
+  assert.equal(solver.staticContactHertz, null);
+  assert.equal(solver.staticContactDamping, null);
   for (const [name, value] of Object.entries(solver))
-    assert.ok(typeof value === 'boolean' || Number.isFinite(value), name);
+    assert.ok(typeof value === 'boolean' || value === null || Number.isFinite(value), name);
   physics.dispose();
 });
 
@@ -58,6 +66,11 @@ test('every setting reads back as it was set, speeds in world units a second', (
     minCcdDt: 0.002,
     ccdTolerance: 0.1,
     ccdMaxAdvances: 100,
+    warmStart: 0.5,
+    allowedPenetration: 0.5,
+    predictionDistance: 2,
+    staticContactHertz: 10,
+    staticContactDamping: 2,
   };
   physics.setSolver(wanted);
   for (const [name, value] of Object.entries(physics.solver)) {
@@ -179,7 +192,67 @@ test('the kernel refuses what the wrapper would, on its own: a count out of rang
   );
   assert.ok(!refused(17, 0) && !refused(15, 0), 'whose 0 is allowed');
   physics.setSolver({ ccdMaxAdvances: 32, minCcdDt: 0 });
-  assert.ok(refused(18, 1) && refused(99, 1), 'a setting that does not exist');
+  assert.ok(
+    refused(18, 1.5) &&
+      refused(18, -0.1) &&
+      refused(19, -1) &&
+      refused(20, Number.NaN) &&
+      refused(21, -2) &&
+      refused(22, -0.5),
+    'a warm start out of 0 to 1, a negative depth or a spring below 0 other than -1',
+  );
+  assert.ok(refused(23, 1) && refused(99, 1), 'a setting that does not exist');
   assert.deepEqual(physics.solver, before);
   physics.dispose();
+});
+
+test('the contact spring for fixed bodies goes back to following the contact spring with null', () => {
+  const { physics } = stack();
+  physics.setSolver({ staticContactHertz: 5, staticContactDamping: 1 });
+  assert.equal(physics.solver.staticContactHertz, 5);
+  physics.setSolver({ staticContactHertz: null, staticContactDamping: null });
+  assert.equal(physics.solver.staticContactHertz, null);
+  assert.equal(physics.solver.staticContactDamping, null);
+  physics.dispose();
+});
+
+test('a warm start out of 0 to 1 or a negative depth is refused and changes nothing', () => {
+  const { physics } = stack();
+  assert.throws(() => physics.setSolver({ substeps: 2, warmStart: 1.5 }), RangeError);
+  assert.throws(() => physics.setSolver({ allowedPenetration: -1 }), RangeError);
+  assert.throws(() => physics.setSolver({ staticContactHertz: -2 }), RangeError);
+  assert.equal(physics.solver.substeps, 4);
+  assert.equal(physics.solver.warmStart, 1);
+  physics.dispose();
+});
+
+test('an allowed penetration lets the resting stack sink by about that depth at each contact', () => {
+  const rest = (allowedPenetration) => {
+    const { physics, boxes } = stack({ pixelsPerMeter: 100 });
+    physics.setSolver({ allowedPenetration });
+    for (let i = 0; i < 240; i++) physics.step();
+    const y = boxes[0].position[1];
+    physics.dispose();
+    return y;
+  };
+  // Y is down: a box that sinks into the floor has a larger y. 1 px is 1 cm at 100 px a metre.
+  const sink = rest(1) - rest(0);
+  assert.ok(Math.abs(sink - 1) < 0.2, `the bottom box sinks ${sink} px for 1 px allowed`);
+});
+
+test('a soft spring for fixed bodies sinks a dropped box into the floor further on its first landing', () => {
+  const deepest = (staticContactHertz) => {
+    const physics = new Physics2D(null, { pixelsPerMeter: 100 });
+    physics.addBody(null, { type: 'fixed', position: [0, 100], colliders: { shape: 'box', width: 1000, height: 20 } });
+    const box = physics.addBody(null, { position: [0, 0], colliders: { shape: 'box', width: 20, height: 20 } });
+    physics.setSolver({ staticContactHertz, staticContactDamping: staticContactHertz === null ? null : 0.5 });
+    let y = -Infinity;
+    for (let i = 0; i < 60; i++) {
+      physics.step();
+      y = Math.max(y, box.position[1]);
+    }
+    physics.dispose();
+    return y;
+  };
+  assert.ok(deepest(2) > deepest(null) + 1, `soft ${deepest(2)} against ${deepest(null)}`);
 });

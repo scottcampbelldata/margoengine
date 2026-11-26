@@ -273,7 +273,7 @@ fn component_local(
     path: &[(usize, usize, usize)],
     dt: f32,
     h: f32,
-    springs: &[Soft; 2],
+    springs: &[Soft; 4],
     pose_distance: &mut [f32],
     weights: &[[f64; 3]],
 ) -> bool {
@@ -335,7 +335,7 @@ fn component_local(
     let mut rows = Vec::new();
     for (at, &(ci, _, _)) in path.iter().enumerate() {
         let c = &constraints[ci];
-        let spring = &springs[c.eighth as usize];
+        let spring = &springs[c.spring as usize];
         if ![spring.bias_rate, spring.mass_scale, spring.impulse_scale]
             .into_iter()
             .all(|x| x > 0.0 && x.is_finite())
@@ -611,7 +611,7 @@ fn component(
     path: &[(usize, usize, usize)],
     dt: f32,
     h: f32,
-    springs: &[Soft; 2],
+    springs: &[Soft; 4],
     pose_distance: &mut [f32],
     weights: &[[f64; 3]],
 ) -> bool {
@@ -890,7 +890,7 @@ pub(super) fn stabilize(
     bounces: &[Bounce],
     dt: f32,
     h: f32,
-    springs: &[Soft; 2],
+    springs: &[Soft; 4],
     pose_distance: &mut [f32],
 ) {
     for range in &plan.ranges {
@@ -1327,6 +1327,8 @@ mod tests {
         let mut observed = alloc::vec![0.0;w.bodies.len()];
         let before = bits(&w, &scratch);
         let springs = [
+            super::super::soft(60.0, 10.0, 1.0 / 240.0),
+            super::super::soft(30.0, 10.0, 1.0 / 240.0),
             super::super::soft(60.0, 10.0, 1.0 / 240.0),
             super::super::soft(30.0, 10.0, 1.0 / 240.0),
         ];

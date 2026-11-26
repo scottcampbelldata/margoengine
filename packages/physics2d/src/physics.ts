@@ -309,7 +309,15 @@ const SOLVER_SETTINGS = [
   ['minCcdDt', 'amount'],
   ['ccdTolerance', 'length'],
   ['ccdMaxAdvances', 'advances'],
+  ['warmStart', 'share'],
+  ['allowedPenetration', 'depth'],
+  ['predictionDistance', 'depth'],
+  ['staticContactHertz', 'spring'],
+  ['staticContactDamping', 'spring'],
 ] as const;
+
+/** Whether a setting of this kind is a distance or speed in world units, scaled to metres on the way in. */
+const scaled = (kind: string): boolean => kind === 'speed' || kind === 'length' || kind === 'depth';
 
 /** The settings of the solver that {@link Physics2D.setSolver} changes. */
 export interface Physics2DSolverOptions {
@@ -353,6 +361,27 @@ export interface Physics2DSolverOptions {
   ccdTolerance?: number;
   /** The most advances the sweep takes for a pair of colliders (default 32, 0 to 4096); the time reached after them is before any touch, as the 3D `ccdMaxAdvances`. */
   ccdMaxAdvances?: number;
+  /**
+   * The share of last step's contact impulses a step starts from, 0 to 1 (default 1), as Rapier's `warmstartCoefficient`. Less than 1
+   * trades the stiffness of stacks for less carried overshoot.
+   */
+  warmStart?: number;
+  /**
+   * How deep, in world units, a contact may overlap before it is pushed apart (default 0), as Rapier's `allowedLinearError`. A small
+   * depth keeps resting contacts touching from step to step, so they do not flicker; the solver's own slop is kept on top of it.
+   */
+  allowedPenetration?: number;
+  /**
+   * How far apart, in world units, two colliders get contact points before they touch (default 0.02 m), as Rapier's
+   * `predictionDistance`. Longer catches faster bodies without continuous collision and costs more contacts.
+   */
+  predictionDistance?: number;
+  /**
+   * The contact spring for contacts with a fixed or kinematic body (`null`, the default: the same as `contactHertz` and
+   * `contactDamping`). A softer one lets bodies settle into the ground while stacks keep the stiff spring between them.
+   */
+  staticContactHertz?: number | null;
+  staticContactDamping?: number | null;
 }
 
 /**
@@ -565,17 +594,25 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
    * each followed by as many relaxing ones) a substep, the contact spring `contactHertz` and `contactDamping`, how fast a depth is
    * pushed out at most (`contactMaxPush`), the approach speed under which a contact does not bounce (`restitutionThreshold`), the
    * speed and time under which a body may sleep (`sleepThreshold`, `sleepTime`) and whether it may (`canSleep`), `blockSolver`,
-   * the joint spring (`jointHertz`, `jointDamping`, `jointMaxPush`) and `jointGeometricStiffness`. Speeds are in world units a
-   * second. Defaults are what a new world reads.
+   * the joint spring (`jointHertz`, `jointDamping`, `jointMaxPush`) and `jointGeometricStiffness`, the continuous-collision
+   * settings, `warmStart`, `allowedPenetration`, `predictionDistance` and the contact spring for fixed bodies
+   * (`staticContactHertz`, `staticContactDamping`, null when it follows the contact spring). Speeds are in world units a second.
+   * Defaults are what a new world reads.
    */
   get solver(): Required<Physics2DSolverOptions> {
     this.live();
     const { kernel } = this;
     const read = kernel.io(kernel.ok(kernel.exports.world_settings(this.handle))).f;
-    const out: Record<string, number | boolean> = {};
+    const out: Record<string, number | boolean | null> = {};
     SOLVER_SETTINGS.forEach(([name, kind], at) => {
       out[name] =
-        kind === 'flag' ? read[at] !== 0 : kind === 'speed' || kind === 'length' ? read[at]! / this.scale : read[at]!;
+        kind === 'flag'
+          ? read[at] !== 0
+          : kind === 'spring' && read[at] === -1
+            ? null
+            : scaled(kind)
+              ? read[at]! / this.scale
+              : read[at]!;
     });
     return out as Required<Physics2DSolverOptions>;
   }
@@ -587,8 +624,12 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.live();
     const { kernel } = this;
     for (const [name, kind] of SOLVER_SETTINGS) {
-      const value = options[name] as number | undefined;
+      const value = options[name] as number | null | undefined;
       if (kind === 'flag' || value === undefined) continue;
+      if (value === null) {
+        if (kind === 'spring') continue;
+        throw new RangeError(`Solver ${name} must be a number; got null.`);
+      }
       const whole = Number.isInteger(value);
       const [valid, wanted, hint] =
         kind === 'count'
@@ -603,7 +644,15 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
                     'a finite number of 1e-7 metres or more',
                     'a distance such as 0.005',
                   ]
-                : [value >= 0 && value < Infinity, 'a finite number of 0 or more', '0 for none'];
+                : kind === 'share'
+                  ? [value >= 0 && value <= 1, 'a number from 0 to 1', '1 for the whole impulse']
+                  : kind === 'spring'
+                    ? [
+                        value >= 0 && value < Infinity,
+                        'a finite number of 0 or more, or null',
+                        'null for the contact spring',
+                      ]
+                    : [value >= 0 && value < Infinity, 'a finite number of 0 or more', '0 for none'];
       if (!valid) throw new RangeError(`Solver ${name} must be ${wanted}; got ${value}. Give ${hint}.`);
     }
     SOLVER_SETTINGS.forEach(([name, kind], at) => {
@@ -613,7 +662,7 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
           kernel.exports.world_set_setting(
             this.handle,
             at,
-            Number(value) * (kind === 'speed' || kind === 'length' ? this.scale : 1),
+            value === null ? -1 : Number(value) * (scaled(kind) ? this.scale : 1),
           ),
         );
     });
