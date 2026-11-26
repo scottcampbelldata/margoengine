@@ -9586,14 +9586,18 @@ A fourth-order determinant term resists compression as volume collapses and has 
 stiffness at rest. Each vertex update recomputes its incident cells' elastic energy to enforce
 descent with the stored f32 positions. The material uses one 18-word record per tetrahedron in
 the snapshot only when a body has authored orthotropy. The existing fracture rules remain scalar.
+The optional soft entry measures 128,798 B gzip, with 36,140 B in its base and 91,828 B in the
+lazy native kernel bundle.
 
-Sources: [Theory and Discretization of Finite Elements](https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf),
-Eftychios Sifakis and Jernej Barbič, 2012, for the Green strain and tetrahedral energy.
-[Mechanical Properties of Wood](https://research.fs.usda.gov/treesearch/62244), C. Adam Senalik
-and Benjamin Farber, 2021, Tables 5–1 and 5–2, for Douglas-fir moduli ratios and Poisson ratios.
-[Invertible Finite Elements for Robust Simulation of Large Deformation](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf),
-Geoffrey Irving, Joseph Teran and Ronald Fedkiw, 2004, for the inversion problem. The fourth-order
-determinant term is derived here to preserve that material's calibrated tangent at rest.
+The tetrahedral energy follows Green strain as described by Eftychios Sifakis and Jernej Barbič,
+2012. [Theory and Discretization of Finite Elements](https://viterbi-web.usc.edu/~jbarbic/femdefo/sifakis-courseNotes-TheoryAndDiscretization.pdf)
+
+The material example uses Douglas-fir moduli and Poisson ratios from Tables 5–1 and 5–2 of
+C. Adam Senalik and Benjamin Farber, 2021. [Mechanical Properties of Wood](https://research.fs.usda.gov/treesearch/62244)
+
+Geoffrey Irving, Joseph Teran and Ronald Fedkiw described the inversion problem in 2004.
+The fourth-order determinant term here keeps the calibrated tangent at rest.
+[Invertible Finite Elements for Robust Simulation of Large Deformation](https://www.math.ucdavis.edu/~jteran/papers/ITF04.pdf)
 
 ### Gas-filled soft shells (SOFT-06)
 

@@ -231,6 +231,7 @@ export class SoftBodies implements PhysicsAttachment {
     cellSolver(body: SoftBody): SoftSolver;
     setCellSolver(body: SoftBody, solver: SoftSolver): void;
     writeCellMaterial(body: SoftBody): void;
+    cellOrthotropy({ cellRange }: SoftBody): readonly number[] | null;
     cellFiber({ cellRange }: SoftBody): SoftFiber | null;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
@@ -296,6 +297,7 @@ export class SoftBody {
     get solverKind(): SoftSolver;
     set solverKind(solver: SoftSolver);
     get fiber(): SoftFiber | null;
+    get orthotropy(): readonly number[] | null;
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -433,6 +435,7 @@ export class SoftBodyDesc {
     cells: number[];
     cellMaterial: CellMaterial;
     fiber: SoftFiber | null;
+    orthotropy: readonly number[] | null;
     clusterGroups: number[][];
     clusterHertz: number;
     massGiven: boolean;
@@ -477,6 +480,7 @@ export class SoftBodyDesc {
     setSurface(): this;
     setSolver(solver: SoftSolver): this;
     setFiberStiffness(direction: Vec3, modulus: number): this;
+    setOrthotropicStiffness(material: SoftOrthotropy | null): this;
     setCellMaterial(material: CellMaterial): this;
     setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
     resolvedMasses(): number[];
@@ -569,6 +573,13 @@ export class SoftMeshBinding {
     static direct(particles: ArrayLike<number>): SoftMeshBinding;
     static directByPosition(eps: number): SoftMeshBinding;
     static skinned(): SoftMeshBinding;
+}
+
+export interface SoftOrthotropy {
+    readonly youngsModuli: Vec3;
+    readonly shearModuli: Vec3;
+    readonly poissonRatios: Vec3;
+    readonly axes?: readonly [Vec3, Vec3];
 }
 
 export interface SoftSoftness {

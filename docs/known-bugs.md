@@ -16747,8 +16747,8 @@ moving-footprint and berm profiles remain EARTH-05 work.
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support rung
-now runs with a full orthotropic tensor in native vertex blocks. The fracture threshold still uses
-scalar cohesion, so this does not yet model measuring and breaking timber across and along its grain.
+now runs with a full orthotropic tensor in native vertex blocks. The fracture threshold uses scalar
+cohesion. Grain-dependent timber fracture remains open.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
