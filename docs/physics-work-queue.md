@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **BIO-03:** Register canonical x-fast cell fields for forest burn severity, fuel moisture, live canopy fuel,
+  crown cover and root cohesion, and expose producer extents with their grid ports. The optional forest solver
+  ships its versioned exposure and output fields and consumes HYDRO-01 and HYDRO-04 directly on matching grids.
+
 - **LIFE-02:** Reserve static Wasm slot 13 and promote the versioned `groundAnimalPose` and
   `groundAnimalContact` rows to shared fields when the rigid/animation readers adopt them. Add initial cell and
   cell size to the solver host, portable bed geometry, and a contact-wrench accumulator for articulated bodies

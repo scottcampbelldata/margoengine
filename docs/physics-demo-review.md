@@ -316,11 +316,11 @@ What it shows: a slow fly-through of an alpine slope, from meadow grass and firs
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | TREE-1 | 0:00-0:15 (meadow, strips at 4 fps) | The caption says "wind runs across the meadow" (0:15-0:18) but I see no gust front crossing the grass; blades look the same pose frame to frame after allowing for the camera move. Uncertain from stills. | Grass leans in a gust that travels across the slope with a visible front and speed. | BIO-01, ATMO-02 | stand-in (PA-30, PA-28) | Modal sway driven by a travelling gust field sampled per plant. | OPEN |
 | TREE-2 | 0:12-0:14 | A young fir in the foreground shows a bright white trunk with scattered glints for one frame and is gone in the next. It looks like a pop in the geometry or level of detail, not a motion. Related to wind: the firs show no visible sway. | A tree sways at its natural frequency with branches lagging the trunk. | BIO-01 | stand-in (PA-30) | Per-species stiffness and mass, trunk and branch modes. | OPEN |
-| TREE-3 | 0:20-1:15 (distant forest and exposed slope) | Trees on the exposed side show no lean or flagging from the wind that the video says shapes the treeline; they are upright in every frame. | Krummholz and flagged trees lean away from the wind. | BIO-01, BIO-03 | stand-in / sound for placement | Growth form tied to the wind field, not only placement. | OPEN |
+| TREE-3 | 0:20-1:15 (distant forest and exposed slope) | Trees on the exposed side show no lean or flagging from the wind that the video says shapes the treeline; they are upright in every frame. | Krummholz and flagged trees lean away from the wind. | BIO-01, BIO-03 | BIO-03 checks a windward crown that keeps a leeward axis after the wind stops, beside an upright sheltered crown. | Apply the solved growth axis to the distant stand and review the filmed shot. | OPEN |
 | TREE-4 | 0:40-1:20 (clouds) | The cloud layer drifts at a steady slow speed with little change in shape. Uncertain: this is more look than physics. | Clouds evolve and move with the wind at height. | ATMO-03 | none (PA-34) | Cloud advection from the shared wind field. | OPEN |
 | TREE-5 | 0:30-1:00 (snow patches near the ridge) | A thin white line of snow on the ridge appears and stays the same; no snow blows off the ridge. | Wind lifts and carries snow off exposed crests. | ATMO-06, EARTH-07 | EARTH-07 fixes PA-63. PA-61 remains open. | `blown-sand-check.mjs` advances a stationary ridge into a visible plume sourced from `TerrainBed` on WebGPU and WebGL2 compatibility. The filmed shot awaits integration. | OPEN |
 Handled acceptably: the fly-through camera is smooth; the treeline gradient (trees thinning with height) is steady from shot to shot; no scree or rock moves wrongly.
-Not in the catalog: none (the stunted growth form tied to wind is covered by BIO-01 and BIO-03 only as sway and placement).
+Not in the catalog: none. BIO-03 supplies a wind-shaped crown axis and BIO-01 supplies sway.
 
 ### A Week of Wind (a-week-of-wind)
 What it shows: an animated map of NOAA reanalysis wind over the North Atlantic, 1 to 8 January 2024, as moving streamlines with blue trails and gold release paths.
@@ -512,4 +512,4 @@ Not in the catalog: staged construction (placement of pieces, stacking, scaffold
   check the arrival order at separated roots and activation of a colliding trunk after an impact.
 - The two analytic frequencies and the planted-root and moving-crown checks in `packages/scatter/test/states.browser.mjs`
   cover the wind response in CY-14, CITY-TO-STREET-1, TREE-2 and THE-SCANNED-WORKSHOP-2.
-- TREE-3's permanent wind-shaped growth remains a plant establishment and growth problem in BIO-03.
+- TREE-3's permanent wind-shaped growth is verified in `packages/biomes/tests/coupling/forest.test.js`. The filmed stand still needs the renderer binding.

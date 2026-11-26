@@ -10171,3 +10171,12 @@ planar face integrals give the pressure and moment before every kick. The regist
 real ICE-02 calving volume into the body queue and paired SI volume patches into the existing
 WakeSolver. The coupled test checks crest and trough, zero mean water gain, freshwater mass
 balance, replay and equal hashes using distinct plain and shared memory.
+
+### Forest crown competition kernel (BIO-03)
+
+The optional `@margoengine/biomes/forest` builds its crown-neighbour table in world-assigned scratch each
+ecological year. It rejects separated crowns using squared distances and computes exact integer overlap depths
+in two SIMD lanes for each remaining pair. Its Rust Wasm has no initial data and imports the world memory in both plain and shared variants.
+The build instantiates each variant over sentinel-filled memory and verifies every byte is intact. An independent
+offline integer reference checks annual births, mortality, snag cleanup and living crowns. World tests exercise
+the surface-water and landscape ports, exact exposure replay, and a retained growth axis after the wind drops.

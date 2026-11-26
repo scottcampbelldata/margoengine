@@ -9348,3 +9348,24 @@ have explicitly allocated body rows, with queued volumes retained across snapsho
 The optional iceberg entry measures 5,162 B gzip with a 5,418 B ceiling. The plain and shared
 assets each measure 9,128 B raw and 4,318 B gzip. Physics/sea measures 7,745 B gzip
 with the field reader, with an 8,001 B ceiling. Core plus stage remains 24,820 B gzip.
+
+### Live forest ecosystem (BIO-03)
+
+The forest entry is 7,194 B gzip and each optional Wasm variant is 1,276 B raw. The shared annual implementation
+raises the offline ecosystem entry from 3,210 B to 3,652 B gzip. Core and stage stay at 24,820 B gzip.
+
+The optional `@margoengine/biomes/forest` advances individual crowns with millimetre radii, centimetre positions
+within 100 km of the origin and Q16 competition. Default capacity is 16,384 trees including snags. Set capacity for
+a plot with `limit`, up to the offline model's one million trees. The annual transition uses one grid of crown
+neighbours sized to twice capacity or the next power of two. Native workspace bytes scale as four times
+`(capacity + 3 * tableSize)`, with a further four per capacity row for shade output. Native scratch is rebuilt
+each year and shared between releases only through the world's arena. World state holds 44 bytes per tree slot for
+population and permanent lean. The annual grid holds four f64 channels per patch plus one duration per distinct
+species flood depth. Match extent and origin with water, landscape and snow readers.
+
+The patch placement approximation bins an entire crown at its stem. Cover is the sum of projected crown shares
+limited to unity. Fuel sums individual crown mass so overlapping live crowns still carry fuel. The wind rule
+updates the crown axis in proportion to new projected area. It represents long-term flagging by changing the crown
+axis rather than tracking individual branches or modelling physiological dormancy, burial or ice damage. Flood
+tolerance represents measured depth and duration for one species and life stage. The burn and fuel-moisture input
+is an explicit versioned port. Cover, roots and canopy fuel update at annual boundaries.

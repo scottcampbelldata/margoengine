@@ -329,3 +329,44 @@ to prepare and validate a real Vite consumer. Run
 The same preparation runs with the package CPU tests. The browser proof checks
 lazy asset loading, exact served Wasm bytes and every real-crop field on WebGPU
 and WebGL2 pages; it makes no GPU erosion or elapsed-speed claim.
+
+## A live forest on the physics clock
+
+Use `@margoengine/biomes/forest` for competition, recruitment, canopy turnover and permanent wind-shaped growth.
+The world keeps each tree's birth identity and replayable annual exposure. The older `/ecosystem` entry runs the same
+crown model offline.
+
+```ts
+import { ForestEcosystemSolver, forestOrientation } from '@margoengine/biomes/forest';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const forest = await ForestEcosystemSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(forest, {
+  bounds: [0, 0, 20, 20],
+  cells: [2, 2],
+  species: [{ id: 'fir', radius: 3, canopyFuel: 0.8, rootCohesion: 1200 }],
+  plants: [{ species: 'fir', x: 5, z: 5, radius: 1.5 }],
+  wind: {
+    medium: 'air',
+    cell: [0, 0, 0],
+    sample: () => ({ velocity: [12, 0, 0], density: 1.2, temperature: 278 }),
+  },
+});
+world.advance(60);
+const tree = forest.trees()[0];
+if (tree) {
+  const rotation = forestOrientation(tree);
+  console.log(tree.id, tree.radius, rotation);
+}
+```
+
+Pass the X/Y/Z/W rotation to `mesh.setQuaternion()` for a mesh rooted at local zero with its trunk along +Y.
+Use any pure `Wind` source, including a terrain-dependent boundary-layer field. The retained growth axis
+adds permanent lean, while `@margoengine/physics/vegetation` handles elastic sway.
+
+Enable `flooding` in `ForestEcosystemSolver.load()` to consume the matching shallow-water grid. Supply
+`erosionField: landscape.incisionField` to consume gross soil loss. Give `LandscapeEvolution.load()` the
+forest's `rootCohesionField` for feedback. These grids must share dimensions, extent and origin cell. Enable
+`exposure` and publish one `[burn severity, fuel moisture]` pair per cell when you have a weather/fire producer.
+The forest publishes cell-centred crown cover, root cohesion in Pa, live canopy fuel in kg/m², and moisture in
+kg/kg dry fuel. Fuel and root strength require site/species measurements and default to zero.

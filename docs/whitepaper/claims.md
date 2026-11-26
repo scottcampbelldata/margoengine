@@ -5583,3 +5583,13 @@ small-amplitude heave and stability signs. A tall block rolls under pressure tor
 glacier release gives a proportional ice body, and the wake receives two zero-sum displacement
 patches. Reproduce after building Physics with `node --test packages/physics/tests/iceberg.test.js
 packages/physics/tests/coupling/iceberg.test.js`.
+
+### Forest succession on the world clock (BIO-03)
+
+In `packages/biomes/tests/forest.test.js`, competition across the origin, recruitment, mortality and snag turnover
+agree exactly with the existing offline stand in each memory mode. Individual IDs are retained across growth.
+The shared coupling fixtures in `packages/biomes/tests/coupling/forest.test.js` compare deterministic hashes across
+frame rates and after a partial-year restore. They route actual shallow-water inundation and LandscapeEvolution
+incision into annual mortality, and send the forest's root cohesion back to LandscapeEvolution. The TREE-3 fixture
+compares the exposed fir's axis with a sheltered fir and measures the permanent horizontal crown-tip component
+after calm conditions return. It proves the orientation used by a renderer, prior to binding it into the filmed shot.

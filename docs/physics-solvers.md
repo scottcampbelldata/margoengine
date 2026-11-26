@@ -206,7 +206,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 |---|---|---|---|---|---|---|
 | BIO-01 | Plant mechanics under wind and water | Trees, shrubs, grass, crops, reeds, kelp: modal response, breakage, windthrow, felled trees; kelp, sea grass and soft corals sway in the water velocity below the surface | `@margoengine/physics/vegetation` and `@margoengine/scatter/plant-motion` | modal motion, windthrow, rigid impacts and scatter posing; reads the supplied subsurface flow contract (PA-30) | de Langre, "Effects of wind on plants" (2008). Stam, "Stochastic dynamics" (1997). Habel, Kusternig and Wimmer, "Physically guided animation of trees" (2009). Gardiner et al., ForestGALES (2000). | K17 K18 K22 |
 | BIO-02 | Plant growth and morphogenesis | L-system growth, tropisms, competition | procedural/src/lsystem.ts, plants.ts (static) | none (dynamic) | Prusinkiewicz and Lindenmayer (1990). Palubicki et al. (2009). Pirk et al. (2012). | K06 |
-| BIO-03 | Forest ecosystem dynamics | Competition, seeding, mortality, succession | biomes/src/ecosystem.ts | sound (JABOWA and SORTIE style, integer-deterministic) | Botkin, Janak and Wallis (1972). Pacala et al. (1996). Cordonnier et al. (2017). | none beyond K01 to K05 |
+| BIO-03 | Forest ecosystem dynamics | Competition, seeding, mortality, succession, chronic wind-shaped growth and tree–soil feedback | `@margoengine/biomes/forest`, offline `@margoengine/biomes/ecosystem` | framework solver; water, soil and burn disturbance; published canopy, roots, fuel and fuel moisture | Botkin, Janak and Wallis (1972). Pacala et al. (1996). Cordonnier et al. (2017). | none beyond K01 to K05 |
 | BIO-04 | Material ageing | Rust, patina, rot, fouling, stone weathering, wreck decay | `@margoengine/physics/ageing` | atmospheric and immersion corrosion, rot, fouling, limestone recession and PBR appearance | Dorsey and Hanrahan (1996). Gu et al., time-varying surface appearance (2006). | none beyond K01 to K05 |
 
 ### Family SPACE: orbital and celestial (3)
@@ -424,7 +424,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 ## 4. State, order and owners
 
 **State across the 103.**
-- Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core), BIO-03 and the SGP4 part of SPACE-01.
+- Sound: DYN-01, DYN-02, DYN-04 (road vehicles), HYDRO-01 (the flood core) and the SGP4 part of SPACE-01.
 - Partial: about 25. The deterministic analytic models in weather, vfx and sky count here: avalanche, eruption,
   lava, thermal, fire front, hurricane and tornado, snow drift and fuel moisture.
 - Stand-in: about 40. These are the kinematic or scripted pieces the audit lists.

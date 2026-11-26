@@ -321,6 +321,20 @@ export const BLUEPRINTS = [
     script: 'packages/biomes/scripts/build-erosion.mjs',
   },
   {
+    name: 'forest-kernel',
+    crate: 'packages/biomes/forest-kernel',
+    blueprint: 'packages/biomes/src/forest-kernel.wasm',
+    script: 'packages/biomes/scripts/build-forest.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'forest-kernel-shared',
+    crate: 'packages/biomes/forest-kernel',
+    blueprint: 'packages/biomes/src/forest-kernel-shared.wasm',
+    script: 'packages/biomes/scripts/build-forest.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'compute-cpu',
     crate: 'packages/compute/cpu-kernel',
     blueprint: 'packages/compute/src/cpu-kernel.wasm',

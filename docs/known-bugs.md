@@ -16341,3 +16341,11 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
 does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
 and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.
+
+## Open: canonical fire and alpine canopy links (BIO-03)
+
+BIO-03 reads a replayable exposure port for burn severity and fuel moisture until a producer in FIRE-01 and the
+weather packages publishes the shared cell layout. The exposure fixture in `packages/biomes/tests/coupling/forest.test.js`
+reproduces the effects on snags and live fuel. Forest growth provides the permanent axis required by TREE-3, and that
+fixture checks the crown-tip direction. Existing treeline footage and its distant impostors still need a growth-axis
+consumer in the shot. The remaining shared fields are listed in [Framework requests](physics-work-queue.md#framework-requests).
