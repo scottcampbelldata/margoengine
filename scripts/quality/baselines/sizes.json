@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20592968,
+  "total": 20593298,
   "history": [
     {
       "date": "2026-10-24",
@@ -13699,6 +13699,12 @@
       "commit": "FLUID-07-mounted-load",
       "grew": 1,
       "reason": "FLUID-07 adds optional mounted-film weight and torque through the existing rigid force port. Thin-film rises from 8264 to 8667 B gzip; cap changes from 8520 to 8928 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "805a3e1dda",
+      "grew": 1,
+      "reason": "SEA-15's live surface and depth-flow binding move physics/tracers from 7916 to 8246 B gzip. The optional ceiling rises from 8172 to 8502 B. Wave-following parcels share the existing motion update; a separate entry would duplicate parcel stepping and the mass ledger."
     }
   ],
   "items": {
@@ -14576,7 +14582,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 8928,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 8172,
+    "@margoengine/physics/tracers": 8502,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
