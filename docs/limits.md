@@ -9589,4 +9589,6 @@ several lattice cells. The leader is voxelized, optical strength is relative, an
 one flash. Use the electric potential and timed segment outputs for visualization and relative acoustic delays.
 Predicting strike locations, current waveforms and absolute sound pressure requires storm observations and
 additional plasma and atmospheric models. Grid capacity follows available wasm32 arena space, including each
-published field's two mirrors. Both native modules measure 2,357 B raw and load only with the optional entry.
+published field's two mirrors. The optional entry measures 5,861 B gzip within a 6,117 B ceiling. Both native
+modules measure 2,357 B raw and 1,155 B gzip and load only with that entry. Sky's bolt measures 5,403 B gzip within
+its existing 5,591 B ceiling. Core and Stage gain zero bytes.

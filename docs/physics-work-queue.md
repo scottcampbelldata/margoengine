@@ -286,7 +286,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | HYDRO-06 | Groundwater and springs | Darcy flow, aquifer recharge and spring discharge | Codex | LANDED b6e01ceb4c |
 | ATMO-05 | Tropical cyclones and large vortices | physics/vortices and Sky | Codex | LANDED 80aa218baa |
 | ATMO-06 | Airborne particle transport | stand-in | Codex | LANDED 965fab2df7 |
-| ATMO-07 | Lightning and atmospheric electricity | none | Codex | BUILDING (codex/physics-atmo-07) |
+| ATMO-07 | Lightning and atmospheric electricity | none | Codex | LANDED 51ccc096bc |
 | ATMO-08 | Fog and cold-air drainage | physics/drainage-fog and environment/fog-volumes | Codex | LANDED 80679b25b4 |
 | ATMO-09 | Surface energy balance | surface temperature, liquid and snow budgets, wetness and fuel | Codex | LANDED 93bf3f2435 |
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
