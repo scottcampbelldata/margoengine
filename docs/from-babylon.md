@@ -544,7 +544,8 @@ Where there is no Margo equivalent today:
 
 | Babylon.js | Status in Margo |
 | --- | --- |
-| Playground | None. Examples run from the repository (`npm run dev:examples`). |
+| Playground | None. There is no playground tool; examples run from the repository (`npm run dev:examples`). |
+| `.babylon` export | None. `.babylon` is import only (`@margoengine/loaders/babylon`); export to glTF instead. |
 | Node Material Editor, GUI editor, Sandbox viewer | None. Node materials and the UI are code, in `@margoengine/shader` and `@margoengine/ui`. The Inspector counterpart is a DOM entity inspector and a frame debugger, not a property editor for every material. |
 | `Observable` and `Observer` | None. Use `engine.onFrame`, DOM events and `addEventListener`. |
 | Several first-class scenes with `scene.activeCamera` switching | One implicit scene per engine; extra scenes exist for overlays, and `engine.render({camera})` renders from another camera. |

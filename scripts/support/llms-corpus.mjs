@@ -23,6 +23,7 @@ export const GUIDES = [
     'margo-convert build: optimise, compress and package models for the web and for Unity, Unreal, Godot and Roblox',
   ],
   ['docs/from-threejs.md', 'Moving from three.js: the same task in Margo, name by name'],
+  ['docs/from-babylon.md', 'Moving from Babylon.js: the same task in Margo, name by name'],
   ['docs/limits.md', 'Measured limits and sizes, with the commands that measure them'],
   ['docs/known-bugs.md', 'Open bugs with repro and cause'],
   ['docs/ai-tools.md', 'Using Margo with Claude, Cursor, Copilot and the @margoengine/mcp server'],
