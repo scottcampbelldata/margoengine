@@ -125,6 +125,22 @@ export interface CrushResult {
     readonly impulse: number;
 }
 
+export interface CrushSheetSeam {
+    readonly sides: readonly [Boundary, Boundary];
+    readonly stiffness: number;
+    readonly peakTraction: number;
+    readonly toughness: number;
+}
+
+export interface CrushSheetSeamReading {
+    readonly separation: Boundary;
+    readonly history: Boundary;
+    readonly elasticEnergy: number;
+    readonly fractureWork: number;
+    readonly openingArea: number;
+    readonly broken: boolean;
+}
+
 export interface CrushShellBudget {
     readonly kinetic: number;
     readonly membrane: number;
@@ -164,6 +180,7 @@ export interface CrushShellParams {
     readonly resolution?: number;
     readonly spheres?: readonly CrushShellSphere[];
     readonly cellSize?: number;
+    readonly seams?: readonly CrushSheetSeam[];
 }
 
 export class CrushShellSolver implements Solver<CrushShellParams> {
@@ -194,6 +211,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     };
     supportReaction(vertex: number): CrushVector;
     readSphereContact(index: number): CrushShellContact;
+    readSeam(index: number): CrushSheetSeamReading;
     readFace(face: number): CrushShellFace;
     readBudget(): CrushShellBudget;
 }
@@ -324,6 +342,8 @@ export function squareTubeCrushMaterial(tube: SquareCrushTube): Required<CrushMa
 // Not exported from this entry, but used by the exports above:
 
 type BedShape = Omit<BedGrid, 'cell'>;
+
+type Boundary = readonly [number, number];
 
 type Cell = readonly [number, number, number];
 

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20668949,
+  "total": 20669770,
   "history": [
     {
       "date": "2026-10-24",
@@ -13951,6 +13951,12 @@
       "commit": "408e506ac4",
       "reason": "BREAK-03 reciprocal sphere contact advances the optional crush entry from 16020 to 17377 B gzip. The ceiling rises from 16501 to 17899 B. The shell bridge matches both impulse and its first time moment using the existing body force and impulse ports. A separate entry would duplicate the shell and rigid setup for the same sheet. The collision and contact-force loops stay in the lazy Wasm module.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "116d3054ed",
+      "reason": "BREAK-03 cohesive seams advance the optional crush entry from 17377 to 18174 B gzip. The ceiling rises from 17899 to 18720 B. Seam preparation checks duplicate rest boundaries, cohesive inputs and stiffness bounds, and the public reading reports actual openings. A split entry would duplicate shell topology, region setup and replay. The fracture quadrature stays in the lazy Wasm module.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14777,7 +14783,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 17899,
+    "@margoengine/physics/crush": 18720,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
