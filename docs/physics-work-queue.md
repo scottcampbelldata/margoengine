@@ -249,7 +249,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | EARTH-03 | Particle-laden gravity currents | partial | Open | OPEN |
 | EARTH-05 | Terramechanics | stand-in | Open | OPEN |
 | EARTH-06 | Impact and explosion cratering | stand-in | Open | OPEN |
-| EARTH-07 | Aeolian transport | stand-in | Codex | BUILDING (codex/physics-earth-07) |
+| EARTH-07 | Aeolian transport | physics/aeolian | Codex | LANDED d2fa3cb303 |
 | EARTH-08 | Seismic waves and ground shaking | none | Open | OPEN |
 | EARTH-09 | Volcanic eruption column | partial | Open | OPEN |
 | EARTH-10 | Lava flow | partial | Open | OPEN |

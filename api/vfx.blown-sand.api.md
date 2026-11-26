@@ -50,9 +50,11 @@ export interface BlownSandHeights {
 
 export interface BlownSandOptions {
     ground: BlownSandGround;
-    wind: BlownSandWind | {
+    wind?: BlownSandWind | {
         readonly options: BlownSandWind;
     };
+    transport?: BlownSandTransport;
+    referenceMass?: number;
     mask?: ((x: number, z: number) => number) | null;
     amount?: number;
     threshold?: number;
@@ -84,6 +86,15 @@ export interface BlownSandSkyLight {
         readonly declarations: string;
     } | undefined;
     bindings(): GPUBindGroupEntry[];
+}
+
+export interface BlownSandTransport {
+    readonly revision: number;
+    readonly bounds: readonly [number, number, number, number];
+    sample(x: number, z: number): {
+        readonly mass: number;
+        readonly velocity: readonly [number, number];
+    } | undefined;
 }
 
 export interface BlownSandWind {

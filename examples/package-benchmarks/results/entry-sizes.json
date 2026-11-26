@@ -14062,6 +14062,10 @@
       "./locomotion": {
         "raw": 15630,
         "gzip": 6419
+      },
+      "./aeolian": {
+        "raw": 13204,
+        "gzip": 5633
       }
     },
     "@margoengine/physics2d": {
@@ -16536,8 +16540,8 @@
         "gzip": 2904
       },
       "./blown-sand": {
-        "raw": 25118,
-        "gzip": 10561
+        "raw": 26368,
+        "gzip": 11061
       },
       "./flame": {
         "raw": 29296,
@@ -17843,6 +17847,16 @@
       "raw": 15525,
       "gzip": 6250,
       "brotli": 5583
+    },
+    "packages/physics/dist/aeolian-kernel.wasm": {
+      "raw": 8172,
+      "gzip": 3574,
+      "brotli": 3230
+    },
+    "packages/physics/dist/aeolian-kernel-shared.wasm": {
+      "raw": 8172,
+      "gzip": 3574,
+      "brotli": 3228
     }
   },
   "splits": {

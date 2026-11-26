@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20028493,
+  "total": 20035208,
   "history": [
     {
       "date": "2026-10-24",
@@ -12771,6 +12771,12 @@
       "commit": "660579824",
       "reason": "xr/near: new optional entry, near-interaction behaviours (hand constraint, follow in view, surface magnetism, six-DoF drag and two-pointer scale, app bar, near menu, slate): 6842 B gzip; one cohesive module sharing the pointer-frame, panel and poke code, a split would duplicate them",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "d2fa3cb303",
+      "grew": 2,
+      "reason": "EARTH-07 entry sizes, previous record to current: @margoengine/physics/aeolian 0→5633 B (ceiling 0→5889 B); @margoengine/vfx/blown-sand 10561→11061 B (ceiling 10823→11393 B). The aeolian entry integrates the registry and lazily loads the arena solver. The renderer carries live grain mass and local velocity in its existing instance layout. A separate renderer entry would duplicate the terrain sampling and draw machinery."
     }
   ],
   "items": {
@@ -13576,6 +13582,7 @@
     "@margoengine/physics": 889499,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 93993,
     "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
+    "@margoengine/physics/aeolian": 5889,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
@@ -14212,7 +14219,7 @@
     "@margoengine/usdz/worker": 13900,
     "@margoengine/vfx": 39137,
     "@margoengine/vfx/base": 13777,
-    "@margoengine/vfx/blown-sand": 10823,
+    "@margoengine/vfx/blown-sand": 11393,
     "@margoengine/vfx/clouds": 8867,
     "@margoengine/vfx/curves": 1816,
     "@margoengine/vfx/debris": 3160,
