@@ -3427,6 +3427,29 @@ world.advance(1);
 console.log(oil.budget.water > 0); // true
 ```
 
+Set `bedWash` to lift sediment below a resolved propeller or thruster flow. Give the `water` field, the x–z
+rectangle in the tracer origin cell, and a `referenceHeight` and `roughnessLength` in metres. Choose the
+reference height inside the local logarithmic layer. The grid defaults to 12 × 12 and supports up to 65,536
+midpoint samples. `bedJets` supplies the grain and pickup settings. `TracerSolver.withBedWash()` exchanges
+the released mass with a live `TerrainBed` using `bedJets.mobileLayer`. For `ShipSolver.water`, put the ship,
+rigid bodies, tracer and mutable bed in the same staggered group, in that order.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const tracer = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+  bed: 1,
+  bedWash: {
+    water: { medium: 'water', cell: [0, 0, 0], sample: () => ({ velocity: [0.6, 0, 0], density: 1025, temperature: 285 }) },
+    bounds: [-0.5, -0.5, 0.5, 0.5], cells: [2, 2], referenceHeight: 0.05, roughnessLength: 0.001,
+  },
+});
+world.advance(1);
+console.log(tracer.jetErosion > 0); // true
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.

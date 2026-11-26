@@ -519,6 +519,11 @@ model integrates the diameter classes, returns resurfacing oil to the slick, and
 Independent measurements of absolute entrainment and intrusion depth remain open. The modern untreated-oil slope
 and its upper-size transition differ from the original law, as recorded in the clean-room notes.
 
+A resolved wash field now drives sediment pickup from the actual bed normal and roughness. A native ship's
+propeller lifts sand and debits its volume from TerrainBed, while a stopped screw lifts none. The wash API also
+accepts a supplied thruster field. A native bow-thruster velocity producer and independent entrained-mass validation
+remain open.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

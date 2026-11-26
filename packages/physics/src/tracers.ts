@@ -36,6 +36,7 @@ import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.
 import { MargoError } from '@margoengine/math/errors';
 import { BED_CHANGE_FIELD } from './earth/bed.js';
 import { TracerBedExchange } from './tracer-bed.js';
+import { type BedWashGrid, bedWashGrid, type TracerBedWash } from './tracer-bed-wash.js';
 import {
   depthDiffusivity,
   type HorizontalDispersionLaw,
@@ -76,6 +77,7 @@ import type {
 
 export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
 export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-diffusion.js';
+export type { TracerBedWash } from './tracer-bed-wash.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
 export type { TracerBreakerExposure, TracerOilDispersion } from './tracer-oil-dispersion.js';
 
@@ -211,6 +213,8 @@ export interface TracerParams {
   horizontalDiffusivity?: number;
   /** Optional horizontal scale law for the unresolved spreading of each release. */
   horizontalDispersion?: TracerHorizontalDispersion;
+  /** Optional resuspension by a near-bed propeller or thruster flow. */
+  bedWash?: TracerBedWash;
   /** Vertical eddy diffusivity, m^2/s (default 0.001). */
   verticalDiffusivity?: number;
   /** Optional depth-dependent vertical diffusivity. Linear between knots, constant outside, overriding the scalar. */
@@ -330,6 +334,7 @@ export class TracerSolver implements Solver<TracerParams> {
       | 'horizontalDispersion'
       | 'verticalDiffusivityProfile'
       | 'bedJets'
+      | 'bedWash'
       | 'breaches'
       | 'breachMixes'
     >
@@ -367,6 +372,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private particles!: Region;
   private ledger!: Region;
   private jetBed?: JetBed;
+  private bedWash?: BedWashGrid;
   private bedExchange?: TracerBedExchange;
   /** Breaches it takes cargo from, and each breach cargo's material (by its code in BREACH_CARGO, -1 for none). */
   private breachSlots = 0;
@@ -387,6 +393,13 @@ export class TracerSolver implements Solver<TracerParams> {
   /** Receives fin impulses and exchanges their suspended sediment with a live TerrainBed. */
   static withBedChange(id = 'tracers'): TracerSolver {
     const solver = new TracerSolver(id, { bedJets: true });
+    solver.writeBedChange = true;
+    return solver;
+  }
+
+  /** Exchanges sediment between a live TerrainBed and the supplied wash field. */
+  static withBedWash(id = 'tracers'): TracerSolver {
+    const solver = new TracerSolver(id);
     solver.writeBedChange = true;
     return solver;
   }
@@ -456,6 +469,9 @@ export class TracerSolver implements Solver<TracerParams> {
       );
     const horizontalLaw =
       params.horizontalDispersion && horizontalDispersionLaw(params.horizontalDispersion, horizontalDiffusivity);
+    this.bedWash = params.bedWash && bedWashGrid(params.bedWash, waterDensity);
+    if (this.writeBedChange && !this.useBedJets && !this.bedWash)
+      throw new MargoError('unsupported', 'A tracer wash exchange needs a wash field; supply bedWash options.');
     this.host = host;
     const [gx, gy, gz] = host.gravity;
     this.g = hypot(gx, gy, gz);
@@ -491,7 +507,7 @@ export class TracerSolver implements Solver<TracerParams> {
         );
       this.sources.push({ material: this.materialIndex(material), source });
     });
-    if (this.useBedJets) {
+    if (this.useBedJets || this.bedWash) {
       const {
         material = 'sand',
         shear = 'wall-jet',
@@ -532,7 +548,10 @@ export class TracerSolver implements Solver<TracerParams> {
         pickupScale,
         pickupExponent: erodibility === undefined ? 1.5 : 1,
         limit: availableMass,
-        rings: shear === 'wall-jet' ? new Float64Array(2 * (JET_CORE_RINGS + JET_OUTER_RINGS)) : undefined,
+        rings:
+          this.useBedJets && shear === 'wall-jet'
+            ? new Float64Array(2 * (JET_CORE_RINGS + JET_OUTER_RINGS))
+            : undefined,
       };
       if (this.writeBedChange) {
         const layer = params.bedJets?.mobileLayer;
@@ -554,7 +573,7 @@ export class TracerSolver implements Solver<TracerParams> {
       name === 'none' ? -1 : this.materialIndex(TRACER_MATERIALS[name]),
     );
     this.initOilSpills(params.oilSpills ?? [], capacity);
-    const base = 4 + this.sources.length + Number(this.useBedJets) + breaches;
+    const base = 4 + this.sources.length + Number(this.jetBed !== undefined) + breaches;
     const ledgerWords = this.initBreachMixes(params.breachMixes ?? [], base);
     this.random = new RandomStream(0, solverNumber(this.id));
     this.particles = host.allocate('particles', capacity * STRIDE * 8, 'f64', TRACER_LAYOUT);
@@ -985,7 +1004,7 @@ export class TracerSolver implements Solver<TracerParams> {
         );
       const memory = breaches.region.memory ?? this.host.memory,
         rec = new Float64Array(memory.buffer, breaches.region.byteOffset, breaches.region.byteLength / 8),
-        base = 4 + this.sources.length + Number(this.useBedJets),
+        base = 4 + this.sources.length + Number(this.jetBed !== undefined),
         count = Math.min(this.breachSlots, rec[0]!, Math.floor((rec.length - 1) / HULL_BREACH_WORDS));
       for (let k = 0; k < count; k++) {
         const r = 1 + k * HULL_BREACH_WORDS,
@@ -1092,12 +1111,15 @@ export class TracerSolver implements Solver<TracerParams> {
       words[p + 1] = ny;
       words[p + 2] = nz;
     }
-    if (this.jetBed) this.entrainBed(context, dt, time, free, this.jetBed);
+    if (this.jetBed) {
+      if (this.useBedJets) free = this.entrainBed(context, dt, time, free, this.jetBed);
+      if (this.bedWash) this.entrainWash(dt, time, free, this.jetBed, this.bedWash);
+    }
   }
 
-  private entrainBed(context: StepContext, dt: number, time: number, free: number, bed: JetBed): void {
+  private entrainBed(context: StepContext, dt: number, time: number, free: number, bed: JetBed): number {
     const port = context.inputs.get(SWIM_WAKE_FIELD.name);
-    if (!port) return;
+    if (!port) return free;
     const { region } = port;
     if (region.layout !== SWIM_WAKE_LAYOUT || region.type !== 'f64' || region.byteLength % (SWIM_WAKE_WORDS * 8))
       throw new RangeError(
@@ -1128,7 +1150,7 @@ export class TracerSolver implements Solver<TracerParams> {
       if (!(mass > 0 && Number.isFinite(mass))) continue;
       for (let parcel = 0; parcel < JET_PARCELS; parcel++) {
         while (free < capacity && words[free * STRIDE + 5] !== FREE) free++;
-        if (free === capacity) return;
+        if (free === capacity) return free;
         const random = this.random.block(context.tick, w / SWIM_WAKE_WORDS, parcel + 1);
         const angle = (2 * Math.PI * (parcel + (random[0]! + 0.5) / 4294967296)) / JET_PARCELS;
         const quantile = (random[1]! + 0.5) / 4294967296;
@@ -1141,18 +1163,84 @@ export class TracerSolver implements Solver<TracerParams> {
           surface = this.surfaceAt(px, pz, time);
         if (!(floor < surface)) continue;
         const share = mass / JET_PARCELS;
-        const amount = this.bedExchange?.erode(px + this.bedOffset[0], pz + this.bedOffset[2], share) ?? share;
-        if (!(amount > 0)) continue;
-        const at = free++ * STRIDE;
-        words[at] = px;
-        words[at + 1] = floor + Math.min(spread * 0.3, (surface - floor) * 0.5);
-        words[at + 2] = pz;
-        words[at + 3] = amount;
-        words[at + 4] = bed.material;
-        words[at + 5] = WATER;
-        book[lifted]! += amount;
-        book[0]! += amount;
-        book[1]! += amount;
+        const py = floor + Math.min(spread * 0.3, (surface - floor) * 0.5);
+        free = this.liftBedParcel([px, py, pz], share, free, bed, words, book);
+      }
+    }
+    return free;
+  }
+
+  private liftBedParcel(
+    [x, y, z]: readonly [number, number, number],
+    mass: number,
+    free: number,
+    bed: JetBed,
+    words: Float64Array,
+    book: Float64Array,
+  ): number {
+    const lifted = 4 + this.sources.length;
+    const requested = Math.min(mass, bed.limit - book[lifted]!);
+    if (!(requested > 0 && Number.isFinite(requested))) return free;
+    const amount = this.bedExchange?.erode(x + this.bedOffset[0], z + this.bedOffset[2], requested) ?? requested;
+    if (!(amount > 0)) return free;
+    const at = free * STRIDE;
+    words[at] = x;
+    words[at + 1] = y;
+    words[at + 2] = z;
+    words[at + 3] = amount;
+    words[at + 4] = bed.material;
+    words[at + 5] = WATER;
+    book[lifted]! += amount;
+    book[0]! += amount;
+    book[1]! += amount;
+    return free + 1;
+  }
+
+  private entrainWash(dt: number, time: number, free: number, bed: JetBed, wash: BedWashGrid): void {
+    const { water, referenceHeight, stressFactor, nx, nz, dx, dz } = wash;
+    const { bed: bottom, cellSize } = this.params;
+    const shiftX = (this.cell[0] - water.cell[0]) * cellSize;
+    const shiftY = (this.cell[1] - water.cell[1]) * cellSize;
+    const shiftZ = (this.cell[2] - water.cell[2]) * cellSize;
+    const [bedX, bedY, bedZ] = this.bedOffset;
+    const words = this.words();
+    const book = this.book();
+    const capacity = this.emissionCapacity;
+    const flatNormal = [0, 1, 0] as const;
+    for (let row = 0; row < nz; row++) {
+      const z = wash.z + (row + 0.5) * dz;
+      for (let column = 0; column < nx; column++) {
+        while (free < capacity && words[free * STRIDE + 5] !== FREE) free++;
+        if (free === capacity) return;
+        const x = wash.x + (column + 0.5) * dx;
+        const sample = typeof bottom === 'number' ? undefined : bottom.sample(x + bedX, z + bedZ);
+        const floor = sample ? sample.elevation - bedY : this.bedAt(x, z);
+        const [normalX, normalY, normalZ] = sample?.normal ?? flatNormal;
+        const sampleX = x + referenceHeight * normalX;
+        const sampleY = floor + referenceHeight * normalY;
+        const sampleZ = z + referenceHeight * normalZ;
+        const surface = this.surfaceAt(x, z, time);
+        if (!(normalY > 0 && floor < surface && sampleY < this.surfaceAt(sampleX, sampleZ, time))) continue;
+        const [ux, uy, uz] = water.sample(
+          sampleX + shiftX,
+          sampleY + shiftY,
+          sampleZ + shiftZ,
+          time,
+          this.flow,
+        ).velocity;
+        const normalSpeed = ux * normalX + uy * normalY + uz * normalZ;
+        const tx = ux - normalSpeed * normalX;
+        const ty = uy - normalSpeed * normalY;
+        const tz = uz - normalSpeed * normalZ;
+        const stress = stressFactor * (tx * tx + ty * ty + tz * tz);
+        if (!Number.isFinite(stress))
+          throw new MargoError(
+            'unsupported',
+            'Bed wash shear exceeds numeric range; supply finite physical velocities and roughness.',
+          );
+        const mass = pickupRate(stress, bed) * dt * ((dx * dz) / normalY);
+        const startY = floor + Math.min(referenceHeight, 0.5 * (surface - floor));
+        free = this.liftBedParcel([x, startY, z], mass, free, bed, words, book);
       }
     }
   }

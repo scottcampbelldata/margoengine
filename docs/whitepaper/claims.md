@@ -287,6 +287,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
   [Delvigne and Sweeney (1988)](https://doi.org/10.1016/S0269-8579(88)80003-0).
 
+- Sediment pickup by propeller wash (SEA-15, 2026-11-26). A live rigid ship and propeller lift the flux predicted
+  by the log-layer stress and van Rijn pickup equations. The same packed volume leaves TerrainBed and snapshot
+  replay is exact. A stopped screw produces zero lift. A second fixture checks the bed's true area and tangential
+  flow on a slope in a different origin cell. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js`
+  after building Physics.
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes

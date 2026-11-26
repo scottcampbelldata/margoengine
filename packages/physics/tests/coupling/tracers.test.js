@@ -2,9 +2,12 @@
 // and a seek equal to a continuous run, with a breach leaking ore and a slick drifting in a current.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { TerrainBed } from '../../dist/earth.js';
+import { Physics } from '../../dist/index.js';
 import { SpectralSea, WakeSolver } from '../../dist/sea.js';
+import { KVLCC2_L7, ShipSolver } from '../../dist/ship.js';
 import { TracerSolver } from '../../dist/tracers.js';
-import { PhysicsWorld } from '../../dist/world.js';
+import { PhysicsWorld, RigidSolver } from '../../dist/world.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const water = {
@@ -690,4 +693,146 @@ test('SEA-15 an invalid breaker sample leaves both slicks ready to retry the sam
   const control = make(() => 10);
   control.world.advance(1);
   assert.equal(trial.world.hash(), control.world.hash());
+});
+
+test('SEA-15 a live propeller race lifts its predicted sediment mass and cuts the same packed volume from TerrainBed', async () => {
+  await Physics.load();
+  const model = KVLCC2_L7;
+  const dt = 1 / 60;
+  const waterDensity = 1025;
+  const grainDensity = 2650;
+  const grain = 0.00025;
+  const porosity = 0.4;
+  const height = 0.05;
+  const roughness = 0.001;
+  const bottom = -0.5;
+  const x = -4.1;
+  const width = 0.2;
+  const make = (revolutions) => {
+    const physics = new Physics(null, { fixedTimestep: dt, gravity: [0, 0, 0] });
+    const body = physics.addBody(null, {
+      position: [0, 0, 0],
+      colliders: {
+        shape: 'box',
+        halfExtents: [model.length / 2, model.draught, model.beam / 2],
+        mass: waterDensity * model.volume,
+      },
+    });
+    const ship = new ShipSolver();
+    const terrain = new TerrainBed();
+    const tracer = TracerSolver.withBedWash();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+      .add(new RigidSolver(), { physics })
+      .add(ship, { ships: [{ row: body.row, model }] })
+      .add(terrain, {
+        columns: 32,
+        rows: 10,
+        width: 12,
+        depth: 3,
+        elevations: () => bottom,
+        bedrock: () => bottom - 0.025,
+      })
+      .add(tracer, {
+        bed: terrain.bed,
+        water: ship.water,
+        bedWash: {
+          water: ship.water,
+          bounds: [x - width / 2, -width / 2, x + width / 2, width / 2],
+          cells: [1, 1],
+          referenceHeight: height,
+          roughnessLength: roughness,
+        },
+        bedJets: { mobileLayer: { thickness: 0.025, porosity } },
+        horizontalDiffusivity: 0,
+        verticalDiffusivity: 0,
+      })
+      .couple(['ship', 'rigid', 'tracers', 'bed'], 'staggered');
+    ship.control(0).revolutions = revolutions;
+    return { world, tracer, terrain, ship };
+  };
+  const { world, tracer, terrain, ship } = make(16);
+  const bedBefore = terrain.volume(bottom);
+  world.advance(1);
+  const velocity = ship.water.sample(x, bottom + height, 0, dt).velocity;
+  const friction = (0.4 * Math.hypot(velocity[0], velocity[2])) / Math.log(height / roughness);
+  const stress = waterDensity * friction ** 2;
+  const reducedG = 9.80665 * (grainDensity / waterDensity - 1);
+  const size = grain * Math.cbrt(reducedG / 1e-12);
+  const critical =
+    (0.3 / (1 + 1.2 * size) + 0.055 * (1 - Math.exp(-0.02 * size))) * (grainDensity - waterDensity) * 9.80665 * grain;
+  assert.ok(stress > critical, `${stress} Pa vs ${critical} Pa`);
+  const mass =
+    dt *
+    width ** 2 *
+    0.00033 *
+    grainDensity *
+    Math.sqrt(reducedG * grain) *
+    size ** 0.3 *
+    (stress / critical - 1) ** 1.5;
+  assert.ok(Math.abs(tracer.jetErosion - mass) < 1e-12 * mass, `${tracer.jetErosion} vs ${mass} kg`);
+  assert.ok(Math.abs((bedBefore - terrain.volume(bottom)) * grainDensity * (1 - porosity) - mass) < 1e-10);
+  assert.equal(terrain.refusedVolume(), 0);
+  const [parcel] = [...tracer.particlesOf()];
+  assert.equal(parcel.state, 'water');
+  assert.ok(Math.abs(parcel.position[0] - x) < 1e-12);
+  assert.ok(Math.abs(parcel.position[1] - (bottom + height)) < 1e-12);
+  const snapshot = world.takeSnapshot();
+  world.advance(12);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(12);
+  assert.equal(world.hash(), hash);
+  const idle = make(0);
+  idle.world.advance(1);
+  assert.equal(idle.tracer.jetErosion, 0);
+});
+
+test('SEA-15 bed wash uses the true sloping bed area and the tangential flow in another origin cell', () => {
+  const terrain = new TerrainBed();
+  const tracer = new TracerSolver();
+  const cellSize = 32;
+  const slope = 0.5;
+  const normalY = 1 / Math.hypot(1, slope);
+  const normalX = -slope * normalY;
+  const speed = 0.6;
+  const height = 0.04;
+  const roughness = 0.001;
+  const referenceBottom = -0.75;
+  const shear = 1025 * ((0.4 * speed) / Math.log(height / roughness)) ** 2;
+  const threshold = 0.05 * (2650 - 1025) * 9.80665 * 0.00025;
+  const erodibility = 0.02;
+  const samples = [];
+  const wash = {
+    medium: 'water',
+    cell: [1, 1, 1],
+    sample(x, y, z) {
+      samples.push([x, y, z]);
+      return {
+        velocity: [speed * normalY + 0.7 * normalX, -speed * normalX + 0.7 * normalY, 0],
+        density: 1025,
+        temperature: 285,
+      };
+    },
+  };
+  const world = new PhysicsWorld({ cellSize, rate: { num: 60, den: 1 } })
+    .add(terrain, { columns: 8, rows: 8, width: 2, depth: 2, elevations: (x) => referenceBottom + slope * x })
+    .add(tracer, {
+      bed: terrain.bed,
+      cellSize,
+      bedWash: {
+        water: wash,
+        bounds: [-0.1, -0.05, 0.1, 0.05],
+        cells: [1, 1],
+        referenceHeight: height,
+        roughnessLength: roughness,
+      },
+      bedJets: { criticalShields: 0.05, erodibility },
+    });
+  world.advance(1);
+  assert.equal(samples.length, 1);
+  const expected = [normalX * height - cellSize, referenceBottom + normalY * height - cellSize, -cellSize];
+  for (const [axis, value] of samples[0].entries())
+    assert.ok(Math.abs(value - expected[axis]) < 1e-12, `${samples[0]} vs ${expected}`);
+  const mass = ((0.02 / normalY) * erodibility * (shear / threshold - 1)) / 60;
+  assert.ok(Math.abs(tracer.jetErosion - mass) < 1e-14, `${tracer.jetErosion} vs ${mass} kg`);
 });
