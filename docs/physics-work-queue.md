@@ -236,7 +236,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | BIO-02 | Plant growth and morphogenesis | none | Open | OPEN |
 | BIO-03 | Forest ecosystem dynamics | sound | Open | OPEN |
 | BIO-04 | Material ageing | none | Open | OPEN |
-| SPACE-01 | N-body and orbital dynamics | partial | Open | OPEN |
+| SPACE-01 | N-body and orbital dynamics | partial | Codex | BUILDING (codex/physics-lane-2) |
 | SPACE-02 | Celestial ephemeris and rotation | partial | Codex | LANDED 18dbe0de5e |
 | SPACE-03 | Accretion disks and motion near compact objects | none | Open | OPEN |
 | DYN-04 | Wheeled vehicles on roads | partial | Open | OPEN |
