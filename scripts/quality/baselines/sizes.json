@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20473261,
+  "total": 20478329,
   "history": [
     {
       "date": "2026-10-24",
@@ -13239,6 +13239,12 @@
       "commit": "c32e306e062638b14e2a13934cea5417ef9e75fe",
       "grew": 1,
       "reason": "SOFT-03 and PA-75 add the optional strand-springs entry at 1991 B gzip with the existing SpringAccess. It contains rigid transform validation, guide-to-skin mapping and hook lifecycle. A separate third package would duplicate the SpringAccess and Animator bridge. The native physics and World modules load on demand and core and Stage gain zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e69a6486d",
+      "reason": "New optional post entry, 0 to 5,068 B gzip: upscale (SpatialUpscale, a single-frame edge-adaptive upscale plus contrast-adaptive sharpen). Its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14191,6 +14197,7 @@
     "@margoengine/post/stack": 5277,
     "@margoengine/post/stylize": 7937,
     "@margoengine/post/trail": 3812,
+    "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
     "@margoengine/procedural/building-plans": 17803,
     "@margoengine/procedural/building-rules": 13427,
