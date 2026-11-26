@@ -1,20 +1,17 @@
 import { MargoError } from '@margoengine/math/errors';
 import { cos, hypot, sin } from '@margoengine/math/pinned';
-import {
-  canShareMemory,
-  isShared,
-  regionWords,
-  STACK_BYTES,
-  type Cell,
-  type FieldDescriptor,
-  type FieldUse,
-  type Port,
-  type Region,
-  type Solver,
-  type SolverDescription,
-  type SolverHost,
-  type StepContext,
+import type {
+  Cell,
+  FieldDescriptor,
+  FieldUse,
+  Port,
+  Region,
+  Solver,
+  SolverDescription,
+  SolverHost,
+  StepContext,
 } from '@margoengine/physics/world';
+import { loadPhysicsWorld, world } from './physics-world.js';
 import type { Branches } from '@margoengine/procedural/lsystem';
 import { umod } from './fixed.js';
 
@@ -255,7 +252,7 @@ async function loadKernel(file: URL, signal?: AbortSignal): Promise<WebAssembly.
 }
 
 function words(state: State, region: Region): Float64Array {
-  return regionWords(state.host.memory, region) as Float64Array;
+  return world().regionWords(state.host.memory, region) as Float64Array;
 }
 
 const row = (id: number): number => HEADER + STRIDE * id;
@@ -551,6 +548,7 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
   /** Compiles the optional crown-shadow kernel. Add the resulting solver to a PhysicsWorld. */
   static async load(options: PlantGrowthOptions = {}): Promise<PlantGrowth> {
     const { signal } = options;
+    const { canShareMemory } = await loadPhysicsWorld();
     const [plain, shared] = await Promise.all([
       loadKernel(new URL(/* @vite-ignore */ './growth-kernel.wasm?no-inline', import.meta.url), signal),
       canShareMemory()
@@ -625,11 +623,12 @@ export class PlantGrowth implements Solver<PlantGrowthParams> {
           }
     }
     const shared =
-      isShared(host.memory) || Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]';
+      world().isShared(host.memory) ||
+      Object.prototype.toString.call(host.memory.buffer) === '[object SharedArrayBuffer]';
     const module = shared ? this.shared : this.plain;
     if (!module)
       throw new MargoError('unsupported', 'Shared plant growth Wasm is unavailable; choose plain world memory.');
-    const stack = host.allocate('plant-growth-stack', STACK_BYTES + 8, 'u8', LAYOUT);
+    const stack = host.allocate('plant-growth-stack', world().STACK_BYTES + 8, 'u8', LAYOUT);
     const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as GrowthKernel;
     if (kernel.__data_end?.value !== 0 || !(kernel.__stack_pointer instanceof WebAssembly.Global))
       throw new MargoError('failed', 'Invalid plant growth Wasm placement; rebuild its slot-free kernel assets.');

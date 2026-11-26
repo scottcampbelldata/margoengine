@@ -1,21 +1,18 @@
 import type { Wind } from '@margoengine/math/fields';
 import { MargoError } from '@margoengine/math/errors';
 import { SURFACE_WATER_FIELD, SURFACE_WATER_LAYOUT } from '@margoengine/physics/hydro';
-import {
-  canShareMemory,
-  isShared,
-  STACK_BYTES,
-  type Cell,
-  type FieldDescriptor,
-  type FieldUse,
-  type Port,
-  type Region,
-  type Solver,
-  type SolverDescription,
-  type SolverHost,
-  type StepContext,
-  regionWords,
+import type {
+  Cell,
+  FieldDescriptor,
+  FieldUse,
+  Port,
+  Region,
+  Solver,
+  SolverDescription,
+  SolverHost,
+  StepContext,
 } from '@margoengine/physics/world';
+import { loadPhysicsWorld, world } from './physics-world.js';
 import type { EcoPlant, EcoSpecies, EcosystemOptions } from './ecosystem.js';
 import { type ForestPopulation, ecosystemConfig, ecosystemYear, plantAdder, seedForest } from './ecosystem-model.js';
 import { divFloor, imod } from './fixed.js';
@@ -188,11 +185,11 @@ function count(value: number, label: string): number {
 }
 
 function floats(data: ForestData, region: Region): Float64Array {
-  return regionWords(data.host.memory, region) as Float64Array;
+  return world().regionWords(data.host.memory, region) as Float64Array;
 }
 
 function population(data: ForestData, clock: Float64Array): ForestPopulation {
-  const words = regionWords(data.host.memory, data.population) as Int32Array;
+  const words = world().regionWords(data.host.memory, data.population) as Int32Array;
   const n = data.config.limit;
   return {
     length: clock[1]!,
@@ -232,7 +229,7 @@ function readGrid(
     !port.cell.every((coordinate, axis) => coordinate === data.cell[axis])
   )
     throw new MargoError('state', `Publish ${port.field} on the forest grid. Use its dimensions and origin cell.`);
-  return regionWords(data.host.memory, region) as Float32Array | Float64Array;
+  return world().regionWords(data.host.memory, region) as Float32Array | Float64Array;
 }
 
 // The exposure fields are reduced every preceding tick. Per-species flood duration uses a block for each distinct
@@ -307,6 +304,7 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
   /** Load the optional native competition kernel before adding this solver to a world. */
   static async load(options: ForestEcosystemOptions = {}): Promise<ForestEcosystemSolver> {
     const { signal } = options;
+    const { canShareMemory } = await loadPhysicsWorld();
     const [plain, shared] = await Promise.all([
       loadForestKernel(new URL(/* @vite-ignore */ './forest-kernel.wasm?no-inline', import.meta.url), signal),
       canShareMemory()
@@ -377,10 +375,10 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
         fuel: finite(species.canopyFuel ?? 0, 'canopy fuel', 0, 1e6),
       };
     });
-    const module = isShared(host.memory) ? this.shared : this.plain;
+    const module = world().isShared(host.memory) ? this.shared : this.plain;
     if (!module) throw new MargoError('unsupported', 'Use a plain world or enable shared forest Wasm support.');
     const kernel = new WebAssembly.Instance(module, { env: { memory: host.memory } }).exports as ForestKernel;
-    const stack = host.allocate('forest-kernel-stack', STACK_BYTES + 8, 'u8', LAYOUT);
+    const stack = host.allocate('forest-kernel-stack', world().STACK_BYTES + 8, 'u8', LAYOUT);
     kernel.__stack_pointer.value = Math.floor((stack.byteOffset + stack.byteLength) / 16) * 16;
     let tableSize = 2;
     while (tableSize < 2 * config.limit) tableSize *= 2;
@@ -547,7 +545,7 @@ export class ForestEcosystemSolver implements Solver<ForestEcosystemParams> {
           tableSize,
           cell,
         );
-        return regionWords(data.host.memory, shade) as Int32Array;
+        return world().regionWords(data.host.memory, shade) as Int32Array;
       },
     );
     annual.fill(0);
