@@ -109,8 +109,8 @@ export function extendSky(code: string, full: boolean): string {
   // The cloud sheet, when the sky has one (its stub otherwise).
   c = swap(
     c,
-    'let opacity=(1.0-exp(-density*3.0/max(slant,0.25)))*haze;',
-    'let opacity=(1.0-exp(-density*3.0*frame.lookCloud.w/max(slant,0.25)))*haze;',
+    'let opacity=(1.0-exp(-thick*3.0/max(slant,0.25)))*haze;',
+    'let opacity=(1.0-exp(-thick*3.0*frame.lookCloud.w/max(slant,0.25)))*haze;',
     true,
   );
   c = swap(

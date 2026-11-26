@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Sky cloud sheet check</title><style>body{margin:0}canvas{display:block;width:320px;height:240px}</style></head><body><canvas width="320" height="240"></canvas>
+<script type="module">
+// The broken cloud sheet (KB-SKY-HOLES-KH1) on a real GPU: a Preetham sky with clouds at coverage 0.4 and 7 km, the sun
+// 45 degrees up, looking 70 degrees up away from the sun through a 20 degree view (8 m a pixel up there), drawn into a PostStack's HDR scene target (linear). The same
+// view drawn clear (coverage 0) is the backdrop; each pixel's lift over it says how much cloud it shows. Before the fix
+// every element was a flat stain: its lift jumped from 0 to full within a pixel or two and stayed even across it.
+// Driven by features-check.mjs.
+import {Engine} from '/packages/core/dist/index.js';
+import {sceneSamples} from '/packages/core/dist/quality.js';
+import {Bloom} from '/packages/post/dist/bloom.js';
+import {Sky} from '/packages/sky/dist/base.js';
+import {preetham} from '/packages/sky/dist/preetham.js';
+import {clouds} from '/packages/sky/dist/clouds.js';
+if(new URLSearchParams(location.search).get('samples')==='1')globalThis.margoLow=1;
+const engine=await Engine.create(document.querySelector('canvas'),{backend:'webgpu',camera:{position:[0,1.6,0],target:[0,1.6,-1],fov:20,near:0.1,far:1000}}),device=engine.gpu,errors=[];
+engine.stop();
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+const post=Bloom.attach(engine,{strength:0,threshold:1,exposure:0});
+const module=device.createShaderModule({code:'@group(0) @binding(0) var image:texture_2d<f32>;@group(0) @binding(1) var<storage,read_write> result:array<vec4f>;@compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u){let s=textureDimensions(image);if(id.x<s.x&&id.y<s.y){result[id.y*s.x+id.x]=textureLoad(image,id.xy,0);}}'});
+const pipeline=device.createComputePipeline({layout:'auto',compute:{module,entryPoint:'main'}});
+async function scene(){
+ const w=post.sceneTexture.width,h=post.sceneTexture.height,size=w*h*16;
+ const output=device.createBuffer({size,usage:GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC}),staging=device.createBuffer({size,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder(),pass=encoder.beginComputePass();pass.setPipeline(pipeline);
+ pass.setBindGroup(0,device.createBindGroup({layout:pipeline.getBindGroupLayout(0),entries:[{binding:0,resource:post.sceneTexture.createView()},{binding:1,resource:{buffer:output}}]}));
+ pass.dispatchWorkgroups(Math.ceil(w/8),Math.ceil(h/8));pass.end();encoder.copyBufferToBuffer(output,0,staging,0,size);device.queue.submit([encoder.finish()]);
+ await staging.mapAsync(GPUMapMode.READ);const v=new Float32Array(staging.getMappedRange().slice(0));staging.unmap();output.destroy();staging.destroy();return {w,h,v};
+}
+const lum=(v,i)=>0.2126*v[i]+0.7152*v[i+1]+0.0722*v[i+2];
+window.check={samples:sceneSamples,
+ async run(){
+  device.pushErrorScope('validation');
+  const sun=[Math.SQRT1_2*Math.sin(0.5),Math.SQRT1_2,-Math.SQRT1_2*Math.cos(0.5)],yaw=0.5+Math.PI,pitch=1.22;
+  engine.camera.target=[Math.sin(yaw)*Math.cos(pitch),1.6+Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)];
+  const draw=async(coverage)=>{const sky=Sky.attach(engine,{timeScale:0,sunDirection:sun,turbidity:3,clouds:{coverage,height:7000,speed:0}},{preetham,clouds});
+   engine.render({delta:0});engine.render({delta:0});const out=await scene();sky.dispose();return out;};
+  const clear=await draw(0),cloudy=await draw(0.4),lift=[];
+  for(let i=0;i<clear.v.length;i+=4)lift.push(lum(cloudy.v,i)-lum(clear.v,i));
+  const sorted=lift.filter(d=>d>0).sort((a,b)=>a-b),top=sorted[Math.floor(sorted.length*0.95)]??0,cloud=lift.filter(d=>d>0.05*top);
+  // rim: the share of cloud pixels lifted less than half the bright 5 % (an element that thins toward its edge has many);
+  // spread: the coefficient of variation of the lift over the cloud pixels (a flat stain has little).
+  const mean=cloud.reduce((a,b)=>a+b,0)/cloud.length,spread=Math.sqrt(cloud.reduce((a,b)=>a+(b-mean)**2,0)/cloud.length)/mean;
+  // steps: of the neighbouring pixel pairs that touch cloud, the share whose lift differs by more than a fifth of the
+  // bright 5 %: a hard-edged stain jumps there at every rim pixel, an element that thins to its rim rarely does.
+  let touching=0,steps=0;const w=clear.w,h=clear.h;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)for(const [dx,dy] of [[1,0],[0,1]]){if(x+dx>=w||y+dy>=h)continue;
+   const a=lift[y*w+x],b=lift[(y+dy)*w+x+dx];if(Math.max(a,b)<=0.05*top)continue;touching++;if(Math.abs(a-b)>0.2*top)steps++;}
+  return {validation:(await device.popErrorScope())?.message??null,errors,pixels:lift.length,cloud:cloud.length/lift.length,
+   rim:cloud.filter(d=>d<0.5*top).length/cloud.length,spread,steps:steps/touching,top};
+ }};
+window.ready=true;
+</script></body></html>

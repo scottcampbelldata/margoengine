@@ -193,13 +193,20 @@ fn cloudSheet(color:vec3f,backdrop:vec3f,ray:vec3f,p:vec2f,footprint:f32,slant:f
  // The two fine octaves erode the edges into wisps (Schneider 2015).
  let erode=cloudOctaves(p,footprint,2u,4u)*0.35;let density=clamp((cover-erode)/(1.0-erode),0.0,1.0);
  if(density<=0.0){return color;}
- let opacity=(1.0-exp(-density*3.0/max(slant,0.25)))*haze;
- // Sun: three samples toward it through a 0.8 km layer, Beer-Lambert absorption with the powder term (Schneider 2015)
+ // density is the element's depth, 0 at its rim and 1 at its thickest. In an adiabatic cloud the liquid water grows
+ // linearly with height above the base, so the optical depth of a column grows as its depth to the 5/3 (Brenguier et
+ // al. 2000): an element thins smoothly to its rim, and its thick middle shades, instead of every element reading as one
+ // flat, hard-edged stain the moment its density rises above 0 (KB-SKY-HOLES-KH1).
+ let thick=pow(density,5.0/3.0);
+ let opacity=(1.0-exp(-thick*3.0/max(slant,0.25)))*haze;
+ // Sun: the element's own depth (what the light crosses to reach the base seen from below, so its thick middle is greyer
+ // than its rim, as altocumulus shows its shading: WMO International Cloud Atlas, altocumulus) and three samples toward
+ // it through a 0.8 km layer, Beer-Lambert absorption with the powder term (Schneider 2015)
  // where the view looks away from the sun, the two-lobe phase, and the atmosphere's sun colour (0 once it has set).
  let s=frame.sun.xyz;let nu=dot(ray,s);var lit=vec3f(0);
  if(max(frame.sunlight.r,max(frame.sunlight.g,frame.sunlight.b))>0.0){
-  let step=s.xz/max(s.y,0.1)*0.13;var depth=density*0.5;
-  for(var k=1;k<=3;k++){depth+=cloudCover(cloudOctaves(p+step*f32(k),footprint,0u,2u));}
+  let step=s.xz/max(s.y,0.1)*0.13;var depth=thick*2.5;
+  for(var k=1;k<=3;k++){depth+=pow(cloudCover(cloudOctaves(p+step*f32(k),footprint,0u,2u)),5.0/3.0);}
   let tau=depth*1.2;let powder=mix(1.0-exp(-2.0*tau-0.3),1.0,0.5+0.5*nu);
   lit=frame.sunlight.rgb*1.6*(exp(-tau)*powder*cloudPhase(nu)+0.4*exp(-0.25*tau));
  }
