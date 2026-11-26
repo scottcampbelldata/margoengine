@@ -91,6 +91,35 @@ test('the like-for-like transfer swaps only the exact sRGB encode for the viewer
   assert.match(run, /exactSize: \[entry\.settings\.width, entry\.settings\.height\]/);
 });
 
+test('the sheen attribution model rewrites exactly the shared sheen albedo lookup', async () => {
+  const { viewerAlbedoRules, rewrite, sheenSpheres, sheenRows } = await import(
+    '../scripts/reference-rendering/sheen-attribution.mjs'
+  );
+  const { sheenAlbedoWGSL } = await import('../packages/shared/sheen.js');
+  const albedo = sheenAlbedoWGSL('margoSheenAlbedo');
+  // Each rule reaches the lookup once, so the attribution measures the albedo the shaders really carry; a change to
+  // shared/sheen.js that the model no longer matches fails here instead of silently measuring the shipped picture.
+  const encoded = rewrite(albedo, viewerAlbedoRules({ floor: 0.25 }));
+  assert.deepEqual(encoded.hits, [1, 1, 1]);
+  assert.match(encoded.code, /let sheenQ=clamp\(roughness,0\.2500,1\.0\);/);
+  assert.match(encoded.code, /1\.055\*pow\(sheenE,1\.0\/2\.4\)-0\.055/);
+  assert.deepEqual(rewrite(albedo, viewerAlbedoRules({ encode: false })).hits, [1, 1]);
+  // The projected sphere centres (rows by sheen roughness, columns by sheen colour), as read off the frozen picture.
+  const spheres = sheenSpheres();
+  assert.deepEqual(
+    spheres.map((r) => r.map((s) => s.centre.map(Math.round))),
+    [156, 206, 256, 306].map((y) => [263, 313, 363, 413].map((x) => [x, y])),
+  );
+  // One unit of error on a sheen sphere of row 2 and one on the backdrop.
+  const blank = () => ({ width: 512, height: 512, data: new Uint8Array(512 * 512 * 4) });
+  const a = blank(),
+    b = blank();
+  const [cx, cy] = spheres[2][3].centre.map(Math.floor);
+  a.data[(cy * 512 + cx) * 4 + 2] = 3;
+  a.data[0] = 1;
+  assert.deepEqual(sheenRows(a, b), { rows: [0, 0, 3, 0], outside: 1, total: 4 });
+});
+
 // Accepted differences (docs/limits.md, "Sample Viewer like for like"): once both pictures share the viewer's
 // pow(x, 1/2.2) transfer and one sample per pixel, these are the measured residuals of the BRDF itself. The integer
 // budgets equal the first measurement and are never raised.

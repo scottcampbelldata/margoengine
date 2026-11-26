@@ -1163,6 +1163,14 @@ on 32 threads; it prints the table for packages/shared/sheen.js and the validati
 representation compared in docs/clean-room.md), and checked on a GPU by
 `node scripts/run-with-timeout.mjs run -- npm run test:gpu:sheen-albedo -w @margoengine/materials`.
 
+The like-for-like residual is attributed by
+`node scripts/run-with-timeout.mjs run -- node scripts/reference-rendering/sheen-attribution.mjs` (optional
+`--floor=0.25`; same outside files as `run.mjs`). It renders the like-for-like picture as shipped, then with the base
+darkening's albedo replaced by the black-box viewer model sRGB_encode(E(n, max(r, floor))) without and with the floor,
+and prints each picture's error per sheen-roughness row of the coloured spheres and elsewhere. RTX A6000, Edge 158
+(2026-11-26): 218,842, 83,480 and 23,113 absolute. The model is a measurement aid only; no Margo shader uses it.
+`tests/reference-rendering.test.js` checks that its rewrite reaches the shared albedo lookup exactly once.
+
 ## Batch 99 emissive resampling accuracy
 
 After `npm run build:packages`, run `node scripts/run-with-timeout.mjs run --max=10 -- npm run test:gpu:resampled --workspace packages/voxel-pathtracer`.

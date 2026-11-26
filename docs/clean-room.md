@@ -3886,6 +3886,17 @@ including its Charlie distribution, alternative visibility and albedo-scaling de
 It does not read any of the linked renderer implementations. Shared Margo sheen equations
 are inspected to name known differences, without claiming an ablation of the complete loss.
 
+The 2026-11-26 attribution (scripts/reference-rendering/sheen-attribution.mjs) is a black-box measurement of the
+viewer's downloaded picture only; no Sample Viewer source, shader or lookup file was read. Sources: the
+KHR_materials_sheen README above ("Albedo-scaling technique", "Sheen visibility"); Dassault Systemes, Enterprise PBR
+Shading Model 2021x and 2022x, "Sheen" (https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/),
+for the albedo E as the cosine-weighted hemisphere integral of the sheen BRDF and the min form of its scaling;
+A. Conty Estevez and C. Kulla, "Production Friendly Microfacet Sheen BRDF", SIGGRAPH 2017 (Charlie D and the
+lambda fit); D. Neubelt and M. Pettineo, "Crafting a Next-Gen Material Pipeline for The Order: 1886", SIGGRAPH 2013
+(the alternative visibility). The model's sRGB encode is IEC 61966-2-1. Margo's E table is checked by
+scripts/sheen-albedo-fit.mjs (tanh-sinh integration of the spec BRDF) and, for this job, by a separate midpoint-rule
+integration outside the tree that agrees with it.
+
 ## WFC sockets (batch 69, job 3)
 
 Clean-room equality matching on opposite face labels and the 24 determinant-positive signed-axis permutations of a cube. Rotations transform each face normal; the right-handed cross product supplies the third basis vector. Constraint formulation follows the already cited Karth and Smith (2017) description; no other implementation read or copied. Generated labelled-cube fixtures are stand-ins.

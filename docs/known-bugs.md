@@ -12354,7 +12354,36 @@ The root tile solver accepted finite weights such as 1e308 even when weight time
 
 The WFC browser check closed the browser and Vite server independently, which could wait on retained connections without the shared shutdown budget. It now uses closeAll from startup through failure cleanup, matching the other browser suites. Regression: tests/browser-teardown.test.js; the existing bounded-close tests cover stalled shutdowns. The tracked-script gate exposed this after the first feature commit; new files are staged before subsequent landing checks.
 
-### Batch 160 sheen picture loss (open)
+### Batch 160 sheen picture loss (attributed 2026-11-26: no Margo cause; acceptance of the roughness-0 part pending)
+
+Attribution (2026-11-26, gap lane A): the whole like-for-like residual is the Sample Viewer's base darkening under
+the sheen, not a Margo term. Ablated one term at a time on `run.mjs --case=sheen --like-for-like` (218,842):
+- Sheen lobe D x V: the green channel (sheen colour (0, c, c) over a (0, 0, 0.5) base, so green is lobe plus white
+  specular) agrees with the viewer byte for byte along every sampled sphere row; neither the Charlie distribution nor
+  the Estevez and Kulla visibility carries the loss.
+- Roughness floor 0.03 on the lobe and albedo: 217,478 (0.6 % less, maximum 103 to 205). Not the cause.
+- Punctual albedo form: the shipped min(1 - c E(n.v), 1 - c E(n.l)) gives 218,842; the ambient form 1 - c E(n.v)
+  260,406, the light form 1 - c E(n.l) 244,960, no scaling 342,955. The spec form is the closest.
+- Base albedo scaling: per pixel, (B - G) / (B - G with no scaling) in linear light gives each picture's scale. Margo's
+  equals 1 - c max(E(n.v), E(n.l)) exactly; the viewer's implies an E 0.2 to 0.4 higher, the same for c = 0.33, 0.66
+  and 1, and about 0.35 at sheen roughness 0, where the spec's E is 0 (the Charlie lobe has no albedo away from
+  grazing at alpha below 0.01). Margo's table agrees with an independent integration of the spec BRDF (r = 1, n.v
+  0.95: 0.171 against 0.164 to 0.179). E is the cosine-weighted hemisphere integral of the sheen BRDF (Enterprise PBR
+  2022x, "Sheen"; KHR_materials_sheen points there for its table), in linear light.
+- Black-box model of the viewer: 1 - c sRGB_encode(E(n, max(r, f))), E read through the sRGB encode and at a lookup
+  roughness of at least f. `node scripts/reference-rendering/sheen-attribution.mjs` renders the three variants: as
+  shipped 218,842 (rows r = 0, 0.33, 0.66, 1 on the coloured spheres 66,004 / 43,795 / 50,018 / 47,720, the rest
+  11,305); the encode alone 83,480 (66,003 / 2,267 / 1,980 / 1,925); the encode and f = 0.25 23,113 (5,636 / 2,267 /
+  1,980 / 1,925), f = 0.2 35,014, f = 0.3 23,322. The rest, 11,305, is one-sample edges and text, as in the other
+  families.
+
+So the encoded lookup (accepted under KB3297c) holds rows 0.33 to 1 (141,533, 64.7 %) and a lookup roughness floor
+near 0.25 to 0.3 the roughness 0 row (66,004, 30.2 %). The KB3297c/KB3297d text said the encoded lookup darkens the
+base everywhere at roughness 0; measured, the encode alone darkens nothing there (66,003 either way), the floor does.
+A floor on E alone darkens a base whose sheen lobe is invisible at roughness 0 (both pictures draw it black), so
+light is removed that no lobe reflects; Margo keeps the spec's E with no floor. No Margo shader changed. Whether the
+roughness 0 part joins the accepted difference is Scott's call; until then this row stays open.
+
 
 Sheen job 3: complete Khronos SheenTestGrid (20 primitives), matching embedded camera/sun,
 512 x 512, no IBL, black background, neutral/sRGB. All-pixel RGB-byte MAE
