@@ -5,6 +5,14 @@
 ```ts
 import { Bed, FlowField, Wind } from "@margoengine/math/fields";
 
+export interface SubmergedJet {
+    height: number;
+    diameter: number;
+    speed: number;
+    density: number;
+    viscosity: number;
+}
+
 export const TRACER_FIELD: FieldDescriptor;
 
 export const TRACER_LAYOUT = 1;
@@ -48,6 +56,7 @@ export const TRACER_MATERIALS: {
 
 export interface TracerBedJets {
     material?: 'sand' | 'silt';
+    shear?: 'wall-jet' | 'footprint';
     criticalShields?: number;
     erodibility?: number;
     availableMass?: number;
@@ -118,6 +127,8 @@ export interface TracerSource {
 }
 
 export function settlingVelocity(material: TracerMaterial, density?: number, nu?: number, g?: number): number;
+
+export function submergedJetWallShear(jet: SubmergedJet, radius: number): number;
 
 // Not exported from this entry, but used by the exports above:
 

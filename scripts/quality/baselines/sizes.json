@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20587118,
+  "total": 20588383,
   "history": [
     {
       "date": "2026-10-24",
@@ -13657,6 +13657,12 @@
       "commit": "67bbc710d",
       "reason": "scene/assets split (manager's ruling): reference counts, preload groups and templates (b37b55e0e, 6b1eb54d6) moved out of AssetRegistry into the new optional entry scene/asset-pools (AssetPool extends AssetRegistry). scene/assets: 7506 B measured (7762 B ceiling) to 4018 B measured (4274 B ceiling), its size before b37b55e0e. scene/asset-pools: new, 0 to 7540 B measured (7796 B ceiling); it bundles the base registry and queue it extends. A registry that only defines, loads and swaps pays nothing for pools.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ae93713540",
+      "grew": 1,
+      "reason": "SEA-15's annular submerged-jet shear and mass-weighted pickup move physics/tracers from 6348 to 7413 B gzip. The optional ceiling rises from 6404 to 7669 B. A separate solver would duplicate the swim wake binding, the parcel store and the mass ledger; the cost stays in the optional tracer entry."
     }
   ],
   "items": {
@@ -14534,7 +14540,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6768,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 6404,
+    "@margoengine/physics/tracers": 7669,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
