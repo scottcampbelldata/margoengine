@@ -17205,6 +17205,11 @@ along a curved body interface are pending.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 
+The finite-chain rubber model underpredicts Treloar's smallest equibiaxial readings, by about 55% at 2%
+extension. The gated held-out traction data in `packages/physics/tests/coupling/volumetric-rubber.test.js`
+start at 20% extension and the low-strain miss is recorded in the limits. This remains a constitutive
+calibration gap. The large-deformation gelatin and ice measurements also await a hold-out comparison.
+
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support rung
 now runs with a full orthotropic tensor in native vertex blocks. It can tear when independent

@@ -29,6 +29,7 @@ mod mixed_fracture;
 mod orthotropic;
 mod tensile_nucleation;
 mod projective;
+mod rubber;
 mod vertex_block;
 mod fem_api;
 #[cfg(target_arch = "wasm32")]

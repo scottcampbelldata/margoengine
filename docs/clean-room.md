@@ -35,6 +35,36 @@ A query-only parent and an open fragment use triangular surfaces without volume 
 [Mirtich](https://people.eecs.berkeley.edu/~jfc/mirtich/massProps.html)
 [Molino et al.](https://physbam.stanford.edu/papers/stanford2004-01.pdf)
 
+Ellen M. Arruda and Mary C. Boyce, “A three-dimensional constitutive model for the large stretch behavior
+of rubber elastic materials” (1993), gives the five-term inverse-Langevin chain expansion. Alan N. Gent and
+Alan G. Thomas, “Forms for the stored (strain) energy function for vulcanized rubber” (1958), contributes
+the logarithmic second invariant. The combined law uses raw invariants `I₁ = ‖F‖²` and `I₂ = ‖cof F‖²`.
+For shear contributions `u = W₁′(3)`, `v = W₂′(3)`, its volumetric energy is
+`(λ + 2u − 4W₁″(3) − 16W₂″(3))(J−1)²/2 − (2u+4v)(J−1)`. Differentiation at identity gives zero
+stress and `μ = 2(u+v)`. At `I₂ < 3` the second-order continuation at 3 preserves the energy and its
+first two derivatives while keeping collapsed cells finite. Both cofactors and the determinant are affine
+in a single vertex's displacement. A tangent majorizer represents the concave logarithmic term, and the
+finite-strain block uses backtracking to accept a decrease of the physical objective.
+[Arruda and Boyce](https://doi.org/10.1016/0022-5096(93)90013-6)
+[Gent and Thomas](https://doi.org/10.1002/pol.1958.1202811814)
+[Chen et al.](https://doi.org/10.1145/3658179)
+
+L. R. G. Treloar, “Stress-strain data for vulcanised rubber under various types of deformation” (1944),
+measured the 8% sulfur sample. The test uses nominal tensile stress, converting one kgf/cm² to 98,066.5 Pa.
+The measured stresses used for calibration are the even-indexed uniaxial readings and the planar series.
+A grid over chain-link parameter `N` from 5 to 25 in 0.05 steps and spread from
+`[1,2,3,4,6,8,10,13,16,24,40,64]` minimizes the calibration squared relative residual. Each candidate
+fits the nonnegative chain and second-invariant coefficients by two-variable least squares. It selects
+`N = 20.45`, spread 6, a chain coefficient of 239,299 Pa, and `W₂′(3) = 54,155 Pa`.
+These give `μ ≈ 354,972 Pa` and transverse fraction 0.3051. For the prediction envelope, normalize
+each calibration residual by its measured stress plus the first 0.6 kgf/cm² recorded load.
+The residual at 21 degrees of freedom is 0.09164 of that scale. Use the 95% Student-t factor 2.080
+and the independent numerical traction bound described in the test. Eleven withheld uniaxial and
+twelve equibiaxial observations at 20% extension or more exercise the native solver. Both the held-out
+stresses and the small-strain mismatches are separate from the coefficient fit.
+[Treloar](https://doi.org/10.1039/TF9444000059)
+[Experimental measurements and units](https://abaqus.uclouvain.be/English/SIMACAEBMKRefMap/simabmk-c-rubberfit.htm)
+
 Senalik and Farber, “Mechanical Properties of Wood” (USDA Forest Products Laboratory, 2021),
 Table 5–1, gives different longitudinal, radial and tangential moduli. The directional regression
 uses the printed Douglas-fir tangential/longitudinal ratio 0.050. Hernandez et al., “Anisotropic

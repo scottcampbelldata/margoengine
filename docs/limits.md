@@ -9618,6 +9618,16 @@ settings. The rigid shape's density is carried when the original collider suppli
 new, outward-wound collision mesh still encloses positive volume. Open cloth pieces keep their
 triangle colliders without volumetric mass. Soft-particle masses transfer separately.
 
+**Large-strain rubber.** `CellMaterial.rubber` adds the finite-chain series and a second-invariant term to
+the native vertex-block solver. It preserves the specified Lamé coefficients at rest. It recovers an inverted
+tetrahedron and reproduces the restored continuation bit for bit. The Treloar test takes traction from actual
+vertex-block acceleration and removes the hydrostatic contribution to compare with the measured nominal tensile
+stress. A two-resolution extrapolation bounds the finite-step error. At 20% extension or greater, the 23
+withheld readings stay within the calibration-derived prediction envelope. The largest observed relative
+errors in that set are 10.9% uniaxial and 12.5% equibiaxial. The reported specimen at 2% biaxial extension
+has about 55% relative underprediction. Small biaxial extension, hysteresis and independent large-strain
+gelatin and ice tests are still open. This material curve is available for reversible isotropic vertex blocks.
+
 `@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean
 tetrahedra. Each sweep solves the local elastic and inertial energy exactly to working precision.
 An entire body still needs enough sweeps for load to propagate through its mesh. Linear tetrahedra

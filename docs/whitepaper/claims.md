@@ -13,6 +13,13 @@ first: each names its scope, its evidence file and how to reproduce it.
   separated force and torque are independent of the attached profile coefficient. A mixed-flow fixture checks the
   attached share of area and zero attached circulation on separated panels. The original light flapping-wing case
   retains its stability bounds. Run `node --test packages/physics/tests/flight.test.js`.
+- Large-strain rubber (SOFT-04, 2026-11-26). Finite-chain native vertex blocks predict 11 uniaxial and
+  12 independent equibiaxial tension observations withheld from calibration. The test reads nominal traction
+  from actual particle acceleration and separately checks the analytical traction limit. It exercises stretches
+  through 7.554 uniaxial and 4.45 equibiaxial. An inverted element recovers and produces an exact snapshot replay.
+  The material misses the smallest measured biaxial tensions, as recorded in the limits.
+  Run `packages/physics/tests/coupling/volumetric-rubber.test.js`.
+  [Material limits](../limits.md#volumetric-vertex-blocks-soft-04)
 
 - Layered tissue (SOFT-05, 2026-11-26). One tetrahedral specimen shares particle degrees of freedom across
   three authored materials. Its axial displacement matches the sum of the cells' stiffnesses and masses, and a
