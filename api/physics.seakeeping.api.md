@@ -57,6 +57,7 @@ export interface FloodResult {
     readonly lostCentre: Float64Array;
     readonly level: Float64Array;
     readonly pressure: Float64Array;
+    readonly sweeps: Float64Array;
 }
 
 export class Flooding {

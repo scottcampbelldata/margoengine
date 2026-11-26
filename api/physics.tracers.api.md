@@ -74,6 +74,7 @@ export interface TracerParams {
     verticalDiffusivity?: number;
     particleMass?: number;
     capacity?: number;
+    breaches?: number;
     bedJets?: TracerBedJets;
 }
 

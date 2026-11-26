@@ -25,6 +25,8 @@ import { cos, hypot, ln, pow, sin } from '@margoengine/math/pinned';
 import { DEFAULT_GRAVITY, gravityMagnitude } from '@margoengine/math/gravity';
 import { RandomStream, solverNumber } from '@margoengine/math/random';
 import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.js';
+import { MargoError } from '@margoengine/math/errors';
+import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
 import { regionWords } from './world/memory.js';
 import type {
   Cell,
@@ -132,6 +134,12 @@ export interface TracerParams {
   particleMass?: number;
   /** The most particles at once (default 20000); a source that would pass it releases heavier particles meanwhile. */
   capacity?: number;
+  /**
+   * The breaches of damaged hulls whose cargo it takes (`hullBreaches`, written by a `HullSolver` with compartments): up to
+   * this many breaches, each released as its cargo's material at its centre at its outflow's rate (default 64; 0 none).
+   * The hull solver must step in the tracers' origin cell.
+   */
+  breaches?: number;
   /** Erodible layer struck by the swimming wake when bed-jet coupling is enabled. */
   bedJets?: TracerBedJets;
 }
@@ -170,7 +178,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private readonly useBedJets: boolean;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
-  private params!: Required<Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources' | 'bedJets'>> & {
+  private params!: Required<Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources' | 'bedJets' | 'breaches'>> & {
     bed: Bed | number;
   };
   private sources: { material: number; source: TracerSource }[] = [];
@@ -182,6 +190,9 @@ export class TracerSolver implements Solver<TracerParams> {
   private particles!: Region;
   private ledger!: Region;
   private jetBed?: { material: number; threshold: number; erodibility: number; limit: number };
+  /** Breaches it takes cargo from, and each breach cargo's material (by its code in BREACH_CARGO, -1 for none). */
+  private breachSlots = 0;
+  private breachMaterials: number[] = [];
   private g = gravityMagnitude(DEFAULT_GRAVITY);
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
@@ -197,12 +208,12 @@ export class TracerSolver implements Solver<TracerParams> {
   describe(): SolverDescription {
     return {
       id: this.id,
-      fields: this.useBedJets
-        ? [
-            { field: TRACER_FIELD, access: 'write' },
-            { field: SWIM_WAKE_FIELD, access: 'read' },
-          ]
-        : [{ field: TRACER_FIELD, access: 'write' }],
+      fields: [
+        { field: TRACER_FIELD, access: 'write' },
+        ...(this.useBedJets ? [{ field: SWIM_WAKE_FIELD, access: 'read' as const }] : []),
+        // The cargo leaving damaged hulls, when a hull solver writes it.
+        { field: HULL_BREACHES_FIELD, access: 'read', optional: true },
+      ],
       rate: 0 as RateLevel,
       stableRate: () => 0 as RateLevel,
     };
@@ -221,7 +232,10 @@ export class TracerSolver implements Solver<TracerParams> {
       verticalDiffusivity = 0.001,
       particleMass = 1,
       capacity = 20000,
+      breaches = 64,
     } = params;
+    if (!(Number.isInteger(breaches) && breaches >= 0 && breaches <= 65536))
+      throw new RangeError(`A tracer solver takes 0 to 65536 whole breaches (got ${breaches}); pass a whole number.`);
     for (const [name, value] of [
       ['water density', waterDensity],
       ['viscosity', viscosity],
@@ -305,15 +319,54 @@ export class TracerSolver implements Solver<TracerParams> {
         limit: availableMass,
       };
     }
+    // Each breach cargo's material, registered here so a particle's material index means the same after a restore.
+    this.breachSlots = breaches;
+    this.breachMaterials = BREACH_CARGO.map((name) =>
+      name === 'none' ? -1 : this.materialIndex(TRACER_MATERIALS[name]),
+    );
     this.random = new RandomStream(0, solverNumber(this.id));
     this.particles = host.allocate('particles', capacity * STRIDE * 8, 'f64', TRACER_LAYOUT);
-    // Released, in the water, on the surface, on the bed (kg), and each source's mass not yet released as a particle.
+    // Released, in the water, on the surface, on the bed (kg), each source's mass not yet released as a particle, the
+    // bed jets' and each breach's.
     this.ledger = host.allocate(
       'ledger',
-      (4 + this.sources.length + Number(this.useBedJets)) * 8,
+      (4 + this.sources.length + Number(this.useBedJets) + breaches) * 8,
       'f64',
       TRACER_LAYOUT,
     );
+  }
+
+  /**
+   * Releases the mass waiting in ledger slot `slot` at `at` as particles of `material`, from the free particle `free` on;
+   * returns where the next free particle may be. Full, the mass waits for room and its next particle carries all of it.
+   */
+  private release(
+    slot: number,
+    at: readonly [number, number, number],
+    material: number,
+    words: Float64Array,
+    book: Float64Array,
+    free: number,
+  ): number {
+    const { capacity, particleMass, waterLevel } = this.params;
+    while (book[slot]! >= particleMass) {
+      while (free < capacity && words[free * STRIDE + 5]! !== FREE) free++;
+      if (free >= capacity) break;
+      const mass = book[slot]!,
+        take = free + 1 < capacity ? particleMass : mass,
+        p = free * STRIDE,
+        floats = this.materials[material]!.floats === true;
+      words[p] = at[0];
+      words[p + 1] = floats ? waterLevel : at[1];
+      words[p + 2] = at[2];
+      words[p + 3] = take;
+      words[p + 4] = material;
+      words[p + 5] = floats ? SURFACE : WATER;
+      book[slot]! -= take;
+      book[0]! += take;
+      book[floats ? 2 : 1]! += take;
+    }
+    return free;
   }
 
   private materialIndex(material: TracerMaterial): number {
@@ -345,7 +398,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const time = (context.tick + 1) * dt,
       words = this.words(),
       book = this.book(),
-      { capacity, particleMass, horizontalDiffusivity: kh, verticalDiffusivity: kv, waterLevel } = this.params;
+      { capacity, horizontalDiffusivity: kh, verticalDiffusivity: kv, waterLevel } = this.params;
     // Release: each source's mass this step, in particles of the set mass, the remainder carried to the next step.
     let free = 0;
     for (let s = 0; s < this.sources.length; s++) {
@@ -361,25 +414,28 @@ export class TracerSolver implements Solver<TracerParams> {
       const overlap = (time < stop ? time : stop) - (time - dt > start ? time - dt : start);
       book[4 + s]! += rate * overlap;
       const at = typeof source.position === 'function' ? source.position(time) : source.position;
-      while (book[4 + s]! >= particleMass) {
-        while (free < capacity && words[free * STRIDE + 5]! !== FREE) free++;
-        if (free >= capacity) {
-          // Full: the source's mass waits for room, and its next particle carries all of it.
-          break;
-        }
-        const mass = book[4 + s]!,
-          take = free + 1 < capacity ? particleMass : mass,
-          p = free * STRIDE,
-          floats = this.materials[material]!.floats === true;
-        words[p] = at[0];
-        words[p + 1] = floats ? waterLevel : at[1];
-        words[p + 2] = at[2];
-        words[p + 3] = take;
-        words[p + 4] = material;
-        words[p + 5] = floats ? SURFACE : WATER;
-        book[4 + s]! -= take;
-        book[0]! += take;
-        book[floats ? 2 : 1]! += take;
+      free = this.release(4 + s, at, material, words, book, free);
+    }
+    // The breaches' cargo: each record's outflow over the step, at its centre, as its cargo's material.
+    const breaches = context.inputs.get(HULL_BREACHES_FIELD.name);
+    if (breaches && this.breachSlots > 0) {
+      const c = breaches.cell;
+      if (c[0] !== this.cell[0] || c[1] !== this.cell[1] || c[2] !== this.cell[2])
+        throw new MargoError(
+          'state',
+          `The hull breaches come from origin cell [${c.join(', ')}] and the tracers step in [${this.cell.join(', ')}]; step the hull solver and the tracers in one cell.`,
+        );
+      const memory = breaches.region.memory ?? this.host.memory,
+        rec = new Float64Array(memory.buffer, breaches.region.byteOffset, breaches.region.byteLength / 8),
+        base = 4 + this.sources.length + Number(this.useBedJets),
+        count = Math.min(this.breachSlots, rec[0]!, Math.floor((rec.length - 1) / HULL_BREACH_WORDS));
+      for (let k = 0; k < count; k++) {
+        const r = 1 + k * HULL_BREACH_WORDS,
+          rate = rec[r + 12]!,
+          material = this.breachMaterials[rec[r + 13]!] ?? -1;
+        if (!(rate > 0 && Number.isFinite(rate)) || material < 0) continue;
+        book[base + k]! += rate * dt;
+        free = this.release(base + k, [rec[r + 2]!, rec[r + 3]!, rec[r + 4]!], material, words, book, free);
       }
     }
     // Motion: the water's velocity (and a slick's windage), settling, and the random walk.

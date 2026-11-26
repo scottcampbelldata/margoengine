@@ -10,6 +10,8 @@ export const ACTIVE_PERIODS = 0.8;
 
 export const ACTIVE_SHARE: number;
 
+export const BUBBLE_SLIP = 0.23;
+
 export interface BreakingStatistics {
     coverage: number;
     active: number;
@@ -18,6 +20,18 @@ export interface BreakingStatistics {
     stokes: [number, number];
     events: Float64Array;
     wavenumbers: Float64Array;
+}
+
+export interface BubblePlumeOptions {
+    readonly source?: number;
+    readonly entrainment?: number;
+    readonly slip?: number;
+    readonly expands?: boolean;
+    readonly atmosphere?: number;
+    readonly density?: number;
+    readonly g?: number;
+    readonly steps?: number;
+    readonly visit?: (z: number, radius: number, speed: number) => void;
 }
 
 export const CREST_SHARE = 0.3;
@@ -43,6 +57,7 @@ export interface FoamParams {
         readonly spinUp?: number;
     } | false;
     readonly ships?: readonly FoamShip[];
+    readonly bubbles?: boolean;
     readonly wakePersistence?: number;
     readonly capacity?: number;
     readonly rate?: RateLevel;
@@ -84,6 +99,8 @@ export class FoamSolver implements Solver<FoamParams> {
     bagBreakups(x: number, z: number): number;
 }
 
+export const PLUME_ENTRAINMENT = 0.055;
+
 export const SALT_FOAM_DECAY = 3.8;
 
 export const SATURATION_THRESHOLD = 0.0009;
@@ -91,6 +108,14 @@ export const SATURATION_THRESHOLD = 0.0009;
 export const SEA_FOAM_FIELD: FieldDescriptor;
 
 export const SEA_FOAM_LAYOUT = 1;
+
+export const SURFACE_ENTRAINMENT = 0.061;
+
+export interface SurfacingPlume {
+    readonly radius: number;
+    readonly speed: number;
+    readonly flux: number;
+}
 
 export const WASH_SPEED = 1;
 
@@ -100,9 +125,16 @@ export function bagBreakups(ustar: number): number;
 
 export function breakingStatistics(spectrum: WaveSpectrumSample, g: number, out?: BreakingStatistics): BreakingStatistics;
 
+export function bubblePlume(depth: number, gas: number, options?: BubblePlumeOptions): SurfacingPlume;
+
 export function sprayFlux(coverage: number, r80: number): number;
 
 export function sprayPerWhitecap(r80: number): number;
+
+export function surfaceCurrent(plume: SurfacingPlume, r: number, beta?: number): {
+    readonly speed: number;
+    readonly depth: number;
+};
 
 // Not exported from this entry, but used by the exports above:
 
