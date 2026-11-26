@@ -44,5 +44,5 @@ export async function createTissueFixture(sliding, position) {
     .add(new RigidSolver(), { physics })
     .add(new TissueSolver(), { soft, bindings: [binding] })
     .couple(['rigid', 'tissue'], 'staggered');
-  return { world, tissue, bone };
+  return { world, tissue, bone, physics };
 }

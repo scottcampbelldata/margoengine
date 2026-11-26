@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Layered tissue (SOFT-05, 2026-11-26). One tetrahedral specimen shares particle degrees of freedom across
+  three authored materials. Its axial displacement matches the sum of the cells' stiffnesses and masses, and a
+  cut carries each parent's material and exact volume-weighted fragment mass within floating-point error.
+  The browser fixture observes the stiffer skin change the whole native surface. Run
+  `packages/physics/tests/coupling/tissue-layers.test.js` and `packages/physics/tests/tissue.browser.mjs`.
+
 - Skeletal tissue boundary (SOFT-05, 2026-11-26). A real kinematic bone translates and rotates a tetrahedral
   insertion through the rigid bodies field. The sliding variant matches the small-extension normal solution
   and produces the same particle positions under an additional 0.5 m tangential shift. An independent world

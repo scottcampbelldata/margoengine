@@ -1019,6 +1019,7 @@ export class SoftBodyDesc {
   /** @internal */ triangles: number[] = [];
   /** @internal Four particle indices per tetrahedron. */ cells: number[] = [];
   /** @internal */ cellMaterial = new CellMaterial();
+  /** @internal */ cellMaterials: readonly CellMaterial[] | null = null;
   /** @internal */ fiber: SoftFiber | null = null;
   /** @internal */ orthotropy: readonly number[] | null = null;
   /** @internal */ orthotropicStrength: readonly number[] | null = null;
@@ -1701,6 +1702,7 @@ export class SoftBodyDesc {
       next.push(...four);
     }
     this.cells = next;
+    this.cellMaterials = null;
     if (material) this.setCellMaterial(material);
     return this;
   }
@@ -1762,6 +1764,42 @@ export class SoftBodyDesc {
   setCellMaterial(material: CellMaterial): this {
     checkCellMaterial(material);
     this.cellMaterial = material.clone();
+    this.cellMaterials = null;
+    return this;
+  }
+  /** Set one reversible Neo-Hookean material per cell, ordered like the tetrahedra. Materials are copied. */
+  setCellMaterials(materials: readonly CellMaterial[]): this {
+    if (!Array.isArray(materials) || this.cells.length === 0 || materials.length !== this.cells.length / 4)
+      throw new MargoError('state', 'Cell materials must match the tetrahedra. Give one material for every cell.');
+    const copied = new Map<CellMaterial, CellMaterial>();
+    const next = Array.from(materials, (material) => {
+      const existing = copied.get(material);
+      if (existing) return existing;
+      if (!material || material.model !== 'neo-hookean' || material.yieldStrain !== 0 || material.tearStrain !== 0)
+        throw new MargoError(
+          'state',
+          'Layered cells need reversible Neo-Hookean materials. Choose that model and clear plastic and tearing strain.',
+        );
+      checkCellMaterial(material);
+      const [mu, lambda] = material.lame();
+      if (
+        !(
+          Math.fround(mu) > 0 &&
+          Number.isFinite(Math.fround(mu + lambda)) &&
+          Math.fround(material.density) > 0 &&
+          Number.isFinite(Math.fround(material.density))
+        )
+      )
+        throw new MargoError(
+          'state',
+          'A layer material exceeds the native coefficient range. Use representable pascals and kilograms per cubic metre.',
+        );
+      const copy = Object.freeze(material.clone());
+      copied.set(material, copy);
+      return copy;
+    });
+    this.cellMaterial = next[0]!.clone();
+    this.cellMaterials = Object.freeze(next);
     return this;
   }
   /**
@@ -1793,9 +1831,9 @@ export class SoftBodyDesc {
       return masses.map((m, i) => (m > 0 ? m : this.masses[i]!));
     }
     if (this.massGiven || this.cells.length === 0) return this.masses;
-    const out = new Array<number>(this.particleCount).fill(0),
-      density = this.cellMaterial.density;
+    const out = new Array<number>(this.particleCount).fill(0);
     for (let t = 0; t < this.cells.length; t += 4) {
+      const density = this.cellMaterials?.[t / 4]?.density ?? this.cellMaterial.density;
       const volume =
         Math.abs(
           tetDeterminant(this.positions, this.cells[t]!, this.cells[t + 1]!, this.cells[t + 2]!, this.cells[t + 3]!),
@@ -1841,6 +1879,13 @@ export class SoftBodyDesc {
   /** Merges another description in: its particles follow this one's, and its indices are shifted to match. */
   append(other: SoftBodyDesc): this {
     const base = this.particleCount;
+    const byCell =
+      this.cellMaterials || other.cellMaterials
+        ? [
+            ...(this.cellMaterials ?? this.cells.filter((_, i) => i % 4 === 0).map(() => this.cellMaterial)),
+            ...(other.cellMaterials ?? other.cells.filter((_, i) => i % 4 === 0).map(() => other.cellMaterial)),
+          ]
+        : null;
     // Two bodies merged are no longer one grid.
     if (other.particleCount) this.grid = null;
     this.positions.push(...other.positions);
@@ -1863,6 +1908,7 @@ export class SoftBodyDesc {
       this.crackBand = other.crackBand;
     }
     for (const p of other.cells) this.cells.push(p + base);
+    this.cellMaterials = byCell;
     for (const group of other.clusterGroups) this.clusterGroups.push(group.map((p) => p + base));
     if (other.clusterGroups.length && !this.clusterHertz) this.clusterHertz = other.clusterHertz;
     this.massGiven ||= other.massGiven;
@@ -2019,6 +2065,7 @@ export interface SoftTearEvent {
 
 /** A soft body in a world: read and move its particles, apply forces, pin it, tear it. */
 export class SoftBody {
+  /** @internal */ cellMaterials: readonly CellMaterial[] | null = null;
   /** @internal */ constructor(
     private readonly owner: SoftBodies,
     /** The number that names this body in its world; it drops by one when an earlier body is removed. */
@@ -2688,12 +2735,18 @@ export class SoftBody {
         'Coplanar fracture toughness needs isotropic elastic cells. Use an elastic material without plastic flow or another tear rule.',
       );
     this.cellMaterial = material.clone();
+    this.cellMaterials = null;
     this.owner.writeCellMaterial(this);
     return this;
   }
-  /** A copy of the cells' material; change it and pass it to {@link SoftBody.setCellMaterial}. */
+  /** A copy of the uniform material, or the first cell's material in a layered body. */
   getCellMaterial(): CellMaterial {
     return this.cellMaterial.clone();
+  }
+  /** A copy of one tetrahedron's material, using the cell order returned by {@link SoftBody.cells}. */
+  cellMaterialAt(cell: number): CellMaterial {
+    this.checkCell(cell);
+    return (this.cellMaterials?.[cell] ?? this.cellMaterial).clone();
   }
   /** Replaces the material, taking effect on every edge. */
   setMaterial(material: SoftBodyMaterial): this {
@@ -3090,6 +3143,15 @@ export class SoftBodies implements PhysicsAttachment {
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const mode = checkedSolver(desc.solver);
     checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
+    if (
+      desc.cellMaterials &&
+      (desc.orthotropy ||
+        desc.cellMaterials.some((m) => m.model !== 'neo-hookean' || m.yieldStrain !== 0 || m.tearStrain !== 0))
+    )
+      throw new MargoError(
+        'state',
+        'Layered cells use reversible isotropic elasticity. Separate the materials with plasticity or orthotropy into their own bodies.',
+      );
     const fiber = desc.fiber && softFiber(desc.fiber.direction, desc.fiber.modulus);
     if (desc.orthotropy && (mode !== 'vertex-block' || fiber))
       throw new RangeError(
@@ -3276,6 +3338,7 @@ export class SoftBodies implements PhysicsAttachment {
       range,
       desc.cellMaterial.clone(),
     );
+    body.cellMaterials = desc.cellMaterials;
     body.triangleList = Uint32Array.from(desc.triangles);
     body.edgeKinds = Uint8Array.from(desc.edgeKinds);
     body.edgeShear = Float32Array.from(desc.edgeShear);
@@ -3774,12 +3837,12 @@ export class SoftBodies implements PhysicsAttachment {
     const { first, count } = body.cellRange;
     if (count === 0) return;
     const f = this.cellColumns(),
-      m = body.cellMaterial,
-      [baseMu, baseLambda] = m.lame(),
+      uniform = body.cellMaterial,
+      lame = uniform.lame(),
+      mode = cellSolverFlag(body.solverKind, CELL_MODEL[uniform.model]),
       flags = f.flags as unknown as Uint32Array,
-      mode = cellSolverFlag(body.solverKind, CELL_MODEL[m.model]),
       orthotropy = this.cellOrthotropy(body),
-      referenceShear = orthotropy ? Math.max(orthotropy[15]!, orthotropy[16]!, orthotropy[17]!) : baseMu,
+      referenceShear = orthotropy && Math.max(orthotropy[15]!, orthotropy[16]!, orthotropy[17]!),
       sets = body.clusterInfo.map((info) => new Set(info.members));
     for (let t = first; t < first + count; t++) {
       let stiffness = 1,
@@ -3791,10 +3854,11 @@ export class SoftBodies implements PhysicsAttachment {
           resistance *= info.tearResistance;
         }
       });
-      const mu = baseMu * stiffness,
-        lambda = baseLambda * stiffness;
-      f.mu![t] = mu;
-      f.lambda![t] = lambda;
+      const layer = body.cellMaterials?.[t - first];
+      const m = layer ?? uniform;
+      const [baseMu, baseLambda] = layer ? layer.lame() : lame;
+      f.mu![t] = baseMu * stiffness;
+      f.lambda![t] = baseLambda * stiffness;
       (f.model as unknown as Uint32Array)[t] = CELL_MODEL[m.model];
       f.yield_strain![t] = m.yieldStrain;
       f.creep![t] = m.creep;
@@ -3804,7 +3868,7 @@ export class SoftBodies implements PhysicsAttachment {
       f.interior![t] = m.interiorStrength;
       // A cell's shear wave crosses it in size / sqrt(mu / density): damping 2 zeta of that frequency.
       const size = Math.cbrt(6 * f.vol0![t]!),
-        wave = Math.sqrt((referenceShear * stiffness) / m.density) / size;
+        wave = Math.sqrt(((referenceShear ?? baseMu) * stiffness) / m.density) / size;
       const rate = (m.deformationDamping ?? this.cellDamping) + 2 * m.elasticDampingRatio * wave;
       f.damp![t] = rate;
       // The implicit solver damps by a factor on the stiffness: the rate over the square of the cell's wave frequency.

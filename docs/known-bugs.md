@@ -17155,10 +17155,10 @@ Reverse travel and the high-slip end of that side-load range remain open.
 
 ### Active and layered soft tissue (SOFT-05)
 
-The skeletal tissue fixture in `packages/physics/tests/coupling/tissue.test.js` deforms a homogeneous
-tetrahedron. The current solver couples each bound particle to a local bone plane. It still needs active
-muscle fibers, independently calibrated materials in joined muscle, fat and skin layers, and sliding
-along a curved body interface for the catalog's full anatomical result.
+The tissue solver supports three authored passive materials in one conforming tetrahedral body, and a
+bone-local plane for the sliding particle. The coupon in `packages/physics/tests/coupling/tissue-layers.test.js`
+uses illustrative coefficients. Active muscle fibers, independent measurements for the joined layers and sliding
+along a curved body interface are pending.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

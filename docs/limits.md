@@ -9603,6 +9603,13 @@ epsilon times the specimen length. A 0.5 m tangent translation leaves its entire
 The same native surface shows a 40.167 mm normal displacement under the rendered control and unchanged render
 pixels under the tangent shift on WebGPU and WebGL2. The fixture is a material coupon.
 
+Three authored layers share their tetrahedral vertices and contribute independent elasticity, damping and
+density. The layered entry uses reversible isotropic Neo-Hookean materials. A one-step specimen matches the sum
+of the independently derived axial stiffnesses and nodal masses within 16 binary32 epsilon times the measured
+quantity's reference scale. The density-weighted cut fixture's fragment mass agrees with the exact tetrahedral
+volume fraction under the same bound. The renderer reads the native soft geometry. Increasing the skin modulus
+changes the loaded surface on WebGPU and WebGL2, with an exact same-backend replay.
+
 ### Volumetric vertex blocks (SOFT-04)
 
 `@margoengine/physics/soft` accepts `'vertex-block'` for isotropic stable Neo-Hookean

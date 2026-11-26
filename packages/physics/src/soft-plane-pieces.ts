@@ -82,7 +82,9 @@ export function makeCutPieces(
   const oldBodyCell = body.cellRange.first;
   const support = new Float64Array(body.particles);
   oldCells.forEach((p, i) => {
-    support[p] = support[p]! + fem.vol0![oldBodyCell + Math.floor(i / 4)]!;
+    const cell = Math.floor(i / 4);
+    const volume = fem.vol0![oldBodyCell + cell]!;
+    support[p] = support[p]! + volume * (body.cellMaterials?.[cell]?.density ?? 1);
   });
   if (support.some((volume) => volume <= 0))
     throw new MargoError(
@@ -135,12 +137,13 @@ export function makeCutPieces(
       const row = oldBodyCell + cell.parent;
       const volume = cell.fraction * fem.vol0![row]!;
       restVolume += volume;
+      const density = body.cellMaterials?.[cell.parent]?.density ?? 1;
       for (const node of cell.nodes) {
         const point = plan.points[node]!;
         const contribute = (p: number, weight: number): void => {
           const local = index.get(node)!;
           // A child's 1/4-volume lumping integrates every linear parent shape function exactly.
-          const share = (weight * volume) / support[p]!;
+          const share = (weight * volume * density) / support[p]!;
           const mass = share * body.masses[p]!;
           masses[local] = masses[local]! + mass;
           for (const axis of AXES)
@@ -199,6 +202,7 @@ export function makeCutPieces(
       history.flatMap(({ nodes }) => nodes),
       body.cellMaterial,
     );
+    if (body.cellMaterials) desc.setCellMaterials(history.map(({ parent }) => body.cellMaterials![parent]!));
     if (body.triangleList.length > 0 || body.surface) desc.setSurface();
     desc.setMasses(masses);
     desc.setMaterial(body.material);

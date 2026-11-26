@@ -10030,7 +10030,10 @@ The parent body handle guards lifetime and rejects a switch to a dynamic bone. C
 prescribed skeleton. Rigid contact outside the prescribed skeleton uses the inherited soft-body ports.
 The CPU fixture checks actual rigid transforms, exact snapshot replay, analytic normal compliance and zero tangent
 load. WebGPU and WebGL2 render the simulated tissue surface and compare the normal and tangential controls.
-Layered anatomical materials and active contraction remain open.
+A conforming tetrahedral mesh can carry independent reversible Neo-Hookean coefficients and density per cell.
+The native step sums all incident cell contributions at each shared particle. Both cut routes carry the parent
+law and use density-weighted material support to distribute nodal mass. Exact coupon and cut proofs cover those
+paths. Active contraction and held-out deformation measurements remain open.
 
 Volumetric vertex blocks (SOFT-04, `soft-kernel/src/vertex_block.rs`). The deterministic incident-corner list
 is rebuilt from the live tetrahedra, so tears retire their cells from the next solve. Inertia and exact local

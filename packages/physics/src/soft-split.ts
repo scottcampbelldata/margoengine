@@ -358,7 +358,8 @@ function splitCells(
     nodeVolume = new Map<number, number>();
   for (const t of cells)
     for (let j = 0; j < 4; j++) {
-      const share = at('vol0')[t]! / 4;
+      const density = body.cellMaterials?.[t - first]?.density ?? 1;
+      const share = (at('vol0')[t]! * density) / 4;
       volume.set(corner(t, j), (volume.get(corner(t, j)) ?? 0) + share);
       const node = find(slots, (t - first) * 4 + j);
       nodeVolume.set(node, (nodeVolume.get(node) ?? 0) + share);
@@ -388,6 +389,7 @@ function splitCells(
     carry(desc, body, c, rows, nodeIndex, masses);
     desc.massGiven = true;
     desc.cells = mine.flatMap((t) => [0, 1, 2, 3].map((j) => nodeIndex.get(find(slots, (t - first) * 4 + j))!));
+    if (body.cellMaterials) desc.setCellMaterials(mine.map((row) => body.cellMaterials![row - first]!));
     // The piece's surface: its own boundary faces, the faces along the crack among them.
     if (body.triangleList.length > 0 || body.surface) {
       desc.triangles = boundaryTriangles(

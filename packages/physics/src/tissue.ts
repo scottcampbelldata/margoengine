@@ -1,7 +1,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
 import { checkVec, rotateVec, type Vec3 } from './math.js';
-import type { SoftBodies, SoftBody } from './soft.js';
+import type { CellMaterial, SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 import type { SolverHost, StepContext } from './world/solver.js';
 import { BODIES_FIELD, BODY_WORDS } from './world/solvers/rigid.js';
 import { SoftSolver, type SoftSolverParams } from './world/solvers/soft.js';
@@ -28,6 +28,28 @@ export interface TissueSolverParams extends SoftSolverParams {
   readonly bindings: readonly TissueBoneBinding[];
   /** Length of a PhysicsWorld origin cell, in metres. Defaults to 4096. */
   readonly cellSize?: number;
+}
+
+export type TissueLayer = 'muscle' | 'fat' | 'skin';
+
+export interface TissueLayers {
+  /** One anatomical label for each tetrahedron in the description. */
+  readonly cells: readonly TissueLayer[];
+  /** Passive material for each label present in cells. */
+  readonly materials: Readonly<Partial<Record<TissueLayer, CellMaterial>>>;
+}
+
+/** Create one conforming tetrahedral body with separate muscle, fat and skin materials. */
+export function createLayeredTissue(soft: SoftBodies, desc: SoftBodyDesc, layers: TissueLayers): SoftBody {
+  if (!layers || !Array.isArray(layers.cells) || !layers.materials)
+    throw new MargoError('state', 'Layered tissue needs cell labels and materials. Supply one label and its material.');
+  const materials = Array.from(layers.cells, (layer: TissueLayer) => {
+    const material = layer === 'muscle' || layer === 'fat' || layer === 'skin' ? layers.materials[layer] : undefined;
+    if (!material)
+      throw new MargoError('state', 'A tissue cell lacks a layer material. Supply its muscle, fat or skin material.');
+    return material;
+  });
+  return soft.create(desc.setCellMaterials(materials));
 }
 
 type Binding = Omit<TissueBoneBinding, 'sliding'> & {

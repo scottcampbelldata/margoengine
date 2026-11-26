@@ -6,6 +6,9 @@
 <script type="module">
   import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
   import { Physics } from '../dist/index.js';
+  import { createLayeredTissue, TissueSolver } from '../dist/tissue.js';
+  import { PhysicsWorld, RigidSolver } from '../dist/world.js';
+  import { cells, createLayerFixture, materials } from './coupling/tissue-layers-fixture.js';
   import { createTissueFixture } from './coupling/tissue-fixture.js';
 
   await Physics.load();
@@ -39,14 +42,34 @@
   }
 
   window.renderTissue = async (position) => {
-    const { world, tissue } = await createTissueFixture(true, position);
+    const { world, tissue, physics } = await createTissueFixture(true, position);
     world.advance(1);
-    const geometry = surface(tissue);
-    mesh.setGeometry(geometry);
+    const reading = await draw(tissue, world, 3);
+    physics.dispose();
+    return reading;
+  };
+
+  window.renderLayers = async (skinModulus) => {
+    const { physics, soft, desc } = await createLayerFixture();
+    const skin = materials.skin.clone();
+    skin.youngsModulus = skinModulus;
+    const tissue = createLayeredTissue(soft, desc, { cells, materials: { ...materials, skin } });
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(new TissueSolver(), { soft, bindings: [] });
+    tissue.applyParticleImpulse(5, [0, 0, 0.45]);
+    world.advance(4);
+    const reading = await draw(tissue, world, 5);
+    physics.dispose();
+    return reading;
+  };
+
+  async function draw(tissue, world, apex) {
+    mesh.setGeometry(surface(tissue));
     engine.render({ delta: 1 / 60 });
     await engine.gpu.queue.onSubmittedWorkDone();
-    return { vertex: tissue.particlePosition(3), hash: world.hash(), visible: engine.stats.visible };
-  };
+    return { vertex: tissue.particlePosition(apex), hash: world.hash(), visible: engine.stats.visible };
+  }
 </script>
 </body>
 </html>

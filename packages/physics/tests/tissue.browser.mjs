@@ -19,6 +19,16 @@ try {
   assert.deepEqual(await page.locator('canvas').screenshot(), pushedImage);
   assert.deepEqual(await page.evaluate(() => window.renderTissue([0, 0, 0.125])), pushed);
   assert.deepEqual(await page.locator('canvas').screenshot(), pushedImage);
+  const supple = await page.evaluate(() => window.renderLayers(6000));
+  const suppleFrame = await page.locator('canvas').screenshot();
+  const firm = await page.evaluate(() => window.renderLayers(18000));
+  const firmFrame = await page.locator('canvas').screenshot();
+  assert.ok(supple.visible >= 1 && supple.visible === firm.visible);
+  assert.ok(supple.vertex[2] > firm.vertex[2]);
+  assert.notDeepEqual(suppleFrame, firmFrame);
+  assert.deepEqual(await page.evaluate(() => window.renderLayers(18000)), firm);
+  assert.deepEqual(await page.locator('canvas').screenshot(), firmFrame);
+  console.log('Layered apex', firm.vertex[2], 'm, state', firm.hash);
   assert.deepEqual(errors, []);
   console.log('Tissue apex', pushed.vertex[2], 'm, state', pushed.hash);
 } finally {

@@ -953,6 +953,52 @@ Clean-room references for the kinematic and sliding boundary conditions:
 - Breannan Smith, Fernando de Goes and Theodore Kim, *Stable Neo-Hookean Flesh Simulation* (2018), supplies the
   native volume constitutive law. [Paper](https://www.tkim.graphics/NEO/StableNeoHookean2018.pdf)
 
+#### Layered muscle, fat and skin
+
+`createLayeredTissue(soft, desc, { cells, materials })` applies one anatomical label per tetrahedron to the
+description and creates a single body with shared vertices across the layers. Label cells `'muscle'`, `'fat'` or
+`'skin'` in the order passed to `setCells`. Provide a reversible Neo-Hookean `CellMaterial` for each label you
+use. Each layer contributes its own density in kg/m³, Young's modulus in Pa, Poisson ratio and deformation damping.
+When no particle mass was authored, each cell contributes a quarter of its rest mass to each corner. Read a copy
+of the effective authored material with `tissue.cellMaterialAt(index)`. Calling `setCellMaterial` on the body
+replaces the layered elastic coefficients with one material.
+
+<!-- example:node -->
+```js
+import { Physics } from '@margoengine/physics';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+import { createLayeredTissue } from '@margoengine/physics/tissue';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics);
+const material = (density, youngsModulus) =>
+  Object.assign(new CellMaterial(), { density, youngsModulus });
+const desc = new SoftBodyDesc([
+  [0, 0, 0], [0.1, 0, 0], [0, 0.1, 0], [-0.1, 0, 0], [0, -0.1, 0], [0, 0, 0.1],
+]).setCells([0, 1, 2, 5, 0, 2, 3, 5, 0, 3, 4, 5]).setSurface().setSolver('vertex-block');
+const tissue = createLayeredTissue(soft, desc, {
+  cells: ['muscle', 'fat', 'skin'],
+  materials: {
+    muscle: material(1060, 6000),
+    fat: material(900, 2500),
+    skin: material(1120, 18000),
+  },
+});
+console.log(tissue.mass(), tissue.cellMaterialAt(1).youngsModulus);
+physics.dispose();
+```
+
+This coupon uses example material values. Author anatomical material coefficients for the part and loading
+regime. Geometric cuts keep each child cell's parent material and apportion mass by the contributing layer
+densities. The tissue solver still takes the bindings belonging to each authored body at creation time.
+
+Lee, Sifakis and Terzopoulos (2009), *Comprehensive Biomechanical Modeling and Simulation of the Upper Body*,
+§§3–4 models separate anatomical structures and tissue-to-skeleton attachments. Smith, de Goes and Kim (2018),
+*Stable Neo-Hookean Flesh Simulation*, supplies the passive local material law used by each cell.
+[Lee et al.](https://pages.cs.wisc.edu/~sifakis/papers/TOG09-Lee-Sifakis-Terzopoulos.pdf)
+[Smith et al.](https://www.tkim.graphics/NEO/StableNeoHookean2018.pdf)
+
 ### Gas pressure in a closed shell
 
 `setGasPressure({pressure, volume, ambientPressure})` uses absolute pressures in pascals. The optional `volume` is the
