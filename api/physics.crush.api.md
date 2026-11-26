@@ -9,6 +9,31 @@ export const CRUSH_LAYOUT = 1;
 
 export const CRUSH_WORDS = 8;
 
+export class CircularPlateIndentation {
+    readonly fractureStroke: number;
+    readonly fractureForce: number;
+    readonly fractureWork: number;
+    constructor(params: CircularPlateParams);
+    read(stroke: number, rest?: ArrayLike<number>): CircularPlateReading;
+}
+
+export interface CircularPlateParams {
+    readonly radius: number;
+    readonly thickness: number;
+    readonly indenterRadius: number;
+    readonly strength: number;
+    readonly hardening: number;
+}
+
+export interface CircularPlateReading {
+    readonly stroke: number;
+    readonly force?: number;
+    readonly work: number;
+    readonly contactRadius: number;
+    readonly fractured: boolean;
+    readonly surface?: CrushPlateSurface;
+}
+
 export type CrushGroundPatch = Omit<CrushPatch, 'support' | 'radius'>;
 
 export interface CrushMaterial {

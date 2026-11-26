@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20644456,
+  "total": 20645716,
   "history": [
     {
       "date": "2026-10-24",
@@ -13873,6 +13873,12 @@
       "commit": "FLUID-07-turning-receiver",
       "grew": 1,
       "reason": "FLUID-07 adds bounded angular contact and delivers the hit normal and lever arm to the existing film recoil path. Thin-film rises from 14185 to 15615 B gzip; cap changes from 14611 to 16084 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "1b1a25c619",
+      "reason": "BREAK-03 measured circular indentation grows the optional crush entry from 11206 to 12430 B gzip. The ceiling rises from 11543 to 12803 B. The same optional family exposes the structural material model and renderable surface. A separate entry would repeat loading and surface-view plumbing for scenes that use both rectangular buckling and circular indentation. Named imports remain tree-shakable.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14697,7 +14703,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 11543,
+    "@margoengine/physics/crush": 12803,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
