@@ -5657,3 +5657,12 @@ frame-rate invariance and exact replay. These are solver and source-link checks.
 ### Developmental wood growth
 
 Plants sharing the Biomes growth field give different branch extension when their measured local soil water differs. The reported angle, branch area and depth attenuation agree with analytical cases in `packages/biomes/tests/coupling/growth.test.js`. The resulting three-internode fixture meshes to 36 triangles in Chromium and replays bit for bit after restore.
+
+### Three-dimensional Bingham and Herschel–Bulkley material (FLUID-06)
+
+Finite-strain APIC preserves translation and mass in the free-fall case. Computed Bingham
+and Herschel–Bulkley shear agree with independent closed forms for exponents 1 and 1/2, and
+the implicit solvent case agrees with a discrete occupied-node shear solution. A varying
+inlet on a live terrain bed has the same state across frame rates, restore and memory modes.
+[Direct tests](../../packages/physics/tests/viscoplastic.test.js) ·
+[Coupling tests](../../packages/physics/tests/coupling/viscoplastic.test.js)

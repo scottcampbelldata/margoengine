@@ -13785,3 +13785,40 @@ mineral dust and water droplets.
 - Sören Pirk, Ondřej Šťava, Julian Kratt, Michel Abdul Massih Said, Boris Neubert, Radomír Měch, Bedřich Beneš and Oliver Deussen, [Plastic Trees](https://graphics.uni-konstanz.de/publikationen/Pirk2012PlasticTreesInteractive/Pirk2012PlasticTreesInteractive.pdf) (2012), §5.3. Tree and obstacle shadows change branch results. Our branch creation follows the prior developmental model and tests new segments against the occupied voxel interior. It avoids re-deforming the existing parent skeleton.
 
 Each solver gets a contiguous topology region whose size follows the productive lifetime, the minimum eligible extension and the maximum seasonal resource. The two layout-compatible native kernels accumulate voxel penumbrae in fixed order and vectorize consecutive x cells. No initial bytes are written into the arena, as verified by a full-memory sentinel in both builds.
+
+## Finite-strain viscoplastic flow (FLUID-06)
+
+- Daniel Ram, Theodore Gast, Chenfanfu Jiang, Craig Schroeder, Alexey Stomakhin, Joseph
+  Teran and Pirouz Kavehpour, “A Material Point Method for Viscoelastic Fluids, Foams
+  and Sponges” (2015). The elastic left Cauchy–Green tensor carries material strain.
+  A Newtonian solvent part can dissipate energy independently of plastic flow.
+  [Paper](https://mass.math.ucdavis.edu/~jteran/papers/RGJSSTK15.pdf)
+- Yonghao Yue, Breannan Smith, Christopher Batty, Changxi Zheng and Eitan Grinspun,
+  “Continuum Foam: A Material Point Method for Shear-Dependent Flows” (2015), equations
+  2, 12–18. Predict `Finc = I + dt ∇v`, update `J` with its determinant and evolve
+  the normalized tensor with `Finc B Fincᵀ`. Volumetric Kirchhoff stress is
+  `κ(J²−1)/2`. Reduce the deviator only above yield, then restore the tensor's
+  unit determinant. The scalar implicit return is a bracketed solve, with a closed
+  form for Bingham flow. The API uses the shear invariant `||s||/√2` so its
+  yield parameter is the simple-shear value.
+  [Paper](https://www.cs.columbia.edu/~yonghao/tog15/yue-mpm-shear-dependent-flow.pdf)
+- Chenfanfu Jiang, Craig Schroeder, Andrew Selle, Joseph Teran and Alexey
+  Stomakhin, “The Affine Particle-In-Cell Method” (2015), equations 8–12. The
+  27-node quadratic basis uses inverse affine covariance `4/dx²`. The
+  differentiated basis independently integrates strain. Momentum and strain
+  have different units and are transferred separately.
+  [Paper](https://www.math.ucdavis.edu/~jteran/papers/JSSTS15.pdf)
+- Xin Huang and Marcelo H. García, “A Herschel–Bulkley model for mud flow down
+  a slope” (1998), equation 1.1. The shear rate above yield is
+  `((|τ|−τy)/K)^(1/n)`. Its continuous free-surface profile has an unyielded
+  plug over a shear layer. This entry carries the three-dimensional strain
+  and separate material points needed to resolve both regions.
+  [Paper](https://doi.org/10.1017/S0022112098002845)
+
+The world owns the particles, a padded Eulerian grid and the occupied-node list. Contact
+projects momentum against a closed box or the live terrain normal. The optional solvent
+operator is a symmetric graph diffusion on occupied nodes. Each face weight is scaled by
+the shared resident fraction. Solving momentum plus the graph Laplacian by Jacobi PCG
+preserves uniform translation and dissipates differences. The inlets carry reference
+volume in SI units on the same clock. All of the implementation was written in this
+repository from the papers.

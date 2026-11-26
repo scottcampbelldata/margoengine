@@ -14122,6 +14122,10 @@
       "./outdoor-sound": {
         "raw": 10097,
         "gzip": 4391
+      },
+      "./viscoplastic": {
+        "raw": 11755,
+        "gzip": 4931
       }
     },
     "@margoengine/physics2d": {
@@ -17993,6 +17997,16 @@
       "raw": 601,
       "gzip": 449,
       "brotli": 415
+    },
+    "packages/physics/dist/viscoplastic-kernel.wasm": {
+      "raw": 16986,
+      "gzip": 6744,
+      "brotli": 6051
+    },
+    "packages/physics/dist/viscoplastic-kernel-shared.wasm": {
+      "raw": 16986,
+      "gzip": 6744,
+      "brotli": 6052
     }
   },
   "splits": {

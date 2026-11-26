@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,246 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,252 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -3138,6 +3138,14 @@ package or tool that takes you past it. The reference tables are [Scale](#scale)
 column. The dated notes between here and those tables, and the sections after Platform, are the change record: each
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
+
+- Outdoor sound (SOUND-01, 2026-11-26). The solver traces one weakly refracted path or one dominant terrain edge
+  per link. It estimates ground interference with one locally horizontal reflecting plane. It uses the current
+  wind profile for the path, with no caustics, atmospheric ducts, turbulence scattering, or multiple-edge
+  diffraction. ISO 9613-1 reports ±10% absorption accuracy for its ordinary weather range. The solver publishes
+  eight octave gains, while the realtime playback approximates the response with two shelves and a centre gain.
+  Maximum configured realtime delay is 180 s (Web Audio DelayNode), with a 30 s default.
+  The optional physics and audio entries are 4,391 and 1,191 bytes gzip.
 
 - Webcam face to morph targets (`@margoengine/input/face`, 2026-11-26): no detector shipped; the app supplies one.
   Landmarks alone give 15 of the 52 ARKit shapes (blinks, wide eyes, jaw, smiles, frowns, pucker, brows); the others
@@ -12581,6 +12589,20 @@ subdivision at half the smallest horizontal cell width; the aggregate ledger ret
 
 The parametric solver places shoots on 60 Hz season boundaries and stores permanent branch structure. The initialization footprint follows the supplied productive seasons and the minimum extension per new branch. The light grid uses cubic voxels with a vertical, distance-attenuated penumbra and horizontal light-seeking gradient. Sites outside the supplied grid receive open light. Roots use a measured water threshold and the mean storage in their own supplied HYDRO-02 cell. The model has no water extraction, leaf anatomy, root branching or moving obstructors. Renderer-adapted coordinates are f32 within an origin cell. The optional growth entry measures 12,386 B minified and 5,474 B gzip. The selected lazy SIMD kernel is 601 B raw in either memory mode. Core and Stage gain zero bytes.
 
+### Three-dimensional viscoplastic material (FLUID-06)
+
+The material point field follows finite strain and plastic shear in a uniform three-dimensional
+grid. Longitudinal elastic waves limit its internal step. Rest density is fixed, while current
+volume changes with the volumetric strain `J`. Coulomb contact applies on closed box faces
+and a triangulated sampled terrain bed. The optional implicit solvent diffusion is on occupied
+grid nodes. Resolve strong gradients with several points per cell. Very thin stretched
+filaments can become under-resolved until an adaptive particle split/merge pass is available.
+Bulk elastic stress is weakly compressible, with no incompressible pressure projection. The
+entry emits positions and stresses for a separate renderer and leaves grain segregation and
+bed entrainment to their own solvers.
+
+The optional viscoplastic entry is 4,931 B gzip with a 5,187 B ceiling. Both Wasm assets are 16,986 B raw and each is 6,744 B gzip. Core plus stage remains 24,820 B gzip.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12590,6 +12612,14 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
+
+- **Repro:** Send a brief sound from 3 km away. Its old positional path pans and attenuates the sound as soon as it plays.
+- **Cause:** Panning and Doppler act on the source's current pose. The graph carried no travel time or air absorption.
+- **Fix:** `OutdoorSound` solves the acoustic path and `OutdoorAudio` applies its delay and broad spectral response.
+- **Regression:** `packages/physics/tests/coupling/outdoor-sound.test.js` checks air, diffraction and reflection.
+  `packages/audio/tests/outdoor-sound.browser.mjs` measures the added arrival delay in real PCM.
 
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
@@ -29028,6 +29058,14 @@ positions. Embers, ash, high-speed debris and snow are outside the environmental
 ### Woody plant growth geometry and moving obstacles (BIO-02)
 
 `PlantGrowth` supplies an updated branch graph that `@margoengine/procedural/lsystem` can mesh; run the geometry case in `packages/biomes/tests/coupling/growth.test.js`. New branches avoid the supplied solid voxel grid. The solver still needs a shared moving-obstacle geometry input and an explicit seasonal transfer contract for live scatter and wind-driven branch physics. Branch growth currently changes the shared graph on a season boundary, and users rebuild the mesh from the new graph when needed.
+
+### Viscoplastic deposits and established mud scenes (PA-60)
+
+The optional 3D solver accepts a time-varying inlet, collides with a live bed and replays its
+mass ledger after restore. The existing mud scene still uses its constant source and
+depth-averaged effect. Its large-scale breach and soil uptake need the hydraulic source and
+entrainment fields before that scene consumes replayable discharge.
+Run `packages/physics/tests/coupling/viscoplastic.test.js` for the varying-inlet regression.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

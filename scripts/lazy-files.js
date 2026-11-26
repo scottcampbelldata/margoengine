@@ -79,6 +79,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/viscoplastic-kernel.wasm',
+    label: 'viscoplastic-kernel.wasm',
+    kind: 'Rust SIMD three-dimensional elastoviscoplastic material points',
+    measure: 'file',
+    when: 'ViscoplasticSolver.load() from the optional /viscoplastic entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/viscoplastic-kernel-shared.wasm',
+    label: 'viscoplastic-kernel-shared.wasm',
+    kind: 'Rust SIMD three-dimensional elastoviscoplastic material points, shared world memory',
+    measure: 'file',
+    when: 'ViscoplasticSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/snowpack-kernel.wasm',
     label: 'snowpack-kernel.wasm',
     kind: 'Rust SIMD layered snowpack',

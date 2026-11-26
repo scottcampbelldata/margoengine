@@ -16451,3 +16451,11 @@ positions. Embers, ash, high-speed debris and snow are outside the environmental
 ### Woody plant growth geometry and moving obstacles (BIO-02)
 
 `PlantGrowth` supplies an updated branch graph that `@margoengine/procedural/lsystem` can mesh; run the geometry case in `packages/biomes/tests/coupling/growth.test.js`. New branches avoid the supplied solid voxel grid. The solver still needs a shared moving-obstacle geometry input and an explicit seasonal transfer contract for live scatter and wind-driven branch physics. Branch growth currently changes the shared graph on a season boundary, and users rebuild the mesh from the new graph when needed.
+
+### Viscoplastic deposits and established mud scenes (PA-60)
+
+The optional 3D solver accepts a time-varying inlet, collides with a live bed and replays its
+mass ledger after restore. The existing mud scene still uses its constant source and
+depth-averaged effect. Its large-scale breach and soil uptake need the hydraulic source and
+entrainment fields before that scene consumes replayable discharge.
+Run `packages/physics/tests/coupling/viscoplastic.test.js` for the varying-inlet regression.

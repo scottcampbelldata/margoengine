@@ -3793,3 +3793,39 @@ matching SEA-13 grid in `spray` to turn active whitecaps into three measured-sou
 Supply `sources` for existing waterfall mist or mineral footstep dust. If `emissions` is enabled, an
 optional source owns one layout-1 f64 kg/s value for each row. Closed mass accounting includes the
 discrete parcels, waiting source mass, vapour, settled mass and open outflow.
+
+## Three-dimensional viscoplastic flow
+
+Use `@margoengine/physics/viscoplastic` for material with a yield stress, including mud, thick paint
+and wet concrete. Material points exchange momentum with the grid, carry elastic deformation below
+yield and flow above it. Use exponent 1 for Bingham flow, lower values for shear thinning and higher
+values for shear thickening. Zero yield stress allows flow at any nonzero shear.
+
+```ts
+import { ViscoplasticSolver } from '@margoengine/physics/viscoplastic';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const mud = await ViscoplasticSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(mud, {
+  cells: [8, 8, 8],
+  spacing: 0.08,
+  yieldStress: 25,
+  exponent: 0.65,
+  points: [
+    { position: [0.27, 0.30, 0.27], volume: 0.00005 },
+    { position: [0.35, 0.30, 0.35], volume: 0.00005 },
+  ],
+});
+world.advance(6);
+console.log(mud.budget.storedReferenceVolume, mud.sample(0).position);
+```
+
+Pass the geometry of a registered `TerrainBed` to `load({ terrain })` to collide with the live bed.
+For an inlet, pass a field descriptor to `load({ inlet })` and reserve `capacity` for the material
+points. The layout-1 f64 inlet rows are position XYZ, velocity XYZ and m³/s. An open face lets
+material leave and frees its point row for the next inlet sample. The reference volume is mass
+divided by rest density. The current volume also includes elastic compression.
+
+`pointField` publishes `VISCOPLASTIC_WORDS` layout-1 f64 values per allocated point, including
+position, velocity, current volume, pressure, shear stress, plastic shear and presence. Draw only
+the present points. `solventViscosity` adds implicit Newtonian diffusion to the material's plastic flow.

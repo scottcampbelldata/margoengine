@@ -181,6 +181,10 @@
       "types": "./dist/thin-film/index.d.ts",
       "import": "./dist/thin-film.js"
     },
+    "./viscoplastic": {
+      "types": "./dist/viscoplastic/index.d.ts",
+      "import": "./dist/viscoplastic.js"
+    },
     "./pack-ice": {
       "types": "./dist/pack-ice/index.d.ts",
       "import": "./dist/pack-ice.js"

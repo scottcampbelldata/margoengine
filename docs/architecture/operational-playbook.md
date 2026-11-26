@@ -10255,3 +10255,11 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 ### Developmental plant growth (BIO-02)
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
+
+### Viscoplastic material points (FLUID-06)
+
+The isolated SIMD module has no static writes on instantiation. The world hashes the live
+material rows, reference-volume ledger and published fields. The 27-node APIC transfer,
+local plastic return and optional occupied-node PCG step run in arena memory. The coupling
+fixture joins a registered inlet to a real TerrainBed and checks the exact mass ledger and
+matching restore. It compares both memory modes at actual shared and plain instantiation.

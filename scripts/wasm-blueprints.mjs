@@ -106,6 +106,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'viscoplastic-kernel',
+    crate: 'packages/physics/viscoplastic-kernel',
+    blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',
+    script: 'packages/physics/scripts/build-viscoplastic-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'viscoplastic-kernel-shared',
+    crate: 'packages/physics/viscoplastic-kernel',
+    blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-viscoplastic-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',
