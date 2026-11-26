@@ -1867,6 +1867,10 @@
       "types": "./dist/scene/tags.d.ts",
       "import": "./dist/scene/tags.js"
     },
+    "./scene/emitter": {
+      "types": "./dist/scene/emitter.d.ts",
+      "import": "./dist/scene/emitter.js"
+    },
     "./selection": {
       "types": "./dist/selection.d.ts",
       "import": "./dist/selection.js"

@@ -213,6 +213,18 @@ export const entries = [
     fix: 'Correct the option the message names, create the engine on WebGPU or the WebGL2 compatibility layer, attach a new view after dispose(), and split a mesh that is too large or leave it out of meshes.',
   },
   {
+    id: 'scene-emitter',
+    title: '@margoengine/scene/emitter: typed events with async iteration',
+    kind: 'family',
+    messages: [
+      'Emitter.on needs a listener function; see https://margoengine.com/errors#scene-emitter',
+      'Emitter.events: capacity must be an integer of 1 or more; see https://margoengine.com/errors#scene-emitter',
+    ],
+    cause:
+      'on() or once() was given something that is not a function, or events() was given a capacity that is not an integer of 1 or more.',
+    fix: 'Pass a function as the listener, and a whole-number capacity of 1 or more (the default is 64). A listener that throws is not this error: it goes to the `onError` option of `new Emitter({ onError })`.',
+  },
+  {
     id: 'scene-helpers',
     title: '@margoengine/lines/scene-helpers: light probe and positional audio helpers',
     kind: 'family',

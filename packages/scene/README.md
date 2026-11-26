@@ -216,6 +216,42 @@ console.log(assets.toJSON());                    // the URL definitions, for sav
 - `AssetRegistry({loadURL, dispose, onMissing})`: `define(key, urlOrFunction, type)`, `fromJSON(map)` and `toJSON()`, `load(key, signal)` (one load shared by every caller; the value is kept), `get`, `has`, `keys`, `subscribe(key, callback)` (called with the value now if loaded, and after every load, reload and swap: assign the value to a material's texture slot there and every material that uses the key follows a swap), `swap(key, source)`, `reload(key)`, `unload(key)` (drops the value, keeps the definition), `loadMap(objectOrURLOrBlob, {signal, fetch, allowedURLs, baseURL, maxBytes = 1 MiB})` (a JSON asset map from an object, a URL or a `File`; the shape is checked and a bad entry throws a coded `TypeError`; each entry resolves against the map's own URL, or `baseURL` for an object or file, and must stay in that directory or under `allowedURLs`, as in the glTF loaders; `data:` entries pass; a redirect out of the directory is refused; `fetch` is the same injectable fetch the loaders take, also the registry's default for URLs), `remove(key)` and `dispose()`. `swap` cancels a load in flight, loads the new source at once when the key is loaded or watched (otherwise the next `load` does), then calls `dispose` on the old value and `subscribe`rs with the new one. `onMissing(key, 'undefined' | 'failed', error)` may return a replacement source; the registry tries it once, and `load` rejects when it returns nothing. Without `loadURL` the registry fetches a URL and reads it as `type`: `'json'`, `'text'`, else bytes.
 - Not here: the visual loading screen (`@margoengine/ui` draws one from `progress`) and loading engine objects (use `loadContainer` above, or pass `(url, signal) => loadGLTF(...)` as a task).
 
+## Typed events (`@margoengine/scene/emitter`)
+
+`Emitter<Events>` is a small typed event emitter that follows the conventions of the web platform: `AbortSignal` and `once` on subscription, an unsubscribe function, `for await` over events, and `Symbol.dispose`. Use it for your own events; the existing `SceneEvents`, `AssetQueue.on` and tag sets are unchanged.
+
+```ts
+import {Emitter} from 'margoengine/scene/emitter';
+
+type Events = {hit: {target: string; damage: number}; reset: undefined};
+const events = new Emitter<Events>({onError: (error, type) => console.error('listener failed on', type, error)});
+
+const stop = new AbortController();
+events.on('hit', ({target, damage}) => console.log(target, damage), {signal: stop.signal});
+events.once('reset', () => console.log('first reset only'));
+
+const feed = events.events('hit', {capacity: 8, signal: stop.signal}); // async iterator
+const reading = (async () => {
+  for await (const hit of feed) console.log('queued', hit.target);
+})();
+
+events.emit('hit', {target: 'crate', damage: 3});
+events.emit('reset', undefined);
+console.log(feed.dropped); // 0: events lost to a full buffer
+stop.abort(); // removes the listener and ends the iterator
+await reading;
+events.dispose(); // or `using events = new Emitter<Events>()`
+```
+
+- `on(type, fn, {signal, once})` returns an idempotent unsubscribe function; `once(type, fn, {signal})`, `off(type, fn)`, `emit(type, event)` (returns how many listeners ran) and `listenerCount(type?)`.
+- Listeners run synchronously in subscription order. A listener added during an emit first sees the next event; one removed during an emit is not called.
+- A listener that throws does not stop the others. The error goes to `onError(error, type)` from the constructor; without it the error is rethrown in a microtask so it is never lost.
+- `events(type, {signal, capacity = 64})` returns an async iterator of the events emitted after the call. Events wait in a buffer of `capacity`; when it is full the oldest unread event is dropped and counted in `iterator.dropped` (a reader that keeps up never loses one). `return()` (also from `break` in `for await`), the signal and `dispose` end it: a pending `next()` resolves as done and unread events are discarded. `iterator.closed` says whether it ended.
+- `dispose()` / `Symbol.dispose` removes every listener and ends every iterator; the emitter stays usable.
+- Errors: a listener that is not a function and a capacity that is not an integer of 1 or more throw coded errors ([help](https://margoengine.com/errors#scene-emitter)).
+
+Sources: the observer pattern (Gamma, Helm, Johnson, Vlissides, *Design Patterns*, 1994); the WHATWG DOM Standard, "Interface EventTarget" and "AbortSignal" (https://dom.spec.whatwg.org/); ECMAScript 2018 async iteration, `AsyncIterator` and `for await...of` (https://tc39.es/ecma262/#sec-asynciterator-interface); explicit resource management, `Symbol.dispose` (https://github.com/tc39/proposal-explicit-resource-management).
+
 ## Good to know
 
 - World results are right as soon as a value is written, before any frame: they read the local values up the parents, while `mesh.matrix` holds the last frame's matrix. Each call walks up the parents, so read `mesh.matrix` when a per-frame loop over many meshes needs no fresher value.
