@@ -17,6 +17,7 @@ import {
   heaveSection,
   lateralSection,
   hullSections,
+  hullMemory,
   lewisForm,
   scatterSection,
   SEA_WATER,
@@ -71,6 +72,26 @@ function box(size, n = 1) {
 
 const still = { elevation: () => 0 };
 const identity = [0, 0, 0, 1];
+
+test('pressure-free sway and roll inertia stay continuous across a rigid-row mass roundoff', () => {
+  const length = 4;
+  const depth = 0.5;
+  const beam = 0.7;
+  const mass = SEA_WATER * length * beam * depth / 2;
+  const roundedMass = 1 / Math.fround(1 / mass);
+  const measure = (subdivisions, m) => hullMemory(
+    box([length, depth, beam], subdivisions), m, [0, 0, 0], SEA_WATER, 1 / 60,
+  ).lateralInfinite;
+  const reference = measure(1, mass);
+  for (const [n, m] of [[1, roundedMass], [4, mass], [4, roundedMass]]) {
+    const candidate = measure(n, m);
+    for (const index of [14, 15, 20, 21, 28]) {
+      assert.ok(Math.abs(candidate[index] - reference[index]) < 2e-6 * Math.abs(reference[index]),
+        JSON.stringify({ n, m, index, actual: candidate[index], expected: reference[index] }));
+    }
+  }
+  assert.ok(reference[14] * reference[21] > reference[15] ** 2);
+});
 
 test('an air cavity clips the exact hydrostatic load and moment across hull triangles', () => {
   const centre = [0, -1, 0],

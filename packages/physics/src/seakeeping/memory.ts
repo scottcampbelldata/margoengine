@@ -15,7 +15,7 @@
 // Direct convolution keeps every frequency the table holds; Perez and Fossen fit a state-space model to the same kernel to
 // save work, which a later change may do.
 import { cos, pow } from '@margoengine/math/pinned';
-import { heaveSection, lateralSection } from './radiation.js';
+import { heaveSection, lateralAddedMassInfinite, lateralSection } from './radiation.js';
 import { heaveAddedMassInfinite, hullSections, type LewisForm, lewisForm, type Section } from './strips.js';
 import { eddyRollCoefficient, FRICTION, frictionGirth } from './viscous.js';
 import { GRAVITY, type HullMesh, wettedLoads } from './wetted.js';
@@ -242,22 +242,12 @@ export function buildHullMemory(
     });
     return { i, j, damping, kernel: kernelOf(frequencies, damping, dt, window) };
   });
-  // The lateral added mass at infinite frequency: each form's limit by a straight line in 1 / xi through xi = 64 and 128.
+  // The high-frequency pressure-free solution is evaluated directly in the Lewis quadrant.
   const limits = new Map<string, { a22: number; a44: number; a24: number }>();
   for (const form of forms) {
     const k = key(form);
     if (limits.has(k)) continue;
-    const at = (xi: number) => lateralSection(form, Math.sqrt((xi * GRAVITY) / form.scale), density, pivot, GRAVITY),
-      [near, far] = [at(64), at(128)],
-      line = (a: number, b: number) => 2 * b - a;
-    limits.set(k, {
-      a22: line(near.sway.addedMass, far.sway.addedMass),
-      a44: line(near.roll.addedMass, far.roll.addedMass),
-      a24: line(
-        (near.swayOfRoll.addedMass + near.rollOfSway.addedMass) / 2,
-        (far.swayOfRoll.addedMass + far.rollOfSway.addedMass) / 2,
-      ),
-    });
+    limits.set(k, lateralAddedMassInfinite(form, density, pivot));
   }
   const lateralInfinite = new Float64Array(36),
     put = (i: number, j: number, v: number) => {

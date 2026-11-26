@@ -225,6 +225,33 @@ export interface LateralSection {
 }
 
 /**
+ * Sway, sway-roll and roll inertia per metre when the free surface holds potential zero.
+ * On the Lewis mapping's quadrant the stream functions expand in cos(2m theta)
+ * and the conjugate potentials in -sin(2m theta). Their Dirichlet energy gives
+ * rho*pi times the sum of m times each pair of stream coefficients.
+ */
+export function lateralAddedMassInfinite(form: LewisForm, density: number, pivot: number):
+  { a22: number; a24: number; a44: number } {
+  const { scale, a1, a3 } = form;
+  const scaleSquared = scale * scale;
+  const factor = 4 * scale / Math.PI;
+  let a22 = 0;
+  let a24 = 0;
+  let a44 = 0;
+  for (let m = 1; m <= 128; m++) {
+    const order = 4 * m * m;
+    const sway = (m % 2 ? -factor : factor) * ((1 - a1) / (1 - order) - 3 * a3 / (9 - order));
+    const shape = m === 1 ? scaleSquared * a1 * (1 + a3) : m === 2 ? -scaleSquared * a3 : 0;
+    const roll = pivot * sway + shape;
+    a22 += m * sway * sway;
+    a24 += m * sway * roll;
+    a44 += m * roll * roll;
+  }
+  const scaleMass = Math.PI * density;
+  return { a22: scaleMass * a22, a24: scaleMass * a24, a44: scaleMass * a44 };
+}
+
+/**
  * The sway and roll added mass and damping per metre of a section of Lewis form `form` at `omega` rad/s, rolling about the
  * point `pivot` metres below the waterline on its centre line (negative above it), in deep water (Journee and Massie eqs.
  * 7.70, 7.73, 7.105-7.112, the antisymmetric potentials, and the same least squares as `heaveSection`).
