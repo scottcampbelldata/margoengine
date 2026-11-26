@@ -929,3 +929,41 @@ Written clean room from the published papers listed in [docs/clean-room.md](../.
 ## Film time
 
 `MToon.advanceTime(delta)` moves the UV scroll and rotation clock (`mtoon.time`); the frame update runs it, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the UV phase a continuous run shows.
+
+## Physical strand spring bones
+
+The optional strand rig binds weighted bones to an SI fibre model with gravity, drag,
+ground, and body contact. Load it through the existing `SpringAccess` or attach it after
+an `Animator` pose with `addStrandSpringRig(animator, options)`.
+
+```ts
+import { Engine } from 'margoengine';
+import { StrandSpringRig } from 'margoengine/rigging/strand-springs';
+import { springAccess } from 'margoengine/rigging/springs';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const scalp = engine.createMesh().setPosition([0, 1.72, 0]);
+const root = engine.createMesh().setParent(scalp).setPosition([0, 0, -0.12]);
+const tip = engine.createMesh().setParent(root).setPosition([0, -0.24, -0.02]);
+const rig = await StrandSpringRig.load(springAccess({ root: scalp, nodes: [scalp, root, tip] }), {
+  chains: [{ joints: [1, 2], radius: 0.006, dragWidth: 0.025 }],
+});
+scalp.setPosition([0.08, 1.72, 0]);
+rig.advance(20); // 20 frames on the 240 Hz world clock
+console.log(rig.solver.sample(0, 1).position);
+```
+
+Pass the chain's ordered glTF indices in `joints`. A single attached earring or antenna
+also takes a `tip` in its bone's local metres. Bone and ancestor transforms require positive
+uniform scales. Each bundle can override its native radius, density, material and drag
+width. The physics controls are the same as in the physics package's strand guide entry.
+Set the same `wind` and `bed` fields as the surrounding scene. Each `colliders` entry can
+be world-space or attached to a glTF node and moves with that node.
+
+For a VRM avatar, get the authored joint and collider lists from `vrmSprings(avatar)`.
+Use `addVRM(animation, avatar, { animator, springs: false })` with the physical attachment
+and supply the matching collider list. The physical rig takes its own fibre properties
+in metres and pascals. A pure per-chain `anchor(time)` gives exact replay across display
+rates and a `seek(frame)` from the initial snapshot. The default live bone attachments
+sample the current animation pose. To replay those, evaluate the same animation frames in
+the same order. Call `dispose()` on the Animator attachment to stop its updates.

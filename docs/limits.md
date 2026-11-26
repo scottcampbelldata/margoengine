@@ -9827,3 +9827,9 @@ run. Both backends produced 1,478 changed pixels and replay hash `f1550b4d0b3290
 body capsules follow the skin pose on each tick. The parameters represent effective hair
 bundles, and bundle-scale stiffness and drag calibration remain open. The horses root and model
 entries measure 17,283 B and 12,180 B gzip. The optional strand horse measures 18,228 B gzip.
+
+The weighted avatar binding accepts positive uniform transforms. Its offline replay uses the
+same time-sampled anchor and wind functions. On the Seed-san reference avatar the fixed
+camera test measured 0.0946 m of ponytail-tip movement and 395 changed pixels on both
+backends. Its restored simulation hash is `7b5d4e76865419a4`. The manual rig uses a 240 Hz
+world clock. The automatic adapter advances that clock after the Animator pose.

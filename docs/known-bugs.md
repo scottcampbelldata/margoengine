@@ -16950,4 +16950,4 @@ bed. Reciprocal rigid contact, segment-level continuous collision and inter-guid
 validation remain open. A point may pass a thin obstacle between substeps or slide past a
 capsule if a link crosses it between guide points. The fixed-camera strand fixture draws
 solved guides. The optional horse driver applies the solved frames to the actual horse skin and replays the gait.
-The named production shots and legacy spring-bone skin path still need their own bindings.
+The optional physical rig also binds the weighted VRM reference ponytail. The named production shots still need their own bindings.

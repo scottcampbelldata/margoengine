@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Physical strand spring bones on a VRM avatar</title></head>
+<body>
+<script type="module">
+  import { Engine } from '/packages/core/dist/index.js';
+  import { createHeadlessCanvas, readPixels } from '/packages/headless/dist/index.js';
+  import { parseGLTFAsync } from '/packages/gltf/dist/pbr.js';
+  import { Animation } from '/packages/animation/dist/index.js';
+  import { Animator } from '/packages/animator/dist/index.js';
+  import { addVRM, readVRM, vrmSprings } from '../dist/vrm.js';
+  import { addStrandSpringRig } from '../dist/strand-springs.js';
+  import { BoundaryLayerWind } from '/packages/weather/dist/boundary-layer.js';
+  import { GLB_MAGIC, GLB_JSON, GLB_BIN, glbChunks } from '/packages/shared/glb.js';
+
+  const engine = await Engine.create(createHeadlessCanvas({ width: 480, height: 320 }), {
+    backend: 'webgpu', camera: { position: [-0.85, 1.58, -1.08], target: [0, 1.45, -0.04], near: 0.05, far: 10 },
+  });
+  engine.stop();
+  const errors = [];
+  engine.gpu.addEventListener('uncapturederror', ({ error }) => errors.push(error.message));
+  const response = await fetch('/examples/assets/vrm/Seed-san.vrm', { signal: AbortSignal.timeout(15000) });
+  if (!response.ok) throw new Error('Load the Seed-san VRM sample from examples/assets/vrm.');
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const avatar = readVRM(bytes);
+  const input = vrmSprings(avatar);
+  const chunks = glbChunks(bytes), bin = chunks.find(c => c.type === GLB_BIN).data;
+  const original = JSON.parse(new TextDecoder().decode(chunks.find(c => c.type === GLB_JSON).data));
+  const head = original.extensions.VRMC_vrm.humanoid.humanBones.head.node;
+  const ponytail = input.chains.find(chain => original.nodes[chain.joints[0]].name === 'hair_tail_1');
+  const keys = new Float32Array([0, 0.28, 0.65, 1.2]);
+  const yaw = new Float32Array([0, 0.7, -0.42, -0.42].flatMap(angle => [0, Math.sin(angle / 2), 0, Math.cos(angle / 2)]));
+  const raw = array => new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+  const wind = new BoundaryLayerWind({ speed: 15, turbulence: false });
+  const distance = (a, b) => Math.hypot(...a.map((x, k) => x - b[k]));
+
+  function withTurn() {
+    const doc = structuredClone(original);
+    const parts = [bin];
+    let offset = bin.byteLength;
+    const add = (typed, type, minmax) => {
+      const view = doc.bufferViews.length, accessor = doc.accessors.length;
+      doc.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: typed.byteLength });
+      parts.push(raw(typed));
+      offset += typed.byteLength;
+      doc.accessors.push({ bufferView: view, componentType: 5126, count: type === 'SCALAR' ? typed.length : typed.length / 4, type, ...minmax });
+      return accessor;
+    };
+    const input = add(keys, 'SCALAR', { min: [0], max: [keys[3]] }), output = add(yaw, 'VEC4');
+    doc.animations = [{
+      name: 'Head turn',
+      channels: [{ sampler: 0, target: { node: head, path: 'rotation' } }],
+      samplers: [{ input, output, interpolation: 'LINEAR' }],
+    }];
+    doc.buffers[0].byteLength = offset;
+    const json = new TextEncoder().encode(JSON.stringify(doc)), padded = (json.length + 3) & ~3;
+    const glb = new Uint8Array(28 + padded + offset), view = new DataView(glb.buffer);
+    [GLB_MAGIC, 2, glb.length, padded, GLB_JSON].forEach((value, index) => view.setUint32(index * 4, value, true));
+    glb.fill(32, 20, 20 + padded);
+    glb.set(json, 20);
+    view.setUint32(20 + padded, offset, true);
+    view.setUint32(24 + padded, GLB_BIN, true);
+    let at = 28 + padded;
+    for (const part of parts) {
+      glb.set(part, at);
+      at += part.length;
+    }
+    return glb;
+  }
+
+  async function portrait(flow) {
+    const model = await parseGLTFAsync(engine, withTurn(), { signal: AbortSignal.timeout(30000) });
+    const animation = Animation.attach(model);
+    const animator = Animator.attach(animation, { initial: 'turn', states: { turn: 'Head turn' } });
+    const face = addVRM(animation, avatar, { animator, springs: false });
+    const physical = await addStrandSpringRig(animator, {
+      wind: flow,
+      chains: [{ joints: ponytail.joints, radius: 0.006, dragWidth: 0.032, young: 90e6 }],
+      colliders: ponytail.colliders.map(index => input.colliders[index]),
+    });
+    try {
+      const tip = ponytail.joints.length - 1;
+      for (let f = 0; f < 52; f++) engine.render({ delta: 1 / 60 });
+      const pose = physical.rig.solver.sample(0, tip).position;
+      const skin = Array.from(model.nodes[ponytail.joints[tip]].matrix.subarray(12, 15));
+      const pixels = (await readPixels(engine)).data;
+      const snapshot = physical.rig.world.takeSnapshot();
+      physical.rig.world.restoreSnapshot(snapshot.bytes);
+      physical.rig.apply();
+      return { pixels, pose, snap: physical.rig.world.hash(), hash: snapshot.hash, error: distance(pose, skin), tick: physical.rig.world.tick };
+    } finally {
+      physical.dispose();
+      face.dispose();
+      animator.dispose();
+      animation.dispose();
+      model.dispose();
+    }
+  }
+
+  window.runAvatarStrands = async () => {
+    const calm = await portrait(undefined), gust = await portrait(wind);
+    let changed = 0;
+    for (let i = 0; i < gust.pixels.length; i += 4)
+      if ([0, 1, 2].reduce((n, k) => n + Math.abs(calm.pixels[i + k] - gust.pixels[i + k]), 0) > 22) changed++;
+    return { changed, errors, error: gust.error, tip: distance(calm.pose, gust.pose), tick: gust.tick, hash: gust.hash, snapshot: gust.snap };
+  };
+</script>
+</body>
+</html>

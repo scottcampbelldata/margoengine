@@ -14769,3 +14769,12 @@ variation across horse tail fibres and along their lengths. The rig uses larger 
 bundles with independently controlled bending and drag settings. Those defaults are an
 authoring approximation pending bundle-scale measurements. The existing equine gait follows
 the references in the horses README.
+
+### Physical spring-bone skin binding
+
+The binding uses the glTF parent hierarchy, world transforms, weights and optional virtual
+tips. It records each rendered joint's rest rotation relative to its native material frame.
+After simulation it composes that offset with the current frame and converts both world
+position and rotation to the live parent frame. The avatar proof uses the authored ponytail
+and selected colliders from the [VRM SpringBone 1.0 extension specification](https://github.com/vrm-c/vrm-specification/tree/master/specification/VRMC_springBone-1.0).
+The avatar asset and license are listed in `examples/assets/vrm/README.md`.
