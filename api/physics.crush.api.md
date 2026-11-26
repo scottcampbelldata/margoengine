@@ -186,6 +186,7 @@ export interface CrushShellParams {
 export class CrushShellSolver implements Solver<CrushShellParams> {
     readonly id: string;
     readonly positionField: FieldDescriptor;
+    readonly apertureField: FieldDescriptor;
     private constructor();
     static load(options?: {
         readonly id?: string;
@@ -195,6 +196,13 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         readonly id?: string;
         readonly signal?: AbortSignal;
         readonly rate?: RateLevel;
+    }): Promise<CrushShellSolver>;
+    static loadWithApertures(options?: {
+        readonly id?: string;
+        readonly signal?: AbortSignal;
+        readonly rigid?: {
+            readonly rate?: RateLevel;
+        };
     }): Promise<CrushShellSolver>;
     describe(): SolverDescription;
     init(host: SolverHost, params: CrushShellParams): void;
@@ -319,6 +327,10 @@ export interface GirderSample {
     readonly strain: number;
     readonly stress: number;
 }
+
+export const SHELL_APERTURE_LAYOUT = 1;
+
+export const SHELL_APERTURE_WORDS = 13;
 
 export interface SquareCrushTube {
     readonly width: number;

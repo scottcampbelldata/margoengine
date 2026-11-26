@@ -71,6 +71,7 @@ export class Flooding {
     initialise(state: Float64Array): void;
     levelOf(i: number, volume: number): number;
     step(state: Float64Array, pose: Pose, sea: Surface, t: number, dt: number, rho: number, g: number): FloodResult;
+    stepWithShellApertures(state: Float64Array, pose: Pose, sea: Surface, t: number, dt: number, rho: number, g: number, live?: ReadonlyMap<number, ShellAperture>): FloodResult;
 }
 
 export const GRAVITY = 9.81;
@@ -158,6 +159,13 @@ export class HullSolver implements Solver<HullParams> {
     readonly id: string;
     readonly wakeSourceField: FieldDescriptor;
     constructor(id?: string, wake?: HullWake, crushDamage?: FieldDescriptor | undefined, girderSeams?: FieldDescriptor | undefined);
+    static withShellApertures(field: FieldDescriptor, options?: {
+        readonly id?: string;
+        readonly cellSize?: number;
+        readonly wake?: HullWake;
+        readonly crushDamage?: FieldDescriptor;
+        readonly girderSeams?: FieldDescriptor;
+    }): HullSolver;
     describe(): SolverDescription;
     init(host: SolverHost, params: HullParams): void;
     step(context: StepContext, dt: number): void;
@@ -214,6 +222,7 @@ export interface Opening {
     readonly collapse?: number;
     readonly crushPatch?: number;
     readonly girderJoint?: number;
+    readonly shellSeam?: number;
 }
 
 export const PERMEABILITY = 0.95;
@@ -343,6 +352,8 @@ interface CompartmentShape {
     readonly free: number;
 }
 
+type CrushVector = readonly [number, number, number];
+
 interface DiffractionForm {
     readonly lewis: LewisForm;
     readonly breadth: number;
@@ -403,6 +414,14 @@ interface Region {
     readonly type: ElementType;
     readonly layout: number;
     readonly memory?: WebAssembly.Memory;
+}
+
+interface ShellAperture {
+    readonly area: number;
+    readonly centre: CrushVector;
+    readonly normal: CrushVector;
+    readonly spans: Float64Array;
+    readonly stripAreas: Float64Array;
 }
 
 interface Solver<Params = unknown> {
