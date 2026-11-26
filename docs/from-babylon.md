@@ -132,7 +132,9 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 | `camera.setTarget(v)`, `camera.position` | `engine.camera.target = [..]`, `engine.camera.position = [..]` | Assign a new tuple |
 | `camera.zoomOn(meshes)`, `framingBehavior` | `engine.camera.fitToBoundingBox(min, max, {duration})`, `stage.fit()` | |
 | `camera.mode = ORTHOGRAPHIC_CAMERA` | `@margoengine/cameras` | `camera.up` gives exact top-down views |
-| `scene.activeCameras`, viewports | `engine.render({camera})`; `@margoengine/core/extension` for viewports | See the [split-screen](../examples/split-screen.html) and [minimap](../examples/minimap.html) examples |
+| `scene.activeCameras`, `camera.viewport` | `engine.views = [{camera, viewport: [x, y, w, h], scissor?, layers?}]` (core `RenderView`), or `engine.render({views})` | Fractions of the canvas by default, `pixels: true` for pixels. See the [split-screen](../examples/split-screen.html) and [minimap](../examples/minimap.html) examples. `StereoRig` and `HologramRig` (`@margoengine/cameras/stereo`, `/hologram`) build the views for stereo and four-sided displays |
+| `mesh.layerMask`, `camera.layerMask` | `setRenderLayers(mesh, mask)`, `setCameraLayers(camera, mask)`, `layerMask(...layers)` (`margoengine/cameras/layers`) | 32-bit masks as in Babylon.js; a view's own `layers` wins. Picking takes `layers` too (`SpatialPickingOptions`, `AreaPickingOptions`) |
+| `Tags.AddTagsTo`, `scene.getMeshesByTags` | `tags(mesh).add('enemy')`, `findByTag(engine.scene, 'enemy')`, `queryTags(scene, 'a && !b')` (`margoengine/scene/tags`) | `TagSet` is an `EventTarget`: it fires `add`, `remove` and `change` |
 | `scene.dispose()`, `engine.dispose()` | `stage.dispose()`, `engine.dispose()` | Disposes every plugin, model and control |
 
 ### Meshes, materials and textures
@@ -143,7 +145,7 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 | `CreateCapsule`, `CreateDisc`, `CreatePolyhedron`, `CreateLathe`, `CreateTube`, `ExtrudeShape` | `capsuleGeometry`, `circleGeometry`, `polyhedronGeometry`, `latheGeometry`, `tubeGeometry`, `extrudeGeometry` | `sweepGeometry` and `loftGeometry` cover shape extrusion along paths; `parametricGeometry` any surface. There is no `CreateRibbon` by that name |
 | `MeshBuilder.CreateDecal` | `decalGeometry` | |
 | `Mesh.MergeMeshes` | `mergeGeometries` | |
-| `CSG`, `CSG2` | `boolean` in `@margoengine/brep` | A CAD-style solid kernel, not mesh-to-mesh CSG |
+| `CSG`, `CSG2` | `booleanMeshesExact(a, b, 'union' \| 'difference' \| 'intersection')` (`margoengine/mesh-edit/boolean-exact`); `batchBooleanMeshes` for many inputs (`/boolean-batch`) | Triangle-mesh booleans on mesh-edit's `PolygonMesh`; `toPolygonMesh` and `fromPolygonMesh` (`margoengine/mesh-edit/geometry`) convert a core `Geometry` in and out. `boolean` in `@margoengine/brep` is the CAD solid kernel |
 | `TransformNode`, `mesh.parent = node` | `engine.createMesh()` without geometry; `mesh.setParent(node)` | |
 | `mesh.position`, `mesh.scaling`, `mesh.rotation` | `mesh.position`, `mesh.scale`, `mesh.rotation` (live views), `setPosition`, `setScale`, `setRotation`, `setQuaternion` | |
 | `mesh.isVisible`, `setEnabled(false)` | `mesh.visible = false` | |
@@ -165,7 +167,9 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 
 | Babylon.js | Margo | Notes |
 | --- | --- | --- |
-| `DirectionalLight` | `engine.scene.lighting.direction.set([x, y, z, strength])` | One sun per engine. Points **toward** the light |
+| `DirectionalLight` | `engine.scene.lighting.direction.set([x, y, z, strength])` | Core's one sun. Points **toward** the light |
+| Several `DirectionalLight`s | `DirectionalLights.attach(engine, {lights}).setLights([{direction, color, intensity, castShadow}])` (`margoengine/clustered/directional`) | Up to 16, four with shadows (`LocalShadows`). Here `direction` is the way the light **travels**, as in Babylon.js. Runnable: [`10-more-suns`](../examples/from-babylon/10-more-suns.html) |
+| IES profiles on lights | `IESLights`, `parseIES` (`margoengine/clustered/ies`) | |
 | `HemisphericLight` | `lighting.radiance.set([r, g, b, ambient])`; `HemisphereLight` (`margoengine/environment`) | `HemisphereLight` has separate sky and ground colours |
 | `PointLight`, `SpotLight` | `Clustered.attach(engine)` then `setLights([...])` | Up to 1,024 by default; range in metres |
 | `ShadowGenerator`, `addShadowCaster` | `Shadows.attach(engine, {resolution})`, `shadows.add(mesh)` | Cascaded, soft edge by default |
@@ -188,7 +192,8 @@ Names in the Margo column exist in the built packages; the examples run them. "N
 | Progressive loading | `loadGLTFProgressive` (`margoengine/gltf/progressive`) | |
 | Draco, KTX2, Meshopt | `@margoengine/decoders` | Passed in only when a file needs them |
 | `.obj`, `.stl`, `.ply`, `.fbx`, `.usdz` | `@margoengine/loaders`, `@margoengine/fbx`, `@margoengine/usdz` | |
-| `.babylon` | `parseBabylon`, `flattenBabylon` (`@margoengine/loaders/babylon`) | [Below](#loading-a-babylon-file) |
+| `.babylon` | `parseBabylon`, `flattenBabylon` (`@margoengine/loaders/babylon`); `exportBabylon` (`@margoengine/exporters/babylon`) writes one | [Below](#loading-a-babylon-file) |
+| Cloth and soft bodies, drawn | `drawSoftBody(engine, body, {material})` (`margoengine/gltf/soft-mesh`) on a `@margoengine/physics/soft` body | |
 | `AnimationGroup`, `scene.animationGroups` | `Animation.attach(model)`, `animation.clips`, `animation.play(name)` | `playing`, `seek`, `loop`, `speed` |
 | Animation blending, weights | `Animator.attach(animation, {...})` (`margoengine/animator`) | State machines, blend trees, additive layers, foot IK |
 | `new Animation(...)` keyframes | `createKeyframeClip` (`margoengine/animation`); `@margoengine/tween` | Tweens: `Timeline`, `Spring`, easings, `to`, `from`, `fromTo` |
@@ -298,6 +303,8 @@ shadows.add(model);                            // glTF models cast and receive o
 const lamps = Clustered.attach(engine);
 lamps.setLights([{position: [0, 2, 1], range: 8, color: [1, 0.3, 0.2], intensity: 12}]);
 ```
+
+A second sun, or sixteen, is `DirectionalLights` from `margoengine/clustered/directional`, four of them shadowed by `LocalShadows`; its `direction` is the way the light travels, as in Babylon.js. Runnable: [`10-more-suns`](../examples/from-babylon/10-more-suns.html).
 
 `setLights` replaces the list; call it again to move a lamp. Image-based lighting, fog and sky are in
 `@margoengine/environment` and `@margoengine/sky`:
@@ -542,12 +549,8 @@ Where there is no Margo equivalent today:
 | `Observable` and `Observer` | None. Use `engine.onFrame`, DOM events and `addEventListener`. |
 | Several first-class scenes with `scene.activeCamera` switching | One implicit scene per engine; extra scenes exist for overlays, and `engine.render({camera})` renders from another camera. |
 | `scene.useRightHandedSystem = false` | Margo is right-handed only. |
-| More than one directional light | One directional light per engine. Point and spot lights are `Clustered`, with shadows from `@margoengine/clustered/shadows`. No IES lights. |
 | WebXR | Present (`@margoengine/xr`) but untested on a headset. |
-| Cloth and soft bodies | Simulated by `@margoengine/physics/soft`; no render bridge draws them yet. |
 | Havok, Cannon, Ammo plugins | Margo has its own kernel only. |
-| Mesh CSG (`CSG2`) | Not as a mesh operation; solid booleans are in `@margoengine/brep`. |
-| `.babylon` export | None. Export glTF instead. |
 | Skeletons and particle systems inside a `.babylon` file | Read as data (skeletons) or skipped; use glTF and `@margoengine/vfx`. |
 
 Margo-only things worth knowing about, since you will not find them in Babylon.js: CAD navigation presets, GPU
