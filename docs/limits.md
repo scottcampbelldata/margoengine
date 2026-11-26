@@ -9851,12 +9851,12 @@ The isolated moving-capsule test closes initial linear momentum including the in
 registry impulse and measures angular response off the body's centre. Use the same
 coupling rate for both solvers. Mixed contact surfaces share the point contact budget.
 Optional segment geometry resolves capsule intersections along each guide edge at substep
-boundaries. Self contact still uses point geometry. This path does not search a swept volume.
+boundaries. Self contact still uses point geometry. Swept-volume collision remains open.
 
 The 720-point fixture moved its selected tip 0.4825 m relative to the still-air control and
 changed 3,107 pixels with the same camera on WebGPU and WebGL2. Plain, shared and restored
-native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 5,313 B gzip
-with a 5,569 B ceiling. Each lazy Wasm variant is 18,084 B raw and 7,312 B gzip. Core and
+native state all hash to `30c8908a983887bc` in the fixture. The optional entry is 5,373 B gzip
+with a 5,569 B ceiling. Each lazy Wasm variant is 21,184 B raw and 8,599 B gzip. Core and
 Stage gain zero bytes.
 
 The optional horse adapter drives eight tail joints and ten five-point mane and forelock
