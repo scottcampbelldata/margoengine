@@ -154,7 +154,7 @@ test('useModelParts returns the named nodes and materials of the enclosing model
   render(h(ModelContext.Provider, { value: model }, h(Probe)));
   assert.deepEqual(Object.keys(parts.nodes), ['Wheel', 'Body']);
   assert.equal(parts.nodes.Wheel, wheel);
-  assert.deepEqual(parts.materials, { Paint: paint, Glass: glass });
+  assert.deepEqual({ ...parts.materials }, { Paint: paint, Glass: glass });
   assert.deepEqual(direct, parts);
   render(
     h(
@@ -165,4 +165,31 @@ test('useModelParts returns the named nodes and materials of the enclosing model
   );
   assert.equal(parts, null, 'null while the model loads');
   assert.throws(() => render(h(() => useModelParts())), /inside <Model> children/);
+});
+
+test('useModelParts keeps nodes and materials named like Object.prototype keys as own entries', async () => {
+  const names = ['__proto__', 'constructor', 'toString'];
+  const model = {
+    disposed: false,
+    root: { name: '' },
+    nodes: names.map((name) => ({ name })),
+    primitives: names.map((name) => ({ material: { name } })),
+  };
+  let parts;
+  function Probe() {
+    parts = useModelParts(model);
+    return null;
+  }
+  render(h(Probe));
+  for (const [record, items] of [
+    [parts.nodes, model.nodes],
+    [parts.materials, model.primitives.map((primitive) => primitive.material)],
+  ]) {
+    assert.equal(Object.getPrototypeOf(record), null, 'a file name never sets the prototype');
+    assert.deepEqual(Object.keys(record).sort(), [...names].sort());
+    names.forEach((name, index) => {
+      assert.equal(Object.hasOwn(record, name), true, name);
+      assert.equal(record[name], items[index], name);
+    });
+  }
 });
