@@ -87,6 +87,22 @@ try {
   assert.deepEqual(await canvas.screenshot(), nativeImage);
   await writeFile(`test-results/break03-native-membrane-${device}.png`, nativeImage);
   console.log(`Native membrane retained ${(1000 * nativeDent.stroke).toFixed(2)} mm at fracture.`);
+  await page.waitForFunction(() => typeof window.drawLiveShell === 'function', null, { timeout: 20_000 });
+  const restShell = await page.evaluate(() => window.drawLiveShell(true));
+  const restShellImage = await decodePNG(await canvas.screenshot());
+  const liveShell = await page.evaluate(() => window.drawLiveShell(false));
+  const liveShellImage = await canvas.screenshot();
+  const shellPixels = changedPixels(restShellImage, await decodePNG(liveShellImage));
+  assert.equal(restShell.dent, 0);
+  assert.equal(liveShell.visible, 1);
+  assert.ok(liveShell.dent > 0.005 && shellPixels > 32);
+  assert.deepEqual(await page.evaluate(() => window.drawLiveShell(false)), liveShell);
+  assert.deepEqual(await canvas.screenshot(), liveShellImage);
+  assert.deepEqual(errors, []);
+  await writeFile(`test-results/break03-live-shell-${device}.png`, liveShellImage);
+  console.log(
+    `Distributed sheet: ${(1000 * liveShell.dent).toFixed(2)} mm live displacement, ${shellPixels} changed pixels.`,
+  );
 } finally {
   await close();
 }

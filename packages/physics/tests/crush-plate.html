@@ -4,9 +4,9 @@
 <body style="margin:0"><canvas width="480" height="320"></canvas>
 <script type="module">
   import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
-  import { CircularPlateIndentation, CrushSolver, resolvePlateBuckling } from '../dist/crush.js';
+  import { CircularPlateIndentation, CrushShellSolver, CrushSolver, resolvePlateBuckling } from '../dist/crush.js';
   import { Physics } from '../dist/index.js';
-  import { PhysicsWorld, RigidSolver } from '../dist/world.js';
+  import { PhysicsWorld, RigidSolver, worldMemory } from '../dist/world.js';
 
   const plate = { length: 0.6, width: 0.3, thickness: 0.003, young: 200e9 };
   const engine = await Engine.create(document.querySelector('canvas'), {
@@ -143,6 +143,40 @@
     const { surface, stroke, work, fractured } = indentation.readIndentation(0, radialRest);
     await drawCircular(surface);
     return { stroke, work, fractured, hash: membraneWorld.hash(), rim: surface.positions.at(-1) };
+  };
+
+  const shellWorld = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+  const shellPhysics = new Physics(null, { arena: shellWorld.arena, gravity, fixedTimestep: 1 / 480, substeps: 4 });
+  const sphere = shellPhysics.addBody(null, {
+    position: [0.3, 0.2, 0.17], linearVelocity: [0, 0, -0.8],
+    colliders: { shape: 'sphere', radius: 0.125, mass: 14, sensor: true },
+  });
+  const shell = await CrushShellSolver.loadRigid({ rate: 3 });
+  shellWorld.add(new RigidSolver(), { physics: shellPhysics, capacity: shellPhysics.kernel.capacity });
+  shellWorld.add(shell, {
+    positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+    triangles: [[0, 1, 2]],
+    material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
+    spheres: [{ body: sphere.row, radius: 0.125, contactModulus: 7e6 }],
+  });
+  shellWorld.couple([shell.id, 'rigid'], 'staggered');
+  shellWorld.advance(1);
+  const shellStart = shellWorld.takeSnapshot();
+  window.drawLiveShell = async (flat) => {
+    shellWorld.restoreSnapshot(shellStart.bytes);
+    if (!flat) shellWorld.advance(9);
+    const mesh = shell.readMesh();
+    const [ax, ay, az, bx, by, bz, cx, cy, cz] = mesh.positions;
+    const x = [bx - ax, by - ay, bz - az];
+    const y = [cx - ax, cy - ay, cz - az];
+    const n = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+    const magnitude = Math.hypot(...n);
+    const normal = n.map(component => component / magnitude);
+    await drawSurface({
+      positions: Float32Array.from(mesh.positions),
+      normals: Float32Array.from([...normal, ...normal, ...normal]),
+    }, mesh.triangles);
+    return { dent: Math.max(0, -az, -bz, -cz), hash: shellWorld.hash(), visible: engine.stats.visible };
   };
 </script>
 </body>

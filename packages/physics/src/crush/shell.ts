@@ -9,8 +9,11 @@ import type {
   SolverHost,
   StepContext,
 } from '../world/solver.js';
+import { isRateLevel, type RateLevel, rateOf } from '../world/solver.js';
+import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_IMPULSES_FIELD } from '../world/solvers/rigid.js';
 import { type CrushVector, triple, ZERO } from './rigid-contact.js';
 import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
+import { type CrushShellContact, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
 import { makeShell, type Triangle } from './shell-topology.js';
 
 const MAX_SUBSTEPS = 8192;
@@ -39,6 +42,10 @@ export interface CrushShellParams {
   readonly velocities?: readonly CrushVector[];
   /** Raise the automatically chosen explicit substep count by an integer factor. Default 1. */
   readonly resolution?: number;
+  /** Centered rigid spheres, available after calling `CrushShellSolver.loadRigid()`. */
+  readonly spheres?: readonly CrushShellSphere[];
+  /** Width of each position cell in metres when rigid spheres and the shell have different cells. */
+  readonly cellSize?: number;
 }
 
 export interface CrushShellFace {
@@ -73,6 +80,8 @@ interface ShellState {
   readonly triangles: Uint32Array;
   readonly maxStep: number;
   readonly resolution: number;
+  readonly rigid?: ShellRigid;
+  readonly maxNodeInverseMass: number;
 }
 
 function finiteVector(v: CrushVector, label: string): CrushVector {
@@ -110,6 +119,8 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
   private constructor(
     private readonly builds: ShellBuilds,
     readonly id: string,
+    private readonly rigid: boolean,
+    private readonly rate: RateLevel,
   ) {
     this.positionField = {
       name: `${id}:vertices`,
@@ -122,15 +133,38 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
 
   /** Loads the optional native kernel. Default id 'crush-shell'. */
   static async load(options: { readonly id?: string; readonly signal?: AbortSignal } = {}): Promise<CrushShellSolver> {
-    return new CrushShellSolver(await loadShell(options.signal), options.id ?? 'crush-shell');
+    return new CrushShellSolver(await loadShell(options.signal), options.id ?? 'crush-shell', false, 0);
+  }
+
+  /** Loads the shell with rigid-sphere coupling. Default id 'crush-shell'. */
+  static async loadRigid(
+    options: {
+      readonly id?: string;
+      readonly signal?: AbortSignal;
+      /** Dyadic world rate. Match RigidSolver when coupled. Default 0 (60 Hz). */
+      readonly rate?: RateLevel;
+    } = {},
+  ): Promise<CrushShellSolver> {
+    const rate = options.rate ?? 0;
+    if (!isRateLevel(rate)) throw new MargoError('state', 'Choose a shell world rate level from 0 to 7.');
+    return new CrushShellSolver(await loadShell(options.signal), options.id ?? 'crush-shell', true, rate);
   }
 
   describe(): SolverDescription {
     return {
       id: this.id,
-      rate: 0,
+      rate: this.rate,
       stableRate: () => 0,
-      fields: [{ field: this.positionField, access: 'write' }],
+      fields: [
+        { field: this.positionField, access: 'write' },
+        ...(this.rigid
+          ? ([
+              { field: BODIES_FIELD, access: 'read' },
+              { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
+              { field: BODY_FORCES_FIELD, access: 'accumulate' },
+            ] as const)
+          : []),
+      ],
     };
   }
 
@@ -139,6 +173,9 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const nodeCount = positions.length;
     const faceCount = triangles.length;
     const resolution = params.resolution ?? 1;
+    const spheres = params.spheres ?? [];
+    if (this.rigid !== spheres.length > 0)
+      throw new MargoError('state', 'Use CrushShellSolver.loadRigid() and give at least one sphere to enable contact.');
     if (nodeCount < 3 || faceCount === 0)
       throw new MargoError('state', 'Give the shell vertices and at least one face.');
     if (!Number.isSafeInteger(resolution) || resolution < 1)
@@ -154,8 +191,9 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     });
     const steel = coefficients(material);
     const topology = makeShell(positions, triangles, material);
-    if (substeps(1 / 60, topology.maxStep, resolution) > MAX_SUBSTEPS)
+    if (substeps(1 / rateOf(this.rate), topology.maxStep, resolution) > MAX_SUBSTEPS)
       throw new MargoError('state', 'Give the shell larger minimum elements or reduce its requested resolution.');
+    const rigid = this.rigid ? new ShellRigid(host, spheres, material.thickness, params.cellSize) : undefined;
     const { kernel } = instanceFor(host, this.builds);
     const f64 = (name: string, count: number) => host.allocate(name, count * 8, 'f64', 1);
     const vertex = f64('shell-positions', 3 * nodeCount);
@@ -169,15 +207,17 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     // The runtime expects an aligned pointer even when the hinge count is zero.
     const hinges = host.allocate('shell-hinges', Math.max(8, topology.hinges.byteLength), 'u8', 1);
     const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount);
-    const descriptor = host.allocate('shell-descriptor', 112, 'u8', 1);
+    const descriptor = host.allocate('shell-descriptor', 120, 'u8', 1);
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
     const m = values(host, nodes);
+    let maxNodeInverseMass = 0;
     for (let index = 0; index < nodeCount; index++) {
       x.set(positions[index]!, 3 * index);
       v.set(velocities?.[index] ?? ZERO, 3 * index);
       m.set([topology.nodeMass[index]!, Number(pinned.has(index))], 2 * index);
+      if (!pinned.has(index)) maxNodeInverseMass = Math.max(maxNodeInverseMass, 1 / topology.nodeMass[index]!);
     }
     new Uint8Array(memory.buffer, faces.byteOffset, faces.byteLength).set(new Uint8Array(topology.faces));
     new Uint8Array(memory.buffer, hinges.byteOffset, hinges.byteLength).set(new Uint8Array(topology.hinges));
@@ -198,6 +238,10 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       0,
     ]);
     new Float64Array(memory.buffer, descriptor.byteOffset + 56, 7).set([...host.gravity, ...steel]);
+    new Uint32Array(memory.buffer, descriptor.byteOffset + 112, 2).set([
+      rigid?.work.byteOffset ?? 0,
+      rigid?.spheres.length ?? 0,
+    ]);
     if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
       throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
     this.state = {
@@ -213,12 +257,16 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       triangles: Uint32Array.from(triangles.flat()),
       maxStep: topology.maxStep,
       resolution,
+      rigid,
+      maxNodeInverseMass,
     };
   }
 
   step(_context: StepContext, dt: number): void {
-    const { kernel, descriptor, maxStep, resolution } = this.requireState();
-    const n = substeps(dt, maxStep, resolution);
+    const { host, kernel, descriptor, velocities, maxStep, resolution, rigid, maxNodeInverseMass } =
+      this.requireState();
+    const contactStep = rigid?.stage(_context, dt, values(host, velocities), maxNodeInverseMass) ?? maxStep;
+    const n = substeps(dt, Math.min(maxStep, contactStep), resolution);
     if (!Number.isFinite(n) || n > MAX_SUBSTEPS || n < 1)
       throw new MargoError('state', 'Use a positive shell step within the explicit integration budget.');
     if (kernel.crush_shell_advance(descriptor.byteOffset, dt, n) !== 1)
@@ -226,21 +274,30 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         'failed',
         'The loaded shell lost finite geometry. Reduce the load or use a finer time step.',
       );
+    rigid?.publish(dt);
   }
 
   importPorts(_tick: number): void {}
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: this.positionField.name, region: this.requireState().positions, tick, cell: ZERO }];
+    const { positions, rigid } = this.requireState();
+    const ports = [{ field: this.positionField.name, region: positions, tick, cell: ZERO }];
+    if (rigid)
+      ports.push(
+        { field: BODY_IMPULSES_FIELD.name, region: rigid.reactions, tick, cell: ZERO },
+        { field: BODY_FORCES_FIELD.name, region: rigid.forces, tick, cell: ZERO },
+      );
+    return ports;
   }
 
   stateRegions(): readonly Region[] {
-    const { positions, velocities, faceState, applied, reactions, energy } = this.requireState();
-    return [positions, velocities, faceState, applied, reactions, energy];
+    const { positions, velocities, faceState, applied, reactions, energy, rigid } = this.requireState();
+    return [...[positions, velocities, faceState, applied, reactions, energy], ...(rigid ? [rigid.readings] : [])];
   }
 
   extraState(): readonly Region[] {
-    return [];
+    const { rigid } = this.requireState();
+    return rigid ? [rigid.reactions, rigid.forces] : [];
   }
 
   /** Sets a persistent vertex force in newtons before advancing the world. */
@@ -265,6 +322,13 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const { host, reactions } = this.requireState();
     const index = indexIn(vertex, reactions.byteLength / 24, 'shell vertex');
     return triple(values(host, reactions), 3 * index);
+  }
+
+  /** Returns the last integrated sphere reaction and compliant interface state. */
+  readSphereContact(index: number): CrushShellContact {
+    const { rigid } = this.requireState();
+    if (!rigid) throw new MargoError('state', 'Enable rigid-sphere coupling before reading contact.');
+    return rigid.read(index);
   }
 
   readFace(face: number): CrushShellFace {

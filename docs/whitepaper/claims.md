@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Distributed sphere contact (BREAK-03, 2026-11-26). A fixed sphere loads all three supports
+  with the independently derived Hertz force. A moving sphere transfers reciprocal momentum to
+  the deforming mesh. Its 4.480000 J initial energy closes at 4.480031 J when recovered energy
+  and plastic work are included. Both graphics backends show 41.63 mm of live sheet displacement
+  and 6,296 changed pixels, with bit-exact state and image replay.
+  [Reproduce](reproduce.md#break-03-distributed-sphere-contact)
 - Distributed ductile shell (BREAK-03, 2026-11-26). World vertex loads advance a thin sheet with
   objective membrane strain, irreversible plane-stress yielding and elastic bending. A fixed
   vertex reports the independently derived membrane reaction. The loaded crease stores the

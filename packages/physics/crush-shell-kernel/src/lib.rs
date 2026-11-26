@@ -1,6 +1,7 @@
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 mod bending;
+mod contact;
 mod material;
 mod math;
 mod membrane;

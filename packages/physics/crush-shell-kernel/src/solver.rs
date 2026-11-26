@@ -1,7 +1,9 @@
 use core::ptr::copy_nonoverlapping;
 
 use crate::bending::{angle, bend};
+use crate::contact::{closest, contact};
 use crate::material::{Plastic, Steel};
+use crate::math::sqrt;
 use crate::membrane::{Element, Vector, combine, cross, dot, membrane, sub};
 
 #[derive(Clone, Copy)]
@@ -46,6 +48,39 @@ struct Ledger {
 }
 
 #[repr(C)]
+struct Sphere {
+    center: Vector,
+    velocity: Vector,
+    inverse_mass: f64,
+    radius: f64,
+    stiffness: f64,
+    force: Vector,
+    impulse: Vector,
+    energy: f64,
+    clearance: f64,
+    first_moment: Vector,
+}
+
+impl Sphere {
+    fn kick(&mut self, gravity: Vector, seconds: f64, remaining: f64, drift: bool) {
+        let half_step = seconds * 0.5;
+        self.impulse = combine(self.impulse, 1.0, self.force, half_step);
+        self.first_moment = combine(self.first_moment, 1.0, self.force, half_step * remaining);
+        if self.inverse_mass > 0.0 {
+            self.velocity = combine(
+                self.velocity,
+                1.0,
+                combine(gravity, 1.0, self.force, self.inverse_mass),
+                half_step,
+            );
+        }
+        if drift {
+            self.center = combine(self.center, 1.0, self.velocity, seconds);
+        }
+    }
+}
+
+#[repr(C)]
 struct Shell {
     positions: *mut Vector,
     velocities: *mut Vector,
@@ -63,6 +98,8 @@ struct Shell {
     padding: u32,
     gravity: Vector,
     steel: Steel,
+    spheres: *mut Sphere,
+    sphere_count: u32,
 }
 
 struct Workspace {
@@ -124,6 +161,57 @@ unsafe fn add_forces<const N: usize>(data: *mut Vector, indices: [u32; N], force
 }
 
 impl Workspace {
+    unsafe fn contact_forces(&self, shell: &Shell) -> bool {
+        for i in 0..shell.sphere_count as usize {
+            let sphere = unsafe { &mut *shell.spheres.add(i) };
+            let mut best_squared = sphere.radius * sphere.radius;
+            let mut winner = None;
+            for j in 0..shell.face_count as usize {
+                let face = unsafe { *shell.faces.add(j) };
+                let vertices = unsafe { load(self.positions, face.vertices) };
+                // Conservative sphere/face AABB check before closest-feature calculations.
+                if (0..3).any(|axis| {
+                    let min = vertices[0][axis]
+                        .min(vertices[1][axis])
+                        .min(vertices[2][axis]);
+                    let max = vertices[0][axis]
+                        .max(vertices[1][axis])
+                        .max(vertices[2][axis]);
+                    let value = sphere.center[axis];
+                    value + sphere.radius < min || value - sphere.radius > max
+                }) {
+                    continue;
+                }
+                let candidate = closest(sphere.center, vertices);
+                let distance_squared = dot(candidate.separation, candidate.separation);
+                if distance_squared < best_squared {
+                    best_squared = distance_squared;
+                    winner = Some((face.vertices, candidate));
+                }
+            }
+            sphere.force = [0.0; 3];
+            sphere.energy = 0.0;
+            sphere.clearance = sqrt(best_squared);
+            if let Some((vertices, candidate)) = winner {
+                let Some(hit) = contact(candidate.separation, sphere.radius, sphere.stiffness)
+                else {
+                    // A center on the sheet has no unique contact normal. Stop before committing the step.
+                    return false;
+                };
+                sphere.force = hit.force;
+                sphere.energy = hit.energy;
+                let reactions = candidate
+                    .weights
+                    .map(|weight| hit.force.map(|component| -weight * component));
+                unsafe { add_forces(self.forces, vertices, reactions) };
+            }
+            if !dot(sphere.force, sphere.force).is_finite() {
+                return false;
+            }
+        }
+        true
+    }
+
     unsafe fn forces(&mut self, shell: &Shell, budget: &mut Ledger) -> bool {
         budget.membrane = 0.0;
         budget.bend = 0.0;
@@ -168,9 +256,10 @@ impl Workspace {
             unsafe { add_forces(self.forces, hinge.vertices, forces) };
         }
         (budget.membrane + budget.bend + budget.hardening + budget.plastic).is_finite()
+            && unsafe { self.contact_forces(shell) }
     }
 
-    unsafe fn kick(&mut self, shell: &Shell, seconds: f64, drift: bool) -> bool {
+    unsafe fn kick(&mut self, shell: &Shell, seconds: f64, remaining: f64, drift: bool) -> bool {
         for i in 0..shell.node_count as usize {
             let node = unsafe { *shell.nodes.add(i) };
             let force = unsafe { *self.forces.add(i) };
@@ -184,6 +273,15 @@ impl Workspace {
                     let position = unsafe { &mut *self.positions.add(i) };
                     *position = combine(*position, 1.0, *velocity, seconds);
                 }
+            }
+        }
+        for i in 0..shell.sphere_count as usize {
+            let sphere = unsafe { &mut *shell.spheres.add(i) };
+            sphere.kick(shell.gravity, seconds, remaining, drift);
+            if !dot(sphere.velocity, sphere.velocity).is_finite()
+                || !dot(sphere.center, sphere.center).is_finite()
+            {
+                return false;
             }
         }
         true
@@ -219,11 +317,16 @@ unsafe extern "C" fn crush_shell_advance(
     if !unsafe { work.forces(shell, &mut budget) } {
         return 0;
     }
-    for _ in 0..count {
+    for index in 0..count {
         if !unsafe {
-            work.kick(shell, interval, true)
+            work.kick(shell, interval, (count - index) as f64 * interval, true)
                 && work.forces(shell, &mut budget)
-                && work.kick(shell, interval, false)
+                && work.kick(
+                    shell,
+                    interval,
+                    (count - index - 1) as f64 * interval,
+                    false,
+                )
         } {
             return 0;
         }

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CrushShellSolver } from '../../dist/crush.js';
-import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
+import { Physics } from '../../dist/index.js';
+import { PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
 
 const material = {
   thickness: 0.015,
@@ -144,4 +145,137 @@ test('invalid mesh rejects precisely and degenerate drift publishes no partial s
   });
   assert.deepEqual(shell.readMesh(), before);
   assert.deepEqual(shell.supportReaction(2), zero);
+});
+
+async function sphereModel({
+  rateLevel,
+  fixed,
+  position,
+  speed = zero,
+  pinned,
+  sphereCell = zero,
+  shared = false,
+  substeps = 4,
+}) {
+  await Physics.load({ threads: shared });
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: zero, memory: worldMemory(shared) });
+  const physics = new Physics(null, {
+    arena: world.arena,
+    gravity: zero,
+    fixedTimestep: 1 / (60 << rateLevel),
+    substeps,
+  });
+  const radius = 0.125;
+  const contactModulus = 7e6;
+  const mass = 14;
+  const sphere = physics.addBody(null, {
+    ...(fixed ? { type: 'fixed' } : {}),
+    position,
+    linearVelocity: speed,
+    colliders: { shape: 'sphere', radius, mass, sensor: true },
+  });
+  const shell = await CrushShellSolver.loadRigid({ rate: rateLevel });
+  world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
+  world.add(shell, {
+    positions,
+    triangles,
+    material,
+    pinned,
+    cellSize: 2,
+    spheres: [{ body: sphere.row, radius, contactModulus }],
+  });
+  world.setCell('rigid', sphereCell);
+  world.couple([shell.id, 'rigid'], 'staggered');
+  return { world, physics, sphere, shell, radius, contactModulus, mass };
+}
+
+test('fixed sphere contact distributes independent Hertz load and work to all three shell supports', async () => {
+  const loaded = await sphereModel({
+    rateLevel: 2,
+    fixed: true,
+    position: [-3.75, 4.25, 0.125],
+    pinned: [0, 1, 2],
+    sphereCell: [2, -2, 0],
+  });
+  using _physics = loaded.physics;
+  const { world, shell, radius, contactModulus } = loaded;
+  world.advance(1);
+  const compression = 0.5 * material.thickness;
+  const force = (4 / 3) * contactModulus * Math.sqrt(radius) * compression ** 1.5;
+  const hit = shell.readSphereContact(0);
+  near(hit.compression, compression, 4e-16);
+  near(hit.energy, 0.4 * force * compression, 1e-12);
+  near(hit.impulse[2], force / 240, 1e-10);
+  near(shell.supportReaction(0)[2], force / 2, 1e-9);
+  near(shell.supportReaction(1)[2], force / 4, 1e-9);
+  near(shell.supportReaction(2)[2], force / 4, 1e-9);
+  assert.deepEqual(shell.readMesh().positions, Float64Array.from(positions.flat()));
+});
+
+test('moving rigid sphere transfers reciprocal linear and angular momentum to a deforming shell and replays', async (t) => {
+  const loaded = await sphereModel({ rateLevel: 3, fixed: false, position: [0.3, 0.2, 0.17], speed: [0, 0, -0.8] });
+  using _physics = loaded.physics;
+  const { world, shell, sphere, mass } = loaded;
+  // Start from the first completed world tick, with the accumulator allocated and the sphere still clear.
+  world.advance(1);
+  assert.equal(shell.readSphereContact(0).compression, 0);
+  const saved = world.takeSnapshot();
+  const nodeMass = (material.density * material.thickness) / 6;
+  const initialMomentum = mass * sphere.linearVelocity[2];
+  const initialCenter = sphere.position;
+  const initialAngular = [initialCenter[1] * initialMomentum, -initialCenter[0] * initialMomentum];
+  const measure = () => {
+    let peak = 0;
+    for (let frame = 2; frame <= 9; frame++) {
+      world.advance(frame);
+      peak = Math.max(peak, shell.readSphereContact(0).compression);
+    }
+    assert.ok(peak > 0.002);
+    assert.ok(sphere.linearVelocity[2] > 0.1);
+    assert.deepEqual(sphere.angularVelocity, zero);
+    const mesh = shell.readMesh();
+    const v = sphere.linearVelocity;
+    near(
+      mass * v[2] + nodeMass * (mesh.velocities[2] + mesh.velocities[5] + mesh.velocities[8]),
+      initialMomentum,
+      2e-5,
+    );
+    const center = sphere.position;
+    let lx = mass * (center[1] * v[2] - center[2] * v[1]);
+    let ly = mass * (center[2] * v[0] - center[0] * v[2]);
+    for (let i = 0; i < mesh.positions.length; i += 3) {
+      lx +=
+        nodeMass * (mesh.positions[i + 1] * mesh.velocities[i + 2] - mesh.positions[i + 2] * mesh.velocities[i + 1]);
+      ly += nodeMass * (mesh.positions[i + 2] * mesh.velocities[i] - mesh.positions[i] * mesh.velocities[i + 2]);
+    }
+    near(lx, initialAngular[0], 0.008);
+    near(ly, initialAngular[1], 0.008);
+    assert.ok(mesh.positions[2] < -0.005);
+    assert.ok(Math.abs(mesh.positions[2] - mesh.positions[5]) > 0.002);
+    return { mesh, reaction: shell.readSphereContact(0), p: sphere.position, v, hash: world.hash() };
+  };
+  const first = measure();
+  const budget = shell.readBudget();
+  const startEnergy = (0.5 * initialMomentum ** 2) / mass;
+  const endEnergy =
+    0.5 * mass * first.v.reduce((sum, value) => sum + value * value, 0) +
+    budget.kinetic +
+    budget.membrane +
+    budget.bending +
+    budget.hardening +
+    budget.plasticDissipation +
+    first.reaction.energy;
+  t.diagnostic(`Mechanical energy and plastic work ${startEnergy.toFixed(6)} → ${endEnergy.toFixed(6)} J`);
+  near(endEnergy, startEnergy, 2e-4);
+  world.restoreSnapshot(saved.bytes);
+  assert.deepEqual(measure(), first);
+});
+
+test('a one-substep moving rigid integrator cannot realize both contact moments', async () => {
+  const loaded = await sphereModel({ rateLevel: 1, fixed: false, position: [0.3, 0.2, 0.16], substeps: 1 });
+  using _physics = loaded.physics;
+  assert.throws(() => loaded.world.advance(1), {
+    code: 'state',
+    message: /Use at least two rigid substeps/,
+  });
 });

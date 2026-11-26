@@ -5334,6 +5334,43 @@ default 1. The explicit integrator accepts at most 8,192 substeps per tick. Choo
 resolution within that limit and test convergence for the applied load.
 [Shell method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-ductile-shell)
 
+To load a sheet with a moving rigid sphere, call `CrushShellSolver.loadRigid()`. Register a
+centered sphere, give its radius and effective Hertz contact modulus, and let the shell own the
+pair's collision. Match the rigid clock to the shell's `rate`. Add the rigid solver before the
+shell and put the shell first in their staggered group. Use at least two native rigid substeps
+for moving spheres. `readSphereContact` reports the integrated rigid impulse, recoverable
+interface energy and compression at the last substep.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { CrushShellSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld, RigidSolver, worldMemory } from '@margoengine/physics/world';
+
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
+using physics = new Physics(null, { arena: world.arena, gravity, fixedTimestep: 1 / 480, substeps: 4 });
+const tool = physics.addBody(null, {
+  position: [0.3, 0.2, 0.13], linearVelocity: [0, 0, -0.8],
+  colliders: { shape: 'sphere', radius: 0.125, mass: 14, sensor: true },
+});
+const shell = await CrushShellSolver.loadRigid({ rate: 3 });
+world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
+world.add(shell, {
+  positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+  triangles: [[0, 1, 2]],
+  material: { thickness: 0.015, density: 7800, youngModulus: 200e9, poissonRatio: 0.3, yieldStress: 350e6 },
+  spheres: [{ body: tool.row, radius: 0.125, contactModulus: 7e6 }],
+});
+world.couple([shell.id, 'rigid'], 'staggered');
+world.advance(1);
+if (tool.linearVelocity[2]! <= -0.8) throw new Error('Expected the compliant contact to slow the sphere');
+```
+
+Contact selects the closest live triangle within one sphere radius plus half the thickness.
+The sphere's surface normal is frictionless. Set `cellSize` if the rigid and shell solvers use
+different origin cells. [Contact method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-sphere-contact)
+
 On moving bodies, add the circular plate to `CrushSolver.indentationPatches`. Choose the
 body-local plate anchor, normal and support point as with ordinary patches. The station
 absorbs the available normal energy up to localization. An intact dent stays plastically

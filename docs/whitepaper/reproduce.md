@@ -45,6 +45,37 @@ oblique plane, an intervening ridge and a cell with one raised corner. The analy
 speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
 The ridge test compares a saved run and its replay in both world memory modes.
 
+## BREAK-03 distributed sphere contact
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.
+The fixed sphere is centred over barycentric weights 1/2, 1/4, 1/4. Its reaction and contact
+energy follow the analytical Hertz normal law. The moving 14 kg sphere deforms a live sheet
+with an eccentric contact. Linear and angular momentum are checked about the initial frame,
+and the energy regression includes both bodies, interface storage and plastic work. It sees
+the old one-impulse coupling lose 1.20 J. It checks the current coupling to 0.0002 J
+and repeats the result from a saved world.
+Run `node packages/physics/tests/crush-plate.browser.mjs` and repeat with `--compat` to see the
+same calculation drive triangle positions and normals, producing a 41.63 mm displacement and
+6,296 changed pixels on both paths. The browser repeats the live frame after a snapshot restore.
+
+The nearest point solves the squared-distance problem on a face and its closed edges. See
+[David Eberly, *Distance Between Point and Triangle in 3D* (1999, revised 2020)](https://www.geometrictools.com/Documentation/DistancePoint3Triangle3.pdf),
+section 1. The contact force acts at this point with barycentric weights that preserve the
+net force and torque. See [Bridson, Fedkiw and Anderson, *Robust Treatment of Collisions, Contact and Friction for Cloth Animation* (2002)](https://visionsystems.stanford.edu/papers/cloth-sig02/).
+The interface stores 2/5 times force times compression for a Hertz force of
+4/3 times the effective elastic modulus, square root of sphere radius and compression to the
+3/2 power. See [Hertz (1882) in *The Contact Mechanics of Solid Bodies*, section 3.3](https://www.phase-trans.msm.cam.ac.uk/2011/JG/3.pdf).
+The effective modulus includes both interface materials. It is an authored input.
+
+The native solver integrates both the sphere reaction impulse and its first time moment. With
+`s` rigid substeps, a constant force produces a drift-weighted average of `(s+1)/(2s)` times
+the total impulse. A start impulse contributes its full value to the drift. For contact
+impulse J, first time moment Q and tick h, the held force supplies impulse
+`(J - Q/h) * 2s/(s-1)`. The remaining start impulse and held force match the native
+model's velocity and contact-induced displacement. This requires at least two rigid substeps
+for dynamic tests. The current evidence is analytic and numerical. Shell-scale contact data
+and fracture remain to be validated.
+
 ## BREAK-03 distributed ductile shell
 
 Run `cargo test --manifest-path packages/physics/crush-shell-kernel/Cargo.toml` for constitutive
