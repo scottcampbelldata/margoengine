@@ -1,17 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registerHooks } from 'node:module';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { readFile } from 'node:fs/promises';
 import { Stage } from '@margoengine/stage';
 import { loadedPBREngine } from '../../../tests/support/loaded-pbr-fixtures.js';
 
-registerHooks({
-  resolve(specifier, context, next) {
-    if (specifier === '@margoengine/animation')
-      throw Object.assign(new Error(`Cannot find package '${specifier}'`), { code: 'ERR_MODULE_NOT_FOUND' });
-    return next(specifier, context);
+await moduleHooks([
+  {
+    specifier: '@margoengine/animation',
+    error: "Cannot find package '@margoengine/animation'",
+    code: 'ERR_MODULE_NOT_FOUND',
   },
-});
+]);
 const { addGLTF } = await import('@margoengine/stage/gltf');
 test('a skinned file requires animation with a feature-specific coded error and leaves no nodes', async () => {
   const bytes = await readFile(

@@ -15227,14 +15227,27 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   stand-in for each. `moduleHooks(rules)` applies module hooks written as plain rules
   (`scripts/support/node-compat-hooks.mjs`) through `module.registerHooks`, or through `module.register` where that is
   missing, so the biomes, mesh-edit, glTF, Blender and WebGL2 route tests run on Node 22.12 too. `zstdDecompressSync` is
-  node:zlib's or the engine's own decoder (`packages/shared/zstd.js`). `zstdCompressSync` has no stand-in (the engine
-  has no JavaScript Zstandard encoder): the 13 tests that need Node-made streams (decoders `streams` and
-  `zstd-destination`, splats `zstd`) pass `{ skip: noZstd }`, which names the Node version and is false on every Node
-  that has the API, so the latest 22.x and Node 24 and 26 still run them. No shipped source used either API.
+  node:zlib's or the engine's own decoder (`packages/shared/zstd.js`). No shipped source used either API.
+- **Follow-up, same day (no skipped tests):** the first fix gave `zstdCompressSync` no stand-in, so the 13 tests that
+  need Node-made streams (decoders `streams` and `zstd-destination`, splats `zstd`) passed `{ skip: noZstd }` and did
+  not run on Node 22.12. Now `zstdCompressSync` falls back to `scripts/support/zstd-store.mjs`, a frame writer after
+  RFC 8878 (Y. Collet, M. Kucherawy, 2021, https://www.rfc-editor.org/rfc/rfc8878) that stores the input in raw blocks
+  of at most 128 KiB, with the content size, window descriptor and XXH64 content checksum (xxHash specification,
+  Y. Collet, https://github.com/Cyan4973/xxHash/blob/dev/doc/xxhash_spec.md) the tests ask for; it serves the tests
+  of frames, checksums, limits and aborts. The tests of Huffman, FSE and match decoding read streams Node compressed
+  once (`zstdFixture`; `packages/decoders/tests/fixtures/zstd`, `packages/splats/test/fixtures/zstd`): on a Node with
+  Zstandard the helper compresses again and fails when a checked-in file is missing or no longer decodes to the
+  test's input (`MARGO_ZSTD_FIXTURES=write` rewrites them). `zstdConstants` stands in for the `ZSTD_c_*` numbers of
+  `zlib.constants`, which Node 22.12 lacks too. The stage, voxel-pathtracer and react tests, the Firefox matrix driver
+  and the sciviz AIS script that still imported `registerHooks` or a zstd function by name take them from the helper;
+  the hook rules gained an error code, a module source and a redirect by resolved URL for them.
 - **Regression:** `tests/node-apis.test.js`: "the Node 22 test files and their helpers use no API newer than Node 22.12
   without a feature test" now scans for every API in the table (a named import of `registerHooks` or a zstd function
-  fails it), and "the stand-ins for registerHooks and zstd work, on this Node and as on Node 22.12" runs them with
-  `MARGO_NODE_COMPAT=fallback`.
+  fails it), "no test or script anywhere names a node: API that Node 22.12 lacks without a feature test" reads every
+  tracked source file that is not shipped, as code and as text, and "the stand-ins for registerHooks and zstd work, on
+  this Node and as on Node 22.12" runs them with `MARGO_NODE_COMPAT=fallback`. `tests/zstd-store.test.js` decodes the
+  writer's frames with Node and with the engine (empty, exactly 128 KiB, several blocks) and checks `zstdFixture`.
+  With the stand-ins forced the three files run 69 tests, 0 skipped (13 skipped before).
 
 ### Fixed 2026-11-26: rebase:main built API reports for every touched package, so a push lost the race for main (KB-REBASE-SLOW1, scripts)
 

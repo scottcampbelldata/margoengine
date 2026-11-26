@@ -364,16 +364,10 @@ test('server imports and canonical JSX evaluate no optional peers; a mounted Blo
       consumer = join(directory, 'ssr.mjs');
     await writeFile(
       hooks,
-      `import {registerHooks} from 'node:module';
-    const peers=${JSON.stringify(optionalPeers)};globalThis.__optionalLoads=[];
-    registerHooks({resolve(specifier,context,next){
-      if(peers.some(peer=>specifier===peer||specifier.startsWith(peer+'/')))return {url:'margo-react-optional:'+encodeURIComponent(specifier),shortCircuit:true};
-      return next(specifier,context);
-    },load(url,context,next){
-      if(!url.startsWith('margo-react-optional:'))return next(url,context);
-      const name=decodeURIComponent(url.slice('margo-react-optional:'.length));
-      return {format:'module',shortCircuit:true,source:'globalThis.__optionalLoads.push('+JSON.stringify(name)+'); export const Bloom={attach(engine,options){const effect={name:"bloom",options,dispose(){engine.plugins.delete("bloom");}};engine.plugins.set("bloom",effect);return effect;}};'};
-    }});`,
+      `import {moduleHooks} from ${JSON.stringify(new URL('../../../scripts/support/node-compat.mjs', import.meta.url).href)};
+    globalThis.__optionalLoads=[];
+    await moduleHooks([{pattern:${JSON.stringify(`^(?:${optionalPeers.join('|')})(?:/|$)`)},
+      module:'globalThis.__optionalLoads.push(%s); export const Bloom={attach(engine,options){const effect={name:"bloom",options,dispose(){engine.plugins.delete("bloom");}};engine.plugins.set("bloom",effect);return effect;}};'}]);`,
     );
     await writeFile(
       consumer,

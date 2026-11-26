@@ -116,3 +116,4 @@ packages/sciviz/tests/fixtures/molecule/** -text
 packages/ifc/tests/fixtures/bcf/** -text
 packages/ifc/tests/fixtures/ids/** -text
 packages/physics/kernel-common/tests/*-vectors.txt text eol=lf
+*.zst binary

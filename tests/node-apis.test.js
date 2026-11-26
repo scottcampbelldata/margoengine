@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import * as zlib from 'node:zlib';
-import { API, check, scan } from '../scripts/check-node-apis.mjs';
+import { API, check, scan, shippedFiles } from '../scripts/check-node-apis.mjs';
 import { config, testFiles } from '../scripts/node22-tests.mjs';
 
 test('no shipped source uses an API newer than Node 22.12 without a feature test', async () => {
@@ -53,22 +53,30 @@ test('the Node 22 test files and their helpers use no API newer than Node 22.12 
 });
 
 test('the stand-ins for registerHooks and zstd work, on this Node and as on Node 22.12', () => {
-  // A stored Zstandard frame of 'abc', a rule of each kind, and a TypeScript source behind a './name.js' specifier.
+  // A stored Zstandard frame of 'abc', one the stand-in writes, a rule of each kind, and a TypeScript source behind a
+  // './name.js' specifier.
   const script = `
     import assert from 'node:assert/strict';
     import { pathToFileURL } from 'node:url';
-    import { moduleHooks, noZstd, zstdCompressSync, zstdDecompressSync } from './scripts/support/node-compat.mjs';
+    import { moduleHooks, zstdCompressSync, zstdConstants, zstdDecompressSync } from './scripts/support/node-compat.mjs';
     const frame = Uint8Array.of(0x28, 0xb5, 0x2f, 0xfd, 0x20, 3, 0x19, 0, 0, 97, 98, 99);
     assert.equal(Buffer.from(zstdDecompressSync(frame)).toString(), 'abc');
-    assert.equal(noZstd === false, typeof zstdCompressSync === 'function');
-    assert.equal(typeof zstdCompressSync, process.argv[1]);
+    assert.equal(zstdCompressSync.name === 'zstdStoreSync' ? 'stored' : 'native', process.argv[1]);
+    const stored = zstdCompressSync(Buffer.from('abc'), { params: { [zstdConstants.ZSTD_c_checksumFlag]: 1 } });
+    assert.equal(Buffer.from(zstdDecompressSync(stored)).toString(), 'abc');
     await moduleHooks([
       { specifier: 'margo:value', url: 'data:text/javascript,export default 7;' },
       { pattern: '^margo:miss', error: 'no such module here' },
+      { specifier: 'margo:gone', error: 'not installed', code: 'ERR_MODULE_NOT_FOUND' },
+      { pattern: '^margo:echo/', module: 'export default %s;' },
+      { resolved: 'data:text/javascript,export default 1;', except: 'margo:none', url: 'data:text/javascript,export default 2;' },
       { source: pathToFileURL('packages/biomes/').href },
     ]);
     assert.equal((await import('margo:value')).default, 7);
     await assert.rejects(import('margo:missing'), /no such module here/);
+    await assert.rejects(import('margo:gone'), { message: 'not installed', code: 'ERR_MODULE_NOT_FOUND' });
+    assert.equal((await import('margo:echo/a')).default, 'margo:echo/a');
+    assert.equal((await import('data:text/javascript,export default 1;')).default, 2);
     assert.equal(typeof (await import('./packages/biomes/src/fixed.js')), 'object');
     console.log('ok');
   `;
@@ -89,8 +97,46 @@ test('the stand-ins for registerHooks and zstd work, on this Node and as on Node
         timeout: 60_000,
       },
     ).trim();
-  assert.equal(run('fallback', 'undefined'), 'ok');
-  assert.equal(run('', typeof zlib.zstdCompressSync), 'ok');
+  assert.equal(run('fallback', 'stored'), 'ok');
+  assert.equal(run('', zlib.zstdCompressSync ? 'native' : 'stored'), 'ok');
+});
+
+// The class, closed (2026-11-26): the test above reads the Node 22 list only, so tests of stage, voxel-pathtracer and
+// react, a Firefox driver and a data script still imported registerHooks or a zstd function by name, and would fail
+// to load the day their package joined the list. Every tracked source file that is not shipped (tests, scripts,
+// examples, tools) is read here for the rows of Node's own modules, as code and as text: a test may write the import
+// into a script it runs in a child process, where no parser sees it. The JavaScript rows (Float16Array and the like)
+// stay with the Node 22 list, because browser test drivers use them in the browser.
+test('no test or script anywhere names a node: API that Node 22.12 lacks without a feature test', async () => {
+  const root = resolve(import.meta.dirname, '..'),
+    shipped = new Set(shippedFiles().map((file) => relative(root, file).replaceAll('\\', '/'))),
+    names = API.filter((row) => row.kind === 'node').map((row) => row.name),
+    named = new RegExp(String.raw`\bimport\s*\{[^}]*\b(${names.join('|')})\b[^}]*\}\s*from\s*\\?['"]node:`, 'g'),
+    constants = /\bimport\s*\{[^}]*\bconstants\b[^}]*\}\s*from\s*\\?['"]node:zlib/,
+    files = execFileSync('git', ['ls-files', '--', '*.js', '*.mjs', '*.cjs', '*.ts', '*.tsx'], {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 1 << 28,
+    })
+      .split('\n')
+      .filter((file) => file && !/\.d\.[mc]?ts$/.test(file) && !shipped.has(file) && existsSync(resolve(root, file))),
+    found = [];
+  for (const file of files) {
+    const source = readFileSync(resolve(root, file), 'utf8');
+    for (const { name, line } of await scan(source, file))
+      if (names.includes(name)) found.push(`${file}:${line} ${name}`);
+    // This file holds the sample lines of the two tests below.
+    if (file === 'tests/node-apis.test.js') continue;
+    for (const match of source.matchAll(named))
+      found.push(`${file}:${source.slice(0, match.index).split('\n').length} ${match[1]} (in text)`);
+    // zlib.constants has no ZSTD_c_* numbers on Node 22.12: a parameter keyed by one is keyed by 'undefined'.
+    if (constants.test(source) && /\bZSTD_[a-z]_/.test(source)) found.push(`${file} ZSTD_* from zlib.constants`);
+  }
+  assert.ok(
+    files.length > 3000 && files.includes('packages/webgl2-compat/test/firefox-matrix.mjs'),
+    'the tree was read',
+  );
+  assert.deepEqual([...new Set(found)], [], 'take these from scripts/support/node-compat.mjs');
 });
 
 // KB-NODE22-BUILD1: CI builds the packages on Node 22.12, and a named import of an API it lacks fails before a line runs.

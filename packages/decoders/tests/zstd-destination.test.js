@@ -1,21 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { constants } from 'node:zlib';
-import { noZstd, zstdCompressSync } from '../../../scripts/support/node-compat.mjs';
+import { zstdConstants as constants, zstdFixture } from '../../../scripts/support/node-compat.mjs';
 import { decompressZstd } from '../../shared/zstd.js';
-const compress = (b, options = {}) =>
-  zstdCompressSync(b, {
-    params: {
-      [constants.ZSTD_c_checksumFlag]: 1,
-      ...options,
-    },
+// Streams with compressed blocks, so matches are copied inside the destination: Node's own where node:zlib has
+// Zstandard, the checked-in fixtures/zstd/<name>.zst elsewhere (zstdFixture checks each file still decodes to `b`).
+const compress = (name, b, options = {}) =>
+  zstdFixture(new URL(`./fixtures/zstd/${name}.zst`, import.meta.url), b, {
+    [constants.ZSTD_c_checksumFlag]: 1,
+    ...options,
   });
 
-test('Zstd borrows a fixed destination without output allocation, growth or a final copy', {
-  skip: noZstd,
-}, async () => {
+test('Zstd borrows a fixed destination without output allocation, growth or a final copy', async () => {
   const source = new Uint8Array(4 << 20).map((_, i) => (i * 59 + (i >>> 12)) & 255);
-  const packed = compress(source),
+  const packed = compress('pattern-4m', source),
     storage = new Uint8Array(source.length + 32).fill(0xa5);
   const destination = storage.subarray(16, -16),
     allocations = [],
@@ -44,13 +41,16 @@ test('Zstd borrows a fixed destination without output allocation, growth or a fi
   assert(storage.subarray(-16).every((n) => n === 0xa5));
 });
 
-test('fixed destination retains concatenation, unknown sizes, checksums and capacity limits', {
-  skip: noZstd,
-}, async () => {
+test('fixed destination retains concatenation, unknown sizes, checksums and capacity limits', async () => {
   const a = new TextEncoder().encode('Margo owned buffer '.repeat(1000));
   const b = new Uint8Array(200_000).fill(29);
   const skip = Uint8Array.of(0x50, 0x2a, 0x4d, 0x18, 1, 0, 0, 0, 77);
-  const packed = Buffer.concat([skip, compress(a), skip, compress(b, { [constants.ZSTD_c_contentSizeFlag]: 0 })]);
+  const packed = Buffer.concat([
+    skip,
+    compress('text', a),
+    skip,
+    compress('fill-unsized', b, { [constants.ZSTD_c_contentSizeFlag]: 0 }),
+  ]);
   const expected = new Uint8Array(Buffer.concat([a, b]));
   for (const spare of [0, 19]) {
     const destination = new Uint8Array(expected.length + spare).fill(0xa5);
@@ -65,7 +65,7 @@ test('fixed destination retains concatenation, unknown sizes, checksums and capa
     decompressZstd(packed, { destination: new Uint8Array(expected.length), maxOutputSize: a.length }),
     /limit/,
   );
-  const bad = compress(a);
+  const bad = compress('text', a);
   bad[bad.length - 1] ^= 1;
   await assert.rejects(decompressZstd(bad, { destination: new Uint8Array(a.length) }), /checksum/);
   for (let n = 0; n < bad.length; n++)
@@ -73,11 +73,9 @@ test('fixed destination retains concatenation, unknown sizes, checksums and capa
   assert.equal((await decompressZstd(skip, { destination: new Uint8Array(0) })).length, 0);
 });
 
-test('fixed destination rejects aliasing, invalid storage, dictionaries and oversized windows', {
-  skip: noZstd,
-}, async () => {
+test('fixed destination rejects aliasing, invalid storage, dictionaries and oversized windows', async () => {
   const source = new Uint8Array(4096),
-    packed = compress(source),
+    packed = compress('zeros-4k', source),
     destination = new Uint8Array(8192);
   destination.set(packed);
   await assert.rejects(decompressZstd(destination.subarray(0, packed.length), { destination }), /overlap/);
@@ -91,9 +89,9 @@ test('fixed destination rejects aliasing, invalid storage, dictionaries and over
   assert.equal(result.byteOffset, 2048);
 });
 
-test('fixed destination abort and Wasm growth reject during a yielded decode', { skip: noZstd }, async () => {
+test('fixed destination abort and Wasm growth reject during a yielded decode', async () => {
   const source = new Uint8Array(16 << 20),
-    packed = compress(source);
+    packed = compress('zeros-16m', source);
   const before = new Uint8Array(source.length).fill(91);
   await assert.rejects(
     decompressZstd(packed, { destination: before, signal: AbortSignal.abort(new Error('before')) }),
