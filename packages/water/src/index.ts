@@ -1808,10 +1808,13 @@ export class Water implements EnginePlugin {
           'state',
           `Water terrain of ${terrain.width} x ${terrain.height} cells needs ${bytes} B in one storage binding, over this device's ${room} B; use larger cells`,
         );
+      // No recorded source (a new Water, resetTime) always builds a fresh flow: with no river and no solver, an unset
+      // record compared equal to the current pair and the old flow stayed.
       if (
+        !this.coastalSource ||
         this.coastal?.terrain !== terrain ||
-        this.coastalSource?.[0] !== river ||
-        this.coastalSource?.[1] !== solver
+        this.coastalSource[0] !== river ||
+        this.coastalSource[1] !== solver
       ) {
         this.spray?.dispose();
         this.spray = undefined;

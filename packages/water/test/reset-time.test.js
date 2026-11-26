@@ -119,3 +119,26 @@ function boxTriangles(w, h, l) {
     ];
   return quads.flatMap(([a, b, c, d]) => [a, b, c, a, c, d].flat());
 }
+
+test('Water.resetTime makes the next frame build a fresh coastal flow, with no river or solver (GAP-FILM-RESET)', () => {
+  // The rebuild compared the recorded river and solver with the current ones; with neither, an unset record compared
+  // equal and the reset Water kept the flow it had (and its state) instead of the fresh one a fresh Water builds.
+  const h = optionalGPU(),
+    terrain = h.engine.gpu.createTexture({
+      size: [16, 16],
+      format: 'r32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING,
+    });
+  const water = new Water({ segments: 4, terrain: { heightmap: () => terrain, origin: [-8, -8], size: [16, 16] } });
+  h.engine.use(water);
+  h.frame();
+  const first = water['coastal'];
+  assert.ok(first, 'the first frame builds the flow');
+  water.resetTime();
+  h.frame();
+  assert.notEqual(water['coastal'], first, 'the frame after a reset builds a fresh flow');
+  assert.ok(
+    first.states.every((t) => t.destroyed),
+    "the old flow's state is released",
+  );
+});
