@@ -37,6 +37,19 @@ pub extern "C" fn soft_fem_reserve(tets: u32, clusters: u32, members: u32) {
     world().fem_reserve(tets as usize, clusters as usize, members as usize);
 }
 
+/// Sets the rest-space reinforcement of the cells of one body. Zero stiffness clears the rows.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_fiber(first: u32, count: u32, x: f32, y: f32, z: f32, modulus: f32) {
+    world().set_fiber(first as usize, count as usize, [x, y, z, modulus]);
+}
+
+/// Contiguous optional fiber rows for the host's snapshots.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_fem_fiber_rows() -> u32 {
+    let fiber = &mut world().fem.fiber;
+    if fiber.is_empty() { 0 } else { fiber.as_mut_ptr() as usize as u32 }
+}
+
 /// Where a tetrahedron or cluster column starts in the memory.
 #[unsafe(no_mangle)]
 pub extern "C" fn soft_fem_column(id: u32) -> u32 {

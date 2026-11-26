@@ -510,3 +510,37 @@ fn projective_global_step_preserves_rigid_rotations_and_recovers_a_nearly_invert
     }
     assert!(inverted.z[3] > 0.5, "the projected volume recovered: {}", inverted.z[3]);
 }
+
+#[test]
+fn axial_fiber_matches_the_published_parallel_and_cross_grain_stiffness_ratio() {
+    use margoengine_soft_kernel::fem::{COROTATED, PROJECTIVE_TET, STABLE_NEO_HOOKEAN, VERTEX_BLOCK_TET};
+    // USDA Wood Handbook (2021), Table 5-1, Douglas-fir E_T/E_L = 0.050.
+    // Only the published ratio is used. A dimensionally rescaled single-coordinate
+    // test keeps the deflections far enough above the float32 rounding scale.
+    let longitudinal = 12_000.0;
+    let transverse = 0.05 * longitudinal;
+    let reinforcement = longitudinal - transverse;
+    let h = 1.0f32 / 60.0;
+    for (model, flag) in [(COROTATED, PROJECTIVE_TET), (STABLE_NEO_HOOKEAN, VERTEX_BLOCK_TET)] {
+        for (direction, modulus) in [([1.0, 0.0, 0.0], transverse), ([0.0, 0.0, 1.0], longitudinal)] {
+            let mut w = World::new();
+            w.reserve(4, 0, 1, 0);
+            w.fem_reserve(1, 0, 0);
+            w.particles = 4;
+            w.bodies = 1;
+            w.x[1] = 1.0;
+            w.y[2] = 1.0;
+            w.z[3] = 1.0;
+            w.w[3] = 0.5;
+            assert!(w.set_tet(0, [0, 1, 2, 3], (transverse / 2.0) as f32, 0.0, model));
+            w.fem.imp.reserve_particles(w.particles);
+            w.fem.flags[0] |= flag;
+            w.set_fiber(0, 1, [direction[0], direction[1], direction[2], reinforcement as f32]);
+            w.z[3] = 1.2;
+            w.step(h, 1, 1, [0.0; 3]);
+            let k = f64::from(h) * f64::from(h) * modulus / 6.0;
+            let expected = (2.0 * f64::from(1.2f32) + k) / (2.0 + k);
+            assert!((f64::from(w.z[3]) - expected).abs() < 8.0 * f64::from(f32::EPSILON), "{} vs {expected}", w.z[3]);
+        }
+    }
+}

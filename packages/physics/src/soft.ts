@@ -34,6 +34,8 @@ interface SoftExports extends WebAssembly.Exports {
   soft_torn(): number;
   soft_hash(): number;
   soft_fem_reserve(tets: number, clusters: number, members: number): void;
+  soft_fem_fiber(first: number, count: number, x: number, y: number, z: number, modulus: number): void;
+  soft_fem_fiber_rows(): number;
   soft_fem_column(id: number): number;
   soft_tet_set(
     t: number,
@@ -528,6 +530,31 @@ interface BoundMesh {
  */
 export type SoftSolver = 'constraints' | 'fem' | 'vertex-block' | 'projective';
 
+/** Additional uniaxial stiffness in a body's rest coordinates, used by the two nonlinear tetrahedron solvers. */
+export interface SoftFiber {
+  readonly direction: Vec3;
+  readonly modulus: number;
+}
+
+function softFiber(direction: Vec3, modulus: number): SoftFiber | null {
+  checkVec(direction, 'Soft fiber direction');
+  const stored = Math.fround(modulus);
+  if (!Number.isFinite(stored) || modulus < 0 || (modulus > 0 && stored === 0))
+    throw new RangeError(
+      'Soft fiber modulus is outside the supported range. Use a finite nonnegative float32 value in Pa.',
+    );
+  if (modulus === 0) return null;
+  const scale = Math.max(Math.abs(direction[0]), Math.abs(direction[1]), Math.abs(direction[2]));
+  if (scale === 0)
+    throw new RangeError('Soft fiber needs a rest-space direction. Supply at least one nonzero component.');
+  const x = direction[0] / scale;
+  const y = direction[1] / scale;
+  const z = direction[2] / scale;
+  const length = Math.sqrt(x * x + y * y + z * z);
+  const axis: Vec3 = Object.freeze([x / length, y / length, z / length] as const);
+  return Object.freeze({ direction: axis, modulus: stored });
+}
+
 /** The elastic model of a body's cells: see {@link CellMaterial.model}. */
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
 
@@ -834,6 +861,7 @@ export class SoftBodyDesc {
   /** @internal */ triangles: number[] = [];
   /** @internal Four particle indices per tetrahedron. */ cells: number[] = [];
   /** @internal */ cellMaterial = new CellMaterial();
+  /** @internal */ fiber: SoftFiber | null = null;
   /** @internal Particle indices of each shape-matching cluster. */ clusterGroups: number[][] = [];
   /** @internal */ clusterHertz = 0;
   /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
@@ -1517,6 +1545,11 @@ export class SoftBodyDesc {
     this.solver = checkedSolver(solver);
     return this;
   }
+  /** Adds an axial modulus in pascals along a rest-space direction. Zero clears it. */
+  setFiberStiffness(direction: Vec3, modulus: number): this {
+    this.fiber = softFiber(direction, modulus);
+    return this;
+  }
   /** Replaces the cells' material (copied). */
   setCellMaterial(material: CellMaterial): this {
     checkCellMaterial(material);
@@ -1614,7 +1647,10 @@ export class SoftBodyDesc {
     for (const p of other.edgePairs) this.edgePairs.push(p + base);
     for (const p of other.bendPairs) this.bendPairs.push(p + base);
     for (const p of other.pinned) this.pinned.add(p + base);
-    if (other.cells.length && !this.cells.length) this.cellMaterial = other.cellMaterial.clone();
+    if (other.cells.length && !this.cells.length) {
+      this.cellMaterial = other.cellMaterial.clone();
+      this.fiber = other.fiber;
+    }
     for (const p of other.cells) this.cells.push(p + base);
     for (const group of other.clusterGroups) this.clusterGroups.push(group.map((p) => p + base));
     if (other.clusterGroups.length && !this.clusterHertz) this.clusterHertz = other.clusterHertz;
@@ -1799,6 +1835,11 @@ export class SoftBody {
   }
   set solverKind(solver: SoftSolver) {
     this.owner.setCellSolver(this, checkedSolver(solver));
+  }
+  /** The authored rest-space reinforcement, if the body has one. */
+  get fiber(): SoftFiber | null {
+    this.check();
+    return this.owner.cellFiber(this);
   }
   /** @internal The cluster of all the particles, once the root body is asked for. */ rootCluster = -1;
   /** @internal */ force: Vec3 = [0, 0, 0];
@@ -2805,6 +2846,7 @@ export class SoftBodies implements PhysicsAttachment {
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const mode = checkedSolver(desc.solver);
     checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
+    const fiber = desc.fiber && softFiber(desc.fiber.direction, desc.fiber.modulus);
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
@@ -2999,6 +3041,7 @@ export class SoftBodies implements PhysicsAttachment {
       });
     }
     this.bodies.push(body);
+    this.writeFiber(range, fiber);
     body.remember();
     this.setCellSolver(body, mode);
     this.writeMaterial(body);
@@ -3461,6 +3504,27 @@ export class SoftBodies implements PhysicsAttachment {
     }
   }
 
+  private writeFiber({ first, count }: CellRange, fiber: SoftFiber | null): void {
+    if (fiber) {
+      this.exports.soft_fem_fiber(first, count, ...fiber.direction, fiber.modulus);
+    } else {
+      this.exports.soft_fem_fiber(first, count, 0, 0, 0, 0);
+    }
+  }
+
+  private fiberWords(): Float32Array | undefined {
+    const at = this.exports.soft_fem_fiber_rows();
+    if (at !== 0 && this.cellTotal > 0) return new Float32Array(this.exports.memory.buffer, at, this.cellTotal * 4);
+  }
+
+  /** @internal Reads the body's reinforcement from its serialized native rows. */
+  cellFiber({ cellRange }: SoftBody): SoftFiber | null {
+    const view = this.fiberWords();
+    const at = cellRange.first * 4;
+    if (!view || cellRange.count === 0 || view[at + 3] === 0) return null;
+    return { direction: [view[at]!, view[at + 1]!, view[at + 2]!], modulus: view[at + 3]! };
+  }
+
   /** @internal Finds the cell across each face of a body's cells, marks the ones with no outside face, and names their body. */
   private linkCells(range: CellRange, handle: number): void {
     const f = this.cellColumns(),
@@ -3572,6 +3636,7 @@ export class SoftBodies implements PhysicsAttachment {
       throw new MargoError('state', 'That soft body belongs to another world; pass it to the SoftBodies that made it.');
     // Keep the rows of the other bodies, in order, and write them back without the removed one.
     const keep = this.bodies.filter((b) => b !== body),
+      fiberSaved = keep.map((b) => this.cellFiber(b)),
       c = this.columns(),
       cols = [
         'x',
@@ -3773,6 +3838,7 @@ export class SoftBodies implements PhysicsAttachment {
         });
       }
       b.cellRange = next;
+      this.writeFiber(next, fiberSaved[k]!);
       this.cellTotal += r.count;
       this.clusterTotal += r.clusterCount;
       this.memberTotal += r.memberCount;
@@ -3855,6 +3921,9 @@ export class SoftBodies implements PhysicsAttachment {
         out.push([name, view as Float32Array | Uint32Array]);
     for (const [name, view] of Object.entries(this.cellColumns()))
       if (view.byteLength > 0) out.push([`cell.${name}`, view as Float32Array | Uint32Array]);
+    const fiber = this.fiberWords();
+    if (fiber && this.bodies.some(({ cellRange }) => cellRange.count > 0 && fiber[4 * cellRange.first + 3]! > 0))
+      out.push(['cell.fiber', fiber]);
     return out;
   }
 

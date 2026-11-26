@@ -31,6 +31,12 @@ pub(crate) fn transform(f: Columns, g: Vec3) -> Vec3 {
     [0, 1, 2].map(|i| f[0][i] * g[0] + f[1][i] * g[1] + f[2][i] * g[2])
 }
 
+/// Nearest unit-length image of a rest-space fiber. At complete collapse all unit targets are tied.
+pub(crate) fn fiber_target(image: Vec3, axis: Vec3) -> Vec3 {
+    let length = crate::math::sqrt64(dot(image, image));
+    if length == 0.0 { axis } else { image.map(|component| component / length) }
+}
+
 /// A symmetric LDL^T solve. Block inertia and shear are strictly positive for every moving vertex.
 fn solve([xx, yy, zz, xy, xz, yz]: [f64; 6], b: Vec3) -> Vec3 {
     let yx = xy / xx;
@@ -45,6 +51,18 @@ fn solve([xx, yy, zz, xy, xz, yz]: [f64; 6], b: Vec3) -> Vec3 {
 }
 
 impl World {
+    pub fn set_fiber(&mut self, first: usize, count: usize, fiber: [f32; 4]) {
+        if count == 0 || (fiber[3] == 0.0 && self.fem.fiber.is_empty()) {
+            return;
+        }
+        self.fem.fiber.resize(self.fem.count.max(first + count));
+        self.fem.fiber[first..first + count].fill(fiber);
+    }
+
+    pub(crate) fn fiber(&self, t: usize) -> (Vec3, f64) {
+        let Some([x, y, z, modulus]) = self.fem.fiber.get(t).copied() else { return ([0.0; 3], 0.0) };
+        ([x as f64, y as f64, z as f64], modulus as f64)
+    }
     /// Builds a deterministic incident-corner list. Rebuilding from live flags also handles tears and new body pieces.
     pub(crate) fn prepare_vertex_blocks(&mut self) -> bool {
         let active = |flag| flag & (TORN_TET | VERTEX_BLOCK_TET) == VERTEX_BLOCK_TET;
@@ -117,10 +135,10 @@ impl World {
                 let lambda = self.fem.lambda[t] as f64 + mu;
                 let scale = h2 * self.fem.vol0[t] as f64;
                 let damping = self.fem.imp.beta[t] as f64 / dt;
+                let prior = if damping > 0.0 { self.vertex_deformation(corners, b, true) } else { f };
                 let mut fg = transform(f, g);
                 let mut volumetric = lambda * (j - 1.0) - mu;
                 if damping > 0.0 {
-                    let prior = self.vertex_deformation(corners, b, true);
                     let pg = transform(prior, g);
                     for axis in 0..3 {
                         fg[axis] += damping * (fg[axis] - pg[axis]);
@@ -134,6 +152,18 @@ impl World {
                 isotropic += stiff * mu * dot(g, g);
                 for (a, (j, k)) in [(0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2)].into_iter().enumerate() {
                     determinant[a] += stiff * lambda * dj[j] * dj[k];
+                }
+                let (axis, modulus) = self.fiber(t);
+                if modulus > 0.0 {
+                    let axial_gradient = dot(g, axis);
+                    let image = transform(f, axis);
+                    let target = fiber_target(image, axis);
+                    let w = scale * modulus;
+                    let old = transform(prior, axis);
+                    for j in 0..3 {
+                        grad[j] += w * axial_gradient * (image[j] - target[j] + damping * (image[j] - old[j]));
+                    }
+                    isotropic += w * (1.0 + damping) * axial_gradient * axial_gradient;
                 }
             }
             for diagonal in determinant.iter_mut().take(3) {

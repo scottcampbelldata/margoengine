@@ -41,8 +41,8 @@
     return new Geometry(positions, normals, indices);
   }
 
-  window.renderRung = async ({ loaded, showBoot = false, solver }) => {
-    const scene = await ladder(undefined, { mass: loaded ? 35 : 0, solver });
+  window.renderRung = async ({ loaded, showBoot = false, solver, fiber }) => {
+    const scene = await ladder(undefined, { mass: loaded ? 35 : 0, solver, fiber });
     scene.world.advance(120);
     rungMesh.setGeometry(surface(scene.rung));
     boot.setGeometry(showBoot ? box(0.106, 0.12, 0.12) : null);

@@ -21,6 +21,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   vertex block descent. Both modes preserve mass and rest volume when a cut splits a solid and each piece
   goes on stepping. Reproduce with the `projective` crate cases and the same CPU and browser tests.
 
+- Directional stiffness (SOFT-04, 2026-11-26). Both nonlinear modes match the closed-form extension
+  response corresponding to the published Douglas-fir tangential/longitudinal modulus ratio.
+  A restore carries the live rung's axis and
+  modulus into a second world, which then reproduces the same state and retains it through cuts.
+  Run the crate's `axial_fiber` case and `packages/physics/tests/coupling/volumetric-solids.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

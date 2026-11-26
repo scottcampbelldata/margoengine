@@ -2,7 +2,10 @@ import { Physics } from '../../dist/index.js';
 import { CellMaterial, SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { PhysicsWorld, RigidSolver, SoftSolver } from '../../dist/world.js';
 
-export async function ladder(rate = { num: 60, den: 1 }, { mass = 35, stiffness = 2e6, solver = 'vertex-block' } = {}) {
+export async function ladder(
+  rate = { num: 60, den: 1 },
+  { mass = 35, stiffness = 2e6, solver = 'vertex-block', fiber } = {},
+) {
   const physics = new Physics(null, { fixedTimestep: 1 / 60 });
   const projective = solver === 'projective';
   const soft = await SoftBodies.attach(physics, { substeps: 4, iterations: projective ? 4 : 24 });
@@ -14,6 +17,7 @@ export async function ladder(rate = { num: 60, den: 1 }, { mass = 35, stiffness 
     model: projective ? 'corotated' : 'neo-hookean',
   });
   const desc = SoftBodyDesc.box([-0.35, 0.84, -0.07], [0.7, 0.14, 0.14], [10, 2, 2], material);
+  if (fiber) desc.setFiberStiffness(fiber.direction, fiber.modulus);
   const fixed = [];
   let center = -1;
   for (let i = 0; i < desc.particleCount; i++) {

@@ -605,10 +605,17 @@ const pins: number[] = [];
 for (let i = 0; i < bar.particleCount; i++) {
   if (bar.positions[3 * i] === 0) pins.push(i);
 }
-const body = soft.create(bar.setPinnedParticles(pins).setSolver('projective'));
+const body = soft.create(bar.setPinnedParticles(pins).setFiberStiffness([1, 0, 0], 1e7).setSolver('projective'));
 for (let frame = 0; frame < 60; frame++) physics.step();
 console.log(body.solver, body.volume());
 ```
+
+`setFiberStiffness(direction, modulus)` adds an axial modulus in pascals in either nonlinear mode.
+Give the direction in the same rest coordinates as the tetrahedral vertices. The default modulus
+is zero, and passing zero clears a previously authored fiber. The additional stiffness acts in
+tension and compression along that axis. It accompanies the body through cuts and snapshots.
+For directional timber, the isotropic material gives the across-grain base stiffness. The fiber
+adds the chosen extra stiffness along the grain.
 
 Not in this entry yet: collision through a skin (see `docs/physics-collision-parity.md` for each row).
 

@@ -263,6 +263,7 @@ function carry(
   desc.setGravityScale(c.gravity_scale[body.handle]!).setLinearDamping(c.linear_damping[body.handle]!);
   desc.setMaterial(body.material);
   desc.setCellMaterial(body.cellMaterial);
+  desc.fiber = body.fiber;
   desc.groups = body.collisionGroups;
   desc.shapeMatching = body.matched;
   desc.solver = body.solverKind;

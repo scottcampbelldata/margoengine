@@ -22,6 +22,12 @@ try {
     console.log(
       `LH-4 ${solver} sag ${((bare.y - loaded.y) * 1000).toFixed(2)} mm, reaction ${loaded.support.toFixed(2)} N, ${loaded.hash}`,
     );
+    const authored = { loaded: true, solver, fiber: { direction: [1, 0, 0], modulus: 1e7 } };
+    const reinforced = await page.evaluate((settings) => window.renderRung(settings), authored);
+    assert.ok(reinforced.support > 0);
+    assert.notEqual(reinforced.y, loaded.y);
+    assert.notDeepEqual(await page.locator('canvas').screenshot(), after);
+    console.log(`LH-4 ${solver} with grain, y=${reinforced.y.toFixed(6)} m, ${reinforced.hash}`);
   }
   assert.deepEqual(errors, []);
 } finally {

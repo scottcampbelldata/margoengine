@@ -9961,6 +9961,12 @@ with three coordinates and a scalar diagonal per vertex. It works in corrections
 prediction and leaves fixed targets out of the unknowns. The same rung proof checks its reactions,
 frame-rate independence and restore, and both renderers draw the changed geometry.
 
+Directional reinforcement contributes one right-axis projection per active fiber and keeps the
+same global stiffness operator within each substep. The local vertex mode adds the corresponding
+diagonal to its surrogate Hessian. Both use the optional native rest-space axis and modulus rows.
+Snapshot restore, body compaction and fracture retain those rows. Isotropic worlds retain their
+earlier state layout.
+
 Exact cloth, links and contacts (2026-11-25, KB-SOFT-LOOPSTRETCH1, `soft-kernel/src/rigid.rs`).
 - **The solve.** A woven sheet's threads, a triangle mesh's edges, rigid edges, the links of particles to bodies and the
   contacts of particles and faces with bodies are one system with the bodies as six-degree-of-freedom unknowns. It is

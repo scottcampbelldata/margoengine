@@ -130,6 +130,8 @@ pub struct Fem {
     /// The implicit solver's settings and scratch (src/implicit.rs).
     pub imp: crate::implicit::Implicit,
     pub(crate) vertex_block: crate::vertex_block::VertexBlock,
+    /// Optional immutable rest-space reinforcement (axis x/y/z and additional axial modulus).
+    pub(crate) fiber: Col<[f32; 4]>,
 }
 
 impl Fem {
@@ -192,6 +194,7 @@ impl Fem {
             ang: [F; 3],
             imp: crate::implicit::Implicit::new(),
             vertex_block: crate::vertex_block::VertexBlock::new(),
+            fiber: Col::new(),
         }
     }
 }
@@ -321,6 +324,9 @@ impl World {
         }
         f.imp.reserve_cells(tets);
         f.vertex_block.next.resize(4 * tets);
+        if !f.fiber.is_empty() {
+            f.fiber.resize(tets);
+        }
         f.member.resize(members);
         for c in f.rest.iter_mut() {
             c.resize(members);

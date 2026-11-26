@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../../dist/index.js';
-import { CellMaterial, SoftBodyDesc } from '../../dist/soft.js';
+import { CellMaterial, SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 import { ladder } from './volumetric-ladder.js';
 
@@ -115,4 +115,65 @@ test('a projective material and solver mode restore from a snapshot', async () =
   world.restoreSnapshot(saved.bytes);
   assert.equal(rung.solver, 'projective');
   assert.equal(world.hash(), saved.hash);
+});
+
+test('directional stiffness is present in snapshots and carried to every cut piece', async () => {
+  const along = { direction: [1, 0, 0], modulus: 1e7 };
+  const across = { direction: [0, 0, 1], modulus: 1e7 };
+  for (const solver of ['vertex-block', 'projective']) {
+    const a = await ladder(undefined, { solver, fiber: along });
+    const b = await ladder(undefined, { solver, fiber: across });
+    assert.notEqual(a.world.hash(), b.world.hash());
+    a.world.advance(12);
+    b.world.advance(12);
+    assert.notEqual(a.reading().y, b.reading().y);
+    const saved = a.world.takeSnapshot();
+    b.world.restoreSnapshot(saved.bytes);
+    assert.deepEqual(b.rung.fiber, along);
+    a.world.advance(24);
+    b.world.advance(24);
+    assert.equal(a.world.hash(), b.world.hash());
+    const { pieces } = b.soft.cut(b.rung, [
+      [0, 0, -2],
+      [0, 4, -2],
+      [0, 0, 4],
+    ]);
+    assert.equal(pieces.length, 2);
+    for (const piece of pieces) assert.deepEqual(piece.fiber, along);
+  }
+});
+
+test('the public fiber control gives the exact small fixture response along and across its axis', async () => {
+  const dt = 1 / 60;
+  for (const [solver, model] of [
+    ['vertex-block', 'neo-hookean'],
+    ['projective', 'corotated'],
+  ]) {
+    for (const [direction, effectiveModulus] of [
+      [[0, 0, 5], 12000],
+      [[2, 0, 0], 600],
+    ]) {
+      const physics = new Physics(null, { fixedTimestep: dt, gravity: [0, 0, 0] });
+      const soft = await SoftBodies.attach(physics, { substeps: 1, iterations: 1 });
+      soft.cellDamping = 0;
+      const material = Object.assign(new CellMaterial(), { youngsModulus: 600, poissonRatio: 0, model });
+      const desc = new SoftBodyDesc([
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+      ])
+        .setCells([0, 1, 2, 3], material)
+        .setParticleMass(2)
+        .setPinnedParticles([0, 1, 2])
+        .setFiberStiffness(direction, 11400)
+        .setSolver(solver);
+      const body = soft.create(desc);
+      body.setParticlePosition(3, [0, 0, 1.2]);
+      physics.step();
+      const k = (dt * dt * effectiveModulus) / 6;
+      const expected = (2 * 1.2 + k) / (2 + k);
+      assert.ok(Math.abs(body.particlePosition(3)[2] - expected) < 8 * 2 ** -23, solver);
+    }
+  }
 });

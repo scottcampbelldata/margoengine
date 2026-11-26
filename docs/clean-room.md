@@ -27,6 +27,18 @@ corrections to the inertial prediction in the solve.
 [Smith et al.](https://doi.org/10.1145/3180491),
 [Bouaziz et al.](https://doi.org/10.1145/2601097.2601116).
 
+Senalik and Farber, “Mechanical Properties of Wood” (USDA Forest Products Laboratory, 2021),
+Table 5–1, gives different longitudinal, radial and tangential moduli. The directional regression
+uses the printed Douglas-fir tangential/longitudinal ratio 0.050. Hernandez et al., “Anisotropic
+Strain Limiting” (2013), motivates authored rest-space directions. For the two tetrahedron solvers
+Margo adds `κ(‖Fa‖−1)²/2` for a unit material axis `a`. Its local target is the nearest unit
+vector to `Fa`. In the projective global solve this adds the constant stiffness entries
+`κ (gᵢ·a)(gⱼ·a)`. In a vertex block the frozen target majorizes the directional energy and adds
+the scalar `κ (gᵢ·a)²` to the three coordinate diagonals. A projection refresh follows the local
+solve. Both routes use the same rest-volume and stiffness-damping scaling as the bulk modes.
+[Wood Handbook](https://research.fs.usda.gov/treesearch/62244),
+[Hernandez et al.](https://filedn.eu/l8vDXhPLwQPyaW6XewVeXCk/publications/anisotropic_strain_limiting/paper.pdf).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

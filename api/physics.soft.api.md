@@ -231,6 +231,7 @@ export class SoftBodies implements PhysicsAttachment {
     cellSolver(body: SoftBody): SoftSolver;
     setCellSolver(body: SoftBody, solver: SoftSolver): void;
     writeCellMaterial(body: SoftBody): void;
+    cellFiber({ cellRange }: SoftBody): SoftFiber | null;
     writeMaterial(body: SoftBody): void;
     remove(body: SoftBody): void;
     beforeStep(dt: number): void;
@@ -294,6 +295,7 @@ export class SoftBody {
     clusterInfo: ClusterInfo[];
     get solverKind(): SoftSolver;
     set solverKind(solver: SoftSolver);
+    get fiber(): SoftFiber | null;
     rootCluster: number;
     force: Vec3;
     pointForces: Map<number, Vec3>;
@@ -430,6 +432,7 @@ export class SoftBodyDesc {
     triangles: number[];
     cells: number[];
     cellMaterial: CellMaterial;
+    fiber: SoftFiber | null;
     clusterGroups: number[][];
     clusterHertz: number;
     massGiven: boolean;
@@ -473,6 +476,7 @@ export class SoftBodyDesc {
     addCellEdges(): this;
     setSurface(): this;
     setSolver(solver: SoftSolver): this;
+    setFiberStiffness(direction: Vec3, modulus: number): this;
     setCellMaterial(material: CellMaterial): this;
     setClusters(groups: readonly ArrayLike<number>[], hertz: number): this;
     resolvedMasses(): number[];
@@ -538,6 +542,11 @@ export interface SoftContact {
 export interface SoftDestination {
     body: SoftBody;
     particle: number;
+}
+
+export interface SoftFiber {
+    readonly direction: Vec3;
+    readonly modulus: number;
 }
 
 export interface SoftGasPressure {

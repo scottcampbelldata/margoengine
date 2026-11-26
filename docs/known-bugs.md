@@ -16746,7 +16746,8 @@ remain EARTH-05 work.
 
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support
-fixture uses isotropic elasticity. Timber with directional grain needs an anisotropic material model.
+fixture uses isotropic elasticity. Directional reinforcement is available in both nonlinear modes.
+Distinct radial and tangential shear and Poisson coefficients need a full orthotropic material law.
 Both native nonlinear modes pass the rung fixture. Dedicated GPU elasticity remains open and needs a
 same-tick GPU contact and snapshot handoff through the physics framework.
 

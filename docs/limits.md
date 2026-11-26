@@ -9552,7 +9552,10 @@ projection per live tetrahedron precedes each global solve. Each matrix applicat
 corners once, then the preconditioner acts once per particle. The iteration limits are the configured
 soft iterations and the existing preconditioned conjugate-gradient limits. Extreme expansion also
 searches the small-root volume branch before accepting a feasible unit-determinant target. This CPU
-mode accepts isotropic tetrahedral elasticity. The existing contact solver still owns rigid reactions.
+mode retains the existing rigid contact solver. Both nonlinear modes also accept a single rest-space
+fiber modulus for longitudinal reinforcement. It captures the parallel/transverse axial contrast
+while the transverse base remains isotropic. Distinct radial and tangential elastic and shear
+coefficients are outside that material model. Fiber rows join the snapshot when the scene authors them.
 
 ### Gas-filled soft shells (SOFT-06)
 

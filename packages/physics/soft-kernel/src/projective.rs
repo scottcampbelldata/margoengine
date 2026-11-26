@@ -4,7 +4,7 @@
 use crate::World;
 use crate::fem::{PROJECTIVE_TET, TORN_TET};
 use crate::math::sqrt64;
-use crate::vertex_block::{Columns, Vec3, cross, dot, transform};
+use crate::vertex_block::{Columns, Vec3, cross, dot, fiber_target, transform};
 
 const AXES: Columns = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
 
@@ -191,6 +191,13 @@ impl World {
         (corners, gradients, shear, bulk, damp)
     }
 
+    fn projective_fiber(&self, t: usize, dt: f64) -> (Vec3, f64, f64) {
+        let (axis, modulus) = self.fiber(t);
+        let elastic = modulus * self.fem.vol0[t] as f64 * dt * dt;
+        let damping = elastic * self.fem.imp.beta[t] as f64 / dt;
+        (axis, elastic, damping)
+    }
+
     fn position(&self, i: usize) -> Vec3 {
         [self.x[i] as f64, self.y[i] as f64, self.z[i] as f64]
     }
@@ -230,6 +237,16 @@ impl World {
                     self.fem.imp.aq[a][i] += w * component;
                 }
             }
+            let (axis, elastic, damping) = self.projective_fiber(t, dt);
+            if elastic > 0.0 {
+                let grain = transform(gradient, axis);
+                for (i, shape) in corners.into_iter().zip(g) {
+                    let axial = (elastic + damping) * dot(shape, axis);
+                    for (a, component) in grain.into_iter().enumerate() {
+                        self.fem.imp.aq[a][i] += axial * component;
+                    }
+                }
+            }
         }
     }
 
@@ -246,10 +263,15 @@ impl World {
                 continue;
             }
             let (corners, g, shear, bulk, damp) = self.projective_geometry(t, dt);
+            let (axis, elastic, damping) = self.projective_fiber(t, dt);
             for (i, shape) in corners.into_iter().zip(g) {
                 if self.w[i] > 0.0 && self.bsleep[self.pbody[i] as usize] == 0 {
                     self.fem.imp.mass[i] = 1.0 / self.w[i] as f64;
                     self.fem.imp.diag[i] += (shear + bulk + damp) * dot(shape, shape);
+                    if elastic > 0.0 {
+                        let axial = dot(shape, axis);
+                        self.fem.imp.diag[i] += (elastic + damping) * axial * axial;
+                    }
                 }
             }
         }
@@ -282,6 +304,21 @@ impl World {
                 for (i, shape) in corners.into_iter().zip(g) {
                     for (a, component) in transform(target, shape).into_iter().enumerate() {
                         self.fem.imp.rhs[a][i] += component;
+                    }
+                }
+                let (axis, elastic, damping) = self.projective_fiber(t, dt);
+                if elastic > 0.0 {
+                    let predicted = transform(x, axis);
+                    let closest = fiber_target(transform(f, axis), transform(r, axis));
+                    let prior = transform(old, axis);
+                    let fiber = [0, 1, 2].map(|a| {
+                        elastic * (closest[a] - predicted[a]) + damping * (prior[a] - predicted[a])
+                    });
+                    for (i, shape) in corners.into_iter().zip(g) {
+                        let axial = dot(shape, axis);
+                        for (a, component) in fiber.into_iter().enumerate() {
+                            self.fem.imp.rhs[a][i] += axial * component;
+                        }
                     }
                 }
             }
