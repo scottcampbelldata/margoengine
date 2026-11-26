@@ -287,3 +287,29 @@ Rev. 69:1199); Hoyt and Taylor 1981 (Nature 292:239); Heglund, Taylor and McMaho
 (Acta Anat. 146:183) and 1994 (Equine Vet. J. 26:230); Back and Clayton, Equine Locomotion, 2013; Winter, Biomechanics
 and Motor Control of Human Movement, 2009; Bystroem et al. 2009 (Equine Vet. J. 41:280); Muenz, Eckardt and Witte 2014
 (Hum. Mov. Sci. 33:227); Kajiya and Kay 1989 (SIGGRAPH).
+
+## Horse traction and gait
+
+Use the same motion controller as `addHorse` without creating a scene. Turn rate depends on available hoof grip,
+forward speed and current acceleration. Each support sample contributes to the local ground plane. Walking uphill
+costs work per metre, so the same command gives a shorter, slower stride and can change the selected gait.
+
+```ts
+import { HorseMotion } from '@margoengine/horses';
+import { horseBody } from '@margoengine/horses/anatomy';
+
+const motion = new HorseMotion(horseBody(), {
+  ground: (_x, z) => 0.08 * z,
+  grip: 0.6,
+  loadMass: 65,
+});
+for (let step = 0; step < 240; step++) {
+  motion.step(1 / 240, { speed: 3.2, heading: 0.3, gait: 'auto' });
+}
+console.log(motion.speed, motion.bank, motion.strideCyclesAt());
+```
+
+`grip` defaults to 0.6, and `loadMass` is extra kilograms carried, with a zero default. The drive uses the horse's
+own mass and `acceleration` to set available propulsive force. `bank` is the trunk angle about its forward axis,
+and `sidewaysSpeed` is lateral slip in metres per second. `addHorse` uses the live duty factor and stride length
+to hold the gait phase continuously when speed changes.

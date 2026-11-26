@@ -74,6 +74,7 @@
   },
   "dependencies": {
     "@margoengine/animation": "^1.0.0",
+    "@margoengine/math": "^1.0.0",
     "@margoengine/materials": "^1.0.0"
   }
 }
