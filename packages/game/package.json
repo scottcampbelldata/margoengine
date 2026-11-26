@@ -2227,6 +2227,10 @@
       "types": "./dist/physics/lightning.d.ts",
       "import": "./dist/physics/lightning.js"
     },
+    "./physics/granular-mpm": {
+      "types": "./dist/physics/granular-mpm.d.ts",
+      "import": "./dist/physics/granular-mpm.js"
+    },
     "./physics/strands": {
       "types": "./dist/physics/strands.d.ts",
       "import": "./dist/physics/strands.js"

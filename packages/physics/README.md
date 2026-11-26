@@ -5057,6 +5057,39 @@ impulses. By default the active layer extends one grid spacing around the bed
 surface and receives 5% of the impinging impulse as distributed tangential shear.
 Set `wakeDepth` or `wakeFraction` to supply other measured values.
 
+```ts
+import { TerrainBed } from '@margoengine/physics/earth';
+import { GranularMpmSolver } from '@margoengine/physics/granular-mpm';
+import { SwimSolver } from '@margoengine/physics/life';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const [ray, sand] = await Promise.all([
+  SwimSolver.load(),
+  GranularMpmSolver.load({ projectBed: true, bedWakes: true }),
+]);
+const surface = new TerrainBed();
+const world = new PhysicsWorld();
+world.add(surface, { rows: 4, columns: 4, width: 1, depth: 1, centre: [0, 0], elevations: () => -0.48 });
+world.add(ray, {
+  bodies: [{
+    position: [0, -0.2, 0], mass: 21.47, length: 1, width: 0.2, height: 0.2,
+    tail: { amplitude: 0, span: 0.16, wavelength: 0.85 },
+    fins: { area: 0.05, strokeAmplitude: 0.2, strokeFrequency: 1 },
+  }],
+});
+world.add(sand, {
+  points: Array.from({ length: 100 }, (_, i) => ({
+    position: [(i % 10 - 4.5) * 0.04, -0.52, (Math.floor(i / 10) - 4.5) * 0.04],
+    volume: 0.000064,
+  })),
+  floor: -0.56,
+  bedSurface: surface.bed,
+});
+world.couple([ray.id, sand.id, surface.id], 'staggered');
+world.advance(20);
+console.log(sand.wakeImpulse, surface.bed.elevations);
+```
+
 ## Physical strand guides
 
 Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone
