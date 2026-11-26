@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20436261,
+  "total": 20446125,
   "history": [
     {
       "date": "2026-10-24",
@@ -13209,6 +13209,12 @@
       "commit": "166ad8688c",
       "grew": 1,
       "reason": "EARTH-05 spatial bedrock and hardpan sampling take the optional entry from 10864 to 11340 B gzip. Keeping both with the existing soil stamp preserves one mass ledger and one native loader. Core plus Stage stays 24820 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e3acc7611",
+      "reason": "New optional post entry, 0 to 9,576 B gzip: mesh-blend (MeshBlend, screen-space mesh blending with per-mesh tags and radii and depth-slope rejection). Most of it is the PostStack it attaches to, as in contact-shadows (8,001) and curvature (10,677); its own entry so an app loads it only when it imports it. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14140,6 +14146,7 @@
     "@margoengine/post/lut1d": 10009,
     "@margoengine/post/mask": 7322,
     "@margoengine/post/material-decals": 10327,
+    "@margoengine/post/mesh-blend": 9864,
     "@margoengine/post/motion-blur": 9318,
     "@margoengine/post/mrt": 4647,
     "@margoengine/post/outline": 7282,
