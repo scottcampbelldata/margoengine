@@ -9860,7 +9860,9 @@ wheel option resolves the driven rim's average stress envelope below its axle. E
 individual contact marks from live spin. Their projected strip uses 65 along-track stations. Indexed tread
 triangles can instead intersect the local horizontal bearing plane at configurable resolution (17 by 65
 profile samples by default). Supply three finite coordinates per vertex and three zero-based indices per
-triangle. Wheel camber is outside that phase-only footprint model. The optional reaction field
+triangle. The optional single-value camber field accepts the right-axis vertical component in [-1, 1],
+default zero. It tilts indexed tread geometry. The analytic bearing arc remains upright while
+determining load. The optional reaction field
 reports vertical and longitudinal force and resisting axle torque for the forward driven arc.
 Its reciprocal rigid binding applies the previous contact result on the same collider. A tyre provides
 independent wheel spin and lateral grip. Lower actual load and the discrete kinetic-work bound

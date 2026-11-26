@@ -5838,6 +5838,8 @@ The discrete two-lug test rotates a tread through 90°, preserves zero pressure 
 matches the independently integrated peak depth for both orientations.
 The indexed-wheel test advances a triangle tread through the physical phase field in both native
 memory modes. It checks the exact cut outside the rim, clearance 90° later and an integrated load of 80 N.
+An independent orientation case checks the exact depth of a tilted tread outside the upright rim,
+the clear bed under the opposite camber, and transmission from the true rigid steered axle.
 Rolling reactions reproduce the closed-form drag of a symmetric, shear-free wheel. At powered slip 1,
 the fixture checks axle torque and drawbar force with the analytic cohesion integrals and a derived
 quadrature error bound. Seek reproduces both reactions and the coupled bed state.

@@ -73,6 +73,7 @@ struct Patch {
     side_reaction: f64,
     lateral_slip: f64,
     side_weight: f64,
+    camber: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -476,16 +477,29 @@ fn phase_offset(angle: f64, pitch: f64) -> f64 {
     if offset < 0.0 { offset + pitch } else { offset }
 }
 
-fn rotate_tread(face: &[f64], sine: f64, cosine: f64) -> [[f64; 3]; 3] {
+#[derive(Clone, Copy)]
+struct TreadPose {
+    spin_sine: f64,
+    spin_cosine: f64,
+    tilt_sine: f64,
+    tilt_cosine: f64,
+}
+
+fn rotate_tread(face: &[f64], pose: TreadPose) -> [[f64; 3]; 3] {
     core::array::from_fn(|i| {
         let [x, y, z] = [face[3 * i], face[3 * i + 1], face[3 * i + 2]];
-        [x, cosine * y - sine * z, sine * y + cosine * z]
+        let spun_y = pose.spin_cosine * y - pose.spin_sine * z;
+        [
+            pose.tilt_cosine * x - pose.tilt_sine * spun_y,
+            pose.tilt_sine * x + pose.tilt_cosine * spun_y,
+            pose.spin_sine * y + pose.spin_cosine * z,
+        ]
     })
 }
 
 fn enclose_tread(
     mesh: &[f64],
-    spin: (f64, f64),
+    pose: TreadPose,
     hub: f64,
     across: &mut f64,
     rear: &mut f64,
@@ -493,7 +507,7 @@ fn enclose_tread(
     cap: &mut f64,
 ) {
     for face in mesh.chunks_exact(9) {
-        let vertices = rotate_tread(face, spin.0, spin.1);
+        let vertices = rotate_tread(face, pose);
         for i in 0..3 {
             let a = vertices[i];
             let b = vertices[(i + 1) % 3];
@@ -517,7 +531,7 @@ fn enclose_tread(
 
 fn raster_tread(
     mesh: &[f64],
-    spin: (f64, f64),
+    pose: TreadPose,
     hub: f64,
     across: f64,
     rear: f64,
@@ -530,7 +544,7 @@ fn raster_tread(
     let dx = 2.0 * across / (columns - 1) as f64;
     let dz = (fore - rear) / (rows - 1) as f64;
     for face in mesh.chunks_exact(9) {
-        let [a, b, c] = rotate_tread(face, spin.0, spin.1);
+        let [a, b, c] = rotate_tread(face, pose);
         if a[1].min(b[1]).min(c[1]) >= -hub {
             continue;
         }
@@ -626,18 +640,28 @@ unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingC
     let mut engaged = false;
     let have_mesh = p.mesh_triangles > 0.0;
     let mut across = p.half_width;
-    let (mesh, spin, columns, rows) = if have_mesh {
+    let (mesh, pose, columns, rows) = if have_mesh {
         let mesh = core::slice::from_raw_parts(
             (p.mesh_geometry as usize) as *const f64,
             p.mesh_triangles as usize * 9,
         );
-        let spin = (sin(p.phase), cos(p.phase));
-        enclose_tread(mesh, spin, hub, &mut across, &mut rear, &mut fore, &mut cap);
-        (mesh, spin, p.mesh_columns as usize, p.mesh_rows as usize)
+        let pose = TreadPose {
+            spin_sine: sin(p.phase),
+            spin_cosine: cos(p.phase),
+            tilt_sine: p.camber,
+            tilt_cosine: root((1.0 - p.camber) * (1.0 + p.camber)),
+        };
+        enclose_tread(mesh, pose, hub, &mut across, &mut rear, &mut fore, &mut cap);
+        (mesh, pose, p.mesh_columns as usize, p.mesh_rows as usize)
     } else {
         (
             &[][..],
-            (0.0, 1.0),
+            TreadPose {
+                spin_sine: 0.0,
+                spin_cosine: 1.0,
+                tilt_sine: 0.0,
+                tilt_cosine: 1.0,
+            },
             2,
             if phased { ROLLING_ROWS } else { 33 },
         )
@@ -703,7 +727,7 @@ unsafe fn rolling_footprint(p: &mut Patch, depth: &mut [f64]) -> Option<RollingC
     }
     if have_mesh && cap > 0.0 {
         raster_tread(
-            mesh, spin, hub, across, rear, fore, cap, columns, rows, depth,
+            mesh, pose, hub, across, rear, fore, cap, columns, rows, depth,
         );
     }
     let shift = 0.5 * (rear + fore);

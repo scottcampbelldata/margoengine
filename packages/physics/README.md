@@ -4817,6 +4817,11 @@ lowest rotating triangle at each sample and combines it with the rim profile. Se
 `rows` to resolve the narrowest groove. They default to 17 across and 65 along travel. The
 [indexed tread example](tests/coupling/terramechanics.test.js) has a two-triangle wheel segment and both phase positions.
 
+Pass the same `soilWheelCamberField()` descriptor as `wheelCamber` to both solvers to tilt the
+indexed tread with the steered wheel. Its f64 row is the vertical component of the wheel's unit
+right axis. Positive values raise that side. The default is level camber. The analytic bearing arc
+remains the load reference.
+
 Pass `wheelReaction: soilWheelReactionField()` to `Terramechanics.load` to publish one resolved
 load record per external row. `SOIL_WHEEL_REACTION_WORDS` is the number of f64 values in each
 layout-1 record: vertical force in N, drawbar force in N along the wheel's forward direction and

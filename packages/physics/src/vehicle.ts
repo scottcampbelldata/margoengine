@@ -244,6 +244,7 @@ interface WheelSetup {
   torque: number;
   groundGrip: number | null;
   sinkage: number;
+  camberSine: number;
   traction?: WheelGroundTraction;
 }
 
@@ -481,6 +482,7 @@ export class Vehicle implements PhysicsAttachment {
         torque: 0,
         groundGrip: null,
         sinkage: 0,
+        camberSine: 0,
       });
       const made = this.wheels[this.wheels.length - 1]!;
       if (made.cast !== 'ray' && made.cast !== 'shape')
@@ -618,6 +620,12 @@ export class Vehicle implements PhysicsAttachment {
       slipAngle: w.alpha,
       load: w.force,
     };
+  }
+
+  /** Vertical component of the wheel's world right-axis unit vector at its last contact. */
+  wheelCamberSine(index: number): number {
+    this.checkWheel(index);
+    return this.wheels[index]!.camberSine;
   }
 
   /** Number of f64 words needed to retain the attachment's controls, wheel spin and drivetrain. */
@@ -899,6 +907,7 @@ export class Vehicle implements PhysicsAttachment {
     for (const wheel of this.wheels) {
       const traction = wheel.traction;
       wheel.traction = undefined;
+      wheel.camberSine = 0;
       if (!wheel.contact) {
         if (wheel.tyre) {
           this.driveBrake(wheel, dt);
@@ -924,6 +933,7 @@ export class Vehicle implements PhysicsAttachment {
             )
           : wheel.axle,
         axleWorld = rotate(rotation, axle);
+      wheel.camberSine = Math.max(-1, Math.min(1, -axleWorld[1]));
       let forward = cross(normal, axleWorld);
       const flat = Math.hypot(forward[0], forward[1], forward[2]);
       if (flat < 1e-6) continue;

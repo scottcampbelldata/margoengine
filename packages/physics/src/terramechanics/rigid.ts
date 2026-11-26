@@ -43,6 +43,8 @@ export interface SoilContactRigidOptions {
   readonly id?: string;
   /** Publish live wheel spin in the same order as the soil patch records. Use soilWheelPhaseField. */
   readonly wheelPhase?: FieldDescriptor;
+  /** Publish the actual steered right axis's vertical component per wheel. Use soilWheelCamberField. */
+  readonly wheelCamber?: FieldDescriptor;
   /** Apply solved drawbar and axle reactions to wheels on the registered terrain collider. */
   readonly wheelReaction?: FieldDescriptor;
   /** Optional lateral soil force to consume along with wheelReaction. Use soilWheelSideForceField. */
@@ -94,13 +96,20 @@ function rollingSlips(
   return [scale > 0 ? (rim - travel) / scale : 0, along > 0 ? -crossing / along : 0];
 }
 
-function wheelLoads(out: Float64Array, at: number, binding: WheelSoilBinding, phases?: Float64Array): number {
+function wheelLoads(
+  out: Float64Array,
+  at: number,
+  binding: WheelSoilBinding,
+  phases?: Float64Array,
+  cambers?: Float64Array,
+): number {
   const { vehicle, patches, ground } = binding;
   const [x, z] = heading(vehicle, binding.forward);
   for (const [index, patch] of patches.entries()) {
     const wheel = vehicle.wheel(index);
     if (phases) phases[at / SOIL_PATCH_WORDS] = wheel.rotation;
     if (wheel.contactPoint && wheel.load > 0 && (!ground || ground === wheel.ground)) {
+      if (cambers) cambers[at / SOIL_PATCH_WORDS] = vehicle.wheelCamberSine(index);
       const azimuth = wheel.steering;
       const lateral = (patch.length * sin(wheel.slipAngle)) / Math.max(cos(wheel.slipAngle), Number.EPSILON);
       const fx = x * cos(azimuth) + z * sin(azimuth);
@@ -178,11 +187,13 @@ export class SoilContactRigidSolver extends RigidSolver {
   private lastTick = -1;
   private readonly terrain?: BedShape;
   private readonly phase?: FieldDescriptor;
+  private readonly camber?: FieldDescriptor;
   private readonly reaction?: FieldDescriptor;
   private readonly sideForce?: FieldDescriptor;
   private ground?: PhysicsCollider;
   private heights?: Region;
   private phases?: Region;
+  private cambers?: Region;
 
   constructor(
     readonly soilField: FieldDescriptor,
@@ -191,6 +202,7 @@ export class SoilContactRigidSolver extends RigidSolver {
     super(options.id ?? 'rigid');
     this.terrain = options.terrain && { ...options.terrain, centre: [...options.terrain.centre] };
     this.phase = options.wheelPhase && { ...options.wheelPhase };
+    this.camber = options.wheelCamber && { ...options.wheelCamber };
     this.reaction = options.wheelReaction && { ...options.wheelReaction };
     this.sideForce = options.wheelSideForce && { ...options.wheelSideForce };
     if (this.sideForce && !this.reaction)
@@ -205,6 +217,7 @@ export class SoilContactRigidSolver extends RigidSolver {
         ...base.fields,
         { field: this.soilField, access: 'write' as const },
         ...(this.phase ? [{ field: this.phase, access: 'write' as const }] : []),
+        ...(this.camber ? [{ field: this.camber, access: 'write' as const }] : []),
         ...(this.reaction ? [{ field: this.reaction, access: 'read' as const }] : []),
         ...(this.sideForce ? [{ field: this.sideForce, access: 'read' as const }] : []),
         ...(this.terrain ? [{ field: BED_FIELD, access: 'read' as const }] : []),
@@ -252,6 +265,7 @@ export class SoilContactRigidSolver extends RigidSolver {
     this.memory = host.memory;
     this.patches = host.allocate('rigid-soil-patches', rows * SOIL_PATCH_WORDS * 8, 'f64', SOIL_LAYOUT);
     if (this.phase) this.phases = host.allocate('rigid-soil-wheel-phase', rows * 8, 'f64', SOIL_LAYOUT);
+    if (this.camber) this.cambers = host.allocate('rigid-soil-wheel-camber', rows * 8, 'f64', SOIL_LAYOUT);
     this.motion = host.allocate(
       'rigid-soil-motion',
       8 * (1 + this.vehicles.reduce((n, v) => n + v.motionStateWords, 0)),
@@ -374,11 +388,13 @@ export class SoilContactRigidSolver extends RigidSolver {
     const out = regionWords(this.memory, this.patches) as Float64Array;
     out.fill(0);
     const phases = this.phases ? (regionWords(this.memory, this.phases) as Float64Array) : undefined;
+    const cambers = this.cambers ? (regionWords(this.memory, this.cambers) as Float64Array) : undefined;
     phases?.fill(0);
+    cambers?.fill(0);
     let at = 0;
     for (const binding of this.wheels)
       at = binding.vehicle.valid
-        ? wheelLoads(out, at, binding, phases)
+        ? wheelLoads(out, at, binding, phases, cambers)
         : at + binding.patches.length * SOIL_PATCH_WORDS;
     for (const binding of this.tracks)
       at = binding.vehicle.valid ? trackLoads(out, at, binding) : at + binding.patches.length * SOIL_PATCH_WORDS;
@@ -391,6 +407,9 @@ export class SoilContactRigidSolver extends RigidSolver {
       ...super.exportPorts(tick),
       { field: this.soilField.name, region: this.patches, tick, cell: this.cell },
       ...(this.phase && this.phases ? [{ field: this.phase.name, region: this.phases, tick, cell: this.cell }] : []),
+      ...(this.camber && this.cambers
+        ? [{ field: this.camber.name, region: this.cambers, tick, cell: this.cell }]
+        : []),
     ];
   }
 
@@ -401,6 +420,7 @@ export class SoilContactRigidSolver extends RigidSolver {
       this.motion,
       ...(this.heights ? [this.heights] : []),
       ...(this.phases ? [this.phases] : []),
+      ...(this.cambers ? [this.cambers] : []),
     ];
   }
 }

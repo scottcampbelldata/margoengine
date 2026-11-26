@@ -7,6 +7,7 @@ import { LeggedLocomotion } from '@margoengine/physics/legged';
 import {
   SoilContactRigidSolver,
   soilPatchField,
+  soilWheelCamberField,
   soilWheelPhaseField,
   soilWheelReactionField,
   soilWheelSideForceField,
@@ -599,13 +600,14 @@ test('live spin phase cuts with a discrete grouser and repeats at one tooth pitc
   const terrain = { columns: 100, rows: 100, width: 0.2, depth: 0.2, centre: [0, 0] };
   const input = soilPatchField('grouser-load');
   const wheelPhase = soilWheelPhaseField('grouser-phase');
+  const wheelCamber = soilWheelCamberField('grouser-camber');
   const radius = 0.15735;
   const lugHeight = 0.01;
   const lugCount = 4;
   const wheel = { radius, lugHeight, lugCount, lugWidth: 0.008 };
   const material = { cohesiveModulus: 0, frictionalModulus: 2_407_400, exponent: 0.84, compaction: 1 };
-  async function stamp(angle, shared, geometry = wheel) {
-    let load, phase;
+  async function stamp(angle, shared, geometry = wheel, tilt = 0) {
+    let load, phase, camber;
     const bench = {
       describe: () => ({
         id: 'grouser-rig',
@@ -614,24 +616,28 @@ test('live spin phase cuts with a discrete grouser and repeats at one tooth pitc
         fields: [
           { field: input, access: 'write' },
           { field: wheelPhase, access: 'write' },
+          { field: wheelCamber, access: 'write' },
         ],
       }),
       init(host) {
         load = host.allocate('grouser-load', 80, 'f64', 1);
         phase = host.allocate('grouser-phase', 8, 'f64', 1);
+        camber = host.allocate('grouser-camber', 8, 'f64', 1);
         regionWords(host.memory, load).set([0, 0, 0, 1, 0.12, 0.08, 80, 0, 0, 0]);
         regionWords(host.memory, phase)[0] = angle;
+        regionWords(host.memory, camber)[0] = tilt;
       },
       step() {},
       exportPorts: (tick) => [
         { field: input.name, region: load, tick, cell: [0, 0, 0] },
         { field: wheelPhase.name, region: phase, tick, cell: [0, 0, 0] },
+        { field: wheelCamber.name, region: camber, tick, cell: [0, 0, 0] },
       ],
       importPorts() {},
-      stateRegions: () => [load, phase],
+      stateRegions: () => [load, phase, camber],
       extraState: () => [],
     };
-    const soil = await Terramechanics.load({ tier: 'resolved', input, wheelPhase });
+    const soil = await Terramechanics.load({ tier: 'resolved', input, wheelPhase, wheelCamber });
     const bed = new TerrainBed();
     const world = new PhysicsWorld({ rate, memory: worldMemory(shared) })
       .add(bed, { ...terrain, elevations: () => 0 })
@@ -676,6 +682,24 @@ test('live spin phase cuts with a discrete grouser and repeats at one tooth pitc
     assert.equal(sideways.elevations[atTread], 0);
     assert.equal(down.rim, sideways.rim);
     assert.deepEqual(down.elevations, repeat.elevations);
+  });
+
+  await t.test('camber moves the indexed contact to its exact angled plane', async () => {
+    const y = -(radius + lugHeight);
+    const treadMesh = {
+      positions: [0.03, y, -0.008, 0.09, y, -0.008, 0.09, y, 0.008, 0.03, y, 0.008],
+      indices: [0, 1, 2, 0, 2, 3],
+      columns: 129,
+    };
+    const geometry = { radius, lugHeight, treadMesh };
+    const lowered = await stamp(0, true, geometry, -0.6);
+    const raised = await stamp(0, false, geometry, 0.6);
+    const x = -0.06;
+    const authoredX = (x - 0.6 * y) / 0.8;
+    const rotatedHeight = -0.6 * authoredX + 0.8 * y;
+    const atTread = 20 * 101 + 50;
+    close(-lowered.elevations[atTread], lowered.rim - radius - rotatedHeight, 1024 * eps);
+    assert.equal(raised.elevations[atTread], 0);
   });
 });
 
@@ -739,8 +763,9 @@ async function coupledVehicles(tier) {
   const terrain = { columns: 28, rows: 40, width: 4.2, depth: 6, centre: [0, 1] };
   const contact = soilPatchField();
   const wheelPhase = tier === 'resolved' ? soilWheelPhaseField() : undefined;
-  const soil = await Terramechanics.load({ input: contact, tier, wheelPhase });
-  const rigid = new SoilContactRigidSolver(contact, { terrain, wheelPhase });
+  const wheelCamber = tier === 'resolved' ? soilWheelCamberField() : undefined;
+  const soil = await Terramechanics.load({ input: contact, tier, wheelPhase, wheelCamber });
+  const rigid = new SoilContactRigidSolver(contact, { terrain, wheelPhase, wheelCamber });
   const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
   const bed = new TerrainBed();
   world.add(bed, { ...terrain, elevations: () => 0 });
@@ -760,6 +785,7 @@ async function coupledVehicles(tier) {
       suspensionRestLength: 0.31,
       suspensionStiffness: 25,
       width: wheelShape.width,
+      axle: tier === 'resolved' ? [-0.8, -0.6, 0] : undefined,
     })),
   );
   using vehicle = new Vehicle(physics, chassisAt(-0.95), {
@@ -819,6 +845,9 @@ async function coupledVehicles(tier) {
   if (wheelPhase) {
     const phases = regionWords(world.memory, world.fields.port(wheelPhase.name).region);
     assert.equal(phases[0], vehicle.wheel(0).rotation);
+    const cambers = regionWords(world.memory, world.fields.port(wheelCamber.name).region);
+    assert.equal(cambers[0], vehicle.wheelCamberSine(0));
+    assert.ok(cambers[0] > 0.5);
   }
   const mark = world.takeSnapshot();
   world.advance(24);

@@ -16873,8 +16873,9 @@ exchange of changing subsurface properties still needs a shared soil contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
 sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
-It stamps evenly spaced lugs and indexed triangle treads from live wheel spin, with wheel tilt still
-open. The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
+It stamps evenly spaced lugs from spin and indexed triangle treads from both live spin and camber.
+The resolved rolling arc exchanges drawbar and axle reactions with the live powered wheel.
+Measured cross-slope camber forces remain open.
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live

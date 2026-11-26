@@ -299,6 +299,16 @@ bearing plane. The test places a tread outside the rim width and checks its exac
 the unloaded opposite side and quarter-turn clearance in both native memory modes.
 [Krenn and Hirzinger](https://elib.dlr.de/60535/1/elib_ISTVS2009_KrennHirzinger.pdf).
 
+R. Matsumura and G. Ishigami, “Visualization and analysis of wheel camber angle effect for
+slope traversability using an in-wheel camera” (2021), measure unequal sinkage across a tilted
+wheel. The indexed geometry now rotates about the axle by its live spin and about the travel
+axis by its signed camber. The rigid field publishes the vertical component of the true steered
+right axis. An independent plane fixture tilts an off-centre tread through both directions and
+solves its height at a bed vertex outside the upright rim. The analytic bearing arc remains the
+load reference, and measured slope-dependent soil failure stays separate from this projection.
+[Matsumura and Ishigami](https://doi.org/10.1016/j.jterra.2020.09.002),
+[Keio Space Robotics Lab](https://www.srg.mech.keio.ac.jp/research/matsumura2021visualization/).
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”

@@ -10581,6 +10581,9 @@ the steady rim bearing envelope with the live projected lug tips before normaliz
 An indexed tread can extend beyond the rim. The native kernel intersects its rotated triangles with
 the local bearing plane and takes the lowest triangle at each occupied profile sample. Geometry lives
 in snapshot regions. The profile is temporary arena storage rebuilt each step.
+The camber field supplies the actual right-axis vertical component from the rigid step.
+The indexed mesh combines that tilt with its spin before intersection. It still shares the
+same force-normalized bearing footprint.
 The opt-in wheel reaction port adds one snapshot record per external row. The native kernel
 integrates net drawbar and axle torque once after finding the loaded arc. The root finder still
 integrates only the vertical force required for its bracket. Unloaded rows are cleared before export.
