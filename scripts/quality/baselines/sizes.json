@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20158390,
+  "total": 20164173,
   "history": [
     {
       "date": "2026-10-24",
@@ -12867,6 +12867,12 @@
       "commit": "014c8749d",
       "reason": "physics/ship is a new optional entry (SEA-09): ShipSolver (MMG manoeuvring on rigid bodies, squat as a drawn-down sea, bow thruster, quay suction, wake sources and the race's boil), Manoeuvring, Propeller with four quadrants and its race field, Holtrop and Mennen resistance and squat laws; 11,202 B gzip, its own entry so scenes without ships pay nothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "498747b468",
+      "grew": 2,
+      "reason": "ATMO-08 entry sizes, previous record to current: @margoengine/physics/drainage-fog 0→4666 B (ceiling 0→4922 B); @margoengine/environment/fog-volumes 1382→2243 B (ceiling 1638→2499 B). The drainage-fog entry integrates the registry and lazily loads the arena solver. The live renderer samples resolved optical columns using one storage binding and shares the existing volumetric pipeline. An additional entry would add a module for the same environment medium interface."
     }
   ],
   "items": {
@@ -13202,7 +13208,7 @@
     "@margoengine/environment/exr-codecs": 1699,
     "@margoengine/environment/exr-tiled": 8421,
     "@margoengine/environment/exr-write": 2084,
-    "@margoengine/environment/fog-volumes": 1638,
+    "@margoengine/environment/fog-volumes": 2499,
     "@margoengine/environment/gi": 19000,
     "@margoengine/environment/ground": 5064,
     "@margoengine/environment/lightformer": 3402,
@@ -13682,6 +13688,7 @@
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
@@ -13708,6 +13715,7 @@
     "@margoengine/physics/sea": 8001,
     "@margoengine/physics/seakeeping": 16953,
     "@margoengine/physics/sediment": 5512,
+    "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
     "@margoengine/physics/soft": 111864,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 34593,
@@ -14761,7 +14769,6 @@
     "margoengine": 308,
     "margoengine/game": 946,
     "margoengine/viz": 800,
-    "margoengine/web": 577,
-    "@margoengine/physics/ship": 11538
+    "margoengine/web": 577
   }
 }

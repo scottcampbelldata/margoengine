@@ -11,6 +11,24 @@ export interface FogBox extends FogVolumeSettings {
     max: Vec3;
 }
 
+export interface FogColumnSource {
+    readonly width: number;
+    readonly depth: number;
+    readonly spacing: readonly [number, number];
+    readonly origin: readonly [number, number];
+    readonly revision: number;
+    writeColumnData(target: Float32Array): void;
+}
+
+export class FogGrid implements VolumetricMediumSource {
+    readonly source: FogColumnSource;
+    constructor(source: FogColumnSource, color?: Vec3);
+    medium(group: number): string;
+    bindings(device: GPUDevice): GPUBindGroupEntry[];
+    dispose(): void;
+    [Symbol.dispose]: () => void;
+}
+
 export interface FogSphere extends FogVolumeSettings {
     shape: 'sphere';
     center: Vec3;
