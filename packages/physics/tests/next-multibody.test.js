@@ -424,3 +424,38 @@ test('a slider has the mass matrix and the torques of its closed forms', async (
   near(j[0][0], 1, 1e-9, 'one metre a metre');
   near(j[3][0], 0, 1e-9, 'with no spin');
 });
+
+test('two branches under a fixed root are one island, and swing as mirror images of each other', async () => {
+  // Under a root that does not move, the joints unite nothing across the root, so each branch was an island of its own and
+  // each island's substeps walked the whole tree: one island projected and placed the other's links. The tree is one island
+  // now. Two pendulums started as mirror images swing as mirror images (one link each: a chain of more is chaotic, and its
+  // rounding is not mirrored).
+  await Physics.load();
+  const physics = new Physics(null);
+  const root = physics.addBody(null, { type: 'fixed', colliders: [] });
+  const arm = (side) => {
+    const links = [];
+    let parent = root;
+    for (let i = 1; i <= 1; i++) {
+      const body = physics.addBody(null, { position: [side * i, 0, 0], colliders: bob(0.05, 1) });
+      links.push({ body, parent, joint: { type: 'revolute', axis: [0, 0, 1], anchorB: [-side, 0, 0] } });
+      parent = body;
+    }
+    return links;
+  };
+  const left = arm(-1),
+    right = arm(1);
+  physics.addMultibody(root, [...left, ...right]);
+  physics.step();
+  assert.equal(physics.kernel.counts.islands, 1, 'one island for the tree');
+  let worst = 0;
+  for (let i = 0; i < 240; i++) {
+    physics.step();
+    for (let k = 0; k < 1; k++) {
+      const [l, r] = [left[k].body.position, right[k].body.position];
+      worst = Math.max(worst, Math.abs(l[0] + r[0]), Math.abs(l[1] - r[1]));
+    }
+  }
+  assert.ok(worst < 1e-4, `the arms drifted ${worst} m from mirror images`);
+  physics.dispose();
+});

@@ -180,8 +180,8 @@ impl World {
 
     /// Calls `each` once with the root of every multibody that has a body awake.
     fn mb_roots(&mut self, mut each: impl FnMut(&mut World, usize)) {
-        let call = self.header().mb_calls.wrapping_add(1);
-        self.header_mut().mb_calls = call;
+        let call = self.window.mb_call.wrapping_add(1);
+        self.window.mb_call = call;
         let (list, from, to) = self.window.bodies;
         for slot in from..to {
             let at = self.uu(list, slot) as usize;
@@ -194,6 +194,40 @@ impl World {
             }
             self.set_u(MB_STAMP, root, call);
             each(self, root);
+        }
+    }
+
+    /// Puts every awake link of a multibody whose root does not move into one island. A tree with a moving root is one island
+    /// already, its joints uniting each link with its parent; under a fixed or kinematic root the joints unite nothing across
+    /// the root, so each branch was an island of its own, and each island's walks (`mb_roots`) reached the root and then every
+    /// branch: one island's substeps projected and placed another's links. Branches under a root that does not move do not
+    /// move each other, so one island for the tree changes no physics, and each tree is walked by the island that holds it.
+    pub fn unite_multibodies(&mut self) {
+        let stamp = self.header().mb_calls.wrapping_add(1);
+        self.header_mut().mb_calls = stamp;
+        for i in 0..self.header().awake as usize {
+            let body = self.uu(AWAKE, i) as usize;
+            if self.uu(MB_ROLE, body) == 0 || self.flags(body) & KIND != DYNAMIC {
+                continue;
+            }
+            let root = self.uu(MB_ROOT, body) as usize;
+            if (self.flags(root) & KIND == DYNAMIC && self.is_awake(root)) || self.uu(MB_STAMP, root) == stamp {
+                continue;
+            }
+            self.set_u(MB_STAMP, root, stamp);
+            let (mut first, mut at, mut guard) = (NONE, self.uu(MB_NEXT, root), 0u32);
+            while at != NONE && guard <= self.header().rows {
+                let link = at as usize;
+                if self.flags(link) & KIND == DYNAMIC && self.is_awake(link) {
+                    if first == NONE {
+                        first = at;
+                    } else {
+                        self.unite(first, at);
+                    }
+                }
+                at = self.uu(MB_NEXT, link);
+                guard += 1;
+            }
         }
     }
 

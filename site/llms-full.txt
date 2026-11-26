@@ -12338,6 +12338,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: the branches of a multibody under a fixed root were islands that walked each other's links (KB-PHYS-MBISLAND1, physics kernel)
+
+- **Repro:** `packages/physics/tests/next-multibody.test.js`, "two branches under a fixed root are one island, and swing as
+  mirror images of each other": two pendulums hung from one fixed root by one `addMultibody` tree.
+- **Cause:** joints unite only moving bodies into an island, so under a fixed or kinematic root each branch was an island of
+  its own. Each island's substeps walk every multibody tree they reach (`mb_roots`), from the root through every link, so one
+  island projected and placed the other branch's links in its own substeps. Solved one island at a time this re-did work on
+  links already consistent; solved at once on threads it would write another island's bodies.
+- **Fix:** the moving links of a multibody whose root does not move are one island (`unite_multibodies`). Branches under a
+  root that does not move do not move each other, so the physics is unchanged: the replay scenes' state hashes are the same.
+- **Regression:** the test above (two islands before).
+
 ### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
 
 - **Repro:** `packages/voxel/tests/debris.test.js`, "with physics a piece is a dynamic body of its cells mass that falls onto

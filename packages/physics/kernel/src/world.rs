@@ -165,6 +165,12 @@ pub struct Window {
     pub kin: Option<u32>,
     /// The substeps this solve's step is cut into (an island's own count, `World::island_level`); 0 for the world's setting.
     pub substeps: u32,
+    /// Strikes this substep has found so far (see `normal_rows`), listed in `IMPACTS` from `pairs.0 * MANIFOLD`: each window
+    /// lists its own in its own run of the column, so islands solved at once never share a list.
+    pub impacts: usize,
+    /// The last stamp this window's multibody walks left (`mb_roots`). A window claims its stamps from the header's count when it
+    /// is set up (`claim_stamps`), two a substep, so windows solved at once never share one.
+    pub mb_call: u32,
 }
 
 pub struct World {
@@ -898,9 +904,16 @@ impl World {
     }
 
     /// The window on every list the step solves: all the awake bodies, every listed pair, joint and coupling.
+    /// Gives the current window the multibody stamps its `substeps` substeps take, two a substep, from the header's count.
+    pub fn claim_stamps(&mut self, substeps: u32) {
+        let first = self.header().mb_calls;
+        self.window.mb_call = first;
+        self.header_mut().mb_calls = first.wrapping_add(substeps.wrapping_mul(2));
+    }
+
     pub fn whole_window(&self) -> Window {
         let h = self.header();
-        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None, substeps: 0 }
+        Window { bodies: (AWAKE, 0, h.awake as usize), pairs: (0, h.solving as usize), joints: (0, h.joint_solving as usize), couplings: (0, h.coupling_rows as usize), kin: None, substeps: 0, impacts: 0, mb_call: 0 }
     }
 
     /// FNV-1a over the world's state, the replay proof's fingerprint: the header's scalars and every column but those of `SCRATCH`, which
