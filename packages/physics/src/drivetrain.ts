@@ -131,7 +131,9 @@ export class Drivetrain {
       this.curve.length < 1 ||
       this.curve.some((p, i) => !(p[0] >= 0 && Number.isFinite(p[1])) || (i > 0 && !(p[0] > this.curve[i - 1]![0])))
     )
-      throw new RangeError('A torque curve is points [rpm, N m] with the rpm rising; pass them sorted by rpm, such as [[1000, 120], [4000, 200]].');
+      throw new RangeError(
+        'A torque curve is points [rpm, N m] with the rpm rising; pass them sorted by rpm, such as [[1000, 120], [4000, 200]].',
+      );
     const peak = Math.max(...this.curve.map((p) => p[1]));
     this.options = {
       axles: options.axles,
@@ -163,7 +165,9 @@ export class Drivetrain {
         throw new RangeError(`Drivetrain ${name} must be a finite number above 0; got ${value}.`);
     if (!(o.redlineRpm > o.idleRpm)) throw new RangeError('Drivetrain redlineRpm must be above idleRpm.');
     if (!Array.isArray(o.gears) || o.gears.length < 1 || o.gears.some((g) => !(g > 0 && Number.isFinite(g))))
-      throw new RangeError('Drivetrain gears are ratios above 0, first gear first; pass them as [3.5, 2.1, 1.4, 1.0], for example.');
+      throw new RangeError(
+        'Drivetrain gears are ratios above 0, first gear first; pass them as [3.5, 2.1, 1.4, 1.0], for example.',
+      );
     if (!(o.efficiency > 0 && o.efficiency <= 1))
       throw new RangeError('Drivetrain efficiency must be above 0 and at most 1.');
     if (!(o.shiftTime >= 0)) throw new RangeError('Drivetrain shiftTime must be 0 or more seconds.');

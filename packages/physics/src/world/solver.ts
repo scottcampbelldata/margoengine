@@ -80,6 +80,11 @@ export interface FieldDescriptor {
 export interface FieldUse {
   readonly field: FieldDescriptor;
   readonly access: FieldAccess;
+  /**
+   * A `read` the solver does without when no solver writes the field (default false): the world then runs it with no port
+   * for the field in its step's inputs, where a field nobody writes is otherwise refused.
+   */
+  readonly optional?: boolean;
 }
 
 /**

@@ -26,9 +26,9 @@ const field = (name, quantity = 'position', unit = 'm') => ({
  * A damped spring stepped by semi-implicit Euler at its own rate, with a little noise from its random stream: its state
  * depends on every step it takes. It publishes its position as `<id>-x` and can read another's, which it is pulled toward.
  */
-function spring(id, rate, { reads, log, stable = () => 0, x = 1 } = {}) {
+function spring(id, rate, { reads, optional = false, log, stable = () => 0, x = 1 } = {}) {
   const fields = [{ field: field(`${id}-x`), access: 'write' }];
-  if (reads) fields.push({ field: field(`${reads}-x`), access: 'read' });
+  if (reads) fields.push({ field: field(`${reads}-x`), access: 'read', optional });
   const s = {
     describe: () => ({ id, rate, fields, stableRate: () => stable(s) }),
     init(host) {
@@ -44,7 +44,9 @@ function spring(id, rate, { reads, log, stable = () => 0, x = 1 } = {}) {
     step(context, dt) {
       const random = new RandomStream(context.seed, solverNumber(id)),
         w = s.words(),
-        target = reads ? regionWords(s.host.memory, context.inputs.get(`${reads}-x`).region)[0] : 0;
+        port = reads ? context.inputs.get(`${reads}-x`) : undefined,
+        target = port ? regionWords(s.host.memory, port.region)[0] : 0;
+      s.saw = port !== undefined;
       w[1] += (-40 * (w[0] - target) - 0.5 * w[1]) * dt + (random.uniform(context.tick, 0) - 0.5) * 1e-3;
       w[0] += w[1] * dt;
       w[2]++;
@@ -291,4 +293,35 @@ test('alpha is where a frame lies between steps of a level, exactly', () => {
   assert.equal(world.alpha(7), 0);
   world.clock.at(0, { num: 1, den: 4 });
   assert.equal(world.alpha(0), 80 / 128);
+});
+
+test('an optional read runs without a writer, and takes the port once one comes', () => {
+  // A field read optionally (FieldUse.optional) and written by nobody is no refusal: the reader steps with no port for it.
+  // A writer added later is read as any other's.
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }),
+    reader = spring('reader', 0, { reads: 'later', optional: true });
+  world.add(reader, {});
+  world.advance(2);
+  assert.equal(reader.saw, false, 'no port while nobody writes it');
+  const saved = world.takeSnapshot();
+  world.add(spring('later', 0, { x: 3 }), {});
+  world.advance(4);
+  assert.equal(reader.saw, true, 'the port once its writer comes');
+  // A snapshot from before the writer came, restored into a world of the reader alone, goes on to the same bits when the
+  // writer joins at the same place.
+  const again = new PhysicsWorld({ rate: { num: 60, den: 1 } }),
+    second = spring('reader', 0, { reads: 'later', optional: true });
+  again.add(second, {});
+  again.restoreSnapshot(saved.bytes);
+  assert.equal(second.saw, undefined, 'restored, not stepped');
+  again.add(spring('later', 0, { x: 3 }), {});
+  again.advance(4);
+  assert.equal(second.saw, true);
+  assert.equal(again.hash(), world.hash(), 'the same bits as the run that never stopped');
+  // A read that is not optional is still refused.
+  const strict = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(spring('strict', 0, { reads: 'none' }), {});
+  assert.throws(
+    () => strict.advance(1),
+    (e) => e.code === 'state' && /No solver writes field "none-x"/.test(e.message),
+  );
 });

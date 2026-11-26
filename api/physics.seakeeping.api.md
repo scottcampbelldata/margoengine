@@ -5,6 +5,16 @@
 ```ts
 import { SeaSurface } from "@margoengine/math/fields";
 
+export interface Deck {
+    readonly nx: number;
+    readonly nz: number;
+    readonly x0: number;
+    readonly z0: number;
+    readonly dx: number;
+    readonly dz: number;
+    readonly height: Float64Array;
+}
+
 export const FRICTION: number;
 
 export const GRAVITY = 9.81;
@@ -51,6 +61,8 @@ export interface HullParams {
     readonly memory?: number;
     readonly diffraction?: boolean;
     readonly drift?: boolean;
+    readonly greenWater?: boolean;
+    readonly deckCells?: readonly [number, number];
     readonly rollDamping?: boolean;
     readonly viscosity?: number;
 }
@@ -146,6 +158,11 @@ export interface WettedLoads {
 
 export function addedMassInfinite(sections: readonly Section[], centre: readonly [number, number, number], density: number): Float64Array;
 
+export function deckOf(mesh: {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+}, waterline: number, nx?: number, nz?: number): Deck;
+
 export function eddyRollCoefficient(form: LewisForm, breadth: number, draft: number, pivot: number): number;
 
 export function frictionGirth(form: LewisForm, pivot: number, points?: number): number;
@@ -174,6 +191,8 @@ export function scatterSection(form: LewisForm, omega: number, pivot: number, mo
     readonly sway?: readonly [number, number];
     readonly roll?: readonly [number, number];
 }, gravity?: number, terms?: number, points?: number, density?: number): Scattering;
+
+export function stepDeck(deck: Deck, water: Float64Array, gravity: readonly [number, number, number], outside: (x: number, z: number, deckHeight: number) => readonly [number, number, number], dt: number, inflow?: number[]): number;
 
 export function stillWaterline(mesh: HullMesh, mass: number, density: number): number;
 
@@ -223,6 +242,7 @@ type FieldKind = 'uniformGrid' | 'sparseGrid' | 'heightfield' | 'particleSet' | 
 interface FieldUse {
     readonly field: FieldDescriptor;
     readonly access: FieldAccess;
+    readonly optional?: boolean;
 }
 
 interface Port {
