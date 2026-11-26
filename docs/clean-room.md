@@ -14394,3 +14394,40 @@ Research compared:
   one gain so hue is kept. The 7-stop width makes the tone map monotone: the weights' slope is at most 1.5 / 7 per stop
   and neighbouring controls differ by at most 4 stops, 6 / 7 < 1 (`tests/enhance.test.js` walks every extreme setting).
   The channel mixer is a 3x3 matrix.
+
+## Mesh data debug view: optional MeshDebugView (2026-11-26)
+
+`@margoengine/inspector/mesh-debug`. The list of views and settings (wireframe, vertex dots, both, checkers on UV sets
+0 and 1, vertex colours, material colours, a multiply switch, camera-lit shading colours, sizes and colours, a
+replaceable material palette with a reset) follows common mesh
+inspection views; no other library's source was read. Names, defaults
+and behaviour are Margo's: lines and dots keep their own colour over the picture, `multiply` defaults by mode, and the
+mesh is never rewritten to unshared vertices.
+
+Research compared:
+- J. A. Bærentzen, S. Munk-Lund, M. Gjøl and B. D. Larsen, *Two Methods for Antialiased Wireframe Drawing with Hidden
+  Line Removal*, Spring Conference on Computer Graphics, 2008,
+  https://orbit.dtu.dk/en/publications/two-methods-for-antialiased-wireframe-drawing-with-hidden-line-re/ (abstract
+  read). Used: the single-pass idea of an edge distance interpolated across the triangle, here a barycentric coordinate
+  over the length of its screen gradient, so no distance is projected per triangle. Silhouette edges show half their
+  width.
+- NVIDIA, *Solid Wireframe*, Direct3D 10 SDK white paper, 2007,
+  https://developer.download.nvidia.com/whitepapers/2007/SDK10/SolidWireframe.pdf (not read beyond its subject). Not
+  used: it works in a geometry shader, which WebGPU lacks.
+- W. Celes and F. R. Abraham, *Fast and versatile texture-based wireframe rendering*, The Visual Computer 27(10), 2011,
+  https://doi.org/10.1007/s00371-011-0623-6 (abstract read). Not used: it carries edges in textures, which would take
+  texture coordinates the view is there to show.
+- A. Norton, A. P. Rockwood and P. T. Skolmoski, *Clamping: A Method of Antialiasing Textured Surfaces by Bandwidth
+  Limiting in Object Space*, SIGGRAPH 1982, https://doi.org/10.1145/800064.801252 (abstract read). Used: the idea of
+  replacing detail finer than the pixel by its local average; the checker is the product of each axis' square wave
+  averaged over the pixel footprint, whose integral (a triangle wave) is elementary.
+- J. F. Blinn, *Models of Light Reflection for Computer Synthesized Pictures*, SIGGRAPH 1977,
+  https://doi.org/10.1145/563858.563893. Used: the half-vector highlight, with the light at the eye.
+- S. Świerczkowski, *On successive settings of an arc on the circumference of a circle*, Fundamenta Mathematicae 46,
+  1958, https://doi.org/10.4064/fm-46-2-187-189 (the three-distance theorem). Used: golden-ratio hue steps for material
+  colours. The saturation 0.7 and the two alternating values are Margo's.
+
+Vertex pulling by `vertex_index` from storage buffers follows the WebGPU and WGSL specifications
+(https://www.w3.org/TR/webgpu/, https://www.w3.org/TR/WGSL/).
+
+Size: new entry, absent to 6,877 B min+gzip, ceiling 7,133 B. No other entry grows; core and stage unchanged.
