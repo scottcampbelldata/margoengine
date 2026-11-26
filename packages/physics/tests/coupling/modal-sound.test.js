@@ -290,7 +290,8 @@ test('ModalContactRigidSolver separates relative slip from a rolling point with 
 test('ModalContactRigidSolver sounds a real joint rupture once and replays before and after the break', async () => {
   await Physics.load();
   const sound = await ModalSoundSolver.load({ inputs: 'both' });
-  const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+  const world = new PhysicsWorld({ rate: FPS, memory: worldMemory(false) });
+  const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
   const anchor = physics.addBody(null, { type: 'fixed' });
   const weight = physics.addBody(null, {
     position: [0, -2, 0],
@@ -300,9 +301,7 @@ test('ModalContactRigidSolver sounds a real joint rupture once and replays befor
   const rigid = new ModalContactRigidSolver(sound, {
     jointBreaks: [{ joint, track: 0, energy: 0.25, effectiveMass: 0.5 }],
   });
-  const world = new PhysicsWorld({ rate: FPS })
-    .add(rigid, { physics, emitters: [weight] })
-    .add(sound, { tracks: oneMode });
+  world.add(rigid, { physics, emitters: [weight] }).add(sound, { tracks: oneMode });
   const start = world.takeSnapshot();
   let onset;
   let atBreak;

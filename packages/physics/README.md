@@ -2953,14 +2953,16 @@ calculated change one tick before it becomes terrain. Use the bed for the curren
 Use @margoengine/physics/modal-sound with a PhysicsWorld to turn collision, scrape, roll and fracture
 loads into mono audio tracks. A material supplies resonant frequencies, damping rates and gains.
 The example records one second at 24 frames per second and plays it through Web Audio's offline renderer.
+It uses plain world memory, the rigid module's current arena format.
 
 ```ts
 import { Physics } from '@margoengine/physics';
 import { ModalContactRigidSolver, ModalSoundSolver } from '@margoengine/physics/modal-sound';
-import { PhysicsWorld } from '@margoengine/physics/world';
+import { PhysicsWorld, worldMemory } from '@margoengine/physics/world';
 
 await Physics.load();
-const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const world = new PhysicsWorld({ rate: { num: 24, den: 1 }, memory: worldMemory(false) });
+const physics = new Physics(null, { fixedTimestep: 1 / 60, arena: world.arena });
 physics.addBody(null, {
   type: 'fixed',
   position: [0, -0.1, 0],
@@ -2971,7 +2973,6 @@ const bell = physics.addBody(null, {
   colliders: { shape: 'sphere', radius: 0.25, mass: 0.6 },
 });
 const sound = await ModalSoundSolver.load();
-const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
 world.add(new ModalContactRigidSolver(sound), { physics, emitters: [bell] });
 world.add(sound, { tracks: [{ material: 'bell' }] });
 
