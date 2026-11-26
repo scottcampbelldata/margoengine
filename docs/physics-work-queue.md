@@ -303,7 +303,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-10 | Damage, flooding, capsize, sinking | none | Claude | CLAIMED |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Claude | CLAIMED |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | CLAIMED |
-| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | CLAIMED |
+| SEA-13 | Whitewater, foam, bubbles, spray generation | stand-in | Claude | LANDED e9007d3bb |
 | SEA-14 | Water entry and exit | stand-in | Claude | CLAIMED |
 | SEA-15 | Tracers and slicks in water | stand-in | Claude | LANDED ccbc86285 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | none | Claude | CLAIMED |
