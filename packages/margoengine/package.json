@@ -643,6 +643,10 @@
       "types": "./dist/cameras/stereo.d.ts",
       "import": "./dist/cameras/stereo.js"
     },
+    "./cameras/hologram": {
+      "types": "./dist/cameras/hologram.d.ts",
+      "import": "./dist/cameras/hologram.js"
+    },
     "./cinematic": {
       "types": "./dist/cinematic.d.ts",
       "import": "./dist/cinematic.js"

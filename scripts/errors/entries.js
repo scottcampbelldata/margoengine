@@ -29,6 +29,26 @@ export const entries = [
     fix: 'Pass a `Skeleton` from `@margoengine/animation` (or an object with names, parents, getPose and setPose), map its bone names with `bones` (for example `humanoidBones(skeleton.names, detectSkeleton(skeleton.names).preset)` from `@margoengine/rigging/retarget`), calibrate on a frame where the person stands in the rest pose in view, and create a new BodyDriver after dispose.',
   },
   {
+    id: 'camera-hologram',
+    title: '@margoengine/cameras/hologram: four-view pyramid display',
+    kind: 'family',
+    messages: [
+      'Hologram source camera looks along its up axis; tilt it or change camera.up; see https://margoengine.com/errors#camera-hologram',
+      'Invalid hologram distance; pass a finite distance > 0; see https://margoengine.com/errors#camera-hologram',
+      'Unknown hologram side <name>; use front, back, left or right; see https://margoengine.com/errors#camera-hologram',
+      'Invalid hologram view orientation; use rotation 0, 90, 180 or 270 and boolean mirror; see https://margoengine.com/errors#camera-hologram',
+      'Hologram output is disposed; create another HologramOutput; see https://margoengine.com/errors#camera-hologram',
+      'Invalid hologram delta; pass finite seconds >= 0; see https://margoengine.com/errors#camera-hologram',
+      'Invalid hologram gap; pass a fraction in [0, 1); see https://margoengine.com/errors#camera-hologram',
+      'Invalid hologram background; pass #rgb, #rrggbb or false; see https://margoengine.com/errors#camera-hologram',
+      'Hologram output needs WebGPU or the WebGL2 compatibility layer; see https://margoengine.com/errors#camera-hologram',
+      'Hologram output needs the engine canvas context; create a WebGPU engine first; see https://margoengine.com/errors#camera-hologram',
+    ],
+    cause:
+      'HologramRig or HologramOutput was given a source camera that looks straight along its up axis, a distance that is not a finite number above 0, a views key other than front, back, left or right, a rotation other than 0, 90, 180 or 270 or a mirror that is not boolean, a gap outside [0, 1), a background that is not a hex colour or false, a negative delta, an engine without WebGPU or the WebGL2 compatibility layer (code unsupported), an engine with no canvas context (code state), or was used after dispose (code disposed).',
+    fix: 'Tilt the source camera off its up axis, pass `distance` above 0, `gap` in [0, 1) and `views` such as `{front: {rotation: 180, mirror: true}}`, create the engine with WebGPU (or the WebGL2 compatibility layer), and create a new HologramOutput after dispose.',
+  },
+  {
     id: 'face-driver',
     title: '@margoengine/input/face: webcam face to morph targets',
     kind: 'family',

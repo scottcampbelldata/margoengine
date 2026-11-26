@@ -227,6 +227,10 @@
       "types": "./dist/cameras/stereo.d.ts",
       "import": "./dist/cameras/stereo.js"
     },
+    "./cameras/hologram": {
+      "types": "./dist/cameras/hologram.d.ts",
+      "import": "./dist/cameras/hologram.js"
+    },
     "./controls/transitions": {
       "types": "./dist/controls/transitions.d.ts",
       "import": "./dist/controls/transitions.js"

@@ -57,6 +57,10 @@
     "./stereo": {
       "types": "./dist/stereo.d.ts",
       "import": "./dist/stereo.js"
+    },
+    "./hologram": {
+      "types": "./dist/hologram.d.ts",
+      "import": "./dist/hologram.js"
     }
   },
   "files": [
@@ -86,6 +90,7 @@
     "prepack": "npm run build",
     "test:gpu": "cd ../.. && node packages/cameras/test/browser-check.mjs",
     "test:browser:panorama": "cd ../.. && node packages/cameras/test/panorama-browser.mjs",
-    "test:browser:stereo": "cd ../.. && node packages/cameras/test/stereo-browser.mjs"
+    "test:browser:stereo": "cd ../.. && node packages/cameras/test/stereo-browser.mjs",
+    "test:browser:hologram": "cd ../.. && node packages/cameras/test/hologram-browser.mjs"
   }
 }
