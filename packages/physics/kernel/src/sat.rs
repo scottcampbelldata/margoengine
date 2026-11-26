@@ -189,7 +189,7 @@ pub fn sat(a: &Poly, b: &Poly, rel: Pose, limit: f32) -> Option<(Feature, f32)> 
     sat_coherent(a, b, rel, limit, None)
 }
 
-/// The same, keeping last step's feature while it is within the bias of the best, so a tie does not change the reference
+/// The same, keeping last step's face while it is within the bias of the best, so a tie does not change the reference
 /// face from step to step (Gregorius 2015: the solver likes contact points built from the same features between frames).
 pub fn sat_coherent(a: &Poly, b: &Poly, rel: Pose, limit: f32, last: Option<Feature>) -> Option<(Feature, f32)> {
     let (face_a, separation_a) = query_faces(a, b, rel);
@@ -209,8 +209,12 @@ pub fn sat_coherent(a: &Poly, b: &Poly, rel: Pose, limit: f32, last: Option<Feat
         if separation > limit {
             return None;
         }
-        let margin = if matches!(last, Some(Feature::Edges(..))) { -FACE_BIAS } else { FACE_BIAS };
-        if separation > face_separation_best + margin {
+        // An edge pair must beat the face by the bias, held or not: faces win ties (Gregorius 2015). An edge pair gives one
+        // point, and where it ties a face its two edges lie near parallel along that face, so the point stands for one end of
+        // a line the face's clip gives whole. Held from the step before, it used to win such ties, and the point hopped from
+        // end to end of a box face resting on a block's edge as the box rocked: a voxel debris piece never came to rest. A
+        // held face still wins its ties below, so the reference face stays coherent.
+        if separation > face_separation_best + FACE_BIAS {
             best = (Feature::Edges(ea, eb, axis), separation);
         }
     }

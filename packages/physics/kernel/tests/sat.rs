@@ -446,3 +446,33 @@ fn a_flat_triangle_takes_the_edge_axes_a_closed_hull_would() {
     println!("triangle: {touching} touching, {edges} by edges");
     assert!(edges > 100, "edge pairs must win where they are the answer, won {edges} times");
 }
+
+#[test]
+fn a_face_resting_on_a_parallel_edge_keeps_both_ends_after_an_edge_pair() {
+    // A plank's bottom face lies on a cube's top edge, its own edge 5 cm past it, turned 5 mrad about its length and 10 mrad
+    // in the face's plane, as a piece of voxel debris lay on the edge of a block. The edge pair of the two near-parallel
+    // edges ties the face to within the bias. Held from the step before, it won the tie and gave one point, at an end of the
+    // cube's edge; as the plank rocked that point hopped from end to end and the plank never came to rest. The face's clip
+    // gives the whole line under it: both ends, as it does with no history.
+    let (mut da, mut db) = (BoxData::new(), BoxData::new());
+    let (a, b) = (box_poly(v3(0.5, 0.5, 0.5), &mut da), box_poly(v3(2.0, 0.1, 0.5), &mut db));
+    let q = Q::from_rotation_vector(v3(0.0, 0.0, -0.5)).mul(Q::from_rotation_vector(v3(-0.005, -0.01, 0.0)));
+    let (n, along) = (q.rotate(v3(0.0, 1.0, 0.0)), q.rotate(v3(1.0, 0.0, 0.0)));
+    // B's centre: from the edge's middle, out along the face normal by B's half thickness less 0.2 mm, and along the face so
+    // that its -x edge lies 5 cm past the cube's edge.
+    let centre = v3(0.5, 0.5, 0.0).add(n.scale(0.1 - 0.0002)).add(along.scale(2.0 - 0.05));
+    let plank = Pose { p: centre, q };
+    for held in [None, Some(Feature::Edges(0, 0, v3(0.0, 1.0, 0.0)))] {
+        let mut m = Manifold::new();
+        if let Some(feature) = held {
+            m.feature = feature.code();
+        }
+        collide_polys(&a, pose(0.0, 0.0, 0.0), &b, plank, 0.04, &mut m);
+        // The points on the cube's edge (others are speculative ones of the plank's end over the cube's top face).
+        let mut ends: Vec<f32> =
+            m.points[..m.count].iter().filter(|p| (p.on_a.x - 0.5).abs() < 1e-3 && (p.on_a.y - 0.5).abs() < 1e-3).map(|p| p.on_a.z).collect();
+        ends.sort_by(f32::total_cmp);
+        assert_eq!(ends.len(), 2, "held {held:?}: {:?}", &m.points[..m.count]);
+        assert!((ends[0] + 0.5).abs() < 1e-3 && (ends[1] - 0.5).abs() < 1e-3, "held {held:?}: {ends:?}");
+    }
+}

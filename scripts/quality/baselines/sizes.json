@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19265005,
+  "total": 19280607,
   "history": [
     {
       "date": "2026-10-24",
@@ -12591,6 +12591,12 @@
       "commit": "dc75a47d35",
       "reason": "HYDRO-04 entry sizes, previous record to current: @margoengine/physics/landscape 0→4347 B (ceiling 0→4603 B); @margoengine/biomes/landscape 0→614 B (ceiling 0→870 B). The optional Physics entry publishes SI-unit watershed and sediment fields and loads two native memory variants on demand. The separate Biomes entry adapts physical terrain snapshots without adding code to the Biomes root, core or stage. A further split would add requests without removing any code when evolving a relief.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "a69348ec9",
+      "reason": "@margoengine/physics lazy physics kernel 519848 to 519854 B: sat_coherent no longer holds an edge pair against a face it ties (KB-PHYS-EDGEHOLD1), so a box face resting on a block's edge keeps both ends; the kernel blueprint is one lazy chunk and the change is in it",
+      "grew": 1
     }
   ],
   "items": {
@@ -13386,7 +13392,7 @@
     "@margoengine/oit/vfx": 486,
     "@margoengine/physics": 618161,
     "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 90777,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 519848,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 535450,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,

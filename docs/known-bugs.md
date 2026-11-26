@@ -6,6 +6,23 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: a box face resting on a block's edge was held at one end at a time and rocked for ever (KB-PHYS-EDGEHOLD1, physics kernel, contacts)
+
+- **Repro:** `packages/voxel/tests/debris.test.js`, "with physics a piece is a dynamic body of its cells mass that falls onto
+  the voxel floor and comes to rest", with the block solver on: the L-shaped piece came to lie on the edge of the pillar's
+  stump and on one corner of its beam, and still moved at 0.03 to 0.16 m/s after 20 s, sinking 4 mm. The same rocking state
+  stepped on with the sweeps did not settle either.
+- **Cause:** the separating axis test kept last step's edge pair when it came within the face bias (1 mm) of the best face
+  (`sat_coherent`, the held-edge margin `-FACE_BIAS`). An edge pair gives one point. Where it ties a face, its two edges lie
+  near parallel along that face, so the closest points clamp to one end of the block's edge: the manifold held that end
+  alone, the other side fell until it struck, and the held point hopped to the other end. The geometry query, with no
+  history, chose the face and clipped both ends.
+- **Fix:** an edge pair must beat the face by the bias whether or not it was held, the rule Gregorius (GDC 2015) gives:
+  faces win ties. A held face still wins its own ties, so the reference face stays coherent. Over 1,734 poses of a plank on
+  a cube's edge (turns of -40 to 40 mrad in 5 mrad steps about its length and in the face's plane, its edge 0 to 30 cm past
+  the cube's), a held edge pair now gives the manifold a test with no history gives on every pose; before, 1,499 lost an end.
+- **Regression:** `packages/physics/kernel/tests/sat.rs` `a_face_resting_on_a_parallel_edge_keeps_both_ends_after_an_edge_pair`
+  (one point with the held edge pair before), and the voxel debris test above with the block solver.
 ### Fixed 2026-11-25: the joint webs' energy ledger read a kinematic body's speed as energy gained (KB-PHYS-LEDGER1, physics kernel tests)
 
 - **Repro:** `packages/physics/kernel/tests/stability.rs` `the_energy_ledger_reads_the_same_in_a_moving_frame`: a kinematic
