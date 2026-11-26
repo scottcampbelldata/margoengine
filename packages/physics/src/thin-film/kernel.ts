@@ -20,6 +20,7 @@ export interface ThinFilmKernel {
     nx: number,
     ny: number,
     dt: number,
+    wetting: number,
   ): number;
 }
 

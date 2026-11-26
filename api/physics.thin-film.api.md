@@ -58,6 +58,10 @@ export interface ThinFilmOptions {
     readonly surfaceTension?: number;
     readonly slip?: number;
     readonly pinning?: number;
+    readonly wetting?: {
+        readonly contactAngle: number;
+        readonly precursorDepth: number;
+    };
     readonly evaporation?: number;
     readonly drains?: readonly [boolean, boolean, boolean, boolean];
 }

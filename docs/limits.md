@@ -9540,7 +9540,13 @@ the film keeps their deposited water. Normal pressure acts along the supported s
 surface. Detaching films, contact-angle dynamics on a steep drop, thin-film interference and
 general rain damping of ocean waves are outside this equation.
 
-The optional thin-film entry is 5,917 B gzip with a 6,173 B ceiling. Both Wasm assets are 9,209 B raw and each is 3,995 B gzip. Core plus stage remains 24,820 B gzip.
+The optional `wetting` model gives the film a finite equilibrium contact angle by adding
+Schwartz–Eley disjoining pressure. The shallow-slope approximation applies to gently sloped
+free surfaces. A linear continuation replaces the singular sub-precursor pressure at unresolved
+thicknesses. The tests check the derived precursor-mode decay, nonlinear energy dissipation and
+water balance. Measured spreading, contact-angle hysteresis and airborne drops remain open.
+
+The optional thin-film entry is 6,512 B gzip with a 6,768 B ceiling. Both Wasm assets are 9,624 B raw and each is 4,197 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

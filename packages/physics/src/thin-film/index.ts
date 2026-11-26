@@ -1,6 +1,6 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { FlowSample, Precipitation, PrecipitationSample, Wind } from '@margoengine/math/fields';
-import { hypot } from '@margoengine/math/pinned';
+import { hypot, sin } from '@margoengine/math/pinned';
 import { WAKE_SOURCE_LAYOUT, WAKE_SOURCE_WORDS } from '../sea/wake.js';
 import { regionWords } from '../world/memory.js';
 import type {
@@ -82,6 +82,13 @@ export interface ThinFilmOptions {
   readonly slip?: number;
   /** Static contact-line retention per unit width, N/m. Defaults to zero. */
   readonly pinning?: number;
+  /** Enable precursor-film wetting for a shallow contact angle. Defaults to disabled. */
+  readonly wetting?: {
+    /** Equilibrium contact angle in radians, from zero to less than π/2. */
+    readonly contactAngle: number;
+    /** Resolved wetting-layer thickness in metres. Include this water in the initial depth. */
+    readonly precursorDepth: number;
+  };
   /** Steady evaporative depth loss. Defaults to zero m/s. */
   readonly evaporation?: number;
   /** Open boundaries at u low, u high, v low or v high. Defaults to all closed. */
@@ -129,6 +136,7 @@ interface FilmState {
   readonly precipitation?: Precipitation;
   readonly drains: readonly boolean[];
   readonly constants: Region;
+  readonly wetting?: Region;
   readonly bottom: Region;
   readonly depth: Region;
   readonly candidate: Region;
@@ -166,6 +174,41 @@ function positive(label: string, value: number): number {
   if (!(Number.isFinite(value) && value > 0))
     throw new RangeError(`Invalid thin-film ${label}. Use a positive finite value.`);
   return value;
+}
+
+function wettingConstants(wetting: ThinFilmOptions['wetting'], tension: number): Vec2 | undefined {
+  if (wetting === undefined) return undefined;
+  if (!wetting || typeof wetting !== 'object')
+    throw Object.assign(
+      new TypeError('Invalid thin-film wetting options. Pass an object with contactAngle and precursorDepth.'),
+      { code: 'PHYSICS_INPUT_TYPE' },
+    );
+  const { contactAngle, precursorDepth } = wetting;
+  if (
+    !(
+      Number.isFinite(contactAngle) &&
+      contactAngle >= 0 &&
+      contactAngle < Math.PI / 2 &&
+      Number.isFinite(precursorDepth) &&
+      precursorDepth > 0
+    )
+  )
+    throw Object.assign(
+      new RangeError(
+        'Invalid thin-film wetting. Use a finite contact angle from zero to less than π/2 and a positive resolved precursor depth.',
+      ),
+      { code: 'PHYSICS_INPUT_RANGE' },
+    );
+  const wettingSlope = (2 * sin(contactAngle * 0.5)) / precursorDepth;
+  const stiffness = tension * wettingSlope * wettingSlope;
+  if (!Number.isFinite(stiffness))
+    throw Object.assign(
+      new RangeError('Thin-film wetting stiffness overflowed. Increase the resolved precursor depth.'),
+      {
+        code: 'PHYSICS_INPUT_RANGE',
+      },
+    );
+  return [precursorDepth, stiffness];
 }
 
 function size(label: string, value: number, min = 1): number {
@@ -333,11 +376,13 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const drains = [...(opts.drains ?? [false, false, false, false])];
     if (drains.length !== 4 || drains.some((edge) => typeof edge !== 'boolean'))
       throw new RangeError('Invalid thin-film drains. Pass four booleans in u-low, u-high, v-low, v-high order.');
+    const surfaceTension = number('surface tension', opts.surfaceTension ?? 0.0728, 0);
+    const wettingValues = wettingConstants(opts.wetting, surfaceTension);
     const constantsValues = [
       positive('inverse spacing', 1 / spacing),
       density,
       positive('viscosity', opts.viscosity ?? 0.001002),
-      number('surface tension', opts.surfaceTension ?? 0.0728, 0),
+      surfaceTension,
       number('slip length', opts.slip ?? 0, 0),
       number('contact-line retention', opts.pinning ?? 0, 0),
       number('evaporation', opts.evaporation ?? 0, 0),
@@ -367,6 +412,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       ? allocate('impact-waves', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT)
       : undefined;
     const nextWaves = waves && allocate('working-impact-waves', WAKE_SOURCE_WORDS * count, WAKE_SOURCE_LAYOUT);
+    const wetting = wettingValues && allocate('wetting', wettingValues.length);
     const kernel = bindThinFilmKernel(host, this.builds);
     const s: FilmState = {
       kernel,
@@ -389,6 +435,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       precipitation: opts.precipitation,
       drains,
       constants,
+      wetting,
       bottom,
       depth,
       candidate,
@@ -403,9 +450,20 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       motion,
       waves,
       nextWaves,
-      regions: [constants, bottom, depth, drips, budget, cellRecords, motion, ...(waves ? [waves] : [])],
+      regions: [
+        constants,
+        bottom,
+        depth,
+        drips,
+        budget,
+        cellRecords,
+        motion,
+        ...(waves ? [waves] : []),
+        ...(wetting ? [wetting] : []),
+      ],
     };
     words(s, constants).set(constantsValues);
+    if (wetting && wettingValues) words(s, wetting).set(wettingValues);
     words(s, motion)[4] = -1;
     const depths = words(s, depth);
     const bases = words(s, bottom);
@@ -605,6 +663,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       s.nx,
       s.ny,
       dt,
+      s.wetting?.byteOffset ?? 0,
     );
     if (status === 2)
       throw new RangeError(

@@ -6093,6 +6093,12 @@ actual energy loss. Empty ticks and snapshot playback preserve the event timing.
 [Reproduce](reproduce.md#fluid-01-impact-energy)
 [Reproduce](reproduce.md#fluid-01-rigid-recoil)
 
+### FLUID-07 precursor wetting
+
+The optional shallow-film wetting model reproduces the discrete decay rate at its equilibrium
+precursor. A disturbed positive film relaxes without gaining free energy or losing water and
+replays to the same state hash after restore. [Reproduce](reproduce.md#fluid-07-precursor-wetting)
+
 Proof capture (2026-11-26, KB-LOOK-TV-PENUMBRA1): the deformed-shadows, gltf-pbr-lighting-hooks and quality-presets --current references advance to 5feaab3d71, whose `Shadows` and `VirtualShadows` write the soft filter's per-frame noise turn (`jitter`, default true: fract(n phi) for the n frames whose clock moved) into the free `soft.w` of their frame uniforms, and whose PCSS spiral starts at `(noise + soft.w)` turns. The call logs differ only in that uniform float and the shader module text; the counts of draws, dispatches, bindings and uploads are unchanged. `packages/shadows/test/sampling.test.js` pins the turn sequence, the pause, `resetTime` and `jitter: false`. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=deformed-shadows,gltf-pbr-lighting-hooks,quality-presets`.
 
 ### Depth-averaged natural granular runout (EARTH-02)

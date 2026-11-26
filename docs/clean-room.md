@@ -14981,11 +14981,19 @@ For unit normal `n` and contact arm `r`, the point's inverse mass along `n` is `
   reduced pressure. Through-depth integration yields pressure mobility
   `(h³/3 + βh²)/μ` and shear mobility `(h²/2 + βh)/μ` for Navier slip length β.
   [Journal](https://doi.org/10.1103/RevModPhys.69.931) · [Paper](https://www.tmfcr.cz/39/pdf/04-oron.pdf)
+- Leonard W. Schwartz and Richard R. Eley, “Simulation of Droplet Motion on Low-Energy and
+  Heterogeneous Surfaces” (1998). Add pressure `A (r² − r³)` for the resolved precursor, where
+  `r = h*/h` and `A = 2 σ (1 − cos θ) / h*`. Integrating from `h*` to infinity gives the
+  wetting energy `σ (1 − cos θ)` per unit area. Oron et al. equation 2.47b gives the pressure
+  sign. The linear continuation below `h*` matches the pressure and its slope at the
+  precursor. The implicit slope `A/h*` bounds the resulting local energy curvature, while
+  the remaining pressure stays in the face right-hand side.
+  [Journal](https://doi.org/10.1006/jcis.1998.5448)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
-  Contact angle gives an independent line force, and curvature links the exposed surface to
-  pressure. The present thin-film depth equation uses a parameter for contact-line retention
-  per unit width, with a local deadband only between wet and dry cells. It resolves a drop's
-  deposited volume and subcell footprint through conservative finite volumes.
+  Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to
+  pressure. The film uses the resolved precursor in its depth equation. The separately configured
+  retention parameter is a static deadband at wet/dry faces. A deposited drop contributes its
+  volume and subcell footprint through conservative finite volumes.
   [Author PDF](https://wanghmin.github.io/publication/wang-2005-wds/Wang-2005-WDS.pdf)
 - L. Zhornitskaya and A. L. Bertozzi, “Positivity-Preserving Numerical Schemes for
   Lubrication-Type Equations” (2000). The fourth-order equation lacks the second-order maximum

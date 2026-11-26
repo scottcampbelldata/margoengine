@@ -23,6 +23,24 @@ struct Model {
     evaporation: f64,
 }
 
+#[repr(C)]
+struct Wetting {
+    precursor_depth: f64,
+    stiffness: f64,
+}
+
+impl Wetting {
+    fn pressure(&self, h: f64) -> f64 {
+        let precursor = self.precursor_depth;
+        if h <= precursor {
+            // Continue the precursor tangent into the unresolved molecular layer.
+            return self.stiffness * (h - precursor);
+        }
+        let ratio = precursor / h;
+        self.stiffness * precursor * ratio * ratio * (1.0 - ratio)
+    }
+}
+
 // Uniform current forcing in the moving plane, then left/right/up/down drainage flags.
 #[repr(C)]
 struct Forcing {
@@ -162,6 +180,7 @@ struct Film {
     grid: Grid,
     work: Workspace,
     model: *const Model,
+    wetting: *const Wetting,
     external: *const Forcing,
     height: *mut f64,
     base: *const f64,
@@ -217,6 +236,16 @@ impl Film {
                 .write(*self.base.add(i) + *self.height.add(i));
         }
         self.hydraulic_pressure(work.trial, k, work.pressure);
+        let mut k = k;
+        if let Some(wetting) = self.wetting.as_ref() {
+            if wetting.stiffness > 0.0 {
+                for i in 0..n {
+                    *work.pressure.add(i) += wetting.pressure(*self.height.add(i));
+                }
+                // Treat the upper bound on wetting energy curvature implicitly so PCG stays positive.
+                k += wetting.stiffness;
+            }
+        }
         let dx2 = grid.inv_dx * grid.inv_dx;
         let capillary = model.surface_tension * dx2 * dx2;
         zero(work.solution, 2 * n);
@@ -497,6 +526,7 @@ unsafe extern "C" fn thin_film_step(
     cols: u32,
     rows: u32,
     dt: f64,
+    wetting: *const Wetting,
 ) -> u32 {
     let (cols, rows) = (cols as usize, rows as usize);
     let n = cols * rows;
@@ -511,6 +541,7 @@ unsafe extern "C" fn thin_film_step(
         grid,
         work,
         model,
+        wetting,
         external: forcing,
         height,
         base,

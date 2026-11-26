@@ -4435,3 +4435,11 @@ is −J·(u + Δu/2), summed separately from the normal impulse. The record keep
 position and substep arrival time. For the fixed-floor control the exact loss is ½ m(v₁² + v₂²).
 Moss et al. (2009), §3, model bubble resonance separately from the direct liquid–solid strike.
 [Sounding Liquids](https://gamma.cs.unc.edu/SoundingLiquids/soundingliquids.pdf)
+
+### FLUID-07 precursor wetting
+
+Run `node --test --test-name-pattern="precursor contact-angle|nonlinear wetting" packages/physics/tests/thin-film.test.js`
+from a built physics entry. The first fixture compares a cosine perturbation to the discrete
+implicit decay with stiffness `2 σ (1 − cos θ) / h*²`. The second integrates the capillary and
+wetting energies of a positive film while checking water volume and snapshot replay.
+[Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)

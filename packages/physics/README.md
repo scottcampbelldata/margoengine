@@ -4543,11 +4543,16 @@ const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(film, {
   u: [1, 0, 0],
   v: [0, -1, 0],
   depth: 0.0002,
+  wetting: { contactAngle: 0.35, precursorDepth: 0.00005 },
   drains: [false, false, false, true],
 });
 world.advance(60);
 console.log(film.budget.dripped, film.sample(0, 5).depth);
 ```
+
+Set `wetting` for a partially wetting surface. Enter the equilibrium contact angle in radians and
+include the resolved precursor layer in the initial depth. The layer contributes to the same water
+budget as the rest of the film. Omit `wetting` to run without disjoining pressure.
 
 Pass a `Precipitation` field for rain arriving at the moving panel and a `Wind` for surface shear.
 A registered rain input can instead publish m/s as a scalar or per cell. The optional `impacts` input

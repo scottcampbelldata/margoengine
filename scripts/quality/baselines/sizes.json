@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20577259,
+  "total": 20577854,
   "history": [
     {
       "date": "2026-10-24",
@@ -13627,6 +13627,12 @@
       "commit": "ae961846ea",
       "grew": 2,
       "reason": "SOFT-04 adds finite-chain elasticity, determinant continuation and per-vertex energy descent for held-out rubber data, moving the soft entry from 146343 to 153261 B gzip. @margoengine/physics/soft: 151973 to 157859 B ceiling (153261 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 103021 to 107182 B ceiling (104060 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-07-wetting",
+      "grew": 1,
+      "reason": "FLUID-07 adds opt-in precursor contact angles with pinned sine and coded input checks. Thin-film rises from 5917 to 6512 B gzip; cap changes from 6173 to 6768 B. A separate entry would duplicate the solver initialization and field plumbing. Core and Stage add zero bytes."
     }
   ],
   "items": {
@@ -14502,7 +14508,7 @@
     "@margoengine/physics/synoptic": 7497,
     "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
-    "@margoengine/physics/thin-film": 6173,
+    "@margoengine/physics/thin-film": 6768,
     "@margoengine/physics/tissue": 3218,
     "@margoengine/physics/tracers": 6404,
     "@margoengine/physics/tsunami": 6794,

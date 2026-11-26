@@ -17133,6 +17133,8 @@ thin-film gravity-drain test leaves the patch without spawning airborne ligament
 atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
 general sea keeps its existing wind-wave damping because heterogeneous rain suppression
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
+The thin-film precursor model now supplies an equilibrium contact angle. Dynamic hysteresis
+and comparison against independent measured drop spreading remain open.
 
 ## Open: environmental airborne sources, feedback and filmed bindings (ATMO-06)
 
