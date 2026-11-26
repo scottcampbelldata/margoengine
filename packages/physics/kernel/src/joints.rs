@@ -831,6 +831,12 @@ impl World {
         unsafe { self.f(JOINT_SCRATCH).add(row * JOINT_WORDS as usize + 64) as *mut f64 }
     }
 
+    /// What each of a joint's axes measures from where its bodies are now: offsets along frame A's axes, then frame B's turn in
+    /// frame A as a rotation vector along them (a hinge's angle on its axis).
+    pub(crate) fn joint_measure(&mut self, row: usize) -> [f32; 6] {
+        self.joint_view(row).at
+    }
+
     /// The rows and measures of a joint from where its bodies are now.
     fn joint_view(&mut self, row: usize) -> View {
         let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
@@ -1273,8 +1279,10 @@ impl World {
             if flags & JOINT_DRIVE != 0 {
                 self.drive_rows(row, a, b, &mut rows, &mut at);
             }
+            // The motors a multibody's tree holds as implicit springs are its, not this pass's (multibody.rs, `tree_springs`).
+            let held = self.tree_springs(row);
             for k in 0..6 {
-                if flags & (JOINT_MOTOR_ON << k) != 0 {
+                if flags & (JOINT_MOTOR_ON << k) != 0 && held & (1 << k) == 0 {
                     self.motor_row(row, k, flags & (JOINT_MOTOR_FORCE << k) != 0, &rows[k], at[k], h, &mut body_a, &mut body_b);
                 }
             }
