@@ -130,11 +130,12 @@ pub struct Moving {
 std::thread_local! {
     /// The work bodies that take no push but move, kinematic ones, have done on what they are solved against, in joules, over
     /// this thread's steps: the energy a scene may gain that no force inside it made. Native only, for the tests; the Wasm
-    /// build has none of it.
+    /// build has none of it. Every impulse counts, a joint's position bias included: a kinematic body at speed u that hands
+    /// on an impulse p does the work p . u whatever the impulse is for. A bias push that a relaxing pass takes back then nets
+    /// no work and no energy, and a push left behind shows as a gain of about p b / 2 (b the bias speed), the energy no
+    /// force made. Counting the take-back and not the push made the ledger depend on the frame: it read p . u as a gain,
+    /// 3.4 MJ in one step of web seed 17, where the bodies gained 73 kJ.
     pub static DRIVEN: core::cell::Cell<f64> = const { core::cell::Cell::new(0.0) };
-    /// Set while a joint's position bias is applied: a push that closes drift is no work a driver does, so DRIVEN leaves it
-    /// out, and energy it leaves behind shows as a gain.
-    pub(crate) static BIASED: core::cell::Cell<bool> = const { core::cell::Cell::new(false) };
 }
 
 impl Moving {
@@ -144,7 +145,7 @@ impl Moving {
     #[inline(always)]
     pub(crate) fn driven(&self, linear: V3, angular: V3) {
         let i = &self.inertia;
-        if !BIASED.with(|b| b.get()) && self.mass.dot(self.mass) == 0.0 && i.xx == 0.0 && i.yy == 0.0 && i.zz == 0.0 && i.xy == 0.0 && i.xz == 0.0 && i.yz == 0.0 {
+        if self.mass.dot(self.mass) == 0.0 && i.xx == 0.0 && i.yy == 0.0 && i.zz == 0.0 && i.xy == 0.0 && i.xz == 0.0 && i.yz == 0.0 {
             let work = -(linear.dot(self.linear) as f64 + angular.dot(self.angular) as f64);
             DRIVEN.with(|d| d.set(d.get() + work));
         }

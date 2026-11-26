@@ -399,11 +399,13 @@ fn a_web_of_joints_gains_no_more_than_its_kinematic_bodies_give_it() {
     // Seed 1's knot: bodies 11 and 30 on sliders from a kinematicVelocity body and from a kinematicPosition body that turns
     // 1.287 rad in a step, with a spherical joint between them. Held where the two rails cross, with one turning, the pair
     // runs out along them faster each substep as they close on parallel, 1.5 times a substep at 8 substeps and 1.2 million
-    // m/s at 128. That is the geometry and not the solve: each relaxing pass that sped the pair up took more work from the
+    // m/s at 128 with the sweeps (430,000 with the block solve). That is the geometry and not the solve: each relaxing pass that sped the pair up took more work from the
     // turning body than the energy it added (2.3e8 J of kinetic energy for 3.6e8 J of work at the fastest step). The energy
     // counts the motion, the height and the test's own moves back into its cube, and the work is every joint and contact
-    // impulse a kinematic body hands on, at the point it hands it on; a joint's position bias is no work, so energy it leaves
-    // shows. The bound is loose: a kinematic body's catch is inelastic and its work counts in full, three times the energy a
+    // impulse a kinematic body hands on, at the point it hands it on, a joint's position bias included: its push and the
+    // relaxing pass's taking back of it are both the kinematic body's impulses, so a push taken back nets nothing and one left
+    // behind shows as a gain. (Counting the taking back alone made the ledger depend on the kinematic body's speed, and with
+    // the block solver it read 3.4 MJ of web seed 17's work in one step as a gain, against the 73 kJ the bodies gained.) The bound is loose: a kinematic body's catch is inelastic and its work counts in full, three times the energy a
     // box keeps in a_joint_does_not_turn_its_drift_into_speed, which is where the tight figures are.
     for substeps in [1, 8, 32, 128] {
         let run = web_run(1, 2000, substeps, Some((&[11, 30, 47, 21], &[0, 18, 21])));
@@ -469,4 +471,38 @@ fn a_bead_on_a_spinning_rail_is_refused_before_it_leaves_the_numbers() {
     assert!(p.dot(p) < RANGE * RANGE * 4.0);
     w.step(DT);
     assert_eq!(w.header().steps, taken, "a step ran after the refusal");
+}
+
+/// A kinematicVelocity hub moving at `speed` along x drags a box on a spherical joint whose anchor starts 0.2 m out of
+/// place, with no gravity: the energy the box gains over 60 steps less the work the ledger says the hub did.
+fn dragged_gain(speed: f32) -> (f64, f64) {
+    let mut w = World::new(4, 4).unwrap();
+    no_gravity(&mut w);
+    let hub = w.add_body(KINEMATIC_VELOCITY).unwrap();
+    w.set_v(LINEAR_X, hub as usize, v3(speed, 0.0, 0.0));
+    let box_ = point(&mut w, v3(1.2, 0.0, 0.0));
+    w.set_v(LINEAR_X, box_ as usize, v3(speed, 0.0, 0.0));
+    w.touch_body(box_);
+    joint(&mut w, hub, box_, LINEAR, v3(1.0, 0.0, 0.0), v3(0.0, 0.0, 0.0));
+    let (start, work) = (energy(&w, box_ as usize), driven());
+    for _ in 0..60 {
+        w.step(DT);
+    }
+    let gained = energy(&w, box_ as usize) - start;
+    (gained - (driven() - work), driven() - work)
+}
+
+#[test]
+fn the_energy_ledger_reads_the_same_in_a_moving_frame() {
+    // A joint's position bias pushes the box back to its anchor and the relaxing pass takes the push's speed back. Both are
+    // impulses the hub hands on, so both are its work. The ledger used to count the taking back and not the push, so a
+    // hub moving at u read p u of work that did nothing, and the energy no force made grew with the frame's speed. What a
+    // scene gains is the same in every frame (Galileo): the ledger's reading at 50 m/s matches its reading at rest.
+    let (still, _) = dragged_gain(0.0);
+    let (moving, work) = dragged_gain(50.0);
+    println!("gain at rest {still:.6e} J, moving {moving:.6e} J over {work:.6e} J of the hub's work");
+    // What f32 lets the two differ by: the 1 kg box's speed of 50 m/s rounds to an ulp of 2^-18 m/s, which moves its kinetic
+    // energy by m v ulp, once a step for 60 steps (0.011 J). The old ledger read 4,800 J.
+    let rounding = 60.0 * 50.0 * 2f64.powi(-18);
+    assert!((moving - still).abs() < rounding, "at rest {still} J, at 50 m/s {moving} J");
 }

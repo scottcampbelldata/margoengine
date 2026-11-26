@@ -1301,11 +1301,7 @@ impl World {
         if pass == Pass::Push {
             let asked = self.path_right(first, last, rate, most, true);
             let share = self.push_share(first, last, asked, h);
-            #[cfg(not(target_arch = "wasm32"))]
-            crate::solver::BIASED.with(|b| b.set(true));
             self.apply_path(first, last, share, false);
-            #[cfg(not(target_arch = "wasm32"))]
-            crate::solver::BIASED.with(|b| b.set(false));
         }
     }
 

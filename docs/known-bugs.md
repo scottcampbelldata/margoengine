@@ -6,6 +6,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25: the joint webs' energy ledger read a kinematic body's speed as energy gained (KB-PHYS-LEDGER1, physics kernel tests)
+
+- **Repro:** `packages/physics/kernel/tests/stability.rs` `the_energy_ledger_reads_the_same_in_a_moving_frame`: a kinematic
+  hub drags a 1 kg box on a spherical joint 0.2 m out of place. At rest the ledger reads no gain; with hub and box moving at
+  50 m/s it read -4,800 J. With the block solver, web seed 17 of `a_web_of_joints_stays_in_the_numbers` reached a state where
+  one step read 3.4 MJ of work as a gain against the 73 kJ its bodies gained (2.7 percent of the run's kinematic work, bound
+  one part in a million).
+- **Cause:** the native ledger `solver::DRIVEN` left out the work a kinematic body does through a joint's position-bias push
+  (the `BIASED` flag) but counted the relaxing pass's taking back of that push. A push p from a body at speed u is the work
+  p . u whatever it is for, so the ledger's "energy no force made" grew with the frame's speed.
+- **Fix:** every impulse a kinematic body hands on counts. A push taken back nets nothing, and one left behind still shows as
+  a gain of about p b / 2 (b the bias speed). All 60 web seeds gain nothing with either solver; the joint-drift proof
+  `a_joint_does_not_turn_its_drift_into_speed` measures speed directly and still fails on the drift bug it was made for. No
+  shipped code changes: the ledger is native only.
+- **Regression:** the moving-frame test above (-4,800 J before), within f32's rounding of the box's kinetic energy.
 ### Fixed 2026-11-25 Open-channel and flood models had no link to changing sediment beds (HYDRO-03)
 
 The shallow-water field now drives suspended load, bedload and bank exchange. The production TerrainBed
