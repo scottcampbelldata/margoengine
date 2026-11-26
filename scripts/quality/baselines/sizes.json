@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20358020,
+  "total": 20358580,
   "history": [
     {
       "date": "2026-10-24",
@@ -13065,6 +13065,12 @@
       "commit": "feat(physics) crests from the sea",
       "reason": "physics/flip 10,188 to 11,232 B gzip (this Mac): FlipSolver takes a sea (seeded from it, its sides on the sea's velocity, a band held to its motion and level; the density projection keeps those sides), so waves run in and break inside the box. It is the same solver's boundary; a separate entry would carry the whole solver again.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "67768939d1",
+      "reason": "cache/hashed 2,006 to 2,022 and cache/bundles 1,883 to 1,915 B gzip measured: hash-named files are asked for with force-cache, and with reload after wrong bytes; a split would cost more than the 80 B",
+      "grew": 2
     }
   ],
   "items": {
@@ -13204,10 +13210,10 @@
     "@margoengine/bvh/sdf": 3090,
     "@margoengine/bvh/tree": 11036,
     "@margoengine/cache": 4658,
-    "@margoengine/cache/bundles": 1883,
+    "@margoengine/cache/bundles": 2171,
     "@margoengine/cache/decoded": 5898,
     "@margoengine/cache/eviction": 1183,
-    "@margoengine/cache/hashed": 2006,
+    "@margoengine/cache/hashed": 2278,
     "@margoengine/cache/manager": 1985,
     "@margoengine/cache/prefetch": 2058,
     "@margoengine/cache/ranges": 5243,
