@@ -441,7 +441,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | partial | Claude | CLAIMED |
 | DYN-06 | Mass properties and collision geometry | partial | Claude | CLAIMED |
-| SOFT-01 | Cloth and thin shells | partial | Claude | CLAIMED |
+| SOFT-01 | Cloth and thin shells | partial: water as a medium landed 1b7d95a48, curtains in a moving hull 3d1e785d7 | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | partial | Claude | CLAIMED |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
 | SEA-02 | Ocean surface synthesis and query | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 52b68ca65 |
