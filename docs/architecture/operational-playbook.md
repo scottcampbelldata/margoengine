@@ -10255,3 +10255,11 @@ the field registry. A production Vite build preserves both lazy Wasm files.
 ### Developmental plant growth (BIO-02)
 
 The Biomes entry reads current HYDRO-02 water through the registered soil storage field and publishes versioned branch geometry. The phase, stable parent graph, radii and in-season water sums survive snapshot restore. The SIMD shadow kernel allocates its own arena stack and has no static window. Geometry conversion uses the existing Procedural tube entry. Tests derive the apical and lateral allocation, branch angle, attenuation, and radius from the production law, then exercise drought, solid occlusion, plant competition and wasm/browser replay.
+
+### Native room pressure kernel (SOUND-02)
+
+Two-lane Wasm updates the seven-point pressure stencil. The world owns both pressure buffers, the receiver
+trace and its sample counter, so alternating buffers and the published trace survive snapshot restoration.
+Both modules have no static data. Instantiation over sentinel-filled shared or plain arena memory must
+leave all existing bytes intact. Scoped tests check rigid standing modes, wall dissipation, exact arrival
+around a doorway, sample-timed excitation and browser packaging of both lazy kernels.

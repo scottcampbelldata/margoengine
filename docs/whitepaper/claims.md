@@ -5657,3 +5657,12 @@ frame-rate invariance and exact replay. These are solver and source-link checks.
 ### Developmental wood growth
 
 Plants sharing the Biomes growth field give different branch extension when their measured local soil water differs. The reported angle, branch area and depth attenuation agree with analytical cases in `packages/biomes/tests/coupling/growth.test.js`. The resulting three-internode fixture meshes to 36 triangles in Chromium and replays bit for bit after restore.
+
+### Enclosed reflection paths and wave diffraction (SOUND-02)
+
+`packages/physics/tests/room-sound.test.js` compares direct and six single-reflection paths with independent image
+distances and checks the two-bounce cutaway path, arrival direction and signed monaural impulse weights.
+The same test suite solves a rigid closed-axis standing wave in both memory modes against its discrete
+eigenfrequency and checks analytical reverberation and energy-decay references.
+`packages/physics/tests/coupling/room-sound.test.js` routes receiver pressure around an opening after the exact
+shortest number of lattice links, checks absorption and verifies registry excitation and snapshot replay.

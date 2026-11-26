@@ -302,6 +302,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'room-sound-kernel',
+    crate: 'packages/physics/room-sound-kernel',
+    blueprint: 'packages/physics/src/room-sound/room-sound-kernel.wasm',
+    script: 'packages/physics/scripts/build-room-sound-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'room-sound-kernel-shared',
+    crate: 'packages/physics/room-sound-kernel',
+    blueprint: 'packages/physics/src/room-sound/room-sound-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-room-sound-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'modal-sound-kernel',
     crate: 'packages/physics/modal-sound-kernel',
     blueprint: 'packages/physics/src/modal-sound/modal-sound-kernel.wasm',

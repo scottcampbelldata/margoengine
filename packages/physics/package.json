@@ -25,6 +25,7 @@
   },
   "scripts": {
     "build:airborne": "node scripts/build-airborne-kernel.mjs",
+    "build:room-sound": "node scripts/build-room-sound-kernel.mjs",
     "build": "node scripts/build.js",
     "test": "npm run build && node scripts/build-oracle.js && node --test tests/*.test.js tests/coupling/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-preview.js && node scripts/test-replay.js --browsers=default",
@@ -72,6 +73,10 @@
     "./ageing": {
       "types": "./dist/ageing.d.ts",
       "import": "./dist/ageing.js"
+    },
+    "./room-sound": {
+      "types": "./dist/room-sound/index.d.ts",
+      "import": "./dist/room-sound.js"
     },
     "./modal-sound": {
       "types": "./dist/modal-sound.d.ts",

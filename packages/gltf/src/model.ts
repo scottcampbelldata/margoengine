@@ -5239,7 +5239,12 @@ export class PBRModel implements EnginePlugin {
     if (extension?.ambient || extension?.coat) code = materialExtensionAmbientShader(code, extension);
     if (transmission) code = transmissionPBR(code, oit!.declarations(2));
     else if (through) code = transparentPBR(code, oit!.declarations(2));
-    else if (capture) code = capturePBR(code, hook!.declarations(code));
+    else if (capture) {
+      // The capture entry is appended after the extension's surface edits ran: give it them (the coat's `keep` is set
+      // there), and weigh the base layer's albedo by what the coat leaves of it, as the beauty pass does.
+      code = capturePBR(code, hook!.declarations(code), extension?.coat?.keep);
+      if (extension) code = materialExtensionSurface(code, extension);
+    }
     // Instancing patches the vertex stage last, so text-patching effects (shader NodeMaterial vertex nodes) keep their anchors.
     if (inst) code = inst.shader(code);
     if (side === 'back' && !topology) code = backSideShader(code);

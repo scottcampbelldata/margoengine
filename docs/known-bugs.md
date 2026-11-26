@@ -27,6 +27,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** `OutdoorSound` solves the acoustic path and `OutdoorAudio` applies its delay and broad spectral response.
 - **Regression:** `packages/physics/tests/coupling/outdoor-sound.test.js` checks air, diffraction and reflection.
   `packages/audio/tests/outdoor-sound.browser.mjs` measures the added arrival delay in real PCM.
+### Fixed 2026-11-26: a clearcoat from `materials.install` reflected its full base albedo into SSR and LightBounce captures (KB-BOUNCE-CAPTURE2, gltf)
+
+- **Repro:** `node scripts/clustered-bounce-gpu-check.js` with its `installed` row: the LightBounce patch as a glTF quad with
+  KHR_materials_clearcoat 1 drawn by `materials.install`, added with `bounce.add`, bounced exactly the uncoated patch's
+  light onto the wall (ratio 1.000 at both points), where the same coat on a materials `Material` (`clearcoat: 1`) bounced
+  0.955 and 0.959 of it, the base layer's 1 - F_coat(n.v) share (KHR_materials_clearcoat, "Layering"; F0 0.04 head on).
+- **Cause:** gltf/pbr builds the capture shader by appending a `capture` entry point (`capturePBR`) after
+  `materialExtensionShader` had run the extension's surface edits on every `let s=surface(i,front);`. The appended entry
+  built the plain surface, so `materialClearcoatLighting` never ran there and its `materialCoatKeep` stayed 1, and the
+  capture's base-layer weight `k` read only the native `layers` (none on an extension coat). SSR's capture shares the
+  path, so its split-sum weight under an installed coat was too high as well.
+- **Fix:** `capturePBR(code, declarations, keep)` multiplies `k` by the extension coat's `keep` expression, and
+  `PBRModel`'s capture derivation applies `materialExtensionSurface` to the appended entry, as the SSAO occlusion entry
+  already does. A materials `createMesh` mesh (a gltf/pbr model) needed nothing: `bounce.add(mesh)` and its clearcoat were
+  right already, and the GPU check now holds them (`materials` and `coated` rows).
+- **Regression:** packages/gltf/test/extensions.test.js ("a material extension coat weighs k by its keep"), and the
+  `installed`, `materials` and `coated` rows of scripts/clustered-bounce-gpu-check.js on WebGPU and `MARGO_COMPAT=1`
+  (0.9548 and 0.9586 of the core patch, within 1% of 0.96; the materials patch 1.0000; the JS twin within 2%).
 
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
@@ -16465,3 +16483,11 @@ positions. Embers, ash, high-speed debris and snow are outside the environmental
 ### Woody plant growth geometry and moving obstacles (BIO-02)
 
 `PlantGrowth` supplies an updated branch graph that `@margoengine/procedural/lsystem` can mesh; run the geometry case in `packages/biomes/tests/coupling/growth.test.js`. New branches avoid the supplied solid voxel grid. The solver still needs a shared moving-obstacle geometry input and an explicit seasonal transfer contract for live scatter and wind-driven branch physics. Branch growth currently changes the shared graph on a season boundary, and users rebuild the mesh from the new graph when needed.
+
+## Open: acoustic room mesh and concert-hall cutaway consumers (SOUND-02)
+
+The room solver accepts an explicit air-mask lattice, and the early path trace accepts finite convex faces.
+To connect dynamic EARTH-02 tunnel or canyon geometry, the solver needs a canonical material and occupancy
+field. The opening fixture proves shadow diffraction with explicit geometry. The concert-hall fixture verifies
+early arrival cutaway points and the README plays the actual convolved response. The filmed scene still needs
+to read those paths and room material inputs. See [Framework requests](physics-work-queue.md#framework-requests).

@@ -15,6 +15,7 @@ import { ContactLights } from '../packages/clustered/dist/contact.js';
 import { LightBounce } from '../packages/clustered/dist/bounce.js';
 import { Terrain } from '../packages/terrain/dist/index.js';
 import { parseGLTFAsync } from '../packages/gltf/dist/pbr.js';
+import { Material, createMesh, install } from '../packages/materials/dist/index.js';
 
 declare const GPUBufferUsage: {
   STORAGE: number;
@@ -50,8 +51,13 @@ type Config = {
   areaMaxLights?: number;
   /** LightBounce options (besides `lights`): one bounce of the point and spot lights (scripts/clustered-bounce-gpu-check.js). */
   bounce?: Record<string, unknown>;
-  /** The LightBounce patch as a gltf/pbr model (albedo 0.8, roughness 1, top at y 0) added to the bounce (`bounce.add`). */
-  patchModel?: boolean | 'not added';
+  /**
+   * The LightBounce patch as a gltf/pbr model (albedo 0.8, roughness 1, top at y 0) added to the bounce (`bounce.add`):
+   * `true` a plain glTF quad, `'installed'` the quad with KHR_materials_clearcoat 1 drawn by `materials.install`,
+   * `'materials'` and `'coated'` a `@margoengine/materials` `createMesh` with a standard `Material` (`'coated'`:
+   * clearcoat 1). `'not added'` makes the plain quad and leaves it out of the bounce.
+   */
+  patchModel?: boolean | 'not added' | 'installed' | 'materials' | 'coated';
 };
 const canvas = document.querySelector('canvas')!,
   engine = await Engine.create(canvas, {
@@ -96,9 +102,10 @@ let shapes: AreaShapes | undefined;
 let cookies: CubeProjectorLights | undefined;
 let stochastic: StochasticLights | undefined;
 let bounce: LightBounce | undefined;
-let patchModel: Awaited<ReturnType<typeof parseGLTFAsync>> | undefined;
+let patchModel: { dispose(): void } | undefined;
+let patchInstall: { dispose(): void } | undefined;
 // The patch as a glTF quad: x -1 to 1, z 0 to 2 at y 0, facing +y, base colour 0.8 (linear), metallic 0, roughness 1.
-function patchGLTF() {
+function patchGLTF(coat = false) {
   const floats = new Float32Array([-1, 0, 0, 1, 0, 0, 1, 0, 2, -1, 0, 2, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
     indices = new Uint16Array([0, 2, 1, 0, 3, 2]),
     bytes = new Uint8Array(floats.byteLength + indices.byteLength);
@@ -111,8 +118,14 @@ function patchGLTF() {
       scenes: [{ nodes: [0] }],
       nodes: [{ mesh: 0 }],
       meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, indices: 2, material: 0 }] }],
+      ...(coat ? { extensionsUsed: ['KHR_materials_clearcoat'] } : {}),
       materials: [
-        { pbrMetallicRoughness: { baseColorFactor: [0.8, 0.8, 0.8, 1], metallicFactor: 0, roughnessFactor: 1 } },
+        {
+          pbrMetallicRoughness: { baseColorFactor: [0.8, 0.8, 0.8, 1], metallicFactor: 0, roughnessFactor: 1 },
+          ...(coat
+            ? { extensions: { KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatRoughnessFactor: 0.2 } } }
+            : {}),
+        },
       ],
       buffers: [{ byteLength: bytes.byteLength }],
       bufferViews: [
@@ -160,8 +173,9 @@ engine.frameGraph.add({
 async function scene(config: Config) {
   bounce?.dispose();
   bounce = undefined;
+  patchInstall?.dispose();
   patchModel?.dispose();
-  patchModel = undefined;
+  patchModel = patchInstall = undefined;
   for (const plugin of [contact, stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
   contact = undefined;
   stochastic = undefined;
@@ -207,10 +221,30 @@ async function scene(config: Config) {
   if (config.stochastic) stochastic = StochasticLights.attach(engine, { lights, quad: false, temporal: false });
   if (config.contact) contact = ContactLights.attach(engine, { lights, ...config.contact });
   if (config.bounce) bounce = LightBounce.attach(engine, { lights, ...config.bounce });
-  if (config.patchModel) {
-    const { doc, bytes } = patchGLTF();
-    patchModel = await parseGLTFAsync(engine, doc, [bytes]);
-    if (config.patchModel === true) bounce?.add(patchModel);
+  if (config.patchModel === 'materials' || config.patchModel === 'coated') {
+    // The same quad as patchGLTF, drawn by @margoengine/materials (a gltf/pbr model underneath, with its capture hook).
+    const mesh = createMesh(
+      engine,
+      {
+        positions: [-1, 0, 0, 1, 0, 0, 1, 0, 2, -1, 0, 2],
+        normals: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+        indices: [0, 2, 1, 0, 3, 2],
+      },
+      new Material({
+        color: [0.8, 0.8, 0.8],
+        metalness: 0,
+        roughness: 1,
+        ...(config.patchModel === 'coated' ? { clearcoat: 1, clearcoatRoughness: 0.2 } : {}),
+      }),
+    );
+    patchModel = mesh;
+    bounce?.add(mesh);
+  } else if (config.patchModel) {
+    const { doc, bytes } = patchGLTF(config.patchModel === 'installed'),
+      model = await parseGLTFAsync(engine, doc, [bytes]);
+    patchModel = model;
+    if (config.patchModel === 'installed') patchInstall = install(model);
+    if (config.patchModel !== 'not added') bounce?.add(model);
   }
 }
 async function scoped<T>(work: () => T | Promise<T>): Promise<T> {
@@ -385,6 +419,7 @@ async function messages(code: string): Promise<string[]> {
   },
   dispose() {
     bounce?.dispose();
+    patchInstall?.dispose();
     patchModel?.dispose();
     for (const plugin of [contact, stochastic, cookies, shapes, terrain, areas, suns, local, lights]) plugin?.dispose();
     engine.dispose();

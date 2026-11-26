@@ -443,12 +443,14 @@ Options, each checked (RangeError out of range): `maxLights` 4 (1 to 4, stronges
 colours and intensities are read every frame, so a flicker or a dimmer has no lag; a capture is redone only when a
 source moves, round robin, or 120 frames after its last readback. WebGPU and the WebGL2 layer from its half-float tier (the LDR tier would clamp
 distances: coded `unsupported`). The capture draws core's meshes with the frame's own lit shader, so Snow and every
-other surface hook are in it. `bounce.add(model)` adds a gltf/pbr model, a `Terrain` or anything else with the
-capture hook SSR uses (`setCapture`): its own materials (maps, alpha mask, instances, skinning) are drawn into every
-capture after the core meshes, depth tested against them, so a glTF floor bounces as a core floor does (the GPU check
-matches them exactly), and adding or removing one captures every source again. It returns a remover, and `dispose()`
-releases every added model. A model not added, and materials and gltf-pro surfaces (no capture hook yet), receive the
-bounce but do not reflect it; added models do not yet stop it in the visibility maps, which hold core meshes' triangles
+other surface hook are in it. `bounce.add(model)` adds a gltf/pbr model, a `@margoengine/materials` mesh
+(`createMesh`), a `Terrain` or anything else with the capture hook SSR uses (`setCapture`): its own materials (maps,
+alpha mask, instances, skinning) are drawn into every capture after the core meshes, depth tested against them, so a
+glTF floor bounces as a core floor does (the GPU check matches them exactly), and adding or removing one captures every
+source again. A clearcoat, a materials `Material`'s or a glTF one drawn by `materials.install`, keeps the base layer's
+1 - F_coat(n.v) share of the albedo, as the beauty pass does (0.955 of the uncoated patch head on). It returns a
+remover, and `dispose()` releases every added model. A model not added receives the bounce but does not reflect it;
+blended, transmissive and unlit primitives are left out of the capture, as SSR leaves them out; added models do not yet stop it in the visibility maps, which hold core meshes' triangles
 (docs/limits.md). A lamp bounces the light it casts: its IES profile, projector image or cube cookie and its layers
 weigh what each captured surface gets, as they weigh its direct light (below). GPU cost per bouncing source: one draw of the core
 meshes per refreshed view at 32 x 32, about 100 KB of targets and readback buffers and 130 KB of storage buffer, and 32 VPLs per

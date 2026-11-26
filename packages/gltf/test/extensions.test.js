@@ -25,7 +25,8 @@ import { MeshoptDecoder } from '../../decoders/dist/index.js';
 import { decodeDraco, initBasis, initDraco, transcodeKTX2 } from '../../decoders/dist/codec.js';
 import { Clustered } from '../../clustered/dist/index.js';
 import { Shadows } from '../../shadows/dist/index.js';
-import { materialShader } from '../../materials/dist/index.js';
+import { materialShader, clearcoat as materialsClearcoat } from '../../materials/dist/index.js';
+import { materialExtensionShader, materialExtensionSurface } from '../src/material-extension.ts';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
 
 // The real Draco and Basis Wasm run in-process (Emscripten needs CommonJS globals and HTTP URLs), as in the decoders tests.
@@ -764,4 +765,24 @@ test('capture hook (contract v1): lit and material-patched variants get a captur
     assert.equal(capturePBR(source, declarations), code, 'cached');
   }
   assert.throws(() => capturePBR(capturePBR(pbrShader, ''), ''), /capture hook point missing/);
+});
+
+test('capture hook: a material extension coat weighs k by its keep, and the appended capture entry runs its surface edits (KB-BOUNCE-CAPTURE2)', () => {
+  // Before the fix the capture entry, appended after materialExtensionShader, built the plain surface: the coat's
+  // keep stayed 1, so an installed clearcoat reflected its full base albedo into SSR and LightBounce captures.
+  const declarations = '// bounce\n',
+    extension = materialsClearcoat({ factor: 1, roughnessFactor: 0.2 });
+  for (const source of [pbrShader, physicalShader]) {
+    const patched = materialExtensionShader(source, extension),
+      layered = source.includes('fn layers(')
+        ? 'layers(s,v,f.light.xyz,vec3f(1))-layers(s,v,f.light.xyz,vec3f(0))'
+        : 'vec3f(1)',
+      code = materialExtensionSurface(capturePBR(patched, declarations, extension.coat.keep), extension),
+      entry = code.split('\n@fragment fn capture(')[1];
+    assert.ok(entry.includes(`return margoCapture(s,v,(${layered})*(materialCoatKeep));`), entry);
+    assert.ok(entry.includes('var s=surface(i,front);') && entry.includes(extension.wgsl), entry);
+    assert.ok(!entry.includes('let s=surface(i,front);'), entry);
+    // The same code without a keep is cached apart.
+    assert.ok(capturePBR(patched, declarations).includes(`return margoCapture(s,v,${layered});`));
+  }
 });

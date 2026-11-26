@@ -13785,3 +13785,36 @@ mineral dust and water droplets.
 - Sören Pirk, Ondřej Šťava, Julian Kratt, Michel Abdul Massih Said, Boris Neubert, Radomír Měch, Bedřich Beneš and Oliver Deussen, [Plastic Trees](https://graphics.uni-konstanz.de/publikationen/Pirk2012PlasticTreesInteractive/Pirk2012PlasticTreesInteractive.pdf) (2012), §5.3. Tree and obstacle shadows change branch results. Our branch creation follows the prior developmental model and tests new segments against the occupied voxel interior. It avoids re-deforming the existing parent skeleton.
 
 Each solver gets a contiguous topology region whose size follows the productive lifetime, the minimum eligible extension and the maximum seasonal resource. The two layout-compatible native kernels accumulate voxel penumbrae in fixed order and vectorize consecutive x cells. No initial bytes are written into the arena, as verified by a full-memory sentinel in both builds.
+
+## SOUND-02 enclosed and urban acoustic pressure and early paths
+
+- J. B. Allen and D. A. Berkley, *Image Method for Efficiently Simulating Small-Room Acoustics* (1979).
+  Equation 10 gives distance divided by sound speed for arrival time and the product of wall pressure coefficients
+  divided by 4π times distance for the spherical Green function. Our gains are relative to a direct source at
+  one metre, which removes the shared 4π factor. We reflect the point across each finite convex face, reconstruct the
+  path backward and reject bounces outside the polygon or segments blocked by another face. [Paper](https://jontalle.web.engr.illinois.edu/Public/Allen-PDFs/PDFs/AllenBerkley79.pdf).
+- N. Raghuvanshi and J. Snyder, *Parametric Wave Field Coding for Precomputed Sound Propagation* (2014). Figure 1 and
+  the response-parameter discussion motivate separating directional early arrivals from the wave response that
+  carries diffracted pressure and late reverberation. The optional entry exposes those two response types directly.
+  [Paper](https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/ParametricWaveField.pdf).
+- B. Hamilton and S. Bilbao, *FDTD Methods for 3-D Room Acoustics Simulation with High-Order Accuracy in Space and Time*
+  (2017). The seven-point finite-difference baseline uses two pressure states with a second-order time update.
+  A cubic lattice with λ = cΔt/h is stable for λ ≤ 1/√3. The solver chooses enough dyadic steps inside the 60 Hz
+  world step to meet that bound. [Paper](https://doi.org/10.1109/TASLP.2017.2744799).
+- S. Bilbao and B. Hamilton, *Passive Volumetric Time Domain Simulation for Room Acoustics Applications* (2019).
+  A dissipative boundary prescribes normal pressure derivative proportional to the negative time derivative.
+  For a real normal-incidence pressure reflection R, the normalized admittance is η = (1 − R)/(1 + R).
+  Applying the flux per closed face with a centered time derivative gives D = ληNclosed/2 + γΔt.
+  The update divides [2p + (D − 1)p_previous + λ² sum(p_neighbor − p)] by 1 + D. Solid cells have no pressure
+  and the sum includes only open neighbours. γ is the optional uniform attenuation rate.
+  [Paper](https://pubmed.ncbi.nlm.nih.gov/31046344/).
+- C. F. Eyring, *Reverberation Time in “Dead” Rooms* (1930). The diffuse mean free path is 4V/S. Multiplying
+  energy by the mean survival fraction 1 − α on each wall encounter gives RT60 = 24 ln(10)V/[−cS ln(1 − α)].
+  [Paper](https://www.trueaudio.com/array/downloads/CF%20Eyring-Reverb%20Time%20in%20Dead%20Rooms.pdf).
+- M. R. Schroeder, *New Method of Measuring Reverberation Time* (1965). We expose the backward sum of squared
+  pressure samples divided by its initial total for the measured finite impulse response. The normalization
+  peak rescales before squaring to preserve finite near-zero and large pressure values.
+  [Paper](https://labrosa.ee.columbia.edu/~dpwe/papers/Schro65-reverb.pdf).
+
+The native pressure update uses SIMD over adjacent cells, immutable boundary coefficients and two pressure regions.
+The continuous reflection model, fractional sample projection and audio-node setup are independently testable.

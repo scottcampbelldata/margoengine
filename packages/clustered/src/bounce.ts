@@ -94,7 +94,7 @@ export interface BounceModelCapture {
   readonly targets: readonly GPUColorTargetState[];
   begin(): GPURenderPassEncoder;
 }
-/** What `bounce.add` takes: a gltf/pbr `PBRModel`, a `Terrain`, a voxel renderer or anything with the same capture hook. */
+/** What `bounce.add` takes: a gltf/pbr `PBRModel` (a materials `createMesh` mesh is one), a `Terrain`, a voxel renderer or anything with the same capture hook. */
 export interface BounceModel {
   setCapture(hook: BounceModelCapture): () => void;
   onDispose(callback: () => void): () => void;
@@ -412,14 +412,16 @@ export class LightBounce implements EnginePlugin, ClusteredBounce {
     return this;
   }
   /**
-   * Makes a gltf/pbr model, terrain or voxel renderer reflect the bounce: its own materials (maps, alpha mask, instances,
-   * skinning) are drawn into every capture after the core meshes. Returns a remover; a model not added still receives
+   * Makes a gltf/pbr model, a `@margoengine/materials` mesh, terrain or voxel renderer reflect the bounce: its own
+   * materials (maps, alpha mask, instances, skinning, clearcoat) are drawn into every capture after the core meshes. Returns a remover; a model not added still receives
    * the bounce but reflects none. Adding or removing captures every source again.
    */
   add(model: BounceModel): () => void {
     if (this.disposed) throw new MargoError('disposed', 'LightBounce is disposed; attach a new LightBounce');
     if (typeof model?.setCapture !== 'function')
-      throw new TypeError('LightBounce add takes a model with a capture hook (gltf/pbr PBRModel, Terrain)');
+      throw new TypeError(
+        'LightBounce add takes a model with a capture hook (gltf/pbr PBRModel, materials mesh, Terrain)',
+      );
     const remove = captureModel(this.models, model, this.hook);
     this.invalidate();
     return () => {
