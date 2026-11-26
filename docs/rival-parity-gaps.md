@@ -76,7 +76,7 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
 | Node Particle system: a whole particle system as a block graph (creation, emitter shape, update, random/gradient, triggers that start or chain systems) with JSON load (`vfx/src/nodes.ts` covers forces only) | Babylon Node Particle Editor | PARTIAL | M |  |
-| Near-interaction XR UI and behaviours: hand constraint, follow-in-view, surface magnetism, six-DoF drag, multi-pointer scale, app bar, holographic slate and near menu | Babylon | PARTIAL | M |  |
+| Near-interaction XR UI and behaviours: hand constraint, follow-in-view, surface magnetism, six-DoF drag, multi-pointer scale, app bar, holographic slate and near menu | Babylon | DONE | M | 660579824 |
 | WebXR body tracking | Babylon | DONE | S | 9464e1394 |
 
 ## Lane C: scene, assets, text and formats
