@@ -16,7 +16,7 @@ import {
   type SolverHost,
   type StepContext,
 } from '../world/solver.js';
-import { loadSchoolKernel, schoolKernel } from './kernel.js';
+import { loadSchoolKernel, schoolKernel, type SchoolKernelBuilds } from './kernel.js';
 
 /** Layout version of the school ports. Kinematics rows are six f64 words. Intent rows are three f64 words. */
 export const SCHOOL_LAYOUT = 1;
@@ -214,7 +214,7 @@ export class SchoolSolver implements Solver<SchoolParams> {
   private readonly ambient: MutableVec3 = [0, 0, 0];
 
   private constructor(
-    private readonly module: WebAssembly.Module,
+    private readonly modules: SchoolKernelBuilds,
     options: SchoolOptions,
   ) {
     const { id = 'school', level = 0, mode = 'point-mass', readPredators = false, fields } = options;
@@ -313,7 +313,7 @@ export class SchoolSolver implements Solver<SchoolParams> {
     const bodyBytes = members.length * BODY_WORDS * 8;
     const intentBytes = members.length * INTENT_WORDS * 8;
     const predatorBytes = this.predatorSize * BODY_WORDS * 8;
-    this.stepKernel = schoolKernel(this.module, host, this.schoolSize);
+    this.stepKernel = schoolKernel(this.modules, host, this.schoolSize);
     this.motion = host.allocate('school-motion', bodyBytes, 'f64', SCHOOL_LAYOUT);
     this.intent = host.allocate('school-intent', intentBytes, 'f64', SCHOOL_LAYOUT);
     this.predatorState = host.allocate('school-predators', predatorBytes, 'f64', SCHOOL_LAYOUT);

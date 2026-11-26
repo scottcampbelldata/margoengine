@@ -218,12 +218,12 @@
     },
     "@margoengine/behavior": {
       ".": {
-        "raw": 24914,
-        "gzip": 8891
+        "raw": 27225,
+        "gzip": 9791
       },
       "./steering": {
-        "raw": 9469,
-        "gzip": 3871
+        "raw": 11770,
+        "gzip": 4736
       },
       "./perception": {
         "raw": 9303,
@@ -13994,6 +13994,10 @@
       "./tracers": {
         "raw": 10950,
         "gzip": 4696
+      },
+      "./schooling": {
+        "raw": 12628,
+        "gzip": 4998
       }
     },
     "@margoengine/physics2d": {
@@ -17637,6 +17641,16 @@
       "raw": 1558039,
       "gzip": 574912,
       "brotli": 424250
+    },
+    "packages/physics/dist/school-kernel.wasm": {
+      "raw": 8622,
+      "gzip": 4464,
+      "brotli": 4040
+    },
+    "packages/physics/dist/school-kernel-shared.wasm": {
+      "raw": 8710,
+      "gzip": 4523,
+      "brotli": 4100
     }
   },
   "splits": {

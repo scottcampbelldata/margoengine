@@ -2,7 +2,6 @@ import { declarePackageCore } from '../../../scripts/core-requirements.mjs';
 import { stripPackageShaderComments } from '../../../scripts/shader-comments.mjs';
 import { copyFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
-import { copyFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { build } from 'vite';
@@ -17,9 +16,12 @@ const dist = distDir(root);
 const exposeSchoolWasmUrl = {
   name: 'expose-school-wasm-url',
   renderChunk(code) {
-    if (!code.includes('school-kernel.wasm?')) return null;
+    if (!code.includes('school-kernel')) return null;
     return {
-      code: code.replace(/\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/school-kernel\.wasm\?no-inline["'])/g, ''),
+      code: code.replace(
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/school-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        '',
+      ),
       map: null,
     };
   },
@@ -63,7 +65,8 @@ await build({
     rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
   },
 });
-await copyFile(resolve(root, 'src/schooling/school-kernel.wasm'), resolve(dist, 'school-kernel.wasm'));
+for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
 execFileSync(
   process.execPath,
   [resolve(repository, 'node_modules/typescript/bin/tsc'), '-p', tsconfigFor(root, dist)],

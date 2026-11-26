@@ -8940,5 +8940,5 @@ Body bending, contact, wing lift, flap power and tail propulsion belong to the b
 fixture verifies the field hand-off and a bank derived from lateral acceleration. The original film shots
 still need playback checks.
 
-The optional entry is 4,864 B gzip plus a separately fetched 4,589 B gzip SIMD kernel (9,035 B raw).
+The optional entry is 4,998 B gzip. The plain SIMD kernel is 4,464 B gzip (8,622 B raw). The shared variant is 4,523 B gzip (8,710 B raw).
 That budget covers the field adapter and the point-mass mode in one import. Core and stage gain zero bytes.

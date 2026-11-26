@@ -7,7 +7,8 @@ import {
   SCHOOL_PREDATORS_FIELD,
   SchoolSolver,
 } from '@margoengine/physics/schooling';
-import { PhysicsWorld } from '@margoengine/physics/world';
+import { HeatConduction } from '@margoengine/physics/thermal';
+import { isShared, PhysicsWorld, worldMemory } from '@margoengine/physics/world';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
 
 const origin = [0, 0, 0];
@@ -297,4 +298,27 @@ test('school validation tells the caller how to set invalid radii or repair the 
 test('load honours an already-aborted signal', async () => {
   const reason = new Error('stop this school load');
   await assert.rejects(SchoolSolver.load({ signal: AbortSignal.abort(reason) }), (error) => error === reason);
+});
+
+test('default shared and explicit plain arenas give the same school and thermal states', async () => {
+  const members = [still([0, 0, 0]), { position: [0, 0, 1], velocity: [0, 0, 1] }];
+  const run = async (memory) => {
+    const school = await SchoolSolver.load();
+    const heat = await HeatConduction.load();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
+    world.add(heat, {
+      dimensions: [2, 1, 1],
+      cellSize: [1, 1, 1],
+      materials: { conductivity: 1, heatCapacity: 2 },
+      initialTemperature: [300, 400],
+    });
+    world.add(school, { members });
+    world.advance(30);
+    assert.ok(school.read(0).position[2] > 0);
+    assert.ok(heat.readTemperature()[0] > 300);
+    return world.hash();
+  };
+  const shared = worldMemory();
+  assert.ok(isShared(shared));
+  assert.equal(await run(shared), await run(worldMemory(false)));
 });

@@ -2437,9 +2437,10 @@ Known kernel gaps:
 
 ### 1.7 Physics kernel
 
-`SchoolSolver` (LIFE-04) imports the world's existing WebAssembly.Memory. Its position-independent Rust
-module has a private world-allocated data, stack and grid workspace. The blueprint build checks
-relocation and stack use on a pre-filled arena. Coupling tests exercise two instances, shared fields
+`SchoolSolver` (LIFE-04) imports the world's WebAssembly.Memory. Its plain and shared Rust builds put
+read-only linker data in slot 4. The host supplies each instance a separate stack and gives the existing
+neighbour grid only its bounded world-allocated scratch. The blueprint build checks both variants
+and verifies their placement and stack use on a pre-filled arena. Coupling tests exercise two instances, shared fields
 after a memory grow, integer-cell coordinate shifts, 24/30/60 fps hashes and snapshot restore.
 Analytic checks cover quadratic coasting and turn curvature. A crossing-predator fixture covers anticipation
 and regrouping. The original film shots need wiring and review once the locomotion consumers adopt the intent field.
