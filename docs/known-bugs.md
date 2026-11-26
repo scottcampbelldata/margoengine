@@ -6,16 +6,17 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-26: a deck volume on a held dynamic hull fed by the sea's inflow pushes the hull up (KB-FLIP-DECKLOAD1, physics flip)
+### Open 2026-11-26: a held hull's deck volume fed by the sea's inflow takes about half its water's weight (KB-FLIP-DECKLOAD2, physics flip)
 
 - **Repro:** a box hull (2 m by 1 m by 1 m, a dynamic body held still by its locks) with its deck 0.2 m under still fresh
   water, `HullSolver` writing `deckInflow` and `DeckWaterSolver` (inflow on, the deck box on the deck, cells [20, 6, 10] of
-  0.1 m). The deck volume takes the inflow and settles at 0.438 m^3, but its load on the hull (its forces region, y) settles
-  at +1,124 N, up, where the water's weight is -4,297 N. With a fixed body, still water placed at the start and no inflow
-  (its own test) the load is the weight.
-- **Cause:** not yet found, in the deck volume's load on a moving (held) body or from inflow-made particles. The hull
+  0.1 m). The deck volume takes the inflow and settles at 0.438 m^3 (4,297 N), but its load on the hull (its forces region,
+  y) settles at -2,198 N after 6 s. KB-FLIP-DECKLOAD1's fix brought the same case from +1,124 N; its regression (0.3 m of
+  water placed at the start, no inflow) takes the full weight.
+- **Cause:** not yet found, in how the deck volume's load treats water made by the inflow on a held hull. The hull
   solver's side is right: it sees the claim and leaves its own deck load out (`packages/physics/tests/deck-water.test.js`,
   "the deck volume claims its hull").
+
 ### Fixed 2026-11-26: deck water on a hull held still loaded it with a fraction of its weight (KB-FLIP-DECKLOAD1, physics/flip)
 
 - **Repro:** a dynamic hull held by locks (or by contacts, joints, a mooring) with a `DeckWaterSolver` on it: 0.3 m of

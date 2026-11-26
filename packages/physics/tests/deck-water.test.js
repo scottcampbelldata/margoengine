@@ -210,8 +210,8 @@ test('the deck volume claims its hull, so the hull carries one deck load, not tw
     Math.abs(shared.held - sides) <= 1e-4 * sides,
     `claimed: the hull solver holds ${shared.held} N, sides ${sides}`,
   );
-  // The deck volume took the sea's inflow (its own load on the hull is the still-water test's above; KB-FLIP-DECKLOAD1
-  // tracks its sign on a held dynamic hull fed by the inflow).
+  // The deck volume took the sea's inflow (its own load on the hull is the still-water test's above; KB-FLIP-DECKLOAD2
+  // tracks its size on a held dynamic hull fed by the inflow).
   assert.ok(shared.water > 0, 'the deck volume took the inflow');
   assert.ok(
     Math.abs(alone.held - whole) <= 1e-4 * whole,
