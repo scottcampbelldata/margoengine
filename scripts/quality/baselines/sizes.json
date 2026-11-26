@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20626455,
+  "total": 20626947,
   "history": [
     {
       "date": "2026-10-24",
@@ -13819,6 +13819,12 @@
       "commit": "C-PID-01-02",
       "grew": 1,
       "reason": "@margoengine/physics base measured 94,001 B gzip (the budget was 93,993): PidController gains split linear and angular axes and gains, a capped command with conditional integration against windup, a whole-pose apply and its integrals read back, and PdController and pdErrors join it (Rapier parity rows C-PID-01 and C-PID-02). The controllers are root exports, so a separate entry would move an existing root export and break the API. Budget (measured + max(3%, 256 B)): 93,993 to 96,821 B. Core plus stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "75e53d5448",
+      "grew": 1,
+      "reason": "SEA-15's horizontal scale-dependent dispersion moves physics/tracers from 12184 to 12662 B gzip. The optional ceiling rises from 12550 to 13042 B. The dispersion law shares the particle transport loop and stores its release ages in the tracer snapshot. A split would duplicate the transport loop or require a second solver to track the same particles."
     }
   ],
   "items": {
@@ -14697,7 +14703,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 13395,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 12550,
+    "@margoengine/physics/tracers": 13042,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
