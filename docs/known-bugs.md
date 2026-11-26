@@ -6,6 +6,19 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-26: on the WebGL2 compatibility layer, test:shot's sky-coverage check loses the device on the orrery shot (KB-SHOT-COMPATLOST1, tools/shot)
+
+- **Repro:** on an Apple M6 Mac (ANGLE on Metal), `npm run build:packages`, then `MARGO_COMPAT=1 npm run test:shot`. Two
+  runs out of two failed the same way. `determinism-check.mjs` passes all its cases. `sky-coverage-check.mjs` passes its
+  first two shots (cabin-hearth-kettle, cabin-window-snow). On its third, orrery-dolly (the page with no sky), the page
+  logs `AbortError: The device was lost before the buffer mapped; map it again on the restored device`, and the shot
+  tool fails on that page error (`tools/shot/render.mjs`, the console handler). `moving-check.mjs` and
+  `look-masks-check.mjs` did not run after it. On WebGPU, `npm run test:shot` passes.
+- **Cause:** not found yet. The compatibility layer reports a device loss while a readback buffer is waiting to map.
+  The page then rejects that map, as the loss contract asks. What makes the layer lose its device on this shot is
+  unknown: it is the third page the same browser opens in that check, and the first without a sky.
+- **Same on main:** main's tools/shot fails the same way. The film hook added for PA-03 does not change it.
+
 ### Fixed 2026-11-26: the branches of a multibody under a fixed root were islands that walked each other's links (KB-PHYS-MBISLAND1, physics kernel)
 
 - **Repro:** `packages/physics/tests/next-multibody.test.js`, "two branches under a fixed root are one island, and swing as
