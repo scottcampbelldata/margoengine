@@ -39,6 +39,7 @@
     "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-preview.js && node scripts/test-replay.js --browsers=default",
     "test:replay": "npm run build && node scripts/test-replay.js",
     "prepack": "npm run build",
+    "test:browser:dfsph": "cd ../.. && node packages/physics/tests/dfsph.browser.mjs && node packages/physics/tests/dfsph.browser.mjs --compat",
     "test:browser:pbf": "cd ../.. && node packages/physics/tests/pbf.browser.mjs && node packages/physics/tests/pbf.browser.mjs --compat"
   },
   "sideEffects": false,
@@ -286,6 +287,10 @@
     "./lava": {
       "types": "./dist/lava/index.d.ts",
       "import": "./dist/lava.js"
+    },
+    "./dfsph": {
+      "types": "./dist/dfsph/index.d.ts",
+      "import": "./dist/dfsph.js"
     },
     "./pbf": {
       "types": "./dist/pbf/index.d.ts",

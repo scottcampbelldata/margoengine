@@ -114,7 +114,17 @@ function curvedSurface(radius: number, half: number, spacing: number): Vec3[] {
   return points;
 }
 
-function boundaryVolumes(points: readonly Vec3[], support: number): Sample[] {
+function poly6(x: number, y: number, z: number): number {
+  const r = Math.max(0, 1 - x * x - y * y - z * z);
+  return r * r * r;
+}
+
+function boundaryVolumes(
+  points: readonly Vec3[],
+  support: number,
+  weight: (x: number, y: number, z: number) => number,
+  normalizer: number,
+): Sample[] {
   const grid = new Map<string, Vec3[]>();
   const inv = 1 / support;
   const cell = ([x, y, z]: Vec3): [number, number, number] => [
@@ -138,11 +148,10 @@ function boundaryVolumes(points: readonly Vec3[], support: number): Sample[] {
             const a = (p[0] - q[0]) * inv;
             const b = (p[1] - q[1]) * inv;
             const c = (p[2] - q[2]) * inv;
-            const r = Math.max(0, 1 - a * a - b * b - c * c);
-            sum += r * r * r;
+            sum += weight(a, b, c);
           }
         }
-    return { position: p, volume: 1 / (POLY6 * sum) };
+    return { position: p, volume: 1 / (normalizer * sum) };
   });
 }
 
@@ -151,6 +160,8 @@ export function prepareBoundary(
   spacing: number,
   support: number,
   bodyCapacity: number,
+  weight = poly6,
+  normalizer = POLY6,
 ): PreparedBoundary {
   const centre = vec(input.centre ?? ZERO, 'PBF boundary centre');
   const rotation = orientation(input.rotation ?? IDENTITY, 'PBF boundary rotation');
@@ -174,7 +185,14 @@ export function prepareBoundary(
     for (const extent of half) positive(extent, 'PBF boundary half extent');
     samples = boxSurface(half, sampleSpacing);
   }
-  return { kind, half, centre, rotation, body: input.body, samples: boundaryVolumes(samples, support) };
+  return {
+    kind,
+    half,
+    centre,
+    rotation,
+    body: input.body,
+    samples: boundaryVolumes(samples, support, weight, normalizer),
+  };
 }
 
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];

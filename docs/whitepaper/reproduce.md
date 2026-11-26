@@ -4347,3 +4347,12 @@ Run `node --test packages/physics/tests/coupling/rail.test.js` after rebuilding 
 Weather. Run `npm --workspace=@margoengine/physics run test:browser:rail` from the repository root
 to exercise WebGPU and WebGL2. The proof records the geometry render under
 `test-results/dyn05-browser` alongside the measured car displacement and pantograph load.
+
+### Divergence-free particle pressure (FLUID-01)
+
+Build Physics and run `node --test packages/physics/tests/coupling/dfsph.test.js`. The tests derive their
+pressure and viscosity values from the native kernel's published equations using an independent JavaScript
+calculation. Run `node packages/physics/tests/dfsph.browser.mjs` and repeat with `--compat` to check that the
+Water package displays the same simulated mass and front on both backends. The experimental diagnostic
+`node packages/physics/tests/dfsph-lab.mjs` compares the channel surge against the unaffected laboratory
+clock intervals and returns a failure when a tolerance is missed.

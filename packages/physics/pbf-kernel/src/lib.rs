@@ -1,13 +1,22 @@
 #![no_std]
 #![cfg(target_arch = "wasm32")]
 
+#[cfg(feature = "dfsph")]
+mod dfsph;
 mod grid;
 mod vector;
 
-use grid::{Bucket, Grid};
-use vector::{Vec3, ZERO, add, cross, dot, length, norm2, rotate, scale, sqrt, sub};
+#[cfg(feature = "pbf")]
+use grid::Bucket;
+use grid::Grid;
+use vector::{Vec3, ZERO, cross, norm2, rotate, scale, sqrt, sub};
 
+#[cfg(feature = "pbf")]
+use vector::{add, dot, length};
+
+#[cfg(feature = "pbf")]
 const POLY6: f64 = 315.0 / (64.0 * core::f64::consts::PI);
+#[cfg(feature = "pbf")]
 const SPIKY: f64 = -45.0 / core::f64::consts::PI;
 
 #[panic_handler]
@@ -93,12 +102,14 @@ pub struct Settings {
 type Reaction = [f64; 6];
 
 #[inline]
+#[cfg(feature = "pbf")]
 fn kernel(distance2: f64) -> f64 {
     let remainder = (1.0 - distance2).max(0.0);
     POLY6 * remainder * remainder * remainder
 }
 
 #[inline]
+#[cfg(feature = "pbf")]
 fn gradient(offset: Vec3, distance2: f64, i: usize, j: usize) -> Vec3 {
     if distance2 >= 1.0 {
         return ZERO;
@@ -179,6 +190,7 @@ fn clip_solid(object: &Solid, p: Vec3, radius: f64) -> Option<(Vec3, f64)> {
     Some((rotate(normal, object.rotation, false), push))
 }
 
+#[cfg(feature = "pbf")]
 fn contacts(
     settings: &Settings,
     point: &mut Particle,
@@ -229,6 +241,7 @@ fn rebuild(grid: &mut Grid<'_>, points: &[Particle], boundary: &[Boundary]) {
     }
 }
 
+#[cfg(feature = "pbf")]
 fn estimate_density(
     points: &mut [Particle],
     work: &mut [Work],
@@ -278,6 +291,7 @@ fn estimate_density(
     maximum
 }
 
+#[cfg(feature = "pbf")]
 fn project_density(
     points: &[Particle],
     work: &mut [Work],
@@ -346,6 +360,7 @@ fn project_density(
     }
 }
 
+#[cfg(feature = "pbf")]
 fn recover_velocity(
     points: &mut [Particle],
     work: &[Work],
@@ -382,6 +397,7 @@ fn recover_velocity(
     }
 }
 
+#[cfg(feature = "pbf")]
 fn limit_mechanical_energy(points: &mut [Particle], work: &[Work], gravity: Vec3, incoming: f64) {
     let mut budget = incoming;
     let mut energy = 0.0;
@@ -415,6 +431,7 @@ fn limit_mechanical_energy(points: &mut [Particle], work: &[Work], gravity: Vec3
     }
 }
 
+#[cfg(feature = "pbf")]
 fn smooth(
     points: &mut [Particle],
     work: &mut [Work],
@@ -538,6 +555,7 @@ fn smooth(
 }
 
 /// All buffers are caller-owned world regions. Positions and velocities are SI, while density iteration is nondimensional.
+#[cfg(feature = "pbf")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn solve_pbf(
     particle_ptr: *mut Particle,

@@ -131,6 +131,44 @@ linearly, and the stress uses the relative velocity of air and water.
 [Garratt](https://doi.org/10.1175/1520-0493%281977%29105%3C0915%3ARODCOO%3E2.0.CO%3B2),
 [Donelan et al.](https://doi.org/10.1029/2004GL019460).
 
+### Divergence-free particle liquid (FLUID-01)
+
+Jan Bender and Dan Koschier (2015, 2017), *Divergence-Free SPH for Incompressible and Viscous Fluids*,
+section 3 equations 7–12 and Algorithms 1–3, supply the two implicit pressure projections, warm starts and CFL
+scheme. The kernel gradients are normalized by reference density. The positive density-prediction residual is
+divided by the step duration, so the two passes use the same symmetric velocity update. A bounded line step
+minimizes the upper quadratic bound of the squared positive residual. This keeps the boundary reaction
+scaled by the same amount as the fluid correction. Margo uses the cubic spline for both kernel value and
+gradient and shares the position-based entry's 27-cell sparse hash. [2015 paper](https://animation.rwth-aachen.de/media/papers/2015-SCA-DFSPH.pdf),
+[2017 paper](https://dankoschier.github.io/resources/papers/BK17.pdf).
+
+Nadir Akinci, Markus Ihmsen, Gizem Akinci, Barbara Solenthaler and Matthias Teschner (2012), *Versatile
+Rigid-Fluid Coupling for Incompressible SPH*, equations 4–10, supply inverse kernel-sum boundary volumes.
+Each sample takes the rigid velocity at its world point. It receives the negative fluid impulse and its
+moment about the rigid body's centre of mass.
+[Akinci et al.](https://cgl.ethz.ch/Downloads/Publications/Papers/2012/Sol12/Sol12.pdf).
+
+Marcel Weiler, Dan Koschier, Magnus Brand and Jan Bender (2018), *A Physically Consistent Implicit Viscosity
+Solver for SPH Fluids*, equations 7–12, supply the central Laplacian, backward-Euler system and moving-body
+boundary term. The same matrix-free system is solved with a coordinate-Jacobi preconditioner. Each fluid pair
+has one central interaction, so a rigid rotational velocity contributes no viscosity on its own.
+[Weiler et al.](https://dankoschier.github.io/resources/papers/WKBB18.pdf).
+
+Rene Winchenbach, Rustam Akhunov and Andreas Kolb (2020), *Semi-Analytic Boundary Handling Below Particle
+Resolution for Smoothed Particle Hydrodynamics*, use the closed plane integral of a radial kernel. Margo
+integrates its cubic spline with circular sections, yielding the dimensionless half-space density
+`2*pi*integral[q,1] W(r)*r*(r-q) dr` and its derivative. At perpendicular walls the product of missed
+fractions approximates overlap, so the gradient matches the same density model.
+[Winchenbach et al.](https://www.cg.informatik.uni-siegen.de/sites/www.cg.informatik.uni-siegen.de/files/data/Publications/2020/semi-analiticBoundaryHandling.pdf).
+
+The lab diagnostic follows J. C. Martin and W. J. Moyce (1952), *An Experimental Study of the Collapse of Liquid
+Columns on a Rigid Horizontal Plane*, section 3 and Table 2. The measured spread intervals exclude the unknown
+diaphragm release time. The native calculation has an early surge in that narrow channel, recorded in
+`docs/known-bugs.md`. Gizem Akinci, Nadir Akinci and Matthias Teschner (2013), *Versatile Surface Tension and
+Adhesion for SPH Fluids*, supplies the cohesion and adhesion scheme considered for the capillarity follow-up.
+[Martin and Moyce](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf),
+[Akinci et al.](https://cg.informatik.uni-freiburg.de/publications/2013_SIGGRAPHASIA_surfaceTensionAdhesion.pdf).
+
 ### Position-based particle liquids (FLUID-02)
 
 Miles Macklin and Matthias Müller (2013), *Position Based Fluids*, equations 1–14 and 15–17, supplies the

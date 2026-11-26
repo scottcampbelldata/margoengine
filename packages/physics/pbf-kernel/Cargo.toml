@@ -14,3 +14,7 @@ lto = "fat"
 codegen-units = 1
 panic = "abort"
 strip = "symbols"
+[features]
+default = ["pbf"]
+pbf = []
+dfsph = []

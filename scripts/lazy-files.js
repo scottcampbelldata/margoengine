@@ -239,6 +239,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/dfsph-kernel.wasm',
+    label: 'dfsph-kernel.wasm',
+    kind: 'Rust SIMD divergence-free particle liquid',
+    measure: 'file',
+    when: 'DfsphSolver.load(world.memory) from the optional /dfsph entry with plain memory',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/dfsph-kernel-shared.wasm',
+    label: 'dfsph-kernel-shared.wasm',
+    kind: 'Rust SIMD divergence-free particle liquid, shared world memory',
+    measure: 'file',
+    when: 'DfsphSolver.load(world.memory) from the optional /dfsph entry with shared memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/lightning-kernel.wasm',
     label: 'lightning-kernel.wasm',
     kind: 'Rust SIMD electric potential relaxation',

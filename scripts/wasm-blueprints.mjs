@@ -99,6 +99,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'dfsph-kernel',
+    crate: 'packages/physics/pbf-kernel',
+    blueprint: 'packages/physics/src/dfsph/dfsph-kernel.wasm',
+    script: 'packages/physics/scripts/build-pbf-kernel.mjs',
+    args: ['plain', 'dfsph'],
+  },
+  {
+    name: 'dfsph-kernel-shared',
+    crate: 'packages/physics/pbf-kernel',
+    blueprint: 'packages/physics/src/dfsph/dfsph-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-pbf-kernel.mjs',
+    args: ['shared', 'dfsph'],
+  },
+  {
     name: 'rail-kernel',
     crate: 'packages/physics/rail-kernel',
     blueprint: 'packages/physics/src/rail/rail-kernel.wasm',

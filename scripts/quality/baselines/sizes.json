@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20406768,
+  "total": 20413532,
   "history": [
     {
       "date": "2026-10-24",
@@ -13155,6 +13155,12 @@
       "commit": "feat(physics) bubbles",
       "reason": "New optional physics/bubbles entry (FW-4): BubbleSolver, parcels of bubbles carried by a flow, rising (Thorpe and Keeling), dissolving (Castro), laying foam, and shipAeration from a ship race; 3,804 B gzip (this Mac). One solver; nothing to split.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "FLUID-01",
+      "grew": 1,
+      "reason": "FLUID-01 adds the optional DFSPH liquid from zero to 6508 B gzip. Its lazy assets contain two pressure passes and implicit viscosity. Core and Stage gain zero bytes."
     }
   ],
   "items": {
@@ -13978,6 +13984,7 @@
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/crush": 3763,
     "@margoengine/physics/decomposition": 11130,
+    "@margoengine/physics/dfsph": 6764,
     "@margoengine/physics/drainage-fog": 4922,
     "@margoengine/physics/earth": 3456,
     "@margoengine/physics/entry": 10205,

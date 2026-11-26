@@ -15,31 +15,46 @@ import { blueprintRustEnv } from '../../../scripts/rust-wasm-env.mjs';
 
 const crate = fileURLToPath(new URL('../pbf-kernel/', import.meta.url));
 // The linker base is zero. This kernel may import the arena only if it writes no static bytes.
-const linker = { name: 'pbf', slot: -1 };
-const output = new URL('../src/pbf/', import.meta.url);
+const solver = process.argv[3] ?? 'pbf';
+if (solver !== 'pbf' && solver !== 'dfsph') throw new Error('Choose PBF or DFSPH.');
+const linker = { name: solver, slot: -1 };
+const output = new URL('../src/' + solver + '/', import.meta.url);
 mkdirSync(output, { recursive: true });
 
 const variant = process.argv[2];
-if (variant && variant !== 'plain' && variant !== 'shared') throw new Error('Choose the plain or shared pbf build.');
+if (variant && variant !== 'plain' && variant !== 'shared')
+  throw new Error('Choose the plain or shared liquid kernel build.');
 for (const shared of variant ? [variant === 'shared'] : [false, true]) {
   const flags = rustFlags(linker, shared).replace('-C target-feature=', '-C target-feature=+simd128,');
   const manifest = join(crate, 'Cargo.toml');
   const result = await runWithTimeout(
-    ['cargo', 'build', '--locked', '--release', '--target', 'wasm32-unknown-unknown', '--manifest-path', manifest],
+    [
+      'cargo',
+      'build',
+      '--locked',
+      '--release',
+      '--target',
+      'wasm32-unknown-unknown',
+      '--manifest-path',
+      manifest,
+      '--no-default-features',
+      '--features',
+      solver,
+    ],
     { env: blueprintRustEnv(crate, flags), timeoutMs: 120_000 },
   );
-  if (result.code !== 0) throw new Error('PBF kernel build failed. Use the pinned Rust toolchain.');
+  if (result.code !== 0) throw new Error('Liquid kernel build failed. Use the pinned Rust toolchain.');
   const file = join(crate, 'target/wasm32-unknown-unknown/release/margoengine_pbf_kernel.wasm');
   const bytes = readFileSync(file);
   const problems = moduleProblems(linker, bytes, shared);
   const { active, exports } = inspectModule(bytes);
   if (active.length || exports.__data_end?.value !== globalBase(linker))
-    problems.push('The stateless pbf module must have an empty data section; move its state into world regions');
-  if (problems.length) throw new Error('PBF kernel placement is invalid. ' + problems.join('. '));
+    problems.push('The stateless liquid module must have an empty data section; move its state into world regions');
+  if (problems.length) throw new Error('Liquid kernel placement is invalid. ' + problems.join('. '));
   const memory = new WebAssembly.Memory({ initial: DYNAMIC_BASE / PAGE, maximum: MAX_MEMORY_PAGES, shared });
   const sentinel = new Uint8Array(memory.buffer).fill(0xd7);
   new WebAssembly.Instance(new WebAssembly.Module(bytes), { env: { memory } });
   if (!sentinel.every((value) => value === 0xd7))
-    throw new Error('PBF initialization overwrote the world; put all working data in solver-owned regions.');
-  copyFileSync(file, new URL(shared ? 'pbf-kernel-shared.wasm' : 'pbf-kernel.wasm', output));
+    throw new Error('Liquid kernel initialization overwrote the world; put all working data in solver-owned regions.');
+  copyFileSync(file, new URL(solver + (shared ? '-kernel-shared.wasm' : '-kernel.wasm'), output));
 }

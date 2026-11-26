@@ -5796,3 +5796,12 @@ matches the independently integrated peak depth for both orientations.
 Two widely separated loads on a 256 × 384 bed examine 771 of 197,248 faces at a repose slope of 0.2. The test
 matches the full-grid reference's native increments and moved volume exactly. It also checks the zero-slope case,
 which reaches 152,113 faces because the ordered sweep can transfer through many of the cells.
+
+### Divergence-free particle pressure (FLUID-01)
+
+The scoped coupling tests verify a cubic self density, closed-form two-particle density and divergence
+updates, three physical scales, the backward-Euler viscous pair and rigid rotational invariance. The clock
+and warm pressure restore bit-for-bit across both Wasm memories. A solved water column renders through the
+Water particle surface in WebGPU and WebGL2. Both show 1,800 liquid particles retaining 77.175 kg and
+a front at 1.982 m. Each backend changes more than 16,200 frame pixels. The narrow-channel physical
+validation remains open.

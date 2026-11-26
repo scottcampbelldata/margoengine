@@ -10441,3 +10441,11 @@ and visits them in the same order as a complete sweep. A transfer schedules any 
 Reported work gives raster-vertex visits and candidate faces examined, and the volume moved is auditable without a timer.
 The browser fixture rebuilds the Terrain mesh from the published bed sampler on demand. The same physical relief
 reaches WebGPU and WebGL2 without transferring a solver-specific render texture.
+
+### Divergence-free particle pressure
+
+The optional Physics liquid entry owns no static native data. Plain and shared SIMD kernels use the
+solver-owned regions for particle state, warm multipliers, sparse buckets and viscosity work. The coupling
+suite checks rigid linear and angular reaction, clock and restore identity, and pressure-driven modal PCM.
+An isolated Water fixture draws the same simulated particle state on WebGPU and WebGL2. The emitted world
+fields have executable consumers and the missing conservative surface exchange is recorded in the physics queue.

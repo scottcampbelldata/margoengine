@@ -4477,6 +4477,43 @@ PBF sizes its impulse field from the whole world's row count. Use `world.couple(
 and paired linear and angular reactions. The solver reads local coordinates from the body's owning cell. Set the
 same `cellSize` on both sides of a floating-origin scene.
 
+### Divergence-free liquid pressure
+
+`@margoengine/physics/dfsph` solves density and velocity divergence independently on the world clock. The
+default `accurate` profile allows up to 40 density and 32 divergence iterations per advective substep.
+The `interactive` profile uses 12 for each. Both use the same cubic kernel, implicit kinematic viscosity and
+sparse native grid. Run it at a higher dyadic `rate` for fast liquid and small features.
+
+```ts
+import { DfsphSolver } from '@margoengine/physics/dfsph';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const water = await DfsphSolver.load(world.memory);
+const spacing = 0.06;
+const particles = Array.from({ length: 64 }, (_, i) => ({
+  position: [
+    (0.5 + i % 4) * spacing,
+    (8.5 + Math.floor(i / 16)) * spacing,
+    (0.5 + Math.floor(i / 4) % 4) * spacing,
+  ] as const,
+}));
+world.add(water, { particles, spacing, density: 1000, viscosity: 1e-6 });
+world.advance(24);
+console.log(water.mass, water.sample(0).position, water.statistics.compression);
+```
+
+The particle field publishes f64 XYZ, velocity XYZ, density and mass. Use `positions(out)` to stage active
+XYZ rows for `ParticleLiquid` in `@margoengine/water/liquid`. Reserve `capacity` to append material with `emit`.
+The box's closed faces integrate the pressure kernel beyond their planes. Use `wallPressure: false` for hard
+contacts alone, or per-face `walls` settings for open edges. Free-surface pressure corrects compression and
+does not supply surface tension.
+
+A fixed or rigid-body box, sphere or capsule uses sampled pressure at its moving surface. For live rigid
+exchange, load with `rigid: true`, set the boundary's `body` row and use
+`world.couple(['rigid', water.id], 'staggered')`. Pass a one-track `ModalSoundSolver.contactField` as
+`modalContactField` to excite resonances from hard liquid impacts. Run both at the same world rate.
+
 ### Rail running gear and contact wire
 
 Import `@margoengine/physics/rail` for railway rolling stock with two sprung bogies, four wheelsets,

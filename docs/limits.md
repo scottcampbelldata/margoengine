@@ -9679,9 +9679,26 @@ Lava uses a regular depth-averaged heightfield patch with closed edges. It resol
 
 The native microstep follows transport and thermal diffusion stability limits and closes the volume and enthalpy ledgers at each world interval. Mass and cooling rates from ICE-05 are received on its 60 Hz staggered interface. Matching grid geometry is supplied explicitly for terrain and deposit consumers. The optional lava entry is 6,304 B gzip with a 6,560 B ceiling. Both Wasm assets are 9,735 B raw and each is 4,127 B gzip. Core plus stage remains 24,820 B gzip.
 
+### Divergence-free particle liquid (FLUID-01)
+
+The DFSPH entry measures 6,508 B gzip. Each lazy native asset measures 23,671 B raw and 9,364 B gzip.
+
+The solver advances one liquid with a uniform rest density and particle mass. Its two pressure passes
+remove compression and positive divergence. Tolerances describe average residuals and the actual residuals
+are reported when iteration budgets are reached. The clock switches to smaller advective substeps above
+0.4 spacings of travel. The support radius, contact radius and arena capacity control resolved detail.
+Plain and shared Wasm preserve the same clocked state and snapshot. Shared memory does not parallelize the
+native loops.
+
+Closed planar walls integrate the cubic pressure kernel. Perpendicular-wall overlap is approximated.
+Rigid boxes, spheres and capsules use sampled boundaries and hold their last published pose during the
+fluid substeps. Contact audio represents an impulse on one selected modal track. Surface tension, bubble
+acoustics, shallow-water exchange and film production bindings are open. The narrow-channel surge is early
+against the cited experimental range.
+
 ### Position-based particle water (FLUID-02)
 
-The dedicated PBF entry measures 6,021 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.
+The dedicated PBF entry measures 6,103 B gzip. Each Wasm variant is 17,854 B raw and 7,143 B gzip.
 
 
 
