@@ -9658,7 +9658,10 @@ The operation validates all pieces before replacing the body. It builds the edit
 and uses the normal native solve for the fragments. The finite triangle blade in `SoftBodies.cut`
 continues to slice along existing faces. Geometric cuts and face tears retain live rigid anchors
 at the same point in the rigid frame for every surviving copy of the attached vertex. Embedded
-skins, separate spring or cluster constraints and bound meshes need a separate transfer. Snapshots
+skins, separate spring or cluster constraints and separately bound meshes need a separate transfer.
+The built-in surface collider is rebuilt from each piece's boundary, including open incision faces.
+Its contact, sensor, filtering and event settings carry over. Each collider has a new identity
+and derives its mass properties from its boundary and copied density. Snapshots
 of a cut restore in worlds with the same cut topology. The optional soft entry is 131,482 B gzip,
 with 38,973 B in its base and 91,849 B in the lazy native kernel bundle.
 
@@ -9667,7 +9670,7 @@ existing tetrahedron. Tetrahedra that meet the supporting plane may be subdivide
 neighboring faces remain conforming. Only the triangles covered by the blade are released.
 Cells outside the blade keep their material connections. Tiny subdivisions must fit the
 same f32 geometry and rest-basis requirements as a full plane cut. The API accepts one
-triangle per operation. Embedded skins, springs, cluster constraints and bound meshes still
+triangle per operation. Embedded skins, springs, cluster constraints and separately bound meshes still
 require their own state transfer.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base

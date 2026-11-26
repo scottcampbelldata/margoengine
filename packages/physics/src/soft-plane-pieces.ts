@@ -3,7 +3,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
 import type { SliceCell, SlicePlan, SlicePoint } from './soft-plane-cut.js';
-import type { SoftDestination, SoftSplit } from './soft-split.js';
+import { carryCutSurface, type SoftDestination, type SoftSplit } from './soft-split.js';
 import type { SoftBodies, SoftBody, SoftBodyDesc } from './soft.js';
 
 type NodeState = {
@@ -145,7 +145,7 @@ export function makeCutPieces(
       history.flatMap(({ nodes }) => nodes),
       body.cellMaterial,
     );
-    if (body.triangleList.length > 0) desc.setSurface();
+    if (body.triangleList.length > 0 || body.surface) desc.setSurface();
     desc.setMasses(masses);
     desc.setMaterial(body.material);
     desc.setParticleRadius(old.radius[oldBodyParticle]!);
@@ -249,6 +249,15 @@ export function makeCutPieces(
     }
     return piece;
   });
+  if (body.surface) {
+    try {
+      for (const piece of pieces) carryCutSurface(soft, body, piece);
+    } catch (error) {
+      // Keep the original query surface and its body alive if a replacement could not be made.
+      for (const piece of pieces.reverse()) soft.remove(piece);
+      throw error;
+    }
+  }
   soft.remove(body);
   return { pieces, destinations: (particle) => where.get(particle) ?? [] };
 }

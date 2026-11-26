@@ -757,7 +757,8 @@ Start with a tetrahedral solid without separate springs, clusters, an embedded s
 mesh. The fragments expose their closed boundary triangles when the original body has a mesh
 surface. Existing particle-to-rigid attachments stay at the same point in the rigid body's frame.
 When a cut duplicates an attached vertex, both copies remain attached. Use the returned pieces
-to bind new rendering or constraints.
+to bind new rendering or constraints. If the solid has a surface collider, each piece gets a
+collider following its new boundary. Friction, restitution, query groups and event settings carry over.
 
 #### Finite incisions in a solid
 
@@ -775,7 +776,7 @@ await Physics.load();
 const physics = new Physics(null, { gravity: [0, 0, 0] });
 const soft = await SoftBodies.attach(physics);
 const desc = new SoftBodyDesc([[0, 0, 0], [2, 0, 0], [0, 2, 0], [0, 0, 2]])
-  .setCells([0, 1, 2, 3]).setSurface().setSolver('vertex-block');
+  .setCells([0, 1, 2, 3]).setSurface().setSolver('vertex-block').setSurfaceCollider({ sensor: true });
 const original = soft.create(desc);
 const anchor = physics.addBody(null, {
   type: 'fixed', colliders: { shape: 'sphere', radius: 0.01, sensor: true },

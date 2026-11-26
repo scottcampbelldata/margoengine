@@ -140,6 +140,14 @@ space so translational velocity reconstruction and subsequent reciprocal contact
 [Vertex Block Descent](https://www.cemyuksel.com/research/papers/vbd-siggraph2024.pdf)
 [Global Momentum Preservation for Position-based Dynamics](https://cal.cs.umbc.edu/Papers/Dahl-2019-GMP/).
 
+Section 4 of Sifakis, Der and Fedkiw (2007) constructs the collision surface from faces with
+one incident material tetrahedron. Margo uses that cut boundary to rebuild configured query
+colliders and carries their live contact and filtering settings. The triangles continue to
+receive their fragment's current vertex positions and velocities, as moving contact geometry
+in Bridson, Fedkiw and Anderson (2002).
+[Arbitrary Cutting of Deformable Tetrahedralized Objects](https://physbam.stanford.edu/papers/stanford2007-04.pdf)
+[Robust Treatment of Collisions, Contact and Friction for Cloth Animation](https://www.cs.ubc.ca/~rbridson/docs/cloth2002.pdf).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

@@ -25,6 +25,31 @@ export interface SoftSplit {
   destinations(particle: number): SoftDestination[];
 }
 
+/** Rebuild the query surface from the piece's current boundary, inheriting the live contact settings. */
+export function carryCutSurface(soft: SoftBodies, original: SoftBody, piece: SoftBody): void {
+  const collider = original.surface?.colliders[0];
+  if (!collider?.valid || piece.triangleList.length === 0) return;
+  const { collision, contactForce } = collider.activeEvents();
+  soft.createSurfaceCollider(piece, {
+    friction: collider.friction(),
+    restitution: collider.restitution(),
+    frictionCombine: collider.frictionCombineRule(),
+    restitutionCombine: collider.restitutionCombineRule(),
+    contactSkin: collider.contactSkin(),
+    collisionGroups: collider.interactionGroups(),
+    solverGroups: collider.solverInteractionGroups(),
+    sensor: collider.isSensor(),
+    enabled: collider.isEnabled(),
+    events: collision,
+    activeCollisionTypes: collider.activeCollisionTypes(),
+    activeHooks: collider.activeHooks(),
+    contactForceEvents: contactForce,
+    contactForceThreshold: collider.contactForceEventThreshold(),
+    density: collider.density(),
+    userData: collider.userData,
+  });
+}
+
 /** A copy of the kernel's columns: making a piece grows the memory, which leaves earlier views empty. */
 const snapshot = (columns: Record<string, Float32Array>): Record<string, Float32Array> =>
   Object.fromEntries(Object.entries(columns).map(([name, view]) => [name, view.slice()]));
@@ -42,8 +67,7 @@ const join = (parent: Int32Array, a: number, b: number): void => {
 
 /**
  * Splits `body` where its cells or edges have torn or `cut` faces (cell index times 4 plus the corner opposite) are cut: returns
- * null when nothing is split, else the pieces, with the old body removed. A body with triangles (cloth, a trimesh) or a surface
- * collider is not split.
+ * null when nothing is split, or the pieces with the old body removed. Each piece can have a rebuilt surface collider.
  */
 export function splitBody(
   soft: SoftBodies,
@@ -53,7 +77,6 @@ export function splitBody(
 ): SoftSplit | null {
   if (body.removed) return null;
   const { count } = body.cellRange;
-  // A body of cells with triangles has surfaces the cell split does not carry; one of edges (cloth, a trimesh) takes them along.
   if (count > 0) return splitCells(soft, body, make, cut);
   return splitEdges(soft, body, make);
 }
@@ -155,11 +178,7 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
       members.map((p) => body.firstParticle + p),
     );
     pieces.push(piece);
-    // A surface collider for each piece, like the body's, and the body's own is taken away with it.
-    if (body.surface && desc.triangles.length > 0) {
-      const old = body.surface.colliders[0]!;
-      soft.createSurfaceCollider(piece, { friction: old.friction() });
-    }
+    carryCutSurface(soft, body, piece);
   }
   soft.remove(body);
   return { pieces, destinations: (p) => (where.has(p) ? [where.get(p)!] : []) };
@@ -457,8 +476,7 @@ function splitCells(
       mine.map((t) => t - first),
     );
     pieces.push(piece);
-    if (body.surface && desc.triangles.length > 0)
-      soft.createSurfaceCollider(piece, { friction: body.surface.colliders[0]!.friction() });
+    carryCutSurface(soft, body, piece);
   }
   soft.remove(body);
   return { pieces, destinations: (p) => where.get(p) ?? [] };

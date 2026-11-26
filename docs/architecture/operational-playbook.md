@@ -10048,6 +10048,11 @@ rigid rows. Moving every point by the mass-weighted inertial residual minimizes 
 objective while leaving the elastic strain unchanged. This preserves the linear impulse of
 free, damped fragments through rigid attachment coupling at a fixed iteration count.
 
+An authored deformable surface collider is rebuilt from each resulting piece's live boundary
+before the source collider is removed. A ray can see the cut immediately and again after the
+body moves. The replacement inherits the live contact, query and event settings, including
+changes since the body was authored.
+
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows
 cells through body compaction, both cut paths, and world snapshots. The existing tear scheduler

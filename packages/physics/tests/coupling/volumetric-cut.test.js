@@ -458,3 +458,85 @@ test('a cut retains the authored local point of a stretched attachment', async (
     bound(body.particlePosition(particle)[2], 0.04, 1, 'both copies return to the original local point');
   }
 });
+
+test('volumetric cuts rebuild query colliders at the moving fracture surfaces', async () => {
+  const operations = [
+    [(soft, body) => soft.cutPlane(body, [0.5, 0, 0], [1, 0, 0]), 2],
+    [
+      (soft, body) =>
+        soft.cutTriangle(body, [
+          [0.5, 0.2, 0.2],
+          [0.5, 0.65, 0.2],
+          [0.5, 0.2, 0.65],
+        ]),
+      1,
+    ],
+  ];
+  for (const [cut, count] of operations) {
+    const label = { part: 'query surface' };
+    const desc = tetrahedron().setSolver('vertex-block').setSurfaceCollider({ userData: label, sensor: true });
+    const { soft, body, physics, world } = await specimen(desc);
+    const hits = () => physics.raycastAll([0.35, 0.3, 0.3], [1, 0, 0], { solid: false });
+    const [before] = hits();
+    assert.ok(before);
+    bound(before.distance, 1.05, 2);
+    before.collider.setFriction(0.625).setRestitution(0.25).setCollisionGroups(0x0001ffff);
+    before.collider.setActiveEvents({ collision: false, contactForce: true });
+    const result = cut(soft, body);
+    assert.equal(result.pieces.length, count);
+    assert.equal(before.collider.valid, false);
+    const after = hits();
+    assert.equal(after.length, count, 'each new geometric piece has a live query collider');
+    for (const { collider, distance } of after) {
+      bound(distance, 0.15, 2, 'a query reaches the new cut before either body has stepped');
+      assert.equal(collider.userData, label);
+      assert.equal(collider.friction(), 0.625);
+      assert.equal(collider.restitution(), 0.25);
+      assert.equal(collider.collisionGroups(), 0x0001ffff);
+      assert.equal(collider.isSensor(), true);
+      assert.deepEqual(collider.activeEvents(), { collision: false, contactForce: true });
+    }
+    const initial = new Map(after.map(({ collider }) => [collider, collider.vertices()]));
+    for (const piece of result.pieces) piece.applyImpulse([15 * piece.mass(), 0, 0]);
+    world.advance(1);
+    const moved = hits();
+    assert.equal(moved.length, count);
+    for (const { collider, distance } of moved) {
+      const piece = result.pieces.find((body) => body.surface?.colliders[0] === collider);
+      assert.ok(piece);
+      const current = piece.particlePositions();
+      assert.deepEqual(collider.vertices(), current);
+      assert.deepEqual(collider.indices(), piece.triangles());
+      const faceX = [...initial.get(collider)].flatMap((x, i) => (i % 3 === 0 && x === 0.5 ? [current[i]] : []));
+      assert.ok(faceX.length >= 3);
+      const hitX = 0.35 + distance;
+      assert.ok(hitX > 0.7, 'the fracture collider moves with the solid');
+      assert.ok(hitX >= Math.min(...faceX) - epsilon32 && hitX <= Math.max(...faceX) + epsilon32);
+    }
+  }
+});
+
+test('a face tear carries live query settings from a surface collider to both pieces', async () => {
+  const desc = new SoftBodyDesc([...position, [0, 0, -2]])
+    .setCells([0, 1, 2, 3, 0, 2, 1, 4])
+    .setSurface()
+    .setSurfaceCollider({ restitution: 0.625, sensor: true });
+  const { soft, body, physics } = await specimen(desc);
+  const ray = () => physics.raycastAll([0.3, 0.3, -3], [0, 0, 1], { solid: false });
+  const [before] = ray();
+  assert.ok(before);
+  const tag = { grain: 'radial' };
+  before.collider.userData = tag;
+  before.collider.setContactForceEventThreshold(42);
+  const split = soft.tear(body, { cells: [0] });
+  assert.equal(split.pieces.length, 2);
+  assert.equal(before.collider.valid, false);
+  const after = ray();
+  assert.equal(after.length, 2);
+  for (const { collider } of after) {
+    assert.equal(collider.userData, tag);
+    assert.equal(collider.restitution(), 0.625);
+    assert.equal(collider.contactForceEventThreshold(), 42);
+    assert.equal(collider.isSensor(), true);
+  }
+});

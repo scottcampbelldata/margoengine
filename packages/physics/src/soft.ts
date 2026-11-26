@@ -2819,8 +2819,8 @@ export class SoftBodies implements PhysicsAttachment {
    */
   femMaxDenseDofs = 600;
   /**
-   * Whether a tear that parts a body makes pieces of it: `'cells'` (default) for bodies of cells, `'all'` for every body made of
-   * edges alone too (a rope in two ropes), `'never'`. A body with triangles (cloth, a trimesh) or a surface collider is never split.
+   * Whether a tear that parts a body makes pieces of it: `'cells'` (default) for bodies of cells, `'all'` also for bodies made
+   * of structural edges such as ropes and cloth, or `'never'`. A surface collider follows the resulting pieces.
    */
   splitOnTear: 'cells' | 'all' | 'never' = 'cells';
   /** @internal Fixed step pieces and passes: change them between steps. */
@@ -5207,7 +5207,6 @@ export class SoftBodies implements PhysicsAttachment {
       body.edgeTotal > 0 ||
       body.cellRange.clusterCount > 0 ||
       body.skin ||
-      body.surface ||
       this.bound.some((item) => item.soft === body)
     )
       throw new MargoError(
