@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20596649,
+  "total": 20597645,
   "history": [
     {
       "date": "2026-10-24",
@@ -13711,6 +13711,12 @@
       "commit": "56a1deab8e",
       "grew": 1,
       "reason": "SEA-15's live terrain exchange moves physics/tracers from 8246 to 9469 B gzip. The optional ceiling rises from 8502 to 9754 B. The same parcels and ledger now debit and replace terrain mass; a separate entry would need a duplicate binding or new per-parcel transfer ports."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "dd6d4b7f23",
+      "reason": "BREAK-03 sectional girder force balance grows the optional crush entry from 5102 to 6094 B gzip. The ceiling rises from 5354 to 6350 B. The girder envelope is a named, tree-shakable export from the ductile material entry. A separate entry would repeat numeric validation and require a second opt-in for one crush workflow.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14535,7 +14541,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 5354,
+    "@margoengine/physics/crush": 6350,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
