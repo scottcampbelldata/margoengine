@@ -4332,6 +4332,15 @@ Build Biomes and the Physics and Procedural prerequisites, then run `node --test
 
 Build `physics`, `road`, and the existing Weather and Procedural prerequisites. Run `node --test packages/road/test/driving.test.js packages/road/tests/coupling/road-driver.test.js`. Run `node packages/road/test/driving-browser.mjs` with and without `MARGO_COMPAT=1` for the opted-in road and vehicle pipeline in Chromium.
 
+### Native preview liquid and measured surge
+
+After building Physics, run `node --test packages/physics/tests/coupling/pbf.test.js`. The dam-break
+case runs at 480 Hz and subtracts the crossing time at `Z = 1.44` from the subsequent readings in each
+Martin and Moyce trial. The fixture allows the published spread, two simulated sampling intervals, the
+rounding seen in Table 2 and the 300 fps camera sampling described in section 3.
+`npm run test:browser:pbf --workspace=@margoengine/physics` runs the rendered
+column regression on both backends and saves frames under `test-results/fluid02-browser`.
+
 ### Rail running gear and contact-wire motion
 
 Run `node --test packages/physics/tests/coupling/rail.test.js` after rebuilding Physics and

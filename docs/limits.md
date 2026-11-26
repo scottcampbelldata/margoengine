@@ -9633,6 +9633,18 @@ Lava uses a regular depth-averaged heightfield patch with closed edges. It resol
 
 The native microstep follows transport and thermal diffusion stability limits and closes the volume and enthalpy ledgers at each world interval. Mass and cooling rates from ICE-05 are received on its 60 Hz staggered interface. Matching grid geometry is supplied explicitly for terrain and deposit consumers. The optional lava entry is 6,304 B gzip with a 6,560 B ceiling. Both Wasm assets are 9,735 B raw and each is 4,127 B gzip. Core plus stage remains 24,820 B gzip.
 
+### Position-based particle water (FLUID-02)
+
+The fast and precise presets apply four and twelve projections per advective substep. A closed box can keep or
+release each face. An open face leaves the particles in the native set with their existing mass and momentum.
+Resolution follows particle spacing and the available Wasm arena, including field publication buffers. The
+support must resolve the smallest solid and jet feature. Rigid box, sphere and capsule surfaces carry kernel-normalized pressure
+samples as well as hard contacts. The staggered exchange holds the last rigid pose during the fluid substeps.
+The model uses one rest density and only corrects compression by default. The optional signed constraint adds
+apparent cohesion without a measured water–air tension law. The higher-iteration preset
+usefully reduces residual compression but retains the same explicit rigid exchange. Automatic shallow-water
+handoff, generic mesh contacts, and physical surface tension are tracked separately.
+
 ### Rail wheelsets and catenary (DYN-05)
 
 The reduced model covers two four-wheel bogies per car, one shared spin coordinate per wheelset,

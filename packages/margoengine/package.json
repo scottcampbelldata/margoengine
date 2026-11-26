@@ -3431,6 +3431,10 @@
       "types": "./dist/physics/lava.d.ts",
       "import": "./dist/physics/lava.js"
     },
+    "./physics/pbf": {
+      "types": "./dist/physics/pbf.d.ts",
+      "import": "./dist/physics/pbf.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

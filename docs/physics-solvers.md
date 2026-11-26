@@ -120,7 +120,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | ID | Solver | Phenomenon and model | Packages | State | Best published method | Kernels |
 |---|---|---|---|---|---|---|
 | FLUID-01 | SPH, divergence-free (accurate mode) | Free-surface liquid, rigid and fluid coupling, surface tension | water/src/liquid.ts (rendering only) | none: PA-22, X-56 to X-59 | Bender and Koschier, "Divergence-free SPH for incompressible and viscous fluids" (2017). Akinci et al., rigid-fluid coupling (2012) and surface tension (2013). | K06 K09 K16 |
-| FLUID-02 | Position based fluids (fast mode) | Interactive and preview liquids | none | none | Macklin and Müller, "Position based fluids" (2013). | K06 K09 |
+| FLUID-02 | Position based fluids (fast mode) | Interactive and preview liquids | `@margoengine/physics/pbf`, `@margoengine/water/liquid` | Shared/plain SIMD, two preview profiles, versioned particle fields, live rigid pressure and torque, measured surge release and an in-engine water-surface fixture | Macklin and Müller, "Position based fluids" (2013). Müller, Charypar and Gross (2003). Akinci et al. (2012). Martin and Moyce (1952). | K06 K09 |
 | FLUID-03 | FLIP and APIC grid-particle liquids | Large liquid volumes, crashing crests, waterfalls, green water on decks | physics/src/flip (`FlipSolver`: APIC on a MAC grid, ghost-fluid free surface, MIC(0) conjugate gradients; `DeckWaterSolver`: a box riding a hull, `deckInflow` in, `deckClaims` and `bodyForces` out) | sound: the liquid, the deck volume and crests from the sea checked (Martin and Moyce's dam break, the free-surface effect, sloshing, a wave through the box, a held hull's deck load); a crest plunges, its jet against Erinin et al.'s not yet like-for-like (docs/limits.md) | Zhu and Bridson, "Animating sand as a fluid" (2005). Jiang et al., "The affine particle-in-cell method" (2015). Gibou et al. (2002). Martin and Moyce (1952). docs/clean-room.md "Grid-particle liquids". | K12 K13 K15 |
 | FLUID-04 | Eulerian smoke and gas | Buoyant flow, vorticity confinement, gunpowder smoke, steam; enclosures with openings: doorway exchange flow, hot gas leaving a kiln, furnace or room, and draughts when a door opens | vfx/src/smoke.ts (prescribed rise) | stand-in: PA-56 | Fedkiw, Stam and Jensen, "Visual simulation of smoke" (2001). Selle et al., "An unconditionally stable MacCormack method" (2008). Zhang, Bridson and Greif (2015). Steckler, Quintiere and Rinkinen, "Flow induced by fire in a compartment" (1982). | K12 K13 |
 | FLUID-05 | Compressible flow, shock and blast | Euler equations, muzzle blast, underwater explosions, sonic effects | none | none: PA-49 | Toro, *Riemann Solvers and Numerical Methods for Fluid Dynamics* (2009). Colella and Woodward, PPM (1984). Cole, *Underwater Explosions* (1948). | K14 |
@@ -342,7 +342,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 | SEA-06 ← EARTH-02, ICE-03, ICE-02 | Slide, calving or fault volume source | one-way |
 | SEA-07 ← ATMO-05, ATMO-10, SPACE-02 | Wind stress, pressure, tidal potential | one-way |
 | FLUID-01/03 ↔ SEA-04/HYDRO-01 | Particle liquid hand-off to and from the surface solvers (mass and momentum exchange) | two-way |
-| FLUID-01/02 ↔ DYN-01 | Boundary particles and pressure forces on rigid bodies | two-way |
+| FLUID-01/02 ↔ DYN-01 | Boundary particles and pressure forces on rigid bodies | two-way; FLUID-02 has a staggered live rigid pose and impulse test in `packages/physics/tests/coupling/pbf.test.js` |
 
 ### Rivers, rain, terrain and sediment
 

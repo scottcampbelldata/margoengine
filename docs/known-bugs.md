@@ -16780,6 +16780,13 @@ specifically from lava in the presence of other heat sources. A layout for separ
 close that ledger. EARTH-02 remains the future granular destination for the published solid deposit elevation.
 The marine test exercises the signed source on the same registry contract that water-entry sources use.
 
+### Particle-to-surface water hand-off (PA-22)
+
+`PbfSolver` follows a free liquid surface, updates moving rigid box, sphere and capsule boundaries, and publishes the matched force
+impulse and torque. Run `packages/physics/tests/coupling/pbf.test.js` and `packages/physics/tests/pbf.browser.mjs`
+to reproduce the fluid front and rendering. The existing plunging-breaker scene still needs a conservative
+particle hand-off carrying both volume and horizontal momentum across the shallow-water interface.
+
 ### Rail production shot and full track contact (DYN-05)
 
 The Last Tram and City to Street shot sources are absent from the public checkout. The solver

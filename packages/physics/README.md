@@ -4357,6 +4357,39 @@ Grid records are f64 in layout 1, with X fastest. `lavaField` exposes lava depth
 
 For contact with ice, load with `exchangeIce: true`, map distinct lava cells to the `IceSolver` site's order and area with `ice`, and use a 60 Hz staggered group `.couple(['lava', 'ice-thermodynamics'], 'staggered')` with `new IceSolver({ readHeat: true })`. Heat used by the ice is removed from lava enthalpy. Drainage and steam mass are reported by both sides. The included `LavaBudget` records supplied and stored lava volume, environmental and ice heat, and displaced water.
 
+### Position-based water for interactive pours and splashes
+
+`@margoengine/physics/pbf` advances a free-surface liquid on the physics clock. Its sparse native neighbour search
+works in local cell coordinates. Choose `fast` for four density projections per advective substep or `precise`
+for twelve. Both profiles solve positive pressure at open interfaces. The optional `cohesive` setting restores
+the signed constraint for stylized sheets and droplets.
+
+```ts
+import { PbfSolver } from '@margoengine/physics/pbf';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+const liquid = await PbfSolver.load(world.memory);
+const spacing = 0.06;
+const particles = Array.from({ length: 128 }, (_, i) => ({
+  position: [spacing * (0.5 + i % 4), spacing * (0.5 + Math.floor(i / 16)), spacing * (0.5 + Math.floor(i / 4) % 4)] as const,
+}));
+world.add(liquid, { particles, spacing, profile: 'fast', bounds: [[0, 0, 0], [1.2, 1, 0.5]] });
+world.advance(18);
+console.log(liquid.mass, liquid.sample(0).position, liquid.statistics.peakCompression);
+```
+
+Pass `liquid.positions()` to `ParticleLiquid.attach` in `@margoengine/water/liquid`. For live rendering, allocate
+one `Float32Array` of `3 * capacity`, write to it with `positions(out)` and call the effect's `update` with the
+current active count. `particleField` publishes the versioned f64 rows with XYZ, velocity XYZ, density and mass.
+Zero mass marks a reserved inactive row. Reserve `capacity` and call `emit` on a tick boundary for a continuous
+pour into the same arena. The standalone browser fixture shows the solved water surface and its measured motion.
+
+Use `boundaries` for a fixed box, sphere or capsule, or attach the shape to a `RigidSolver` body row with `rigid: true`.
+PBF sizes its impulse field from the whole world's row count. Use `world.couple(['rigid', liquid.id], 'staggered')` for body-driven obstacle motion
+and paired linear and angular reactions. The solver reads local coordinates from the body's owning cell. Set the
+same `cellSize` on both sides of a floating-origin scene.
+
 ### Rail running gear and contact wire
 
 Import `@margoengine/physics/rail` for railway rolling stock with two sprung bogies, four wheelsets,

@@ -85,6 +85,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'pbf-kernel',
+    crate: 'packages/physics/pbf-kernel',
+    blueprint: 'packages/physics/src/pbf/pbf-kernel.wasm',
+    script: 'packages/physics/scripts/build-pbf-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'pbf-kernel-shared',
+    crate: 'packages/physics/pbf-kernel',
+    blueprint: 'packages/physics/src/pbf/pbf-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-pbf-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'rail-kernel',
     crate: 'packages/physics/rail-kernel',
     blueprint: 'packages/physics/src/rail/rail-kernel.wasm',

@@ -2415,6 +2415,10 @@
       "types": "./dist/physics/lava.d.ts",
       "import": "./dist/physics/lava.js"
     },
+    "./physics/pbf": {
+      "types": "./dist/physics/pbf.d.ts",
+      "import": "./dist/physics/pbf.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

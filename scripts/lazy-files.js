@@ -223,6 +223,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/pbf-kernel.wasm',
+    label: 'pbf-kernel.wasm',
+    kind: 'Rust SIMD position-based particle liquid',
+    measure: 'file',
+    when: 'PbfSolver.load(world.memory) from the optional /pbf entry with plain memory',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/pbf-kernel-shared.wasm',
+    label: 'pbf-kernel-shared.wasm',
+    kind: 'Rust SIMD position-based particle liquid, shared world memory',
+    measure: 'file',
+    when: 'PbfSolver.load(world.memory) from the optional /pbf entry with shared memory',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/lightning-kernel.wasm',
     label: 'lightning-kernel.wasm',
     kind: 'Rust SIMD electric potential relaxation',

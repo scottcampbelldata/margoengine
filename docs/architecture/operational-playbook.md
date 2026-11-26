@@ -10400,6 +10400,15 @@ The optional `@margoengine/physics/lava` entry joins the 60 Hz solver graph. A s
 
 `TerrainBed` supplies a heightfield. ICE-05 returns absorbed heat, liquid and steam through the existing layout-1 fields. SEA-06 consumes the layout-1 displacement rows. The tests cover direct analysis, live bidirectional thermal transfer, a downstream wave, render-frame cadence, snapshot replay and the two browser memory variants. The producer also publishes solid deposit elevation for the next granular terrain consumer.
 
+### Native free-surface preview water (FLUID-02)
+
+The optional PBF module uses a SIMD kernel in an imported PhysicsWorld arena without static slots or startup
+writes. The caller-owned sparse grid probes 27 cells in a fixed order and reports candidate work. Solver state
+is the reserved point rows, statistics and in-flight rigid impulses. The grid and boundary poses rebuild from
+that state and the existing body field. Deterministic playback is checked across plain and shared memories.
+The renderer draws the same solved points on WebGPU and the WebGL2 compatibility backend. The current evidence
+includes a published surge timing comparison, a real offset rigid impulse and a native replay.
+
 ### Rail wheelsets and catenary (DYN-05)
 
 The optional rail solver owns layout-1 f64 car and cable regions. It consumes ATMO-09 wetness directly through the field registry. The numeric state includes springs, axle speeds, controls and wire deflections. The Rust SIMD cable kernel works in the same arena and has no active static data in either memory mode. Its two lanes carry lateral and vertical waves. Focused proofs cover static axle loads, rolling distance, cant, a rail joint, wet-braking slip, coupler reactions, wire lift, contact loss, deterministic scrub and rendered asset motion on both backends.

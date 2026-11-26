@@ -38,7 +38,8 @@
     "test": "npm run build && node scripts/build-oracle.js && node --test tests/*.test.js tests/coupling/*.test.js ../../examples/package-benchmarks/proofs/package-guard.mjs",
     "test:browser": "npm run build && node scripts/test-browser.js && node scripts/test-preview.js && node scripts/test-replay.js --browsers=default",
     "test:replay": "npm run build && node scripts/test-replay.js",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:browser:pbf": "cd ../.. && node packages/physics/tests/pbf.browser.mjs && node packages/physics/tests/pbf.browser.mjs --compat"
   },
   "sideEffects": false,
   "exports": {
@@ -281,6 +282,10 @@
     "./lava": {
       "types": "./dist/lava/index.d.ts",
       "import": "./dist/lava.js"
+    },
+    "./pbf": {
+      "types": "./dist/pbf/index.d.ts",
+      "import": "./dist/pbf.js"
     }
   },
   "files": [

@@ -5750,6 +5750,14 @@ times of radial infall. The coupling harness verifies identical memory modes, fr
 
 A vent-fed lava patch closes volume and sensible-plus-crystallisation enthalpy. The motion converges to the implicit analytical wide-sheet Bingham relation for a uniform layer, stays at rest below the yield stress, and follows a channel between cooled margins. A separate block checks the surface and basal heat ledger and lateral conduction against their finite-volume equations. ICE-05 removes measured heat, releases the initial ice mass as liquid and steam, and cools the lava. SEA-06 admits the same signed natural displacement that the terrain-following lava releases. The tracked proof runs on 24, 30 and 60 fps cadences, restores from a snapshot and replays plain and shared Wasm in an isolated browser. See `packages/physics/tests/lava.test.js`, `packages/physics/tests/coupling/lava.test.js`, `packages/physics/tests/lava.browser.mjs`, and the scope in [Limits](../limits.md#thermo-viscoplastic-lava-and-nearshore-occupancy-earth-10).
 
+### Preview water at measured surge times
+
+The optional PBF solver reproduces the Martin and Moyce Table 2 release-independent arrival intervals between
+normalized front stations 1.44, 2.33 and 3.00. Both density projection presets use the same 3,456 particles.
+The exact tests also check the three-dimensional kernel, the first Jacobi position correction, gravity and
+rigid momentum exchange. WebGPU and the WebGL2 compatibility renderer draw the same native 1,800-point field
+and retain its original mass.
+
 ### Railway motion and contact-wire uplift
 
 DYN-05 advances four common axle speeds and two sprung bogies on an authored route. The

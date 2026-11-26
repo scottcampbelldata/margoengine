@@ -80,6 +80,42 @@ precipitation service uses the land rain-to-snow transition from Aiguo Dai (2008
 [Smith and Barstad](https://doi.org/10.1175/1520-0469%282004%29061%3C1377%3AALTOOP%3E2.0.CO%3B2),
 [Dai](https://doi.org/10.1029/2008GL033295).
 
+### Position-based particle liquids (FLUID-02)
+
+Miles Macklin and Matthias Müller (2013), *Position Based Fluids*, equations 1–14 and 15–17, supplies the
+Jacobi density constraint, kernel-relative artificial pressure, vorticity confinement and XSPH transport.
+Matthias Müller, David Charypar and Markus Gross (2003), *Particle-Based Fluid Simulation for Interactive
+Applications*, equations 20–21, gives the three-dimensional Poly6 and Spiky kernels. The PBF solve works
+in support-normalized coordinates, with particle rest volume as its kernel weight. The artificial pressure
+exponent is four and the reference distance is 0.3 support radii. A global correction scale limits a single
+Jacobi update to the 0.4-support advective interval without disturbing paired pressure reactions.
+[Macklin and Müller](https://mmacklin.com/pbf_sig_preprint.pdf),
+[Müller, Charypar and Gross](https://cgl.ethz.ch/Downloads/Publications/Papers/2003/Mue03b/Mue03b.pdf).
+
+Matthias Teschner, Bruno Heidelberger, Matthias Müller, Danat Pomeranets and Markus Gross (2003), *Optimized
+Spatial Hashing for Collision Detection of Deformable Objects*, section 4.1, supplies the coordinate hash.
+The native grid matches the complete keys after a collision and clears only touched buckets. Its 27-cell
+support covers the entire kernel because a cell's edge equals the smoothing radius.
+[Teschner et al.](https://cgl.ethz.ch/Downloads/Publications/Papers/2003/Tes03/Tes03.pdf).
+
+Nadir Akinci, Markus Ihmsen, Gizem Akinci, Barbara Solenthaler and Matthias Teschner (2012), *Versatile
+Rigid-Fluid Coupling for Incompressible SPH*, equations 4–10, gives the inverse kernel-sum volume for each
+boundary sample and the action-reaction exchange. Margo applies those weights to the PBF constraint, rotates
+them from actual body poses, and records the positional correction as a momentum change over the substep.
+Matthias Müller, Bruno Heidelberger, Marcus Hennix and John Ratcliff (2007), *Position based dynamics*, gives
+hard contact projection for separate geometric overlaps. A sphere projects along its radial normal, while
+a capsule uses the nearest point on its spine to find the same radial normal. The confinement option subtracts the
+net linear mode and limits restored kinetic energy to the available XSPH loss. Static contacts only have the
+incoming kinetic energy and work of gravity available to redistribute.
+[Akinci et al.](https://cgl.ethz.ch/Downloads/Publications/Papers/2012/Sol12/Sol12.pdf),
+[Müller et al.](https://doi.org/10.1016/j.jvcir.2007.01.005).
+
+J. C. Martin and W. J. Moyce (1952), *An experimental study of the collapse of liquid columns on a rigid
+horizontal plane*, Table 2, supplies independent surge arrival readings. The fixture uses their rectangular
+column with aspect ratio two, 2¼ inches wide and thick. It subtracts the time at the first measured front
+station from the subsequent readings within each trial, so camera release offsets cancel.
+[Martin and Moyce](https://www.math.ntu.edu.tw/~shyue/orch08/benchmarks/lowmach/broken-dam/91519.pdf).
+
 ### Atmospheric lightning (ATMO-07)
 
 Luciano Niemeyer, Luciano Pietronero and Hans J. Wiesmann, “Fractal Dimension of Dielectric Breakdown”

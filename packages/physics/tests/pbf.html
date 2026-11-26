@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Position-based water column</title></head>
+<body style="margin:0"><canvas width="720" height="405"></canvas>
+<script type="module">
+  import { createStage } from '/packages/stage/dist/index.js';
+  import { ParticleLiquid } from '/packages/water/dist/liquid.js';
+  import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+  import { PbfSolver } from '/packages/physics/dist/pbf.js';
+
+  const errors = [];
+  const stage = await createStage(document.querySelector('canvas'), {
+    controls: false, autoStart: false, background: '#a9bdc2', exactSize: [720, 405],
+    camera: { position: [1.15, 0.89, 1.72], target: [0.87, 0.24, 0.17], near: 0.05, far: 6 },
+    onError: error => errors.push(String(error.message ?? error)),
+  });
+  stage.box({ size: [2.37, 0.1, 0.76], position: [1.00, -0.05, 0.15], color: '#788286', roughness: 0.8 });
+  stage.box({ size: [2.18, 0.31, 0.045], position: [1.00, 0.155, -0.07], color: '#586363', roughness: 0.84 });
+  stage.box({ size: [0.07, 0.72, 0.42], position: [-0.035, 0.36, 0.14], color: '#697274', roughness: 0.67 });
+  const obstruction = { centre: [1.02, 0.09, 0.18], halfExtents: [0.06, 0.09, 0.095] };
+  stage.box({ size: obstruction.halfExtents.map(x => 2 * x), position: obstruction.centre, color: '#756758', roughness: 0.65 });
+
+  const memory = worldMemory(true);
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
+  const pbf = await PbfSolver.load(memory);
+  const spacing = 0.035;
+  const initial = [];
+  for (let x = 0; x < 10; x++) for (let y = 0; y < 18; y++) for (let z = 0; z < 10; z++)
+    initial.push({ position: [(x + .5) * spacing, (y + .5) * spacing, (z + .5) * spacing] });
+  world.add(pbf, { spacing, particles: initial, bounds: [[0, 0, 0], [2.0, 1.1, 0.35]], boundaries: [obstruction] });
+  const positions = new Float32Array(3 * initial.length);
+  pbf.positions(positions);
+  const liquid = ParticleLiquid.attach(stage.engine, {
+    particles: { positions }, radius: 0.72 * spacing, absorption: [2.5, 0.43, 0.16],
+  });
+
+  window.pbfFrame = async frame => {
+    world.advance(frame);
+    pbf.positions(positions);
+    liquid.update();
+    await stage.engine.render({ delta: 0 });
+    await stage.engine.render({ delta: 0 });
+    let front = 0;
+    for (let i = 0; i < positions.length; i += 3) front = Math.max(front, positions[i]);
+    return { front, mass: pbf.mass, points: pbf.statistics.particles, stats: liquid.frameStats,
+      errors, shared: memory.buffer instanceof SharedArrayBuffer };
+  };
+  window.closePbf = () => { liquid.dispose(); stage.dispose(); };
+</script></body></html>

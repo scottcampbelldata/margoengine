@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|rail|terramechanics|synoptic)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|airborne|falling|pedestrian|landscape|accretion|room-sound|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg|snowpack|pack-ice|drainage-fog|thin-film|viscoplastic|seismic|tsunami|lightning|lava|rail|terramechanics|synoptic|pbf)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -65,6 +65,7 @@ await build({
         waves: resolve(root, 'src/waves/index.ts'),
         entry: resolve(root, 'src/entry/index.ts'),
         flip: resolve(root, 'src/flip/index.ts'),
+        pbf: resolve(root, 'src/pbf/index.ts'),
         sea: resolve(root, 'src/sea/index.ts'),
         seakeeping: resolve(root, 'src/seakeeping/index.ts'),
         celestial: resolve(root, 'src/space/index.ts'),
@@ -113,6 +114,8 @@ for (const name of ['school-kernel.wasm', 'school-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/schooling', name), resolve(dist, name));
 for (const name of ['rail-kernel.wasm', 'rail-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/rail', name), resolve(dist, name));
+for (const name of ['pbf-kernel.wasm', 'pbf-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/pbf', name), resolve(dist, name));
 for (const name of ['seismic-kernel.wasm', 'seismic-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/seismic', name), resolve(dist, name));
 for (const name of ['lightning-kernel.wasm', 'lightning-kernel-shared.wasm'])
