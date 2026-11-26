@@ -13309,6 +13309,18 @@ log-layer assumption at very small clearances remain open. [R. A. Soulsby, “Dy
 [Liao, Wang and Wang, “In situ measurement of sediment resuspension caused by propeller wash” (2015)](https://doi.org/10.1016/j.flowmeasinst.2014.10.008),
 [Toni Llull, “Ship propeller induced scour of non-cohesive sediment in low bed-clearance conditions” (2021), §2.3.3](https://upcommons.upc.edu/server/api/core/bitstreams/14f411e3-4c77-41f1-aeac-86a82213a315/content).
 
+Cohesive tracers use Winterwerp's aggregate and breakup balance. Setting fractal dimension 2, breakup exponent
+`p = 1` and shear exponent `q = 1/2` in Eq. 1 yields `D′ = D²[k_A c G − k_B G^1.5(D − D_p)]/2`. Freezing
+the positive mobility `D²` gives an exponential relaxation toward the local equilibrium for that step. The
+size is saved per parcel. The dry mass stays constant and the excess density decreases as `D_p/D`. Settling
+uses Eq. 9 with unit shape factors and the Schiller–Naumann drag correction. The test integrates an independent
+implicit solution to verify the settling path and first-order convergence. A second case checks breakup under
+shear and exact replay. Measured aggregate-size and velocity distributions remain open. The fixed fractal
+dimension and spherical drag approximate the effects of permeability and mixed primary sizes documented in
+recent flume and field experiments. [Winterwerp, “A simple model for turbulence induced flocculation of cohesive sediment” (1998)](https://doi.org/10.1080/00221689809498621),
+[Winterwerp, Manning, Martens, de Mulder and Vanlede, “A heuristic formula for turbulence-induced flocculation of cohesive sediment” (2006), equations 1 and 9](https://doi.org/10.1016/j.ecss.2006.02.003),
+[Nghiem et al., “Testing floc settling velocity models in rivers and freshwater wetlands” (2024)](https://doi.org/10.5194/esurf-12-1267-2024).
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

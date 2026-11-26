@@ -3450,6 +3450,26 @@ world.advance(1);
 console.log(tracer.jetErosion > 0); // true
 ```
 
+Set `flocculation` to track the aggregate diameter of a cohesive sediment as it grows, breaks up and settles.
+The default material is `silt`, and its grain diameter supplies the primary diameter. A custom material can
+set another primary diameter. `initialDiameter` defaults to that primary diameter. Supply aggregation in
+m²/kg, breakup in s½/m², dry concentration in kg/m³ and shear rate in s⁻¹. A deterministic `environment`
+function can supply concentration and shear at each parcel. The ledger continues to count dry sediment mass.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const tracer = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+  sources: [{ material: 'silt', position: [0, -1, 0], rate: 60, stop: 1 / 60 }],
+  horizontalDiffusivity: 0, verticalDiffusivity: 0,
+  flocculation: { aggregation: 40_000, breakup: 1e8, environment: { concentration: 0.4, shearRate: 4 } },
+});
+world.advance(60);
+console.log(tracer.particlesOf().next().value!.position[1] < -1); // true
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.

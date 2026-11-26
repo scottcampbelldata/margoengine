@@ -524,6 +524,11 @@ propeller lifts sand and debits its volume from TerrainBed, while a stopped scre
 accepts a supplied thruster field. A native bow-thruster velocity producer and independent entrained-mass validation
 remain open.
 
+Cohesive sediment can now grow and break up under supplied local concentration and turbulence. Its evolving
+diameter and porous density drive settling while the dry-mass ledger stays conserved. The settling trajectory
+converges against the Winterwerp equation and the breakup case replays exactly. Measured floc-size and settling-speed
+validation remain open.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

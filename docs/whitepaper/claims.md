@@ -297,6 +297,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   flow on a slope in a different origin cell. Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js`
   after building Physics.
 
+- Cohesive floc settling (SEA-15, 2026-11-26). The Winterwerp aggregate-size and fall-speed model converges
+  to an independent integrated settling trajectory under constant exposure. With concentration removed,
+  shear breaks aggregates back toward primary grains, and the simulation replays exactly. Reproduce with
+  `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
+  [Winterwerp et al. (2006), equations 1 and 9](https://doi.org/10.1016/j.ecss.2006.02.003).
+
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its
   TerrainBed and gives the same state after frame-rate changes and seek. The renderer fixture publishes

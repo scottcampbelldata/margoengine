@@ -54,6 +54,13 @@ import {
 } from './tracer-evaporation.js';
 import { type FayCoefficients, fayAreaTime, fayCoefficients, fayRadius } from './tracer-fay.js';
 import {
+  checkFlocConditions,
+  flocDiameter,
+  flocFallSpeed,
+  type FlocKinetics,
+  type TracerFlocEnvironment,
+} from './tracer-floc.js';
+import {
   oilBreaking,
   type OilDispersionLaw,
   oilDispersionLaw,
@@ -79,6 +86,7 @@ export { type SubmergedJet, submergedJetWallShear } from './tracer-wall-jet.js';
 export type { TracerDiffusionKnot, TracerHorizontalDispersion } from './tracer-diffusion.js';
 export type { TracerBedWash } from './tracer-bed-wash.js';
 export type { TracerOilEvaporation } from './tracer-evaporation.js';
+export type { TracerFlocConditions, TracerFlocEnvironment } from './tracer-floc.js';
 export type { TracerBreakerExposure, TracerOilDispersion } from './tracer-oil-dispersion.js';
 
 /** The registry field of the tracers: each particle's position (x, y, z) and mass, owned by {@link TracerSolver}. */
@@ -185,6 +193,20 @@ export interface TracerOilSpill {
   dispersion?: TracerOilDispersion;
 }
 
+/** Turbulent flocculation of one cohesive sediment, using a fractal dimension of two. */
+export interface TracerFlocculation {
+  /** Material to evolve (default the `silt` preset). The material diameter is its primary grain diameter. */
+  material?: TracerMaterial | 'silt';
+  /** Initial floc diameter in metres (default the primary grain diameter). */
+  initialDiameter?: number;
+  /** Winterwerp's aggregation coefficient k_A, m²/kg. */
+  aggregation: number;
+  /** Winterwerp's breakup coefficient k_B, s^(1/2)/m². Must be positive. */
+  breakup: number;
+  /** Dry concentration and shear rate, fixed or sampled at each parcel. */
+  environment: TracerFlocEnvironment;
+}
+
 /** Settings of a {@link TracerSolver}; each has a default. */
 export interface TracerParams {
   /** The sources. */
@@ -215,6 +237,8 @@ export interface TracerParams {
   horizontalDispersion?: TracerHorizontalDispersion;
   /** Optional resuspension by a near-bed propeller or thruster flow. */
   bedWash?: TracerBedWash;
+  /** Optional aggregation, breakup and settling of cohesive sediment. */
+  flocculation?: TracerFlocculation;
   /** Vertical eddy diffusivity, m^2/s (default 0.001). */
   verticalDiffusivity?: number;
   /** Optional depth-dependent vertical diffusivity. Linear between knots, constant outside, overriding the scalar. */
@@ -332,6 +356,7 @@ export class TracerSolver implements Solver<TracerParams> {
       | 'sources'
       | 'oilSpills'
       | 'horizontalDispersion'
+      | 'flocculation'
       | 'verticalDiffusivityProfile'
       | 'bedJets'
       | 'bedWash'
@@ -350,6 +375,7 @@ export class TracerSolver implements Solver<TracerParams> {
   private depthDiffusivity?: ReturnType<typeof depthDiffusivity>;
   private horizontalLaw?: HorizontalDispersionLaw;
   private dispersionAges?: Region;
+  private flocculation?: { material: number; kinetics: FlocKinetics; sizes: Region };
   private stokes?: StokesProfile;
   private readonly stokesVelocity: [number, number] = [0, 0];
   private emissionCapacity = 0;
@@ -577,6 +603,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const ledgerWords = this.initBreachMixes(params.breachMixes ?? [], base);
     this.random = new RandomStream(0, solverNumber(this.id));
     this.particles = host.allocate('particles', capacity * STRIDE * 8, 'f64', TRACER_LAYOUT);
+    if (params.flocculation) this.initFlocculation(params.flocculation, capacity);
     if (horizontalLaw && horizontalLaw.rate > 0 && horizontalLaw.power > 1) {
       this.horizontalLaw = horizontalLaw;
       this.dispersionAges = host.allocate('horizontal-dispersion-ages', capacity * 8, 'f64', 1);
@@ -584,6 +611,46 @@ export class TracerSolver implements Solver<TracerParams> {
     // Released, in the water, on the surface, on the bed (kg), each source's mass not yet released as a particle, the
     // bed jets' and each breach's.
     this.ledger = host.allocate('ledger', ledgerWords * 8, 'f64', TRACER_LAYOUT);
+  }
+
+  private initFlocculation(options: TracerFlocculation, capacity: number): void {
+    const { material = 'silt', aggregation, breakup, environment } = options;
+    const grain: TracerMaterial = material === 'silt' ? TRACER_MATERIALS.silt : material;
+    const primary = grain.diameter ?? 0;
+    const initial = options.initialDiameter ?? primary;
+    const { viscosity, waterDensity } = this.params;
+    const stokesFactor = ((grain.density / waterDensity - 1) * this.g * primary) / (18 * viscosity);
+    if (
+      !(
+        primary > 0 &&
+        initial >= primary &&
+        !grain.floats &&
+        stokesFactor > 0 &&
+        aggregation >= 0 &&
+        breakup > 0 &&
+        [primary, initial, stokesFactor, aggregation, breakup].every(Number.isFinite)
+      )
+    )
+      throw new MargoError(
+        'unsupported',
+        'Flocculation needs finite kinetic coefficients and sinking primary grains; supply a positive grain diameter and breakup coefficient.',
+      );
+    if (typeof environment !== 'function') checkFlocConditions(environment);
+    const kinetics = {
+      primary,
+      initial,
+      aggregation,
+      breakup,
+      waterViscosity: viscosity,
+      stokesFactor,
+      environment: typeof environment === 'function' ? environment : { ...environment },
+    };
+    flocFallSpeed(kinetics, initial);
+    this.flocculation = {
+      material: this.materialIndex(grain),
+      kinetics,
+      sizes: this.host.allocate('floc-diameters', capacity * 8, 'f64', 1),
+    };
   }
 
   private initOilSpills(spills: readonly TracerOilSpill[], capacity: number): void {
@@ -1034,6 +1101,8 @@ export class TracerSolver implements Solver<TracerParams> {
       sv = pow(2 * kv * dt, 0.5);
     const horizontalLaw = this.horizontalLaw;
     const ages = this.dispersionAges && (regionWords(this.host.memory, this.dispersionAges) as Float64Array);
+    const flocs = this.flocculation;
+    const diameters = flocs && (regionWords(this.host.memory, flocs.sizes) as Float64Array);
     for (let i = 0; i < capacity; i++) {
       const p = i * STRIDE,
         state = words[p + 5]!;
@@ -1085,7 +1154,15 @@ export class TracerSolver implements Solver<TracerParams> {
       }
       const nx = x + ux * dt + sh * n0;
       const vertical = column ? turbulentVerticalStep(column, this.surfaceAt(x, z, time) - y, dt, n1) : sv * n1;
-      let ny = y + (uy - this.settling[words[p + 4]!]!) * dt + vertical;
+      const materialIndex = words[p + 4]!;
+      let settling = this.settling[materialIndex]!;
+      if (flocs && diameters && materialIndex === flocs.material) {
+        const previous = diameters[i] || flocs.kinetics.initial;
+        const diameter = flocDiameter(flocs.kinetics, previous, dt, x, y, z, time);
+        settling = flocFallSpeed(flocs.kinetics, diameter);
+        diameters[i] = diameter;
+      }
+      let ny = y + (uy - settling) * dt + vertical;
       const nz = z + uz * dt + sh * n2;
       // The surface reflects what is in the water; the bed keeps what reaches it.
       const surface = this.surfaceAt(nx, nz, time);
@@ -1299,6 +1376,7 @@ export class TracerSolver implements Solver<TracerParams> {
     if (this.spillVapour) regions.push(this.spillVapour);
     if (this.spillWater) regions.push(this.spillWater);
     if (this.dispersionAges) regions.push(this.dispersionAges);
+    if (this.flocculation) regions.push(this.flocculation.sizes);
     return regions;
   }
 

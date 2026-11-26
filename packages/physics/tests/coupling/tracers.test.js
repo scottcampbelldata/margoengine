@@ -836,3 +836,98 @@ test('SEA-15 bed wash uses the true sloping bed area and the tangential flow in 
   const mass = ((0.02 / normalY) * erodibility * (shear / threshold - 1)) / 60;
   assert.ok(Math.abs(tracer.jetErosion - mass) < 1e-14, `${tracer.jetErosion} vs ${mass} kg`);
 });
+
+function estuarineFlocSpeed(diameter) {
+  const primary = 40e-6;
+  const stokes = ((2650 / 1025 - 1) * 9.80665 * primary * diameter) / 18e-6;
+  let lo = 0;
+  let hi = stokes;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if (mid * (1 + 0.15 * ((mid * diameter) / 1e-6) ** 0.687) < stokes) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+test('SEA-15 Winterwerp floc growth converges to the integrated settling path under fixed exposure', () => {
+  const primary = 40e-6;
+  const equilibrium = 120e-6;
+  const seconds = 1.5;
+  const G = 4;
+  const breakup = 1e8;
+  const aggregation = 40_000;
+  const concentration = 0.4;
+  const primitive = (x) => Math.log(x / (1 - x)) - 1 / x;
+  const start = primitive(primary / equilibrium);
+  const lambda = 0.5 * breakup * G ** 1.5 * equilibrium ** 2;
+  const exactSpeed = (time) => {
+    const target = start + lambda * time;
+    let lo = primary / equilibrium;
+    let hi = 1;
+    for (let i = 0; i < 50; i++) {
+      const mid = (lo + hi) / 2;
+      if (primitive(mid) < target) lo = mid;
+      else hi = mid;
+    }
+    return estuarineFlocSpeed((equilibrium * (lo + hi)) / 2);
+  };
+  // Composite Simpson quadrature of the independent implicit diameter solution.
+  const intervals = 1024;
+  const h = seconds / intervals;
+  let exact = exactSpeed(0) + exactSpeed(seconds);
+  for (let i = 1; i < intervals; i++) exact += (i % 2 ? 4 : 2) * exactSpeed(i * h);
+  exact *= h / 3;
+  const errors = [1, 2].map((factor) => {
+    // Scaling both kinetic coefficients changes only the time coordinate of the held exposure.
+    const tracer = new TracerSolver();
+    const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+      sources: [{ material: 'silt', position: [0, -1, 0], rate: 60, stop: 1 / 60 }],
+      flocculation: {
+        aggregation: aggregation / factor,
+        breakup: breakup / factor,
+        environment: { concentration, shearRate: G },
+      },
+    });
+    world.advance(seconds * factor * 60);
+    const [parcel] = [...tracer.particlesOf()];
+    assert.equal(tracer.budget.water, 1);
+    return Math.abs((-1 - parcel.position[1]) / factor - exact);
+  });
+  assert.ok(errors[0] < 3e-5 && errors[1] < errors[0], `${errors}`);
+  assert.ok(Math.abs(errors[0] / errors[1] - 2) < 0.2, `${errors}`);
+});
+
+test('SEA-15 removing suspended concentration breaks mature flocs back toward primary grains and replays', () => {
+  const primary = 40e-6;
+  const mature = 120e-6;
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+    capacity: 1,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    sources: [{ material: 'silt', position: [0, -1, 0], rate: 60, stop: 1 / 60 }],
+    flocculation: {
+      initialDiameter: mature,
+      aggregation: 40_000,
+      breakup: 1e8,
+      environment: (_x, _y, _z, time) => ({ concentration: time <= 1 ? 0.4 : 0, shearRate: 4 }),
+    },
+  });
+  const height = () => tracer.particlesOf().next().value.position[1];
+  world.advance(60);
+  assert.ok(Math.abs(-1 - height() - estuarineFlocSpeed(mature)) < 1e-12);
+  const snapshot = world.takeSnapshot();
+  world.advance(60 * 29);
+  const before = height();
+  world.advance(60 * 30);
+  assert.ok(Math.abs(before - height() - estuarineFlocSpeed(primary)) < 2e-10);
+  assert.equal(tracer.budget.water, 1);
+  assert.equal(tracer.budget.released, 1);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(60 * 30);
+  assert.equal(world.hash(), hash);
+});
