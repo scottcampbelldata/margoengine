@@ -115,6 +115,16 @@ export interface TracerBedJets {
   availableMass?: number;
 }
 
+/** The grain-size or material mixture at an opening that publishes cargo outflow. */
+export interface BreachTracerMix {
+  /** Rigid body row of the hull that owns the opening. */
+  body: number;
+  /** Index in that hull's openings array. */
+  opening: number;
+  /** Positive dry-mass shares summing to one. */
+  fractions: readonly { material: TracerMaterial | keyof typeof TRACER_MATERIALS; fraction: number }[];
+}
+
 /** Settings of a {@link TracerSolver}; each has a default. */
 export interface TracerParams {
   /** The sources. */
@@ -145,6 +155,8 @@ export interface TracerParams {
    * The hull solver must step in the tracers' origin cell.
    */
   breaches?: number;
+  /** Per-opening cargo mixtures (default: one material from the port's cargo code). */
+  breachMixes?: readonly BreachTracerMix[];
   /** Erodible layer struck by the swimming wake when bed-jet coupling is enabled. */
   bedJets?: TracerBedJets;
 }
@@ -168,6 +180,12 @@ interface JetBed {
   pickupExponent: number;
   limit: number;
   rings?: Float64Array;
+}
+
+interface CargoFraction {
+  material: number;
+  share: number;
+  slot: number;
 }
 
 function pickupRate(shear: number, bed: JetBed): number {
@@ -215,7 +233,9 @@ export class TracerSolver implements Solver<TracerParams> {
   private readonly useBedJets: boolean;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
-  private params!: Required<Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources' | 'bedJets' | 'breaches'>> & {
+  private params!: Required<
+    Omit<TracerParams, 'water' | 'wind' | 'bed' | 'sources' | 'bedJets' | 'breaches' | 'breachMixes'>
+  > & {
     bed: Bed | number;
   };
   private sources: { material: number; source: TracerSource }[] = [];
@@ -230,6 +250,7 @@ export class TracerSolver implements Solver<TracerParams> {
   /** Breaches it takes cargo from, and each breach cargo's material (by its code in BREACH_CARGO, -1 for none). */
   private breachSlots = 0;
   private breachMaterials: number[] = [];
+  private breachMixes?: Map<string, readonly CargoFraction[]>;
   private g = gravityMagnitude(DEFAULT_GRAVITY);
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
@@ -377,16 +398,59 @@ export class TracerSolver implements Solver<TracerParams> {
     this.breachMaterials = BREACH_CARGO.map((name) =>
       name === 'none' ? -1 : this.materialIndex(TRACER_MATERIALS[name]),
     );
+    const base = 4 + this.sources.length + Number(this.useBedJets) + breaches;
+    const ledgerWords = this.initBreachMixes(params.breachMixes ?? [], base);
     this.random = new RandomStream(0, solverNumber(this.id));
     this.particles = host.allocate('particles', capacity * STRIDE * 8, 'f64', TRACER_LAYOUT);
     // Released, in the water, on the surface, on the bed (kg), each source's mass not yet released as a particle, the
     // bed jets' and each breach's.
-    this.ledger = host.allocate(
-      'ledger',
-      (4 + this.sources.length + Number(this.useBedJets) + breaches) * 8,
-      'f64',
-      TRACER_LAYOUT,
-    );
+    this.ledger = host.allocate('ledger', ledgerWords * 8, 'f64', TRACER_LAYOUT);
+  }
+
+  private initBreachMixes(mixes: readonly BreachTracerMix[], firstSlot: number): number {
+    if (mixes.length === 0) return firstSlot;
+    if (this.breachSlots === 0)
+      throw new MargoError('unsupported', 'Cargo mixtures require hull breaches; set breaches to a positive count.');
+    const byOpening = new Map<string, readonly CargoFraction[]>();
+    let nextSlot = firstSlot;
+    for (const { body, opening, fractions } of mixes) {
+      if (!(Number.isSafeInteger(body) && body >= 0 && Number.isSafeInteger(opening) && opening >= 0))
+        throw new MargoError(
+          'unsupported',
+          'A cargo mixture needs nonnegative whole body and opening indices; use the hull record indices.',
+        );
+      const key = `${body}/${opening}`;
+      if (byOpening.has(key))
+        throw new MargoError('unsupported', `Opening ${key} has more than one cargo mixture; combine them into one.`);
+      const total = fractions.reduce((sum, entry) => sum + entry.fraction, 0);
+      if (!Number.isFinite(total) || Math.abs(total - 1) > Number.EPSILON * 2 * fractions.length)
+        throw new MargoError('unsupported', `Opening ${key} has invalid cargo shares; use fractions that sum to one.`);
+      const entries = fractions.map(({ material, fraction }) => {
+        const grain: TracerMaterial | undefined = typeof material === 'string' ? TRACER_MATERIALS[material] : material;
+        const diameter = grain?.diameter ?? 0;
+        const shape = grain?.shape ?? 1;
+        if (
+          !(
+            grain &&
+            grain.density > 0 &&
+            Number.isFinite(grain.density) &&
+            diameter >= 0 &&
+            Number.isFinite(diameter) &&
+            shape > 0 &&
+            Number.isFinite(shape) &&
+            fraction > 0
+          )
+        )
+          throw new MargoError(
+            'unsupported',
+            `Opening ${key} has an invalid cargo fraction; use positive shares and finite valid grain properties.`,
+          );
+        return { material: this.materialIndex(grain), share: fraction / total, slot: nextSlot++ };
+      });
+      byOpening.set(key, entries);
+    }
+    this.breachMixes = byOpening;
+    return nextSlot;
   }
 
   /**
@@ -487,8 +551,22 @@ export class TracerSolver implements Solver<TracerParams> {
           rate = rec[r + 12]!,
           material = this.breachMaterials[rec[r + 13]!] ?? -1;
         if (!(rate > 0 && Number.isFinite(rate)) || material < 0) continue;
-        book[base + k]! += rate * dt;
-        free = this.release(base + k, [rec[r + 2]!, rec[r + 3]!, rec[r + 4]!], material, words, book, free);
+        const at = [rec[r + 2]!, rec[r + 3]!, rec[r + 4]!] as const;
+        const mixture = this.breachMixes?.get(`${rec[r]}/${rec[r + 1]}`);
+        const mass = rate * dt;
+        if (mixture) {
+          let remaining = mass;
+          for (let i = 0; i < mixture.length; i++) {
+            const item = mixture[i]!;
+            const amount = i + 1 < mixture.length ? Math.min(remaining, mass * item.share) : remaining;
+            remaining -= amount;
+            book[item.slot]! += amount;
+            free = this.release(item.slot, at, item.material, words, book, free);
+          }
+        } else {
+          book[base + k]! += mass;
+          free = this.release(base + k, at, material, words, book, free);
+        }
       }
     }
     // Motion: the water's velocity (and a slick's windage), settling, and the random walk.

@@ -472,6 +472,10 @@ shear and annular pickup where clearance reaches its nozzle diameter. Four indep
 points check the downstream wall-stress law. Independent lifted mass, the short-gap jet and turbulent
 transition, and the original shot's plume and bed binding still need verification.
 
+EF-11 can now release coarse taconite pellets and suspended ore fines through the same live hull opening.
+The two grain classes account for the hull's cargo flux separately, including fractional parcels, and the
+pellets settle farther than the fines. The measured sediment plume and original EF-11 playback remain open.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

@@ -13155,6 +13155,14 @@ Particles*, 1957, extinction paradox). The mass, source placement, and replay as
 same packed wake from the live swimmer. Manufactured stresses verify onset, dry mass flux and grain
 size dependence through the live ray path. Independent dry mass pickup measurements remain to be checked.
 
+For the cargo plume (EF-11), the [U.S. Coast Guard Marine Board report](https://www.dco.uscg.mil/Portals/9/DCO%20Documents/5p/CG-5PC/INV/docs/boards/edmundfitz.pdf)
+describes Great Lakes taconite pellets of about one-half inch in diameter. The
+[NTSB report MAR-78-3 (1978)](https://www.ntsb.gov/investigations/AccidentReports/Reports/MAR7803.pdf) gives the
+3/8 to 5/8 inch diameter range. The tested 12 mm pellet is a representative input. The fixture's mixture and
+individual grain density are prescribed, and its test checks mass conservation, differential settling and replay.
+The release carries a separate mass remainder by material from the same port record and uses Ferguson and Church
+settling after release. The cargo reports supply size context. A comparison against measured plume evolution remains open.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

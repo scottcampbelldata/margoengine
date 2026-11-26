@@ -36,7 +36,7 @@ const frequencies = new Float64Array(8).map((_, i) => 0.06 * 1.3 ** i),
  * hold (x -9 to -2), half full of iron ore and flooded above the waterline, is holed low in its side: its water drains
  * out, and the ore with it. The tracers take the ore and the foam the air.
  */
-function damaged(rate = { num: 60, den: 1 }) {
+function damaged(rate = { num: 60, den: 1 }, mixedOre = false) {
   const physics = new Physics(null, { fixedTimestep: 1 / 60 }),
     body = physics.addBody(null, {
       colliders: { shape: 'box', halfExtents: [10, 2, 4], mass: 1025 * 20 * 8 * 2 },
@@ -57,7 +57,11 @@ function damaged(rate = { num: 60, den: 1 }) {
                 mesh: cuboid([-9, -1.8, -3.8], [-2, 1.8, 3.8]),
                 permeability: 0.6,
                 water: 0.6 * 7 * 7.6 * 2.8,
-                cargo: { material: 'ironOre', mass: 7 * 7.6 * 1.6 * 0.6 * 5200 },
+                cargo: {
+                  material: 'ironOre',
+                  mass: 7 * 7.6 * 1.6 * 0.6 * 5200,
+                  diameter: mixedOre ? 0.012 : undefined,
+                },
               },
             ],
             openings: [
@@ -70,7 +74,27 @@ function damaged(rate = { num: 60, den: 1 }) {
         sea: { density: 1025, elevation: () => 0 },
         greenWater: false,
       })
-      .add(tracers, { particleMass: 50, bed: 40 })
+      .add(tracers, {
+        particleMass: mixedOre ? 5 : 50,
+        bed: 40,
+        horizontalDiffusivity: mixedOre ? 0 : undefined,
+        verticalDiffusivity: mixedOre ? 0 : undefined,
+        breachMixes: mixedOre
+          ? [
+              {
+                body: body.row,
+                opening: 2,
+                fractions: [
+                  { material: 'ironOre', fraction: 0.2 },
+                  {
+                    material: { density: 3800, diameter: 0.012, shape: 0.4, colour: [0.25, 0.14, 0.09] },
+                    fraction: 0.8,
+                  },
+                ],
+              },
+            ]
+          : undefined,
+      })
       .add(foam, { waves: calm, cells: [32, 32], cellSize: 1, statistics: 32 })
       .couple(['hull', 'rigid'], 'staggered');
   return Object.assign(world, { body, hull, tracers, foam });
@@ -126,3 +150,30 @@ test('hull, tracers and foam: the same state at 24, 30 and 60 frames a second', 
   frameRateIndependent(damaged, { seconds: 2 }));
 test('hull, tracers and foam: a seek equals a continuous run', () =>
   seekEqualsContinuous(() => damaged({ num: 24, den: 1 })));
+
+test('EF-11 coarse pellets settle out of a fine plume from the same active hold', () => {
+  const world = damaged(undefined, true);
+  let lost = 0;
+  for (let frame = 1; frame <= 120; frame++) {
+    world.advance(frame);
+    lost += breaches(world)[2][12] / 60;
+  }
+  assert.ok(lost > 25, `ore lost: ${lost}`);
+  const particles = [...world.tracers.particlesOf()];
+  const pellet = particles.filter((item) => world.tracers.materialList[item.material].diameter === 0.012);
+  const fines = particles.filter((item) => world.tracers.materialList[item.material].diameter === 1e-4);
+  const mass = (items) => items.reduce((total, item) => total + item.mass, 0);
+  assert.ok(pellet.length > 0 && fines.length > 0);
+  // Each independent release lane can carry less than 5 kg to its next parcel.
+  assert.ok(lost * 0.2 - mass(fines) >= -1e-9 && lost * 0.2 - mass(fines) < 5);
+  assert.ok(lost * 0.8 - mass(pellet) >= -1e-9 && lost * 0.8 - mass(pellet) < 5);
+  assert.equal(mass(fines) + mass(pellet), world.tracers.budget.released);
+  const bottom = (items) => Math.min(...items.map((item) => item.position[1]));
+  assert.ok(bottom(pellet) < bottom(fines));
+  const snapshot = world.takeSnapshot();
+  world.advance(180);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(180);
+  assert.equal(world.hash(), hash);
+});

@@ -3034,6 +3034,25 @@ const cell = plume.mass.findIndex((m) => m > 0);
 console.log(Array.from(plume.colour.slice(3 * cell, 3 * cell + 3)).map((c) => c.toFixed(2))); // ['0.55', '0.12', '0.06']: iron-ore red
 ```
 
+When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
+`openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
+selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const cargo = new TracerSolver();
+const world = new PhysicsWorld().add(cargo, {
+  breachMixes: [{ body: 0, opening: 2, fractions: [
+    { material: 'ironOre', fraction: 0.2 },
+    { material: { density: 3800, diameter: 0.012, shape: 0.4, colour: [0.25, 0.14, 0.09] }, fraction: 0.8 },
+  ] }],
+});
+world.advance(1);
+console.log(cargo.budget.released); // 0 until a connected hold reports cargo outflow
+```
+
 For a ray, enable `bedJets` to couple swimming impulses to the erodible bed. A downward fin impulse spreads
 as it reaches the bed. The default `shear: 'wall-jet'` computes a radial submerged-jet wall stress with zero
 shear at stagnation, an off-centre peak and an outward decay. Eroded mass is integrated over the affected annuli.
