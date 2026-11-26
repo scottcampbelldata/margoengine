@@ -3127,6 +3127,10 @@
       "types": "./dist/physics/robots.d.ts",
       "import": "./dist/physics/robots.js"
     },
+    "./physics/thermal": {
+      "types": "./dist/physics/thermal.d.ts",
+      "import": "./dist/physics/thermal.js"
+    },
     "./physics/world": {
       "types": "./dist/physics/world.d.ts",
       "import": "./dist/physics/world.js"
