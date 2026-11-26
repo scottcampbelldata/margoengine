@@ -68,6 +68,10 @@
       "types": "./dist/clouds/index.d.ts",
       "import": "./dist/clouds.js"
     },
+    "./ageing": {
+      "types": "./dist/ageing.d.ts",
+      "import": "./dist/ageing.js"
+    },
     "./modal-sound": {
       "types": "./dist/modal-sound.d.ts",
       "import": "./dist/modal-sound.js"

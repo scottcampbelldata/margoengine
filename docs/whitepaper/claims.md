@@ -5560,3 +5560,10 @@ LIFE-02 uses an inextensible lateral-undulation chain with anisotropic ground re
 legged gaits with planted stance feet. The direct Physics fixtures substantiate friction, spring load, gait phase,
 forward and lateral motion, and equal state hashes in plain and shared memory. Coupling fixtures substantiate
 sampling from the real TerrainBed and hash-equivalent replay at multiple display rates. No speed claim is made.
+
+### Physics-driven material ageing (BIO-04)
+
+Outdoor and immersed material patches evolve with exposure on the world clock. The analytical tests
+check first-year and multi-year corrosion, immersion loss, rot activation, marine coverage, carbonate
+recession and layered reflectance. The same exposure sequence yields the same snapshot hash during
+normal advance, film-rate changes and seek. PBR data changes with the computed layers and coverage.

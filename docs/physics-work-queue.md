@@ -55,6 +55,10 @@ there, add a line below with the solver ID and what is needed, and build against
   It consumes the `Wind` contract or held friction fields. Registry fixtures exercise the outgoing ports
   while the atmosphere solvers adopt those fields.
 
+- **BIO-04:** Provide a canonical per-patch material exposure layout for annual climate, deposition,
+  immersion, corrosion current and larval availability. The ageing entry consumes a versioned
+  exposure port with the same units and tests it with a replayable publisher.
+
 - **LIFE-05:** Register slot 10 for the pedestrian SIMD kernel. Provide canonical per-body force
   and stance/position fields and an identity layout for LIFE-06 formations, DYN-07 body and foot
   hand-off, and BREAK-05 impacts. LIFE-05 publishes its declared kinematics and compressive loads

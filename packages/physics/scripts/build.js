@@ -51,6 +51,7 @@ await build({
         earth: resolve(root, 'src/earth/index.ts'),
         clouds: resolve(root, 'src/clouds/index.ts'),
         falling: resolve(root, 'src/falling.ts'),
+        ageing: resolve(root, 'src/ageing.ts'),
         'modal-sound': resolve(root, 'src/modal-sound.ts'),
         flight: resolve(root, 'src/flight.ts'),
         waves: resolve(root, 'src/waves/index.ts'),

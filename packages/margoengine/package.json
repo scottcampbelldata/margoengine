@@ -3191,6 +3191,10 @@
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
     },
+    "./physics/ageing": {
+      "types": "./dist/physics/ageing.d.ts",
+      "import": "./dist/physics/ageing.js"
+    },
     "./physics/modal-sound": {
       "types": "./dist/physics/modal-sound.d.ts",
       "import": "./dist/physics/modal-sound.js"

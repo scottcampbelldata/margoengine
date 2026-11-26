@@ -16295,3 +16295,12 @@ The engine fixture covers the real TerrainBed-to-contact path. A ground animal p
 reach the underside through a heightfield; its feet see the Bed surface. Supporting a climbing rig needs an
 arbitrary-surface collider field and articulated foot binding. The queue lists the shared contact and terrain
 geometry contract needed for independent impulse and animation consumers.
+
+## Open: weather and sea do not yet publish complete material-ageing exposure (BIO-04)
+
+A material-ageing world needs local deposition and annual climate values for atmospheric loss,
+and needs corrosion current and larval supply for site-specific wreck decay. Existing weather
+and sea fields leave out those quantities. A fixed `AgeingExposure` or a publisher writing
+`ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
+`packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
+See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.

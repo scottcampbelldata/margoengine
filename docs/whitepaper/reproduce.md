@@ -4297,3 +4297,11 @@ The fixtures isolate passive spring and slip reactions, then run the authored sp
 terrain. Each replay starts from the same solver parameters. Use
 `node packages/physics/scripts/test-browser.js --locomotion-only` in the normal and compatibility environments
 to reproduce lazy asset loading and restoring the published contact state.
+
+### BIO-04 material ageing
+
+Build Physics with `node packages/physics/scripts/build.js`, then run
+`node --test packages/physics/tests/ageing.test.js packages/physics/tests/coupling/ageing.test.js`.
+The checks include independent closed forms, evolving field producers, real PBR material data and
+plain/shared-memory replay. The Physics README's material ageing block builds a 30-year copper
+and submerged steel example without external datasets.

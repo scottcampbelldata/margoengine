@@ -3297,3 +3297,57 @@ the midpoint plus and minus half a link length along that axis. Consumers can re
 `GROUND_POSE_FIELD` and `GROUND_CONTACT_FIELD` directly through the world registry. Contact rows are grouped by
 body order and report the samples that produced the last substep. The entry fetches Wasm on `load`, and accepts
 an abort signal.
+
+## Material ageing
+
+MaterialAgeingSolver advances rust, copper patina, wood rot, marine fouling and carbonate stone recession
+on the physics clock. A wreck can use metal patches with different immersion and surface exposure.
+Read a patch's remaining thickness for geometry or integrity logic and its appearance for an existing PBR material.
+
+```ts
+import { PbrMaterial } from '@margoengine/core';
+import { AGEING_YEAR, MaterialAgeingSolver } from '@margoengine/physics/ageing';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const world = new PhysicsWorld({ rate: { num: 24, den: 1 } });
+const ageing = new MaterialAgeingSolver();
+world.add(ageing, {
+  timeScale: AGEING_YEAR,
+  exposure: { temperature: 293.15, relativeHumidity: 0.8, sulphurDioxide: 7, chloride: 25 },
+  patches: [
+    { material: 'copper' },
+    { material: 'steel', thickness: 0.003, exposure: { submerged: 1 } },
+  ],
+});
+const copper = new PbrMaterial(ageing.appearance(0));
+world.advance(30 * 24);
+copper.set(ageing.appearance(0));
+const wreck = ageing.read(1);
+if (wreck.fouledFraction <= 0 || wreck.consumedThickness <= 0 || copper.data[5]! >= 1) {
+  throw new Error('The material should show ageing. Advance the world and use the solver appearance.');
+}
+```
+
+The default time scale is one environmental second per world second. Use `AGEING_YEAR` to
+advance one model year per world second. Each patch can scale that duration with `exposureMultiplier`
+(default 1). Metal starts 0.01 m thick. Pine sapwood and limestone start 0.05 m thick.
+Use `initialLoss`, `initialRotActivity` and `initialCover` to start with an older patch. All default
+to zero. For metal, pre-existing loss seeds the atmospheric loss curve. Corrosion products are
+fully retained by default. Set `coatingRetention` to represent partial retention and
+`copperInnerScale` to change the copper substrate depth at which cuprite saturates (default 8 µm).
+
+Ambient defaults are 293.15 K, 70% relative humidity, 4 mg/(m² day) SO₂ and 3 mg/(m² day)
+chloride deposition. Rain defaults to 0.8 m/year at pH 5.6 and dry carbonate recession is zero.
+Submersion defaults to zero, and immersion current defaults to the carbon-steel equivalent
+of 60 µm/year. Specify current density in A/m² for the actual alloy and water chemistry.
+Default full-supply recruitment is 0.01 per day. Wet and dry removal default to 0.002 and 0.05 per day.
+Larval supply defaults to 1.
+
+For changing exposure, construct `new MaterialAgeingSolver({ readExposure: true })`
+and publish to its `exposureField`. Use `writeAgeingExposure` to fill one layout-1 f64 broadcast
+row or one row per patch. Row order is temperature in K, RH fraction, SO₂ and chloride in mg/(m² day),
+immersed fraction, incident rain in m/s, rain pH, corrosion current in A/m², dry carbonate recession in
+m/s and larval supply fraction. Fixed exposure defaults remain available before a producer's first tick.
+The solver's default ID and field prefix are `ageing`. Choose a separate `id` per group in one world.
+Its `stateField` has layout-1 f64 rows holding remaining and consumed metres, total and inner
+coating metres, rot activity, fouled fraction and environmental seconds.

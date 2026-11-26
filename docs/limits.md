@@ -9283,3 +9283,23 @@ kinematics and reaction wrenches for downstream animation or an erosion consumer
 feedback into the live terrain require downstream coupling.
 
 The optional entry measures 15,630 B raw and 6,419 B gzip. The plain Wasm is 9,037 B raw and 4,134 B gzip; the shared Wasm is 9,125 B raw and 4,196 B gzip.
+
+## Material ageing (BIO-04)
+
+State is one uniform column per material patch. Atmospheric loss uses ISO 9223 annual inputs
+and the ISO 9224 carbon steel or copper average curves. Instantaneous local climates are a
+piecewise-constant equivalent-exposure approximation when used in these empirical annual curves.
+Current density sets uniform immersion attack. Localized pits, galvanic pairs, coatings
+with delamination or adhesion, and loss of a structure's load capacity require extra models.
+
+Wood decay represents untreated pine sapwood at 0–30 °C and at least 95% RH. The exposed wood
+model uses that calibration. Wood loss is expressed as equivalent thickness at unchanged surface area
+and density. The immersion fraction suppresses atmospheric pine decay. Marine fouling is one
+aggregate population limited by free area, with caller-provided rates to distinguish conditions.
+Submerged loss of wood by marine borers is outside the fit.
+
+Limestone models carbonate dissolution from incident water and an optional dry deposition term.
+Physical exfoliation and freeze-thaw are separate effects. The appearance result uses per-patch
+diffuse layer transport for the metal colors and a coverage mix for the aggregate fouling.
+The material consumes linear PBR values. Multi-spectral gloss, grain, individual corrosion
+pits and run-off streak geometry require authored patch variation or other algorithms.

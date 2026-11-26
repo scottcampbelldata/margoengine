@@ -13336,3 +13336,48 @@ bound, link closure, frictionless motion, swing loads, alternating footholds, la
 and snapshot replay. The coupling tests compare the published reaction to the actual flat and sloped TerrainBed
 fields. The animal templates reproduce the documented coordination patterns and physical loads. The default masses,
 geometry and controller gains describe a generic starting point for each gait.
+
+## Material ageing and surface optics (BIO-04)
+
+- Julie Dorsey and Pat Hanrahan, [*Modeling and Rendering of Metallic Patinas*](https://graphics.stanford.edu/papers/patina/)
+  (1996), §§3–4. Coat and substrate layers are modeled separately. The diffuse finite-layer
+  Kubelka–Munk equation follows from the two-flux transport coefficients `K` and `S`, with mode
+  `m = sqrt(K(K + 2S))`. We evaluate its exponential form and apply their §4.2
+  combining rule `R = R₁ + T₁²R₂/(1 - R₁R₂)`. Zero absorption reduces to
+  `R = S d/(1 + S d)` and `T = 1/(1 + S d)`. The test uses the hyperbolic form as its independent reference.
+- Jinwei Gu, Chien-I Tu, Ravi Ramamoorthi, Peter Belhumeur, Wojciech Matusik and Shree
+  Nayar, [*Time-Varying Surface Appearance: Acquisition, Modeling and Rendering*](https://cave.cs.columbia.edu/old/publications/pdfs/Gu_TOG06.pdf)
+  (2006), Eq. 2. Spatial exposure rate alters local age; the special case `Aφ + D`
+  supplies the scalar-weathered fraction model for wood and stone. The reflectance palettes
+  are authored linear colors. Copper's inner oxide saturates with substrate loss; residual
+  consumed copper feeds the exterior carbonate layer. Oxide volume per unit metal volume
+  follows molecular mass, stoichiometry and density.
+- International Organization for Standardization, [*ISO 9223:2012*](https://www.iso.org/standard/53499.html)
+  (2012), §8.2 Eqs. 1 and 3, supplies first-year loss versus annualized RH, temperature, SO₂
+  and chloride deposition. [*ISO 9224:2012*](https://www.iso.org/standard/53500.html) (2012), Eqs. 1
+  and 3 and Table 2, give the long-term power law and linear continuation from 20 years.
+  For a changed annual climate, inverting the new loss curve at the accumulated depth
+  preserves the previous penetration. Immersion has a separate time and loss contribution.
+- ASTM International, [*G102-23: Standard Practice for Calculation of Corrosion Rates and
+  Related Information from Electrochemical Measurements*](https://store.astm.org/standards/g102)
+  (2023), uses Faraday's law. In SI the immersion depth rate is `j M/(n F ρ)`.
+  Robert E. Melchers, [*Predicting corrosion for life estimation of ocean and coastal steel
+  infrastructure*](https://doi.org/10.1002/maco.202314201) (2025), reports a representative
+  long-term rate of about 0.06 mm/year in the coastal case near 20 °C. The default current
+  is the carbon-steel current equivalent for that case.
+- Hannu Viitanen, Tomi Toratti, Lasse Makkonen, Ruut Peuhkuri, Tuomo Ojanen,
+  Leena Ruokolainen and Jarmo Räisänen, [*Towards modelling of decay risk of wooden
+  materials*](https://doi.org/10.1007/s00107-010-0450-x) (2010). The [2011 VTT
+  presentation](https://webpages.tuni.fi/nsb2011/sites/www.tut.fi.nsb2011/files/b11_4_viitanen_et_al_durability_of_wood_nsb_2011.pdf)
+  shows the exact critical time and mass-loss equations. The model accumulates activation,
+  subtracts dry deactivation and integrates irreversible mass loss from the instant activity reaches one.
+- S. Muko, K. Sakai and Y. Iwasa, [*Dynamics of marine sessile organisms with space-limited
+  growth and recruitment*](https://doi.org/10.1006/jtbi.2001.2298) (2001). Recruitment is proportional
+  to available surface and larval abundance. An aggregate group with first-order loss has
+  `C' = a(1-C)-bC`, whose fixed-input solution is exact. Recruitment and removal rates are adjustable.
+- Frederick W. Lipfert, [*Atmospheric damage to calcareous stones*](https://doi.org/10.1016/0004-6981(89)90587-8)
+  (1989), supplies the clean-rain equilibrium contribution of 18.8 µm recession per metre of rainfall.
+  Michael M. Reddy, [*Acid rain damage to carbonate stone*](https://www.usgs.gov/publications/acid-rain-damage-carbonate-stone-a-quantitative-assessment-based-aqueous-geochemistry)
+  (1988), and Paul A. Baedecker et al., [*Effects of acidic deposition on the erosion of carbonate stone*](https://doi.org/10.1016/0957-1272(92)90018-N)
+  (1992), distinguish clean-rain dissolution, acidity and dry deposition. In the solver's ideal acid
+  balance, two excess moles of protons dissolve one mole of CaCO₃, converted to depth by density.
