@@ -5135,3 +5135,27 @@ and exchange contact and friction impulses. A registered rigid capsule receives 
 matching linear and angular impulse. Choose `'swept'` to test both body and self contacts
 along linear endpoint trajectories between substeps. Use a higher rate for fast rotation
 to sample the arc more closely. The default is `'points'`.
+
+## Depth-averaged natural granular flow
+
+Load `GranularFlowSolver` for dry slides, dense snow or a bulk granular release with prescribed basal pore support. It advances vertical layer depth and both horizontal discharges over a fixed or live bed. An initial release takes one depth in metres per cell. X varies fastest.
+
+```js
+import { TerrainBed } from '@margoengine/physics/earth';
+import { GranularFlowSolver } from '@margoengine/physics/granular-flow';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const grid = { columns: 16, rows: 4, width: 16, depth: 4, centre: [8, 2] };
+const flow = await GranularFlowSolver.load({ liveTerrain: true });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(new TerrainBed(), { ...grid, elevations: (x) => -0.125 * x })
+  .add(flow, {
+    grid,
+    depth: Float64Array.from({ length: 64 }, (_, i) => i % 16 < 4 ? 0.8 : 0),
+    friction: 0.06,
+  });
+world.advance(120);
+console.log(flow.sample(5, 2).depth, flow.mass);
+```
+
+The boundary is closed. The grid cells hold vertical depth in metres, X and Z discharge in m²/s and bed elevation in metres. `mass` reports kilograms from the material's constant density. `flowField` publishes the same row-major values through `GRANULAR_FLOW_LAYOUT`. The world stores the state, and its snapshots capture the runout and step count. Pass the same rectangular shape and world cell to the `TerrainBed` and the flow. For a fixed bed, omit `liveTerrain` and give the bed elevations in `bed`. The dry basal friction coefficient defaults to 0.35. `poreSupport` is a prescribed fraction of grain contact load taken by pore pressure, from zero (dry) to one. The Voellmy coefficient defaults to 2,000 m/s². Set `turbulence: Infinity` for pure Coulomb. Bulk density defaults to 1,600 kg/m³. The world provides downward gravity.

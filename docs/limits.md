@@ -10043,3 +10043,9 @@ rigging entry measures 1,991 B gzip with a 2,247 B ceiling.
 ## Asset references and templates (scene/assets)
 
 A key has one reference count: `acquire`, preload groups and templates add one each, `release` removes one, and at 0 the value is disposed and unloaded. A plain `load` takes no reference, so a key used with both is unloaded when the references reach 0. Disposal is the `dispose` option or the value's `Symbol.dispose`; a prototype tree is disposed whole (core detaches children on dispose, it does not dispose them). A template build shares one loading signal between concurrent first callers. Instances copy the prototype with `cloneSubtree` (structured-cloneable `userData`, geometry and materials shared); the templates entry loads `clone` and the scene index on first use, so a registry without templates imports no engine code.
+
+### Natural granular runout (EARTH-02)
+
+The optional granular-flow entry evolves one vertically integrated layer on a finite rectangular grid with closed walls, constant material density, downward gravity and hydrostatic pressure. It reads exact cell-area averages of the live TerrainBed triangles. Coulomb stress can hold a stopped layer and prescribed basal pore support reduces the dry friction load. Voellmy drag dissipates moving discharge without reversal. This first-order finite-volume tier treats vertical depth and horizontal discharge in the shallow-bed approximation. Grain segregation, steep-surface curvature forces, effective stress evolution, erosion, and consolidated deposition have separate evidence requirements. The optional loader gets one plain and one shared Rust SIMD asset and adds nothing to the Physics root, World, Core or Stage.
+
+The granular-flow entry is 3,378 B gzip under a 3,634 B ceiling. The plain SIMD asset is 3,707 B raw and 1,578 B gzip. The shared asset is 3,707 B raw and 1,578 B gzip. Core and Stage remain 24,846 B gzip.

@@ -10696,3 +10696,7 @@ UV sets, vertex and material colours, multiply, a deformer buffer at a 256-byte 
 instances, two views, a rebooted device); `test/mesh-debug.test.js` (options and errors); the owner/lifetime fixture.
 Not measured: GPU cost. Not tested: HDR targets, orthographic cameras, a `Skin` from `@margoengine/animation` (the
 check's own deformer buffer stands for it).
+
+### Natural granular runout (EARTH-02)
+
+The optional Rust SIMD kernel keeps depth, discharge and sampled bed in world-owned regions. It uses a separate trial region with no static arena writes, and updates the published field only when the complete Courant-controlled step succeeds. The coupling fixture keeps a closed mass ledger on a rectangular grid over a live triangulated ridge. Resting pressure balance, dry-front positivity, Voellmy drag, pressure-supported release, 24/30/60 fps cadence, snapshot parity and the isolated browser's plain/shared kernels are checked independently.

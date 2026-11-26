@@ -17216,3 +17216,6 @@ against the noon sun's 5, so the night haze is about 4 percent of the day's, blu
 35, 48, 83 over a valley of 3, 1, 0), against 74.5 before. The valley under the blowup smoke now reads black at night:
 see KB-WEATHER-FIREHAZE1 for the fire's light the haze still lacks.
 
+### Natural granular runout and bed exchange (EARTH-02)
+
+The new finite-volume entry holds a resting layer on a bank, follows the live terrain around relief, and replays its state after restore. For a runout over loose saturated sediment, the basal pore-support fraction is fixed and the bed does not gain or lose soil through this entry. The cause is the constant-density layer and missing sediment transport and effective-stress state. The remaining queue work covers conservative bed exchange, measured dense-grain and saturated profiles, incoming and outgoing couplings, and use of the new solver in legacy terrain callers.

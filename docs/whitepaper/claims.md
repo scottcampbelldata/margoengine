@@ -6034,3 +6034,7 @@ actual energy loss. Empty ticks and snapshot playback preserve the event timing.
 [Reproduce](reproduce.md#fluid-01-rigid-recoil)
 
 Proof capture (2026-11-26, KB-LOOK-TV-PENUMBRA1): the deformed-shadows, gltf-pbr-lighting-hooks and quality-presets --current references advance to 5feaab3d71, whose `Shadows` and `VirtualShadows` write the soft filter's per-frame noise turn (`jitter`, default true: fract(n phi) for the n frames whose clock moved) into the free `soft.w` of their frame uniforms, and whose PCSS spiral starts at `(noise + soft.w)` turns. The call logs differ only in that uniform float and the shader module text; the counts of draws, dispatches, bindings and uploads are unchanged. `packages/shadows/test/sampling.test.js` pins the turn sequence, the pause, `resetTime` and `jitter: false`. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=deformed-shadows,gltf-pbr-lighting-hooks,quality-presets`.
+
+### Depth-averaged natural granular runout (EARTH-02)
+
+The native optional solver conserves closed-grid mass, holds a stationary free surface across wet and dry cells, and responds to registered terrain relief. A physically closed test compares the same release against a barrier and an open down-slope corridor. Numerical checks cover the implicit drag root, Coulomb rest, release with prescribed pore pressure, and positive 2D fronts under the combined Courant bound. Both memory kinds and a restored run reproduce the prior hash. [Method and primary sources](../clean-room.md#depth-integrated-natural-granular-runout-earth-02)

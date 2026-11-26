@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20532586,
+  "total": 20536220,
   "history": [
     {
       "date": "2026-10-24",
@@ -13475,6 +13475,12 @@
       "commit": "a7ff48e5db",
       "grew": 4,
       "reason": "KB-PICK-INSTMOVE1: GPU picking draws gltf/pbr instances through the shared pick shader (instance transform after the vertex move, one ID per row) in PickingPrimitives, which every selection entry carries; ceilings hit-details 16055 to 16163, xray 13225 to 13398, area 16230 to 16394, highlight 14000 to 14153 B gzip (headroom included). A split would put a second copy of the pick shader in each entry. Core plus Stage unchanged at 24846 B."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "6350a88f55",
+      "grew": 1,
+      "reason": "EARTH-02 adds the optional granular-flow entry from 0 to 3378 B gzip (ceiling 3634 B) with lazy native conservative wet/dry transport and registered bed. A second entry would repeat configuration and arena binding for the same grid. Core plus Stage stay 24846 B."
     }
   ],
   "items": {
@@ -14310,6 +14316,7 @@
     "@margoengine/physics/flip": 11699,
     "@margoengine/physics/foam": 9368,
     "@margoengine/physics/glacier": 3775,
+    "@margoengine/physics/granular-flow": 3634,
     "@margoengine/physics/granular-mpm": 5370,
     "@margoengine/physics/groundwater": 4195,
     "@margoengine/physics/hydro": 7652,

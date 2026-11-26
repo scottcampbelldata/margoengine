@@ -274,6 +274,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'granular-flow-kernel',
+    crate: 'packages/physics/granular-flow-kernel',
+    blueprint: 'packages/physics/src/granular-flow/granular-flow-kernel.wasm',
+    script: 'packages/physics/scripts/build-granular-flow-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'granular-flow-kernel-shared',
+    crate: 'packages/physics/granular-flow-kernel',
+    blueprint: 'packages/physics/src/granular-flow/granular-flow-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-granular-flow-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',

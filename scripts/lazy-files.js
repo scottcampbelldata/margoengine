@@ -127,6 +127,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/granular-flow-kernel.wasm',
+    label: 'granular-flow-kernel.wasm',
+    kind: 'Rust SIMD depth-averaged conservative granular flow',
+    measure: 'file',
+    when: 'GranularFlowSolver.load() from the optional /granular-flow entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/granular-flow-kernel-shared.wasm',
+    label: 'granular-flow-kernel-shared.wasm',
+    kind: 'Rust SIMD depth-averaged conservative granular flow, shared world memory',
+    measure: 'file',
+    when: 'GranularFlowSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/lava-kernel.wasm',
     label: 'lava-kernel.wasm',
     kind: 'Rust SIMD thermo-viscoplastic lava advance and cooling',

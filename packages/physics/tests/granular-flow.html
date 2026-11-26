@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Natural granular flow over a terrain ridge</title></head>
+<body>
+  <script type="module">
+    import { TerrainBed } from '/packages/physics/dist/earth.js';
+    import { GranularFlowSolver } from '/packages/physics/dist/granular-flow.js';
+    import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+
+    window.runGranularFlow = async () => {
+      const simulate = async (sharedMemory) => {
+        const flow = await GranularFlowSolver.load({ liveTerrain: true });
+        const grid = { columns: 17, rows: 5, width: 17, depth: 5, centre: [8.5, 2.5] };
+        const depth = Float64Array.from({ length: 85 }, (_, i) => i % 17 < 4 && i >= 17 && i < 68 ? 1 : 0);
+        const memory = worldMemory(sharedMemory);
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory })
+          .add(new TerrainBed(), { ...grid, elevations: (x) => x >= 12 && x <= 14 ? 3 : -0.125 * x })
+          .add(flow, { grid, depth, friction: 0.065 });
+        const initial = flow.mass;
+        world.advance(180);
+        return { hash: world.hash(), initial, mass: flow.mass, advance: flow.sample(6, 2).depth,
+          barrier: flow.sample(12, 2), isShared: memory.buffer instanceof SharedArrayBuffer };
+      };
+      return { plain: await simulate(false), shared: await simulate(true) };
+    };
+  </script>
+</body>
+</html>

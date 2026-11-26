@@ -2423,6 +2423,10 @@
       "types": "./dist/physics/orbit.d.ts",
       "import": "./dist/physics/orbit.js"
     },
+    "./physics/granular-flow": {
+      "types": "./dist/physics/granular-flow.d.ts",
+      "import": "./dist/physics/granular-flow.js"
+    },
     "./physics/lava": {
       "types": "./dist/physics/lava.d.ts",
       "import": "./dist/physics/lava.js"
