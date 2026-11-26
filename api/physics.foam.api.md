@@ -703,6 +703,12 @@ class KernelWorld {
     }): this;
     touch(body: number): this;
     stepSeconds: number;
+    get threadCount(): number;
+    useThreads(count: number, { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<this>;
+    endThreads(): void;
+    stepAsync(dt: number): Promise<this>;
     step(dt: number): this;
     detect(): this;
     handle(kind: KernelHandle['kind'], row: number): KernelHandle;

@@ -735,6 +735,7 @@ interface KernelHeightfieldOptions {
 interface KernelLoadOptions {
     signal?: AbortSignal;
     simd?: boolean;
+    threads?: boolean;
 }
 
 interface KernelManifold {
@@ -1022,6 +1023,12 @@ class KernelWorld {
     }): this;
     touch(body: number): this;
     stepSeconds: number;
+    get threadCount(): number;
+    useThreads(count: number, { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<this>;
+    endThreads(): void;
+    stepAsync(dt: number): Promise<this>;
     step(dt: number): this;
     detect(): this;
     handle(kind: KernelHandle['kind'], row: number): KernelHandle;

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19486939,
+  "total": 20021651,
   "history": [
     {
       "date": "2026-10-24",
@@ -12759,6 +12759,12 @@
       "commit": "lane-d",
       "reason": "New optional entry @margoengine/input/face, 0 to 3,481 B gzip measured (budget 3,737): the face-to-ARKit-blendshape driver with landmark measures, head rotation and smoothing. Core plus stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ea6114769",
+      "reason": "@margoengine/physics: the kernel's threaded build (Wasm SIMD and atomics for a shared memory), a third lazy blueprint chunk of about 247 KB deflated that only loadKernel({threads: true}) fetches, so the lazy kernel items and the package total grow by it (budgets 535450 to 795608 and 618161 to 889499 B) while a world that does not ask downloads nothing more; the base entry grows from 90777 to about 91255 B measured (budget 93993) for useThreads, stepAsync and the worker launch. The worker needs a module built with atomics, which the plain builds cannot be.",
+      "grew": 3
     }
   ],
   "items": {
@@ -13561,9 +13567,9 @@
     "@margoengine/oit/peel": 3771,
     "@margoengine/oit/precise": 4608,
     "@margoengine/oit/vfx": 486,
-    "@margoengine/physics": 618161,
-    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 90777,
-    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 535450,
+    "@margoengine/physics": 889499,
+    "@margoengine/physics base (without physics kernel (deflated Wasm blueprint and its column table))": 93993,
+    "@margoengine/physics lazy physics kernel (deflated Wasm blueprint and its column table)": 795608,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
     "@margoengine/physics/decomposition": 11130,

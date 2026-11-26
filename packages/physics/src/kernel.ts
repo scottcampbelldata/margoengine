@@ -30,6 +30,9 @@ interface KernelExports extends WebAssembly.Exports {
   world_iterations(): number;
   world_steps(): number;
   world_step(dt: number): number;
+  world_step_begin(dt: number): number;
+  world_solve_islands(first: number, last: number, dt: number): void;
+  world_step_end(dt: number): number;
   world_detect(): number;
   world_quarantined(): number;
   world_lost(): number;
@@ -837,9 +840,13 @@ const hasSimd = (): boolean =>
     ]),
   );
 /** The two builds of the kernel, each its own chunk loaded on first use: with Wasm SIMD, and without it for engines that lack it. */
-const compile = (variant: 'simd' | 'scalar') =>
+const compile = (variant: 'simd' | 'scalar' | 'threads') =>
   new LoadOnce<WebAssembly.Module>(async () => {
-    const blueprint = await (variant === 'simd' ? import('./wasm.js') : import('./wasm-scalar.js'));
+    const blueprint = await (variant === 'simd'
+      ? import('./wasm.js')
+      : variant === 'scalar'
+        ? import('./wasm-scalar.js')
+        : import('./wasm-threads.js'));
     loadedBuild = blueprint.kernelSource;
     kernelColumns = blueprint.kernelColumns;
     const bytes = Uint8Array.from(atob(blueprint.wasmBase64), (c) => c.charCodeAt(0));
@@ -847,7 +854,7 @@ const compile = (variant: 'simd' | 'scalar') =>
       await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(),
     );
   });
-const builds = { simd: compile('simd'), scalar: compile('scalar') };
+const builds = { simd: compile('simd'), scalar: compile('scalar'), threads: compile('threads') };
 /** Which build new worlds use: the one the latest {@link loadKernel} chose. */
 let chosen: 'simd' | 'scalar' | null = null;
 /** The build the loaded kernel is: `'simd'` or `'scalar'`, or '' before {@link loadKernel} has finished. */
@@ -863,15 +870,21 @@ export interface KernelLoadOptions {
    * is downloaded. New worlds use the build of the latest call.
    */
   simd?: boolean;
+  /**
+   * Also load the threaded build (Wasm SIMD and atomics, default false), which a world on a shared memory needs
+   * (`new KernelWorld(bodies, colliders, {arena: new Arena(worldMemory(true))})`), and with it {@link KernelWorld.useThreads}.
+   */
+  threads?: boolean;
 }
 
 /**
  * Compiles the kernel, once per app: compiling is asynchronous, so `new KernelWorld()` can stay synchronous.
  * @throws AbortError (the signal's reason) when `signal` aborts first.
  */
-export async function loadKernel({ signal, simd }: KernelLoadOptions = {}): Promise<void> {
+export async function loadKernel({ signal, simd, threads = false }: KernelLoadOptions = {}): Promise<void> {
   const variant = (simd ?? hasSimd()) ? 'simd' : 'scalar';
   await builds[variant].load(signal);
+  if (threads) await builds.threads.load(signal);
   chosen = variant;
 }
 
@@ -986,6 +999,63 @@ export interface KernelSolverOptions {
   adaptiveSubsteps?: boolean;
 }
 
+/** A worker thread of a KernelWorld: its stack region, and a call that sends it a message and waits for its answer. */
+interface KernelThread {
+  readonly stack: Region;
+  send(message: object): Promise<void>;
+  end(): void;
+}
+
+/** Starts a worker on `src/kernel-thread.ts`: a module worker in a page, a worker_threads one in Node. */
+async function startThread(): Promise<{ send(message: object): Promise<void>; end(): void }> {
+  const url = new URL(/* @vite-ignore */ './kernel-thread.js', import.meta.url);
+  let post: (message: object) => void,
+    end: () => void,
+    pending: ((reply: { ok: boolean; message?: string }) => void) | null = null;
+  const settle = (reply: { ok: boolean; message?: string }) => {
+    const resolve = pending;
+    pending = null;
+    resolve?.(reply);
+  };
+  if (typeof Worker === 'function') {
+    const worker = new Worker(url, { type: 'module' });
+    worker.onmessage = (event) => settle(event.data);
+    worker.onerror = (event) => settle({ ok: false, message: event.message });
+    post = (message) => worker.postMessage(message);
+    end = () => worker.terminate();
+  } else {
+    const name = 'node:worker_threads';
+    // The few members of Node's worker_threads used here (the package has no Node types).
+    const { Worker: NodeWorker } = (await import(/* @vite-ignore */ name)) as {
+      Worker: new (
+        url: URL,
+      ) => {
+        on(event: 'message' | 'error', listener: (value: never) => void): void;
+        postMessage(message: object): void;
+        terminate(): Promise<number>;
+      };
+    };
+    const worker = new NodeWorker(url);
+    worker.on('message', settle as (value: never) => void);
+    worker.on('error', ((error: Error) => settle({ ok: false, message: error.message })) as (value: never) => void);
+    post = (message) => worker.postMessage(message);
+    end = () => void worker.terminate();
+  }
+  return {
+    send: (message) =>
+      new Promise<void>((resolve, reject) => {
+        pending = (reply) =>
+          reply.ok
+            ? resolve()
+            : reject(
+                new MargoError('failed', `A kernel thread stopped: ${reply.message}; end the threads and step on one.`),
+              );
+        post(message);
+      }),
+    end,
+  };
+}
+
 /** What a {@link KernelWorld} is made with besides its rows. */
 export interface KernelWorldOptions {
   /**
@@ -1013,7 +1083,10 @@ export class KernelWorld {
   private views: Record<string, KernelColumn> = {};
   private bound: ArrayBuffer | SharedArrayBuffer | null = null;
   private block: Region | null = null;
+  private readonly module: WebAssembly.Module;
   private readonly api: KernelExports;
+  /** The worker threads islands solve on, besides the main thread's own (`useThreads`). */
+  private threads: KernelThread[] = [];
   private layout = -1;
   private recycleDistance = 0.05;
   private clusterAngle = 0.1;
@@ -1031,15 +1104,18 @@ export class KernelWorld {
    * @throws RangeError for a capacity the kernel refuses.
    */
   constructor(bodies = 1024, colliders = bodies, options: KernelWorldOptions = {}) {
-    const module = chosen ? builds[chosen].value : undefined;
-    if (!module) throw new MargoError('state', 'The physics kernel is not loaded; call await loadKernel() first.');
     const arena = options.arena ?? new Arena(worldMemory(false)),
-      { memory } = arena;
-    if (isShared(memory))
+      { memory } = arena,
+      shared = isShared(memory),
+      module = shared ? builds.threads.value : chosen ? builds[chosen].value : undefined;
+    if (!module)
       throw new MargoError(
-        'unsupported',
-        'The rigid kernel has a build for a plain memory only so far; pass an Arena over worldMemory(false), or a PhysicsWorld made with {memory: worldMemory(false)}.',
+        'state',
+        shared
+          ? 'A world on a shared memory needs the threaded kernel; call await loadKernel({threads: true}) first.'
+          : 'The physics kernel is not loaded; call await loadKernel() first.',
       );
+    this.module = module;
     if (hosting.has(memory))
       throw new MargoError(
         'state',
@@ -3187,6 +3263,92 @@ export class KernelWorld {
   }
   /** Seconds of the last step, or one 60th before the first. */
   stepSeconds = 1 / 60;
+  /** Threads the islands of a step solve on: the main thread and the workers {@link KernelWorld.useThreads} started. */
+  get threadCount(): number {
+    return this.threads.length + 1;
+  }
+
+  /**
+   * Starts `count - 1` worker threads (the main thread is the last of `count`) for {@link KernelWorld.stepAsync}. The world must
+   * be on a shared memory (an Arena over `worldMemory(true)`, which needs a cross-origin-isolated page) and the threaded kernel
+   * loaded (`loadKernel({threads: true})`). Each thread is a worker with its own instance of the kernel over the world's memory
+   * and a stack region of its own; it solves only islands, so a step gives the same bits on any number of threads.
+   * @throws RangeError for a count that is not a whole number from 1 to 64.
+   * @throws MargoError (`state`) for a world on a plain memory; AbortError (the signal's reason) when `signal` aborts first.
+   */
+  async useThreads(count: number, { signal }: { signal?: AbortSignal } = {}): Promise<this> {
+    if (!Number.isInteger(count) || count < 1 || count > 64)
+      throw new RangeError(
+        `Threads are a whole number from 1 to 64 (got ${count}); pass navigator.hardwareConcurrency or less.`,
+      );
+    if (!isShared(this.memory))
+      throw new MargoError(
+        'state',
+        'Threads share the world through a shared memory; make the world on an Arena over worldMemory(true) in a cross-origin-isolated page.',
+      );
+    this.endThreads();
+    const started: KernelThread[] = [];
+    try {
+      for (let i = 1; i < count; i++) {
+        signal?.throwIfAborted();
+        const stack = stackRegion(this.arena, `rigid-thread${i}`, KERNEL_STACK),
+          top = stack.byteOffset + stack.byteLength,
+          thread = { stack, ...(await startThread()) };
+        started.push(thread);
+        await thread.send({ module: this.module, memory: this.memory, stack: top - (top % 16) });
+      }
+    } catch (error) {
+      for (const thread of started) {
+        thread.end();
+        this.arena.free(thread.stack);
+      }
+      throw error;
+    }
+    this.threads = started;
+    return this;
+  }
+
+  /** Stops the worker threads {@link KernelWorld.useThreads} started; later steps solve on the main thread alone. */
+  endThreads(): void {
+    for (const thread of this.threads) {
+      thread.end();
+      this.arena.free(thread.stack);
+    }
+    this.threads = [];
+  }
+
+  /**
+   * {@link KernelWorld.step} with the step's islands split over the threads (`useThreads`) in fixed runs of island numbers,
+   * the main thread solving the first: islands share no body a solve changes, so the bits are those of `step` on any number of
+   * threads. With no worker thread it is `step`.
+   * @throws as {@link KernelWorld.step} does; MargoError (`failed`) when a thread stopped.
+   */
+  async stepAsync(dt: number): Promise<this> {
+    if (this.threads.length === 0) return this.step(dt);
+    this.beforeStep(dt);
+    let failed: number;
+    try {
+      const islands = this.api.world_step_begin(dt);
+      if (islands !== 0xffffffff) {
+        const runs = this.threads.length + 1,
+          // Islands a run: the count over the runs, rounded up, in whole numbers.
+          run = (islands - (islands % runs)) / runs + (islands % runs === 0 ? 0 : 1),
+          end = (first: number) => (first + run < islands ? first + run : islands),
+          // Each worker's run, sent before the main thread solves its own.
+          waits = this.threads.map((thread, i) => {
+            const first = (i + 1) * run;
+            return first < islands ? thread.send({ first, last: end(first), dt }) : Promise.resolve();
+          });
+        this.api.world_solve_islands(0, end(0), dt);
+        await Promise.all(waits);
+      }
+      failed = this.api.world_step_end(dt);
+    } finally {
+      this.stepping = false;
+    }
+    return this.afterStep(failed);
+  }
+
   /**
    * Advances the world by `dt` seconds, in {@link KernelWorld.substeps} equal pieces. Finding new pairs can grow the world,
    * so read views from `columns` after this call.
@@ -3195,6 +3357,18 @@ export class KernelWorld {
    * more. {@link KernelWorld.restore} an earlier snapshot, or build the world again with what drove the body limited.
    */
   step(dt: number): this {
+    this.beforeStep(dt);
+    let failed: number;
+    try {
+      failed = this.api.world_step(dt);
+    } finally {
+      this.stepping = false;
+    }
+    return this.afterStep(failed);
+  }
+
+  /** What every step does first: the sleepers whose kind changed wake. */
+  private beforeStep(dt: number): void {
     if (!(dt > 0) || !Number.isFinite(dt))
       throw new RangeError(`A step must be finite and above zero; a usual step is 1 / 60 (got ${dt}).`);
     if (this.stepping) throw new MargoError('state', 'A contact filter ran a step; a filter may only read the world.');
@@ -3202,12 +3376,10 @@ export class KernelWorld {
     for (const row of this.wakeAtStep) this.api.body_wake_touching(row);
     this.wakeAtStep.length = 0;
     this.stepping = true;
-    let failed: number;
-    try {
-      failed = this.api.world_step(dt);
-    } finally {
-      this.stepping = false;
-    }
+  }
+
+  /** What every step does last: fresh views, and the refusals of a world that could not step. */
+  private afterStep(failed: number): this {
     if (this.api.world_layout() !== this.layout) this.bind();
     if (failed)
       throw new RangeError('Memory cannot hold the pairs of this world; spread the colliders out or use fewer.');

@@ -42,6 +42,7 @@ await build({
     lib: {
       entry: {
         index: resolve(root, 'src/index.ts'),
+        'kernel-thread': resolve(root, 'src/kernel-thread.ts'),
         decomposition: resolve(root, 'src/decomposition.ts'),
         soft: resolve(root, 'src/soft.ts'),
         meshfiles: resolve(root, 'src/meshfiles.ts'),

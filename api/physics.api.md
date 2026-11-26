@@ -668,6 +668,7 @@ export interface KernelFaceContacts {
 export interface KernelLoadOptions {
     signal?: AbortSignal;
     simd?: boolean;
+    threads?: boolean;
 }
 
 export interface KernelManifold {
@@ -929,6 +930,12 @@ export class KernelWorld {
     }): this;
     touch(body: number): this;
     stepSeconds: number;
+    get threadCount(): number;
+    useThreads(count: number, { signal }?: {
+        signal?: AbortSignal;
+    }): Promise<this>;
+    endThreads(): void;
+    stepAsync(dt: number): Promise<this>;
     step(dt: number): this;
     detect(): this;
     handle(kind: KernelHandle['kind'], row: number): KernelHandle;
@@ -2108,7 +2115,7 @@ export function geometryPositions(source: ColliderGeometry, scale?: Vec3): Float
 
 export function interactionGroups(memberships?: number | readonly number[], filter?: number | readonly number[], testMode?: 'and' | 'or'): InteractionGroups;
 
-export function loadKernel({ signal, simd }?: KernelLoadOptions): Promise<void>;
+export function loadKernel({ signal, simd, threads }?: KernelLoadOptions): Promise<void>;
 
 export function meshConnectedComponents(indices: ArrayLike<number>): {
     component: Uint32Array;

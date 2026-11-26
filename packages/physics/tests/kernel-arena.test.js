@@ -41,7 +41,7 @@ test("the kernel's world, stack and query records are regions of the arena, abov
   physics.dispose();
 });
 
-test('a second rigid kernel on one memory, or one on a shared memory, is refused before it writes, naming the fix', () => {
+test('a second rigid kernel on one memory, or one on a shared memory without the threaded kernel, is refused before it writes, naming the fix', () => {
   const arena = new Arena(worldMemory(false)),
     { physics } = stack(1, arena),
     used = arena.used;
@@ -53,11 +53,11 @@ test('a second rigid kernel on one memory, or one on a shared memory, is refused
       /pass another Arena, one per KernelWorld/.test(error.message),
   );
   assert.equal(arena.used, used);
-  // A shared memory needs the kernel's threaded build, which is not made yet.
+  // A shared memory needs the kernel's threaded build, which this file does not load.
   assert.throws(
     () => new Physics(null, { arena: new Arena(worldMemory(true)) }),
     (error) =>
-      error.name === 'MargoError' && error.code === 'unsupported' && /worldMemory\(false\)/.test(error.message),
+      error.name === 'MargoError' && error.code === 'state' && /loadKernel\(\{threads: true\}\)/.test(error.message),
   );
   physics.dispose();
 });

@@ -904,6 +904,29 @@ impl World {
     }
 
     /// The window on every list the step solves: all the awake bodies, every listed pair, joint and coupling.
+    /// A handle on the same world for one thread of an island solve: the same block, and a window, clock readings and counts
+    /// of its own, so threads solving different islands at once never write the same field. Only `World::solve_island` may
+    /// run on a view, and only while the world itself does nothing else.
+    pub fn thread_view(&self) -> World {
+        World {
+            arena: self.arena.view(),
+            #[cfg(not(target_arch = "wasm32"))]
+            filter: self.filter,
+            #[cfg(not(target_arch = "wasm32"))]
+            modifier: self.modifier,
+            timing: [0.0; 15],
+            window: Window::default(),
+            island_major: self.island_major,
+            query_groups_hi: 0,
+            query_motion: [0.0; 9],
+            part_id: core::cell::Cell::new(u32::MAX),
+            path_samples: core::cell::Cell::new(0),
+            path_searches: core::cell::Cell::new(0),
+            narrow_found: core::cell::Cell::new(0),
+            narrow_recycled: core::cell::Cell::new(0),
+        }
+    }
+
     /// Gives the current window the multibody stamps its `substeps` substeps take, two a substep, from the header's count.
     pub fn claim_stamps(&mut self, substeps: u32) {
         let first = self.header().mb_calls;

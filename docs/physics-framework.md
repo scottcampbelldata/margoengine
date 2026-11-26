@@ -282,6 +282,14 @@ them:
 - The reduction rules of section 7 keep the result independent of the thread count.
 - Without cross-origin isolation, a world runs single-threaded and reports the mode it chose.
 
+**Status (2026-11-26):** the rigid kernel's islands solve on threads. `KernelWorld.useThreads(count)` starts `count - 1`
+workers, each with its own instance of the kernel's threaded build over the world's shared memory and a stack region of its
+own; `stepAsync` begins the step on the main thread (broad and narrow phases, islands, rows, each island's planned level and
+multibody stamps), hands fixed runs of island numbers to the workers and solves the first itself, then ends the step on the
+main thread. Islands share no row a solve writes, so the bits are those of one thread at any count (section 7, rule 7):
+`kernel/tests/threads.rs` with native threads and `tests/kernel-threads.test.js` with Wasm workers check the state hash after
+every step at 1, 2, 4 and 8 threads. The broad and narrow phases are still serial.
+
 ## 10. The guard: coupling tests in the merge gate
 
 For every coupling edge and every solver that claims a physical effect, `check:merge` runs:
