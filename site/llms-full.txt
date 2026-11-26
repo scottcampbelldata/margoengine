@@ -15202,31 +15202,47 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differs by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap, webgl2-compat)
+### Fixed 2026-11-26: tonemap's settings check on the WebGL2 layer on ANGLE Direct3D 11 differed by one pixel in group `local` about half the time (KB-TONEMAP-LOCALD3D1, tonemap)
 
 - **Repro:** `node packages/tonemap/tests/settings-browser.mjs --compat` on the workstation (RTX A6000, Chrome, ANGLE
-  Direct3D 11): it failed 2 of 4 runs, then 4 of 6, at "local: the sweep's last frame is what writing its values once
-  draws" or "local: the defaults written leave the frame exact", one pixel (green 176 against 177). WebGPU passes.
-- **Found:** on such a frame the scene's own HDR target (`rgba16float`, before any Tonemap pass reads it) differs: 4 of
-  230,400 half floats, one step apart, inside the white box's faces (the same values with antialias off, so not an
-  edge or a resolve). `LocalExposure` only lifts that step across an 8-bit boundary. The frame's uniform uploads
-  (every `queue.writeBuffer`, hashed) are byte for byte the same, and a rebuilt Tonemap makes no GL program (the
-  layer's `glObjects`): only textures, framebuffers and 2 multisampled renderbuffers.
-- **Not seen with:** `antialias: false` (0 of 6 runs), ANGLE's OpenGL back end (`--use-angle=gl`, 0 of 8 on this
-  check), 20 frames in place of 2 before the compared frame (0 of 6), or a 400 ms wait before each compared frame's
-  first draw (0 of 6).
-- **Cause:** not found. The engine's input is identical, and the difference goes with wall-clock time with no draw in
-  between, so work below the engine that finishes in the background (ANGLE's Direct3D 11 back end or the driver) is
-  the suspect, most likely a second compile of the scene's pixel shader once a multisampled target is made again.
-- **Owed:** a Chrome trace (gpu and angle categories) of a failing run to see what runs in those 400 ms, then the fix in
-  the package that owns it and a regression test. The check is not loosened.
+  Direct3D 11): it failed 2 of 4 runs, then 4 of 6 and 2 of 3, at "local: the sweep's last frame is what writing its
+  values once draws" or "local: the defaults written leave the frame exact", one pixel (green 176 against 177).
+- **Cause:** the check compared frames that each drew the scene again, and on this driver the same draw does not
+  always give the same half floats. Every compared frame's scene target was copied to a buffer without a wait and read
+  at the end: 4 values at 4 fixed places inside the white box (two of them diagonal neighbours) take one of two states
+  one step apart (16677 or 16678, 16796 or 16795), flipping between frames of one effect as well as between rebuilt
+  effects, with antialias on and off. Every WebGL call of two such consecutive frames was recorded (name, arguments,
+  the hash of every uniform and buffer upload, the identity of every texture, framebuffer, program and buffer): both
+  frames made the same 133 calls on the same objects with the same data and still drew different values. So the
+  difference is below the WebGL API (ANGLE's Direct3D 11 back end or the driver) and the engine cannot make it exact;
+  `LocalExposure` only lifts the step across an 8-bit boundary. A GPU wait after each frame changed the timing enough
+  to hide it, which is why waits and more frames seemed to cure it. The earlier "not seen with `--use-angle=gl`" was
+  SwiftShader, not OpenGL (see KB-TONEMAP-CURVEGL1).
+- **Fix:** the check renders the scene's HDR frame once, keeps it in a texture (copied texel for texel by
+  `textureLoad`) and gives it to every effect it compares as `options.source`, so the exact comparisons tonemap one
+  input. No comparison is loosened: every channel of every pixel still has to match.
+- **Regression:** `packages/tonemap/tests/settings-browser.mjs` asserts that every compared frame of every group
+  tonemaps the kept frame ("every compared frame tonemaps the kept HDR frame"); an effect that captures the scene
+  itself, as every effect of the old check did, fails it on every run. Native passed, and the WebGL2 layer on Direct3D 11
+  passed 6 of 6 runs (2026-11-26).
 
-### Open 2026-11-26: on ANGLE's OpenGL back end, tonemap's settings check sees no GPU object from `tonemap.curve` (KB-TONEMAP-CURVEGL1, tonemap, webgl2-compat)
+### Fixed 2026-11-26: with `--use-angle=gl`, tonemap's settings check saw no GPU object from `tonemap.curve` (KB-TONEMAP-CURVEGL1, tonemap)
 
 - **Repro:** `node packages/tonemap/tests/settings-browser.mjs --compat` with Chrome started with `--use-angle=gl`
-  (workstation, RTX A6000): 3 of 4 runs fail at "tonemap.curve is live: false because it makes GPU objects"; the
-  default Direct3D 11 back end passes that assertion.
-- **Cause:** not looked at yet.
+  (workstation, RTX A6000): 3 of 4 runs failed at "tonemap.curve is live: false because it makes GPU objects".
+- **Cause:** two things. Headless Chrome on this PC does not run ANGLE's OpenGL back end with that flag: the WebGL2
+  renderer is SwiftShader (`ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))`), and in 2 of 3 runs its
+  first context was lost about 2 ms after the engine was made, so the engine restored itself on a new device. The
+  check counted GPU objects by wrapping the methods of the first device only, so after the restore every count stayed
+  0: the "makes GPU objects" assertions failed, and the "60 frames made no GPU objects" ones passed without counting
+  anything.
+- **Fix:** the check wraps the device's class instead of one device, calls `engine.rebootDevice()` itself before it
+  starts so the counter has to follow a restore on every run, pushes its validation scope on the device it then has,
+  and fails with "the device was replaced during the check" if the device changes later (a scope on a lost device
+  would hide its errors).
+- **Regression:** the same check: with the old per-device counter, its own `rebootDevice()` leaves every count at 0
+  and "tonemap.curve is live: false because it makes GPU objects" fails on every run, on every backend. With
+  `--use-angle=gl` (SwiftShader) it passed 3 of 3 runs.
 
 ### Fixed 2026-11-26: the subsurface case had no measured Direct3D 11 time (KB-VPT-SPLIT-SUBSURFACE, voxel-pathtracer)
 

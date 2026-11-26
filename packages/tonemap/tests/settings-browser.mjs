@@ -1,5 +1,8 @@
 // Real-GPU check of @margoengine/tonemap/settings, built packages: a lit white box and a red box on a floor under a bright
 // sun, Tonemap alone with the extension the group needs (the display is read back from the canvas).
+//   - Every exact comparison tonemaps one HDR frame of the scene, rendered once and kept in a texture (options.source, a function): on
+//     ANGLE Direct3D 11 the same WebGL calls, objects and data drew 4 of the scene's half floats one step apart from
+//     frame to frame (KB-TONEMAP-LOCALD3D1), so a scene drawn again for each compared frame is not the same input.
 //   - The defaults written draw exactly what the same effect draws with only the group's base values (every channel of every pixel).
 //   - Writing every live row of the group each frame for 60 frames creates no pipeline, buffer or texture, and the last
 //     frame equals the frame of a fresh effect given the same values once (not for eye adaptation, whose history is time).
@@ -39,9 +42,12 @@ await postBrowser(
           .setGeometry(box(...size))
           .setPosition(position)
           .setMaterial(new PbrMaterial({ color, roughness: 0.4 }));
-      const device = engine.gpu;
-      device.pushErrorScope('validation');
-      const made = { pipelines: 0, buffers: 0, textures: 0 };
+      // The counter wraps the device class, not one device: a restore gives the engine a new device, and a counter on
+      // the first one then saw nothing at all (KB-TONEMAP-CURVEGL1: Chrome started with --use-angle=gl ran SwiftShader
+      // here and lost its first context within milliseconds, so every count stayed 0). The restore below runs every
+      // time, so a counter that misses the new device fails every run.
+      const made = { pipelines: 0, buffers: 0, textures: 0 },
+        proto = Object.getPrototypeOf(engine.gpu);
       for (const [method, key] of [
         ['createRenderPipeline', 'pipelines'],
         ['createComputePipeline', 'pipelines'],
@@ -50,41 +56,99 @@ await postBrowser(
         ['createBuffer', 'buffers'],
         ['createTexture', 'textures'],
       ]) {
-        const real = device[method];
+        const real = proto[method];
         if (real)
-          device[method] = function (...args) {
+          proto[method] = function (...args) {
             made[key]++;
             return real.apply(this, args);
           };
       }
+      const first = engine.gpu;
+      await engine.rebootDevice();
+      if (engine.gpu === first) throw new Error('rebootDevice() kept the device');
+      const device = engine.gpu;
+      device.pushErrorScope('validation');
       // Each group: how the effect is built and the non-live values held while its live rows move (so the program stays put).
       const cases = {
-        tonemap: { make: () => ({ tonemap: Tonemap.attach(engine) }), base: {} },
-        vignette: { make: () => ({ tonemap: Tonemap.attach(engine) }), base: { 'vignette.amount': 0.4 } },
-        autoExposure: { make: () => ({ tonemap: Tonemap.attach(engine) }), base: { 'autoExposure.enabled': 'on' } },
+        tonemap: { make: (source) => ({ tonemap: Tonemap.attach(engine, { source }) }), base: {} },
+        vignette: {
+          make: (source) => ({ tonemap: Tonemap.attach(engine, { source }) }),
+          base: { 'vignette.amount': 0.4 },
+        },
+        autoExposure: {
+          make: (source) => ({ tonemap: Tonemap.attach(engine, { source }) }),
+          base: { 'autoExposure.enabled': 'on' },
+        },
         grade: {
-          make: () => {
+          make: (source) => {
             const grade = new Grade();
-            return { grade, tonemap: Tonemap.attach(engine, { extensions: [grade] }) };
+            return { grade, tonemap: Tonemap.attach(engine, { source, extensions: [grade] }) };
           },
           base: { 'grade.lift': [0.02, 0, 0] },
         },
         hue: {
-          make: () => {
+          make: (source) => {
             const hueGrade = new HueGrade();
-            return { hueGrade, tonemap: Tonemap.attach(engine, { extensions: [hueGrade] }) };
+            return { hueGrade, tonemap: Tonemap.attach(engine, { source, extensions: [hueGrade] }) };
           },
           base: { 'grade.lift': [0.02, 0, 0] },
         },
         local: {
-          make: () => {
+          make: (source) => {
             const local = new LocalExposure();
-            return { local, tonemap: Tonemap.attach(engine, { extensions: [local] }) };
+            return { local, tonemap: Tonemap.attach(engine, { source, extensions: [local] }) };
           },
           base: {},
         },
       };
-      window.t = { engine, settings, cases, made, device };
+      // The scene's HDR frame, once: a Tonemap's own capture, read by an extension and drawn texel for texel (textureLoad
+      // into the same format) into a texture of its own.
+      const canvas = document.querySelector('canvas'),
+        hdr = device.createTexture({
+          size: [canvas.width, canvas.height],
+          format: 'rgba16float',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+        }),
+        copyModule = device.createShaderModule({
+          code: `@group(0) @binding(0) var src:texture_2d<f32>;
+@vertex fn v(@builtin(vertex_index) i:u32)->@builtin(position) vec4f {
+  return vec4f(array(vec2f(-1,-1),vec2f(3,-1),vec2f(-1,3))[i],0,1);
+}
+@fragment fn f(@builtin(position) p:vec4f)->@location(0) vec4f { return textureLoad(src,vec2i(p.xy),0); }`,
+        }),
+        copy = device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module: copyModule, entryPoint: 'v' },
+          fragment: { module: copyModule, entryPoint: 'f', targets: [{ format: 'rgba16float' }] },
+        });
+      const grab = {
+          key: 'capture',
+          patch: (shader) => shader,
+          encode: (c) => {
+            const source = 'createView' in c.source ? c.source.createView() : c.source,
+              pass = c.encoder.beginRenderPass({
+                colorAttachments: [{ view: hdr.createView(), loadOp: 'clear', storeOp: 'store' }],
+              });
+            pass.setPipeline(copy);
+            pass.setBindGroup(
+              0,
+              device.createBindGroup({
+                layout: copy.getBindGroupLayout(0),
+                entries: [{ binding: 0, resource: source }],
+              }),
+            );
+            pass.draw(3);
+            pass.end();
+          },
+        },
+        capture = Tonemap.attach(engine, { extensions: [grab] });
+      const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
+      await waitForPipelines(async () => {
+        engine.render({ delta: 1 / 60 });
+        await engine.gpu.queue.onSubmittedWorkDone();
+      });
+      capture.dispose();
+      window.t = { engine, settings, cases, made, device, hdr: () => hdr };
     });
     const t = (fn, ...args) => page.evaluate(fn, ...args);
     const diff = (a, b) => {
@@ -98,13 +162,15 @@ await postBrowser(
         const { waitForPipelines } = await import('/scripts/support/gpu-ready.js');
         await waitForPipelines(async () => {
           window.t.engine.render({ delta: 1 / 60 });
-          await window.t.device.queue.onSubmittedWorkDone();
+          await window.t.engine.gpu.queue.onSubmittedWorkDone();
         });
         for (let i = 0; i < n; i++) window.t.engine.render({ delta: 1 / 60 });
-        await window.t.device.queue.onSubmittedWorkDone();
+        await window.t.engine.gpu.queue.onSubmittedWorkDone();
       }, n);
       return shot();
     };
+    // Whether the effect being compared tonemaps the kept HDR frame (the exact comparisons need one input).
+    const kept = () => t(() => window.t.e.tonemap.options.source === window.t.hdr);
     const result = {};
     const groups = await t(() => Object.keys(window.t.cases));
     for (const group of groups) {
@@ -114,7 +180,7 @@ await postBrowser(
           const w = window.t;
           w.rows = w.settings.TONEMAP_LIVE_SETTINGS.filter((r) => r.group === group);
           w.build = () => {
-            const e = w.cases[group].make();
+            const e = w.cases[group].make(w.hdr);
             w.e = e;
             w.holder = Object.fromEntries(Object.entries(e));
             return e;
@@ -142,7 +208,8 @@ await postBrowser(
         window.t.build();
         window.t.settings.applyTonemapSettings(window.t.e, window.t.cases[window.t.rows[0].group].base);
       });
-      const plain = await frame();
+      const plain = await frame(),
+        inputs = [await kept()];
       await t(() => window.t.dispose());
       await t(() => {
         window.t.build();
@@ -153,6 +220,7 @@ await postBrowser(
         applyTonemapSettings(window.t.e, { ...tonemapSettingDefaults(), ...base });
       });
       const written = await frame();
+      inputs.push(await kept());
       const entry = (result[group] = { defaultsDiffer: diff(plain, written), rows: rows.length });
       // 2. Sixty frames of every live row make no GPU object, and the last frame is what writing the values once draws.
       await t(() => window.t.settings.applyTonemapSettings(window.t.e, window.t.at(0)));
@@ -165,16 +233,19 @@ await postBrowser(
           w.settings.applyTonemapSettings(w.e, w.at(i / 59));
           w.engine.render({ delta: 1 / 60 });
         }
-        await w.device.queue.onSubmittedWorkDone();
+        await w.engine.gpu.queue.onSubmittedWorkDone();
       });
       entry.counts = { before, after: await t(() => ({ ...window.t.made })) };
       const swept = await frame();
+      inputs.push(await kept());
       await t(() => window.t.dispose());
       await t(() => {
         window.t.build();
         window.t.settings.applyTonemapSettings(window.t.e, window.t.at(1));
       });
       entry.onceDiffers = diff(swept, await frame());
+      inputs.push(await kept());
+      entry.keptInput = inputs.every(Boolean);
       entry.changed = diff(plain, swept);
       await t(() => window.t.dispose());
     }
@@ -229,6 +300,8 @@ await postBrowser(
       c.style.height = '240px';
     });
     const validation = await t(async () => {
+      // A device lost and restored after the scope was pushed would hide its errors: the check names it instead.
+      if (window.t.engine.gpu !== window.t.device) return 'the device was replaced during the check';
       const e = await window.t.device.popErrorScope();
       window.t.engine.dispose();
       return e?.message;
@@ -241,6 +314,7 @@ await postBrowser(
         r.counts.before,
         `${group}: 60 frames of every live row made GPU objects: ${JSON.stringify(r.counts)}`,
       );
+      assert.ok(r.keptInput, `${group}: every compared frame tonemaps the kept HDR frame`);
       assert.ok(r.changed > 100, `${group}: the swept rows change the frame (${r.changed})`);
       if (group === 'autoExposure') continue;
       assert.equal(r.defaultsDiffer, 0, `${group}: the defaults written leave the frame exact`);
