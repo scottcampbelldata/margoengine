@@ -1,7 +1,7 @@
 # Reading the three.js parity counts
 
 Date: 2026-11-24. The table in [threejs-parity.md](threejs-parity.md) was rewritten by feature group on 2026-10-31 and
-recounted on 2026-11-25: **195 features, 187 COVERED, 5 PARTIAL, 0 MISSING**, plus 3 NOT PLANNED by decision. The earlier table
+recounted on 2026-11-26: **195 features, 189 COVERED, 3 PARTIAL, 0 MISSING**, plus 3 NOT PLANNED by decision. The earlier table
 counted 161 rows (153 / 4 / 4); its coarse rows hid gaps that now have rows of their own. The rows and the
 [to-do table](threejs-parity.md#what-is-missing-or-partial-and-what-to-do) are the source; this page only explains how
 to read them.
@@ -31,6 +31,8 @@ COVERED by `@margoengine/xr/models`.
 ## The PARTIAL rows
 
 WebGL2 fallback: see above.
+
+On 2026-11-26 cloth simulation became COVERED with `drawSoftBody` (`@margoengine/gltf/soft-mesh`) and particle fluids with `DfsphSolver` (`@margoengine/physics/dfsph`); the two soft-body defects they named are fixed. Three rows stay PARTIAL.
 
 Four rows became PARTIAL on 2026-11-24, when their code was found: cloth simulation, particle fluids and soft bodies,
 the triangle-mesh path tracer and real-time caustics; real-time caustics became COVERED on 2026-11-25 with

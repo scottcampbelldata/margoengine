@@ -4,12 +4,12 @@ What Margo Engine covers compared with three.js r186 and its common add-ons (`th
 
 ## Summary
 
-195 three.js features in 19 areas (recounted from the rows 2026-11-25; 52 of the COVERED rows are marked †):
+195 three.js features in 19 areas (recounted from the rows 2026-11-26; 52 of the COVERED rows are marked †):
 
 | Status | Count | Meaning |
 | --- | --- | --- |
-| COVERED | 187 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
-| PARTIAL | 5 | Some of it exists, but a common use case is missing. The notes say what. |
+| COVERED | 189 | A Margo package implements the feature in a form a three.js user would accept as equivalent (limits noted). |
+| PARTIAL | 3 | Some of it exists, but a common use case is missing. The notes say what. |
 | MISSING | 0 | Worth having and not written yet. Listed below with what to do. |
 | NOT PLANNED | 3 | Out of scope by decision. The note says why and what to use instead. |
 
@@ -213,7 +213,7 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 | three.js | Status | Margo | Shows it | Notes |
 | --- | --- | --- | --- | --- |
-| AnimationMixer, clip playback | COVERED | animation `Animation` (`packages/animation/src/index.ts`) | | For glTF PBR models on WebGPU. One clip at a time unless animator is used. |
+| AnimationMixer, clip playback | COVERED | animation `Animation` (`packages/animation/src/index.ts`); `AnimationMixer` (`@margoengine/animation/mixer`, `packages/animation/src/mixer.ts`) | | `Animation` plays one clip per glTF PBR model on WebGPU. `AnimationMixer` plays any number of clips on one root (a model, an `Animation`, a `Skeleton` or a plain object with bound property tracks) and blends them per property, weighted or additive, with fades, crossfades, warps, loop modes and time scales. |
 | Cross-fade, blending, additive layers | COVERED | animator `Animator`, `blend1D`, `blend2D` (`packages/animator/src/index.ts`) | | Also has blend trees and state transitions. |
 | SkinnedMesh, Skeleton, Bone | COVERED | animation compute skinning (`packages/animation/src/shader.ts`); raw-data `Skeleton` and `Skin` (`packages/animation/src/skin.ts`); exporters `skinWeights`, `skinBindMatrices`, `skinHierarchy` (`@margoengine/exporters/skin`) | [page](https://margoengine.com/demos/character-animation.html) | Four influences per vertex, eight for glTF skins with `JOINTS_1`/`WEIGHTS_1`. Skins load from glTF (or fbx) or are built in code: `Skin.attach(mesh, skeleton, joints, weights)` on `createMesh` meshes, `setInfluences`, and CPU skinning with `pose()`. |
 | Animated crowds (vertex animation textures; three.js has no built-in) | COVERED | animation `bakeVAT`, `VATCrowd` (`packages/animation/src/vat.ts`, entry `@margoengine/animation/vat`) | | Clips baked on the CPU into an rgba32float texture; any number of instances in one instanced draw with per-instance matrix, clip, time offset, speed and atlas region. Opaque; casts and receives `Shadows` (`shadows.add(crowd)`) and takes `EnvironmentLighting` IBL (`lighting.add(crowd)`); no SSAO or clustered lights; no clip blending. |
@@ -291,8 +291,8 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 | Decals | COVERED | post `Decals`, entry `@margoengine/post/decals` (`packages/post/src/decals.ts`) | | Screen-space projected decals (box projector, depth-reconstructed, normal-angle fade, one texture atlas; multiply or over), up to 4,096; needs a post capture for scene depth. Colour only. DecalGeometry itself (mesh decals) is not provided. Real-GPU checked (`results/decals-gpu.json`). |
 | MarchingCubes add-on | COVERED † | procedural `marchingCubes` (`packages/procedural/src/`) | | Own Marching Cubes with asymptotic-decider faces (closed indexed mesh, no dependency) behind the same `marchingCubes` call; a density function's vertices are its exact roots on the grid edges. |
 | Soft particles fading against scene depth | COVERED | vfx `softness` option (`packages/vfx/src/base.ts`) | | `softness` (world units) fades a particle over that distance in front of the opaque surface behind it, read from a depth texture the caller passes (`depth`, e.g. post `DepthTexture`); 0 costs nothing. Test: `packages/vfx/test/clouds.test.js` ("softness samples the scene depth"). |
-| Cloth simulation | PARTIAL | physics `margoengine/physics/soft` / `@margoengine/physics/soft` (`packages/physics/src/soft.ts`; README "Soft bodies" in `packages/physics/README.md`) | | `SoftBodyDesc.cloth`, `clothTube`, `clothAnisotropic` and `trimesh` build sheets with stretch, shear and bend edges, with tearing, self-contacts and collision with every rigid shape. Missing: a cloth render bridge. No package in the repository draws a soft body as a deforming mesh. |
-| Particle fluids and soft bodies | PARTIAL | physics `margoengine/physics/soft` (soft bodies); water `ParticleLiquid` (`packages/water/src/liquid.ts`) | | Soft bodies are as in the cloth row, with two open defects in [known bugs](known-bugs.md): KB-SOFT-LIGHT1 (a 1 cm bead tunnels a default cloth after about a second) and KB-SOFT-ITER1 (a rigid chain's stiffness depends on iterations, substeps and mass ratio). Particle fluid has a screen-space surface renderer, `ParticleLiquid`, and no fluid solver. |
+| Cloth simulation | COVERED | physics `margoengine/physics/soft` / `@margoengine/physics/soft` (`packages/physics/src/soft.ts`; README "Soft bodies" in `packages/physics/README.md`); drawing: `margoengine/gltf/soft-mesh` `drawSoftBody` (`packages/gltf/src/soft-mesh.ts`; README "Drawing a soft body" in `packages/gltf/README.md`) | | `SoftBodyDesc.cloth`, `clothTube`, `clothAnisotropic` and `trimesh` build sheets with stretch, shear and bend edges, with tearing, self-contacts and collision with every rigid shape. `drawSoftBody` draws the body as a PBR mesh that follows its particles every frame, with normals and tangents recomputed. |
+| Particle fluids and soft bodies | COVERED | physics `margoengine/physics/dfsph` / `@margoengine/physics/dfsph` (`packages/physics/src/dfsph`; README "Divergence-free liquid pressure" in `packages/physics/README.md`); water `ParticleLiquid` (`packages/water/src/liquid.ts`); soft bodies as in the cloth row | | `DfsphSolver` is a divergence-free SPH particle solver: density and velocity divergence solved on the world clock, with optional rigid bodies and impacts. `ParticleLiquid` draws fluid particles as a screen-space surface. The two soft-body defects the row named, KB-SOFT-LIGHT1 and KB-SOFT-ITER1, are fixed in [known bugs](known-bugs.md). |
 
 ### 18. Audio
 
@@ -313,14 +313,12 @@ Legend. A **†** marks rows where the evidence is the exported symbols, the pac
 
 ## What is missing or partial, and what to do
 
-Recounted from the rows (2026-11-25): 5 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
+Recounted from the rows (2026-11-26): 3 PARTIAL, 0 MISSING. Each fix goes in the optional package named; core stays frozen for features.
 
 | Row | What is missing | What to do |
 | --- | --- | --- |
 | WebXR VR, WebXR AR | PARTIAL. Never run on a headset or AR device. The AR reflection cube map waits on a WebGPU form in the Lighting Estimation draft. | Test on a device first (`examples/xr-device-check`). |
 | WebGL2 fallback | PARTIAL. M8 is done; the voxel and mesh path tracers run on it (slow cold compiles on ANGLE Direct3D 11 are ANGLE's, KB-L5a-10), Safari, Firefox and phones are not yet measured, XR runs on it through `/xr`, and the integrated-GPU frame-budget run is still to be recorded. | See [the roadmap](webgl2-compat-roadmap.md). |
-| Cloth simulation | PARTIAL. Soft bodies simulate cloth, but no render bridge draws them. | Add a render bridge to `@margoengine/physics/soft` that reads a body's particles as a mesh, with a test. |
-| Particle fluids and soft bodies | PARTIAL. `ParticleLiquid` draws fluid particles; there is no fluid solver. The soft-body defects KB-SOFT-LIGHT1 and KB-SOFT-ITER1 are open. | Research a particle fluid solver first and build it as an optional package; fix the two soft defects in `@margoengine/physics` with regression tests. |
 
 ## Leave as the documented limit
 
