@@ -78,7 +78,7 @@ test('capacity, names, types, defaults and every setter are checked with coded m
   const data = instanceAttributes(3, {
     f: 'f32',
     two: 'vec2f',
-    three: { type: 'vec3f', default: [1, 2, 3] },
+    triple: { type: 'vec3f', default: [1, 2, 3] },
     four: 'vec4f',
     tint: 'color',
     basis: 'mat3x3f',
@@ -90,7 +90,7 @@ test('capacity, names, types, defaults and every setter are checked with coded m
   assert.deepEqual(data.types, {
     f: 'f32',
     two: 'vec2f',
-    three: 'vec3f',
+    triple: 'vec3f',
     four: 'vec4f',
     tint: 'color',
     basis: 'mat3x3f',
@@ -98,7 +98,7 @@ test('capacity, names, types, defaults and every setter are checked with coded m
     color: 'color',
   });
   assert.equal(data.get('f', 2), 0);
-  assert.deepEqual(Array.from(data.get('three', 2)), [1, 2, 3]);
+  assert.deepEqual(Array.from(data.get('triple', 2)), [1, 2, 3]);
   assert.deepEqual(Array.from(data.get('tint', 0)), [1, 1, 1]);
   assert.deepEqual(Array.from(data.get('color', 0)), [0, 0, 0]);
   assert.deepEqual(Array.from(data.get('basis', 1)), [1, 0, 0, 0, 1, 0, 0, 0, 1]);
@@ -147,8 +147,8 @@ test('capacity, names, types, defaults and every setter are checked with coded m
 
   data.reset('two', 1);
   assert.deepEqual(Array.from(data.array('two')), [4, 5, 0, 0, 3, 4]);
-  data.reset('three').set('three', 0, [9, 9, 9]).reset();
-  assert.deepEqual(Array.from(data.array('three')), [1, 2, 3, 1, 2, 3, 1, 2, 3]);
+  data.reset('triple').set('triple', 0, [9, 9, 9]).reset();
+  assert.deepEqual(Array.from(data.array('triple')), [1, 2, 3, 1, 2, 3, 1, 2, 3]);
   assert.equal(data.get('f', 2), 0);
 });
 

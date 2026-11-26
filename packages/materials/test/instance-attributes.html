@@ -62,15 +62,15 @@ window.check={
   // Every type reads its own floats of its own row.
   async types(){
     const {engine,errors,bytes}=await scene();
-    const data=instanceAttributes(3,{f:'f32',two:'vec2f',three:'vec3f',four:'vec4f',tint:'color',basis:'mat3x3f',pose:'mat4x4f'});
+    const data=instanceAttributes(3,{f:'f32',two:'vec2f',triple:'vec3f',four:'vec4f',tint:'color',basis:'mat3x3f',pose:'mat4x4f'});
     const plugin=materialPlugin({name:'t',instanceAttributes:data,vertex:'position.x += t_pose[3][1];',
       output:'color = vec3f(t_f + t_two.y, t_three.z + t_basis[1][1] - 1.0 + t_basis[2][0], t_pose[3][0] + t_four.w) * t_tint;'});
     createInstancedMesh(engine,quad(0.5),new UnlitMaterial({features:[plugin]}),3);
     // pose[13] places each quad (-1.5, 0, 1.5); pose[12] feeds blue.
     for(let i=0;i<3;i++)data.set('pose',i,[1,0,0,0,0,1,0,0,0,0,1,0,0.1*i,(i-1)*1.5,0,1]);
     data.set('tint',0,[0,0,0]);
-    data.set('f',1,0.2).set('two',1,[9,0.4]).set('three',1,[9,9,0.2]).set('basis',1,[9,9,9,9,1.5,9,0.1,9,9]).set('four',1,[9,9,9,0.3]);
-    data.set('f',2,1).set('three',2,[9,9,1]).set('tint',2,[0,1,0]);
+    data.set('f',1,0.2).set('two',1,[9,0.4]).set('triple',1,[9,9,0.2]).set('basis',1,[9,9,9,9,1.5,9,0.1,9,9]).set('four',1,[9,9,9,0.3]);
+    data.set('f',2,1).set('triple',2,[9,9,1]).set('tint',2,[0,1,0]);
     const out=three(await bytes());engine.dispose();return {errors,out};
   },
   // Plain meshes sharing the material and geometry read row 0, whatever order they are drawn or batched in.
