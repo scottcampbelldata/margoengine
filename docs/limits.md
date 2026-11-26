@@ -9910,7 +9910,7 @@ drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Su
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 13,617 B gzip with a 13,728 B ceiling. Both Wasm assets are 32,388 B raw and 12,732 B gzip each.
+The optional entry is 13,650 B gzip with a 13,728 B ceiling. Both Wasm assets are 33,712 B raw and 13,196 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
