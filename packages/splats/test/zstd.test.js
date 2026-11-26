@@ -3,22 +3,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
-import * as zlib from 'node:zlib';
+import { constants as P } from 'node:zlib';
+import { noZstd as skip, zstdCompressSync, zstdDecompressSync } from '../../../scripts/support/node-compat.mjs';
 
 // The decoder is an internal, lazily loaded chunk of the build (parseSpz imports it for version 4 files).
 const chunk = readdirSync(new URL('../dist/', import.meta.url)).find((f) => /^zstd-.*\.js$/.test(f));
 const { decompressZstd } = await import(new URL(`../dist/${chunk}`, import.meta.url));
 
 const fixture = (name) => new Uint8Array(readFileSync(new URL(`./fixtures/${name}`, import.meta.url)));
-const hasZstd = typeof zlib.zstdCompressSync === 'function';
-const skip = hasZstd ? false : 'this Node has no zstd in node:zlib (Node 22.15 or later)';
-const P = zlib.constants;
 
 /** Compresses with Node's zstd; `params` maps ZSTD_c_* names to values. */
 function zstd(bytes, params = {}) {
   const p = {};
   for (const [k, v] of Object.entries(params)) p[P[`ZSTD_c_${k}`]] = v;
-  return new Uint8Array(zlib.zstdCompressSync(bytes, { params: p }));
+  return new Uint8Array(zstdCompressSync(bytes, { params: p }));
 }
 
 /** Deterministic test data: word-like text, random bytes, runs, and a real binary file. */
@@ -179,7 +177,7 @@ test('decodes the six Zstandard streams of the SPZ version 4 fixture to their de
       size = view.getUint32(40 + i * 16, true),
       out = await decompressZstd(file.subarray(at, at + compressed));
     assert.equal(out.length, size, `stream ${i}`);
-    if (hasZstd) assert.ok(Buffer.from(out).equals(zlib.zstdDecompressSync(file.subarray(at, at + compressed))));
+    assert.ok(Buffer.from(out).equals(zstdDecompressSync(file.subarray(at, at + compressed))));
     at += compressed;
   }
   assert.equal(at, file.length);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { zstdDecompressSync } from 'node:zlib';
+import { zstdDecompressSync } from '../../../scripts/support/node-compat.mjs';
 import { loadNativeBasis } from '../dist/basis-native.js';
 import { decompressZstd } from '../../shared/zstd.js';
 

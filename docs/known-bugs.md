@@ -363,9 +363,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   Binary32 inputs encode as before. The TIFF reader already decoded half floats itself.
 - **Regression:** `packages/decoders/tests/tiff.test.js`, "TIFF half floats and the binary16 encoder need no built-in
   float16, and match it where it exists", and `tests/node-apis.test.js`, "the Node 22 test files and their helpers use
-  no built-in float16 API without a feature test".
+  no API newer than Node 22.12 without a feature test" (named "no built-in float16 API" until KB-NODE22-TESTS1).
 
-### Open 2026-11-26: some tests CI runs on Node 22.12 import APIs it lacks (KB-NODE22-TESTS1, tests)
+### Fixed 2026-11-26: some tests CI runs on Node 22.12 import APIs it lacks (KB-NODE22-TESTS1, tests)
 
 - **Repro:** on Node 22.12, `npm run test:node22`: files that import `registerHooks` from `node:module` (in
   `packages/biomes/tests`, `packages/mesh-edit/tests`, `packages/gltf/test/auto.test.js`,
@@ -374,7 +374,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/exporters/tests/basis-native.test.js` and `basis-zstd.test.js`, `packages/splats/test/zstd.test.js`) can fail
   with "does not provide an export named".
 - **Cause:** both arrived after Node 22.12 (22.22 has them), and `scripts/check-node-apis.mjs` reads shipped sources
-  only. `tests/node-apis.test.js` checks the Node 22 test files for the float16 APIs alone until these are guarded.
+  only. `tests/node-apis.test.js` checked the Node 22 test files for the float16 APIs alone.
+- **Fix:** the test files take both from `scripts/support/node-compat.mjs`, which reads the module namespaces and has a
+  stand-in for each. `moduleHooks(rules)` applies module hooks written as plain rules
+  (`scripts/support/node-compat-hooks.mjs`) through `module.registerHooks`, or through `module.register` where that is
+  missing, so the biomes, mesh-edit, glTF, Blender and WebGL2 route tests run on Node 22.12 too. `zstdDecompressSync` is
+  node:zlib's or the engine's own decoder (`packages/shared/zstd.js`). `zstdCompressSync` has no stand-in (the engine
+  has no JavaScript Zstandard encoder): the 13 tests that need Node-made streams (decoders `streams` and
+  `zstd-destination`, splats `zstd`) pass `{ skip: noZstd }`, which names the Node version and is false on every Node
+  that has the API, so the latest 22.x and Node 24 and 26 still run them. No shipped source used either API.
+- **Regression:** `tests/node-apis.test.js`: "the Node 22 test files and their helpers use no API newer than Node 22.12
+  without a feature test" now scans for every API in the table (a named import of `registerHooks` or a zstd function
+  fails it), and "the stand-ins for registerHooks and zstd work, on this Node and as on Node 22.12" runs them with
+  `MARGO_NODE_COMPAT=fallback`.
 
 ### Fixed 2026-11-26: rebase:main built API reports for every touched package, so a push lost the race for main (KB-REBASE-SLOW1, scripts)
 

@@ -1,14 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-// module.registerHooks exists from Node 22.15; it is read only for the source mode, so the dist run works on 22.12.
-if (process.env.MARGO_PAINT_SOURCE === '1')
-  (await import('node:module')).registerHooks({
-    resolve(specifier, context, nextResolve) {
-      if (specifier.startsWith('.') && specifier.endsWith('.js') && context.parentURL?.includes('/mesh-edit/src/'))
-        return nextResolve(specifier.slice(0, -3) + '.ts', context);
-      return nextResolve(specifier, context);
-    },
-  });
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
+// Source verification avoids rebuilding shared dist while another author works on UV operations.
+if (process.env.MARGO_PAINT_SOURCE === '1') await moduleHooks([{ source: new URL('../src/', import.meta.url).href }]);
 const K = await import(process.env.MARGO_PAINT_SOURCE === '1' ? '../src/paint-session.ts' : '../dist/index.js');
 const P = await import(process.env.MARGO_PAINT_SOURCE === '1' ? '../src/paint.ts' : '../dist/index.js');
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];

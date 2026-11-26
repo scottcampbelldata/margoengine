@@ -7,28 +7,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, realpathSync } from 'node:fs';
-import { registerHooks } from 'node:module';
-import { isAbsolute, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { random } from './random.js';
 
 // classify.ts is internal (no public entry), so the test imports the TypeScript source, as gpu-classify-inputs.test.js does.
-const repository = realpathSync(new URL('../../../', import.meta.url));
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (/^\.{1,2}\//.test(specifier) && specifier.endsWith('.js') && context.parentURL?.startsWith('file:')) {
-      const js = new URL(specifier, context.parentURL),
-        ts = new URL(specifier.slice(0, -3) + '.ts', context.parentURL);
-      if (!existsSync(js) && existsSync(ts)) {
-        const source = realpathSync(ts),
-          within = relative(repository, source);
-        if (!within.startsWith('..') && !isAbsolute(within)) return nextResolve(pathToFileURL(source).href, context);
-      }
-    }
-    return nextResolve(specifier, context);
-  },
-});
+await moduleHooks([{ source: new URL('../../../', import.meta.url).href }]);
 const { checkPaint, classifier, classify, classifyInputs, membership } = await import('../src/classify.ts');
 
 const digest = (...parts) => {

@@ -8,10 +8,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { registerHooks } from 'node:module';
-import { isAbsolute, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { readFileSync } from 'node:fs';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import {
   fieldIntegrationCases,
   fieldNames,
@@ -20,21 +18,7 @@ import {
   requireFieldIntegrationHost,
 } from './gpu-field-integration-cases.mjs';
 
-const repository = realpathSync(new URL('../../../', import.meta.url));
-function resolveSource(specifier, context, nextResolve) {
-  if (/^\.{1,2}\//.test(specifier) && specifier.endsWith('.js') && context.parentURL?.startsWith('file:')) {
-    const js = new URL(specifier, context.parentURL);
-    const ts = new URL(specifier.slice(0, -3) + '.ts', context.parentURL);
-    if (!existsSync(js) && existsSync(ts)) {
-      const source = realpathSync(ts);
-      const within = relative(repository, source);
-      if (within !== '..' && !within.startsWith('../') && !within.startsWith('..\\') && !isAbsolute(within))
-        return nextResolve(pathToFileURL(source).href, context);
-    }
-  }
-  return nextResolve(specifier, context);
-}
-registerHooks({ resolve: resolveSource });
+await moduleHooks([{ source: new URL('../../../', import.meta.url).href }]);
 
 const module = {
   ...(await import('../src/gpu-fields.ts')),

@@ -3,8 +3,8 @@
 // (routes-browser.mjs) draws each one natively and on the layer and compares the pixels.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { registerHooks } from 'node:module';
+import { readFileSync, readdirSync } from 'node:fs';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { fileURLToPath } from 'node:url';
 import { planCompute, runComputeOnCPU } from '../dist/compute.js';
 import { COMPAT_VENDOR as layerVendor } from '../dist/device.js';
@@ -13,15 +13,7 @@ import { prefixDownShader, prefixLevels, prefixTopShader, prefixUpShader } from 
 
 const packages = fileURLToPath(new URL('../../', import.meta.url));
 // The tests read shader texts from the packages' sources, which import each other as './name.js'.
-registerHooks({
-  resolve(specifier, context, next) {
-    if (context.parentURL?.endsWith('.ts') && /^\.\.?\/.*\.js$/.test(specifier)) {
-      const source = new URL(specifier.replace(/\.js$/, '.ts'), context.parentURL);
-      if (existsSync(source)) return next(source.href, context);
-    }
-    return next(specifier, context);
-  },
-});
+await moduleHooks([{ source: new URL('../../', import.meta.url).href }]);
 /**
  * The compat chunk the package's build split off for its `import('./compat.js')`: the one its root imports lazily (a
  * package with several entries may also get packages/shared/compat.js as a chunk of the same name stem). With several

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { registerHooks } from 'node:module';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import { loadAuto } from '../dist/auto.js';
@@ -11,17 +11,16 @@ import { documentOf, headlessEngine, vertexData, withBitmaps } from './helpers.j
 import { MargoError } from '@margoengine/math/errors';
 
 // Stands in for gltf/pbr, which needs a GPU; the real one runs in scripts/test-gltf-browser.mjs.
-registerHooks({
-  resolve(specifier, context, next) {
-    if (specifier === '@margoengine/gltf/pbr-instancing')
-      return { url: 'data:text/javascript,export const instancing = { read() {} };', shortCircuit: true };
-    if (specifier !== '@margoengine/gltf/pbr') return next(specifier, context);
-    return {
-      url: 'data:text/javascript,export const loadGLTF = (...args) => globalThis.loadPro(...args);',
-      shortCircuit: true,
-    };
+await moduleHooks([
+  {
+    specifier: '@margoengine/gltf/pbr-instancing',
+    url: 'data:text/javascript,export const instancing = { read() {} };',
   },
-});
+  {
+    specifier: '@margoengine/gltf/pbr',
+    url: 'data:text/javascript,export const loadGLTF = (...args) => globalThis.loadPro(...args);',
+  },
+]);
 
 const positions = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
   normals = new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]);

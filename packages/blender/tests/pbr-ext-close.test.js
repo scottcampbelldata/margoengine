@@ -3,18 +3,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { registerHooks } from 'node:module';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 
-let hookHits = 0;
-registerHooks({
-  resolve(specifier, context, next) {
-    if (context.parentURL?.endsWith('/dist/pbr-ext.js') && /^\.\/extended(-[\w-]+)?\.js$/.test(specifier)) {
-      hookHits++;
-      throw new Error('shader chunk failed to load');
-    }
-    return next(specifier, context);
+// The rule's message reaching the caller shows the shader import went through the failing hook.
+await moduleHooks([
+  {
+    pattern: String.raw`^\./extended(-[\w-]+)?\.js$`,
+    parent: '/dist/pbr-ext.js',
+    error: 'shader chunk failed to load',
   },
-});
+]);
 
 const { parseMargoPBR } = await import('../dist/pbr-ext.js');
 const { decodeMargo } = await import('../dist/index.js');
@@ -34,7 +32,6 @@ test('a failed shader import closes every decoded image', async (t) => {
     return image;
   };
   await assert.rejects(parseMargoPBR({}, bytes), /shader chunk failed to load/);
-  assert.equal(hookHits, 1, 'the shader import went through the failing hook');
   assert.equal(opened.length, pngCount, 'every image was decoded before the rejection settled');
   assert.deepEqual(
     opened.map((image) => image.closed),

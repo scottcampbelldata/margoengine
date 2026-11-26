@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { zstdCompressSync, constants } from 'node:zlib';
+import { constants } from 'node:zlib';
+import { noZstd, zstdCompressSync } from '../../../scripts/support/node-compat.mjs';
 import { decompressZstd } from '../../shared/zstd.js';
 const compress = (b, options = {}) =>
   zstdCompressSync(b, {
@@ -10,7 +11,9 @@ const compress = (b, options = {}) =>
     },
   });
 
-test('Zstd borrows a fixed destination without output allocation, growth or a final copy', async () => {
+test('Zstd borrows a fixed destination without output allocation, growth or a final copy', {
+  skip: noZstd,
+}, async () => {
   const source = new Uint8Array(4 << 20).map((_, i) => (i * 59 + (i >>> 12)) & 255);
   const packed = compress(source),
     storage = new Uint8Array(source.length + 32).fill(0xa5);
@@ -41,7 +44,9 @@ test('Zstd borrows a fixed destination without output allocation, growth or a fi
   assert(storage.subarray(-16).every((n) => n === 0xa5));
 });
 
-test('fixed destination retains concatenation, unknown sizes, checksums and capacity limits', async () => {
+test('fixed destination retains concatenation, unknown sizes, checksums and capacity limits', {
+  skip: noZstd,
+}, async () => {
   const a = new TextEncoder().encode('Margo owned buffer '.repeat(1000));
   const b = new Uint8Array(200_000).fill(29);
   const skip = Uint8Array.of(0x50, 0x2a, 0x4d, 0x18, 1, 0, 0, 0, 77);
@@ -68,7 +73,9 @@ test('fixed destination retains concatenation, unknown sizes, checksums and capa
   assert.equal((await decompressZstd(skip, { destination: new Uint8Array(0) })).length, 0);
 });
 
-test('fixed destination rejects aliasing, invalid storage, dictionaries and oversized windows', async () => {
+test('fixed destination rejects aliasing, invalid storage, dictionaries and oversized windows', {
+  skip: noZstd,
+}, async () => {
   const source = new Uint8Array(4096),
     packed = compress(source),
     destination = new Uint8Array(8192);
@@ -84,7 +91,7 @@ test('fixed destination rejects aliasing, invalid storage, dictionaries and over
   assert.equal(result.byteOffset, 2048);
 });
 
-test('fixed destination abort and Wasm growth reject during a yielded decode', async () => {
+test('fixed destination abort and Wasm growth reject during a yielded decode', { skip: noZstd }, async () => {
   const source = new Uint8Array(16 << 20),
     packed = compress(source);
   const before = new Uint8Array(source.length).fill(91);

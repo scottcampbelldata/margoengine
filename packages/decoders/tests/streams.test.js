@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { constants, zstdCompressSync } from 'node:zlib';
+import { constants } from 'node:zlib';
+import { noZstd, zstdCompressSync } from '../../../scripts/support/node-compat.mjs';
 import { Worker } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { decodeLZ4, decodeLZ4Block } from '@margoengine/decoders/lz4';
@@ -38,7 +39,10 @@ test('LZ4 reads stored blocks, empty files, frames without checksums and framed 
   );
 });
 
-test('standalone stream entries decode in a Node worker without browser APIs', { timeout: 15000 }, async () => {
+test('standalone stream entries decode in a Node worker without browser APIs', {
+  timeout: 15000,
+  skip: noZstd,
+}, async () => {
   const worker = new Worker(new URL('./support/stream-worker.mjs', import.meta.url), {
     workerData: { lz4: fixture(manifest.frames[0]), zstd: zstdCompressSync(expected) },
   });
@@ -135,7 +139,9 @@ test('LZ4 validates options and cancels before or between blocks without swallow
   await assert.rejects(pending, (error) => error === reason);
 });
 
-test('standalone Zstandard matches native compressed data, with concatenation, unknown sizes and destination reuse', async () => {
+test('standalone Zstandard matches native compressed data, with concatenation, unknown sizes and destination reuse', {
+  skip: noZstd,
+}, async () => {
   const frames = [];
   for (const level of [-5, 1, 3, 9, 19]) {
     const bytes = zstdCompressSync(expected, {

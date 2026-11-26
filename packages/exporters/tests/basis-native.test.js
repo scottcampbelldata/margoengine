@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { zstdDecompressSync } from 'node:zlib';
+import { zstdDecompressSync } from '../../../scripts/support/node-compat.mjs';
 import { encodeKTX2 } from '@margoengine/exporters/ktx2';
 import { encodeBasisLZ, packKTX2 } from '../dist/basis-wire.js';
 import { transcodeKTX2 } from '../../decoders/dist/codec.js';
