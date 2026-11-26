@@ -202,7 +202,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | ICE-05 | Ice thermodynamics | none | Open | OPEN |
 | FIRE-04 | Explosive blast loading | none | Open | OPEN |
 | FIRE-05 | Explosive source and fragments | stand-in | Open | OPEN |
-| FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED 3238609d65 |
+| FIRE-06 | Heat conduction and phase change | heat, phase change and thermoelasticity | Codex | LANDED e497def90e |
 | FIRE-07 | Burning of structures, ships and solids | stand-in | Open | OPEN |
 | SOUND-01 | Outdoor propagation | stand-in | Open | OPEN |
 | SOUND-02 | Enclosed and urban acoustics | partial | Open | OPEN |
