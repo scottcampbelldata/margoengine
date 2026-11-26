@@ -265,8 +265,9 @@ test('the instanced vertex patch applies after material and shader-node patches,
 test('texture binding limit: over the device limit, the draw throws naming the material and effects', async () => {
   const { gpu, engine, store, view } = await scene(),
     fixture = animatedTriangle();
-  // All eight extension maps are authored: missing-map constants must not turn this resource-limit test into a small shader.
-  const map = { index: 0 };
+  // All eight extension maps are authored, each its own glTF texture: neither missing-map constants nor a shared binding
+  // may turn this resource-limit test into a small shader.
+  const map = (index) => ({ index });
   const uv = new Float32Array([0, 0, 1, 0, 0.5, 1]);
   const uvView = fixture.doc.bufferViews.length;
   fixture.doc.bufferViews.push({ buffer: fixture.buffers.length, byteLength: uv.byteLength });
@@ -274,19 +275,19 @@ test('texture binding limit: over the device limit, the draw throws naming the m
   fixture.buffers.push(uv);
   fixture.doc.meshes[0].primitives[0].attributes.TEXCOORD_0 = fixture.doc.accessors.length;
   fixture.doc.accessors.push({ bufferView: uvView, componentType: 5126, count: 3, type: 'VEC2' });
-  fixture.doc.textures = [{ source: 0 }];
+  fixture.doc.textures = Array.from({ length: 8 }, () => ({ source: 0 }));
   fixture.doc.materials = [
     {
       extensions: {
         KHR_materials_clearcoat: {
           clearcoatFactor: 1,
-          clearcoatTexture: map,
-          clearcoatRoughnessTexture: map,
-          clearcoatNormalTexture: map,
+          clearcoatTexture: map(0),
+          clearcoatRoughnessTexture: map(1),
+          clearcoatNormalTexture: map(2),
         },
-        KHR_materials_transmission: { transmissionTexture: map },
-        KHR_materials_sheen: { sheenColorTexture: map, sheenRoughnessTexture: map },
-        KHR_materials_specular: { specularTexture: map, specularColorTexture: map },
+        KHR_materials_transmission: { transmissionTexture: map(3) },
+        KHR_materials_sheen: { sheenColorTexture: map(4), sheenRoughnessTexture: map(5) },
+        KHR_materials_specular: { specularTexture: map(6), specularColorTexture: map(7) },
       },
     },
   ];

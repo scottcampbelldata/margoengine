@@ -96,7 +96,9 @@ import {
   pbrShader,
   extendedPBRShader,
   physicalShader,
+  shareOwner,
   sparsePhysicalShader,
+  srgbSlots,
   factorPhysicalShader,
   transmissiveShader,
   transparentPBR,
@@ -259,7 +261,7 @@ export interface GLTFLightReceiver {
  * Options of loadGLTF: asset limits and fetch options, plus the Draco, meshopt and KTX2 decoders and an AbortSignal.
  */
 export type GLTFLoadOptions = Omit<AssetOptions, 'buffers'> & CompressionOptions;
-const srgbMaps = [0, 4, 9, 12, 17, 19],
+const srgbMaps = srgbSlots,
   normalMaps = [2, 7],
   blended = (m: PBRMaterial) => m.settings[0] === 2 || (!!m.tint && !m.extension?.replacesPhysical),
   // Drawn after the opaque phase: blended, or its extension asks for the opaque capture (`afterOpaque`). A static
@@ -1637,8 +1639,16 @@ function textureGroup(
       : []),
     ...r.views.flatMap((view, i) => {
       if (i < 5 && packed) return [];
-      // Keep fallback views available for a hook added later, but bind only authored native physical maps.
-      if (i >= 5 && m.physical && !m.maps[i] && !m.shading && !(r.primitive.extension ?? m.extension)) return [];
+      // Keep fallback views available for a hook added later, but bind only authored native physical maps, once per
+      // shared texture (sparsePhysicalShader samples a sharing slot through its owner's binding).
+      if (
+        i >= 5 &&
+        m.physical &&
+        !m.shading &&
+        !(r.primitive.extension ?? m.extension) &&
+        (m.extended || i >= 13 ? !m.maps[i] : shareOwner(m.maps, i, 13) !== i)
+      )
+        return [];
       const binding = i < 5 || !m.extended ? i * 2 : 10 + planOf(m, hooks!).slots[i] * 2;
       return view && (!(r.primitive.extension ?? m.extension)?.replacesPhysical || i < 5)
         ? [

@@ -174,6 +174,46 @@ test('sparse physical shaders preserve every authored extension-map slot indepen
   }
 });
 
+test('sparse physical shaders sample a shared glTF texture through one binding, by colour space', async () => {
+  const { sparsePhysicalShader, shareOwner } = await import('../src/shader.ts');
+  const bound = (code) => [...code.matchAll(/var (\w+)Map:texture_2d<f32>/g)].map((m) => m[1]);
+  // Clearcoat R + roughness G, and sheen colour RGB (sRGB) + roughness A, each in one texture: 2 extension bindings.
+  const maps = Array(13);
+  maps[5] = maps[6] = { index: 20 };
+  maps[9] = maps[10] = { index: 21 };
+  maps[8] = { index: 23 };
+  let code = sparsePhysicalShader(maps);
+  assert.deepEqual(bound(code), ['base', 'mr', 'normal', 'ao', 'emissive', 'clearcoat', 'transmission', 'sheenColor']);
+  assert.match(code, /textureSample\(clearcoatMap,clearcoatSampler,uv\(i,6\)\)\.g/, 'roughness keeps its own UV row');
+  assert.match(code, /textureSample\(sheenColorMap,sheenColorSampler,uv\(i,10\)\)\.a/, 'alpha joins the sRGB view');
+  assert.ok(!code.includes('clearcoatRoughnessSampler') && !code.includes('sheenRoughnessSampler'));
+  // Specular A + colour RGB: the sRGB colour slot owns, though it comes later.
+  const specular = Array(13);
+  specular[11] = specular[12] = { index: 4 };
+  code = sparsePhysicalShader(specular);
+  assert.deepEqual(bound(code).slice(5), ['specularColor']);
+  assert.match(code, /s\.sw=f\.specular\.w\*textureSample\(specularColorMap,specularColorSampler,uv\(i,11\)\)\.a/);
+  assert.equal(shareOwner(specular, 11, 13), 12);
+  // Clearcoat (linear R) and sheen colour (sRGB RGB) in one texture need two views: no sharing across colour spaces.
+  const mixed = Array(13);
+  mixed[5] = mixed[9] = { index: 7 };
+  assert.deepEqual(bound(sparsePhysicalShader(mixed)).slice(5), ['clearcoat', 'sheenColor']);
+  // Without an sRGB slot, an alpha-only slot owns its linear group; with one, the colour slots stay linear.
+  const linear = Array(13);
+  linear[11] = linear[5] = { index: 3 };
+  assert.deepEqual([shareOwner(linear, 5, 13), shareOwner(linear, 11, 13)], [5, 5]);
+  linear[12] = { index: 3 };
+  assert.deepEqual(
+    [5, 11, 12].map((k) => shareOwner(linear, k, 13)),
+    [5, 12, 12],
+  );
+  // The cache tells sharing apart from distinct textures with the same slots present.
+  const distinct = Array(13);
+  distinct[11] = { index: 4 };
+  distinct[12] = { index: 5 };
+  assert.deepEqual(bound(sparsePhysicalShader(distinct)).slice(5), ['specular', 'specularColor']);
+});
+
 test('adding and removing a live shading hook retains its full fallback-map resource interface', async (t) => {
   const f = await fixture();
   t.after(() => f.engine.dispose());

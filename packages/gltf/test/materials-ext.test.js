@@ -107,6 +107,74 @@ test('all physical map bindings survive base-layer packing and model cleanup', a
   }
 });
 
+test('native physical slots sharing a glTF texture bind it once, in the owner colour space', async () => {
+  const map = (index) => ({ index }),
+    formats = new Map(),
+    groups = [];
+  const { gpu, engine, model, view } = await scene(
+    [
+      {
+        pbrMetallicRoughness: { baseColorTexture: map(0) },
+        extensions: {
+          KHR_materials_clearcoat: { clearcoatFactor: 1, clearcoatTexture: map(1), clearcoatRoughnessTexture: map(1) },
+          KHR_materials_specular: { specularTexture: map(2), specularColorTexture: map(2) },
+        },
+      },
+    ],
+    {
+      doc: {
+        textures: Array.from({ length: 3 }, (_, source) => ({ source })),
+        images: Array.from({ length: 3 }, () => ({})),
+      },
+      images: Array.from({ length: 3 }, () => ({ width: 1, height: 1, close() {} })),
+      configureGPU(gpu) {
+        const texture = gpu.device.createTexture,
+          group = gpu.device.createBindGroup;
+        gpu.device.createTexture = (descriptor) => {
+          const made = texture(descriptor),
+            view = made.createView;
+          made.createView = (d) => {
+            const v = view(d);
+            formats.set(v, descriptor.format);
+            return v;
+          };
+          return made;
+        };
+        gpu.device.createBindGroup = (descriptor) => {
+          groups.push(descriptor);
+          return group(descriptor);
+        };
+      },
+    },
+  );
+  try {
+    const r = model['resources'][0];
+    const log = gpu.record(() => {
+      view.begin(0);
+      model.draw(view.c, 'beauty', view.c.color, view.c.depth);
+    });
+    const group = log.find((e) => e[0] === 'group' && e[2].entries.some((entry) => entry.binding === 10));
+    assert.deepEqual(
+      group[2].entries.map((e) => e.binding),
+      [...Array.from({ length: 10 }, (_, i) => i), 10, 11, 24, 25],
+      'clearcoat (10) and specular colour (24) bind; roughness (12) and specular (22) read them',
+    );
+    const bound = groups.find((g) => g.entries.some((e) => e.binding === 24));
+    assert.equal(bound.entries.find((e) => e.binding === 24).resource, r.views[12]);
+    assert.equal(
+      formats.get(r.views[12]),
+      'rgba8unorm-srgb',
+      'specular (A) reads the sRGB view, where alpha is linear',
+    );
+    assert.equal(formats.get(bound.entries.find((e) => e.binding === 10).resource), 'rgba8unorm');
+    const code = log.find((e) => e[0] === 'module' && /clearcoatMap/.test(e[2].code))[2].code;
+    assert.equal((code.match(/var \w+Map:texture_2d<f32>/g) ?? []).length, 7);
+  } finally {
+    model.dispose();
+    engine.dispose();
+  }
+});
+
 async function scene(materials, extra = {}) {
   const gpu = mockGPU(),
     store = await TransformStore.create(64),
@@ -205,9 +273,9 @@ for (const variant of ['physical', 'extended', 'factors']) {
         const material = model.primitives[0].material;
         if (variant === 'factors') material.maps.length = 5;
         view.begin(0);
-        const authoredScale = material.physical[2],
-          log = gpu.record(() => model.draw(view.c, 'beauty', view.c.color, view.c.depth)),
-          frame = model['resources'][0].uniform.contents;
+        const authoredScale = material.physical[2];
+        gpu.record(() => model.draw(view.c, 'beauty', view.c.color, view.c.depth));
+        const frame = model['resources'][0].uniform.contents;
         assert.equal(frame[variant === 'extended' ? 274 : 210], mapped ? 1.75 : 0);
         assert.equal(material.physical[2], authoredScale, 'Rendering must not mutate authored normal scale');
       } finally {

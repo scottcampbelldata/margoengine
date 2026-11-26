@@ -431,22 +431,76 @@ let packedPhysical: string | undefined;
 /** Stable unmodified physical source contract for material and node-shader consumers. */
 export const physicalShader = (): string => rawPhysicalShader();
 const sparsePhysical = new Map<number, string>();
-/** Native glTF physical maps: absent extension slots have their exact one-texel fallback value without a sampler. */
+/** Map slots whose textures decode as sRGB: base colour, emissive, sheen colour, specular colour, diffuse transmission colour, multi-scatter colour. */
+export const srgbSlots: readonly number[] = [0, 4, 9, 12, 17, 19];
+// Extension slots that read only alpha, which stays linear in an sRGB view: sheen roughness, specular, diffuse transmission.
+const alphaSlots = [10, 11, 16];
+/**
+ * The slot whose texture binding extension slot `k` (5 or more) samples, among slots 5 to `end - 1`: `k` itself, or a slot
+ * holding the same glTF texture (the same image and sampler) in a view that decodes `k`'s channels right; -1 when `k` has
+ * no map. Slots of one colour space share; a slot reading only alpha also joins an sRGB view. sRGB slots own first, so
+ * specular (A) and specular colour (RGB) in one texture, the layout KHR_materials_specular suggests, share its sRGB view,
+ * while clearcoat (R, linear) and sheen colour (RGB, sRGB) in one texture keep two views. Each slot keeps its UV row.
+ */
+export function shareOwner(maps: readonly unknown[], k: number, end: number = maps.length): number {
+  const index = (o: number) => (maps[o] as { index?: unknown } | undefined)?.index,
+    own = index(k);
+  if (!maps[k]) return -1;
+  if (typeof own !== 'number') return k;
+  let srgb = -1,
+    linear = -1,
+    rgbLinear = -1;
+  for (let o = 5; o < end; o++) {
+    if (!maps[o] || index(o) !== own) continue;
+    if (srgbSlots.includes(o)) srgb = srgb < 0 ? o : srgb;
+    else {
+      linear = linear < 0 ? o : linear;
+      if (rgbLinear < 0 && !alphaSlots.includes(o)) rgbLinear = o;
+    }
+  }
+  // With an sRGB owner present the alpha-only slots join it, so a linear group holds only the slots reading colour.
+  return srgbSlots.includes(k)
+    ? srgb
+    : alphaSlots.includes(k)
+      ? srgb >= 0
+        ? srgb
+        : linear
+      : srgb >= 0
+        ? rgbLinear
+        : linear;
+}
+/**
+ * Native glTF physical maps: absent extension slots have their exact one-texel fallback value without a sampler, and
+ * slots sharing a glTF texture sample one binding (`shareOwner`), so a material with clearcoat R + roughness G, sheen
+ * RGB + A and specular A + RGB packed as the extensions suggest binds 5 extension textures, not 8.
+ */
 export function sparsePhysicalShader(maps: readonly unknown[]): string {
-  const mask = physicalMaps.reduce((bits, _, i) => bits | (maps[i + 5] ? 1 << i : 0), 0);
-  let code = sparsePhysical.get(mask);
+  let key = 0;
+  for (let k = 5; k < 13; k++) {
+    const owner = shareOwner(maps, k, 13);
+    key = key * 9 + (owner < 0 ? 0 : owner - 4);
+  }
+  let code = sparsePhysical.get(key);
   if (code !== undefined) return code;
   code = rawPhysicalShader();
   for (let i = 0; i < physicalMaps.length; i++) {
-    if (mask & (1 << i)) continue;
+    const owner = shareOwner(maps, i + 5, 13);
+    if (owner === i + 5) continue;
     const name = physicalMaps[i];
     code = code
       .replace(`@group(1) @binding(${10 + i * 2}) var ${name}Map:texture_2d<f32>;`, '')
       .replace(`@group(1) @binding(${11 + i * 2}) var ${name}Sampler:sampler;`, '')
-      .replaceAll(sample(name), name === 'clearcoatNormal' ? 'vec4f(0.5,0.5,1,1)' : 'vec4f(1)');
+      .replaceAll(
+        sample(name),
+        owner >= 0
+          ? `textureSample(${physicalMaps[owner - 5]}Map,${physicalMaps[owner - 5]}Sampler,uv(i,${i + 5}))`
+          : name === 'clearcoatNormal'
+            ? 'vec4f(0.5,0.5,1,1)'
+            : 'vec4f(1)',
+      );
   }
   if (maps.slice(5, 13).filter(Boolean).length >= 6) code = packBaseShader(code);
-  sparsePhysical.set(mask, code);
+  sparsePhysical.set(key, code);
   return code;
 }
 const transmissive = new Map<string, string>();

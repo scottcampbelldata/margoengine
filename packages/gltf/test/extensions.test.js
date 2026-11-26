@@ -612,7 +612,8 @@ test('physical extensions select the physical shader variant, its maps and the t
         ['fragment', { srcFactor: 'one', dstFactor: 'one' }],
       ],
     );
-    assert.deepEqual(groups, [10, 16, 16]);
+    // Clearcoat and its normal (both linear) share texture 0's binding; sheen colour (sRGB) keeps its own view.
+    assert.deepEqual(groups, [10, 14, 14]);
     assert.equal(pipelines[2].depthStencil.depthWriteEnabled, false);
     assert.ok(!calls.some((c) => c[0] === 'constant'), 'no blend constant');
     const formats = h.resources.filter((r) => r.format).map((r) => r.format);

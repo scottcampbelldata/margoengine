@@ -1,14 +1,16 @@
 // Real-GPU check of KB-BOUNCE-COMPATUNITS1: a glTF physical material with every map, image lighting, sun Shadows,
 // LocalShadows and LightBounce draw together, on WebGPU and on the 16-unit WebGL2 layer (--compat or MARGO_COMPAT=1).
-// Two models built in code: all 13 maps (5 base, 8 physical extension maps; the base maps pack), and the 5 + 5 peak
-// (clearcoat's 3 and sheen's 2, not packed). Each is lit by an Environment, a sun with Shadows, and a shadowed spot
+// Three models built in code: all 13 maps (5 base, 8 physical extension maps; the base maps pack), the 5 + 5 peak
+// (clearcoat's 3 and sheen's 2, not packed), and `shared`: the 13 slots with clearcoat R + roughness G, sheen RGB + A
+// and specular A + RGB each in one texture, as the extensions suggest, so 8 extension slots bind 5 textures. Each is
+// lit by an Environment, a sun with Shadows, and a shadowed spot
 // light that bounces (Clustered, LocalShadows, LightBounce). Asserts: no GPU error and no engine.onError, the model is
 // drawn (its pixel differs from the background), the bounce captured its source, and each feature moves the model's
 // pixel when it is detached (nothing is dropped silently).
 // On Edge's default ANGLE Direct3D 11 the lit fragment program holds 15 sampler units and two uniform blocks of 50 or
 // more rows, which ANGLE makes shader resources after the textures: 17 of 16, and the GPU process crashed at the first
 // draw until the layer declared such blocks inside a struct (webgl2-compat glsl/emit.ts fitShaderResources). Run by
-// webgl2-compat's test:gpu with --compat; flags --variants=all,peak --features=ibl,shadows,localShadows,bounce, env
+// webgl2-compat's test:gpu with --compat; flags --variants=all,peak,shared --features=ibl,shadows,localShadows,bounce, env
 // CU_ANGLE=d3d11|vulkan|gl, CU_SHADOW='{"filter":"pcf"}', CU_DEBUG=1 (sampler counts per program, the lost context).
 // node scripts/run-with-timeout.mjs -- node scripts/compat-units-gpu-check.js [--compat]
 import assert from 'node:assert/strict';
@@ -32,7 +34,7 @@ await postBrowser(
       variants = process.argv
         .find((a) => a.startsWith('--variants='))
         ?.slice(11)
-        .split(',') ?? ['all', 'peak'];
+        .split(',') ?? ['all', 'peak', 'shared'];
     for (const variant of variants) {
       const r = await page
         .evaluate(
@@ -180,14 +182,16 @@ await postBrowser(
               offset += p.byteLength;
             }
             const count = pos.length / 3,
-              maps = variant === 'all' ? 13 : 10,
+              maps = variant === 'peak' ? 10 : 13,
               images = Array.from({ length: maps }, (_, i) => {
                 const data = new Uint8Array(4 * 4 * 4);
                 for (let k = 0; k < 16; k++)
                   data.set([(37 * i + 20 * k) % 256, (91 * i + 7 * k) % 256, 200, 255], k * 4);
                 return { width: 4, height: 4, data };
               });
-            const t = (i) => ({ index: i });
+            // `shared` points each pair's second slot at the first slot's texture (images 6, 9 and 12 go unused).
+            const share = variant === 'shared' ? { 6: 5, 9: 8, 12: 11 } : {},
+              t = (i) => ({ index: share[i] ?? i });
             const extensions = {
               KHR_materials_clearcoat: {
                 clearcoatFactor: 1,
@@ -202,7 +206,7 @@ await postBrowser(
                 sheenRoughnessFactor: 0.5,
                 sheenRoughnessTexture: t(9),
               },
-              ...(variant === 'all'
+              ...(variant !== 'peak'
                 ? {
                     KHR_materials_transmission: { transmissionFactor: 0, transmissionTexture: t(10) },
                     KHR_materials_specular: { specularTexture: t(11), specularColorTexture: t(12) },

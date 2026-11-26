@@ -11,6 +11,10 @@ needs 17 resources and a 50-row block, ANGLE Vulkan draws every case), CPU check
 13 maps, image light, both shadow kinds and LightBounce) on native WebGPU, ANGLE Direct3D 11 and ANGLE Vulkan, RTX
 A6000. Missing: other Direct3D 11 GPUs (Intel Arc, Radeon) not run; the 50-row threshold is measured, not documented
 by ANGLE, so the layer switches on the count of all blocks, not only large ones.
+Step 1 of the unit plan (2026-11-25): gltf's sparse physical shader binds a glTF texture that several extension slots
+share once, by colour space (shader.ts `shareOwner`), so the KHR_materials layouts that pack two maps in one texture
+need 5 extension units, not 8. Evidence: CPU checks of the WGSL and bind entries (physical-map-renderer.test.js,
+materials-ext.test.js) and the `shared` variant of compat-units-gpu-check.js on native WebGPU and the WebGL2 layer.
 
 ### Section 5 evidence: rough reflections with contact hardening (2026-11-25)
 

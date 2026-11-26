@@ -1362,6 +1362,13 @@ or removed live; its full resource interface is retained. This fixes the viewer'
 transmission lens plus IBL and shadows on a 16-unit WebGL2 compatibility device. Authored maps
 are retained; a material that really exceeds hardware limits still has that limit.
 
+Extension maps that point at one glTF texture (the same image and sampler) bind it once; each slot keeps its own UV
+set and transform. Slots share only within one colour space, except that a slot reading only alpha (sheen roughness,
+specular) also reads an sRGB view, where alpha stays linear. So clearcoat R + roughness G, sheen colour RGB + roughness
+A and specular A + colour RGB, packed as the extensions suggest, bind 5 extension textures in place of 8. Clearcoat
+(linear) and sheen colour (sRGB) in one texture keep two views. Nothing to set: the same glTF file draws with fewer
+texture units.
+
 The existing loadGLTF examples apply unchanged. Run scripts/stage-viewer-gpu-check.js with --compat
 for the licensed FlightHelmet integration regression, including cascaded
 shadows, IBL, visible product, turntable radius, failed-load rollback and disposal. No speed claim.
