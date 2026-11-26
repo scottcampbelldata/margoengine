@@ -19,7 +19,7 @@ const exposeOptionalWasmUrl = {
     if (!code.includes('-kernel.wasm') && !code.includes('-kernel-shared.wasm')) return null;
     return {
       code: code.replace(
-        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
+        /\/\*\s*@vite-ignore\s*\*\/\s*(?=["']\.\/(?:school|swim|falling|pedestrian|landscape|modal-sound|groundwater|glacier|locomotion|aeolian|iceberg)-kernel(?:-shared)?\.wasm\?no-inline["'])/g,
         '',
       ),
       map: null,
@@ -78,6 +78,7 @@ await build({
         vegetation: resolve(root, 'src/vegetation.ts'),
         ice: resolve(root, 'src/ice/index.ts'),
         glacier: resolve(root, 'src/glacier/index.ts'),
+        iceberg: resolve(root, 'src/iceberg/index.ts'),
         underwater: resolve(root, 'src/underwater/index.ts'),
         orbit: resolve(root, 'src/orbit/index.ts'),
       },
@@ -133,6 +134,9 @@ for (const name of ['modal-sound-kernel.wasm', 'modal-sound-kernel-shared.wasm']
 
 for (const name of ['glacier-kernel.wasm', 'glacier-kernel-shared.wasm'])
   await copyFile(resolve(root, 'src/glacier', name), resolve(dist, name));
+
+for (const name of ['iceberg-kernel.wasm', 'iceberg-kernel-shared.wasm'])
+  await copyFile(resolve(root, 'src/iceberg', name), resolve(dist, name));
 
 await declarePackageCore(root);
 await stripPackageShaderComments(root);

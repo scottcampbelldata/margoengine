@@ -155,6 +155,21 @@ test('bad grids and sources are refused', () => {
   assert.throws(() => w.advance(1), RangeError);
 });
 
+test('wake sources refuse non-finite radii and registry sources require the base rate', () => {
+  const wave = world();
+  wave.add(new WakeSolver('bad-radius'), {
+    cells: [16, 16],
+    sponge: 2,
+    sources: () => [{ x: 0, z: 0, radius: Infinity, pressure: 1, volume: 0 }],
+  });
+  assert.throws(() => wave.advance(1), /finite positive radius/);
+  const field = { name: 'wake-payload', kind: 'bodySet', quantity: 'seaSource', unit: 'SI', centring: 'particle' };
+  const wake = new WakeSolver('registry', field);
+  assert.throws(
+    () => world().add(wake, { cells: [16, 16], sponge: 2, rate: 1 }),
+    /Set the wake and its publisher to 60 Hz/,
+  );
+});
 test('a sea adds its wake: sample, elevation and pressure carry the wake over the waves', () => {
   const wake = new WakeSolver();
   world().add(wake, {

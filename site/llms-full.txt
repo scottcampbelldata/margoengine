@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,216 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,224 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12447,6 +12447,22 @@ The material consumes linear PBR values. Multi-spectral gloss, grain, individual
 pits and run-off streak geometry require authored patch variation or other algorithms.
 
 The optional Physics ageing entry measures 4,922 bytes gzip.
+
+### Iceberg rigid-body dynamics and calving (ICE-03)
+
+The optional 60 Hz solver handles homogeneous rectangular solids with exact planar hydrostatic
+loads, six degrees of freedom, quadratic normal-pressure drag and prescribed wet-face recession.
+It uses dyadic substeps from hydrostatic stiffness, rotation, and drag. The ablation step moves the
+centre of mass with the shape. It preserves lost solid volume in the freshwater budget at
+1000 kg/m³. Release sources and WakeSolver must publish at the same 60 Hz and use one origin cell.
+A WakeSolver receives two area-scaled patches per changing body and gives the linear wave response.
+
+Wind and water currents are each uniform and use the still-water plane. The model excludes large
+wave feedback on the body, fragment collisions, grounding and sea-ice resistance. Calving sites
+have explicitly allocated body rows, with queued volumes retained across snapshots when full.
+The optional iceberg entry measures 5,162 B gzip with a 5,418 B ceiling. The plain and shared
+assets each measure 9,128 B raw and 4,318 B gzip. Physics/sea measures 7,745 B gzip
+with the field reader, with an 8,001 B ceiling. Core plus stage remains 24,820 B gzip.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -28748,12 +28764,11 @@ through springs and seepage. Connect its recharge port to `GroundwaterSolver` an
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
 
-### Glacier calving still needs the water impulse solver (PA-25)
+### General water impulse sources still need SEA-06 (PA-25)
 
-Advance `GlacierSolver` with a submerged grounded front and its adjacent open-water cell. The
-glacier publishes detached volume and its drainage independently. A live wave requires SEA-06
-to convert the released ice volume and location into a water-source impulse, so the current
-registry observer proves delivery only. The avalanche, lava and lahar cases remain open in PA-25.
+ICE-02 releases ice at its water-facing cells. ICE-03 turns those volumes into moving bodies and
+exports conservative local wave sources. The general impulse propagation and inundation model,
+the avalanche and lava sources, and the lahar feedback remain open under PA-25.
 
 ### Ground animal terrain and rig adapters (LIFE-02)
 
@@ -28770,6 +28785,12 @@ and sea fields leave out those quantities. A fixed `AgeingExposure` or a publish
 `ageing.exposureField` supplies them explicitly. Run the changing-exposure and wreck cases in
 `packages/physics/tests/coupling/ageing.test.js` for a replayable producer example.
 See [Framework requests](physics-work-queue.md#framework-requests) for the shared layout.
+
+### Ice impacts and long-wave inundation (PA-15 and PA-25)
+
+A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
+does not yet exchange contacts with ships or grounded terrain. Pack-ice collisions, resistance
+and rafting are ICE-04. General run-up and terrain, avalanche and lava sources still need SEA-06.
 
 === Using Margo with AI tools (docs/ai-tools.md) ===
 

@@ -64,6 +64,20 @@ export const BLUEPRINTS = [
     deflated: true,
   },
   {
+    name: 'iceberg-kernel',
+    crate: 'packages/physics/iceberg-kernel',
+    blueprint: 'packages/physics/src/iceberg/iceberg-kernel.wasm',
+    script: 'packages/physics/scripts/build-iceberg-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'iceberg-kernel-shared',
+    crate: 'packages/physics/iceberg-kernel',
+    blueprint: 'packages/physics/src/iceberg/iceberg-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-iceberg-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',

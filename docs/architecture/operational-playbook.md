@@ -10153,3 +10153,11 @@ the configured number of links or feet plus torso, and each one gets its own sam
 The Physics fixtures verify inextensible link closure, analytical slip force, a passive spring load, stance and
 swing wrenches, the live TerrainBed interface, deterministic replay after a snapshot, and the two memory variants
 after growth. The focused browser gate checks lazy loading, contact-driven motion and snapshot restoration.
+
+### Iceberg capsize and conservative wave sources (ICE-03)
+
+The no-static-data native module imports the world arena and uses a world-allocated stack. Its
+planar face integrals give the pressure and moment before every kick. The registry path carries
+real ICE-02 calving volume into the body queue and paired SI volume patches into the existing
+WakeSolver. The coupled test checks crest and trough, zero mean water gain, freshwater mass
+balance, replay and equal hashes using distinct plain and shared memory.

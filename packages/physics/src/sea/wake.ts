@@ -47,6 +47,10 @@ export const WAKE_HEIGHT_FIELD: FieldDescriptor = {
 };
 /** The layout version of a wake's regions: x fastest, then z, f64. */
 export const WAKE_LAYOUT = 1;
+/** Layout-1 f64 SeaSource rows are x, z, radius, pressure and volume. */
+export const WAKE_SOURCE_WORDS = 5;
+/** Binary version of a SeaSource registry field. */
+export const WAKE_SOURCE_LAYOUT = 1;
 
 /** What a {@link WakeSolver} is made from. */
 export interface WakeParams {
@@ -101,6 +105,7 @@ export class WakeSolver implements Solver<WakeParams> {
   private rho = 1025;
   private level: RateLevel = 0;
   private sources?: (t: number) => readonly SeaSource[];
+  private readonly sourceField?: FieldDescriptor;
   private fft!: RealFft2;
   private height!: Region;
   private potential!: Region;
@@ -115,15 +120,24 @@ export class WakeSolver implements Solver<WakeParams> {
   private press!: Float64Array;
   private spectra!: [Float64Array, Float64Array, Float64Array];
 
-  /** @param id The solver's id (default `'wake'`). */
-  constructor(id = 'wake') {
+  /**
+   * @param id The solver's id, default 'wake'.
+   * @param sourceField Optional layout-1 f64 SeaSource rows from a 60 Hz solver in the same world cell.
+   */
+  constructor(id = 'wake', sourceField?: FieldDescriptor) {
+    if (sourceField && (sourceField.quantity !== 'seaSource' || sourceField.unit !== 'SI'))
+      throw new RangeError('Invalid wake source descriptor. Use a seaSource field in SI units.');
     this.id = id;
+    this.sourceField = sourceField ? Object.freeze({ ...sourceField }) : undefined;
   }
 
   describe(): SolverDescription {
     return {
       id: this.id,
-      fields: [{ field: WAKE_HEIGHT_FIELD, access: 'write' }],
+      fields: [
+        { field: WAKE_HEIGHT_FIELD, access: 'write' },
+        ...(this.sourceField ? [{ field: this.sourceField, access: 'read' as const }] : []),
+      ],
       rate: this.level,
       stableRate: () => this.level,
     };
@@ -161,6 +175,8 @@ export class WakeSolver implements Solver<WakeParams> {
       throw new RangeError(`A wake's sponge is a whole number of cells under half the grid (got ${sponge}); pass one.`);
     if (!(Number.isInteger(rate) && rate >= 0 && rate <= 7))
       throw new RangeError(`A wake's rate level is 0 to 7 (got ${rate}); pass one.`);
+    if (this.sourceField && rate !== 0)
+      throw new RangeError('Wake field sources use the world base rate. Set the wake and its publisher to 60 Hz.');
     if (sources !== undefined && typeof sources !== 'function')
       throw new TypeError('A wake takes its sources as a function of time, (t) => SeaSource[]; pass one.');
     this.fft = new RealFft2(cells[0], cells[1]);
@@ -245,6 +261,8 @@ export class WakeSolver implements Solver<WakeParams> {
     press.fill(0);
     // Sources at the step's middle: each a raised-cosine patch of its pressure, and its volume spread over the same patch.
     for (const source of this.sources?.(t) ?? []) this.stamp(source, h);
+    const sourcePort = this.sourceField && context.inputs.get(this.sourceField.name);
+    if (sourcePort) this.stampField(sourcePort, context.cell, h);
     this.factors(dt);
     const [H, P, F] = this.spectra,
       fft = this.fft,
@@ -284,13 +302,39 @@ export class WakeSolver implements Solver<WakeParams> {
     }
   }
 
+  private stampField(port: Port, cell: Cell, height: Float64Array): void {
+    const { region } = port;
+    if (region.type !== 'f64' || region.layout !== WAKE_SOURCE_LAYOUT || region.byteLength % (WAKE_SOURCE_WORDS * 8))
+      throw new RangeError('Invalid wake source layout. Use five f64 words per layout-1 source row.');
+    if (cell.some((coordinate, i) => coordinate !== port.cell[i]))
+      throw new RangeError('Wake source coordinates use another world cell. Set the source and wake to the same cell.');
+    const words = regionWords(this.host.memory, region) as Float64Array;
+    for (let at = 0; at < words.length; at += WAKE_SOURCE_WORDS) {
+      const x = words[at]!;
+      const z = words[at + 1]!;
+      const radius = words[at + 2]!;
+      const pressure = words[at + 3]!;
+      const volume = words[at + 4]!;
+      if (pressure !== 0 || volume !== 0) this.stamp({ x, z, radius, pressure, volume }, height);
+    }
+  }
+
   /** Adds one source to the step's pressure grid and its volume to the height, as a raised cosine of its radius. */
   private stamp(source: SeaSource, h: Float64Array): void {
     const { x, z, radius, pressure, volume } = source;
     if (
-      !(Number.isFinite(x) && Number.isFinite(z) && radius > 0 && Number.isFinite(pressure) && Number.isFinite(volume))
+      !(
+        Number.isFinite(x) &&
+        Number.isFinite(z) &&
+        Number.isFinite(radius) &&
+        radius > 0 &&
+        Number.isFinite(pressure) &&
+        Number.isFinite(volume)
+      )
     )
-      throw new RangeError('A sea source has a finite place, a radius above 0, and a finite pressure and volume.');
+      throw new RangeError(
+        'Invalid sea source. Use a finite place, a finite positive radius, and finite pressure and volume.',
+      );
     const { nx, nz, dx, x0, z0, press } = this,
       i0 = Math.max(0, Math.floor((x - radius - x0) / dx)),
       i1 = Math.min(nx - 1, Math.ceil((x + radius - x0) / dx)),

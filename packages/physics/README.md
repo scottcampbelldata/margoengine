@@ -3392,3 +3392,38 @@ m/s and larval supply fraction. Fixed exposure defaults remain available before 
 The solver's default ID and field prefix are `ageing`. Choose a separate `id` per group in one world.
 Its `stateField` has layout-1 f64 rows holding remaining and consumed metres, total and inner
 coating metres, rot activity, fouled fraction and environmental seconds.
+
+## Iceberg capsize and calving
+
+`@margoengine/physics/iceberg` simulates cuboid icebergs in six degrees of freedom. The pressure
+on their cut waterplane drives roll and heave. Current, wind and wet-face ablation update the pose
+and scale. The optional wake reader takes displaced water in surface patches with zero net volume.
+
+```ts
+import { IcebergSolver } from '@margoengine/physics/iceberg';
+import { WakeSolver } from '@margoengine/physics/sea';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const ice = await IcebergSolver.load();
+const wake = new WakeSolver('iceberg-wake', ice.wakeSourceField);
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(wake, { cells: [48, 48], cellSize: 0.5, sponge: 6 })
+  .add(ice, { bodies: [{ size: [1, 4, 8] }], basalMelt: 0.001 });
+world.advance(1200);
+console.log(ice.sample(0), ice.budget, wake.sample(3, 0));
+```
+
+For actual marine release, use `IcebergSolver.load({ calving: glacier.calvingField })` and add
+`releaseSites` with the glacier cell index and local x,z coordinates. Each site admits volumes to
+its reusable body rows and retains excess events in its pending budget. Its default shape ratio is
+[1,2,2], with one reusable row per site. Choose more rows for overlapping events.
+
+Options default to ice 917 kg/m³, seawater 1025 kg/m³, air 1.225 kg/m³, sea level 0 m, still air and
+water, face drag coefficients of 1, and zero recession. An unstable upright body without an authored
+orientation receives a 0.001 rad seed heel around its less stable axis. An authored quaternion
+takes precedence. `sample` gives the centre, orientation, velocity, angular velocity in body axes
+and current geometry for rendering. `meltwaterField` carries freshwater in m³/s.
+
+The wake field contains paired layout-1 f64 SeaSource rows [x, z, radius, pressure, volume]. Bind it
+in the second argument of `WakeSolver`, with both solvers at 60 Hz in the same world cell. It works
+alongside `WakeParams.sources`. Read the result in `SpectralSea` or render it with `WaterWake`.

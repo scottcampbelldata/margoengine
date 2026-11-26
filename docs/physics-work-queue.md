@@ -118,6 +118,10 @@ there, add a line below with the solver ID and what is needed, and build against
   per-tick marine and dry ice-release volumes (m³) for HYDRO-02 and SEA-06. ICE-02 publishes these descriptors
   in the optional glacier entry, couples discharge to HYDRO-01 and exercises a wave-source reader.
 
+- **ICE-03:** Promote layout-1 f64 SeaSource patch rows and marine release-volume fields into the shared contracts.
+  The optional Physics entries use the existing contract type, match ICE-02 and the wake through declared ports, and
+  use no static module window. A canonical per-body contact impulse port would support iceberg grounding and ship contact.
+
 ## Research notes for open solvers
 
 Earlier design work on some open solvers, to start from. Formulas are as the designers wrote them; check each against its paper before relying on it, and cite what you use.
