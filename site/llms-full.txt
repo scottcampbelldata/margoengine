@@ -13928,7 +13928,12 @@ split faces or edges. An existing front advances through an eligible adjacent te
 when its projected principal plane crosses the material. Front edge flags travel with
 their material through cuts and snapshots. General mixed-mode propagation remains open.
 Use tensile nucleation on unskinned cells without independent springs or clusters.
-With tracked tensile fronts the optional entry measures 141,408 B gzip including a 96,641 B lazy native kernel.
+Automatic cracks preflight rounded rest coordinates, basis terms and nodal masses before
+editing topology. A candidate below the native resolution remains intact for that step.
+Nucleation can select another eligible cell in the same step. An authored blade still reports
+a geometry error when its exact requested cut cannot be represented.
+The optional entry measures 141,595 B gzip with the fracture resolution checks.
+The base is 45,047 B and the lazy native kernel is 96,646 B.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into
 600 tetrahedra. With live rigid-anchor transfer, the optional entry measures 137,034 B gzip, with a 42,494 B base
 and a 94,249 B lazy kernel.
@@ -14141,14 +14146,15 @@ The optional cross-track berm mode places the loose soil in separate triangular 
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
 [0, 1], rotating lugs fill the solver's cumulative rear depression or transfer loose soil between
-banks at large obliquity. For travel angles under 10°, partial backfill forms a flat bottom
-from the deepest part of the rear depression. Cross-track banks settle with one simultaneous sparse transfer pass
-per solver step. The solver stores eight history bytes per grid vertex and a second sparse bitset
+banks at large obliquity. At travel angles under 10°, partial backfill placed within the trench
+forms a flat bottom from the deepest part of the rear depression. Cross-track banks settle with
+one simultaneous sparse transfer pass per solver step. The solver stores eight history bytes per grid vertex and a second sparse bitset
 for affected vertices, approximately 0.26 bytes per vertex. Steep loose slopes can take more
 than one step to settle. The separate excavation maximum prevents counting a cut twice.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
-drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
+drawbar force and torque at 60% lug-tip slip for the reported wheel and sand and relative
+crest-to-trough relief at one straight locked-wheel condition. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
@@ -31203,7 +31209,8 @@ The steady drawbar and axle torque match the measured 60% tip-slip case; transie
 high-slip sinkage and measured berm geometry still need held-out measurements. The optional
 cross-track depositor conserves independent bank volumes from the actual cut.
 Grouser transport can backfill its solver-owned trench from earlier cuts or feed the opposite bank.
-A quantitative comparison to steady scanned trench profiles remains open.
+The straight locked condition matches both measured relative bank crests. Absolute scanned
+profiles at powered slip and oblique angles remain open.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
 brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
 opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
@@ -31217,6 +31224,8 @@ tensile, compressive or shear stresses exceed authored strengths. A progressive 
 tension and shear before tearing. A prescribed tensile seam can open inside a tetrahedron.
 Unseeded tensile cracks can nucleate inside a cell from its principal strain and extend
 from a tracked front. Mixed-mode propagation with separate sliding and tearing toughness remains open.
+Automatic fracture evaluates whether each proposed edit fits the native rest mesh before
+committing the geometry. Regions below its resolution stay intact for that step.
 Dedicated GPU elasticity still needs a same-tick GPU contact and snapshot handoff through the physics framework.
 Plane cuts and finite interior incisions work on tetrahedral solids with live rigid anchors and
 their own deformable surface colliders. Geometric cutting of bodies with embedded skins, springs,
