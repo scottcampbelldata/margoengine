@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19355880,
+  "total": 19356379,
   "history": [
     {
       "date": "2026-10-24",
@@ -12633,6 +12633,12 @@
       "commit": "feat(physics) wakes",
       "reason": "WakeSolver (SEA-04) joins the physics/sea entry beside SpectralSea and its patches: budget 3,437 to 7,259, measured before and after on this Mac. The wake is the sea's own local surface and SpectralSea carries it, so they share the entry; a bundler drops the solver from an app that imports only SpectralSea, and a separate entry would only add an import.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-25",
+      "commit": "chore(sizes) water film clock",
+      "reason": "Water on a film clock (WaterOptions.clock: tickFlow, settle, the ring of frame-uniform slices) and Ripples on it (each drop born at its due tick, the dyadic tick rate, the config buffers for later steps): water 34,601 to 34,733 and water/ripples 3,940 to 4,307, measured before and after on this Mac. The clock path is Water's own stepping and Ripples' own field, so it has nowhere smaller to live; the size rows were left out of the two commits that grew them.",
+      "grew": 2
     }
   ],
   "items": {
@@ -14182,7 +14188,7 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 34601,
+    "@margoengine/water": 34733,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6669,
@@ -14195,7 +14201,7 @@
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,
-    "@margoengine/water/ripples": 3940,
+    "@margoengine/water/ripples": 4307,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,
