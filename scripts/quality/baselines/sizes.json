@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20127168,
+  "total": 20143737,
   "history": [
     {
       "date": "2026-10-24",
@@ -12843,6 +12843,12 @@
       "commit": "e6403e5f16",
       "reason": "LIFE-01: 11101 B gzip for the optional biped and quadruped entry with rigid deck impulses, variable stance, and the reused ground kernel. Horses now use loaded slope, traction and live phase. Core and stage add zero bytes.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3609b9e1c9",
+      "reason": "FG-17 piece 6c new entry post/rt-gi 15,595 B gzip: RTGI extends SSGI (the entry carries SSGI's own chunk, shared with post/ssgi) plus the trace patch and the shared traced-hit shading of rt-shade; post/ssgi grows 77 B for its traced hook (SSGITrace), which with no subclass builds and binds what it did",
+      "grew": 2
     }
   ],
   "items": {
@@ -13750,13 +13756,14 @@
     "@margoengine/post/outline": 7282,
     "@margoengine/post/overlays": 11210,
     "@margoengine/post/pixelate": 10491,
+    "@margoengine/post/rt-gi": 16063,
     "@margoengine/post/rt-reflections": 16677,
     "@margoengine/post/scene-fade": 3074,
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,
     "@margoengine/post/smaa": 6435,
     "@margoengine/post/ssao": 10584,
-    "@margoengine/post/ssgi": 14202,
+    "@margoengine/post/ssgi": 14708,
     "@margoengine/post/ssr": 15069,
     "@margoengine/post/sss": 8526,
     "@margoengine/post/stack": 5277,

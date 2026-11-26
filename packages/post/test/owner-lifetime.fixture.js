@@ -63,19 +63,24 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { Pixelate } = await load('../dist/pixelate.js');
   const { Bloom } = await load('../dist/bloom.js');
   const { PostStack } = await load('../dist/stack.js');
-  // RTReflections needs a scene on the engine's device; the scene is the caller's (a dependency), released at cleanup.
+  // RTReflections and RTGI need a scene on the engine's device; the scene is the caller's (a dependency), released at cleanup.
   const { RTReflections } = await load('../dist/rt-reflections.js');
   const { MeshBVH } = await load('../../bvh/dist/index.js');
   const { GPUSceneBVH } = await load('../../bvh/dist/gpu-scene.js');
-  out.push({
-    name: 'RTReflections.attach',
-    create({ engine, dependency }) {
-      const bvh = MeshBVH.build({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
-        scene = dependency(() => GPUSceneBVH.forShader(engine, [{ bvh }])),
-        plugin = RTReflections.attach(engine, { scene, stochastic: true });
-      return { plugin, dispose: () => plugin.dispose(), cleanup: () => scene.dispose() };
-    },
-  });
+  const { RTGI } = await load('../dist/rt-gi.js');
+  for (const [name, attach] of [
+    ['RTReflections.attach', (engine, scene) => RTReflections.attach(engine, { scene, stochastic: true })],
+    ['RTGI.attach', (engine, scene) => RTGI.attach(engine, { scene, multiBounce: true })],
+  ])
+    out.push({
+      name,
+      create({ engine, dependency }) {
+        const bvh = MeshBVH.build({ positions: [0, 0, 0, 1, 0, 0, 0, 1, 0], indices: [0, 1, 2] }),
+          scene = dependency(() => GPUSceneBVH.forShader(engine, [{ bvh }])),
+          plugin = attach(engine, scene);
+        return { plugin, dispose: () => plugin.dispose(), cleanup: () => scene.dispose() };
+      },
+    });
   out.push({
     name: 'EffectMask.attach',
     create({ engine }) {

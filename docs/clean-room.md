@@ -12412,6 +12412,22 @@ Benyoub, "Sampling Visible GGX Normals with Spherical Caps", CGF 2023, https://d
 distribution, kept for a later speed pass. Hit shading is core's own glTF 2.0 Appendix B BRDF text; traversal is
 `sceneBvhWGSL` of piece 6a. Written from these papers; no engine's code was read.
 
+### Ray-traced bounce light behind screen-space GI (FG-17 piece 6c, 2026-11-25)
+
+`packages/post/src/rt-gi.ts`, `src/rt-shade.ts` and the `traced` hook in `src/ssgi.ts`. The same hybrid order as piece
+6b, screen first and the scene where the screen has no hit (Barre-Brisebois et al., "Hybrid Rendering for Real-Time Ray
+Tracing", Ray Tracing Gems ch. 25, 2019, https://doi.org/10.1007/978-1-4842-4427-2_25), applied to SSGI's
+cosine-weighted rays (Matt Pharr, Wenzel Jakob and Greg Humphreys, "Physically Based Rendering", 3rd ed., 13.6.3,
+2016). Compared and not used yet: reservoir reuse of bounce paths (Yaobin Ouyang, Shiqiu Liu, Markus Kettunen, Matt
+Pharr and Jacopo Pantaleoni, "ReSTIR GI: Path Resampling for Real-Time Path Tracing", CGF 40(8), HPG 2021,
+https://doi.org/10.1111/cgf.14378), and a variance-guided denoise (Christoph Schied, Anton Kaplanyan, Chris Wyman et
+al., "Spatiotemporal Variance-Guided Filtering", HPG 2017, https://doi.org/10.1145/3105762.3105770), both left for a
+later piece as SSGI's blur already filters the sum; probe volumes (Zander Majercik, Jean-Philippe Guertin, Derek
+Nowrouzezahrai and Morgan McGuire, "Dynamic Diffuse Global Illumination with Ray-Traced Irradiance Fields", JCGT 8(2),
+2019, https://jcgt.org/published/0008/02/01/) answer a different question (world-space caches) and are not part of
+this piece. Hit shading is core's own BRDF text, shared with piece 6b. Written from these papers; no engine's code was
+read.
+
 ### Deforming mesh motion blur in the path tracer (FG-17 piece 4b, 2026-11-25)
 
 `packages/voxel-pathtracer/src/mesh-instances.ts`, `mesh-build.ts`, `mesh-shader.ts`, `sequence.ts` and

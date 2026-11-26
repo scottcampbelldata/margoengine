@@ -15,7 +15,10 @@ export class RTReflections extends SSR {
     dispose(): void;
 }
 
-export interface RTReflectionsOptions extends SSROptions {
+export interface RTReflectionsOptions extends SSROptions, TracedOptions {
+}
+
+export interface TracedOptions {
     scene: GPUSceneBVH;
     shadows?: boolean;
     bias?: number;

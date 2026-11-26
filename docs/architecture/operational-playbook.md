@@ -349,6 +349,20 @@ once per pass, the light words, steady frames build nothing, no live GPU objects
 (ssr-rough, ssr-cone) pass unchanged. Missing: a GPU cost figure, the a-trous denoise of rough hits, quarter-resolution
 tracing on the WebGL2 layer, and environment light at traced hits.
 
+Piece 6c (same day): `@margoengine/post/rt-gi` (`RTGI extends SSGI`), hybrid diffuse bounce light (Barre-Brisebois
+et al. 2019). SSGI gains one internal hook, `traced` (`SSGITrace`), the same shape as SSR's: while the scene is live
+the one-bounce and multi-bounce trace shaders are patched by text (a patch that no longer applies throws) so a ray with
+no Hi-Z hit traces the scene from the same start, and its hit adds into the same sum over rays. The traced-hit shading,
+light uniform and bind group now live in one shared module, `src/rt-shade.ts`, used by `RTReflections` and `RTGI`.
+Evidence: `packages/post/test/rt-gi-browser.mjs` (in `test:gpu`, native and `--compat`; RTX A6000, identical figures):
+a white floor under an emissive ceiling that is never on screen, sun and ambient off, reads 181 against the closed form
+180.54 with one bounce and with `multiBounce`; turned away it reads 0; a disposed scene gives plain SSGI's 0.
+`rt-reflections-browser.mjs` gives the same figures after the shared-module move; SSGI's `ssgi-bounce-browser.mjs`
+passes unchanged. CPU: `packages/post/test/rt-gi.test.js` (option checks, the patched trace for both bounce modes,
+group 1 bound once, the light words, steady frames build nothing, a disposed scene rebuilds the plain trace, nothing
+left live). Missing: ReSTIR GI reservoir reuse (Ouyang et al. 2021) and an SVGF denoise (Schied et al. 2017), a GPU
+cost figure, and traced hits that carry the multi-bounce history (they are lit directly).
+
 ### Section 5 evidence: motion vectors of a scatter in wind (scatter/velocity FG-16, 2026-11-24)
 
 New optional entry `@margoengine/scatter/velocity` (`packages/scatter/src/velocity.ts`), drawn inside TAA's object

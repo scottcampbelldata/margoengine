@@ -3459,6 +3459,10 @@
       "types": "./dist/post/rt-reflections.d.ts",
       "import": "./dist/post/rt-reflections.js"
     },
+    "./post/rt-gi": {
+      "types": "./dist/post/rt-gi.d.ts",
+      "import": "./dist/post/rt-gi.js"
+    },
     "./post/ssgi": {
       "types": "./dist/post/ssgi.d.ts",
       "import": "./dist/post/ssgi.js"
