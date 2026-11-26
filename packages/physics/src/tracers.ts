@@ -16,9 +16,8 @@
 //   it, the wind drift factor (3 percent by default, the traditional constant; Liu, Li and Mu, Frontiers in Marine Science
 //   2023, read in its abstract).
 //
-// Accepted differences: no oil weathering (evaporation, emulsification, dispersion into droplets by breaking waves), slicks
-// spread by turbulence only (no Fay gravity-viscous spreading), constant diffusivities (no profile, so no drift correction
-// is needed), no flocculation of fine silt, and settled tracer parcels remain in the bed ledger.
+// Finite oil spills add Fay's axisymmetric spreading to the water, wind and turbulent parcel motion. Remaining limits:
+// oil weathering and flocculation are unresolved, and diffusivities are constant. Settled parcels remain in the bed ledger.
 
 import type { Bed, FlowField, FlowSample, SeaSurface, SeaSurfaceSample, Wind } from '@margoengine/math/fields';
 import { cos, exp, hypot, ln, pow, sin } from '@margoengine/math/pinned';
@@ -28,6 +27,7 @@ import { SWIM_WAKE_FIELD, SWIM_WAKE_LAYOUT, SWIM_WAKE_WORDS } from './life/wake.
 import { MargoError } from '@margoengine/math/errors';
 import { BED_CHANGE_FIELD } from './earth/bed.js';
 import { TracerBedExchange } from './tracer-bed.js';
+import { type FayCoefficients, fayCoefficients, fayRadius } from './tracer-fay.js';
 import { evaluateWallJet, wallJetProfile } from './tracer-wall-jet.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from './world/flooding.js';
 import { regionWords } from './world/memory.js';
@@ -129,10 +129,28 @@ export interface BreachTracerMix {
   fractions: readonly { material: TracerMaterial | keyof typeof TRACER_MATERIALS; fraction: number }[];
 }
 
+/** One finite oil release, represented by a spreading patch of floating tracer parcels. */
+export interface TracerOilSpill {
+  /** Oil mass in kg. */
+  mass: number;
+  /** X and Z, m from the tracer solver's origin cell. */
+  position: readonly [number, number];
+  /** Time of release on the world clock, s (default 0). */
+  start?: number;
+  /** Air–water tension minus oil–air and oil–water tensions, N/m. Use zero for gravity-only spreading. */
+  spreadingCoefficient: number;
+  /** Initial floating oil (default the `oil` preset). */
+  material?: TracerMaterial;
+  /** Slots reserved for this release (default 128, at least two). Counts against `capacity`. */
+  parcels?: number;
+}
+
 /** Settings of a {@link TracerSolver}; each has a default. */
 export interface TracerParams {
   /** The sources. */
   sources?: readonly TracerSource[];
+  /** Instantaneous oil releases that spread by Fay's radial model (default none). */
+  oilSpills?: readonly TracerOilSpill[];
   /** Live surface, wave velocity at depth, and water density (default: flat, still water). */
   sea?: SeaSurface;
   /** Override the water's velocity at any depth (default: sea.water when supplied). */
@@ -180,6 +198,7 @@ const JET_PARCELS = 4;
 const JET_CORE_RINGS = 32;
 const JET_OUTER_RINGS = 16;
 const GAUSS_OFFSET = Math.sqrt(1 / 3) / 2;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 interface JetBed {
   material: number;
@@ -194,6 +213,16 @@ interface CargoFraction {
   material: number;
   share: number;
   slot: number;
+}
+
+interface OilSpillState {
+  first: number;
+  count: number;
+  material: number;
+  mass: number;
+  position: readonly [number, number];
+  start: number;
+  profile: FayCoefficients;
 }
 
 function pickupRate(shear: number, bed: JetBed): number {
@@ -243,11 +272,17 @@ export class TracerSolver implements Solver<TracerParams> {
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private params!: Required<
-    Omit<TracerParams, 'sea' | 'water' | 'wind' | 'bed' | 'sources' | 'bedJets' | 'breaches' | 'breachMixes'>
+    Omit<
+      TracerParams,
+      'sea' | 'water' | 'wind' | 'bed' | 'sources' | 'oilSpills' | 'bedJets' | 'breaches' | 'breachMixes'
+    >
   > & {
     bed: Bed | number;
   };
   private sources: { material: number; source: TracerSource }[] = [];
+  private readonly oilSpills: OilSpillState[] = [];
+  private spillRadii?: Region;
+  private emissionCapacity = 0;
   private materials: TracerMaterial[] = [];
   private settling: number[] = [];
   private sea?: SeaSurface;
@@ -449,6 +484,7 @@ export class TracerSolver implements Solver<TracerParams> {
     this.breachMaterials = BREACH_CARGO.map((name) =>
       name === 'none' ? -1 : this.materialIndex(TRACER_MATERIALS[name]),
     );
+    this.initOilSpills(params.oilSpills ?? [], capacity);
     const base = 4 + this.sources.length + Number(this.useBedJets) + breaches;
     const ledgerWords = this.initBreachMixes(params.breachMixes ?? [], base);
     this.random = new RandomStream(0, solverNumber(this.id));
@@ -456,6 +492,63 @@ export class TracerSolver implements Solver<TracerParams> {
     // Released, in the water, on the surface, on the bed (kg), each source's mass not yet released as a particle, the
     // bed jets' and each breach's.
     this.ledger = host.allocate('ledger', ledgerWords * 8, 'f64', TRACER_LAYOUT);
+  }
+
+  private initOilSpills(spills: readonly TracerOilSpill[], capacity: number): void {
+    const { waterDensity, viscosity } = this.params;
+    let first = capacity;
+    for (const spill of spills) {
+      const { mass, position, spreadingCoefficient, start = 0, parcels = 128, material = TRACER_MATERIALS.oil } = spill;
+      if (!(Number.isInteger(parcels) && parcels >= 2 && parcels <= first))
+        throw new MargoError(
+          'unsupported',
+          'Oil spill parcels cannot resolve a patch or exceed available slots; use at least two whole parcels within tracer capacity.',
+        );
+      if (
+        !(
+          mass / parcels > 0 &&
+          Number.isFinite(mass) &&
+          Number.isFinite(start) &&
+          start >= 0 &&
+          position.length === 2 &&
+          position.every(Number.isFinite) &&
+          material.floats &&
+          material.density > 0 &&
+          material.density < waterDensity &&
+          spreadingCoefficient >= 0 &&
+          Number.isFinite(spreadingCoefficient)
+        )
+      )
+        throw new MargoError(
+          'unsupported',
+          'Oil spreading needs finite mass, position, time and tension with oil lighter than the water; pass positive mass, nonnegative time and tension, and a floating material.',
+        );
+      const profile = fayCoefficients(
+        mass / material.density,
+        this.g * (1 - material.density / waterDensity),
+        waterDensity,
+        viscosity,
+        spreadingCoefficient,
+      );
+      if (!profile.every(Number.isFinite) || !(fayRadius(profile, 1) > 0))
+        throw new MargoError(
+          'unsupported',
+          'Oil spill radius is outside numeric range; use physical oil mass, buoyancy, viscosity and tension.',
+        );
+      first -= parcels;
+      this.oilSpills.push({
+        first,
+        count: parcels,
+        material: this.materialIndex(material),
+        position,
+        mass,
+        start,
+        profile,
+      });
+    }
+    this.emissionCapacity = first;
+    if (this.oilSpills.length)
+      this.spillRadii = this.host.allocate('fay-spill-radii', 8 * this.oilSpills.length, 'f64', 1);
   }
 
   private initBreachMixes(mixes: readonly BreachTracerMix[], firstSlot: number): number {
@@ -516,7 +609,8 @@ export class TracerSolver implements Solver<TracerParams> {
     book: Float64Array,
     free: number,
   ): number {
-    const { capacity, particleMass, waterLevel } = this.params;
+    const { particleMass, waterLevel } = this.params;
+    const capacity = this.emissionCapacity;
     while (book[slot]! >= particleMass) {
       while (free < capacity && words[free * STRIDE + 5]! !== FREE) free++;
       if (free >= capacity) break;
@@ -568,6 +662,66 @@ export class TracerSolver implements Solver<TracerParams> {
     return this.params.waterLevel - dy + (this.sea?.elevation(x + dx, z + dz, time) ?? 0);
   }
 
+  private spreadOil(time: number, words: Float64Array, book: Float64Array): void {
+    if (!this.spillRadii) return;
+    const radii = regionWords(this.host.memory, this.spillRadii) as Float64Array;
+    for (let i = 0; i < this.oilSpills.length; i++) {
+      const spill = this.oilSpills[i]!;
+      const age = time - spill.start;
+      if (!(age > 0)) continue;
+      const radius = fayRadius(spill.profile, age);
+      if (!(radius > 0 && Number.isFinite(radius)))
+        throw new MargoError(
+          'unsupported',
+          'The oil spill radius exceeds numeric range; use a physical release mass and time.',
+        );
+      const previous = radii[i]!;
+      if (previous === 0) {
+        this.seedOil(spill, radius, words);
+        book[0]! += spill.mass;
+        book[2]! += spill.mass;
+      } else {
+        this.expandOil(spill, radius / previous, words);
+      }
+      radii[i] = radius;
+    }
+  }
+
+  private seedOil(spill: OilSpillState, radius: number, words: Float64Array): void {
+    const { first, count, position, material, mass } = spill;
+    const pairs = Math.floor(count / 2);
+    const share = mass / count;
+    for (let i = 0; i < count; i++) {
+      const pair = Math.floor(i / 2);
+      const angle = pair * GOLDEN_ANGLE;
+      const signedRadius = pair === pairs ? 0 : (i % 2 === 0 ? 1 : -1) * radius * Math.sqrt((pair + 0.5) / pairs);
+      const p = (first + i) * STRIDE;
+      words[p] = position[0] + signedRadius * cos(angle);
+      words[p + 1] = this.params.waterLevel;
+      words[p + 2] = position[1] + signedRadius * sin(angle);
+      words[p + 3] = i + 1 < count ? share : mass - share * (count - 1);
+      words[p + 4] = material;
+      words[p + 5] = SURFACE;
+    }
+  }
+
+  private expandOil(spill: OilSpillState, scale: number, words: Float64Array): void {
+    const first = spill.first * STRIDE;
+    const end = first + spill.count * STRIDE;
+    let cx = 0;
+    let cz = 0;
+    for (let p = first; p < end; p += STRIDE) {
+      cx += words[p]! - words[first]!;
+      cz += words[p + 2]! - words[first + 2]!;
+    }
+    cx = words[first]! + cx / spill.count;
+    cz = words[first + 2]! + cz / spill.count;
+    for (let p = first; p < end; p += STRIDE) {
+      words[p] = cx + (words[p]! - cx) * scale;
+      words[p + 2] = cz + (words[p + 2]! - cz) * scale;
+    }
+  }
+
   step(context: StepContext, dt: number): void {
     this.cell = context.cell;
     const sea = this.sea;
@@ -583,6 +737,7 @@ export class TracerSolver implements Solver<TracerParams> {
       book = this.book(),
       { capacity, horizontalDiffusivity: kh, verticalDiffusivity: kv, waterLevel } = this.params;
     const [seaX, seaY, seaZ] = this.seaOffset;
+    this.spreadOil(time, words, book);
     // Release: each source's mass this step, in particles of the set mass, the remainder carried to the next step.
     let free = 0;
     for (let s = 0; s < this.sources.length; s++) {
@@ -712,7 +867,7 @@ export class TracerSolver implements Solver<TracerParams> {
     const words = this.words(),
       book = this.book(),
       lifted = 4 + this.sources.length,
-      { capacity } = this.params;
+      capacity = this.emissionCapacity;
     for (let w = 0; w < wake.length; w += SWIM_WAKE_WORDS) {
       const x = wake[w]!,
         y = wake[w + 1]!,
@@ -810,9 +965,10 @@ export class TracerSolver implements Solver<TracerParams> {
   importPorts(): void {}
 
   stateRegions(): readonly Region[] {
-    return this.bedExchange
-      ? [this.particles, this.ledger, ...this.bedExchange.regions()]
-      : [this.particles, this.ledger];
+    const regions = [this.particles, this.ledger];
+    if (this.bedExchange) regions.push(...this.bedExchange.regions());
+    if (this.spillRadii) regions.push(this.spillRadii);
+    return regions;
   }
 
   extraState(): readonly Region[] {

@@ -13180,6 +13180,14 @@ pickup at each vertex. `coupling/swim.test.js` verifies the transient loss, fina
 the real `TerrainBed` ledgers. The rendered fixture draws the bed heights and verifies negative and positive relief.
 Independent lifted-mass measurements and playback of the original BB-7 shot remain open.
 
+Finite surface releases use J. A. Fay, [“Physical Processes in the Spread of Oil on a Water Surface” (1971)](https://iosc.kglmeridian.com/downloadpdf/view/journals/iosc/1971/1/article-p463.xml),
+Tables I and II. The three axisymmetric radii use Fay's 1.14, 1.45 and 2.30 constants with age powers 1/2, 1/4 and
+3/4. The gravity envelope takes the smaller of its inertial and viscous radii. Positive net interfacial tension
+dominates where its radius exceeds that envelope. This continuous join is Margo's approximation for the regime
+transitions. Antipodal equal-area parcels give the initial patch; each step expands about its transported centroid
+and applies the usual surface advection and diffusion. The closed-form check uses all three regimes and exact
+mass and snapshot replay. Independent field validation of oil extent remains open.
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

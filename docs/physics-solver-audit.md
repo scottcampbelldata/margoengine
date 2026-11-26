@@ -488,6 +488,10 @@ The original shot binding, independent lifted mass and multi-writer bedrock acce
 The SEA-15 consumer is rebased on Lane D's `4ec0717e8a`. A calm-spectrum test with a real `WakeSolver`
 confirms submerged dye follows the analytical potential gradient through `SpectralSea.water`.
 
+Finite instantaneous oil releases now use Fay's three radial laws, with mass conservation, current transport and
+snapshot replay checked separately. Oil film thickness and weathering, scale-dependent diffusion and independent
+measured slick-extent validation remain open.
+
 ## Verification passes
 
 A reviewer checks each row Codex sets LANDED (after a reopen, or on its first landing) against the eight-point

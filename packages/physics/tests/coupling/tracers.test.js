@@ -149,3 +149,80 @@ test('SEA-15 dye follows the SEA-04 patch potential below a level surface', () =
   assert.ok(moved[0] < x);
   assert.deepEqual(sample([]), initial);
 });
+
+test('SEA-15 an oil release conserves mass and expands through Fay’s three radial regimes', () => {
+  const mass = 0.025;
+  const oil = 870;
+  const waterDensity = 1025;
+  const nu = 1e-6;
+  const strength = 0.0003;
+  const gravity = 9.80665;
+  const volume = mass / oil;
+  const reducedG = gravity * (1 - oil / waterDensity);
+  const positions = [0.25, -0.5];
+  const tracer = new TracerSolver();
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+    capacity: 64,
+    waterDensity,
+    viscosity: nu,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    oilSpills: [{ mass, position: positions, spreadingCoefficient: strength, parcels: 64 }],
+  });
+  // Fay 1971, Tables I and II. The times lie inside the indicated dominant regimes.
+  const cases = [
+    [0.5, (t) => 1.14 * (reducedG * volume * t * t) ** 0.25],
+    [10, (t) => 1.45 * ((reducedG * volume * volume * t ** 1.5) / Math.sqrt(nu)) ** (1 / 6)],
+    [40, (t) => 2.3 * ((strength * strength * t ** 3) / (waterDensity * waterDensity * nu)) ** 0.25],
+  ];
+  let saved;
+  for (const [time, radius] of cases) {
+    world.advance(time * 60);
+    const particles = [...tracer.particlesOf()];
+    assert.equal(particles.length, 64);
+    assert.equal(tracer.budget.released, mass);
+    assert.equal(tracer.budget.surface, mass);
+    let squared = 0;
+    for (const particle of particles) {
+      assert.equal(particle.state, 'surface');
+      squared += (particle.position[0] - positions[0]) ** 2 + (particle.position[2] - positions[1]) ** 2;
+    }
+    const equivalent = Math.sqrt((2 * squared) / particles.length);
+    assert.ok(
+      Math.abs(equivalent - radius(time)) < 2e-12 * radius(time),
+      `${equivalent} vs ${radius(time)} at ${time} s`,
+    );
+    if (time === 10) saved = world.takeSnapshot();
+  }
+  const hash = world.hash();
+  world.restoreSnapshot(saved.bytes);
+  world.advance(40 * 60);
+  assert.equal(world.hash(), hash);
+});
+
+test('SEA-15 a delayed oil spill keeps its slots and follows the current alongside an ordinary source', () => {
+  const tracer = new TracerSolver();
+  const dt = 1 / 60;
+  const oilMass = 0.5;
+  const flow = { ...water, sample: () => ({ velocity: [0.25, 0, -0.5], density: 1025, temperature: 280 }) };
+  const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(tracer, {
+    capacity: 3,
+    water: flow,
+    horizontalDiffusivity: 0,
+    verticalDiffusivity: 0,
+    sources: [{ material: 'dye', position: [0, -1, 0], rate: 60, stop: dt }],
+    oilSpills: [{ mass: oilMass, position: [4, 2], start: 1, spreadingCoefficient: 0, parcels: 2 }],
+  });
+  world.advance(60);
+  assert.equal([...tracer.particlesOf()].length, 1);
+  assert.equal(tracer.budget.surface, 0);
+  world.advance(61);
+  const particles = [...tracer.particlesOf()];
+  const oil = particles.filter((parcel) => parcel.state === 'surface');
+  assert.equal(oil.length, 2);
+  assert.equal(oil[0].mass + oil[1].mass, oilMass);
+  assert.equal(tracer.budget.water, 1);
+  const centre = (axis) => (oil[0].position[axis] + oil[1].position[axis]) / 2;
+  assert.ok(Math.abs(centre(0) - (4 + 0.25 * dt)) < 8 * Number.EPSILON);
+  assert.ok(Math.abs(centre(2) - (2 - 0.5 * dt)) < 8 * Number.EPSILON);
+});

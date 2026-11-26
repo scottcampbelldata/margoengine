@@ -230,10 +230,16 @@ first: each names its scope, its evidence file and how to reproduce it.
   `node packages/audio/tests/outdoor-sound.browser.mjs` after building Physics and Audio.
 
 - Ray fin and seabed coupling (BB-7, 2026-11-26). The live swimming port entrains sand from the near bed
-  and leaves a distant bed or still fins clear. The mass ledger closes as the plume settles. The rendered
-  fixture moves 14.1 pixels downstream on WebGPU and the WebGL2 compatibility backend before clearing.
+  and leaves a distant bed or still fins clear. The terrain and suspension volume ledger closes as the plume
+  settles. The rendered fixture moves 16.6 pixels downstream and leaves 549.7 µm of bed relief on WebGPU and
+  the WebGL2 compatibility backend.
   Reproduce with `node --test packages/physics/tests/coupling/swim.test.js` and
   `node packages/environment/tests/swim-sediment.browser.mjs` with and without `--compat` after building.
+
+- Finite oil release (SEA-15, 2026-11-26). An instantaneous surface release recovers Fay's three
+  circular spreading radii from the parcel second moment, conserves its prescribed mass, and replays from a
+  snapshot. A delayed release shares a world with an ordinary dye source and moves with the given current.
+  Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
 - Sediment transport (HYDRO-03, 2026-11-25). Analytic cases verify the Van Rijn fall-speed regimes, settling,
   the Rouse depth mean, steady bedload and finite-volume advection. A live shallow-water reach changes its

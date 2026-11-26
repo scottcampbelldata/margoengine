@@ -3206,6 +3206,25 @@ const { position: [x, y, z] } = [...slick.particlesOf()][0]!;
 console.log(y === sea.elevation(x, z, 1 / 60)); // true
 ```
 
+Use `oilSpills` for a finite release that spreads by Fay's radial laws. Set its mass in kilograms, position in
+local metres, and `spreadingCoefficient` in N/m (air–water tension minus oil–air and oil–water tensions).
+Zero selects gravity-driven spreading. Each release reserves `parcels` slots from `capacity` (default 128,
+minimum 2), follows the supplied water and wind, and starts at `start` seconds (default 0). The default
+material is `TRACER_MATERIALS.oil`. Ordinary sources and cargo can use the other slots.
+
+```ts
+import { TracerSolver } from 'margoengine/physics/tracers';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const oil = new TracerSolver();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(oil, {
+  oilSpills: [{ mass: 0.025, position: [0, 0], spreadingCoefficient: 0.0003, parcels: 64 }],
+  horizontalDiffusivity: 0,
+});
+world.advance(60);
+console.log(oil.budget.surface, [...oil.particlesOf()].length); // 0.025 64
+```
+
 When one opening carries several grain sizes, set `breachMixes` for its rigid body row and its index in the hull's
 `openings` array. Each positive mass fraction gets its own parcel carry. Without a mixture, the port's cargo code
 selects one material. This configuration describes 12 mm pellets and fines at body row 0, opening 2.
