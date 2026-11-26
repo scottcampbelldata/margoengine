@@ -14230,7 +14230,14 @@ the seam breaks. Its location and dimensions come from the hull opening, indepen
 subsequent gap between the halves. Distributed shell fracture, cyclic plastic history,
 automatic shell-part generation and the measured floating-tank breakup remain open.
 
-Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 24016 B minified and 9430 B gzip under its 9719 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
+Ground stations intersect a finite triangulated heightfield along their local linear trajectory
+for one coupling tick. The first intersected face supplies the reaction normal throughout the
+tick. Each station has its own authored anchor and material. The bed acts as an immovable
+support. Deforming sediment, obstructions with overhangs, and distributed plate tearing around
+a rock require additional models. The oblique and cross-grid tests use analytical terrain input.
+The measured grounding-force and rupture histories remain open.
+
+Station-level input curves represent creased plating, rail absorbers, or road crumple members. The default event mode resolves normal loading and release during one 60 Hz coupling interval. Continuous patches evaluate one normal load and return map per tick. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 28524 B minified and 11206 B gzip under its 11543 B ceiling. The optional seakeeping entry measures 77208 B minified and 29838 B gzip under its 30480 B ceiling. Core and Stage gain zero bytes.
 
 ### Lubrication films on moving surfaces (FLUID-07)
 
@@ -14269,10 +14276,12 @@ per drop, 2.6% below the 51.5 μL cycle volume from Zhang and Basaran (1996). Ea
 the rim pose and velocity. `ThinFilmDropFlight` uses that velocity as constant over the source
 tick to recover the release position, then advances the drop relative to the air. It tracks
 diameters from 1 μm to 7 mm at a configurable capacity and expires each drop by age. An
-optional static, planar receiver absorbs incoming drops in its UV bounds. It sends volume
-and normal momentum to the receiving film in the same tick and can drive its wake. The
-receiver covers deposition. Moving receivers, splashing, rebound, satellite breakup and free
-pinch-off away from a configured outlet remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
+optional planar receiver absorbs incoming drops in its UV bounds. Static planes deposit
+volume and send normal momentum to a receiving film or wake. A rigidly mounted receiver
+follows the linear translation between consecutive rigid poses and sends relative normal
+momentum to its mounted film. It holds its orientation fixed. Rotation within an interval,
+splashing, rebound, satellite breakup and free pinch-off away from a configured outlet
+remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-circular-sill-drops)
 The optional `hydrostaticLoad` adds the film's normal gravitational force and moment to
 its rigid mount. The coupled test checks both a supported tray and an off-centre underside
 patch. The optional `impactRecoil` sends the resolved volume's incoming normal impulse
@@ -14288,7 +14297,7 @@ uses spherical drop geometry. It compares the same rigid pose with each liquid m
 hidden in turn. Interior camera attachment, full layered water–glass optics and production
 shot review remain open. [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-The optional thin-film entry is 13,202 B gzip with a 13,395 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
+The optional thin-film entry is 14,185 B gzip with a 14,611 B ceiling. Both Wasm assets are 14,668 B raw and each is 6,195 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 
@@ -14944,6 +14953,12 @@ The bilge virtual-inertia seakeeping entry is 30,177 B gzip with a 30,480 B ceil
 ### Holdout roll damping and period with bilge keels
 
 The IIT Madras BK10 flume case gives a damping ratio within its measured repeat variation at two time steps. For the same test the computed period is about 6% short. The bare control also over-predicts damping. This constrained-roll result covers the specified geometry and input only. Period, whole-hull added inertia and nonlinear wake pressure remain separate limitations.
+
+### Three-dimensional surge added mass
+
+The per-hull `surgeAddedMass` flag defaults to false. It uses at most 512 wetted triangular panels at the reference draft and requires the hull to stay clear of the reference bed. The matrix is filled and factored when the optional feature first encounters a wet hull. Assembly uses quadratic storage and the factorization takes cubic work in the panel count. The deep-water branch uses an odd free-surface reflection. The finite-depth branch uses twelve alternating image shells. The cached scalar affects surge acceleration under the existing `addedMass` option. Fully dry hulls carry zero surge inertia. A manoeuvring solver that claims the added mass continues to own its surge row. The option covers the high-frequency limit, with depth and draft held at their reference values. Finite-frequency 3D damping, diffraction and off-diagonal panel forces remain open.
+
+The 3D axial seakeeping entry is 31,553 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
@@ -32268,8 +32283,10 @@ thin-film gravity-drain test leaves the patch without spawning airborne ligament
 atomizing into smaller drops. A wet impact emits a pressure pulse into WakeSolver. The
 general sea keeps its existing wind-wave damping because heterogeneous rain suppression
 and airborne secondary-drop transport are separate atmosphere and surface-wave work.
-The thin-film precursor model now supplies an equilibrium contact angle. Dynamic hysteresis
-and comparison against independent measured drop spreading remain open.
+The thin-film precursor model supplies an equilibrium contact angle and advancing and receding
+thresholds. Independent measurements of partially wetting slip and absolute radius history
+remain open. A translating fixed-orientation tray absorbs drops and receives their normal
+recoil. Capture by a turning tray and secondary splash drops remain open.
 The reversed-gravity film test reproduces the growth of a long underside disturbance.
 A configured circular sill now publishes timed detached drops. Finite depth columns still require
 a separate free-surface representation to pinch off a drop away from a rim.

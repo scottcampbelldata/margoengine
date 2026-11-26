@@ -10323,4 +10323,4 @@ The IIT Madras BK10 flume case gives a damping ratio within its measured repeat 
 
 The per-hull `surgeAddedMass` flag defaults to false. It uses at most 512 wetted triangular panels at the reference draft and requires the hull to stay clear of the reference bed. The matrix is filled and factored when the optional feature first encounters a wet hull. Assembly uses quadratic storage and the factorization takes cubic work in the panel count. The deep-water branch uses an odd free-surface reflection. The finite-depth branch uses twelve alternating image shells. The cached scalar affects surge acceleration under the existing `addedMass` option. Fully dry hulls carry zero surge inertia. A manoeuvring solver that claims the added mass continues to own its surge row. The option covers the high-frequency limit, with depth and draft held at their reference values. Finite-frequency 3D damping, diffraction and off-diagonal panel forces remain open.
 
-The 3D axial seakeeping entry is SIZE_ENTRY B gzip with a SIZE_CAP B ceiling. Core and Stage gain zero bytes.
+The 3D axial seakeeping entry is 31,553 B gzip with a 32,500 B ceiling. Core and Stage gain zero bytes.
