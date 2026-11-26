@@ -1,0 +1,179 @@
+{
+ "stage38": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n    variantSets = \"vs\"\n    variants = { string vs = \"x\" }\n)\n{\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\"\n            {\n            }\n        }\n    }\n}\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n    subLayers = [@./l1.usda@ (offset = 4)]\n)\nclass \"C\" (\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"R\" (\n    references = @./l2.usda@</M/a>\n)\n{\n}\n"
+  },
+  "prims": {
+   "/M": [
+    3,
+    0
+   ],
+   "/R": [
+    5
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/R": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage38-root-variant": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n    variantSets = \"vs\"\n    variants = { string vs = \"x\" }\n)\n{\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\"\n            {\n            }\n        }\n    }\n}\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n    subLayers = [@./l1.usda@ (offset = 4)]\n)\nclass \"C\" (\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\r\n(\r\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\r\n)\r\ndef \"R\" (\r\n    references = @./l2.usda@</M/a>\r\n)\r\n{\r\n}\r\nclass \"C\"\r\n{\r\n    variantSet \"vs\" = {\r\n        \"y\" {\r\n            def \"a\"\r\n            {\r\n            }\r\n        }\r\n    }\r\n}\r\n"
+  },
+  "prims": {
+   "/M": [
+    3,
+    6,
+    0
+   ],
+   "/M/a": [
+    7
+   ],
+   "/R": [
+    5,
+    7
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage38-class-unselected": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\" (\n    variantSets = \"vs\"\n    variants = { string vs = \"x\" }\n)\n{\n    variantSet \"vs\" = {\n        \"x\" {\n            def \"a\"\n            {\n            }\n        }\n    }\n}\ndef \"M\" (\n    specializes = </C>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l2.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n    subLayers = [@./l1.usda@ (offset = 4)]\r\n)\r\nclass \"C\"\r\n{\r\n}\r\n",
+   "root.usda": "#usda 1.0\r\n(\r\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\r\n)\r\ndef \"R\" (\r\n    references = @./l2.usda@</M/a>\r\n)\r\n{\r\n}\r\nclass \"C\"\r\n{\r\n    variantSet \"vs\" = {\r\n        \"y\" {\r\n            def \"a\"\r\n            {\r\n            }\r\n        }\r\n    }\r\n}\r\n"
+  },
+  "prims": {
+   "/M": [
+    3,
+    6,
+    0
+   ],
+   "/M/a": [
+    7
+   ],
+   "/R": [
+    5,
+    7,
+    2
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage38-authoring-unselected": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\n",
+   "l1.usda": "#usda 1.0\r\n(\r\n    defaultPrim = \"M\"\r\n)\r\nclass \"C\" (\r\n    variantSets = \"vs\"\r\n    variants = { string vs = \"x\" }\r\n)\r\n{\r\n    variantSet \"vs\" = {\r\n        \"x\" {\r\n            def \"a\"\r\n            {\r\n            }\r\n        }\r\n    }\r\n}\r\ndef \"M\" (\r\n    specializes = </C>\r\n)\r\n{\r\n}\r\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n    subLayers = [@./l1.usda@ (offset = 4)]\n)\nclass \"C\" (\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "root.usda": "#usda 1.0\r\n(\r\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\r\n)\r\ndef \"R\" (\r\n    references = @./l2.usda@</M/a>\r\n)\r\n{\r\n}\r\nclass \"C\"\r\n{\r\n    variantSet \"vs\" = {\r\n        \"y\" {\r\n            def \"a\"\r\n            {\r\n            }\r\n        }\r\n    }\r\n}\r\n"
+  },
+  "prims": {
+   "/M": [
+    2,
+    5,
+    0
+   ],
+   "/M/a": [
+    1
+   ],
+   "/R": [
+    4,
+    1
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/M/a": {
+    "type": "",
+    "props": {}
+   },
+   "/R": {
+    "type": "",
+    "props": {}
+   }
+  }
+ },
+ "stage31": {
+  "files": {
+   "l0.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\ndef \"M\" (\n    specializes = </C/a>\n    variants = { string vs = \"y\" }\n)\n{\n}\n",
+   "l1.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n)\nclass \"C\"\n{\n    def \"a\" (\n        variantSets = \"vs\"\n        variants = { string vs = \"x\" }\n    )\n    {\n        variantSet \"vs\" = {\n            \"x\" {\n                def \"a\"\n                {\n                }\n            }\n        }\n    }\n}\n",
+   "l2.usda": "#usda 1.0\n(\n    defaultPrim = \"M\"\n    subLayers = [@./l0.usda@ (offset = 4)]\n)\n",
+   "root.usda": "#usda 1.0\n(\n    subLayers = [@./l1.usda@ (offset = 7), @./l0.usda@]\n)\ndef \"Q\" (\n)\n{\n    def \"c\"\n    {\n        def \"b\" (\n            prepend references = @./l2.usda@</M/a> (offset = 3; scale = 2)\n        )\n        {\n        }\n    }\n}\n"
+  },
+  "prims": {
+   "/M": [
+    0,
+    2
+   ],
+   "/Q": [
+    5
+   ],
+   "/Q/c": [
+    6
+   ],
+   "/Q/c/b": [
+    7
+   ]
+  },
+  "reading": {
+   "/M": {
+    "type": "",
+    "props": {}
+   },
+   "/Q": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c": {
+    "type": "",
+    "props": {}
+   },
+   "/Q/c/b": {
+    "type": "",
+    "props": {}
+   }
+  }
+ }
+}

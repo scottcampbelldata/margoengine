@@ -438,6 +438,8 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     lift: Node[];
     /** Grafted specializes nodes still to move under the root, after every task of the four kinds. */
     late: Node[];
+    /** Carried variant nodes of a site composed alone for an arc, queued once every other task is done. */
+    deferred: Node[];
     held: Map<string, Node>;
     settle: boolean;
     depth: number;
@@ -570,6 +572,17 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
         build!.late.push(n);
         return;
       }
+      // Seen on OpenUSD (black-box stages, KB1942c part 34), the specification does not say: an implied specializes arc
+      // carried down inside a graft keeps only the ancestral variants its site selects composed alone, as a grafted
+      // authored one does (`promote`), not those the graft's own ancestor chose for it.
+      if (n !== top && n.kind === 'specialize' && n.implied && n.anc && !n.inert) {
+        const path = stripVariants(n.path);
+        if (depthOf(path) > 1 && unbuilt(n.stack, path)) {
+          const alone = graft(tree(n.stack, path, false), n.kind, n.depth, n.order, n.steps, n.offset);
+          n.children = n.children.filter((c) => !(c.kind === 'variant' && c.anc));
+          for (const c of alone.children) if (c.kind === 'variant' && c.anc) attach(n, c);
+        }
+      }
       queue(n, false, n !== top || lift);
       n.children.forEach(walk);
     };
@@ -636,6 +649,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       tasks: { reference: [], payload: [], inherit: [], specialize: [] },
       lift: [],
       late: [],
+      deferred: [],
       held: new Map(),
       settle,
       depth,
@@ -644,6 +658,13 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     };
     // The nodes carried down are queued in tree order.
     const carry = (n: Node) => {
+      // Seen on OpenUSD (black-box prim indexes, KB1942c part 36), the specification does not say: in a site composed
+      // alone for an arc, the variants carried down from its ancestors are chosen again, so their arcs come after every
+      // other task (the prim index dump shows them as direct, not ancestral, variants). A stage prim keeps them in order.
+      if (!settle && n.kind === 'variant' && n.anc && n !== root) {
+        build!.deferred.push(n);
+        return;
+      }
       queue(n, true);
       n.children.forEach(carry);
     };
@@ -678,6 +699,14 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       }
       if (b.late.length) {
         expand(b.late.shift()!, b.depth, 'specialize');
+        continue;
+      }
+      if (b.deferred.length) {
+        const walk = (n: Node) => {
+          queue(n, true);
+          n.children.forEach(walk);
+        };
+        walk(b.deferred.shift()!);
         continue;
       }
       if (!b.settle) return;
@@ -1007,7 +1036,30 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     // Seen on OpenUSD (black-box prim indexes, KB1942c), the specification does not say: the first live node made for a
     // site holds it in the index. A later inherit to it makes no node; a later specializes leaves an inert placeholder,
     // which still implies its arc upward unless it was itself implied.
-    const claimed = b.held.has(node.stack.id + '\0' + path);
+    const holder = b.held.get(node.stack.id + '\0' + path),
+      claimed = !!holder;
+    // Seen on OpenUSD (black-box prim indexes, KB1942c part 35), the specification does not say: an implied specializes
+    // arc placed below the index root (on a variant of the prim) whose site an implied specializes arc carried down onto
+    // the index root holds leaves its placeholder, and its node under the root stays inert as the site was held, but
+    // the carried arc goes, with the arcs implied from it: the site gives no opinions.
+    if (
+      kind === 'specialize' &&
+      implied &&
+      node !== b.top &&
+      holder &&
+      holder.parent === b.top &&
+      holder.kind === 'specialize' &&
+      holder.implied &&
+      carriedFrom.has(holder)
+    ) {
+      dropPending(b, holder);
+      stub();
+      const real = stub();
+      node.children = node.children.filter((c) => c !== real);
+      attach(b.top, real);
+      b.held.set(siteKey(real), real);
+      return undefined;
+    }
     if (
       claimed ||
       [...(b.pending ?? [])].some(
@@ -1060,12 +1112,23 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
     return placed;
   }
   /**
+   * The layer that authored class arc `arc` at the prim its first step names: the strongest layer of its stack whose
+   * list op there gives the arc's site. Seen on OpenUSD (black-box stages, KB1942c part 33): a sublayer of the arc's
+   * stack, not only its root layer, makes a stack that also holds it read the authoring prim's selections.
+   */
+  function authorOf(arc: Node, step: Step): Layer {
+    const field = arc.kind === 'inherit' ? 'inheritPaths' : 'specializes';
+    const hit = listed<string>(arc.stack, step.to, field).find(({ item }) => stripVariants(item) === step.from);
+    return hit?.entry.layer ?? arc.stack.root;
+  }
+  /**
    * Seen on OpenUSD (black-box prim indexes, KB1942c), the specification does not say: an implied class arc that stands
    * for an arc carried down from an ancestor prim A sets its ancestral variants with the selections of A in context, then
    * its own. A maps into the stack it joins where the arcs on the way can and is taken as authored where they cannot.
    * Below the index root, A's context is the site that authored the arc into that stack, at the path A maps to there,
    * and the nodes of other stacks in the index of the stage prim A maps to. At the index root it is A's own index there,
-   * when that stack holds the layer that authored the arc; the node that stands for this same arc there does not count.
+   * when that stack holds the layer that authored the arc (`authorOf`, a sublayer too, part 33); the node that stands
+   * for this same arc there does not count.
    */
   function carriedContext(near: Node, arc: Node): Node[] {
     const step = arc.steps[0],
@@ -1094,7 +1157,7 @@ export function composeStage(rootId: string, options: ComposeOptions): Composed 
       if (up !== undefined && unbuilt(b.top.stack, up))
         for (const n of strength(tree(b.top.stack, up, true)))
           if (n.stack !== by?.stack && !counterpart(n)) ctx.push(n);
-    } else if (near.stack.layers.some((e) => e.layer === arc.stack.root) && unbuilt(near.stack, authored))
+    } else if (near.stack.layers.some((e) => e.layer === authorOf(arc, step)) && unbuilt(near.stack, authored))
       for (const n of strength(tree(near.stack, authored, true))) if (!counterpart(n)) ctx.push(n);
     return ctx;
   }
