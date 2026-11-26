@@ -8,6 +8,7 @@ import { StreamingAssetCache } from '../dist/stream.js';
 import { DecodedAssetCache } from '../dist/decoded.js';
 import { hashBytes } from '../dist/hashed.js';
 import { DracoDecoder, KTX2Decoder } from '../../decoders/dist/index.js';
+import { bundleProof, freshnessRound, varyProof } from './browser-http.js';
 import { prefetchProof, throttleProof } from './browser-prefetch.js';
 import { staleTouch } from './stale-touch.js';
 
@@ -80,6 +81,9 @@ window.cacheChecks = {
       for (const mode of ['evict', 'replace']) results.push({ indexed, mode, ...(await staleTouch(mode, indexed)) });
     return results;
   },
+  varyProof,
+  bundleProof,
+  freshnessRound,
   prefetchProof: () => prefetchProof('window-prefetch'),
   throttleProof,
   async serviceWorkerReady(revision = 1) {
