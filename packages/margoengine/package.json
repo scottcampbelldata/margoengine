@@ -3411,6 +3411,10 @@
       "types": "./dist/physics/orbit.d.ts",
       "import": "./dist/physics/orbit.js"
     },
+    "./physics/lava": {
+      "types": "./dist/physics/lava.d.ts",
+      "import": "./dist/physics/lava.js"
+    },
     "./physics2d": {
       "types": "./dist/physics2d.d.ts",
       "import": "./dist/physics2d.js"

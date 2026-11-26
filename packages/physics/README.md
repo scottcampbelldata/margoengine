@@ -4133,3 +4133,31 @@ samples. Pass the same initial `cell` to `world.add()` if the grid is outside th
 the trunk polyline and branches. `thunderField` has one `LIGHTNING_THUNDER_WORDS` f64 header row with the source count,
 followed by source XYZ (m), emission time (s), relative weight and segment length (m). Apply source emission time
 before acoustic flight time. `channel()` and `thunder()` return copies of their active data.
+
+## Natural lava flow and coastal displacement
+
+`@margoengine/physics/lava` advances a vent-fed lava sheet on the PhysicsWorld clock. It transports mass and enthalpy, grows stationary crust, follows slopes and channels, and stops sub-yield flow. It can sample a live `TerrainBed` and publish the volume entering the sea to `TsunamiSolver`.
+
+<!-- example: natural-lava-flow -->
+```js
+import assert from 'node:assert/strict';
+import { LavaSolver } from '@margoengine/physics/lava';
+import { TsunamiSolver } from '@margoengine/physics/tsunami';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const cells = [16, 2];
+const bed = Array.from({ length: 32 }, (_, i) => (i % 16 < 6 ? 0.2 : -0.75));
+const lava = await LavaSolver.load();
+const sea = await TsunamiSolver.load({ sources: [lava.seaSourceField] });
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(lava, { cells, spacing: 1, bed, seaLevel: 0, vents: [{ cell: [5, 0], flow: 2.5, end: 1 }] })
+  .add(sea, { cells, spacing: 1, bathymetry: bed });
+
+world.advance(120);
+assert.ok(lava.sample(7, 0).depth > 0);
+assert.ok(sea.budget.admittedSourceVolume > 0);
+```
+
+Grid records are f64 in layout 1, with X fastest. `lavaField` exposes lava depth (m), bulk and skin temperature (K), crust thickness (m), X and Z discharge (m²/s), surface altitude (m) and enthalpy (J/m²). `depositField` provides ground plus solid crust altitude (m). Use `id` to name independent deposits, and match the receiving grid and origin. `seaSourceField` uses the same layout as water-entry and calving sources. Its signed volume is the change in submerged lava occupancy at each tick. With `seaLevel` omitted, the solver runs a terrestrial patch.
+
+For contact with ice, load with `exchangeIce: true`, map distinct lava cells to the `IceSolver` site's order and area with `ice`, and use a 60 Hz staggered group `.couple(['lava', 'ice-thermodynamics'], 'staggered')` with `new IceSolver({ readHeat: true })`. Heat used by the ice is removed from lava enthalpy. Drainage and steam mass are reported by both sides. The included `LavaBudget` records supplied and stored lava volume, environmental and ice heat, and displaced water.

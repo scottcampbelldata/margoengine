@@ -5721,3 +5721,7 @@ The optional entry closes its mass budget against both edge fluxes and supplied 
 one-face heat and inward mass flux agree with the zero-torque solution. Its tracer reproduces prograde and retrograde
 circular frequencies, the inclined Schwarzschild orbital plane, radial turning radii, and the observer and proper
 times of radial infall. The coupling harness verifies identical memory modes, frame rates and snapshot replay.
+
+### Conservative lava transport with ice and marine displacement (EARTH-10)
+
+A vent-fed lava patch closes volume and sensible-plus-crystallisation enthalpy. The motion converges to the implicit analytical wide-sheet Bingham relation for a uniform layer, stays at rest below the yield stress, and follows a channel between cooled margins. A separate block checks the surface and basal heat ledger and lateral conduction against their finite-volume equations. ICE-05 removes measured heat, releases the initial ice mass as liquid and steam, and cools the lava. SEA-06 admits the same signed natural displacement that the terrain-following lava releases. The tracked proof runs on 24, 30 and 60 fps cadences, restores from a snapshot and replays plain and shared Wasm in an isolated browser. See `packages/physics/tests/lava.test.js`, `packages/physics/tests/coupling/lava.test.js`, `packages/physics/tests/lava.browser.mjs`, and the scope in [Limits](../limits.md#thermo-viscoplastic-lava-and-nearshore-occupancy-earth-10).

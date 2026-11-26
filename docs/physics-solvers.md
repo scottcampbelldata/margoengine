@@ -166,7 +166,7 @@ The first column is the ID. Paths are relative to `packages/`. The last column l
 | EARTH-07 | Aeolian transport | Saltation, dust emission, impact ripples, dunes | physics/aeolian; vfx/blown-sand | landed: PA-46, PA-63 | Sauermann, Kroy and Herrmann (2001). Werner (1995). Kok et al., "The physics of wind-blown sand and dust" (2012). Pomeroy and Gray (1990), snow saltation. Anderson (1987), impact ripples. | K14 |
 | EARTH-08 | Seismic waves and ground shaking | Source, propagation, site amplification, liquefaction, building response | physics/seismic | Staggered SIMD elastic section, layered sites, free-surface acceleration, cyclic-stress screening, Newmark buildings and rigid support loads | Virieux (1986). Komatitsch and Tromp (1999). Seed and Idriss (1971). Newmark (1959). | K12 K19 |
 | EARTH-09 | Volcanic eruption column | Plinian column, collapse, umbrella cloud, ballistics | weather/src/eruption.ts, thermal.ts | partial: sound deterministic analytic model (Woods, Sparks, Morton-Taylor-Turner) | Woods (1988). Sparks (1986). | K13 K18 |
-| EARTH-10 | Lava flow | Viscosity-temperature law, crust, channel and levee, stopping | weather/src/lava.ts | partial: analytic deterministic (Griffiths, Hulme, Jeffreys) | Griffiths (2000). Costa and Macedonio (2005). Harris and Rowland, FLOWGO (2001). | K14 K27 |
+| EARTH-10 | Lava flow | Conservative vent flux, temperature-dependent Bingham resistance, cooling, crust and levees, solid deposit, natural water displacement | physics/src/lava (LavaSolver), weather/src/lava.ts (analytic channels and visuals) | LANDED: two-dimensional heightfield, live ICE-05 thermal exchange, TerrainBed and SEA-06 source, closed-form and replay checks | Griffiths (2000), Hulme (1974), Costa and Macedonio (2005), Harris and Rowland (2001) | K14 K27 |
 
 ### Family ICE: cryosphere (5)
 
@@ -377,7 +377,7 @@ In the "Direction" column, "one-way" is written A→B. Everything not listed is 
 | FIRE-07 → SEA-10 | See above | one-way |
 | EARTH-09 → ATMO-06 | Ash and tephra particles; fallout builds a bed layer | one-way |
 | EARTH-09 ↔ ATMO-01 | Column entrains wind; wind bends the plume | two-way |
-| EARTH-10 (lava) ↔ ICE-05, ICE-01, SEA-14, EARTH-02 | Meltwater, steam; lava entering water | one-way into water solvers. Cooling and steam return. |
+| EARTH-10 (lava) ↔ ICE-05, ICE-01, SEA-14, EARTH-02 | ICE-05 heat, meltwater and steam. Lava displacement enters SEA-06 on the layout shared with SEA-14. TerrainBed supplies heights and LavaSolver publishes solid deposits. | Staggered ICE-05 heat and phase exchange, plus one-way signed displacement into water. Direct distributed ICE-01 and EARTH-02 bindings still need the shared contracts. |
 | EARTH-03 ↔ EARTH-02 | Dense core produces the powder cloud; the cloud's deposit changes the bed | two-way |
 | EARTH-02/03 → BIO-01, BREAK-02 | Dynamic pressure fells trees and walls; obstacles take momentum from the flow (PA-33) | two-way |
 | EARTH-08 → BREAK-02, EARTH-02, DYN-01, cameras | Ground acceleration shakes bodies, triggers slides and liquefaction | one-way |

@@ -44,6 +44,10 @@ The framework (`packages/physics/src/world/`, `packages/kernel-common/`, `@margo
 `@margoengine/math/pinned`, `@margoengine/math/clock`) changes only through its owners. If a solver needs a change
 there, add a line below with the solver ID and what is needed, and build against what exists meanwhile.
 
+- **EARTH-10:** Specify a registered extent and per-source basal heat acceptance on ICE-01 columns, plus a shared
+  solid-deposit height/material input for EARTH-02. The existing lava entry publishes grid height and lava records,
+  exchanges heat and phases with ICE-05, and emits registered layout-1 coastal displacement.
+
 - **DYN-04:** Define canonical wheel sinkage/soil displacement and road-control fields for EARTH-05 and procedural
   traffic publishers. The road entry already reads real rigid body poses and ATMO-09 wetness, publishes versioned
   drive commands, and applies paired contact impulses through the existing vehicle attachment.

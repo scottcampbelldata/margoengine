@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Lava flow and coastal displacement</title></head>
+<body>
+  <script type="module">
+    import { LavaSolver } from '/packages/physics/dist/lava.js';
+    import { TsunamiSolver } from '/packages/physics/dist/tsunami.js';
+    import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+
+    window.runLava = async () => {
+      const simulate = async (sharedMemory) => {
+        const lava = await LavaSolver.load();
+        const wave = await TsunamiSolver.load({ sources: [lava.seaSourceField] });
+        const cells = [16, 2];
+        const bed = Array.from({ length: 32 }, (_, i) => i % 16 < 6 ? 0.2 : -0.75);
+        const memory = worldMemory(sharedMemory);
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory })
+          .add(lava, { cells, spacing: 1, bed, seaLevel: 0, viscosity: 150, yieldStrength: 0,
+            vents: [{ cell: [5, 0], flow: 2.5, end: 1 }] })
+          .add(wave, { cells, spacing: 1, bathymetry: bed });
+        world.advance(120);
+        return { hash: world.hash(), coastDepth: lava.sample(7, 0).depth,
+          displacement: wave.budget.admittedSourceVolume,
+          isShared: memory.buffer instanceof SharedArrayBuffer };
+      };
+      return { plain: await simulate(false), shared: await simulate(true) };
+    };
+  </script>
+</body>
+</html>

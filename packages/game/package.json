@@ -2395,6 +2395,10 @@
       "types": "./dist/physics/orbit.d.ts",
       "import": "./dist/physics/orbit.js"
     },
+    "./physics/lava": {
+      "types": "./dist/physics/lava.d.ts",
+      "import": "./dist/physics/lava.js"
+    },
     "./pixel": {
       "types": "./dist/pixel.d.ts",
       "import": "./dist/pixel.js"

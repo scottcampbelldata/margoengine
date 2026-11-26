@@ -111,6 +111,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/lava-kernel.wasm',
+    label: 'lava-kernel.wasm',
+    kind: 'Rust SIMD thermo-viscoplastic lava advance and cooling',
+    measure: 'file',
+    when: 'LavaSolver.load() from the optional /lava entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/lava-kernel-shared.wasm',
+    label: 'lava-kernel-shared.wasm',
+    kind: 'Rust SIMD thermo-viscoplastic lava advance and cooling, shared world memory',
+    measure: 'file',
+    when: 'LavaSolver.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/snowpack-kernel.wasm',
     label: 'snowpack-kernel.wasm',
     kind: 'Rust SIMD layered snowpack',

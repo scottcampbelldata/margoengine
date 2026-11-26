@@ -9592,3 +9592,9 @@ additional plasma and atmospheric models. Grid capacity follows available wasm32
 published field's two mirrors. The optional entry measures 5,861 B gzip within a 6,117 B ceiling. Both native
 modules measure 2,357 B raw and 1,155 B gzip and load only with that entry. Sky's bolt measures 5,403 B gzip within
 its existing 5,591 B ceiling. Core and Stage gain zero bytes.
+
+### Thermo-viscoplastic lava and nearshore occupancy (EARTH-10)
+
+Lava uses a regular depth-averaged heightfield patch with closed edges. It resolves laminar Bingham resistance, advected crystallisation enthalpy, diffusion, radiative and convective skin transfer and basal cooling. Terrain, cooled crust and the pressure gradient drive channel confinement and arrest. The shallow-layer aspect-ratio approximation applies to patch-scale flow. Individual crust fractures, elastic lava tubes, three-dimensional overturning and a separate bubble phase need higher-dimensional models. The coastal source is the signed change in displaced volume under a fixed reference sea level. This estimate covers gravity-wave forcing from submerged occupancy. Rapid interface chemistry and water-side multiphase overturning are outside the model.
+
+The native microstep follows transport and thermal diffusion stability limits and closes the volume and enthalpy ledgers at each world interval. Mass and cooling rates from ICE-05 are received on its 60 Hz staggered interface. Matching grid geometry is supplied explicitly for terrain and deposit consumers. The optional lava entry is 6,304 B gzip with a 6,560 B ceiling. Both Wasm assets are 9,735 B raw and each is 4,127 B gzip. Core plus stage remains 24,820 B gzip.

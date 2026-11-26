@@ -162,6 +162,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'lava-kernel',
+    crate: 'packages/physics/lava-kernel',
+    blueprint: 'packages/physics/src/lava/lava-kernel.wasm',
+    script: 'packages/physics/scripts/build-lava-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'lava-kernel-shared',
+    crate: 'packages/physics/lava-kernel',
+    blueprint: 'packages/physics/src/lava/lava-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-lava-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'glacier-kernel',
     crate: 'packages/physics/glacier-kernel',
     blueprint: 'packages/physics/src/glacier/glacier-kernel.wasm',

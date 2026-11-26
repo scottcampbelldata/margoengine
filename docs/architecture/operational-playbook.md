@@ -10366,3 +10366,9 @@ per annulus and exports density, heat flux and orbital phase through the registr
 intact when instantiated. The Kerr tracer uses pinned elementary functions, signed radial and polar velocities and an
 exterior log radius. Tests cover steady heating, stiff mass balance, circular rates, radial and polar turns, infall,
 frame dragging, a null orbit and exact replay.
+
+### Thermo-viscoplastic lava transport (EARTH-10)
+
+The optional `@margoengine/physics/lava` entry joins the 60 Hz solver graph. A slot-free Rust SIMD module imports world memory and uses solver-owned grid, state and variable work regions, with a private stack in the arena. The mobile layer uses an HLL flux with hydrostatic reconstruction against terrain plus stationary crust. A symmetric stencil transfers enthalpy between occupied cells. Surface skin balance, basal cooling and an implicit Bingham friction update supply the thermal and momentum source terms. Native code subcycles to the transport and diffusion limits. State is published only after the owned candidate passes those checks.
+
+`TerrainBed` supplies a heightfield. ICE-05 returns absorbed heat, liquid and steam through the existing layout-1 fields. SEA-06 consumes the layout-1 displacement rows. The tests cover direct analysis, live bidirectional thermal transfer, a downstream wave, render-frame cadence, snapshot replay and the two browser memory variants. The producer also publishes solid deposit elevation for the next granular terrain consumer.

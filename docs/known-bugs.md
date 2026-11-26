@@ -16511,11 +16511,13 @@ through springs and seepage. Connect its recharge port to `GroundwaterSolver` an
 solver the aquifer's outlet port. The coupling cases in `packages/physics/tests/coupling/groundwater.test.js`
 check the exact exchanged volume, and a fixed-head case verifies lateral discharge independently.
 
-### Additional natural water-impulse producers still need connections (PA-25)
+### Avalanche displacement and lahar feedback need connections (PA-25)
 
-ICE-02 releases ice at its water-facing cells. ICE-03 turns those volumes into moving bodies and
-exports conservative local wave sources. The general impulse propagation and inundation model,
-the avalanche and lava sources, and the lahar feedback remain open under PA-25. SEA-06 now consumes the live Iceberg source and registered moving bathymetry and reproduces run-up on a dry beach.
+Later water response needs an avalanche producer writing the same signed displacement rows as the live ICE-03
+and EARTH-10 couplings. SEA-06 already consumes those sources, registered bottom motion and the moving lava front.
+The meltwater and steam from lava contact with ICE-05 are measured. Sediment entrainment plus heat and water
+return across a lahar remain open. Reproduce the resolved shoreline and heat edges with
+`packages/physics/tests/coupling/lava.test.js`.
 
 ### Ground animal terrain and rig adapters (LIFE-02)
 
@@ -16536,7 +16538,7 @@ See [Framework requests](physics-work-queue.md#framework-requests) for the share
 ### Ice impacts and long-wave inundation (PA-15 and PA-25)
 
 A cuboid released with ICE-03 rolls, ablates and generates a local dispersive wake. The new solver
-does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. SEA-06 supplies natural shoreline run-up from the real calving and terrain fields. The avalanche and lava producers still need the shared displacement binding.
+does not yet exchange contacts with ships or grounded terrain. ICE-04 supplies floating pack-ice collisions, vessel resistance and rafting separately. SEA-06 supplies natural shoreline run-up from the real calving and terrain fields. EARTH-10 now publishes marine lava displacement through the same registered source. The avalanche producer still needs that binding.
 
 ## Open: canonical fire and alpine canopy links (BIO-03)
 
@@ -16628,3 +16630,11 @@ a relativistic stress and heat equation. The test-geodesic solve covers that reg
 procedural bolt, and the acoustic sources carry relative weights. A storm queue would need evolving cloud charge,
 and sound-pressure calibration would need a defined return current and acoustic source model. The combined
 regressions are `packages/physics/tests/coupling/lightning.test.js` and `packages/physics/tests/lightning.browser.mjs`.
+
+### Distributed snow and granular deposits need the shared lava contracts (EARTH-10)
+
+The two-way lava boundary presently receives ICE-05 absorbed heat, drainage and steam. The existing ICE-01
+summary combines unused top and bottom heat, so a live multilayer snowpack cannot identify heat accepted
+specifically from lava in the presence of other heat sources. A layout for separate basal heat feedback would
+close that ledger. EARTH-02 remains the future granular destination for the published solid deposit elevation.
+The marine test exercises the signed source on the same registry contract that water-entry sources use.

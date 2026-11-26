@@ -24,6 +24,7 @@
     "access": "public"
   },
   "scripts": {
+    "test:browser:lava": "cd ../.. && node packages/physics/tests/lava.browser.mjs",
     "test:browser:lightning": "cd ../.. && node packages/physics/tests/lightning.browser.mjs",
     "test:browser:seismic": "cd ../.. && node packages/physics/tests/seismic.browser.mjs",
     "build:airborne": "node scripts/build-airborne-kernel.mjs",
@@ -256,6 +257,10 @@
     "./orbit": {
       "types": "./dist/orbit/index.d.ts",
       "import": "./dist/orbit.js"
+    },
+    "./lava": {
+      "types": "./dist/lava/index.d.ts",
+      "import": "./dist/lava.js"
     }
   },
   "files": [
