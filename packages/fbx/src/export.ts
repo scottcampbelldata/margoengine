@@ -17,13 +17,17 @@ import { inverse, multiply } from './math.js';
 
 /** One curve on a camera's or light's own property: the node holds the camera or light, `values` run with `times`. */
 export interface FBXPropertyChannel {
-  /** The scene node that carries the camera (for `yfov`) or the light (for `intensity` and `color`). */
+  /** The scene node that carries the camera (`yfov`, `znear`, `zfar`) or the light (the other properties). */
   node: ExportNode;
   /**
-   * `yfov`: a perspective camera's vertical field of view in radians (written as FBX `FieldOfView` and the `FocalLength`
-   * it gives); `intensity`: candela or lux, as `LightData.intensity`; `color`: linear rgb in [0, 1], three values per key.
+   * Camera: `yfov`, a perspective camera's vertical field of view in radians, above 0 and below PI (written as FBX
+   * `FieldOfView` and the `FocalLength` it gives); `znear` and `zfar`, the clip planes in metres. Light: `intensity`,
+   * candela or lux, as `LightData.intensity`; `color`, linear rgb in [0, 1], three values per key; `range`, the cutoff
+   * distance in metres of a point or spot light that sets `range`; `innerConeAngle` and `outerConeAngle`, a spot's cone
+   * from its axis in radians (written as the whole cone in degrees). A key is bound as the property it drives, and
+   * `zfar` stays above `znear` and the outer angle above the inner one at every time.
    */
-  property: 'yfov' | 'intensity' | 'color';
+  property: 'yfov' | 'znear' | 'zfar' | 'intensity' | 'color' | 'range' | 'innerConeAngle' | 'outerConeAngle';
   interpolation?: 'STEP' | 'LINEAR';
   /** Nonnegative, strictly increasing seconds. */
   times: ArrayLike<number>;
@@ -38,7 +42,7 @@ export interface FBXPropertyClip {
 
 /** Options of {@link exportFBX}, on top of the options shared by every scene exporter. */
 export interface FBXExportOptions extends SceneOptions {
-  /** Lens, light intensity and light colour curves, which node clips cannot hold. Default none. */
+  /** Curves on camera lenses and clip planes and on light values, which node clips cannot hold. Default none. */
   propertyClips?: readonly FBXPropertyClip[];
   /** Write the ASCII form instead of binary. Default false. */
   ascii?: boolean;
@@ -91,7 +95,8 @@ const CREATION_TIME = '1970-01-01 10:00:00:000',
 const encoder = new TextEncoder();
 const int = (value: number): Whole => ({ int: value }),
   flag = (value: number): Whole => ({ flag: value }),
-  objectName = (name: string | undefined, kind: string) => `${(name ?? '').replace(/[\0-\x1f]/g, '_')}\0\x01${kind}`,
+  plainName = (name: string) => name.replace(/[\0-\x1f]/g, '_'),
+  objectName = (name: string | undefined, kind: string) => `${plainName(name ?? '')}\0\x01${kind}`,
   P = (name: string, type: string, label: string, flags: string, ...values: Prop[]): Rec => [
     'P',
     [name, type, label, flags, ...values],
@@ -106,6 +111,42 @@ const int = (value: number): Whole => ({ int: value }),
 const FILM_INCH = 1,
   INCH_MM = 25.4,
   DEGREES = 180 / Math.PI;
+
+const focalLength = (yfov: number) => (FILM_INCH * INCH_MM) / (2 * Math.tan(yfov / 2)),
+  centimetre = (value: number) => value * CM,
+  wholeCone = (angle: number) => angle * 2 * DEGREES;
+
+type Property = FBXPropertyChannel['property'];
+type Curve = [
+  kind: 'Camera' | 'Light',
+  allows: (value: number) => boolean,
+  bounds: string,
+  writes: [property: string, convert: (value: number) => number][],
+];
+/** What each property curve drives: the values glTF allows and the FBX properties it is written to. */
+const CURVES: Record<Property, Curve> = {
+  yfov: [
+    'Camera',
+    (v) => v > 0 && v < Math.PI,
+    'above 0 and below PI',
+    [
+      ['FieldOfView', (v) => v * DEGREES],
+      ['FocalLength', focalLength],
+    ],
+  ],
+  znear: ['Camera', (v) => v > 0, 'above 0', [['NearPlane', centimetre]]],
+  zfar: ['Camera', (v) => v > 0, 'above 0', [['FarPlane', centimetre]]],
+  intensity: ['Light', (v) => v >= 0, '0 or more', [['Intensity', (v) => v * 100]]],
+  color: ['Light', (v) => v >= 0 && v <= 1, 'from 0 to 1', [['Color', (v) => v]]],
+  range: ['Light', (v) => v > 0, 'above 0', [['FarAttenuationEnd', centimetre]]],
+  innerConeAngle: ['Light', (v) => v >= 0 && v < Math.PI / 2, 'from 0 to below PI / 2', [['InnerAngle', wholeCone]]],
+  outerConeAngle: ['Light', (v) => v > 0 && v <= Math.PI / 2, 'above 0, at most PI / 2', [['OuterAngle', wholeCone]]],
+};
+/** Properties glTF orders: the second of each pair stays above the first. */
+const ORDERED = [
+  ['znear', 'zfar'],
+  ['innerConeAngle', 'outerConeAngle'],
+] as const;
 
 /** The properties of a camera as FBX holds it: film and lens for a perspective one, a zoom for an orthographic one. */
 function cameraProperties(camera: CameraData): Rec[] {
@@ -132,14 +173,13 @@ function cameraProperties(camera: CameraData): Rec[] {
     );
     return out;
   }
-  const half = Math.tan(perspective!.yfov / 2);
   out.push(
     P('CameraProjectionType', 'enum', '', '', int(0)),
     P('ApertureMode', 'enum', '', '', int(3)),
     P('GateFit', 'enum', '', '', int(0)),
     P('FilmHeight', 'double', 'Number', '', FILM_INCH),
     P('FilmWidth', 'double', 'Number', '', FILM_INCH * Math.abs(aspect ?? 1)),
-    P('FocalLength', 'double', 'Number', '', (FILM_INCH * INCH_MM) / (2 * half)),
+    P('FocalLength', 'double', 'Number', '', focalLength(perspective!.yfov)),
     P('FieldOfView', 'FieldOfView', '', 'A', perspective!.yfov * DEGREES),
   );
   return out;
@@ -332,6 +372,113 @@ function rotationKeys(keys: Keys, step: boolean): Keys {
   return out;
 }
 
+/** The camera or light a curve may target, with the properties written for it. */
+interface Attribute {
+  id: bigint;
+  kind: 'Camera' | 'Light';
+  camera?: CameraData;
+  light?: LightData;
+  properties: Rec[];
+}
+/** One checked property curve. */
+interface Driver {
+  keys: Keys;
+  step: boolean;
+  label: string;
+}
+
+/** The camera or light a property curve targets and its keys, refused when the scene or glTF would not hold them. */
+function propertyDriver(
+  channel: FBXPropertyChannel,
+  attributes: ReadonlyMap<ExportNode, Attribute>,
+): [Attribute, Driver] {
+  const { property, node, interpolation, times, values } = channel,
+    label = node.name ?? 'a node';
+  if (!Object.hasOwn(CURVES, property))
+    throw new TypeError(`A property curve cannot drive ${property}; use one of ${Object.keys(CURVES).join(', ')}`);
+  const [kind, allows, bounds] = CURVES[property],
+    target = attributes.get(node);
+  if (target === undefined)
+    throw new TypeError(
+      `A ${property} curve targets ${label}, which holds no ${kind.toLowerCase()} in the scene; point it at the node that carries one`,
+    );
+  if (target.kind !== kind) {
+    const fitting = Object.entries(CURVES).filter(([, curve]) => curve[0] === target.kind);
+    throw new TypeError(
+      `A ${property} curve targets ${label}, which holds a ${target.kind.toLowerCase()}; use one of ${fitting.map(([name]) => name).join(', ')}`,
+    );
+  }
+  const { camera, light } = target;
+  if (property === 'yfov' && !camera!.perspective)
+    throw new TypeError(`A yfov curve needs a perspective camera; ${label} holds an orthographic one`);
+  if (property === 'range' && (light!.type === 'directional' || light!.range === undefined))
+    throw new TypeError(`A range curve needs a point or spot light that sets range; set it on the light of ${label}`);
+  if ((property === 'innerConeAngle' || property === 'outerConeAngle') && light!.type !== 'spot')
+    throw new TypeError(`The ${property} curve needs a spot light; ${label} holds a ${light!.type} light`);
+  const keys = channelKeys({ path: property, interpolation, times, values }, property === 'color' ? 3 : 1),
+    // An orthographic near plane may sit on the camera.
+    onCamera = property === 'znear' && !!camera!.orthographic,
+    outside = keys.values.findIndex((v) => !(allows(v) || (onCamera && v === 0)));
+  if (outside >= 0)
+    throw new RangeError(
+      `A ${property} curve on ${label} has the value ${keys.values[outside]}; keep every key ${bounds}`,
+    );
+  return [target, { keys, step: interpolation === 'STEP', label }];
+}
+
+/** The value a property holds when no curve drives it, as written to the file. */
+function restValue({ camera, light }: Attribute, property: Property): number {
+  if (camera) {
+    const lens = (camera.perspective ?? camera.orthographic)!;
+    return property === 'znear' ? lens.znear : (lens.zfar ?? lens.znear * 1e6);
+  }
+  const { spot } = lightDefinition(light!);
+  return property === 'innerConeAngle' ? spot!.innerConeAngle! : spot!.outerConeAngle!;
+}
+
+/** A linear or step curve at `time`, held past its end keys; `before` gives the value just short of `time`. */
+function sample({ keys: { times, values }, step }: Driver, time: number, before: boolean): number {
+  let low = 0,
+    high = times.length;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (before ? times[middle] < time : times[middle] <= time) low = middle + 1;
+    else high = middle;
+  }
+  const i = low - 1;
+  if (i < 0) return values[0];
+  if (step || i === times.length - 1) return values[i];
+  return values[i] + ((values[i + 1] - values[i]) * (time - times[i])) / (times[i + 1] - times[i]);
+}
+
+/** Both sides of a pair run straight or hold between keys, so checking each key and the instant before it is enough. */
+function checkOrder(target: Attribute, found: ReadonlyMap<Property, Driver>): void {
+  for (const [low, high] of ORDERED) {
+    const a = found.get(low),
+      b = found.get(high);
+    if (!a && !b) continue;
+    const at = (driver: Driver | undefined, property: Property, time: number, before: boolean) =>
+      driver ? sample(driver, time, before) : restValue(target, property);
+    for (const time of [...(a?.keys.times ?? []), ...(b?.keys.times ?? [])])
+      for (const before of [false, true])
+        if (!(at(b, high, time, before) > at(a, low, time, before)))
+          throw new RangeError(
+            `On ${(a ?? b)!.label}, ${high} is not above ${low} at ${time} s; keep ${high} the larger one at every key`,
+          );
+  }
+}
+
+/** The `DefaultCamera` setting for the camera whose `extras.defaultCamera` is true; FBX names it by its model. */
+function defaultCamera(cameras: readonly [name: string, isDefault: boolean][]): Rec[] {
+  const chosen = cameras.find(([, isDefault]) => isDefault)?.[0];
+  if (chosen === undefined) return [];
+  if (cameras.some(([name, isDefault]) => (name === chosen) !== isDefault))
+    throw new TypeError(
+      `A file has one default camera, found by name; set extras.defaultCamera on one camera and give ${chosen} a name no other camera has`,
+    );
+  return [P('DefaultCamera', 'KString', '', '', chosen)];
+}
+
 /** Builds the record tree of a scene; arrays stay typed so each encoder picks its own form. */
 function buildTree(source: ExportSource, options: FBXExportOptions, files: ReturnType<typeof textureFiles>): Rec[] {
   const signal = options.signal,
@@ -347,7 +494,9 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
         .filter((p, i, all) => all.findIndex((q) => q.name === p.name) === i)
         .map((p) => ({ name: p.name, channels: [] as readonly never[] })),
     ],
-    attributes = new Map<ExportNode, { id: bigint; kind: 'Camera' | 'Light'; camera?: CameraData }>(),
+    attributes = new Map<ExportNode, Attribute>(),
+    // Every camera model's name, and whether its camera asks to be the file's default.
+    cameraModels: [name: string, isDefault: boolean][] = [],
     objects: Rec[] = [],
     connections: Rec[] = [],
     counts = new Map<string, number>(),
@@ -729,26 +878,17 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
     // A glTF camera and light look down -Z, an FBX camera down +X and an FBX light down -Y. A child model turns one into
     // the other: the node keeps its own transform, curves and children, and may hold a mesh as well.
     if (node.camera) {
-      const attribute = attach(
-        node.camera.name ?? `${node.name ?? 'Node'} camera`,
-        'Camera',
-        [0, 90, 0],
-        cameraProperties(node.camera),
-        id,
-        passOn,
-      );
-      if (node.source) attributes.set(node.source, { id: attribute, kind: 'Camera', camera: node.camera });
+      const name = node.camera.name ?? `${node.name ?? 'Node'} camera`,
+        properties = cameraProperties(node.camera),
+        attribute = attach(name, 'Camera', [0, 90, 0], properties, id, passOn);
+      cameraModels.push([plainName(name), node.camera.extras?.defaultCamera === true]);
+      if (node.source) attributes.set(node.source, { id: attribute, kind: 'Camera', camera: node.camera, properties });
     }
     if (node.light) {
-      const attribute = attach(
-        node.light.name ?? `${node.name ?? 'Node'} light`,
-        'Light',
-        [90, 0, 0],
-        lightProperties(node.light),
-        id,
-        passOn,
-      );
-      if (node.source) attributes.set(node.source, { id: attribute, kind: 'Light' });
+      const name = node.light.name ?? `${node.name ?? 'Node'} light`,
+        properties = lightProperties(node.light),
+        attribute = attach(name, 'Light', [90, 0, 0], properties, id, passOn);
+      if (node.source) attributes.set(node.source, { id: attribute, kind: 'Light', light: node.light, properties });
     }
     for (const child of node.children) visit(child, id, passOn);
   };
@@ -832,56 +972,33 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
         curve(baked.times, values, step, curveNode, AXES[axis]);
       }
     }
+    const driven = new Map<Attribute, Map<Property, Driver>>();
     for (const group of propertyClips.filter((p) => p.name === clip.name))
       for (const channel of group.channels) {
-        const target = attributes.get(channel.node);
-        if (target === undefined)
-          throw new TypeError(
-            `A ${channel.property} curve targets ${channel.node.name ?? 'a node'}, which holds no ${channel.property === 'yfov' ? 'camera' : 'light'} in the scene; point it at the node that carries one`,
-          );
-        const width = channel.property === 'color' ? 3 : 1,
-          step = channel.interpolation === 'STEP';
-        if (target.kind !== (channel.property === 'yfov' ? 'Camera' : 'Light'))
-          throw new TypeError(
-            `A ${channel.property} curve targets ${channel.node.name ?? 'a node'}, which holds a ${target.kind.toLowerCase()}; use ${target.kind === 'Camera' ? 'yfov' : 'intensity or color'}`,
-          );
-        if (channel.property === 'yfov' && !target.camera!.perspective)
-          throw new TypeError(
-            `A yfov curve needs a perspective camera; ${channel.node.name ?? 'the node'} holds an orthographic one`,
-          );
-        const keys = channelKeys(
-          {
-            path: channel.property,
-            interpolation: channel.interpolation,
-            times: channel.times,
-            values: channel.values,
-          },
-          width,
-        );
+        const [target, driver] = propertyDriver(channel, attributes),
+          { property } = channel,
+          { keys, step } = driver,
+          found = driven.get(target) ?? new Map<Property, Driver>();
+        if (found.has(property))
+          throw new TypeError(`Two ${property} curves drive ${driver.label} in one clip; keep one of them`);
+        driven.set(target, found.set(property, driver));
         end = Math.max(end, keys.times[keys.times.length - 1]);
-        const count = keys.times.length,
-          column = (index: number, convert: (v: number) => number) =>
-            Float32Array.from({ length: count }, (_, i) => convert(keys.values[i * width + index])),
-          write = (property: string, axes: string[], columns: Float32Array[]) => {
-            const curveNode = track(
-              property,
+        const width = property === 'color' ? 3 : 1;
+        for (const [name, convert] of CURVES[property][3]) {
+          const axes = width === 3 ? AXES : [`d|${name}`],
+            columns = axes.map((_, i) => Float32Array.from(keys.times, (_, k) => convert(keys.values[k * width + i]))),
+            curveNode = track(
+              name,
               axes,
               columns.map((c) => c[0]),
             );
-            linkProperty(curveNode, target.id, property);
-            columns.forEach((values, i) => curve(keys.times, values, step, curveNode, axes[i]));
-          };
-        if (channel.property === 'yfov') {
-          write('FieldOfView', ['d|FieldOfView'], [column(0, (v) => v * DEGREES)]);
-          write('FocalLength', ['d|FocalLength'], [column(0, (v) => (FILM_INCH * INCH_MM) / (2 * Math.tan(v / 2)))]);
-        } else if (channel.property === 'intensity') write('Intensity', ['d|Intensity'], [column(0, (v) => v * 100)]);
-        else
-          write(
-            'Color',
-            AXES,
-            [0, 1, 2].map((i) => column(i, (v) => v)),
-          );
+          // Only a property flagged animatable takes a curve.
+          target.properties.find((record) => record[1][0] === name)![1][3] = 'A';
+          linkProperty(curveNode, target.id, name);
+          columns.forEach((values, i) => curve(keys.times, values, step, curveNode, axes[i]));
+        }
       }
+    for (const [target, found] of driven) checkOrder(target, found);
     const span = BigInt(Math.round(end * TICKS));
     stackProperties.push(P('LocalStop', 'KTime', 'Time', '', span), P('ReferenceStop', 'KTime', 'Time', '', span));
     takes.push([
@@ -929,6 +1046,7 @@ function buildTree(source: ExportSource, options: FBXExportOptions, files: Retur
             P('OriginalUnitScaleFactor', 'double', 'Number', '', 1),
             P('TimeMode', 'enum', '', '', int(6)),
             P('CustomFrameRate', 'double', 'Number', '', 30),
+            ...defaultCamera(cameraModels),
           ],
         ],
       ],

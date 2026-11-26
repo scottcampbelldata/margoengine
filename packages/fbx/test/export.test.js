@@ -1018,3 +1018,135 @@ test('a camera or light curve that has no matching camera or light is refused wi
   await assert.rejects(exportFBX({ nodes: [view] }, channel(view, 'intensity')), /holds a camera/);
   await assert.rejects(exportFBX({ nodes: [ortho] }, channel(ortho, 'yfov')), /needs a perspective camera/);
 });
+
+const rack = (...channels) => ({ propertyClips: [{ name: 'rack', channels }] });
+const shotCamera = (extra = {}) => ({
+  name: 'shot',
+  camera: { type: 'perspective', perspective: { yfov: 0.5, znear: 0.1, zfar: 50 }, ...extra },
+});
+const spotLamp = () => ({
+  name: 'lamp',
+  light: { type: 'spot', color: [1, 1, 1], intensity: 2, range: 10, innerConeAngle: 0.2, outerConeAngle: 0.6 },
+});
+
+test('clip plane, range and cone curves are written in FBX units on properties flagged animatable', async () => {
+  const view = shotCamera(),
+    lamp = spotLamp(),
+    { fbx } = await exportFBX(
+      { nodes: [view, lamp] },
+      rack(
+        { node: view, property: 'znear', times: [0, 1], values: [0.1, 2] },
+        { node: view, property: 'zfar', times: [0, 1], values: [50, 80] },
+        { node: lamp, property: 'range', times: [0, 1], values: [10, 25] },
+        { node: lamp, property: 'innerConeAngle', times: [0, 1], values: [0.2, 0.4] },
+        { node: lamp, property: 'outerConeAngle', interpolation: 'STEP', times: [0, 1], values: [0.6, 1] },
+      ),
+    ),
+    records = readRecords(fbx),
+    objects = records.find((c) => c.name === 'Objects'),
+    links = records.find((c) => c.name === 'Connections').children.map((c) => c.props),
+    attributes = named(objects, 'NodeAttribute'),
+    curves = named(objects, 'AnimationCurve');
+  assert.equal(named(objects, 'AnimationCurveNode').length, 5);
+  for (const [kind, property, values] of [
+    ['Camera', 'NearPlane', [10, 200]],
+    ['Camera', 'FarPlane', [5000, 8000]],
+    ['Light', 'FarAttenuationEnd', [1000, 2500]],
+    ['Light', 'InnerAngle', [(0.4 * 180) / Math.PI, (0.8 * 180) / Math.PI]],
+    ['Light', 'OuterAngle', [(1.2 * 180) / Math.PI, (2 * 180) / Math.PI]],
+  ]) {
+    const attribute = attributes.find((a) => a.props[2] === kind),
+      node = links.find((l) => l[0] === 'OP' && l[2] === attribute.props[0] && l[3] === property)?.[1],
+      curve = curves.find((c) =>
+        links.some((l) => l[0] === 'OP' && l[1] === c.props[0] && l[2] === node && l[3] === `d|${property}`),
+      );
+    [...child(curve, 'KeyValueFloat').props[0]].forEach((v, i) => near(v, values[i], 1e-3));
+    const written = named(child(attribute, 'Properties70'), 'P').find((p) => p.props[0] === property);
+    assert.equal(written.props[3], 'A', `${property} is animatable`);
+  }
+  // A property no curve drives keeps the flags it had.
+  const still = readRecords((await exportFBX({ nodes: [shotCamera()] })).fbx).find((c) => c.name === 'Objects'),
+    attribute = named(still, 'NodeAttribute').find((a) => a.props[2] === 'Camera'),
+    plane = named(child(attribute, 'Properties70'), 'P').find((p) => p.props[0] === 'NearPlane');
+  assert.equal(plane.props[3], '');
+});
+
+test('a property curve is held to the bounds glTF puts on the property', async () => {
+  const view = shotCamera(),
+    lamp = spotLamp(),
+    sun = { name: 'sun', light: { type: 'directional', color: [1, 1, 1], intensity: 1 } },
+    open = { name: 'open', light: { type: 'point', color: [1, 1, 1], intensity: 1 } },
+    refused = (node, property, values, message, times = [0]) =>
+      assert.rejects(exportFBX({ nodes: [node] }, rack({ node, property, times, values })), message);
+  await refused(view, 'yfov', [0], /above 0 and below PI/);
+  await refused(view, 'znear', [0], /above 0/);
+  await refused(lamp, 'intensity', [-1], /0 or more/);
+  await refused(lamp, 'color', [1, 2, 0], /from 0 to 1/);
+  await refused(lamp, 'range', [0], /above 0/);
+  await refused(lamp, 'outerConeAngle', [2], /at most PI \/ 2/);
+  await refused(lamp, 'innerConeAngle', [-0.1], /below PI \/ 2/);
+  await refused(sun, 'range', [1], /point or spot light that sets range/);
+  await refused(open, 'range', [1], /point or spot light that sets range/);
+  await refused(open, 'outerConeAngle', [1], /needs a spot light/);
+  await refused(lamp, 'znear', [1], /holds a light; use one of intensity, color, range/);
+  await refused(view, 'range', [1], /holds a camera; use one of yfov, znear, zfar/);
+  await refused(view, 'roll', [1], /cannot drive roll/);
+  // Against the value the other side of the pair holds.
+  await refused(view, 'znear', [60], /zfar is not above znear at 0 s/);
+  await refused(lamp, 'innerConeAngle', [0.7], /outerConeAngle is not above innerConeAngle/);
+  const twice = { node: view, property: 'znear', times: [0], values: [1] };
+  await assert.rejects(exportFBX({ nodes: [view] }, rack(twice, twice)), /Two znear curves/);
+  // A held far plane that a rising near plane passes just before the far one steps out.
+  await assert.rejects(
+    exportFBX(
+      { nodes: [view] },
+      rack(
+        { node: view, property: 'znear', times: [0, 10], values: [1, 10] },
+        { node: view, property: 'zfar', interpolation: 'STEP', times: [0, 10], values: [5, 20] },
+      ),
+    ),
+    /zfar is not above znear at 10 s/,
+  );
+  // Both planes may move past where the other one rests, and an orthographic near plane may sit on the camera.
+  const plan = {
+    name: 'plan',
+    camera: { type: 'orthographic', orthographic: { xmag: 1, ymag: 1, znear: 1, zfar: 2 } },
+  };
+  await exportFBX(
+    { nodes: [view, plan] },
+    rack(
+      { node: view, property: 'znear', times: [0, 1], values: [0.1, 60] },
+      { node: view, property: 'zfar', times: [0, 1], values: [50, 100] },
+      { node: plan, property: 'znear', times: [0, 1], values: [0, 1] },
+    ),
+  );
+});
+
+test('the camera flagged defaultCamera is the file default, and reads back flagged', async () => {
+  const { sceneExtras } = await import('../dist/scene-extras.js'),
+    camera = (name, isDefault) => ({
+      name,
+      camera: {
+        type: 'perspective',
+        perspective: { yfov: 0.5, znear: 0.1 },
+        ...(isDefault ? { extras: { defaultCamera: true } } : {}),
+      },
+    });
+  for (const ascii of [false, true]) {
+    const { fbx } = await exportFBX({ nodes: [camera('wide'), camera('close', true)] }, { ascii }),
+      { json } = readGLB(await convertFBX(fbx, { extensions: [sceneExtras] }));
+    assert.deepEqual(
+      json.cameras.map((c) => [c.name, !!c.extras?.defaultCamera]),
+      [
+        ['wide camera', false],
+        ['close camera', true],
+      ],
+    );
+  }
+  const plain = await exportFBX({ nodes: [camera('wide')] }, { ascii: true });
+  assert.doesNotMatch(new TextDecoder().decode(plain.fbx), /DefaultCamera/);
+  await assert.rejects(exportFBX({ nodes: [camera('a', true), camera('b', true)] }), /one default camera/);
+  await assert.rejects(exportFBX({ nodes: [camera('a', true), camera('a')] }), /one default camera/);
+  // Cameras that share the default's name and flag, as an imported file's do, name the same default.
+  await exportFBX({ nodes: [camera('a', true), camera('a', true)] });
+});

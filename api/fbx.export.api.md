@@ -20,7 +20,7 @@ export interface FBXExportResult {
 
 export interface FBXPropertyChannel {
     node: ExportNode;
-    property: 'yfov' | 'intensity' | 'color';
+    property: 'yfov' | 'znear' | 'zfar' | 'intensity' | 'color' | 'range' | 'innerConeAngle' | 'outerConeAngle';
     interpolation?: 'STEP' | 'LINEAR';
     times: ArrayLike<number>;
     values: ArrayLike<number>;
