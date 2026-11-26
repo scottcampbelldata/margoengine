@@ -6,6 +6,20 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: rebase:main built API reports for every touched package, so a push lost the race for main (KB-REBASE-SLOW1, scripts)
+
+- **Repro:** a branch that adds exports entries to a package and to the re-export packages (`margoengine`, the kits),
+  rebased while `main` takes a landing every few minutes: `npm run rebase:main`, then `npm run push:main`. Four rounds
+  on 2026-11-25 each took 7 to 9 minutes and each push was refused with "HEAD does not contain origin/main".
+- **Cause:** `scripts/rebase-main.mjs` ran `api-report.js --update` once for every package the branch changed any file
+  of, whenever a generated file conflicted (`docs/api-surface.md` conflicts on its totals line at nearly every landing).
+  Each run builds the stale packages and loads every package's declarations.
+- **Fix:** a report is built only when both sides changed it, for its package alone; any other report replays as it is,
+  and `docs/api-surface.md` is merged row by row and entry by entry. For the branch above the report runs go from six per
+  round to none. `npm run api:check` after the rebase stays the check.
+- **Regression:** `tests/rebase-main.test.js`: a branch that adds entries builds no report and the merged surface holds
+  both sides; a report both sides changed builds its own package only.
+
 ### Fixed 2026-11-26: solvers that push on bodies could not share a world (KB-PHYS-BODYROWS1, physics framework)
 
 - **Repro:** a world with a `SoftSolver` (a curtain on a hull) and a `HullSolver`: the first step threw "Contributors
