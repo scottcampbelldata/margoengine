@@ -411,7 +411,7 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 | LIFE-05 | Pedestrian and dense-crowd dynamics | physics/pedestrians and mass-weighted NavMesh avoidance | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 561885e7a1 |
 | LIFE-06 | Mass formations and cavalry charge | stand-in | Open | OPEN |
 | FLUID-01 | SPH, divergence-free (accurate mode) | none | Open | OPEN |
-| FLUID-02 | Position based fluids (fast mode) | none | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 14a5956173 |
+| FLUID-02 | Position based fluids (fast mode) | none | Codex | BUILDING (codex/physics-pbf-upgrade) |
 | FLUID-04 | Eulerian smoke and gas | stand-in | Open | OPEN |
 | HYDRO-03 | Sediment transport and channel morphodynamics | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed db1950c88f |
 | ATMO-10 | Synoptic weather and moisture transport | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed d19267aa1e |
