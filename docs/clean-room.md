@@ -14048,6 +14048,49 @@ Research compared:
   https://doi.org/10.1016/0025-5564(79)90080-4 (the golden-angle spiral: even disc coverage with no directional
   spokes, which eight fixed search directions left at mesh corners).
 
+## Spatial upscaler (2026-11-26)
+
+`@margoengine/post/upscale` `SpatialUpscale` (gap row: single-frame spatial upscaler). Built from AMD's published
+descriptions of FidelityFX Super Resolution 1 only: the talk text and slides, and the GPUOpen product and manual pages.
+No shader source of AMD's, of any port, or of any engine was read. Read for the method:
+- Timothy Lottes and Kleber Garcia, *Improved Spatial Upscaling through FidelityFX Super Resolution for Real-Time Game
+  Engines*, SIGGRAPH 2021 Advances in Real-Time Rendering course,
+  https://advances.realtimerendering.com/s2021/Unity%20AMD%20FSR%20-%20SIGGRAPH%202021.pdf (the 12-tap window around
+  the 2x2 quad, a luma of r + 2g + b, central-difference direction, feature length from gradient reversal on three
+  texels per axis, analysis interpolated bilinearly, kernel rotated and scaled 1 to sqrt 2 on one axis and 1 to 2 on
+  the other, a base times an adaptive window from radius sqrt 2 to 2, clamp to the 2x2 quad's range; perceptual input).
+- AMD, *AMD FidelityFX Super Resolution 1 (FSR 1)*, GPUOpen, https://gpuopen.com/fidelityfx-superresolution/ (quality
+  modes 1.3x, 1.5x, 1.7x and 2x per axis; EASU then RCAS).
+- AMD, *FidelityFX Super Resolution 1.2 (FSR1)*, GPUOpen manual,
+  https://gpuopen.com/manuals/fidelityfx_sdk/techniques/super-resolution-spatial/ (input in 0..1 and perceptual, after
+  anti-aliasing and tone mapping, before grain and UI).
+- AMD, *FidelityFX Contrast Adaptive Sharpening (CAS)*, GPUOpen, https://gpuopen.com/fidelityfx-cas/ (sharpening scaled
+  by local contrast; RCAS described as solving for the most sharpening possible before clipping).
+
+Margo's own: the kernel polynomial (1 - s)(1 - s / 4) (zeros at one and two texels) times (1 - s / r^2)^2, the feature
+length as the square of |right - left| / max(left, right) taking the larger axis, which axis gets which scaling (across
+the gradient 1 to 1 / max(|dx|, |dy|), along the edge 1 to 2), the sharpen bound derived from the five taps' range
+(w >= -min / (4 max) and w >= -(1 - max) / (4 (1 - min)), floored at -0.2), the linear-frame sRGB round trip, and the
+pass placement (orders -75 to 45). Nothing of AMD's constants beyond the published ranges is used.
+
+Research compared:
+- Claude E. Duchon, *Lanczos Filtering in One and Two Dimensions*, Journal of Applied Meteorology 18(8), 1979,
+  https://doi.org/10.1175/1520-0450(1979)018<1016:LFIOAT>2.0.CO;2 (the two-lobe windowed sinc the kernel follows).
+- Don P. Mitchell and Arun N. Netravali, *Reconstruction Filters in Computer-Graphics*, SIGGRAPH 1988,
+  https://doi.org/10.1145/54852.378514 (the blur against ringing trade-off of negative lobes).
+- Ken Turkowski, *Filters for Common Resampling Tasks*, Graphics Gems, 1990 (Lanczos-2 against bilinear and cubic in
+  resampling).
+- Xin Li and Michael T. Orchard, *New Edge-Directed Interpolation*, IEEE Transactions on Image Processing 10(10),
+  2001, https://doi.org/10.1109/83.951537 (interpolating along edges rather than across them).
+- Lei Zhang and Xiaolin Wu, *An Edge-Guided Image Interpolation Algorithm via Directional Filtering and Data Fusion*,
+  IEEE Transactions on Image Processing 15(8), 2006, https://doi.org/10.1109/TIP.2006.877407 (direction-weighted
+  estimates fused per pixel).
+- Andrea Polesel, Giovanni Ramponi and V. John Mathews, *Image Enhancement via Adaptive Unsharp Masking*, IEEE
+  Transactions on Image Processing 9(3), 2000, https://doi.org/10.1109/83.826787 (sharpening that adapts to local
+  contrast to avoid noise and overshoot).
+The CPU test (packages/post/test/upscale.test.js) compares against bilinear: on a step, the edge-adaptive output beside
+the edge stays at least 0.02 nearer each side's own value.
+
 ## Contact and modal sound (SOUND-04)
 
 - Kees van den Doel and Dinesh K. Pai, [*The Sounds of Physical Shapes*](https://www.persianney.com/kvdoelcsubc/publications/sound-shapes.pdf)

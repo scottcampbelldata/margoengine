@@ -1938,6 +1938,45 @@ WebGPU and the WebGL2 layer, and costs a redraw of the core meshes into a tag ta
 [docs/limits.md](../../docs/limits.md#mesh-blending-margoenginepostmesh-blend-2026-11-26); sources in
 [docs/clean-room.md](../../docs/clean-room.md#mesh-blending-2026-11-26).
 
+## Spatial upscaling: `SpatialUpscale`
+
+`@margoengine/post/upscale` (its own entry) renders the scene below the canvas size and rebuilds the full frame from
+that one frame, with no history: for phones, integrated GPUs and scenes where a temporal upscaler does not fit (no
+motion data, a cut every frame). An edge-adaptive upsample reads the 12 render pixels around each output pixel,
+finds the local edge direction and whether the feature is a long edge or a thin line, and filters with a kernel
+stretched along the edge, then clamps to the four nearest pixels so the edge stays sharp with no ringing. A
+contrast-adaptive sharpen follows, as strong as the local range allows without clipping. Both work on display-encoded
+colour (a linear frame is encoded on read and decoded on write). Passes from frame-graph order -75 to 45 (the main
+pass, a `PostStack`, TAA, motion blur) run at render size and get cheaper too.
+
+```ts
+import {Engine} from 'margoengine/core';
+import {Material, createMesh} from 'margoengine/materials';
+import {SpatialUpscale} from 'margoengine/post/upscale';
+const engine = await Engine.create(document.querySelector('canvas')!);
+createMesh(engine, {
+  positions: [-1,-1,0, 1,-1,0, 0,1,0],
+  normals: [0,0,1, 0,0,1, 0,0,1],
+  indices: [0,1,2],
+}, new Material({color: '#e0a040'}));
+const upscale = SpatialUpscale.attach(engine, {scale: 0.5});
+upscale.options.sharpen = 0.5; // options are read every frame, so a resolution scaler can drive `scale`
+engine.render();
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `scale` | `0.67` | Render size as a share of the canvas on each axis, 0.25 to 1; 0.77, 0.67, 0.59 and 0.5 are the usual quality steps |
+| `sharpen` | `0.8` | Sharpening after the upscale, 0 (off) to 1 (the most the local range allows without clipping) |
+
+Feed it anti-aliased input (the engine's MSAA, TAA, or FXAA/SMAA inside a `PostStack`): it reconstructs edges, it does
+not remove aliasing. It runs instead of `TAAUpscale`, not with it, upscales one full-canvas view (a frame of several
+views or a partial view is drawn at full size), and plugins that draw after order 45 draw over the full frame without
+the scene's depth. Values above 1 (an HDR canvas) are upscaled but not sharpened. `SpatialUpscale` is disposable
+(`using upscale = ...`). Limits are in
+[docs/limits.md](../../docs/limits.md#spatial-upscaler-margoenginepostupscale-2026-11-26); sources in
+[docs/clean-room.md](../../docs/clean-room.md#spatial-upscaler-2026-11-26).
+
 ## FXAA
 
 `FXAA.attach(stage.engine)` (`@margoengine/post/fxaa`) is FXAA 3.11-style anti-aliasing for
