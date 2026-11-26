@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Hologram output correctness</title></head><body>
+<canvas width="400" height="400" style="width:400px;height:400px"></canvas>
+<script type="module">
+import {Engine,box,PbrMaterial} from '/packages/core/dist/index.js';
+import {HologramOutput} from '/packages/cameras/dist/hologram.js';
+const canvas=document.querySelector('canvas');
+const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:[0,0,6],target:[0,0,0]}});
+engine.lighting.direction[3]=0;engine.lighting.radiance[3]=0.5;
+// One colour per side, plus an off-centre marker above and to one side so turns and mirrors show in each picture.
+for(const [color,p] of [['#ff0000',[0,0,1.5]],['#00ff00',[0,0,-1.5]],['#0000ff',[1.5,0,0]],['#ffffff',[-1.5,0,0]]])
+ engine.createMesh().setGeometry(box(1,1,1)).setMaterial(new PbrMaterial({color})).setPosition(p);
+engine.createMesh().setGeometry(box(0.6,0.6,0.6)).setMaterial(new PbrMaterial({color:'#ff00ff'})).setPosition([0.9,1.6,0.9]);
+const output=new HologramOutput(engine),device=engine.gpu,errors=[];
+device.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+let updates=0;engine.use({name:'hologram-count',setup(){},onPreUpdate(){updates++;}});
+const read=async texture=>{
+ const w=texture.width,h=texture.height,row=Math.ceil(w*4/256)*256,buffer=device.createBuffer({size:row*h,usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ});
+ const encoder=device.createCommandEncoder();encoder.copyTextureToBuffer({texture},{buffer,bytesPerRow:row},[w,h]);device.queue.submit([encoder.finish()]);
+ await buffer.mapAsync(GPUMapMode.READ);const src=new Uint8Array(buffer.getMappedRange()),out=[];
+ for(let y=0;y<h;y++)out.push(...src.slice(y*row,y*row+w*4));buffer.destroy();return {width:w,height:h,data:out};
+};
+window.check={
+ async render(options={}){
+  Object.assign(output.options,options);
+  device.pushErrorScope('validation');const before=updates;output.render(0.1);await device.queue.onSubmittedWorkDone();
+  return {validation:(await device.popErrorScope())?.message??null,errors:errors.splice(0),updates:updates-before,position:[...engine.camera.position]};
+ },
+ // Reference pictures: each rig camera drawn alone at the view size into a readable texture.
+ async views(){const out=[],side=output.state.side;for(const name of ['front','back','left','right']){
+  const t=device.createTexture({size:[side,side],format:'rgba8unorm',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});
+  engine.render({views:[{camera:output.rig[name],viewport:[0,0,1,1],target:{color:t},clear:{color:'#000000'}}]});out.push(await read(t));t.destroy();}
+  return out;},
+ async resize(){canvas.width=600;canvas.height=300;canvas.style.width='600px';canvas.style.height='300px';output.render();await device.queue.onSubmittedWorkDone();return [canvas.width,canvas.height,output.state.textures[0].width];},
+ async restore(){await engine.rebootDevice();return window.check.render();},
+ dispose(){output.dispose();output.dispose();let code;try{output.render();}catch(e){code=e.code;}engine.dispose();return code;}
+};window.ready=true;
+</script></body></html>

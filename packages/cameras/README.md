@@ -531,6 +531,67 @@ frame(1 / 60);
 output.dispose(); engine.dispose(); canvas.remove();
 ```
 
+## Pyramid hologram: optional /hologram
+
+A see-through pyramid stood on a flat screen (a "Pepper's ghost" display) shows a floating object when the screen
+draws four views of it in a cross: the front view in the bottom slot, the back view in the top slot and the side
+views in the left and right slots. Each face is a half-mirror over its wedge of the screen, so its reflection is
+mirrored and a point farther from the centre appears higher.
+
+HologramRig derives four cameras from a source Camera: front at the source position, then back, right and left a
+quarter turn apart about camera.up, all looking at the source target from the same height. distance (world units)
+defaults to the source camera's distance to its target. The source pose and projection are not changed; views are
+square, and an orthographic source stays orthographic.
+
+HologramOutput owns the rig, four RGBA8 view textures and the layout pass. Construct it with an engine and call
+render(deltaSeconds) from the application's frame loop instead of engine.render. Animation and plugins advance once
+for the four views. Options (all mutable, validated on render):
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| camera | engine.camera | Source camera; its target is the centre, its side the front |
+| scene | engine.scene | Scene drawn in all four views |
+| layers | the source camera's mask | Layer mask for all four views |
+| distance | source distance to target | Camera distance from the target, > 0 |
+| gap | 0.2 | Side of the empty centre square, a fraction of the canvas's smaller side, in [0, 1) |
+| views | HOLOGRAM_VIEWS | Per side `{rotation: 0 \| 90 \| 180 \| 270, mirror: boolean}`; missing fields keep the default |
+| background | '#000000' | Clear colour of each view, or false to keep the scene's background |
+
+Each view is (1 - gap) / 2 of the smaller canvas side. Below gap 1/3 neighbouring slots meet along the diagonals and
+each view is cut to its own wedge, the shape a pyramid face covers. Everything outside the slots is black, which a
+face does not reflect. HOLOGRAM_VIEWS mirrors every view and turns its top away from the centre (front 180, back 0,
+left 90, right 270 degrees counter-clockwise), which suits a pyramid standing on the screen; for a screen held above
+the pyramid, turn each view by 180 degrees. dispose() releases the textures and is idempotent; render after it
+throws a coded disposed error. WebGPU or the full WebGL2 compatibility layer.
+
+```ts
+import {Engine, box, PbrMaterial} from '@margoengine/core';
+import {HologramOutput, HologramRig} from '@margoengine/cameras/hologram';
+const canvas = document.body.appendChild(document.createElement('canvas'));
+canvas.width = 480; canvas.height = 480;
+const engine = await Engine.create(canvas, {backend: 'webgpu', camera: {position: [0, 1, 4], target: [0, 0, 0]}});
+engine.createMesh().setGeometry(box()).setMaterial(new PbrMaterial({color: '#4af'}));
+const rig = new HologramRig({distance: 5});
+rig.update(engine.camera);
+console.log(rig.front.position, rig.right.position);
+using output = new HologramOutput(engine, {gap: 0.25, distance: 5});
+output.render(1 / 60);
+// Show the front view upright and unmirrored, for a check without the pyramid.
+output.options.views = {front: {rotation: 0, mirror: false}};
+output.render(1 / 60);
+engine.dispose(); canvas.remove();
+```
+
+Sources (public descriptions only): J. H. Pepper, "The True History of the Ghost; and All About Metempsychosis",
+1890 (the half-mirror illusion, with H. Dircks); patent WO2017196399A1, "Hologram pyramid", 2017,
+https://patents.google.com/patent/WO2017196399A1/en (four views of one object around a centre square, one per face);
+University of Arizona Wyant College of Optical Sciences, "POPtics Pepper's Pyramid",
+https://wp.optics.arizona.edu/oscoutreach/poptics-peppers-pyramid/ (four faces so the image is seen from all sides).
+
+- npm run test:browser:hologram --workspace @margoengine/cameras checks the four views against each camera drawn
+  alone, every slot's turn and mirror, the wedge cut, gap, distance, one update per frame, resize, device restore
+  and disposal. Add -- --compat for the WebGL2 compatibility layer.
+
 ## Attachment ownership and validation
 
 CameraProjection.attach(engine) registers the projection with the engine, while

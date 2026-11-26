@@ -163,6 +163,10 @@
       "types": "./dist/cameras/stereo.d.ts",
       "import": "./dist/cameras/stereo.js"
     },
+    "./cameras/hologram": {
+      "types": "./dist/cameras/hologram.d.ts",
+      "import": "./dist/cameras/hologram.js"
+    },
     "./compute": {
       "types": "./dist/compute.d.ts",
       "import": "./dist/compute.js"
