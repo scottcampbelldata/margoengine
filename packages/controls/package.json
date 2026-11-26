@@ -102,6 +102,10 @@
       "types": "./dist/box-gizmo.d.ts",
       "import": "./dist/box-gizmo.js"
     },
+    "./behaviors": {
+      "types": "./dist/behaviors.d.ts",
+      "import": "./dist/behaviors.js"
+    },
     "./presentation": {
       "types": "./dist/presentation.d.ts",
       "import": "./dist/presentation.js"

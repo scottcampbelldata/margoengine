@@ -2794,6 +2794,7 @@ export const entries = [
     title: '@margoengine/controls: an option, input or attached object outside its range',
     kind: 'family',
     messages: [
+      'OrbitBehaviors.frame needs OrbitControls imported from @margoengine/controls/transitions; import it from there',
       'ArcballGizmo needs controls made on an engine, not a bare Camera',
       'ArcballControls projection has no numeric zoom; pass a CameraProjection or null',
       'BoxGizmo options must be positive finite numbers; use null to disable snapping',

@@ -799,6 +799,10 @@
       "types": "./dist/controls/box-gizmo.d.ts",
       "import": "./dist/controls/box-gizmo.js"
     },
+    "./controls/behaviors": {
+      "types": "./dist/controls/behaviors.d.ts",
+      "import": "./dist/controls/behaviors.js"
+    },
     "./controls/presentation": {
       "types": "./dist/controls/presentation.d.ts",
       "import": "./dist/controls/presentation.js"

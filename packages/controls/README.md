@@ -662,6 +662,44 @@ the minimum target radius throws instead of clipping silently. Custom perspectiv
 projections are not accepted by the fit methods. Moving bounds are sampled when
 called; subsequent scene motion does not retarget the move.
 
+## Orbit behaviours: `@margoengine/controls/behaviors`
+
+`OrbitBehaviors` adds three behaviours to an `OrbitControls` from `/transitions`; each is off until you ask for it.
+Call `behaviors.update(delta)` right before `controls.update(delta)` each frame.
+
+- **Elastic bounce** (`bounce`): the control's `minDistance` and `maxDistance` become the soft limits. The hard limits
+  widen by `overshoot` (default 0.2 of the limit), so a wheel or pinch can stretch past a soft limit, and when the
+  input ends a damped spring (`stiffness` 120, `damping` 1, a ratio of 1 settling without swing) pulls the distance
+  back. Pass `min` and `max` to set the soft limits yourself.
+- **Idle auto-rotation** (`autoRotate`): turns the view after `wait` seconds (default 3) without input, at `speed`
+  (default the control's `autoRotateSpeed`), and stops at the next input or while a transition runs. `idleTime` reports
+  the wait so far.
+- **Animated framing** (`frame`): `frame({min, max})` or `frame({bounds})` (a model's six-number bounds) flies the
+  camera to fit the box with `controls.transitions.fitToBox`; it takes the `FitOptions` of that method and resolves
+  false when input cancels it.
+
+```ts
+import {Camera} from '@margoengine/core';
+import {OrbitControls} from '@margoengine/controls/transitions';
+import {OrbitBehaviors} from '@margoengine/controls/behaviors';
+
+const camera = new Camera({position: [0, 2, 8], target: [0, 0, 0]});
+using controls = new OrbitControls(camera);
+controls.minDistance = 3;
+controls.maxDistance = 12;
+using behaviors = new OrbitBehaviors(controls, {bounce: true, autoRotate: {wait: 2}});
+const framed = behaviors.frame({min: [-1, 0, -1], max: [1, 2, 1]}, {duration: 0.4});
+for (let frame = 0; frame < 60; frame++) {
+  behaviors.update(1 / 60);
+  controls.update(1 / 60);
+}
+console.log(await framed, behaviors.idleTime);
+```
+
+The bounce is a spring, Hooke's law with viscous damping, integrated in sub-steps of at most 1/240 s so any frame
+length is stable. Bad options throw a RangeError that ends with its fix, and `frame` on a control that is not from
+`/transitions` throws one too. `dispose()` (or `using`) stops listening; the widened limits stay.
+
 ## How it works
 
 - **Camera model.** The Margo Engine `Camera` is a position, a target, `fov`, `near`, `far` and an `up` vector (default world +Y). All controls write `camera.position` and `camera.target` and nothing else. `OrbitControls.target` reads and writes `camera.target`. The core camera rejects a view parallel to its `up`, so with the default +Y every control keeps the view at least a hair off the poles (orbit uses an epsilon on the polar angle, the walk controls cap pitch just under 90 degrees).

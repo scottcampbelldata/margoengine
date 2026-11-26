@@ -154,7 +154,7 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 | Light probe helper and positional-audio cone helper | three.js | MISSING | S |  |
 | Raycaster helper (ray and hits) and BVH tree visualiser with a depth slider | three.js, three-mesh-bvh | MISSING | S |  |
 | Octree helper for `points/src/octree.ts` | three.js | MISSING | S |  |
-| Cycle raycast: repeat a pick to step through overlapping hits | drei | MISSING | S |  |
+| Cycle raycast: repeat a pick to step through overlapping hits | drei | DONE (`CycleRaycast`, `@margoengine/selection`) | S | 29bb42e10 |
 | Bounding-box anchor: HTML or a label pinned to a box corner or face | drei `BBAnchor` | DONE (`boxAnchorPoint`, `@margoengine/labels`) | S | 9cf6c56f0 |
 | Playground as a tool: live code editor beside a running canvas, save and share by link, templates, versions | Babylon Playground | MISSING | L |  |
 | Declarative action manager: triggers on a node (pick, long pick, pointer over/out, intersect enter/exit, every frame, keys) with chained actions | Babylon ActionManager | PARTIAL | S to M |  |
