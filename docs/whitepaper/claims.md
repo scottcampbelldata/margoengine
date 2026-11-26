@@ -5817,6 +5817,8 @@ vertical force and leaves a persistent rut along its moving path. The same rolli
 wheel loads in a separate vehicle-and-belt seek case.
 Both tiers close the volume budget against a spatially varying excavation floor and distinguish equal loads
 over different hardpan thicknesses on one registered bed.
+The real rigid-wheel adapter publishes the spin of a wheel with lugs. The geometric phase test matches
+the deepest tip cut, the unloaded gap and one full pitch exactly while conserving the specified normal load.
 
 ### Divergence-free particle pressure (FLUID-01)
 
