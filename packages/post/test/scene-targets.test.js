@@ -280,9 +280,36 @@ test('SceneTargets marks subject models and reads their sun visibility; terrain 
     code,
     /fn margoSSR\(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32\)->MargoSSR \{_=v;let o=margoTargets\(TargetSurface\(margoPosition,n,vec4f\(base,1\),rough,metal,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0,1\.0\)\);return MargoSSR\(o\.o0,o\.o1\);\}/,
   );
-  assert.throws(() => field.hooks[0].declarations('struct Frame {camera:mat4x4f,eye:vec4f,sun:vec4f}'), {
+  // A Frame that names no sun direction (neither terrain's `light` nor water's `sun`) has nothing to shade with.
+  assert.throws(() => field.hooks[0].declarations('struct Frame {camera:mat4x4f,eye:vec4f,radiance:vec4f}'), {
     code: 'unsupported',
   });
+  targets.dispose();
+});
+
+// KB-WATER-TARGETS1: water declares a `Surface` of its own ({position, normal, crest}), which SceneTargets took for
+// gltf's PBR Surface: it returned margoCapture for a stage that never calls it and no MargoSSR, so `targets.add(water)`
+// built a shader that did not compile. Water's Frame names the sun `sun`: it gets the margoSSR form with that light.
+test('SceneTargets gives water (its own Surface, the sun as `sun`) the margoSSR form, not the PBR one', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, { outputs: { lit: 'litGround', normal: 'normal' } }),
+    hooks = [],
+    water = {
+      hooks,
+      setCapture(hook) {
+        hooks.push(hook);
+        return () => hooks.splice(hooks.indexOf(hook), 1);
+      },
+      onDispose: () => () => {},
+      draw() {},
+    };
+  targets.add(water, { ground: false });
+  const code = water.hooks[0].declarations(
+    'struct Wave {wave:vec4f,shape:vec4f}\nstruct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,color:vec4f,waves:array<Wave,8>,sun:vec4f,radiance:vec4f}\nstruct Surface {position:vec3f,normal:vec3f,crest:f32}\n',
+  );
+  assert.doesNotMatch(code, /margoCapture/);
+  assert.match(code, /struct MargoSSR \{@location\(0\) o0:vec4f,@location\(1\) o1:vec4f\}/);
+  assert.match(code, /frame\.eye\.xyz,1\.0,frame\.sun\.xyz,0\.0,0\.0\)\);return MargoSSR\(o\.o0,o\.o1\);\}/);
   targets.dispose();
 });
 

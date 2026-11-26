@@ -119,9 +119,18 @@ const luminance = 'vec3f(0.2126,0.7152,0.0722)';
 /** The sun visibility a lit shader computes, `direct` (the light a shadow plugin wraps) set to 1; 1.0 when unshadowed. */
 const sunVisibility = (code: string, position: string, normal: string): string =>
   code.includes('fn shadowLit(') ? `dot(shadowLit(vec3f(1),${position},${normal}),${luminance})` : '1.0';
-// Terrain's and lit scatter's capture hook (SSR's contract for shaders without the PBR Surface): their Frame names eye
-// and light (terrain writes `{camera`, core's lit shader, which scatter extends, `{ camera`).
-const terrainFrame = /struct Frame \{\s*camera:mat4x4f,eye:vec4f,light:vec4f,/;
+// gltf/pbr and materials shaders: their PBR `Surface` (water declares a `Surface` of its own, position first).
+const pbrSurface = /struct Surface \{\s*base:vec4f\b/;
+// Terrain's, lit scatter's and water's capture hook (SSR's contract for shaders without the PBR Surface): their Frame
+// starts with camera and eye (terrain writes `{camera`, core's lit shader, which scatter extends, `{ camera`) and names
+// the unit direction toward the sun `light` (terrain, core) or `sun` (water).
+const eyeFrame = /struct Frame \{\s*camera:mat4x4f,eye:vec4f,([^}]*)\}/;
+const frameLight = (code: string): string | undefined => {
+  const fields = eyeFrame.exec(code)?.[1];
+  if (fields === undefined) return undefined;
+  if (/(^|,)\s*light:vec4f/.test(fields)) return 'frame.light.xyz';
+  return /(^|,)\s*sun:vec4f/.test(fields) ? 'frame.sun.xyz' : undefined;
+};
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/;
 // Integer and depth formats would need other WGSL output types; colour-renderable float and unorm formats only.
 const floatFormat = /^(r|rg|rgba|bgra)(8unorm|8unorm-srgb|16float|32float)$|^rgb10a2unorm$|^rg11b10ufloat$/;
@@ -218,17 +227,18 @@ export class SceneTargets implements EnginePlugin {
         let out = cache.get(code);
         if (out === undefined) {
           let capture: string;
-          if (code.includes('struct Surface'))
+          const light = frameLight(code);
+          if (pbrSurface.test(code))
             capture = `fn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=k;_=v;return margoTargets(TargetSurface(margoPosition,s.n,s.base,s.roughness,s.metal,s.occlusion,s.emissive,f.eye.xyz,${sunVisibility(code, 'margoPosition', 's.n')},f.light.xyz,${flag}));}\n`;
-          else if (terrainFrame.test(code))
+          else if (light)
             // Terrain returns `margoSSR(n, v, base, metal, rough)` as a MargoSSR: the same outputs under that name.
             capture =
               `struct MargoSSR {${this.formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
-              `fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {_=v;let o=margoTargets(TargetSurface(margoPosition,n,vec4f(base,1),rough,metal,1.0,vec3f(0),frame.eye.xyz,${sunVisibility(code, 'margoPosition', 'n')},frame.light.xyz,${flag}));return MargoSSR(${fields});}\n`;
+              `fn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {_=v;let o=margoTargets(TargetSurface(margoPosition,n,vec4f(base,1),rough,metal,1.0,vec3f(0),frame.eye.xyz,${sunVisibility(code, 'margoPosition', 'n')},${light},${flag}));return MargoSSR(${fields});}\n`;
           else
             throw margoError(
               'unsupported',
-              'SceneTargets captures gltf/pbr surfaces and terrain only; add gltf/pbr models, materials meshes or a Terrain',
+              'SceneTargets captures gltf/pbr surfaces, terrain, lit scatters and water only; add gltf/pbr models, materials meshes, a Terrain, a lit Scatter or a Water',
             );
           if (cache.size >= 64) cache.clear();
           out = 'var<private> margoPosition:vec3f;\n' + this.code + capture;

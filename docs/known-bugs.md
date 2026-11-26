@@ -119,16 +119,31 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Owed:** a repro that fails on demand (the first case under load), the root cause in its owning package and a
   regression test.
 
-### Open 2026-11-26: water added to SceneTargets or MeshBlend builds an invalid capture stage (KB-WATER-TARGETS1, water)
+### Fixed 2026-11-26: water added to SceneTargets or MeshBlend built an invalid capture stage (KB-WATER-TARGETS1, water, post)
 
-- **Repro:** `targets.add(water)` on a `SceneTargets` whose outputs are not exactly three, or `meshBlend.add(water)`:
-  the water capture fragment returns `MargoSSR(specular, weight, normal)` while that effect's `MargoSSR` has one field
-  per output, so the shader does not compile.
-- **Cause:** water's capture (`captureShader` in `packages/water/src/index.ts`) writes SSR's three fields itself (the
-  sky reflection SSR replaces) instead of calling the hook's `margoSSR(n, v, base, metal, rough)`, and
-  `SceneTargets.add`/`MeshBlend.add` accept any model with `setCapture`.
-- **Owed:** water calls `margoSSR` for an effect that is not SSR (its normal, body colour and roughness), with a
-  test that adds one water to SSR and to SceneTargets.
+- **Repro:** `targets.add(water)` on a `SceneTargets` whose outputs are not exactly three, or `meshBlend.tag(water)`:
+  the water capture fragment returned `MargoSSR(specular, weight, normal)` while that effect's `MargoSSR` has one field
+  per output, so the shader did not compile; SceneTargets also gave water gltf's `margoCapture` form.
+- **Cause:** water's capture (`captureShader` in `packages/water/src/index.ts`) wrote SSR's three fields itself for
+  every effect, and SceneTargets and MeshBlend took any shader declaring a `struct Surface` for a gltf/pbr one; water
+  declares its own `Surface {position, normal, crest}`.
+- **Fix:** water writes SSR's fields only for SSR's own `MargoSSR` and calls the hook's `margoSSR(n, v, base, metal,
+  rough)` for any other effect (body colour with the foam it shows, roughness, not metal; `margoPosition` where
+  declared). SceneTargets and MeshBlend match gltf's `Surface` by its `base` field, and SceneTargets reads the sun
+  direction from a Frame's `light` or water's `sun`. Regression: water `test/capture.test.js`, post
+  `test/scene-targets.test.js` and `test/mesh-blend.test.js`, and post `test/scene-targets-water-browser.mjs` (WebGPU
+  and the WebGL2 layer: one water in SceneTargets with four outputs, MeshBlend and SSR, no GPU error, 7,988 water
+  pixels at height 0, none of them lit ground).
+
+### Fixed 2026-11-26: a water capture after the post stack was replaced bound the destroyed scene depth (KB-WATER-STALEDEPTH1, water)
+
+- **Repro:** water added to `SceneTargets`, then the post stack replaced (`meshBlend.dispose()`, `SSR.attach`): the
+  next frame failed with "Destroyed texture ... used in a submit" (post `test/scene-targets-water-browser.mjs`).
+- **Cause:** the capture reused the bind groups of the surface's last draw, which hold the scene depth. SceneTargets
+  captures at order -4.5, before the water draws at 4, so the first frame after the swap bound the old stack's depth.
+- **Fix:** the depth-dependent groups are made in one place (`bindDepth`), called by the surface draw and by a
+  capture whose scene depth changed since that draw. Regression: water `test/capture.test.js` (a new depth is bound
+  once, before the capture draws) and the GPU proof above.
 
 ### Fixed 2026-11-26: water beside a solid box ran faster than beside the liquid box's own sides (KB-FLIP-SOLIDSLIP1, physics, flip)
 

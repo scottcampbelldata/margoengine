@@ -96,7 +96,14 @@ test('MeshBlend tags capture models through their hook and releases it', () => {
     ['rgba16float'],
   );
   // The hook writes the model's radius and its key for a gltf/pbr surface and for terrain, and refuses anything else.
-  assert.match(hook.declarations('struct Surface {n:vec3f}'), /fn margoCapture\(s:Surface[^]*vec4f\(0\.25,/);
+  assert.match(hook.declarations('struct Surface {base:vec4f,n:vec3f}'), /fn margoCapture\(s:Surface[^]*vec4f\(0\.25,/);
+  // Water's own Surface ({position, normal, crest}) is not the PBR one: its stage returns margoSSR (KB-WATER-TARGETS1).
+  assert.match(
+    hook.declarations(
+      'struct Frame {camera:mat4x4f,eye:vec4f,settings:vec4f,sun:vec4f}\nstruct Surface {position:vec3f,normal:vec3f,crest:f32}',
+    ),
+    /fn margoSSR\([^]*vec4f\(0\.25,/,
+  );
   assert.match(
     hook.declarations('struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f}'),
     /fn margoSSR\([^]*vec4f\(0\.25,/,

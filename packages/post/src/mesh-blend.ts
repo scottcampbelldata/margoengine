@@ -133,14 +133,20 @@ fn spanAt(p:vec2i)->f32 {let w=at(p);return min(abs(w-at(p-vec2i(1,0))),abs(at(p
 // depth, with one constant output, its radius and key (keys counted down from the top of the range, so they never meet
 // a core mesh's entity id + 1).
 const KEY_TOP = 2048 * 2048 - 1;
-// Terrain writes `struct Frame {camera`, core's lit shader (which lit scatter extends) `struct Frame { camera`.
-const terrainFrame = /struct Frame \{\s*camera:mat4x4f,eye:vec4f,light:vec4f,/;
+// gltf/pbr and materials shaders declare the PBR `Surface` (water's own `Surface` starts with its position). Terrain
+// writes `struct Frame {camera`, core's lit shader (which lit scatter extends) `struct Frame { camera`, water the same
+// camera and eye: those return `margoSSR(n, v, base, metal, rough)`.
+const pbrSurface = /struct Surface \{\s*base:vec4f\b/;
+const terrainFrame = /struct Frame \{\s*camera:mat4x4f,eye:vec4f,/;
 const captureCode = (code: string, value: string): string => {
-  if (code.includes('struct Surface'))
+  if (pbrSurface.test(code))
     return `struct MargoCapture {@location(0) o0:vec4f}\nfn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=s.n;_=v;_=k;return MargoCapture(${value});}\n`;
   if (terrainFrame.test(code))
     return `struct MargoSSR {@location(0) o0:vec4f}\nfn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {_=n;_=v;_=base;_=metal;_=rough;return MargoSSR(${value});}\n`;
-  throw margoError('unsupported', 'MeshBlend tags core meshes, gltf/pbr models, materials meshes and terrain only');
+  throw margoError(
+    'unsupported',
+    'MeshBlend tags core meshes, gltf/pbr models, materials meshes, terrain, lit scatters and water only',
+  );
 };
 type Tagged = { radius: number; hook: SSRCapture; release: () => void };
 
