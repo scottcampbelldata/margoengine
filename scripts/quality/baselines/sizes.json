@@ -13401,6 +13401,12 @@
       "commit": "160bd6f4ea",
       "grew": 1,
       "reason": "SOFT-04 adds representability checks and selection for automatic tensile fracture, moving the soft entry from 141408 to 141595 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 44952 to 46399 B ceiling (45047 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "30e5e604e2",
+      "grew": 0,
+      "reason": "SOFT-04 adds the independent sliding and tearing strain modes on authored seams, moving the soft entry from 141595 to 141760 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {

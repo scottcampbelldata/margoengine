@@ -637,6 +637,8 @@ export interface SoftTensileSeam {
     readonly cell: number;
     readonly triangle: Triangle;
     readonly openingStrain: number;
+    readonly slidingStrain?: number;
+    readonly tearingStrain?: number;
 }
 
 export function fabricShearDamping(shear: FabricShear): number;

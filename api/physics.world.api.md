@@ -2636,6 +2636,8 @@ interface SoftTensileSeam {
     readonly cell: number;
     readonly triangle: Triangle;
     readonly openingStrain: number;
+    readonly slidingStrain?: number;
+    readonly tearingStrain?: number;
 }
 
 type Triangle = readonly [Vec3, Vec3, Vec3];
