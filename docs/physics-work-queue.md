@@ -366,7 +366,7 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | SEA-02 | Ocean surface synthesis and query | partial | Claude | LANDED 52b68ca65 |
 | SEA-04 | Local dispersive free surface | stand-in | Claude | LANDED 33ab69766 |
 | SEA-08 | Ship seakeeping | stand-in | Claude | LANDED d865c4c8f |
-| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | CLAIMED |
+| SEA-09 | Manoeuvring, propulsion, resistance, sailing hull | none | Claude | LANDED ebfc65dbb |
 | SEA-10 | Damage, flooding, capsize, sinking | none | Claude | CLAIMED |
 | SEA-11 | Wave impact: slamming, green water | stand-in | Claude | LANDED d90933a42 (green water d865c4c8f) |
 | SEA-12 | Hydrodynamic loads on arbitrary bodies | none | Claude | CLAIMED |
