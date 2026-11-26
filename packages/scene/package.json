@@ -70,6 +70,10 @@
     "./tags": {
       "types": "./dist/tags.d.ts",
       "import": "./dist/tags.js"
+    },
+    "./emitter": {
+      "types": "./dist/emitter.d.ts",
+      "import": "./dist/emitter.js"
     }
   },
   "files": [
