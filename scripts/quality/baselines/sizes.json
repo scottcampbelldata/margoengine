@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20642722,
+  "total": 20643496,
   "history": [
     {
       "date": "2026-10-24",
@@ -14107,6 +14107,12 @@
       "commit": "X-81-82",
       "grew": 1,
       "reason": "@margoengine/netcode/physics is a new optional entry (X-81, X-82): a physics world as a rollback game, snapshot diffs, and server bodies played back on clients; measured 3,515 B gzip, typed by shape so it imports no physics code. Its own entry, so netcode pages without physics pay nothing. Budget (measured + max(3%, 256 B)): 3,771 B. Core plus stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "3127561cb7",
+      "reason": "BREAK-03 native shell work counts advances @margoengine/physics/crush from 21214 to 21350 B gzip. Ceiling 21217 to 21991 B. Work counts come from the same native force passes and survive shell snapshots. A separate entry would require a second copy of the same native interface.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14936,7 +14942,7 @@
     "@margoengine/physics/bubbles": 3289,
     "@margoengine/physics/celestial": 9756,
     "@margoengine/physics/clouds": 5981,
-    "@margoengine/physics/crush": 21217,
+    "@margoengine/physics/crush": 21991,
     "@margoengine/physics/decomposition": 11103,
     "@margoengine/physics/dfsph": 8136,
     "@margoengine/physics/drainage-fog": 4523,
