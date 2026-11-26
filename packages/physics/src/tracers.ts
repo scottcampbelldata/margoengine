@@ -57,6 +57,7 @@ import {
   checkFlocConditions,
   flocDiameter,
   flocFallSpeed,
+  flocShearLimit,
   type FlocKinetics,
   type TracerFlocEnvironment,
 } from './tracer-floc.js';
@@ -216,6 +217,8 @@ export interface TracerFlocculation {
   aggregation: number;
   /** Winterwerp's breakup coefficient k_B, s^(1/2)/m². Must be positive. */
   breakup: number;
+  /** Floc yield force in newtons, enabling Kuprenas shear-limited breakup. Omit to use Winterwerp. */
+  yieldForce?: number;
   /** Dry concentration and shear rate, fixed or sampled at each parcel. */
   environment: TracerFlocEnvironment;
 }
@@ -662,7 +665,7 @@ export class TracerSolver implements Solver<TracerParams> {
   }
 
   private initFlocculation(options: TracerFlocculation, capacity: number): void {
-    const { material = 'silt', aggregation, breakup, environment } = options;
+    const { material = 'silt', aggregation, breakup, yieldForce, environment } = options;
     const grain: TracerMaterial = material === 'silt' ? TRACER_MATERIALS.silt : material;
     const primary = grain.diameter ?? 0;
     const initial = options.initialDiameter ?? primary;
@@ -691,6 +694,7 @@ export class TracerSolver implements Solver<TracerParams> {
       breakup,
       waterViscosity: viscosity,
       stokesFactor,
+      shearLimit: yieldForce === undefined ? undefined : flocShearLimit(yieldForce, waterDensity, viscosity),
       environment: typeof environment === 'function' ? environment : { ...environment },
     };
     flocFallSpeed(kinetics, initial);

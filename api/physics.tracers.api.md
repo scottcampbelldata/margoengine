@@ -111,6 +111,7 @@ export interface TracerFlocculation {
     initialDiameter?: number;
     aggregation: number;
     breakup: number;
+    yieldForce?: number;
     environment: TracerFlocEnvironment;
 }
 

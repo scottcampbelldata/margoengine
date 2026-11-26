@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20579556,
+  "total": 20580146,
   "history": [
     {
       "date": "2026-10-24",
@@ -14053,6 +14053,12 @@
       "commit": "1f0be45072",
       "reason": "BREAK-03 native multipoint shell contact advances @margoengine/physics/crush from 20253 to 20599 B gzip. Ceiling 20426 to 21217 B. The live manifold shares the sheet mesh and the rigid force bridge. A separate entry would duplicate that state and still load the same native solver.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "5cd592e176",
+      "grew": 1,
+      "reason": "SEA-15 shear-limited cohesive breakup moves physics/tracers from 15497 to 15896 B gzip. The optional ceiling rises from 15783 to 16373 B. The implicit breakup solve uses the existing parcel diameter, settling and snapshot state. A separate solver would duplicate this work or expose private parcel state."
     }
   ],
   "items": {
@@ -14936,7 +14942,7 @@
     "@margoengine/physics/thermal": 6905,
     "@margoengine/physics/thin-film": 15631,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 15783,
+    "@margoengine/physics/tracers": 16373,
     "@margoengine/physics/tsunami": 5780,
     "@margoengine/physics/underwater": 4221,
     "@margoengine/physics/vegetation": 9250,

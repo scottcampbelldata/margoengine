@@ -567,7 +567,9 @@ Cohesive sediment can now grow and break up under supplied local concentration a
 diameter and porous density drive settling while the dry-mass ledger stays conserved. The settling trajectory
 converges against the Winterwerp equation and the breakup case replays exactly. Given measured aggregate size,
 settling improves over primary-grain settling at all four Wax Lake Delta profiles. Its largest remaining error
-is a 5.01-fold underprediction in the fall profile. Aggregate-size growth and the fall transport remain open.
+is a 5.01-fold underprediction in the fall profile. An optional shear-limited breakup law predicts aggregate
+sizes during three held-out dilution trials. Across 15 sampled phases its RMS error is 6.58 µm against pooled
+measurement scatter of 6.84 µm, with a 12.22 µm peak. The field fall transport remains open.
 
 ## Verification passes
 

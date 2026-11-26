@@ -13477,6 +13477,30 @@ grains to 0.854 for the aggregates. In the fall profile, the settled aggregate m
 versus 0.830 mm/s tracked. The benchmark leaves growth, permeability and high-organic composition unconstrained.
 [Nghiem et al., source data](https://doi.org/10.22002/w4ave-nrg52).
 
+The optional shear-limited closure reads R. Kuprenas, D. Tran and K. Strom,
+[“A Shear-Limited Flocculation Model for Dynamically Predicting Average Floc Size” (2018), Eqs. 1 and 9](https://doi.org/10.1029/2018JC014154).
+For two-dimensional fractal mass scaling, it multiplies the Winterwerp breakup term by
+`(ρν² (D/η)²/F_y)^(1.5 D/η)`, with `η = √(ν/G)` and `ν` the kinematic viscosity.
+The step freezes the positive `D²` mobility and solves the new breakup term implicitly. For
+`r = D/η` and `c = ρν²/F_y`, the correction has minimum `exp(−3/(e √c))`. This bounds the
+root above. The logarithmic derivative of `(D − D_p) (c r²)^(1.5 r)` is positive when
+`c > 9/e⁴`, using the minimum of `r (ln(c r²) + 2)` at `r = e⁻²/√c`. The method bisects
+that bracket with logarithms to represent high shear without overflowing the breakup term.
+
+The lab comparison transforms the paper's Set A coefficients `k′_A = 0.45`, `k′_B = 1.16 × 10⁻⁶`
+and `D_p = 5 µm` to the solver's SI form. Set A's 50 mg/L time series and 50-to-400 mg/L equilibrium
+spread supplied the published calibration. All three separate Set B time series from D. Tran, R. Kuprenas
+and K. Strom, [“How do changes in suspended sediment concentration alone influence the size of mud flocs under steady turbulent shearing?” (2018)](https://doi.org/10.1016/j.csr.2018.02.008),
+are reserved for comparison. The solver runs at 50 s⁻¹ with 60 lab minutes of 400 mg/L and the programmed
+drop to 50 mg/L over 50, 100 or 200 lab minutes. Each of five phase centres per trial uses the eleven
+adjacent one-minute observations of volume-median size. The inputs use the nominal concentration program.
+The result's 6.58 µm RMS error is below the observed pooled temporal scatter of 6.84 µm. The largest
+mean error is 12.22 µm at the end of the 200-minute ramp. The original equation with the same coefficients
+gives 1,696.70 µm RMS error. Size is recovered from the last step's particle displacement with the separate
+drag balance. The bench checks kinetics under prescribed conditions. Field settling and permeability
+are separate and the Wax Lake Delta fall profile discrepancy remains.
+[Tran et al., time-series measurement tables 15–17](https://github.com/FlocData/Data-2018-TranEtal/tree/master/01%20Time%20Series%20Data).
+
 ### The sea's waves: a spectral wave model (SEA-01, `@margoengine/physics/waves`, 2026-11-25)
 
 `packages/physics/src/waves/spectral.ts` (`WaveSolver`, a framework solver) and the contract `WaveSpectrumField`

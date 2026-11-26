@@ -1369,6 +1369,135 @@ test('SEA-15 Winterwerp floc growth converges to the integrated settling path un
   assert.ok(Math.abs(errors[0] / errors[1] - 2) < 0.2, `${errors}`);
 });
 
+test('SEA-15 shear-limited breakup predicts the held-out Tran dilution trials', (t) => {
+  // Tran et al. (2018), Set B. Mean D50 and its temporal sample SD over eleven 1-minute measurements
+  // centred at preparation, dilution start, midpoint, end and 30 minutes after each dilution.
+  const trials = [
+    [
+      50,
+      [
+        [133.88, 6.88],
+        [135.39, 6.19],
+        [116.7, 7.54],
+        [84.18, 7.01],
+        [79.61, 3.53],
+      ],
+    ],
+    [
+      100,
+      [
+        [124.99, 5.2],
+        [133.14, 8.23],
+        [121.94, 5.46],
+        [80.69, 3.16],
+        [85.1, 4.81],
+      ],
+    ],
+    [
+      200,
+      [
+        [137.7, 7.04],
+        [130.42, 14.25],
+        [121.91, 4.08],
+        [78.71, 3.4],
+        [82.82, 7.68],
+      ],
+    ],
+  ];
+  const primary = 5e-6;
+  const viscosity = 1e-6;
+  const waterDensity = 1000;
+  const yieldForce = 1e-10;
+  const grain = { density: 2650, diameter: primary, colour: [0.21, 0.18, 0.14] };
+  const targetShear = 50;
+  const rate = 60;
+  const timeScale = 300;
+  const labSecondsPerStep = timeScale / rate;
+  // Kuprenas et al. (2018), §4.2. Transform the published Set A coefficients to the n_f=2 SI form.
+  // Multiplying both rates by the clock scale preserves the competition and stands for 5 s of lab time per tick.
+  const aggregation = (0.45 * timeScale) / (grain.density * primary);
+  const breakup = (1.16e-6 * timeScale * Math.sqrt((waterDensity * viscosity) / yieldForce)) / primary;
+  const stokesFactor = ((grain.density / waterDensity - 1) * 9.80665 * primary) / (18 * viscosity);
+  let squaredError = 0;
+  let observedVariance = 0;
+  let maximumError = 0;
+  for (const [duration, observed] of trials) {
+    const tracer = new TracerSolver();
+    const world = new PhysicsWorld({ rate: { num: rate, den: 1 } }).add(tracer, {
+      capacity: 1,
+      bed: 500,
+      viscosity,
+      waterDensity,
+      horizontalDiffusivity: 0,
+      verticalDiffusivity: 0,
+      sources: [{ material: grain, position: [0, -1, 0], rate, stop: 1 / rate }],
+      flocculation: {
+        material: grain,
+        aggregation,
+        breakup,
+        yieldForce,
+        environment: (_x, _y, _z, time) => ({
+          concentration: 0.4 - 0.35 * Math.min(1, Math.max(0, (time * timeScale) / 60 - 60) / duration),
+          shearRate: targetShear,
+        }),
+      },
+    });
+    const times = [30, 60, 60 + duration / 2, 60 + duration, 90 + duration];
+    const height = () => tracer.particlesOf().next().value.position[1];
+    let snapshot;
+    for (const [i, minute] of times.entries()) {
+      const tick = (minute * 60) / labSecondsPerStep;
+      world.advance(tick - 1);
+      const previous = height();
+      world.advance(tick);
+      const speed = (previous - height()) * rate;
+      // Invert the independently evaluated drag balance, using only the observed terminal displacement.
+      let lower = speed / stokesFactor;
+      let upper = 0.01;
+      for (let k = 0; k < 43; k++) {
+        const d = (lower + upper) / 2;
+        if (speed * (1 + 0.15 * ((speed * d) / viscosity) ** 0.687) > stokesFactor * d) lower = d;
+        else upper = d;
+      }
+      const actual = 1e6 * (lower + upper) * 0.5;
+      const [reference, scatter] = observed[i];
+      const error = Math.abs(actual - reference);
+      squaredError += error ** 2;
+      observedVariance += scatter ** 2;
+      maximumError = Math.max(maximumError, error);
+      assert.equal(tracer.budget.water, 1);
+      if (i === 2) snapshot = world.takeSnapshot();
+    }
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance((times.at(-1) * 60) / labSecondsPerStep);
+    assert.equal(world.hash(), hash);
+  }
+  const rmsError = Math.sqrt(squaredError / 15);
+  const pooledScatter = Math.sqrt(observedVariance / 15);
+  assert.ok(rmsError <= pooledScatter, `RMS error ${rmsError} µm vs measured scatter ${pooledScatter} µm`);
+  t.diagnostic(
+    `Set B RMS ${rmsError.toFixed(2)} µm, measured scatter ${pooledScatter.toFixed(2)} µm, peak ${maximumError.toFixed(2)} µm.`,
+  );
+});
+
+test('SEA-15 shear-limited flocculation refuses invalid yield force', () => {
+  for (const yieldForce of [0, -1e-10, Infinity, NaN, 1e-8]) {
+    assert.throws(
+      () =>
+        new PhysicsWorld().add(new TracerSolver(), {
+          flocculation: {
+            aggregation: 30,
+            breakup: 700,
+            yieldForce,
+            environment: { concentration: 0.4, shearRate: 50 },
+          },
+        }),
+      /finite positive yieldForce/,
+    );
+  }
+});
+
 test('SEA-15 removing suspended concentration breaks mature flocs back toward primary grains and replays', () => {
   const primary = 40e-6;
   const mature = 120e-6;

@@ -344,6 +344,14 @@ first: each names its scope, its evidence file and how to reproduce it.
   [Brönner et al., Figure 4](https://doi.org/10.1016/j.marpolbul.2018.02.021).
   Reproduce with `node --test packages/physics/tests/coupling/tracers.test.js` after building Physics.
 
+- Cohesive tracer growth and breakup (SEA-15, 2026-11-26). The shear-limited closure predicts 15 sampled phases
+  of three dilution trials with 6.58 µm RMS error against 6.84 µm of measured temporal scatter. The largest
+  mean error is 12.22 µm. The fitted data come from separate constant-concentration runs. Snapshot restore
+  reproduces all three dilution runs. The Wax Lake Delta fall settling discrepancy remains.
+  Reproduce with `node --test --test-name-pattern='held-out Tran' packages/physics/tests/coupling/tracers.test.js`.
+  [Kuprenas et al., Eq. 9](https://doi.org/10.1029/2018JC014154),
+  [Tran et al., Set B](https://doi.org/10.1016/j.csr.2018.02.008).
+
 - Vertical dye diffusion (SEA-15, 2026-11-26). The solver recovers the drift and midpoint variance in a linear
   diffusivity layer and replays exactly. For CMO Experiment 4, the independent microstructure input yields an
   effective 1.61 × 10⁻⁶ m²/s from the parcel variance. The range inferred from Rhodamine measurements was 1.4–2.2 × 10⁻⁶ m²/s.

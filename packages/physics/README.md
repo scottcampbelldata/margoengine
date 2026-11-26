@@ -3552,6 +3552,9 @@ The default material is `silt`, and its grain diameter supplies the primary diam
 set another primary diameter. `initialDiameter` defaults to that primary diameter. Supply aggregation in
 m²/kg, breakup in s½/m², dry concentration in kg/m³ and shear rate in s⁻¹. A deterministic `environment`
 function can supply concentration and shear at each parcel. The ledger continues to count dry sediment mass.
+Set `yieldForce` in newtons to increase breakup as aggregates approach the Kolmogorov microscale.
+Use a positive force below `Math.exp(4) * waterDensity * viscosity ** 2 / 9`, where `viscosity` is
+kinematic. Omit it for the original Winterwerp kinetics.
 
 ```ts
 import { TracerSolver } from 'margoengine/physics/tracers';
