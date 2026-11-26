@@ -21,6 +21,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   vertex block descent. Both modes preserve mass and rest volume when a cut splits a solid and each piece
   goes on stepping. Reproduce with the `projective` crate cases and the same CPU and browser tests.
 
+- Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
+  curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
+  matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water
+  pressure and a live cloud box. Run `node --test packages/physics/tests/coupling/synoptic.test.js` and
+  `node packages/physics/tests/synoptic.browser.mjs` after building Physics and Weather.
+
 - Lightning (ATMO-07, 2026-11-26). The native lattice reproduces the closed-form electric potential in vacuum
   and under uniform volume charge. A return stroke touches the actual terrain and produces a timed acoustic
   source along each segment. The browser regression draws the same solved channel in plain and shared worlds.

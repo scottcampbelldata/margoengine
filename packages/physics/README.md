@@ -4250,6 +4250,40 @@ for null geodesics. Its input radii use `GM/c²`. Output distances and proper ti
 options default to 60 physics updates per second and an RK4 phase increment of 1/32 at the start of each tick.
 The disk publishes density, heating and orbital phase in increasing radial order.
 
+## Synoptic weather, fronts and mountain precipitation
+
+`SynopticWeather` evolves regional vorticity, column vapour, cloud water, falling condensate and temperature in a
+fixed map frame. It publishes wind, pressure, altitude-adjusted air temperature, precipitation and integrated vapour
+transport. The atmosphere and its water budget share the PhysicsWorld clock.
+
+```ts
+import { SynopticWeather } from '@margoengine/physics/synoptic';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const weather = await SynopticWeather.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(weather, {
+  cells: [32, 16],
+  spacing: [50_000, 50_000],
+  meanWind: [20, 0],
+  timeScale: 1200,
+  vapour: (x, z) => (x < 350_000 && z > 200_000 && z < 350_000 ? 28 : 10),
+});
+world.advance(30);
+console.log(weather.sample(400_000, 250_000).ivt, weather.budget);
+```
+
+The grid defaults to 32 by 32 with 80 km square cells. Choose power-of-two extents and place weather features
+through the initial fields in `SynopticParams`. The default latitude is 45° north and the mean wind is 12 m/s east.
+Use the high tier for limited higher-order transport, curved-flow pressure and a Fourier terrain-wave uplift
+correction. The fast tier uses first-order upwind transport, geostrophic pressure and direct upslope motion.
+The default condensed-water conversion and fallout times are 1000 s. Supply a `TerrainBed` for the orographic model.
+Set `timeScale` for a time lapse. Rates and the water ledger refer to physical weather seconds.
+
+`wind` is the existing `Wind` contract for a cloud box or other atmospheric reader. `rainSource()` supplies surface
+mm/h to `PrecipitationField`. Set its `base` just above the ground when the upstream physics has already accounted for
+fallout. Load with `{water: true}` and pass the grid of a `ShallowWaterSolver` to accumulate pressure gradients and wind
+stress on it. Arrange the pair in a staggered coupling. `@margoengine/weather/synoptic` adapts the same solve for Sky.
+
 ## Natural lightning and thunder
 
 `LightningSolver` advances a single cloud-to-ground leader in the electric field above a flat plane or a sampled

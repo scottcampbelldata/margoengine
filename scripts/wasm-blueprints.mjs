@@ -127,6 +127,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'synoptic-kernel',
+    crate: 'packages/physics/synoptic-kernel',
+    blueprint: 'packages/physics/src/synoptic/synoptic-kernel.wasm',
+    script: 'packages/physics/scripts/build-synoptic-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'synoptic-kernel-shared',
+    crate: 'packages/physics/synoptic-kernel',
+    blueprint: 'packages/physics/src/synoptic/synoptic-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-synoptic-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'pack-ice-kernel-shared',
     crate: 'packages/physics/pack-ice-kernel',
     blueprint: 'packages/physics/src/pack-ice/pack-ice-kernel-shared.wasm',

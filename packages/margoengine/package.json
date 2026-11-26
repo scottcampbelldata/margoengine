@@ -3239,6 +3239,10 @@
       "types": "./dist/physics/lightning.d.ts",
       "import": "./dist/physics/lightning.js"
     },
+    "./physics/synoptic": {
+      "types": "./dist/physics/synoptic.d.ts",
+      "import": "./dist/physics/synoptic.js"
+    },
     "./physics/clouds": {
       "types": "./dist/physics/clouds.d.ts",
       "import": "./dist/physics/clouds.js"
@@ -6398,6 +6402,10 @@
     "./weather/drive": {
       "types": "./dist/weather/drive.d.ts",
       "import": "./dist/weather/drive.js"
+    },
+    "./weather/synoptic": {
+      "types": "./dist/weather/synoptic.d.ts",
+      "import": "./dist/weather/synoptic.js"
     },
     "./weather/audio": {
       "types": "./dist/weather/audio.d.ts",

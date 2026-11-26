@@ -85,6 +85,10 @@ there, add a line below with the solver ID and what is needed, and build against
   Expose per-vertex solid material and accepted excavation for varying bedrock. The optional entry already uses
   `bedChange` and publishes versioned contact response and ATMO-06 dust.
 
+- **ATMO-10:** Publish the SEA-07 adapter's regional pressure and wind input layout, including origin and
+  spacing. The synoptic solver supplies pressure and horizontal wind on its local grid and already transfers
+  their gradient and stress through the shallow-water forcing port.
+
 - **EARTH-10:** Specify a registered extent and per-source basal heat acceptance on ICE-01 columns, plus a shared
   solid-deposit height/material input for EARTH-02. The existing lava entry publishes grid height and lava records,
   exchanges heat and phases with ICE-05, and emits registered layout-1 coastal displacement.

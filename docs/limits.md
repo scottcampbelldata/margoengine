@@ -9598,6 +9598,16 @@ requires a separate light-transport stage and an emissivity source.
 The optional TypeScript entry is 6,095 B gzip. Each Wasm variant is 1,657 B raw and 919 B gzip. Neither uses
 a shared static window. Core and stage add zero bytes.
 
+### Regional barotropic weather (ATMO-10)
+
+The periodic beta plane transports one air column per cell. Use regional domains away from equatorial and polar
+geometry. Pressure follows a horizontal balance and atmospheric fronts inherit their initial temperature contrast.
+The high tier filters the mean wind's terrain wave with a fixed moist stratification. Local flow anomalies add their
+direct upslope component. The source assumes a humid uplift layer and conserves available vapour through conversion
+and fallout. Cloud output is column mass and Weather uses a display opacity derived from it. Deep baroclinic
+development, vertical wind shear, evolving stability and forecast data assimilation require a multilayer model.
+Forecasts and film-length time acceleration use different clock scales. Keep coupled physical budgets on the same scale.
+
 ### Cloud-to-ground discharge (ATMO-07)
 
 The optional lightning solver follows one natural strike in a homogeneous dielectric with insulating sides, a

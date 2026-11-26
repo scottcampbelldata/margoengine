@@ -47,6 +47,27 @@ height-field triangles and weights the berm in the direction of mobilized shear.
 volume, dry mineral fines and loose soil that leaves the modeled patch. Native state retains the peak indentation.
 [Sumner et al.](https://www.ri.cmu.edu/pub_files/pub4/sumner_robert_1999_1/sumner_robert_1999_1.pdf).
 
+### Synoptic weather and moisture (ATMO-10)
+
+J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”
+(1950), supplies the rotating-vorticity model and the inverse horizontal Laplacian. James R. Holton,
+*An Introduction to Dynamic Meteorology* (fourth edition, 2004), gives geostrophic balance, curvature and the
+moist lapse. Margo inverts the periodic discrete Laplacian by FFT, advances the linear beta term by
+Crank–Nicolson, and transports the regional fields with either upwind or limited piecewise-linear face fluxes
+following Bram van Leer, “Towards the Ultimate Conservative Difference Scheme. IV” (1977).
+[Charney et al.](https://doi.org/10.1111/j.2153-3490.1950.tb00336.x),
+[Holton](https://webspace.science.uu.nl/~delde102/Holton_2004.pdf),
+[van Leer](https://doi.org/10.1016/0021-9991(77)90095-X).
+
+Helen Dacre et al., “How Do Atmospheric Rivers Form?” (2015), defines the column vapour budget and transport
+vectors. Ronald B. Smith and Idar Barstad, “A Linear Theory of Orographic Precipitation” (2004), Eqs. 1–2
+and 10–19, gives separate cloud and falling reservoirs and the wave-filtered lifting of the prescribed mean wind.
+Their appendix supplies the moisture depth and saturated-column condensation coefficient. The existing
+precipitation service uses the land rain-to-snow transition from Aiguo Dai (2008).
+[Dacre et al.](https://doi.org/10.1175/BAMS-D-14-00031.1),
+[Smith and Barstad](https://doi.org/10.1175/1520-0469%282004%29061%3C1377%3AALTOOP%3E2.0.CO%3B2),
+[Dai](https://doi.org/10.1029/2008GL033295).
+
 ### Atmospheric lightning (ATMO-07)
 
 Luciano Niemeyer, Luciano Pietronero and Hans J. Wiesmann, “Fractal Dimension of Dielectric Breakdown”

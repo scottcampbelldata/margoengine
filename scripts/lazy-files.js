@@ -255,6 +255,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/synoptic-kernel.wasm',
+    label: 'synoptic-kernel.wasm',
+    kind: 'Rust SIMD regional weather and moisture transport',
+    measure: 'file',
+    when: 'SynopticWeather.load() from the optional /synoptic entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/synoptic-kernel-shared.wasm',
+    label: 'synoptic-kernel-shared.wasm',
+    kind: 'Rust SIMD regional weather and moisture transport, shared world memory',
+    measure: 'file',
+    when: 'SynopticWeather.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/seismic-kernel.wasm',
     label: 'seismic-kernel.wasm',
     kind: 'Rust SIMD elastodynamic waves',

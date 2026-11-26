@@ -688,6 +688,40 @@ that splits, `change.clear(); for (const e of lava.lavaEvents()) change.add(e)`)
 `examples/test-pages/lava.html` is a whole flow at night that checks a step against a seek (front and ground events),
 the arms' fluxes, the levee cap and the tube against the open channel.
 
+## Drive Sky from a synoptic simulation
+
+`synopticDrive` samples the regional atmosphere at the camera, including the actual cloud water and surface
+precipitation. Advance the physics world on the film clock. WeatherDrive uses the sampled state without advancing
+its own preset machine.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { SynopticWeather } from '@margoengine/physics/synoptic';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { Sky } from '@margoengine/sky';
+import { Weather } from '@margoengine/sky/weather';
+import { WeatherDrive } from '@margoengine/weather/drive';
+import { synopticDrive } from '@margoengine/weather/synoptic';
+
+const engine = await Engine.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const solver = await SynopticWeather.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(solver, { cloud: 0.015, hydrometeors: 0.4 });
+const sky = Sky.attach(engine, { hours: 13 });
+const precipitation = Weather.attach(engine, { fadeSeconds: 0 });
+WeatherDrive.attach(engine, {
+  weather: synopticDrive(solver, () => [0, 20, 0]),
+  sky,
+  precipitation,
+  advance: false,
+});
+world.advance(60);
+engine.render({ delta: 1 / 60 });
+```
+
+Return the camera position relative to the synoptic solver's cell. The adapter defaults to a 10 μm cloud droplet
+radius and a 2400 m moisture scale height for display opacity and humidity. It uses the existing rain-to-snow phase
+transition. For exact precipitation rates and flow in physics, use `solver.rainSource()` and `solver.wind` directly.
+
 ## Weather in different places
 
 `WeatherRegions` from `margoengine/weather/regions` gives a map weather that differs from place to place: a `base`

@@ -16756,6 +16756,13 @@ The Event Horizon scene still uses its established SPACE-01 emitter paths. Bind 
 to the new annulus fields to show heating and density. A disk crossing the strongly relativistic inner region needs
 a relativistic stress and heat equation. The test-geodesic solve covers that region in the exterior observer chart.
 
+### Synoptic development and regional scene binding (ATMO-10)
+
+The regional fields transport fronts, rain and IVT through a fixed map frame. The browser fixture applies them to
+Sky and both renderers. The existing RITS, WIND and CF production scenes need bindings to these fields. A multilayer
+model would add frontal lifting and baroclinic cyclone growth. SEA-07 still needs its direct pressure and velocity
+binding once its surge port is available. The solver already supplies the corresponding inputs to shallow water.
+
 ### Continuous lightning weather and calibrated thunder (ATMO-07)
 
 `LightningSolver` handles one supplied cloud-to-ground flash. Weather can draw its actual path and light it, and

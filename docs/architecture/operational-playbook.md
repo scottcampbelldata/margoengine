@@ -4303,6 +4303,14 @@ and amplification through a softer site. A registered ground reader applies the 
 to an actual rigid body. Building and soil states share the solver's world clock. Native Chromium and
 Node replay identical f64 worlds in both memory modes.
 
+### Regional rotating atmosphere and moisture (ATMO-10)
+
+The optional native regional solver uses a periodic discrete Laplacian, an FFT and a conservative flux stencil.
+The plain and shared Wasm import the same world arena with no static data or heap. Each substep transports five
+columns and performs one flux stage in the fast tier or two in the high tier. Each pressure or wave inversion costs
+one forward and one inverse transform. The optional beta term adds one pair per substep. The moisture ledger reports
+total evaporation and fallout in kg. The same fields drive Weather, a cloud box, runoff and spatial water loads.
+
 ### Electric potential and return paths (ATMO-07)
 
 Plain and shared worlds load optional slot-free Rust Wasm to relax a seven-point Poisson stencil. The SIMD kernel

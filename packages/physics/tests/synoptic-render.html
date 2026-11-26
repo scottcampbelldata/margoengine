@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Synoptic weather rendering</title></head>
+<body>
+<script type="module">
+  import { Engine, PbrMaterial, box } from '/packages/core/dist/index.js';
+  import { createHeadlessCanvas, readPixels } from '/packages/headless/dist/index.js';
+  import { Sky } from '/packages/sky/dist/index.js';
+  import { Weather } from '/packages/sky/dist/weather.js';
+  import { WeatherDrive } from '/packages/weather/dist/drive.js';
+  import { synopticDrive } from '/packages/weather/dist/synoptic.js';
+  import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+
+  const engine = await Engine.create(createHeadlessCanvas({ width: 480, height: 270 }), {
+    backend: 'webgpu', camera: { position: [0, 4, 14], target: [0, 3, 0], near: 0.1, far: 15000 },
+  });
+  engine.stop();
+  const errors = [];
+  engine.gpu.addEventListener('uncapturederror', event => errors.push(event.error.message));
+  const sky = Sky.attach(engine, { hours: 14, timeScale: 0, clouds: { coverage: 0, speed: 0 } });
+  const precipitation = Weather.attach(engine, { fadeSeconds: 0, intensity: 0 });
+  engine.createMesh().setGeometry(box(90, 0.4, 70)).setPosition([0, -0.2, 0])
+    .setMaterial(new PbrMaterial({ color: '#536442', roughness: 0.9 }));
+  engine.createMesh().setGeometry(box(16, 5, 11)).setPosition([-13, 2.5, -14])
+    .setMaterial(new PbrMaterial({ color: '#606462', roughness: 0.92 }));
+
+  window.runSynoptic = async () => {
+    const { SynopticWeather } = await import('/packages/physics/dist/synoptic.js');
+    const make = async shared => {
+      const solver = await SynopticWeather.load();
+      const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) }).add(solver, {
+        cells: [16, 8], spacing: [10000, 10000], origin: [-80000, -40000], meanWind: [20, 0],
+        beta: 0, streamfunction: 0, timeScale: 12000, temperature: 289,
+        vapour: (x, z) => x >= -40000 && x <= -10000 && Math.abs(z) < 20000 ? 32 : 5,
+        cloud: (x, z) => x >= -40000 && x <= -10000 && Math.abs(z) < 20000 ? 2 : 0,
+        hydrometeors: (x, z) => x >= -40000 && x <= -10000 && Math.abs(z) < 20000 ? 45 : 0,
+      });
+      return { solver, world };
+    };
+    const { solver, world } = await make(false);
+    const shared = await make(true);
+    const driveSource = synopticDrive(solver, () => engine.camera.position);
+    const drive = WeatherDrive.attach(engine, { weather: driveSource, advance: false, sky, precipitation });
+    const frame = async () => {
+      for (let i = 0; i < 4; i++) engine.render({ delta: 1 / 60 });
+      return (await readPixels(engine)).data;
+    };
+    const before = driveSource.state;
+    const dry = await frame();
+    world.advance(8);
+    shared.world.advance(8);
+    const after = driveSource.state;
+    const wet = await frame();
+    let changed = 0;
+    for (let p = 0; p < wet.length; p += 4) {
+      if (Math.abs(wet[p] - dry[p]) + Math.abs(wet[p + 1] - dry[p + 1]) + Math.abs(wet[p + 2] - dry[p + 2]) > 24) changed++;
+    }
+    const cold = synopticDrive(solver, () => [0, 3200, 0]).state;
+    const rendered = { precipitation: precipitation.options.precipitation, intensity: precipitation.options.intensity, cover: sky.options.clouds.coverage };
+    drive.dispose();
+    return { before, after, cold, changed, rendered, plain: world.hash(), shared: shared.world.hash(), errors };
+  };
+</script>
+</body>
+</html>
