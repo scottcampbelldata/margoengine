@@ -9734,11 +9734,12 @@ It compares the same rigid pose with each liquid mesh hidden in turn. Full layer
 water–glass optics and complete production-cut review remain open.
 [Reproduce](whitepaper/reproduce.md#fluid-07-moving-window-render)
 
-One-row or one-column strips without advancing and receding contact-angle hysteresis use a
-direct banded pressure solve. The capillary regression covers a 128-cell strip at 20 μm spacing.
-The multidimensional pressure solve and hysteresis use their existing iterative operators.
+One-row and one-column strips use a direct banded pressure solve with optional advancing and
+receding contact angles. The capillary regression covers a 128-cell strip at 20 μm spacing.
+Two-dimensional patches use the iterative pressure solve. The strip retention check uses a
+derived force bracket. A measured sliding threshold for this solver remains open.
 
-The optional thin-film entry is 16,381 B gzip with a 16,873 B ceiling. Both Wasm assets are 16,188 B raw and each is 6,794 B gzip.
+The optional thin-film entry is 15,175 B gzip with a 16,873 B ceiling. Both Wasm assets are 16,711 B raw and each is 6,969 B gzip.
 
 ### Environmental airborne transport (ATMO-06)
 

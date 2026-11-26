@@ -5665,8 +5665,8 @@ precursor and omit the older scalar `pinning` option. Hysteresis is off by defau
 
 Set `suspended: true` on the underside of a panel with its normal pointing into the liquid.
 Gravity can then amplify long disturbances while surface tension damps short ones.
-For a spanwise-uniform strip, either `cells` dimension can be one. The strip uses a direct
-banded pressure solve when advancing and receding contact-angle hysteresis is off.
+For a spanwise-uniform strip, either `cells` dimension can be one. A direct banded
+pressure solve also supports strips with advancing and receding contact angles.
 
 Pass a `Precipitation` field for rain arriving at the moving panel and a `Wind` for surface shear.
 A registered rain input can instead publish m/s as a scalar or per cell. The optional `impacts` input
