@@ -15,6 +15,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   real 35 kg rigid load, with reactions through the world ports. Run the crate's `fem` test,
   `packages/physics/tests/coupling/volumetric-solids.test.js` and `packages/physics/tests/volumetric-solids.browser.mjs`.
 
+- Projective Dynamics (SOFT-04, 2026-11-26). Native local rotations preserve a rigidly rotated tetrahedron
+  and the global position solve matches affine extension and compression. The volume projection restores
+  a nearly inverted cell. The local/global mode shares the LH-4 impulse, frame-rate and seek fixtures with
+  vertex block descent. Both modes preserve mass and rest volume when a cut splits a solid and each piece
+  goes on stepping. Reproduce with the `projective` crate cases and the same CPU and browser tests.
+
 - Lightning (ATMO-07, 2026-11-26). The native lattice reproduces the closed-form electric potential in vacuum
   and under uniform volume charge. A return stroke touches the actual terrain and produces a timed acoustic
   source along each segment. The browser regression draws the same solved channel in plain and shared worlds.

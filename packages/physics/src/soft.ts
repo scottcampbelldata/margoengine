@@ -129,21 +129,30 @@ const CELL_MODEL = { 'neo-hookean': 0, corotated: 1, volume: 2 } as const;
 const INTERIOR_CELL = 2;
 const IMPLICIT_CELL = 4;
 const VERTEX_BLOCK_CELL = 8;
-const SOLVER_MODES: readonly SoftSolver[] = ['constraints', 'fem', 'vertex-block'];
-const SOLVER_CODE = { constraints: 0, fem: 1, 'vertex-block': 2 } as const;
+const PROJECTIVE_CELL = 16;
+const SOLVER_MODES: readonly SoftSolver[] = ['constraints', 'fem', 'vertex-block', 'projective'];
+const SOLVER_CODE = { constraints: 0, fem: 1, 'vertex-block': 2, projective: 3 } as const;
 // pflags is already part of the snapshot. Only the first particle of a body owns its mode bits.
 const SOLVER_MODE_SHIFT = 2;
 const SOLVER_MODE_MASK = 3 << SOLVER_MODE_SHIFT;
 
 function checkedSolver(solver: SoftSolver): SoftSolver {
   if (typeof SOLVER_CODE[solver] !== 'number')
-    throw new RangeError("Use 'constraints', 'fem' or 'vertex-block' for a soft solver.");
+    throw new RangeError("Use 'constraints', 'fem', 'vertex-block' or 'projective' for a soft solver.");
   return solver;
 }
 
 function cellSolverFlag(solver: SoftSolver, model: number): number {
   if (solver === 'vertex-block') return VERTEX_BLOCK_CELL;
+  if (solver === 'projective') return PROJECTIVE_CELL;
   return solver === 'fem' && model !== CELL_MODEL.volume ? IMPLICIT_CELL : 0;
+}
+
+function checkSolverModel(solver: SoftSolver, model: number): void {
+  if (solver === 'vertex-block' && model !== CELL_MODEL['neo-hookean'])
+    throw new RangeError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
+  if (solver === 'projective' && model !== CELL_MODEL.corotated)
+    throw new RangeError('Projective cells use corotated elasticity. Choose the corotated CellMaterial model.');
 }
 
 let columnNames: readonly string[] = [];
@@ -514,9 +523,10 @@ interface BoundMesh {
  * How a body's cells are solved: `'constraints'` (default) as XPBD constraints, whose stiffness grows with the substeps and passes
  * a step is given; `'fem'` as one linear solve a substep (a linearly implicit step, Baraff and Witkin 1998), whose stiffness does not,
  * the choice for very stiff materials. `'vertex-block'` minimizes the exact local implicit energy of each free vertex for
- * stable Neo-Hookean solids. Its sweep count follows the soft world's `iterations`. Volume-only cells use constraints.
+ * stable Neo-Hookean solids. `'projective'` alternates local corotated and volume projections with a global position solve.
+ * Both use the soft world's `iterations`. Volume-only cells use constraints.
  */
-export type SoftSolver = 'constraints' | 'fem' | 'vertex-block';
+export type SoftSolver = 'constraints' | 'fem' | 'vertex-block' | 'projective';
 
 /** The elastic model of a body's cells: see {@link CellMaterial.model}. */
 export type CellModel = 'neo-hookean' | 'corotated' | 'volume';
@@ -2397,10 +2407,7 @@ export class SoftBody {
   setCellMaterial(material: CellMaterial): this {
     this.check();
     checkCellMaterial(material);
-    if (this.solverKind === 'vertex-block' && material.model !== 'neo-hookean')
-      throw new RangeError(
-        'Vertex-block cells use neo-hookean elasticity. Change the solver before changing this model.',
-      );
+    checkSolverModel(this.solverKind, CELL_MODEL[material.model]);
     this.cellMaterial = material.clone();
     this.owner.writeCellMaterial(this);
     return this;
@@ -2797,8 +2804,7 @@ export class SoftBodies implements PhysicsAttachment {
     if (this.disposed)
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const mode = checkedSolver(desc.solver);
-    if (mode === 'vertex-block' && desc.cellMaterial.model !== 'neo-hookean')
-      throw new RangeError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
+    checkSolverModel(mode, CELL_MODEL[desc.cellMaterial.model]);
     const particles = desc.particleCount;
     if (desc.selfContacts && desc.triangles.length === 0)
       throw new RangeError('Self contacts need triangles; build the body with trimesh, cloth or clothTube.');
@@ -3403,13 +3409,12 @@ export class SoftBodies implements PhysicsAttachment {
   setCellSolver(body: SoftBody, solver: SoftSolver): void {
     const f = this.cellColumns();
     const { first, count } = body.cellRange;
-    if (solver === 'vertex-block' && count > 0 && f.model![first] !== CELL_MODEL['neo-hookean'])
-      throw new RangeError('Vertex-block cells use neo-hookean elasticity. Choose the neo-hookean CellMaterial model.');
+    if (count > 0) checkSolverModel(solver, f.model![first]!);
     const flags = this.columns().pflags;
     flags[body.firstParticle] =
       (flags[body.firstParticle]! & ~SOLVER_MODE_MASK) | (SOLVER_CODE[solver] << SOLVER_MODE_SHIFT);
     for (let t = first; t < first + count; t++) {
-      const flags = f.flags![t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL);
+      const flags = f.flags![t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL | PROJECTIVE_CELL);
       f.flags![t] = flags | cellSolverFlag(solver, f.model![t]!);
     }
   }
@@ -3452,7 +3457,7 @@ export class SoftBodies implements PhysicsAttachment {
       f.damp![t] = rate;
       // The implicit solver damps by a factor on the stiffness: the rate over the square of the cell's wave frequency.
       f.imp_beta![t] = wave > 0 ? rate / (wave * wave) : 0;
-      flags[t] = (flags[t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL)) | mode;
+      flags[t] = (flags[t]! & ~(IMPLICIT_CELL | VERTEX_BLOCK_CELL | PROJECTIVE_CELL)) | mode;
     }
   }
 

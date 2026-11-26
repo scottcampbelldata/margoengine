@@ -256,7 +256,25 @@ impl World {
             self.fem.imp.sol[1][i] = self.vy[i] as f64;
             self.fem.imp.sol[2][i] = self.vz[i] as f64;
         }
-        self.implicit_multiply(hh, 0);
+        self.solve_preconditioned(hh, Self::implicit_multiply);
+        // The new velocities, and the particles carried by them from where the substep began.
+        for i in 0..n {
+            if self.fem.imp.mass[i] == 0.0 {
+                continue;
+            }
+            self.vx[i] = self.fem.imp.sol[0][i] as f32;
+            self.vy[i] = self.fem.imp.sol[1][i] as f32;
+            self.vz[i] = self.fem.imp.sol[2][i] as f32;
+            self.x[i] = self.px[i] + h * self.vx[i];
+            self.y[i] = self.py[i] + h * self.vy[i];
+            self.z[i] = self.pz[i] + h * self.vz[i];
+        }
+    }
+
+    /// Diagonal-preconditioned conjugate gradients on the free coordinates.
+    pub(crate) fn solve_preconditioned(&mut self, h: f64, multiply: impl Fn(&mut Self, f64, u8)) {
+        let n = self.particles;
+        multiply(self, h, 0);
         let (mut rz, mut bb, mut free) = (0.0f64, 0.0f64, 0usize);
         for i in 0..n {
             if self.fem.imp.mass[i] == 0.0 {
@@ -287,7 +305,7 @@ impl World {
         }
         let mut pass = 0;
         while pass < limit && rr > tolerance * bb && rz > 0.0 {
-            self.implicit_multiply(hh, 1);
+            multiply(self, h, 1);
             let mut pap = 0.0f64;
             for i in 0..n {
                 if self.fem.imp.mass[i] == 0.0 {
@@ -328,18 +346,6 @@ impl World {
                 }
             }
             pass += 1;
-        }
-        // The new velocities, and the particles carried by them from where the substep began.
-        for i in 0..n {
-            if self.fem.imp.mass[i] == 0.0 {
-                continue;
-            }
-            self.vx[i] = self.fem.imp.sol[0][i] as f32;
-            self.vy[i] = self.fem.imp.sol[1][i] as f32;
-            self.vz[i] = self.fem.imp.sol[2][i] as f32;
-            self.x[i] = self.px[i] + h * self.vx[i];
-            self.y[i] = self.py[i] + h * self.vy[i];
-            self.z[i] = self.pz[i] + h * self.vz[i];
         }
     }
 }

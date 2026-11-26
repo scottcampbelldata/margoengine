@@ -9547,6 +9547,13 @@ can lock near incompressibility or need refinement to resolve bending. This mode
 and shares the rigid/soft contact passes. Its optional entry and kernel sizes are recorded in the
 [entry-size results](../examples/package-benchmarks/results/entry-sizes.json).
 
+The local/global `'projective'` mode uses the corotated material. A local rotation and unit-determinant
+projection per live tetrahedron precedes each global solve. Each matrix application visits its four
+corners once, then the preconditioner acts once per particle. The iteration limits are the configured
+soft iterations and the existing preconditioned conjugate-gradient limits. Extreme expansion also
+searches the small-root volume branch before accepting a feasible unit-determinant target. This CPU
+mode accepts isotropic tetrahedral elasticity. The existing contact solver still owns rigid reactions.
+
 ### Gas-filled soft shells (SOFT-06)
 
 `@margoengine/physics/soft` solves the pressure of an outward-wound, watertight hollow triangle mesh. The chamber

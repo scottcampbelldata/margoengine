@@ -16694,7 +16694,8 @@ Vehicles now sink into a calibrated yielding surface and feel the resulting susp
 The LH-4 rung fixture bends, vibrates and supports a rigid load through live world ports. The filmed
 climber and complete tower still need the DYN-07 contact and animation bindings. The fixed-support
 fixture uses isotropic elasticity. Timber with directional grain needs an anisotropic material model.
-The prefactored local/global Projective Dynamics variant (X-33) and dedicated GPU compute remain open.
+Both native nonlinear modes pass the rung fixture. Dedicated GPU elasticity remains open and needs a
+same-tick GPU contact and snapshot handoff through the physics framework.
 
 ### Accretion field rendering and relativistic disk transport (SPACE-03)
 

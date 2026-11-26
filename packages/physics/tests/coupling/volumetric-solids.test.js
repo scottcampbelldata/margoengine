@@ -7,10 +7,10 @@ import { ladder } from './volumetric-ladder.js';
 
 await Physics.load();
 
-test('LH-4: a loaded rung flexes and vibrates while the rigid boot receives its weight in reaction', async () => {
+async function loadedRung(solver) {
   const mass = 35;
-  const loaded = await ladder(undefined, { mass });
-  const bare = await ladder(undefined, { mass: 0 });
+  const loaded = await ladder(undefined, { mass, solver });
+  const bare = await ladder(undefined, { mass: 0, solver });
   const contacts = [];
   for (let frame = 1; frame <= 180; frame++) {
     loaded.world.advance(frame);
@@ -44,15 +44,35 @@ test('LH-4: a loaded rung flexes and vibrates while the rigid boot receives its 
     Math.abs(average('support') - expectedSupport) < integrationAllowance,
     `support ${average('support')} N vs ${expectedSupport} N within ${integrationAllowance}`,
   );
-});
+}
 
-test('SoftSolver: the volumetric ladder is identical across frame rates and snapshot seek', async () => {
-  const rates = [24, 30, 60];
-  const scenes = await Promise.all(rates.map((num) => ladder({ num, den: 1 })));
-  frameRateIndependent(() => scenes.shift().world, { rates });
-  for (let i = 0; i < 2; i++) scenes.push(await ladder({ num: 24, den: 1 }));
-  seekEqualsContinuous(() => scenes.shift().world, { at: 4, frames: 18 });
-});
+for (const solver of ['vertex-block', 'projective']) {
+  test(`LH-4: ${solver} flexes the rung and balances the rigid load`, () => loadedRung(solver));
+  test(`SoftSolver: ${solver} is identical across frame rates and snapshot seek`, async () => {
+    const rates = [24, 30, 60];
+    const scenes = await Promise.all(rates.map((num) => ladder({ num, den: 1 }, { solver })));
+    frameRateIndependent(() => scenes.shift().world, { rates });
+    for (let i = 0; i < 2; i++) scenes.push(await ladder({ num: 24, den: 1 }, { solver }));
+    seekEqualsContinuous(() => scenes.shift().world, { at: 4, frames: 18 });
+  });
+  test(`SoftSolver: ${solver} cut pieces retain mass, volume and the native mode`, async () => {
+    const { world, soft, rung } = await ladder(undefined, { mass: 0, solver });
+    const mass = rung.mass();
+    const volume = rung.restVolume();
+    const { pieces } = soft.cut(rung, [
+      [0, 0, -2],
+      [0, 4, -2],
+      [0, 0, 4],
+    ]);
+    assert.equal(pieces.length, 2);
+    assert.ok(pieces.every((piece) => piece.solver === solver));
+    const sum = (read) => pieces.reduce((total, piece) => total + read(piece), 0);
+    assert.ok(Math.abs(sum((piece) => piece.mass()) - mass) <= 64 * 2 ** -23 * mass);
+    assert.ok(Math.abs(sum((piece) => piece.restVolume()) - volume) <= 64 * 2 ** -23 * volume);
+    world.advance(6);
+    assert.ok(pieces.every((piece) => Number.isFinite(piece.volume()) && piece.volume() > 0));
+  });
+}
 
 test('solver mode switches restore with the existing state layout and survive body compaction', async () => {
   const { world, soft, rung } = await ladder();
@@ -60,6 +80,7 @@ test('solver mode switches restore with the existing state layout and survive bo
   const saved = world.takeSnapshot();
   const corotated = Object.assign(new CellMaterial(), { model: 'corotated' });
   assert.throws(() => rung.setCellMaterial(corotated), /neo-hookean/);
+  assert.throws(() => rung.setSolver('projective'), /corotated/);
   assert.throws(
     () => soft.create(SoftBodyDesc.box([3, 0, 0], [1, 1, 1], [1, 1, 1], corotated).setSolver('vertex-block')),
     /neo-hookean/,
@@ -82,4 +103,16 @@ test('solver mode switches restore with the existing state layout and survive bo
   assert.equal(extra.solver, 'vertex-block');
   world.advance(10);
   assert.ok(Number.isFinite(extra.volume()) && extra.volume() > 0);
+});
+
+test('a projective material and solver mode restore from a snapshot', async () => {
+  const { world, rung } = await ladder(undefined, { solver: 'projective' });
+  world.advance(9);
+  const saved = world.takeSnapshot();
+  rung.setSolver('constraints');
+  assert.equal(rung.solver, 'constraints');
+  world.advance(12);
+  world.restoreSnapshot(saved.bytes);
+  assert.equal(rung.solver, 'projective');
+  assert.equal(world.hash(), saved.hash);
 });

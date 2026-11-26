@@ -431,6 +431,7 @@ impl World {
             self.lambda[e] = 0.0;
         }
         self.fem_implicit(h);
+        self.solve_projective(h, iterations);
         let vertex_block = self.prepare_vertex_blocks();
         self.shape_begin();
         self.fem_begin();

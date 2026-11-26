@@ -44,6 +44,8 @@ pub const INTERIOR_TET: u32 = 2;
 pub const IMPLICIT_TET: u32 = 4;
 /// The cell uses the VBD solve (src/vertex_block.rs).
 pub const VERTEX_BLOCK_TET: u32 = 8;
+/// The cell uses the local/global projective solve (src/projective.rs).
+pub const PROJECTIVE_TET: u32 = 16;
 /// No neighbour across a face.
 pub const NONE: u32 = u32::MAX;
 
@@ -553,7 +555,7 @@ impl World {
     /// One pass over every live tetrahedron and cluster.
     pub(crate) fn solve_fem(&mut self, h: f32) {
         for t in 0..self.fem.count {
-            if self.fem.flags[t] & (TORN_TET | IMPLICIT_TET | VERTEX_BLOCK_TET) != 0 {
+            if self.fem.flags[t] & (TORN_TET | IMPLICIT_TET | VERTEX_BLOCK_TET | PROJECTIVE_TET) != 0 {
                 continue;
             }
             let (mu, lambda, vol) = (self.fem.mu[t], self.fem.lambda[t], self.fem.vol0[t]);
