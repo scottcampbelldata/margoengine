@@ -146,8 +146,8 @@ geospatial camera. Rivals are judged by their public docs and feature lists only
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| Webcam face tracking driving morph targets (landmarks to ARKit-style blendshapes, webcam driver) | three.js, drei `FaceControls`/`FaceLandmarker` | MISSING | L |  |
-| Webcam hand and pose landmarks from a camera stream outside WebXR, for AR and body overlays | drei, MediaPipe examples | MISSING | L |  |
+| Webcam face tracking driving morph targets (landmarks to ARKit-style blendshapes, webcam driver) | three.js, drei `FaceControls`/`FaceLandmarker` | DONE | L | 71b195b94 (source 588842f8f) |
+| Webcam hand and pose landmarks from a camera stream outside WebXR, for AR and body overlays | drei, MediaPipe examples | DONE | L | 24e6efcad (source 588842f8f) |
 | Tube painter for freehand 3D strokes (pointer or XR controller paint) | three.js | DONE (`TubePainter`, `@margoengine/lines/tube-painter`) | S | 3b1a571bb |
 | Infinite shader grid with cell and section sizes and distance fade (`GridHelper` is finite) | drei `Grid` | DONE (`@margoengine/lines/infinite-grid`) | S | f144ef66b |
 | Shadow map viewer: debug view of cascade, spot and point shadow maps | three.js | DONE | S | e639b3ed9 |
