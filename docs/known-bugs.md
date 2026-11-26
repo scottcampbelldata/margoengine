@@ -79,6 +79,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `installed`, `materials` and `coated` rows of scripts/clustered-bounce-gpu-check.js on WebGPU and `MARGO_COMPAT=1`
   (0.9548 and 0.9586 of the core patch, within 1% of 0.96; the materials patch 1.0000; the JS twin within 2%).
 
+### Fixed 2026-11-26: sand ripples aliased into moire on frames under 1080 lines (KB-TERRAIN-SAND3, terrain)
+
+- **Repro:** `packages/terrain/test/sand-footprint.browser.mjs`: flat sand from 20 m up, rendered at 960 x 540 and
+  480 x 270 and compared with a 3840 x 2160 frame filtered down to each (a Gaussian of 0.5 small pixels). Mean sRGB
+  luma error was 1.90 and 2.76 steps with ripples on (0.07 and 0.12 with them off).
+- **Cause:** the `sandSurface` ripple clamp took its pixel footprint as the distance over 1,000, one pixel of a
+  1080-line frame at 50 degrees, whatever the frame's real size. A 540-line pixel is 1.7 times wider and a 270-line one
+  3.5 times, so 0.1 m ripples stayed on where a pixel no longer resolves them.
+- **Fix:** `TerrainColors` takes the footprint once per pixel as the longer of `dpdx` and `dpdy` of the position, at the
+  top of the shared per-pixel block where control flow is uniform (as the mesh blend and rock surface do), and passes
+  it to every mesh's `terrainSurface`. Errors now 1.10 and 0.66 (RTX A6000, Edge 158).
+- **Regression:** the test above (under 1.4 steps with ripples, under 0.3 without), in terrain's `test:gpu`.
+
 ### Fixed 2026-11-26: the order bodies woke in changed how the world moved (KB-PHYS-ORDER1, physics kernel)
 
 - **Repro:** `packages/physics/kernel/tests/canonical.rs`: two worlds with the same rows, one with its awake list put back in

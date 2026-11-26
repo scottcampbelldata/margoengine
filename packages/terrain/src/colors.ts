@@ -290,6 +290,9 @@ export type TerrainLook = Pick<
 > & { sandSurface?: SandSurface };
 /** Where {@link TerrainColors.setLook} takes `null` to mean the default. */
 export type TerrainLookUpdate = { [K in keyof TerrainLook]?: TerrainLook[K] | null };
+// The pixel's footprint on the surface, metres: the longer of the screen-space position derivatives, so it follows the
+// frame's real size, device pixel ratio and grazing angle (KB-TERRAIN-SAND3).
+const footprintLine = 'let terrainColorFootprint=max(length(dpdx(i.position)),length(dpdy(i.position)));';
 const surfaceStruct = 'struct TerrainSurface {color:vec3f,normal:vec3f,rough:f32}\n';
 // Height-based blending (A. Mishkinis, "Advanced Terrain Texture Splatting", 2013): near a transition the higher surface
 // wins within a 0.2 depth. Material heights stay in 0..0.5, so a material at weight 0 never shows through.
@@ -415,7 +418,8 @@ export class TerrainColors implements EnginePlugin {
     // surface gradient (M. Mikkelsen, "Surface Gradient-Based Bump Mapping Framework", JCGT 9(3), 2020), clamped out
     // in object space before a pixel covers half a ripple (A. Norton, A. Rockwood and P. Skolmoski, "Clamping: a method
     // of antialiasing textured surfaces by bandwidth limiting in object space", SIGGRAPH 1982): the footprint is the
-    // distance over 1,000 (about one pixel at 1080 lines and 50 degrees), stretched by the grazing angle. Avalanching
+    // pixel's real one, the longer screen-space derivative of the position (it was distance / 1000, one pixel at 1080
+    // lines, and aliased into moire at 540 and 270 lines, KB-TERRAIN-SAND3). Avalanching
     // lee slip faces carry no ripples and show fresh, paler sand; windward faces keep a coarser, darker lag (N.
     // Lancaster, "Geomorphology of Desert Dunes", 1995, ch. 4; R. E. Hunter, "Basic types of stratification in small
     // eolian dunes", Sedimentology 24, 1977) in grainflow tongues, so dune faces read apart in flat overcast light. Streaks run along the
@@ -424,7 +428,7 @@ export class TerrainColors implements EnginePlugin {
     this.sandOn = sandOn;
     const sandCode = sandOn
       ? `
- let sv=frame.eye.xyz-p;let sd=max(length(sv),1e-4);let foot=sd*0.001/max(abs(dot(sv/sd,n)),0.05);
+ let foot=footprint;
  let sw=${U(8, 'xy')};let along=dot(p.xz,sw);let across=dot(p.xz,vec2f(-sw.y,sw.x));
  let face=dot(n.xz,sw);let lee=smoothstep(0.25,0.45,face);let stoss=smoothstep(0.03,0.2,-face);
  var sandShade=1.0+${U(9, 'x')}*lee-${U(9, 'y')}*stoss;
@@ -455,7 +459,7 @@ export class TerrainColors implements EnginePlugin {
     // triplanar where stone shows: anisotropic noise on the two vertical projections reads as horizontal strata, so
     // cliffs never stretch a top-down pattern; its analytic gradient tilts the normal (surface-gradient bump mapping).
     this.surfaceCode = `
-fn terrainSurface(p:vec3f,n:vec3f)->TerrainSurface {
+fn terrainSurface(p:vec3f,n:vec3f,footprint:f32)->TerrainSurface {
  var s:TerrainSurface;let h=p.y;${
    variation || detail
      ? `let fade=1.0-smoothstep(20.0,60.0,distance(frame.eye.xyz,p));
@@ -569,7 +573,10 @@ fn terrainWet(position:vec3f)->vec2f {
     const opened = openMeshBlock(source);
     // Silent like the other optional core patches: without the standard shader the mesh keeps its material color.
     if (!opened) return source;
-    const { code, at } = opened;
+    const { code } = opened;
+    // One footprint for every mesh's call, taken where control flow is still uniform; later meshes' calls go after it.
+    const shared = code.indexOf(footprintLine),
+      at = shared < 0 ? opened.at : shared + footprintLine.length;
     const suffix = '_' + id;
     const own = (
       `@group(0) @binding(${this.lookBinding}) var<uniform> terrainLook:array<vec4f,${LOOK_SLOTS}>;
@@ -583,7 +590,8 @@ fn terrainWet(position:vec3f)->vec2f {
       (this.surfaceCode.includes('terrainBlend(') && !code.includes('fn terrainBlend(') ? blendCode : '') +
       own +
       code.slice(0, at) +
-      `if(i.terrainId==${id + 1}.0){let s=terrainSurface${suffix}(i.position,n);i.color=s.color;i.material.x*=s.rough;n=s.normal;}` +
+      (shared < 0 ? footprintLine : '') +
+      `if(i.terrainId==${id + 1}.0){let s=terrainSurface${suffix}(i.position,n,terrainColorFootprint);i.color=s.color;i.material.x*=s.rough;n=s.normal;}` +
       code.slice(at)
     );
   }

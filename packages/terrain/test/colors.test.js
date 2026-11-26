@@ -77,6 +77,29 @@ test('multiple wet terrains share the mesh ID varying and keep distinct textures
     h.cleanup();
   }
 });
+// KB-TERRAIN-SAND3: the ripple clamp's footprint is the pixel's own (screen-space derivatives of the position), taken once
+// where control flow is uniform, before every mesh's call; it was distance / 1000 whatever the frame size.
+test('terrain colors take the real pixel footprint once, before every mesh call', async () => {
+  const engine = await shaderEngine();
+  const first = engine.createMesh(),
+    second = engine.createMesh();
+  engine.use(new TerrainColors(first, options));
+  engine.use(new TerrainColors(second, options));
+  const c = { backend: 'webgpu', shader: wgsl, bindings: [], draw() {} };
+  engine.frameGraph.execute(c);
+  const line = 'let terrainColorFootprint=max(length(dpdx(i.position)),length(dpdy(i.position)));',
+    at = c.shader.indexOf(line);
+  assert.ok(at >= 0, 'the footprint line is in the shader');
+  assert.equal(c.shader.indexOf(line, at + 1), -1, 'the footprint is taken once');
+  for (const mesh of [first, second]) {
+    const id = meshRuntime(mesh).id,
+      call = c.shader.indexOf(`let s=terrainSurface_${id}(i.position,n,terrainColorFootprint);`);
+    assert.ok(call > at, `mesh ${id}'s call comes after the footprint`);
+  }
+  assert.doesNotMatch(c.shader, /sd\*0\.001/, 'no distance-based footprint guess');
+  assert.ok(balanced(c.shader));
+});
+
 test('terrain colors shade one mesh per pixel inside core lighting and cache the patch', async () => {
   const engine = await shaderEngine();
   const mesh = engine.createMesh(),
@@ -86,10 +109,12 @@ test('terrain colors shade one mesh per pixel inside core lighting and cache the
   const c = { backend: 'webgpu', shader: wgsl, bindings: [], draw() {} };
   engine.frameGraph.execute(c);
   const id = meshRuntime(mesh).id;
-  assert.ok(c.shader.includes(`if(i.terrainId==${id + 1}.0){let s=terrainSurface_${id}(i.position,n);`));
+  assert.ok(
+    c.shader.includes(`if(i.terrainId==${id + 1}.0){let s=terrainSurface_${id}(i.position,n,terrainColorFootprint);`),
+  );
   assert.ok(!c.shader.includes(`terrainSurface_${meshRuntime(other).id}(`));
   // Bands are evaluated per pixel from the interpolated height and normal, not in the vertex stage.
-  assert.ok(c.shader.includes(`fn terrainSurface_${id}(p:vec3f,n:vec3f)->TerrainSurface`));
+  assert.ok(c.shader.includes(`fn terrainSurface_${id}(p:vec3f,n:vec3f,footprint:f32)->TerrainSurface`));
   assert.doesNotMatch(c.shader, /o\.color=mix/);
   assert.ok(c.shader.includes('let linear=direct*'));
   assert.ok(balanced(c.shader));
@@ -245,6 +270,10 @@ test('sand carries wind ripples, streaks and slope sorting by default; false or 
   assert.ok(values(looks[1], 32, 0, 1, 0.2, 2));
   assert.ok(values(looks[1], 36, 0.05, 0.035, 0.08, 0));
   assert.ok(values(looks[1], 40, 0.07, 0.05, 0.1));
+  // The values live in the look uniform, so the turned wind compiles the same shader (only the mesh suffix differs).
+  assert.equal(turned.replace(/_\d+/g, '_'), sand.replace(/_\d+/g, '_'));
+  // The clamp's footprint is the pixel's own, passed in (KB-TERRAIN-SAND3).
+  assert.match(sand, /let foot=footprint;/);
   // Broad scour bands: a term with no distance fade, at strength 0 (the look before the option) unless asked.
   assert.match(sand, /along\*0\.012/);
   assert.equal(looks[0][39], 0);

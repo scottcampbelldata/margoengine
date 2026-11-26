@@ -1,0 +1,60 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Terrain sand ripple footprint check</title><style>body{margin:0}canvas{display:block}</style></head><body>
+<script type="module">
+// Real-GPU check for the sandSurface ripple clamp at the real pixel footprint (sand-footprint.browser.mjs reads the
+// results). Flat sand seen from above, so the ripples (0.1 m apart) sit 20 to 30 m away, where a pixel of a
+// 1080-line frame still resolves them but one of a 540 or 270-line frame does not. Each size has its own canvas
+// rendered at exactly that many pixels (no resize, no MSAA); `show` keeps the frame's sRGB luma. The reference
+// filter is a Gaussian of 0.5 small pixels (a 4 x 4 box leaks the very frequencies being measured).
+import {waitForPipelines} from '/scripts/support/gpu-ready.js';
+import {Engine,PbrMaterial} from '/packages/core/dist/index.js';
+import {TerrainColors,heightfield} from '/packages/terrain/dist/index.js';
+const errors=[],kept=new Map(),engines=new Map();
+const view={position:[0,20,0],target:[8,0,0.5]};
+async function engineFor(w,h){
+  const key=w+'x'+h;
+  if(!engines.has(key)){
+    const canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;canvas.style.width=Math.min(w,960)+'px';document.body.append(canvas);
+    const engine=await Engine.create(canvas,{backend:'webgpu',exactSize:true,camera:{position:view.position,target:view.target,fov:50,near:0.1,far:3000}});
+    engine.gpu.addEventListener('uncapturederror',e=>errors.push(e.error.message));
+    engine.lighting.direction.set([0.1,0.64,0.76,3]);engine.lighting.radiance.set([1,1,1,0.35]);engine.scene.background='#b8c4d0';
+    engines.set(key,{engine,canvas});
+  }
+  return engines.get(key);
+}
+window.check={
+  async show(name,w,h,options){
+    const {engine,canvas}=await engineFor(w,h),device=engine.gpu;
+    device.pushErrorScope('validation');
+    const mesh=engine.createMesh().setGeometry(heightfield(()=>0,{size:[400,400],origin:[-200,-200],resolution:256}))
+      .setMaterial(new PbrMaterial({color:[0.52,0.46,0.35],roughness:0.92}));
+    const colors=TerrainColors.attach(engine,mesh,{sand:[0.52,0.46,0.35],shore:[80,90],stoneNormal:[0.2,0.25],...options});
+    await waitForPipelines(async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();});
+    engine.render({delta:0});
+    const c=new OffscreenCanvas(w,h).getContext('2d');c.drawImage(canvas,0,0);const d=c.getImageData(0,0,w,h).data;
+    const luma=new Float32Array(w*h);for(let p=0;p<w*h;p++)luma[p]=0.2126*d[p*4]+0.7152*d[p*4+1]+0.0722*d[p*4+2];
+    kept.set(name,{w,h,luma});
+    colors.dispose();mesh.dispose();
+    const e=await device.popErrorScope();if(e)errors.push(e.message);
+    return errors.splice(0);
+  },
+  // Mean |a - b box-filtered down to a's size| over the rectangle [x0, y0, x1, y1) as fractions of a: how far the
+  // small frame strays from the large one seen through the same pixels (aliasing shows as error the filter removes).
+  // The large frame filtered with a Gaussian of `sigma` small pixels and sampled at the small frame's pixel centres.
+  gauss(b,W,H,sigma){
+    const r=kept.get(b),k=r.w/W,sd=sigma*k,R=Math.ceil(3*sd),wt=[];let t=0;for(let i=-R;i<=R;i++){wt.push(Math.exp(-i*i/(2*sd*sd)));t+=wt.at(-1);}
+    const rows=new Float32Array(W*r.h);
+    for(let y=0;y<r.h;y++)for(let x=0;x<W;x++){const c=Math.round((x+0.5)*k-0.5);let m=0,ws=0;for(let i=-R;i<=R;i++){const q=c+i;if(q<0||q>=r.w)continue;m+=wt[i+R]*r.luma[y*r.w+q];ws+=wt[i+R];}rows[y*W+x]=m/ws;}
+    const out=new Float32Array(W*H);
+    for(let y=0;y<H;y++){const c=Math.round((y+0.5)*k-0.5);for(let x=0;x<W;x++){let m=0,ws=0;for(let i=-R;i<=R;i++){const q=c+i;if(q<0||q>=r.h)continue;m+=wt[i+R]*rows[q*W+x];ws+=wt[i+R];}out[y*W+x]=m/ws;}}
+    return out;
+  },
+  // Mean |small frame - large frame filtered and sampled at its pixels| in sRGB luma steps: how far the small frame
+  // strays from the same ground seen through properly filtered pixels. Aliased ripples show as pixel-scale error.
+  error(a,b){const s=kept.get(a),g=this.gauss(b,s.w,s.h,0.5);let sum=0;for(let p=0;p<g.length;p++)sum+=Math.abs(s.luma[p]-g[p]);return sum/g.length;},
+  // Grey PNG of a kept frame, box filtered down by k.
+  async png(name,k=1){const r=kept.get(name),w=r.w/k,h=r.h/k,img=new ImageData(w,h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){let m=0;for(let j=0;j<k;j++)for(let i=0;i<k;i++)m+=r.luma[(y*k+j)*r.w+x*k+i];m/=k*k;const o=(y*w+x)*4;img.data[o]=img.data[o+1]=img.data[o+2]=m;img.data[o+3]=255;}
+    const c=new OffscreenCanvas(w,h);c.getContext('2d').putImageData(img,0,0);const a=new Uint8Array(await (await c.convertToBlob()).arrayBuffer());let s='';for(let i=0;i<a.length;i+=32768)s+=String.fromCharCode(...a.subarray(i,i+32768));return s;},
+};
+window.ready=true;
+</script></body></html>
