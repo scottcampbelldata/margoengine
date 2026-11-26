@@ -5876,6 +5876,8 @@ precursor and omit the older scalar `pinning` option. Hysteresis is off by defau
 
 Set `suspended: true` on the underside of a panel with its normal pointing into the liquid.
 Gravity can then amplify long disturbances while surface tension damps short ones.
+The pressure uses the full curvature of the height surface. Downslope gravity and pressure use
+the same face mobility on a prewetted panel, so a hanging drop can lose water to its wake as it moves.
 For a spanwise-uniform strip, either `cells` dimension can be one. A direct banded
 pressure solve also supports strips with advancing and receding contact angles.
 On a two-dimensional patch, a line preconditioner helps solve pressure between

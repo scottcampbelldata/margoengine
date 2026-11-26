@@ -107,7 +107,7 @@ export interface ThinFilmOptions {
   readonly viscosity?: number;
   /** Liquid-air surface tension. Defaults to 0.0728 N/m. */
   readonly surfaceTension?: number;
-  /** Let normal gravity destabilize a film on the underside of its surface. Defaults to false. */
+  /** Let normal gravity destabilize a film on the underside of its surface with full graph curvature. Defaults to false. */
   readonly suspended?: boolean;
   /** Navier slip length. Defaults to zero metres. */
   readonly slip?: number;
@@ -543,7 +543,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
     const candidate = allocate('working-depth', count);
     const rainRates = allocate('rain-rates', count);
     const forcing = allocate('surface-forcing', 9);
-    const workspace = allocate('face-solver', (wettingValues?.contact ? 32 : 25) * count);
+    const workspace = allocate('face-solver', ((wettingValues?.contact ? 32 : 25) + (suspended ? 2 : 0)) * count);
     const drips = allocate('drips', count);
     const nextDrips = allocate('working-drips', count);
     const budget = allocate('budget', 7);
@@ -861,6 +861,7 @@ export class ThinFilmSolver implements Solver<ThinFilmOptions> {
       s.wetting?.byteOffset ?? 0,
       s.wettingMap?.byteOffset ?? 0,
       s.contactAngles?.byteOffset ?? 0,
+      Number(s.suspended),
     );
     if (status === 2)
       throw new RangeError(

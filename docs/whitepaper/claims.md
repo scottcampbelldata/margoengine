@@ -6375,6 +6375,11 @@ The suspended-film solve amplifies a long disturbance and damps a short disturba
 discrete rates from the gravity–capillarity dispersion relation. The closed patch conserves
 water and reproduces the same state hash after restore. [Reproduce](reproduce.md#fluid-07-suspended-film)
 
+At 3.4° on a prewetted glass underside, a pendant silicone-oil drop thins to about
+1 mm and travels 20 mm in five minutes at both resolutions. The starting shape,
+oil properties and coating determine the run. Later laboratory markers are used only
+for comparison. [Reproduce](reproduce.md#fluid-07-suspended-film)
+
 ### FLUID-07 circular sill drops
 
 An open film edge can feed a wet circular rim. The registered output carries the volume and

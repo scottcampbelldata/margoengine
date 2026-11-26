@@ -848,6 +848,97 @@ test('ThinFilmSolver: a suspended film amplifies the long mode and damps the sho
   }
 });
 
+function pendantProfile(amplitude, length) {
+  // Jambon-Puillet et al. (2021), supplement S2 in radial graph coordinates.
+  // q = h′ / sqrt(1 + h′²), so equilibrium is q′ + q/r + h = pressure.
+  const apex = amplitude / length;
+  const dr = 0.002;
+  function trace(pressure) {
+    const heights = [apex];
+    let height = apex + ((pressure - apex) * dr * dr) / 4;
+    let slope = ((pressure - apex) * dr) / 2;
+    const derivative = (r, h, q) => [q / Math.sqrt(1 - q * q), pressure - h - q / r];
+    for (let i = 1; i < 5 / dr; i++) {
+      heights.push(height);
+      const r = i * dr;
+      const [a, b] = derivative(r, height, slope);
+      const [c, d] = derivative(r + dr / 2, height + (dr * a) / 2, slope + (dr * b) / 2);
+      const [e, f] = derivative(r + dr / 2, height + (dr * c) / 2, slope + (dr * d) / 2);
+      const [g, j] = derivative(r + dr, height + dr * e, slope + dr * f);
+      height += (dr * (a + 2 * c + 2 * e + g)) / 6;
+      slope += (dr * (b + 2 * d + 2 * f + j)) / 6;
+      if (slope >= 0) return { rim: height, heights };
+    }
+    assert.fail('the pendant profile must reach a horizontal tangent at its rim');
+  }
+  let lower = 0.24 * apex;
+  let upper = 0.36 * apex;
+  for (let i = 0; i < 32; i++) {
+    const midpoint = (lower + upper) / 2;
+    if (trace(midpoint).rim > 0) upper = midpoint;
+    else lower = midpoint;
+  }
+  const { rim, heights } = trace((lower + upper) / 2);
+  close(rim, 0, 1e-8);
+  return (r) => {
+    const index = r / (length * dr);
+    const left = Math.floor(index);
+    const value = heights[left] ?? 0;
+    return length * (value + (index - left) * ((heights[left + 1] ?? 0) - value));
+  };
+}
+
+test('ThinFilmSolver: a pendant drop matches held-out thinning on tilted glass', async () => {
+  // Figure 2(b) supplies initial amplitude and coating; the later markers in Fig. 3
+  // supply the separate amplitude and displacement at five minutes.
+  const density = 971;
+  const surfaceTension = 0.0203;
+  const g = 9.81;
+  const angle = (3.4 * Math.PI) / 180;
+  const coating = 89e-6;
+  const initial = pendantProfile(1.16e-3, Math.sqrt(surfaceTension / (density * g)));
+  const startX = 0.00875;
+  const predictions = [];
+  for (const spacing of [0.000625, 0.0005]) {
+    const cells = [Math.round(0.04 / spacing), Math.round(0.02 / spacing)];
+    const [columns, rows] = cells;
+    const depth = Float64Array.from({ length: columns * rows }, (_, i) => {
+      const x = ((i % columns) + 0.5) * spacing - startX;
+      const y = (Math.floor(i / columns) + 0.5) * spacing - 0.01;
+      return coating + initial(Math.hypot(x, y));
+    });
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate, gravity: [g * Math.sin(angle), -g * Math.cos(angle), 0] }).add(film, {
+      cells,
+      spacing,
+      v: [0, 0, 1],
+      density,
+      // The inertialess film equation is linear in inverse viscosity. Each tick
+      // at this rescaling therefore represents fifty seconds of the experiment.
+      viscosity: 1.13 / 3000,
+      surfaceTension,
+      depth,
+      suspended: true,
+    });
+    world.advance(3);
+    const saved = world.takeSnapshot();
+    world.advance(6);
+    const depths = film.depths();
+    const peak = depths.reduce((top, height, i) => (height > depths[top] ? i : top), 0);
+    const amplitude = depths[peak] - coating;
+    const travel = ((peak % columns) + 0.5) * spacing - startX;
+    close(amplitude, 1.01e-3, 0.05e-3);
+    close(travel, 0.02, 0.003);
+    close(film.budget.stored, film.budget.initial, 128 * depth.length * Number.EPSILON * film.budget.initial);
+    predictions.push(amplitude);
+    const hash = world.hash();
+    world.restoreSnapshot(saved.bytes);
+    world.advance(6);
+    assert.equal(world.hash(), hash);
+  }
+  close(predictions[0], predictions[1], 0.025e-3);
+});
+
 test('ThinFilmSolver: a suspended film rejects removal of its restoring surface tension', async () => {
   await assert.rejects(() => patch({ cells: [4, 1], spacing: 0.001, suspended: true, surfaceTension: 0 }), {
     name: 'RangeError',

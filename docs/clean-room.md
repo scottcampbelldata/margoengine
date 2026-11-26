@@ -15713,6 +15713,14 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   wavelength the explicit gravity coefficient is twice the rate, so the native solver
   subdivides to keep the explicit contribution at most one-half per step.
   [Journal](https://doi.org/10.1017/S0022112092001447)
+- Etienne Jambon-Puillet, Pier Giuseppe Ledda, François Gallaire and P.-T. Brun,
+  “Drops on the Underside of a Slightly Inclined Wet Substrate Move Too Fast to Grow”
+  (2021). Supplement S1 gives the suspended film equation with full height-graph
+  curvature `div(grad h / sqrt(1 + |grad h|²))`. Freeze the positive face metric in each
+  semi-implicit solve and use the same face mobility for the downslope body force and
+  pressure gradient. The starting drop comes from the Young–Laplace equation S2 and
+  Fig. 2(b). The Fig. 3 measured five-minute amplitude and travel are held-out outputs.
+  [Journal](https://doi.org/10.1103/PhysRevLett.127.044503)
 - Yasuhiko H. Mori, “Harkins–Brown correction factor for drop formation” (1990), equations
   3 and 7. For a wet circular rim of diameter `D`, the ideal volume is `Vp = πDσ/(ρg)`.
   The released volume is `Vp[0.6 + 0.4(1 − D/(1.4 Vp^(1/3)))^2.2]` in the published

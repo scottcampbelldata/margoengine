@@ -84,6 +84,14 @@ impl Grid {
         }
     }
 
+    fn previous(&self, i: usize, axis: usize) -> Option<usize> {
+        if axis == 0 {
+            (i.checked_rem(self.cols).unwrap_or_else(|| unreachable()) > 0).then(|| i - 1)
+        } else {
+            (i >= self.cols).then(|| i - self.cols)
+        }
+    }
+
     fn degree(&self, i: usize) -> f64 {
         let x = i.checked_rem(self.cols).unwrap_or_else(|| unreachable());
         let z = i.checked_div(self.cols).unwrap_or_else(|| unreachable());
@@ -194,6 +202,7 @@ struct Film {
     external: *const Forcing,
     height: *mut f64,
     base: *const f64,
+    curvature: *mut f64,
 }
 
 impl Film {
@@ -207,11 +216,95 @@ impl Film {
         h * (0.5 * h + model.slip) / model.viscosity
     }
 
+    fn suspended(&self) -> bool {
+        !self.curvature.is_null()
+    }
+
+    unsafe fn transverse_slope(&self, h: *const f64, i: usize, axis: usize) -> f64 {
+        let grid = self.grid;
+        let before = grid.previous(i, axis).unwrap_or(i);
+        let after = grid.neighbor(i, axis).unwrap_or(i);
+        0.5 * grid.inv_dx * (*h.add(after) - *h.add(before))
+    }
+
+    unsafe fn update_curvature_weights(&self, h: *const f64) -> f64 {
+        let grid = self.grid;
+        let mut max_metric: f64 = 1.0;
+        for i in 0..grid.n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let across = (*h.add(j) - *h.add(i)) * grid.inv_dx;
+                    let along = 0.5
+                        * (self.transverse_slope(h, i, 1 - axis)
+                            + self.transverse_slope(h, j, 1 - axis));
+                    // Freeze the graph-curvature metric during the pressure solve.
+                    let metric = scalar_sqrt(1.0 + across * across + along * along);
+                    self.curvature.add(2 * i + axis).write(1.0 / metric);
+                    max_metric = max_metric.max(metric);
+                }
+            }
+        }
+        max_metric
+    }
+
+    unsafe fn free_surface(&self) -> *const f64 {
+        let surface = self.work.trial;
+        for i in 0..self.grid.n {
+            surface
+                .add(i)
+                .write(*self.base.add(i) + *self.height.add(i));
+        }
+        surface
+    }
+
+    unsafe fn curvature_weight(&self, face: usize) -> f64 {
+        if self.suspended() {
+            *self.curvature.add(face)
+        } else {
+            1.0
+        }
+    }
+
+    unsafe fn curvature_degree(&self, i: usize) -> f64 {
+        if !self.suspended() {
+            return self.grid.degree(i);
+        }
+        let mut sum = 0.0;
+        for axis in 0..2 {
+            if let Some(before) = self.grid.previous(i, axis) {
+                sum += self.curvature_weight(2 * before + axis);
+            }
+            if self.grid.neighbor(i, axis).is_some() {
+                sum += self.curvature_weight(2 * i + axis);
+            }
+        }
+        sum
+    }
+
+    unsafe fn apply_curvature(&self, h: *const f64, out: *mut f64) {
+        let grid = self.grid;
+        let inv_dx2 = grid.inv_dx * grid.inv_dx;
+        for i in 0..grid.n {
+            for axis in 0..2 {
+                if let Some(j) = grid.neighbor(i, axis) {
+                    let exchange =
+                        (*h.add(i) - *h.add(j)) * inv_dx2 * self.curvature_weight(2 * i + axis);
+                    *out.add(i) += exchange;
+                    *out.add(j) -= exchange;
+                }
+            }
+        }
+    }
+
     unsafe fn hydraulic_pressure(&self, h: *const f64, k: f64, out: *mut f64) {
         let sigma = (*self.model).surface_tension;
         zero(out, self.grid.n);
         if sigma != 0.0 {
-            self.grid.laplacian(h, out);
+            if self.suspended() {
+                self.apply_curvature(h, out);
+            } else {
+                self.grid.laplacian(h, out);
+            }
         }
         for i in 0..self.grid.n {
             *out.add(i) = k * *h.add(i) + sigma * *out.add(i);
@@ -259,12 +352,11 @@ impl Film {
         let work = &self.work;
         let model = &*self.model;
         let n = grid.n;
-        for i in 0..n {
-            work.trial
-                .add(i)
-                .write(*self.base.add(i) + *self.height.add(i));
+        let surface = self.free_surface();
+        if self.suspended() {
+            self.update_curvature_weights(surface);
         }
-        self.hydraulic_pressure(work.trial, k, work.pressure);
+        self.hydraulic_pressure(surface, k, work.pressure);
         // Gravity pulling liquid away from the backing enters only the right-hand side.
         // The implicit capillary and supporting-pressure terms remain positive semidefinite.
         let mut k = k.max(0.0);
@@ -299,6 +391,10 @@ impl Film {
                     let other = *self.height.add(j);
                     let mut m = 0.5 * (self.mobility(h) + self.mobility(other));
                     rhs = -*work.pressure.add(j) + head;
+                    if self.suspended() && m > 0.0 {
+                        // Use the same wet-face mobility for gravity and pressure.
+                        rhs += self.suspended_transport(h, other, m, axis) / m / grid.inv_dx;
+                    }
                     // Contact-line hysteresis is a pressure deadband only at a wet/dry edge.
                     if (h == 0.0) != (other == 0.0) {
                         let threshold = model.pinning * grid.inv_dx;
@@ -321,9 +417,12 @@ impl Film {
                         / (1.0
                             + dt * m
                                 * ((2.0 * k + stiffness) * dx2
-                                    + (grid.degree(i) + grid.degree(j) + 2.0) * capillary));
+                                    + (self.curvature_degree(i)
+                                        + self.curvature_degree(j)
+                                        + 2.0 * self.curvature_weight(f))
+                                        * capillary));
                     rhs *= weight * grid.inv_dx;
-                    if !self.contact.is_null() && weight > 0.0 {
+                    if !self.suspended() && !self.contact.is_null() && weight > 0.0 {
                         rhs += *work.flux.add(f) / weight;
                     }
                 }
@@ -350,7 +449,7 @@ impl Film {
         let dx2 = grid.inv_dx * grid.inv_dx;
         let capillary = (*self.model).surface_tension * dx2;
         // The strip gradient times its transpose is the tridiagonal (−1, 2, −1).
-        // Squaring it for curvature gives −4 and 1 on the two off-diagonals.
+        // The curvature block is T W T, where W holds the frozen face metrics.
         // Keep just those bands of the Cholesky factor in the unused PCG workspace.
         for i in 0..faces {
             let f = 2 * i + axis;
@@ -358,8 +457,13 @@ impl Film {
             let mut lower_two = 0.0;
             let mut lower_one = 0.0;
             if i > 1 {
-                lower_two =
-                    dt * dx2 * capillary * weight * *work.weight.add(f - 4) / *work.z.add(f - 4);
+                lower_two = dt
+                    * dx2
+                    * capillary
+                    * self.curvature_weight(f - 2)
+                    * weight
+                    * *work.weight.add(f - 4)
+                    / *work.z.add(f - 4);
             }
             if i > 0 {
                 let wetting = if self.wetting_map.is_null() {
@@ -373,8 +477,9 @@ impl Film {
                     let scale = *contact_norm.add(i);
                     scale * scale
                 };
+                let metric = 2.0 * (self.curvature_weight(f - 2) + self.curvature_weight(f));
                 let subdiagonal = -dx2
-                    * (dt * (k + wetting + 4.0 * capillary) + contact)
+                    * (dt * (k + wetting + metric * capillary) + contact)
                     * weight
                     * *work.weight.add(f - 2);
                 lower_one =
@@ -439,7 +544,11 @@ impl Film {
                 let f = 2 * i + axis;
                 let weight = *w.weight.add(f);
                 let lower_two = if index > 1 {
-                    dt * dx2 * capillary * weight * *w.weight.add(f - 2 * step)
+                    dt * dx2
+                        * capillary
+                        * self.curvature_weight(f - step)
+                        * weight
+                        * *w.weight.add(f - 2 * step)
                         / *center.add(f - 2 * step)
                 } else {
                     0.0
@@ -456,8 +565,15 @@ impl Film {
                         let scale = *contact_norm.add(i);
                         scale * scale
                     };
+                    let metric = self.curvature_degree(i)
+                        + self.curvature_weight(f - step)
+                        + if grid.neighbor(i, axis).is_some() {
+                            self.curvature_weight(f)
+                        } else {
+                            0.0
+                        };
                     let subdiagonal = -dx2
-                        * (dt * (k + wetting + (grid.degree(i) + 2.0) * capillary) + contact)
+                        * (dt * (k + wetting + metric * capillary) + contact)
                         * weight
                         * *w.weight.add(f - step);
                     (subdiagonal - lower_two * *one.add(f - step)) / *center.add(f - step)
@@ -639,7 +755,8 @@ impl Film {
             } else {
                 *contact_norm.add(i)
             };
-            let stiffness = dt * (k + wetting + capillary * grid.degree(i)) + contact * contact;
+            let stiffness =
+                dt * (k + wetting + capillary * self.curvature_degree(i)) + contact * contact;
             inverse
                 .add(i)
                 .write(1.0 / (1.0 + *mobility.add(i) * stiffness));
@@ -970,6 +1087,23 @@ impl Film {
         }
     }
 
+    fn suspended_transport(&self, left: f64, right: f64, mobility: f64, axis: usize) -> f64 {
+        let forcing = unsafe { &*self.external };
+        let (gravity, shear) = if axis == 0 {
+            (forcing.gravity_u, forcing.shear_u)
+        } else {
+            (forcing.gravity_v, forcing.shear_v)
+        };
+        let body = unsafe { (*self.model).density } * gravity;
+        if left == 0.0 {
+            return self.transport(right, body, shear, false).min(0.0);
+        }
+        if right == 0.0 {
+            return self.transport(left, body, shear, false).max(0.0);
+        }
+        mobility * body + 0.5 * (self.shear_weight(left) + self.shear_weight(right)) * shear
+    }
+
     unsafe fn advective_faces(&self) {
         let s = &*self.external;
         let grid = self.grid;
@@ -999,6 +1133,9 @@ impl Film {
             }
             if z + 1 == grid.rows && s.drain_v1 != 0.0 {
                 w.edges.add(4 * i + 3).write((slip_v + head).max(0.0));
+            }
+            if self.suspended() {
+                continue;
             }
             for axis in 0..2 {
                 if let Some(j) = grid.neighbor(i, axis) {
@@ -1116,8 +1253,10 @@ impl Film {
         let advective_steps = 2.0 * max_adv * dt * grid.inv_dx;
         let growth_steps = if k < 0.0 {
             // The fastest long-wave mode has growth M k²/(4 sigma). Its explicit
-            // gravity term is twice that rate. Keep its update at half or less.
-            dt * self.mobility(max_depth) * (k * k / model.surface_tension)
+            // gravity term is twice that rate. Use the weakest frozen capillary
+            // coefficient when keeping this update at half or less.
+            let metric = self.update_curvature_weights(self.free_surface());
+            dt * self.mobility(max_depth) * (k * k / model.surface_tension) * metric
         } else {
             0.0
         };
@@ -1129,13 +1268,15 @@ impl Film {
         }
         let step = dt / substeps;
         for _ in 0..substeps as u32 {
-            self.advective_faces();
-            if self.contact.is_null() {
-                self.move_water(step, true, exits);
-            } else if drains {
-                zero(self.work.flux, 2 * n);
-                self.move_water(step, true, exits);
+            if !self.suspended() || drains {
                 self.advective_faces();
+                if self.contact.is_null() || self.suspended() {
+                    self.move_water(step, true, exits);
+                } else if drains {
+                    zero(self.work.flux, 2 * n);
+                    self.move_water(step, true, exits);
+                    self.advective_faces();
+                }
             }
             if !self.wet_solution(k, step) {
                 return 2;
@@ -1184,6 +1325,7 @@ unsafe extern "C" fn thin_film_step(
     wetting: *const Wetting,
     wetting_map: *const f64,
     contact: *const ContactAngles,
+    suspended: u32,
 ) -> u32 {
     let (cols, rows) = (cols as usize, rows as usize);
     let n = cols * rows;
@@ -1194,6 +1336,11 @@ unsafe extern "C" fn thin_film_step(
         inv_dx: (*model).inv_dx,
     };
     let work = Workspace::new(workspace, n);
+    let curvature = if suspended != 0 {
+        workspace.add(if contact.is_null() { 25 * n } else { 32 * n })
+    } else {
+        core::ptr::null_mut()
+    };
     Film {
         grid,
         work,
@@ -1204,6 +1351,7 @@ unsafe extern "C" fn thin_film_step(
         external: forcing,
         height,
         base,
+        curvature,
     }
     .step(rain, out, budget, dt)
 }

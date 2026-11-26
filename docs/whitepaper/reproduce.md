@@ -4869,6 +4869,17 @@ Laplacian eigenvalue. A higher-growth case checks subdivision against the derive
 gravity rate and verifies the uniform-state fixed point.
 [Fermigier et al. (1992), Eq. 1.3 and §2](https://doi.org/10.1017/S0022112092001447)
 
+Run `node --test --test-name-pattern="held-out thinning" packages/physics/tests/thin-film.test.js`
+for the prewetted glass case. Figure 2(b) supplies the 3.4° tilt, 89 µm coating and
+1.16 mm starting amplitude. The test solves the radial Young–Laplace initial profile
+from supplement S2. Figure 3's later measured markers give about 1.01 mm amplitude
+and 20 mm travel at five minutes. The 0.625 and 0.5 mm grids use the same physical patch,
+and each conserves liquid volume and repeats its exact snapshot hash. Scaling viscosity by
+1/3000 advances the same inertialess equation by 50 experimental seconds per tick.
+The former split first-order body flux gave 0.810 mm at 0.5 mm spacing. The shared
+pressure and gravity mobility and full graph curvature give about 1 mm at both
+resolutions. [Jambon-Puillet et al. (2021), Figs. 2–3 and supplementary equations S1–S2](https://doi.org/10.1103/PhysRevLett.127.044503)
+
 ### FLUID-07 circular sill drops
 
 Run `node --test --test-name-pattern="circular sill" packages/physics/tests/coupling/thin-film.test.js`

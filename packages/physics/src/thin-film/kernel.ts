@@ -23,6 +23,7 @@ export interface ThinFilmKernel {
     wetting: number,
     wettingMap: number,
     contactAngles: number,
+    suspended: number,
   ): number;
 }
 
