@@ -245,9 +245,14 @@ function evaluateCurve(c: SocketCurve, s: number): number {
 }
 // Blender turns a colour wired into a float socket into its scene-linear Rec. 709 luminance, not the mean of R, G and B.
 // The weights are the ones a Cycles bake of RGB -> Math Add 0 gives in Blender 5.3 (KB-P3d, tests/fixtures/node-probes.json);
-// Geometry Nodes rounds them to 0.2126, 0.7152 and 0.0722 (ITU-R BT.709-6, 2015, item 3.2).
+// Geometry Nodes rounds them to 0.2126, 0.7152 and 0.0722 (ITU-R BT.709-6, 2015, item 3.2). A vector becomes the mean
+// of its components, as a Cycles bake of Combine XYZ -> Math Add 0 gives (KB5339h).
 const scalar = (e: string, type: string) =>
-  type === 'color' ? `dot(${e}.rgb,vec3f(0.2126391,0.7151691,0.0721927))` : `${e}.x`;
+  type === 'color'
+    ? `dot(${e}.rgb,vec3f(0.2126391,0.7151691,0.0721927))`
+    : type === 'vector'
+      ? `dot(${e}.xyz,vec3f(0.3333333333333333))`
+      : `${e}.x`;
 
 /** A compiled GPU surface and its live uniform values. set and seek never recompile the shader or bake an image. */
 export class MargoNodeMaterial {

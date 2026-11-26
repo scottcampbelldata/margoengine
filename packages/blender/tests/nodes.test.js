@@ -271,6 +271,31 @@ test("KB-P3d: a colour wired into a float socket gives Blender's luminance, not 
     assert.ok(Math.abs(gray - value) < 1e-4, `Geometry Nodes grey of ${color}: ${gray} against ${value}`);
   }
 });
+test('KB5339h: a vector wired into a float socket becomes the mean of its components', () => {
+  // Truth: Blender 5.3 baking Combine XYZ (0.9, 0.2, 0.1) -> Math Add 0 in Cycles gives 0.4
+  // (tools/blender-addon/tests/blender_mute.py, case vector_float).
+  const parameters = Object.fromEntries([0.9, 0.2, 0.1].map((v, i) => [`c${i}`, { value: [v] }]));
+  const graph = {
+    version: 1,
+    nodes: [
+      {
+        name: 'Combine',
+        type: 'vector',
+        op: 'combine',
+        inputs: [{ parameter: 'c0' }, { parameter: 'c1' }, { parameter: 'c2' }],
+      },
+    ],
+    parameters,
+    surface: { roughness: { link: 0 } },
+    bounds: [
+      [0, 0, 0],
+      [1, 1, 1],
+    ],
+    unitScale: 1,
+  };
+  const source = new MargoNodeMaterial(graph).extension.wgsl;
+  assert.match(source, /dot\(bn0\.xyz,vec3f\(0\.3333333333333333\)\)/, source);
+});
 test("KB-P3d: LINEAR extrapolation follows each end key's own interpolation (CONSTANT flat, LINEAR neighbour, others handle)", async () => {
   // Truth: Blender 5.3 fcurve.evaluate past both ends of each exported curve (tools/blender-addon/tests/blender_node_probes.py).
   const { graph: probed, truth } = JSON.parse(

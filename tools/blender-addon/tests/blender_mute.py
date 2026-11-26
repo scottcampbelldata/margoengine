@@ -1,4 +1,4 @@
-"""KB5339f: muted nodes and links export as Blender evaluates them. Each case wires muted constructs into the Emission
+"""KB5339f, and KB5339g (a colour or vector fed into a float input bakes as Blender converts it): muted nodes and links export as Blender evaluates them. Each case wires muted constructs into the Emission
 Colour and Roughness of a Principled BSDF whose own socket values differ, then a Cycles bake of the untouched material
 (emission and roughness passes) is the truth for all three exporter paths: the bake, the live node graph and the direct
 export. Run with:
@@ -107,7 +107,23 @@ def muted_surface(tree, emission, rough):
     tree.links.new(value(tree, 0.6), rough)
 
 
-CASES = (muted_pass, muted_drop, muted_links, muted_chain, muted_surface)
+def color_float(tree, emission, rough):
+    """A colour passed through a muted Math node into Roughness becomes its luminance."""
+    m = math(tree)
+    tree.links.new(rgb(tree), m.inputs[0])
+    tree.links.new(m.outputs[0], rough)
+    m.mute = True
+
+
+def vector_float(tree, emission, rough):
+    """A vector wired into Roughness becomes the mean of its components."""
+    combine = tree.nodes.new("ShaderNodeCombineXYZ")
+    for i, v in enumerate((0.9, 0.2, 0.1)):
+        combine.inputs[i].default_value = v
+    tree.links.new(combine.outputs[0], rough)
+
+
+CASES = (muted_pass, muted_drop, muted_links, muted_chain, muted_surface, color_float, vector_float)
 
 
 def make(case):
@@ -166,10 +182,14 @@ for case in CASES:
     truth = (cycles(material, "EMIT")[:3], cycles(material, "ROUGHNESS")[0])
     report[name] = {"emission": truth[0].tolist(), "roughness": float(truth[1])}
 
-    data = graph(bpy.context, material, plane)
-    emission = live_value(data, data["surface"]["emission"])
-    close(emission[:3] if len(emission) > 2 else emission * 3, truth[0], f"{name} live emission")
-    close(live_value(data, data["surface"]["roughness"])[:1], [truth[1]], f"{name} live roughness")
+    if case is not vector_float:  # its live conversion is the reader's (packages/blender/tests/nodes.test.js, KB5339h)
+        data = graph(bpy.context, material, plane)
+        emission = live_value(data, data["surface"]["emission"])
+        close(emission[:3] if len(emission) > 2 else emission * 3, truth[0], f"{name} live emission")
+        rough = live_value(data, data["surface"]["roughness"])
+        if len(rough) > 1:  # a colour: the reader takes its luminance (KB-P3d)
+            rough = [np.dot(rough[:3], (0.2126391, 0.7151691, 0.0721927))]
+        close(rough, [truth[1]], f"{name} live roughness")
 
     links = sorted((l.from_node.name, l.to_node.name, l.is_muted) for l in material.node_tree.links)
     baked = bake_material(bpy.context, plane, material, 4)
