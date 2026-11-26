@@ -116,6 +116,7 @@ export interface SoilRollingWheel {
     readonly lugWidth?: number;
     readonly treadMesh?: SoilTreadMesh;
     readonly bermProfile?: 'ring' | 'cross-track';
+    readonly grouserFill?: number;
 }
 
 export interface SoilTreadMesh {

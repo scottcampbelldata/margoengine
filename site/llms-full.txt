@@ -13020,15 +13020,16 @@ The optional side-force field combines rim shear and passive sidewall earth pres
 gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
-or off-grid banks report their volume as exported. Closed-form backfill and transport in grousers
-are outside this initial deposit model.
+or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
+[0, 1], rotating lugs return up to the current rear cut capacity or transfer loose soil between
+banks at large obliquity. Previously filled and compacted tracks use the cumulative bed state.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 13,617 B gzip with a 13,728 B ceiling. Both Wasm assets are 32,388 B raw and 12,732 B gzip each.
+The optional entry is 13,650 B gzip with a 13,728 B ceiling. Both Wasm assets are 33,712 B raw and 13,196 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
@@ -29985,6 +29986,8 @@ Measured cross-slope camber forces remain open.
 The steady drawbar and axle torque match the measured 60% tip-slip case; transient digging,
 high-slip sinkage and measured berm geometry still need held-out measurements. The optional
 cross-track depositor conserves independent bank volumes from the actual cut.
+Grouser transport can backfill the newly cut ground or feed the opposite bank. A quantitative
+comparison to steady scanned trench profiles remains open.
 Forward skidding can opt into signed dry-soil contact including lockup. The closed-form and live
 brake cases pass. Oblique rolling publishes combined shear and sidewall force, with a live
 opposing chassis impulse. Reverse travel and measurements over multiple slip angles remain open.
