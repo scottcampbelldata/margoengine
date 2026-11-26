@@ -12036,24 +12036,6 @@
     },
     {
       "date": "2026-11-25",
-      "commit": "200b488af",
-      "reason": "@margoengine/math/random: new entry, 944 B gzip: the engine's counter-based generator (Philox4x32-10, the TypeScript twin of K02), moved from physics/world (which re-exports it) so that weather and other packages draw the same numbers without loading the physics world.",
-      "grew": 1
-    },
-    {
-      "date": "2026-11-25",
-      "commit": "200b488af",
-      "reason": "@margoengine/weather/turbulence: new entry, 1,709 B gzip: Mann's sheared spectral-tensor turbulence box (ATMO-02) on the pinned FFT and maths.",
-      "grew": 1
-    },
-    {
-      "date": "2026-11-25",
-      "commit": "200b488af",
-      "reason": "@margoengine/weather/boundary-layer: new entry, 2,340 B gzip: the framework's wind (ATMO-01), the log-law boundary layer over the Mann box with the standard atmosphere, as the Wind contract.",
-      "grew": 1
-    },
-    {
-      "date": "2026-11-25",
       "commit": "edad7b6e0",
       "reason": "tonemap Grade tonal ranges (colour curves: hue, density, saturation, exposure per global, shadows, midtones, highlights)",
       "grew": 3

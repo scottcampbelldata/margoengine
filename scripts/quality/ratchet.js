@@ -75,11 +75,19 @@ export function droppedHistory(root, gate, baseline, ref = 'origin/main') {
   return historyMissing(base.history ?? [], baseline.history ?? []);
 }
 
+/** What makes a history entry itself: its date, commit and reason, whatever the order of its keys. */
+const historyKey = (h) => `${h.date}|${h.commit}|${h.reason}`;
+
 /** Entries of `before` (by date, commit and reason) that `after` lacks. */
 export function historyMissing(before, after) {
-  const key = (h) => `${h.date}|${h.commit}|${h.reason}`,
-    kept = new Set(after.map(key));
-  return before.filter((h) => !kept.has(key(h)));
+  const kept = new Set(after.map(historyKey));
+  return before.filter((h) => !kept.has(historyKey(h)));
+}
+
+/** Entries of `history` that repeat an earlier one (by date, commit and reason): a merge that appended a row twice. */
+export function historyRepeated(history) {
+  const seen = new Set();
+  return history.filter((h) => seen.size === seen.add(historyKey(h)).size);
 }
 
 function headCommit(root) {
