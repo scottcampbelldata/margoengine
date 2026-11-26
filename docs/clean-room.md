@@ -520,6 +520,50 @@ load reference, and measured slope-dependent soil failure stays separate from th
 [Matsumura and Ishigami](https://doi.org/10.1016/j.jterra.2020.09.002),
 [Keio Space Robotics Lab](https://www.srg.mech.keio.ac.jp/research/matsumura2021visualization/).
 
+### Resistive force on rotating legs (EARTH-05)
+
+Chen Li, Tingnan Zhang and Daniel I. Goldman, *A Terradynamics of Legged Locomotion on
+Granular Media* (2013), Eq. 1, Eq. 2 and supplement Eqs. S8–S9, give the force on
+an immersed element of a moving surface. The four horizontal and five vertical
+Fourier terms depend on element attack and intrusion directions. They multiply the
+wet element's area and vertical depth; the force at each midpoint produces a moment
+about the rigid body's centre of mass. Angles follow Fig. 2A, with the positive
+intrusion direction pointing down. The sign and magnitude of vertical extraction force
+can differ from intrusion. The implementation uses angle-addition products of unit
+directions and deterministic two-element SIMD batches.
+[Paper and supplement](https://goldmanlab.gatech.edu/pages/publications/pdf/Science-2013-Li-1408-12_ALL.pdf).
+
+Tingnan Zhang and Daniel I. Goldman, *The effectiveness of resistive force theory in
+granular locomotion* (2014), reviews the independent strip superposition and where speed
+and adjacent elements limit it. Laura K. Treers, Cyndia Cao and Hannah S. Stuart,
+*Granular Resistive Force Theory Implementation for Three-Dimensional Trajectories*
+(2021), tests a three-dimensional extension to the vertical-plane law used here.
+[Zhang and Goldman](https://doi.org/10.1063/1.4898629).
+[Treers, Cao and Stuart](https://doi.org/10.1109/LRA.2021.3057052).
+
+Table S2 gives coefficients in N/cm³ from linear measurements on a 38.1 × 25.4 mm
+plate. Multiply by 10⁶ to obtain N/m³. The held-out targets come from the separate
+Fig. S5 A and D rigid C-leg rotation runs by the apparatus at a 20 mm hip height
+and 0.2 rad/s. The fixture divides the 76.2 mm long, 25.4 mm wide C-leg into 30 strips
+and computes force and moment from the actual kinematic body in the live TerrainBed.
+The model input consists of geometry, motion and nine coefficients from the plate tests.
+
+The test digitizes the green solid thrust and blue solid lift paths on supplement
+page 11 every π/8 over ±π/2. In top-left PDF points, panel A uses θ = 0 at x = 263.307,
+π/2 spans 35.309 pt, and the 0 N and 10 N grid lines are at y = 166.277 and 82.555.
+Panel D uses θ = 0 at x = 263.195, π/2 spans 34.724 pt, and its 0 N and 20 N grid
+lines are at y = 270.534 and 182.585. The independent peaks are [4.619, 9.357] N
+and [6.981, 15.175] N in thrust, lift order. The tests use the paper's C-leg
+10% and all-leg 33% peak error envelopes, plus the 0.05 N instrument precision
+and up to 0.13 N from half the 1.1 pt PDF curve stroke. The phase comparisons use
+the wider published envelope relative to each measured peak. These bounds account
+for model error separately from instrument precision.
+
+Run `node --test packages/physics/tests/coupling/resistive-soil.test.js` after building
+Physics. The analytic fixture independently integrates a translating strip's force and
+moment, verifies the rigid body's resulting velocity and checks snapshot hash parity.
+The browser repeats that test with both native memory variants.
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”

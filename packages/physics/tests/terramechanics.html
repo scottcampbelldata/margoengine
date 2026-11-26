@@ -4,10 +4,11 @@
 <body style="margin:0">
   <canvas id="soil" width="640" height="360"></canvas>
   <script type="module">
+    import { Physics } from '/packages/physics/dist/index.js';
     import { AirborneParticles } from '/packages/physics/dist/airborne.js';
     import { TerrainBed } from '/packages/physics/dist/earth.js';
-    import { Terramechanics } from '/packages/physics/dist/terramechanics.js';
-    import { PhysicsWorld, worldMemory } from '/packages/physics/dist/world.js';
+    import { ResistiveSoil, Terramechanics } from '/packages/physics/dist/terramechanics.js';
+    import { PhysicsWorld, RigidSolver, worldMemory } from '/packages/physics/dist/world.js';
 
     const terrain = { columns: 24, rows: 24, width: 2.4, depth: 2.4, centre: [0, 0] };
 
@@ -39,6 +40,38 @@
       return { mean: [await simulate(false, 'mean'), await simulate(true, 'mean')],
         resolved: [await simulate(false, 'resolved'), await simulate(true, 'resolved')],
         hardpan: [await simulate(false, 'resolved', hardpan), await simulate(true, 'resolved', hardpan)] };
+    };
+
+    window.runResistiveSoil = async () => {
+      await Physics.load({ threads: true });
+      const simulate = async (shared) => {
+        const soil = await ResistiveSoil.load();
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+        const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
+        try {
+          const body = physics.addBody(null, {
+            linearVelocity: [0, -0.06, 0],
+            colliders: { shape: 'sphere', radius: 0.05, mass: 2 },
+          });
+          const strip = { start: [0.01, -0.10, 0], end: [0.11, -0.10, 0], width: 0.1, samples: 3 };
+          world.add(new TerrainBed(), { ...terrain, elevations: () => 0 })
+            .add(new RigidSolver(), { physics })
+            .add(soil, { terrain, coefficients: [1000, 0, 0, 0, 0, 0, 0, 0, 0], bodies: [{ row: body.row, strips: [strip] }] })
+            .couple(['bed', 'rigid', soil.id], 'staggered');
+          world.advance(1);
+          const snapshot = world.takeSnapshot();
+          const { force, torque } = soil.read(body.row);
+          const depth = 0.1 - body.position[1];
+          world.advance(2);
+          const hash = world.hash();
+          world.restoreSnapshot(snapshot.bytes);
+          world.advance(2);
+          return { hash, restored: world.hash(), depth, force, torque, velocity: body.linearVelocity };
+        } finally {
+          physics.dispose();
+        }
+      };
+      return [await simulate(false), await simulate(true)];
     };
 
     window.prepareTerramechanicsRender = async () => {

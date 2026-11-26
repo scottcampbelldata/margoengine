@@ -5102,7 +5102,7 @@ sidewall earth pressure. It uses the prepared soil's density and `sidewallGravit
 to 9.81 m/s². The rigid wheel applies the force at the contact and limits it to oppose side slip.
 Set a measured `lateralShearLength` on prepared soil to use separate transverse and longitudinal
 mobilization on the forward rolling rim. Omit it for the combined shear model.
-[FJS-1 measured side-load example](tests/coupling/terramechanics.test.js).
+[FJS-1 directional side-load calibration example](tests/coupling/terramechanics.test.js).
 
 Set a rolling wheel's `bermProfile` to `'cross-track'` to form two soil banks beside its path.
 The projected wheel geometry splits the uncompacted material at oblique angles. Material is
@@ -5136,6 +5136,46 @@ const soil = await Terramechanics.load({ tier: 'resolved', input, wheelPhase, wh
 const rigid = new SoilContactRigidSolver(input, { terrain, wheelPhase, wheelReaction });
 console.log(rigid.describe().id, soil.describe().id);
 ```
+
+Use `ResistiveSoil` when forces should follow the shape, depth and velocity of a moving leg
+through dry grains. It reads the active bed, integrates the published anisotropic stress law
+on thin strips, and returns the force and moment to the real rigid body. Supply the nine
+Fourier coefficients from a separate plate experiment in N/m³. Each strip samples 30
+midpoints by default. To form a curved leg, chain short strips. They resolve motion in the
+vertical plane perpendicular to local +Z projected onto the horizontal.
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { TerrainBed } from '@margoengine/physics/earth';
+import { ResistiveSoil } from '@margoengine/physics/terramechanics';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+
+await Physics.load();
+const soil = await ResistiveSoil.load();
+const terrain = { columns: 8, rows: 8, width: 0.24, depth: 0.22, centre: [0, 0] as const };
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
+using physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, gravity: [0, 0, 0] });
+const leg = physics.addBody(null, {
+  position: [0, 0.02, 0],
+  linearVelocity: [-0.01, -0.01, 0],
+  colliders: { shape: 'sphere', radius: 0.02, mass: 1 },
+});
+world.add(new TerrainBed(), { ...terrain, elevations: () => 0 });
+world.add(new RigidSolver(), { physics });
+world.add(soil, {
+  terrain,
+  coefficients: [51_000, 47_000, 53_000, 83_000, 20_000, -26_000, 57_000, 0, 25_000],
+  bodies: [{ row: leg.row, strips: [{ start: [0, 0, 0], end: [0, -0.0762, 0], width: 0.0254 }] }],
+});
+world.couple(['bed', 'rigid', soil.id], 'staggered');
+world.advance(2);
+console.log(soil.read(leg.row).force);
+```
+
+The example uses the measured loosely packed poppy-seed coefficients from Li, Zhang
+and Goldman (2013), Table S2. The load acts on the next rigid step. The separately
+measured rotating-leg experiment checks both lift and thrust.
+[Rotating-leg validation](tests/coupling/resistive-soil.test.js).
 
 ## Granular material points
 

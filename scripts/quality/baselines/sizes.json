@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20558458,
+  "total": 20560098,
   "history": [
     {
       "date": "2026-10-24",
@@ -13591,6 +13591,12 @@
       "commit": "297d67482",
       "grew": 1,
       "reason": "react/post measured 4,872 B, ceiling 4,621 to 5,018: Pixelate, DotScreen, Vignette, FilmGrain and ChromaticAberration join the composer effect components (the last three set options of its Tonemap). A separate entry would load the composer code twice."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "16f7aa54b4",
+      "grew": 1,
+      "reason": "EARTH-05 adding native resistive strip integration from Li, Zhang and Goldman takes the optional entry from 14749 to 16311 B gzip. The force integrator shares the existing lazy native asset, world memory and bed sampler. A separate entry would add a Wasm fetch and duplicate that setup. Core plus Stage stays 24846 B."
     }
   ],
   "items": {
@@ -14464,7 +14470,7 @@
     "@margoengine/physics/strands": 6518,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/synoptic": 7497,
-    "@margoengine/physics/terramechanics": 15161,
+    "@margoengine/physics/terramechanics": 16801,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
     "@margoengine/physics/tissue": 3218,

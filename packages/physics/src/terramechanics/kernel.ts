@@ -8,6 +8,14 @@ export interface Builds {
 }
 
 export interface NativeSoil {
+  resistive(
+    coefficients: number,
+    samples: number,
+    count: number,
+    horizontalX: number,
+    horizontalZ: number,
+    forces: number,
+  ): void;
   stamp(
     patch: number,
     areas: number,
@@ -86,6 +94,7 @@ export function bindSoil(host: SolverHost, builds: Builds): NativeSoil {
   const { exports } = new WebAssembly.Instance(module, { env: { memory: host.memory } });
   if (
     !(exports.__stack_pointer instanceof WebAssembly.Global) ||
+    typeof exports.resistive !== 'function' ||
     typeof exports.stamp !== 'function' ||
     typeof exports.repose !== 'function'
   )

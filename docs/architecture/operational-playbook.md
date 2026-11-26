@@ -10681,6 +10681,12 @@ for the same conservative repose sweep and records the share of each missing ban
 Grouser transport takes its volume from the same cut ledger. It uses the rear area's current
 excavation capacity and sends it to the opposite bank when the projected corners align.
 
+The dry granular resistive-force solver reads TerrainBed and the rigid body pose and velocity
+on the world clock. Each SIMD lane integrates a separate submerged strip sample from the
+published anisotropic stress law. The native reduction preserves sample order. Forces and
+centre-of-mass moments accumulate through the existing rigid field and survive snapshot restore.
+The calibration plate stresses and measured rotating-leg force traces come from separate experiments.
+
 ### Divergence-free particle pressure
 
 The optional Physics liquid entry owns no static native data. Plain and shared SIMD kernels use the

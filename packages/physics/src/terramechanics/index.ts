@@ -17,6 +17,13 @@ import type { Cell, FieldDescriptor, Port, Region, Solver, SolverHost, StepConte
 import { bindSoil, type Builds, loadSoil, type NativeSoil } from './kernel.js';
 
 export {
+  ResistiveSoil,
+  type ResistiveSoilCoefficients,
+  type ResistiveSoilOptions,
+  type ResistiveSoilParams,
+  type ResistiveSoilStrip,
+} from './resistive.js';
+export {
   SoilContactRigidSolver,
   type SoilContactRigidParams,
   type SoilContactRigidOptions,

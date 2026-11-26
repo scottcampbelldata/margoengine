@@ -35,6 +35,13 @@ try {
   assert.notEqual(results.mean[0].min, results.resolved[0].min);
   assert.ok(results.hardpan[0].min > results.resolved[0].min);
   assert.deepEqual([...assets].sort(), ['terramechanics-kernel-shared.wasm', 'terramechanics-kernel.wasm']);
+  const [plainSoil, sharedSoil] = await page.evaluate(() => window.runResistiveSoil());
+  assert.deepEqual(plainSoil, sharedSoil);
+  assert.equal(plainSoil.hash, plainSoil.restored);
+  assert.ok(Math.abs(plainSoil.force[1] - 10 * plainSoil.depth) < 1e-14);
+  assert.ok(Math.abs(plainSoil.torque[2] - 0.06 * plainSoil.force[1]) < 1e-14);
+  assert.ok(Math.abs(plainSoil.velocity[1] - (-0.06 + plainSoil.force[1] / 120)) < 2e-8);
+  console.log(`Browser EARTH-05 resistive force and rigid replay ${plainSoil.hash}, force ${plainSoil.force[1]} N.`);
   await page.evaluate(() => window.prepareTerramechanicsRender());
   const flat = await page.evaluate(() => window.terramechanicsFrame(0));
   const canvas = page.locator('#soil');

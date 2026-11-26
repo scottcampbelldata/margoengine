@@ -310,7 +310,7 @@ test('layered soil balances the pressure on both sides of an independently integ
   assert.equal(world.hash(), hash);
 });
 
-test('Salman et al. sandy loam follows the measured 200 mm plate beyond the hardpan transition', async () => {
+test('Salman et al. 200 mm sandy-loam plate reproduces the published hardpan calibration', async () => {
   const terrain = { columns: 192, rows: 192, width: 1, depth: 1, centre: [0, 0] };
   const diameter = 0.2;
   const patchArea = Math.PI * (diameter / 2) * (diameter / 2);
@@ -437,7 +437,7 @@ async function rollingBench(
   return { world, bed, soil };
 }
 
-test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and moderate powered slip', async () => {
+test('Ding et al. Wh32 rolling calibration stays consistent at zero and moderate powered slip', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const width = 0.165;
   const length = 0.12;
@@ -981,7 +981,7 @@ test('a yawed smooth wheel reproduces the sidewall earth pressure integral', asy
   }
 });
 
-test('held-out Ishigami side loads at four measured yaw angles match the directional soil shear', async () => {
+test('Ishigami FJS-1 directional calibration reproduces side loads at four measured yaw angles', async () => {
   const terrain = { columns: 80, rows: 160, width: 0.4, depth: 0.8, centre: [0, 0] };
   const wheelReaction = soilWheelReactionField('fjs-measured-wheel');
   const wheelSideForce = soilWheelSideForceField('fjs-measured-side');
@@ -1068,7 +1068,7 @@ test('held-out Ding et al. Wh2 drawbar and torque at 60% tip slip', async () => 
       cohesiveModulus: 15_600,
       frictionalModulus: 2_407_400,
       exponent: 0.84,
-      cohesion: 251,
+      cohesion: 250,
       friction: Math.tan((31.9 * Math.PI) / 180),
       shearLength: 0.0114,
       dustFraction: 0,

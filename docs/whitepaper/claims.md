@@ -5971,6 +5971,13 @@ over different hardpan thicknesses on one registered bed.
 The real rigid-wheel adapter publishes the spin of a wheel with lugs. The geometric phase test matches
 the deepest tip cut, the unloaded gap and one full pitch exactly while conserving the specified normal load.
 
+The planar resistive-force tier compares lift and thrust for a rotating aluminium C-leg
+against independently measured solid curves for two beds in Li, Zhang and Goldman
+(2013), Figure S5 A and D. Its Fourier coefficients come from the paper's separate
+linear plate experiments. A one-strip world additionally checks the exact force and
+centre-of-mass moment against the rigid body and replays the same state in both memories.
+[Measurement conditions and digitization](../clean-room.md#resistive-force-on-rotating-legs-earth-05).
+
 ### Divergence-free particle pressure (FLUID-01)
 
 The scoped coupling tests verify a cubic self density, closed-form two-particle density and divergence

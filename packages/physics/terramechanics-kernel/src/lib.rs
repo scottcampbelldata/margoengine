@@ -1,6 +1,8 @@
 #![no_std]
 #![allow(unsafe_op_in_unsafe_fn)]
 
+mod resistive;
+
 use core::arch::wasm32::{f64x2, f64x2_extract_lane, f64x2_mul, f64x2_sqrt, unreachable};
 use margoengine_physics_kernel_common::pinned::{cos, exp, pow, sin};
 

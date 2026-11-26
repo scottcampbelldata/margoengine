@@ -9941,6 +9941,14 @@ The optional side-force field combines rim shear and passive sidewall earth pres
 gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
 A supplied `lateralShearLength` resolves directional shear in forward rolling within the same
 yield magnitude. Measured FJS-1 cases cover side force near 0.6 slip and four yaw angles.
+The resistive-force solver uses the Li, Zhang and Goldman quasistatic dry-grain law.
+It takes nine caller-calibrated coefficients in N/m³ and integrates 1–128 midpoint samples
+per strip, with a maximum of 65,536 configured samples across the solver. It samples the
+surface under each strip centreline and evaluates motion in a vertical plane. Motion
+parallel to the projected transverse axis, fully dry points and exactly edge-on motion
+produce no load. This tier uses 64 scratch bytes per configured sample and an extra sample
+when padding an odd count. It returns forces and moments through the rigid body's force
+field. It currently reads the bed without modifying soil distribution or emitting dust.
 The optional cross-track berm mode places the loose soil in separate triangular banks. Its
 physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
 or off-grid banks report their volume as exported. With an effective `grouserFill` fraction in
@@ -9965,7 +9973,7 @@ crest-to-trough relief at one straight locked-wheel condition. Supply the same e
 and TerrainBed bedrock data. The volume ledger records material crossing the modeled bounds,
 compaction and lofted mineral dust.
 
-The optional entry is 14,749 B gzip with a 15,161 B ceiling. Both Wasm assets are 38,545 B raw and 15,635 B gzip each.
+The optional entry is 16,311 B gzip with a 16,801 B ceiling. Both Wasm assets are 39,311 B raw and 15,986 B gzip each.
 The Physics root is 866,971 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,846 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)

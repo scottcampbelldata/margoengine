@@ -15,6 +15,68 @@ export interface LeggedSoilPatch {
     readonly rounded?: boolean;
 }
 
+export class ResistiveSoil implements Solver<ResistiveSoilParams> {
+    readonly id: string;
+    private constructor();
+    static load(options?: ResistiveSoilOptions): Promise<ResistiveSoil>;
+    describe(): {
+        id: string;
+        rate: 0;
+        stableRate: () => 0;
+        fields: ({
+            field: import("../world/solver.js").FieldDescriptor;
+            access: 'read';
+        } | {
+            field: import("../world/solver.js").FieldDescriptor;
+            access: 'accumulate';
+        })[];
+    };
+    init(host: SolverHost, params: ResistiveSoilParams): void;
+    step(context: StepContext): void;
+    read(row: number): {
+        readonly force: Point;
+        readonly torque: Point;
+    };
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+export type ResistiveSoilCoefficients = readonly [
+    a00: number,
+    a10: number,
+    b11: number,
+    b01: number,
+    bMinus11: number,
+    c11: number,
+    c01: number,
+    cMinus11: number,
+    d10: number
+];
+
+export interface ResistiveSoilOptions {
+    readonly id?: string;
+    readonly signal?: AbortSignal;
+}
+
+export interface ResistiveSoilParams {
+    readonly terrain: BedShape;
+    readonly coefficients: ResistiveSoilCoefficients;
+    readonly bodies: readonly {
+        readonly row: number;
+        readonly strips: readonly ResistiveSoilStrip[];
+    }[];
+    readonly cellSize?: number;
+}
+
+export interface ResistiveSoilStrip {
+    readonly start: Point;
+    readonly end: Point;
+    readonly width: number;
+    readonly samples?: number;
+}
+
 export const SOIL_LAYOUT = 1;
 
 export const SOIL_PATCH_WORDS = 10;
@@ -1877,6 +1939,8 @@ interface PhysicsSnapshot {
     readonly colliders: readonly (readonly [number, number])[];
     readonly joints: readonly number[];
 }
+
+type Point = readonly [number, number, number];
 
 type Point = readonly [number, number, number];
 
