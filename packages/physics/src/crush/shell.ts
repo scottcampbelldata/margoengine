@@ -1,0 +1,306 @@
+import { MargoError } from '@margoengine/math/errors';
+import { regionWords } from '../world/memory.js';
+import type {
+  FieldDescriptor,
+  Port,
+  Region,
+  Solver,
+  SolverDescription,
+  SolverHost,
+  StepContext,
+} from '../world/solver.js';
+import { type CrushVector, triple, ZERO } from './rigid-contact.js';
+import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
+import { makeShell, type Triangle } from './shell-topology.js';
+
+const MAX_SUBSTEPS = 8192;
+const FACE_STATE_WORDS = 8;
+
+/** Uniform thin-sheet material in SI units. */
+export interface CrushShellMaterial {
+  readonly thickness: number;
+  readonly density: number;
+  readonly youngModulus: number;
+  readonly poissonRatio: number;
+  readonly yieldStress: number;
+  /** Linear isotropic hardening slope in Pa. Default 0, ideal plasticity. */
+  readonly hardeningModulus?: number;
+}
+
+/** Authored rest sheet, constraints and initial velocities. */
+export interface CrushShellParams {
+  readonly positions: readonly CrushVector[];
+  /** Outward-wound zero-based faces. Open sheets are supported. */
+  readonly triangles: readonly Triangle[];
+  readonly material: CrushShellMaterial;
+  /** Vertices fixed at their rest positions. Default none. */
+  readonly pinned?: readonly number[];
+  /** Initial vertex velocities in m/s. Default zero. */
+  readonly velocities?: readonly CrushVector[];
+  /** Raise the automatically chosen explicit substep count by an integer factor. Default 1. */
+  readonly resolution?: number;
+}
+
+export interface CrushShellFace {
+  /** In-plane normal and shear second Piola–Kirchhoff stress in local rest coordinates, Pa. */
+  readonly stress: CrushVector;
+  readonly equivalentPlasticStrain: number;
+  /** Irreversible initial-yield work per rest cubic metre, J/m³. */
+  readonly dissipatedDensity: number;
+}
+
+/** Distributed structural energy ledger in joules. */
+export interface CrushShellBudget {
+  readonly kinetic: number;
+  readonly membrane: number;
+  readonly bending: number;
+  readonly hardening: number;
+  readonly plasticDissipation: number;
+  /** Cumulative work from authored vertex forces. Gravity is supplied by the world. */
+  readonly appliedWork: number;
+}
+
+interface ShellState {
+  readonly host: SolverHost;
+  readonly kernel: ReturnType<typeof instanceFor>['kernel'];
+  readonly descriptor: Region;
+  readonly positions: Region;
+  readonly velocities: Region;
+  readonly faceState: Region;
+  readonly applied: Region;
+  readonly reactions: Region;
+  readonly energy: Region;
+  readonly triangles: Uint32Array;
+  readonly maxStep: number;
+  readonly resolution: number;
+}
+
+function finiteVector(v: CrushVector, label: string): CrushVector {
+  if (v.length !== 3 || !v.every(Number.isFinite))
+    throw new MargoError('state', `Give each shell ${label} three finite Cartesian components.`);
+  return v;
+}
+
+function indexIn(index: number, count: number, label: string): number {
+  if (!Number.isSafeInteger(index) || index < 0 || index >= count)
+    throw new MargoError('state', `Choose a ${label} index from 0 to ${count - 1}.`);
+  return index;
+}
+
+function coefficients(m: CrushShellMaterial): readonly number[] {
+  const hardening = m.hardeningModulus ?? 0;
+  if (
+    ![m.thickness, m.density, m.youngModulus, m.yieldStress].every((value) => value > 0 && Number.isFinite(value)) ||
+    !(m.poissonRatio > -1 && m.poissonRatio < 0.5) ||
+    !(hardening >= 0 && Number.isFinite(hardening))
+  )
+    throw new MargoError(
+      'state',
+      'Use positive SI sheet dimensions and moduli, -1 < Poisson ratio < 0.5, and nonnegative hardening.',
+    );
+  return [m.youngModulus, m.poissonRatio, m.yieldStress, hardening];
+}
+
+/** A thin-sheet solver with plane-stress plasticity and elastic bending hinges. */
+export class CrushShellSolver implements Solver<CrushShellParams> {
+  /** Layout 1 positions, three f64 metre offsets per vertex. */
+  readonly positionField: FieldDescriptor;
+  private state: ShellState | undefined;
+
+  private constructor(
+    private readonly builds: ShellBuilds,
+    readonly id: string,
+  ) {
+    this.positionField = {
+      name: `${id}:vertices`,
+      kind: 'meshVertexSet',
+      quantity: 'position',
+      unit: 'm',
+      centring: 'vertex',
+    };
+  }
+
+  /** Loads the optional native kernel. Default id 'crush-shell'. */
+  static async load(options: { readonly id?: string; readonly signal?: AbortSignal } = {}): Promise<CrushShellSolver> {
+    return new CrushShellSolver(await loadShell(options.signal), options.id ?? 'crush-shell');
+  }
+
+  describe(): SolverDescription {
+    return {
+      id: this.id,
+      rate: 0,
+      stableRate: () => 0,
+      fields: [{ field: this.positionField, access: 'write' }],
+    };
+  }
+
+  init(host: SolverHost, params: CrushShellParams): void {
+    const { positions, triangles, material, velocities } = params;
+    const nodeCount = positions.length;
+    const faceCount = triangles.length;
+    const resolution = params.resolution ?? 1;
+    if (nodeCount < 3 || faceCount === 0)
+      throw new MargoError('state', 'Give the shell vertices and at least one face.');
+    if (!Number.isSafeInteger(resolution) || resolution < 1)
+      throw new MargoError('state', 'Choose a positive integer shell substep resolution.');
+    if (velocities && velocities.length !== nodeCount)
+      throw new MargoError('state', 'Give one initial velocity per shell vertex.');
+    const pinned = new Set((params.pinned ?? []).map((index) => indexIn(index, nodeCount, 'pinned vertex')));
+    positions.forEach((p) => finiteVector(p, 'position'));
+    velocities?.forEach((v, index) => {
+      finiteVector(v, 'velocity');
+      if (pinned.has(index) && v.some((value) => value !== 0))
+        throw new MargoError('state', 'Use zero initial velocity on fixed shell vertices.');
+    });
+    const steel = coefficients(material);
+    const topology = makeShell(positions, triangles, material);
+    if (substeps(1 / 60, topology.maxStep, resolution) > MAX_SUBSTEPS)
+      throw new MargoError('state', 'Give the shell larger minimum elements or reduce its requested resolution.');
+    const { kernel } = instanceFor(host, this.builds);
+    const f64 = (name: string, count: number) => host.allocate(name, count * 8, 'f64', 1);
+    const vertex = f64('shell-positions', 3 * nodeCount);
+    const speed = f64('shell-velocities', 3 * nodeCount);
+    const applied = f64('shell-forces', 3 * nodeCount);
+    const reactions = f64('shell-reactions', 3 * nodeCount);
+    const faceState = f64('shell-face-state', FACE_STATE_WORDS * faceCount);
+    const energy = f64('shell-ledger', 6);
+    const nodes = f64('shell-nodes', 2 * nodeCount);
+    const faces = host.allocate('shell-faces', topology.faces.byteLength, 'u8', 1);
+    // The runtime expects an aligned pointer even when the hinge count is zero.
+    const hinges = host.allocate('shell-hinges', Math.max(8, topology.hinges.byteLength), 'u8', 1);
+    const scratch = f64('shell-work', 9 * nodeCount + FACE_STATE_WORDS * faceCount);
+    const descriptor = host.allocate('shell-descriptor', 112, 'u8', 1);
+    const memory = host.memory;
+    const x = values(host, vertex);
+    const v = values(host, speed);
+    const m = values(host, nodes);
+    for (let index = 0; index < nodeCount; index++) {
+      x.set(positions[index]!, 3 * index);
+      v.set(velocities?.[index] ?? ZERO, 3 * index);
+      m.set([topology.nodeMass[index]!, Number(pinned.has(index))], 2 * index);
+    }
+    new Uint8Array(memory.buffer, faces.byteOffset, faces.byteLength).set(new Uint8Array(topology.faces));
+    new Uint8Array(memory.buffer, hinges.byteOffset, hinges.byteLength).set(new Uint8Array(topology.hinges));
+    new Uint32Array(memory.buffer, descriptor.byteOffset, 14).set([
+      vertex.byteOffset,
+      speed.byteOffset,
+      faceState.byteOffset,
+      applied.byteOffset,
+      reactions.byteOffset,
+      nodes.byteOffset,
+      faces.byteOffset,
+      hinges.byteOffset,
+      scratch.byteOffset,
+      energy.byteOffset,
+      nodeCount,
+      faceCount,
+      topology.hinges.byteLength / 32,
+      0,
+    ]);
+    new Float64Array(memory.buffer, descriptor.byteOffset + 56, 7).set([...host.gravity, ...steel]);
+    if (kernel.crush_shell_advance(descriptor.byteOffset, 0, 0) !== 1)
+      throw new MargoError('state', 'Use finite initial geometry and velocities for the shell.');
+    this.state = {
+      host,
+      kernel,
+      descriptor,
+      positions: vertex,
+      velocities: speed,
+      applied,
+      reactions,
+      faceState,
+      energy,
+      triangles: Uint32Array.from(triangles.flat()),
+      maxStep: topology.maxStep,
+      resolution,
+    };
+  }
+
+  step(_context: StepContext, dt: number): void {
+    const { kernel, descriptor, maxStep, resolution } = this.requireState();
+    const n = substeps(dt, maxStep, resolution);
+    if (!Number.isFinite(n) || n > MAX_SUBSTEPS || n < 1)
+      throw new MargoError('state', 'Use a positive shell step within the explicit integration budget.');
+    if (kernel.crush_shell_advance(descriptor.byteOffset, dt, n) !== 1)
+      throw new MargoError(
+        'failed',
+        'The loaded shell lost finite geometry. Reduce the load or use a finer time step.',
+      );
+  }
+
+  importPorts(_tick: number): void {}
+
+  exportPorts(tick: number): readonly Port[] {
+    return [{ field: this.positionField.name, region: this.requireState().positions, tick, cell: ZERO }];
+  }
+
+  stateRegions(): readonly Region[] {
+    const { positions, velocities, faceState, applied, reactions, energy } = this.requireState();
+    return [positions, velocities, faceState, applied, reactions, energy];
+  }
+
+  extraState(): readonly Region[] {
+    return [];
+  }
+
+  /** Sets a persistent vertex force in newtons before advancing the world. */
+  setForce(vertex: number, force: CrushVector): void {
+    const { host, applied } = this.requireState();
+    const index = indexIn(vertex, applied.byteLength / 24, 'shell vertex');
+    values(host, applied).set(finiteVector(force, 'force'), 3 * index);
+  }
+
+  /** Copies the live xyz offsets, xyz velocities and original triangle indices. */
+  readMesh(): { positions: Float64Array; velocities: Float64Array; triangles: Uint32Array } {
+    const { host, positions, velocities, triangles } = this.requireState();
+    return {
+      positions: values(host, positions).slice(),
+      velocities: values(host, velocities).slice(),
+      triangles: triangles.slice(),
+    };
+  }
+
+  /** Reads the fixed support's endpoint force on a vertex in newtons, or zero on a free vertex. */
+  supportReaction(vertex: number): CrushVector {
+    const { host, reactions } = this.requireState();
+    const index = indexIn(vertex, reactions.byteLength / 24, 'shell vertex');
+    return triple(values(host, reactions), 3 * index);
+  }
+
+  readFace(face: number): CrushShellFace {
+    const { host, faceState } = this.requireState();
+    const words = values(host, faceState);
+    const at = FACE_STATE_WORDS * indexIn(face, words.length / FACE_STATE_WORDS, 'shell face');
+    return {
+      equivalentPlasticStrain: words[at + 3]!,
+      dissipatedDensity: words[at + 4]!,
+      stress: triple(words, at + 5),
+    };
+  }
+
+  readBudget(): CrushShellBudget {
+    const { host, energy } = this.requireState();
+    const [kinetic, membrane, bending, hardening, plasticDissipation, appliedWork] = values(host, energy);
+    return {
+      kinetic: kinetic!,
+      membrane: membrane!,
+      bending: bending!,
+      hardening: hardening!,
+      plasticDissipation: plasticDissipation!,
+      appliedWork: appliedWork!,
+    };
+  }
+
+  private requireState(): ShellState {
+    if (!this.state) throw new MargoError('state', 'Add CrushShellSolver to a PhysicsWorld before using it.');
+    return this.state;
+  }
+}
+
+function values(host: SolverHost, region: Region): Float64Array {
+  return regionWords(host.memory, region) as Float64Array;
+}
+
+function substeps(dt: number, maxStep: number, resolution: number): number {
+  return Math.ceil((dt * resolution) / maxStep);
+}

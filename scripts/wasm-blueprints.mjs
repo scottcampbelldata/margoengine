@@ -218,6 +218,20 @@ export const BLUEPRINTS = [
     args: ['shared'],
   },
   {
+    name: 'crush-shell-kernel',
+    crate: 'packages/physics/crush-shell-kernel',
+    blueprint: 'packages/physics/src/crush/crush-shell-kernel.wasm',
+    script: 'packages/physics/scripts/build-crush-shell-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'crush-shell-kernel-shared',
+    crate: 'packages/physics/crush-shell-kernel',
+    blueprint: 'packages/physics/src/crush/crush-shell-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-crush-shell-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'viscoplastic-kernel',
     crate: 'packages/physics/viscoplastic-kernel',
     blueprint: 'packages/physics/src/viscoplastic/viscoplastic-kernel.wasm',

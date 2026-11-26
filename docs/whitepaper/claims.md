@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Distributed ductile shell (BREAK-03, 2026-11-26). World vertex loads advance a thin sheet with
+  objective membrane strain, irreversible plane-stress yielding and elastic bending. A fixed
+  vertex reports the independently derived membrane reaction. The loaded crease stores the
+  hinge energy at its measured angle. Plain and shared memory agree in gravity, and plastic
+  loading replays from a saved world. [Reproduce](reproduce.md#break-03-distributed-ductile-shell)
 - Native circular plate rupture (BREAK-03, 2026-11-26). Paired rigid bodies transfer reciprocal
   impulse and lose the measured-law material work. The intact dent supports continued load, and
   the fractured station opens a real SEA-10 aperture. The solver's 41.80 mm dent repeats with its

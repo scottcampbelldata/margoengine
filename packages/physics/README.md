@@ -5293,6 +5293,39 @@ if (!dent.force || !dent.surface || dent.surface.positions[2] !== dent.stroke) {
 }
 ```
 
+For a distributed sheet, load `CrushShellSolver` and pass its rest positions, consistently wound
+triangles and uniform material. `pinned` fixes vertices at their rest offsets. It defaults to an
+unconstrained sheet, with all initial velocities zero. The world supplies gravity. Set vertex loads
+in newtons with `setForce`; they hold until replaced. The solver publishes xyz position offsets as
+a layout-1 f64 mesh field and copies live positions, velocities and triangle indices through
+`readMesh`. `supportReaction` gives the endpoint reaction on a fixed vertex. `readFace` gives
+local second Piola–Kirchhoff stress and plastic state. `readBudget` gives the work and energy
+ledger in joules. Omit `hardeningModulus` for ideal plasticity.
+
+```ts
+import { CrushShellSolver } from '@margoengine/physics/crush';
+import { PhysicsWorld } from '@margoengine/physics/world';
+
+const shell = await CrushShellSolver.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity: [0, 0, 0] });
+world.add(shell, {
+  positions: [[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+  triangles: [[0, 1, 2]],
+  pinned: [0, 2],
+  material: { thickness: 0.015, density: 7800, youngModulus: 200e9, poissonRatio: 0.3, yieldStress: 350e6 },
+});
+shell.setForce(1, [125000, 0, 0]);
+world.advance(1);
+if (shell.readMesh().positions[3]! <= 1) throw new Error('Expected the steel sheet to extend');
+```
+
+The optional Wasm code uses the same arena as the world and loads on demand through
+`CrushShellSolver.load({ signal })`. The default solver id is `crush-shell`. Substeps follow the rest
+stiffness and lumped vertex masses. Set `resolution` to a positive integer to refine them from the
+default 1. The explicit integrator accepts at most 8,192 substeps per tick. Choose a mesh and
+resolution within that limit and test convergence for the applied load.
+[Shell method and checks](../../docs/whitepaper/reproduce.md#break-03-distributed-ductile-shell)
+
 On moving bodies, add the circular plate to `CrushSolver.indentationPatches`. Choose the
 body-local plate anchor, normal and support point as with ordinary patches. The station
 absorbs the available normal energy up to localization. An intact dent stays plastically

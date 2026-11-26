@@ -45,6 +45,30 @@ oblique plane, an intervening ridge and a cell with one raised corner. The analy
 speed and reduced mass determine the elastic contact impulse independently of the bed tracer.
 The ridge test compares a saved run and its replay in both world memory modes.
 
+## BREAK-03 distributed ductile shell
+
+Run `cargo test --manifest-path packages/physics/crush-shell-kernel/Cargo.toml` for constitutive
+return, rigid rotations and finite-difference membrane and hinge forces. Build Physics and run
+`node --test packages/physics/tests/coupling/crush-shell.test.js` for the native world path. The
+suite checks analytical free fall, the current tensile stress and fixed support reactions, the
+independent J2 yield surface, the work and stored energy, live hinge deformation, failure
+atomicity and exact replay. These checks are analytic and numerical. The separate circular
+indentation fixture compares its reduced membrane model with physical measurements.
+
+The triangular membrane uses a constant deformation gradient, Green strain and the
+conjugate second Piola–Kirchhoff stress. The associated plane-stress return follows
+[Simo and Taylor, *A return mapping algorithm for plane stress elastoplasticity* (1986)](https://doi.org/10.1002/nme.1620220310).
+Two yield-scaled factors return the trial mean and deviatoric/shear stresses separately.
+Plastic work is split between initial-yield dissipation and stored isotropic hardening.
+The interior edge hinge uses signed dihedral change and its exact gradient. Its stiffness is
+three times the plate rigidity times edge length squared divided by the area of the incident
+faces. See [Grinspun, Hirani, Desbrun and Schröder, *Discrete Shells* (2003)](https://doi.org/10.2312/SCA03/062-067)
+and [Tamstorf and Grinspun, *Derivation of discrete bending forces and their gradients* (2013)](https://media.disneyanimation.com/uploads/production/publication_asset/75/asset/WDAS_TR_201307.pdf).
+The clamped layer and through-thickness integration in
+[Belytschko, Lin and Tsay, *Explicit algorithms for the nonlinear dynamics of shells* (1984)](https://doi.org/10.1016/0045-7825(84)90026-4)
+are alternatives for a layered shell. This implementation uses one membrane material point per
+triangle and an elastic hinge on each interior edge.
+
 ## BREAK-03 measured circular plate indentation
 
 Build Physics with `node scripts/build-modern.js --precompiled --only=physics`, then run
