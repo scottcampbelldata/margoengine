@@ -4876,6 +4876,12 @@ force in N along the wheel's right axis. The resolved model combines sideways ri
 sidewall earth pressure. It uses the prepared soil's density and `sidewallGravity`, which defaults
 to 9.81 m/s². The rigid wheel applies the force at the contact and limits it to oppose side slip.
 
+Set a rolling wheel's `bermProfile` to `'cross-track'` to form two soil banks beside its path.
+The projected wheel geometry splits the uncompacted material at oblique angles. Material is
+placed using the prepared soil's repose slope and the exact terrain vertex areas. A bank
+outside the modeled terrain is accounted as exported soil. The default `'ring'` is a compact
+local deposit and also applies at zero repose slope.
+
 ```ts
 import { SoilContactRigidSolver, soilPatchField, soilWheelReactionField, Terramechanics } from '@margoengine/physics/terramechanics';
 

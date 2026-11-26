@@ -504,6 +504,46 @@ test('native rolling reactions resolve asymmetric normal drag and full-slip axle
   }
 });
 
+test('cross-track wheel berms conserve each side allocation and export an absent bank', async () => {
+  const base = { columns: 90, rows: 140, width: 0.36, depth: 0.8, centre: [0, 0] };
+  const offCentre = { ...base, width: 0.18, centre: [-0.06, 0] };
+  const wheel = { radius: 0.12, bermProfile: 'cross-track' };
+  const material = {
+    cohesiveModulus: 0,
+    frictionalModulus: 800_000,
+    compaction: 0,
+    dustFraction: 0,
+    reposeSlope: 0.55,
+  };
+  const rig = { width: 0.1, length: 0.16, load: 100, speed: 0.03, slip: 0 };
+  for (const [terrain, amount, shared] of [
+    [base, 1, false],
+    [offCentre, 0.5, true],
+  ]) {
+    const { world, soil, bed } = await rollingBench(terrain, material, wheel, { ...rig, shared });
+    world.advance(1);
+    const budget = soil.budget;
+    assert.ok(budget.removed > 0);
+    close(budget.deposited, budget.removed * amount, 512 * eps * budget.removed);
+    close(budget.exported, budget.removed * (1 - amount), 512 * eps * budget.removed);
+    close(bed.volume(), -budget.exported, 2048 * eps * budget.removed);
+    const elevations = bed.elevations();
+    const positive = (left) =>
+      elevations.some((height, i) => {
+        const x = terrain.centre[0] + terrain.width * (Math.floor(i / (terrain.rows + 1)) / terrain.columns - 0.5);
+        return height > 0 && (left ? x < 0 : x > 0);
+      });
+    assert.ok(positive(true));
+    assert.equal(positive(false), amount === 1);
+    const snapshot = world.takeSnapshot();
+    world.advance(16);
+    const hash = world.hash();
+    world.restoreSnapshot(snapshot.bytes);
+    world.advance(16);
+    assert.equal(world.hash(), hash);
+  }
+});
+
 test('a yawed smooth wheel reproduces the sidewall earth pressure integral', async () => {
   const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
   const radius = 0.14;

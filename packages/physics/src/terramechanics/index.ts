@@ -135,6 +135,8 @@ export interface SoilRollingWheel {
   readonly lugWidth?: number;
   /** Optional arbitrary moving tread triangles, rotated about the across axis. Use the wheel-phase field. */
   readonly treadMesh?: SoilTreadMesh;
+  /** Place the loose soil in separate triangular berms across travel. The default uses a local ring. */
+  readonly bermProfile?: 'ring' | 'cross-track';
 }
 
 /** Indexed tread geometry centred on the axle. Coordinates are across, up and forward, in metres. */
@@ -319,6 +321,9 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
     Number.EPSILON,
     1 - Number.EPSILON,
   );
+  const bermProfile = wheel.bermProfile ?? 'ring';
+  if (bermProfile !== 'ring' && bermProfile !== 'cross-track')
+    throw new MargoError('state', 'The wheel berm profile is invalid. Choose ring or cross-track.');
   return {
     radius,
     lugHeight,
@@ -331,6 +336,7 @@ function rollingWheel(wheel: SoilRollingWheel): RollingParameters {
     exitFraction: finite(wheel.exitFraction ?? 0, 'wheel exit fraction', -1, 0),
     lugCount,
     lugWidth,
+    bermProfile,
   };
 }
 
@@ -533,7 +539,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 52);
+    this.nativePatch = allocate('soil-patch-scratch', 53);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -784,9 +790,12 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       skid,
       rolling?.skidExponent ?? 0,
       rolling && this.sides ? this.sides.byteOffset + (row - this.fixed.length) * 8 : 0,
-      rolling && this.sides ? finite((shearX * forward[1] - shearZ * forward[0]) / length, 'lateral wheel slip') : 0,
+      rolling && (this.sides || rolling.bermProfile === 'cross-track')
+        ? finite((shearX * forward[1] - shearZ * forward[0]) / length, 'lateral wheel slip')
+        : 0,
       this.sideWeight,
       finite(camber, 'wheel camber sine', -1, 1),
+      rolling?.bermProfile === 'cross-track' ? material.reposeSlope : 0,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,

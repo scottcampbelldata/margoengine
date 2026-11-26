@@ -9882,6 +9882,10 @@ limit the paired impulse. A configured skid exponent adds signed two-region shea
 braking, including lockup. A configured shear radius uses actual wheel and ground speed.
 The optional side-force field combines rim shear and passive sidewall earth pressure with default
 gravity 9.81 m/s². The sidewall assumes a straight soil chord between angular entry and exit.
+The optional cross-track berm mode places the loose soil in separate triangular banks. Its
+physical width uses the configured repose slope; slope zero uses the default ring. Unresolved
+or off-grid banks report their volume as exported. Closed-form backfill and transport in grousers
+are outside this initial deposit model.
 Reverse travel keeps the tyre response. Transient digging and measured skid forces at oblique
 slip angles remain open. The measured rover comparison covers steady
 drawbar force and torque at 60% lug-tip slip for the reported wheel and sand. Supply the same excavation floor
