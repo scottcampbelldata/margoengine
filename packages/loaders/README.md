@@ -81,6 +81,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parsePRWM` (`/prwm`) | See [PRWM](#prwm) |
 | `parseTilt` (`/tilt`, async) | See [Tilt Brush](#tilt-brush) |
 | `parseBabylon`, `flattenBabylon` (`/babylon`) | See [Babylon scenes](#babylon-scenes) |
+| `parseX` (`/xfile`) | See [DirectX .x files](#directx-x-files) |
 | `parseGCode` (`/gcode`) | See [G-code](#g-code) |
 | `parseVDB` (`/vdb`, async) | See [VDB volumes](#vdb-volumes) |
 | `parseMaterialX` (`/materialx`) | See [MaterialX](#materialx) |
@@ -691,6 +692,28 @@ const scene = parseBabylon({
 });
 console.log(scene.cameras[0].position, scene.meshes[0].translation); // [0, 1, 5] [1, 2, -3]
 console.log(flattenBabylon(scene).positions.length / 3); // 3
+```
+
+## DirectX .x files
+
+`parseX(input, {rightHanded, maxVertices, maxTriangles, maxDepth, maxNodes})` from `./xfile` reads DirectX `.x` files, text (`txt `) or binary (`bin `), with 32 or 64-bit floats (format reference: Microsoft, "DirectX File Format"). `input` is the bytes or the text. Compressed files (`tzip`, `bzip`, MSZip) throw `'unsupported'`. It returns `{format, frames, meshes, materials, animationSets, ticksPerSecond, warnings}`:
+
+- **Frames** keep the hierarchy: `name`, `parent` (-1 for a root; parents come first), `matrix` (the FrameTransformMatrix relative to the parent, 16 values column-major), `world` (that times every parent's) and `meshes` (indices into `meshes`). A mesh outside any frame gets a root frame of its own.
+- **Meshes** are triangles: polygons are fanned, and because a `.x` file indexes normals apart from positions, a vertex is split wherever two faces give it different normals. `geometry` holds `positions`, `normals`, `uvs` (MeshTextureCoords), `colors` (MeshVertexColors, rgb) and one group per material (`properties.materialIndex`, triangles sorted by it); `attributes.sourceVertex` gives each output vertex's index in the file. `materials` are the mesh's MeshMaterialList (colour, specular power, specular, emissive, `texture`).
+- **Skin**: each SkinWeights block becomes a bone (`name`, `frame`, `inverseBind`). `joints` and `weights` give four influences per vertex, strongest first (`joints1` and `weights1` hold five to eight; more are dropped and the rest renormalised).
+- **Animation**: each AnimationSet lists animations by frame name with `rotation` (quaternion x, y, z, w; the file stores w, x, y, z), `scale`, `position` and `matrix` tracks, key times in seconds (ticks over AnimTicksPerSecond, default 4800).
+- The format is left-handed with row vectors. `rightHanded` (default true) negates Z in positions, normals, matrices, quaternions and key positions and swaps each triangle's winding; false keeps the file's numbers.
+- A count that claims more data than the file holds, an index past its list, a face with fewer than 3 corners, nesting past `maxDepth`, more than `maxNodes` frames, or counts past the vertex and triangle limits throws a `LoaderError` with a `code`, before anything is allocated from the count.
+
+```ts
+import { parseX } from '@margoengine/loaders/xfile';
+
+const x = parseX(`xof 0302txt 0032
+Frame Root {
+  FrameTransformMatrix { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,5,1;; }
+  Mesh Tri { 3; 0;0;0;, 1;0;0;, 0;1;0;; 1; 3;0,1,2;; }
+}`);
+console.log(x.frames[0].matrix.slice(12, 15), x.meshes[0].geometry.indices?.length); // [0, 0, -5] 3
 ```
 
 ## Tilt Brush
