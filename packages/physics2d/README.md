@@ -193,6 +193,23 @@ console.log(disc.linearVelocity, disc.angularVelocity);
 physics.dispose();
 ```
 
+A collider's outline can change after it is made: `collider.setShape(shape)` takes any one convex outline a collider is
+made with (`circle`, `box`, `capsule`, `segment`, `triangle`, a convex `polygon`), at the collider's own offset and turn.
+Its material, density and filtering stay, the body's mass follows the new area, and the next step builds its contacts
+from the new outline, as Rapier's `setShape` does. An outline of several kernel shapes (a concave polygon, a polyline,
+a trimesh) is refused: remove the collider and add a new one.
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1 });
+const body = physics.addBody(null, { colliders: { shape: 'box', width: 0.5, height: 0.5, density: 2 } });
+body.colliders[0].setShape({ shape: 'circle', radius: 0.6 });
+console.log(body.mass.toFixed(3)); // '2.262': 2 kg/m^2 over a disc of 0.6 m
+physics.dispose();
+```
+
 ## Articulations
 
 `physics.addArticulation(root, links)` joins bodies into a tree of revolute and prismatic joints and gives it a joint space: positions, velocities, motors, limits, forward and inverse kinematics.

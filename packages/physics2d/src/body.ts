@@ -1,6 +1,14 @@
 import { MargoError } from '@margoengine/math/errors';
 import type { Kernel, Words } from './kernel.js';
-import { describeShape, type ActiveHooks2D, type ColliderOptions2D, type Described, type Vec2D } from './shapes.js';
+import {
+  describeShape,
+  describeShapes,
+  type ActiveHooks2D,
+  type ColliderOptions2D,
+  type Described,
+  type ShapeOptions2D,
+  type Vec2D,
+} from './shapes.js';
 
 /** How a body moves: `dynamic` (simulated), `fixed`, or kinematic (driven by position or by velocity). */
 export type BodyType2D = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
@@ -121,6 +129,28 @@ export class Collider2D {
       io.u.set(this.settings);
       kernel.ok(kernel.exports.shape_set(handle, shape));
     }
+  }
+  /**
+   * Changes the collider's outline after it is made (Rapier's `setShape`): any one convex outline a collider takes
+   * (`circle`, `box`, `capsule`, `segment`, `triangle`, a convex `polygon`), placed at the collider's own offset and
+   * turn. Its material, density, filtering and flags stay; the body's mass follows the new area, and the next step builds
+   * its contacts from the new outline (a pair already touching stays one: no collision event from the change alone).
+   * @throws RangeError for an outline of several kernel shapes (a concave polygon, polyline, trimesh, heightfield, compound
+   * or voxels) or a collider made of several; MargoError (state) once the collider was removed.
+   */
+  setShape(shape: ShapeOptions2D): void {
+    if (this.removed)
+      throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
+    const { kernel, handle, scale } = this.owner,
+      parts = describeShapes({ ...shape, offset: this.offset, rotation: this.turn } as ColliderOptions2D, scale);
+    if (this.shapes.length !== 1 || parts.length !== 1 || parts[0].kind > 4)
+      throw new RangeError(
+        'setShape changes one convex outline (circle, box, capsule, segment, triangle or convex polygon); remove this collider and add a new one for any other.',
+      );
+    const io = kernel.io(parts[0].geometry.length);
+    io.u.set(parts[0].geometry, 0);
+    kernel.ok(kernel.exports.shape_set_core(handle, this.shapes[0], parts[0].kind));
+    this.described = { ...parts[0], settings: this.settings };
   }
   isSensor(): boolean {
     return (this.settings[5] & (1 << 16)) !== 0;

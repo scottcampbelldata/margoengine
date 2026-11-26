@@ -205,6 +205,7 @@ export class Collider2D {
     parent(): Body2D;
     get isRemoved(): boolean;
     markRemoved(): void;
+    setShape(shape: ShapeOptions2D): void;
     isSensor(): boolean;
     setSensor(sensor: boolean): void;
     setActiveHooks(hooks: ActiveHooks2D): void;
@@ -800,6 +801,7 @@ interface Exports {
     shape_create(world: number, body: number, kind: number): number;
     shape_remove(world: number, shape: number): number;
     shape_set(world: number, shape: number): number;
+    shape_set_core(world: number, shape: number, kind: number): number;
     shape_read(world: number, shape: number): number;
     joint_create(world: number, a: number, b: number, collide: number): number;
     joint_remove(world: number, joint: number): number;

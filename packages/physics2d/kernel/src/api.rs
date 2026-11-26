@@ -497,6 +497,15 @@ pub extern "C" fn shape_set(handle: i32, shape: u32) -> i32 {
     })
 }
 
+/// io: the shape's new outline as `shape_create` reads it for `kind` (circle, capsule, segment, rect or polygon), from io[0].
+#[unsafe(no_mangle)]
+pub extern "C" fn shape_set_core(handle: i32, shape: u32, kind: u32) -> i32 {
+    with_world!(handle, |w| {
+        let core = read_core(kind, 0)?;
+        w.set_shape_core(shape, core).map(|()| 0)
+    })
+}
+
 /// The body of a shape, and in the buffer its settings words and whether it is a chain segment.
 #[unsafe(no_mangle)]
 pub extern "C" fn shape_read(handle: i32, shape: u32) -> i32 {

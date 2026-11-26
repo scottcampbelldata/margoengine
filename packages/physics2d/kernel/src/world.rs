@@ -982,6 +982,37 @@ impl World {
 
     /// Takes a shape out of its body and the broad phase, ends its contacts (reporting a stop where a pair was touching)
     /// and wakes what it touched; the body's mass is worked out again.
+    /// Replaces a shape's outline with `core`, keeping its material, filtering and flags: a circle, capsule, segment, box or
+    /// convex polygon, not a chain's segment or a voxel grid (those are made again whole). The body's mass follows the new
+    /// outline, the shape's broad-phase box is refitted, and its contacts keep their pairs (so no collision event is made by
+    /// the change alone) but drop their points and warm start, so the next step builds them from the new outline. Wakes the
+    /// body. A refused change leaves the shape as it was.
+    pub fn set_shape_core(&mut self, id: u32, core: Core) -> Result<(), PhysicsError> {
+        let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
+        if shape.dead {
+            return Err(PhysicsError::InvalidHandle);
+        }
+        if shape.chain || shape.grid.is_some() {
+            return Err(PhysicsError::InvalidParameter);
+        }
+        let body = shape.body;
+        let bounds = bounds_of(&core, self.bodies[body as usize].xf)?;
+        let before = core::mem::replace(&mut self.shapes[id as usize].core, core);
+        if let Err(error) = self.update_mass(body) {
+            self.shapes[id as usize].core = before;
+            return Err(error);
+        }
+        self.broad.remove(id);
+        self.broad.place(id, &bounds, BOX_MARGIN);
+        for contact in self.contacts.iter_mut().filter(|c| c.a == id || c.b == id) {
+            contact.manifold.count = 0;
+            contact.normal_impulse = [0.0; 2];
+            contact.tangent_impulse = [0.0; 2];
+            contact.primed = false;
+        }
+        self.wake(body)
+    }
+
     pub fn remove_shape(&mut self, id: u32) -> Result<(), PhysicsError> {
         let shape = self.shapes.get(id as usize).ok_or(PhysicsError::InvalidHandle)?;
         if shape.dead { return Err(PhysicsError::InvalidHandle); }
