@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20654017,
+  "total": 20657132,
   "history": [
     {
       "date": "2026-10-24",
@@ -13921,6 +13921,12 @@
       "commit": "xr-gizmo-ray",
       "reason": "XR controller rays drive the transform gizmo: controls/transform gains rayHover, rayDown, rayMove, rayUp, scaleDown and scaleTo with the closest-point axis solve and its parallel guard (13,110 to 13,943 B gzip, controls root 29,462 to 30,273 B), and the new xr/gizmo entry is 1,541 B. Worth it: the gizmo's own constraints, snapping and multi-object drags serve XR with no second copy. A split would need a subclass with the drag internals made protected, and an existing gizmo could not be driven",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "64367a8847",
+      "reason": "BREAK-03 distributed sheet advances the optional crush entry from 12996 to 16020 B gzip. The ceiling rises from 13386 to 16501 B. The solver adds checked membrane and hinge topology, arena layout and its live force, stress and mesh API. A separate entry would add another optional entry and public import for a scene that uses both reduced crush and the shell. Named imports are tree-shakable, and the compiled material and bending code is fetched by the shell loader.",
+      "grew": 1
     }
   ],
   "items": {
@@ -14745,7 +14751,7 @@
     "@margoengine/physics/bubbles": 3804,
     "@margoengine/physics/celestial": 10137,
     "@margoengine/physics/clouds": 7762,
-    "@margoengine/physics/crush": 13386,
+    "@margoengine/physics/crush": 16501,
     "@margoengine/physics/decomposition": 11130,
     "@margoengine/physics/dfsph": 8782,
     "@margoengine/physics/drainage-fog": 4922,
