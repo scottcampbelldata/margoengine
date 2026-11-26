@@ -2901,6 +2901,7 @@
       "Articulation2D",
       "Body2D",
       "CharacterController2D",
+      "CoefficientCombineRule2D",
       "Collider2D",
       "Joint2D",
       "Physics2D",
