@@ -6,14 +6,20 @@
 import { Camera, EngineKernel, Mesh, RenderView } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
-export class CycleRaycast<T = unknown> {
+export interface CycleHit {
+    mesh?: unknown;
+    distance?: number;
+    [field: string]: any;
+}
+
+export class CycleRaycast<T = CycleHit> {
     constructor(options?: CycleRaycastOptions);
     get index(): number;
     get current(): T | null;
     pick(x: number, y: number, hits: readonly T[], step?: number): T | null;
     step(delta: number): T | null;
     reset(): void;
-    handle(event: Pick<KeyboardEvent & WheelEvent, 'type' | 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'deltaY'>): T | null | undefined;
+    handle(event: KeyboardEvent | WheelEvent): T | null | undefined;
 }
 
 export interface CycleRaycastOptions {

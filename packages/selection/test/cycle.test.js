@@ -31,7 +31,7 @@ test('wrap false stops at the ends and step goes back', () => {
 test('the Tab key and Alt wheel step, Shift reverses, other events do nothing', () => {
   const c = new CycleRaycast();
   c.pick(0, 0, hits);
-  assert.equal(c.handle({ type: 'keydown', key: 'Tab' }), 'middle');
+  assert.equal(c.handle({ type: 'keydown', key: 'Tab', shiftKey: false }), 'middle');
   assert.equal(c.handle({ type: 'keydown', key: 'Tab', shiftKey: true }), 'front');
   assert.equal(c.handle({ type: 'wheel', deltaY: 10, altKey: true }), 'middle');
   assert.equal(c.handle({ type: 'wheel', deltaY: 10 }), undefined);

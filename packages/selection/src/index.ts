@@ -600,4 +600,4 @@ export class Selection implements EnginePlugin {
   }
 }
 export { CycleRaycast } from './cycle.js';
-export type { CycleRaycastOptions } from './cycle.js';
+export type { CycleRaycastOptions, CycleHit } from './cycle.js';

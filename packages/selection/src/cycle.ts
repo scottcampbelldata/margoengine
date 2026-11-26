@@ -1,5 +1,11 @@
 import { rangeError } from '../../shared/errors.js';
 
+/** The default hit type: what Raycaster and Picking hits share, with any other field left open. */
+export interface CycleHit {
+  mesh?: unknown;
+  distance?: number;
+  [field: string]: any;
+}
 /** Settings of {@link CycleRaycast}. */
 export interface CycleRaycastOptions {
   /** CSS pixels the pointer may drift before a repeat counts as a new pick. Default 3. */
@@ -19,7 +25,7 @@ export interface CycleRaycastOptions {
  * the same spot answers the next one back, so a hidden part can be picked without moving the pointer. Give it the
  * depth-sorted hit list of a ray (for example `Raycaster.intersectEngine`) and it tracks which one is current.
  */
-export class CycleRaycast<T = unknown> {
+export class CycleRaycast<T = CycleHit> {
   private x = Number.NaN;
   private y = Number.NaN;
   private list: readonly T[] = [];
@@ -86,13 +92,10 @@ export class CycleRaycast<T = unknown> {
    * modifier. Returns the hit now current, or undefined when the event does not cycle (nothing is changed then).
    * The caller should `preventDefault()` when the result is not undefined.
    */
-  handle(event: Pick<KeyboardEvent & WheelEvent, 'type' | 'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'deltaY'>): T | null | undefined {
-    if (event.type === 'keydown' && event.key === this.key) return this.step(event.shiftKey ? -1 : 1);
-    if (event.type === 'wheel' && event.deltaY) {
-      const m = this.wheelModifier;
-      const held = m === 'none' || (m === 'alt' ? event.altKey : m === 'ctrl' ? event.ctrlKey : m === 'meta' ? event.metaKey : event.shiftKey);
-      if (held) return this.step(Math.sign(event.deltaY));
-    }
-    return undefined;
+  handle(event: KeyboardEvent | WheelEvent): T | null | undefined {
+    if ('key' in event) return event.type === 'keydown' && event.key === this.key ? this.step(event.shiftKey ? -1 : 1) : undefined;
+    const m = this.wheelModifier;
+    const held = m === 'none' || (m === 'alt' ? event.altKey : m === 'ctrl' ? event.ctrlKey : m === 'meta' ? event.metaKey : event.shiftKey);
+    return event.type === 'wheel' && event.deltaY && held ? this.step(Math.sign(event.deltaY)) : undefined;
   }
 }

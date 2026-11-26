@@ -437,7 +437,7 @@ the hit now current, or undefined when the event does not cycle. A negative
 
 ```ts
 import { Engine, box } from '@margoengine/core';
-import { Raycaster, type RaycasterHit } from '@margoengine/bvh';
+import { Raycaster } from '@margoengine/bvh';
 import { CycleRaycast } from '@margoengine/selection';
 
 const canvas = document.createElement('canvas'); document.body.append(canvas);
@@ -446,12 +446,12 @@ const cube = box(1, 1, 1);
 engine.createMesh().setGeometry(cube);
 engine.createMesh().setGeometry(cube).setPosition([0, 0, -2]);
 engine.render();
-const cycle = new CycleRaycast<RaycasterHit>();
+const cycle = new CycleRaycast();
 const x = canvas.clientWidth / 2, y = canvas.clientHeight / 2;
 const hits = () => new Raycaster().setFromEngine(engine, x, y).intersectEngine(engine);
 console.log(cycle.pick(x, y, hits())?.distance); // nearest box
 console.log(cycle.pick(x, y, hits())?.distance); // the box behind it
-window.addEventListener('keydown', (e) => cycle.handle(Object.assign(e, { deltaY: 0 })) && e.preventDefault());
+window.addEventListener('keydown', (e) => cycle.handle(e) && e.preventDefault());
 // On teardown: engine.dispose(); canvas.remove();
 ```
 
