@@ -5,6 +5,7 @@
 // reflection mirrors the picture: by default each view is mirrored with its top pointing away from the centre.
 import type { EngineKernel } from '@margoengine/core';
 import { Camera, engineRuntime, type RenderView, type Vec3 } from '@margoengine/core/extension';
+import { hexColor } from '@margoengine/math/color';
 import { MargoError } from '@margoengine/math/errors';
 import { fullscreen, group, render } from '../../shared/gpu.js';
 import { getCameraLayers } from './layers.js';
@@ -197,7 +198,7 @@ export class HologramOutput {
     const { gap = 0.2, background = '#000000' } = this.options;
     if (!Number.isFinite(gap) || gap < 0 || gap >= 1)
       throw new RangeError('Invalid hologram gap; pass a fraction in [0, 1)' + HELP);
-    if (background !== false && !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(background)))
+    if (background !== false && (String(background).length > 7 || !hexColor(String(background))))
       throw new TypeError('Invalid hologram background; pass #rgb, #rrggbb or false' + HELP);
     const orientation = this.orientations(),
       engine = this.engine,

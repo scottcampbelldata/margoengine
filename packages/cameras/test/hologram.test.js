@@ -66,8 +66,19 @@ test('orientations default to mirrored, outward-facing views and reject bad side
     assert.throws(() => output.render(), RangeError);
   }
   output.options.gap = 0.2;
-  output.options.background = 'black';
-  assert.throws(() => output.render(), TypeError);
+  // The shared hex parser (math/color) also reads alpha forms; the background takes only #rgb and #rrggbb.
+  for (const background of ['black', '#ffffff80', '#ffff', '123456', '#12345g']) {
+    output.options.background = background;
+    assert.throws(() => output.render(), TypeError, background);
+  }
+  for (const background of ['#AbC', '#102030']) {
+    output.options.background = background;
+    assert.throws(
+      () => output.render(),
+      (e) => e.code === 'unsupported',
+      background,
+    );
+  }
   output.options.background = false;
   assert.throws(
     () => output.render(),
