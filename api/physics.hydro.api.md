@@ -71,6 +71,7 @@ export interface ShallowWaterParams {
     readonly inflows?: readonly ShallowInflow[];
     readonly rain?: Precipitation;
     readonly wind?: Wind;
+    readonly windDragLimit?: number;
     readonly density?: number;
     readonly courant?: number;
     readonly rate?: RateLevel;
@@ -97,6 +98,8 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
 }
 
 export const WATER_DENSITY = 1000;
+
+export const WIND_DRAG_LIMIT = 0.0025;
 
 export interface WaterSample {
     depth: number;

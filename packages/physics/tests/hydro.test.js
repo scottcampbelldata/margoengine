@@ -323,6 +323,41 @@ test('a periodic channel keeps its water exactly while a current runs round it',
   assert.ok(Math.abs(water.sample(79, 8).velocity[0]) > 0.3, 'the current still runs at the far end');
 });
 
+test("a storm wind's drag levels off at Donelan's 2.5e-3: 40 m/s drives the water at rho_a 2.5e-3 U^2 / rho, not Garratt's 3.4e-3", () => {
+  // A periodic channel of still water 10 m deep, no friction: the wind's stress is all the water feels.
+  const { bed } = ground(8, 1, 80, 10, () => -10),
+    wind = (speed) => ({
+      medium: 'air',
+      cell: [0, 0, 0],
+      sample: (_x, _y, _z, _t, out = { velocity: [0, 0, 0], density: 0, temperature: 0 }) => {
+        out.velocity[0] = speed;
+        out.velocity[1] = out.velocity[2] = 0;
+        out.density = 1.2;
+        out.temperature = 288.15;
+        return out;
+      },
+    }),
+    run = (speed, extra = {}) => {
+      const { water, run: go } = flood({
+        bed,
+        level: 0,
+        roughness: 0,
+        sides: { minX: 'periodic', maxX: 'periodic' },
+        wind: wind(speed),
+        ...extra,
+      });
+      go(1);
+      return water.sample(40, 5).velocity[0] * 10;
+    };
+  // Momentum per area after 1 s: rho_a C_D U^2 / rho_w.
+  assert.ok(Math.abs(run(40) / ((1.2 * 2.5e-3 * 1600) / 1000) - 1) < 1e-9, `${run(40)}`);
+  // Below 26 m/s Garratt's law holds as it was: 15 m/s gives (0.75 + 0.067 * 15) 1e-3.
+  assert.ok(Math.abs(run(15) / ((1.2 * (0.75 + 0.067 * 15) * 1e-3 * 225) / 1000) - 1) < 1e-9);
+  // Powell et al.'s 2.6e-3, asked for.
+  assert.ok(Math.abs(run(40, { windDragLimit: 2.6e-3 }) / ((1.2 * 2.6e-3 * 1600) / 1000) - 1) < 1e-9);
+  assert.throws(() => run(40, { windDragLimit: 0 }), /drag coefficient limit/);
+});
+
 test('settings out of range are refused with what to pass', () => {
   const { bed } = ground(4, 4, 4, 4, () => 0),
     add = (params) => new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new ShallowWaterSolver(), params);

@@ -124,8 +124,16 @@ export interface ShallowWaterParams {
   readonly inflows?: readonly ShallowInflow[];
   /** Rain falling on the water and the ground, sampled at each cell's bed (default none). */
   readonly rain?: Precipitation;
-  /** The wind 10 m above the water, which drags it with the stress rho_a C_D |U| U (default none). */
+  /**
+   * The wind 10 m above the water, which drags it with the stress rho_a C_D |U| U, C_D = (0.75 + 0.067 U) 1e-3 (Garratt 1977)
+   * up to `windDragLimit` (default none).
+   */
   readonly wind?: Wind;
+  /**
+   * The most the wind's drag coefficient C_D reaches (default 2.5e-3, where the sea's roughness saturates in very strong
+   * winds, Donelan et al. 2004; Garratt's law reaches it at 26 m/s).
+   */
+  readonly windDragLimit?: number;
   /** The water's density, kg/m^3 (default 1000). */
   readonly density?: number;
   /** The largest Courant number of a substep (default 0.4; at most 0.5, where the scheme keeps depths positive). */
@@ -136,6 +144,8 @@ export interface ShallowWaterParams {
 
 const ORIGIN: Cell = [0, 0, 0];
 const AIR_DENSITY = 1.225;
+/** The wind's drag coefficient in very strong winds, where the sea's roughness saturates (Donelan et al. 2004). */
+export const WIND_DRAG_LIMIT = 2.5e-3;
 /** The ledger's words: water that came in by the inflows, by rain, and that left over the sides (negative: came in). */
 const LEDGER = 3;
 
@@ -167,6 +177,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
   private runoffCells: ReadonlyArray<{ readonly sourceCell: number; readonly cell: number }> = [];
   private rain: Precipitation | undefined;
   private wind: Wind | undefined;
+  private windDragLimit = WIND_DRAG_LIMIT;
   private density = WATER_DENSITY;
   private courant = 0.4;
   private level: RateLevel = 0;
@@ -280,6 +291,12 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     this.level = rate as RateLevel;
     this.rain = params.rain;
     this.wind = params.wind;
+    const windDragLimit = params.windDragLimit ?? WIND_DRAG_LIMIT;
+    if (!(windDragLimit > 0 && windDragLimit <= 0.01))
+      throw new RangeError(
+        `The wind's drag coefficient limit lies in (0, 0.01] (got ${windDragLimit}); pass one, or leave it for 2.5e-3.`,
+      );
+    this.windDragLimit = windDragLimit;
     this.blocks = new Float64Array(count);
     for (const building of params.buildings ?? []) {
       const { min, max, height } = building ?? ({} as ShallowBuilding);
@@ -534,8 +551,9 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
               u = air.velocity[0],
               w = air.velocity[2],
               speed = Math.sqrt(u * u + w * w),
-              // Garratt (1977): C_D = (0.75 + 0.067 U10) 1e-3.
-              cd = (0.75 + 0.067 * speed) * 1e-3,
+              // Garratt (1977): C_D = (0.75 + 0.067 U10) 1e-3, fitted to 21 m/s; above, the sea's roughness saturates and
+              // C_D with it (Donelan et al. 2004: 2.5e-3 from 33 m/s in the laboratory; Powell et al. 2003, 2.6e-3 near 35 m/s).
+              cd = Math.min((0.75 + 0.067 * speed) * 1e-3, this.windDragLimit),
               k2 = ((air.density || AIR_DENSITY) * cd * speed) / this.density;
             rhu[k]! += k2 * u;
             rhv[k]! += k2 * w;

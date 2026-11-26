@@ -157,6 +157,7 @@ interface ShallowWaterParams {
     readonly inflows?: readonly ShallowInflow[];
     readonly rain?: Precipitation;
     readonly wind?: Wind;
+    readonly windDragLimit?: number;
     readonly density?: number;
     readonly courant?: number;
     readonly rate?: RateLevel;
