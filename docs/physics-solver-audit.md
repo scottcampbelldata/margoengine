@@ -203,6 +203,30 @@ understates what is built.
 | ATMO-03 moist convection and clouds (`physics/clouds`) | THIN | 1, 2, 3, 4, 5, 6, 7 | None against a published benchmark: bubble rise bounded only by free acceleration (`clouds.test.js:85`); cloud base from the model's own saturation formula; the Marshall–Palmer integral checks the formula; drift within an arbitrary ±30%. | Ice phase and hail; anelastic or compressible flow (Klemp–Wilhelmson); terrain lift; any consumer of `cloudWater` (the sky never reads it); ATMO-09 and ATMO-07 links; water is not conserved (documented). | Pressure solve stops at 400 iterations with no residual reported (`src/clouds/convection.ts:758`); white-noise thermal patchiness per 200 m column (`:610`); vorticity 0.2, patchiness 0.6 and period 600 s uncited (`:207`); no air-density correction on rain fall speed (`:917`); 0.3 s per step on CPU. | Ice microphysics (Morrison et al. 2005); anelastic tier. Validate against the Bryan and Fritsch 2002 moist bubble, BOMEX (Siebesma et al. 2003), Weisman and Klemp 1982 supercell. Rival: CM1. |
 | ATMO-04 precipitation microphysics (`weather/precipitation`) | THIN (strongest of the air set) | 1, 3, 4, 5, 6 | Measured: Gunn and Kinzer 1949 fall speeds for 1-5 mm drops (one-sided 7%, documented bias); Heymsfield and Wright 2014 hail and graupel laws (±8%, arbitrary); Marshall–Palmer intercept (±15%); Stokes limit (analytic). | Below-cloud evaporation and melting (phase switches instantly; hail never melts); gamma or normalised size distributions; breakup and aggregation; K23 particle ballistics; snow not checked against Locatelli and Hobbs 1974 (band 0.5-1.6 m/s). | One median speed carries every hydrometeor sideways (`weather/src/precipitation.ts:531`). | **Films:** Rain carried by the gusty ATMO-02 wind drop by drop (not one median speed), with rings and splash sources on SEA-04 and snow fall speeds checked against Locatelli and Hobbs 1974 for squalls. (EF-7, EF-12). Then: Seifert and Beheng 2006 two-moment scheme; Testud et al. 2001 normalised distribution. Validate against 2DVD disdrometer data and Locatelli and Hobbs 1974. |
 
+**SEA-08 forward speed: notes from Claude's unlanded work (2026-11-27), for its builder.** Built in a branch and
+measured, not landed (the upgrade moved to Codex). What it did, in body axes (x forward, pitch bow up):
+- Ordinary strip theory with its end terms (Salvesen, Tuck and Faltinsen 1970; Journee and Massie, Offshore
+  Hydromechanics, eqs. 8.15-8.31) in the time domain. The radiation memory already convolves the body-frame heave
+  velocity v_y, which holds the -U theta of a trimmed hull on a level course. Missing were: heave +U A33inf q (the fold
+  takes the added mass on the world heave acceleration); pitch -U (A33inf v_y + K33 * z), z the relative heave
+  displacement (written as the kernel convolved with z measured back from now, which truncates better than the running
+  integral of the kernel); and taking the course's share of v_y back out of the pitch-heave coupling memory (store it in
+  the history and subtract the same convolution), where the end terms cancel it. Shown term by term to reproduce eq.
+  8.30 in the frequency domain.
+- Pitfalls found: (1) a steady trim makes v_y constant, and the 2-D heave added mass grows without bound at low
+  frequency, so the pitch term tipped a towed box to 13 degrees; the terms must act on the motion about the steady
+  course (running means of v_y and of U with a 60 s time constant worked). (2) U must be the steady speed, not the
+  instantaneous body-frame surge: a heaving, pitching hull has a second-order surge (heave velocity on the pitched axis)
+  that spoiled the zero-speed heave-pitch test by 7 percent. (3) Adding the pitch-rate convective term and the coupling
+  correction separately (each through the running integral of a coupling kernel) went unstable; cancel them exactly
+  instead. (4) A body whose velocity is set after the world publishes its first ports starts the means at 0.
+- Result: the uneven heave-pitch hull of `coupling/seakeeping.test.js`, towed at Froude number 0.29 (2 m/s on 4.83 m)
+  and driven in heave at 3 rad/s, came within 3.0 percent in heave and 4.1 in pitch of the frequency-domain answer with
+  eq. 8.30's coefficients (default 20 s memory; 3.5 and 4.1 with 60 s); the speed terms moved the pitch by 110 percent,
+  and turning their signs put it far off. Sway, yaw and roll speed terms were not done (the lateral relative velocity
+  needs the drift angle). Radiated waves to SEA-04 were not started: `WakeSolver` reads layout-1 `seaSource` rows (x, z,
+  radius, pressure, volume pushed over the step), so the hull would write one row a station.
+
 ## Catalog gaps found
 
 - **Soft bodies cut or torn into separate bodies.** SOFT-06 (landed in `a82ff99eb`) does not cover this. What exists:
