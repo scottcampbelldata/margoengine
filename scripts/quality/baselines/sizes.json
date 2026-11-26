@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20341374,
+  "total": 20356976,
   "history": [
     {
       "date": "2026-10-24",
@@ -13053,6 +13053,12 @@
       "commit": "68fd95a7be",
       "reason": "exporters usdz 22,472 to 22,482, threemf 20,207 to 20,446, dae 15,626 to 15,808, dae-glb 19,390 to 19,426 B gzip measured: the shared scene collector reads LineBatches, and 3MF writes a tint under a texture; a split would add a lazy chunk to every scene writer for 10 to 240 B",
       "grew": 4
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "e0aa251214",
+      "grew": 2,
+      "reason": "SOFT-04 adds local/global rotation and volume projections with one shared native sparse operator, moving the soft entry from 113913 to 121474 B gzip. @margoengine/physics/soft: 117331 to 125119 B ceiling (121474 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 80702 to 88516 B ceiling (85937 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
@@ -13912,9 +13918,9 @@
     "@margoengine/physics/seismic": 5902,
     "@margoengine/physics/ship": 11538,
     "@margoengine/physics/snowpack": 5993,
-    "@margoengine/physics/soft": 117331,
+    "@margoengine/physics/soft": 125119,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 35704,
-    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 80702,
+    "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 88516,
     "@margoengine/physics/surf": 9345,
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 6173,
