@@ -1,7 +1,7 @@
 # React, Next.js and react-three-fiber options in Margo: full write-up
 
 Sources: `packages/react/README.md`, `packages/react/SCENE.md`, `packages/react/package.json`,
-`docs/react-from-r3f.md`, `docs/react-cookbook.md`, `docs/limits.md` (React page), `examples/next`,
+`docs/from-react-three-fiber.md`, `docs/react-cookbook.md`, `docs/limits.md` (React page), `examples/next`,
 `examples/react-viewer`. Numbers are the ones those files quote; re-run `npm run measure:size` and
 `npm run modern:test:bundlers` before using them publicly.
 
@@ -117,7 +117,7 @@ Rapier. `XR`, `Controller`, `useXR`.
 
 ## 6. Coming from react-three-fiber (and drei)
 
-Same tree shape, different spelling. Full table in `docs/react-from-r3f.md`.
+Same tree shape, different spelling. Full table in `docs/from-react-three-fiber.md`.
 
 | R3F / drei | Margo |
 | --- | --- |

@@ -36,7 +36,7 @@ export const MATRIX_DIRS = ['examples/vite', 'examples/next'];
 /** The documents modern-package-tests.js type-checks or copies next to the packed React package. */
 export const REACT_DOCS = [
   'docs/react-cookbook.md',
-  'docs/react-from-r3f.md',
+  'docs/from-react-three-fiber.md',
   'docs/react-integration.md',
   'docs/react-r3f.md',
 ];

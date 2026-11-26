@@ -26,6 +26,7 @@ lit scene with shadows, orbit controls and click-to-select.
 | Plot data or volumes | [sciviz](../packages/sciviz/README.md), [compute](../packages/compute/README.md) |
 | Save a scene as glTF, STL or USDZ | [exporters](../packages/exporters/README.md) |
 | Use React | [React package README](../packages/react/README.md), [cookbook](react-cookbook.md) and [integration](react-integration.md) |
+| Move a React Three Fiber app to Margo | [Coming from React Three Fiber](from-react-three-fiber.md) |
 | Build your first React scene (texture, shadows, click) | [React: your first scene](guides/react-first-scene.md) |
 | Build an editor with save, load and undo in React | [React: build the scene from a document](guides/react-scene-document.md) |
 | Decide what goes in React state and what in the frame loop | [React: state or the frame loop?](guides/react-state-vs-frame-loop.md) |

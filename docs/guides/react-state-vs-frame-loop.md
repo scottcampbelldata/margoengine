@@ -132,4 +132,4 @@ to time frames in your own scene.
 
 - Recipes for models, physics and post-processing: the [React cookbook](../react-cookbook.md).
 - Every component and hook: the [React package README](../../packages/react/README.md).
-- Coming from react-three-fiber: [the migration guide](../react-from-r3f.md).
+- Coming from react-three-fiber: [the migration guide](../from-react-three-fiber.md).

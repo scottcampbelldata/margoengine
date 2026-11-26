@@ -62,6 +62,12 @@ export const PROJECTS = [
   },
   { id: 'react-viewer', config: 'examples/react-viewer/tsconfig.json', entries: () => ['examples/react-viewer/src'] },
   { id: 'next', config: 'examples/next/tsconfig.json', entries: () => ['examples/next/app', 'examples/next/pages'] },
+  // One file per task of docs/from-react-three-fiber.md.
+  {
+    id: 'from-react-three-fiber',
+    config: 'examples/from-react-three-fiber/tsconfig.json',
+    entries: (root) => filesIn(root, 'examples/from-react-three-fiber', ['.tsx']),
+  },
   {
     id: 'gameplay-sandbox',
     config: 'examples/gameplay-sandbox/tsconfig.json',

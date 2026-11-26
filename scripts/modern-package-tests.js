@@ -375,7 +375,7 @@ try {
   for (const page of pages()) await writeFile(join(fixture, `docs-${page.slug}-readme.tsx`), page.all ?? page.program);
   // The React cookbook and the react-three-fiber guide are checked like a README. A snippet whose first line is
   // `// path/file.tsx` is written to that path so a second snippet can import it.
-  for (const doc of reactScope ? ['react-cookbook', 'react-from-r3f'] : []) {
+  for (const doc of reactScope ? ['react-cookbook', 'from-react-three-fiber'] : []) {
     const examples = [];
     for (const [, code] of (await readFile(`docs/${doc}.md`, 'utf8')).matchAll(/```tsx?\r?\n([\s\S]*?)```/g)) {
       if (!examples.length || /^\s*(?:\/\/ [\w/.-]+\.tsx\r?\n)?\s*import\s/m.test(code)) examples.push(code);

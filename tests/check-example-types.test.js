@@ -57,6 +57,27 @@ test('a wrong engine call planted in an example fails the check, and the same fi
   }
 });
 
+test('the react-three-fiber migration examples type-check, and a wrong prop name planted in one fails', async () => {
+  const [ok] = await checkExampleTypes({ ids: ['from-react-three-fiber'] });
+  assert.equal(ok.ok, true, ok.output);
+  const source = join(root, 'examples/from-react-three-fiber');
+  mkdirSync(join(root, 'test-results'), { recursive: true });
+  const dir = mkdtempSync(join(root, 'test-results', 'from-r3f-types-'));
+  try {
+    for (const name of readdirSync(source)) writeFileSync(join(dir, name), readFileSync(join(source, name), 'utf8'));
+    const file = join(dir, 'orbit-controls.tsx'),
+      code = readFileSync(file, 'utf8');
+    assert.match(code, /enableDamping /);
+    writeFileSync(file, code.replace('enableDamping ', 'enableDampening '));
+    const projects = [{ id: 'planted', config: posix(relative(root, join(dir, 'tsconfig.json'))) }];
+    const [bad] = await checkExampleTypes({ ids: ['planted'], projects });
+    assert.equal(bad.ok, false);
+    assert.match(bad.output, /orbit-controls\.tsx\(\d+,\d+\): error TS2322: .*enableDampening/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('imports of unbuilt Margo packages give one coded error naming the fix, not one TS2307 each', async () => {
   const fixture = plant("export * from 'margoengine/not-built-yet';\nexport * from '@margoengine/not-built-either';\n");
   try {

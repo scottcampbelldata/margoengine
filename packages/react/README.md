@@ -1275,7 +1275,7 @@ export function Scene() {
 
 Import `Scene` from a server `page.tsx` behind `<Suspense fallback={...}>`. Next.js example: `examples/next`. More recipes are
 in the [React cookbook](../../docs/react-cookbook.md); moving from react-three-fiber is in
-[Coming from react-three-fiber](../../docs/react-from-r3f.md).
+[Coming from React Three Fiber](../../docs/from-react-three-fiber.md).
 
 A Next.js page is larger than the Vite page: about 194 KB gzip of JavaScript. Its build output also holds the Basis and
 Draco decoders; they are emitted but never requested at load or while orbiting.
