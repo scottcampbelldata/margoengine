@@ -2151,8 +2151,9 @@ export class BiomeView implements Disposable {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError(
+      throw typeError(
         'Invalid biome view capture hook; pass an object with declarations() and begin() functions and a targets array to a live BiomeView.',
+        'biomes',
       );
     this.#releaseCapture();
     this.#capture = hook;
@@ -2165,7 +2166,7 @@ export class BiomeView implements Disposable {
 
   /** Calls `callback` once when the view is disposed; returns a remover. */
   onDispose(callback: () => void): () => void {
-    if (typeof callback !== 'function') throw new TypeError('BiomeView onDispose needs a function');
+    if (typeof callback !== 'function') throw typeError('BiomeView onDispose needs a function', 'biomes');
     this.#disposers.add(callback);
     return () => this.#disposers.delete(callback);
   }

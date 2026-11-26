@@ -644,8 +644,9 @@ export class BiomeObjects implements Disposable {
       typeof hook.begin !== 'function' ||
       !Array.isArray(hook.targets)
     )
-      throw new TypeError(
+      throw typeError(
         'Invalid biome objects capture hook; pass an object with declarations() and begin() functions and a targets array to live BiomeObjects.',
+        'biomes',
       );
     this.#release();
     this.#capture = hook;
@@ -658,7 +659,7 @@ export class BiomeObjects implements Disposable {
 
   /** Calls `callback` once when the objects are disposed; returns a remover. */
   onDispose(callback: () => void): () => void {
-    if (typeof callback !== 'function') throw new TypeError('BiomeObjects onDispose needs a function');
+    if (typeof callback !== 'function') throw typeError('BiomeObjects onDispose needs a function', 'biomes');
     this.#disposers.add(callback);
     return () => this.#disposers.delete(callback);
   }

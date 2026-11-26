@@ -2332,6 +2332,10 @@ export const entries = [
     kind: 'family',
     messages: [
       'Set a valid treeline elevation, width 12..400 m, patchSize 20..2000 m and int32 seed',
+      'Invalid biome objects capture hook; pass an object with declarations() and begin() functions and a targets array to live BiomeObjects.',
+      'BiomeObjects onDispose needs a function',
+      'Invalid biome view capture hook; pass an object with declarations() and begin() functions and a targets array to a live BiomeView.',
+      'BiomeView onDispose needs a function',
       'Provide at least one selector for both mature and stunted trees',
       'Treeline cohorts require distinct, nonempty species selectors',
       'A species canopyKind must be broadleaf, conifer or palm',
@@ -3105,9 +3109,11 @@ export const entries = [
       'TransformControls offset must be three finite numbers; pass [x, y, z]',
       'TransformControls axisColors must be three colours or null; pass [x, y, z] colours',
       'TransformControls lineWidth must be a finite number above 0; pass a width in CSS pixels',
+      'TransformControls ray must be a finite origin and a non-zero direction; pass [x, y, z] and [x, y, z]',
+      'TransformControls scaleTo factor must be a finite number above 0; pass a ratio such as 1.5',
     ],
     cause:
-      'A TransformControls (or PivotControls) option is outside its range, or `attach` was given a mesh from another engine or an active mesh that is not in the list. `axisColors` and `hoveredColor` take CSS hex colours or 0..1 channel arrays; `size` and `lineWidth` are finite and above 0; `offset` is three finite numbers.',
+      'A TransformControls (or PivotControls) option is outside its range, or `attach` was given a mesh from another engine or an active mesh that is not in the list. `axisColors` and `hoveredColor` take CSS hex colours or 0..1 channel arrays; `size` and `lineWidth` are finite and above 0; `offset` is three finite numbers. A ray (from `rayHover`, `rayDown` and the XR gizmo) needs a finite origin and a non-zero direction, and `scaleTo` a finite factor above 0.',
     fix: 'Pass colours as `#rgb`, `#rrggbb`, `#rrggbbaa` or `[r, g, b]` / `[r, g, b, a]` in 0..1 (null restores the default), a finite positive `size` and `lineWidth`, `offset` as `[x, y, z]`, and attach meshes created by the engine the controls belong to. See the controls package README for each default.',
   },
   {
