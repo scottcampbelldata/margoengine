@@ -71,7 +71,10 @@ const noticeFiles = new Map(
       ),
   ),
 );
-const packageDocuments = new Map([...noticeFiles, ['blender', 'FORMAT.md']]);
+// [package, file] pairs a package ships besides dist/, its README, LICENSE and NOTICE: notices, documents and data a
+// consumer reads (sciviz's figure JSON Schema, also served at margoengine.com/schemas). A list, not a Map, so one
+// package can ship several (sciviz has NOTICE.md and its schema).
+const packageDocuments = [...noticeFiles, ['blender', 'FORMAT.md'], ['sciviz', 'schemas/figure-v1.json']];
 const packageName = (name) => (name === 'margoengine' ? 'margoengine' : `@margoengine/${name}`);
 assert.ok(npm, 'Run this check through npm run modern:test:packages');
 // --packages=a,b: only those packages' README examples (the umbrella's always); absent: every package.
@@ -216,7 +219,7 @@ for (const name of packedNames) {
           'README.md',
           'LICENSE',
           'NOTICE',
-          ...(packageDocuments.has(name) ? [packageDocuments.get(name)] : []),
+          ...packageDocuments.filter(([owner]) => owner === name).map(([, file]) => file),
           // A command the package installs (bin in its manifest), such as margoengine-mcp.
           ...Object.values(manifest.bin ?? {}).map((path) => path.replace(/^\.\//, '')),
         ].includes(file.path) && !file.path.startsWith('dist/'),
