@@ -5746,6 +5746,13 @@ Schlick-Smith G, Fresnel). The call logs differ only in shader module text. pack
 the claim: a lamp 10 km along the sun's glint direction at the sun's irradiance lights 685 pixels where the sun lights
 686. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
 
+Proof capture (2026-11-26, KB-WATER-FOAMPATCH-KH1 and KB-WATER-SHORESAW1): the water-ssr --current proof advances to
+a551dd9f5a, whose surface shader holds the shoreline foam off by the steady share of breaking waves (surfBreakingShare)
+and keeps a dry coastal vertex at the nearest wet texel's level (coastalReach). The call logs differ only in the text of
+16 shader modules (4, 8 and 4 in the three stories, 545, 27,675 and 593 calls each, unchanged); every other call and
+argument is the same. packages/water/test/surf-lull.browser.mjs and packages/water/test/shoreline.browser.mjs hold the
+claims. Reproduce with `node examples/package-benchmarks/proofs/capture.mjs --only=water-ssr`.
+
 The Terrain SSR call-trace proof and uniform work-count proof explicitly use `clipmapAnchor: 'camera'` to preserve
 the moving clipmap workload of their references. The default fixed anchor has a separate camera-boundary GPU
 regression in `packages/terrain/test/clipmap-anchor.browser.mjs` that checks color, silhouette and shadow stability.
