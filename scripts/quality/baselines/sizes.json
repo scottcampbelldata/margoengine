@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20651497,
+  "total": 20651534,
   "history": [
     {
       "date": "2026-10-24",
@@ -14149,6 +14149,18 @@
       "commit": "aaece31fb7",
       "reason": "KB-LOOK-TV-SHIMMER1 bounded wind sway: scatter root 28233 to 28480 B gzip (ceiling 29335), velocity 3319 to 3871 B (ceiling 4127), settings 2444 to 2448 B (ceiling 2704). Every scatter pose gains the beam shape, the length correction and the damped gust response in WGSL, and the velocity entry poses twice; the maths is shared by every pass, so a split would duplicate it. Core plus stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics2d) vehicle",
+      "reason": "body.inertia",
+      "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics2d) vehicle",
+      "reason": "body.inertia",
+      "grew": 1
     }
   ],
   "items": {
@@ -15041,8 +15053,8 @@
     "@margoengine/physics/vortices": 5479,
     "@margoengine/physics/waves": 7804,
     "@margoengine/physics/world": 17331,
-    "@margoengine/physics2d": 22543,
-    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 20882,
+    "@margoengine/physics2d": 22561,
+    "@margoengine/physics2d base (without 2D physics kernel loader JavaScript)": 20901,
     "@margoengine/physics2d lazy 2D physics kernel loader JavaScript": 2000,
     "@margoengine/physics2d/outline": 2524,
     "@margoengine/pixel": 4664,

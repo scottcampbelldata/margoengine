@@ -39,6 +39,10 @@
     "./outline": {
       "types": "./dist/outline.d.ts",
       "import": "./dist/outline.js"
+    },
+    "./vehicle": {
+      "types": "./dist/vehicle.d.ts",
+      "import": "./dist/vehicle.js"
     }
   },
   "files": [

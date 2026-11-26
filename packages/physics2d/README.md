@@ -206,6 +206,47 @@ console.log(Math.round(box.linearVelocity[0]), Math.abs(box.rotation) < 0.05); /
 physics.dispose();
 ```
 
+## Vehicles (`@margoengine/physics2d/vehicle`)
+
+`new Vehicle2D(physics, chassis, { wheels })` is Rapier's ray cast vehicle seen from the side: a hill-climb car, a cart or
+a truck. Each wheel casts a ray from its `position` on the chassis along its `direction` (default down on screen); a
+spring (`suspensionStiffness`, default 5.88 as Rapier's) and dampers (`suspensionCompression` 0.83, `suspensionRelaxation`
+0.88) on the suspension (`suspensionRestLength` default 0.3 m, `maxSuspensionTravel` 5 m, `maxSuspensionForce` 6000 N) hold
+the chassis up, and the tyre drives and brakes along the ground inside what its load can hold (`frictionSlip`, default
+10.5). `engineForce` and `brake` (newtons per wheel, or `setInput({ throttle, brake })` against `maxEngineForce` and
+`maxBrakeForce`) drive it; `speed` is the chassis's speed along `forward` (Rapier's `currentVehicleSpeed`), and
+`vehicle.wheel(i)` gives `inContact`, `contactPoint`, `contactNormal`, `ground`, `hardPoint`, `suspensionLength`,
+`suspensionForce`, `forwardImpulse` and the wheel's `rotation`; `wheelCenter(i)` is where to draw it. The pushes are held on
+the chassis (and on a dynamic body under a wheel, unless `groundReaction: false`) as forces over each step, so they act in
+every substep as gravity does. There is no steering and no sideways grip: in a side view the axle points out of the screen.
+`body.inertia` reads a body's moment of inertia (Rapier's `principalInertia`).
+
+```ts
+import { Physics2D } from '@margoengine/physics2d';
+import { Vehicle2D } from '@margoengine/physics2d/vehicle';
+
+await Physics2D.load();
+const physics = new Physics2D(null, { pixelsPerMeter: 1 });
+physics.addBody(null, { type: 'fixed', position: [0, 1], colliders: { shape: 'box', width: 400, height: 1 } });
+const chassis = physics.addBody(null, {
+  position: [0, -0.2],
+  colliders: { shape: 'box', width: 2, height: 0.5, mass: 800 },
+});
+const wheel = (x: number) => ({
+  position: [x, 0.25] as [number, number],
+  radius: 0.3,
+  suspensionStiffness: 40,
+  suspensionCompression: 4,
+  suspensionRelaxation: 4,
+});
+using car = new Vehicle2D(physics, chassis, { wheels: [wheel(-0.8), wheel(0.8)] });
+for (let i = 0; i < 60; i++) physics.step(); // settles on its springs
+car.setInput({ throttle: 1 });
+for (let i = 0; i < 120; i++) physics.step();
+console.log(car.speed > 2, car.wheel(0).inContact); // true true
+physics.dispose();
+```
+
 ## Forces at a point, locked rotation and collider settings
 
 `body.applyForceAtPoint(force, point)` holds a force that acts every step and turns the body by the arm from its centre of mass, as Rapier's `addForceAtPoint` does; `resetTorques()` clears the turning and keeps the push, `resetForces()` clears both. `body.lockRotation(locked = true)` holds the angle and takes the spin away until `lockRotation(false)`. A collider's `setActiveCollisionTypes(bits)` chooses the pairs it meets (1 dynamic with dynamic, 2 dynamic with kinematic, 4 dynamic with fixed, 8 kinematic with kinematic, 16 kinematic with fixed, 32 fixed with fixed; the default is 7), `setActiveEvents({collision, contactForce})` the events it asks for, and `setContactForceEventThreshold(newtons)` how hard a contact must press to raise `contactforce`.

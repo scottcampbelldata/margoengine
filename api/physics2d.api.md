@@ -105,6 +105,7 @@ export class Body2D {
     resetTorques(): this;
     resetForces(): this;
     get mass(): number;
+    get inertia(): number;
     restoreAdditionalMass(value: number): void;
     get additionalMass(): number;
     set additionalMass(value: number);

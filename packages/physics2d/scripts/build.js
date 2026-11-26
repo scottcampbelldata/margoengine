@@ -88,6 +88,7 @@ await build({
       entry: {
         index: resolve(root, 'src/index.ts'),
         outline: resolve(root, 'src/outline.ts'),
+        vehicle: resolve(root, 'src/vehicle.ts'),
       },
       formats: ['es'],
       fileName: (_, entry) => `${entry}.js`,

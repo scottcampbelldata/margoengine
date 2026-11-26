@@ -606,7 +606,7 @@ export class Body2D {
   private read(): Words {
     const { x, h, kernel } = this.k;
     kernel.ok(x.body_read(h, this.handle));
-    return kernel.io(15);
+    return kernel.io(16);
   }
   /** Velocity in world units per second. */
   get linearVelocity(): [number, number] {
@@ -701,6 +701,14 @@ export class Body2D {
   }
   get mass(): number {
     return this.read().f[7];
+  }
+  /**
+   * Moment of inertia about the centre of mass, in kilogram square world units (Rapier's `principalInertia`): what turns the
+   * body as `mass` is what moves it. 0 for a fixed or kinematic body.
+   */
+  get inertia(): number {
+    const scale = this.owner.scale;
+    return this.read().f[15] / (scale * scale);
   }
   /** @internal The added mass a restored snapshot carries. */
   restoreAdditionalMass(value: number): void {

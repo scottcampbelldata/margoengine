@@ -290,13 +290,15 @@ pub extern "C" fn body_remove(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| w.remove_body(body).map(|()| 0))
 }
 
-/// Writes x, y, cos, sin, vx, vy, angular velocity, mass, awake (u32), the world centre of mass whether the body is enabled (u32), its angular speed limit and its extra solver passes (u32) to the buffer.
+/// Writes x, y, cos, sin, vx, vy, angular velocity, mass, awake (u32), the world centre of mass, whether the body is enabled (u32),
+/// its angular speed limit, its extra solver passes and substeps (u32) and its moment of inertia about its centre of mass to the buffer.
 #[unsafe(no_mangle)]
 pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
     with_world!(handle, |w| {
         let b = w.bodies.get(body as usize).filter(|b| !b.dead).ok_or(PhysicsError::InvalidHandle)?;
         let (xf, v, av, mass, awake, center, enabled, cap, extra, more) = (b.xf, b.linear_velocity, b.angular_velocity, b.mass, b.awake, b.center, b.enabled, b.max_angular_speed, b.extra_passes, b.extra_substeps);
-        ensure(15);
+        let inertia = b.inertia;
+        ensure(16);
         for (i, value) in [xf.p.x, xf.p.y, xf.q.c, xf.q.s, v.x, v.y, av, mass].into_iter().enumerate() {
             put(i, value);
         }
@@ -307,6 +309,7 @@ pub extern "C" fn body_read(handle: i32, body: u32) -> i32 {
         put(12, cap);
         io()[13] = extra;
         io()[14] = more;
+        put(15, inertia);
         Ok(0)
     })
 }
