@@ -3,6 +3,7 @@ import test from 'node:test';
 import { TerrainBed } from '../../dist/earth.js';
 import { GRANULAR_MPM_LAYOUT, GRANULAR_MPM_WORDS, GranularMpmSolver } from '../../dist/granular-mpm.js';
 import { PhysicsWorld, regionWords, worldMemory } from '../../dist/world.js';
+import { frameRateIndependent } from './harness.js';
 
 const rate = { num: 60, den: 1 };
 const zero = [0, 0, 0];
@@ -171,4 +172,13 @@ test('the snow material clamps elastic snow stretches and retains the rejected c
     8e-12,
   );
   assert.ok(solver.sample(0).logPlasticVolume < 0);
+});
+
+test('the granular contact shot is independent of the presentation frame rate', async () => {
+  const points = block([-0.08, 0.28, -0.04], 0.04, [3, 4, 2]);
+  const solvers = await Promise.all([0, 1, 2].map(() => GranularMpmSolver.load()));
+  frameRateIndependent((rate) => {
+    const world = new PhysicsWorld({ rate, memory: worldMemory(false) });
+    return world.add(solvers.pop(), { points, floor: 0, rate: 4, materials: [{ young: 25000 }] });
+  });
 });
