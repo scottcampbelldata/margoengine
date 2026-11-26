@@ -12074,6 +12074,31 @@ still need playback checks.
 The optional entry is 4,998 B gzip. The plain SIMD kernel is 4,464 B gzip (8,622 B raw). The shared variant is 4,523 B gzip (8,710 B raw).
 That budget covers the field adapter and the point-mass mode in one import. Core and stage gain zero bytes.
 
+## Rooted plant mechanics (BIO-01)
+
+The optional vegetation kernel integrates two small-angle transverse modes about one upright root. The crown is a
+distributed load and mass on the stem. The model has fixed geometry, no branch topology, axial motion, finite-angle
+reconfiguration, growth or reciprocal flow feedback. The effect of a fluid is integrated at three stations on each
+element, and stem rupture is checked at nine cross-sections. A fluid sampler supplies density and velocity in the same
+origin cell. Deep-water Airy motion in the coupling test is a supplied field. Mixed media can use separate plant
+solvers; the sampled `medium` determines the default added mass and whether buoyancy is computed. Kernel execution
+requires Wasm SIMD. The plain and shared builds use the same layout in module slot 3, with a separate stack per
+instance. The dry model is checked against the uniform clamped–free solution.
+The optional physics entry is 9,402 B min+gzip. Each Wasm build is 6,456 B, or 2,226 B gzip. Loading on a
+shared-memory host prepares both builds so the same solver API can use either world memory type.
+The optional scatter entry is 2,248 B min+gzip. The measured core + stage gzip remains 24,820 B on Windows.
+
+`@margoengine/scatter/plant-motion` copies four modal displacements per plant to a 32-byte GPU record and maps
+instances to one root per selected X/Z cell. Bin indices and displacement use float32 for rendering. The input
+root and mesh pivot need to share a cell, and the rendered reach must fit Scatter's culling radius. A zero-strength
+Scatter wind enables its existing doubled reach while the solver poses mapped roots. The normal transform
+uses the derivative of the same displacement as the colour, depth and shadow geometry.
+
+The rigid adapter uses a fixed standing trunk proxy, so the rigid impact sees a fixed obstacle until release. It
+passes normal impulse to the bending modes at the stored contact heights. A released stem uses one authored rigid
+geometry with the pose and velocity of its detached chord. Release needs a preallocated dynamic fragment at the
+matching section height. Scatter can hide the entire failed instance when a separate body draws the fragment.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -28092,6 +28117,16 @@ more firmly. The exact block solve of each manifold (`blockSolver`) gives the st
 block solver's default, which waits on KB-PHYS-BLOCK1; the test bounds the sweeps at 0.2 m until then. (The 2.2 cm sink that
 was KB-PHYS-WALL1 was a different bug, fixed: the floor cell under the wall snapped the cube's foot to its open bottom.)
 
+
+
+## Open: a time-zero coupled snapshot predates its accumulator sum region (BIO-01)
+
+Add `PlantSway` and `PlantRigidSolver` to a `PhysicsWorld`, snapshot before the first `advance()`, advance
+one frame and restore that snapshot. Restore rejects the unequal region count. The field registry allocates the
+accumulator's sum region on first use. A snapshot taken after the first step captures the full layout. The
+regression in `packages/physics/tests/coupling/vegetation.test.js` restores a frame-two snapshot, taken before the
+hit and before either body changes its enabled flag. See BIO-01 in [Framework requests](physics-work-queue.md#framework-requests).
+
 === Using Margo with AI tools (docs/ai-tools.md) ===
 
 # Using Margo with AI tools
@@ -34149,27 +34184,25 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
-## Ropes, vehicles and compound shapes
+## Rooted plants in wind and water
+
+`@margoengine/physics/vegetation` models each plant as a tapered cantilever with two bending modes on each horizontal axis. Set its geometry, tissue density and Young’s modulus in SI units. A `FlowField` supplies the velocity and density of air or water at the plant and at the world clock's time.
 
 ```ts
-import {Engine, box} from 'margoengine/core';
-import {Physics, Rope, Vehicle} from 'margoengine/physics';
-import {convexDecomposition} from 'margoengine/physics/decomposition';
+import { PlantSway } from '@margoengine/physics/vegetation';
+import { PhysicsWorld } from '@margoengine/physics/world';
+import { BoundaryLayerWind } from '@margoengine/weather/boundary-layer';
 
-await Physics.load();
-const engine = await Engine.create(document.querySelector('canvas')!);
-const physics = new Physics(engine);
-physics.addBody(null, {type: 'fixed', position: [0, -0.5, 0], colliders: {shape: 'box', halfExtents: [50, 0.5, 50]}});
-
-// A rope hung from a fixed hook, carrying a crate. rope.points() is the polyline for @margoengine/lines.
-const crate = physics.addBody(null, {position: [0, 3, 0], colliders: {shape: 'box', halfExtents: [0.3, 0.3, 0.3]}});
-const rope = new Rope(physics, {start: [0, 6, 0], end: [0, 3.3, 0], segments: 10, attachStart: 'fixed', attachEnd: crate});
-const polyline = rope.points();
-
-// Rope and spring joints between two bodies.
-const hook = physics.addBody(null, {type: 'fixed', position: [3, 5, 0], colliders: []});
-const bob = physics.addBody(null, {position: [3, 4, 0], colliders: {shape: 'sphere', radius: 0.2, mass: 2}});
-physics.addJoint(hook, bob, {type: 'spring', restLength: 1, stiffness: 50, damping: 5}); // or {type: 'rope', length: 1.5}
+const breeze = new BoundaryLayerWind({ speed: 6, roughness: 0.03, turbulence: false });
+const sway = await PlantSway.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(sway, {
+  flow: breeze,
+  plants: [{ root: [0, 0, 0], height: 1.5, baseDiameter: 0.035,
+    tipDiameter: 0.012, youngModulus: 8e8, density: 650, dampingRatio: 0.04 }],
+});
+world.advance(60);
+const tip = sway.sample(0, 1.5);
+console.log(tip.displacement, sway.dryFrequencies(0));
 ```
 
 [README continues: https://margoengine.com/llms/packages/physics.md]
