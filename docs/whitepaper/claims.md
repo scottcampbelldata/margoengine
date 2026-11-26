@@ -6302,6 +6302,15 @@ continues translating at 140%, with conserved volume on 64 and 128 cells. Disabl
 contact-angle interval at 80% restores translation. This is a force-bracket check.
 [Reproduce](reproduce.md#fluid-07-cylindrical-cap-retention)
 
+### FLUID-07 planar pressure convergence
+
+A stiff 10 μL cap redistributes on a level patch and then advances on an incline with
+contact-angle hysteresis. The previous diagonal-only pressure solve failed during the
+level advance. The new solve conserves liquid, keeps the film positive and reproduces its
+hash from a snapshot. A separate rectangular patch matches the exact discrete decay of
+an orthogonal Neumann mode product.
+[Reproduce](reproduce.md#fluid-07-planar-pressure-convergence)
+
 ### FLUID-07 measured inclined film
 
 The film reaches the observed glycerol depth for three independently measured pump settings

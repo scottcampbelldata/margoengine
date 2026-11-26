@@ -5719,6 +5719,8 @@ Set `suspended: true` on the underside of a panel with its normal pointing into 
 Gravity can then amplify long disturbances while surface tension damps short ones.
 For a spanwise-uniform strip, either `cells` dimension can be one. A direct banded
 pressure solve also supports strips with advancing and receding contact angles.
+On a two-dimensional patch, a line preconditioner helps solve pressure between
+a thick bead and its thin precursor while retaining cross-plane capillary flow.
 
 Pass a `Precipitation` field for rain arriving at the moving panel and a `Wind` for surface shear.
 A registered rain input can instead publish m/s as a scalar or per cell. The optional `impacts` input

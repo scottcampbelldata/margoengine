@@ -4683,6 +4683,19 @@ Use the excess cross-sectional liquid mass to convert this force to acceleration
 about a derived force, independent of the moving solutions. A measured tilt threshold remains open.
 [Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
 
+### FLUID-07 planar pressure convergence
+
+Run `node --test --test-name-pattern="planar pressure|planar cap" packages/physics/tests/thin-film.test.js`
+from a built physics entry. Start the 32 × 32 patch with 10 μL above a 20 μm precursor. Its
+radial profile is proportional to `I0(R/ℓc) − I0(r/ℓc)` inside radius `R`, where `ℓc`
+is the capillary length. Normalize the excess volume on the grid and evolve four ticks at
+level, then four more ticks in a fresh inclined world with a nonzero contact-angle interval.
+Check positive depths, volume, downhill first moment and exact replay. Independently, the
+17 × 12 patch checks decay `1 / (1 + dt M σ (λx + λy)^2)` for the product of discrete
+horizontal and vertical cosines. The cap test has authored geometry, forcing and contact
+angles and checks convergence.
+[Model and sources](../clean-room.md#thin-liquid-films-on-moving-surfaces-fluid-07)
+
 ### FLUID-07 measured inclined film
 
 Run `node --test --test-name-pattern="calibrated inlet" packages/physics/tests/coupling/thin-film.test.js`

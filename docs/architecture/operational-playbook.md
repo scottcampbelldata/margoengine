@@ -10643,6 +10643,12 @@ pressure solve to initialize the wet-area rate and reuses one augmented Cholesky
 the constrained iterations. A three-mode regression covers 20 μm cells in either axis under
 both Wasm memory modes.
 
+The planar conjugate-gradient solve takes the principal factor of each face line when mobility
+varies appreciably across the patch. The line factors borrow the consumed transport workspace
+for the duration of the pressure solve. Each matrix application keeps the cross-line gradient
+and curvature terms. A viscous-cap regression and a rectangular Neumann modal regression cover
+both choices of preconditioner.
+
 ### Environmental airborne batch (ATMO-06)
 
 The optional native kernel integrates two Cartesian lanes at once, with a third scalar lane in the same operation

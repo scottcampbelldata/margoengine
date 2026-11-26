@@ -206,6 +206,101 @@ test('ThinFilmSolver: a shallow strip retains or slides under a bracket of the F
   }
 });
 
+test('ThinFilmSolver: planar pressure damps a product of orthogonal Neumann modes', async () => {
+  const cells = [17, 12];
+  const spacing = 42e-6;
+  const depth = 95e-6;
+  const amplitude = 1e-10;
+  const viscosity = 0.04;
+  const surfaceTension = 0.03;
+  const kx = (2 * Math.PI) / cells[0];
+  const ky = (3 * Math.PI) / cells[1];
+  const shape = Array.from({ length: cells[0] * cells[1] }, (_, i) => {
+    const x = i % cells[0];
+    const y = Math.floor(i / cells[0]);
+    return Math.cos(kx * (x + 0.5)) * Math.cos(ky * (y + 0.5));
+  });
+  const eigenvalue = 4 * ((Math.sin(kx / 2) / spacing) ** 2 + (Math.sin(ky / 2) / spacing) ** 2);
+  const mobility = depth ** 3 / (3 * viscosity);
+  const damping = 1 / (1 + dt * mobility * surfaceTension * eigenvalue ** 2);
+  const film = await ThinFilmSolver.load();
+  const world = new PhysicsWorld({ rate, gravity: [0, 0, 0] }).add(film, {
+    cells,
+    spacing,
+    depth: shape.map((mode) => depth + amplitude * mode),
+    viscosity,
+    surfaceTension,
+  });
+  world.advance(1);
+  const tolerance = (64 * amplitude ** 2) / depth + 32 * Number.EPSILON * depth;
+  for (const [i, value] of film.depths().entries()) close(value, depth + amplitude * damping * shape[i], tolerance);
+  close(film.budget.stored, film.budget.initial, 128 * Number.EPSILON * film.budget.initial);
+});
+
+test('ThinFilmSolver: a stiff low-viscosity planar cap advances conservatively on an incline', async () => {
+  const count = 32;
+  const radius = 0.0034;
+  const spacing = (3.2 * radius) / count;
+  const density = 726;
+  const viscosity = 0.000845;
+  const surfaceTension = 0.0234;
+  const precursorDepth = 20e-6;
+  const volume = 10e-9;
+  const gravity = 9.80665;
+  const tilt = (0.85 * Math.PI) / 180;
+  const x = (i) => (i + 0.5 - count / 2) * spacing;
+  // The shallow gravity-capillary profile solves the radial linear Young–Laplace
+  // equation. The modified Bessel I0 series supplies its shape before scaling to volume.
+  const inverseCapillaryLength = Math.sqrt((density * gravity) / surfaceTension);
+  const bessel0 = (value) => {
+    let term = 1;
+    let sum = 1;
+    for (let i = 1; i <= 12; i++) {
+      term *= (value * value) / (4 * i * i);
+      sum += term;
+    }
+    return sum;
+  };
+  const wetEdge = bessel0(inverseCapillaryLength * radius);
+  const profile = Array.from({ length: count * count }, (_, i) => {
+    const r = Math.hypot(x(i % count), x(Math.floor(i / count)));
+    return r < radius ? wetEdge - bessel0(inverseCapillaryLength * r) : 0;
+  });
+  const scale = volume / (spacing ** 2 * profile.reduce((sum, h) => sum + h, 0));
+  const depth = profile.map((h) => precursorDepth + scale * h);
+  const setup = async (normal, tangent, values, contactAngleHysteresis) => {
+    const film = await ThinFilmSolver.load();
+    const world = new PhysicsWorld({ rate, gravity: [tangent, -normal, 0] }).add(film, {
+      cells: [count, count],
+      spacing,
+      depth: values,
+      density,
+      viscosity,
+      surfaceTension,
+      wetting: { precursorDepth, contactAngle: 0.368 },
+      contactAngleHysteresis,
+    });
+    return { world, film };
+  };
+  const level = await setup(gravity, 0, depth);
+  level.world.advance(4);
+  const initial = level.film.depths();
+  const { world, film } = await setup(gravity * Math.cos(tilt), gravity * Math.sin(tilt), initial, [0.363, 0.373]);
+  const moment = (values) => values.reduce((sum, h, i) => sum + (h - precursorDepth) * x(i % count), 0);
+  world.advance(2);
+  const first = moment(film.depths());
+  const snapshot = world.takeSnapshot();
+  world.advance(4);
+  const final = film.depths();
+  assert.ok(final.every((h) => h > 0));
+  assert.ok(first > moment(initial) && moment(final) > first);
+  close(film.budget.stored, film.budget.initial, 128 * Number.EPSILON * film.budget.initial);
+  const hash = world.hash();
+  world.restoreSnapshot(snapshot.bytes);
+  world.advance(4);
+  assert.equal(world.hash(), hash);
+});
+
 test('ThinFilmSolver: the precursor contact-angle pressure has its derived linear decay rate', async () => {
   const n = 16;
   const dx = 0.002;

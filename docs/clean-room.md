@@ -15550,6 +15550,21 @@ rendering local shortening. The live fixture pushes and retracts a real RigidSol
   band directly, using scratch already owned by the solver. The modal regression checks the same
   discrete equation with three independent Neumann cosine modes.
   [Publisher](https://doi.org/10.1137/1.9781421407944)
+- Eike H. Müller and Robert Scheichl, “Massively parallel solvers for elliptic PDEs in
+  numerical weather and climate prediction” (2014), sections 4.2 and 6.2.2, use complete
+  grid lines to precondition elliptic coupling. The thin-film face operator uses the
+  principal five-band blocks along each grid axis with Cholesky factorization. The
+  capillary contribution coupling consecutive faces contains the shared cell's grid
+  degree plus two, and their second-neighbour coupling comes from one Laplacian edge.
+  The remaining couplings are applied by the full operator at every iteration.
+  [Author preprint](https://arxiv.org/abs/1307.2036)
+- Shuo Zhang and Jinchao Xu, “Optimal solvers for fourth-order PDEs discretized on
+  unstructured grids” (2014), section 2. Their analysis distinguishes the eigenvalue
+  distribution from the worst-case condition number in fourth-order solves. The film
+  regression tests the nearly uniform modal case independently of the variable-mobility
+  cap. The diagonal preconditioner is retained when the positive mobilities span
+  at most a factor of four.
+  [Author preprint](https://arxiv.org/abs/1203.0632)
 - Huamin Wang, Peter J. Mucha and Greg Turk, “Water Drops on Surfaces” (2005), sections 4–6.
   Young's relation supplies the equilibrium angle and Laplace pressure relates curvature to
   pressure. Equation 10 brackets the stationary contact front by the advancing and receding

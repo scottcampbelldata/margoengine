@@ -285,6 +285,8 @@ impl Film {
         }
         let dx2 = grid.inv_dx * grid.inv_dx;
         let capillary = model.surface_tension * dx2 * dx2;
+        let mut min_mobility = f64::INFINITY;
+        let mut max_mobility: f64 = 0.0;
         for i in 0..n {
             let h = *self.height.add(i);
             let head = *work.pressure.add(i);
@@ -304,6 +306,10 @@ impl Film {
                         if rhs == 0.0 {
                             m = 0.0;
                         }
+                    }
+                    if m > 0.0 {
+                        min_mobility = min_mobility.min(m);
+                        max_mobility = max_mobility.max(m);
                     }
                     weight = scalar_sqrt(m);
                     let stiffness = if patterned {
@@ -326,10 +332,13 @@ impl Film {
                 work.residual.add(f).write(rhs);
             }
         }
+        // Near-uniform mobility retains the face operator's modal structure.
+        // In the varying case line blocks account for couplings that the diagonal misses.
+        let lines = max_mobility > 4.0 * min_mobility;
         if let Some(contact) = self.contact.as_ref() {
-            self.contact_solution(contact, k, dt)
+            self.contact_solution(contact, k, dt, lines)
         } else {
-            self.solve_faces(k, dt, core::ptr::null(), false)
+            self.solve_faces(k, dt, core::ptr::null(), false, lines)
         }
     }
 
@@ -413,8 +422,114 @@ impl Film {
         }
     }
 
+    unsafe fn factor_planar_lines(&self, k: f64, dt: f64, contact_norm: *const f64) -> bool {
+        let grid = self.grid;
+        let w = &self.work;
+        let dx2 = grid.inv_dx * grid.inv_dx;
+        let capillary = (*self.model).surface_tension * dx2;
+        // Wet pressure has consumed the explicit face flux and edge outflow.
+        // Reuse those arrays for the principal line blocks until it writes the new flux.
+        let center = w.edges;
+        let one = center.add(2 * grid.n);
+        let two = w.flux;
+        for i in 0..grid.n {
+            let x = i.checked_rem(grid.cols).unwrap_or_else(|| unreachable());
+            let y = i.checked_div(grid.cols).unwrap_or_else(|| unreachable());
+            for (axis, (index, step)) in [(x, 2), (y, 2 * grid.cols)].into_iter().enumerate() {
+                let f = 2 * i + axis;
+                let weight = *w.weight.add(f);
+                let lower_two = if index > 1 {
+                    dt * dx2 * capillary * weight * *w.weight.add(f - 2 * step)
+                        / *center.add(f - 2 * step)
+                } else {
+                    0.0
+                };
+                let lower_one = if index > 0 {
+                    let wetting = if self.wetting_map.is_null() {
+                        0.0
+                    } else {
+                        *self.wetting_map.add(i)
+                    };
+                    let contact = if contact_norm.is_null() {
+                        0.0
+                    } else {
+                        let scale = *contact_norm.add(i);
+                        scale * scale
+                    };
+                    let subdiagonal = -dx2
+                        * (dt * (k + wetting + (grid.degree(i) + 2.0) * capillary) + contact)
+                        * weight
+                        * *w.weight.add(f - step);
+                    (subdiagonal - lower_two * *one.add(f - step)) / *center.add(f - step)
+                } else {
+                    0.0
+                };
+                let diagonal =
+                    1.0 / *w.diagonal.add(f) - lower_one * lower_one - lower_two * lower_two;
+                if !(diagonal > 0.0 && diagonal.is_finite()) {
+                    return false;
+                }
+                center.add(f).write(scalar_sqrt(diagonal));
+                one.add(f).write(lower_one);
+                two.add(f).write(lower_two);
+            }
+        }
+        true
+    }
+
+    unsafe fn precondition_planar(&self, rhs: *const f64, out: *mut f64, lines: bool) {
+        let grid = self.grid;
+        let w = &self.work;
+        if !lines {
+            for i in 0..2 * grid.n {
+                out.add(i).write(*rhs.add(i) * *w.diagonal.add(i));
+            }
+            return;
+        }
+        let center = w.edges;
+        let one = center.add(2 * grid.n);
+        let two = w.flux;
+        for i in 0..grid.n {
+            let x = i.checked_rem(grid.cols).unwrap_or_else(|| unreachable());
+            let y = i.checked_div(grid.cols).unwrap_or_else(|| unreachable());
+            for (axis, (index, step)) in [(x, 2), (y, 2 * grid.cols)].into_iter().enumerate() {
+                let f = 2 * i + axis;
+                let mut value = *rhs.add(f);
+                if index > 1 {
+                    value -= *two.add(f) * *out.add(f - 2 * step);
+                }
+                if index > 0 {
+                    value -= *one.add(f) * *out.add(f - step);
+                }
+                out.add(f).write(value / *center.add(f));
+            }
+        }
+        for i in (0..grid.n).rev() {
+            let x = grid.cols - 1 - i.checked_rem(grid.cols).unwrap_or_else(|| unreachable());
+            let y = grid.rows - 1 - i.checked_div(grid.cols).unwrap_or_else(|| unreachable());
+            for (axis, (index, step)) in [(x, 2), (y, 2 * grid.cols)].into_iter().enumerate() {
+                let f = 2 * i + axis;
+                let mut value = *out.add(f);
+                if index > 0 {
+                    value -= *one.add(f + step) * *out.add(f + step);
+                }
+                if index > 1 {
+                    value -= *two.add(f + 2 * step) * *out.add(f + 2 * step);
+                }
+                out.add(f).write(value / *center.add(f));
+            }
+        }
+    }
+
     #[inline(never)]
-    unsafe fn solve_faces(&self, k: f64, dt: f64, contact_norm: *const f64, warm: bool) -> bool {
+    unsafe fn solve_faces(
+        &self,
+        k: f64,
+        dt: f64,
+        contact_norm: *const f64,
+        warm: bool,
+        lines: bool,
+    ) -> bool {
         let work = &self.work;
         let len = 2 * self.grid.n;
         let rhs2 = dot(work.residual, work.residual, len);
@@ -445,10 +560,11 @@ impl Film {
         } else {
             zero(work.solution, len);
         }
-        for i in 0..len {
-            *work.direction.add(i) = *work.residual.add(i) * *work.diagonal.add(i);
+        if lines && !warm && !self.factor_planar_lines(k, dt, contact_norm) {
+            return false;
         }
-        // PCG on a symmetric positive definite face operator, with an exact diagonal.
+        self.precondition_planar(work.residual, work.direction, lines);
+        // PCG on the original face operator with a block for each row or column.
         let mut rz = dot(work.residual, work.direction, len);
         for _ in 0..len {
             self.matrix(work.direction, work.result, k, dt, contact_norm);
@@ -460,11 +576,11 @@ impl Film {
             for i in 0..len {
                 *work.solution.add(i) += alpha * *work.direction.add(i);
                 *work.residual.add(i) -= alpha * *work.result.add(i);
-                *work.z.add(i) = *work.diagonal.add(i) * *work.residual.add(i);
             }
             if dot(work.residual, work.residual, len) <= tolerance2 {
                 return true;
             }
+            self.precondition_planar(work.residual, work.z, lines);
             let next_rz = dot(work.residual, work.z, len);
             let beta = next_rz / rz;
             rz = next_rz;
@@ -475,7 +591,13 @@ impl Film {
         false
     }
 
-    unsafe fn contact_solution(&self, angles: &ContactAngles, k: f64, dt: f64) -> bool {
+    unsafe fn contact_solution(
+        &self,
+        angles: &ContactAngles,
+        k: f64,
+        dt: f64,
+        lines: bool,
+    ) -> bool {
         let w = &self.work;
         let grid = self.grid;
         let n = grid.n;
@@ -535,12 +657,12 @@ impl Film {
             }
         }
         if !resist {
-            return self.solve_faces(k, dt, core::ptr::null(), false);
+            return self.solve_faces(k, dt, core::ptr::null(), false, lines);
         }
         if grid.cols == 1 || grid.rows == 1 {
             // The free strip solve gives a feasible starting wet-area rate. At
             // weak pinning it is already close to the constrained solution.
-            if !self.solve_faces(k, dt, core::ptr::null(), false) {
+            if !self.solve_faces(k, dt, core::ptr::null(), false, lines) {
                 return false;
             }
             grid.gradient_transpose(w.solution, w.weight, w.transpose);
@@ -577,7 +699,7 @@ impl Film {
                     *w.residual.add(f) = *rhs.add(f) + change;
                 }
             }
-            if !self.solve_faces(k, dt, norm, iteration > 0) {
+            if !self.solve_faces(k, dt, norm, iteration > 0, lines) {
                 return false;
             }
             grid.gradient_transpose(w.solution, w.weight, w.transpose);

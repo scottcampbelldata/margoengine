@@ -18401,14 +18401,14 @@
       "brotli": 2332
     },
     "packages/physics/dist/thin-film-kernel.wasm": {
-      "raw": 16711,
-      "gzip": 6969,
-      "brotli": 6042
+      "raw": 18508,
+      "gzip": 7591,
+      "brotli": 6630
     },
     "packages/physics/dist/thin-film-kernel-shared.wasm": {
-      "raw": 16711,
-      "gzip": 6969,
-      "brotli": 6042
+      "raw": 18508,
+      "gzip": 7591,
+      "brotli": 6630
     },
     "packages/physics/dist/viscoplastic-kernel.wasm": {
       "raw": 16986,
