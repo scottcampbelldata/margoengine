@@ -98,15 +98,15 @@ shader node editor (`shader/src/editor.ts`), metaballs (`procedural/src/marching
 
 | Gap | Rival | Status | Size | Landed |
 | --- | --- | --- | --- | --- |
-| MMD loader: PMD/PMX models plus VMD motion and camera clips (no physics) | three.js | DONE (`parsePMD`, `parsePMX`, `parseMMD`, `parseVMD`, `sampleVMDBone` of `@margoengine/loaders/mmd`; rigid bodies and joints are data only, never simulated) | M | 084f38ec9 |
-| DirectX `.x` loader (text and binary, skin and animation sets) | three.js | DONE (`parseX` of `@margoengine/loaders/xfile`; compressed `tzip` and `bzip` files are refused as unsupported) | M | a5f8c55ea |
+| MMD loader: PMD/PMX models plus VMD motion and camera clips (no physics) | three.js | DONE (`parsePMD`, `parsePMX`, `parseMMD`, `parseVMD`, `sampleVMDBone` of `@margoengine/loaders/mmd`; rigid bodies and joints are data only, never simulated) | M | c47d27afe |
+| DirectX `.x` loader (text and binary, skin and animation sets) | three.js | DONE (`parseX` of `@margoengine/loaders/xfile`; compressed `tzip` and `bzip` files are refused as unsupported) | M | 55fe7dd90 |
 | Tilt Brush `.tilt` loader (brush strokes as ribbons) | three.js | DONE (`@margoengine/loaders/tilt`) | S | 004c621ab |
 | PRWM loader (packed binary mesh) | three.js | DONE (`@margoengine/loaders/prwm`) | S | 004c621ab |
 | RGBM, LogLuv and HDR-JPG texture loaders (Ultra HDR gain maps exist) | three.js | DONE (`@margoengine/environment/encoded-hdr`; HDR-JPG is the existing gain-map decoder, now also `decodeHDRJPG`) | S | d49bcdff4 |
 | G-code exporter (toolpath from a mesh or lines; the G-code loader exists) | three.js | DONE (`@margoengine/exporters/gcode`) | S | b3bf73bcb |
 | Depth-video point cloud (RGB plus depth video to points) | three.js | DONE (`@margoengine/points/depth-video`) | S | 146657294 |
 | Parametric surface presets (Klein bottle, Mobius strip, torus-knot variants) on the generic `geometry/src/parametric.ts` builder | three.js | DONE (`@margoengine/geometry/extras`: Klein bottle, Möbius strip, knots) | S | 65bd2d5d3 |
-| Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | DONE (`GeometryGraph`, `buildGeometryGraph`, `parseGeometryGraph` of `@margoengine/geometry/node-graph`; no editor) | L | 0946c2a9d |
+| Node Geometry runtime: serializable graph (sources, setters, instantiate on vertices/faces, conditional, noise, merge, material id) that builds a mesh, JSON in and out; the editor is in do-later.md | Babylon Node Geometry | DONE (`GeometryGraph`, `buildGeometryGraph`, `parseGeometryGraph` of `@margoengine/geometry/node-graph`; no editor) | L | 688590050 |
 | Scene change recorder: track edits to a loaded scene and save or re-apply them as a small JSON delta (prefab overrides exist) | Babylon delta files | DONE (`@margoengine/save/delta`) | S to M | 0d5b43853 |
 | Asset task queue: typed tasks with per-task success/error, progress, retry and an all-done event | Babylon AssetsManager | DONE (`@margoengine/scene/assets`) | S | 861843398 |
 | `.babylon` scene import and scene-serializer export | Babylon | DONE (`parseBabylon`, `flattenBabylon` of `@margoengine/loaders/babylon`; `exportBabylon` of `@margoengine/exporters/babylon`; meshes, shared geometries, instances, standard and PBR materials, cameras, lights, skeletons, node animation; static pose on export) | S to M | 8df1341a1 |
