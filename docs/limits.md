@@ -10305,3 +10305,7 @@ The bilge hull-pressure seakeeping entry is 29,592 B gzip with a 30,480 B ceilin
 The `addedMass` path applies the plate’s normal virtual mass through the existing six-axis solve. A dry plate adds zero. The model uses the oscillatory long-plate wall calibration and the current harmonic roll-amplitude estimate. Finite-section and mount-gap corrections, wave excitation of the plates and higher time harmonics remain open. The estimate is a local virtual mass, with no separate time derivative of the plate’s mass matrix during a fast wetting transition.
 
 The bilge virtual-inertia seakeeping entry is 30,177 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
+
+### Holdout roll damping and period with bilge keels
+
+The IIT Madras BK10 flume case gives a damping ratio within its measured repeat variation at two time steps. For the same test the computed period is about 6% short. The bare control also over-predicts damping. This constrained-roll result covers the specified geometry and input only. Period, whole-hull added inertia and nonlinear wake pressure remain separate limitations.

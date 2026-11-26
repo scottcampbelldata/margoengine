@@ -14941,6 +14941,10 @@ The `addedMass` path applies the plate’s normal virtual mass through the exist
 
 The bilge virtual-inertia seakeeping entry is 30,177 B gzip with a 30,480 B ceiling. Core and Stage gain zero bytes.
 
+### Holdout roll damping and period with bilge keels
+
+The IIT Madras BK10 flume case gives a damping ratio within its measured repeat variation at two time steps. For the same test the computed period is about 6% short. The bare control also over-predicts damping. This constrained-roll result covers the specified geometry and input only. Period, whole-hull added inertia and nonlinear wake pressure remain separate limitations.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features

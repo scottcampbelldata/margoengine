@@ -816,6 +816,107 @@ test('HullSolver bilge keel inertia opposes acceleration only on its wet normal'
   }
 });
 
+test('HullSolver reproduces held-out Irkal BK10 roll damping at two step sizes', () => {
+  // Irkal et al. (2016), Tables 1–2 and figures 2–3: a 0.58 m parallel section on a fixed roll bearing.
+  // The tank's prescribed 20 degree release belongs to the input. Damping and period are independent outputs.
+  const length = 0.58;
+  const breadth = 0.3;
+  const depth = 0.2;
+  const draft = 0.12;
+  const radius = 0.025;
+  const kg = 0.08;
+  const mass = 20.88;
+  const rollInertia = 0.2258; // Bifilar pendulum, the value in parentheses in Table 2.
+  const plateBreadth = 0.01;
+  const release = Math.PI / 9;
+  const shoulder = breadth / 2 - radius;
+  const shoulderY = radius - kg;
+  const profile = [[depth - kg, breadth / 2]];
+  for (const side of [1, -1]) {
+    for (let i = 0; i <= 8; i++) {
+      const theta = (-((side === 1 ? 0 : 1) + i / 8) * Math.PI) / 2;
+      profile.push([shoulderY + radius * Math.sin(theta), side * shoulder + radius * Math.cos(theta)]);
+    }
+  }
+  profile.push([depth - kg, -breadth / 2]);
+  const rows = profile.length;
+  const vertices = Float64Array.from([-length / 2, length / 2].flatMap((x) => profile.flatMap(([y, z]) => [x, y, z])));
+  const triangles = [];
+  for (let i = 0; i < rows; i++) {
+    const j = (i + 1) % rows;
+    triangles.push(i, j, rows + j, i, rows + j, rows + i);
+  }
+  for (let i = 1; i < rows - 1; i++) triangles.push(0, i + 1, i, rows, rows + i, rows + i + 1);
+  const mesh = { vertices, indices: Uint32Array.from(triangles) };
+  const plates = [-1, 1].map((side) => ({
+    root: [0, shoulderY - radius / Math.sqrt(2), side * (shoulder + radius / Math.sqrt(2))],
+    span: [-plateBreadth / Math.sqrt(2), (side * plateBreadth) / Math.sqrt(2)],
+    length,
+  }));
+  const decay = (level, bilgeKeels) => {
+    const hz = 60 * (1 << level);
+    using physics = new Physics(null, { fixedTimestep: 1 / hz, substeps: 1 });
+    const body = physics.addBody(null, {
+      position: [0, kg - draft, 0],
+      rotation: [Math.sin(release / 2), 0, 0, Math.cos(release / 2)],
+      enabledTranslations: [false, false, false],
+      enabledRotations: [true, false, false],
+      colliders: { shape: 'box', halfExtents: [length / 2, depth / 2, breadth / 2], mass },
+    });
+    body.setMassProperties({
+      mass,
+      centerOfMass: [0, 0, 0],
+      inertia: [
+        rollInertia,
+        (mass * (length * length + breadth * breadth)) / 12,
+        (mass * (length * length + depth * depth)) / 12,
+      ],
+    });
+    const world = new PhysicsWorld({ rate: { num: hz, den: 1 }, gravity: [0, -9.81, 0] })
+      .add(new RigidSolver(), { physics })
+      .add(new HullSolver(), {
+        level,
+        hulls: [{ row: body.row, mesh, bilgeKeels }],
+        sea: { density: 1000, elevation: () => 0 },
+        viscosity: 1e-6,
+        drag: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .couple(['hull', 'rigid'], 'staggered');
+    const peaks = [];
+    let before = release;
+    let last = release;
+    for (let step = 1; step <= 7 * hz && peaks.length < 5; step++) {
+      world.advance(step);
+      const value = 2 * Math.atan2(body.rotation[0], body.rotation[3]);
+      if (step > hz / 2 && last > 0 && last > before && last > value) {
+        const curvature = (value + before - 2 * last) / 2;
+        const slope = (value - before) / 2;
+        const extremum = -slope / (2 * curvature);
+        peaks.push([(step - 1 + extremum) / hz, last + slope * extremum + curvature * extremum * extremum]);
+      }
+      before = last;
+      last = value;
+    }
+    assert.equal(peaks.length, 5, 'five positive peaks after release, as in the experiment');
+    const decrement = Math.log(peaks[0][1] / peaks[4][1]) / 4;
+    const damping = decrement / Math.hypot(2 * Math.PI, decrement);
+    const period = ((peaks[4][0] - peaks[0][0]) / 4) * Math.sqrt(1 - damping * damping);
+    return { damping, period };
+  };
+  const bare = decay(1, undefined);
+  for (const level of [1, 2]) {
+    const actual = decay(level, plates);
+    // Table 6, BK10 at d=0.12 m: the published mean and standard deviation over four tank runs.
+    assert.ok(Math.abs(actual.damping - 0.077) <= 0.00203, JSON.stringify({ level, ...actual }));
+    assert.ok(actual.damping > bare.damping, 'the plates increase free-roll damping');
+    assert.ok(actual.period > bare.period, 'the plates lengthen the period');
+  }
+  // Table 8 also reports a measured 1.196 s for BK10. The simulated period is roughly 1.124 s.
+  // That period residual remains open and has no inflated passing tolerance.
+});
+
 function radiatingBox(linearVelocity, angularVelocity, memory, y = D / 2 - T) {
   const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory });
   const physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });

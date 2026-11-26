@@ -4599,3 +4599,7 @@ Build Physics and run `node --test --test-name-pattern "bilge keel damping" pack
 ### SEA-08 bilge keel added inertia
 
 Build Physics and run `node --test --test-name-pattern "bilge keel damping|bilge keel inertia" packages/physics/tests/coupling/seakeeping.test.js`. The heave case checks the denominator of the held normal acceleration with the horizontal plates wet and dry. The separate forward-roll case recovers its viscous moment through the coupled sway and roll added-inertia matrix.
+
+### SEA-08 independently measured roll decay
+
+Build Physics and run `node --test --test-name-pattern "held-out Irkal BK10" packages/physics/tests/coupling/seakeeping.test.js`. The recorded mass, shape and bearings are inputs, then the test recovers decay from five positive peaks at 120 and 240 Hz. It checks both against the published repeat standard deviation. Natural-period and bare-damping residuals are recorded alongside the comparison.

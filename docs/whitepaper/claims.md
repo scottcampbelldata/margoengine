@@ -6265,3 +6265,7 @@ The wet rectangular girth adds 2,010.140 N m s/rad at 0.125 rad/s in the mirror-
 ### SEA-08 bilge keel virtual inertia
 
 The held force of a box with a horizontal plate pair matches its independent normal-mass reduction. A dry pair and the disabled added-mass option produce the expected controls. The moving-hull case checks the sway–roll coupling in the force port using a direct two-coordinate Schur complement. The wall-tunnel measurements were used to calibrate the plate coefficient. The independent Wind Orca roll-period series remains reserved.
+
+### SEA-08 independent bilge-keel damping measurement
+
+The held-out Irkal BK10 model at 0.12 m draft and 20° release has a measured damping ratio of 0.077 with a reported standard deviation of 0.00203. The engine gives 0.07524 and 0.07508 at 120 and 240 Hz. The predicted natural period is about 1.124 s against 1.196 s measured. Its bare control gives 0.04178 against 0.033 measured. The damping comparison qualifies the constrained BK10 test. The bare damping and appended period and inertia remain open. [Inputs and evidence](../clean-room.md#sea-08-independent-iit-madras-bilge-keel-roll-decay)
