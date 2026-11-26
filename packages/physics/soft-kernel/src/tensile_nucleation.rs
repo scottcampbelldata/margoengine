@@ -2,7 +2,7 @@
 // Li and Barbič (2014), "Stable Orthotropic Materials," section 3, defines the
 // reference strain using F^T F. F F^T has the same spectrum and gives current axes.
 use crate::World;
-use crate::fem::{CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NONE, NUCLEATED_TET, TORN_TET};
+use crate::fem::{CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NONE, NUCLEATED_TET, TORN_TET, UNREPRESENTABLE_TET};
 use crate::math::sqrt64;
 use crate::vertex_block::{Columns, Vec3, cross, dot};
 
@@ -110,7 +110,7 @@ impl World {
         for t in first..first + count {
             let flags = self.fem.flags[t];
             let at_front = flags & CRACK_FRONT_MASK != 0;
-            if flags & (TORN_TET | NUCLEATED_TET) != 0 || (!at_front && existing.is_some()) {
+            if flags & (TORN_TET | NUCLEATED_TET | UNREPRESENTABLE_TET) != 0 || (!at_front && existing.is_some()) {
                 continue;
             }
             let corners = [0, 1, 2, 3].map(|i| self.fem.p[i][t] as usize);

@@ -6,7 +6,7 @@
 <script type="module">
   import { Engine, Geometry, PbrMaterial, box } from '/packages/core/dist/index.js';
   import { Physics } from '../dist/index.js';
-  import { ladder } from './coupling/volumetric-ladder.js';
+  import { ladder, tensileLadder } from './coupling/volumetric-ladder.js';
 
   await Physics.load();
   const canvas = document.querySelector('canvas');
@@ -15,8 +15,7 @@
     camera: { position: [0.12, 1.23, 1.38], target: [0, 0.88, 0], near: 0.05, far: 10 },
   });
   const wood = new PbrMaterial({ color: '#c99364', roughness: 0.63 });
-  const rungMesh = engine.createMesh().setMaterial(wood);
-  const cutMesh = engine.createMesh().setMaterial(wood);
+  const rungMeshes = [];
   const steel = new PbrMaterial({ color: '#626d76', roughness: 0.5 });
   for (const x of [-0.39, 0.39]) {
     engine.createMesh().setGeometry(box(0.08, 1.58, 0.13)).setMaterial(steel).setPosition([x, 0.79, 0]);
@@ -43,11 +42,18 @@
     return new Geometry(positions, normals, indices);
   }
 
+  function placeRung(pieces) {
+    for (let i = 0; i < pieces.length; i++) {
+      const mesh = rungMeshes[i] ??= engine.createMesh().setMaterial(wood);
+      mesh.setGeometry(surface(pieces[i]));
+    }
+    for (let i = pieces.length; i < rungMeshes.length; i++) rungMeshes[i].setGeometry(null);
+  }
+
   window.renderRung = async ({ loaded, showBoot = false, solver, fiber, orthotropy, frame = 120 }) => {
     const scene = await ladder(undefined, { mass: loaded ? 35 : 0, solver, fiber, orthotropy });
     scene.world.advance(frame);
-    cutMesh.setGeometry(null);
-    rungMesh.setGeometry(surface(scene.rung));
+    placeRung([scene.rung]);
     boot.setGeometry(showBoot ? box(0.106, 0.12, 0.12) : null);
     if (showBoot) boot.setPosition(scene.boot.position);
     engine.render({ delta: 1 / 60 });
@@ -62,13 +68,29 @@
       ? scene.soft.cutTriangle(scene.rung, [[0.031, 0.92, -0.13], [0.031, 1.1, -0.13], [0.031, 0.92, 0.2]])
       : scene.soft.cutPlane(scene.rung, [0.031, 0.91, 0], [1, 0.25, 0]);
     scene.world.advance(145);
-    rungMesh.setGeometry(surface(pieces[0]));
-    cutMesh.setGeometry(pieces[1] ? surface(pieces[1]) : null);
+    await drawCutLadder(pieces, scene.boot);
+    return { hash: scene.world.hash(), visible: engine.stats.visible, boot: scene.boot.position, pieces: pieces.length };
+  };
+
+  async function drawCutLadder(pieces, rigidBoot) {
+    placeRung(pieces);
     boot.setGeometry(box(0.106, 0.12, 0.12));
-    boot.setPosition(scene.boot.position);
+    boot.setPosition(rigidBoot.position);
     engine.render({ delta: 1 / 60 });
     await engine.gpu.queue.onSubmittedWorkDone();
-    return { hash: scene.world.hash(), visible: engine.stats.visible, boot: scene.boot.position, pieces: pieces.length };
+  }
+
+  window.renderLoadedFracture = async () => {
+    const scene = await tensileLadder();
+    scene.world.advance(18);
+    const pieces = [...scene.pieces];
+    await drawCutLadder(pieces, scene.boot);
+    return {
+      hash: scene.world.hash(),
+      firstCrack: scene.cracks[0],
+      fractures: scene.cracks.length,
+      cells: pieces.reduce((sum, piece) => sum + piece.numCells(), 0),
+    };
   };
 </script>
 </body>

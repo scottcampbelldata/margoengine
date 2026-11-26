@@ -8,6 +8,7 @@ type Edges = [Vec3, Vec3, Vec3];
 export const NUCLEATED_CELL = 32;
 export const CRACK_FRONT_SHIFT = 6;
 export const CRACK_FRONT_MASK = 63 << CRACK_FRONT_SHIFT;
+export const UNREPRESENTABLE_CELL = 1 << 12;
 
 /** A triangular weak patch in a single tetrahedron, opened by positive normal Green strain. */
 export interface SoftTensileSeam {

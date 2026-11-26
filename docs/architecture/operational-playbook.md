@@ -10079,6 +10079,9 @@ For propagation, a supercritical cell at the existing front projects its princip
 into the plane perpendicular to that edge. The new section starts at the old front. Its
 midpoint separates when the front advances, and the registered replacement facets keep the
 two lips continuous. The edge slots are included in native snapshot state.
+The fracture step checks the rounded rest mesh before it replaces live topology. The LH-4
+overload fixture starts fracturing on step 4 under a 122.86 N rigid contact reaction and
+replays 15 cut events by step 18, while the same test threshold keeps the bare rung intact.
 
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows

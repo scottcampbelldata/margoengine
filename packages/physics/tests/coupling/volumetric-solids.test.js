@@ -3,7 +3,7 @@ import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { CellMaterial, SoftBodies, SoftBodyDesc } from '../../dist/soft.js';
 import { frameRateIndependent, seekEqualsContinuous } from './harness.js';
-import { ladder } from './volumetric-ladder.js';
+import { ladder, tensileLadder } from './volumetric-ladder.js';
 
 await Physics.load();
 
@@ -73,6 +73,35 @@ for (const solver of ['vertex-block', 'projective']) {
     assert.ok(pieces.every((piece) => Number.isFinite(piece.volume()) && piece.volume() > 0));
   });
 }
+
+test('automatic cracks remain finite when continued remeshing reaches the native geometry resolution', async () => {
+  const scene = await tensileLadder(0, 0.005);
+  const initialMass = scene.rung.mass();
+  scene.world.advance(18);
+  assert.ok(scene.cracks.length > 8, 'the rung keeps fracturing past its earlier resolution failure');
+  assert.ok([...scene.pieces].every((piece) => Number.isFinite(piece.volume()) && piece.volume() > 0));
+  const mass = [...scene.pieces].reduce((sum, piece) => sum + piece.mass(), 0);
+  assert.ok(Math.abs(mass - initialMass) <= 8 * 2 ** -23 * scene.cracks.length * initialMass);
+});
+
+test('LH-4: actual rigid contact opens a tensile crack while self-weight leaves the rung intact', async () => {
+  const [bare, loaded] = await Promise.all([tensileLadder(0), tensileLadder()]);
+  // Fixed-end moments for uniform self-weight w and a centered point load W are wL²/12 and WL/8.
+  const length = 0.7;
+  const side = 0.14;
+  const inertia = side ** 4 / 12;
+  const toStrain = side / (2 * 2e6 * inertia);
+  const ownWeight = 650 * side * side * 9.81;
+  const strainFromOwnWeight = (ownWeight * length * length * toStrain) / 12;
+  const strainFromBoot = (35 * 9.81 * length * toStrain) / 8;
+  assert.ok(2 * strainFromOwnWeight < 0.015 && 0.015 < strainFromBoot);
+  bare.world.advance(18);
+  loaded.world.advance(18);
+  assert.equal(bare.cracks.length, 0);
+  assert.ok(loaded.cracks.length > 0);
+  assert.ok(loaded.cracks[0].support > 0, 'the first crack opens on a step with actual boot reaction');
+  assert.ok(loaded.boot.position.every(Number.isFinite));
+});
 
 test('solver mode switches restore with the existing state layout and survive body compaction', async () => {
   const { world, soft, rung } = await ladder();
