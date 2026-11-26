@@ -1,6 +1,6 @@
 {
   "about": "Seconds each browser-check case took cold on the WebGL2 layer over ANGLE Direct3D 11 (MARGO_COMPAT=1, RTX A6000, Edge 157, GPU shared with other lanes), most of it fxc compiling the case's programs. tests/voxel-pathtracer-gpu-split.test.js checks every split script fits its time limit with them.",
-  "measured": "2026-11-11, gpu-package-tests --parallel, the L5a stack on 520f675532; transparent, determinism, disposecompile and convergence from docs/limits.md (the 757 s run) until their own script ran; shadowplane 2026-11-24, run alone as its page's first case (cold programs), RTX A6000",
+  "measured": "2026-11-11, gpu-package-tests --parallel, the L5a stack on 520f675532; transparent, determinism, disposecompile and convergence from docs/limits.md (the 757 s run) until their own script ran; shadowplane 2026-11-24 and subsurface 2026-11-26, each run alone as its page's first case (cold programs), RTX A6000",
   "seconds": {
     "agx": 139.1,
     "groundprecision": 101.6,
@@ -17,6 +17,7 @@
     "mediaboundary": 1.5,
     "bouncelimit": 0.9,
     "shadowplane": 21.3,
+    "subsurface": 55.4,
     "arealight": 9.8,
     "dispersion": 8.1,
     "microfacet": 13.8,
