@@ -2067,6 +2067,10 @@
       "types": "./dist/input/haptics.d.ts",
       "import": "./dist/input/haptics.js"
     },
+    "./input/landmarks": {
+      "types": "./dist/input/landmarks.d.ts",
+      "import": "./dist/input/landmarks.js"
+    },
     "./inspector": {
       "types": "./dist/inspector.d.ts",
       "import": "./dist/inspector.js"

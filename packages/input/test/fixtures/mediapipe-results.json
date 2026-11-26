@@ -1,0 +1,60 @@
+{
+  "comment": "Hand-written MediaPipe Tasks Vision result shapes (FaceLandmarker, HandLandmarker, PoseLandmarker) for the landmark adapter test; no model produced it.",
+  "time": 1000,
+  "face": {
+    "faceLandmarks": [
+      [
+        { "x": 0.5, "y": 0.4, "z": -0.02 },
+        { "x": 0.52, "y": 0.45, "z": -0.05 }
+      ]
+    ],
+    "faceBlendshapes": [
+      {
+        "categories": [
+          { "index": 0, "categoryName": "_neutral", "score": 0.0001 },
+          { "index": 9, "categoryName": "eyeBlinkLeft", "score": 0.8 },
+          { "index": 25, "categoryName": "jawOpen", "score": 0.35 }
+        ]
+      }
+    ],
+    "facialTransformationMatrixes": [
+      {
+        "rows": 4,
+        "columns": 4,
+        "data": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -40, 1]
+      }
+    ]
+  },
+  "hands": {
+    "landmarks": [
+      [{ "x": 0.3, "y": 0.6, "z": 0 }],
+      [{ "x": 0.7, "y": 0.6, "z": 0 }]
+    ],
+    "worldLandmarks": [
+      [{ "x": 0, "y": 0, "z": 0 }],
+      [{ "x": 0, "y": 0, "z": 0 }]
+    ],
+    "handedness": [
+      [
+        {
+          "index": 0,
+          "categoryName": "Left",
+          "displayName": "Left",
+          "score": 0.97
+        }
+      ],
+      [
+        {
+          "index": 1,
+          "categoryName": "Right",
+          "displayName": "Right",
+          "score": 0.91
+        }
+      ]
+    ]
+  },
+  "pose": {
+    "landmarks": [[{ "x": 0.5, "y": 0.2, "z": -0.3, "visibility": 0.99 }]],
+    "worldLandmarks": [[{ "x": 0, "y": -0.6, "z": -0.1, "visibility": 0.99 }]]
+  }
+}

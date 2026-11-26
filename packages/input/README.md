@@ -252,6 +252,44 @@ gestures.on('doubletap', () => (zoom = 1));
 
 Touch and pen only (mouse never triggers them, so they never fight orbit controls): `tap`, `doubletap`, `swipe` (direction and px/s), two-finger `pinch` (scale since the last event) and `rotate` (radians). Thresholds are options with defaults. Set `touch-action: none` on the element.
 
+## Webcam landmarks
+
+`@margoengine/input/landmarks` turns any face, hand or pose detector's output into one `LandmarkFrame` stream, an async iterator with a timestamp per frame. Margo ships no trained weights and no detector and never downloads one: the app loads its own (MediaPipe Tasks' FaceLandmarker, HandLandmarker or PoseLandmarker, or anything that gives points) and passes its results in.
+
+```ts
+import {fromMediaPipe, landmarkStream, OneEuroFilter, webcamLandmarks, type LandmarkSource} from 'margoengine/input/landmarks';
+
+// A recorded FaceLandmarker result; with MediaPipe Tasks, detect would return
+// fromMediaPipe({face: faceLandmarker.detectForVideo(video, time)}, time).
+const recorded = {face: {faceLandmarks: [[{x: 0.5, y: 0.5, z: 0}]], faceBlendshapes: [{categories: [{categoryName: 'jawOpen', score: 0.4}]}]}};
+const detect = (_video: unknown, time: number) => fromMediaPipe(recorded, time);
+
+const controller = new AbortController();
+let source: LandmarkSource;
+try {
+  source = await webcamLandmarks({detect, signal: controller.signal});
+} catch (error) {
+  // No camera, or permission refused: play the recording instead.
+  console.warn('No webcam:', (error as Error).message);
+  const replay = landmarkStream({buffer: 8});
+  for (let time = 0; time <= 99; time += 33) replay.push(fromMediaPipe(recorded, time));
+  replay.close();
+  source = replay;
+}
+const jaw = new OneEuroFilter({minCutoff: 1, beta: 0.5});
+for await (const frame of source) {
+  console.log(frame.time, jaw.filter(frame.faces[0]?.blendshapes?.jawOpen ?? 0, frame.time / 1000));
+  if (frame.time > 60) break; // break, dispose() or the signal stops the camera
+}
+```
+
+- `LandmarkFrame`: `time` (ms), `faces` (`landmarks`, optional `blendshapes` by ARKit name, `transform`, `score`), `hands` (`landmarks`, `worldLandmarks`, `handedness` `'left'` or `'right'` for the subject's hand, `score`) and `poses` (`landmarks`, `worldLandmarks`). Points are `{x, y, z, visibility?, presence?}`: image points normalised 0..1 (y down), world points in metres.
+- `fromMediaPipe({face, hands, pose}, time, {mirroredHandedness})` reads MediaPipe Tasks Vision results as they come from `detectForVideo`: `faceLandmarks`, `faceBlendshapes` (`_neutral` dropped), `facialTransformationMatrixes`, `landmarks`, `worldLandmarks` and `handedness` (or the older `handednesses`). MediaPipe labels hands as if the picture were mirrored, so `mirroredHandedness` (default true) swaps them for an unmirrored webcam frame.
+- `landmarkStream({buffer = 1, signal})` is a source the app pushes frames into (`push`, `close`, `dispose`); a slow reader gets the newest `buffer` frames, older ones are dropped.
+- `startWebcam({onFrame, video, constraints, signal, mediaDevices})` opens the camera (`getUserMedia`, default `{facingMode: 'user', width: 640, height: 480}`), plays it muted and inline into `video` (default a new element) and calls `onFrame(video, time)` once per new picture (`requestVideoFrameCallback`, else animation frames). `stop()`, `using` or the signal stops every track.
+- `webcamLandmarks({detect, buffer, ...webcam})` is both together: the source the drivers read. A detector that throws stops the camera and its error comes out of the next read.
+- `OneEuroFilter({minCutoff = 1, beta = 0.007, dCutoff = 1})` is the one-euro filter (Casiez, Roussel and Vogel, CHI 2012): `filter(value, seconds)` smooths one number, cutting jitter at rest and lag in motion; raise `beta` for less lag, lower `minCutoff` for less jitter. `reset()` forgets the history.
+
 Apache-2.0. Optional, tree-shakable package; core peer: ^0.1.0 || ^1.0.0.
 
 Build and unit tests: npm test --workspace @margoengine/input

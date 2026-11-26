@@ -1,4 +1,4 @@
-import { lifetimeFault, ownedByEngine, watchTimers } from '../../../tests/support/owner-shell.js';
+import { ownedByEngine, watchTimers } from '../../../tests/support/owner-shell.js';
 
 const actions = { jump: [{ type: 'key', code: 'Space' }], aim: [{ type: 'control', id: 'pen', axis: 'x' }] };
 const quiet = (promise) => {
@@ -16,6 +16,7 @@ export async function fixtures(load = (entry) => import(entry)) {
   const { KeyboardLabels } = await load('../dist/layout.js');
   const { XRBindings } = await load('../dist/xr.js');
   const { VectorInput, wasd } = await load('../dist/vector.js');
+  const { landmarkStream } = await load('../dist/landmarks.js');
   const entries = [];
   const input = () => new Input(actions, { target: new EventTarget(), gamepads: () => [] });
   // `make` returns { release, cleanup? } and runs, like the release, with timers watched.
@@ -130,6 +131,17 @@ export async function fixtures(load = (entry) => import(entry)) {
     const gestures = new Gestures(new EventTarget());
     gestures.on('tap', () => {});
     return { release: () => gestures.dispose() };
+  });
+  own('landmarkStream', () => {
+    const stream = landmarkStream();
+    const reading = stream[Symbol.asyncIterator]().next();
+    return {
+      release: () => stream.dispose(),
+      cleanup: () =>
+        reading.then((r) => {
+          if (!r.done) throw new Error('a disposed landmarkStream left its reader waiting');
+        }),
+    };
   });
   return entries;
 }

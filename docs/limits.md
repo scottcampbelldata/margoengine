@@ -8,6 +8,10 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Webcam landmarks (`@margoengine/input/landmarks`, 2026-11-26): no detector shipped; the app supplies one. Margo
+  bundles no trained weights and never downloads a model; frames come from the app's own detector (MediaPipe Tasks
+  results plug in through `fromMediaPipe`). A stream keeps only the newest `buffer` frames (default 1) for a slow reader.
+
 - Shadow map viewer (`@margoengine/shadows/viewer`, 2026-11-25) shows one layer at a time, nearest texel, no
   filtering, so a map larger than the viewer drops texels; it draws over the frame at order 1000 without depth or
   blending. Virtual shadow map pages (`@margoengine/shadows/virtual`) and the colour (tint) maps of coloured shadows are

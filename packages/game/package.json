@@ -1547,6 +1547,10 @@
       "types": "./dist/input/haptics.d.ts",
       "import": "./dist/input/haptics.js"
     },
+    "./input/landmarks": {
+      "types": "./dist/input/landmarks.d.ts",
+      "import": "./dist/input/landmarks.js"
+    },
     "./lighting2d/sdf": {
       "types": "./dist/lighting2d/sdf.d.ts",
       "import": "./dist/lighting2d/sdf.js"

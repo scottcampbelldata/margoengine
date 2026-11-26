@@ -65,6 +65,10 @@
     "./haptics": {
       "types": "./dist/haptics.d.ts",
       "import": "./dist/haptics.js"
+    },
+    "./landmarks": {
+      "types": "./dist/landmarks.d.ts",
+      "import": "./dist/landmarks.js"
     }
   },
   "files": [

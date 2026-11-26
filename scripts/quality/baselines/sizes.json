@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19465030,
+  "total": 19467364,
   "history": [
     {
       "date": "2026-10-24",
@@ -12729,6 +12729,12 @@
       "commit": "fix(water) crownless splash",
       "reason": "water/splash 5,886 to 5,893 B gzip (this Mac): a splash with no crown (a column alone, or the look's height at 0) leaves its crown and mist emitters alone instead of giving a VFX an empty lifetime.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "lane-d",
+      "reason": "New optional entry @margoengine/input/landmarks, 0 to 2,078 B gzip measured (budget 2,334): landmark frames, the MediaPipe Tasks adapter, the webcam helper and the one-euro filter. Core plus stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13246,6 +13252,7 @@
     "@margoengine/input": 5722,
     "@margoengine/input/haptics": 1201,
     "@margoengine/input/interactions": 1614,
+    "@margoengine/input/landmarks": 2334,
     "@margoengine/input/layout": 1954,
     "@margoengine/input/lock": 1616,
     "@margoengine/input/motion": 1806,

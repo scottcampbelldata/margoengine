@@ -8,6 +8,27 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'webcam-landmarks',
+    title: '@margoengine/input/landmarks: webcam and detector landmark frames',
+    kind: 'family',
+    messages: [
+      'A landmark frame needs a finite time in ms and faces, hands and poses arrays; see https://margoengine.com/errors#webcam-landmarks',
+      'A landmark frame needs a faces array; pass [] for none; see https://margoengine.com/errors#webcam-landmarks',
+      'landmarkStream buffer must be a whole number >= 1; see https://margoengine.com/errors#webcam-landmarks',
+      'The landmark stream has ended; create a new landmarkStream; see https://margoengine.com/errors#webcam-landmarks',
+      'A landmark stream has one reader; await each next() in turn; see https://margoengine.com/errors#webcam-landmarks',
+      'MediaPipe face result has no landmark arrays; see https://margoengine.com/errors#webcam-landmarks',
+      'This page has no camera access (getUserMedia); serve it over https; see https://margoengine.com/errors#webcam-landmarks',
+      'webcamLandmarks needs a detect(video, time) function; see https://margoengine.com/errors#webcam-landmarks',
+      'OneEuroFilter cutoffs must be finite and above 0 Hz; see https://margoengine.com/errors#webcam-landmarks',
+      'OneEuroFilter beta must be finite and >= 0; see https://margoengine.com/errors#webcam-landmarks',
+      'OneEuroFilter needs a finite value and time; see https://margoengine.com/errors#webcam-landmarks',
+    ],
+    cause:
+      'A landmark frame without a finite time or its faces, hands and poses arrays, a MediaPipe result without its landmark arrays, a stream pushed to after it ended or read by two readers at once, a page without camera access (no getUserMedia: not a secure context), a missing detect function, or a one-euro filter with a cutoff that is not above 0, a negative beta or a non-finite sample.',
+    fix: 'Build frames with `fromMediaPipe(result, time)` or as `{time, faces: [], hands: [], poses: []}`, create a new `landmarkStream` after `close` or `dispose` and read it with one `for await`, serve the page over https (or localhost) and handle a refused camera, pass `detect: (video, time) => frame`, and give `OneEuroFilter` cutoffs above 0 Hz, a beta of 0 or more and finite values with times in seconds.',
+  },
+  {
     id: 'mobile',
     title: 'margo-convert mobile: Capacitor project from a built app',
     kind: 'family',
