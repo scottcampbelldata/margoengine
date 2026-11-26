@@ -58,9 +58,10 @@ export interface TargetOutput {
   value?: TargetValue;
   /**
    * WGSL expression of type `vec4f` over `t: TargetSurface` {position: vec3f, normal: vec3f, albedo: vec4f, roughness:
-   * f32, metalness: f32, occlusion: f32, emissive: vec3f, eye: vec3f, shadow: f32, light: vec3f, subject: f32}, all
-   * world space: `vec4f(t.normal.y, 0, 0, 1)`. `shadow` is the sun's visibility (1 lit, 0 hidden), `light` the unit
-   * direction toward the sun, `subject` 1 on models added with `{subject: true}`.
+   * f32, metalness: f32, occlusion: f32, emissive: vec3f, eye: vec3f, shadow: f32, light: vec3f, subject: f32, ground:
+   * f32}, all world space: `vec4f(t.normal.y, 0, 0, 1)`. `shadow` is the sun's visibility (1 lit, 0 hidden), `light`
+   * the unit direction toward the sun, `subject` 1 on models added with `{subject: true}`, `ground` 0 on models added
+   * with `{ground: false}` (plants, props: they hide the ground and are not ground) and 1 elsewhere.
    */
   wgsl?: string;
   /**
@@ -86,11 +87,17 @@ export interface SceneTargetsOptions {
 export interface SceneTargetsAddOptions {
   /** The model is the shot's subject: `t.subject` reads 1 on it (the `subject` value). Default false. */
   subject?: boolean;
+  /**
+   * The model may count as ground: true lets its normal decide (`litGround` and `shadedGround` take an up-facing
+   * surface), false marks it as not ground (`t.ground` 0: grass, ferns and leaves whose normals face up), so those masks
+   * read 0 on it while it still hides the ground behind it and writes depth and every other output. Default true.
+   */
+  ground?: boolean;
 }
 
 const L = TARGET_MASK_LIMITS,
   facing = 'dot(t.normal,t.light)',
-  ground = `t.normal.y>=${L.ground}&&${facing}>=${L.groundFacing}`,
+  ground = `t.ground>0.5&&t.normal.y>=${L.ground}&&${facing}>=${L.groundFacing}`,
   mask = (test: string): [string, GPUTextureFormat] => [`vec4f(select(0.0,1.0,${test}),0,0,1)`, 'r8unorm'];
 const values: Record<TargetValue, [string, GPUTextureFormat]> = {
   albedo: ['t.albedo', 'rgba8unorm'],
@@ -106,14 +113,15 @@ const values: Record<TargetValue, [string, GPUTextureFormat]> = {
   subject: ['vec4f(t.subject,0,0,1)', 'r8unorm'],
 };
 const surface =
-  'struct TargetSurface {position:vec3f,normal:vec3f,albedo:vec4f,roughness:f32,metalness:f32,occlusion:f32,emissive:vec3f,eye:vec3f,shadow:f32,light:vec3f,subject:f32}\n';
+  'struct TargetSurface {position:vec3f,normal:vec3f,albedo:vec4f,roughness:f32,metalness:f32,occlusion:f32,emissive:vec3f,eye:vec3f,shadow:f32,light:vec3f,subject:f32,ground:f32}\n';
 // Rec. 709 luminance: a coloured shadow (tinted glass) counts by how much light it lets through.
 const luminance = 'vec3f(0.2126,0.7152,0.0722)';
 /** The sun visibility a lit shader computes, `direct` (the light a shadow plugin wraps) set to 1; 1.0 when unshadowed. */
 const sunVisibility = (code: string, position: string, normal: string): string =>
   code.includes('fn shadowLit(') ? `dot(shadowLit(vec3f(1),${position},${normal}),${luminance})` : '1.0';
-// Terrain's capture hook (SSR's contract for shaders without the PBR Surface): its Frame names eye and light.
-const terrainFrame = /struct Frame \{camera:mat4x4f,eye:vec4f,light:vec4f,/;
+// Terrain's and lit scatter's capture hook (SSR's contract for shaders without the PBR Surface): their Frame names eye
+// and light (terrain writes `{camera`, core's lit shader, which scatter extends, `{ camera`).
+const terrainFrame = /struct Frame \{\s*camera:mat4x4f,eye:vec4f,light:vec4f,/;
 const identifier = /^[A-Za-z][A-Za-z0-9_]*$/;
 // Integer and depth formats would need other WGSL output types; colour-renderable float and unorm formats only.
 const floatFormat = /^(r|rg|rgba|bgra)(8unorm|8unorm-srgb|16float|32float)$|^rgb10a2unorm$|^rg11b10ufloat$/;
@@ -152,8 +160,8 @@ export class SceneTargets implements EnginePlugin {
   private readonly models = new Map<SSRModel, () => void>();
   private readonly hooks = new WeakMap<SSRModel, SSRCapture>();
   private readonly listeners = new Set<() => void>();
-  private readonly hook: SSRCapture;
-  private readonly subjectHook: SSRCapture;
+  /** Capture hooks by `subject * 2 + (ground ? 0 : 1)`; `[0]` is a plain model's. */
+  private readonly hookSet: SSRCapture[];
   private static serial = 0;
 
   constructor(readonly options: SceneTargetsOptions) {
@@ -197,13 +205,12 @@ export class SceneTargets implements EnginePlugin {
       surface +
       `struct MargoCapture {${this.formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\n` +
       `fn margoTargets(t:TargetSurface)->MargoCapture {var o:MargoCapture;${lines.join('')}return o;}\n`;
-    this.hook = this.makeHook(0);
-    this.subjectHook = this.makeHook(1);
+    this.hookSet = [this.makeHook(0, 1), this.makeHook(0, 0), this.makeHook(1, 1), this.makeHook(1, 0)];
   }
-  /** The capture hook of models whose `t.subject` reads `subject`. */
-  private makeHook(subject: 0 | 1): SSRCapture {
+  /** The capture hook of models whose `t.subject` reads `subject` and `t.ground` reads `ground`. */
+  private makeHook(subject: 0 | 1, ground: 0 | 1): SSRCapture {
     const cache = new Map<string, string>(),
-      flag = subject ? '1.0' : '0.0',
+      flag = `${subject ? '1.0' : '0.0'},${ground ? '1.0' : '0.0'}`,
       fields = this.formats.map((_, i) => `o.o${i}`).join(',');
     return {
       targets: this.formats.map((format) => ({ format })),
@@ -281,12 +288,13 @@ export class SceneTargets implements EnginePlugin {
    * remover. Models not added still draw in the scene but leave the targets alone. `{subject: true}` marks the model as
    * the shot's subject (`t.subject` 1, the `subject` value); adding a model again with the other choice moves it.
    */
-  add(model: SSRModel, { subject = false }: SceneTargetsAddOptions = {}): () => void {
+  add(model: SSRModel, { subject = false, ground = true }: SceneTargetsAddOptions = {}): () => void {
     if (this.disposed) throw margoError('disposed', 'SceneTargets is disposed; create new SceneTargets');
     if (!model || typeof model.setCapture !== 'function')
       throw new TypeError('SceneTargets.add needs a gltf/pbr model, materials mesh or Terrain');
     if (typeof subject !== 'boolean') throw new TypeError('SceneTargets.add subject must be true or false');
-    const hook = subject ? this.subjectHook : this.hook;
+    if (typeof ground !== 'boolean') throw new TypeError('SceneTargets.add ground must be true or false');
+    const hook = this.hookSet[(subject ? 2 : 0) + (ground ? 0 : 1)];
     const current = this.models.get(model);
     if (current && this.hooks.get(model) !== hook) current();
     this.hooks.set(model, hook);
@@ -341,7 +349,7 @@ export class SceneTargets implements EnginePlugin {
           .replace(
             /(let direct=[\s\S]*)return (vec4f\([^\n]+\));/,
             (_, dead: string, colour: string) =>
-              `if(false){${dead}_=${colour};}return margoTargets(TargetSurface(i.position,n,vec4f(i.color,1),i.material.x,i.material.y,1.0,vec3f(0),frame.eye.xyz,${sun},frame.light.xyz,0.0));`,
+              `if(false){${dead}_=${colour};}return margoTargets(TargetSurface(i.position,n,vec4f(i.color,1),i.material.x,i.material.y,1.0,vec3f(0),frame.eye.xyz,${sun},frame.light.xyz,0.0,1.0));`,
           );
       if (!code.includes('->MargoCapture') || !code.includes('return margoTargets('))
         throw margoError(
@@ -389,7 +397,7 @@ export class SceneTargets implements EnginePlugin {
       });
       if (this.models.size) {
         this.context = c;
-        for (const model of this.models.keys()) drawCapture(model, this.hooks.get(model) ?? this.hook, c);
+        for (const model of this.models.keys()) drawCapture(model, this.hooks.get(model) ?? this.hookSet[0], c);
       }
     } finally {
       this.pass?.end();

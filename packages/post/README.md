@@ -1299,7 +1299,7 @@ value (`albedo`, `normal` (world), `position` (world), `distance` (from the came
 (roughness, metalness, occlusion)) or your WGSL `vec4f` expression over `t: TargetSurface` (the same values, all world
 space), with its own float or normalised colour format. Core meshes always draw (a replay of core's shader with the
 lighting left out); add gltf/pbr models, materials meshes and a `Terrain` with `targets.add(model)` so their own maps,
-skinning and instances write the outputs. The pass runs after the passes at -5 that change core's shader and draw
+skinning and instances write the outputs, and a lit `Scatter` with `targets.add(scatter, {ground: false})`. The pass runs after the passes at -5 that change core's shader and draw
 shadow maps (`Shadows`, sections), whatever order they were attached in, and before the main pass (`order: -4.5` by
 default), so materials can read this frame's targets; a material that reads a target must not be added. Its own depth
 is `targets.depth`. Textures follow the drawing size and are replaced on resize (`onResize`). WebGPU only (and the
@@ -1354,6 +1354,13 @@ const looks = SceneTargets.attach(engine, {
 looks.add(person, { subject: true });
 engine.start();
 ```
+
+Plants and props hide the ground and are not ground: `targets.add(model, {ground: false})` sets `t.ground` to 0 on the
+model, so `litGround` and `shadedGround` read 0 there (grass, ferns and blades carry the ground's up-facing normal)
+while it still hides the ground behind it and writes depth, `shadow`, `penumbra`, `subject` and every custom output.
+The default `ground: true` lets the normal decide, as before; `t.ground` is 1 on core meshes. A lit `Scatter`
+(`@margoengine/scatter`) and its subclasses are added like any model: their capture draws this frame's LOD rings with
+their own stage (see that README, "Material capture").
 
 ## Depth texture: `DepthTexture`
 

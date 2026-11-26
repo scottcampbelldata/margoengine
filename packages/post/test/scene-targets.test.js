@@ -96,7 +96,7 @@ test('SceneTargets gives gltf/pbr capture declarations that build the same outpu
   assert.match(code, /fn margoCapture\(s:Surface,v:vec3f,k:vec3f\)->MargoCapture/);
   assert.match(
     code,
-    /TargetSurface\(margoPosition,s\.n,s\.base,s\.roughness,s\.metal,s\.occlusion,s\.emissive,f\.eye\.xyz,1\.0,f\.light\.xyz,0\.0\)/,
+    /TargetSurface\(margoPosition,s\.n,s\.base,s\.roughness,s\.metal,s\.occlusion,s\.emissive,f\.eye\.xyz,1\.0,f\.light\.xyz,0\.0,1\.0\)/,
   );
   assert.deepEqual(
     hook.targets.map((t) => t.format),
@@ -193,7 +193,7 @@ test('SceneTargets keeps the sun visibility a shadow plugin wraps around direct 
   assert.ok(replay, 'the replay is built');
   assert.match(
     live(replay),
-    /TargetSurface\(i\.position,n,vec4f\(i\.color,1\),i\.material\.x,i\.material\.y,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),i\.position,i\.normal\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0\)/,
+    /TargetSurface\(i\.position,n,vec4f\(i\.color,1\),i\.material\.x,i\.material\.y,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),i\.position,i\.normal\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0,1\.0\)/,
     'the visibility is computed outside the dead block, after the -5 shader patch of a plugin attached later',
   );
   assert.equal(h.engine.plugins.size, 2);
@@ -204,7 +204,7 @@ test('SceneTargets reads visibility 1 with no shadow plugin', () => {
   const h = harness(),
     targets = SceneTargets.attach(h.engine, { outputs: { sun: 'shadow' } });
   const replay = modules(h.gpu.record(() => h.frame())).find((code) => code.includes('fn margoTargets('));
-  assert.match(live(replay), /frame\.eye\.xyz,1\.0,frame\.light\.xyz,0\.0\)/);
+  assert.match(live(replay), /frame\.eye\.xyz,1\.0,frame\.light\.xyz,0\.0,1\.0\)/);
   targets.dispose();
 });
 
@@ -222,11 +222,11 @@ test('SceneTargets draws the look masks as r8unorm built-in values', () => {
   );
   assert.match(
     replay,
-    /o\.o2=vec4f\(vec4f\(select\(0\.0,1\.0,t\.normal\.y>=0\.7071&&dot\(t\.normal,t\.light\)>=0\.2&&t\.shadow>=0\.98\),0,0,1\)\);/,
+    /o\.o2=vec4f\(vec4f\(select\(0\.0,1\.0,t\.ground>0\.5&&t\.normal\.y>=0\.7071&&dot\(t\.normal,t\.light\)>=0\.2&&t\.shadow>=0\.98\),0,0,1\)\);/,
   );
   assert.match(
     replay,
-    /o\.o3=vec4f\(vec4f\(select\(0\.0,1\.0,t\.normal\.y>=0\.7071&&dot\(t\.normal,t\.light\)>=0\.2&&t\.shadow<=0\.02\),0,0,1\)\);/,
+    /o\.o3=vec4f\(vec4f\(select\(0\.0,1\.0,t\.ground>0\.5&&t\.normal\.y>=0\.7071&&dot\(t\.normal,t\.light\)>=0\.2&&t\.shadow<=0\.02\),0,0,1\)\);/,
   );
   assert.match(replay, /o\.o4=vec4f\(vec4f\(t\.subject,0,0,1\)\);/);
   const pipeline = log.find((e) => e[0] === 'renderPipeline' && e[2].fragment?.targets?.length === 5)[2];
@@ -261,13 +261,13 @@ test('SceneTargets marks subject models and reads their sun visibility; terrain 
     groundCode = ground.hooks[0].declarations(pbr);
   assert.match(
     subjectCode,
-    /f\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,s\.n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),f\.light\.xyz,1\.0\)\);\}/,
+    /f\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,s\.n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),f\.light\.xyz,1\.0,1\.0\)\);\}/,
   );
-  assert.match(groundCode, /f\.light\.xyz,0\.0\)\);\}/);
+  assert.match(groundCode, /f\.light\.xyz,0\.0,1\.0\)\);\}/);
   // Added again with the other choice, the model moves to that hook.
   targets.add(person);
   assert.equal(person.hooks.length, 1);
-  assert.match(person.hooks[0].declarations(pbr), /f\.light\.xyz,0\.0\)\);\}/);
+  assert.match(person.hooks[0].declarations(pbr), /f\.light\.xyz,0\.0,1\.0\)\);\}/);
   assert.throws(() => targets.add(ground, { subject: 'yes' }), TypeError);
   // Terrain's capture (SSR's contract for shaders without the PBR Surface) gets margoSSR over the same outputs.
   const terrain =
@@ -278,10 +278,56 @@ test('SceneTargets marks subject models and reads their sun visibility; terrain 
   assert.match(code, /struct MargoSSR \{@location\(0\) o0:vec4f,@location\(1\) o1:vec4f\}/);
   assert.match(
     code,
-    /fn margoSSR\(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32\)->MargoSSR \{_=v;let o=margoTargets\(TargetSurface\(margoPosition,n,vec4f\(base,1\),rough,metal,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0\)\);return MargoSSR\(o\.o0,o\.o1\);\}/,
+    /fn margoSSR\(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32\)->MargoSSR \{_=v;let o=margoTargets\(TargetSurface\(margoPosition,n,vec4f\(base,1\),rough,metal,1\.0,vec3f\(0\),frame\.eye\.xyz,dot\(shadowLit\(vec3f\(1\),margoPosition,n\),vec3f\(0\.2126,0\.7152,0\.0722\)\),frame\.light\.xyz,0\.0,1\.0\)\);return MargoSSR\(o\.o0,o\.o1\);\}/,
   );
   assert.throws(() => field.hooks[0].declarations('struct Frame {camera:mat4x4f,eye:vec4f,sun:vec4f}'), {
     code: 'unsupported',
   });
+  targets.dispose();
+});
+
+test('SceneTargets.add {ground: false}: plants hide the ground and are not ground; core lit stages capture too', () => {
+  const h = harness(),
+    targets = SceneTargets.attach(h.engine, {
+      outputs: {
+        lit: 'litGround',
+        shade: 'shadedGround',
+        plants: { wgsl: 'vec4f(1.0-t.ground,0,0,1)', format: 'r8unorm' },
+      },
+    }),
+    made = () => {
+      const hooks = [];
+      return {
+        hooks,
+        setCapture(hook) {
+          hooks.push(hook);
+          return () => hooks.splice(hooks.indexOf(hook), 1);
+        },
+        onDispose: () => () => {},
+        draw() {},
+      };
+    };
+  // Core's lit shader, which lit scatter extends, spells its Frame `struct Frame { camera`.
+  const core = 'struct Frame { camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,ambient:vec4f }',
+    plant = made(),
+    soil = made();
+  targets.add(plant, { ground: false });
+  targets.add(soil);
+  const plantCode = plant.hooks[0].declarations(core),
+    soilCode = soil.hooks[0].declarations(core);
+  assert.match(
+    plantCode,
+    /frame\.eye\.xyz,1\.0,frame\.light\.xyz,0\.0,0\.0\)\);return MargoSSR\(o\.o0,o\.o1,o\.o2\);\}/,
+  );
+  assert.match(soilCode, /frame\.light\.xyz,0\.0,1\.0\)\);return MargoSSR/);
+  assert.match(plantCode, /o\.o0=vec4f\(vec4f\(select\(0\.0,1\.0,t\.ground>0\.5&&/, 'litGround needs ground');
+  assert.match(plantCode, /o\.o2=vec4f\(vec4f\(1\.0-t\.ground,0,0,1\)\);/);
+  // Added again with the other choice, the model moves; a subject that is not ground has both flags.
+  targets.add(plant, { subject: true, ground: false });
+  assert.equal(plant.hooks.length, 1);
+  assert.match(plant.hooks[0].declarations(core), /frame\.light\.xyz,1\.0,0\.0\)\);/);
+  targets.add(plant);
+  assert.match(plant.hooks[0].declarations(core), /frame\.light\.xyz,0\.0,1\.0\)\);/);
+  assert.throws(() => targets.add(soil, { ground: 'no' }), TypeError);
   targets.dispose();
 });

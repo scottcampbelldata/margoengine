@@ -133,7 +133,8 @@ fn spanAt(p:vec2i)->f32 {let w=at(p);return min(abs(w-at(p-vec2i(1,0))),abs(at(p
 // depth, with one constant output, its radius and key (keys counted down from the top of the range, so they never meet
 // a core mesh's entity id + 1).
 const KEY_TOP = 2048 * 2048 - 1;
-const terrainFrame = /struct Frame \{camera:mat4x4f,eye:vec4f,light:vec4f,/;
+// Terrain writes `struct Frame {camera`, core's lit shader (which lit scatter extends) `struct Frame { camera`.
+const terrainFrame = /struct Frame \{\s*camera:mat4x4f,eye:vec4f,light:vec4f,/;
 const captureCode = (code: string, value: string): string => {
   if (code.includes('struct Surface'))
     return `struct MargoCapture {@location(0) o0:vec4f}\nfn margoCapture(s:Surface,v:vec3f,k:vec3f)->MargoCapture {_=s.n;_=v;_=k;return MargoCapture(${value});}\n`;
