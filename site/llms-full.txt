@@ -8162,7 +8162,8 @@ Batch 160 job 4 retains complete 512 x 512 TransmissionTest (22 primitives)
 and AttenuationTest (23 primitives), all pixels and original viewer/Cycles
 full/direct integer budgets. Native volume estimates a homogeneous refracted
 slab in mesh space with world-space Beer attenuation, including transforms and
-instancing. It does not trace mesh boundaries, add thickness maps or reproduce
+instancing, scaled per texel by a thickness map's green channel (KB4000, 2026-11-26). It does not trace mesh
+boundaries or reproduce
 Cycles multiple scattering. Native tint retains optical depth until the world
 path is known, avoiding intermediate transmittance underflow; binary32 depth
 and transform limits still apply. The separate hooked route retains its
@@ -14856,18 +14857,19 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the motion from the `.f32` file), `tests/shot-capture.test.js` (`resampleNearness`); real GPU:
   `tools/shot/test/moving-check.mjs` (the floats are written and round to the PNG).
 
-### Open 2026-11-26: ship lamp glints read the sea's roughness as GGX alpha, the sun glint as perceptual (KB-SHIPLAMP1, water)
+### Fixed 2026-11-26: ship lamp glints read the sea's roughness as GGX alpha, the sun glint as perceptual (KB-SHIPLAMP1, water)
 
-- **Repro:** packages/water/src/ships.ts `shipLamps` writes `a2 = max(rough^2, 1e-4)`, so its lobe has alpha = rough;
-  packages/water/src/index.ts `directionalGlint` writes alpha = rough^2, a2 = alpha^2 + the waves' slope variance
-  (`frame.foam.y`). With `lampRoughness: null` the lamps take the same `rough` as the sun glitter, so on one sea at
-  roughness 0.08 a lamp's lobe has alpha 0.08 and the sun's 0.0064 plus the variance. No test pins either width
-  (test/ships.browser.mjs checks only that a lamp adds a glint on the mirror line and a rougher sea spreads it).
-- **Cause:** two conventions for one roughness on one surface; the `lampRoughness` row (0.02 to 1) was written as an
-  alpha, while "null follows the Water's glitter" hands it the glitter's perceptual roughness.
-- **Plan:** the lamp lobe takes the sun glint's mapping and variance (one lobe per surface), with a GPU test comparing a
-  lamp's glint width with the sun glint's at equal roughness; the `lampRoughness` row's meaning follows the engine's
-  perceptual roughness. Found while fixing KB6016d.
+- **Repro (before):** packages/water/test/ships.browser.mjs, "sun and lamp glint at one roughness": a lamp 10 km away
+  along the sun's glint direction, as bright at the sea as the sun, lit 1168 pixels at a peak of 84 where the sun lit
+  686 at 250 (lampRoughness null, so both took the Water's roughness).
+- **Cause:** packages/water/src/ships.ts `shipLamps` wrote `a2 = max(rough^2, 1e-4)` (alpha = rough), with no slope
+  variance, no Smith G and an extra N.L, while index.ts `directionalGlint` writes alpha = rough^2, a2 = alpha^2 + the
+  waves' unresolved slope variance (`frame.foam.y`): two conventions for one roughness on one surface.
+- **Fix:** index.ts `seaGlint(n, v, l, rough)` is the Water's one glint lobe (GGX D with the variance, Schlick-Smith G,
+  Fresnel); `directionalGlint` and `shipLamps` both call it, so the far lamp now lights 685 pixels at 250. The lamp
+  function moved beside the glint functions after `struct Output`, since WaveQuery compiles the surface part before it
+  alone. `lampRoughness` is a perceptual roughness like the Water's (README, settings row); `SHIP_LOOKS.calmNight` moved
+  from 0.06 to 0.25 (alpha 0.0625, the old lobe's width).
 
 ### Fixed 2026-11-26: seven GGX D sites still cancelled in float32 near a narrow lobe's peak (KB6016d)
 
