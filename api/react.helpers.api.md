@@ -93,7 +93,9 @@ export function useBounds(): BoundsApi;
 
 export function useCursor(hovered: boolean, over?: string, out?: string): void;
 
-export function useIntersect<T extends MeshRef = MeshHandle>(onChange: (visible: boolean) => void): RefObject<T | null>;
+export function useIntersect<T extends MeshRef = MeshHandle>(onChange: (visible: boolean) => void): {
+    current: T | null;
+};
 
 export function useViewport(): Viewport;
 

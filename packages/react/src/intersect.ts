@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef } from 'react';
 import type { FrameCallback, Mesh as MeshHandle } from '@margoengine/core';
 import type { Mesh as EngineMesh } from '@margoengine/core/extension';
 import type { MeshRef } from './components.js';
@@ -66,9 +66,11 @@ export function drawnLastFrame(scene: Scene, root: EngineMesh): boolean {
  * }
  * ```
  */
+// The ref is typed `{ current: T | null }`, not RefObject: React 18's ref prop takes RefObject<T> (current T | null)
+// and React 19's takes RefObject<T | null>; this shape is both, so <Box ref={ref} /> types on either.
 export function useIntersect<T extends MeshRef = MeshHandle>(
   onChange: (visible: boolean) => void,
-): RefObject<T | null> {
+): { current: T | null } {
   const scene = useScene(),
     ref = useRef<T | null>(null),
     latest = useRef(onChange);
