@@ -844,7 +844,8 @@ interface WaterView {
   resources: GPUBindingResource[][];
   drawn: number;
   built: number;
-  captureGroups: GPUBindGroup[];
+  // Capture groups per capture pipeline (each effect that captures this water has its own).
+  captureGroups: Map<GPURenderPipeline, GPUBindGroup[]>;
 }
 /**
  * An opaque, Y-up water surface: up to eight Gerstner swell trains with analytic normals, Fresnel reflection, glints,
@@ -902,7 +903,16 @@ export class Water implements EnginePlugin {
   // Foam history and its bind groups per engine view (the plain frame is one too), released when a view is not drawn
   // for a frame. `built` bumps when a binding all views share changes, so each view rebuilds its groups once.
   private readonly views = new ViewStates<WaterView>(
-    () => ({ foam: [], foamViews: [], current: 0, groups: [], resources: [], drawn: 0, built: -1, captureGroups: [] }),
+    () => ({
+      foam: [],
+      foamViews: [],
+      current: 0,
+      groups: [],
+      resources: [],
+      drawn: 0,
+      built: -1,
+      captureGroups: new Map(),
+    }),
     (view) => {
       for (const texture of view.foam) texture.destroy();
       if (view === this.drawnView) this.drawnView = undefined;
@@ -918,10 +928,12 @@ export class Water implements EnginePlugin {
   private effectBindings: GPUBindGroupEntry[] = [];
   private vertexBindings: GPUBindGroupEntry[] = [];
   private capture?: WaterCapture;
-  private capturePipeline?: GPURenderPipeline;
-  private captureKey = '';
-  private captureShadow?: GPUBindGroup;
-  private captureShadowEntries?: GPUBindGroupEntry[];
+  // Capture pipelines keyed by the shader, the effect's declarations, targets and pass format: one water captured by
+  // two effects keeps both, each with that effect's own MargoSSR outputs.
+  private readonly captures = new Map<
+    string,
+    { pipeline: GPURenderPipeline; shadow?: GPUBindGroup; shadowEntries?: GPUBindGroupEntry[] }
+  >();
   private readonly disposers = new Set<() => void>();
   private shadowGroup?: GPUBindGroup;
   private shadowEntries?: GPUBindGroupEntry[];
@@ -2000,7 +2012,7 @@ export class Water implements EnginePlugin {
     if (view.built !== this.built) {
       view.groups = [];
       view.resources = [];
-      view.captureGroups = [];
+      view.captureGroups.clear();
       for (let i = 0; i < 2; i++)
         for (let j = 0; j < (this.coastal ? 2 : 1); j++) {
           const resources: GPUBindingResource[] = [
@@ -2123,16 +2135,21 @@ export class Water implements EnginePlugin {
     void color;
     void depth;
     const shadows = this.options.shadows,
+      declarations = hook.declarations(this.shaderCode),
       key =
-        this.shaderCode +
         hook.targets.map((t) => t.format).join(',') +
+        ':' +
         c.descriptor.multisample?.count +
-        c.descriptor.depthStencil!.format;
-    if (this.captureKey !== key) {
-      const module = c.device.createShaderModule({
-        code: captureShader(this.shaderCode, hook.declarations(this.shaderCode)),
-      });
-      this.capturePipeline = c.device.createRenderPipeline({
+        ':' +
+        c.descriptor.depthStencil!.format +
+        '\0' +
+        declarations +
+        '\0' +
+        this.shaderCode;
+    let capture = this.captures.get(key);
+    if (!capture) {
+      const module = c.device.createShaderModule({ code: captureShader(this.shaderCode, declarations) });
+      const pipeline = c.device.createRenderPipeline({
         layout: 'auto',
         vertex: {
           module,
@@ -2156,37 +2173,45 @@ export class Water implements EnginePlugin {
         },
         multisample: c.descriptor.multisample,
       });
-      this.captureKey = key;
-      for (const state of this.views.values()) state.captureGroups = [];
-      this.captureShadowEntries = undefined;
+      if (this.captures.size >= 8) {
+        this.captures.clear();
+        for (const state of this.views.values()) state.captureGroups.clear();
+      }
+      this.captures.set(key, (capture = { pipeline }));
     }
+    const pipeline = capture.pipeline;
     // The capture fragment ends before the fog mix, so its layout has no fog binding (resource 8).
-    if (!view.captureGroups.length)
-      view.captureGroups = view.resources.map((resources) =>
-        c.device.createBindGroup({
-          layout: this.capturePipeline!.getBindGroupLayout(0),
-          entries: [
-            ...resources.slice(0, 8).map((resource, binding) => ({ binding, resource })),
-            ...this.effectBindings,
-          ],
-        }),
+    let groups = view.captureGroups.get(pipeline);
+    if (!groups)
+      view.captureGroups.set(
+        pipeline,
+        (groups = view.resources.map((resources) =>
+          c.device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+              ...resources.slice(0, 8).map((resource, binding) => ({ binding, resource })),
+              ...this.effectBindings,
+            ],
+          }),
+        )),
       );
     const entries = shadows?.bindings();
-    if (entries && this.captureShadowEntries !== entries) {
-      this.captureShadowEntries = entries;
-      this.captureShadow = c.device.createBindGroup({ layout: this.capturePipeline!.getBindGroupLayout(1), entries });
+    if (entries && capture.shadowEntries !== entries) {
+      capture.shadowEntries = entries;
+      capture.shadow = c.device.createBindGroup({ layout: pipeline.getBindGroupLayout(1), entries });
     }
     const pass = hook.begin();
-    pass.setPipeline(this.capturePipeline!);
-    pass.setBindGroup(0, view.captureGroups[view.drawn]);
-    if (entries) pass.setBindGroup(1, this.captureShadow!);
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, groups[view.drawn]);
+    if (entries) pass.setBindGroup(1, capture.shadow!);
     pass.setVertexBuffer(0, this.vertices!);
     pass.setIndexBuffer(this.indices!, 'uint32');
     pass.drawIndexed(this.count);
   }
   private release(): void {
-    this.capturePipeline = this.captureShadow = this.captureShadowEntries = undefined;
-    this.captureKey = this.shaderCode = '';
+    this.captures.clear();
+    for (const state of this.views.values()) state.captureGroups.clear();
+    this.shaderCode = '';
     this.foamMSAA?.destroy();
     this.foamMSAA = undefined;
     this.foamMSAAView = undefined;

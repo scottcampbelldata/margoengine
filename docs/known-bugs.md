@@ -6,6 +6,30 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: one terrain or water in two capture effects draws the first effect's outputs (KB-CAPTURE-TWOEFFECTS1, terrain, water)
+
+- **Repro:** add one `Terrain` to SSR and to `SceneTargets` (`ssr.add(terrain); targets.add(terrain)`): the second
+  effect's capture stage carries SSR's three-output `MargoSSR` under its own two to seven targets, a pipeline error
+  on the GPU. Water with two effects of the same target formats drew the first effect's stage for both, and with
+  different formats rebuilt its capture pipeline and bind groups on every draw.
+- **Cause:** a model takes one hook, shared by every effect through `shareCapture` (`packages/shared/capture.js`),
+  which forwards `declarations()` to the effect drawing now. Terrain cached its capture stage by the lit shader alone
+  (`captureCode`), and water kept one capture pipeline keyed without the declarations.
+- **Fix:** both key the stage and pipeline by the declarations this draw's effect returns; water keeps one pipeline
+  (and its bind groups per view) per key. Regression: `packages/terrain/test/capture.test.js` and
+  `packages/water/test/capture.test.js` ("in two effects").
+
+### Open 2026-11-26: water added to SceneTargets or MeshBlend builds an invalid capture stage (KB-WATER-TARGETS1, water)
+
+- **Repro:** `targets.add(water)` on a `SceneTargets` whose outputs are not exactly three, or `meshBlend.add(water)`:
+  the water capture fragment returns `MargoSSR(specular, weight, normal)` while that effect's `MargoSSR` has one field
+  per output, so the shader does not compile.
+- **Cause:** water's capture (`captureShader` in `packages/water/src/index.ts`) writes SSR's three fields itself (the
+  sky reflection SSR replaces) instead of calling the hook's `margoSSR(n, v, base, metal, rough)`, and
+  `SceneTargets.add`/`MeshBlend.add` accept any model with `setCapture`.
+- **Owed:** water calls `margoSSR` for an effect that is not SSR (its normal, body colour and roughness), with a
+  test that adds one water to SSR and to SceneTargets.
+
 ### Fixed 2026-11-26: water beside a solid box ran faster than beside the liquid box's own sides (KB-FLIP-SOLIDSLIP1, physics, flip)
 
 - **Repro:** Martin and Moyce's dam break (`packages/physics/tests/flip.test.js`) on a floor of two solid rows instead of

@@ -122,3 +122,38 @@ test('with TerrainLayer.bump the capture entry shades with the bumped normal, as
   assert.equal(code.split(shading).length, 3, 'in margoShade and in capture');
   assert.match(code, /@fragment fn capture\(i:Output\)->MargoSSR \{if\(any[^\n]*let n=terrainBump/);
 });
+
+test('one terrain in two effects: each capture draw builds its stage from that effect’s own declarations', async () => {
+  const { shareCapture, drawCapture } = await import('../../shared/capture.js');
+  const r = rig();
+  r.frame();
+  const hook = (tag, formats) => ({
+    targets: formats.map((format) => ({ format })),
+    declarations: () =>
+      `// effect ${tag}\nstruct MargoSSR {${formats.map((_, i) => `@location(${i}) o${i}:vec4f`).join(',')}}\nfn margoSSR(n:vec3f,v:vec3f,base:vec3f,metal:f32,rough:f32)->MargoSSR {return MargoSSR(${formats.map(() => 'vec4f(1)').join(',')});}\n`,
+    begin: () => r.hook.begin(),
+  });
+  const ssr = hook('ssr', ['rgba16float', 'rgb10a2unorm', 'rgb10a2unorm']),
+    targets = hook('targets', ['rgba16float', 'r8unorm']);
+  const stopSSR = shareCapture(r.terrain, ssr),
+    stopTargets = shareCapture(r.terrain, targets);
+  const stage = (h) => {
+    const log = r.gpu.record(() => drawCapture(r.terrain, h, r.view.c)),
+      pipeline = log.find((e) => e[0] === 'renderPipeline')?.[2];
+    return { code: modules(log)[0], pipeline };
+  };
+  const a = stage(ssr),
+    b = stage(targets);
+  assert.match(a.code, /\/\/ effect ssr\n/);
+  assert.ok(b.pipeline, 'the second effect gets its own pipeline');
+  assert.deepEqual(
+    b.pipeline.fragment.targets.map((t) => t.format),
+    ['rgba16float', 'r8unorm'],
+  );
+  assert.match(b.code ?? '', /\/\/ effect targets\n/, "the second effect's stage carries its own MargoSSR outputs");
+  assert.doesNotMatch(b.code ?? '', /\/\/ effect ssr\n/);
+  assert.equal(modules(r.gpu.record(() => drawCapture(r.terrain, ssr, r.view.c))).length, 0, 'both stay cached');
+  assert.equal(modules(r.gpu.record(() => drawCapture(r.terrain, targets, r.view.c))).length, 0);
+  stopTargets();
+  stopSSR();
+});
