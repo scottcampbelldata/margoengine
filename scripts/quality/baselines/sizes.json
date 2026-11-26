@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20539450,
+  "total": 20539477,
   "history": [
     {
       "date": "2026-10-24",
@@ -13536,6 +13536,12 @@
       "commit": "f3295120cc",
       "grew": 1,
       "reason": "KB4000: the native volume tint reads KHR_materials_volume thicknessTexture (margoThickness, slot 20); @margoengine/gltf/pbr 92158 to 92204, gltf/prepare 35545 to 35588 and gltf/worker 92644 to 92722 B gzip. The WGSL lives in the shader strings these entries already carry; a split would move the whole tint shader for 46 B. Core plus Stage unchanged."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "b6781020ba",
+      "grew": 1,
+      "reason": "Measured at the lane A landing: gltf/pbr 92204 to 92219 and gltf/worker 92722 to 92734 B gzip come from b6781020ba (shadow cascades fit an instanced caster) and d31534edc1 (selection picks instanced meshes), which landed without a size row. Their WGSL and fields sit in the instancing code these entries carry. Core plus Stage unchanged."
     }
   ],
   "items": {
@@ -13998,7 +14004,7 @@
     "@margoengine/gltf/material-draw": 688,
     "@margoengine/gltf/meshopt": 1205,
     "@margoengine/gltf/metadata": 2432,
-    "@margoengine/gltf/pbr": 92204,
+    "@margoengine/gltf/pbr": 92219,
     "@margoengine/gltf/pbr-instancing": 3448,
     "@margoengine/gltf/pbr-model": 71859,
     "@margoengine/gltf/physics": 10323,
@@ -14013,7 +14019,7 @@
     "@margoengine/gltf/splats": 2356,
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9808,
-    "@margoengine/gltf/worker": 92722,
+    "@margoengine/gltf/worker": 92734,
     "@margoengine/headless": 3309,
     "@margoengine/headless/accumulate": 4620,
     "@margoengine/headless/compare": 3721,
