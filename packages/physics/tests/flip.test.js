@@ -164,6 +164,68 @@ test('a lone droplet flies a parabola: spray that makes no liquid cell keeps its
   assert.ok(Math.abs(end[1] - (start[1] + 3 * t - (G * t * t) / 2)) < 0.05, `y ${end[1]}`);
 });
 
+test("a box held to the sea passes the sea's waves through: a linear wave keeps its amplitude and phase inside it", () => {
+  // A regular deep-water wave 1 m long and 0.03 m high runs through a box 2 m long held to it at its sides (a band of 6
+  // cells). In the middle, the surface's motion at the wave's frequency, fitted over two periods, has the sea's amplitude
+  // within 15 percent and its phase within 0.15 rad, and its mean within half a cell of the still level.
+  const a = 0.03,
+    k = 2 * Math.PI,
+    w = Math.sqrt(G * k),
+    h = 0.0125,
+    sea = {
+      elevation: (x, _z, t) => a * Math.cos(k * x - w * t),
+      water: {
+        sample(x, y, _z, t, out = { velocity: [0, 0, 0], density: 1000, temperature: 288 }) {
+          const e = a * w * Math.exp(k * Math.min(y, 0));
+          out.velocity[0] = e * Math.cos(k * x - w * t);
+          out.velocity[1] = e * Math.sin(k * x - w * t);
+          out.velocity[2] = 0;
+          return out;
+        },
+      },
+    },
+    liquid = new FlipSolver(),
+    world = new PhysicsWorld({ rate: { num: 120, den: 1 }, gravity: [0, -G, 0] }).add(liquid, {
+      cells: [160, 64, 1],
+      cellSize: h,
+      origin: [0, -0.6, 0],
+      sea,
+      blend: 6,
+      rate: 1,
+      maxSubsteps: 128,
+    });
+  let c = 0,
+    s = 0,
+    mean = 0,
+    n = 0;
+  for (let f = 1; f <= 120 * 2.4; f++) {
+    world.advance(f);
+    if (f <= 96) continue;
+    const t = f / 120,
+      phi = liquid['phi'],
+      i = Math.floor(1 / h);
+    // The grid's own free surface over x = 1 m (where phi crosses 0 between cell centres), the surface the waves move on.
+    let y = NaN;
+    for (let j = 0; j + 1 < 64; j++) {
+      const lo = phi[i + 160 * j],
+        hi = phi[i + 160 * (j + 1)];
+      if (lo < 0 && hi >= 0) {
+        y = (j + 0.5) * h + (h * lo) / (lo - hi) - 0.6;
+        break;
+      }
+    }
+    c += y * Math.cos(k - w * t);
+    s += y * Math.sin(k - w * t);
+    mean += y;
+    n++;
+  }
+  const amplitude = (2 * Math.hypot(c, s)) / n,
+    phase = Math.atan2(s, c);
+  assert.ok(Math.abs(amplitude - a) <= 0.15 * a, `amplitude ${amplitude} m against ${a}`);
+  assert.ok(Math.abs(phase) <= 0.15, `phase ${phase} rad`);
+  assert.ok(Math.abs(mean / n) <= h / 2, `mean level ${mean / n} m`);
+});
+
 test('a snapshot restores the liquid bit for bit, and a second run gives the same bits', () => {
   const make = () => {
     const liquid = new FlipSolver(),

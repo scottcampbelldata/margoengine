@@ -13202,6 +13202,19 @@ Written from papers and notes read as text (no code, no companion repositories):
 - J. C. Martin and W. J. Moyce, "An experimental study of the collapse of liquid columns on a rigid horizontal plane",
   Phil. Trans. R. Soc. A 244, 312-324, 1952, table 2 (the check).
 
+- N. Chentanez, M. Muller and T.-Y. Kim, "Coupling 3D Eulerian, heightfield and particle methods for interactive
+  simulation of large scale liquid phenomena", SCA 2014, https://doi.org/10.2312/sca.20141117: a liquid region held to a
+  larger water model in a band at its border, blending towards it over a few cells (the `sea` option's band).
+- The dispersively focused wave packet of M. S. Longuet-Higgins (1976) and R. J. Rapp and W. K. Melville (Phil. Trans.
+  R. Soc. A 331, 1990), as Erinin et al. describe it (both read only through that description): components of equal
+  spacing in frequency converging at one place and time; the crest test gives them equal steepness a k, summing to S.
+- D. Erinin, X. Liu, Q. Wang and J. H. Duncan, "Plunging breakers - Part 1", J. Fluid Mech., 2023, arXiv 2210.01925:
+  N = 32 components, N dw / w = 0.77, f0 = 1.15 Hz; crest speed at jet formation 1.511 to 1.536 m/s, jet tip at impact
+  1.904 to 2.010 m/s, 1.24 to 1.33 times the crest speed (the check).
+- X. Barthelemy et al., "On a unified breaking onset threshold for gravity waves in deep and intermediate depth water",
+  J. Fluid Mech., 2018, arXiv 1508.06002: breaking sets in where the crest's water speed passes 0.85 of the crest's
+  speed (why the crest test asks for the jet to outrun the crest).
+
 No constant is calibrated. The surface's particle radius (half a cell) and the extrapolation depth (two faces) are
 Zhu and Bridson's choices.
 

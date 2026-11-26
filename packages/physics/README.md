@@ -2441,6 +2441,37 @@ boxes it flows round (`solids`) and the sides open to the air (`open`), where wa
 `positions()` gives the particles for drawing, `velocityAt` and `pressureAt` read the grid. Martin and Moyce's dam
 break is its check: the front within 2 percent of their measurements.
 
+Crashing crests: give a box a `sea` (a `SpectralSea`, or anything with `elevation(x, z, t)` and `water.sample`) and no
+`initial`, and it starts as that sea, its water moving as the sea's does. Its four sides then take the sea's own
+velocity, and a band of `blend` cells (6) inside them is held to the sea's motion and level (the hybrid of Chentanez,
+Muller and Kim 2014). Waves run in and out, and inside the box they are free to steepen, overturn and break. Checked:
+a linear wave passes through with its amplitude and phase, and a dispersively focused packet overturns and plunges, its
+jet outrunning its crest (`node scripts/check-breaker.mjs`, minutes a run). How much faster is not yet settled: 1.26 to
+1.72 times the crest speed across starts and grids, where Erinin et al. (2023) measured 1.24 to 1.33 (docs/limits.md
+says why). Cells of 2 cm do not resolve a 15 cm plunger's jet: give a breaking crest a dozen cells.
+
+```ts
+import {FlipSolver} from 'margoengine/physics/flip';
+import {PhysicsWorld} from 'margoengine/physics/world';
+
+// A regular wave 1 m long and 3 cm high, and a box of it 2 m long.
+const [a, k] = [0.03, 2 * Math.PI];
+const w = Math.sqrt(9.81 * k);
+const sea = {
+  elevation: (x: number, _z: number, t: number) => a * Math.cos(k * x - w * t),
+  water: {
+    sample(x: number, y: number, _z: number, t: number) {
+      const e = a * w * Math.exp(k * Math.min(y, 0));
+      return {velocity: [e * Math.cos(k * x - w * t), e * Math.sin(k * x - w * t), 0] as [number, number, number]};
+    },
+  },
+};
+const box = new FlipSolver();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}}).add(box, {cells: [80, 32, 1], cellSize: 0.025, origin: [0, -0.6, 0], sea});
+world.advance(30); // half a second of the wave running through it
+console.log(box.count > 0); // true
+```
+
 `DeckWaterSolver` is green water on a hull's deck: the same liquid in a box riding a rigid body (`row`, `offset` in
 the body's frame), feeling the frame's acceleration as the hull heaves and rolls. It takes the sea where it comes over
 the bulwarks from the `deckInflow` port, gives water over an open side back to the sea, and holds the hull with the

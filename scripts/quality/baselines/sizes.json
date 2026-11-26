@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20356976,
+  "total": 20358020,
   "history": [
     {
       "date": "2026-10-24",
@@ -13059,6 +13059,12 @@
       "commit": "7d44694c88",
       "grew": 2,
       "reason": "SOFT-04 adds local/global rotation and volume projections with one shared native sparse operator, moving the soft entry from 113913 to 121474 B gzip. @margoengine/physics/soft: 117331 to 125119 B ceiling (121474 B measured); @margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table): 80702 to 88516 B ceiling (85937 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "feat(physics) crests from the sea",
+      "reason": "physics/flip 10,188 to 11,232 B gzip (this Mac): FlipSolver takes a sea (seeded from it, its sides on the sea's velocity, a band held to its motion and level; the density projection keeps those sides), so waves run in and break inside the box. It is the same solver's boundary; a separate entry would carry the whole solver again.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13886,7 +13892,7 @@
     "@margoengine/physics/entry": 9838,
     "@margoengine/physics/falling": 6515,
     "@margoengine/physics/flight": 8719,
-    "@margoengine/physics/flip": 10188,
+    "@margoengine/physics/flip": 11232,
     "@margoengine/physics/foam": 8022,
     "@margoengine/physics/glacier": 3775,
     "@margoengine/physics/groundwater": 4195,

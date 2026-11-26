@@ -52,6 +52,7 @@ export function project(
   rho: number,
   pressure: Float64Array,
   open: readonly boolean[] = [false, false, false, false, false, false],
+  prescribed: readonly boolean[] = [false, false, false, false, false, false],
   tolerance = 1e-6,
   maxIterations = 400,
   source?: Float64Array,
@@ -100,7 +101,10 @@ export function project(
         // Minus the divergence, the walls' faces at rest.
         const solidOrOut = (o: number) => o === -1 || (o >= 0 && kind[o] === SOLID);
         // An open side's outside is air: its face keeps its velocity.
-        for (let side = 0; side < 6; side++) if (open[side] && nbrs[side]![0] < 0) nbrs[side]![0] = -2;
+        // An open side's outside is air, and a prescribed side's boundary face holds the velocity it was given (the sea's
+        // inflow or outflow): either way the face keeps its velocity.
+        for (let side = 0; side < 6; side++)
+          if ((open[side] || prescribed[side]) && nbrs[side]![0] < 0) nbrs[side]![0] = -2;
         const uL = solidOrOut(nbrs[0]![0]) ? 0 : u[faceU(g, i, j, k)]!,
           uR = solidOrOut(nbrs[1]![0]) ? 0 : u[faceU(g, i + 1, j, k)]!,
           vD = solidOrOut(nbrs[2]![0]) ? 0 : v[faceV(g, i, j, k)]!,
@@ -249,6 +253,7 @@ export function project(
         const f = faceU(g, i, j, k),
           a = i > 0 ? cell(g, i - 1, j, k) : -1,
           b = i < nx ? cell(g, i, j, k) : -1;
+        if ((a < 0 && prescribed[0]) || (b < 0 && prescribed[1])) continue;
         if ((a < 0 && open[0] && kind[b] === LIQUID) || (b < 0 && open[1] && kind[a] === LIQUID)) {
           u[f]! -= k2 * (a < 0 ? pressure[b]! - openGhost(b) : openGhost(a) - pressure[a]!);
           continue;
@@ -268,6 +273,7 @@ export function project(
         const f = faceV(g, i, j, k),
           a = j > 0 ? cell(g, i, j - 1, k) : -1,
           b = j < ny ? cell(g, i, j, k) : -1;
+        if ((a < 0 && prescribed[2]) || (b < 0 && prescribed[3])) continue;
         if ((a < 0 && open[2] && kind[b] === LIQUID) || (b < 0 && open[3] && kind[a] === LIQUID)) {
           v[f]! -= k2 * (a < 0 ? pressure[b]! - openGhost(b) : openGhost(a) - pressure[a]!);
           continue;
@@ -287,6 +293,7 @@ export function project(
         const f = faceW(g, i, j, k),
           a = k > 0 ? cell(g, i, j, k - 1) : -1,
           b = k < nz ? cell(g, i, j, k) : -1;
+        if ((a < 0 && prescribed[4]) || (b < 0 && prescribed[5])) continue;
         if ((a < 0 && open[4] && kind[b] === LIQUID) || (b < 0 && open[5] && kind[a] === LIQUID)) {
           w[f]! -= k2 * (a < 0 ? pressure[b]! - openGhost(b) : openGhost(a) - pressure[a]!);
           continue;

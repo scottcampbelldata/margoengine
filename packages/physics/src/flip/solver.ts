@@ -54,6 +54,30 @@ export interface FlipParams {
    * `seaSources()` hands its volume to the sea below (a WakeSolver's `sources`). '-x', '+x', '-y', '+y', '-z', '+z'.
    */
   readonly open?: readonly ('-x' | '+x' | '-y' | '+y' | '-z' | '+z')[];
+  /**
+   * The sea the box sits in (a `SpectralSea` of `@margoengine/physics/sea`, in the solver's cell): with no `initial`
+   * the box starts as the sea at time 0, its water below the surface moving as the sea's does; its four sides take
+   * the sea's own velocity, and a band of `blend` cells inside them is held to the sea's motion and level (the hybrid of
+   * N. Chentanez, M. Muller and T.-Y. Kim, SCA 2014), so waves run in and out and the water inside is free to steepen,
+   * overturn and break.
+   */
+  readonly sea?: LiquidSea;
+  /** Cells of the band held to the sea (default 6). */
+  readonly blend?: number;
+}
+
+/** The sea a liquid's box sits in: its surface and the water's velocity below it, on the world clock. */
+export interface LiquidSea {
+  elevation(x: number, z: number, t: number): number;
+  readonly water: {
+    sample(
+      x: number,
+      y: number,
+      z: number,
+      t: number,
+      out?: { velocity: [number, number, number]; density: number; temperature: number },
+    ): { velocity: [number, number, number] };
+  };
 }
 
 const SIDES = ['-x', '+x', '-y', '+y', '-z', '+z'] as const;
@@ -82,6 +106,11 @@ export class FlipSolver implements Solver<FlipParams> {
   protected open: boolean[] = [false, false, false, false, false, false];
   /** The water that left over the open sides this step: [x, z, volume] each, world, m and m^3. */
   protected sinks: number[] = [];
+  protected sea: LiquidSea | null = null;
+  protected blend = 6;
+  /** The time of the substep being taken, s on the world clock. */
+  protected time = 0;
+  private readonly flow = { velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0 };
   private lastSubsteps = 0;
   private lastIterations = 0;
 
@@ -106,7 +135,17 @@ export class FlipSolver implements Solver<FlipParams> {
       rate = 0,
       maxSubsteps = 64,
       open = [],
+      sea,
+      blend = 6,
     } = params;
+    if (sea !== undefined && (typeof sea?.elevation !== 'function' || typeof sea?.water?.sample !== 'function'))
+      throw new TypeError(
+        'A liquid sits in a sea with elevation(x, z, t) and water.sample(x, y, z, t); pass a SpectralSea or none.',
+      );
+    if (!(Number.isInteger(blend) && blend >= 1 && blend <= 64))
+      throw new RangeError(`A liquid's band held to the sea is 1 to 64 whole cells (got ${blend}); pass one.`);
+    this.sea = sea ?? null;
+    this.blend = blend;
     if (!(Array.isArray(open) && open.every((side) => (SIDES as readonly string[]).includes(side))))
       throw new RangeError(`A liquid's open sides are some of ${SIDES.join(', ')}; pass a list of them.`);
     this.open = SIDES.map((side) => open.includes(side));
@@ -183,6 +222,7 @@ export class FlipSolver implements Solver<FlipParams> {
     this.countRegion = host.allocate(`${this.id}:count`, 8, 'f64', FLIP_LAYOUT);
     this.pressureRegion = host.allocate(`${this.id}:pressure`, n * 8, 'f64', FLIP_LAYOUT);
     if (initial) this.seed(initial);
+    else if (this.sea) this.seedSea(0);
   }
 
   protected words(region: Region | null): Float64Array {
@@ -250,7 +290,12 @@ export class FlipSolver implements Solver<FlipParams> {
         'state',
         `The liquid moves ${bound.toFixed(2)} m/s, ${substeps} substeps of a ${this.grid.h} m cell this step (at most ${this.maxSubsteps}); raise maxSubsteps or the solver's rate.`,
       );
-    for (let s = 0; s < substeps; s++) this.substep(dt / substeps);
+    const start = context.tick / rateOf(context.level);
+    if (this.sea) this.refill(start);
+    for (let s = 0; s < substeps; s++) {
+      this.time = start + (s * dt) / substeps;
+      this.substep(dt / substeps);
+    }
     this.lastSubsteps = substeps;
     this.afterStep(context, dt);
   }
@@ -283,6 +328,7 @@ export class FlipSolver implements Solver<FlipParams> {
     this.correctDensity(dt);
     toGrid(g, p, count, this.vel, this.mass);
     this.accelerate(dt);
+    if (this.sea) this.holdToSea(dt);
     for (let c = 0; c < this.kind.length; c++) this.kind[c] = this.solid[c] ? SOLID : 0;
     surface(g, p, count, h, 0.5 * h, this.kind, this.phi);
     this.lastIterations = project(
@@ -296,6 +342,7 @@ export class FlipSolver implements Solver<FlipParams> {
       this.density,
       pressure,
       this.open,
+      this.sea ? [true, true, false, false, g.nz > 1, g.nz > 1] : undefined,
     );
     extrapolate(g, this.kind, this.vel, 2, this.mass);
     toParticles(g, p, count, this.vel);
@@ -316,16 +363,19 @@ export class FlipSolver implements Solver<FlipParams> {
       let gone = false;
       for (let a = 0; a < 3; a++) {
         if (to[a]! < lo) {
-          if (this.open[2 * a]) gone = true;
+          if (this.open[2 * a] || (this.sea && (a === 0 || (a === 2 && g.nz > 1)))) gone = true;
           else to[a] = lo;
         } else if (to[a]! > top[a]!) {
-          if (this.open[2 * a + 1]) gone = true;
+          if (this.open[2 * a + 1] || (this.sea && (a === 0 || (a === 2 && g.nz > 1)))) gone = true;
           else to[a] = top[a]!;
         }
       }
       if (gone) {
-        const w = this.toWorld(to[0], to[1], to[2]);
-        this.sinks.push(w[0], w[2], volume);
+        // Water over an open side goes to the sea below; water through a side held to the sea is the sea's again.
+        if (!this.sea || to[1] < lo || to[1] > top[1]) {
+          const w = this.toWorld(to[0], to[1], to[2]);
+          this.sinks.push(w[0], w[2], volume);
+        }
         continue;
       }
       // A particle carried into a solid stays where it was this substep.
@@ -436,6 +486,8 @@ export class FlipSolver implements Solver<FlipParams> {
       this.density,
       new Float64Array(nx * ny * nz),
       this.open,
+      // The sea's sides hold their faces (here at rest), so the correction moves no water through them.
+      this.sea ? [true, true, false, false, nz > 1, nz > 1] : undefined,
       1e-6,
       400,
       source,
@@ -553,6 +605,120 @@ export class FlipSolver implements Solver<FlipParams> {
             this.acceleration(x, y, z, v, acc);
             va[f]! += acc[a]! * dt;
           }
+    }
+  }
+
+  /** The box as the sea is at time `t`: eight particles a cell below its surface, moving as its water does. */
+  private seedSea(t: number): void {
+    const sea = this.sea!;
+    this.seed((x, y, z) => {
+      const w = this.toWorld(x, y, z);
+      return w[1] < sea.elevation(w[0], w[2], t);
+    });
+    const { p, count } = this.state();
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        w = this.toWorld(p[o]!, p[o + 1]!, p[o + 2]!),
+        v = sea.water.sample(w[0], w[1], w[2], t, this.flow).velocity;
+      p[o + 3] = v[0];
+      p[o + 4] = v[1];
+      p[o + 5] = v[2];
+    }
+  }
+
+  /** How far a cell (i, k) is from the box's nearest side along x or z, in cells (0 at the side). */
+  private sideDistance(i: number, k: number): number {
+    const { nx, nz } = this.grid;
+    return Math.min(i, nx - 1 - i, nz > 1 ? Math.min(k, nz - 1 - k) : Infinity);
+  }
+
+  /**
+   * The band at the step's start: its cells under the sea's surface that hold no particle take eight, moving as the sea
+   * does; its particles above the sea's surface go, so the band's water stands at the sea's level.
+   */
+  private refill(t: number): void {
+    const sea = this.sea!,
+      { nx, ny, nz, h } = this.grid,
+      p = this.words(this.particleRegion),
+      countWords = this.words(this.countRegion),
+      held = new Uint8Array(nx * ny * nz);
+    let count = countWords[0]!,
+      kept = 0;
+    for (let q = 0; q < count; q++) {
+      const o = q * PARTICLE_WORDS,
+        i = Math.floor(p[o]! / h),
+        j = Math.floor(p[o + 1]! / h),
+        k = Math.floor(p[o + 2]! / h),
+        w = this.toWorld(p[o]!, p[o + 1]!, p[o + 2]!);
+      if (this.sideDistance(i, k) < this.blend && w[1] > sea.elevation(w[0], w[2], t)) continue;
+      held[cell(this.grid, i, j, k)] = 1;
+      if (kept !== q) p.copyWithin(kept * PARTICLE_WORDS, o, o + PARTICLE_WORDS);
+      kept++;
+    }
+    p.fill(0, kept * PARTICLE_WORDS, count * PARTICLE_WORDS);
+    count = kept;
+    for (let k = 0; k < nz; k++)
+      for (let j = 0; j < ny; j++)
+        for (let i = 0; i < nx; i++) {
+          if (this.sideDistance(i, k) >= this.blend) continue;
+          const c = cell(this.grid, i, j, k);
+          if (held[c] || this.solid[c]) continue;
+          for (let o = 0; o < 8; o++) {
+            const x = (i + 0.25 + 0.5 * (o & 1)) * h,
+              y = (j + 0.25 + 0.5 * ((o >> 1) & 1)) * h,
+              z = (k + 0.25 + 0.5 * ((o >> 2) & 1)) * h,
+              w = this.toWorld(x, y, z);
+            if (!(w[1] < sea.elevation(w[0], w[2], t))) continue;
+            if (count >= this.capacity)
+              throw new MargoError(
+                'state',
+                `The liquid holds at most ${this.capacity} particles and the sea brings more; raise capacity.`,
+              );
+            const v = sea.water.sample(w[0], w[1], w[2], t, this.flow).velocity,
+              at = count * PARTICLE_WORDS;
+            p.fill(0, at, at + PARTICLE_WORDS);
+            p.set([x, y, z, v[0], v[1], v[2]], at);
+            count++;
+          }
+        }
+    countWords[0] = count;
+  }
+
+  /**
+   * Holds the band to the sea over a substep: its faces under the sea's surface relax to the sea's velocity by
+   * b = (1 - d / blend)^2, d the face's distance from the side in cells (1 at the side, which takes the sea's velocity
+   * outright, 0 at the band's inner edge); faces above the surface are left to the liquid.
+   */
+  private holdToSea(dt: number): void {
+    const sea = this.sea!,
+      g = this.grid,
+      { h } = g,
+      t = this.time + dt;
+    for (let a = 0; a < 3; a++) {
+      const [mx, my, mz] = a === 0 ? [g.nx + 1, g.ny, g.nz] : a === 1 ? [g.nx, g.ny + 1, g.nz] : [g.nx, g.ny, g.nz + 1],
+        va = this.vel[a]!;
+      for (let k = 0; k < mz; k++)
+        for (let i = 0; i < mx; i++) {
+          // Distance from the nearest x or z side, in cells, for this face's place.
+          const fx = i + (a === 0 ? 0 : 0.5),
+            fz = k + (a === 2 ? 0 : 0.5),
+            d = Math.min(fx, g.nx - fx, g.nz > 1 ? Math.min(fz, g.nz - fz) : Infinity);
+          if (d >= this.blend) continue;
+          const b = (1 - d / this.blend) ** 2;
+          for (let j = 0; j < my; j++) {
+            const x = fx * h,
+              y = (j + (a === 1 ? 0 : 0.5)) * h,
+              z = fz * h,
+              w = this.toWorld(x, y, z);
+            const f = i + mx * (j + my * k);
+            if (!(w[1] < sea.elevation(w[0], w[2], t))) {
+              if (d === 0) va[f] = 0;
+              continue;
+            }
+            const v = sea.water.sample(w[0], w[1], w[2], t, this.flow).velocity[a]!;
+            va[f] = d === 0 ? v : (1 - b) * va[f]! + b * v;
+          }
+        }
     }
   }
 

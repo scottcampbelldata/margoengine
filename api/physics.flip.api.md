@@ -40,6 +40,8 @@ export interface FlipParams {
     readonly rate?: RateLevel;
     readonly maxSubsteps?: number;
     readonly open?: readonly ('-x' | '+x' | '-y' | '+y' | '-z' | '+z')[];
+    readonly sea?: LiquidSea;
+    readonly blend?: number;
 }
 
 export class FlipSolver implements Solver<FlipParams> {
@@ -62,6 +64,9 @@ export class FlipSolver implements Solver<FlipParams> {
     protected mass: Float64Array[];
     protected open: boolean[];
     protected sinks: number[];
+    protected sea: LiquidSea | null;
+    protected blend: number;
+    protected time: number;
     constructor(id?: string);
     describe(): SolverDescription;
     init(host: SolverHost, params?: FlipParams): void;
@@ -106,6 +111,19 @@ export interface GridShape {
 
 export const LIQUID = 1;
 
+export interface LiquidSea {
+    elevation(x: number, z: number, t: number): number;
+    readonly water: {
+        sample(x: number, y: number, z: number, t: number, out?: {
+            velocity: [number, number, number];
+            density: number;
+            temperature: number;
+        }): {
+            velocity: [number, number, number];
+        };
+    };
+}
+
 export interface LiquidSolid {
     readonly min: readonly [number, number, number];
     readonly max: readonly [number, number, number];
@@ -117,7 +135,7 @@ export const SOLID = 2;
 
 export const THETA_FLOOR = 0.01;
 
-export function project(g: GridShape, kind: Uint8Array, phi: Float64Array, u: Float64Array, v: Float64Array, w: Float64Array, dt: number, rho: number, pressure: Float64Array, open?: readonly boolean[], tolerance?: number, maxIterations?: number, source?: Float64Array): number;
+export function project(g: GridShape, kind: Uint8Array, phi: Float64Array, u: Float64Array, v: Float64Array, w: Float64Array, dt: number, rho: number, pressure: Float64Array, open?: readonly boolean[], prescribed?: readonly boolean[], tolerance?: number, maxIterations?: number, source?: Float64Array): number;
 
 export function sampleVelocity(g: GridShape, vel: Float64Array[], x: number, y: number, z: number, out: [number, number, number]): [number, number, number];
 
