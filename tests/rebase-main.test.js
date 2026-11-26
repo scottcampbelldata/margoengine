@@ -189,6 +189,74 @@ test('both sides changing one api-surface row keep the entries of both', (t) => 
   );
 });
 
+const HOOKS = [
+  'pre-rebase',
+  'pre-commit',
+  'prepare-commit-msg',
+  'commit-msg',
+  'post-commit',
+  'post-checkout',
+  'post-merge',
+  'post-rewrite',
+];
+/** Every hook a rebase or a commit can run, each leaving its name in the git directory. */
+function hooks(repo) {
+  for (const name of HOOKS)
+    writeFileSync(join(repo.clone, '.git/hooks', name), `#!/bin/sh\necho ${name} >> .git/hooks.log\n`, { mode: 0o755 });
+  return () => (existsSync(join(repo.clone, '.git/hooks.log')) ? repo.read('.git/hooks.log') : '');
+}
+
+test('a two-commit branch replays without running any git hook, generated conflicts settled', (t) => {
+  const repo = repository(t, {
+    ...generators,
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    'docs/b.md': ['b\n', 'b\n', 'b work\n'],
+    'site/llms.txt': ['a\nb\n', 'a upstream\nb\n', 'a\nb work\n'],
+  });
+  writeFileSync(join(repo.clone, 'docs/second.md'), 'second\n');
+  repo.git('add', 'docs/second.md');
+  repo.git('commit', '-q', '--author=Someone <someone@example.invalid>', '-m', 'second\n\nIts body.');
+  const authored = repo.git('log', '-2', '--format=%an|%ae|%ad|%B');
+  const ran = hooks(repo);
+  const result = repo.rebase();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(ran(), '', 'no hook ran');
+  assert.match(result.stdout, /replayed 2 commit\(s\) without a checkout/);
+  assert.equal(
+    repo.git('log', '--format=%s').trim(),
+    'chore: generated files after the rebase\nsecond\nwork\nupstream\nbase',
+  );
+  assert.equal(repo.git('log', '-2', '--skip=1', '--format=%an|%ae|%ad|%B'), authored);
+  assert.equal(repo.git('log', '-3', '--format=%ce'), 'test@example.invalid\n'.repeat(3), 'the committer is yours');
+  assert.equal(repo.read('docs/a.md'), 'a upstream\n');
+  assert.equal(repo.read('docs/second.md'), 'second\n');
+  assert.equal(repo.read('site/llms.txt'), 'a upstream\nb work\n');
+  assert.equal(repo.git('status', '--porcelain'), '');
+  assert.equal(repo.git('branch', '--show-current'), 'work\n');
+});
+
+test('a replay never overwrites an untracked file that main adds', (t) => {
+  const repo = repository(t, {
+    ...generators,
+    'docs/a.md': ['a\n', 'a upstream\n', 'a\n'],
+    'docs/b.md': ['b\n', 'b\n', 'b work\n'],
+  });
+  // main gains a file this checkout already holds untracked.
+  repo.git('checkout', '-q', 'main');
+  writeFileSync(join(repo.clone, 'docs/new.md'), 'upstream\n');
+  repo.git('add', 'docs/new.md');
+  repo.git('commit', '-qm', 'adds new');
+  repo.git('push', '-q', 'origin', 'main');
+  repo.git('checkout', '-q', 'work');
+  writeFileSync(join(repo.clone, 'docs/new.md'), 'mine\n');
+  const before = repo.git('rev-parse', 'HEAD');
+  const result = repo.rebase();
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /new\.md/);
+  assert.equal(repo.read('docs/new.md'), 'mine\n');
+  assert.equal(repo.git('rev-parse', 'HEAD'), before);
+});
+
 test('a clean rebase runs no generator and adds no commit', (t) => {
   const stub = (body) => Array(3).fill(`import { appendFileSync } from 'node:fs';\n${body}\n`);
   const repo = repository(t, {

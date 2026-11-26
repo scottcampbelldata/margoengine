@@ -12950,6 +12950,21 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: rebase:main ran the checkout and commit hooks for every commit, so main moved before it ended (KB-REBASE-HOOKS1, scripts)
+
+- **Repro:** on a Windows laptop with the git-lfs hooks installed, `npm run rebase:main` on a branch of four to ten
+  commits while `main` took a landing about every minute: 2.5 to 5 minutes, and `npm run push:main` was refused.
+- **Cause:** `git rebase` runs `post-checkout` and `post-commit` as it goes; `git lfs` in them took 5 to 30 s each
+  (`GIT_TRACE2_PERF`), once per commit and per generated conflict. Then its conflict-marker scan read every tracked
+  file, 39 s for 23,156 files.
+- **Fix:** the commits are replayed without a checkout (`git merge-tree --write-tree`, `git commit-tree`) and the branch
+  moves once (`git reset --keep`). Generated conflicts are settled there as before; any other conflict, a merge commit,
+  signed commits, changed tracked files or a git older than 2.40 go to `git rebase`, which stops for a person. The
+  `pre-push` hook is untouched. Hooks run by the tested two-commit rebase: 12 before, none after. The marker scan now
+  reads only the files `git grep` finds a marker-like line in, with the same findings.
+- **Regression:** `tests/rebase-main.test.js`: a two-commit branch replays without running any git hook; a replay never
+  overwrites an untracked file that main adds.
+
 ### Open 2026-11-26: GPU picking of an instanced mesh tests the instances where its vertex shader did not move them (KB-PICK-INSTMOVE1, selection)
 
 - **Repro:** `createInstancedMesh` with a material whose `materialPlugin` vertex point (or a `displacementMap`) moves the

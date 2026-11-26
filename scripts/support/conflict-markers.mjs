@@ -6,7 +6,15 @@ import { join } from 'node:path';
 export function conflictMarkers(root) {
   const git = (args, input) =>
     execFileSync('git', args, { cwd: root, input, encoding: 'utf8', timeout: 30_000, maxBuffer: 32 << 20 });
-  const files = git(['ls-files', '-z'])
+  // Only the tracked files git grep finds a marker-like line in are read: reading all 23,000 took 40 s and more on
+  // Windows, in every rebase:main run (KB-REBASE-HOOKS1).
+  let candidates = '';
+  try {
+    candidates = git(['grep', '-zlIE', '^(<<<<<<< |=======|>>>>>>>)']);
+  } catch (error) {
+    if (error.status !== 1) throw error; // 1 means no match
+  }
+  const files = candidates
     .split('\0')
     .filter((file) => file && (file.startsWith('docs/') || /\.(md|ts|js|json|mjs|wgsl|glsl)$/i.test(file)));
   if (!files.length) return [];
