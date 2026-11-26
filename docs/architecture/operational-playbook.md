@@ -4193,6 +4193,14 @@ is one a fake device can raise.
 
 ## 5. Current evidence gaps
 
+### N-body and orbital dynamics (SPACE-01)
+
+The separate plain and shared SIMD modules use slot 8 and publish inertial positions, velocities and elapsed
+time through the field registry. The binary, quadrupole and drag tests use analytic comparisons. The coupling
+fixtures verify replay across frame rates and both memory modes. The Event Horizon test advances the shader
+clock and an explicit override and checks moving beaming, radial inflow and exact repeated frame values on
+WebGPU and WebGL2. See the [clean-room record](../clean-room.md#n-body-and-orbital-dynamics-space-01).
+
 ### Underwater acoustics (SOUND-03)
 
 The underwater entry proves exact Snell arcs in a linear sound-speed gradient, refraction at a slope

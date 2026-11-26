@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 19233736,
+  "total": 19238009,
   "history": [
     {
       "date": "2026-10-24",
@@ -12567,6 +12567,12 @@
       "commit": "db1950c88f",
       "reason": "HYDRO-03 entry sizes, previous record to current: @margoengine/physics/sediment 0→5256 B (ceiling 0→5512 B); @margoengine/water/flood 14174→14457 B (ceiling 14600→14600 B). The optional sediment entry owns conservative routing and Exner coupling with lazy Wasm. Flood adds live concentration upload and reuses its existing tint shader and texture lifetime. Splitting the upload would add a lazy request to that same existing texture path.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "df1d94845f",
+      "reason": "SPACE-01 adds optional orbital mechanics at 4017 B gzip (budget 4273 B) for the world solver and analytic Kepler samples. The plain and shared SIMD assets load separately. Shader/black-hole stays within its existing budget at 25814 B gzip, and core plus stage stays at 24,820 B.",
+      "grew": 1
     }
   ],
   "items": {
@@ -13372,6 +13378,7 @@
     "@margoengine/physics/ice": 4099,
     "@margoengine/physics/life": 7542,
     "@margoengine/physics/meshfiles": 2857,
+    "@margoengine/physics/orbit": 4273,
     "@margoengine/physics/robots": 5127,
     "@margoengine/physics/runoff": 4162,
     "@margoengine/physics/schooling": 5254,

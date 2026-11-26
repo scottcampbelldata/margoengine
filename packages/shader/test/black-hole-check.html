@@ -1,19 +1,17 @@
 <!doctype html><html><head><meta charset="utf-8"/><title>Black hole check</title><style>body{margin:0;background:#000}#host{width:480px;height:270px}</style></head><body>
 <div id="host"></div>
 <script type="module">
-// The black hole on a real adapter: one frame per scene at a set shader clock (camera.time reads performance.now), read
-// back by the script as pixels. A scene sets the camera, the hole's properties and the clock in seconds.
-const realNow = performance.now.bind(performance);
-let clock = null;
-performance.now = () => (clock === null ? realNow() : clock * 1000);
+// The black hole on a real adapter. A scene sets the camera, the hole's properties and the shader clock in seconds.
 const {waitForPipelines} = await import('/scripts/support/gpu-ready.js');
 const {createStage} = await import('/packages/stage/dist/index.js');
 const {BlackHole} = await import('/packages/shader/dist/black-hole.js');
+const {ShaderClock} = await import('/packages/shader/dist/index.js');
 const stage = await createStage('#host', {backend: 'webgpu', autoStart: false, controls: false, camera: {position: [0, 0.12, 12.5], target: [0, 0, 0], fov: 38, near: 0.05, far: 1000}});
 const engine = stage.engine, device = engine.gpu, errors = [];
 engine.onError = (e) => errors.push(String(e && e.message || e));
 const hole = BlackHole.attach(engine);
-const defaults = {spin: 0.9, accretion: 1, turbulence: 0.6, jet: 0, stars: 0, galaxy: 0, exposure: 1, view: 'beauty', prefilter: true};
+const clock = ShaderClock.attach(engine);
+const defaults = {spin: 0.9, accretion: 1, turbulence: 0.6, jet: 0, stars: 0, galaxy: 0, exposure: 1, view: 'beauty', prefilter: true, diskTime: null, diskInflow: 0.002};
 const settle = async () => { await device.queue.onSubmittedWorkDone(); };
 window.check = {
   async scene({position, target = [0, 0, 0], time = 1, ...props}) {
@@ -25,11 +23,11 @@ window.check = {
     // 20 s to translate on the WebGL2 compatibility layer here). Then, on the real clock so its timeout runs, until
     // every other pipeline has compiled and a frame was drawn with all of them (scripts/support/gpu-ready.js); then the
     // one frame at the scene's clock.
-    clock = null;
     engine.render(); await settle();
     await hole.raw.ready();
     await waitForPipelines(async () => { engine.render(); await settle(); });
-    clock = time;
+    clock.resetTime();
+    clock.advanceTime(time);
     engine.render(); await settle();
     return {errors: [...errors]};
   },

@@ -147,6 +147,25 @@ for (const [name, prefilter] of [
   results.jetBase = { peak };
 }
 
+// EVENTHORIZON-1/2/3: sample actual disk motion and pressure-weighted beaming with the same camera.
+{
+  const setup = { position: [-0.55, 0.95, 11.8], target: [0, -0.05, 0], turbulence: 0.65, time: 1 };
+  const darkDiff = (a, b) => a.lum.reduce((count, value, i) => count + Number(Math.abs(value - b.lum[i]) > 1), 0);
+  const exactDiff = (a, b) => a.lum.reduce((count, value, i) => count + Number(value !== b.lum[i]), 0);
+  const still = await frame({ ...setup, view: 'beaming', diskTime: 1 });
+  const moved = await frame({ ...setup, view: 'beaming', diskTime: 1.5 });
+  const repeated = await frame({ ...setup, view: 'beaming', diskTime: 1, time: 3 });
+  const following = await frame({ ...setup, view: 'beaming', time: 1.5 });
+  const rotating = await frame({ ...setup, view: 'beauty', diskTime: 3, diskInflow: 0 });
+  const drifting = await frame({ ...setup, view: 'beauty', diskTime: 3, diskInflow: 0.01 });
+  results.orbit = {
+    moved: darkDiff(still, moved),
+    replay: exactDiff(still, repeated),
+    following: exactDiff(moved, following),
+    drift: darkDiff(rotating, drifting),
+  };
+}
+
 console.log(JSON.stringify(results));
 await context.close();
 assert.deepEqual(pageErrors, []);
@@ -171,5 +190,9 @@ if (!report) {
     results.disk.ratio < 1.25 && results.disk.ratio > 0.8,
     `disk: fine detail changed over time (${results.disk.ratio})`,
   );
+  assert.ok(results.orbit.moved >= 16, `disk beaming texture froze (${results.orbit.moved} moved pixels)`);
+  assert.equal(results.orbit.replay, 0, 'disk replay uses the provided clock');
+  assert.equal(results.orbit.following, 0, 'default playback follows the engine shader clock');
+  assert.ok(results.orbit.drift >= 16, `disk radial flow had no visible effect (${results.orbit.drift} moved pixels)`);
   console.log('ok black hole: camera frame, round stars, jet side on, disk detail over time');
 }

@@ -12354,6 +12354,44 @@ The load point in the step is this package's own: a restoring load -k x taken at
 step of s symplectic-Euler substeps, has the update's determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), so
 theta = (s - 1) / (2 s) neither feeds nor drains the motion; the radiation force is carried there linearly.
 
+## N-body and orbital dynamics (SPACE-01)
+
+- Ernst Hairer, Christian Lubich and Gerhard Wanner, [Geometric Numerical Integration](https://doi.org/10.1007/3-540-30666-8)
+  (2006), and their [Acta Numerica Störmer–Verlet paper](https://www.math.mcgill.ca/gantumur/docs/down/gniverlet.pdf)
+  (2003), §§1–3. The kernel computes each unordered Newton pair once and applies equal and opposite forces.
+  Two half velocity kicks use acceleration at either end of the position drift. Haruo Yoshida,
+  [Construction of higher order symplectic integrators](https://doi.org/10.1016/0375-9601(90)90092-3) (1990),
+  equations 4.4–4.6, composes three such steps. Their time factors are `1 / (2 - 2^(1/3))` for the outer
+  steps and `-2^(1/3) / (2 - 2^(1/3))` for the middle step. Gravity uses fixed-order SIMD in the orbital
+  plane and scalar arithmetic in z, with the CODATA 2022 value of G from [NIST](https://physics.nist.gov/cuu/pdf/wall_2022.pdf).
+- Jack Wisdom and Matthew Holman, [Symplectic maps for the N-body problem](https://web.mit.edu/wisdom/www/nbodymap.pdf)
+  (1991), demonstrate Kepler splitting for a dominant central mass. Hanno Rein and David Spiegel,
+  [IAS15](https://arxiv.org/abs/1409.4779) (2015), §2, use adaptive high-order quadrature for close encounters.
+  The engine's general Cartesian layout uses the position-dependent symmetric split so no central hierarchy
+  is required. It exposes fixed subdivisions. An ideal bound orbit uses the eccentric anomaly bracket
+  `M ± e` and rotates the standard perifocal position and velocity into the requested inertial plane.
+- NASA Jet Propulsion Laboratory, [Fundamentals of Orbital Mechanics](https://spsweb.fltops.jpl.nasa.gov/portaldataops/mpg/MPG_Docs/MPG%20Book/Release/Chapter7-OrbitalMechanics.pdf),
+  Chapter 7 on conics, zonal gravity and drag. The orbit model differentiates the J2 term of the axial potential
+  and reacts the correction on its source body. Atmospheric drag uses the stated `-ρ Cd A |v| v / 2` force
+  with atmosphere-relative velocity. At fixed density its relative velocity has the exact rational decay
+  `1 / (1 + ρ Cd A |v| dt / (2m))`. A half drag step on each side of conservative transport keeps air resistance
+  dissipative through the positive-duration part of the update. David Vallado, Paul Crawford, Richard Hujsak and
+  T. S. Kelso, [Revisiting Spacetrack Report #3](https://celestrak.org/publications/AIAA/2006-6753/) (2006),
+  establishes the independent SGP4 mean-element path which remains in `sciviz/geo`.
+- J. M. Bardeen, W. H. Press and S. A. Teukolsky, [Rotating Black Holes](https://www.osti.gov/biblio/4585183)
+  (1972), give circular angular velocity `1 / (r^(3/2) + a)` in geometric units. J. E. Pringle,
+  [Accretion Discs in Astrophysics](https://courses.physics.ucsd.edu/2020/Winter/physics116/Pringle_%20Accretion%20Disks.pdf)
+  (1981), describes advective radial transport in a thin disk. The emitter model holds a prescribed radial
+  velocity over a texture phase. With radius varying linearly, the zero-spin integral of angular velocity
+  rationalizes to `2 t / (√r0 √r1 (√r0 + √r1))`. For spinning disks the renderer applies two-point
+  Gauss–Legendre to the Kerr angular velocity along that path. Doppler hue follows the existing observer
+  redshift, and local emission modulates beaming brightness as the texture moves through the flow.
+
+The binary test checks fourth-order step refinement and barycentre symmetry. Other tests check a quadrupole
+orbit, exact constant-density drag, inclined Kepler states, the disk phase, and equal hashes after restore
+and across shared and plain SIMD builds. The shader tests exercise the Event Horizon observations against
+real pixel readback at a fixed camera in addition to the CPU orbit checks.
+
 ## Underwater acoustics (SOUND-03)
 
 - Finn B. Jensen, William A. Kuperman, Michael B. Porter and Henrik Schmidt, [Computational Ocean Acoustics](https://doi.org/10.1007/978-1-4419-8678-8),

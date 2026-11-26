@@ -1306,7 +1306,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,136 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,140 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -11779,6 +11779,24 @@ clearance kernel 6.3 to 7.2 s, lightmap's bake 6.7 s, sciviz's mapped volume 11.
 Near a capture edge, the filter and distortion determine the width of the transition.
 Reflected objects beyond the captured extent are unavailable to the planar adapter.
 
+## Orbital mechanics and disk motion (SPACE-01)
+
+The simulator uses a single inertial Cartesian frame for all bodies. Direct pair gravity costs O(n²) per
+force evaluation. Use fixed steps small relative to close-approach and orbital timescales. Optional Plummer
+softening changes the near-field force. A positive J2 models one body's axial figure. The exponential atmosphere
+is a prescribed rotating background with dissipative drag, so its combined integrator is second order.
+It models atmospheric deceleration without heating, ablation, aerodynamic lift, surface contact or a mission
+atmosphere. The Cartesian solver uses Newtonian gravity and provides a bound-ellipse helper. Catalog orbit
+elements continue to use the SGP4 entry.
+
+The lensed disk uses circular Kerr angular velocity and a prescribed radial drift. The angular integral is exact
+for zero spin and a two-point quadrature for spinning disks. The model covers slow radial drift of the emitter
+texture. Full relativistic gas dynamics, disk thickness and angular momentum transport are separate work.
+
+The orbit JS entry measures 4,017 B gzip against 4,273 B. Its optional plain and shared Rust Wasm assets
+measure 2,380 B and 2,435 B gzip. The black-hole entry grows from 25,293 B to 25,814 B within its 26,010 B
+budget. Core and stage together measure 24,820 B.
+
 ## Underwater acoustics (SOUND-03)
 
 The medium is stationary with sound speed varying only with depth. Each ray and beam propagate in a
@@ -12186,6 +12204,18 @@ The optional falling entry measures 6,259 B min+gzip. Each lazy Wasm build is 10
 4,273 B gzip. The Hail overlay measures 5,443 B and its optional world adapter 1,056 B min+gzip.
 Core and stage remain at 24,820 B min+gzip combined.
 
+### Sediment transport and bed change (HYDRO-03, 2026-11-25)
+
+`@margoengine/physics/sediment` works on one co-located rectangular TerrainBed and shallow-water grid. It uses a
+representative bed diameter and a representative suspended diameter for dilute transport. The bank model uses
+local near-bank velocity relative to the wet reach mean with user-supplied erodibility and optional root stress.
+The vertex reserve covers the mobile layer the caller declares. Set it to the bedrock clearance when TerrainBed
+has a floor. Fluid momentum and bed evolution exchange one field update per world tick. An open boundary exports
+sediment; external inflow at that edge carries clear water. Use the source grid's same rectangle for Flood tint.
+
+The optional sediment entry measures 5,256 B min+gzip. The plain and shared SIMD Wasm files are 12,483 B and
+12,571 B before HTTP compression. The Flood entry measures 14,457 B min+gzip with the concentration upload.
+
 === Known bugs and unverified features (docs/known-bugs.md) ===
 
 # Known bugs and unverified features
@@ -12196,12 +12226,29 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-25 Open-channel and flood models had no link to changing sediment beds (HYDRO-03)
+
+The shallow-water field now drives suspended load, bedload and bank exchange. The production TerrainBed
+receives conservative elevation changes, and the same concentration controls the Flood tint.
+`packages/physics/tests/coupling/sediment.test.js` compares a moving and a fixed bed and verifies solid
+mass. `packages/water/test/sediment-source.browser.mjs` verifies the rendering link. Flood-body
+feedback, debris impact and dam breach still have their own work-queue rows.
+
 ### Open 2026-11-25 RITS-10 atmospheric-river scene still needs its watershed inputs wired
 
 - **Repro** Re-render RITS-10 at 7:55–8:20 and 9:48–10:15 and check the terrain, streams and valley floor.
 - **Cause** The original scene has no connected precipitation → catchment → flood solver inputs. The engine fixture
   routes rain and melt, checks water volume in the flood and reads the resulting inundation into Biomes. The demo review
   remains open until the scene consumes those fields and flood depth appears in the shot.
+
+### Fixed 2026-11-25 orbital dynamics and Event Horizon's stationary beaming (SPACE-01)
+
+The orbital catalog had mean-element satellite propagation and lacked a world-stepped N-body solver. The
+Event Horizon beaming view sampled redshift and discarded the moving emission magnitude. Its real-adapter
+fixture also drove wall-clock time while the raw shader reads the engine's shader clock.
+`packages/physics/tests/orbit.test.js` checks the new conservative and atmospheric dynamics.
+`packages/shader/test/black-hole-check.mjs` uses the actual shader clock and checks moving emission,
+repeatable explicit disk time and inward advection. The live demo uses the same clock for flare timing.
 
 ### Fixed 2026-11-25 underwater sound lacked depth refraction and water-column arrivals (SOUND-03)
 
@@ -34355,29 +34402,36 @@ engine.start(); // each frame's delta drives the accumulator
 // On teardown: physics.dispose(), engine.removePlugin('physics') or engine.dispose().
 ```
 
-## Rainfall runoff and channel inflow
+## Sediment transport and bed change
 
-`@margoengine/physics/runoff` turns rain and snowmelt into soil water, groundwater recharge and routed
-discharge. It integrates the Green-Ampt wetting front, handles saturation on a wetness-index grid, and
-routes excess water downstream using the implicit kinematic-wave balance.
+`@margoengine/physics/sediment` reads shallow-water depth and discharge and routes suspended and bedload sediment.
+It contributes the Exner elevation change to the same TerrainBed. Water then runs over the updated surface.
 
 ```ts
-import { bedSurface } from '@margoengine/physics/earth';
+import { TerrainBed } from '@margoengine/physics/earth';
 import { ShallowWaterSolver } from '@margoengine/physics/hydro';
-import { RainfallRunoff } from '@margoengine/physics/runoff';
+import { SedimentTransport } from '@margoengine/physics/sediment';
 import { PhysicsWorld } from '@margoengine/physics/world';
 
-const runoff = await RainfallRunoff.load();
-const flood = new ShallowWaterSolver('valley', {
-  field: runoff.outletField,
-  outlets: [{ sourceCell: 2, position: [5, 5] }],
-});
-const bed = bedSurface({ columns: 2, rows: 1, width: 20, depth: 10, centre: [10, 5] }, new Float64Array(6));
+const grid = { columns: 4, rows: 2, width: 16, depth: 8, centre: [8, 4] as const };
+const terrain = new TerrainBed();
+const sediment = await SedimentTransport.load();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } });
-world.add(runoff, { nx: 3, nz: 1, dx: 10, downstream: [1, 2, -1], rainRate: 0.0001 });
-world.add(flood, { bed });
+world.add(terrain, { ...grid, elevations: () => 0 });
+world.add(new ShallowWaterSolver(), {
+  bed: terrain.bed,
+  depth: 1,
+  velocity: () => [1, 0],
+  sides: { maxX: 'open' },
+});
+world.add(sediment, {
+  grid,
+  mobileDepth: 0.1,
+  grainDiameter: 0.0003,
+  open: { maxX: true },
+});
 world.advance(120);
-console.log(runoff.read(2, 0).outflow, runoff.budget, flood.budget.inflow);
+console.log(sediment.read(1, 0), sediment.budget, terrain.volume());
 ```
 
 [README continues: https://margoengine.com/llms/packages/physics.md]

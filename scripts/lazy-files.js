@@ -47,6 +47,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/orbit-kernel.wasm',
+    label: 'orbit-kernel.wasm',
+    kind: 'Rust SIMD N-body gravity and orbital drag',
+    measure: 'file',
+    when: 'OrbitSolver.load(), only from the optional /orbit entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/orbit-kernel-shared.wasm',
+    label: 'orbit-kernel-shared.wasm',
+    kind: 'Rust SIMD N-body gravity, shared world memory',
+    measure: 'file',
+    when: 'OrbitSolver.load() on a host with shared memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/runoff-kernel.wasm',
     label: 'runoff-kernel.wasm',
     kind: 'Rust SIMD catchment runoff',
