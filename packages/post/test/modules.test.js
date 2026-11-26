@@ -13,6 +13,8 @@ async function staticClosure(specifier) {
     for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*)(['"])([^'"]+)\1/g)) {
       const dependency = match[2];
       if (dependency.startsWith('.')) await visit(new URL(dependency, url).href);
+      // Math is imported, not bundled (KB-INL1): its files count toward the closure like the package's own.
+      else if (dependency.startsWith('@margoengine/math/')) await visit(import.meta.resolve(dependency));
       else
         assert.ok(
           ['@margoengine/core', '@margoengine/core/extension'].includes(dependency),

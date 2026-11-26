@@ -9,6 +9,7 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
+import { packageExternal } from '../../../scripts/support/math-external.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -38,7 +39,9 @@ await build({
       formats: ['es'],
       fileName: (_, name) => `${name}.js`,
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh'] },
+    rollupOptions: {
+      external: packageExternal(root, ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh']),
+    },
   },
 });
 // The packed EGM96 grid of the geoid entry ships beside it when it has been made (scripts/geoid/pack-egm96.mjs).

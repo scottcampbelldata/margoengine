@@ -24,6 +24,7 @@ import { acquireBuildLock } from './support/build-lock.mjs';
 import { removeStalePackageOutputs } from './support/stale-packages.mjs';
 import { DIST_DIR_ENV, STAGING_DIR, stagingDir, swapDist, tsconfigFor } from './support/dist-dir.mjs';
 import { missingPackageTargets } from './package-export-targets.mjs';
+import { withMathExternal } from './support/math-external.mjs';
 import { SIZES_FILE, sizeReport, wantsFullSizes } from './support/size-report.mjs';
 // One package build at a time in this checkout: two at once would swap their output into the same dist folders (KB-RM4).
 // Released when the process exits, whatever the outcome. Each package is built into packages/<name>/dist-next and moved
@@ -149,7 +150,8 @@ async function buildPackage(name, output) {
       target: 'es2022',
       lib: { entry, formats: ['es'], fileName: (_, entryName) => entryName + '.js' },
       rollupOptions: {
-        external: [
+        // A declared @margoengine/math stays an import, so an app holds one MargoError class (KB-INL1).
+        external: withMathExternal(manifest, [
           '@margoengine/core',
           '@margoengine/core/extension',
           '@margoengine/animation',
@@ -196,7 +198,7 @@ async function buildPackage(name, output) {
           '@margoengine/clustered/ies',
           '@margoengine/decoders/png',
           '@margoengine/decoders/image',
-        ],
+        ]),
         output: compactOutput,
       },
     },

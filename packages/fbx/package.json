@@ -88,11 +88,11 @@
     "@margoengine/exporters": "^1.0.0",
     "@margoengine/gltf": "^1.0.0",
     "@margoengine/geometry": "^1.0.0",
-    "@margoengine/loaders": "^1.0.0"
+    "@margoengine/loaders": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
   },
   "devDependencies": {
-    "@margoengine/animation": "^1.0.0",
-    "@margoengine/math": "^1.0.0"
+    "@margoengine/animation": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"

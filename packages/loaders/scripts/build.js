@@ -9,6 +9,7 @@ import { buildWorkers } from '../../../scripts/build-workers.js';
 import { packageDeclarations, packageRuntime } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
+import { packageExternal } from '../../../scripts/support/math-external.mjs';
 
 // Plain TypeScript emit: one ES module per loader, so a bundler keeps only the parsers an app imports.
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -35,7 +36,7 @@ await build({
     target: 'es2022',
     minify: false,
     lib: { entry: resolve(root, 'src/worker.ts'), formats: ['es'], fileName: () => 'worker.js' },
-    rollupOptions: { external: (id) => /^\.\/[\w-]+\.js$/.test(id) },
+    rollupOptions: { external: packageExternal(root, (id) => /^\.\/[\w-]+\.js$/.test(id)) },
   },
 });
 await rm(resolve(dist, 'usd.worker.js'));

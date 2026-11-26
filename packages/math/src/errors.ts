@@ -15,8 +15,9 @@ export type MargoErrorCode = 'disposed' | 'attached' | 'state' | 'unsupported' |
 
 /**
  * A Margo error that is not an argument error. The message names the subject, what went wrong and the fix
- * (`'Input is disposed; create a new Input'`). Each package bundles its own copy of this class, so `instanceof`
- * matches any Margo package's instance by name; do not subclass it.
+ * (`'Input is disposed; create a new Input'`). A package that declares @margoengine/math imports this class; module
+ * workers and code without math carry their own copy, so `instanceof` matches any Margo package's instance by name; do
+ * not subclass it.
  */
 export class MargoError extends Error {
   /** Machine-readable reason; see {@link MargoErrorCode}. */

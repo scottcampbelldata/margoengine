@@ -28,12 +28,14 @@ Rules:
 - A package that keeps a public name for one of these re-exports it (`export type { Vec3 } from '@margoengine/math'`),
   never redeclares it.
 - A package whose public `.d.ts` uses a math type, or that throws `MargoError`, lists `@margoengine/math` under
-  `dependencies` (consumers need it for the types). Bundling is the build script's choice: `scripts/build-optional.js`
-  keeps dependencies external (one shared copy at runtime); packages with their own build scripts (lines, points,
-  text, geometry) bundle the math helpers they use, as before. Exception: a package whose build inlines math (the
-  default `build-modern` pipeline, `build-postfx.js`, creative's script) and whose `.d.ts` uses no math type keeps math
-  under `devDependencies` (build order only; consumers never load it): post, clustered, shadows, taa, splats, creative,
-  dof, tonemap. The tonemap test pins "no `dependencies`".
+  `dependencies` (consumers need it for the types), and so does any package whose source imports math. Every build
+  keeps a declared `@margoengine/math` and its subpaths external (`scripts/build-optional.js` does so for every
+  declared dependency; `build-modern.js`, `build-postfx.js` and the packages' own build scripts through
+  `scripts/support/math-external.mjs`), so an app
+  holds one copy of math, and one `MargoError` class, however many packages it imports (KB-INL1; before 2026-11-26
+  post, shadows, taa, creative, dof, tonemap and others kept math under `devDependencies` and each bundled its own copy).
+  Module workers still bundle what they use: a worker reads no import map. `tests/no-inlined-margo-error.test.js`
+  fails on a package dist that carries the class, or a package that imports math without declaring it.
 - A private alias that shows up in a published `.d.ts` (`type Context = Extract<PassContext, {backend: 'webgpu'}>`)
   is still a declaration there: give it a package-specific name (`SkyPassContext`, `PostPassContext`, ...) rather
   than the same name in many packages. Core (frozen) cannot host a shared one.
@@ -60,8 +62,8 @@ Rules:
 | `version` | two copies of core meet: a package or plugin built against one core version is given an engine from another ([core-version-guard.md](core-version-guard.md)) |
 
 Branch on `error.code`, not on the message. Messages name the subject, the problem and the fix, in that order:
-`'Input is disposed; create a new Input'`. Packages bundle their own copy of the class, so `MargoError` matches by
-name (`static [Symbol.hasInstance]`): `error instanceof MargoError` holds for any package's copy. Do not subclass it.
+`'Input is disposed; create a new Input'`. Packages import the class from math, but module workers and
+`packages/shared` code carry their own copy, so `MargoError` matches by name (`static [Symbol.hasInstance]`): `error instanceof MargoError` holds for any package's copy. Do not subclass it.
 `@margoengine/loaders` has its own `LoaderError` (format plus code) for malformed input.
 Likewise `@margoengine/procedural/expression` throws `VoxelExpressionError` (code `syntax`, `limit` or `evaluation`, with
 the 1-based line and column) for faults in the expression text; its arguments follow the table above.

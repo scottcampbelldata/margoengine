@@ -9,6 +9,7 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
+import { withMathExternal } from '../../../scripts/support/math-external.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -34,7 +35,7 @@ await build({
     target: 'es2022',
     lib: { entry, formats: ['es'], fileName: (_, name) => name + '.js' },
     rollupOptions: {
-      external: [
+      external: withMathExternal(manifest, [
         '@margoengine/post/stack',
         '@margoengine/sky/planet',
         '@margoengine/scatter/interact',
@@ -45,7 +46,7 @@ await build({
         '@margoengine/vfx/wrap',
         '@margoengine/vfx/sort',
         '@margoengine/vfx/texture',
-      ],
+      ]),
     },
   },
 });

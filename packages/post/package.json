@@ -235,6 +235,9 @@
     "NOTICE.md",
     "NOTICE"
   ],
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "peerDependencies": {
     "@margoengine/bvh": "^1.0.0",
     "@margoengine/core": "^1.0.0"
@@ -243,8 +246,5 @@
     "@margoengine/bvh": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
   }
 }

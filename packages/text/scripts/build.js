@@ -7,6 +7,7 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
+import { packageExternal } from '../../../scripts/support/math-external.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -38,7 +39,14 @@ await build({
       },
       formats: ['es'],
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/decoders/png', '@margoengine/loaders/font-woff'] },
+    rollupOptions: {
+      external: packageExternal(root, [
+        '@margoengine/core',
+        '@margoengine/core/extension',
+        '@margoengine/decoders/png',
+        '@margoengine/loaders/font-woff',
+      ]),
+    },
   },
 });
 execFileSync(

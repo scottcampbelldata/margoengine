@@ -707,12 +707,14 @@ Rules:
 - A package that keeps a public name for one of these re-exports it (`export type { Vec3 } from '@margoengine/math'`),
   never redeclares it.
 - A package whose public `.d.ts` uses a math type, or that throws `MargoError`, lists `@margoengine/math` under
-  `dependencies` (consumers need it for the types). Bundling is the build script's choice: `scripts/build-optional.js`
-  keeps dependencies external (one shared copy at runtime); packages with their own build scripts (lines, points,
-  text, geometry) bundle the math helpers they use, as before. Exception: a package whose build inlines math (the
-  default `build-modern` pipeline, `build-postfx.js`, creative's script) and whose `.d.ts` uses no math type keeps math
-  under `devDependencies` (build order only; consumers never load it): post, clustered, shadows, taa, splats, creative,
-  dof, tonemap. The tonemap test pins "no `dependencies`".
+  `dependencies` (consumers need it for the types), and so does any package whose source imports math. Every build
+  keeps a declared `@margoengine/math` and its subpaths external (`scripts/build-optional.js` does so for every
+  declared dependency; `build-modern.js`, `build-postfx.js` and the packages' own build scripts through
+  `scripts/support/math-external.mjs`), so an app
+  holds one copy of math, and one `MargoError` class, however many packages it imports (KB-INL1; before 2026-11-26
+  post, shadows, taa, creative, dof, tonemap and others kept math under `devDependencies` and each bundled its own copy).
+  Module workers still bundle what they use: a worker reads no import map. `tests/no-inlined-margo-error.test.js`
+  fails on a package dist that carries the class, or a package that imports math without declaring it.
 - A private alias that shows up in a published `.d.ts` (`type Context = Extract<PassContext, {backend: 'webgpu'}>`)
   is still a declaration there: give it a package-specific name (`SkyPassContext`, `PostPassContext`, ...) rather
   than the same name in many packages. Core (frozen) cannot host a shared one.
@@ -739,8 +741,8 @@ Rules:
 | `version` | two copies of core meet: a package or plugin built against one core version is given an engine from another ([core-version-guard.md](core-version-guard.md)) |
 
 Branch on `error.code`, not on the message. Messages name the subject, the problem and the fix, in that order:
-`'Input is disposed; create a new Input'`. Packages bundle their own copy of the class, so `MargoError` matches by
-name (`static [Symbol.hasInstance]`): `error instanceof MargoError` holds for any package's copy. Do not subclass it.
+`'Input is disposed; create a new Input'`. Packages import the class from math, but module workers and
+`packages/shared` code carry their own copy, so `MargoError` matches by name (`static [Symbol.hasInstance]`): `error instanceof MargoError` holds for any package's copy. Do not subclass it.
 `@margoengine/loaders` has its own `LoaderError` (format plus code) for malformed input.
 Likewise `@margoengine/procedural/expression` throws `VoxelExpressionError` (code `syntax`, `limit` or `evaluation`, with
 the 1-based line and column) for faults in the expression text; its arguments follow the table above.
@@ -12276,6 +12278,16 @@ files (3ef159ec16 and 1aa72fb945, which let an app download one decoder; files c
 instead of each carrying its colour matrices and error class (-370 B; the EXR codecs worker keeps its copy, since a
 module worker reads no import map), and the web starter's `vite.config.ts` turns off Vite's `modulepreload` polyfill,
 which no browser with WebGPU needs (-268 B). It measures 84,852 B.
+
+KB-INL1 (2026-11-26): every package that imports `@margoengine/math` now declares it under `dependencies` and keeps it
+an import (`scripts/support/math-external.mjs`), where controls and shadows each bundled a copy of the `MargoError`
+class. The starter went from 85,554 B to 85,471 B (-83 B, the two class copies), measured by rebuilding every package
+on this commit and its parent (2d52025b91 plus the main commits rebased under it); core + stage stays 24,846 B. Across
+every package dist the change removes 39,384 B gzip (physics -7,330 B, usdz -5,736 B, animation -3,898 B, controls
+-2,811 B). The starter is over the bound on its parent as well; the commits that took it from 84,852 B are being
+traced apart from this one. Still inlined, because sharing them needs a public entry (Scott's call): the shared
+`margoError`/`fault` helpers of `packages/shared/errors.js` (core, environment twice, controls) and the `hypot` helper of
+`packages/shared/hypot.js` (core and shadows).
 
 The earlier bound moved from 82,000 to 83,000 B (2026-11-16) for 1,246 B of shadow and controls fixes and features, measured
 per commit by rebuilding the template's packages at each commit that touched its dependency closure (81,591 B on

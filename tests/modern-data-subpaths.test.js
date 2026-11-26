@@ -13,7 +13,10 @@ async function nativeClosure(specifier) {
     for (const match of code.matchAll(/(?:\bfrom\s*|\bimport\s*)(['"])([^'"]+)\1/g)) {
       const dependency = match[2];
       assert.ok(
-        dependency.startsWith('.') || dependency === '@margoengine/decoders/meshopt',
+        // Math is imported, not bundled (KB-INL1); its files are visited and checked like the package's own.
+        dependency.startsWith('.') ||
+          dependency === '@margoengine/decoders/meshopt' ||
+          dependency.startsWith('@margoengine/math/'),
         'Unexpected data dependency: ' + dependency,
       );
       await visit(dependency.startsWith('.') ? new URL(dependency, url).href : import.meta.resolve(dependency));

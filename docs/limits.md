@@ -7642,6 +7642,16 @@ instead of each carrying its colour matrices and error class (-370 B; the EXR co
 module worker reads no import map), and the web starter's `vite.config.ts` turns off Vite's `modulepreload` polyfill,
 which no browser with WebGPU needs (-268 B). It measures 84,852 B.
 
+KB-INL1 (2026-11-26): every package that imports `@margoengine/math` now declares it under `dependencies` and keeps it
+an import (`scripts/support/math-external.mjs`), where controls and shadows each bundled a copy of the `MargoError`
+class. The starter went from 85,554 B to 85,471 B (-83 B, the two class copies), measured by rebuilding every package
+on this commit and its parent (2d52025b91 plus the main commits rebased under it); core + stage stays 24,846 B. Across
+every package dist the change removes 39,384 B gzip (physics -7,330 B, usdz -5,736 B, animation -3,898 B, controls
+-2,811 B). The starter is over the bound on its parent as well; the commits that took it from 84,852 B are being
+traced apart from this one. Still inlined, because sharing them needs a public entry (Scott's call): the shared
+`margoError`/`fault` helpers of `packages/shared/errors.js` (core, environment twice, controls) and the `hypot` helper of
+`packages/shared/hypot.js` (core and shadows).
+
 The earlier bound moved from 82,000 to 83,000 B (2026-11-16) for 1,246 B of shadow and controls fixes and features, measured
 per commit by rebuilding the template's packages at each commit that touched its dependency closure (81,591 B on
 9de40842c5): `add(group or model root)` casts every mesh below it +570 B (c0667a30ae; the group walk sits in the

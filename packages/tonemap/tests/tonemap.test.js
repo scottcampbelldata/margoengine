@@ -143,7 +143,8 @@ test('optional manifests preserve the frozen core peer contract and tree shaking
   for (const name of ['dof', 'tonemap']) {
     const pkg = JSON.parse(readFileSync(new URL(`../../${name}/package.json`, import.meta.url), 'utf8'));
     assert.deepEqual(pkg.peerDependencies, { '@margoengine/core': `^${pkg.version}` });
-    assert.equal(pkg.dependencies, undefined);
+    // Math only, imported rather than bundled, so the app holds one MargoError class (KB-INL1); never core.
+    assert.deepEqual(pkg.dependencies, { '@margoengine/math': `^${pkg.version}` });
     assert.equal(pkg.sideEffects, false);
     const code = readFileSync(new URL(`../../${name}/dist/index.js`, import.meta.url), 'utf8');
     assert.match(code, /@margoengine\/core\/extension/);

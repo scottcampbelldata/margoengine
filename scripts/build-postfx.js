@@ -9,6 +9,7 @@ import { build } from 'vite';
 import { packageDeclarations } from './package-declarations.js';
 import { copyLegal } from './package-legal.js';
 import { distDir, tsconfigFor } from './support/dist-dir.mjs';
+import { withMathExternal } from './support/math-external.mjs';
 
 const name = process.argv[2];
 assert.ok(['dof', 'tonemap'].includes(name), 'Expected dof or tonemap');
@@ -34,7 +35,7 @@ await build({
     emptyOutDir: true,
     target: 'es2022',
     lib: { entry: entries, formats: ['es'], fileName: (_format, module) => module + '.js' },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension'] },
+    rollupOptions: { external: withMathExternal(manifest, ['@margoengine/core', '@margoengine/core/extension']) },
   },
 });
 execFileSync(

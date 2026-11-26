@@ -7,6 +7,7 @@ import { build } from 'vite';
 import { packageDeclarations } from '../../../scripts/package-declarations.js';
 import { copyLegal } from '../../../scripts/package-legal.js';
 import { distDir, tsconfigFor } from '../../../scripts/support/dist-dir.mjs';
+import { packageExternal } from '../../../scripts/support/math-external.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const repository = resolve(root, '../..');
@@ -24,15 +25,31 @@ await build({
     target: 'es2022',
     lib: {
       entry: Object.fromEntries(
-        ['index', 'las', 'laz', 'e57', 'octree', 'copc', 'surfels', 'potree', 'pick', 'clip', 'style', 'depth-video'].map((name) => [
-          name,
-          resolve(root, `src/${name}.ts`),
-        ]),
+        [
+          'index',
+          'las',
+          'laz',
+          'e57',
+          'octree',
+          'copc',
+          'surfels',
+          'potree',
+          'pick',
+          'clip',
+          'style',
+          'depth-video',
+        ].map((name) => [name, resolve(root, `src/${name}.ts`)]),
       ),
       formats: ['es'],
       fileName: (_format, name) => `${name}.js`,
     },
-    rollupOptions: { external: ['@margoengine/core', '@margoengine/core/extension', '@margoengine/decoders/brotli'] },
+    rollupOptions: {
+      external: packageExternal(root, [
+        '@margoengine/core',
+        '@margoengine/core/extension',
+        '@margoengine/decoders/brotli',
+      ]),
+    },
   },
 });
 execFileSync(

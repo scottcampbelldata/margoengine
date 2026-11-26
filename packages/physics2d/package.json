@@ -47,12 +47,10 @@
     "NOTICE"
   ],
   "dependencies": {
-    "@margoengine/geometry": "^1.0.0"
+    "@margoengine/geometry": "^1.0.0",
+    "@margoengine/math": "^1.0.0"
   },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0"
-  },
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
   }
 }

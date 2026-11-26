@@ -88,6 +88,9 @@
     "dist",
     "NOTICE"
   ],
+  "dependencies": {
+    "@margoengine/math": "^1.0.0"
+  },
   "peerDependencies": {
     "@margoengine/core": "^1.0.0",
     "@margoengine/animation": "^1.0.0",
@@ -98,8 +101,5 @@
     "@margoengine/splines": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@margoengine/math": "^1.0.0"
   }
 }
