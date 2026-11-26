@@ -322,6 +322,59 @@ test('an oblique interior incision has conforming shared facets across a volume 
   bound(stitchedAreaTwice, 2 * twiceArea(blade), 1);
 });
 
+test('pure opening extends a prescribed finite crack through the bonded material in its plane', async () => {
+  const desc = tetrahedron().setPinnedParticles([0, 1, 2, 3]).setTensileNucleation(0.01);
+  const blade = [
+    [0.5, 0.25, 0.25],
+    [0.5, 0.625, 0.25],
+    [0.5, 0.25, 0.625],
+  ];
+  const prepare = async () => {
+    const { soft, body, world } = await specimen(desc);
+    const [piece] = soft.cutTriangle(body, blade).pieces;
+    const events = [];
+    soft.onTear((event) => events.push(event));
+    world.advance(1);
+    assert.equal(events.length, 0, 'the intact ligament holds under zero load');
+    return { soft, world, piece, events };
+  };
+  const area = (bodies, plane) =>
+    bodies.reduce((sum, body) => {
+      const triangles = body.triangles();
+      for (let i = 0; i < triangles.length; i += 3) {
+        const [p, q, r] = [...triangles.subarray(i, i + 3)].map((slot) => body.particlePosition(slot));
+        if ([p, q, r].every(([x]) => Math.abs(x - plane) < 4 * epsilon32))
+          sum += Math.abs((q[1] - p[1]) * (r[2] - p[2]) - (r[1] - p[1]) * (q[2] - p[2])) / 2;
+      }
+      return sum;
+    }, 0);
+  const [control, replay] = await Promise.all([prepare(), prepare()]);
+  const span = 0.625 - 0.25;
+  bound(area([control.piece], 0.5), span ** 2, 1);
+  const { first, count } = control.piece.cellRange;
+  const initial = control.soft.cellColumns().flags.slice(first, first + count);
+  assert.ok(
+    initial.some((flags) => flags & (63 << 6)),
+    'the blade seeds a bonded front',
+  );
+  replay.world.restoreSnapshot(control.world.takeSnapshot().bytes);
+  for (const { piece, world, events } of [control, replay]) {
+    for (let p = 0; p < piece.particles; p++) {
+      const [x, y, z] = piece.particlePosition(p);
+      piece.setParticleKinematicTarget(p, [x * 1.25, y, z]);
+    }
+    world.advance(2);
+    assert.equal(events.length, 1);
+    assert.ok(initial[events[0].cells[0]] & (63 << 6), 'the load extends a seeded edge before nucleating elsewhere');
+    const [kept] = events[0].pieces;
+    closed(kept);
+    // The new triangle crosses half the ligament from y+z = 7/8 to y+z = 3/2.
+    const addedTwoSidedArea = (span * (1.5 - 0.875)) / 2;
+    bound(area(events[0].pieces, 0.625), span ** 2 + addedTwoSidedArea, 1);
+  }
+  assert.equal(replay.world.hash(), control.world.hash());
+});
+
 test('a finite blade that misses the solid leaves all state alone', async () => {
   const { world, soft, body } = await specimen(tetrahedron());
   const before = world.hash();

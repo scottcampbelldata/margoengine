@@ -2,7 +2,7 @@
 // and each fragment's share of the original nodal mass and momentum.
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
-import { type SliceCell, type SlicePlan, type SlicePoint, TETRA_EDGES } from './soft-plane-cut.js';
+import { faceKey, type SliceCell, type SlicePlan, type SlicePoint, TETRA_EDGES } from './soft-plane-cut.js';
 import { carryCutSurface, type SoftDestination, type SoftSplit } from './soft-split.js';
 import { CRACK_FRONT_MASK, CRACK_FRONT_SHIFT, NUCLEATED_CELL } from './soft-tensile-seam.js';
 import { MIN_TET_DETERMINANT, tetDeterminant } from './soft-volume.js';
@@ -57,7 +57,7 @@ function cutFrontFlags(plan: SlicePlan, cell: SliceCell, oldCells: Uint32Array, 
   TETRA_EDGES.forEach(([a, b], i) => {
     const u = points[cell.nodes[a]]!;
     const v = points[cell.nodes[b]]!;
-    const fresh = crackFront?.get(u)?.has(v) || crackFront?.get(v)?.has(u);
+    const fresh = crackFront?.has(faceKey([cell.nodes[a], cell.nodes[b]]));
     if (fresh || previousEdges.some(([a, b]) => belongs(u, at(a), at(b)) && belongs(v, at(a), at(b))))
       transferred |= 1 << (CRACK_FRONT_SHIFT + i);
   });

@@ -103,6 +103,12 @@ first: each names its scope, its evidence file and how to reproduce it.
   Restoring a snapshot at the old front reproduces the next state's hash. Run
   `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Prescribed front seeding (SOFT-04, 2026-11-26). A finite blade gives the native solver
+  a bonded edge on the actual lips. Under prescribed pure opening, the test specimen
+  gains 0.1171875 square metres of two-sided crack area on the same plane, and restoration
+  from the unloaded incised state reproduces the final hash. Run
+  `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Load-driven tensile fracture (SOFT-04, 2026-11-26). A 35 kg rigid boot initiates a tensile
   crack on step 4 with a measured 122.86 N boot reaction. At step 18 the fixture has advanced
   15 fracture events and both renderers replay state hash `67aefc4a2ce1fed7`. Every marked

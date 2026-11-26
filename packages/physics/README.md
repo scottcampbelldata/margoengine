@@ -827,6 +827,8 @@ current principal stretch. The cell's material can continue deforming after it b
 The remesher splits just that cell and the neighboring faces and edges it touches.
 Under continued tension, an adjacent eligible cell can extend the crack from its current
 front edge. The old segment stops participating once its two lips separate.
+To prescribe where the crack starts, use `soft.cutTriangle(solid, blade)` on a solid with
+nucleation enabled. A bonded lip edge becomes eligible for continued tensile growth.
 The fracture step chooses a cut that fits the native mesh's precision.
 Nucleation is off by default. Pass `null` to clear the option on the descriptor.
 

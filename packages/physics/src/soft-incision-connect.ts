@@ -22,7 +22,8 @@ export function incisionPieces(
   cells: readonly SliceCell[],
   points: SlicePoint[],
   severed: ReadonlySet<string>,
-): SliceCell[][] {
+  trackFront?: true | ReadonlySet<string>,
+): { pieces: SliceCell[][]; crackFront: ReadonlySet<string> | undefined } {
   const bodies = disjointSets(cells.length);
   const corners = disjointSets(4 * cells.length);
   const awaiting = new Map<string, number>();
@@ -43,6 +44,8 @@ export function incisionPieces(
   const firstGroup = new Map<number, number>();
   const aliases = new Map<number, number>();
   const pieces = new Map<number, SliceCell[]>();
+  const lipFaces = trackFront && new Map<string, number[]>();
+  const crackFront = trackFront && new Set<string>();
   cells.forEach((cell, i) => {
     const nodes = cell.nodes.map((point, slot) => {
       const root = corners.find(4 * i + slot);
@@ -58,6 +61,25 @@ export function incisionPieces(
     const piece = pieces.get(root) ?? [];
     piece.push({ ...cell, nodes });
     pieces.set(root, piece);
+    if (lipFaces && crackFront) {
+      for (const face of FACES) {
+        const key = faceKey(face.map((slot) => cell.nodes[slot]));
+        if (!severed.has(key)) continue;
+        const lip = face.map((slot) => nodes[slot]);
+        const previous = lipFaces.get(key);
+        if (!previous) {
+          lipFaces.set(key, lip);
+          continue;
+        }
+        // The open faces retain exactly the two shared particles at a bonded front.
+        const shared = face.filter((slot) => previous.includes(nodes[slot]));
+        if (
+          shared.length === 2 &&
+          (trackFront === true || trackFront?.has(faceKey(shared.map((slot) => cell.nodes[slot]))))
+        )
+          crackFront.add(faceKey(shared.map((slot) => nodes[slot])));
+      }
+    }
   });
-  return [...pieces.values()];
+  return { pieces: [...pieces.values()], crackFront };
 }

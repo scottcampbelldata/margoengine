@@ -5244,7 +5244,8 @@ export class SoftBodies implements PhysicsAttachment {
     if (!Array.isArray(blade) || blade.length !== 3)
       throw new RangeError('A finite blade needs three points. Supply the corners of one world-space triangle.');
     for (const point of blade) checkVec(point, 'Blade point');
-    const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade));
+    const trackFront = body.tensileNucleation === null ? undefined : true;
+    const split = this.splitGeometrically(body, (current, cells) => planTriangleCut(current, cells, blade, trackFront));
     return this.announce(body, [], [], split);
   }
 

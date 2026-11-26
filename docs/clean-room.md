@@ -187,6 +187,13 @@ crack direction under stress-intensity loading. The implemented rule uses tensil
 [Graphical Modeling and Animation of Brittle Fracture](https://arxiv.org/pdf/2303.02934)
 [On the Crack Extension in Plates Under Plane Loading and Transverse Shear](https://doi.org/10.1115/1.3656897).
 
+Sifakis, Der and Fedkiw (2007), §4, use the connectivity of released material to
+represent incompletely separated incisions. For prescribed finite cuts, Margo pairs
+the two triangles with the same pre-release material face after assigning the new
+particle identities. Exactly two common particles identify a bonded lip edge. This
+avoids interpreting an exposed edge on a fully separated fragment as a front.
+[Arbitrary Cutting of Deformable Tetrahedralized Objects](https://physbam.stanford.edu/papers/stanford2007-04.pdf).
+
 Shewchuk's 1997 work on robust geometric predicates motivates checking the determinant
 in the coordinates that the native kernel will hold. An automatic crack is eligible only
 when the replacement has representable f32 vertex positions, affine rest bases and nodal masses.

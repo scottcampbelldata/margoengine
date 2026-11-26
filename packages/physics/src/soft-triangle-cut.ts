@@ -222,6 +222,7 @@ export function planTriangleCut(
   current: Float32Array,
   cells: Uint32Array,
   blade: readonly [Vec3, Vec3, Vec3],
+  trackFront?: true,
 ): SlicePlan | null {
   const normal = cross(subtract(blade[1], blade[0]), subtract(blade[2], blade[0]));
   const scale = Math.max(...normal.map(Math.abs));
@@ -237,7 +238,7 @@ export function planTriangleCut(
       normal: cross(n, subtract(blade[(i + 1) % 3]!, blade[i])),
     })),
   ];
-  return planIncision(current, cells, planes);
+  return planIncision(current, cells, planes, trackFront);
 }
 
 /** Release the entire section through the nominated material tetrahedron. */
@@ -306,21 +307,16 @@ export function planNucleatedCut(
     if (triangles.length === 4) children.push({ parent, nodes: tet, inverse: null, fraction: 1 });
     else addCones(children, geometry, parent, tet, triangles);
   }
-  const crackFront = new Map<SlicePoint, Set<SlicePoint>>();
+  const nextFront = new Set<string>();
   for (const { face, joined } of shared.values()) {
     if (!joined || halves.some((half) => !geometry.hasArea(half[face]!))) continue;
     const section = halves[0]![face]!.filter(onPlane);
     if (section.length !== 2) continue;
-    const a = geometry.points[section[0]!]!;
-    const b = geometry.points[section[1]!]!;
-    const following = crackFront.get(a) ?? new Set<SlicePoint>();
-    following.add(b);
-    crackFront.set(a, following);
+    nextFront.add(faceKey(section));
   }
   return {
     points: geometry.points,
-    pieces: incisionPieces(children, geometry.points, severed),
-    crackFront,
+    ...incisionPieces(children, geometry.points, severed, nextFront.size > 0 ? nextFront : undefined),
     releasedFront,
   };
 }
@@ -336,7 +332,12 @@ function addCones(
   for (const face of triangles) result.push(childCell(parent, tet, [centre, ...face], geometry.points));
 }
 
-function planIncision(current: Float32Array, cells: Uint32Array, planes: readonly Plane[]): SlicePlan | null {
+function planIncision(
+  current: Float32Array,
+  cells: Uint32Array,
+  planes: readonly Plane[],
+  trackFront?: true,
+): SlicePlan | null {
   const g = new IncisionGeometry(current, planes);
   const { origin, normal } = planes[0]!;
   const d = cutDistances(current, origin, normal);
@@ -433,5 +434,5 @@ function planIncision(current: Float32Array, cells: Uint32Array, planes: readonl
       addCones(children, g, parent, tet, triangles);
     }
   });
-  return { points: g.points, pieces: incisionPieces(children, g.points, severed) };
+  return { points: g.points, ...incisionPieces(children, g.points, severed, trackFront) };
 }

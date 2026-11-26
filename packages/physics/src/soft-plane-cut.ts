@@ -27,7 +27,7 @@ export interface SliceCell {
 export interface SlicePlan {
   readonly points: readonly SlicePoint[];
   readonly pieces: readonly SliceCell[][];
-  readonly crackFront?: ReadonlyMap<SlicePoint, ReadonlySet<SlicePoint>>;
+  readonly crackFront?: ReadonlySet<string>;
   /** Original particle IDs of the front segment opened by this advance. */
   readonly releasedFront?: readonly [number, number];
 }
