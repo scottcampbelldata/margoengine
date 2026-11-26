@@ -47,6 +47,28 @@ export interface CrushPatchState {
     readonly impacts: number;
 }
 
+export interface CrushPlate {
+    readonly length: number;
+    readonly width: number;
+    readonly thickness: number;
+    readonly young: number;
+    readonly poisson?: number;
+    readonly initialCrest?: number;
+}
+
+export interface CrushPlateResponse {
+    readonly criticalForce: number;
+    readonly force: number;
+    readonly halfWaves: number;
+    readonly crest: number;
+    readonly surface?: CrushPlateSurface;
+}
+
+export interface CrushPlateSurface {
+    readonly positions: Float64Array;
+    readonly normals: Float64Array;
+}
+
 export interface CrushResult {
     readonly incidentEnergy: number;
     readonly absorbedEnergy: number;
@@ -126,6 +148,8 @@ export function resolveCrush(material: CrushMaterial, effectiveMass: number, clo
 export function resolveCrushStroke(material: CrushMaterial, totalStroke: number, permanentStroke?: number): CrushStrokeResult;
 
 export function resolveGirder(fibers: readonly GirderFiber[], curvature: number, { axialForce, previousStrain }?: GirderLoading): GirderResponse | undefined;
+
+export function resolvePlateBuckling(plate: CrushPlate, shortening: number, rest?: ArrayLike<number>): CrushPlateResponse;
 
 export function squareTubeCrushMaterial(tube: SquareCrushTube): Required<CrushMaterial>;
 

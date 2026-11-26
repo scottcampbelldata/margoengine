@@ -9547,7 +9547,13 @@ The Smith-method section balances plate and stiffener axial forces and evaluates
 curvature. It follows authored load-shortening curves and needs the prior reference strain to select among
 multiple stable branches. It reports 153.6 MN·m² for the independently measured N200 box-girder elastic
 reloading case, with an observed 140–160 MN·m² band. The section uses a sectional constitutive envelope.
-Computed shell buckling curves, cyclic unloading and dynamic hull deformation remain open.
+Cyclic unloading and dynamic hull deformation remain open.
+
+The supported rectangular plate resolves the first elastic buckling mode and returns a sampled deformed
+surface. Three early measured loads for Stein’s five-half-wave bay agree within 0.02 on the normalized load axis. The supports stay
+straight in-plane and free of in-plane shear. High deflection, mode switching, post-yield rupture and
+full hull shell coupling remain open. The fixture renders an 8.48 mm crest with the sampled normals on
+native WebGPU and the WebGL2 compatibility layer.
 
 Station-level input curves represent creased plating, rail absorbers, or road crumple members. Each station resolves a normal load-release event during one 60 Hz coupling interval. Peak compression is a ledger and pose input, while the rigid integrator receives its net impulse. Use distinct contact pairs and exclude their ordinary rigid response during the crush event. A separately coupled seakeeping hull keeps its water loads, and dynamic added mass during the short crush event needs an effective-inertia port. A linked compartment aperture opens at full seal loss from the authored stroke threshold. The aperture has its authored rectangle and discharge coefficient. It supplies inflow and carried mass through SEA-10. Opening geometry from a distributed structural rupture remains open. With compartments, hull snapshots include inertial history for any carried floodwater even when exterior added mass is disabled. The optional crush entry measures 14450 B minified and 6094 B gzip under its 6350 B ceiling. The optional seakeeping entry measures 67934 B minified and 26195 B gzip under its 26271 B ceiling. Core and Stage gain zero bytes.
 

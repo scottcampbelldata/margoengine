@@ -15102,6 +15102,28 @@ relaxed elastic cycles have a 140–160 MN·m² observed band in Fig. 12. The tw
 for this elastic comparison. The ultimate moments and loading cycles remain separate validation targets.
 [Gordo and Guedes Soares (2014)](https://doi.org/10.1016/j.marstruc.2014.03.003)
 
+Manuel Stein, “Loads and Deformations of Buckled Rectangular Plates” (1959), NASA TR R-40, Eqs. 1–3
+and Fig. 1, gives the von Kármán plate equations and longitudinal mode selection. Pai C. Hu, Eugene
+E. Lundquist and S. B. Batdorf, “Effect of Small Deviations from Flatness on Effective Width and
+Buckling of Plates in Compression” (1946), Appendix, uses the stress-free initial curvature in
+the nonlinear strain terms. The first-mode displacement is `a sin(αx) sin(βy)`, `α = mπ/L`, `β = π/B`.
+The Airy compatibility equation has a forcing proportional to `α²β²(a² − a₀²)(cos 2αx + cos 2βy)`.
+Projection of the membrane force onto the first mode gives `σ/E = εcr(1 − a₀/a) + K(a² − a₀²)`,
+with `εcr = t²(α² + β²)²/[12(1 − ν²)α²]` and `K = (α⁴ + β⁴)/(16α²)`. The imposed shortening strain
+adds the mean geometric term `α²(a² − a₀²)/8`. The positive-amplitude solution is monotone if
+there is an initial crest. Its sign follows the authored imperfection. Surface normals use derivatives
+with respect to the shortened x and y coordinates, and all four support edges have zero out-of-plane motion.
+[Stein (1959)](https://ntrs.nasa.gov/citations/19980235521)
+[Hu, Lundquist and Batdorf (1946)](https://ntrs.nasa.gov/citations/19930081796)
+
+Stein’s Appendix gives a 25.36 in by 4.71 in by 0.072 in plate bay in a knife-edge fixture. The first
+three early postbuckling comparison points come from the experimental trace in Fig. 3 before secondary
+mode changes. At nondimensional shortenings 1.25, 1.50 and 1.75, the measured loads are approximately
+1.13, 1.27 and 1.42. Calculated loads are 1.137, 1.272 and 1.407, with five longitudinal half-waves.
+The test uses the held-out measured line and derives the model from the elastic equations. The 0.02
+dimensionless load band covers line thickness and rounding when reading the printed axes. The measured trace extends into plasticity
+and changes to six, seven and eight half-waves. Those regimes are outside this first-mode model.
+
 ## Thin liquid films on moving surfaces (FLUID-07)
 
 - Alexander Oron, Stephen H. Davis and S. George Bankoff, “Long-scale evolution of thin liquid

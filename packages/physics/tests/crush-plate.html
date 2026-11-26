@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Elastic steel plate buckling</title></head>
+<body style="margin:0"><canvas width="480" height="320"></canvas>
+<script type="module">
+  import { Engine, Geometry, PbrMaterial } from '/packages/core/dist/index.js';
+  import { resolvePlateBuckling } from '../dist/crush.js';
+
+  const plate = { length: 0.6, width: 0.3, thickness: 0.003, young: 200e9 };
+  const engine = await Engine.create(document.querySelector('canvas'), {
+    backend: 'webgpu',
+    camera: { position: [0.72, 0.45, 0.48], target: [0.3, 0.14, 0], near: 0.02, far: 5 },
+  });
+  const panel = engine.createMesh().setMaterial(new PbrMaterial({ color: '#7a91a5', roughness: 0.38 }));
+  const columns = 36;
+  const rows = 18;
+  const points = [];
+  const triangles = [];
+  for (let y = 0; y <= rows; y++) {
+    for (let x = 0; x <= columns; x++) {
+      points.push(plate.length * (x / columns), plate.width * (y / rows));
+      if (x === columns || y === rows) continue;
+      const a = y * (columns + 1) + x;
+      const b = a + columns + 1;
+      triangles.push(a, a + 1, b + 1, a, b + 1, b);
+    }
+  }
+
+  window.drawCrushPlate = async (flat) => {
+    const { crest, surface } = resolvePlateBuckling(plate, 0.0014, points);
+    if (flat) {
+      // Control draw keeps the same in-plane positions and changes only surface shape and normals.
+      for (let i = 0; i < surface.positions.length; i += 3) {
+        surface.positions[i + 2] = 0;
+        surface.normals.set([0, 0, 1], i);
+      }
+    }
+    panel.setGeometry(new Geometry(surface.positions, surface.normals, triangles));
+    await engine.render({ delta: 0 });
+    await engine.gpu.queue.onSubmittedWorkDone();
+    return { crest, visible: engine.stats.visible, compat: Boolean(globalThis.__margoCompat) };
+  };
+</script>
+</body>
+</html>

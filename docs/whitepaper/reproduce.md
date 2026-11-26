@@ -10,6 +10,15 @@ The model takes the dimensions and tensile properties from Tables 1 and 3 and th
 observed sample standard deviation of the mean. The numerical sled test separately checks energy
 transfer in an ideal normal impact. [Yob et al. (2016)](https://doi.org/10.5539/mas.v10n1p34)
 
+## BREAK-03 measured plate buckling
+
+After `node scripts/build-modern.js --precompiled --only=physics`, run
+`node --test packages/physics/tests/crush-plate.test.js` to compare the first elastic mode with the early
+measured trace in Stein (1959), Fig. 3. The appendix supplies the dimensions of one bay. Compare both
+draw paths using `node packages/physics/tests/crush-plate.browser.mjs` and the same command with `--compat`.
+The flat control keeps the same in-plane vertex locations. Only the crest and normals affect the changed
+pixels. The buckled frame repeats byte for byte. [Stein (1959)](https://ntrs.nasa.gov/citations/19980235521)
+
 ## Package evidence
 
 - Batch 170 vfx: `npm test --workspace @margoengine/vfx` runs the per-frame upload guard
