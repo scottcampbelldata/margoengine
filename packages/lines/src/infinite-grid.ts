@@ -215,7 +215,7 @@ export class InfiniteGrid implements EnginePlugin {
           targets: [{ format: context.format, blend: alphaBlend }],
         },
         primitive: { topology: 'triangle-list', cullMode: 'none' },
-        depthStencil: { format: depth, depthWriteEnabled: false, depthCompare: 'less-equal' },
+        depthStencil: { format: depth, depthWriteEnabled: false, depthCompare: 'greater-equal' },
         multisample: { count },
       });
       this.pipelines.set(key, pipeline);

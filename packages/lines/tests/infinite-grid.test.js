@@ -57,6 +57,7 @@ test('one draw of two triangles, alpha blended, depth tested and never written',
   assert.equal(log.filter((e) => e[0] === 'pass.draw').length, 1);
   assert.equal(log.find((e) => e[0] === 'pass.draw')[1], 6);
   assert.equal(pipeline.depthStencil.depthWriteEnabled, false);
+  assert.equal(pipeline.depthStencil.depthCompare, 'greater-equal', 'the engine depth buffer is reversed-Z');
   assert.equal(pipeline.fragment.targets[0].blend.color.srcFactor, 'src-alpha');
   assert.match(setup.find((e) => e[0] === 'module')[2].code, /fwidth/);
 });
