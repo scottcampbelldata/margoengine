@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
-import { blockedLoad } from '../../../tests/support/wasm-csp.js';
+import { blockedLoad, stubCompile } from '../../../tests/support/wasm-csp.js';
 import { startBasis } from '../dist/codec.js';
 import { WorkerPool } from '../dist/pool.js';
 
@@ -54,6 +54,17 @@ for (const kind of ['WebAssembly.CompileError', 'EvalError']) {
     });
 }
 
+// KB-CSP-STUB1, forced here on every Node: a module somebody else is already loading when the block is stubbed in.
+test('a blocked-compilation stub leaves a module already loading in the process alone', async (t) => {
+  const empty = Uint8Array.of(0, 97, 115, 109, 1, 0, 0, 0),
+    loading = WebAssembly.compile(empty).then((module) => WebAssembly.instantiate(module));
+  stubCompile(t, 'instantiate', async () => {
+    throw new EvalError('Wasm blocked by Content Security Policy');
+  });
+  assert.ok((await loading) instanceof WebAssembly.Instance);
+  await assert.rejects(WebAssembly.instantiate(empty), EvalError);
+});
+
 test('JPEG XL worker reports blocked compilation', async (t) => {
   const messages = [];
   t.mock.method(
@@ -63,7 +74,7 @@ test('JPEG XL worker reports blocked compilation', async (t) => {
       new Response(new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]), { headers: { 'Content-Type': 'application/wasm' } }),
   );
   for (const method of ['instantiate', 'instantiateStreaming'])
-    t.mock.method(WebAssembly, method, async () => {
+    stubCompile(t, method, async () => {
       throw new EvalError('Wasm blocked by Content Security Policy');
     });
   globalThis.self = { postMessage: (message) => messages.push(message) };
