@@ -15110,6 +15110,13 @@ sum, including the half-step displacement. The incline test exercises a real ter
 bed and replays exactly in plain and shared memory. The fixed-camera collapse draws
 the simulated material-point positions on both renderers.
 
+For the voxel fallback, the two-cell swap preserves the exact liquid amount and
+metadata while sand descends. The conservation condition is independent of the
+continuum yield law. Yongning Zhu and Robert Bridson,
+[*Animating Sand as a Fluid*](https://doi.org/10.1145/1073204.1073298) (2005),
+describes continuum material transport. The discrete packed-cell exchange is
+Margo's own rule, covered by the two-layer falling-sand regression.
+
 ## Native strand guides (SOFT-03)
 
 - Florence Bertails, Basile Audoly, Marie-Paule Cani, Bernard Querleux, Frédéric Leroy and

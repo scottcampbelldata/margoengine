@@ -93,6 +93,24 @@ test('falling sand drops one cell per delay and lands on the floor, also when it
   assert.equal(world.getBlock(5, 3, 5), 0);
 });
 
+test('falling sand displaces liquid upward without deleting or replacing the packed fluid states', () => {
+  const { world, ids } = setup();
+  const water = world.blocks.define('water', { solid: false, shape: 'liquid', liquid: true });
+  const deep = blockState(water, 2);
+  const shallow = blockState(water, 6);
+  const sand = blockState(ids.sand, 17);
+  world.setBlocks([5, 1, 5, ids.stone, 5, 2, 5, deep, 5, 3, 5, shallow]);
+  const ticks = VoxelTicks.attach(world, { rules: { sand: fallingRule(1) }, randomTicks: 0 });
+  world.setBlock(5, 4, 5, sand);
+  const column = () => [2, 3, 4].map((y) => world.getBlock(5, y, 5));
+  ticks.tick();
+  assert.deepEqual(column(), [deep, shallow, sand]);
+  ticks.tick();
+  assert.deepEqual(column(), [deep, sand, shallow]);
+  for (let i = 0; i < 4; i++) ticks.tick();
+  assert.deepEqual(column(), [sand, deep, shallow]);
+});
+
 test('grass spreads onto dirt with enough sky light, not in the dark; crops grow; fire burns through wood and out', () => {
   const { world, ids } = setup(),
     ticks = VoxelTicks.attach(world, {

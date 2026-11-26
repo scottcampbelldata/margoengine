@@ -262,8 +262,8 @@ export class VoxelTicks {
 }
 
 /**
- * Falling blocks (sand, gravel): a block with an open cell below (air, or neither solid nor liquid) falls one cell
- * every `delay` ticks once a neighbour changes, until it lands; whatever it falls through is replaced.
+ * Falling blocks (sand, gravel): a block with an open cell below falls one cell every `delay` ticks.
+ * A liquid cell below moves up into the space left by the falling block.
  */
 export function fallingRule(delay = 2): VoxelTickRule {
   whole('falling delay', delay, 1, 2 ** 20);
@@ -279,8 +279,9 @@ export function fallingRule(delay = 2): VoxelTickRule {
     placed: wake,
     scheduled: (c) => {
       if (!open(c, c.y - 1)) return;
-      c.world.setBlock(c.x, c.y, c.z, 0);
-      c.world.setBlock(c.x, c.y - 1, c.z, c.state);
+      const below = c.world.getBlock(c.x, c.y - 1, c.z);
+      const liquid = c.world.blocks.table[below & 0xffff]?.liquid;
+      c.world.setBlocks([c.x, c.y, c.z, liquid ? below : 0, c.x, c.y - 1, c.z, c.state]);
       // The block now below schedules itself through its neighbour update.
     },
   };

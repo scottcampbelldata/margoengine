@@ -1330,7 +1330,8 @@ engine.onFrame((_, delta) => ticks.update(delta)); // 20 ticks a second
 - **Hooks** get `{world, x, y, z, state, tick, random(), schedule(delay)}`; `schedule` runs the cell's `scheduled`
   hook later (for whatever block is there then).
 - **Built-in rules.** `fallingRule(delay)`: falls a cell every `delay` ticks while the cell below is open (air or not
-  solid, loaded, in range). `spreadRule({onto, chance, light, smothered})`: on a random tick, onto an `onto` block in
+  solid, loaded, in range). If it falls into liquid, that liquid occupies the vacated cell
+  and keeps its level and other state. `spreadRule({onto, chance, light, smothered})`: on a random tick, onto an `onto` block in
   the 3 x 3 x 3 around it whose cell above is not solid and has at least `light` sky light; a solid block on top turns
   it into `smothered`. `growRule(stages, chance, grown)`: state data counts the stages, then `grown`.
   `fireRule({burns, delay, life})`: each step sets each burnable neighbour on fire with its chance, ages, and goes out
