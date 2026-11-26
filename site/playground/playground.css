@@ -202,6 +202,66 @@ button:disabled {
   overflow: auto;
   height: 100%;
 }
+.api {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+}
+.api summary {
+  cursor: pointer;
+  min-height: 36px;
+  padding-block: 6px;
+}
+.api input {
+  font: inherit;
+  width: 100%;
+  min-height: 44px;
+  padding: 4px 10px;
+  margin-block: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+#api-list {
+  max-height: 40vh;
+  overflow: auto;
+}
+#api-list h3 {
+  font-size: 1rem;
+  margin: 10px 0 4px;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+#api-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+#api-list li {
+  padding-block: 4px;
+  border-top: 1px solid var(--line);
+}
+#api-list button {
+  font: inherit;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-weight: 700;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+}
+#api-list code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+#api-list p {
+  margin: 2px 0 0;
+}
 .stage {
   position: relative;
   height: min(48vh, 520px);

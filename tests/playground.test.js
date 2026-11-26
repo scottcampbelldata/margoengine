@@ -256,6 +256,46 @@ test('the playground page keeps a strict policy; only the sandboxed run frame ge
   assert.doesNotMatch(page, /\.srcdoc\b|'allow-same-origin'|allow-scripts allow-same-origin/);
 });
 
+test('api messages are capped and keep only well-formed names', () => {
+  const item = {
+    name: 'createStage',
+    kind: 'function',
+    signature: 'function createStage(target)',
+    doc: 'Makes a stage.',
+  };
+  assert.deepEqual(
+    parseFrameMessage({ channel: CHANNEL, kind: 'api', entries: [{ specifier: 'margoengine', exports: [item] }] }),
+    {
+      kind: 'api',
+      entries: [{ specifier: 'margoengine', exports: [item] }],
+    },
+  );
+  const message = parseFrameMessage({
+    channel: CHANNEL,
+    kind: 'api',
+    entries: [
+      { specifier: 'javascript:alert(1)', exports: [item] },
+      {
+        specifier: '@margoengine/core',
+        exports: [
+          { ...item, name: '<img src=x>' },
+          { ...item, kind: 'script' },
+          { ...item, signature: 's'.repeat(900), doc: 7 },
+          ...Array.from({ length: 500 }, (_, i) => ({ ...item, name: `n${i}` })),
+        ],
+      },
+      ...Array.from({ length: 30 }, () => ({ specifier: 'margoengine', exports: [] })),
+    ],
+  });
+  assert.equal(message.entries.length, 19, 'at most 20 entries, the bad one dropped');
+  const core = message.entries[0];
+  assert.equal(core.specifier, '@margoengine/core');
+  assert.equal(core.exports[0].signature.length, 300);
+  assert.equal(core.exports[0].doc, '');
+  assert.equal(core.exports.length, 398, 'the first 400 exports, less the two bad ones');
+  assert.equal(parseFrameMessage({ channel: CHANNEL, kind: 'api', entries: 'x' }), null);
+});
+
 test('only well-formed frame messages pass the schema', () => {
   assert.deepEqual(parseFrameMessage({ channel: CHANNEL, kind: 'log', level: 'warn', text: 'hi' }), {
     kind: 'log',

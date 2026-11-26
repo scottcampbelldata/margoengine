@@ -238,16 +238,43 @@ export function downloadDocument(frameHtml, files, packages = null) {
 }
 
 const LEVELS = new Set(['log', 'info', 'warn', 'error', 'debug']);
+const API_KINDS = new Set(['function', 'class', 'interface', 'type', 'const', 'let', 'enum', 'namespace']);
+const short = (value, max) => (typeof value === 'string' ? value.slice(0, max) : '');
+
+/** The `entries` of an `api` message, checked: at most 20 entries of at most 400 exports; anything else is dropped. */
+function apiEntries(entries) {
+  if (!Array.isArray(entries)) return null;
+  return entries
+    .slice(0, 20)
+    .filter(
+      (e) =>
+        e && typeof e.specifier === 'string' && /^[@\w][\w@./-]{0,199}$/.test(e.specifier) && Array.isArray(e.exports),
+    )
+    .map((e) => ({
+      specifier: e.specifier,
+      exports: e.exports
+        .slice(0, 400)
+        .filter(
+          (x) => x && typeof x.name === 'string' && /^[A-Za-z_$][\w$]{0,99}$/.test(x.name) && API_KINDS.has(x.kind),
+        )
+        .map((x) => ({ name: x.name, kind: x.kind, signature: short(x.signature, 300), doc: short(x.doc, 300) })),
+    }));
+}
 
 /**
  * A message from the frame, checked against the schema, or null to ignore it. The caller checks `event.source` first;
  * this checks the shape: `{channel, kind: 'log', level, text}`, `{channel, kind: 'error', text, file, line, code}`,
+ * `{channel, kind: 'api', entries: [{specifier, exports: [{name, kind, signature, doc}]}]}`
  * or `{channel, kind: 'ready' | 'done'}`. Text is capped at 4,000 characters.
  */
 export function parseFrameMessage(data) {
   if (!data || typeof data !== 'object' || data.channel !== CHANNEL) return null;
   const text = typeof data.text === 'string' ? data.text.slice(0, 4000) : null;
   if (data.kind === 'done' || data.kind === 'ready') return { kind: data.kind };
+  if (data.kind === 'api') {
+    const entries = apiEntries(data.entries);
+    return entries && { kind: 'api', entries };
+  }
   if (data.kind === 'log' && LEVELS.has(data.level) && text !== null) return { kind: 'log', level: data.level, text };
   if (data.kind === 'error' && text !== null) {
     const file = typeof data.file === 'string' && FILE_NAME.test(data.file) ? data.file : null;

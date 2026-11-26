@@ -74,6 +74,31 @@ test('the playground runs templates, reports errors with lines and codes, and op
     for (let i = 0; i < shot.data.length; i += 4) if (shot.data[i] > 120 && shot.data[i] > shot.data[i + 2] + 40) lit++;
     assert.ok(lit > shot.width * shot.height * 0.005, `the cube is drawn (${lit} warm pixels)`);
 
+    // The API panel lists what the imports export, read from their .d.ts through re-exports
+    // (margoengine -> @margoengine/stage -> @margoengine/core), with signatures and doc lines.
+    await page.click('#api summary');
+    await page.locator('#api-list h3', { hasText: 'margoengine/webgl2-compat/preview' }).waitFor();
+    const margo = page.locator('#api-list section').filter({ has: page.locator('h3', { hasText: /^margoengine$/ }) });
+    await margo.getByRole('button', { name: 'Insert createStage' }).waitFor();
+    assert.match(
+      await margo.locator('li', { hasText: 'createStage' }).first().textContent(),
+      /function createStage\(target/,
+    );
+    assert.ok(
+      await margo.getByRole('button', { name: 'Insert Engine', exact: true }).count(),
+      'core re-exports are followed',
+    );
+    await page.fill('#api-filter', 'webglRend');
+    assert.deepEqual(await page.locator('#api-list h3').allTextContents(), ['margoengine/webgl2-compat/preview']);
+    // Ctrl+Space completes a name with one match.
+    const before = await page.inputValue('#editor');
+    await page.locator('#editor').focus();
+    await page.keyboard.press('Control+End');
+    await page.keyboard.type('\ncreateSta');
+    await page.keyboard.press('Control+Space');
+    assert.equal(await page.inputValue('#editor'), `${before}\ncreateStage`);
+    await page.fill('#editor', before);
+
     // A message that does not come from the frame is ignored.
     await page.evaluate((channel) => postMessage({ channel, kind: 'error', text: 'forged' }, '*'), 'margo-playground');
     await page.waitForTimeout(200);
@@ -232,6 +257,7 @@ test('the playground runs templates, reports errors with lines and codes, and op
             'message',
             (e) =>
               e.source === frame.contentWindow &&
+              e.data.kind !== 'api' && // the API list arrives beside the run, in no fixed order
               heard.push(e.data.kind === 'error' ? `error: ${e.data.text}` : e.data.kind),
           );
           document.body.append(frame);

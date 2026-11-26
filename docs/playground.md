@@ -13,6 +13,10 @@ it as one HTML file.
   a tab's × removes it, keeping the project before it as a version. Left and right arrows move between tabs.
 - **Editor**: a code font, line numbers, Tab and Shift+Tab indent and outdent the line or the selected lines. Esc, then
   Tab, moves focus out of the editor (so the keyboard is never trapped).
+- **API panel**: after a run, "API of the imported entries" lists, for each `margoengine` or `@margoengine/*` entry
+  the code imports, its top-level exports with their kind, declaration line and the first sentence of their doc
+  comment. The filter narrows the names; clicking a name inserts it at the caret. **Ctrl+Space** completes the word
+  before the caret when one name fits, and otherwise opens the panel filtered to that word.
 - **Console**: `console.log`, `info`, `warn`, `error` and `debug` from the code appear under the canvas. An uncaught
   error or rejected promise shows its message, its file and its line (a button that opens that tab and selects the
   line). An error
@@ -53,6 +57,16 @@ Each file runs as a blob module, and a blob URL cannot be the base of a relative
 blob URL of that file), added beside margoengine's entries before main.js loads. Through the map, files may import each
 other in any order, cycles included; lines are not moved, so an error's line is the line in its own file. A
 `./name.js` that names no file of the project is left as written and fails to load with the browser's own error.
+
+## How the API panel reads the types
+
+No TypeScript service and no new dependency: the run frame fetches the `.d.ts` beside each imported entry's `.js`
+(through the same import map) and reads only its top-level `export` declarations (`function`, `class`, `interface`,
+`type`, `const`, `let`, `enum`, `namespace`) with their doc comments, following `export * from` and
+`export {a as b} from` into the files they name, bare specifiers through the import map. It is a list of names, not a
+type checker: no members, no overloads beyond the first line, no inferred types, no errors. At most 120 declaration
+files are read per run, 20 entries and 400 names each; the page checks the list's shape like every other message and
+shows it as text. It loads beside the run and never delays it.
 
 ## Run it against this checkout
 
@@ -117,7 +131,7 @@ parent's Content Security Policy, which would force the page's policy open.
 
 ## Not yet
 
-Type hints from the packages' `.d.ts` and an embed mode are the next pieces of this row in [the rival parity list](rival-parity-gaps.md). The limits are in [docs/limits.md](limits.md#playground).
+An embed mode is the next piece of this row in [the rival parity list](rival-parity-gaps.md). The limits are in [docs/limits.md](limits.md#playground).
 
 ## Sources
 

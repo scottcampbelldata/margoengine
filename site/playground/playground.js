@@ -189,7 +189,10 @@ function indent(outdent) {
 
 editor.addEventListener('keydown', (event) => {
   const mod = event.ctrlKey || event.metaKey;
-  if (event.key === 'Escape') tabReleased = true;
+  if (event.key === ' ' && event.ctrlKey) {
+    event.preventDefault();
+    complete();
+  } else if (event.key === 'Escape') tabReleased = true;
   else if (event.key === 'Tab' && !tabReleased && !mod && !event.altKey) {
     event.preventDefault();
     indent(event.shiftKey);
@@ -266,8 +269,82 @@ addEventListener('message', (event) => {
   if (!frame || event.source !== frame.contentWindow) return;
   const message = parseFrameMessage(event.data);
   if (message?.kind === 'ready') frame.contentWindow.postMessage(runMessage(frameFiles, packages), '*');
+  else if (message?.kind === 'api') showApi(message.entries);
   else if (message) showMessage(message);
 });
+
+// ---- API panel and completion -------------------------------------------------------------------------------------
+// The frame reads the .d.ts of the entries the code imports and sends their top-level exports (docs/playground.md).
+
+let api = [];
+const apiFilter = $('api-filter'),
+  apiList = $('api-list');
+
+/** Puts `text` in place of the selection (or the `before` characters before the caret) and keeps editing. */
+function insert(text, before = 0) {
+  const at = editor.selectionStart - before;
+  editor.setRangeText(text, at, editor.selectionEnd, 'end');
+  editor.focus();
+  editor.dispatchEvent(new Event('input'));
+}
+
+function renderApi() {
+  const term = apiFilter.value.trim().toLowerCase();
+  const sections = api
+    .map(({ specifier, exports }) => {
+      const shown = exports.filter((x) => !term || x.name.toLowerCase().includes(term));
+      if (!shown.length) return null;
+      const heading = Object.assign(document.createElement('h3'), { textContent: specifier });
+      const list = document.createElement('ul');
+      for (const item of shown) {
+        const row = document.createElement('li');
+        const name = Object.assign(document.createElement('button'), { type: 'button', textContent: item.name });
+        name.setAttribute('aria-label', `Insert ${item.name}`);
+        name.addEventListener('click', () => insert(item.name));
+        row.append(
+          name,
+          ' ',
+          item.kind,
+          Object.assign(document.createElement('code'), { textContent: item.signature }),
+        );
+        if (item.doc) row.append(Object.assign(document.createElement('p'), { textContent: item.doc }));
+        row.title = item.doc;
+        list.append(row);
+      }
+      const section = document.createElement('section');
+      section.append(heading, list);
+      return section;
+    })
+    .filter(Boolean);
+  apiList.replaceChildren(...sections);
+  $('api-empty').hidden = sections.length > 0;
+  if (!sections.length && api.length)
+    $('api-empty').textContent = api.some((e) => e.exports.length)
+      ? 'No name matches the filter.'
+      : 'The imported entries list no exports: their .d.ts files could not be read.';
+}
+
+function showApi(entries) {
+  api = entries;
+  $('api-empty').textContent = 'Run the code to list what its imports export.';
+  renderApi();
+}
+apiFilter.addEventListener('input', renderApi);
+
+/** Ctrl+Space: completes the word before the caret from the API; several matches open the panel filtered to them. */
+function complete() {
+  const word = /[A-Za-z_$][\w$]*$/.exec(editor.value.slice(0, editor.selectionStart))?.[0] ?? '';
+  const names = [...new Set(api.flatMap((e) => e.exports.map((x) => x.name)))].filter((n) => n.startsWith(word));
+  if (names.length === 1) return insert(names[0], word.length);
+  $('api').open = true;
+  apiFilter.value = word;
+  renderApi();
+  say(
+    names.length
+      ? `${names.length} names start with "${word}": pick one in the API panel.`
+      : 'No API name starts with that; run the code to list its imports.',
+  );
+}
 
 // ---- Run -----------------------------------------------------------------------------------------------------------
 

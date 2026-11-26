@@ -99,6 +99,69 @@
     code.replace(/(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(['"])\.\/([A-Za-z0-9_-]+\.js)\2/g, (whole, head, q, name) =>
       names.has(name) ? `${head}${q}#tab/${name}${q}` : whole);
 
+  // ---- The API of the imported entries, from their .d.ts files, for the page's API panel ----------------------------
+  // A small reader of declaration files, not a type checker: top-level `export` declarations with their first line and
+  // the first sentence of their doc comment, following `export * from` and `export {a as b} from` through the import
+  // map (bare) or the file's URL (relative). At most 120 declaration files per run.
+  const MAX_DTS = 120, MAX_EXPORTS = 400, MAX_ENTRIES = 20;
+  const KINDS = new Set(['function', 'class', 'interface', 'type', 'const', 'let', 'enum', 'namespace']);
+  const DECL =
+    /(?:\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?export\s+(?:declare\s+)?(?:abstract\s+)?(function|class|interface|type|const|let|enum|namespace)\s+([A-Za-z_$][\w$]*)([^\n]*)/g;
+  const doc = (comment) =>
+    (comment || '').replace(/^\s*\*\s?/gm, '').split(/\n\s*@|(?<=\.)\s/)[0].replace(/\s+/g, ' ').trim().slice(0, 300);
+
+  function apiReader(map) {
+    const cache = new Map();
+    const typesOf = (js) => js.replace(/\.(m?js)$/, '.d.ts');
+    const resolve = (specifier, base) => {
+      if (/^\.\.?\//.test(specifier)) return typesOf(new URL(specifier, base).href);
+      const target = map.imports[specifier];
+      return target ? typesOf(new URL(target, location.href).href) : null;
+    };
+    const read = (url) => {
+      if (!url || cache.size >= MAX_DTS) return Promise.resolve(new Map());
+      if (!cache.has(url)) cache.set(url, parse(url));
+      return cache.get(url);
+    };
+    async function parse(url) {
+      const out = new Map();
+      let text = '';
+      try {
+        const response = await fetch(url);
+        if (response.ok) text = await response.text();
+      } catch {
+        return out; // A missing declaration file leaves its entry without names, never stops the run.
+      }
+      for (const [, comment, kind, name, rest] of text.matchAll(DECL))
+        out.set(name, { name, kind, signature: `${kind} ${name}${rest.replace(/\s*\{\s*$/, '')}`.trim().slice(0, 300), doc: doc(comment) });
+      for (const [, list, from] of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g)) {
+        const target = await read(resolve(from, url));
+        for (const part of list.split(',')) {
+          const [name, alias = name] = part.replace(/^\s*type\s+/, '').split(/\s+as\s+/).map((x) => x.trim());
+          if (/^[A-Za-z_$][\w$]*$/.test(alias) && !out.has(alias))
+            out.set(alias, { ...(target.get(name) ?? { kind: 'const', signature: alias, doc: '' }), name: alias });
+        }
+      }
+      for (const [, from] of text.matchAll(/export\s+\*\s+from\s*['"]([^'"]+)['"]/g))
+        for (const [name, item] of await read(resolve(from, url))) if (!out.has(name)) out.set(name, item);
+      return out;
+    }
+    return async (files) => {
+      const specifiers = new Set();
+      for (const f of files)
+        for (const m of f.code.matchAll(/\bfrom\s*['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+          const specifier = m[1] ?? m[2];
+          if (map.imports[specifier] && !specifier.startsWith('#tab/')) specifiers.add(specifier);
+        }
+      const entries = [];
+      for (const specifier of [...specifiers].slice(0, MAX_ENTRIES)) {
+        const items = [...(await read(resolve(specifier, location.href))).values()].filter((x) => KINDS.has(x.kind));
+        entries.push({ specifier, exports: items.sort((a, b) => a.name.localeCompare(b.name)).slice(0, MAX_EXPORTS) });
+      }
+      return entries;
+    };
+  }
+
   async function run(message) {
     if (started || !valid(message)) return;
     started = true;
@@ -114,6 +177,9 @@
       script.type = 'importmap';
       script.textContent = JSON.stringify(map);
       document.head.append(script);
+      // The API panel's names load beside the run, never in its way.
+      if (top)
+        apiReader(map)(message.files).then((entries) => send({ kind: 'api', entries }), () => {});
       await import('#tab/main.js');
       send({ kind: 'done' });
     } catch (error) {

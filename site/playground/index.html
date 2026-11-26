@@ -54,6 +54,12 @@
           <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" wrap="off"
             aria-labelledby="editor-label"></textarea>
         </div>
+        <details id="api" class="api">
+          <summary>API of the imported entries <span class="hint">Ctrl+Space completes a name</span></summary>
+          <input id="api-filter" type="search" placeholder="Filter names" aria-label="Filter the API" autocomplete="off">
+          <p id="api-empty" class="hint">Run the code to list what its imports export.</p>
+          <div id="api-list"></div>
+        </details>
       </section>
       <section class="pane" aria-labelledby="output-label">
         <h2 id="output-label" class="pane-title">Result</h2>
