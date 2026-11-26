@@ -3255,6 +3255,10 @@
       "types": "./dist/physics/life.d.ts",
       "import": "./dist/physics/life.js"
     },
+    "./physics/legged": {
+      "types": "./dist/physics/legged.d.ts",
+      "import": "./dist/physics/legged.js"
+    },
     "./physics/locomotion": {
       "types": "./dist/physics/locomotion.d.ts",
       "import": "./dist/physics/locomotion.js"

@@ -9309,7 +9309,7 @@ caves or overhanging holds needs a collider-based foot placement system. The pos
 kinematics and reaction wrenches for downstream animation or an erosion consumer. Inter-animal collision and
 feedback into the live terrain require downstream coupling.
 
-The optional entry measures 15,630 B raw and 6,419 B gzip. The plain Wasm is 9,037 B raw and 4,134 B gzip; the shared Wasm is 9,125 B raw and 4,196 B gzip.
+The optional entry measures 17,194 B raw and 6,926 B gzip. The plain Wasm is 10,782 B raw and 4,873 B gzip. The shared Wasm is 10,870 B raw and 4,937 B gzip.
 
 ## Material ageing (BIO-04)
 
@@ -9380,4 +9380,5 @@ contactable support-patch field. Planting and flight follow a reduced spring-mas
 couple. The renderer's baked export clips keep a single pace for each clip, while runtime horse posing uses the
 actual instantaneous stride.
 
-<!-- LIFE01_SIZE -->
+The legged entry measures 29,240 B raw and 11,101 B gzip and shares the ground kernel bytes listed above.
+Horses measures 40,737 B raw and 16,724 B gzip. Its gait utilities measure 2,738 B raw and 1,266 B gzip.

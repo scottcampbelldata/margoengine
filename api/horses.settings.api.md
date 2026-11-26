@@ -72,6 +72,8 @@ interface HorseOptions extends HorseModelOptions {
     ground?: (x: number, z: number) => number;
     acceleration?: number;
     turnRate?: number;
+    grip?: number;
+    loadMass?: number;
     fade?: number;
     coatHair?: HairOptions | false;
     maneHair?: HairOptions | false;
