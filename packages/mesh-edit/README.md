@@ -274,6 +274,26 @@ console.log(result.mesh.faces.length, result.collapsedFaces, result.nonManifoldE
 - Only at the end are corners rounded to float64. A face of the exact result too thin to be a valid face (about 4e-9 of its length, or a few float64 steps) is folded away, keeping every edge matched by its reverse; `collapsedFaces` counts these. The returned mesh is always closed and passes the mesh-edit checks, so it can feed the next boolean.
 - Inputs must be closed and outward facing. Separate shells of one input that overlap are joined first, and `sources` and `faceMap` still name the input's faces. A single surface that crosses itself throws `MargoError` code `failed` when the crossing breaks the result. Faces that are not quite planar count as the triangles an exact ear clip gives them.
 - Speed: only what lies in the box where the two bounds overlap goes through the exact trees, so a small cut in a large mesh costs the faces near it. Measured on two spheres of 10,224 triangles each, one operation: 7 to 11 s when they overlap by half, 2 to 3 s with a cutter a fifth the size, under 1 s when they only overlap at the edge. Work in the box grows with its faces squared. Use `booleanMeshes` for large clean inputs and pass `signal` to stop a long run.
+### Core geometry in and out
+
+`margoengine/mesh-edit/geometry` carries a core `Geometry` into the polygon mesh the booleans work on, and the result back to something `engine.createMesh().setGeometry(...)` draws.
+
+```ts
+import { box } from 'margoengine/core';
+import { booleanMeshesExact } from 'margoengine/mesh-edit/boolean-exact';
+import { fromPolygonMesh, toPolygonMesh } from 'margoengine/mesh-edit/geometry';
+
+const block = toPolygonMesh(box(2, 2, 2)).mesh;
+const cutter = toPolygonMesh(box(2, 2, 2)).mesh;
+cutter.vertices = cutter.vertices.map(([x, y, z]): [number, number, number] => [x + 1, y + 1, z + 1]);
+cutter.faces = cutter.faces.map((face) => ({ ...face, id: 'cutter-' + face.id })); // face IDs must differ between inputs
+const notched = fromPolygonMesh(booleanMeshesExact(block, cutter, 'difference').mesh); // a core Geometry, volume 7
+console.log(notched.indices.length / 3, 'triangles');
+```
+
+- `toPolygonMesh(geometry, options?)` takes the options of `polygonMeshFromTriangles` and returns its result. Positions that the geometry splits for hard edges weld back together, coplanar triangles merge into polygons (a box is six quads), and UVs come from an unwrap, since a core `Geometry` has none (`uv: 'unwrap'` is the default here).
+- `fromPolygonMesh(mesh)` triangulates every face (concave ones by ear clipping) into a vertex per corner with the face's flat normal, so hard edges stay hard. An empty mesh gives an empty `Geometry`. The mesh's UVs are not carried over. A malformed mesh, a face with no area or a self-crossing face throws `TypeError`.
+
 ## Modifier stack
 
 Mirror, array, solidify, screw and lattice deform that never touch the base mesh. Change the base or any modifier and the stack re-runs from the first stage that is out of date:

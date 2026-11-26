@@ -31,6 +31,7 @@ export interface HighlightOptions {
     radius?: number;
     innerGlow?: boolean;
     outerGlow?: boolean;
+    layers?: number;
 }
 
 // Not exported from this entry, but used by the exports above:

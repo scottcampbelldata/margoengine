@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20509908,
+  "total": 20525693,
   "history": [
     {
       "date": "2026-10-24",
@@ -13341,6 +13341,12 @@
       "commit": "4b7980c174",
       "grew": 1,
       "reason": "SOFT-04 adds material-coordinate tensile strain sampling and automatically opened cut geometry, moving the soft entry from 137978 to 138830 B gzip. @margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table)): 43627 to 44952 B ceiling (43642 B measured). It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "55b0f51fb",
+      "reason": "new mesh-edit/geometry entry; selection layers option",
+      "grew": 1
     }
   ],
   "items": {
@@ -14087,6 +14093,7 @@
     "@margoengine/mesh-edit/bake": 5070,
     "@margoengine/mesh-edit/boolean-batch": 10775,
     "@margoengine/mesh-edit/boolean-exact": 10618,
+    "@margoengine/mesh-edit/geometry": 15785,
     "@margoengine/mesh-edit/hull": 12352,
     "@margoengine/mesh-edit/modeling": 35466,
     "@margoengine/mesh-edit/modifiers": 8564,

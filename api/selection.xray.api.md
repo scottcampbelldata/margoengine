@@ -103,6 +103,7 @@ interface SelectionOptions {
     color?: readonly [number, number, number];
     name?: string;
     xray?: boolean | XRayOptions;
+    layers?: number;
 }
 
 interface XRayOptions {

@@ -315,6 +315,10 @@ engine.start();
 // On teardown: outline.dispose(); picker.dispose(); engine.dispose(); canvas.remove();
 ```
 
+`layers` (default every layer) limits a query to meshes sharing a bit with the mask, the way
+`SpatialPickingOptions.layers` limits ray picking; a view's own `layers` wins, and without either the camera's mask
+applies. `Selection` takes the same option, so an outline can skip meshes on other layers.
+
 Defaults: `capture: false`, `maxPixels: 16_777_216` drawing-buffer pixels in
 the clipped bounding rectangle, not just pixels inside the polygon. The query
 allocates r32uint IDs, depth32float depth and a readback buffer with 256-byte
@@ -340,18 +344,21 @@ glow through blockers. Options are mutable and checked again when rendering:
 | glowOpacity | 0.85 | Inner and outer halo alpha, 0..1 |
 | radius | 8 | Gaussian support in drawing-buffer pixels, 1..64; sigma = radius / 3 |
 | innerGlow / outerGlow | true / true | Enable the halo inside / outside the silhouette |
+| layers | every layer | Render-layer mask: only selected meshes sharing a bit glow (`layerMask` in `@margoengine/cameras/layers`) |
 
 ```ts
 import {Engine, box} from '@margoengine/core';
 import {Highlight} from '@margoengine/selection/highlight';
+import {layerMask, setRenderLayers} from '@margoengine/cameras/layers';
 
 const canvas = document.createElement('canvas'); document.body.append(canvas);
 const engine = await Engine.create(canvas, {backend: 'webgpu', camera: {position: [0, 0, 4]}});
 const left = engine.createMesh().setGeometry(box()).setPosition([-0.8, 0, 0]);
 const right = engine.createMesh().setGeometry(box()).setPosition([0.8, 0, 0]);
 const warm = Highlight.attach(engine, {name: 'warm', fillColor: [1, 0.2, 0], glowColor: [1, 0.7, 0], radius: 12});
-const cool = Highlight.attach(engine, {name: 'cool', color: [0, 0.5, 1], fillOpacity: 0, innerGlow: false});
-warm.set([left]); cool.set([right]);
+const cool = Highlight.attach(engine, {name: 'cool', color: [0, 0.5, 1], fillOpacity: 0, innerGlow: false, layers: layerMask(1)});
+setRenderLayers(right, layerMask(1)); // `left` stays on layer 0, so `cool` would skip it
+warm.set([left]); cool.set([left, right]);
 engine.start();
 // On teardown: warm.dispose(); cool.dispose(); engine.dispose(); canvas.remove();
 ```

@@ -31,7 +31,7 @@ import {
 } from '@margoengine/core/extension';
 import { fullscreen, meshVertex, group, compute, render, dispatch, draw } from '../../shared/gpu.js';
 import { alphaBlend } from '../../shared/pass.js';
-import { applyView } from '../../shared/view-rect.js';
+import { applyView, meshLayers } from '../../shared/view-rect.js';
 import { currentFrame, retire, uniformGroups, writeUniform } from '../../shared/frame-resources.js';
 import {
   Models,
@@ -66,6 +66,11 @@ export interface SelectionOptions {
   name?: string;
   /** Also outline the hidden (occluded) parts, dashed by default (`true` = `{dash: 4, opacity: 0.85}`). Mutable like the other options. */
   xray?: boolean | XRayOptions;
+  /**
+   * Render-layer mask (`setRenderLayers` in `@margoengine/cameras/layers`): only selected meshes that share a bit with it
+   * are outlined, as `SpatialPickingOptions.layers` limits picking. Mutable. Default every layer.
+   */
+  layers?: number;
 }
 // Outline distance field by jump flooding: Rong & Tan, "Jump Flooding in GPU with Applications to Voronoi Diagram and
 // Distance Transform" (I3D 2006).
@@ -196,6 +201,7 @@ export class Selection implements EnginePlugin {
   private format = '';
   private depthFormat = '';
   private readonly values = new Float32Array(8);
+  private layerBits = 0xffffffff;
   private disposed = false;
   constructor(readonly options: SelectionOptions = {}) {
     this.name = options.name ?? 'selection';
@@ -409,11 +415,14 @@ export class Selection implements EnginePlugin {
       this.maskDraw.bindings = [{ binding: 1, resource: { buffer: this.buffer } }];
     }
     this.flags.fill(0);
+    const layers = (this.layerBits = this.options.layers ?? 0xffffffff);
+    if (!Number.isInteger(layers) || layers < 0 || layers > 0xffffffff)
+      throw new RangeError('Selection layers must be an integer from 0 to 0xffffffff; build one with layerMask().');
     const selectedIds = new Set([...this.selected].map((value) => meshRuntime(isModel(value) ? value.root : value).id));
     for (const mesh of this.engine!.meshes.values())
       for (let id = mesh.id; id !== -1; id = this.engine!.store.parents[id])
         if (selectedIds.has(id)) {
-          this.flags[mesh.id] = 1;
+          if ((meshLayers(mesh) & layers) !== 0) this.flags[mesh.id] = 1;
           break;
         }
     c.device.queue.writeBuffer(this.buffer!, 0, this.flags as Uint32Array<ArrayBuffer>);
@@ -521,7 +530,7 @@ export class Selection implements EnginePlugin {
     draws.reset();
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
-      if (p.buffers && !hidden(e, p.node.id) && (p.instances || meshTriangles(p.node)?.kind !== 'pbr'))
+      if (p.buffers && !hidden(e, p.node.id) && (meshLayers(p.node) & this.layerBits) !== 0 && (p.instances || meshTriangles(p.node)?.kind !== 'pbr'))
         if (!p.instances) draws.add(p, 1);
         else if (p.instances.count) draws.addInstances(p, 1, p.node.matrix);
     }
