@@ -109,6 +109,7 @@ export interface HullBilgeKeel {
 export interface HullCourse {
     readonly speed?: number;
     readonly trim?: number;
+    readonly lateralHeading?: number;
 }
 
 export interface HullMemory {
