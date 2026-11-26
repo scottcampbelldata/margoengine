@@ -3,6 +3,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { Bed, BedSample } from '@margoengine/math/fields';
 import { hypot, sin } from '@margoengine/math/pinned';
 import { BED_CHANGE_FIELD } from '../earth/bed.js';
+import { SWIM_WAKE_FIELD } from '../life/wake.js';
 import { canShareMemory, MAX_MEMORY_PAGES, regionWords, STACK_BYTES } from '../world/memory.js';
 import { isRateLevel, rateOf } from '../world/solver.js';
 import type {
@@ -18,6 +19,7 @@ import type {
 } from '../world/solver.js';
 
 import { GranularLayer, type LayerRaster } from './layer.js';
+import { GranularWake, type WakeKernel } from './wake.js';
 
 const GRID_WORDS = 6;
 const MODEL_WORDS = 8;
@@ -77,6 +79,10 @@ export interface GranularMpmParams {
   readonly bed?: Bed;
   /** Optional receiving terrain surface, separate from the contact bed or floor. Enable with projectBed at load. */
   readonly bedSurface?: Bed;
+  /** Half-depth of the bed's water-driven active layer, metres. Defaults to the grid spacing. */
+  readonly wakeDepth?: number;
+  /** Share of impinging impulse converted to resolved bed shear. Defaults to 0.05. */
+  readonly wakeFraction?: number;
   /** Horizontal contact elevation in metres if no terrain field is supplied. Omit for an open domain. */
   readonly floor?: number;
   /** Grid-ground Coulomb coefficient, default 0.55. */
@@ -90,6 +96,8 @@ export interface GranularMpmLoadOptions {
   readonly id?: string;
   /** Publish material volume changes to the bedChange field. Default false. */
   readonly projectBed?: boolean;
+  /** Receive real swimming wake impulses in the material layer. Also enable projectBed. Default false. */
+  readonly bedWakes?: boolean;
   readonly signal?: AbortSignal;
 }
 
@@ -105,6 +113,7 @@ export interface GranularMpmSample {
 type Native = {
   readonly __stack_pointer: WebAssembly.Global;
   mpm_layer: LayerRaster;
+  mpm_wake: WakeKernel;
   mpm_scatter(
     points: number,
     count: number,
@@ -115,6 +124,8 @@ type Native = {
     active: number,
     control: number,
     dt: number,
+    kicks: number,
+    driven: number,
   ): number;
   mpm_move(
     points: number,
@@ -229,12 +240,14 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
   private floor: number | undefined;
   private bed: Bed | undefined;
   private layer?: GranularLayer;
+  private wake?: GranularWake;
 
   private constructor(
     readonly id: string,
     private readonly plain: WebAssembly.Module,
     private readonly shared: WebAssembly.Module | undefined,
     private readonly projectBed: boolean,
+    private readonly bedWakes: boolean,
   ) {
     this.field = {
       name: `${id}:materialPoints`,
@@ -255,12 +268,19 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
         : undefined,
     ]);
     signal?.throwIfAborted();
-    return new GranularMpmSolver(options.id ?? 'granular-mpm', plain, shared, options.projectBed ?? false);
+    return new GranularMpmSolver(
+      options.id ?? 'granular-mpm',
+      plain,
+      shared,
+      options.projectBed ?? false,
+      options.bedWakes ?? false,
+    );
   }
 
   describe() {
     const fields: FieldUse[] = [{ field: this.field, access: 'write' }];
     if (this.projectBed) fields.push({ field: BED_CHANGE_FIELD, access: 'accumulate' });
+    if (this.bedWakes) fields.push({ field: SWIM_WAKE_FIELD, access: 'read' });
     return { id: this.id, rate: 0 as const, stableRate: () => this.rate, fields };
   }
 
@@ -277,6 +297,8 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
     this.bed = params.bed;
     if (this.projectBed !== Boolean(params.bedSurface))
       invalid('Set projectBed and supply the receiving bedSurface together.');
+    if (this.bedWakes && !params.bedSurface)
+      invalid('Enable bed projection and supply a bedSurface when receiving swim wakes.');
     if (params.bedSurface && params.bedSurface === params.bed)
       invalid('Use the receiving surface for deposition and a separate bed or floor for support.');
     this.pointCount = params.points.length;
@@ -316,6 +338,16 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
       invalid('Rebuild both granular MPM module variants with the world stack export.');
     if (params.bedSurface)
       this.layer = new GranularLayer(host, params.bedSurface, this.cellSize, this.native.mpm_layer);
+    if (this.bedWakes && params.bedSurface)
+      this.wake = new GranularWake(
+        host,
+        params.bedSurface,
+        positive(params.wakeDepth ?? this.spacing, 'active wake depth'),
+        inRange(params.wakeFraction ?? 0.05, 'wake impulse fraction', 0, 1),
+        this.cellSize,
+        this.pointCount,
+        this.native.mpm_wake,
+      );
     this.native.__stack_pointer.value = (stack.byteOffset + stack.byteLength) & ~15;
     this.words(this.control).set([
       ...host.gravity,
@@ -383,6 +415,7 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
       model = this.models.byteOffset,
       node = this.nodes.byteOffset,
       list = this.active.byteOffset;
+    const delivered = this.wake?.prepare(context, this.points, this.pointCount);
     const used = this.native.mpm_scatter(
       point,
       this.pointCount,
@@ -393,6 +426,8 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
       list,
       this.control.byteOffset,
       dt,
+      this.wake?.kicks.byteOffset ?? this.control.byteOffset,
+      Number(this.wake !== undefined),
     );
     this.check(used);
     try {
@@ -415,6 +450,7 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
         ),
       );
       this.layer?.update(this.points, this.pointCount, this.cell);
+      if (delivered) this.wake?.commit(delivered);
       this.words(this.work)[0] = used;
     } finally {
       this.native.mpm_clear(node, this.slots, list, used);
@@ -441,7 +477,7 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
   importPorts(): void {}
 
   stateRegions(): readonly Region[] {
-    return [this.points, this.work, ...(this.layer?.regions() ?? [])];
+    return [this.points, this.work, ...(this.layer?.regions() ?? []), ...(this.wake ? [this.wake.ledger] : [])];
   }
 
   extraState(): readonly Region[] {
@@ -461,6 +497,11 @@ export class GranularMpmSolver implements Solver<GranularMpmParams> {
       logPlasticVolume: data[at + 26]!,
       material: data[at + 27]!,
     };
+  }
+
+  /** Cumulative net horizontal impulse accepted from swimming wakes, in N·s. */
+  get wakeImpulse(): Vec3 {
+    return this.wake?.impulse ?? [0, 0, 0];
   }
 
   /** Number of occupied grid nodes in the last completed step. */

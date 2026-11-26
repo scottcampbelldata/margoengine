@@ -15168,6 +15168,19 @@ offset. The height change at a vertex is its volume change divided by the exact
 vertex area from the terrain host. A uniform translation verifies the transferred
 volume analytically and restores the previous layer state exactly.
 
+The BB-7 adapter receives the published water-side impulse and follows the existing
+swimming-sediment fixture's outward spread and shear fraction. Nallamuthu Rajaratnam,
+[*Erosion by Plane Turbulent Jets*](https://www.iahr.org/library/infor?pid=6873) (1981),
+and [*Erosion by Impinging Circular Turbulent Jets*](https://doi.org/10.1061/JYCEAJ.0004852)
+(1976), show that a submerged impinging jet erodes through its bed wall jet. The
+local MPM adapter resolves a compact radial shear profile and subtracts the
+mass-weighted mean of its radial directions. The radial shear therefore redistributes
+the layer without creating net horizontal impulse. The normalized quartic footprint
+has area integral `πr²/3`; its vertical taper through the solid half-band gives
+volume `πr²d/6`. If fewer grains occupy the footprint, only that covered share of the
+incoming tangential impulse is applied. The test with a slower emitter proves the
+exact accepted momentum and verifies that one publication is consumed once.
+
 For the voxel fallback, the two-cell swap preserves the exact liquid amount and
 metadata while sand descends. The conservation condition is independent of the
 continuum yield law. Yongning Zhu and Robert Bridson,

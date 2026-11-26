@@ -5052,6 +5052,10 @@ change an existing terrain surface, load with `projectBed: true` and provide its
 `bedSurface` in the solver settings. Give the particles a separate support floor or
 bedrock bed. The solver records the starting layer and publishes each change in
 column volume through `bedChange`, so relief persists on the existing terrain.
+Load with `bedWakes: true` as well to accept the swimming solver's real water-side
+impulses. By default the active layer extends one grid spacing around the bed
+surface and receives 5% of the impinging impulse as distributed tangential shear.
+Set `wakeDepth` or `wakeFraction` to supply other measured values.
 
 ## Physical strand guides
 
