@@ -333,6 +333,12 @@ Earlier design work on some open solvers, to start from. Formulas are as the des
 - **Collider:** `BedCollider`, a fixed body holding the kernel's height field, edited in place through
   `PhysicsCollider.setHeights` (the kernel's `refit_grid`): editing the ground every step allocates nothing.
 
+## Scope: solvers only (Scott, 2026-11-26)
+
+This queue builds the 103 physics solvers in `docs/physics-solvers.md`, each to "The standard: the best solver we can
+build", and nothing else. Engine tooling, refactors and non-physics packages are outside it. A parity row counts only
+when it is a capability of a solver.
+
 ## One solver at a time, start to finish (Scott, 2026-11-26)
 
 Scott: "complete wave all the way start to finish until it's done and passes all eight test and wire it into anything
@@ -365,8 +371,9 @@ REOPENED row, then the Open rows.
   names. Rows with no solver are assigned here:
   - 2D soft bodies (S2-01 to S2-12, SB-03, and the 2D parts of SB-01, SB-12 and SB-17): Claude, with SOFT-02.
   - X-60 unified particles: Codex, with FLUID-01 and FLUID-02.
-  - X-81 rollback and X-82 snapshot sync: Claude, with DYN-03.
-  - X-84 record-and-replay debugger, X-85 per-island profiler, X-86 binary shape cache: Claude, with DYN-01.
+  - Engine features that are not solvers are out of scope for this work (Scott, 2026-11-26: only solvers are
+    built): X-81 rollback, X-82 snapshot sync, X-84 replay debugger, X-85 per-island profiler and X-86 binary shape
+    cache. They stay MISSING in the parity docs and have no owner.
 - Upgrades (Scott, 2026-11-26): Codex builds every upgrade, on every REOPENED row, whoever first built it. Claude
   finishes the builds it still has CLAIMED, then verifies: each row Codex sets LANDED is checked and set VERIFIED,
   or REOPENED with reasons.
