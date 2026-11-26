@@ -35,7 +35,8 @@
 // - Slamming: Ochi, "Prediction of occurrence and severity of ship slamming at sea", 5th Symp. Naval Hydrodynamics
 //   (1964): a slam needs the bow to leave the water and re-enter faster than 0.093 sqrt(g L).
 // - Lamp glints: Cox and Munk, "Measurement of the roughness of the sea surface from photographs of the sun's glitter",
-//   J. Opt. Soc. Am. 44 (1954); GGX D (Walter et al. 2007); Schlick's Fresnel with F0 = 0.02.
+//   J. Opt. Soc. Am. 44 (1954); the Water's glint lobe (index.ts seaGlint): GGX D (Walter et al. 2007), Schlick-Smith G,
+//   Schlick's Fresnel with F0 = 0.02.
 // Margo's own choices are named where they are made: the bow ridge's shape past its crest, the foam widths and the
 // splash rates.
 import type { EngineKernel } from '@margoengine/core';
@@ -43,7 +44,6 @@ import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from 
 import type { Water } from './index.js';
 import { addSurfaceEffect, surfaceEffects } from './surface-effects.js';
 import { fault, rangeError, typeError } from '../../shared/errors.js';
-import { ggxDenominatorOf } from '../../shared/light-terms.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
@@ -211,7 +211,10 @@ export interface ShipWakeLook {
   foamLife: number;
   /** Strength of the turbulent (propeller) wake's foam, 0..3. Default 1. */
   turbulentWake: number;
-  /** Roughness of lamp glints, 0.02..1; null follows the Water's glitter, which follows the wind. Default null. */
+  /**
+   * Roughness of lamp glints, 0.02..1, perceptual like the Water's glitter (GGX alpha = roughness^2, widened by the
+   * waves' slope variance); null follows the Water's glitter, which follows the wind. Default null.
+   */
   lampRoughness: number | null;
   /** Multiplier of every lamp's intensity, 0..100. Default 1. */
   lampIntensity: number;
@@ -608,17 +611,19 @@ fn shipWake(p:vec2f,sampleFoam:bool)->ShipSurface {
  }
  return ShipSurface(height,clamp(foam,0.0,1.0),vec4f(tint.rgb,clamp(tint.w,0.0,1.0)));
 }
-// Lamp glints: GGX reflection of each point lamp off the sea's normal n, seen along v, at roughness rough.
+`;
+// Placed beside the Water's glint functions, after `struct Output`: WaveQuery compiles the surface part before it alone.
+const LAMP_WGSL = /* wgsl */ `
+// Lamp glints: each point lamp reflected off the sea's normal n, seen along v, through the Water's own glint lobe
+// (seaGlint: alpha = rough^2 plus the waves' slope variance), so a lamp and the sun glitter alike at one roughness.
 fn shipLamps(world:vec3f,n:vec3f,v:vec3f,waterRough:f32)->vec3f {
  var rough=waterRough;if(shipData.head.z>0.0){rough=shipData.head.z;}
- let a2=max(rough*rough,1e-4);var sum=vec3f(0);
+ var sum=vec3f(0);
  for(var i=0u;i<u32(shipData.head.y);i++){
   let lamp=shipData.lamps[i*2u];let color=shipData.lamps[i*2u+1u].rgb;
   let toLamp=lamp.xyz-world;let dist2=max(dot(toLamp,toLamp),0.01);let l=toLamp*inverseSqrt(dist2);
-  let nl=dot(n,l);if(nl<=0.0){continue;}
-  let h=normalize(l+v);let nh=max(dot(n,h),0.0);let q=${/* @__PURE__ */ ggxDenominatorOf('n', 'h')};let dd=a2/(3.14159265*q*q);
-  let fresnel=0.02+0.98*pow(1.0-max(dot(v,h),0.0),5.0);
-  sum+=color*lamp.w*shipData.foam.w*dd*fresnel/(4.0*max(dot(n,v),0.05)*dist2)*nl;
+  if(dot(n,l)<=0.0){continue;}
+  sum+=color*(lamp.w*shipData.foam.w/dist2)*seaGlint(n,v,l,rough);
  }
  return sum;
 }
@@ -993,7 +998,8 @@ function shipShader(code: string, binding: number): string {
   const colorLine = 'var color=mix(body,skyColor(reflect(-v,n),rough),reflection)+glint*shade;';
   const bodyStart = 'let body=bottom*transmission+';
   const foamAlbedo = 'vec3f(0.72,0.77,0.74)';
-  for (const needle of [surfaceReturn, foamLine, bodyStart, colorLine, foamAlbedo])
+  const glintStart = 'fn directionalGlint(';
+  for (const needle of [surfaceReturn, foamLine, bodyStart, colorLine, foamAlbedo, glintStart])
     if (!code.includes(needle))
       throw fault('state', 'ShipWakes found no place in the Water shader for the wake; update @margoengine/water');
   const head = `
@@ -1026,6 +1032,7 @@ ${WAKE_WGSL}`;
   foam=max(foam,clamp(pattern*(wash*mix(0.40,1.45,flecks)+islands*flecks),0.0,1.0));
  }`,
       )
+      .replace(glintStart, LAMP_WGSL + glintStart)
       .replace(bodyStart, 'var body=bottom*transmission+')
       .replace(
         colorLine,

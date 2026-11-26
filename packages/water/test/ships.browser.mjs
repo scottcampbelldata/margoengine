@@ -2,7 +2,7 @@
 // WaveQuery at the grid's vertices, is the CPU law of ShipWakes.sample (the measured Kelvin and Rabaud-Moisy bounds are
 // held on that law in ships.test.js), on the open sea and on a Flood's water; a Floater rides the drawn wake on the flood
 // as it rides the CPU law; and a lamp's glint on a night sea stands on the mirror line between the eye and the lamp,
-// longer on a rougher sea.
+// longer on a rougher sea, and glitters like the sun at one roughness (one lobe, KB-SHIPLAMP1).
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -316,6 +316,46 @@ try {
   result.dark = await frame(0, 0.08);
   result.sharp = await frame(1, 0.08);
   result.wide = await frame(1, 0.4);
+  // 4. One lobe for the sun and a lamp (KB-SHIPLAMP1): a lamp 10 km away along the sun's direction, as bright at the sea
+  // as the sun, must glitter like the sun at the Water's own roughness (lampRoughness null). The sun is the Water's
+  // retained glint light, so the engine light on the body and foam stays the same in every frame.
+  const lobe = async (sun, lamp) => {
+    await page.evaluate(
+      async ({ sun, lamp }) => {
+        const { engine, lamps, sunLight } = window.shipsTest;
+        lamps.setLook({ lampIntensity: lamp, lampRoughness: null });
+        sunLight.direction[3] = sun;
+        engine.render({ delta: 0 });
+        await engine.gpu.queue.onSubmittedWorkDone();
+      },
+      { sun, lamp },
+    );
+    return page.locator('canvas').screenshot();
+  };
+  await page.evaluate(async () => {
+    const t = window.shipsTest;
+    const { Water } = await import('/packages/water/dist/index.js');
+    const { ShipWakes } = await import('/packages/water/dist/ships.js');
+    t.lamps.dispose();
+    t.night.dispose();
+    // The mirror point of the eye at [0, 4, 0] is [0, 0, -25]; the lamp sits 1e4 m from it along l = (0, 4, -25) / |.|,
+    // so 1e6 x lampIntensity 5 over 1e8 m^2 gives an irradiance of 0.05, the sun's below.
+    t.sunLight = { direction: [0, 4, -25, 0], radiance: [1, 1, 1] };
+    t.night = Water.attach(t.engine, {
+      size: [400, 400],
+      segments: 64,
+      waves: [{ direction: [1, 0], amplitude: 0.02, wavelength: 3 }],
+      lights: [t.sunLight],
+    });
+    const k = 1e4 / Math.hypot(4, 25);
+    t.lamps = ShipWakes.attach(t.engine, {
+      surface: t.night,
+      lamps: [{ position: [0, 4 * k, -25 - 25 * k], intensity: 1e6, color: [1, 1, 1] }],
+    });
+  });
+  result.lobeOff = await lobe(0, 0);
+  result.lobeSun = await lobe(0.05, 0);
+  result.lobeLamp = await lobe(0, 5);
   result.validation = await page.evaluate(async () => {
     const { engine, lamps, night } = window.shipsTest;
     lamps.dispose();
@@ -411,9 +451,45 @@ try {
     `the glint is off the mirror line at column ${g1.bestX} of ${dark.width}`,
   );
   assert.ok(g2.lit > g1.lit * 1.5, `a rougher sea should spread the glint (${g1.lit} -> ${g2.lit} pixels)`);
+  // The sun's and the far lamp's glints: the same pixels lit and the same peak, within the lamp's few-mrad parallax.
+  const lobeOff = await luminance(result.lobeOff),
+    lobeSun = await luminance(result.lobeSun),
+    lobeLamp = await luminance(result.lobeLamp);
+  const added = (img) => {
+    let best = 0,
+      lit = 0,
+      sum = 0;
+    for (let k = 0; k < img.out.length; k++) {
+      const a = Math.max(0, img.out[k] - lobeOff.out[k]);
+      if (a > best) best = a;
+      if (a > 8) lit++;
+      sum += a;
+    }
+    return { best, lit, sum };
+  };
+  const sunLobe = added(lobeSun),
+    lampLobe = added(lobeLamp);
+  console.log('sun and lamp glint at one roughness:', JSON.stringify({ sun: sunLobe, lamp: lampLobe }));
+  assert.ok(sunLobe.lit > 20, `the sun adds no glint (${sunLobe.lit} pixels)`);
+  assert.ok(
+    lampLobe.lit > sunLobe.lit * 0.8 && lampLobe.lit < sunLobe.lit * 1.25,
+    `a lamp glints ${lampLobe.lit} pixels where the sun at the same roughness glints ${sunLobe.lit}`,
+  );
+  assert.ok(
+    lampLobe.sum > sunLobe.sum * 0.8 && lampLobe.sum < sunLobe.sum * 1.25,
+    `a lamp adds ${lampLobe.sum} where the sun adds ${sunLobe.sum}`,
+  );
   assert.equal(result.validation, null);
   assert.deepEqual(errors, []);
-  const report = { hardware, open, early, flood, ride: result.ride, glint: { sharp: g1, wide: g2 } };
+  const report = {
+    hardware,
+    open,
+    early,
+    flood,
+    ride: result.ride,
+    glint: { sharp: g1, wide: g2 },
+    lobe: { sun: sunLobe, lamp: lampLobe },
+  };
   await writeFile(
     `test-results/water-ships-${hardware?.compat ? 'compat' : 'webgpu'}.json`,
     JSON.stringify(report, null, 2),

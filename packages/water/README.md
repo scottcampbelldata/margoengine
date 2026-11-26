@@ -1468,7 +1468,9 @@ console.log(fronts.length, fronts[0].count, geometry.positions.length / 3, mater
 - `SHIP_SETTINGS` in `@margoengine/water/settings` holds the slider rows on the shared shape, all live. They are
   `wakeHeight`, `sternWaves`, `wakeLife`, `bowWave`, `waterlineFoam`, `foamLife`, `turbulentWake`, `lampRoughness`,
   `lampIntensity`, `sprayRate`, `slamBurst` and `slamThreshold`. `lampRoughness` defaults to null, which follows the
-  Water's glitter and so the weather's wind. `SHIP_LOOKS` names `calmNight` and `heavyWeather`. `applyShipSettings(wakes,
+  Water's glitter and so the weather's wind. A lamp reflects through the Water's own glint lobe, so a set
+  `lampRoughness` is a perceptual roughness like the Water's (GGX alpha is its square, widened by the waves' slope
+  variance), and a lamp and the sun glitter alike at one roughness. `SHIP_LOOKS` names `calmNight` and `heavyWeather`. `applyShipSettings(wakes,
   values, splash?)` writes a set of values.
 
 ```ts
