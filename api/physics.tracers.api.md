@@ -94,6 +94,21 @@ export interface TracerDiffusionKnot {
     diffusivity: number;
 }
 
+export interface TracerFlocConditions {
+    concentration: number;
+    shearRate: number;
+}
+
+export type TracerFlocEnvironment = TracerFlocConditions | ((x: number, y: number, z: number, time: number) => TracerFlocConditions);
+
+export interface TracerFlocculation {
+    material?: TracerMaterial | 'silt';
+    initialDiameter?: number;
+    aggregation: number;
+    breakup: number;
+    environment: TracerFlocEnvironment;
+}
+
 export interface TracerHorizontalDispersion {
     referenceScale: number;
     exponent?: number;
@@ -150,6 +165,7 @@ export interface TracerParams {
     horizontalDiffusivity?: number;
     horizontalDispersion?: TracerHorizontalDispersion;
     bedWash?: TracerBedWash;
+    flocculation?: TracerFlocculation;
     verticalDiffusivity?: number;
     verticalDiffusivityProfile?: readonly TracerDiffusionKnot[];
     particleMass?: number;

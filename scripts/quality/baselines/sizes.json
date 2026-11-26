@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20645716,
+  "total": 20646479,
   "history": [
     {
       "date": "2026-10-24",
@@ -13879,6 +13879,12 @@
       "commit": "1b1a25c619",
       "reason": "BREAK-03 measured circular indentation grows the optional crush entry from 11206 to 12430 B gzip. The ceiling rises from 11543 to 12803 B. The same optional family exposes the structural material model and renderable surface. A separate entry would repeat loading and surface-view plumbing for scenes that use both rectangular buckling and circular indentation. Named imports remain tree-shakable.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "59c7854b6c",
+      "grew": 1,
+      "reason": "SEA-15's cohesive floc kinetics moves physics/tracers from 14915 to 15656 B gzip. The optional ceiling rises from 15363 to 16126 B. Floc kinetics shares the existing sediment parcels, position integration and dry-mass ledger. A separate entry would need a second parcel store or per-particle coupling adapter."
     }
   ],
   "items": {
@@ -14758,7 +14764,7 @@
     "@margoengine/physics/thermal": 6930,
     "@margoengine/physics/thin-film": 16084,
     "@margoengine/physics/tissue": 3218,
-    "@margoengine/physics/tracers": 15363,
+    "@margoengine/physics/tracers": 16126,
     "@margoengine/physics/tsunami": 6794,
     "@margoengine/physics/underwater": 5014,
     "@margoengine/physics/vegetation": 9685,
