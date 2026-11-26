@@ -87,6 +87,11 @@ first: each names its scope, its evidence file and how to reproduce it.
   crack history. A neighboring cell can nucleate on a later step while the first material
   region stays intact after its opening. Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
 
+- Local remeshing after nucleation (SOFT-04, 2026-11-26). An untouched tetrahedron along the
+  same supporting plane stays at one cell. It previously grew to four. A repair across an
+  adjacent face preserves enclosure and volume and releases only the selected cell's section.
+  Run `node --test packages/physics/tests/coupling/volumetric-cut.test.js`.
+
 - Synoptic weather (ATMO-10, 2026-11-26). The regional solver reproduces independent discrete geostrophic,
   curved-flow and Rossby solutions, and Smith–Barstad's neutral terrain-wave limit. Airborne water plus fallout
   matches initial storage plus evaporation. The coupling fixtures use land precipitation, runoff, shallow-water

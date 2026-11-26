@@ -727,3 +727,57 @@ test('native nucleation selects the largest cell strain and leaves other materia
   world.advance(12);
   assert.equal(events.length, 2);
 });
+
+test('a local tensile crack leaves distant tetrahedra unrefined even on the same plane', async () => {
+  const distant = position.map(([x, y, z]) => [x + 8, y, z]);
+  const desc = new SoftBodyDesc([...position, ...distant])
+    .setCells([0, 1, 2, 3, 4, 5, 6, 7])
+    .setSurface()
+    .setPinnedParticles([0, 1, 2, 3, 4, 5, 6, 7])
+    .setTensileNucleation(0.005);
+  const { soft, body, world } = await specimen(desc);
+  const events = [];
+  soft.onTear((event) => events.push(event));
+  body.setParticleKinematicTarget(3, [0, 0, 2.2]);
+  world.advance(1);
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0].cells, [0]);
+  assert.equal(events[0].pieces.length, 3);
+  const unchanged = events[0].pieces.find((piece) => piece.particlePosition(0)[0] >= 8);
+  assert.ok(unchanged);
+  assert.equal(unchanged.numCells(), 1);
+  assert.deepEqual(unchanged.particlePositions(), Float32Array.from(distant.flat()));
+});
+
+test('local nucleation conforms to its face neighbor and releases only the selected cell', async () => {
+  const desc = new SoftBodyDesc([...position, [0, -2, 0]])
+    .setCells([0, 1, 2, 3, 0, 4, 1, 3])
+    .setSurface()
+    .setPinnedParticles([0, 1, 2, 3, 4])
+    .setTensileNucleation(0.005);
+  const { soft, body, world } = await specimen(desc);
+  const events = [];
+  soft.onTear((event) => events.push(event));
+  const stretch = 1.1;
+  body.setParticleKinematicTarget(3, [0, 0, 2 * stretch]);
+  world.advance(1);
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0].cells, [0]);
+  assert.equal(events[0].pieces.length, 1);
+  const [piece] = events[0].pieces;
+  closed(piece);
+  bound(piece.volume(), 2 * stretch * unitVolume, 2 * unitVolume);
+  const triangles = piece.triangles();
+  let lips = 0;
+  for (let i = 0; i < triangles.length; i += 3) {
+    const [p, q, r] = [...triangles.subarray(i, i + 3)].map((slot) => piece.particlePosition(slot));
+    if ([p, q, r].every((v) => Math.abs(v[2] - stretch / 2) < 4 * epsilon32)) {
+      assert.ok(
+        [p, q, r].every((v) => v[1] >= 0),
+        'the neighboring tetrahedron keeps its material connection',
+      );
+      lips += Math.abs((q[0] - p[0]) * (r[1] - p[1]) - (r[0] - p[0]) * (q[1] - p[1])) / 2;
+    }
+  }
+  bound(lips, 2.25, 2.25);
+});

@@ -10066,6 +10066,8 @@ The unseeded option scans the existing native cell state after contact, bounds t
 strain and diagonalizes the surviving symmetric tensors. The principal direction orients the
 exact centroid section of the most stretched cell. The inherited native flag suppresses
 repeat nucleation in that material region and leaves all uncracked neighbors eligible.
+The remesher shares the split faces and edges with incident neighbors. The matching facets
+keep the mesh closed, and remote tetrahedra stay at their original resolution.
 
 Orthotropic fracture evaluates material-frame stress after native elasticity and contact. It
 filters tensile, compressive and shear utilization separately. That optional state follows

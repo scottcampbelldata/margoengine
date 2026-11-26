@@ -167,6 +167,12 @@ region and prevents the same material from nucleating repeatedly.
 [Graphical Modeling and Animation of Brittle Fracture](https://doi.org/10.1145/311535.311550)
 [Stable Orthotropic Materials](https://viterbi-web.usc.edu/~jbarbic/orthotropic/LiBarbicStableOrthotropicMaterials-SCA2014.pdf).
 
+O'Brien and Hodgins (1999), §4.3, describe sharing the edges split by the fracture with
+the original tetrahedron's face and edge neighbors. Margo registers those edge nodes and the
+split faces once. A neighbor matches the registered facets and makes its interior tetrahedra
+from that boundary. The center nodes do not insert new points on any other old edges.
+[Graphical Modeling and Animation of Brittle Fracture](https://doi.org/10.1145/311535.311550).
+
 ### Soil pressure, shear and permanent footprints (EARTH-05)
 
 M. G. Bekker, *Introduction to Terrain-Vehicle Systems* (1969), supplies the plate fit

@@ -9663,8 +9663,8 @@ Unseeded tensile nucleation scans the cells once after the soft step. It selects
 principal elastic Green strain and opens the full centroid section of that cell. The scan skips
 inverted and previously nucleated material and uses an eigenvalue bound to avoid diagonalizing
 cells whose strain is too low. Other cells remain eligible after the topology changes. The
-remesher may also subdivide tetrahedra intersecting the supporting plane to preserve shared
-faces. Crack-front tracking and mixed-mode propagation remain open. Use tensile nucleation
+remesher subdivides the selected tetrahedron and only the original neighbors that share its
+split faces or edges. Crack-front tracking and mixed-mode propagation remain open. Use tensile nucleation
 as the fracture rule on unskinned cells without independent springs or clusters.
 The optional entry measures 140,330 B gzip including a 96,131 B lazy native kernel.
 In the loaded ladder fixture, one finite incision subdivides 240 original tetrahedra into

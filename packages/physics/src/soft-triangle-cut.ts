@@ -98,6 +98,12 @@ class IncisionGeometry {
     return point;
   }
 
+  sectionEdge(a: number, b: number): number {
+    const point = this.intersection(0, a, b);
+    this.subdivisions.set(edgeKey(a, b), [point]);
+    return point;
+  }
+
   /** Both tetrahedra incident to an old facet insert the same blade-line intersections along it. */
   capEdge(a: number, b: number): void {
     const key = edgeKey(a, b);
@@ -224,7 +230,7 @@ export function planTriangleCut(
       normal: cross(n, subtract(blade[(i + 1) % 3]!, blade[i])),
     })),
   ];
-  return planIncision(current, cells, planes, null);
+  return planIncision(current, cells, planes);
 }
 
 /** Release the entire section through the nominated material tetrahedron. */
@@ -239,15 +245,55 @@ export function planNucleatedCut(
     for (let k = 0; k < 4; k++) sum += current[cells[cell * 4 + k]! * 3 + axis]!;
     return sum * 0.25;
   });
-  return planIncision(current, cells, [{ origin, normal }], cell);
+  const geometry = new IncisionGeometry(current, [{ origin, normal }]);
+  const distances = cutDistances(current, origin, normal);
+  const tetrahedron = (id: number): Tet => [cells[4 * id]!, cells[4 * id + 1]!, cells[4 * id + 2]!, cells[4 * id + 3]!];
+  const seed = tetrahedron(cell);
+  const halves = SIGNS.map((side) =>
+    FACES.map((face) => faceIntersection(seed, face, side, distances, (a, b) => geometry.sectionEdge(a, b))),
+  );
+  const ring = sectionPolygon(halves[0]!, (p) => p >= distances.length || distances[p] === 0);
+  if (!geometry.hasArea(ring)) return null;
+  const cap = geometry.triangles(ring, true);
+  const severed = new Set(cap.map(faceKey));
+  const halvesTriangles = halves.map((faces) => faces.map((face) => geometry.triangles(face, false)));
+  // A neighboring tetrahedron only needs the face split or individual edge nodes created by the seed.
+  // Its other faces keep their old topology, so this repair does not propagate down the cutting plane.
+  const shared = new Map(
+    FACES.map((face, i) => [faceKey(face.map((slot) => seed[slot])), halvesTriangles.flatMap((side) => side[i]!)]),
+  );
+  const children: SliceCell[] = [];
+  for (let parent = 0; parent < cells.length / 4; parent++) {
+    const tet = tetrahedron(parent);
+    if (parent === cell) {
+      for (const half of halvesTriangles) addCones(children, geometry, parent, tet, [...half.flat(), ...cap]);
+      continue;
+    }
+    const faces = FACES.map((face) => face.map((slot) => tet[slot]));
+    const triangles = faces.flatMap((face) => {
+      const existing = shared.get(faceKey(face));
+      if (existing) return existing;
+      const refined = geometry.refineEdges(face);
+      return geometry.triangles(refined, refined.length !== 3);
+    });
+    if (triangles.length === 4) children.push({ parent, nodes: tet, inverse: null, fraction: 1 });
+    else addCones(children, geometry, parent, tet, triangles);
+  }
+  return { points: geometry.points, pieces: incisionPieces(children, geometry.points, severed) };
 }
 
-function planIncision(
-  current: Float32Array,
-  cells: Uint32Array,
-  planes: readonly Plane[],
-  nominated: number | null,
-): SlicePlan | null {
+function addCones(
+  result: SliceCell[],
+  geometry: IncisionGeometry,
+  parent: number,
+  tet: Tet,
+  triangles: Triangle[],
+): void {
+  const centre = geometry.centre(triangles.flat());
+  for (const face of triangles) result.push(childCell(parent, tet, [centre, ...face], geometry.points));
+}
+
+function planIncision(current: Float32Array, cells: Uint32Array, planes: readonly Plane[]): SlicePlan | null {
   const g = new IncisionGeometry(current, planes);
   const { origin, normal } = planes[0]!;
   const d = cutDistances(current, origin, normal);
@@ -294,10 +340,9 @@ function planIncision(
     });
   }
 
-  const nominatedSection = nominated === null ? null : parents[nominated]?.parts[0]?.section;
   const openSections = new Set<Section>();
   for (const cap of sections.values()) {
-    if (!cap.negative || !cap.positive || (nominated !== null && cap !== nominatedSection)) continue;
+    if (!cap.negative || !cap.positive) continue;
     let inside = cap.ring;
     for (const plane of g.edgePlanes) {
       if (inside.length === 0) break;
@@ -342,8 +387,7 @@ function planIncision(
       const triangles = faces.flatMap((face, i) => g.triangles(face, face.length !== part.faces[i]!.length));
       if (part.section)
         triangles.push(...(part.section.refined ? part.section.triangles : g.triangles(part.section.ring, false)));
-      const centre = g.centre(triangles.flat());
-      for (const face of triangles) children.push(childCell(parent, tet, [centre, ...face], g.points));
+      addCones(children, g, parent, tet, triangles);
     }
   });
   return { points: g.points, pieces: incisionPieces(children, g.points, severed) };
