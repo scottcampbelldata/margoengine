@@ -32,6 +32,8 @@
   "exports": {
     "./build": "./pipeline/build.js",
     "./optimize": "./pipeline/optimize.js",
+    "./playable": "./pipeline/playable.js",
+    "./playable-runtime": "./pipeline/playable-runtime.js",
     "./presets": "./pipeline/presets.js",
     "./sequence": "./pipeline/sequence.js"
   },

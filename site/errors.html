@@ -66,6 +66,11 @@
       <p><strong>Fix.</strong> Release the first owner (call its <code>dispose()</code> or the function it returned) before attaching another, or create a separate target for the second. The message names what is already attached.</p>
     </section>
     <h2>Messages</h2>
+    <section id="playable">
+      <h2><a href="#playable">margo-convert playable: one-file playable-ad build</a></h2>
+      <p><strong>Cause.</strong> buildPlayable (margo-convert playable) stopped: the file is over its network budget (a MargoError with code failed and the report on error.report), a page, stylesheet or module loads something from the network or names a file outside the root, a module imports a package by name (code unsupported: the input was not bundled), the page has no module entry, or a stylesheet uses @import.</p>
+      <p><strong>Fix.</strong> Read error.report.largest and shrink those files (margo-convert build, smaller textures, compressed audio), pick the budget of the network you upload to or pass allowOverBudget to write the file anyway. Bundle the app first (vite build) and pass its output folder, keep every file under the root, and replace network URLs with files in the folder.</p>
+    </section>
     <section id="actions">
       <h2><a href="#actions">@margoengine/selection/actions: declarative trigger and action rules</a></h2>
       <p><strong>Cause.</strong> An action rule was registered or driven with an unknown trigger, a missing other node or pick function, a negative time, or after it was disposed (a MargoError with code disposed).</p>

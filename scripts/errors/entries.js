@@ -8,6 +8,15 @@
 /** @type {{id: string, title: string, kind: 'code' | 'family', messages: string[], cause: string, fix: string}[]} */
 export const entries = [
   {
+    id: 'playable',
+    title: 'margo-convert playable: one-file playable-ad build',
+    kind: 'family',
+    messages: [],
+    cause:
+      'buildPlayable (margo-convert playable) stopped: the file is over its network budget (a MargoError with code failed and the report on error.report), a page, stylesheet or module loads something from the network or names a file outside the root, a module imports a package by name (code unsupported: the input was not bundled), the page has no module entry, or a stylesheet uses @import.',
+    fix: 'Read error.report.largest and shrink those files (margo-convert build, smaller textures, compressed audio), pick the budget of the network you upload to or pass allowOverBudget to write the file anyway. Bundle the app first (vite build) and pass its output folder, keep every file under the root, and replace network URLs with files in the folder.',
+  },
+  {
     id: 'actions',
     title: '@margoengine/selection/actions: declarative trigger and action rules',
     kind: 'family',

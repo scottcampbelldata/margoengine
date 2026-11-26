@@ -7,6 +7,7 @@ packages models, textures and audio for the web and for each export target.
 npx margo-convert build ./assets --out dist                  # web preset (default)
 npx margo-convert build ./assets --out dist --preset mobile
 npx margo-convert optimize helmet.glb                       # one model -> helmet.optimized.glb
+npx margo-convert playable dist --out playable.html          # one-file playable ad: MRAID hooks, size budget
 ```
 
 ## Build and optimize
@@ -127,6 +128,95 @@ Options: `--out` (default `<folder>.mgc`), `--fps` (24), `--chunk` (most frames 
 out, {fps})` from `margo-convert/sequence`. A frame with no triangles is refused by file name. Each frame holds at most
 1,000,000 vertices (the cache's chunk limit).
 
+## Playable ads: one HTML file
+
+`margo-convert playable` turns a built app into the single self-contained HTML file that playable-ad networks take:
+no other files, and no network requests at run time.
+
+```sh
+npx vite build                                              # or any bundler: an index.html plus its files
+npx margo-convert playable dist --out playable.html --budget unity
+```
+
+The input is a built app folder (its `index.html`), an HTML file, or an entry module (`.js`, `.mjs`; the page is made
+for it). Every file under the folder goes in:
+
+- **Modules**: the entry and every module it imports (static, and `import('./x.js')` with a literal) go in as text and
+  load through an import map of blob URLs, so code splitting keeps working. A module that imports a package by name
+  fails with code `unsupported`: bundle first.
+- **Files**: `new URL('./x.wasm', import.meta.url)` (a literal first argument, as bundlers write it) is rewritten to
+  the in-page asset map, and `fetch` answers a bundled file from it (a path relative to the page, or a URL made from
+  `import.meta.url`) with its content type, so `WebAssembly.instantiateStreaming` and glTF loaders work unchanged.
+  Images, audio, video, fonts and scripts get blob URLs, so `img.src` and `new Audio(url)` work too; other files (Wasm,
+  `.glb`, `.gltf` and its buffers, `.json`, `.ktx2`) get `margo-playable:/<path>` URLs that `fetch` reads, so a `.gltf`
+  finds its `.bin` beside it.
+- **The page**: stylesheets become `<style>` with their `url(...)` files as data URLs; `<img src>`, `<source>` and the
+  like become data URLs; classic scripts are inlined; `modulepreload` and `preload` links are dropped. Script text is
+  escaped so nothing in it can end its element. Source maps, dotfiles and other HTML files stay out.
+- **Size**: the report gives the file raw and gzipped and its largest parts. Over the budget the build fails
+  (MargoError code `failed` with `error.report`; exit 1) unless `allowOverBudget` (`--allow-over-budget`) is set.
+
+Budgets (`PLAYABLE_BUDGETS`, in bytes, "MB" read as 1,000,000, the stricter reading). Networks change their limits:
+pass `{bytes, measure}` (or `--budget <bytes> --measure raw|gzip`) for any other figure, or `false` (`none`) for no check.
+
+| Name | Limit | Measured | Source |
+| --- | --- | --- | --- |
+| `unity` (default) | 4,999,999 | raw | [Unity Ads playable specifications](https://docs.unity.com/en-us/user-acquisition/creatives/specifications/playable): one `index.html`, less than 5 MB, no network requests, MRAID 3.0 |
+| `applovin` | 5,000,000 | raw | [AppLovin creative specs and guidelines](https://support.applovin.com/en/growth/promoting-your-apps/welcome-to-applovin/creative-specs-and-guidelines): one HTML file, 5 MB |
+| `meta` | 2,000,000 | raw | [Meta playable ads](https://developers.facebook.com/docs/app-ads/formats/playable-ad/): a single HTML file over 2 MB is refused |
+| `chartboost` | 3,000,000 | raw | [Chartboost MRAID playable](https://docs.chartboost.com/en/advertising/creatives/mraid-playable/): one bundled standalone HTML file, 3 MB |
+| `liftoff` | 5,000,000 | raw | [Liftoff interactive creatives](https://docs.liftoff.io/liftoff_creatives/liftoff_creatives/interactive_api_integration): single HTML file, 5 MB |
+| `moloco` | 5,000,000 | raw | [Moloco playable and IEC creative guide](https://help.moloco.com/hc/en-us/articles/24124525963799-Playable-and-Interactive-End-Card-IEC-creative-guide): single HTML file under 5 MB |
+| `iab` | 300,000 | gzip | [IAB Tech Lab New Ad Portfolio (2017)](https://www.iab.com/wp-content/uploads/2019/07/IABNewAdPortfolio_FINAL_0719.pdf): full page ad on a phone over 4.5 in, max initial load 300 kB, file weight gzipped; one file is all initial load |
+
+Unity's and Meta's figures were read from their pages on 2026-11-25; the AppLovin, Chartboost, Liftoff and Moloco
+figures from those pages as quoted in [Segwise's network comparison (2026)](https://segwise.ai/blog/playable-ad-specs-by-network-2026)
+and Chartboost's documentation. IAB publishes no playable-specific byte limit: its
+[Playables Playbook (2019)](https://www.iab.com/wp-content/uploads/2019/05/IAB-Playables-Playbook-Final-June-2019.pdf)
+points playables at MRAID 3.0, so `iab` is the New Ad Portfolio's file weight, the strictest figure here. Google Ads,
+Mintegral and TikTok take a ZIP, not one file, so they have no preset.
+
+### MRAID and the click-through
+
+The file waits for MRAID's `ready` event and for the ad to be viewable before it runs the entry (Unity's rule; pass
+`waitForViewable: false` or `--no-wait-viewable` to start at `ready`). With no MRAID it starts once the page is parsed
+and visible. In the app, import the hooks from `margo-convert/playable-runtime`; the published file maps that name to
+its own copy, and in a dev server the same import works without MRAID:
+
+```js
+import { onViewableChange, open, close } from 'margo-convert/playable-runtime';
+
+const audio = new AudioContext();
+onViewableChange((viewable) => (viewable ? audio.resume() : audio.suspend())); // pause and resume with the ad
+document.querySelector('#install')?.addEventListener('click', () => {
+  open('https://apps.apple.com/app/id000000000'); // FbPlayableAd.onCTAClick(), else mraid.open(url), else window.open
+});
+document.querySelector('#done')?.addEventListener('click', () => close()); // mraid.close(); false with no MRAID
+```
+
+`ready({signal})`, `whenViewable({signal})`, `isViewable()`, `hasMraid()` and `assetURL(path)` (the URL of a bundled
+file by its path, for a file the code names without `new URL`) are there too. `mraidScript: true` (`--mraid-script`)
+adds `<script src="mraid.js">` for containers that ask for the tag; Unity and AppLovin inject MRAID themselves. MRAID:
+IAB Tech Lab,
+[Mobile Rich Media Ad Interface Definitions (MRAID) Version 3.0](https://iab.com/wp-content/uploads/2017/07/MRAID_3.0_FINAL.pdf),
+2017 (`getState`, the `ready` and `viewableChange` events, `isViewable`, `open`, `close`).
+
+The same from code:
+
+```js
+import { writeFile } from 'node:fs/promises';
+import { buildPlayable, playableReportText } from 'margo-convert/playable';
+
+const { html, report } = await buildPlayable({ input: 'dist', budget: 'applovin', signal: AbortSignal.timeout(60_000) });
+await writeFile('playable.html', html);
+console.log(playableReportText(report)); // size raw and gzipped, the budget, the largest files
+```
+
+Not done: Web Workers that import other modules (a worker script is a blob of its own and sees no import map), a
+`new URL()` whose first argument is not a literal handed to `img.src` (it gets a `margo-playable:` URL only `fetch`
+reads), `XMLHttpRequest`, CSS `@import`, and minification (bundle minified first). Limits:
+[docs/limits.md](../../docs/limits.md#scale).
+
 ## Thumbnail
 
 Render one model to a PNG with no page, for server thumbnails and asset checks.
@@ -152,6 +242,6 @@ with meshopt, which decodes in Node. Lighting is core's default.
 
 ## Tests
 
-`node --test tests/margo-convert-pipeline.test.js tests/margo-convert-textures.test.js tests/margo-convert-audio.test.js tests/margo-convert-paths.test.js` from the repository root (part of `npm run verify`).
+`node --test tests/margo-convert-pipeline.test.js tests/margo-convert-textures.test.js tests/margo-convert-audio.test.js tests/margo-convert-paths.test.js tests/margo-convert-playable.test.js` from the repository root (part of `npm run verify`).
 
 Apache-2.0 licensed.

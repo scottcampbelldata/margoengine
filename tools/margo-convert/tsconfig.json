@@ -21,6 +21,8 @@
     "pipeline/passes.js",
     "pipeline/textures.js",
     "pipeline/audio.js",
-    "pipeline/meshopt-encode.js"
+    "pipeline/meshopt-encode.js",
+    "pipeline/playable.js",
+    "pipeline/playable-runtime.js"
   ]
 }
