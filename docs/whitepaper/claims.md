@@ -5806,6 +5806,9 @@ which reaches 152,113 faces because the ordered sweep can transfer through many 
 Both tiers reproduce the calibrated 200 mm sandy-loam plate response over a dense layer from Salman et al.
 (2020). A separate analytic test checks the resolved stress at vertices above and below the pressure transition
 and balances their integrated force independently.
+The moving Wh32 carriage reproduces reported sinkage at zero and 20% powered slip, closes the integrated
+vertical force and leaves a persistent rut along its moving path. The same rolling contact receives live rigid
+wheel loads in a separate vehicle-and-belt seek case.
 
 ### Divergence-free particle pressure (FLUID-01)
 

@@ -2,7 +2,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 
 use core::arch::wasm32::{f64x2, f64x2_extract_lane, f64x2_mul, f64x2_sqrt, unreachable};
-use margoengine_physics_kernel_common::pinned::pow;
+use margoengine_physics_kernel_common::pinned::{cos, exp, pow, sin};
 
 struct ArenaOnly;
 unsafe impl core::alloc::GlobalAlloc for ArenaOnly {
@@ -20,6 +20,7 @@ fn abort(_: &core::panic::PanicInfo<'_>) -> ! {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
 struct Patch {
     x: f64,
     z: f64,
@@ -47,6 +48,17 @@ struct Patch {
     transition: f64,
     transition_pressure: f64,
     lower_at_transition: f64,
+    wheel_radius: f64,
+    lug_height: f64,
+    lug_support: f64,
+    peak_fraction: f64,
+    peak_slip: f64,
+    exit_fraction: f64,
+    drive_slip: f64,
+    cohesion: f64,
+    friction: f64,
+    shear_length: f64,
+    projected_area: f64,
 }
 
 fn length(x: f64, z: f64) -> f64 {
@@ -204,11 +216,116 @@ fn layered_pressure(p: &Patch, depth: f64) -> (f64, f64) {
     }
 }
 
+fn root(value: f64) -> f64 {
+    f64x2_extract_lane::<0>(f64x2_sqrt(f64x2(value, value)))
+}
+
+fn arc_sin(value: f64) -> f64 {
+    let v = value.clamp(-1.0, 1.0);
+    if v.abs() == 1.0 {
+        return v * core::f64::consts::FRAC_PI_2;
+    }
+    // Half-angle reduction keeps the Newton iterations away from the vanishing derivative.
+    let y = v / root(2.0 * (1.0 + root((1.0 - v) * (1.0 + v))));
+    let mut angle = y;
+    for _ in 0..5 {
+        angle += (y - sin(angle)) / cos(angle);
+    }
+    2.0 * angle
+}
+
+fn contact_depth(radius: f64, entry: f64, angle: f64) -> f64 {
+    (2.0 * radius * sin(0.5 * (entry + angle)) * sin(0.5 * (entry - angle))).max(0.0)
+}
+
+fn rolling_angle(p: &Patch, entry: f64) -> (f64, f64) {
+    (
+        p.exit_fraction * entry,
+        (p.peak_fraction + p.peak_slip * p.drive_slip) * entry,
+    )
+}
+
+fn rolling_load(p: &Patch, entry: f64) -> f64 {
+    let (exit, peak) = rolling_angle(p, entry);
+    let rim = p.wheel_radius;
+    let lug_entry = 2.0 * arc_sin(root(0.5 * (1.0 - rim * cos(entry) / (rim + p.lug_height))));
+    let lug_sine = sin(lug_entry);
+    let shear_radius = rim + 0.5 * p.lug_height;
+    let mut force = 0.0;
+    for (first, last) in [(exit, peak), (peak, entry)] {
+        let delta = (last - first) / 24.0;
+        for i in 0..24 {
+            let at = first + (i as f64 + 0.5) * delta;
+            let mirrored = if at < peak {
+                entry - (at - exit) * ((entry - peak) / (peak - exit))
+            } else {
+                at
+            };
+            let depth = contact_depth(rim, entry, mirrored);
+            let pressure = if p.lower_stiffness > 0.0 {
+                layered_pressure(p, depth).0
+            } else {
+                p.stiffness * pow(depth, p.exponent)
+            };
+            let slide = rim * ((lug_entry - at) - (1.0 - p.drive_slip) * (lug_sine - sin(at)));
+            let shear = (p.cohesion + pressure * p.friction)
+                * (1.0 - exp(-slide.max(0.0) / p.shear_length));
+            force += delta * (rim * pressure * cos(at) + shear_radius * shear * sin(at));
+        }
+    }
+    2.0 * p.half_width * force
+}
+
+const ROLLING_ROWS: usize = 33;
+
+fn rolling_footprint(p: &mut Patch, depth: &mut [f64; ROLLING_ROWS * 2]) -> f64 {
+    let mut lo = 0.0;
+    let mut hi = core::f64::consts::FRAC_PI_2;
+    if rolling_load(p, hi) < p.load {
+        return f64::NAN;
+    }
+    while hi - lo > 1e-9 {
+        let middle = 0.5 * (lo + hi);
+        if rolling_load(p, middle) < p.load {
+            lo = middle;
+        } else {
+            hi = middle;
+        }
+    }
+    let entry = 0.5 * (lo + hi);
+    let (exit, peak) = rolling_angle(p, entry);
+    let rim = p.wheel_radius;
+    let rear = rim * sin(exit);
+    let fore = rim * sin(entry);
+    let shift = 0.5 * (rear + fore);
+    let highest = contact_depth(rim, entry, peak);
+    for i in 1..ROLLING_ROWS - 1 {
+        let position = rear + (fore - rear) * (i as f64 / (ROLLING_ROWS - 1) as f64);
+        let angle = arc_sin(position / rim);
+        let mapped = if angle < peak {
+            entry - (angle - exit) * ((entry - peak) / (peak - exit))
+        } else {
+            angle
+        };
+        let value = (contact_depth(rim, entry, mapped) / highest).clamp(0.0, 1.0);
+        depth[i] = value;
+        depth[i + ROLLING_ROWS] = value;
+    }
+    p.x += shift * p.forward_x;
+    p.z += shift * p.forward_z;
+    p.half_length = 0.5 * (fore - rear);
+    p.profile = depth.as_ptr() as usize as f64;
+    p.profile_columns = 2.0;
+    p.profile_rows = ROLLING_ROWS as f64;
+    p.projected_area = (fore - rear) * (2.0 * p.half_width);
+    (contact_depth(rim, entry, 0.0) + p.lug_height * p.drive_slip - p.lug_support).max(0.0)
+}
+
 /// Rasterizes one moving soil contact into pending bed deltas, using exact nodal areas for the mass ledger.
 /// Arrays belong to the caller's arena. Scratch is only accessed in the footprint and its first exterior ring.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn stamp(
-    patch: *const f64,
+    patch: *mut f64,
     areas: *const f64,
     peak: *mut f64,
     deltas: *mut f64,
@@ -227,7 +344,20 @@ pub unsafe extern "C" fn stamp(
     origin_x: f64,
     origin_z: f64,
 ) -> f64 {
-    let p = &*patch.cast::<Patch>();
+    let source = &mut *patch.cast::<Patch>();
+    let mut local = *source;
+    let mut rolling_shape = [0.0; ROLLING_ROWS * 2];
+    let rolling_depth = if local.wheel_radius > 0.0 {
+        let depth = rolling_footprint(&mut local, &mut rolling_shape);
+        if !depth.is_finite() {
+            return f64::NAN;
+        }
+        source.projected_area = local.projected_area;
+        Some(depth)
+    } else {
+        None
+    };
+    let p = &local;
     let along_cell = p.forward_x.abs() * dx + p.forward_z.abs() * dz;
     let across_cell = p.forward_z.abs() * dx + p.forward_x.abs() * dz;
     let halo = 0.5 * (along_cell / p.half_length).max(across_cell / p.half_width);
@@ -268,7 +398,10 @@ pub unsafe extern "C" fn stamp(
         if !settlement.is_finite() || !crest_pressure.is_finite() {
             return f64::NAN;
         }
-        layered = p.lower_stiffness > 0.0 && settlement > p.transition;
+        if let Some(depth) = rolling_depth {
+            settlement = depth;
+        }
+        layered = rolling_depth.is_none() && p.lower_stiffness > 0.0 && settlement > p.transition;
         if layered {
             let (area, profile) = largest_vertex;
             // A single vertex carrying the entire prescribed force bounds the solution from above.

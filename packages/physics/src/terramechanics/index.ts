@@ -101,6 +101,24 @@ export interface SoilHardpan {
   readonly exponent?: number;
 }
 
+/** Cylindrical contact geometry for a driven rigid wheel. */
+export interface SoilRollingWheel {
+  /** Rim radius, m, excluding lugs. */
+  readonly radius: number;
+  /** Lug height, m. Default zero. */
+  readonly lugHeight?: number;
+  /** Measured reduction in settlement from lug support, m. Default zero. */
+  readonly lugSupport?: number;
+  /** Increase in bearing exponent per unit of powered slip. Default zero. */
+  readonly slipExponent?: number;
+  /** Fraction of entry angle at the pressure peak with zero slip. Default 0.4. */
+  readonly peakFraction?: number;
+  /** Increase in pressure peak fraction per unit of powered slip. Default 0.3. */
+  readonly peakSlip?: number;
+  /** Exit angle divided by entry angle, in [-1, 0]. Default zero. */
+  readonly exitFraction?: number;
+}
+
 export interface TerramechanicsOptions {
   readonly id?: string;
   /** Read an external SOIL_LAYOUT F64 patch field, e.g. one returned by `soilPatchField`. */
@@ -125,6 +143,8 @@ export interface TerramechanicsParams {
   readonly feet?: readonly LeggedSoilPatch[];
   /** Optional shape for each response row in fixed, external, then foot order. Null uses its built-in shape. */
   readonly profiles?: readonly (SoilContactProfile | null)[];
+  /** Per external load row. Use null to keep its existing shape. Requires the resolved tier. */
+  readonly rollingWheels?: readonly (SoilRollingWheel | null)[];
   /** Minimum elevation to excavate, m in the bed cell. Default no floor. Set the same uniform floor as TerrainBed. */
   readonly floor?: number;
   /** Distance between floating-origin cells, m. Default 4,096. */
@@ -208,6 +228,26 @@ export function wheelSoil(
 type Patch = readonly [number, number, number, number, number, number, number, number, number, number];
 type ProfileSlot = Pick<SoilContactProfile, 'columns' | 'rows' | 'area' | 'perimeter'> & { region: Region };
 
+function rollingWheel(wheel: SoilRollingWheel): Required<SoilRollingWheel> {
+  const radius = positive(wheel.radius, 'wheel radius');
+  const lugHeight = finite(wheel.lugHeight ?? 0, 'wheel lug height', 0);
+  const peakFraction = finite(
+    wheel.peakFraction ?? 0.4,
+    'wheel pressure peak fraction',
+    Number.EPSILON,
+    1 - Number.EPSILON,
+  );
+  return {
+    radius,
+    lugHeight,
+    lugSupport: finite(wheel.lugSupport ?? 0, 'wheel lug support', 0, lugHeight),
+    slipExponent: finite(wheel.slipExponent ?? 0, 'wheel slip exponent increment', 0),
+    peakFraction,
+    peakSlip: finite(wheel.peakSlip ?? 0.3, 'wheel pressure peak slip increment', 0, 1 - Number.EPSILON - peakFraction),
+    exitFraction: finite(wheel.exitFraction ?? 0, 'wheel exit fraction', -1, 0),
+  };
+}
+
 function packed(p: SoilPatch): Patch {
   return [
     p.x,
@@ -250,6 +290,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
   private fixed: Patch[] = [];
   private feet: LeggedSoilPatch[] = [];
   private profiles: (ProfileSlot | null)[] = [];
+  private rolling: (Required<SoilRollingWheel> | null)[] = [];
   private inputRows = 0;
   private cell: Cell = CENTRE;
   private cellSize = 4096;
@@ -339,6 +380,18 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       );
     const responses = this.fixed.length + this.inputRows + this.feet.length;
     const profiles = parameters.profiles ?? [];
+    const rolling = parameters.rollingWheels ?? [];
+    if (rolling.length && (!this.pressureField || rolling.length !== this.inputRows))
+      throw new MargoError(
+        'state',
+        'Rolling wheels need resolved external loads. Supply one entry per external load row.',
+      );
+    if (rolling.some((wheel, row) => wheel && profiles[this.fixed.length + row]))
+      throw new MargoError(
+        'state',
+        'A rolling load has two footprint geometries. Choose a cylindrical wheel or a sampled profile for that row.',
+      );
+    this.rolling = rolling.map((wheel) => wheel && rollingWheel(wheel));
     if (profiles.length && (!this.pressureField || profiles.length !== responses))
       throw new MargoError(
         'state',
@@ -349,7 +402,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     this.areas = allocate('soil-areas', count);
     this.peaks = allocate('soil-peak-settlement', count);
     this.rim = allocate('soil-rim-scratch', count);
-    this.nativePatch = allocate('soil-patch-scratch', 26);
+    this.nativePatch = allocate('soil-patch-scratch', 37);
     this.dust = allocate('soil-dust-flux', count);
     this.budgetRegion = allocate('soil-budget', 5);
     this.response = allocate('soil-response', responses * SOIL_RESPONSE_WORDS);
@@ -415,6 +468,10 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     positive(length, 'contact length');
     positive(width, 'contact width');
     const material = this.material;
+    const rolling = this.rolling[row - this.fixed.length];
+    const forward = [forwardX / direction, forwardZ / direction] as const;
+    const drivingSlip = rolling ? Math.min(1, Math.max(0, -(shearX * forward[0] + shearZ * forward[1]) / length)) : 0;
+    const exponent = positive(material.exponent + (rolling?.slipExponent ?? 0) * drivingSlip, 'effective exponent');
     const resolved = Boolean(this.pressure);
     const ellipse = Boolean(flags & 1);
     const profile = this.profiles[row];
@@ -427,7 +484,9 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const pressure = positive(load / area, 'contact pressure');
     const effectiveWidth = profile
       ? (2 * profile.area) / profile.perimeter
-      : bearingWidth(length, width, ellipse, resolved);
+      : rolling
+        ? width
+        : bearingWidth(length, width, ellipse, resolved);
     const stiffness = positive(
       material.cohesiveModulus / effectiveWidth + material.frictionalModulus,
       'effective stiffness at this footprint width',
@@ -446,7 +505,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
         )
       : 0;
     const transitionPressure = hardpan
-      ? finite(stiffness * pow(transition, material.exponent), 'hardpan transition pressure', 0)
+      ? finite(stiffness * pow(transition, exponent), 'hardpan transition pressure', 0)
       : 0;
     const lowerAtTransition = hardpan
       ? finite(lowerStiffness * pow(transition, hardpan.exponent), 'hardpan pressure', 0)
@@ -454,20 +513,19 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
     const depth = finite(
       hardpan && pressure > transitionPressure
         ? pow((pressure - transitionPressure + lowerAtTransition) / lowerStiffness, 1 / hardpan.exponent)
-        : pow(pressure / stiffness, 1 / material.exponent),
+        : pow(pressure / stiffness, 1 / exponent),
       'settlement',
       0,
     );
     const slip = hypot(shearX, shearZ);
     const share = 1 - exp(-slip / material.shearLength);
-    const shear = finite((material.cohesion + pressure * material.friction) * share, 'shear stress', 0);
     const dust = (1 - material.compaction) * material.dustFraction;
     const { columns, rows, width: dx, depth: dz, centre } = this.terrain;
     this.words(this.nativePatch).set([
       x,
       z,
-      forwardX / direction,
-      forwardZ / direction,
+      forward[0],
+      forward[1],
       length / 2,
       width / 2,
       depth,
@@ -481,7 +539,7 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       Number(resolved),
       load,
       stiffness,
-      material.exponent,
+      exponent,
       profile?.region.byteOffset ?? 0,
       profile?.columns ?? 0,
       profile?.rows ?? 0,
@@ -490,6 +548,17 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       transition,
       transitionPressure,
       lowerAtTransition,
+      rolling?.radius ?? 0,
+      rolling?.lugHeight ?? 0,
+      rolling?.lugSupport ?? 0,
+      rolling?.peakFraction ?? 0,
+      rolling?.peakSlip ?? 0,
+      rolling?.exitFraction ?? 0,
+      drivingSlip,
+      material.cohesion,
+      material.friction,
+      material.shearLength,
+      0,
     ]);
     const peak = this.kernel.stamp(
       this.nativePatch.byteOffset,
@@ -511,10 +580,17 @@ export class Terramechanics implements Solver<TerramechanicsParams> {
       centre[0] - dx / 2,
       centre[1] - dz / 2,
     );
-    this.words(this.response).set(
-      [pressure, finite(peak, 'resolved soil settlement', 0), shear, load],
-      row * SOIL_RESPONSE_WORDS,
-    );
+    if (rolling && !Number.isFinite(peak))
+      throw new MargoError(
+        'state',
+        'The rolling footprint cannot carry the prescribed load above its axle. Reduce the normal load or supply a measured firmer bearing fit.',
+      );
+    const settlement = finite(peak, 'resolved soil settlement', 0);
+    const measuredPressure = rolling
+      ? load / positive(this.words(this.nativePatch)[36]!, 'rolling contact area')
+      : pressure;
+    const shear = finite((material.cohesion + measuredPressure * material.friction) * share, 'shear stress', 0);
+    this.words(this.response).set([measuredPressure, settlement, shear, load], row * SOIL_RESPONSE_WORDS);
   }
 
   private footsteps(port: Port, start: number, bed: Region, dt: number): void {

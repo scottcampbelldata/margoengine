@@ -10471,6 +10471,8 @@ The browser fixture rebuilds the Terrain mesh from the published bed sampler on 
 reaches WebGPU and WebGL2 without transferring a solver-specific render texture.
 The optional hardpan uses a continuous two-regime bearing curve. The resolved native kernel brackets its
 force integral, accounting for stations that reach the layer and those that still load homogeneous soil.
+The rolling option integrates normal and shear stresses on the loaded arc. Its moving projected footprint
+uses the published rigid load and signed shear displacement, and the bed continues to feed the collider.
 
 ### Divergence-free particle pressure
 

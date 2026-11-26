@@ -16834,8 +16834,8 @@ pressures produce persistent relief and loft mineral dust. A configured uniform 
 response. Spatially varying bedrock and shared subsurface layers need a profile contract.
 The original city, deck, horse and courier shots still need the production bindings. The mean
 and resolved tiers reproduce held-out dry quartz and fire clay plate sinkage. The resolved tier supports
-sampled projected shoe and tread contours. Live 3D tread intersection and validation against measured
-moving-footprint and berm profiles remain EARTH-05 work.
+sampled projected contours and reproduces the Wh32 rolling sinkage at zero and moderate powered slip.
+Live 3D tread intersection, high-slip digging and measured berm profiles remain EARTH-05 work.
 
 ### The Last Hold ladder and volumetric solver parity (SOFT-04)
 

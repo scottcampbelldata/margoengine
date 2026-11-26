@@ -4668,6 +4668,14 @@ the original bed and provide the lower layer's `frictionalModulus`. The optional
 `exponent` default to 0 and 1. Footprint width and topsoil friction determine when the pressure cone reaches
 the hardpan. Omit `hardpan` for a homogeneous pressure fit.
 
+For a driven rigid wheel, use `rollingWheels` in the resolved solver's parameters, with one entry per external
+load row. For example, `rollingWheels: [{ radius: 0.15735, lugHeight: 0.01, lugSupport: 0.0015, slipExponent: 0.72 }]`
+is the geometry and slip fit for the 2011 Wh32 test wheel. Pass `null` for each other external row.
+`SoilContactRigidSolver` supplies forward motion, load and signed shear displacement. The rolling model
+finds the loaded arc and uses the computed contact length. Set a measured topsoil exponent and shear fit.
+`peakFraction`, `peakSlip` and `exitFraction` default to 0.4, 0.3 and 0. Use the same modes as the
+[executable moving-wheel example](tests/coupling/terramechanics.test.js).
+
 ## Physical strand guides
 
 Use `@margoengine/physics/strands` to solve guides for hair, fur, feather shafts, and spring-bone

@@ -97,6 +97,16 @@ export interface SoilPatch {
     readonly rounded?: boolean;
 }
 
+export interface SoilRollingWheel {
+    readonly radius: number;
+    readonly lugHeight?: number;
+    readonly lugSupport?: number;
+    readonly slipExponent?: number;
+    readonly peakFraction?: number;
+    readonly peakSlip?: number;
+    readonly exitFraction?: number;
+}
+
 export class Terramechanics implements Solver<TerramechanicsParams> {
     readonly id: string;
     readonly dustField: FieldDescriptor;
@@ -155,6 +165,7 @@ export interface TerramechanicsParams {
     readonly inputRows?: number;
     readonly feet?: readonly LeggedSoilPatch[];
     readonly profiles?: readonly (SoilContactProfile | null)[];
+    readonly rollingWheels?: readonly (SoilRollingWheel | null)[];
     readonly floor?: number;
     readonly cellSize?: number;
 }

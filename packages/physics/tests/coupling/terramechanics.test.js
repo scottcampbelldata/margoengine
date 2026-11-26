@@ -289,6 +289,84 @@ test('Salman et al. sandy loam follows the measured 200 mm plate beyond the hard
   }
 });
 
+test('Ding et al. Wh32 rolling contact follows observed sinkage at zero and moderate powered slip', async () => {
+  const terrain = { columns: 72, rows: 160, width: 0.36, depth: 0.8, centre: [0, 0] };
+  const width = 0.165;
+  const length = 0.12;
+  const load = 80;
+  const speed = 0.08;
+  const material = {
+    cohesiveModulus: 15_600,
+    frictionalModulus: 2_407_400,
+    exponent: 0.84,
+    cohesion: 250,
+    friction: Math.tan((31.9 * Math.PI) / 180),
+    shearLength: 0.0114,
+    dustFraction: 0,
+  };
+  const wheel = { radius: 0.15735, lugHeight: 0.01, lugSupport: 0.0015, slipExponent: 0.72 };
+  // At 0.2 slip, Table 4 reports 0.25 mm at 2.89% relative scatter. Propagating their printed
+  // precision gives a mean in [8.46, 8.84] mm; use two of the measured 0.25 mm scatter widths.
+  for (const [slip, lower, upper] of [
+    [0, 0.00264, 0.00314],
+    [0.2, 0.00796, 0.00934],
+  ]) {
+    const input = soilPatchField('lab-wheel-assembly');
+    let memory, region;
+    const carriage = {
+      describe: () => ({ id: 'carriage', rate: 0, stableRate: () => 0, fields: [{ field: input, access: 'write' }] }),
+      init(host) {
+        memory = host.memory;
+        region = host.allocate('carriage-load', 80, 'f64', 1);
+      },
+      step(context) {
+        regionWords(memory, region).set([
+          0,
+          -0.16 + (speed * context.tick) / 60,
+          0,
+          1,
+          length,
+          width,
+          load,
+          0,
+          -slip * length,
+          0,
+        ]);
+      },
+      exportPorts: (tick) => [{ field: input.name, region, tick, cell: [0, 0, 0] }],
+      importPorts() {},
+      stateRegions: () => [region],
+      extraState: () => [],
+    };
+    const soil = await Terramechanics.load({ tier: 'resolved', input });
+    const bed = new TerrainBed();
+    const world = new PhysicsWorld({ rate })
+      .add(bed, { ...terrain, elevations: () => 0 })
+      .add(carriage)
+      .add(soil, { terrain, material, inputRows: 1, rollingWheels: [wheel] })
+      .couple(['carriage', 'terramechanics', 'bed'], 'staggered');
+    const areas = bedVertexAreas(terrain);
+    world.advance(40);
+    const result = soil.read(0);
+    assert.ok(result.sinkage >= lower && result.sinkage <= upper, `slip ${slip}: ${result.sinkage} m`);
+    const pressure = regionWords(world.memory, world.fields.port(soil.pressureField.name).region);
+    close(
+      pressure.reduce((sum, value, i) => sum + value * areas[i], 0),
+      load,
+      1024 * eps * load,
+    );
+    world.advance(100);
+    assert.ok(bed.bed.sample(0, -0.11).elevation < 0);
+    assert.ok(bed.bed.sample(0, -0.02).elevation < 0);
+    const saved = world.takeSnapshot();
+    world.advance(120);
+    const hash = world.hash();
+    world.restoreSnapshot(saved.bytes);
+    world.advance(120);
+    assert.equal(world.hash(), hash);
+  }
+});
+
 async function steps(kind, speed) {
   const terrain = { columns: 48, rows: 120, width: 3.6, depth: 9, centre: [0, 2] };
   const legged = await LeggedLocomotion.load({ bedShape: terrain });
@@ -413,6 +491,7 @@ async function coupledVehicles(tier) {
     inputRows: 6,
     material: { dustFraction: 0 },
     profiles: tier === 'resolved' ? [null, null, null, null, lug, lug] : undefined,
+    rollingWheels: tier === 'resolved' ? [...wheels.map(({ radius }) => ({ radius })), null, null] : undefined,
   });
   world.couple(['rigid', 'terramechanics', 'bed'], 'staggered');
   world.advance(7);

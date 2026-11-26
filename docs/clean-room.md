@@ -131,6 +131,27 @@ allowing one rendered PDF pixel. This checks the published fitted example. The q
 above use held-out plate geometry.
 [Salman et al.](https://doi.org/10.1299/jamdsm.2020jamdsm0084).
 
+L. Ding, H. Gao, Z. Deng and J. Tao, “Wheel slip-sinkage and its prediction model of lunar rover” (2010),
+Eqs. 13–19 and 22, supplies the slip-adjusted exponent, lug entry and shear geometry, asymmetric Wong–Reece
+normal stress and lug bearing offset. The implementation integrates each side of the pressure maximum
+with 24 midpoint ordinates and brackets the axle load against the vertical components of normal and shear
+stress. It projects the loaded arc onto the bed using 33 stations and normalizes the rasterized vertical
+load. The assumed peak fractions 0.4 and 0.3 use the published empirical range in K. Nagaoka,
+*Study on Soil-Screw Interaction of Exploration Robot for Surface and Subsurface Locomotion in Soft Terrain*
+(2011), Appendix B.2.
+The exit angle is zero by default, a reported simplification in L. Ding, H. Gao, Z. Deng, K. Nagatani and
+K. Yoshida, “Experimental study and analysis on driving wheels’ performance for planetary exploration
+rovers moving in deformable soil” (2011), Sec. 2. The material values come from its separate plate and shear
+tests in Table 2. The rod carriage replays the Wh32 geometry and an 80 N load. The 2010 rolling coefficients
+are 0.84 at zero slip and 0.72 per unit slip, with 1.5 mm lug support. The 2011 observation at zero slip
+is 2.89 mm, checked against a 0.25 mm comparison band from the same wheel's reported Table 4 scatter.
+At 20% slip, the rounded 0.25 mm absolute and 2.89% relative scatter give a mean range of 8.46–8.84 mm.
+The test extends that range by two 0.25 mm scatter widths, giving 7.96–9.34 mm. These cases check
+the two publications’ related rigs and settings.
+[Ding et al. (2010)](https://doi.org/10.1007/s11771-010-0021-7),
+[Ding et al. (2011)](https://www.sciencedirect.com/science/article/pii/S0022489810000601),
+[SOKENDAI thesis appendix](https://ir.soken.ac.jp/record/2467/files/%E7%94%B21413_%E6%9C%AC%E6%96%87.pdf).
+
 ### Synoptic weather and moisture (ATMO-10)
 
 J. G. Charney, R. Fjørtoft and J. von Neumann, “Numerical Integration of the Barotropic Vorticity Equation”

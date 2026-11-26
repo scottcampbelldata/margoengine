@@ -9745,12 +9745,14 @@ with several grid vertices. Surface repose uses one ordered face sweep over the 
 The candidate set follows newly moved soil and can spread far when the specified repose slope approaches zero.
 The ground is a height field with peak indentation per vertex. The optional hardpan adds one uniform
 subsurface pressure transition. Shear and displaced material still use the topsoil fit. Time-varying 3D tread
-contact, spatially varying shared layers, overhangs and accumulated subgrade fatigue remain open. The optional
-uniform excavation floor should match TerrainBed's bedrock. The volume ledger records material crossing the
-modeled bounds, compaction and lofted mineral dust.
+contact, spatially varying shared layers, overhangs and accumulated subgrade fatigue remain open. The rolling
+wheel option resolves the driven rim's average stress envelope below its axle. Lug phase, transient digging,
+braking-specific stress shapes and a direct tyre torque exchange remain open. The optional uniform excavation
+floor should match TerrainBed's bedrock. The volume ledger records material crossing the modeled bounds,
+compaction and lofted mineral dust.
 
-The optional entry is 10,366 B gzip with a 10,388 B ceiling. Both Wasm assets are 10,951 B raw and 4,823 B gzip each.
-The Physics root is 865,979 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
+The optional entry is 10,864 B gzip with a 11,190 B ceiling. Both Wasm assets are 14,955 B raw and 5,969 B gzip each.
+The Physics root is 865,981 B gzip with tracked-attachment motion snapshots. Core and Stage remain 24,820 B gzip.
 
 ## Colour enhancement and channel mixer (`@margoengine/tonemap/enhance`, 2026-11-26)
 
