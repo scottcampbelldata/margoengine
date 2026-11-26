@@ -4,7 +4,7 @@
 import { MargoError } from '@margoengine/math/errors';
 import { forwardDynamics, inverseDynamics, jacobian, massMatrix } from './dynamics.js';
 import type { JointOptions } from './joints.js';
-import type { KernelWorld } from './kernel.js';
+import { JOINT_LOCK, type KernelWorld } from './kernel.js';
 import type { PhysicsBody } from './body.js';
 import type { Vec3 } from './math.js';
 import type { PhysicsJoint } from './joints.js';
@@ -224,6 +224,75 @@ export class Multibody {
       options.gravity ?? this.owner.kernel.gravity,
     );
   }
+  /**
+   * Solves the motors of `link`'s joint to its parent inside the tree's own direct solve, as implicit springs (default off):
+   * each one a spring and damper on the joint's coordinate, stepped by backward Euler together with every other link's, so
+   * a long, stiff chain of them (a rod, a cable, a tentacle, hair) stays stable at any stiffness and any number of links,
+   * where motors solved one joint at a time run away. It takes the motors set with `model: 'force'`, no `maxForce` and no
+   * limit on their axis; any other motor of the joint stays with the joint passes. `link` may be an array of links, and
+   * `on: false` hands the motors back.
+   * @throws MargoError (`state`) for a body that is not a link of this tree (the root has no joint of its own).
+   */
+  setImplicitMotors(link: PhysicsBody | readonly PhysicsBody[], on = true): this {
+    this.check();
+    const columns = this.owner.kernel.columns;
+    for (const body of Array.isArray(link) ? (link as readonly PhysicsBody[]) : [link as PhysicsBody]) {
+      const found = this.links.find((entry) => entry.body === body);
+      if (!found)
+        throw new MargoError(
+          'state',
+          'Implicit motors are set on a link of this multibody; pass one of multibody.links[i].body (the root has no joint of its own).',
+        );
+      columns.jointElastic[found.joint.row] = (columns.jointElastic[found.joint.row] & ~63) | (on ? 63 : 0);
+      this.owner.kernel.wake(body.row);
+    }
+    return this;
+  }
+  /**
+   * Holds a joint from a body of this tree to a body outside it in the tree's own solve, as a stiff spring between its
+   * anchors stepped by backward Euler with the tree's springs (default off): the end of a cable pinned to a bollard or a
+   * hull, which the joint passes alone, a joint at a time, let open under a stiff rod's pull. The joint keeps its other locks
+   * in the joint passes. The other body gets the pin's pull back; `on: false` hands the joint back to the joint passes.
+   * `give` lets the pin give way along its link's own +Y axis as a spring (N/m) and damper (N s/m): the half link a rod's
+   * pinned end stands for, which stretches with the rest of the rod (default none: stiff every way).
+   * @throws MargoError (`state`) for a joint that does not join this tree to a body outside it, or that does not lock all
+   * three of its sliding axes; RangeError for a `give` that is not positive and finite.
+   */
+  pinJoint(joint: PhysicsJoint, on = true, give?: { stiffness: number; damping?: number }): this {
+    this.check();
+    const columns = this.owner.kernel.columns,
+      inTree = new Set(this.attachedBodies());
+    if (!joint?.valid || inTree.has(joint.bodyA) === inTree.has(joint.bodyB))
+      throw new MargoError(
+        'state',
+        'A pinned joint joins a body of this multibody to a body outside it; pass such a joint.',
+      );
+    if ((columns.jointFlags[joint.row] & (JOINT_LOCK * 7)) !== JOINT_LOCK * 7)
+      throw new MargoError(
+        'state',
+        'A pinned joint locks all three sliding axes; lock linX, linY and linZ, or pin with a spherical joint.',
+      );
+    if (give !== undefined) {
+      const damping = give.damping ?? 0;
+      if (!(give.stiffness > 0) || !Number.isFinite(give.stiffness) || !(damping >= 0) || !Number.isFinite(damping))
+        throw new RangeError(
+          'A pin gives way as a spring; pass a positive finite stiffness in N/m and a damping of 0 or more in N s/m.',
+        );
+      columns.jointStiffness1[joint.row] = give.stiffness;
+      columns.jointDamping1[joint.row] = damping;
+    }
+    columns.jointElastic[joint.row] =
+      (columns.jointElastic[joint.row] & ~(64 | 128)) | (on ? 64 : 0) | (on && give !== undefined ? 128 : 0);
+    this.owner.kernel.wake(joint.bodyA.row);
+    this.owner.kernel.wake(joint.bodyB.row);
+    return this;
+  }
+  /** True when `link`'s joint motors are solved inside the tree (see {@link Multibody.setImplicitMotors}). */
+  implicitMotors(link: PhysicsBody): boolean {
+    this.check();
+    const found = this.links.find((entry) => entry.body === link);
+    return found !== undefined && this.owner.kernel.columns.jointElastic[found.joint.row] !== 0;
+  }
   /** Releases the tree: the bodies stay, with their joints as ordinary joints that are no longer held to reduced coordinates. */
   remove(): void {
     if (!this.removed) this.owner.removeMultibody(this);
@@ -316,4 +385,5 @@ export function clearMultibody(kernel: KernelWorld, multibody: Multibody): void 
     columns.mbParent[body.row] = NONE;
     columns.mbNoSelf[body.row] = 0;
   }
+  for (const link of multibody.links) if (link.joint.valid) columns.jointElastic[link.joint.row] = 0;
 }

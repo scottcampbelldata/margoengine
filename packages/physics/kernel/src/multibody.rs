@@ -28,6 +28,16 @@ use crate::world::{NONE, World};
 /// keep every joint that closely themselves; the pose pass is for what they leave under a heavy load or on a branch.
 pub const DRIFT: f32 = 1e-3;
 const TURN: f32 = 6.283_185_5;
+/// JOINT_ELASTIC's bit for a pin: a joint from a link of a tree to a body outside it, whose anchors the tree's spring solve
+/// holds together as a stiff implicit spring (`add_pins`), so a chain pinned at both ends holds under its springs' load.
+pub const JOINT_PIN: u32 = 1 << 6;
+/// JOINT_ELASTIC's bit for a pin that gives way along its link's own +Y axis as a spring of JOINT_STIFFNESS_1 (N/m) and
+/// JOINT_DAMPING_1 (N s/m): the half link a rod's pinned end stands for, which stretches as the rest of the rod does.
+pub const JOINT_PIN_ALONG: u32 = 1 << 7;
+/// A pin's stiffness over a substep, in its link's own mass: h^2 k = PIN_STIFFNESS m. Its gap under a load F is then
+/// F h^2 / (PIN_STIFFNESS m): a millionth of how far F moves the link alone in a substep, and the tree's matrices still hold
+/// it, a ratio of 10^6 in doubles of 16 digits.
+const PIN_STIFFNESS: f64 = 1e6;
 
 type D3 = [f64; 3];
 type M6 = [[f64; 6]; 6];
@@ -51,8 +61,10 @@ struct Axis {
     angular: bool,
     axis: D3,
     point: D3,
+    /// The joint's axis this is, 0 to 2 sliding along frame A's axes, 3 to 5 turning about them.
+    dof: usize,
 }
-const NO_AXIS: Axis = Axis { angular: false, axis: [0.0; 3], point: [0.0; 3] };
+const NO_AXIS: Axis = Axis { angular: false, axis: [0.0; 3], point: [0.0; 3], dof: 0 };
 const UNIT: [V3; 3] = [v3(1.0, 0.0, 0.0), v3(0.0, 1.0, 0.0), v3(0.0, 0.0, 1.0)];
 
 // Where a link keeps its numbers, in doubles from the start of its joint's scratch: its subtree's inertia A, the right side r, the
@@ -63,6 +75,11 @@ const S_AT: usize = 42;
 const DINV_AT: usize = 78;
 const K_AT: usize = 114;
 const U_AT: usize = 115;
+/// Each free axis's implicit spring term g (see `tree_springs`), six doubles after the twist.
+const G_AT: usize = 121;
+/// A link's twist before `spring_tree` and the twist its springs' projection gave it.
+const V_AT: usize = 127;
+const W_AT: usize = 133;
 
 /// The transport of a twist at a centre to one at a centre `r` further on: v + w x r, w.
 fn transport(r: D3) -> M6 {
@@ -140,6 +157,21 @@ fn inverse(mut a: M6, n: usize, whisper: f64) -> M6 {
     }
     out
 }
+/// The velocity of a point `arm` from a body's centre as three rows of a twist (v, w): v + w x r = v - [r]x w.
+fn point_jacobian(arm: D3) -> [[f64; 6]; 3] {
+    let mut jac = [[0.0f64; 6]; 3];
+    for i in 0..3 {
+        jac[i][i] = 1.0;
+    }
+    jac[0][4] = arm[2];
+    jac[0][5] = -arm[1];
+    jac[1][3] = -arm[2];
+    jac[1][5] = arm[0];
+    jac[2][3] = arm[1];
+    jac[2][4] = -arm[0];
+    jac
+}
+
 /// Makes the leading `n` by `n` of `a` symmetric, each pair of entries their mean. The articulated inertias of a tree are
 /// symmetric, and the pass from the last link to the first (A - A S D^-1 S^T A, then P^T A P) keeps a symmetric matrix symmetric
 /// but grows any asymmetry rounding leaves: about 3.5 times a link in a chain of 24 slender links, so the rotational block of
@@ -248,7 +280,348 @@ impl World {
 
     /// Projects the speeds of every awake multibody onto its joint space. See the head of this file.
     pub fn project_multibodies(&mut self) {
-        self.mb_roots(|w, root| w.project_tree(root));
+        self.mb_roots(|w, root| w.project_tree(root, 0.0, false));
+    }
+
+    /// Steps the implicit springs of every awake tree that has any (`tree_springs`), over the substep of `h` seconds about to
+    /// move the poses: the projection with each spring's backward Euler term, on the speeds the substep's forces and pushing
+    /// passes left, so the poses move by the speeds the springs give, as backward Euler moves them. Run where it is, after
+    /// the pushing passes and before the poses move; at the end of the substep, after the next substep's gravity was still to
+    /// come, a cantilever's springs met gravity one substep late and the rod stood 28 % too stiff at 4 substeps.
+    pub fn spring_multibodies(&mut self, h: f32) {
+        self.mb_roots(|w, root| {
+            if w.uu(MB_HELD, root) == 2 {
+                w.spring_tree(root, h);
+            }
+        });
+    }
+
+    /// Gives a tree's links what its implicit springs change of their speeds, and nothing else: the projection with the springs
+    /// less the projection without them, both of the speeds the pushing passes left. Projecting those speeds outright would
+    /// also take out what the joint rows push to close their gaps before the poses move, and a cantilever's joints then opened
+    /// and its tip crept down, 5 % in 40 s. Both projections are linear in the speeds with the same articulated inertias, so
+    /// the difference is the springs' own answer in the joint space.
+    fn spring_tree(&mut self, root: usize, h: f32) {
+        let twist_of = |w: &World, b: usize| -> V6 {
+            let (l, a) = (d3(w.v(LINEAR_X, b)), d3(w.v(ANGULAR_X, b)));
+            [l[0], l[1], l[2], a[0], a[1], a[2]]
+        };
+        let set = |w: &mut World, b: usize, u: &V6| {
+            w.set_v(LINEAR_X, b, v3(u[0] as f32, u[1] as f32, u[2] as f32));
+            w.set_v(ANGULAR_X, b, v3(u[3] as f32, u[4] as f32, u[5] as f32));
+        };
+        let root_start = twist_of(self, root);
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let b = at as usize;
+            let (d, v) = (self.doubles(self.uu(MB_JOINT, b) as usize), twist_of(self, b));
+            for i in 0..6 {
+                unsafe { *d.add(V_AT + i) = v[i] };
+            }
+            at = self.uu(MB_NEXT, b);
+        }
+        self.project_tree(root, h, true);
+        let root_sprung = twist_of(self, root);
+        set(self, root, &root_start);
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let b = at as usize;
+            let d = self.doubles(self.uu(MB_JOINT, b) as usize);
+            let mut v = [0.0; 6];
+            for i in 0..6 {
+                unsafe {
+                    *d.add(W_AT + i) = *d.add(U_AT + i);
+                    v[i] = *d.add(V_AT + i);
+                }
+            }
+            set(self, b, &v);
+            at = self.uu(MB_NEXT, b);
+        }
+        self.project_tree(root, h, false);
+        if self.flags(root) & KIND == DYNAMIC && self.s(INVERSE_MASS, root) > 0.0 {
+            let plain = twist_of(self, root);
+            let mut u = [0.0; 6];
+            for i in 0..6 {
+                u[i] = root_start[i] + root_sprung[i] - plain[i];
+            }
+            set(self, root, &u);
+            self.react_pins(root, h as f64, &root_sprung);
+        }
+        let mut at = self.uu(MB_NEXT, root);
+        while at != NONE {
+            let b = at as usize;
+            let d = self.doubles(self.uu(MB_JOINT, b) as usize);
+            if self.s(INVERSE_MASS, b) > 0.0 && self.flags(b) & KIND == DYNAMIC {
+                let mut u = [0.0; 6];
+                let mut sprung = [0.0; 6];
+                for i in 0..6 {
+                    sprung[i] = unsafe { *d.add(W_AT + i) };
+                    u[i] = unsafe { *d.add(V_AT + i) } + sprung[i] - unsafe { *d.add(U_AT + i) };
+                }
+                set(self, b, &u);
+                self.react_pins(b, h as f64, &sprung);
+            }
+            at = self.uu(MB_NEXT, b);
+        }
+    }
+
+    /// Finds, at the start of a substep's passes, which awake trees hold (MB_HELD): the joint passes leave a held tree's implicit
+    /// springs to its projection, and what such a motor carried before the tree held it is dropped, as the tree's springs keep
+    /// no impulse of the passes' to warm start from.
+    pub fn hold_multibodies(&mut self) {
+        self.mb_roots(|w, root| {
+            let held = w.mb_check(root).is_some();
+            w.set_u(MB_HELD, root, held as u32);
+            if !held {
+                return;
+            }
+            let (mut at, mut any) = (w.uu(MB_NEXT, root), false);
+            while at != NONE {
+                let joint = w.uu(MB_JOINT, at as usize) as usize;
+                let springs = w.tree_springs(joint);
+                for k in 0..6 {
+                    if springs & (1 << k) != 0 {
+                        w.set_s(JOINT_MOTOR_0 + k, joint, 0.0);
+                    }
+                }
+                any |= springs != 0 || w.drags(at as usize) || w.pinned(at as usize);
+                at = w.uu(MB_NEXT, at as usize);
+            }
+            any |= w.drags(root) || w.pinned(root);
+            // 2: the tree holds and has springs or drag for `spring_multibodies` to step.
+            if any {
+                w.set_u(MB_HELD, root, 2);
+            }
+        });
+    }
+
+    /// Calls `each(joint, other)` for every live pin of `body` (JOINT_PIN) whose other body is outside `body`'s tree.
+    fn each_pin(&self, body: usize, mut each: impl FnMut(&World, usize, usize)) {
+        let (mut joint, mut guard) = (self.uu(FIRST_JOINT, body), 0u32);
+        let root = self.uu(MB_ROOT, body);
+        while joint != NONE && guard <= self.header().joint_rows {
+            let row = joint as usize;
+            let (a, b) = (self.uu(JOINT_A, row) as usize, self.uu(JOINT_B, row) as usize);
+            let other = if a == body { b } else { a };
+            let flags = self.uu(JOINT_FLAGS, row);
+            let inside = self.uu(MB_ROLE, other) != 0 && self.uu(MB_ROOT, other) == root;
+            if self.uu(JOINT_ELASTIC, row) & JOINT_PIN != 0 && flags & JOINT_ALIVE != 0 && flags & JOINT_IDLE == 0 && !inside {
+                each(self, row, other);
+            }
+            joint = if a == body { self.uu(JOINT_NEXT_A, row) } else { self.uu(JOINT_NEXT_B, row) };
+            guard += 1;
+        }
+    }
+
+    /// A pin's anchors on `body` and on `other`, the velocity of the other's anchor and the arm of `body`'s from its centre.
+    fn pin_geometry(&self, joint: usize, body: usize, other: usize) -> (D3, D3, D3) {
+        let on_a = self.uu(JOINT_A, joint) as usize == body;
+        let (mine, theirs) = if on_a { (JOINT_ANCHOR_A_X, JOINT_ANCHOR_B_X) } else { (JOINT_ANCHOR_B_X, JOINT_ANCHOR_A_X) };
+        let here = self.pose_position(body).add(self.pose_rotation(body).rotate(self.v(mine, joint)));
+        let there = self.pose_position(other).add(self.pose_rotation(other).rotate(self.v(theirs, joint)));
+        let moving = self.flags(other) & KIND != FIXED;
+        let speed = if moving {
+            self.v(LINEAR_X, other).add(self.v(ANGULAR_X, other).cross(there.sub(self.pose_center(other))))
+        } else {
+            v3(0.0, 0.0, 0.0)
+        };
+        (sub(d3(here), d3(there)), d3(speed), sub(d3(here), d3(self.pose_center(body))))
+    }
+
+    /// A link's own cost with its pins over a substep of `h`: each a zero-length spring of h^2 k = PIN_STIFFNESS m between its
+    /// anchors, backward Euler, the other anchor moving as it moves now: h^2 k J^T J on the mass matrix and
+    /// J^T (h^2 k v_other - h k gap) on the right side, J the anchor's velocity from the link's twist.
+    fn add_pins(&self, body: usize, h: f64, m: &mut M6, r: &mut V6) {
+        self.each_pin(body, |w, joint, other| {
+            let (gap, speed, arm) = w.pin_geometry(joint, body, other);
+            let (c, pull) = w.pin_terms(joint, body, h, gap);
+            let jac = point_jacobian(arm);
+            // C J, then J^T C J and J^T (C v_other - pull).
+            let mut cj = [[0.0f64; 6]; 3];
+            for i in 0..3 {
+                for k in 0..3 {
+                    for j in 0..6 {
+                        cj[i][j] += c[i][k] * jac[k][j];
+                    }
+                }
+            }
+            for a in 0..6 {
+                for b in a..6 {
+                    let mut sum = 0.0;
+                    for i in 0..3 {
+                        sum += jac[i][a] * cj[i][b];
+                    }
+                    m[a][b] += sum;
+                    if b != a {
+                        m[b][a] += sum;
+                    }
+                }
+                for i in 0..3 {
+                    let mut cv = 0.0;
+                    for k in 0..3 {
+                        cv += c[i][k] * speed[k];
+                    }
+                    r[a] += jac[i][a] * (cv - pull[i]);
+                }
+            }
+        });
+    }
+
+    /// A pin's matrix over a substep, C = h^2 k_pin (I - t t^T) + (h d + h^2 k) t t^T, and its pull from the gap,
+    /// h k_pin (I - t t^T) gap + h k (t . gap) t: stiff across, and along the link's own +Y axis t the pin's spring of
+    /// JOINT_STIFFNESS_1 and JOINT_DAMPING_1 when it has JOINT_PIN_ALONG, else stiff that way too. h^2 k_pin is
+    /// PIN_STIFFNESS times the link's mass.
+    fn pin_terms(&self, joint: usize, body: usize, h: f64, gap: D3) -> ([[f64; 3]; 3], D3) {
+        let stiff = PIN_STIFFNESS / self.s(INVERSE_MASS, body) as f64;
+        let (mut c, mut pull) = ([[0.0f64; 3]; 3], [0.0f64; 3]);
+        if self.uu(JOINT_ELASTIC, joint) & JOINT_PIN_ALONG == 0 {
+            for i in 0..3 {
+                c[i][i] = stiff;
+                pull[i] = stiff / h * gap[i];
+            }
+            return (c, pull);
+        }
+        let t = d3(self.pose_rotation(body).rotate(UNIT[1]));
+        let (k, d) = (self.s(JOINT_STIFFNESS_1, joint) as f64, self.s(JOINT_DAMPING_1, joint) as f64);
+        let along = h * d + h * h * k;
+        let gap_along = t[0] * gap[0] + t[1] * gap[1] + t[2] * gap[2];
+        for i in 0..3 {
+            for j in 0..3 {
+                let unit = if i == j { 1.0 } else { 0.0 };
+                c[i][j] = stiff * (unit - t[i] * t[j]) + along * t[i] * t[j];
+            }
+            pull[i] = stiff / h * (gap[i] - gap_along * t[i]) + h * k * gap_along * t[i];
+        }
+        (c, pull)
+    }
+
+    /// Gives each pin's other body what its pin pulled on the link with, the other way: the impulse -(C (v_p - v_other) + pull)
+    /// the link took in the solve with the springs (`pin_terms`), `twist` its speeds there.
+    fn react_pins(&mut self, body: usize, h: f64, twist: &V6) {
+        let mut pushes: [(usize, D3, D3); 4] = [(usize::MAX, [0.0; 3], [0.0; 3]); 4];
+        let mut count = 0;
+        self.each_pin(body, |w, joint, other| {
+            if w.flags(other) & KIND != DYNAMIC || count == pushes.len() {
+                return;
+            }
+            let (gap, speed, arm) = w.pin_geometry(joint, body, other);
+            let (c, pull) = w.pin_terms(joint, body, h, gap);
+            let jac = point_jacobian(arm);
+            let mut slip = [0.0; 3];
+            for i in 0..3 {
+                for a in 0..6 {
+                    slip[i] += jac[i][a] * twist[a];
+                }
+                slip[i] -= speed[i];
+            }
+            let mut on_link = [0.0; 3];
+            for i in 0..3 {
+                let mut cs = 0.0;
+                for k in 0..3 {
+                    cs += c[i][k] * slip[k];
+                }
+                on_link[i] = -(cs + pull[i]);
+            }
+            let there = sub(d3(w.pose_center(body)), [0.0; 3]);
+            let point = [there[0] + arm[0] - gap[0], there[1] + arm[1] - gap[1], there[2] + arm[2] - gap[2]];
+            pushes[count] = (other, [-on_link[0], -on_link[1], -on_link[2]], point);
+            count += 1;
+        });
+        for &(other, impulse, point) in pushes.iter().take(count) {
+            let imp = v3(impulse[0] as f32, impulse[1] as f32, impulse[2] as f32);
+            let arm = v3(point[0] as f32, point[1] as f32, point[2] as f32).sub(self.pose_center(other));
+            let frame = self.pose_rotation(other).mul(self.q(INERTIA_FRAME_X, other));
+            let turn = crate::integrate::apply_inverse_inertia(self.v(INVERSE_INERTIA_X, other), frame, arm.cross(imp));
+            self.set_v(LINEAR_X, other, self.v(LINEAR_X, other).add(imp.scale(self.s(INVERSE_MASS, other))));
+            self.set_v(ANGULAR_X, other, self.v(ANGULAR_X, other).add(turn));
+        }
+    }
+
+    /// True when a body moves and has a pin to a body outside its tree.
+    fn pinned(&self, body: usize) -> bool {
+        let mut any = false;
+        if self.flags(body) & KIND == DYNAMIC {
+            self.each_pin(body, |_, _, _| any = true);
+        }
+        any
+    }
+
+    /// True when a body moves and has drag toward a flow (DRAG_ACROSS, DRAG_ALONG).
+    fn drags(&self, body: usize) -> bool {
+        self.flags(body) & KIND == DYNAMIC && (self.s(DRAG_ACROSS, body) > 0.0 || self.s(DRAG_ALONG, body) > 0.0)
+    }
+
+    /// A link's own cost with its drag toward the flow over a substep of `h`: the drag at its point p, c (u_f - v_p) with
+    /// v_p = v + w x r, backward Euler, adds h J^T C J to the link's mass matrix and h J^T C u_f to its right side, J = [I, -[r]x]
+    /// the point's velocity from the link's twist and C = c_across (I - t t^T) + c_along t t^T on the link's axis t.
+    fn add_drag(&self, body: usize, h: f64, m: &mut M6, r: &mut V6) {
+        let (across, along) = (self.s(DRAG_ACROSS, body) as f64, self.s(DRAG_ALONG, body) as f64);
+        let rotation = self.pose_rotation(body);
+        let t = d3(rotation.rotate(UNIT[1]));
+        let point = self.pose_position(body).add(rotation.rotate(self.v(DRAG_AT_X, body)));
+        let arm = sub(d3(point), d3(self.pose_center(body)));
+        let flow = d3(self.v(FLOW_X, body));
+        let mut c = [[0.0f64; 3]; 3];
+        for i in 0..3 {
+            for j in 0..3 {
+                let unit = if i == j { 1.0 } else { 0.0 };
+                c[i][j] = across * (unit - t[i] * t[j]) + along * t[i] * t[j];
+            }
+        }
+        let jac = point_jacobian(arm);
+        // C J and C u_f, then J^T of each.
+        let mut cj = [[0.0f64; 6]; 3];
+        let mut cu = [0.0f64; 3];
+        for i in 0..3 {
+            for k in 0..3 {
+                for j in 0..6 {
+                    cj[i][j] += c[i][k] * jac[k][j];
+                }
+                cu[i] += c[i][k] * flow[k];
+            }
+        }
+        for a in 0..6 {
+            for b in a..6 {
+                let mut sum = 0.0;
+                for i in 0..3 {
+                    sum += jac[i][a] * cj[i][b];
+                }
+                m[a][b] += h * sum;
+                if b != a {
+                    m[b][a] += h * sum;
+                }
+            }
+            let mut sum = 0.0;
+            for i in 0..3 {
+                sum += jac[i][a] * cu[i];
+            }
+            r[a] += h * sum;
+        }
+    }
+
+    /// The axes (bit k for axis k) of `joint` whose motors its multibody's tree holds as implicit springs this substep: those it
+    /// marks JOINT_ELASTIC with a force-model motor, no cap and no limit, while it is the joint of a link of a tree that holds.
+    /// Each is a spring and damper on the joint's own coordinate, taken into the tree's direct solve of its joint space as
+    /// backward Euler (`project_tree`), so a stiff chain of them is stable at any stiffness and any number of links, where the
+    /// joint passes, one joint at a time, are not (a rod of 16 links at a bending stiffness of 7.7 N m^2 ran away).
+    pub(crate) fn tree_springs(&self, joint: usize) -> u32 {
+        let elastic = self.uu(JOINT_ELASTIC, joint);
+        if elastic == 0 {
+            return 0;
+        }
+        let b = self.uu(JOINT_B, joint) as usize;
+        if self.uu(MB_ROLE, b) != 2 || self.uu(MB_JOINT, b) as usize != joint || self.uu(MB_HELD, self.uu(MB_ROOT, b) as usize) == 0 {
+            return 0;
+        }
+        let flags = self.uu(JOINT_FLAGS, joint);
+        let mut held = 0;
+        for k in 0..6 {
+            let on = flags & (JOINT_MOTOR_ON << k) != 0 && flags & (JOINT_MOTOR_FORCE << k) != 0 && flags & (JOINT_LIMIT << k) == 0;
+            if elastic & (1 << k) != 0 && on && self.s(JOINT_CAP_0 + k, joint) == f32::INFINITY {
+                held |= 1 << k;
+            }
+        }
+        held
     }
 
     /// Puts every awake multibody's links back where their joints place them.
@@ -287,7 +660,7 @@ impl World {
                 let axis = frame.rotate(UNIT[k]);
                 // A limit the joint stands at and moves into is a wall: its speed along the axis is held at zero.
                 if !self.at_limit(joint, flags, k, gap.dot(axis), along.dot(axis)) {
-                    axes[n] = Axis { angular: false, axis: d3(axis), point: d3(point) };
+                    axes[n] = Axis { angular: false, axis: d3(axis), point: d3(point), dof: k };
                     n += 1;
                 }
             }
@@ -296,7 +669,7 @@ impl World {
             if flags & (JOINT_LOCK << (3 + k)) == 0 {
                 let axis = frame.rotate(UNIT[k]);
                 if !(free_turns == 1 && self.at_limit(joint, flags, 3 + k, self.s(JOINT_ANGLE, joint), spin.dot(axis))) {
-                    axes[n] = Axis { angular: true, axis: d3(axis), point: d3(point) };
+                    axes[n] = Axis { angular: true, axis: d3(axis), point: d3(point), dof: 3 + k };
                     n += 1;
                 }
             }
@@ -331,7 +704,7 @@ impl World {
         m
     }
 
-    fn project_tree(&mut self, root: usize) {
+    fn project_tree(&mut self, root: usize, h: f32, with_springs: bool) {
         let Some(last) = self.mb_check(root) else { return };
         let root_moves = self.flags(root) & KIND == DYNAMIC;
         let twist_of = |w: &World, b: usize| -> V6 {
@@ -341,12 +714,24 @@ impl World {
         // Each link's own cost: its mass matrix and mass matrix times the speed the passes left it.
         let mut a0 = self.mass6(root);
         let mut r0 = apply6(&a0, &twist_of(self, root));
+        if with_springs && self.flags(root) & KIND == DYNAMIC {
+            if self.drags(root) {
+                self.add_drag(root, h as f64, &mut a0, &mut r0);
+            }
+            self.add_pins(root, h as f64, &mut a0, &mut r0);
+        }
         let mut at = self.uu(MB_NEXT, root);
         while at != NONE {
             let b = at as usize;
             let joint = self.uu(MB_JOINT, b) as usize;
-            let (m, d) = (self.mass6(b), self.doubles(joint));
-            let r = apply6(&m, &twist_of(self, b));
+            let (mut m, d) = (self.mass6(b), self.doubles(joint));
+            let mut r = apply6(&m, &twist_of(self, b));
+            if with_springs && self.flags(b) & KIND == DYNAMIC {
+                if self.drags(b) {
+                    self.add_drag(b, h as f64, &mut m, &mut r);
+                }
+                self.add_pins(b, h as f64, &mut m, &mut r);
+            }
             unsafe {
                 for i in 0..6 {
                     for j in 0..6 {
@@ -398,6 +783,27 @@ impl World {
                     }
                 }
             }
+            // The joint's implicit springs: on axis c, the impulse -h (stiffness (theta + h qd - target) + damping (qd - speed)),
+            // backward Euler, adds h damping + h^2 stiffness to D and takes g = h (stiffness (theta - target) - damping speed)
+            // from the right side, here and in the pass out (Featherstone 2008, section 7.2, with a joint's spring as a term of
+            // its own coordinate; Deul et al. 2018, a rod's bending and twisting as such springs, solved directly on the tree).
+            let springs = if with_springs { self.tree_springs(joint) } else { 0 };
+            let mut g = [0.0f64; 6];
+            if springs != 0 {
+                let at = self.joint_measure(joint);
+                let hd = h as f64;
+                for c in 0..k {
+                    let dof = axes[c].dof;
+                    if springs & (1 << dof) == 0 {
+                        continue;
+                    }
+                    let (stiffness, damping) = (self.s(JOINT_STIFFNESS_0 + dof, joint) as f64, self.s(JOINT_DAMPING_0 + dof, joint) as f64);
+                    let (target, speed) = (self.s(JOINT_TARGET_0 + dof, joint) as f64, self.s(JOINT_SPEED_0 + dof, joint) as f64);
+                    dm[c][c] += hd * damping + hd * hd * stiffness;
+                    g[c] = hd * (stiffness * (at[dof] as f64 - target) - damping * speed);
+                    s_r[c] -= g[c];
+                }
+            }
             symmetric(&mut dm, k);
             let dinv = if k > 0 { inverse(dm, k, whisper_of(&dm, k)) } else { [[0.0; 6]; 6] };
             let (mut hat_a, mut hat_r) = (a, r);
@@ -422,6 +828,9 @@ impl World {
                     }
                 }
                 *d.add(K_AT) = k as f64;
+                for c in 0..6 {
+                    *d.add(G_AT + c) = g[c];
+                }
             }
             let p = transport(sub(center, d3(self.pose_center(parent))));
             symmetric(&mut hat_a, 6);
@@ -497,6 +906,7 @@ impl World {
                     for i in 0..6 {
                         rhs[c] += s[c][i] * (r[i] - a_moved[i]);
                     }
+                    rhs[c] -= unsafe { *d.add(G_AT + c) };
                 }
                 for c in 0..k {
                     let mut q = 0.0;

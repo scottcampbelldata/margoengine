@@ -1,5 +1,6 @@
 // Long chains held to reduced coordinates (src/multibody.rs): the projection onto the joint space stays a projection however
-// many links the chain has.
+// many links the chain has, and a chain whose joints carry implicit springs (JOINT_ELASTIC) bends as the beam those springs
+// make, at any number of links and substeps.
 use margoengine_physics_kernel::layout::*;
 use margoengine_physics_kernel::math::*;
 use margoengine_physics_kernel::world::{NONE, World};
@@ -11,12 +12,12 @@ const DENSITY: f32 = 1000.0;
 const ALONG_X: Q = Q { x: 0.0, y: 0.0, z: -core::f32::consts::FRAC_1_SQRT_2, w: core::f32::consts::FRAC_1_SQRT_2 };
 
 /// A 1 m chain of `n` capsules of radius 1 cm from a fixed wall along +X, each on a spherical joint to the one before, held as
-/// one multibody with its self contacts off. Returns the links' rows.
-fn chain(w: &mut World, n: usize) -> Vec<u32> {
+/// one multibody with its self contacts off. Returns the links' rows and their joints' rows.
+fn chain(w: &mut World, n: usize) -> (Vec<u32>, Vec<usize>) {
     w.header_mut().gravity = [0.0, -G, 0.0];
     let l = 1.0 / n as f32;
     let wall = w.add_body(FIXED).unwrap();
-    let (mut rows, mut parent) = (Vec::new(), wall);
+    let (mut rows, mut joints, mut parent) = (Vec::new(), Vec::new(), wall);
     for i in 0..n {
         let b = w.add_body(DYNAMIC).unwrap();
         w.add_collider(b, SHAPE_CAPSULE, [RADIUS, l / 2.0, 0.0], [0.0; 3], [0.0, 0.0, 0.0, 1.0], DENSITY).unwrap();
@@ -29,6 +30,7 @@ fn chain(w: &mut World, n: usize) -> Vec<u32> {
         }
         w.set_u(MB_NEXT, parent as usize, b);
         rows.push(b);
+        joints.push(j);
         parent = b;
     }
     for (column, value) in [(MB_ROLE, 1), (MB_ROOT, wall), (MB_JOINT, NONE), (MB_PARENT, NONE), (MB_NO_SELF, 1)] {
@@ -37,7 +39,7 @@ fn chain(w: &mut World, n: usize) -> Vec<u32> {
     for &b in &rows {
         w.touch_body(b);
     }
-    rows
+    (rows, joints)
 }
 
 fn mass(w: &World, b: u32) -> f64 {
@@ -54,7 +56,7 @@ fn a_long_slender_chain_falls_with_no_more_energy_than_it_had() {
     for n in [24usize, 64] {
         let mut w = World::new(256, 256).unwrap();
         w.header_mut().substeps = 16;
-        let rows = chain(&mut w, n);
+        let (rows, _) = chain(&mut w, n);
         let l = 1.0 / n as f64;
         let start: f64 = rows.iter().map(|&b| mass(&w, b) * G as f64 * w.v(CENTER_X, b as usize).y as f64).sum();
         let lowest: f64 = rows.iter().enumerate().map(|(i, &b)| -mass(&w, b) * G as f64 * (i as f64 + 0.5) * l).sum();
@@ -71,5 +73,86 @@ fn a_long_slender_chain_falls_with_no_more_energy_than_it_had() {
             }
         }
         println!("{n} links: nearest the energy bound {nearest:.3}");
+    }
+}
+
+/// The tip's fall of an `n`-link cantilever of bending stiffness `ei` held by implicit springs, at `substeps`, after 10 s of
+/// settling, and the fall at which its chain of springs balances the links' weights: joint j turns by theta_j with
+/// k_j theta_j = -M_j, M_j the moment of the weights beyond it about it with the arms the bent chain has, and k_j = EI / l
+/// (2 EI / l at the wall, which bends half a link). The balance is found by turning the joints to the moments of the last
+/// shape until the shape stops changing, so it holds at any slope, not only the small ones.
+fn cantilever(n: usize, substeps: u32, ei: f32) -> (f64, f64) {
+    let mut w = World::new(256, 256).unwrap();
+    w.header_mut().substeps = substeps;
+    let (rows, joints) = chain(&mut w, n);
+    let l = 1.0 / n as f32;
+    for (i, &j) in joints.iter().enumerate() {
+        let k = if i == 0 { 2.0 * ei / l } else { ei / l };
+        if i == 0 {
+            // The wall's frame stands as the first link does, so the straight rod is the rest.
+            w.set_q(JOINT_FRAME_A_X, j, ALONG_X);
+        }
+        let mut flags = w.uu(JOINT_FLAGS, j);
+        for axis in 3..6 {
+            flags |= (JOINT_MOTOR_ON | JOINT_MOTOR_FORCE) << axis;
+            w.set_s(JOINT_STIFFNESS_0 + axis, j, k);
+            w.set_s(JOINT_DAMPING_0 + axis, j, 0.02 * k);
+            w.set_s(JOINT_CAP_0 + axis, j, f32::INFINITY);
+            w.set_s(JOINT_TARGET_0 + axis, j, 0.0);
+            w.set_s(JOINT_SPEED_0 + axis, j, 0.0);
+        }
+        w.set_u(JOINT_FLAGS, j, flags);
+        w.set_u(JOINT_ELASTIC, j, 0b111000);
+    }
+    // The balance is the rod at rest. A sleeping rod stops where its speed fell under the sleep threshold, short of it (8 links
+    // slept 0.57 % short), so these links never sleep.
+    for &b in &rows {
+        let flags = w.flags(b as usize);
+        w.set_u(FLAGS, b as usize, flags & !CAN_SLEEP);
+    }
+    for _ in 0..600 {
+        w.step(1.0 / 60.0);
+    }
+    let last = *rows.last().unwrap() as usize;
+    let tip = w.v(POSITION_X, last).add(w.q(ROTATION_X, last).rotate(v3(0.0, l / 2.0, 0.0)));
+    let (l, ei) = (l as f64, ei as f64);
+    let weights: Vec<f64> = rows.iter().map(|&b| mass(&w, b) * G as f64).collect();
+    let mut turns = vec![0.0f64; n];
+    let mut fall = 0.0;
+    for _ in 0..200 {
+        // The shape the turns give: each link's slope, its joint and its centre.
+        let (mut slope, mut at) = (0.0f64, (0.0f64, 0.0f64));
+        let (mut joints_at, mut centres) = (Vec::with_capacity(n), Vec::with_capacity(n));
+        for &turn in &turns {
+            slope += turn;
+            joints_at.push(at);
+            centres.push(at.0 + 0.5 * l * slope.cos());
+            at = (at.0 + l * slope.cos(), at.1 + l * slope.sin());
+        }
+        fall = -at.1;
+        for j in 0..n {
+            let moment: f64 = (j..n).map(|i| weights[i] * (centres[i] - joints_at[j].0)).sum();
+            let k = if j == 0 { 2.0 * ei / l } else { ei / l };
+            turns[j] = -moment / k;
+        }
+    }
+    (-tip.y as f64, fall)
+}
+
+#[test]
+fn a_chain_of_implicit_springs_bends_as_its_beam_at_any_length_and_substeps() {
+    // EI = 7.7 N m^2 for a 1 cm nylon-like rod of capsules: the tip falls about 6 to 7 cm. Motors solved one joint at a time in the
+    // joint passes ran away from 16 links on; held in the tree's direct solve each link count and substep count lands where its
+    // chain of springs balances the weights. What is left is rounding: the poses are f32, a part in 10^7 of a metre's chain,
+    // and the joint rows hold their anchors to the f32 step's slack, so 0.1 % is ten times what any case here shows. The
+    // springs once projected all of the passes' speeds and took out the joint rows' push to close their gaps: the tip crept
+    // down 5 % in 40 s at 16 substeps, so the run is long enough to see a creep of that size.
+    for n in [8usize, 32, 64] {
+        for substeps in [4u32, 16] {
+            let (tip, springs) = cantilever(n, substeps, 7.7);
+            let off = (tip - springs).abs() / springs;
+            println!("{n} links, {substeps} substeps: tip falls {tip:.5} m, its springs give {springs:.5} m ({:.4} %)", off * 100.0);
+            assert!(off < 1e-3, "{n} links, {substeps} substeps: the tip fell {tip} m where its springs give {springs} m");
+        }
     }
 }

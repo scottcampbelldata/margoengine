@@ -1122,6 +1122,12 @@ class Multibody {
     forwardDynamics(torques: readonly number[], options?: {
         gravity?: Vec3;
     }): number[];
+    setImplicitMotors(link: PhysicsBody | readonly PhysicsBody[], on?: boolean): this;
+    pinJoint(joint: PhysicsJoint, on?: boolean, give?: {
+        stiffness: number;
+        damping?: number;
+    }): this;
+    implicitMotors(link: PhysicsBody): boolean;
     remove(): void;
     markRemoved(): void;
 }
