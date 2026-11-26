@@ -13407,6 +13407,12 @@
       "commit": "30e5e604e2",
       "grew": 0,
       "reason": "SOFT-04 adds the independent sliding and tearing strain modes on authored seams, moving the soft entry from 141595 to 141760 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "f3e276205b",
+      "grew": 0,
+      "reason": "SOFT-04 adds retirement of consumed crack front edges across all incident child tetrahedra, moving the soft entry from 141760 to 141779 B gzip. It shares material state, cuts and rigid contacts in the existing lazy soft kernel. A second Wasm kernel would have to duplicate the particle store, step and contact paths."
     }
   ],
   "items": {
