@@ -85,6 +85,20 @@ export const BLUEPRINTS = [
     args: ['plain'],
   },
   {
+    name: 'seismic-kernel',
+    crate: 'packages/physics/seismic-kernel',
+    blueprint: 'packages/physics/src/seismic/seismic-kernel.wasm',
+    script: 'packages/physics/scripts/build-seismic-kernel.mjs',
+    args: ['plain'],
+  },
+  {
+    name: 'seismic-kernel-shared',
+    crate: 'packages/physics/seismic-kernel',
+    blueprint: 'packages/physics/src/seismic/seismic-kernel-shared.wasm',
+    script: 'packages/physics/scripts/build-seismic-kernel.mjs',
+    args: ['shared'],
+  },
+  {
     name: 'pack-ice-kernel-shared',
     crate: 'packages/physics/pack-ice-kernel',
     blueprint: 'packages/physics/src/pack-ice/pack-ice-kernel-shared.wasm',

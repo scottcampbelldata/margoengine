@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Seismic native replay</title></head>
+<body>
+  <script type="module">
+    import { SeismicGround } from '/packages/physics/dist/seismic.js';
+    import { PhysicsWorld, canShareMemory, worldMemory } from '/packages/physics/dist/world.js';
+
+    window.runSeismic = async () => {
+      const simulate = async (shared) => {
+        const solver = await SeismicGround.load();
+        const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(shared) });
+        world.add(solver, {
+          width: 25, depth: 20, spacing: [1, 1],
+          material: { density: 2400, compressionalSpeed: 90, shearSpeed: 50 },
+          sources: [{ position: [14, 8], moment: [90000, -90000, 60000], timescale: 0.03 }],
+          sites: [{ x: 11.5, frequency: 2.5 }],
+        });
+        world.advance(60);
+        return { motion: solver.motion(11), building: solver.reading(), hash: world.hash() };
+      };
+      const plain = await simulate(false);
+      return { plain, shared: canShareMemory() ? await simulate(true) : undefined };
+    };
+  </script>
+</body>
+</html>

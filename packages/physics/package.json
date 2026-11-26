@@ -66,6 +66,10 @@
       "types": "./dist/earth/index.d.ts",
       "import": "./dist/earth.js"
     },
+    "./seismic": {
+      "types": "./dist/seismic/index.d.ts",
+      "import": "./dist/seismic.js"
+    },
     "./clouds": {
       "types": "./dist/clouds/index.d.ts",
       "import": "./dist/clouds.js"

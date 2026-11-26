@@ -175,6 +175,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/physics',
+    file: 'packages/physics/dist/seismic-kernel.wasm',
+    label: 'seismic-kernel.wasm',
+    kind: 'Rust SIMD elastodynamic waves',
+    measure: 'file',
+    when: 'SeismicGround.load() from the optional /seismic entry',
+  },
+  {
+    package: '@margoengine/physics',
+    file: 'packages/physics/dist/seismic-kernel-shared.wasm',
+    label: 'seismic-kernel-shared.wasm',
+    kind: 'Rust SIMD elastodynamic waves, shared world memory',
+    measure: 'file',
+    when: 'SeismicGround.load() with shared world memory support',
+  },
+  {
+    package: '@margoengine/physics',
     file: 'packages/physics/dist/landscape-kernel.wasm',
     label: 'landscape-kernel.wasm',
     kind: 'Rust SIMD landscape evolution',

@@ -4272,6 +4272,14 @@ and Weather supplies the boundary layer through the shared Wind contract. Frame-
 hashes. Chromium's OfflineAudioContext measures the physical delay with the same panner and filters in a control
 render. For the 3 km still-air check, the delayed waveform starts 419,541 samples later at 48 kHz.
 
+### Elastic seismic waves (EARTH-08)
+
+The optional SIMD module has no static data and uses a world-owned stack and regions. The staggered
+tests exercise an odd-width grid, the two dispersion branches, initial arrival at a free surface,
+and amplification through a softer site. A registered ground reader applies the measured acceleration
+to an actual rigid body. Building and soil states share the solver's world clock. Native Chromium and
+Node replay identical f64 worlds in both memory modes.
+
 ### Ice thermodynamics (ICE-05)
 
 The world coupling test applies heat through the registry and verifies the phase budget, liquid and vapour mass,

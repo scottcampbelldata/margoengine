@@ -3199,6 +3199,44 @@ Use `SedimentTransport.shearField` or a time-averaged equivalent for hydraulic f
 fields. TerrainBed applies a published change at its next tick, so diagnostics describe the most recent
 calculated change one tick before it becomes terrain. Use the bed for the current rendered elevation.
 
+## Seismic waves and ground motion
+
+`@margoengine/physics/seismic` solves P and SV waves through a vertical geological section. Supply density
+and the two wave speeds per cell or use one material throughout. The top surface is traction-free.
+The optional absorbing strip damps the sides and bottom. Grid spacing defaults to 10 m on both axes.
+Moment sources take x and depth in metres from the section's top-left corner. The reported vertical
+motion is positive up. World tick rate follows the spatial Courant bound.
+
+```ts
+import { SeismicGround } from 'margoengine/physics/seismic';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const ground = await SeismicGround.load();
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(ground, {
+  width: 25,
+  depth: 20,
+  spacing: [1, 1],
+  material: (_x, depth) => depth < 4
+    ? { density: 1800, compressionalSpeed: 55, shearSpeed: 25 }
+    : { density: 2400, compressionalSpeed: 90, shearSpeed: 50 },
+  sources: [{ position: [14, 8], moment: [90000, -90000, 60000], timescale: 0.03 }],
+  sites: [{
+    x: 11.5,
+    frequency: 2.5,
+    saturatedSoil: { overburdenRatio: 1.7, depthReduction: 0.92, cyclicResistance: 0.18 },
+  }],
+});
+world.advance(60);
+console.log(ground.motion(11).peakHorizontalAcceleration > 0, ground.reading().cyclicStress > 0);
+```
+
+The ground-motion field supplies acceleration for cameras and structural consumers. `SeismicInertialLoad`
+maps selected rigid bodies to support columns and adds a mass-scaled base-acceleration load. The optional
+single-mode building receiver defaults to a 0.05 damping ratio. Its soil receiver compares peak horizontal
+cyclic demand with the supplied resistance. The default boundary attenuation targets an outgoing amplitude
+of 0.001 through at most 12 cells, reduced automatically for small grids. Set `absorbingCells: 0` to study
+boundary reflections. A `signal` can cancel kernel loading.
+
 ## Outdoor sound
 
 `@margoengine/physics/outdoor-sound` gives each source–listener link its travel time and eight octave gains.

@@ -6,6 +6,16 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-26: simulated earthquake loads lacked a propagating ground field (EARTH-08)
+
+- **Repro:** Trigger a moment below a layered site. Scene shake parameters could move a camera, but the ground
+  did not propagate a wave or supply different site accelerations to structures.
+- **Cause:** The engine had no solver for the site's elastic propagation and free-surface response.
+- **Fix:** `SeismicGround` propagates P and SV waves and publishes surface acceleration, building response,
+  and soil cyclic demand. `SeismicInertialLoad` moves coupled rigid bodies in their support reference frame.
+- **Regression:** `packages/physics/tests/coupling/seismic.test.js` checks the analytic wave branches, a
+  free surface and layered site, live body recoil, and replay in both memory modes.
+
 ### Fixed 2026-11-26: outdoor sounds played before the pressure wave arrived (PA-64)
 
 - **Repro:** Send a brief sound from 3 km away. Its old positional path pans and attenuates the sound as soon as it plays.

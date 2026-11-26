@@ -9,6 +9,12 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Seismic waves (EARTH-08, 2026-11-26). Propagated P and SV waves match the closed-form discrete
+  dispersion law. Reflected velocity adds at the free top, an elastic low-impedance layer amplifies the
+  first arrival, and the ground field moves a real rigid body. The building response obeys the Newmark
+  equilibrium equation and soil demand matches Seed–Idriss. Run `node --test packages/physics/tests/coupling/seismic.test.js`
+  and `node packages/physics/tests/seismic.browser.mjs` after building.
+
 - Outdoor sound (SOUND-01, 2026-11-26). Terrain ridge diffraction, Weather wind, the round-trip ground image
   and the ISO 9613-1 coefficient are checked against independent reference values. Web Audio delays a 3 km
   pulse by 8.74044 s at 48 kHz relative to its otherwise identical undelayed filter chain. Reproduce with

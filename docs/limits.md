@@ -8,6 +8,13 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- Seismic waves (EARTH-08, 2026-11-26). One plane-strain section resolves in-plane P and SV, with
+  a level, traction-free top. Pick cell spacing for the shortest wavelength in the scene. The world
+  chooses a dyadic rate that keeps the elastic Courant number at or below 0.95. The damped outer strip
+  approximates an open side and bottom, and oblique waves can return a weak reflection. Cyclic stress
+  screening uses configured soil resistance, with no pore-water pressure evolution. A building receiver
+  is one horizontal mode. The optional solver is 5,646 bytes gzip and each lazy SIMD asset is 2,474 bytes raw.
+
 - Outdoor sound (SOUND-01, 2026-11-26). The solver traces one weakly refracted path or one dominant terrain edge
   per link. It estimates ground interference with one locally horizontal reflecting plane. It uses the current
   wind profile for the path, with no caustics, atmospheric ducts, turbulence scattering, or multiple-edge

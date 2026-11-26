@@ -1,5 +1,32 @@
 # Clean room
 
+### Seismic waves and ground shaking (EARTH-08)
+
+Jean Virieux, “P-SV wave propagation in heterogeneous media: Velocity-stress finite-difference method”
+(1986), gives the spatially staggered velocity and stress equations, face coefficients, and their
+two-dimensional wave dispersion. Margo uses the second-order stencil with the corresponding Courant
+bound and native pairwise SIMD across the section. Dimitri Komatitsch and Jeroen Tromp,
+“Introduction to the spectral element method for three-dimensional seismic wave propagation” (1999),
+describe a traction-free surface, source moment tensors, and physically heterogeneous propagation.
+The surface uses an odd normal-stress extension and zero tangential traction.
+<https://doi.org/10.1190/1.1442147> and <https://doi.org/10.1046/j.1365-246x.1999.00967.x>.
+
+James N. Brune (1970), “Tectonic stress and the spectra of seismic shear waves from earthquakes,”
+motivates the single-corner source spectrum. Margo releases a prescribed moment with the normalized
+causal double-pole pulse whose rate is proportional to time times an exponential. The integrated
+moment is independent of world rate. Cerjan, Kosloff, Kosloff and Reshef (1985),
+“A nonreflecting boundary condition for discrete acoustic and elastic wave equations,” motivates
+the absorbing strip. Margo uses diagonal implicit damping with a quadratic profile.
+<https://doi.org/10.1029/JB075i026p04997> and <https://doi.org/10.1190/1.1441945>.
+
+H. B. Seed and I. M. Idriss, “Simplified Procedure for Evaluating Soil Liquefaction Potential” (1971),
+and the Youd and Idriss workshop report (2001), give cyclic stress demand as 0.65 times the peak
+horizontal acceleration in g, times the total-to-effective stress ratio and depth reduction.
+Nathan Newmark, “A Method of Computation for Structural Dynamics” (1959), supplies the
+constant-average-acceleration update used for base-excited single-mode structures.
+<https://doi.org/10.1061/JSFEAQ.0001662>, <https://doi.org/10.1061/(ASCE)1090-0241(2001)127:10(817)>,
+and <https://doi.org/10.1061/JMCEA3.0000098>.
+
 ### Outdoor sound propagation (SOUND-01)
 
 The absolute air losses implement ISO 9613-1:1993 equations (3)–(5) and the Annex B humidity conversion.
