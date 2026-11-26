@@ -925,6 +925,7 @@ export const LAZY_FILES = [
     label: 'growth-kernel.wasm',
     kind: 'Rust SIMD growth penumbra',
     measure: 'file',
+    when: 'PlantGrowth.load() compiles the plain build for an arena without shared memory',
   },
   {
     package: '@margoengine/biomes',
@@ -932,6 +933,7 @@ export const LAZY_FILES = [
     label: 'growth-kernel-shared.wasm',
     kind: 'Rust SIMD growth penumbra, shared world memory',
     measure: 'file',
+    when: 'PlantGrowth.load() also compiles this build when the host supports shared memory',
   },
   {
     package: '@margoengine/biomes',
