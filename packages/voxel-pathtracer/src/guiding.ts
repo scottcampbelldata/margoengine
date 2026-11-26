@@ -73,23 +73,26 @@ function guidedSource(source: string, guideStrength: number): string {
   let result = source;
   for (const [original, replacement] of edits) result = result.replace(original, replacement);
   result = result.replaceAll('roulette(&thr,bounces)', 'guidedRoulette(&thr,bounces,guideRoulette)');
+  // The WGSL below holds no comments, because the shipped file must not (KB-WGSL1). What it does:
+  // - Sampling a small bound lowers throughput by its directional importance weight; do not immediately discard that
+  //   variance gain at the next dielectric exit. Roulette's probability may be chosen freely; its actual survival
+  //   divides throughput.
+  // - Deflector records follow every setScene upload, so no cached geometry can go stale.
+  // - A face containing the origin projects to a zero-solid-angle plane. Sampling it would add singular directional mass
+  //   that a continuous PDF cannot represent.
+  // - Area sampling of visible box faces has a one-to-one directional mapping. Inside the bound, all six faces are sampled,
+  //   and the PDF uses the exit face then. The last active face is kept if cumulative floating-point subtraction rounds up.
   const helpers = /* wgsl */ `
-// Sampling a small bound lowers throughput by its directional importance weight.
-// Do not immediately discard that variance gain at the next dielectric exit.
-// Roulette's probability may be chosen freely; its actual survival divides throughput.
 fn guidedRoulette(thr:ptr<function,vec3f>,bounces:u32,guideScale:f32)->bool {
  if(bounces<3u){return true;}
  let q=clamp(max(max((*thr).x,(*thr).y),(*thr).z)*guideScale,0.05,1.0);
  if(rand()>=q){return false;}*thr/=q;return true;
 }
 fn guideable(m:Mat)->bool {return m.glass==0.0&&m.metal==0.0&&m.spec==0.0;}
-// Deflector records follow every setScene upload. No cached geometry can go stale.
 fn guideCount()->u32 {return scene[scene[1]+1u];}
 struct GuideBox {size:vec3f,origin:vec3f,local:Xform,world:Xform,area:vec3f,side:vec3f,total:f32,inside:bool}
 fn guideFace(g:GuideBox,axis:u32,sign:f32)->bool {
  if(!g.inside){return g.side[axis]==sign;}
- // A face containing the origin projects to a zero-solid-angle plane. Sampling
- // it would add singular directional mass that a continuous PDF cannot represent.
  return select(g.origin[axis]>0.0,g.origin[axis]<g.size[axis],sign>0.0);
 }
 fn guideBox(o:vec3f,k:u32)->GuideBox {
@@ -110,8 +113,6 @@ fn guideBox(o:vec3f,k:u32)->GuideBox {
  }
  return g;
 }
-// Area sampling of visible box faces has a one-to-one directional mapping.
-// Inside the bound, all six faces are sampled. The PDF uses the exit face then.
 fn boxPdf(o:vec3f,wi:vec3f,g:GuideBox)->f32 {
  let p=xpoint(g.local,o);let d=xdir(g.local,wi);
  var near=-INF;var far=INF;var na=0u;var fa=0u;
@@ -150,7 +151,6 @@ fn guidedSurface(m:Mat,n:vec3f,wo:vec3f,etaI:f32,o:vec3f,air:bool)->Bounce {
    let axis=face>>1u;let sign=select(-1.0,1.0,(face&1u)!=0u);
    if(!guideFace(g,axis,sign)){continue;}
    pick-=g.area[axis];
-   // Keep the last active face if cumulative floating-point subtraction rounds up.
    selected=face;
    if(pick<=0.0){break;}
   }

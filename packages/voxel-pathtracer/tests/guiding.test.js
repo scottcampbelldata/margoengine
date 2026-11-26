@@ -76,3 +76,27 @@ test('guiding strength survives device replacement and native WebGL2 has coded h
       error.code === 'unsupported' && error.message.includes('https://margoengine.com/errors#voxel-pathtracer'),
   );
 });
+
+test('the lines caustic guiding adds to the shader carry no comment text (KB-WGSL1)', async () => {
+  const plain = harness(),
+    guided = harness();
+  const tracers = [
+    VoxelPathTracer.attach(plain.engine, { scene: simpleScene() }),
+    GuidedVoxelPathTracer.attach(guided.engine, { scene: simpleScene() }),
+  ];
+  try {
+    await Promise.all(tracers.map((t) => t.ready));
+    const known = new Set(plain.sources[0].split('\n')),
+      added = guided.sources[0].split('\n').filter((line) => !known.has(line));
+    assert.ok(
+      added.some((line) => line.includes('guidedRoulette')),
+      'the guided shader differs from the plain one',
+    );
+    assert.deepEqual(
+      added.filter((line) => line.includes('//')),
+      [],
+    );
+  } finally {
+    for (const tracer of tracers) tracer.dispose();
+  }
+});
