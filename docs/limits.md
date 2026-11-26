@@ -8,6 +8,11 @@ column. The dated notes between here and those tables, and the sections after Pl
 notes one change's size or behaviour and its evidence. Every number has a row in
 [whitepaper/claims.md](whitepaper/claims.md).
 
+- BVH, octree and raycaster helpers (`@margoengine/lines/tree-helpers`, 2026-11-25) draw box edges, 24 points a box, in
+  one `Line`: a tree level with many thousands of nodes is that many boxes, so keep `depth` low on a deep tree (`maxDepth`
+  says how deep it goes). They read the node bounds when built and on `setDepth`; they do not follow a `refit` or an
+  edited tree until `setDepth` is called again. Depth is a whole number from 0 to 64.
+
 - Infinite grid (`@margoengine/lines/infinite-grid`, 2026-11-25) is a plane at one height `y`, drawn as a quad of
   the fade distance's half-width centred under the camera (or the origin), so nothing draws past `fadeDistance`;
   lines under two pixels apart fade out instead of aliasing. It is a transparent overlay: it writes no depth, so

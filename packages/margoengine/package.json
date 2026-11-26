@@ -2283,6 +2283,10 @@
       "types": "./dist/lines/infinite-grid.d.ts",
       "import": "./dist/lines/infinite-grid.js"
     },
+    "./lines/tree-helpers": {
+      "types": "./dist/lines/tree-helpers.d.ts",
+      "import": "./dist/lines/tree-helpers.js"
+    },
     "./loaders/ply": {
       "types": "./dist/loaders/ply.d.ts",
       "import": "./dist/loaders/ply.js"

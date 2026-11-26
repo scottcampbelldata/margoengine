@@ -78,6 +78,10 @@
     "./infinite-grid": {
       "types": "./dist/infinite-grid.d.ts",
       "import": "./dist/infinite-grid.js"
+    },
+    "./tree-helpers": {
+      "types": "./dist/tree-helpers.d.ts",
+      "import": "./dist/tree-helpers.js"
     }
   },
   "files": [

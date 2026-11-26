@@ -31,6 +31,7 @@ await build({
         trail: resolve(root, 'src/trail.ts'),
         flow: resolve(root, 'src/flow.ts'),
         'infinite-grid': resolve(root, 'src/infinite-grid.ts'),
+        'tree-helpers': resolve(root, 'src/tree-helpers.ts'),
         batch: resolve(root, 'src/batch.ts'),
         hidden: resolve(root, 'src/hidden.ts'),
         stroke: resolve(root, 'src/stroke.ts'),

@@ -1,5 +1,9 @@
 # Clean room
 
+### BVH, octree and raycaster helpers in Lines (2026-11-25)
+
+Timothy L. Kay and James T. Kajiya, Ray Tracing Complex Scenes (SIGGRAPH 1986), and Donald Meagher, Geometric Modeling Using Octree Encoding (Computer Graphics and Image Processing 19, 1982), define the two hierarchies. `BVHHelper` and `OctreeHelper` walk the engine's own node layouts, draw the boxes at one level and the leaves above it, and nothing else. The helper names and the depth slider come from public documentation only; no rival source was read.
+
 ### Infinite shader grid in Lines (2026-11-25)
 
 Eric Chan and Frédo Durand, [Fast Prefiltered Lines](https://developer.nvidia.com/gpugems/gpugems2/part-iii-high-quality-rendering/chapter-22-fast-prefiltered-lines), GPU Gems 2 chapter 22, 2005, give the antialiased line as a ramp over the distance to the line centre; David Ebert, F. Kenton Musgrave, Darwyn Peachey, Ken Perlin and Steven Worley, Texturing and Modeling: A Procedural Approach, 3rd ed., 2003, chapter 2, fade a procedural pattern out when its period falls below the sampling rate. `InfiniteGrid` (`@margoengine/lines/infinite-grid`) measures the distance to the nearest line in pixels with the screen-space derivative of the world coordinate, ramps one pixel around a line of the asked width, and fades both line sets out once a cell is under two pixels. The visible plane is a quad under the camera sized by the fade distance. drei's `Grid` and its option names (cell and section size, fade distance, follow camera) were taken from its public documentation only; no rival source was read.

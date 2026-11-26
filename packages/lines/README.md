@@ -235,6 +235,34 @@ engine.dispose();
 
 `seek(seconds, gain = 1)` uses absolute time and a gain from 0 to 1. It does not rebuild path geometry. Gain zero hides both layers. Each visible path draws one dashed line and, if configured, its guide. `dispose()` or `using` unregisters both. The same API works on WebGPU and the WebGL2 compatibility layer.
 
+## BVH, octree and raycaster helpers
+
+`@margoengine/lines/tree-helpers` draws what a spatial query sees. `BVHHelper(bvh, { depth })` draws the boxes of a `MeshBVH` at one level (the root is level 0) plus every leaf above it, so the boxes always cover the mesh; `setDepth` redraws, and `maxDepth` is the deepest level, for a depth slider. `OctreeHelper(octree, { depth })` does the same for a `MemoryOctree`, any `OctreeSource` or a root node of `@margoengine/points/octree`. `RaycasterHelper(ray, hits)` draws the ray to its farthest hit with a cross and a normal tick on each hit. The shapes are structural, so this entry imports neither the BVH nor the points package.
+
+```ts
+import { Engine } from '@margoengine/core';
+import { Lines } from '@margoengine/lines';
+import { BVHHelper, OctreeHelper, RaycasterHelper } from '@margoengine/lines/tree-helpers';
+import { MeshBVH } from '@margoengine/bvh';
+import { buildOctree } from '@margoengine/points/octree';
+
+const engine = await Engine.create(document.querySelector('canvas')!);
+const lines = Lines.attach(engine);
+const triangles = new Float32Array(90).map((_, i) => ((i * 7919) % 1000) / 1000);
+const bvh = lines.add(new BVHHelper(MeshBVH.build({ positions: triangles }, { maxLeafTriangles: 2 }), { depth: 2 }));
+const cloud = new Float32Array(3000).map((_, i) => ((i * 104729) % 1000) / 1000);
+const tree = lines.add(new OctreeHelper(buildOctree({ positions: cloud }, { maxPointsPerNode: 100, grid: 4 }), { depth: 1 }));
+const ray = lines.add(
+  new RaycasterHelper({ origin: [0, 2, 0], direction: [0, -1, 0], far: 5 }, [{ point: [0, 0, 0], normal: [0, 1, 0] }]),
+);
+bvh.setDepth(bvh.maxDepth); // Every leaf.
+tree.setDepth(3);
+engine.render();
+engine.dispose();
+```
+
+Options: `depth` (default 3, whole number 0 to 64), `color`, and every `LineMaterial` option; `RaycasterHelper` also takes `length` (drawn when the ray has no hit and an infinite `far`, default 10) and `markSize` (default 0.1). Sources: Timothy L. Kay and James T. Kajiya, Ray Tracing Complex Scenes (SIGGRAPH 1986), for bounding-volume hierarchies; Donald Meagher, Geometric Modeling Using Octree Encoding (Computer Graphics and Image Processing, 1982), for octrees. The helpers only read node bounds; no rival source was read.
+
 ## Infinite grid
 
 `InfiniteGrid` from `@margoengine/lines/infinite-grid` is a ground grid with no edge: thin cell lines, thick section lines, analytic antialiasing, a smooth distance fade and a disc that follows the camera. The lines come from the fragment shader, so one draw of two triangles covers any `cellSize`; `GridHelper` stays the finite, geometry-based grid. Lines closer than two pixels fade out instead of turning to moire, and the grid is depth tested against the scene without writing depth. WebGPU only (the engine's WebGL2 compatibility layer is a WebGPU device, so it works there too).
