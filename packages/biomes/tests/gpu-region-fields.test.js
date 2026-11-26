@@ -1,26 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { existsSync, readFileSync, realpathSync } from 'node:fs';
-import { registerHooks } from 'node:module';
-import { isAbsolute, relative } from 'node:path';
+import { readFileSync, realpathSync } from 'node:fs';
+import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
+import { sourceOf } from '../../../scripts/support/node-compat-hooks.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { regionFieldCases, oracleAxes, oracleFields, oracleStored, storedCPU } from './gpu-region-fields-cases.mjs';
 
 const repository = realpathSync(new URL('../../../', import.meta.url));
-function resolveSource(specifier, context, nextResolve) {
-  if (/^\.{1,2}\//.test(specifier) && specifier.endsWith('.js') && context.parentURL?.startsWith('file:')) {
-    const js = new URL(specifier, context.parentURL);
-    const ts = new URL(specifier.slice(0, -3) + '.ts', context.parentURL);
-    if (!existsSync(js) && existsSync(ts)) {
-      const source = realpathSync(ts);
-      const within = relative(repository, source);
-      if (within !== '..' && !within.startsWith('../') && !within.startsWith('..\\') && !isAbsolute(within))
-        return nextResolve(pathToFileURL(source).href, context);
-    }
-  }
-  return nextResolve(specifier, context);
-}
-registerHooks({ resolve: resolveSource });
+await moduleHooks([{ source: new URL('../../../', import.meta.url).href }]);
 
 const module = {
   ...(await import('../src/gpu-region-fields.ts')),
@@ -35,7 +22,7 @@ const bytes = (array) => Buffer.from(array.buffer, array.byteOffset, array.byteL
 
 test('source resolver maps only missing relative JS files to repository TypeScript sources', () => {
   const context = { parentURL: import.meta.url };
-  const resolve = (specifier, parent = context) => resolveSource(specifier, parent, (value) => value);
+  const resolve = (specifier, parent = context) => sourceOf(specifier, parent.parentURL, repository) ?? specifier;
   assert.equal(
     resolve('../src/fixed.js'),
     pathToFileURL(realpathSync(new URL('../src/fixed.ts', import.meta.url))).href,

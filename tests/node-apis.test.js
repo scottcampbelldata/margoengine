@@ -3,8 +3,10 @@
 // passes every parse and import check and throws only when the line runs (a server render, a CLI, an exporter).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
+import * as zlib from 'node:zlib';
 import { API, check, scan } from '../scripts/check-node-apis.mjs';
 import { config, testFiles } from '../scripts/node22-tests.mjs';
 
@@ -30,7 +32,9 @@ test('every API in the table is really missing on Node 22.12 and present where t
 });
 
 // KB-NODE22-HALF1: a TIFF test writer called DataView.setFloat16, which failed only on CI's Node 22 job.
-test('the Node 22 test files and their helpers use no built-in float16 API without a feature test', async () => {
+// KB-NODE22-TESTS1: test files imported registerHooks and the zstd functions by name, which fails the whole file at link
+// time on Node 22.12; they take them from scripts/support/node-compat.mjs.
+test('the Node 22 test files and their helpers use no API newer than Node 22.12 without a feature test', async () => {
   const root = resolve(import.meta.dirname, '..'),
     listed = [...config().sharedTests, ...testFiles().flatMap((group) => group.files)],
     files = new Set(listed.map((file) => resolve(root, file))),
@@ -38,14 +42,55 @@ test('the Node 22 test files and their helpers use no built-in float16 API witho
   // The set grows while it is walked: every helper a listed test imports from a test or support folder.
   for (const file of files) {
     const source = readFileSync(file, 'utf8');
-    for (const [, from] of source.matchAll(/\bfrom\s+'(\.{1,2}\/[^']+\.(?:m?js|ts))'/g)) {
+    for (const [, from] of source.matchAll(/\b(?:from|import)\s+'(\.{1,2}\/[^']+\.(?:m?js|ts))'/g)) {
       const helper = resolve(dirname(file), from);
       if (/[\\/](?:tests?|support)[\\/]/.test(helper) && existsSync(helper)) files.add(helper);
     }
-    for (const { name, line } of await scan(source, file))
-      if (/float16|f16round/i.test(name)) found.push(`${relative(root, file)}:${line} ${name}`);
+    for (const { name, line } of await scan(source, file)) found.push(`${relative(root, file)}:${line} ${name}`);
   }
+  assert.ok(files.has(resolve(root, 'scripts/support/node-compat-hooks.mjs')), 'the helpers were walked');
   assert.deepEqual(found, []);
+});
+
+test('the stand-ins for registerHooks and zstd work, on this Node and as on Node 22.12', () => {
+  // A stored Zstandard frame of 'abc', a rule of each kind, and a TypeScript source behind a './name.js' specifier.
+  const script = `
+    import assert from 'node:assert/strict';
+    import { pathToFileURL } from 'node:url';
+    import { moduleHooks, noZstd, zstdCompressSync, zstdDecompressSync } from './scripts/support/node-compat.mjs';
+    const frame = Uint8Array.of(0x28, 0xb5, 0x2f, 0xfd, 0x20, 3, 0x19, 0, 0, 97, 98, 99);
+    assert.equal(Buffer.from(zstdDecompressSync(frame)).toString(), 'abc');
+    assert.equal(noZstd === false, typeof zstdCompressSync === 'function');
+    assert.equal(typeof zstdCompressSync, process.argv[1]);
+    await moduleHooks([
+      { specifier: 'margo:value', url: 'data:text/javascript,export default 7;' },
+      { pattern: '^margo:miss', error: 'no such module here' },
+      { source: pathToFileURL('packages/biomes/').href },
+    ]);
+    assert.equal((await import('margo:value')).default, 7);
+    await assert.rejects(import('margo:missing'), /no such module here/);
+    assert.equal(typeof (await import('./packages/biomes/src/fixed.js')), 'object');
+    console.log('ok');
+  `;
+  const run = (mode, compress) =>
+    execFileSync(
+      process.execPath,
+      [
+        ...(process.features.typescript ? [] : ['--experimental-strip-types']),
+        '--input-type=module',
+        '-e',
+        script,
+        compress,
+      ],
+      {
+        cwd: resolve(import.meta.dirname, '..'),
+        env: { ...process.env, MARGO_NODE_COMPAT: mode },
+        encoding: 'utf8',
+        timeout: 60_000,
+      },
+    ).trim();
+  assert.equal(run('fallback', 'undefined'), 'ok');
+  assert.equal(run('', typeof zlib.zstdCompressSync), 'ok');
 });
 
 // KB-NODE22-BUILD1: CI builds the packages on Node 22.12, and a named import of an API it lacks fails before a line runs.
@@ -73,6 +118,7 @@ test('unguarded uses are reported with their line', async () => {
     'const b = Promise.try(() => 1);',
     'const c = bytes.toHex();',
     "import { zstdCompressSync } from 'node:zlib';",
+    "import { registerHooks } from 'node:module';",
     'const d = /(?i:abc)/;',
     'const e = Uint8Array.fromBase64(text);',
   ].join('\n');
@@ -83,8 +129,9 @@ test('unguarded uses are reported with their line', async () => {
       '2 Promise.try',
       '3 toHex',
       '4 zstdCompressSync',
-      '5 regular expression modifiers (?i:...)',
-      '6 Uint8Array.fromBase64',
+      '5 registerHooks',
+      '6 regular expression modifiers (?i:...)',
+      '7 Uint8Array.fromBase64',
     ],
   );
 });
