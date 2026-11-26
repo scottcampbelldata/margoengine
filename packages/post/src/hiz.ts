@@ -48,6 +48,8 @@ export function createHiZ(
     storage = GPUTextureUsage.STORAGE_BINDING,
     split = compatibilityLevel(device),
     pyramid = texture(half, 'r32float', sampled | (split ? GPUTextureUsage.COPY_DST : storage), levels),
+    // Made before the levels' views, so the full level's calls are what they were.
+    view = pyramid.createView(),
     own: GPUTexture[] = [],
     groups: GPUBindGroup[] = [],
     sizes: number[][] = [];
@@ -62,7 +64,7 @@ export function createHiZ(
       ]),
     );
   }
-  return { view: pyramid.createView(), groups, sizes, own: split ? { pyramid, levels: own } : undefined };
+  return { view, groups, sizes, own: split ? { pyramid, levels: own } : undefined };
 }
 
 /** Encodes a frame's Hi-Z reduction (and, at the compatibility level, the copies into the pyramid). */
