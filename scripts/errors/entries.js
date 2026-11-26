@@ -14,14 +14,18 @@ export const entries = [
     messages: [
       'Body minVisibility and minScore must be in 0..1; see https://margoengine.com/errors#body-driver',
       'Body hold must be seconds >= 0; see https://margoengine.com/errors#body-driver',
+      'Body limits must be radians in 0..pi; see https://margoengine.com/errors#body-driver',
       'Body aspect must be a finite width / height above 0; see https://margoengine.com/errors#body-driver',
       'BodyDriver needs a skeleton with names, parents, getPose and setPose; see https://margoengine.com/errors#body-driver',
+      'BodyDriver skeleton parents must be an array as long as names; see https://margoengine.com/errors#body-driver',
+      'BodyDriver skeleton parents must each be -1 or another bone index; see https://margoengine.com/errors#body-driver',
+      'BodyDriver skeleton parents form a cycle; every chain must reach a root; see https://margoengine.com/errors#body-driver',
       'No humanoid bone of the targets is in the skeleton; pass a bones map; see https://margoengine.com/errors#body-driver',
       'Calibrate on a frame where the body or hands are visible; see https://margoengine.com/errors#body-driver',
       'The body driver is disposed; create a new BodyDriver; see https://margoengine.com/errors#body-driver',
     ],
     cause:
-      'The body driver was given an option out of range (visibility or score outside 0..1, a negative hold, an aspect that is not above 0), something that is not a skeleton, a skeleton with none of the VRM humanoid bone names it drives, a calibration frame where no driven point is visible, or was used after dispose (a MargoError with code disposed).',
+      'The body driver was given an option out of range (visibility or score outside 0..1, a negative hold, a joint limit outside 0..pi, an aspect that is not above 0), something that is not a skeleton, a skeleton whose parents are not a forest (the wrong length, an entry that is not -1 or another bone index, or a cycle), a skeleton with none of the VRM humanoid bone names it drives, a calibration frame where no driven point is visible, or was used after dispose (a MargoError with code disposed).',
     fix: 'Pass a `Skeleton` from `@margoengine/animation` (or an object with names, parents, getPose and setPose), map its bone names with `bones` (for example `humanoidBones(skeleton.names, detectSkeleton(skeleton.names).preset)` from `@margoengine/rigging/retarget`), calibrate on a frame where the person stands in the rest pose in view, and create a new BodyDriver after dispose.',
   },
   {
