@@ -9679,9 +9679,15 @@ triangular area and approximates the height density within each strip. The sea l
 at the area-weighted centroid. This supplies inflow and adds carried water to the hull.
 The geometry source is the shell's separate world trajectory, so align the panel with the
 compartment and use the same world scale. Closing the geometric gap stops flow while the
-seam remains fractured. Fluid pressure feedback to the shell, unilateral lip contact,
+seam remains fractured. The optional pressure feedback uses the previous same-rate
+flooding step, a level sampled at each opening, and current shell normals and
+waterline clipping. It supports stationary fixed hulls with downward Y gravity.
+Structural support reactions stay with the shell, and the authored-force ledger
+excludes pressure work. Moving hull attachments, transient fluid pressure, feedback
+from wall displacement into compartment volume, unilateral lip contact,
 automatic crack paths, mode-dependent cohesive properties and independent measured
 shell fracture remain open.
+[Return pressure tests](whitepaper/reproduce.md#break-03-hydrostatic-shell-feedback)
 The optional shell loader fetches the 17,398 B plain Wasm asset (8,163 B gzip). On hosts with
 shared-memory support it also fetches the shared asset, the same raw and gzip size.
 

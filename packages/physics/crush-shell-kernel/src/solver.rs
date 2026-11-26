@@ -8,6 +8,7 @@ use crate::contact::{
 use crate::material::{Hill, Plastic, Steel};
 use crate::math::sqrt;
 use crate::membrane::{Element, Vector, combine, cross, dot, membrane, sub};
+use crate::pressure::{PanelPressure, pressure_forces};
 
 #[derive(Clone, Copy)]
 #[repr(C)]
@@ -115,7 +116,7 @@ struct Shell {
     node_count: u32,
     face_count: u32,
     hinge_count: u32,
-    padding: u32,
+    pressure: *const PanelPressure,
     gravity: Vector,
     steel: Steel,
     spheres: *mut Sphere,
@@ -349,6 +350,15 @@ impl Workspace {
             budget.hardening += face.element.volume * result.result.hardened;
             budget.plastic += face.element.volume * result.result.state.dissipated;
             unsafe { add_forces(self.forces, face.vertices, result.forces) };
+            if !shell.pressure.is_null() {
+                let pressure = unsafe { *shell.pressure.add(i) };
+                if pressure.air != 0.0
+                    || (pressure.water_weight != 0.0 && pressure.inside != pressure.outside)
+                {
+                    let forces = pressure_forces(pressure, points);
+                    unsafe { add_forces(self.forces, face.vertices, forces) };
+                }
+            }
         }
         for i in 0..shell.hinge_count as usize {
             let hinge = unsafe { *shell.hinges.add(i) };

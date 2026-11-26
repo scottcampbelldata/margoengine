@@ -166,6 +166,7 @@ export class HullSolver implements Solver<HullParams> {
         readonly crushDamage?: FieldDescriptor;
         readonly girderSeams?: FieldDescriptor;
     }): HullSolver;
+    static withShellPressure(field: FieldDescriptor, pressure: FieldDescriptor, options?: Parameters<typeof HullSolver.withShellApertures>[1]): HullSolver;
     static withContactInertia(channel: CrushInertiaChannel, options?: {
         readonly id?: string;
         readonly wake?: HullWake;

@@ -6,6 +6,7 @@ mod contact;
 mod material;
 mod math;
 mod membrane;
+mod pressure;
 mod solver;
 
 #[cfg(target_arch = "wasm32")]

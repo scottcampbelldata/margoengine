@@ -13,7 +13,14 @@ import { isRateLevel, type RateLevel, rateOf } from '../world/solver.js';
 import { BODIES_FIELD, BODY_FORCES_FIELD, BODY_IMPULSES_FIELD } from '../world/solvers/rigid.js';
 import { type CrushVector, triple, ZERO } from './rigid-contact.js';
 import { type CrushShellAnisotropy, shellAnisotropy } from './shell-anisotropy.js';
-import { SHELL_APERTURE_LAYOUT, SHELL_APERTURE_WORDS, shellApertureField } from './shell-aperture.js';
+import {
+  SHELL_APERTURE_LAYOUT,
+  SHELL_APERTURE_WORDS,
+  SHELL_PRESSURE_LAYOUT,
+  SHELL_PRESSURE_WORDS,
+  shellApertureField,
+  shellPressureField,
+} from './shell-aperture.js';
 import { instanceFor, loadShell, type ShellBuilds } from './shell-kernel.js';
 import { type CrushShellContact, type CrushShellFriction, type CrushShellSphere, ShellRigid } from './shell-rigid.js';
 import {
@@ -61,6 +68,8 @@ export interface CrushShellParams {
   readonly cellSize?: number;
   /** Optional initially bonded pairs of coincident boundary edges. */
   readonly seams?: readonly CrushSheetSeam[];
+  /** Outward-wound panel faces paired with a SEA-10 opening. Requires pressure feedback. */
+  readonly pressurePatches?: readonly { readonly seam: number; readonly faces: readonly number[] }[];
 }
 
 export interface CrushShellFace {
@@ -100,6 +109,11 @@ interface ShellState {
   readonly maxNodeInverseMass: number;
   readonly seams?: Region;
   readonly apertures?: { readonly region: Region; readonly vertices: Uint32Array };
+  readonly pressure?: {
+    readonly region: Region;
+    readonly cellSize: number | undefined;
+    readonly pairs: readonly { readonly seam: number; readonly face: number }[];
+  };
 }
 
 function finiteVector(v: CrushVector, label: string): CrushVector {
@@ -134,7 +148,10 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
   readonly positionField: FieldDescriptor;
   /** Layout 1 seam openings. Published by the aperture-enabled loader. */
   readonly apertureField: FieldDescriptor;
+  /** Layout 1 pressure samples consumed by a shell using aperture pressure feedback. */
+  readonly aperturePressureField: FieldDescriptor;
   private state: ShellState | undefined;
+  private pressureFeedback = false;
 
   private constructor(
     private readonly builds: ShellBuilds,
@@ -144,6 +161,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     private readonly publishApertures = false,
   ) {
     this.apertureField = shellApertureField(id);
+    this.aperturePressureField = shellPressureField(id);
     this.positionField = {
       name: `${id}:vertices`,
       kind: 'meshVertexSet',
@@ -192,6 +210,15 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     );
   }
 
+  /** Publishes live apertures and reads the previous hull head across selected panel faces. */
+  static async loadWithAperturePressure(
+    options: Parameters<typeof CrushShellSolver.loadWithApertures>[0] = {},
+  ): Promise<CrushShellSolver> {
+    const shell = await CrushShellSolver.loadWithApertures(options);
+    shell.pressureFeedback = true;
+    return shell;
+  }
+
   describe(): SolverDescription {
     return {
       id: this.id,
@@ -200,6 +227,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       fields: [
         { field: this.positionField, access: 'write' },
         ...(this.publishApertures ? [{ field: this.apertureField, access: 'write' as const }] : []),
+        ...(this.pressureFeedback ? [{ field: this.aperturePressureField, access: 'read' as const }] : []),
         ...(this.rigid
           ? ([
               { field: BODIES_FIELD, access: 'read' },
@@ -238,6 +266,26 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const seams = params.seams ?? [];
     if (this.publishApertures && seams.length === 0)
       throw new MargoError('state', 'Give an aperture-enabled shell at least one cohesive seam.');
+    const patches = params.pressurePatches ?? [];
+    if (this.pressureFeedback !== patches.length > 0)
+      throw new MargoError('state', 'Use loadWithAperturePressure and provide pressurePatches together.');
+    const claimedFaces = new Set<number>();
+    const pairs = patches.flatMap(({ seam, faces }) => {
+      indexIn(seam, seams.length, 'pressure seam');
+      if (faces.length === 0) throw new MargoError('state', 'Give each shell pressure patch at least one face.');
+      return faces.map((face) => {
+        indexIn(face, faceCount, 'pressure face');
+        if (claimedFaces.has(face)) throw new MargoError('state', 'Use one pressure patch per shell face.');
+        claimedFaces.add(face);
+        return { seam, face };
+      });
+    });
+    if (
+      this.pressureFeedback &&
+      params.cellSize !== undefined &&
+      !(params.cellSize > 0 && Number.isFinite(params.cellSize))
+    )
+      throw new MargoError('state', 'Use a positive finite cellSize for shell pressure feedback.');
     const cohesive = seams.length
       ? prepareSeams(seams, positions, topology.boundaryEdges, topology.nodeMass, material.thickness)
       : undefined;
@@ -278,6 +326,9 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
     const descriptor = host.allocate('shell-descriptor', 176, 'u8', 1);
     const incidence = params.contactManifold ? manifoldTopology(triangles) : undefined;
     const contactTopology = incidence && host.allocate('shell-contact-topology', incidence.byteLength, 'u32', 1);
+    const pressure = this.pressureFeedback
+      ? { region: f64('shell-pressure-faces', 4 * faceCount), pairs, cellSize: params.cellSize }
+      : undefined;
     const memory = host.memory;
     const x = values(host, vertex);
     const v = values(host, speed);
@@ -309,7 +360,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       nodeCount,
       faceCount,
       topology.hinges.byteLength / 32,
-      0,
+      pressure?.region.byteOffset ?? 0,
     ]);
     new Float64Array(memory.buffer, descriptor.byteOffset + 56, 7).set([...host.gravity, ...steel]);
     new Uint32Array(memory.buffer, descriptor.byteOffset + 112, 5).set([
@@ -345,12 +396,24 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
       maxNodeInverseMass,
       seams: seamState,
       apertures,
+      pressure,
     };
   }
 
   step(_context: StepContext, dt: number): void {
-    const { host, kernel, descriptor, velocities, maxStep, resolution, rigid, maxNodeInverseMass, contactBound } =
-      this.requireState();
+    const {
+      host,
+      kernel,
+      descriptor,
+      velocities,
+      maxStep,
+      resolution,
+      rigid,
+      maxNodeInverseMass,
+      contactBound,
+      pressure,
+    } = this.requireState();
+    if (pressure) this.stagePressure(pressure, host, _context);
     const contactStep =
       rigid?.stage(_context, dt, values(host, velocities), maxNodeInverseMass, contactBound) ?? maxStep;
     const n = substeps(dt, Math.min(maxStep, contactStep), resolution);
@@ -362,6 +425,39 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
         'The loaded shell lost finite geometry. Reduce the load or use a finer time step.',
       );
     rigid?.publish(dt);
+  }
+
+  private stagePressure(pressure: NonNullable<ShellState['pressure']>, host: SolverHost, context: StepContext): void {
+    const port = context.inputs.get(this.aperturePressureField.name);
+    if (!port || port.tick !== context.tick - 1)
+      throw new MargoError('state', 'Use the same rate and put the shell before the hull for pressure feedback.');
+    const bytes = SHELL_PRESSURE_WORDS * 8;
+    if (
+      port.region.type !== 'f64' ||
+      port.region.layout !== SHELL_PRESSURE_LAYOUT ||
+      port.region.byteLength % bytes !== 0
+    )
+      throw new MargoError('state', 'Use the layout-1 HullSolver shell pressure port.');
+    const delta = port.cell[1] - context.cell[1];
+    if (delta !== 0 && pressure.cellSize === undefined)
+      throw new MargoError('state', 'Set the common cellSize for pressure feedback across different vertical cells.');
+    const offset = delta * (pressure.cellSize ?? 1);
+    const input = regionWords(port.region.memory ?? host.memory, port.region) as Float64Array;
+    const packed = values(host, pressure.region);
+    packed.fill(0);
+    for (const { seam, face } of pressure.pairs) {
+      const at = seam * SHELL_PRESSURE_WORDS;
+      if (at >= input.length)
+        throw new MargoError('state', 'Choose pressurePatches that link to seams owned by the hull.');
+      if (input[at] === 0 && context.tick === 0) continue;
+      const outside = input[at + 1]! + offset;
+      const inside = input[at + 2]! + offset;
+      const air = input[at + 3]!;
+      const weight = input[at + 4]!;
+      if (input[at] !== 1 || weight <= 0 || ![outside, inside, air, weight].every(Number.isFinite))
+        throw new MargoError('state', 'Provide an active finite hydrostatic sample for each shell pressure seam.');
+      packed.set([outside, inside, air, weight], face * 4);
+    }
   }
 
   importPorts(_tick: number): void {}

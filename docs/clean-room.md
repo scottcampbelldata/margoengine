@@ -15463,6 +15463,17 @@ Anderson, *Robust Treatment of Collisions, Contact and Friction for Cloth
 Animation* (2002), distribute the force and friction to the live shell.
 [Johnson and Willemsen](https://www-old.cs.utah.edu/gdc/publications/papers/johnson2004.pdf) · [Macklin et al.](https://mmacklin.com/sdfcontact.pdf) · [Bridson, Fedkiw and Anderson](https://graphics.stanford.edu/papers/cloth-sig02/)
 
+Pekka Ruponen, *Progressive Flooding of a Damaged Passenger Ship* (2007),
+Eq. 3.2, expresses total pressure as air pressure plus hydrostatic head.
+M. L. Bucalem and K. J. Bathe, *Finite Element Analysis of Shell Structures*
+(1997), Eq. 5, integrate pressure over the current surface along its
+normal. The native panel integrates `Nᵢ (pinside − poutside)` against
+the current area normal. A waterline clips each affine hydrostatic head.
+The clipped integral uses barycentric moments of the linear shape functions
+and linear head. SEA-10 supplies the exterior sample and interior water
+and air state from the same live opening used in the flooding calculation.
+[Ruponen](https://aaltodoc.aalto.fi/server/api/core/bitstreams/745b4f83-7891-4a64-bf68-25f016159491/content) · [Bucalem and Bathe](https://web.mit.edu/kjb/www/Publications_Prior_to_1998/Finite_Element_Analysis_of_Shell_Structures.pdf) · [Exact force and coupling checks](whitepaper/reproduce.md#break-03-hydrostatic-shell-feedback)
+
 Dry friction minimizes the kinetic-energy change `vₜ · q + 0.5 qᵀ W q` with `|q| ≤ μJₙ` after the normal step.
 Tobias Preclik, Sebastian Eibl and Ulrich Rüde, “The Maximum Dissipation Principle in Rigid-Body Dynamics
 with Purely Inelastic Impacts” (2018), Eqs. 1–3, derive the contact inverse mass and energy objective.

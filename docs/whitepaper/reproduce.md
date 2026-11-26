@@ -1,5 +1,30 @@
 # Reproducing Margo's numbers
 
+## BREAK-03 hydrostatic shell feedback
+
+Build Physics and run `node --test packages/physics/tests/coupling/crush-shell-flood.test.js`.
+The fixed hull publishes its exterior waterline, interior waterline, air gauge
+pressure and water specific weight. The shell consumes the previous tick's
+sample and follows its own live face normals. Both waterlines clip the native
+quadrature. The remaining pressure and linear shape functions have a quadratic
+product, which is integrated exactly on each clipped triangle. Interior gas
+pressure acts over the whole panel.
+
+For an intact triangular panel pair spanning 0.2–0.4 m below the sea, the
+support reactions add to 196.2 N, the analytical load from the centroid and
+total area of 0.06 m². The test also checks one exact nodal force across
+different origin cells. With the live seam released, a 0.02769 m² aperture
+produces 74.725 Pa of air overpressure in the unvented compartment and 1.971 Pa
+in the separately simulated vented case. The panels have identical geometry
+when the hole opens. Their motion differs by 48.80 µm on the following tick.
+The unvented case replays exactly from a snapshot.
+
+This fixture exercises a stationary hull with structural supports. The return
+pressure carries the hydrostatic head with one tick of lag. Dynamic flow loads,
+changing compartment volume from deformed walls, and moving shell attachments
+need additional coupling. The fixture's values are simulated and the intact
+pressure check is analytic.
+
 ## BREAK-03 folded shell contact
 
 Build Physics and run `node --test packages/physics/tests/coupling/crush-shell.test.js`.

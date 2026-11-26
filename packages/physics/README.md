@@ -5660,6 +5660,15 @@ The opening's `normal` selects the outward side for the outflow field. Use match
 cells or give the consumer the common `cellSize` in metres. To combine this with rigid sphere
 contact, call the shell loader with `{ rigid: { rate } }`.
 
+On a stationary fixed hull, use `loadWithAperturePressure` to return the previous
+flooding step's water levels and compartment pressure to the selected shell
+faces. Give `HullSolver.withShellPressure` both shell fields and
+assign faces through `pressurePatches`. Wind the panel faces outward. The
+closed panel receives hydrostatic load before its seam releases. After release,
+the live aperture controls flooding and air compression. The shell applies
+the resulting differential pressure to its deformed faces. Use gravity along
+negative Y, the same solver rate, and the order shell, hull, rigid.
+
 ```ts
 import { Physics } from '@margoengine/physics';
 import { CrushShellSolver } from '@margoengine/physics/crush';
@@ -5671,10 +5680,11 @@ const gravity = [0, -9.81, 0] as const;
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 }, gravity, memory: worldMemory(false) });
 using physics = new Physics(null, { arena: world.arena, gravity });
 const body = physics.addBody(null, {
+  type: 'fixed',
   colliders: { shape: 'box', halfExtents: [0.5, 0.5, 0.5], mass: 500, sensor: true },
 });
-const shell = await CrushShellSolver.loadWithApertures();
-const hull = HullSolver.withShellApertures(shell.apertureField);
+const shell = await CrushShellSolver.loadWithAperturePressure();
+const hull = HullSolver.withShellPressure(shell.apertureField, shell.aperturePressureField);
 const vertices = Float64Array.from(
   [-1,-1,-1, 1,-1,-1, 1,1,-1, -1,1,-1, -1,-1,1, 1,-1,1, 1,1,1, -1,1,1], value => value * 0.5,
 );
@@ -5684,9 +5694,11 @@ world.add(new RigidSolver(), { physics, capacity: physics.kernel.capacity });
 world.add(shell, {
   positions: [[-0.3,-0.4,0.5], [0,-0.4,0.5], [0,-0.2,0.5], [0,-0.4,0.5], [0.3,-0.4,0.5], [0,-0.2,0.5]],
   triangles: [[0,1,2], [3,4,5]],
-  velocities: [[-1.2,0,0], [-1.2,0,0], [-1.2,0,0], [1.2,0,0], [1.2,0,0], [1.2,0,0]],
+  pinned: [0, 4],
+  velocities: [[0,0,0], [-1.6,0,0], [-1.6,0,0], [1.6,0,0], [0,0,0], [1.6,0,0]],
   material: { thickness: 0.015, density: 7800, youngModulus: 200e6, poissonRatio: 0.3, yieldStress: 350e3 },
   seams: [{ sides: [[1,2],[3,5]], stiffness: 4e5, peakTraction: 12e3, toughness: 600 }],
+  pressurePatches: [{ seam: 0, faces: [0, 1] }],
 });
 world.add(hull, {
   hulls: [{ row: body.row, mesh, compartments: [{ mesh, permeability: 1 }], openings: [{
@@ -5695,10 +5707,15 @@ world.add(hull, {
   sea: { density: 1000, elevation: () => 0, pressure: (_x, y) => Math.max(0, -9810 * y) },
 });
 world.couple([shell.id, hull.id, 'rigid'], 'staggered');
-world.advance(8);
+world.advance(1);
+for (let frame = 2; frame <= 16 && !shell.readSeam(0).broken; frame++) world.advance(frame);
 const aperture = world.fields.port(HULL_BREACHES_FIELD.name)!;
 if (Number(regionWords(world.memory, aperture.region)[10]) >= 0) throw new Error('Expected flooding through the seam');
+const head = world.fields.port(shell.aperturePressureField.name)!;
+if (Number(regionWords(world.memory, head.region)[3]) <= 0) throw new Error('Expected air compression in the flooded compartment');
 ```
+
+[Flooding and return-pressure checks](../../docs/whitepaper/reproduce.md#break-03-hydrostatic-shell-feedback)
 
 The shell aperture port uses layout 1, with area in square metres followed by four
 xyz vertices in metres in the port's origin cell. `SHELL_APERTURE_WORDS` gives the row width.
@@ -5740,7 +5757,7 @@ if (!dent.fractured || crush.read(0).sealLoss !== 1)
   throw new Error('Expected the native plate contact to open the seal and retain its dent');
 ```
 
-`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Let the crush patch own the contact event by using sensor colliders or filtering the selected rigid pair. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
+`CrushSolver` couples a list of known contact patches to a `RigidSolver`, including fixed barriers. Use body-local anchors for moving patches. Fix a barrier in the zero cell or give its cell and set `cellSize`. Match `bodyCapacity` to the rigid port and register both solvers in a `staggered` group. Use collision groups to filter the contact pair handled by the crush patch. The README fixtures use sensor-only colliders for bodies whose entire collision response belongs to the patch. The normal and point impulses are equal and opposite on moving pairs. A patch that stays compressed after
 impact continues to support load. It uses its `backingStiffness` and critical damping of the effective
 normal mass. This contact carries reciprocal impulses without creating a new material event. The durable
 damage fields record the prior material event and accumulated crush work. The descriptor `damageField` publishes layout-1 f64 rows in input order. Each row contains permanent stroke (m), cumulative absorbed work (J), last peak stroke (m), force (N), impulse (N s), elastic work (J), seal loss (0–1), and impact count. `read()` copies the corresponding typed record.

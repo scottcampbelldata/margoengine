@@ -10672,6 +10672,13 @@ each shared mesh feature. Native tests cover folded and flat sheets, opposing no
 with continuing friction, and exact plain and shared replay. The folded sheet is rendered
 on WebGPU and WebGL2. Arbitrary rigid shapes and shell self-contact remain open.
 
+For fixed hulls, SEA-10 returns a layout-1 pressure row per linked shell seam.
+The shell consumes the prior flooding row and the hull consumes the current
+deformed opening. The native shell integrates the resulting pressure along
+the current face normals. The support-reaction and vented/unvented fixtures
+verify the feedback and catch reversed tick order. Dynamic rigid attachments
+and fully coupled fluid stress are still open.
+
 Staged crush envelopes extend the same contact path with trigger peaks followed by
 folding at lower loads. Their increasing permanent offsets separate return work from
 elastic recoil. The continuous contact uses the rigid rate and rejects an active

@@ -219,12 +219,17 @@ export interface CrushShellParams {
     readonly contactManifold?: boolean;
     readonly cellSize?: number;
     readonly seams?: readonly CrushSheetSeam[];
+    readonly pressurePatches?: readonly {
+        readonly seam: number;
+        readonly faces: readonly number[];
+    }[];
 }
 
 export class CrushShellSolver implements Solver<CrushShellParams> {
     readonly id: string;
     readonly positionField: FieldDescriptor;
     readonly apertureField: FieldDescriptor;
+    readonly aperturePressureField: FieldDescriptor;
     private constructor();
     static load(options?: {
         readonly id?: string;
@@ -242,6 +247,7 @@ export class CrushShellSolver implements Solver<CrushShellParams> {
             readonly rate?: RateLevel;
         };
     }): Promise<CrushShellSolver>;
+    static loadWithAperturePressure(options?: Parameters<typeof CrushShellSolver.loadWithApertures>[0]): Promise<CrushShellSolver>;
     describe(): SolverDescription;
     init(host: SolverHost, params: CrushShellParams): void;
     step(_context: StepContext, dt: number): void;

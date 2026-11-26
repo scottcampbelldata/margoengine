@@ -9,6 +9,11 @@ made ([Speed compared with three.js](#speed-compared-with-threejs)).
 (LIM-001 onward). The dated notes between here and the headline table are per-change evidence records, newest
 first: each names its scope, its evidence file and how to reproduce it.
 
+- Hydrostatic shell feedback (BREAK-03 / SEA-10, 2026-11-26). The fixed hull
+  returns water levels and compartment pressure to the live shell. The intact
+  panel reactions sum to the analytic 196.2 N. After a common 0.02769 m²
+  release, a real vent lowers the pressure from 74.725 to 1.971 Pa and changes
+  the following shell step. [Reproduce](reproduce.md#break-03-hydrostatic-shell-feedback)
 - Folded shell contact (BREAK-03, 2026-11-26). An optional native manifold loads
   both faces of a crease and deduplicates a flat shared edge or vertex. Opposing
   normal forces cancel while both faces dissipate sliding. The WebGPU and

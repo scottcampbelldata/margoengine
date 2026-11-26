@@ -65,12 +65,21 @@ import { CLAIM_ADDED_MASS, CLAIM_DAMPING, MANOEUVRING_CLAIMS_FIELD } from '../wo
 import { type Deck, deckOf, stepDeck } from './deck.js';
 import { courseWaveCorrection } from './excitation.js';
 import { type SlamStation, slamSlope, slamStations } from './slamming.js';
-import { AIR_DENSITY, type Compartment, FLOOD_OPENING_GRID, Flooding, type Opening, volumeBelow } from './flooding.js';
+import {
+  AIR_DENSITY,
+  ATMOSPHERE,
+  type Compartment,
+  FLOOD_OPENING_GRID,
+  Flooding,
+  type Opening,
+  volumeBelow,
+} from './flooding.js';
 import { BREACH_CARGO, HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { buildHullMemory, type HullMemory, type HullWaveMemory, stillWaterline } from './memory.js';
 import { surgePanelMass } from './panel-surge.js';
 import { heaveSection, lateralSection, scatterSection } from './radiation.js';
 import { isShellApertureField, panelAperture, type ShellAperture, shellApertureRows } from './shell-opening.js';
+import { SHELL_PRESSURE_LAYOUT, SHELL_PRESSURE_WORDS, shellPressureField } from '../crush/shell-aperture.js';
 import { addedMassInfinite, hullSections, type Section } from './strips.js';
 import { type ForwardRoll, forwardRollOf } from './viscous.js';
 import {
@@ -301,6 +310,8 @@ export class HullSolver implements Solver<HullParams> {
   private lastGirderJoint = -1;
   private lastShellSeam = -1;
   private shellApertures?: { readonly field: FieldDescriptor; readonly cellSize?: number };
+  private shellPressureField?: FieldDescriptor;
+  private shellPressure: Region | null = null;
   private entryCavity?: FieldDescriptor;
   private wetChannel?: CrushInertiaChannel;
   private wetMobility: Region | null = null;
@@ -359,6 +370,26 @@ export class HullSolver implements Solver<HullParams> {
     return hull;
   }
 
+  /** Couples a stationary fixed hull's live shell opening and hydrostatic return pressure. */
+  static withShellPressure(
+    field: FieldDescriptor,
+    pressure: FieldDescriptor,
+    options: Parameters<typeof HullSolver.withShellApertures>[1] = {},
+  ): HullSolver {
+    const hull = HullSolver.withShellApertures(field, options);
+    const expected = shellPressureField(field.name.slice(0, -':shellApertures'.length));
+    if (
+      pressure.name !== expected.name ||
+      pressure.kind !== expected.kind ||
+      pressure.quantity !== expected.quantity ||
+      pressure.unit !== expected.unit ||
+      pressure.centring !== expected.centring
+    )
+      throw new MargoError('state', 'Pass the matching CrushShellSolver.aperturePressureField.');
+    hull.shellPressureField = pressure;
+    return hull;
+  }
+
   /** Supplies instantaneous added and carried-water inertia to the paired crush solver. */
   static withContactInertia(
     channel: CrushInertiaChannel,
@@ -402,6 +433,7 @@ export class HullSolver implements Solver<HullParams> {
         ...(this.crushDamage ? [{ field: this.crushDamage, access: 'read' as const }] : []),
         ...(this.girderSeams ? [{ field: this.girderSeams, access: 'read' as const }] : []),
         ...(this.shellApertures ? [{ field: this.shellApertures.field, access: 'read' as const }] : []),
+        ...(this.shellPressureField ? [{ field: this.shellPressureField, access: 'write' as const }] : []),
         ...(this.entryCavity ? [{ field: this.entryCavity, access: 'read' as const }] : []),
         ...(this.wetChannel
           ? ([
@@ -427,9 +459,10 @@ export class HullSolver implements Solver<HullParams> {
     let lastCrushPatch = -1;
     let lastGirderJoint = -1;
     let lastShellSeam = -1;
+    const pressureSeams = new Set<number>();
     for (const hull of hulls) {
       if (hull.bilgeKeels !== undefined) validateBilgeKeels(hull.bilgeKeels);
-      for (const { crushPatch, girderJoint, shellSeam } of hull.openings ?? []) {
+      for (const { crushPatch, girderJoint, shellSeam, to } of hull.openings ?? []) {
         if (crushPatch !== undefined) {
           if (!this.crushDamage || !Number.isSafeInteger(crushPatch) || crushPatch < 0)
             throw new MargoError(
@@ -449,6 +482,11 @@ export class HullSolver implements Solver<HullParams> {
         if (shellSeam !== undefined) {
           if (!this.shellApertures || !Number.isSafeInteger(shellSeam) || shellSeam < 0)
             throw new MargoError('state', 'Use HullSolver.withShellApertures and a nonnegative shellSeam index.');
+          if (this.shellPressureField) {
+            if (to !== 'outside' || pressureSeams.has(shellSeam))
+              throw new MargoError('state', 'Use one opening to the outside per pressure seam.');
+            pressureSeams.add(shellSeam);
+          }
           lastShellSeam = Math.max(lastShellSeam, shellSeam);
         }
       }
@@ -501,6 +539,19 @@ export class HullSolver implements Solver<HullParams> {
     this.lastCrushPatch = lastCrushPatch;
     this.lastGirderJoint = lastGirderJoint;
     this.lastShellSeam = lastShellSeam;
+    if (this.shellPressureField) {
+      if (lastShellSeam < 0)
+        throw new MargoError('state', 'Give the pressure-enabled hull at least one shellSeam opening.');
+      const [gx, gy, gz] = this.gravity;
+      if (gx !== 0 || gz !== 0 || !(gy < 0 && Number.isFinite(gy)))
+        throw new MargoError('state', 'Use downward Y gravity when linking shell aperture pressure.');
+      this.shellPressure = host.allocate(
+        'shell-pressure',
+        (lastShellSeam + 1) * SHELL_PRESSURE_WORDS * 8,
+        'f64',
+        SHELL_PRESSURE_LAYOUT,
+      );
+    }
     this.forces = host.allocate('forces', capacity * FORCE_WORDS * 8, 'f64', HULL_LAYOUT);
     if (this.wetChannel)
       this.wetMobility = host.allocate('wet-mobility', capacity * WET_INERTIA_WORDS * 8, 'f64', WET_INERTIA_LAYOUT);
@@ -728,6 +779,12 @@ export class HullSolver implements Solver<HullParams> {
     if (seams && this.lastGirderJoint * GIRDER_SEAM_WORDS >= seams.length)
       throw new MargoError('state', 'Choose a hull opening girderJoint within the connected seam port.');
     const aperturePort = this.shellApertures && context.inputs.get(this.shellApertures.field.name);
+    const shellPressure = this.shellPressure
+      ? (regionWords(host.memory, this.shellPressure) as Float64Array)
+      : undefined;
+    if (shellPressure && (aperturePort?.tick !== context.tick || port.tick !== context.tick - 1))
+      throw new MargoError('state', 'Use the same rate and the order shell, hull, rigid for aperture pressure.');
+    shellPressure?.fill(0);
     let shellInput: { rows: Float64Array; offset: Vec3 } | undefined;
     if (aperturePort && this.lastShellSeam >= 0) {
       const { cell } = aperturePort;
@@ -771,7 +828,37 @@ export class HullSolver implements Solver<HullParams> {
         : undefined;
     for (const [index, hull] of this.hulls.entries()) {
       const at = hull.row * BODY_WORDS;
-      if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
+      if (at + BODY_WORDS > bodies.length) continue;
+      if (shellPressure && hull.openings?.some((opening) => opening.shellSeam !== undefined)) {
+        const position: Vec3 = [bodies[at]!, bodies[at + 1]!, bodies[at + 2]!];
+        const rotation = [bodies[at + 3]!, bodies[at + 4]!, bodies[at + 5]!, bodies[at + 6]!] as const;
+        if (
+          bodies[at + 23] !== 0 ||
+          bodies.subarray(at + 10, at + 16).some((component) => component !== 0) ||
+          rotation.every((component) => component === 0) ||
+          port.cell.some((cell, axis) => cell !== context.cell[axis])
+        )
+          throw new MargoError(
+            'state',
+            'Use a live, stationary fixed hull in its rigid origin cell for shell pressure.',
+          );
+        this.floodLoad(
+          hull,
+          { position, rotation },
+          position,
+          t,
+          dt,
+          context.tick,
+          breaches,
+          undefined,
+          damage,
+          seams,
+          shellInput,
+          shellPressure,
+        );
+        continue;
+      }
+      if (bodies[at + 23] !== 1) continue;
       const cavityAt = hull.row * ENTRY_CAVITY_WORDS,
         cavityNormal: Vec3 | undefined =
           cavity?.[cavityAt] === 1 ? [cavity[cavityAt + 1]!, cavity[cavityAt + 2]!, cavity[cavityAt + 3]!] : undefined;
@@ -1578,10 +1665,11 @@ export class HullSolver implements Solver<HullParams> {
     dt: number,
     tick: number,
     breaches: Float64Array,
-    loads: WettedLoads,
+    loads: WettedLoads | undefined,
     damage: Float64Array | undefined,
     seams: Float64Array | undefined,
     shellInput: { rows: Float64Array; offset: Vec3 } | undefined,
+    shellPressure?: Float64Array,
   ): number[] {
     const entry = this.floods.get(hull);
     if (!entry || !this.flood) return [];
@@ -1621,7 +1709,7 @@ export class HullSolver implements Solver<HullParams> {
       r = flooding.stepWithShellApertures(state, pose, this.sea!, t, dt, density, magnitude, live),
       points: number[] = [],
       add = (m: number, x: number, y: number, z: number) => {
-        if (m === 0) return;
+        if (m === 0 || !loads) return;
         const f = [m * g[0], m * g[1], m * g[2]],
           d = [x - centre[0], y - centre[1], z - centre[2]];
         loads.force[0] += f[0]!;
@@ -1651,6 +1739,18 @@ export class HullSolver implements Solver<HullParams> {
           o.shellSeam === undefined ? r.open[k]! * o.width * o.height : r.open[k] === 1 ? (aperture?.area ?? 0) : 0,
         cargo = flooding.compartments[o.from]!.cargo,
         w = 1 + n * HULL_BREACH_WORDS;
+      if (shellPressure && o.shellSeam !== undefined) {
+        const exterior = this.sea!.elevation(x, z, t);
+        const interior = r.level[o.from]!;
+        const air = r.pressure[o.from]! - ATMOSPHERE;
+        const waterWeight = density * magnitude;
+        if (![exterior, interior, air, waterWeight].every(Number.isFinite) || waterWeight <= 0)
+          throw new MargoError(
+            'state',
+            'Provide finite water levels, positive density and a finite compartment pressure.',
+          );
+        shellPressure.set([1, exterior, interior, air, waterWeight], o.shellSeam * SHELL_PRESSURE_WORDS);
+      }
       breaches.set(
         [
           hull.row,
@@ -2064,6 +2164,9 @@ export class HullSolver implements Solver<HullParams> {
       ...(this.wetMobility && this.wetChannel
         ? [{ field: this.wetChannel.mobility.name, region: this.wetMobility, tick, cell: [0, 0, 0] as const }]
         : []),
+      ...(this.shellPressure && this.shellPressureField
+        ? [{ field: this.shellPressureField.name, region: this.shellPressure, tick, cell: [0, 0, 0] as const }]
+        : []),
     ];
   }
 
@@ -2082,6 +2185,7 @@ export class HullSolver implements Solver<HullParams> {
       this.slam,
       this.flood,
       this.wetMobility,
+      this.shellPressure,
     ].filter((r): r is Region => r !== null);
   }
 
