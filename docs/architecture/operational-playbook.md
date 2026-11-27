@@ -2362,6 +2362,12 @@ post check that reads one frame after another also reads the canvas in the rende
 (`scene-background-browser.mjs`; KB-POST-HALFVIEW-ONCE1, still open). `SceneFade` draws on canvas views only
 (KB-FADE-TARGETVIEW1, `scene-fade-target-browser.mjs`, both backends).
 
+XR on a transparent canvas, stand-in `navigator.xr` only (2026-11-27, RTX A6000): at 1 sample, with TransparentCanvas
+attached, `immersive-ar` and `immersive-vr` eyes of WebGPU and the WebGL2 layer matched (Bloom within 1) for no effect,
+Tonemap, PostStack, Bloom, FXAA, TAA and DOF; no eye held colour above its alpha; empty AR pixels were 0,0,0,0 except
+under Bloom's glow; VR eyes were opaque. Open: KB-XR-AREFFECTS1 and KB-XR-AR4XCOMPAT1. Not covered: a headset, a
+browser compositor, additive displays and composition layers.
+
 A GPU reset is the device's loss (2026-11-27, KB-COMPAT-LOSSREPORT1): Chrome answers the synchronous query that waited
 for a reset (LINK_STATUS and COMPILE_STATUS false with empty logs, checkFramebufferStatus 0x8cdd, getError 0) before
 isContextLost() turns true and CONTEXT_LOST_WEBGL is queued, one task later; no synchronous signal exists (measured, RTX

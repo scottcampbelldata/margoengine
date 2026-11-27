@@ -6,6 +6,30 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: in an AR session a post effect makes solid meshes see-through (KB-XR-AREFFECTS1, xr, shared)
+
+- **Repro:** the stand-in XR page `packages/webgl2-compat/test/xr.html` with `createXREngine`, an `immersive-ar`
+  session and `Tonemap.attach(engine)`, reading both eyes (RTX A6000, WebGPU and the WebGL2 layer, the same on a
+  transparent and an opaque canvas). Engine at 1 sample (`exactSize`): with no effect 8,239 of the left eye's 8,700
+  covered pixels have alpha 255; with Tonemap, PostStack or DOF none has, and their alpha is the brightest colour
+  channel (80 to 241), so the real world shows through. FXAA and TAA leave only 681 and about 900 at 255. At 4 samples
+  (`antialias: true`) with no effect 7,927 pixels have alpha 255, with Tonemap, PostStack or DOF 6,791: 1,137 pixels of
+  alpha 241 are still see-through.
+- **Cause:** the AR blit (`packages/xr/src/eyes.ts`) takes alpha from the eye's depth coverage, or the brightest channel
+  where no depth was written. At 1 sample, by reading, a capturing effect draws into its own depth and
+  `SceneTarget.restore` (`packages/shared/msaa.js`) returns without copying it to the eye's, which the blit and the
+  compositor's depth layer then find empty. At 4 samples the copy runs and the cause of the remaining pixels is not
+  established.
+- **Fix needs:** the scene depth copied back at 1 sample too (a shared change: every `SceneTarget` user), the 4-sample
+  remainder found, and an eye-alpha check with an effect on both backends.
+
+### Open 2026-11-27: on the WebGL2 layer at 4 samples AR eye edges differ from WebGPU (KB-XR-AR4XCOMPAT1, xr, webgl2-compat)
+
+- **Repro:** the same page, `antialias: true`, no effect: the left eye differs from the WebGPU eye by more than 2 in 512
+  bytes (largest 191) and has 8,208 pixels of alpha 255 against 7,927. At 1 sample the two are identical.
+- **Cause:** not established. The layer reads the samples of a 4x texture from a resolved copy (KB-TAA-COMPATEDGE1), so
+  the blit's per-sample coverage is the likely difference.
+
 ### Fixed 2026-11-27: SceneFade also drew into offscreen target views (KB-FADE-TARGETVIEW1, post)
 
 - **Repro:** `node packages/post/test/scene-fade-target-browser.mjs` (and `--compat`), before the fix (RTX A6000): half
