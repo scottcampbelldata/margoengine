@@ -9039,6 +9039,18 @@ Elastic rods (`@margoengine/physics/rod`, 2026-11-26):
   - a line between pins within 0.007 % of its chain and 0.03 % of the catenary;
   - a taut cable's ring within 0.07 % of the beam-string frequency;
   - strumming that locks to the cable's frequency at reduced velocities 5 and 7 (within 0.3 % and 6 % of its frequency at the tension its bow along the flow gives it), swinging 0.57 and 0.60 diameters, and follows the shedding at 2 (0.014 diameters).
+- `MooringLine` (2026-11-27): lumped masses on tension-only segments, explicit substeps the axial springs keep stable (a stiff
+  line steps finely: 100 m of chain at EA 1e7 in 100 segments takes about 3 s of computer time for a minute; a near-massless
+  line without damping can gain energy as its slack segments come taut, so keep its default damping); the seabed flat and
+  horizontal, its friction Coulomb along and across the line (no static-to-kinetic step, no soil suction or bearing); the
+  water's loads by Morison per segment with its wetted fraction (a node's buoyancy by its own depth); not yet coupled to
+  rigid bodies or the framework (a fairlead on a ship is driven with `setEnd`). Measured (`packages/physics/tests/mooring.test.js`):
+  - friction stopping distances within 0.08 % of v^2 / (2 mu g), along and across;
+  - a clump's snap within 0.02 % of the closed form; a buoy's anchor pull within 0.001 %;
+  - the elastic catenary with its grounded length within 0.3 % at 100 segments (held to 1 %);
+  - the 33 m chain of Bergdahl et al. (2016), its top driven clockwise round circles of 0.075 to 0.2 m at 1.25 to 3.5 s: the
+    measured top tension maxima (30 cases, read to +-5 %) within a mean of 2.7 % (bias +1.6 %), 23 within the reading
+    error, the worst 7.4 % (at the two smallest radii and longest periods); held to 3.5 % and 8 %.
 - Vortex-induced vibration against measurements (`packages/physics/tests/rod-viv.test.js`, 2026-11-27): the pipes of Fu et al. (2025, arXiv 2502.05748), measured values read from their Figs. 5, 7, 9 and 12. The wake's two amplitudes (`lift` 0.56, `drag` 0.53 at Re 5e4) were calibrated on the uniform 1.6 m/s case's cross-flow and in-line RMS (+2.5 % and -1.8 % after calibration; a change of 0.01 in either moves them about 1.5 % and 3 %); everything else is held out and held to the miss of the paper's own validated CFD on that case:
   - uniform 1.6 m/s: modes as measured (third across, fifth in line); the bow -8.3 % (CFD +9.8 %, held to it);
   - uniform 0.4 m/s: modes as measured (first and first, where the paper's CFD gives the second in line); across +2.4 % (CFD -23 %), in line +0.4 % (CFD -11 %), bow +8.4 % (held to 10 %);

@@ -5,6 +5,57 @@
 ```ts
 import { EngineKernel, EnginePlugin, Geometry, Mesh, Vec3 } from "@margoengine/core";
 import { Mesh } from "@margoengine/core/extension";
+import { SeaSurface } from "@margoengine/math/fields";
+
+export interface MooringClump {
+    readonly node: number;
+    readonly mass: number;
+    readonly volume?: number;
+}
+
+export class MooringLine {
+    readonly segments: number;
+    broken: number;
+    readonly stableStep: number;
+    constructor(options: MooringLineOptions);
+    setEnd(end: 'start' | 'end', position: Vec3, velocity?: Vec3): void;
+    step(dt: number): void;
+    position(i: number): Vec3;
+    velocity(i: number): Vec3;
+    tension(i: number): number;
+    endForce(end: 'start' | 'end'): Vec3;
+    points(): Float64Array;
+}
+
+export interface MooringLineOptions {
+    readonly start: Vec3;
+    readonly end: Vec3;
+    readonly length: number;
+    readonly massPerLength: number;
+    readonly axialStiffness: number;
+    readonly segments?: number;
+    readonly density?: number;
+    readonly diameter?: number;
+    readonly drag?: {
+        readonly normal?: number;
+        readonly tangential?: number;
+    };
+    readonly addedMass?: number;
+    readonly damping?: number;
+    readonly breakingLoad?: number;
+    readonly water?: LoadWater;
+    readonly seabed?: MooringSeabed;
+    readonly clumps?: readonly MooringClump[];
+    readonly fixed?: 'start' | 'end' | 'both' | 'none';
+    readonly gravity?: Vec3;
+    readonly velocity?: Vec3;
+}
+
+export interface MooringSeabed {
+    readonly y?: number;
+    readonly friction?: number;
+    readonly lateralFriction?: number;
+}
 
 export class Rod implements PhysicsAttachment {
     readonly segments: PhysicsBody[];
@@ -1134,6 +1185,8 @@ class KernelWorld {
 interface KernelWorldOptions {
     arena?: Arena;
 }
+
+type LoadWater = Pick<SeaSurface, 'elevation' | 'water' | 'density'>;
 
 interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
     shape?: 'trimesh' | 'convexHull' | 'convexDecomposition';

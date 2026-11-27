@@ -649,6 +649,32 @@ const [lifting, paying] = line.tension(0);
 console.log((lifting / paying).toFixed(3), line.holding(0)); // 2.566 false: the drum slips under the line at e^(0.3 pi)
 ```
 
+A mooring line or anchor chain on the seabed is `MooringLine`: lumped masses on segments that take tension only (it goes
+slack rather than push), its internal damping while taut, Morison's loads on each segment's own normal and tangent
+(buoyancy of its wetted length, drag across and along, added mass across, `drag` and `addedMass` on `diameter` and its
+material's volume), and a seabed (`seabed: {y, friction, lateralFriction}`) with Coulomb friction along and across the line
+on what rests there. `clumps` add weights or buoys at nodes; `breakingLoad` parts a segment past it for good (`broken`);
+snap loads come of themselves when a slack line is pulled taut. Hold its ends with `setEnd` (a fairlead that moves), step it
+with `step(dt)` (it takes the substeps its springs need), and read `tension(i)`, `endForce(end)` (the load on what holds
+that end), `position(i)` and `velocity(i)`. Checked against the measured top tensions of a 33 m chain driven round circles
+(Bergdahl et al. 2016, 30 cases, mean error 2.7 %) and the elastic catenary with its grounded length.
+
+```ts
+import {MooringLine} from '@margoengine/physics/rod';
+
+// 100 m of 10 kg/m chain from an anchor on the seabed to a fairlead 90 m off and 20 m up, in still sea water.
+const sea = {density: 1025, elevation: () => 30, water: {medium: 'water' as const, cell: [0, 0, 0] as const,
+  sample: (x: number, y: number, z: number, t: number, out = {velocity: [0, 0, 0] as [number, number, number], density: 0, temperature: 0}) =>
+    Object.assign(out, {velocity: [0, 0, 0], density: 1025, temperature: 288})}};
+const chain = new MooringLine({
+  start: [0, 0, 0], end: [90, 20, 0], length: 100, massPerLength: 10, axialStiffness: 1e7, segments: 40,
+  water: sea, seabed: {friction: 0.7}, drag: {normal: 2.4, tangential: 1.15},
+});
+for (let i = 0; i < 1800; i++) chain.step(1 / 60);
+const [fx] = chain.endForce('end');
+console.log(chain.tension(0), -fx > 0); // 0 true: the seabed's friction holds the grounded chain, the fairlead pulls
+```
+
 ## Loose props on a moving deck
 
 Props resting on a moving body (cups, plates and chairs in a ship's saloon, crates in a lift) stick, slide and tip as its

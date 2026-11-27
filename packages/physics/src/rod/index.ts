@@ -695,3 +695,4 @@ export {
   type WrappedRopeSolverParams,
   type WrappedRopeSolverWrap,
 } from './wrapped-solver.js';
+export { type MooringClump, MooringLine, type MooringLineOptions, type MooringSeabed } from './mooring.js';

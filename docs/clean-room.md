@@ -17963,3 +17963,24 @@ values are numbers read from the paper's figures, no data file.
   the in-line motion, U^2 + <x'^2>, from the drag on the relative flow.
 - Found on the way: `Physics.step()` takes no step length (it steps its `fixedTimestep`), so the earlier test's
   `physics.step(1 / 600)` ran at 60 steps a second, three steps an in-line period; the test now sets `fixedTimestep`.
+
+## physics mooring line and anchor chain (2026-11-27)
+
+Files: `packages/physics/src/rod/mooring.ts` (`MooringLine`), `packages/physics/tests/mooring.test.js`. No rival engine
+source (MoorDyn, MooDy, OrcaFlex) and no paper's companion code was read; the measured values are the paper's table.
+
+- M. Hall and A. Goupee, "Validation of a lumped-mass mooring line model with DeepCwind semisubmersible model test data",
+  Ocean Engineering 104 (2015) 590-603, https://doi.org/10.1016/j.oceaneng.2015.05.035 (abstract and the method as widely
+  described; the paper not read). Used: the lumped-mass approach, mass in nodes, tension-only segments with internal
+  damping, Morison loads per segment on its own normal and tangent, bottom contact.
+- L. Bergdahl, J. Palm, C. Eskilsson and J. Lindahl, "Dynamically scaled model experiment of a mooring cable", J. Mar. Sci.
+  Eng. 4(1):5 (2016), https://doi.org/10.3390/jmse4010005 (open, read). Used: the experiment (section 3, Fig. 3 for the
+  sheave's clockwise turn, Table 3), its measured top tension maxima (Table 7, read to +-5 %) and its model input (Table 8:
+  drag across 2.5 and along 0.5 on the bar diameter, added mass 3.8 on the steel's volume, bed friction 0.3).
+- H. M. Irvine, Cable Structures (MIT Press, 1981): the elastic catenary, here with a grounded length on a frictionless bed,
+  for the test's closed form.
+- The capstan-free closed forms: Coulomb's stopping distance v^2 / (2 mu g); a mass caught by a spring, M g + sqrt((M g)^2 +
+  k M v^2), from its energy.
+- Own derivations: the seabed as a floor the node's speed into is taken out of each substep, that taken speed over the
+  substep the bed's push, and friction along and across the line each up to its coefficient of it; the substep from one
+  segment's axial mode with its damping, 1 / (omega (1 + 2 zeta)); a held end's load as the whole load on its node.
