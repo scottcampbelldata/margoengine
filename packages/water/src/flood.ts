@@ -22,6 +22,7 @@
 // the bounds).
 import type { Engine, EnginePlugin } from '@margoengine/core';
 import type { Water } from './index.js';
+import { floodRigidDrag } from './flood-rigid-drag.js';
 import { waterSolvers, type WaterSolver, type WaterSolverInput } from './query-state.js';
 import {
   FLOOD_MAKER_FLOAT,
@@ -142,6 +143,77 @@ export interface FloodTsunami {
   /** 'n-wave' (default): the trough and the crest; 'solitary': one crest, H sech^2 of time (Synolakis 1987), `leading` ignored. */
   shape?: 'n-wave' | 'solitary';
 }
+/** The synchronous rigid state driven by a 120 Hz PhysicsWorld and RigidSolver. */
+export interface FloodDragWorld {
+  /** The rigid world's tick rate, which must be 120 Hz. */
+  readonly rate: { readonly num: number; readonly den: number };
+  /** The rigid world's frame cursor, initially at zero. */
+  readonly clock: { readonly frame: number; at(frame: number): unknown };
+  /** Advance the rigid world to the specified frame. */
+  advance(frame: number): number;
+  /** Hash of the current rigid world state. */
+  hash(): string;
+  /** Capture the rigid world at the start of the session. */
+  takeSnapshot(): { readonly bytes: Uint8Array; readonly hash: string };
+  /** Reset the rigid world to a previously captured state. */
+  restoreSnapshot(bytes: Uint8Array): unknown;
+}
+
+/** Settings for a single rigid body that exchanges drag with a standalone Flood. */
+export interface FloodDragOptions {
+  /** The new rigid world whose clock the Flood session drives. */
+  readonly world: FloodDragWorld;
+  /** The Physics instance registered with this world's RigidSolver. */
+  readonly physics: { readonly fixedTimestep: number; stepCount: number };
+  /** A dynamic body in `physics`, with world X and Z translation enabled. */
+  readonly body: {
+    readonly type: string;
+    readonly mass: number;
+    readonly enabledTranslations: readonly [boolean, boolean, boolean];
+    readonly worldCenterOfMass: readonly [number, number, number];
+    readonly linearVelocity: readonly [number, number, number];
+    applyImpulse(impulse: [number, number, number]): unknown;
+  };
+  /** Body projected area normal to slip, m². */
+  readonly area: number;
+  /** Vertical half-height in metres, measured from the rigid centre. */
+  readonly halfHeight: number;
+  /** Nonnegative quadratic drag coefficient, default 1. */
+  readonly dragCoefficient?: number;
+  /** Water density in kg/m³, default 1025. */
+  readonly density?: number;
+  /** Drag model, default 'horizontal-drag'. */
+  readonly model?: 'horizontal-drag';
+}
+
+/** The horizontal momentum exchange committed by a paired tick. */
+export interface FloodDragReceipt {
+  /** The tick just committed by both solvers. */
+  readonly tick: number;
+  /** Accepted water impulse in world X/Z order, N s. */
+  readonly waterImpulse: readonly [number, number];
+  /** Opposite rigid impulse in world X/Z order, N s. */
+  readonly bodyImpulse: readonly [number, number];
+}
+
+/** Drives both solvers on the same clock and supports deterministic replay. */
+export interface FloodDragSession {
+  /** The last tick committed by both solvers. */
+  readonly tick: number;
+  /** Advance both solvers by one tick and return the paired impulses. */
+  step(options?: { readonly signal?: AbortSignal }): Promise<FloodDragReceipt>;
+  /** Restore the paired tick-zero state and replay both solvers to this tick. */
+  seek(tick: number, options?: { readonly signal?: AbortSignal }): Promise<void>;
+}
+
+interface DragPair {
+  readonly solver: FloodSolver;
+  tick: number;
+  committed: number;
+  pending: boolean;
+  failed: boolean;
+}
+
 /** Settings of a {@link Flood}. */
 export interface FloodOptions {
   /** The Water whose terrain the flood runs on (its `terrain` option is required); attach it to the engine first. */
@@ -521,11 +593,14 @@ export class Flood implements EnginePlugin {
   readonly options: FloodOptions;
   private engine?: Engine;
   private solver?: FloodSolver;
+  private dragPair?: DragPair;
   // The solver factory the Water builds its flow with. resetTime gives it a new one, so the Water sees its flow
   // changed and builds a fresh solver (tick 0, nothing wetted yet) at the next frame.
   private factory = this.solverFactory();
   private solverFactory(): (input: WaterSolverInput) => WaterSolver {
     return (input) => {
+      if (this.dragPair)
+        throw fault('state', 'Flood drag terrain or device changed; initialise a new paired Flood and rigid world');
       const solver = new FloodSolver(input, this);
       this.solver = solver;
       return solver;
@@ -660,9 +735,161 @@ export class Flood implements EnginePlugin {
       },
     });
   }
+  /**
+   * Owns the Flood clock and a new 120 Hz rigid world's clock. Render one zero-delta frame to
+   * initialise Flood, then bind at tick zero. Settings and terrain must stay fixed during the session.
+   */
+  coupleRigidDrag(options: FloodDragOptions): FloodDragSession {
+    this.live();
+    if (this.dragPair || !this.solver || this.solver.disposed || this.ticks !== 0 || this.seconds !== 0)
+      throw fault('state', 'Bind Flood rigid drag once, after the first zero-delta render and before stepping');
+    const { body, physics, world, model = 'horizontal-drag' } = options ?? ({} as FloodDragOptions);
+    if (model !== 'horizontal-drag')
+      throw fault(
+        'unsupported',
+        'Flood rigid drag supports horizontal drag; use PhysicsWorld Hydro for pressure blockage',
+      );
+    if (
+      !body ||
+      typeof body.applyImpulse !== 'function' ||
+      body.type !== 'dynamic' ||
+      !body.enabledTranslations?.[0] ||
+      !body.enabledTranslations?.[2] ||
+      !physics ||
+      physics.stepCount !== 0 ||
+      physics.fixedTimestep !== 1 / RATE ||
+      world?.rate?.num !== RATE ||
+      world.rate.den !== 1 ||
+      world.clock?.frame !== 0 ||
+      typeof world.clock.at !== 'function' ||
+      !body.worldCenterOfMass ||
+      !body.linearVelocity ||
+      typeof world.hash !== 'function' ||
+      typeof world.advance !== 'function' ||
+      typeof world.takeSnapshot !== 'function' ||
+      typeof world.restoreSnapshot !== 'function'
+    )
+      throw fault(
+        'state',
+        'Use a new 120 Hz PhysicsWorld and RigidSolver with one dynamic rigid body free to move along X and Z',
+      );
+    const area = finite(options.area, NaN, 'rigid drag area in m²', 1e-12, 1e8);
+    const halfHeight = finite(options.halfHeight, NaN, 'rigid half-height in m', 1e-9, 1e5);
+    const density = finite(options.density, RHO_WATER, 'drag water density in kg/m³', 1e-6, 1e6);
+    const coefficient = 0.5 * density * area * finite(options.dragCoefficient, 1, 'rigid drag coefficient', 0, 100);
+    const initial = world.takeSnapshot();
+    let worldHash = initial.hash;
+    const pair: DragPair = { solver: this.solver, tick: 0, committed: 0, pending: false, failed: false };
+    this.dragPair = pair;
+    const ensureDevice = () => {
+      this.live();
+      if (this.solver !== pair.solver || pair.solver.disposed)
+        throw fault('state', 'Flood drag terrain or device changed; initialise a fresh paired Flood and rigid world');
+    };
+    const tick = async (signal?: AbortSignal): Promise<FloodDragReceipt> => {
+      signal?.throwIfAborted();
+      ensureDevice();
+      if (world.hash() !== worldHash || world.clock.frame !== pair.tick)
+        throw fault('state', 'Rigid world moved outside Flood drag; seek the pair before advancing again');
+      const [x, y, z] = body.worldCenterOfMass;
+      const [vx, , vz] = body.linearVelocity;
+      const [moveX, , moveZ] = body.enabledTranslations;
+      const mass = body.mass;
+      if (
+        body.type !== 'dynamic' ||
+        !moveX ||
+        !moveZ ||
+        !(Math.fround(mass) > 0) ||
+        !Number.isFinite(Math.fround(1 / mass)) ||
+        ![x, y, z, vx, vz, mass].every((v) => Number.isFinite(Math.fround(v)))
+      )
+        throw fault(
+          'state',
+          'Use a live dynamic body with finite mass, position and velocity and enable X and Z motion',
+        );
+      const next = pair.tick + 1;
+      this.seconds = next / RATE;
+      const waterImpulse = await pair.solver.dragTick(x, y, z, vx, vz, mass, halfHeight, coefficient, density);
+      signal?.throwIfAborted();
+      ensureDevice();
+      if (world.hash() !== worldHash || world.clock.frame !== pair.tick)
+        throw fault('state', 'Rigid world changed while Flood was stepping; seek the pair before advancing again');
+      const opposite = (value: number) => (value === 0 ? 0 : -value);
+      const bodyImpulse = [opposite(waterImpulse[0]), opposite(waterImpulse[1])] as const;
+      if (bodyImpulse[0] !== 0 || bodyImpulse[1] !== 0) body.applyImpulse([bodyImpulse[0], 0, bodyImpulse[1]]);
+      world.advance(next);
+      if (physics.stepCount !== next)
+        throw fault(
+          'state',
+          'The rigid world did not take one paired 120 Hz step; bind the actual RigidSolver Physics',
+        );
+      this.driveSurface();
+      worldHash = world.hash();
+      pair.tick = next;
+      return { tick: next, bodyImpulse, waterImpulse };
+    };
+    const execute = async <T>(task: () => Promise<T>, recovering: boolean, signal?: AbortSignal): Promise<T> => {
+      ensureDevice();
+      if (pair.pending || (pair.failed && !recovering))
+        throw fault('state', 'Flood drag is busy or needs recovery; await the current operation or seek the pair');
+      signal?.throwIfAborted();
+      pair.pending = true;
+      try {
+        const result = await task();
+        pair.committed = pair.tick;
+        pair.failed = false;
+        return result;
+      } catch (error) {
+        pair.failed = true;
+        this.seconds = pair.committed / RATE;
+        throw error;
+      } finally {
+        pair.pending = false;
+      }
+    };
+    return {
+      get tick() {
+        return pair.committed;
+      },
+      step: ({ signal } = {}) => execute(() => tick(signal), false, signal),
+      seek: (target, { signal } = {}) => {
+        if (!Number.isSafeInteger(target) || target < 0)
+          return Promise.reject(rangeError('Flood drag seek needs a whole nonnegative tick', 'geometry'));
+        return execute(
+          async () => {
+            world.restoreSnapshot(initial.bytes);
+            world.clock.at(0);
+            physics.stepCount = 0;
+            worldHash = initial.hash;
+            this.seconds = 0;
+            await pair.solver.resetDrag();
+            signal?.throwIfAborted();
+            ensureDevice();
+            if (world.hash() !== initial.hash || world.clock.frame !== 0)
+              throw fault('state', 'Rigid world changed during Flood seek; finish or retry the paired seek by itself');
+            this.driveSurface();
+            pair.tick = 0;
+            while (pair.tick < target) await tick(signal);
+          },
+          true,
+          signal,
+        );
+      },
+    };
+  }
+
+  private checkUnpaired(): void {
+    if (this.dragPair) throw fault('state', 'A Flood drag session owns this Flood; use its step and seek methods');
+  }
+
+  private checkPairReadable(): void {
+    if (this.dragPair && (this.dragPair.pending || this.dragPair.failed))
+      throw fault('state', 'The Flood drag pair has no readable state; await its operation or seek the pair');
+  }
+
   /** Seconds on the flood's clock: the sum of frame deltas and `advanceTime` calls. */
   get time(): number {
-    return this.seconds;
+    return this.dragPair ? this.dragPair.committed / RATE : this.seconds;
   }
   /** Seconds per step: 1 / (120 m), known once the flow has started (0 before). */
   get dt(): number {
@@ -670,7 +897,7 @@ export class Flood implements EnginePlugin {
   }
   /** Steps run so far. */
   get steps(): number {
-    return this.solver?.steps ?? 0;
+    return this.solver ? (this.dragPair ? this.dragPair.committed * this.solver.substeps : this.solver.steps) : 0;
   }
   /** Ticks of 1 / 120 s run so far. */
   /**
@@ -679,6 +906,7 @@ export class Flood implements EnginePlugin {
    * with the terrain's origin and size) so ripples run with the water. Changes texture between ticks: read it each frame.
    */
   get velocityTexture(): GPUTexture | undefined {
+    this.checkPairReadable();
     const s = this.solver;
     return s && !s.disposed ? s.velocities[s.ticks % 2] : undefined;
   }
@@ -688,11 +916,12 @@ export class Flood implements EnginePlugin {
    * water goes back; undefined before the flow starts. Changes texture between ticks: read it each frame.
    */
   get wetTexture(): GPUTexture | undefined {
+    this.checkPairReadable();
     const s = this.solver;
     return s && !s.disposed ? s.records[s.ticks % 2] : undefined;
   }
   get ticks(): number {
-    return this.solver?.ticks ?? 0;
+    return this.dragPair?.committed ?? this.solver?.ticks ?? 0;
   }
   /**
    * Puts the flood back to tick 0 with the inputs it had there, as a fresh flood given them has it, so a later `seek`
@@ -704,6 +933,7 @@ export class Flood implements EnginePlugin {
    */
   resetTime(): void {
     this.live();
+    this.checkUnpaired();
     const first = this.log[0],
       surface = this.options.surface as unknown as { setSeaLevel?: (y: number) => unknown };
     this.seconds = 0;
@@ -736,16 +966,19 @@ export class Flood implements EnginePlugin {
    */
   advanceTime(delta: number): void {
     this.live();
+    this.checkUnpaired();
     this.commit();
     if (delta > 0) this.seconds += delta;
     this.driveSurface();
   }
   onPreUpdate(delta: number): void {
-    this.advanceTime(delta);
+    this.checkPairReadable();
+    if (!this.dragPair) this.advanceTime(delta);
   }
   /** Adds a wall (at most 16) and returns its index; it stands from the next tick. */
   wall(wall: FloodWall, log = true): number {
     this.live();
+    this.checkUnpaired();
     if (this.walls.length >= MAX_FLOOD_WALLS)
       throw rangeError(`Flood takes at most ${MAX_FLOOD_WALLS} walls`, 'geometry');
     if (!wall || typeof wall !== 'object') throw typeError('Flood wall must be { from, to, top }', 'geometry');
@@ -764,6 +997,7 @@ export class Flood implements EnginePlugin {
    * seconds (default 2; 0 at once), from how open it was then.
    */
   breach(index: number, { at = this.seconds, over = 2 }: { at?: number; over?: number } = {}): void {
+    this.checkUnpaired();
     this.live();
     if (!Number.isInteger(index) || index < 0 || index >= this.walls.length)
       throw rangeError(`Flood has no wall ${index}; walls are 0..${this.walls.length - 1}`, 'geometry');
@@ -774,6 +1008,7 @@ export class Flood implements EnginePlugin {
   }
   /** Replaces the inflows; read from the next tick. */
   setSources(sources: readonly FloodSource[]): void {
+    this.checkUnpaired();
     this.live();
     this.sources = this.checkSources(sources);
     this.commit();
@@ -803,6 +1038,7 @@ export class Flood implements EnginePlugin {
     shape = 'n-wave',
   }: FloodTsunami = {}): void {
     this.live();
+    this.checkUnpaired();
     const b = this.options.boundary;
     if (![b?.west, b?.east, b?.south, b?.north].includes('sea'))
       throw fault(
@@ -831,6 +1067,7 @@ export class Flood implements EnginePlugin {
    * Kirby and Sinha (1999), made one-way by a matching momentum source; it needs water at the line.
    */
   waveMaker(maker: FloodWaveMaker): number {
+    this.checkUnpaired();
     this.live();
     if (this.makers.length >= MAX_FLOOD_WAVE_MAKERS)
       throw rangeError(`Flood takes at most ${MAX_FLOOD_WAVE_MAKERS} wave makers`, 'geometry');
@@ -840,6 +1077,7 @@ export class Flood implements EnginePlugin {
   }
   /** Replaces the wave makers (at most 4); read from the next tick. */
   setWaveMakers(makers: readonly FloodWaveMaker[]): void {
+    this.checkUnpaired();
     this.live();
     if (!Array.isArray(makers) || makers.length > MAX_FLOOD_WAVE_MAKERS)
       throw rangeError(`Flood takes at most ${MAX_FLOOD_WAVE_MAKERS} wave makers in an array`, 'geometry');
@@ -874,6 +1112,7 @@ export class Flood implements EnginePlugin {
    * is null, sets the sea up at the 'sea' sides.
    */
   setWind(wind: { speed: number; direction?: readonly [number, number] }): this {
+    this.checkUnpaired();
     this.live();
     if (!wind || typeof wind !== 'object') throw typeError('Flood setWind needs { speed, direction }', 'geometry');
     const speed = finite(wind.speed, NaN, 'wind speed', 0, 100);
@@ -889,6 +1128,7 @@ export class Flood implements EnginePlugin {
   }
   /** Rain on the whole map in mm/h, 0..2,000, while `options.rain` is null (the weather drive calls this). */
   setRainRate(rate: number): this {
+    this.checkUnpaired();
     this.live();
     this.driven = finite(rate, NaN, 'rain rate', 0, 2000);
     this.commit();
@@ -926,6 +1166,7 @@ export class Flood implements EnginePlugin {
   }
   /** Notes the live settings in the log, from the next tick, when they differ from the last entry's. */
   private commit(): void {
+    this.checkUnpaired();
     const o = this.options,
       tick = this.effective(),
       surface = o.surface as unknown as { seaLevel?: number },
@@ -1099,6 +1340,7 @@ export class Flood implements EnginePlugin {
    */
   async settle(): Promise<void> {
     this.live();
+    this.checkUnpaired();
     const solver = this.solver;
     if (!solver || solver.disposed)
       throw fault('state', 'The flood has not started; render a frame with its Water first');
@@ -1107,6 +1349,7 @@ export class Flood implements EnginePlugin {
   /** Reads the water back: volume, wet area, depths, speeds and the Courant number, plus every cell. */
   async read(): Promise<FloodReading> {
     this.live();
+    this.checkPairReadable();
     const solver = this.solver;
     if (!solver || solver.disposed)
       throw fault('state', 'The flood has not started; render a frame with its Water first');
@@ -1178,6 +1421,9 @@ class FloodSolver implements WaterSolver {
   readonly width: number;
   readonly height: number;
   readonly cell: readonly [number, number];
+  private readonly speedLimit: number;
+  private readonly origin: readonly [number, number];
+  private drag?: ReturnType<FloodSolver['dragResources']>;
   constructor(
     input: WaterSolverInput,
     private readonly flood: Flood,
@@ -1193,6 +1439,7 @@ class FloodSolver implements WaterSolver {
     this.width = width;
     this.height = height;
     this.cell = [dx, dz];
+    this.origin = [place.origin[0], place.origin[1]];
     const o = flood.options,
       speed = (o.maxSpeed ?? 15) + Math.sqrt(G * (o.maxDepth ?? 20)),
       limit = (COURANT * Math.min(dx, dz)) / speed,
@@ -1202,6 +1449,7 @@ class FloodSolver implements WaterSolver {
         `Flood needs ${m} steps per 1/120 s for cells of ${Math.min(dx, dz)} m at maxDepth ${o.maxDepth ?? 20} m and maxSpeed ${o.maxSpeed ?? 15} m/s (at most 16); use larger cells or lower maxDepth or maxSpeed`,
         'geometry',
       );
+    this.speedLimit = o.maxSpeed ?? 15;
     this.m = Math.max(1, m);
     this.dt = 1 / (RATE * this.m);
     try {
@@ -1216,8 +1464,8 @@ class FloodSolver implements WaterSolver {
       }
       this.views.push(...this.states.slice(0, 2).map((t) => t.createView()));
       for (let i = 0; i < 2; i++) {
-        this.velocities.push(texture('rgba32float'));
-        this.records.push(texture('rgba32float'));
+        this.velocities.push(texture('rgba32float', usage | GPUTextureUsage.COPY_DST));
+        this.records.push(texture('rgba32float', usage | GPUTextureUsage.COPY_DST));
       }
       this.connected = own(
         device.createBuffer({
@@ -1318,6 +1566,129 @@ class FloodSolver implements WaterSolver {
   get steps(): number {
     return this.ticks * this.m;
   }
+  get substeps(): number {
+    return this.m;
+  }
+  private dragResources() {
+    const uniform = this.device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.owned.push(uniform);
+    const receipt = this.device.createBuffer({ size: 512, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST });
+    this.owned.push(receipt);
+    const pipeline = compute(this.device, floodRigidDrag);
+    const groups = [0, 1].map((side) =>
+      group(this.device, pipeline, [
+        { buffer: uniform },
+        this.views[side]!,
+        this.fluxes[side]!.createView(),
+        this.views[1 - side]!,
+        this.fluxes[1 - side]!.createView(),
+      ]),
+    );
+    return { uniform, receipt, pipeline, groups };
+  }
+
+  async dragTick(
+    x: number,
+    y: number,
+    z: number,
+    vx: number,
+    vz: number,
+    mass: number,
+    halfHeight: number,
+    coefficient: number,
+    density: number,
+  ): Promise<readonly [number, number]> {
+    const [dx, dz] = this.cell;
+    const i = Math.floor((x - this.origin[0]) / dx);
+    const j = Math.floor((z - this.origin[1]) / dz);
+    const inside = i >= 0 && i < this.width && j >= 0 && j < this.height;
+    const device = this.device;
+    const encoder = device.createCommandEncoder();
+    const densityArea = density * dx * dz;
+    let before = this.current;
+    device.pushErrorScope('validation');
+    try {
+      const drag = inside ? (this.drag ??= this.dragResources()) : undefined;
+      if (drag)
+        device.queue.writeBuffer(
+          drag.uniform,
+          0,
+          new Float32Array([
+            i,
+            j,
+            vx,
+            vz,
+            y,
+            halfHeight,
+            mass,
+            coefficient,
+            densityArea,
+            1 / RATE,
+            DRY,
+            this.speedLimit,
+          ]),
+        );
+      const count = this.record(
+        encoder,
+        1,
+        drag &&
+          ((pass) => {
+            before = this.current;
+            pass.setPipeline(drag.pipeline);
+            pass.setBindGroup(0, drag.groups[before]!);
+            pass.dispatchWorkgroups(Math.ceil(this.width / 8), Math.ceil(this.height / 8));
+            this.current = 1 - before;
+          }),
+      );
+      if (count !== 1)
+        throw fault('state', 'Flood drag needs exactly one owed water tick; use the paired session clock');
+      if (drag)
+        for (const [offset, index] of [
+          [0, before],
+          [256, this.current],
+        ] as const)
+          encoder.copyTextureToBuffer(
+            { texture: this.fluxes[index]!, origin: [i, j] },
+            { buffer: drag.receipt, offset, bytesPerRow: 256 },
+            [1, 1],
+          );
+      device.queue.submit([encoder.finish()]);
+      if (!drag) {
+        await device.queue.onSubmittedWorkDone();
+        return [0, 0];
+      }
+      await drag.receipt.mapAsync(GPUMapMode.READ);
+      try {
+        const state = new Float32Array(drag.receipt.getMappedRange());
+        // Read the two stored f32 texels, so the opposite rigid impulse uses the enacted difference.
+        return [densityArea * (state[65]! - state[1]!), densityArea * (state[67]! - state[3]!)];
+      } finally {
+        drag.receipt.unmap();
+      }
+    } finally {
+      const error = await device.popErrorScope();
+      if (error) throw fault('state', 'Flood drag tick could not run on this device; seek the pair: ' + error.message);
+    }
+  }
+
+  /** Preserve Water's resource identities while restoring the raw startup contents. */
+  async resetDrag(): Promise<void> {
+    this.ticks = 0;
+    this.current = 0;
+    this.started = false;
+    this.pair = -1;
+    const zero = new Float32Array(this.width * this.height * 4);
+    const write = (texture: GPUTexture) =>
+      this.device.queue.writeTexture({ texture }, zero, { bytesPerRow: this.width * 16 }, [this.width, this.height]);
+    for (const texture of this.velocities) write(texture);
+    for (const texture of this.records) write(texture);
+    if (this.shown) write(this.shown);
+    const encoder = this.device.createCommandEncoder();
+    this.record(encoder, 0);
+    this.device.queue.submit([encoder.finish()]);
+    await this.device.queue.onSubmittedWorkDone();
+  }
+
   /** The bind group of ring slice `slice` (even: stage 0, odd: stage 1) with the state in `c`. */
   private bound(slice: number, c: number): GPUBindGroup {
     const key = slice * 2 + c;
@@ -1377,7 +1748,7 @@ class FloodSolver implements WaterSolver {
     }
   }
   /** Records up to `limit` owed ticks into `encoder`; returns how many. */
-  record(encoder: GPUCommandEncoder, limit = TICKS_PER_FRAME): number {
+  record(encoder: GPUCommandEncoder, limit = TICKS_PER_FRAME, kick?: (pass: GPUComputePassEncoder) => void): number {
     if (this.disposed) return 0;
     const x = Math.ceil(this.width / 8),
       y = Math.ceil(this.height / 8),
@@ -1400,6 +1771,7 @@ class FloodSolver implements WaterSolver {
         pass.dispatchWorkgroups(x, y);
         this.current = 1 - this.current;
       }
+      kick?.(pass);
       // The tick's current and wetting record, so the deepest water and the drying clock see every tick, not only frames.
       pass.setPipeline(this.recorder);
       pass.setBindGroup(0, this.recordGroup(this.current, (this.ticks + i) % 2));
@@ -1437,6 +1809,7 @@ class FloodSolver implements WaterSolver {
       }),
       encoder = device.createCommandEncoder(),
       steps = this.steps;
+    const ticks = this.ticks;
     try {
       encoder.copyTextureToBuffer({ texture: this.states[this.current] }, { buffer, bytesPerRow: row }, [
         width,
@@ -1512,7 +1885,7 @@ class FloodSolver implements WaterSolver {
       return {
         time: steps * this.dt,
         steps,
-        ticks: this.ticks,
+        ticks,
         volume: volume * dx * dz,
         wetArea: wet * dx * dz,
         maxDepth: deepest,

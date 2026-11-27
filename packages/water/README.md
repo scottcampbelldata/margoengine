@@ -1205,6 +1205,76 @@ of 100 s over flats 500 m wide leaves most of their water (Doggerland's 260 s N-
 m there; none of it sat in a closed basin), so give the wave the period the scene needs (Storegga's run-in periods were
 tens of minutes) or a smoother bed (lower `roughness`) rather than finer cells (FG-09).
 
+### Couple standalone Flood to a rigid body
+
+A standalone GPU Flood can exchange reciprocal horizontal drag with one dynamic rigid body free to
+translate along X and Z. Configure Flood and add its body to a new 120 Hz PhysicsWorld before the first step. Render once at zero
+delta to initialise the water, then let the returned session own both clocks. Await each step before
+rendering. Await seek to restore the original water and rigid state and replay both to a tick.
+Terrain, Flood inputs and external rigid inputs stay fixed during a session.
+
+The backward-Euler quadratic drag uses the body's supplied projected area, the immersed fraction of
+its vertical profile and the water mass in its centre-of-mass cell. Flood reads back the enacted
+change of the GPU cell's signed momentum and applies the exact opposite horizontal impulse through
+the rigid body's ordinary next-step API. Dry profiles produce zero impulse. The split pass preserves
+depth. It uses the Flood speed bound and leaves a cell unchanged when the proposed drag would exceed
+that bound. The model covers horizontal drag only. For pressure blockage, use the PhysicsWorld
+shallow-water solver and the ShallowWaterSurface mirror.
+
+An aborted or failed submitted operation invalidates the pair until a successful seek. The last
+committed tick stays visible. A device or terrain replacement needs a fresh Flood and rigid world.
+The readback is asynchronous on both WebGPU and the full WebGL2 compatibility layer, and real-time
+120 Hz throughput is outside this feature's contract.
+
+The split update solves the relative two-mass drag equation with a held geometry and uses the
+same quadratic drag strength for both impulses. [Morison, O'Brien, Johnson and Schaaf, The Force
+Exerted by Surface Waves on Piles (1950)](https://doi.org/10.2118/950149-G)
+
+```ts
+import { EngineKernel } from '@margoengine/core';
+import { Physics } from '@margoengine/physics';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+import { Water } from '@margoengine/water';
+import { Flood } from '@margoengine/water/flood';
+
+const engine = await EngineKernel.create(document.querySelector('canvas')!, { backend: 'webgpu' });
+const texture = engine.gpu!.createTexture({
+  size: [8, 8],
+  format: 'r32float',
+  usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+});
+engine.gpu!.queue.writeTexture({ texture }, new Float32Array(64), { bytesPerRow: 32 }, [8, 8]);
+const water = Water.attach(engine, {
+  height: -1,
+  size: [8, 8],
+  terrain: { heightmap: () => texture, origin: [-4, -4], size: [8, 8] },
+  fill: () => 0.8,
+});
+const flood = Flood.attach(engine, { surface: water, maxDepth: 1, roughness: 0 });
+await Physics.load();
+const gravity = [0, 0, 0] as const;
+const world = new PhysicsWorld({ rate: { num: 120, den: 1 }, gravity });
+const physics = new Physics(null, { fixedTimestep: 1 / 120, arena: world.arena, gravity });
+const body = physics.addBody(null, {
+  position: [0, 0.5, 0],
+  linearVelocity: [1.2, 0, 0],
+  colliders: { shape: 'sphere', radius: 0.2, mass: 48 },
+});
+world.add(new RigidSolver(), { physics });
+engine.render({ delta: 0 });
+const coupled = flood.coupleRigidDrag({ world, physics, body, area: 0.15, halfHeight: 0.2 });
+const exchange = await coupled.step();
+console.log(exchange.bodyImpulse, exchange.waterImpulse);
+engine.render({ delta: 0 });
+await coupled.seek(0);
+flood.dispose();
+water.dispose();
+texture.destroy();
+physics[Symbol.dispose]();
+engine.dispose();
+```
+
+
 ### Draw a PhysicsWorld flood with Water
 
 Attach the optional ShallowWaterSurface mirror to a flowing Water surface. Advance the PhysicsWorld first and

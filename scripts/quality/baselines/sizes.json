@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20692221,
+  "total": 20695190,
   "history": [
     {
       "date": "2026-10-24",
@@ -14203,6 +14203,12 @@
       "commit": "16800c8b12",
       "grew": 1,
       "reason": "@margoengine/physics/hydro grew from 14291 to 18683 B gzip and from a 14720 to a 19244 B ceiling. SEA-12 settles paired projected drag in the final wet/dry state, after finite-volume transport. The optional Hydro path lazy-loads its settlement code and shares the existing rigid and water ports. Separating the pressure and drag entry stubs would still load the same solver for the coupled scene."
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "aa31dc3cad",
+      "grew": 1,
+      "reason": "@margoengine/water/flood 14457 to 17057 B gzip, ceiling 14600 to 17569 B. SEA-12 applies the same signed horizontal momentum to standalone Flood and its rigid body, owns the paired tick and seek, and reads only two GPU texels. A separate coupler would still need Flood's internal ping-pong resources, recorder and clock; keeping it here reuses them without loading the rigid package. Water, Core and Stage entries unchanged."
     }
   ],
   "items": {
@@ -15838,7 +15844,7 @@
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,
     "@margoengine/water/fft": 7704,
-    "@margoengine/water/flood": 14600,
+    "@margoengine/water/flood": 17569,
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
     "@margoengine/water/ice": 13364,

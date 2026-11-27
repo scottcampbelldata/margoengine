@@ -15242,6 +15242,18 @@ its coastal reconstruction. The adapter inherits the same shoreline threshold an
 or foam source. The standalone GPU Flood continues to own its separate simulation. The optional
 entry is 1,706 B gzip under a 1,962 B ceiling. Water, Core and Stage roots gain zero bytes.
 
+`Flood.coupleRigidDrag` pairs a standalone GPU Flood with one dynamic body with free horizontal
+translation. Both advance at 120 Hz with fixed terrain and inputs. The split drag uses one
+centre-of-mass cell and a vertical profile, with area 10⁻¹² to 10⁸ m², half-height 10⁻⁹ to 10⁵ m,
+drag coefficient 0 to 100 (default 1) and density 10⁻⁶ to 10⁶ kg/m³ (default 1,025). The applied
+impulse follows the actual f32 momentum difference. One full-grid copy pass and one 512-byte
+asynchronous readback per tick are paid only by paired sessions with the body on the grid. The
+exchange stays within the Flood speed bound. Pressure blockage, vertical force, torque, multiple
+bodies and live input edits use other paths or remain outside this GPU tier. After abort, the pair
+seeks by restoring its start state and replaying. Device or terrain replacement needs a fresh pair.
+Supported on both renderers. Real-time readback throughput is unmeasured. The optional Flood entry
+grew from 14,457 to 17,057 B gzip. Water, Core and Stage roots gain zero bytes.
+
 ### Seakeeping encounter-scaled taper loads
 
 The incident-wave velocity and the longitudinal added-mass gradient use the same encounter scaling. The finite-memory continuation applies inside the first tabulated band. Tank qualification of the forward-motion amplitudes and near-stationary three-dimensional flow remain open. The seakeeping entry moved from 33,399 to 33,432 B gzip under its 33,698 B ceiling. Core and Stage gain zero bytes.

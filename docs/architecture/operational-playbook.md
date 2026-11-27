@@ -552,8 +552,17 @@ Hydro owns the clock, pressure reaction and rigid impulse. Water owns the upload
 interpolation. The test `packages/water/test/shallow-surface.browser.mjs` exercises both backends,
 including exact seek, a live guided pressure impulse and restoring ordinary Water when the mirror
 detaches. The 8×8 grid changes depth by 0.016331 m and its draw residual is below 0.086 μm. The
-CPU bridge test checks device restore and caller-owned terrain lifetime. Asynchronous standalone GPU
-Flood feedback and the original production shots remain open.
+CPU bridge test checks device restore and caller-owned terrain lifetime. The original production
+shots remain open.
+
+The optional standalone Flood pair advances a 120 Hz rigid world alongside the GPU solver. After
+the finite-volume stages, a texture pass updates signed momentum in the body's centre-of-mass
+cell and leaves depth unchanged. One asynchronous 512-byte readback covers both stored momentum
+texels. The CPU applies the opposite impulse after the readback and advances the rigid tick once.
+`packages/water/test/flood-rigid-drag.browser.mjs` verifies both renderers with approximately
+4.521075 N·s of X impulse and 1.391100 N·s of Z impulse, zero impulse when dry, rejection of
+locked motion and bit-identical paired seek after an abort. The GPU pair covers horizontal drag.
+The CPU Hydro bridge supplies pressure blockage.
 
 ### Section 5 evidence: the flood's film clock and the sea, WebGPU and the WebGL2 layer (water/flood push 4, 2026-11-17)
 
