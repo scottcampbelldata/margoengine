@@ -1,0 +1,1657 @@
+{
+  "examples/from-babylon/02-mesh-pbr.ts": [
+    "format"
+  ],
+  "examples/from-babylon/03-lights-shadows.ts": [
+    "format"
+  ],
+  "examples/from-babylon/06-picking.ts": [
+    "format"
+  ],
+  "examples/from-babylon/07-post.ts": [
+    "format"
+  ],
+  "examples/from-babylon/08-input-camera.ts": [
+    "format"
+  ],
+  "examples/from-babylon/09-babylon-file.ts": [
+    "format"
+  ],
+  "examples/from-babylon/10-more-suns.ts": [
+    "format"
+  ],
+  "examples/from-playcanvas/03-script-lifecycle.ts": [
+    "format"
+  ],
+  "examples/from-playcanvas/04-pbr-material.ts": [
+    "format"
+  ],
+  "examples/from-playcanvas/05-lights-shadows.ts": [
+    "format"
+  ],
+  "examples/from-playcanvas/08-picking.ts": [
+    "format"
+  ],
+  "examples/from-playcanvas/09-input.ts": [
+    "format"
+  ],
+  "examples/gpu-flocking.ts": [
+    "format"
+  ],
+  "examples/gpu-liquid.ts": [
+    "format"
+  ],
+  "examples/ocean.ts": [
+    "format"
+  ],
+  "examples/physics-joints.ts": [
+    "format"
+  ],
+  "examples/test-pages/cloth.ts": [
+    "format"
+  ],
+  "examples/test-pages/tile-voxel-editor.ts": [
+    "lint/style/useImportType"
+  ],
+  "examples/voxel-sandbox/src/plaza.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "examples/water-ripples.ts": [
+    "format"
+  ],
+  "packages/animator/src/warping.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/animator/test/playback-state.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/armies/src/bake.ts": [
+    "format"
+  ],
+  "packages/armies/src/riders.ts": [
+    "format"
+  ],
+  "packages/armies/src/settings.ts": [
+    "format"
+  ],
+  "packages/armies/test/armies-check.mjs": [
+    "format"
+  ],
+  "packages/armies/test/armies.test.js": [
+    "format"
+  ],
+  "packages/armies/test/soldier.js": [
+    "format"
+  ],
+  "packages/audio/src/voice-manager.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/behavior/tests/owner-lifetime.fixture.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/biomes/src/hydrology.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/biomes/src/multinoise.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/biomes/src/relief.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/biomes/tests/mountain-valley.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/brep/src/model/loft.ts": [
+    "lint/correctness/noUnusedVariables",
+    "lint/style/useConst"
+  ],
+  "packages/brep/src/model/sweep.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/brep/tests/offset.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/cameras/test/stereo.test.js": [
+    "lint/style/useConst"
+  ],
+  "packages/clustered/src/local-shadows.ts": [
+    "format"
+  ],
+  "packages/clustered/src/shader.ts": [
+    "format"
+  ],
+  "packages/clustered/test/local-shadows.test.js": [
+    "format"
+  ],
+  "packages/compute/src/nn.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/controls/src/behaviors.ts": [
+    "format"
+  ],
+  "packages/controls/src/presentation.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/controls/tests/behaviors.test.js": [
+    "format"
+  ],
+  "packages/controls/tests/geospatial-collision.test.js": [
+    "format"
+  ],
+  "packages/controls/tests/geospatial-surface.test.js": [
+    "format"
+  ],
+  "packages/controls/tests/geospatial.test.js": [
+    "format"
+  ],
+  "packages/controls/tests/transform-many.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/creative/scripts/test-grass-terrain.js": [
+    "format"
+  ],
+  "packages/creative/scripts/test-targets-depth.js": [
+    "format"
+  ],
+  "packages/creative/src/grass-settings.ts": [
+    "format"
+  ],
+  "packages/creative/src/targets-depth.ts": [
+    "format"
+  ],
+  "packages/creative/tests/entries.test.js": [
+    "format"
+  ],
+  "packages/creative/tests/grass-settings-browser.mjs": [
+    "format"
+  ],
+  "packages/creative/tests/grass-terrain.test.js": [
+    "format"
+  ],
+  "packages/creative/tests/paint-aniso.test.js": [
+    "format"
+  ],
+  "packages/creative/tests/targets-depth.test.js": [
+    "format"
+  ],
+  "packages/creative/tests/targets-launch.test.js": [
+    "format"
+  ],
+  "packages/decoders/src/brotli-data.ts": [
+    "format"
+  ],
+  "packages/decoders/src/ktx2-layers.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/decoders/tests/tiff-libtiff.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/ecs/src/coroutines.ts": [
+    "format"
+  ],
+  "packages/ecs/test/coroutines.test.js": [
+    "format",
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/ecs/test/scripts.test.js": [
+    "format"
+  ],
+  "packages/environment/src/encoded-hdr.ts": [
+    "format"
+  ],
+  "packages/environment/tests/encoded-hdr.test.js": [
+    "format"
+  ],
+  "packages/environment/tests/mesh-reflector-browser.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/exporters/src/gcode.ts": [
+    "format"
+  ],
+  "packages/exporters/tests/gcode.test.js": [
+    "format"
+  ],
+  "packages/fsm/test/final-pins.test.js": [
+    "lint/style/useConst"
+  ],
+  "packages/geometry/src/surfaces.ts": [
+    "format"
+  ],
+  "packages/geometry/tests/surfaces.test.js": [
+    "format"
+  ],
+  "packages/gltf/scripts/test-node-images.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/gltf/src/meshopt.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/gltf/src/soft-mesh.ts": [
+    "format"
+  ],
+  "packages/gltf/test/physics.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/gltf/test/static-bindings.test.js": [
+    "format"
+  ],
+  "packages/headless/scripts/test-real-ffmpeg-files.mjs": [
+    "lint/correctness/noUnusedImports",
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/headless/src/look.ts": [
+    "format"
+  ],
+  "packages/headless/tests/look-clean.test.js": [
+    "format"
+  ],
+  "packages/horses/src/anatomy.ts": [
+    "format"
+  ],
+  "packages/horses/src/seat.ts": [
+    "format"
+  ],
+  "packages/horses/src/settings.ts": [
+    "format"
+  ],
+  "packages/humans/src/cast.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/ifc/src/predefined-enums.ts": [
+    "format"
+  ],
+  "packages/ifc/src/schema-tree.ts": [
+    "format"
+  ],
+  "packages/ifc/tests/scene.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/ifc/tests/stream.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/inspector/src/gl.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/inspector/src/index.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/labels/tests/anchor.test.js": [
+    "format"
+  ],
+  "packages/labels/tests/dispose-scene.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/lighting2d/src/cookie.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/lighting2d/src/emissive.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/lighting2d/src/height.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/lighting2d/src/soft.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/lighting2d/tests/browser-check.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/lighting2d/tests/gi.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/lines/src/tube-painter.ts": [
+    "format"
+  ],
+  "packages/lines/tests/trail.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/lines/tests/tube-painter.test.js": [
+    "format"
+  ],
+  "packages/loaders/src/font-woff.ts": [
+    "format"
+  ],
+  "packages/loaders/src/kmz.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/loaders/src/sfnt-variation.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/loaders/src/tilt.ts": [
+    "format"
+  ],
+  "packages/loaders/tests/babylon.test.js": [
+    "format"
+  ],
+  "packages/loaders/tests/fixtures/tilt/make.mjs": [
+    "format"
+  ],
+  "packages/loaders/tests/mmd.test.js": [
+    "format"
+  ],
+  "packages/loaders/tests/prwm.test.js": [
+    "format"
+  ],
+  "packages/loaders/tests/tilt.test.js": [
+    "format"
+  ],
+  "packages/loaders/tests/xfile.test.js": [
+    "format"
+  ],
+  "packages/machinery/test/runtime.test.js": [
+    "format"
+  ],
+  "packages/materials/test/features.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/materials/tests/batched.test.js": [
+    "format"
+  ],
+  "packages/math/src/geo.ts": [
+    "format"
+  ],
+  "packages/math/test/geo.test.js": [
+    "format"
+  ],
+  "packages/math/test/line-frustum-pins.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/math/test/matrix-pins.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/math/test/pinned.test.js": [
+    "format"
+  ],
+  "packages/mcp/bin/margoengine-mcp.js": [
+    "format"
+  ],
+  "packages/mesh-edit/tests/geometry.test.js": [
+    "format"
+  ],
+  "packages/mixer/src/loudness.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/mixer/tests/browser.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/mixer/tests/dynamics.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/mixer/tests/fx.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/mixer/tests/pitch.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/mixer/tests/sidechain.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/mixer/tests/worklet.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/navmesh/src/agents.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/netcode/tests/smoothing.test.js": [
+    "lint/style/useConst"
+  ],
+  "packages/oit/src/vfx.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/oit/test/gpu/depth.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/physics/scripts/build-hull-panel-kernel.mjs": [
+    "format"
+  ],
+  "packages/physics/scripts/compare-rapier-floors.mjs": [
+    "format"
+  ],
+  "packages/physics/src/debug.ts": [
+    "format"
+  ],
+  "packages/physics/src/drag.ts": [
+    "format"
+  ],
+  "packages/physics/src/entry/cavity-port.ts": [
+    "format"
+  ],
+  "packages/physics/src/fields.ts": [
+    "format"
+  ],
+  "packages/physics/src/gpu-cloth-sim.ts": [
+    "format",
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/physics/src/gpu-cloth.ts": [
+    "format"
+  ],
+  "packages/physics/src/index.ts": [
+    "format"
+  ],
+  "packages/physics/src/joints.ts": [
+    "format"
+  ],
+  "packages/physics/src/kernel-shapes.ts": [
+    "format"
+  ],
+  "packages/physics/src/mechanisms.ts": [
+    "format"
+  ],
+  "packages/physics/src/mesh-tools.ts": [
+    "format"
+  ],
+  "packages/physics/src/multibody.ts": [
+    "format"
+  ],
+  "packages/physics/src/seakeeping/panel-bake.ts": [
+    "format"
+  ],
+  "packages/physics/src/seakeeping/panel-runtime.ts": [
+    "format"
+  ],
+  "packages/physics/src/seakeeping/radiation.ts": [
+    "format"
+  ],
+  "packages/physics/src/seakeeping/solver.ts": [
+    "format"
+  ],
+  "packages/physics/src/seakeeping/strips.ts": [
+    "format"
+  ],
+  "packages/physics/src/seakeeping/wetted.ts": [
+    "format"
+  ],
+  "packages/physics/src/tracked.ts": [
+    "format"
+  ],
+  "packages/physics/tests/coupling/entry.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/coupling/hull-panels.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/coupling/seakeeping.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/fields.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/frames.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/gpu-cloth.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/joint-axes.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/mechanisms.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/next-decomposition.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/next-joint-break.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/next-joint-kinds.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/next-multibody.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/seakeeping.test.js": [
+    "format"
+  ],
+  "packages/physics/tests/vehicle-tracked.test.js": [
+    "format"
+  ],
+  "packages/physics2d/scripts/build-kernel.mjs": [
+    "format"
+  ],
+  "packages/physics2d/src/articulation.ts": [
+    "format"
+  ],
+  "packages/physics2d/src/pid.ts": [
+    "format"
+  ],
+  "packages/physics2d/src/wasm-load.ts": [
+    "format"
+  ],
+  "packages/physics2d/tests/kernel-features.test.js": [
+    "format"
+  ],
+  "packages/physics2d/tests/simd-fallback.test.js": [
+    "format"
+  ],
+  "packages/physics2d/tests/wasm-module.test.js": [
+    "format"
+  ],
+  "packages/physics2d/tests/wasm-response.test.js": [
+    "format"
+  ],
+  "packages/points/src/depth-video.ts": [
+    "format"
+  ],
+  "packages/points/tests/depth-video.test.js": [
+    "format"
+  ],
+  "packages/points/tests/dispose-scene.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/points/tests/features-browser.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/procedural/test/flyer.test.js": [
+    "format"
+  ],
+  "packages/ragdoll/src/ragdoll.ts": [
+    "lint/style/useConst"
+  ],
+  "packages/react/src/clone.tsx": [
+    "format"
+  ],
+  "packages/react/src/controls-helpers.tsx": [
+    "format"
+  ],
+  "packages/react/src/offscreen.tsx": [
+    "format"
+  ],
+  "packages/react/src/performance.tsx": [
+    "format"
+  ],
+  "packages/react/src/presentation-controls.tsx": [
+    "format"
+  ],
+  "packages/react/src/scroll-controls.tsx": [
+    "format"
+  ],
+  "packages/react/src/svg.tsx": [
+    "format"
+  ],
+  "packages/react/tests/asset-disposed.test.js": [
+    "format"
+  ],
+  "packages/react/tests/controls-extra-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/effects-extra-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/extras-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/fbo-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/performance-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/portals-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/priority-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/shapes-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/test-offscreen-browser.tsx": [
+    "format"
+  ],
+  "packages/react/tests/textures-browser.tsx": [
+    "format"
+  ],
+  "packages/rigging/src/voxel-weights.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/rigging/src/vrm.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/rigging/tests/mtoon-avatar.browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/rigging/tests/mtoon-outline.browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/rigging/tests/vrma.browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/robot-planning/tests/concave.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/save/src/delta.ts": [
+    "format"
+  ],
+  "packages/save/tests/browser/safe-check.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/save/tests/container.test.js": [
+    "format"
+  ],
+  "packages/save/tests/delta.test.js": [
+    "format"
+  ],
+  "packages/save/tests/materials.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/scatter/src/occlusion.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/scatter/test/attributes.browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/scatter/test/states-flood.browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/scene/src/asset-pools.ts": [
+    "format"
+  ],
+  "packages/scene/src/assets.ts": [
+    "format"
+  ],
+  "packages/scene/src/container.ts": [
+    "format"
+  ],
+  "packages/scene/src/emitter.ts": [
+    "format"
+  ],
+  "packages/scene/tests/asset-pools.test.js": [
+    "format"
+  ],
+  "packages/scene/tests/assets.test.js": [
+    "format"
+  ],
+  "packages/scene/tests/container.test.js": [
+    "format"
+  ],
+  "packages/scene/tests/emitter.test.js": [
+    "format"
+  ],
+  "packages/scenes/test/fauld-tunnels.test.js": [
+    "format"
+  ],
+  "packages/sciviz/scripts/audit-accessibility.mjs": [
+    "format"
+  ],
+  "packages/sciviz/scripts/write-provenance-versions.mjs": [
+    "format"
+  ],
+  "packages/sciviz/src/aggregate-shade.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/appearance.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/atmosphere.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/calc-expression.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/cell-complex.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/cf-units.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/clip.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/contour.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/datasets-readers.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/datasets.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/density.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/derive.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/extent.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/fields.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/flow-particles.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/flow-seeds.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/flow-shaders.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/flow.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/format.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/sciviz/src/geo-sgp4.ts": [
+    "lint/style/useConst"
+  ],
+  "packages/sciviz/src/geo-trips.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/sciviz/src/grids.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/interact.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/link.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/math-parser.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/multivolume.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/netcdf.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/sciviz/src/notebook.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/ometiff.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/openfoam.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/parcoords-density.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/parcoords-layer.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/parcoords.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/pick-visibility.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/probe.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/provenance.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/sciviz/src/query.ts": [
+    "format",
+    "lint/style/useImportType"
+  ],
+  "packages/sciviz/src/series-data.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/series-figure.ts": [
+    "format",
+    "lint/style/useImportType"
+  ],
+  "packages/sciviz/src/series-source.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/series-spectral.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/series.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/share.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/spec-values.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/stream-sources.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/table-aggregate.ts": [
+    "format",
+    "lint/style/useImportType"
+  ],
+  "packages/sciviz/src/table-arrow.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/table-batches.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/table-parquet.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/table-read.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/table.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/temporal-files.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/temporal-units.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/temporal.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/tensor-track.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/tubes.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/volume-quality-shader.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/volume-quality.ts": [
+    "format"
+  ],
+  "packages/sciviz/src/volume.ts": [
+    "format"
+  ],
+  "packages/sciviz/tests/a11y-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/a11y-lifecycle-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/aggregate-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/astronomy.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/atmosphere-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/atmosphere.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/audit-132.test.js": [
+    "format",
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/sciviz/tests/backend-isolation.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/bricks-browser.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/cf.test.js": [
+    "format",
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/sciviz/tests/charts.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/climate-formats.test.js": [
+    "lint/style/useConst"
+  ],
+  "packages/sciviz/tests/clip-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/clip.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/color-scales.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/contour-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/contour.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/curvilinear-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/datasets.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/demos-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/density.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/derive-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/derive.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/engineering.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/entries-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/entries-cases.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/fallback-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/flow-draw-shader.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/flow-seeds.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/formats-spec.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/glyph-data.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/graph-gpu-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/graph-gpu.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/grids.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/hdf5.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/labels.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/legend.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/lic.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/link-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/link.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/math.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/mesh-ownership.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/minip-kinds-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/molecule-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/multivolume-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/multivolume.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/notebook-backend.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/notebook-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/notebook-fixtures.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/nrrd.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/omezarr.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/parcoords-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/parcoords.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/pdf-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/pdf.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/pick-gpu-browser.mjs": [
+    "format",
+    "lint/style/useConst"
+  ],
+  "packages/sciviz/tests/pick-gpu-hover.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/pick-gpu.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/pick-live-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/pick-visibility.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/pointcloud.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/probe-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/probe.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/progressive.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/provenance.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/query-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/query.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/range-overflow.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/scientific-image.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/series-browser.mjs": [
+    "format",
+    "lint/style/useConst"
+  ],
+  "packages/sciviz/tests/series.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/share-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/share.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/spec-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/spec-types.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/sciviz/tests/spec.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/splom-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/stream-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/stream.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/streamline-stagnation.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/surface-repeat-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/table-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/table-writers.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/table.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/temporal-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/temporal.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/tetvolume-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/themes-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/transfer-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/tubes.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/views-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/views.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/sciviz/tests/volume-depth.test.js": [
+    "format"
+  ],
+  "packages/sciviz/tests/volume-modes-browser.mjs": [
+    "format"
+  ],
+  "packages/sciviz/tests/volume-physics-browser.mjs": [
+    "format"
+  ],
+  "packages/selection/src/actions.ts": [
+    "format"
+  ],
+  "packages/selection/src/cycle.ts": [
+    "format"
+  ],
+  "packages/selection/src/picking-primitives.ts": [
+    "format"
+  ],
+  "packages/selection/test/actions.test.js": [
+    "format"
+  ],
+  "packages/selection/test/cycle.test.js": [
+    "format"
+  ],
+  "packages/selection/test/scene-owner-picking.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/shader/src/glsl/program.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/shared/alpha-hash.js": [
+    "format"
+  ],
+  "packages/shared/bindgen-wasm.d.ts": [
+    "format"
+  ],
+  "packages/shared/bindgen-wasm.js": [
+    "format"
+  ],
+  "packages/shared/capture.d.ts": [
+    "format"
+  ],
+  "packages/shared/caster.js": [
+    "format"
+  ],
+  "packages/shared/displacement.d.ts": [
+    "format"
+  ],
+  "packages/shared/error-scope.js": [
+    "format"
+  ],
+  "packages/shared/frame-capture.js": [
+    "format"
+  ],
+  "packages/shared/precise-math.js": [
+    "format"
+  ],
+  "packages/shared/section.js": [
+    "format"
+  ],
+  "packages/shared/selection-mask.js": [
+    "format"
+  ],
+  "packages/shared/sheen.js": [
+    "format"
+  ],
+  "packages/shared/swept-advance.d.ts": [
+    "format"
+  ],
+  "packages/shared/swept-advance.js": [
+    "format"
+  ],
+  "packages/shared/texture-density.js": [
+    "format"
+  ],
+  "packages/shared/xml-document.js": [
+    "format"
+  ],
+  "packages/sky/src/fog.ts": [
+    "format"
+  ],
+  "packages/sky/src/settings.ts": [
+    "format"
+  ],
+  "packages/sky/test/features-check.mjs": [
+    "format"
+  ],
+  "packages/sky/test/scene-owner.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/sky/test/tornado.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/splats/src/session.ts": [
+    "format",
+    "lint/style/useConst"
+  ],
+  "packages/splats/test/gpu/splats.js": [
+    "lint/suspicious/noVar"
+  ],
+  "packages/splats/test/session.test.js": [
+    "format"
+  ],
+  "packages/studio/test/pathtrace.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/taa/test/reactive-mask.test.js": [
+    "format"
+  ],
+  "packages/terrain/src/planet.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/text/src/selection.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/text/tests/outline-scene.mts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/tilemap/test/scene-owner.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/tiles/tests/i3dm.test.js": [
+    "lint/style/useConst"
+  ],
+  "packages/tiles/tests/splats.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/tiles/tests/tiles-browser.ts": [
+    "lint/style/useConst"
+  ],
+  "packages/tween/test/owner-lifetime.fixture.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/ui/src/world-gl.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/usdz/src/curve-geometry.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/usdz/src/layer.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/usdz/src/skel.ts": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/usdz/tests/clips.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/vfx/src/flocking-sim.ts": [
+    "format"
+  ],
+  "packages/vfx/src/flocking.ts": [
+    "format"
+  ],
+  "packages/vfx/src/mesh.ts": [
+    "format"
+  ],
+  "packages/vfx/test/flame.test.js": [
+    "format"
+  ],
+  "packages/vfx/test/flocking.test.js": [
+    "format"
+  ],
+  "packages/vfx/test/reactive-check.mjs": [
+    "format"
+  ],
+  "packages/vfx/test/scene-owner.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/vfx/test/solid-check.mjs": [
+    "format"
+  ],
+  "packages/voxel-edit/src/generate.ts": [
+    "format"
+  ],
+  "packages/voxel-edit/src/gpu.ts": [
+    "format"
+  ],
+  "packages/voxel-edit/src/raster.ts": [
+    "format"
+  ],
+  "packages/voxel-edit/src/shaders.ts": [
+    "format"
+  ],
+  "packages/voxel-edit/tests/formats.test.js": [
+    "format"
+  ],
+  "packages/voxel-edit/tests/generate.test.js": [
+    "format"
+  ],
+  "packages/voxel-edit/tests/gpu.test.js": [
+    "format"
+  ],
+  "packages/voxel-edit/tests/raster.test.js": [
+    "format"
+  ],
+  "packages/voxel-net/tests/resume-crowd.test.js": [
+    "format"
+  ],
+  "packages/voxel-net/tests/rooms.test.js": [
+    "format"
+  ],
+  "packages/voxel-net/tests/server-runtimes.test.js": [
+    "format"
+  ],
+  "packages/voxel-net/tests/sql-fixture.js": [
+    "format"
+  ],
+  "packages/voxel-net/tests/sql-store-failure.js": [
+    "format"
+  ],
+  "packages/voxel-net/tests/sql-store.test.js": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/src/denoise-ml-weights.ts": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/src/dispatch.ts": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/src/mesh-ies.ts": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/src/mesh-lights.ts": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/src/mesh-pbr.ts": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/compose-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/dispatch-budget.test.js": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/magicavoxel-gamma-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/media-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/mesh-attributes-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/mesh-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/mesh-instances-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/mesh-lights-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/mesh-pbr-lobes-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/mesh-pbr-lobes.test.js": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/resampled-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/resampled.test.js": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/route-pace.test.js": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/sky-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/spectral-browser.mjs": [
+    "format"
+  ],
+  "packages/voxel-pathtracer/tests/spectrum.test.js": [
+    "format"
+  ],
+  "packages/voxel/src/bevel.ts": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/voxel/tests/bevel-seam.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/water/src/breaker.ts": [
+    "format"
+  ],
+  "packages/water/src/fft-cpu.ts": [
+    "format"
+  ],
+  "packages/water/src/fft.ts": [
+    "format"
+  ],
+  "packages/water/src/index.ts": [
+    "format"
+  ],
+  "packages/water/src/liquid-band.ts": [
+    "format"
+  ],
+  "packages/water/src/liquid-mpm-sim.ts": [
+    "format"
+  ],
+  "packages/water/src/liquid-mpm.ts": [
+    "format"
+  ],
+  "packages/water/src/liquid.ts": [
+    "format"
+  ],
+  "packages/water/src/ripple-field.ts": [
+    "format"
+  ],
+  "packages/water/src/ripples.ts": [
+    "format"
+  ],
+  "packages/water/src/sea-state.ts": [
+    "format"
+  ],
+  "packages/water/src/sea-surface.ts": [
+    "format"
+  ],
+  "packages/water/test/caustics-scale.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/caustics.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/coast-reference.js": [
+    "format"
+  ],
+  "packages/water/test/fft.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/fft.test.js": [
+    "format"
+  ],
+  "packages/water/test/flood-analytic.js": [
+    "format"
+  ],
+  "packages/water/test/flood-bounds.test.js": [
+    "format"
+  ],
+  "packages/water/test/flood-film.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/flood-reference.js": [
+    "format"
+  ],
+  "packages/water/test/flood-settings.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/flood-settings.test.js": [
+    "format"
+  ],
+  "packages/water/test/flood-waves.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/flood.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/gpu-liquid-check.mjs": [
+    "format"
+  ],
+  "packages/water/test/gpu-liquid.test.js": [
+    "format"
+  ],
+  "packages/water/test/ice.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/ice.test.js": [
+    "format"
+  ],
+  "packages/water/test/liquid-band-reference.js": [
+    "format"
+  ],
+  "packages/water/test/liquid-band.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/liquid-restore-load.test.js": [
+    "format"
+  ],
+  "packages/water/test/liquid-scale.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/liquid.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/liquid.test.js": [
+    "format"
+  ],
+  "packages/water/test/ocean-query.test.js": [
+    "format"
+  ],
+  "packages/water/test/owner-lifetime.fixture.js": [
+    "format"
+  ],
+  "packages/water/test/rain.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/restore-depth.test.js": [
+    "format"
+  ],
+  "packages/water/test/results-path.test.js": [
+    "format"
+  ],
+  "packages/water/test/ripple-field.test.js": [
+    "format"
+  ],
+  "packages/water/test/ripples.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/ripples.test.js": [
+    "format"
+  ],
+  "packages/water/test/rivers.test.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/water/test/scatter.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/sea-state.test.js": [
+    "format"
+  ],
+  "packages/water/test/seek-check.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/splash.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/spray-view.test.js": [
+    "format"
+  ],
+  "packages/water/test/surface-copies.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/underwater-optics.browser.mjs": [
+    "format"
+  ],
+  "packages/water/test/wake-agreement.browser.mjs": [
+    "format"
+  ],
+  "packages/weather/tests/air-load.test.js": [
+    "format"
+  ],
+  "packages/weather/tests/scene-owner-class.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "packages/webgl2-compat/src/wgsl/builtins.ts": [
+    "format"
+  ],
+  "packages/webgl2-compat/test/glsl-corpus-browser.mjs": [
+    "format"
+  ],
+  "packages/webgl2-compat/test/preview-browser-check.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/webgl2-compat/test/read-canvas-browser.mjs": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "packages/worker/tests/rpc-types.ts": [
+    "lint/style/useImportType"
+  ],
+  "packages/xr/tests/hands.test.js": [
+    "lint/correctness/noUnusedVariables",
+    "lint/style/useConst"
+  ],
+  "scripts/acceptance/draco-generic-inputs.mjs": [
+    "lint/style/useConst"
+  ],
+  "scripts/animation-dqs-tests.js": [
+    "format",
+    "lint/correctness/noUnusedVariables"
+  ],
+  "scripts/animation-instanced-skin-tests.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "scripts/check-site-links.mjs": [
+    "lint/style/useConst"
+  ],
+  "scripts/clustered-shadow-gpu-check.js": [
+    "format"
+  ],
+  "scripts/diagnose-ssgi-angle.mjs": [
+    "lint/style/useConst"
+  ],
+  "scripts/fresh-clone-check.mjs": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "scripts/modern-wrapper-tests.js": [
+    "lint/correctness/noUnusedVariables"
+  ],
+  "tests/deep-core-stress.test.js": [
+    "lint/style/useConst"
+  ],
+  "tests/margo-convert-mobile.test.js": [
+    "format"
+  ],
+  "tests/modern-animator-spline-ik.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "tests/proofs-pinned-core.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "tests/shot-encode.test.js": [
+    "format"
+  ],
+  "tests/speed-phase.test.js": [
+    "lint/correctness/noUnusedImports"
+  ],
+  "tests/support/compat-chunk.js": [
+    "format"
+  ],
+  "tools/create-margo/templates/next/app/page.tsx": [
+    "format"
+  ],
+  "tools/margo-convert/pipeline/mobile.js": [
+    "format"
+  ]
+}

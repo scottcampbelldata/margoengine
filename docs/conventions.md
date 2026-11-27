@@ -291,6 +291,16 @@ messages and the inspector's error placement still point at the right line. Rule
   shader in `packages/*/src` and proves that broken strips are caught. Text-patching code should still search code, not
   comments.
 
+## Lint
+
+`npm run lint` (`scripts/lint.mjs`) runs Biome three ways: lint over the tree; `biome check` (format and lint,
+warnings fail) over the files changed since the merge base with origin/main; and `biome check` over the whole tree
+against `scripts/lint-debt.json`. The third step exists because local CI checks commits that are already on main, where
+nothing differs from origin/main and the second step checks no file. The list records the failures the tree held when
+the step landed, as `file: [kind]`: a file or kind of failure outside it fails, wherever the gate runs. It only
+shrinks: after fixing listed files, run `node scripts/lint.mjs --shrink`. Before a push, `npx biome check <changed
+files>` takes a second and keeps the next CI run green. Test: `tests/lint-changed.test.js`.
+
 ## API lock
 
 `api/lock.json` and `api/breaks.json` are explicitly inert file-class records for GPU
