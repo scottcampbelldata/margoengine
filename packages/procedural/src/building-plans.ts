@@ -44,6 +44,7 @@ import {
   WALL_LINING,
 } from './building-interiors.js';
 import { type Joins, type BuildingJoinStep, planJoins } from './building-joins.js';
+import { WINDOW_FIT, windowFit } from './building-windows.js';
 import { MeshBuilder, type V3 } from './mesh-builder.js';
 
 export type { BuildingJoinStep } from './building-joins.js';
@@ -1016,7 +1017,27 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     });
   }
   const { first, joined } = planStairs(specs, Array.isArray(raw.wings) ? (raw.wings as BuildingWing[]) : []);
-  const built = specs.map((sp) => generateBuilding({ ...sp.opts, origin: sp.at, yaw: (sp.turn * Math.PI) / 2 }));
+  const generate = (sp: BlockSpec) => generateBuilding({ ...sp.opts, origin: sp.at, yaw: (sp.turn * Math.PI) / 2 }),
+    alone = specs.map(generate),
+    placed = alone.map((b, j) =>
+      blockSolids(b, roofPlanes(b)).map((s) => placeSolid(s, specs[j].at, (specs[j].turn * Math.PI) / 2)),
+    ),
+    // A block that has others beside it is built again, now and by the joins, with its windows fitted clear of them.
+    built = alone.map((b, j) => {
+      const others = placed.flatMap((list, i) => (i === j ? [] : list));
+      if (!others.length) return b;
+      const sp = specs[j],
+        yawB = (sp.turn * Math.PI) / 2,
+        c = Math.cos(yawB),
+        sn = Math.sin(yawB),
+        fit = windowFit(
+          others.map((s) => s.halves),
+          ([x, y, z]) => [sp.at[0] + x * c + z * sn, sp.at[1] + y, sp.at[2] - x * sn + z * c],
+          b.options.wall,
+        );
+      specs[j] = { ...sp, opts: Object.assign({}, sp.opts, { [WINDOW_FIT]: fit }) };
+      return generate(specs[j]);
+    });
   const joins = joinFloors(specs, built, first, joined, o.style);
   const blocks: Block[] = specs.map((sp, j) => {
     const yawB = (sp.turn * Math.PI) / 2,

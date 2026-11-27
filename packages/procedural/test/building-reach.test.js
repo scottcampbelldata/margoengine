@@ -286,8 +286,8 @@ test('partitions that cross meet in a post', () => {
  * less everything within `r` of a wall face at 1 m up and the stairs' footprints. Floods from `seeds` and the grid
  * cells `entries`.
  */
-function walkMesh(b, y, seeds, solids, r, entries = [], up = 1) {
-  const meshes = [b.parts.interior, b.parts.walls].filter(Boolean),
+function walkMesh(b, y, seeds, solids, r, entries = [], up = 1, more = []) {
+  const meshes = [b.parts.interior, b.parts.walls, ...more.map((name) => b.parts[name])].filter(Boolean),
     xs = b.blocks.flatMap((q) => q.footprint.map((c) => c[0])),
     zs = b.blocks.flatMap((q) => q.footprint.map((c) => c[1])),
     x0 = Math.min(...xs) - 1,
@@ -462,6 +462,7 @@ test('every storey of every random plan, towers and wings too, is reached on foo
       label = `#${i} ${o.style} ${o.plan} ${o.tower}+${o.towerStoreys} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)}${wing}`,
       r = b.stairs.some((s) => s.kind === 'ladder') ? 0.12 : 0.18;
     if (o.tower !== 'none' && o.towerStoreys > 0) towers++;
+    wrong.push(...coveredWindows(b, label));
     let y = generateBuilding({ style: o.style }).floors[0],
       seeds = b.openings.filter((d) => d.kind === 'door' && d.floor === 0).flatMap(inward);
     for (let k = 0; k < tallest; k++) {
@@ -489,6 +490,24 @@ test('every storey of every random plan, towers and wings too, is reached on foo
 test('the smallest tower the options accept builds, and a smaller one is refused by name', () => {
   assert.ok(generateBuildingPlan({ tower: 'front-left', towerSize: 3 }).blocks.length > 1);
   assert.throws(() => generateBuildingPlan({ tower: 'front-left', towerSize: 2.9 }), /towerSize/);
+});
+
+// KB-PROC-ROOFWINDOW1: the wing's eaves reached a window of the main block, which kept its opening into the roof space.
+test('a window a wing roof or wall reaches moves, or is made smaller, clear of it', () => {
+  const wing = { at: [0.66, -5.87], width: 6.5, depth: 7.18, plinth: 1.11, storeys: [3, 3] },
+    o = { style: 'japan-2011-house', interior: 'rooms', width: 11.27, depth: 9.14, storeys: [3, 3] },
+    alone = generateBuilding(o),
+    b = generateBuildingPlan({ ...o, wings: [wing] }),
+    rear = (list) => list.filter((q) => q.kind === 'window' && q.centre[2] < -4.5 && q.centre[0] > 3.9),
+    before = rear(alone.openings),
+    after = rear(b.openings).filter((q) => Math.abs(q.centre[2] + 4.57) < 0.01);
+  assert.equal(before.length, 2);
+  assert.equal(after.length, 2, 'both windows are kept');
+  for (const [i, q] of after.entries()) {
+    assert.ok(q.width >= 0.4 && q.width < before[i].width, `narrowed from ${before[i].width} to ${q.width}`);
+    assert.ok(q.centre[0] > before[i].centre[0], 'moved away from the wing');
+  }
+  assert.deepEqual(coveredWindows(b, 'rear'), []);
 });
 
 // A window another block stands over is cut out with its wall; its curtains used to hang on in the middle of the room.
@@ -635,6 +654,63 @@ function surfaces(b, names, x, z) {
 
 const inBox = (s, x, z, e) => x > s.min[0] - e && x < s.max[0] + e && z > s.min[1] - e && z < s.max[1] + e;
 
+/**
+ * Windows that another block's walls or roof cover in part: every point of one has open air in front of it and no other
+ * block behind it, so none opens into another block's roof space.
+ */
+function coveredWindows(b, label) {
+  const wrong = [],
+    // The openings each wall holds.
+    held = new Map();
+  for (const q of b.openings) {
+    const [cx, cy, cz] = q.centre,
+      faults = [];
+    b.blocks.forEach((block, own) => {
+      const f = block.footprint,
+        mid = [0, 1].map((a) => f.reduce((n, p) => n + p[a], 0) / f.length);
+      f.forEach((p, i) => {
+        const e = f[(i + 1) % f.length],
+          alongX = Math.abs(e[1] - p[1]) < 1e-6,
+          off = alongX ? cz - p[1] : cx - p[0],
+          t = alongX ? cx : cz,
+          ends = alongX ? [p[0], e[0]] : [p[1], e[1]];
+        if (Math.abs(off) > 0.002 || t < Math.min(...ends) || t > Math.max(...ends)) return;
+        // A wall of a block, and the side its openings face (one on a wall around the corner has another).
+        const wall = `${own},${i},${q.side}`;
+        held.set(wall, [...(held.get(wall) ?? []), { ...q, t }]);
+        const out = Math.sign((alongX ? p[1] - mid[1] : p[0] - mid[0]) || 1);
+        let bad = '';
+        for (const u of [-0.49, -0.25, 0, 0.25, 0.49])
+          for (const v of [-0.49, -0.25, 0, 0.25, 0.49])
+            for (const d of [0.03, -0.03]) {
+              const a = t + u * q.width,
+                n = (alongX ? p[1] : p[0]) + out * d,
+                at = alongX ? [a, cy + v * q.height, n] : [n, cy + v * q.height, a];
+              b.blocks.forEach((_, k) => {
+                if ((d > 0 || k !== own) && b.insideBlock(k, ...at))
+                  bad ||= `block ${k} covers it at ${at.map((w) => w.toFixed(2))}`;
+              });
+            }
+        faults.push(bad);
+      });
+    });
+    if (!faults.length) wrong.push(`${label}: a ${q.kind} at ${q.centre.map((v) => v.toFixed(2))} is on no wall`);
+    else if (faults.every(Boolean))
+      wrong.push(`${label}: a ${q.kind} at ${q.centre.map((v) => v.toFixed(2))}: ${faults[0]}`);
+  }
+  // Nor do two openings of one wall run into each other.
+  for (const list of held.values())
+    list.forEach((q, i) => {
+      for (const r of list.slice(i + 1))
+        if (
+          Math.abs(q.t - r.t) < (q.width + r.width) / 2 - 0.001 &&
+          Math.abs(q.centre[1] - r.centre[1]) < (q.height + r.height) / 2 - 0.001
+        )
+          wrong.push(`${label}: a ${q.kind} and a ${r.kind} overlap at ${q.centre.map((v) => v.toFixed(2))}`);
+    });
+  return wrong;
+}
+
 /** Everything a walker from the outer doors cannot reach, and every floor edge one could fall from. */
 function unevenFaults(b, o, label) {
   const wrong = [],
@@ -692,8 +768,9 @@ function unevenFaults(b, o, label) {
     if (walks[at(q.level)].shut(q))
       wrong.push(`${label}: a ${q.use} at ${q.level.toFixed(2)} by ${q.min.map((v) => v.toFixed(1))} is cut off`);
   // Open ledges: floor beside no floor and no wall, over floor more than one riser down.
-  // Walls 0.35 m up: under any window sill, and at a ledge there is none.
-  const open = levels.map((y) => walkMesh(b, y, [], [], 0.09, [], 0.35));
+  // Walls 0.35 m up: under most window sills, and at a ledge there is none. A window down to the floor is closed by
+  // its glass, which is cut away wherever another block's roof or walls take it, so one into a roof space is found.
+  const open = levels.map((y) => walkMesh(b, y, [], [], 0.09, [], 0.35, ['glass']));
   open.forEach((w, k) => {
     let edges = 0,
       first = '';
@@ -704,14 +781,6 @@ function unevenFaults(b, o, label) {
         const x = w.x0 + ((n % w.nx) + 0.5) * CELL,
           z = w.z0 + (Math.floor(n / w.nx) + 0.5) * CELL;
         if (flights.some((s) => inBox(s, x, z, 0.15))) continue;
-        // A window down to the floor is an opening in its own wall, not an edge of this floor.
-        const glazed = b.openings.some(
-          (q) =>
-            q.kind !== 'door' &&
-            Math.hypot(q.centre[0] - x, q.centre[2] - z) < q.width / 2 + 0.3 &&
-            Math.abs(q.centre[1] - levels[k] - 0.35) < q.height / 2,
-        );
-        if (glazed) continue;
         const gap = levels.map((v) => levels[k] - v),
           near = open.some((q, j) => Math.abs(gap[j]) <= code.rise + 1e-3 && q.floor[n]),
           below = open.some((q, j) => gap[j] > code.rise + 1e-3 && gap[j] < 3.6 && q.floor[n]);
@@ -727,6 +796,7 @@ function unevenFaults(b, o, label) {
     if (edges > 2)
       wrong.push(`${label}: an open ledge of ${edges} cells at ${levels[k].toFixed(2)}, the first at ${first}`);
   });
+  wrong.push(...coveredWindows(b, label));
   for (const s of steps) {
     const name = `${label}: steps ${s.from.toFixed(2)} to ${s.to.toFixed(2)}${s.sunken ? ' sunk' : ''}`;
     if (Math.abs(s.risers * s.rise - (s.to - s.from)) > 1e-6) wrong.push(`${name}: risers do not climb the change`);

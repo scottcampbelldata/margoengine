@@ -43,6 +43,7 @@ import {
   KEEP_CLEAR,
   type KeepClear,
 } from './building-interiors.js';
+import { WINDOW_FIT, type WindowFit } from './building-windows.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
 export type BuildingStyle =
@@ -891,6 +892,35 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
       }
     }
   }
+
+  // In a joined plan an opening another block stands against moves or shrinks, and a window may go
+  // (building-windows.ts).
+  const fit = (options as { [WINDOW_FIT]?: WindowFit })[WINDOW_FIT];
+  if (fit)
+    for (let i = holes.length - 1; i >= 0; i--) {
+      const h = holes[i],
+        s = sides[h.side];
+      const bays = Math.max(1, Math.round(s.length / o.bayWidth)),
+        bw = s.length / bays,
+        bay = Math.floor((h.a0 + h.a1) / 2 / bw),
+        mine = holes.filter((q) => q !== h && q.side === h.side && q.floor === h.floor),
+        // A shop window stops under its transom.
+        above = mine.filter((q) => q.y0 >= h.y1 && q.a0 < h.a1 && q.a1 > h.a0),
+        beside = mine.filter((q) => q.y0 < h.y1 && q.y1 > h.y0),
+        // A window keeps to its bay; a door may go as far as the opening next to it.
+        door = h.kind === 'door',
+        from = door ? Math.max(0, ...beside.filter((q) => q.a1 <= h.a0).map((q) => q.a1 + 0.1)) : bay * bw + 0.1,
+        to = door
+          ? Math.min(s.length, ...beside.filter((q) => q.a0 >= h.a1).map((q) => q.a0 - 0.1))
+          : (bay + 1) * bw - 0.1,
+        next = fit(h, s, {
+          a0: Math.max(th + 0.05, from),
+          a1: Math.min(s.length - th - 0.05, to),
+          y1: Math.min(floors[h.floor] + o.storeys[h.floor] - 0.3, ...above.map((q) => q.y0 - 0.1)),
+        });
+      if (next) holes[i] = next;
+      else holes.splice(i, 1);
+    }
 
   // Walls: the outer face, the inner face and the reveals, from a grid of breaks cut round the openings.
   const lap = near && (o.cladding === 'clapboard' || o.cladding === 'siding'),

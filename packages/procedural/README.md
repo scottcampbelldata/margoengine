@@ -1230,6 +1230,12 @@ narrower limits. Between two ground floors a flight is sunk into the higher floo
 climb under. Where no flight fits, the join is walled off and the wing gets its own door, so no floor ends in an open
 ledge. Furniture keeps off the steps and their landings.
 
+No window opens into another block's roof space. A window that another block's walls or roof reach moves along its bay
+or up its storey, else is made smaller, keeping 150 mm above a roof (the least upstand NHBC Standards 7.1 give where a
+roof meets a wall), and is left out where less than 0.4 by 0.45 m would remain. An outer door that is partly covered
+slides along its wall the same way, narrowed to no less than 0.82 m; with no room for that it is left out, another way
+in being made where the plan then has none. `openings` lists what was built.
+
 ```ts
 import {generateBuildingPlan} from 'margoengine/procedural/building-plans';
 const split = generateBuildingPlan({style: 'western-1910-house', width: 12, depth: 8, storeys: [3.2, 3.2],

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21421609,
+  "total": 21424477,
   "history": [
     {
       "date": "2026-10-24",
@@ -15115,6 +15115,12 @@
       "commit": "lane-e",
       "reason": "parse3MFBoolean evaluates boolean shapes: loaders/threemf-boolean 12,596 to 14,069 B gzip; the exact boolean stays the optional mesh-edit peer behind import(). A separate entry would move the colour and operand code behind a second import that this entry needs by default.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "building-windows",
+      "reason": "Openings fitted clear of joined blocks (KB-PROC-ROOFWINDOW1): a window or door another block stands against moves, shrinks or goes: procedural/building-plans 29,245 to 30,418 B gzip measured. generateBuildingPlan is synchronous and a window open into a roof space is a defect, so a split entry would need a second import before any joined plan could be built.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16107,7 +16113,7 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 30091,
+    "@margoengine/procedural/building-plans": 31331,
     "@margoengine/procedural/building-rules": 20923,
     "@margoengine/procedural/building-settings": 5862,
     "@margoengine/procedural/buildings": 1758,
