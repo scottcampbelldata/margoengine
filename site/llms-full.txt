@@ -15413,17 +15413,32 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the test reads the 144-byte block; the glass colour, metalness and the other asserts hold unchanged.
 - **Regression:** `examples/gameplay-sandbox/test/procedural.test.js` itself.
 
-### Open 2026-11-26: the gameplay-sandbox visual baselines differ after the day's look fixes (KB-GS-GOLDENS1, visual)
+### Fixed 2026-11-27: the gameplay-sandbox visual baselines differed after the day's look fixes (KB-GS-GOLDENS1, visual)
 
 - **Repro:** `npm run visual:check -- --only=gameplay-sandbox-high,gameplay-sandbox-light,gameplay-sandbox-phone`
-  (nvidia-ampere-msedge-158, baseline commit 0a9e9367ce): changed 0.458, 0.423 and 0.337 (limit 0.0005).
-- **Attributed so far** (one package's source rolled back at a time, high view): scatter to before SHIMMER1 takes
-  changed to 0.349 (the trees and grass: the new bounded sway); terrain, sky, environment and biomes to before
-  KB-TERRAIN-SKYAMBIENT1, and core's KB-VIEW-SRGB1 plus KB-CLEAR-DEFAULT1 reversed, change nothing. Left: the
-  shoreline water and foam, the clouds and the eyebrow copy ("PLAYGROUND" to "SANDBOX", 895391feac). Candidates since
-  the baseline: water 52c5f0e79f, 5bad7f5ccb, 3424ada843, a551dd9f5a, 0d06a4a3af; sky clouds 4ef090e745; shared GGX
-  70351f3224 (KB6016d). Rolling those back together fails to build against today's shared light terms.
-- **Owed:** prove the rest are those intended fixes, then `visual:update` the three views with the reasons.
+  (nvidia-ampere-msedge-158, baseline commit 0a9e9367ce): changed 0.464, 0.428 and 0.356 (limit 0.0005).
+- **Cause, proven:** no regression; every changed pixel is an intended look fix. The commits were reversed one at a
+  time, newest first and cumulatively, on today's tree (`gameplay-sandbox-high` rendered after each step); with all
+  the steps below reversed, high, light and phone match the old baselines exactly (changed 0). Footprint of each
+  step (share of the high frame changed by more than 8 codes, against the step before):
+  - 5bad7f5ccb white water lit from above (KB-WATER-WHITEWATERLIGHT1): 2.9 percent, the surf and shore foam only;
+    the foam reads as a brighter bubble layer instead of a flat grey sheet.
+  - 3424ada843 short-crested surf sections and wet sand with no wind ripples (KB-WATER-SURFBANDS1,
+    KB-TERRAIN-SANDWET1): 5.0 percent, the lower half; one continuous foam band becomes broken breaking sections.
+  - 0d06a4a3af a bent ray onto a shallow bed at a grazing angle (KB-WATER-SEABEDMAZE1): 2.4 percent, the shallows;
+    the seabed shows through instead of the flat fallback.
+  - a551dd9f5a the surf foam gate reads the steady breaking share, and the waterline meets the sand: 2.3 percent,
+    the waterline.
+  - 4ef090e745 broken cloud elements thin to their rims and shade within: 1.4 percent, the top quarter (clouds) only.
+  - 1d1729c194 a plant's wind sway bounded by its height and stiffness (KB-LOOK-TV-SHIMMER1): 1.3 percent, the trees
+    and grass (scatter's source rolled back to before it, as the later scatter commits build on it).
+  - 895391feac the eyebrow copy "PLAYGROUND" to "SANDBOX": 0.05 percent, the eyebrow line.
+  - No change to this view: 52c5f0e79f (near-sea ripples and TAA), 5da4190576, 51254088d7 (shallow-surface entry),
+    34a10cf540, 6ba30b8fc6, 6fb507e6ed, e2efb48e53, 70351f3224 (GGX D, KB6016d); 4350eae86c and 541cac31dc were not
+    reversed and the frame still matches, so they change nothing either. Earlier: terrain, sky, environment and
+    biomes before KB-TERRAIN-SKYAMBIENT1, and core's KB-VIEW-SRGB1 and KB-CLEAR-DEFAULT1, change nothing.
+- **Fix:** `npm run visual:update` for the three views at ed3163e5af, whose high frame is byte-identical to the
+  chain's starting frame (the later vfx, clustered, taa and decoders commits change nothing here).
 
 ### Fixed 2026-11-26: moving the world origin displaced a retained water reading (KB-LOADS-ORIGINMIRROR)
 
