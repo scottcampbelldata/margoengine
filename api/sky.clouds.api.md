@@ -82,6 +82,8 @@ class Sky implements EnginePlugin {
         readonly ambient: string;
     } | undefined;
     bindings(): GPUBindGroupEntry[];
+    shader(source: string, group: number): string;
+    finish(source: string, group: number): string;
     static attach(engine: EngineKernel, options?: SkyOptions, features?: SkyFeatures): Sky;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
@@ -168,6 +170,7 @@ interface SkyFeatures {
                 readonly ambient: string;
             } | undefined;
             bindings(): GPUBindGroupEntry[];
+            terrain(source: string, group: number): string;
         };
     };
 }
@@ -216,6 +219,8 @@ interface SkyLightingTarget {
             readonly declarations: string;
             readonly ambient?: string;
         } | undefined;
+        shader(source: string, group: number): string;
+        finish(source: string, group: number): string;
         bindings(): GPUBindGroupEntry[];
     }): () => void;
 }

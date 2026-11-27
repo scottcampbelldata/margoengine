@@ -87,13 +87,19 @@ async function alpine(){
   plainRock=await s.pixels(world,{materials:{rock:{color:[0.54,0.51,0.47],detail:0.25}}}),
   mask=await s.pixels(world,{materials:{rock:flat([0.35,0,0]),snow:flat([0,0,0.35]),scree:flat([0.35,0.35,0]),meadow:flat([0,0.35,0])}});
  const white=await s.pixels(world,{materials:{snow:flat([1,1,1])}});
+ // The same view with the four mask materials black: the sky's reflection alone (a dielectric's, F0 0.04, which does not
+ // depend on the albedo). Since the ground takes the sky's light (KB-TERRAIN-SKYAMBIENT1) the mask's rock is sRGB about
+ // (67, 11, 19), not pure red; the mask less this, in linear light, is the albedo's own light again.
+ const black=await s.pixels(world,{materials:{rock:flat([0,0,0]),snow:flat([0,0,0]),scree:flat([0,0,0]),meadow:flat([0,0,0])}}),
+  lin=v=>{const c=v/255;return c<=0.04045?c/12.92:((c+0.055)/1.055)**2.4;},
+  own=k=>Math.max(0,lin(mask[k])-lin(black[k]));
  const rock=new Uint8Array(W*H),snow=new Uint8Array(W*H),high=new Int8Array((W>>1)*(H>>1)).fill(-1);
  // Ground height per 2 x 2 pixel block, marched only where the mask shows rock.
  const above=(x,y)=>{const b=(y>>1)*(W>>1)+(x>>1);if(high[b]<0){const q=hit(world,position,s.ray(x&~1,y&~1));high[b]=+(q!==null&&q[1]>2600);}return high[b];};
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-  const i=y*W+x,k=i*4,[r,gg,b]=[mask[k],mask[k+1],mask[k+2]];
-  if(b>r&&b>3*gg&&b>20)snow[i]=1;
-  else if(r>10*gg&&r>10*b&&r>20)rock[i]=above(x,y);
+  const i=y*W+x,k=i*4,[r,gg,b]=[own(k),own(k+1),own(k+2)],floor=lin(20);
+  if(b>r&&b>3*gg&&b>floor)snow[i]=1;
+  else if(r>10*gg&&r>10*b&&r>floor)rock[i]=above(x,y);
  }
  let n=0,sum=0,sq=0,sn=0,ss=0,sw=0;
  for(let y=0;y<H;y++)for(let x=0;x<W;x++){

@@ -320,7 +320,7 @@ export class TerrainReliefLighting implements EnginePlugin, TerrainLighting, Dis
     const previous = this.#shaders.get(key);
     if (previous) return previous;
     const direct = /let direct=[^;]+;/g;
-    const sky = '+base*frame.radiance.w';
+    const sky = '+base*frame.radiance.w*frame.ambient.rgb';
     if ([...source.matchAll(direct)].length !== 1 || source.split(sky).length !== 2)
       throw new MargoError(
         'unsupported',

@@ -2,7 +2,7 @@ import { neutralShader } from '../../shared/display.js';
 import { ggxD, smithGCorrelated } from '../../shared/light-terms.js';
 // Vertex morph between grid levels: Strugar 2009, "Continuous Distance-Dependent Level of Detail" (CDLOD), JGT.
 export const terrainVertex = /* wgsl */ `
-struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,grid:vec4f,offset:vec4f,map:vec4f,heights:vec4f}
+struct Frame {camera:mat4x4f,eye:vec4f,light:vec4f,radiance:vec4f,grid:vec4f,offset:vec4f,map:vec4f,heights:vec4f,ambient:vec4f}
 struct Layer {heightSlope:vec4f,params:vec4f}
 @group(0) @binding(0) var<uniform> frame:Frame;
 @group(0) @binding(1) var heightMap:texture_2d<f32>;
@@ -78,7 +78,7 @@ export const originShader = (code: string): string =>
   code.includes('anchor:vec4f}')
     ? code
     : code
-        .replace('heights:vec4f}', 'heights:vec4f,anchor:vec4f}')
+        .replace('ambient:vec4f}', 'ambient:vec4f,anchor:vec4f}')
         .replace(/struct Layer \{([^}]*)\}/, 'struct Layer {$1,wrap:vec4f,tone:vec4f}')
         .split('let p=position*scale;')
         .join('let p=(position+layerRules[layer].wrap.xyz)*scale;')
@@ -146,7 +146,7 @@ fn terrainColor(position:vec3f,normal:vec3f)->vec3f {
   let nl=clamp(dot(n,l),0.0,1.0);let nv=clamp(dot(n,v),0.0001,1.0);let nh=clamp(dot(n,h),0.0,1.0);let vh=clamp(dot(v,h),0.0,1.0);let a=i.material.x*i.material.x;let a2=a*a;
   let d=${ggxD};let g=${smithGCorrelated};let fresnel=vec3f(0.04)+vec3f(0.96)*pow(1-vh,5.0);
   let direct=((1-fresnel)*base/3.14159265+d*g*fresnel/max(4*nl*nv,0.0001))*nl;
-  let linear=direct*frame.radiance.xyz*frame.light.w+base*frame.radiance.w;
+  let linear=direct*frame.radiance.xyz*frame.light.w+base*frame.radiance.w*frame.ambient.rgb;
   if(frame.heights.w>0.5){return vec4f(linear,1);}
   let mapped=pbrNeutral(max(linear,vec3f(0)));return vec4f(select(mapped*12.92,1.055*pow(mapped,vec3f(1.0/2.4))-0.055,mapped>=vec3f(0.0031308)),1);
 }`;

@@ -171,7 +171,7 @@ export class TerrainMaterials implements EnginePlugin, TerrainLighting {
       bumped = 'let n=terrainBump(i.position,terrainN);',
       rules = 'let weight=smoothstep(',
       painted = 'let weight=packed[layer/4u][layer%4u];if(weight<=0.0){continue;}',
-      ambient = '+base*frame.radiance.w';
+      ambient = '+base*frame.radiance.w*frame.ambient.rgb';
     const parts = [head, ambient, 'total+=weight;'];
     if (
       parts.some((p) => source.split(p).length !== 2) ||

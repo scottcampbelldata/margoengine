@@ -1222,6 +1222,36 @@ true; `sky.add(model)` still works and lights a model from another scene), and o
 the environment's. It composes with shadows and clustered lights; custom
 renderers using their own shaders need their own ambient integration.
 
+`sky.add(terrain)` lights a clipmap `Terrain` (`@margoengine/terrain`) the same way: the sky's light, from the shaded
+normal, takes the place of terrain's flat `lighting.ambient` x `radiance[3]` term in its lighting group (group 1,
+bindings 8, 10 and 11), times whatever the terrain's effects multiplied that term by (layer materials' occlusion,
+relief lighting's sky visibility); a `HemisphereLight` added to the terrain stays beside it. The sky patches at
+`finish`, after every other terrain effect, so it may be added before or after `TerrainMaterials`. Shaded ground then
+takes the sky's colour as the meshes on it do (KB-TERRAIN-SKYAMBIENT1; `BiomeView` adds its ground to its `sky`).
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {Sky} from 'margoengine/sky';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const sky = new Sky({hours:15, lighting:{ambient:{day:[0.05,0.05,0.06], night:[0.01,0.01,0.02]}}});
+engine.use(sky);
+const terrain = Terrain.attach(engine, {
+  resolution:64, levels:6, cellSize:1, origin:[-50,-50], size:[100,100], heightScale:20,
+  layers:[0.3,0.2,0.4,0.2].map((scale)=>({height:[-20,100] as [number,number],slope:[0,1] as [number,number],scale})),
+  textures:device=>{
+    // 6 = TEXTURE_BINDING | COPY_DST: flat grey demo ground; replace with your assets.
+    const heightmap = device.createTexture({size:[4,4],format:'r32float',usage:6});
+    device.queue.writeTexture({texture:heightmap},new Float32Array(16),{bytesPerRow:16},[4,4]);
+    const layers = device.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});
+    device.queue.writeTexture({texture:layers},new Uint8Array(16).fill(128),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);
+    return {heightmap,layers};
+  }
+});
+const removeSkyLight = sky.add(terrain); // removeSkyLight() goes back to the flat ambient
+engine.start();
+```
+
 The light map is drawn in the sky's own units and the engine sun in `lighting.intensity`'s, where 1 is the zenith sun
 on the ground. Each frame `sky.lightScale`, the intensity over the zenith sun on the ground in sky units (4 pi x 0.55
 for Preetham, the clouds' calibration; 20 times the zenith transmittance down to the camera for Bruneton), takes the

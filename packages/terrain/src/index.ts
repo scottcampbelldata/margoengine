@@ -494,8 +494,8 @@ export class Terrain implements EnginePlugin {
         ],
       });
     this.ringGroup = group;
-    // With `floatingOrigin` the frame grows by `anchor` (originShader), 176 to 192 bytes.
-    const floats = this.options.floatingOrigin ? 48 : 44;
+    // With `floatingOrigin` the frame grows by `anchor` (originShader), 192 to 208 bytes.
+    const floats = this.options.floatingOrigin ? 52 : 48;
     for (let i = 0; i < (this.options.levels ?? 6); i++) {
       const uniform = this.device.createBuffer({
           size: floats * 4,
@@ -660,11 +660,17 @@ export class Terrain implements EnginePlugin {
       values[41] = heightOffset - s[1];
       values[42] = layers;
       values[43] = hdr;
+      // `lighting.ambient`, the colour core meshes multiply their ambient by (white when the engine has none).
+      const ambient = this.engine!.lighting.ambient;
+      values[44] = ambient?.[0] ?? 1;
+      values[45] = ambient?.[1] ?? 1;
+      values[46] = ambient?.[2] ?? 1;
+      values[47] = 0;
       if (floating) {
-        values[44] = s[0] - this.anchor![0];
-        values[45] = s[2] - this.anchor![1];
-        values[46] = s[1];
-        values[47] = 0;
+        values[48] = s[0] - this.anchor![0];
+        values[49] = s[2] - this.anchor![1];
+        values[50] = s[1];
+        values[51] = 0;
       }
       this.upload(c.device.queue, this.rings[i].uniform, values);
       previousX = x;

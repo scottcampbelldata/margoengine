@@ -18,6 +18,10 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Owner:** the physics solver rows whose commits added them (SEA-12 at 113a391fde and 1a6c425709, K2-09 at
   2f22453d8b and the rest of the physics queue); found by gap lane B's gate for KB-LOOK-TV-BOUNCE1, which changes none
   of them.
+- **Also red, 2026-11-26:** `packages/water/test/browser-root.test.js` (in `npm run test:changed` for any water
+  dependent): `packages/water/package.json` now runs `wake-agreement.browser.mjs --panel-hull` and `--lateral-course`
+  (SEA-08 at fd1df9f4c5, SEA-12), which the test's list of one command per browser file does not hold. Owner: SEA-12
+  (Codex, BUILDING); found by gap lane B's gate for KB-TERRAIN-SKYAMBIENT1, which changes no water file.
 
 ### Fixed 2026-11-26: `bounce` and `shadowTint` averaged the ground masks' edge pixels, where the frame mixes lit and shadowed ground (KB-LOOK-TV-BOUNCE1, headless)
 
@@ -54,29 +58,51 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   absorbs blue, so the diffuse light is not cooler than the sun's.
 - **Decision owed:** the T6 bound (10 to 35 percent, cooler shadows) describes sunlit ground. Scott decides whether a
   shot under a smoke pall is held to it, is exempt from T6, or the blowup is lit differently. No bound was moved.
+- **After KB-TERRAIN-SKYAMBIENT1 (2026-11-26):** the ground now takes the smoky sky's own light instead of the white
+  floor, and the blowup reads bounce 93.4 and 91.3 percent, shadowTint 0.33 and 0.68 b*: the diffuse light under the pall
+  is brighter and warmer than the floor was, as the Izana measurements describe. Still the same decision; no bound moved.
 
-### Open 2026-11-26: terrain's ambient light is a white floor, not the sky's light or `lighting.ambient` (KB-TERRAIN-SKYAMBIENT1, terrain, sky)
+### Fixed 2026-11-26: terrain's ambient light was a white floor, not the sky's light or `lighting.ambient` (KB-TERRAIN-SKYAMBIENT1, terrain, sky, biomes)
 
 - **Repro:** `packages/terrain/src/shader.ts`, the fragment: `linear=direct*frame.radiance.xyz*frame.light.w+base*frame.radiance.w`.
-  The terrain `Frame` has no ambient field, and `Sky.add(terrain)` throws (terrain's `addLighting` takes `shader` and
-  `bindings`, the sky gives `pbr` and `bindings`).
+  The terrain `Frame` had no ambient field, and `Sky.add(terrain)` threw (terrain's `addLighting` takes `shader` and
+  `bindings`, the sky gave `pbr` and `bindings`).
 - **Cause:** core meshes, gltf/pbr and materials take the sky's nine-coefficient irradiance (`skyIrradiance`) or
-  `lighting.ambient` times `radiance[3]`; terrain takes only `radiance[3]`, which the sky sets to its ambient floor
-  (0.1 in timber valley), white. Shaded ground is lit by a grey floor while a rock beside it is lit by the blue sky, so
-  ground shadows are never sky-tinted (the calm rail-line shot passes shadowTint only through the warm sun) and do not
-  follow the sky's brightness. `packages/environment/src/hemisphere.ts` says terrain takes `lighting.ambient`; it does not.
-- **Owed:** terrain takes the sky's ambient as core meshes do (a terrain lighting hook from `@margoengine/sky`, or the
-  ambient colour in terrain's frame), with a regression test on both GPU backends; then T6 is measured again on the
-  rail-line shot in both weathers.
+  `lighting.ambient` times `radiance[3]`; terrain took only `radiance[3]`, which the sky sets to its ambient floor
+  (0.1 in timber valley), white. Shaded ground was lit by a grey floor while a rock beside it was lit by the blue sky.
+- **Fix:** terrain's frame gains `ambient` (`lighting.ambient`, 192 bytes, the floating-origin anchor after it) and its
+  term is core's, albedo x `radiance[3]` x `lighting.ambient`. `Sky` implements terrain's lighting contract: `shader`
+  leaves the source, `finish` (after every other effect) puts `skyLighting` at group 1, bindings 8, 10 and 11, in the
+  flat term's place, keeping what earlier effects multiplied it by (layer occlusion, relief sky visibility) and a
+  `HemisphereLight` beside it, as the sky does on core meshes (nine harmonics, Ramamoorthi and Hanrahan, "An Efficient
+  Representation for Irradiance Environment Maps", SIGGRAPH 2001, https://doi.org/10.1145/383259.383317; split-sum
+  reflections, Karis, "Real Shading in Unreal Engine 4", SIGGRAPH 2013 course). `BiomeView` adds its ground and far
+  ground to its `sky`.
+- **Regression:** `packages/terrain/test/sky-ambient.test.js` (`Sky.add(terrain)` threw before the fix; the patch, its
+  order with `TerrainMaterials` and its bindings) and `packages/terrain/test/sky-ambient.browser.mjs` on WebGPU and the
+  WebGL2 layer, the same pixels on both (RTX A6000): no sun and `lighting.ambient` [1, 0.5, 0.25] draw flat grey
+  ground at sRGB (82, 50, 14) against (74, 74, 74) white, grey before; a clear noon sky added to the terrain draws
+  (20, 22, 31) against (19, 19, 19) without.
+- **T6 after it, rail-line shot `--once --seconds 1.1`:** calm bounce 17.6 and 28.9 percent (was 15.0 and 25.1),
+  shadowTint 14.9 and 12.8 b* (was 19.1 and 17.5), both inside their bounds; blowup see KB-LOOK-TV-PALL1.
 
-### Open 2026-11-26: the calm rail-line shot reads penumbra grain 0.92 and 0.82 (KB-LOOK-TV-PENUMBRA2, cause not yet found)
+### Open 2026-11-26: the calm rail-line shot reads penumbra grain 0.92 and 0.81 from the plants' own detail, not shadow noise (KB-LOOK-TV-PENUMBRA2, headless look bar; needs a decision)
 
-- **Repro:** the rail-line shot with `{"weather": "calm"}`: penumbra 0.919 code early and 0.820 mid (bound 0.7). The
-  default blowup shot now passes (0.598 and 0.621; 0.804 early when last measured, before KB-LOOK-TV-SHIMMER1
-  bounded the plants' sway), so the blowup failure of KB-LOOK-TV-PENUMBRA1 no longer shows.
-- **Cause:** not found yet. Under the full sun the penumbra bands carry 13 times the sun the pall leaves, so any
-  movement of plant shadows or mixed edge pixels inside the band shows as grain; whether this is the same mask-edge
-  mixing as KB-LOOK-TV-BOUNCE1 (`grain` reads a one-pixel interior) or real noise is owed.
+- **Repro:** the rail-line shot with `{"weather": "calm"}`, `--once --seconds 1.1`: penumbra 0.919 code early and 0.810
+  mid (bound 0.7). The default blowup shot passes (0.576 and 0.593 after KB-TERRAIN-SKYAMBIENT1).
+- **Cause (found 2026-11-26):** the `penumbra` mask (`@margoengine/post/mrt`) is every sun-facing surface whose sun
+  visibility is partial, plants included, and `penumbra` measures it with Immerkaer's estimator ("Fast Noise Variance
+  Estimation", CVIU 64(2), 300-302, 1996), which assumes the image is smooth where it measures. A copy of the calm shot
+  with the page's `plants` mask (MASKOCCLUDE1) splits the rows, same interior and estimator as the check: penumbra on
+  ground 0.558 and 0.504 (passes), penumbra on plants 1.218 and 0.921; plants that are fully lit or fully hidden,
+  where no shadow filter runs, read 1.610 and 1.289, more than in the penumbra; lit ground 0.417 and 0.389. So the
+  excess is the foliage's own detail (needles, leaves, their edges), which the estimator counts as noise (the known
+  bias Tai and Yang correct by leaving edge pixels out: "A fast method for image noise estimation using Laplacian
+  operator and adaptive edge detection", ISCCSP 2008, https://doi.org/10.1109/ISCCP.2008.4537384). Under the pall the
+  sun is 26 times weaker, so the same detail is smaller in codes and the blowup passes. The shadows themselves pass.
+- **Decision owed:** what T1 in penumbras measures. Either the penumbra check leaves the plants' pixels out (the page's
+  `plants` mask, as MASKOCCLUDE1 does for the ground masks), or the grain estimator leaves edge and texture pixels out
+  everywhere (Tai and Yang), which moves every grain reading. No bound or estimator was changed.
 
 ### Open 2026-11-26: the rail-line shot still shimmers 5.7 to 9.2 percent after the plants' sway was bounded (KB-LOOK-TV-SHIMMER2, BIO-01)
 

@@ -34,7 +34,7 @@ const wgsl = (group: number) => `struct MargoSkyLight {sky:vec4f, ground:vec4f}
 @group(${group}) @binding(${HEMISPHERE_BINDING}) var<uniform> margoSkyLightData:MargoSkyLight;
 fn margoSkyLight(n:vec3f)->vec3f {return mix(margoSkyLightData.ground.rgb,margoSkyLightData.sky.rgb,clamp(n.y*0.5+0.5,0.0,1.0));}
 `;
-// Core's ambient term (core meshes; terrain's has no colour; sky's absolute colour in its place) and the same once an
+// Core's ambient term (core meshes and terrain, both times `lighting.ambient`; sky's absolute colour in its place) and the same once an
 // IBL-style effect zeroed it.
 const builtIn = /\*frame\.radiance\.w(?:\*frame\.ambient\.rgb)?|\*skyAmbient\.rgb/g,
   zeroed = /(i\.color\*\(1\.0-i\.material\.y\)|base)\*0\.0(?:\*frame\.ambient\.rgb)?/;

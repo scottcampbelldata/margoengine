@@ -203,7 +203,8 @@ test('ring uniforms and layer rules are bit-identical at 0, 1e5 and 1e7 when the
   frameOf(reference);
   const ringsOf = (r) => r.terrain.rings.map((ring) => bits32(ring.values)).join(),
     rules = bits32(reference.terrain.ruleData());
-  assert.equal(reference.terrain.rings[0].values.length, 48);
+  // 48 floats, `lighting.ambient` among them (KB-TERRAIN-SKYAMBIENT1), and the anchor after them.
+  assert.equal(reference.terrain.rings[0].values.length, 52);
   for (const d of OFFSETS.slice(1)) {
     const r = originRig(d);
     frameOf(r);
@@ -298,7 +299,7 @@ test('the origin shader edits every layer sample and keeps the anchors other ent
   ];
   for (const r of variants) {
     const code = r.terrain.colorSource().code;
-    assert.ok(code.includes('heights:vec4f,anchor:vec4f}'));
+    assert.ok(code.includes('heights:vec4f,ambient:vec4f,anchor:vec4f}'));
     assert.match(code, /struct Layer \{heightSlope:vec4f,params:vec4f(,surface:vec4f)?,wrap:vec4f,tone:vec4f\}/);
     assert.ok(!code.includes('position*scale;') && !code.includes('let p=position*m;'), 'no unwrapped sample left');
     assert.equal(code.split('wrap:vec4f').length, 2, 'the layer struct grows once');
@@ -312,7 +313,7 @@ test('the origin shader edits every layer sample and keeps the anchors other ent
 test('without a floating origin the shader text and uniforms are what they were', () => {
   const r = rig();
   frameOf(r);
-  assert.equal(r.terrain.rings[0].values.length, 44);
+  assert.equal(r.terrain.rings[0].values.length, 48);
   assert.ok(!r.terrain.colorSource().code.includes('wrap:vec4f'));
   assert.equal(r.terrain.anchor, undefined);
   assert.deepEqual([...r.terrain.shift], [0, 0, 0]);

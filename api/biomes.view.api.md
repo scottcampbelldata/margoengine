@@ -46,6 +46,7 @@ export interface BiomeShadows {
 export interface BiomeSky {
     readonly reflectionTexture: GPUTexture | undefined;
     readonly lights: readonly WaterLight[];
+    add?(terrain: Terrain): () => void;
 }
 
 export class BiomeView implements Disposable {

@@ -189,7 +189,8 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
     };
     let gpu: ReturnType<typeof build> | undefined,
       layered: { pipeline: GPUComputePipeline; layer?: GPUTexture; group?: GPUBindGroup } | undefined;
-    const hooks = new Map<number, { readonly declarations: string; readonly ambient: string }>();
+    const hooks = new Map<number, { readonly declarations: string; readonly ambient: string }>(),
+      terrains = new Map<string, string>();
     return {
       pbr(group) {
         if (!gpu) return undefined;
@@ -205,6 +206,34 @@ export const lighting: NonNullable<SkyFeatures['lighting']> = {
       },
       bindings() {
         return gpu?.bindings ?? [];
+      },
+      terrain(source, group) {
+        const hook = this.pbr(group);
+        if (!hook) return source;
+        const key = group + source,
+          cached = terrains.get(key);
+        if (cached) return cached;
+        // Terrain's ambient term: its flat `lighting.ambient` x `radiance[3]`, or a HemisphereLight's term in its place,
+        // then what the effects before multiplied it by (layer materials' occlusion, relief lighting's sky visibility).
+        const lines = source.match(/let linear=[^;]+;/g),
+          term =
+            /\+base\*(frame\.radiance\.w\*frame\.ambient\.rgb|margoSkyLight\(n\))((?:\*[A-Za-z_][\w.]*(?:\([^()]*\))?)*)/,
+          found = lines?.length === 1 ? term.exec(lines[0]) : null;
+        if (!lines || !found)
+          throw new MargoError(
+            'unsupported',
+            "Sky ambient on a terrain requires the terrain's lit shader once; remove the effect that replaced its ambient term",
+          );
+        // The sky's light (diffuse from its nine harmonics, reflections from its map, Karis's split sum) takes the flat
+        // term's place, as on core meshes; a hemisphere's light stays beside it. Terrain is a dielectric (F0 0.04).
+        const multiplied = found[2],
+          sky = `+margoAmbient${multiplied}`,
+          replaced = found[1].startsWith('margoSkyLight') ? found[0] + sky : sky,
+          lit = `let margoAmbient=skyLighting(n,v,base,0.0,i.material.x,vec3f(0.04),1.0);${lines[0].replace(found[0], () => replaced)}`,
+          code = hook.declarations + source.replace(lines[0], () => lit);
+        if (terrains.size >= 16) terrains.clear();
+        terrains.set(key, code);
+        return code;
       },
       recode(next, bindings) {
         code = next;

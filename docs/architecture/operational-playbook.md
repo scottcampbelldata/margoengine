@@ -3394,6 +3394,15 @@ binding numbers fitted only `Shadows`. Evidence: `packages/shadows/test/virtual-
 0.95 with `Shadows` for culled parts, scatter and voxels; real Mount Rainier elevation against Blender Cycles, overlap 0.86
 (`Shadows`) and 0.81 (`VirtualShadows`), 0 with the terrain not casting, RTX A6000. Missing: other GPUs.
 
+Terrain's ambient (2026-11-26, KB-TERRAIN-SKYAMBIENT1) is core's term, albedo x `radiance[3]` x `lighting.ambient` (a
+fourth frame row, the floating-origin anchor after it, 192 and 208 bytes). `Sky.add(terrain)` is a terrain lighting
+effect whose `finish` runs after every other effect's `shader`: it puts `skyLighting` (nine harmonics, Ramamoorthi and
+Hanrahan 2001; split-sum reflections, Karis 2013) at bindings 8, 10 and 11 in place of that term, keeping what earlier
+effects multiplied it by (layer occlusion, relief sky visibility) and a hemisphere beside it. Evidence:
+`packages/terrain/test/sky-ambient.test.js` (the patch and its bindings) and `sky-ambient.browser.mjs` (coloured
+ambient and the sky's blue on flat ground, the same pixels on WebGPU and the WebGL2 layer, RTX A6000). Missing: other
+GPUs; the planet terrain (`@margoengine/terrain/planet`) has no sky ambient.
+
 Terrain layer materials (`@margoengine/terrain/layers-pbr`, 2026-11-07) are a lighting effect in the same group, at
 bindings 90 to 92: they patch the layer loop (a height-blend factor on each weight, then the layer's normal and surface
 samples) and wrap the fragment so the per-pixel roughness is written into the input before any later lighting code reads

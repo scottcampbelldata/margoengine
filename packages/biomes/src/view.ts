@@ -243,6 +243,11 @@ export interface BiomeSky {
   readonly reflectionTexture: GPUTexture | undefined;
   /** Sun and moon, for glints on the waves. */
   readonly lights: readonly WaterLight[];
+  /**
+   * Adds the sky's ambient to a terrain (`Sky.add`); the view adds its ground and far ground, so shaded ground takes
+   * the sky's colour as the meshes on it do. Returns a remover.
+   */
+  add?(terrain: Terrain): () => void;
 }
 
 /**
@@ -897,8 +902,8 @@ export class BiomeView implements Disposable {
   #tint?: { readonly width: number; readonly depth: number; readonly data: Uint8Array<ArrayBuffer> };
   #retint?: (rect?: readonly [number, number, number, number]) => void;
   #offSeasons?: () => void;
-  /** Removers of the casters added to `options.shadows`. */
-  #offShadows: (() => void)[] = [];
+  /** Removers of the casters added to `options.shadows` and of the ground added to `options.sky`. */
+  #offLights: (() => void)[] = [];
   /** Streaming: tiles drawn at full detail, tiles whose objects are on the GPU, jobs on their way (`v` view, `p`
    * objects, then `x,z`) with their tile, the frame's streaming work (finished jobs waiting to be copied in, jobs
    * waiting to be sent), the camera's last place and velocity. */
@@ -1370,7 +1375,11 @@ export class BiomeView implements Disposable {
       }
       if (shadows)
         for (const source of [view.terrain, ...(view.#objects?.casters ?? [])])
-          view.#offShadows.push(shadows.add(source));
+          view.#offLights.push(shadows.add(source));
+      // The sky's light on the ground and the far ground (KB-TERRAIN-SKYAMBIENT1), as on the plants and props.
+      if (typeof sky?.add === 'function')
+        for (const ground of [view.terrain, ...(view.#horizon ? [view.#horizon] : [])])
+          view.#offLights.push(sky.add(ground));
       const sea = world.climate.sea / 1000; // float division: mm to metres
       if (water === true || typeof water === 'object' || (water === 'auto' && view.#heights.some((h) => h < sea))) {
         const { Water } = await import('@margoengine/water'),
@@ -2221,7 +2230,7 @@ export class BiomeView implements Disposable {
     this.#off();
     this.#offObjects?.();
     this.#offSeasons?.();
-    for (const off of this.#offShadows.splice(0)) off();
+    for (const off of this.#offLights.splice(0)) off();
     // The lifetime abort above cancels every started subscriber; queued jobs are removed below.
     this.#pending.clear();
     this.#arrived.length = 0;

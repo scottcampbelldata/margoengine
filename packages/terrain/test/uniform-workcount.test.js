@@ -84,5 +84,7 @@ test('unchanged ring and shadow uniforms are not uploaded again', () => {
 test('camera-following terrain keeps the reference uniform bytes at every frame', () => {
   const { digest, buffers } = replay();
   assert.equal(buffers, 12);
-  assert.equal(digest, '653e78b09281c96ea35d464ddb70c6a50d61b98c0ba937ef307e3a6ee10a3982');
+  // The parent's bytes (653e78b0...) and the frame's `lighting.ambient` after them, white here (KB-TERRAIN-SKYAMBIENT1):
+  // cutting each uniform's last 16 bytes (1, 1, 1, 0) off gives the parent's digest again.
+  assert.equal(digest, '7e4047a4396804a7ea5971b7fa50258dc4771235cc31f6d99b0b2db5ad76d5a7');
 });

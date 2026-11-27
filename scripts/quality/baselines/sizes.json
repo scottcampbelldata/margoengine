@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20698068,
+  "total": 20700383,
   "history": [
     {
       "date": "2026-10-24",
@@ -14227,6 +14227,12 @@
       "commit": "72be40e454",
       "reason": "KB1664: direct light filtered apart from bounced light in the voxel path tracer's denoiser. @margoengine/voxel-pathtracer 95,364 B min+gzip against a ceiling of 94,957 B: a third filter chain's prepare flags, lane indexes, the 7 x 7 first estimate of the bounced light (spatial) and the direct sums in trace. The bytes buy the uncovered pixels' error going from 6.49 to 6.09 with shadow edges kept (0.725 of the converged contrast against 0.657). A split into its own entry would make every viewport with denoise on load a second chunk for one kernel string that shares its bindings, structs and helpers with the denoiser already in this entry.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "ce06986663",
+      "reason": "KB-TERRAIN-SKYAMBIENT1: Sky lights a clipmap Terrain (Sky.shader and Sky.finish, the sky lighting feature's terrain patch: skyLighting in place of terrain's flat ambient term, keeping its occlusion factors). Measured gzip: sky from its 24,501 B ceiling to 24,735 B measured (ceiling 25,478), sky/lighting to 4,879 B (ceiling 5,135), sky/scenes to 25,914 B (ceiling 26,692). The patch is part of the lighting feature every ambient sky already loads; a separate entry would make each terrain page import a second sky entry and pass it to Sky. Only these three rows are written; main's physics2d/vehicle row and its repeated history entry are left to their owner.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15496,7 +15502,7 @@
     "@margoengine/shadows/viewer": 2540,
     "@margoengine/shadows/virtual": 18421,
     "@margoengine/shadows/vsm": 2046,
-    "@margoengine/sky": 24501,
+    "@margoengine/sky": 25478,
     "@margoengine/sky/aerial": 7124,
     "@margoengine/sky/astro": 10457,
     "@margoengine/sky/aurora": 5489,
@@ -15514,7 +15520,7 @@
     "@margoengine/sky/fog": 3589,
     "@margoengine/sky/hillaire": 10843,
     "@margoengine/sky/hurricane": 2851,
-    "@margoengine/sky/lighting": 4834,
+    "@margoengine/sky/lighting": 5135,
     "@margoengine/sky/lightning-bolt": 5591,
     "@margoengine/sky/look": 2796,
     "@margoengine/sky/milky-way": 6589,
@@ -15527,7 +15533,7 @@
     "@margoengine/sky/presets": 1832,
     "@margoengine/sky/reflection": 1325,
     "@margoengine/sky/scene-kits": 3252,
-    "@margoengine/sky/scenes": 25655,
+    "@margoengine/sky/scenes": 26692,
     "@margoengine/sky/settings": 9490,
     "@margoengine/sky/shafts": 12210,
     "@margoengine/sky/shafts base (without hurricane storm field)": 8285,

@@ -170,3 +170,52 @@ test('regression KB-BIOMES-RIVERSTEP1: the riverbed paints the ground under the 
     globalThis.GPUTextureUsage = usage;
   }
 });
+
+test('regression KB-TERRAIN-SKYAMBIENT1: a view with a sky gives it its ground and far ground, and takes them back on dispose', async () => {
+  const usage = globalThis.GPUTextureUsage;
+  globalThis.GPUTextureUsage = { TEXTURE_BINDING: 4, COPY_DST: 2, RENDER_ATTACHMENT: 16, STORAGE_BINDING: 8 };
+  const engine = {
+    backend: 'webgpu',
+    gpu: {
+      limits: { maxTextureDimension2D: 8192 },
+      createTexture: () => ({ destroy() {} }),
+      queue: { writeTexture() {} },
+    },
+    camera: { position: [0, 0, 0] },
+    use() {},
+    removePlugin() {},
+    sceneOf: () => undefined,
+  };
+  // A stand-in for a Sky: what the view reads (reflection, lights) and `add`, recording what it lights.
+  const lit = new Set(),
+    sky = {
+      reflectionTexture: undefined,
+      lights: [],
+      add(terrain) {
+        lit.add(terrain);
+        return () => lit.delete(terrain);
+      },
+    };
+  try {
+    const land = await BiomeWorld.create({
+        size: [1024, 1024],
+        biomes: [presets.temperate],
+        height: { field: (x, z) => 200 + 0.05 * x + 0.03 * z },
+        climate: { latitude: 45 },
+      }),
+      view = await BiomeView.attach(engine, land, {
+        sky,
+        objects: false,
+        water: false,
+        radius: 50,
+        textureResolution: 16,
+      });
+    assert.ok(view.horizon, 'far ground around a world with no sea at its edges');
+    // Before the fix the view never added its ground: shaded ground took a white floor, not the sky's light.
+    assert.deepEqual([...lit], [view.terrain, view.horizon]);
+    view.dispose();
+    assert.equal(lit.size, 0, 'removed on dispose');
+  } finally {
+    globalThis.GPUTextureUsage = usage;
+  }
+});

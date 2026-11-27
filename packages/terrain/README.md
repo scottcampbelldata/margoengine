@@ -242,7 +242,7 @@ the source heightmap's UVs and stores world metres in R. It refreshes on changes
 so call `terrain.invalidate()` after editing samples. The target is capped at 2,049 texels per side. It uses R32F
 on WebGPU and the full compatibility tier, RGBA16F on the half-float tier. The LDR tier cannot render the float target.
 [The height regression](test/surface-height.browser.mjs) checks a fine source peak that the coarse rendered triangles omit.
-Each ring's 176-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
+Each ring's 192-byte uniform (and each shadow cascade's and local shadow layer's copy) is uploaded only when its bits
 differ from the last upload to that buffer, so a still camera under unchanged light uploads nothing; buffers made
 after a device restore always get their first write.
 
@@ -1682,6 +1682,42 @@ calls exactly as before (`examples/package-benchmarks/proofs/terrain-ssr.proof.j
 Checked on a real GPU (NVIDIA RTX A6000, Edge 155; `examples/package-benchmarks/post-effects-gpu.mjs --only=ssr-surfaces`, [ssr-surfaces-gpu.json](../../examples/package-benchmarks/results/ssr-surfaces-gpu.json)): a red box above a flat terrain (roughness 0.05, albedo 0.04) appears in it inside the box's planar
 mirror (24,929 pixels, none outside the projected mirror bounds by more than 6 px) and red at the mirrored centre,
 at 4x and 1x MSAA. A terrain is reflected only on screen and, being a dielectric, reflects 4-10% at most view angles.
+
+## Ambient light and the sky
+
+Without other light, terrain's ambient is `engine.lighting.radiance[3]` times `engine.lighting.ambient` (white by
+default) times the albedo, the same term core meshes use, so a coloured `lighting.ambient` colours the ground as it
+colours the meshes on it. `sky.add(terrain)` (`@margoengine/sky` with `lighting.ambient`) puts the sky's own light in
+its place: diffuse from the sky's nine spherical harmonics (Ramamoorthi and Hanrahan 2001) along the shaded normal and
+split-sum sky reflections (Karis 2013), so ground in shadow takes the blue of the sky above it. A `HemisphereLight`
+(`@margoengine/environment`) added to the terrain takes the flat term's place the same way. Checked on WebGPU and the
+WebGL2 compatibility layer by `test/sky-ambient.browser.mjs` (in `test:gpu`): under no sun, `lighting.ambient`
+[1, 0.5, 0.25] draws flat grey ground at sRGB (82, 50, 14) against (74, 74, 74) for white; under a clear noon sky the
+ground with the sky's light reads (20, 22, 31) against (19, 19, 19) without, the same pixels on both backends.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Terrain} from 'margoengine/terrain';
+import {Sky} from 'margoengine/sky';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const terrain = Terrain.attach(engine, {
+  resolution:64, levels:6, cellSize:1, origin:[-50,-50], size:[100,100], heightScale:20,
+  layers:[0.3,0.2,0.4,0.2].map((scale)=>({height:[-20,100] as [number,number],slope:[0,1] as [number,number],scale})),
+  textures:device=>{
+    // 6 = TEXTURE_BINDING | COPY_DST: flat grey demo ground; replace with your assets.
+    const heightmap = device.createTexture({size:[4,4],format:'r32float',usage:6});
+    device.queue.writeTexture({texture:heightmap},new Float32Array(16),{bytesPerRow:16},[4,4]);
+    const layers = device.createTexture({size:[1,1,4],format:'rgba8unorm-srgb',usage:6});
+    device.queue.writeTexture({texture:layers},new Uint8Array(16).fill(128),{bytesPerRow:4,rowsPerImage:1},[1,1,4]);
+    return {heightmap,layers};
+  }
+});
+engine.lighting.ambient.set([1, 0.9, 0.8]); // warm flat ambient on the ground, as on core meshes
+const sky = new Sky({hours:15, lighting:{ambient:{day:[0.05,0.05,0.06], night:[0.01,0.01,0.02]}}});
+engine.use(sky);
+const removeSkyLight = sky.add(terrain); // the sky's light in place of the flat ambient; removeSkyLight() undoes it
+engine.start();
+```
 
 ## Shadows
 

@@ -1,0 +1,95 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Terrain ambient: lighting.ambient and the sky's light</title>
+</head>
+<body style="margin:0">
+<canvas style="width:160px;height:120px"></canvas>
+<script type="module">
+// One flat grey terrain seen from above per page load, ?mode=native|compat&case=white|coloured|sky|skyOff, in exact-pixel
+// mode. white and coloured: no sun, the flat ambient times lighting.ambient ([1, 1, 1] or [1, 0.5, 0.25]). sky and
+// skyOff: a clear noon sky driving the light, its ambient added to the terrain (Sky.add) or not. The driver reads the
+// canvas (test/sky-ambient.browser.mjs).
+import { Engine } from '/packages/core/dist/index.js';
+import { install } from '/packages/webgl2-compat/dist/index.js';
+import { Terrain } from '/packages/terrain/dist/index.js';
+import { Sky } from '/packages/sky/dist/index.js';
+import { waitForPipelines } from '/scripts/support/gpu-ready.js';
+
+const q = new URLSearchParams(location.search);
+const mode = q.get('mode') ?? 'native',
+  name = q.get('case') ?? 'white';
+const errors = [];
+addEventListener('error', (e) => errors.push(String(e.message)));
+addEventListener('unhandledrejection', (e) => errors.push(String(e.reason?.message ?? e.reason)));
+
+// Flat ground; every layer one mid-grey texel (sRGB 128), so the colour on screen is the light alone.
+const n = 33;
+function textures(gpu) {
+  const heightmap = gpu.createTexture({ size: [n, n], format: 'r32float', usage: 6 });
+  gpu.queue.writeTexture({ texture: heightmap }, new Float32Array(n * n), { bytesPerRow: n * 4 }, [n, n]);
+  const layers = gpu.createTexture({ size: [1, 1, 4], format: 'rgba8unorm-srgb', usage: 6 });
+  gpu.queue.writeTexture({ texture: layers }, new Uint8Array(16).fill(128), { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1, 4]);
+  return { heightmap, layers };
+}
+const options = {
+  origin: [-128, -128],
+  size: [256, 256],
+  heightScale: 1,
+  cellSize: 1,
+  resolution: 32,
+  levels: 4,
+  layers: Array.from({ length: 4 }, () => ({ height: [-1e5, 1e5], slope: [0, 1], scale: 1 })),
+  textures,
+};
+
+async function main() {
+  const canvas = document.querySelector('canvas');
+  if (mode === 'compat') {
+    const result = await install({ force: true });
+    if (!result.installed) throw new Error('install() did not install: ' + result.reason);
+  }
+  const engine = await Engine.create(canvas, {
+    backend: 'webgpu',
+    exactSize: [160, 120],
+    camera: { position: [0, 40, -1], target: [0, 0, 0], near: 0.5, far: 1000 },
+  });
+  const terrain = Terrain.attach(engine, options);
+  if (name === 'white' || name === 'coloured') {
+    engine.lighting.direction.set([0, 1, 0, 0]);
+    engine.lighting.radiance.set([1, 1, 1, 0.5]);
+    engine.lighting.ambient.set(name === 'white' ? [1, 1, 1] : [1, 0.5, 0.25]);
+  } else {
+    const sky = new Sky({
+      hours: 12,
+      timeScale: 0,
+      lighting: { intensity: 0.4, ambient: { day: [0.02, 0.02, 0.02], night: [0, 0, 0] } },
+    });
+    engine.use(sky);
+    if (name === 'sky') sky.add(terrain);
+  }
+  const device = () => engine.gpu;
+  const frame = async () => {
+    engine.render({ delta: 0 });
+    await device().queue.onSubmittedWorkDone();
+  };
+  window.check = {
+    info: () => ({ vendor: device().adapterInfo?.vendor ?? null, errors: errors.splice(0), gl: device().gl ? device().gl.getError() : 0 }),
+    async settle() {
+      await waitForPipelines(frame);
+      // The sky's light is built on its first ambient frame and the terrain's shader follows on the next.
+      for (let i = 0; i < 4; i++) await frame();
+      await waitForPipelines(frame);
+    },
+  };
+  window.ready = true;
+}
+main().catch((e) => {
+  errors.push(String(e?.stack ?? e));
+  window.check = { info: () => ({ errors }) };
+  window.ready = true;
+});
+</script>
+</body>
+</html>

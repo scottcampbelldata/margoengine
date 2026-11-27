@@ -146,8 +146,8 @@ ${height}
       }
       const texture = device.createTexture({ size: [side, side], format: 'r32float', usage: 6 });
       device.queue.writeTexture({ texture }, unit, { bytesPerRow: side * 4 }, [side, side]);
-      const uniform = device.createBuffer({ size: 176, usage: 72 }),
-        values = new Float32Array(44);
+      const uniform = device.createBuffer({ size: 192, usage: 72 }),
+        values = new Float32Array(48);
       values.set([...options.origin, ...options.size], 36);
       values.set([options.heightScale, options.heightOffset], 40);
       device.queue.writeBuffer(uniform, 0, values);

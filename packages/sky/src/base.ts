@@ -382,10 +382,15 @@ export function sunDirectionFromAngles(azimuth: number, elevation: number, out =
   return out;
 }
 
-/** A native PBR renderer accepting optional sky ambient lighting (materials meshes, gltf/pbr and VoxelRenderer). */
+/**
+ * A renderer accepting optional sky ambient lighting: native PBR (materials meshes, gltf/pbr and VoxelRenderer) through
+ * `pbr`, or `@margoengine/terrain`'s `Terrain` through `shader` and `finish`.
+ */
 export interface SkyLightingTarget {
   addLighting(effect: {
     pbr(group: number): { readonly declarations: string; readonly ambient?: string } | undefined;
+    shader(source: string, group: number): string;
+    finish(source: string, group: number): string;
     bindings(): GPUBindGroupEntry[];
   }): () => void;
 }
@@ -474,6 +479,8 @@ export interface SkyFeatures {
       recode(code: string, entries: GPUBindGroupEntry[]): void;
       pbr(group: number): { readonly declarations: string; readonly ambient: string } | undefined;
       bindings(): GPUBindGroupEntry[];
+      /** Terrain's lit shader with the sky's ambient in place of its flat term (bindings in `group`); unchanged before the first ambient frame. */
+      terrain(source: string, group: number): string;
     };
   };
 }
@@ -757,6 +764,19 @@ export class Sky implements EnginePlugin {
   /** Bindings of the native PBR sky ambient hook, borrowed until device restoration. */
   bindings(): GPUBindGroupEntry[] {
     return this.ambient() ? (this.lit?.bindings() ?? []) : [];
+  }
+  /** Terrain lighting hook (`Sky.add(terrain)`): unchanged here; the sky's light goes in at `finish`, after every effect. */
+  shader(source: string, group: number): string {
+    void group;
+    return source;
+  }
+  /**
+   * Terrain lighting hook: the terrain's lit shader with the sky's diffuse and specular ambient in place of its flat
+   * `lighting.ambient` x `radiance[3]` term, after every other effect patched it (layer materials, relief lighting), so
+   * shaded ground takes the sky's colour as core meshes beside it do. Unchanged until the sky's ambient is ready.
+   */
+  finish(source: string, group: number): string {
+    return this.ambient() ? (this.lit?.terrain(source, group) ?? source) : source;
   }
   /**
    * The ambient floor in force this frame: `lighting.ambient`, else the `environment` fallback, else undefined.
