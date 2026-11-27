@@ -140,15 +140,47 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   call). The browser corpus compute part asserts and counts both refusals. Regression:
   `packages/webgl2-compat/test/compute-limits.test.js`.
 
-### Open 2026-11-27: the browser corpus compute part fails on a recorded kernel that varies by run (KB-COMPAT-CORPUSFBO1, webgl2-compat)
+### Open 2026-11-27: the browser corpus compute part fails because a recorded animation kernel never ends on the page's zero-filled stand-ins (KB-COMPAT-CORPUSFBO1, webgl2-compat test page, animation)
 
-- **Repro:** `npm run test:browser:compute -w @margoengine/webgl2-compat` (Chrome, RTX A6000), two runs of one build
-  of the layer. First run: `sky 8bd2180e7c0c8ef7 main` "The compatibility layer's own masked::texelFetch(t, p, 0)
-  program did not link" (empty driver log) and `compute 8c376d839a33176a main` "The render pass attachments do not
-  form a complete WebGL2 framebuffer (status 0x8cdd) GL error 1282". Second run: only `sky 8bd2180e7c0c8ef7 main`,
-  with the framebuffer message and GL error 0; the other kernel passed. The runs differ only in when the page made a
-  fresh device (the first recreated it after each oversize kernel).
-- **Cause:** not yet established. The failures move with the device's history.
+- **Repro:** `npm run build -w @margoengine/webgl2-compat`, then `node scripts/run-with-timeout.mjs --max=9.5 -- node
+  packages/webgl2-compat/test/corpus-draw-browser.mjs --part=compute` (Chrome, ANGLE Direct3D 11, RTX A6000). The
+  record that fails is the one after `animation 8b858be2e0a8c694 main` (index 612 of the part): `sky 8bd2180e7c0c8ef7
+  main` (613), and in a run that made a fresh device after it, `compute 8c376d839a33176a main` (614) as well. The
+  fewest records that fail: 612 then 613 through `window.dispatchAll` of `test/corpus-draw.html`; 613 alone, 608 to
+  611 with 613, and every other half of the bisection pass.
+- **Cause (proven):** the page dispatches every kernel with zero-filled stand-in buffers. Kernel 8b858be2e0a8c694
+  (`packages/animation/src/morph-gpu.ts`, `MorphWeightPlayer`) runs on the scatter tier and binary-searches a track's
+  keys with `var hi=track.keys-1u` and `mid=(lo+hi+1u)/2u`. With `keys` 0, `hi` wraps to 0xFFFFFFFF, `mid` wraps to 0
+  and `times[0] <= at` (both 0) keeps `lo` at 0, so the loop never ends. Measured on the machine above with only that
+  kernel: a `readPixels` after the dispatch blocks 5,547 ms (the Windows GPU watchdog), the next program link fails
+  with an empty log, then `webglcontextlost` fires, `device.lost` resolves ('unknown') and the context is restored.
+  The same dispatch with `keys` 1 in the stand-in track table syncs in 1 ms and loses nothing. Nothing reads back after
+  612's dispatch, so the reset lands in the next record, whose CPU-tier upload (`masked::texelFetch` helper link, or
+  `checkFramebufferStatus`, which returns FRAMEBUFFER_UNSUPPORTED 0x8cdd on a lost context) reports it. Which of the
+  two messages shows, and whether 614 is hit too, depends on where the reset falls; recreating the device after the
+  oversize kernels (before KB-COMPAT-WGSIZE1) only moved it.
+- **Ruled out:** resource exhaustion, framebuffer cache key collisions (sub keys use unique storage ids), the
+  translation (the loop behaves as WGSL defines it) and the KB-COMPAT-WGSIZE1 change. The kernel is correct for every
+  input its package gives it: glTF accessor counts are at least 1 (`packages/gltf/src/accessor.ts`) and the CPU twin
+  `sampleTrackInto` refuses a track with no keys.
+- **Not fixed, decision needed:** no stand-in content makes every kernel terminate, so the fix is one of: (1) the
+  morph weight kernel bounds its search for any buffer contents (`max(track.keys,1u)-1u`, same output for valid
+  tracks), then a full `npm run record:wgsl-corpus`, as `--add` keeps the recorded old source; or (2) the corpus page
+  gives this kernel stand-ins inside its contract. The loss probe: create the pipeline on a fresh compat device, bind
+  zero-filled buffers sized as the page does, dispatch one workgroup, then time a 1x1 `readPixels` and watch
+  `webglcontextlost`.
+
+### Open 2026-11-27: after a GPU reset the WebGL2 layer reports the loss as its own link failure or an incomplete framebuffer (KB-COMPAT-LOSSREPORT1, webgl2-compat)
+
+- **Repro:** as KB-COMPAT-CORPUSFBO1: after the hanging dispatch, the next CPU-tier storage texture upload throws
+  "The compatibility layer's own masked::texelFetch(t, p, 0) program did not link (a bug: report it)" with an empty
+  log, or reports the validation error "The render pass attachments do not form a complete WebGL2 framebuffer (status
+  0x8cdd)", before `device.lost` resolves.
+- **Cause:** Chrome learns of the reset in the synchronous query that waited for it (`getProgramParameter`,
+  `checkFramebufferStatus`) but sets `isContextLost()` and fires `webglcontextlost` in a later task (measured: link
+  failed at 5,788 ms, `isContextLost()` false right after, the event at 5,790 ms). `CompatRenderer.helper` checks
+  `isContextLost()` before reading the link status, and `makeFramebuffer` reports any incomplete status at once, so
+  both report a loss as a layer bug or a validation error. WebGPU surfaces no errors once a device is lost.
 
 ### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
 
