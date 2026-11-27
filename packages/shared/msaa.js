@@ -53,6 +53,48 @@ function depthCopy(device, source, view, count, format, single = false) {
   };
 }
 
+/** Records `source`'s depth into `view`, inside the rectangle of `place.view` and keeping earlier views' depth. */
+function copyInto(source, encoder, view, count, format, place) {
+  let formats = source.pipelines.get(count);
+  if (!formats) source.pipelines.set(count, (formats = new Map()));
+  let cached = formats.get(format);
+  if (!cached) {
+    const single = source.samples === 1;
+    formats.set(format, (cached = depthCopy(source.device, source.depthSource, view, count, format, single)));
+  }
+  cached.descriptor.depthStencilAttachment.view = view;
+  cached.descriptor.depthStencilAttachment.depthLoadOp = place?.view ? 'load' : 'clear';
+  const pass = encoder.beginRenderPass(cached.descriptor);
+  if (place) applyView(pass, place);
+  // An indexed loop, and the pipeline setup outside this function: it runs up to three times a frame, and a for-of
+  // iterator or a context for the setup's closures cost 92 B a call wherever V8 does not optimize them away
+  // (Chrome 156 on macOS arm64; tests/frame-alloc.test.js).
+  const draws = cached.draws;
+  for (let i = 0; i < draws.length; i++) {
+    pass.setPipeline(draws[i].pipeline);
+    pass.setBindGroup(0, draws[i].group);
+    pass.draw(3);
+  }
+  pass.end();
+}
+
+/**
+ * For a pass that redirects only the scene's depth attachment: copies the private `depth` (sampleable, `samples` per
+ * texel) back into the attachment it replaced, so what follows, and an XR eye's AR coverage, sees the scene.
+ */
+export class DepthCopy {
+  constructor(device, depth, samples) {
+    this.device = device;
+    this.samples = samples;
+    this.pipelines = new Map();
+    this.depthSource = depth.createView({ aspect: 'depth-only' });
+  }
+  /** Writes the depth into `view` (`count` samples, `format`), within `context.view` where there is one. */
+  copy(context, view, count, format) {
+    copyInto(this, context.encoder, view, count, format, context);
+  }
+}
+
 /** Optional scene capture: 4x raster attachments, with sampleable 1x outputs. */
 export class SceneTarget {
   constructor(device, color, depth, samples = 4) {
@@ -123,33 +165,22 @@ export class SceneTarget {
     c.descriptor = this.descriptor;
     c[owner] = this;
     this.retired = false;
+    // The outer depth takes a copy of the capture's only where both have one size. An upscaling capture draws smaller
+    // (its owner sets the size after begin) and writes the outer depth itself.
+    this.resized =
+      c.width !== undefined && (c.width !== this.resolvedDepth.width || c.height !== this.resolvedDepth.height);
   }
   copyDepth(encoder, view, count, format = this.resolvedDepth.format) {
-    let formats = this.pipelines.get(count);
-    if (!formats) this.pipelines.set(count, (formats = new Map()));
-    let cached = formats.get(format);
-    if (!cached) {
-      // With one sample the scene's depth is the resolved depth itself; its view is made on the first copy only.
-      this.depthSource ??= this.resolvedDepth.createView({ aspect: 'depth-only' });
-      formats.set(format, (cached = depthCopy(this.device, this.depthSource, view, count, format, this.samples === 1)));
-    }
-    cached.descriptor.depthStencilAttachment.view = view;
-    cached.descriptor.depthStencilAttachment.depthLoadOp = this.viewContext?.view ? 'load' : 'clear';
-    const pass = encoder.beginRenderPass(cached.descriptor);
-    if (this.viewContext) applyView(pass, this.viewContext);
-    // An indexed loop, and the pipeline setup outside this method: it runs up to three times a frame, and a for-of
-    // iterator or a context for the setup's closures cost 92 B a call wherever V8 does not optimize them away
-    // (Chrome 156 on macOS arm64; tests/frame-alloc.test.js).
-    const draws = cached.draws;
-    for (let i = 0; i < draws.length; i++) {
-      pass.setPipeline(draws[i].pipeline);
-      pass.setBindGroup(0, draws[i].group);
-      pass.draw(3);
-    }
-    pass.end();
+    // With one sample the scene's depth is the resolved depth itself; its view is made on the first copy only.
+    this.depthSource ??= this.resolvedDepth.createView({ aspect: 'depth-only' });
+    copyInto(this, encoder, view, count, format, this.viewContext);
   }
   resolve(encoder, final = false, depth = true) {
-    if (this.samples === 1) return;
+    if (this.samples === 1) {
+      // The capture's depth is complete: the outer depth gets it now, as at 4 samples, before the owner presents.
+      if (final) this.give(encoder);
+      return;
+    }
     // depth false: the caller reads no 1x depth after this resolve (only a final one may skip it).
     if (depth) this.copyDepth(encoder, this.resolvedDepthView, 1);
     if (final) {
@@ -158,36 +189,29 @@ export class SceneTarget {
       const store = this.viewContext?.view ? 'store' : 'discard';
       this.finalResolution.colorAttachments[0].storeOp = store;
       this.finalResolution.depthStencilAttachment.depthStoreOp = store;
-      if (this.original)
-        this.copyDepth(
-          encoder,
-          this.original.depth,
-          this.original.descriptor.multisample?.count ?? 1,
-          this.original.descriptor.depthStencil.format,
-        );
-      this.retired = true;
+      this.give(encoder);
     }
     encoder.beginRenderPass(final ? this.finalResolution : this.resolution).end();
   }
+  /**
+   * Copies the capture's depth into the attachment it replaced, once a frame: what follows tests against the scene's
+   * depth, and an XR eye's depth is its AR coverage (KB-XR-AREFFECTS1).
+   */
+  give(encoder) {
+    const original = this.original;
+    if (this.retired || !original || this.resized) return;
+    this.copyDepth(
+      encoder,
+      original.depth,
+      original.descriptor.multisample?.count ?? 1,
+      original.descriptor.depthStencil.format,
+    );
+    this.retired = true;
+  }
   restore(c) {
     const original = this.original;
-    if (this.samples === 1) {
-      Object.assign(c, {
-        color: original.color,
-        depth: original.depth,
-        format: original.format,
-        descriptor: original.descriptor,
-      });
-      c[owner] = original.owner;
-      return;
-    }
-    if (!this.retired)
-      this.copyDepth(
-        c.encoder,
-        original.depth,
-        original.descriptor.multisample?.count ?? 1,
-        original.descriptor.depthStencil.format,
-      );
+    // A final resolve has given the depth back already.
+    this.give(c.encoder);
     Object.assign(c, {
       color: original.color,
       depth: original.depth,

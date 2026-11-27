@@ -42,7 +42,8 @@ for (const samples of [1, 4])
     try {
       h.engine.frameGraph.execute(c);
       assert.deepEqual({ depth: c.depth, descriptor: c.descriptor, color: c.color, format: c.format }, original);
-      assert.equal(promoted.texture.usage, GPUTextureUsage.RENDER_ATTACHMENT);
+      // Sampleable, for the copy back into the replaced attachment (KB-XR-AREFFECTS1).
+      assert.equal(promoted.texture.usage, GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING);
     } finally {
       h.plugin.dispose();
     }
@@ -67,7 +68,8 @@ test('stencil targets reuse warm resources and replace depth when dimensions or 
     assert.equal(observed[1].depth, observed[0].depth);
     assert.equal(observed[1].descriptor, observed[0].descriptor);
     assert.equal(h.counts.textures, 1);
-    assert.equal(h.counts.views, 1);
+    // The attachment view and the depth-only view of the copy back, both made once.
+    assert.equal(h.counts.views, 2);
     c.width = 256;
     h.engine.frameGraph.execute(c);
     assert.equal(observed[0].depth.texture.destroyed, true);

@@ -93,7 +93,11 @@ for (const [name, attach] of [
             frameColour = h.gpu.snap(original);
           assert.ok(present >= 0, 'the glass presents');
           assert.equal(passes[present].colorAttachments[0].view, frameColour, 'into the frame colour');
-          assert.equal(present, passes.length - 1, `no capture writes after the glass presented (frame ${frame})`);
+          // Only the depth-only return of a redirected scene depth may follow (KB-XR-AREFFECTS1): no colour pass.
+          assert.ok(
+            passes.slice(present + 1).every((p) => p.colorAttachments.length === 0 && p.depthStencilAttachment),
+            `no capture writes colour after the glass presented (frame ${frame})`,
+          );
           assert.equal(h.view.c.color, original, 'the frame ends on its own colour');
         }
       } finally {

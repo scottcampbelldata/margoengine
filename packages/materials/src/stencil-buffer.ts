@@ -8,15 +8,17 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
+import { DepthCopy } from '../../shared/msaa.js';
 
-declare const GPUTextureUsage: { RENDER_ATTACHMENT: number };
+declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
 
 /**
  * Opt-in portable stencil attachment for the scene. Existing stencil targets are borrowed; otherwise the scene uses
  * depth24plus-stencil8 with its current dimensions and sample count. Core's main draw clears stencil to zero each frame.
  * Stencil belongs to its attachment: captures and MSAA resolves copy depth only, so masks do not cross target boundaries.
- * Explicit offscreen renderers and XR targets must provide their own stencil attachments.
+ * Explicit offscreen renderers and XR targets must provide their own stencil attachments. After the frame's passes the
+ * replaced attachment gets the scene depth back, so what reads it (an XR eye's AR coverage) sees the scene.
  */
 export class StencilBuffer implements EnginePlugin {
   readonly name = 'materials:stencil-buffer';
@@ -27,6 +29,7 @@ export class StencilBuffer implements EnginePlugin {
   private base?: GPURenderPipelineDescriptor;
   private descriptor?: GPURenderPipelineDescriptor;
   private frame?: { context: Context; depth: GPUTextureView; descriptor: GPURenderPipelineDescriptor };
+  private copier?: DepthCopy;
   private disposed = false;
 
   /** Attach a portable scene stencil buffer to a WebGPU engine. */
@@ -65,7 +68,9 @@ export class StencilBuffer implements EnginePlugin {
       name: this.name + ':restore',
       order: 10001,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.restore(c);
+        if (c.backend !== 'webgpu') return;
+        this.copyBack(c);
+        this.restore(c);
       },
     });
   }
@@ -97,7 +102,7 @@ export class StencilBuffer implements EnginePlugin {
         size: [c.width, c.height],
         format: 'depth24plus-stencil8',
         sampleCount: samples,
-        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       });
       let view: GPUTextureView;
       try {
@@ -109,6 +114,7 @@ export class StencilBuffer implements EnginePlugin {
       this.texture?.destroy();
       this.texture = texture;
       this.view = view;
+      this.copier = undefined;
       this.device = c.device;
     }
     if (this.base !== c.descriptor) {
@@ -121,6 +127,14 @@ export class StencilBuffer implements EnginePlugin {
     this.frame = { context: c, depth: c.depth, descriptor: c.descriptor };
     c.depth = this.view!;
     c.descriptor = this.descriptor!;
+  }
+
+  /** The scene drew into this depth: the attachment it replaced gets it back (an XR eye's AR coverage reads it). */
+  private copyBack(c: Context): void {
+    const frame = this.frame;
+    if (!frame || frame.context !== c || c.depth !== this.view) return;
+    this.copier ??= new DepthCopy(c.device, this.texture!, this.texture!.sampleCount);
+    this.copier.copy(c, frame.depth, this.texture!.sampleCount, frame.descriptor.depthStencil!.format);
   }
 
   private restore(c?: Context): void {
@@ -138,7 +152,7 @@ export class StencilBuffer implements EnginePlugin {
   private release(): void {
     this.restore();
     this.texture?.destroy();
-    this.texture = this.view = this.device = this.base = this.descriptor = undefined;
+    this.texture = this.view = this.device = this.base = this.descriptor = this.copier = undefined;
   }
 
   /** Release old device resources and rebind the plugin after engine device recovery. */

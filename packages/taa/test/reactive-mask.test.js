@@ -9,12 +9,7 @@ import assert from 'node:assert/strict';
 import { TAA } from '../dist/index.js';
 import { mockGPU, passes, context } from '../../../examples/package-benchmarks/proofs/gpu-recorder.js';
 import { wgsl } from '../../core/src/shaders.ts';
-import {
-  publishReactiveMask,
-  reactiveMasks,
-  reactiveMaskWanted,
-  reactiveTarget,
-} from '../../shared/reactive-mask.js';
+import { publishReactiveMask, reactiveMasks, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
 
 function rig(options) {
   const gpu = mockGPU(),
@@ -114,8 +109,8 @@ test("several masks in one frame are combined by their maximum, the option's inc
   const start = log.findIndex(
       (c) =>
         c[0] === 'beginRenderPass' &&
-        c[1].colorAttachments[0].loadOp === 'clear' &&
-        c[1].colorAttachments[0].clearValue,
+        c[1].colorAttachments[0]?.loadOp === 'clear' &&
+        c[1].colorAttachments[0]?.clearValue,
     ),
     end = log.findIndex((c, i) => i > start && c[0] === 'pass.end');
   assert.ok(start >= 0, 'cleared to 0 first');
@@ -125,7 +120,7 @@ test("several masks in one frame are combined by their maximum, the option's inc
   // One mask again (the option's alone): bound as it is, with no combine pass.
   const again = r.gpu.record(() => r.frame());
   assert.equal(
-    again.filter((c) => c[0] === 'beginRenderPass' && c[1].colorAttachments[0].clearValue).length,
+    again.filter((c) => c[0] === 'beginRenderPass' && c[1].colorAttachments[0]?.clearValue).length,
     0,
     'no combine pass for a single mask',
   );
@@ -156,7 +151,14 @@ test('a mask is wanted from the frame after a read, for every view of that frame
 
 test('the shared particle target is cleared by the first draw of a view, loaded after, and published', () => {
   const gpu = mockGPU(),
-    c = { device: gpu.device, encoder: {}, view: {}, width: 320, height: 180, descriptor: { multisample: { count: 4 } } };
+    c = {
+      device: gpu.device,
+      encoder: {},
+      view: {},
+      width: 320,
+      height: 180,
+      descriptor: { multisample: { count: 4 } },
+    };
   const first = reactiveTarget(c),
     second = reactiveTarget(c);
   assert.equal(first.loadOp, 'clear');

@@ -131,11 +131,23 @@ test('nonfinal resolve preserves its store policy for ordinary and viewed contex
 });
 
 test('single-sample view captures still perform no multisample resolve', () => {
-  const h = harness(1);
+  const h = harness(1),
+    seen = [],
+    begin = h.context.encoder.beginRenderPass;
+  h.context.encoder.beginRenderPass = (descriptor) => {
+    seen.push([descriptor.colorAttachments.length, descriptor.depthStencilAttachment.depthLoadOp]);
+    return begin(descriptor);
+  };
   try {
     for (const view of views) h.frame(view);
     assert.equal(h.passes.length, 0);
-    assert.equal(h.counts.render, 0);
+    // One depth-only pass a view returns the capture's depth to the attachment it replaced (KB-XR-AREFFECTS1).
+    assert.equal(h.counts.render, views.length);
+    // No colour attachment, and each view loads the depth the views before it returned.
+    assert.deepEqual(
+      seen,
+      views.map(() => [0, 'load']),
+    );
   } finally {
     h.close();
   }

@@ -1,5 +1,5 @@
 import { margoError } from './errors.js';
-import { SceneTarget, sceneTarget } from './msaa.js';
+import { SceneTarget, sceneTarget, DepthCopy } from './msaa.js';
 import { applyView, viewLoadOp } from './view-rect.js';
 export const fullscreen = `
 struct Vertex { @builtin(position) position:vec4f,@location(0) uv:vec2f }
@@ -128,6 +128,7 @@ export function acquireDepth(engine) {
                   });
                   this.depthView = this.texture.createView();
                 }
+                this.outer = c.depth;
                 c.depth = this.depthView;
                 return;
               }
@@ -162,8 +163,14 @@ export function acquireDepth(engine) {
           name: this.name + ':restore',
           order: 10000,
           execute: (c) => {
-            if (c.backend === 'webgpu' && !this.borrowed && c.descriptor.multisample?.count !== 1)
-              this.target.present(c);
+            if (c.backend !== 'webgpu' || this.borrowed) return;
+            if (c.descriptor.multisample?.count !== 1) return this.target.present(c);
+            // The scene drew into the private depth: the scene's own attachment gets it back (KB-XR-AREFFECTS1).
+            if (!this.outer) return;
+            this.copier ??= new DepthCopy(c.device, this.texture, 1);
+            this.copier.copy(c, this.outer, 1, c.descriptor.depthStencil.format);
+            c.depth = this.outer;
+            this.outer = undefined;
           },
         });
       },
@@ -171,7 +178,7 @@ export function acquireDepth(engine) {
         this.target?.dispose();
         this.texture?.destroy();
         this.color?.destroy();
-        this.target = this.texture = this.color = this.depthView = undefined;
+        this.target = this.texture = this.color = this.depthView = this.copier = this.outer = undefined;
       },
       dispose() {
         this.onDeviceRestored();

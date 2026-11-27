@@ -17,6 +17,11 @@ export class SceneTarget {
   present(context: Context): void;
   dispose(): void;
 }
+/** Copies a pass's private depth back into the scene attachment it replaced. */
+export class DepthCopy {
+  constructor(device: GPUDevice, depth: GPUTexture, samples: number);
+  copy(context: Context, view: GPUTextureView, count: number, format: GPUTextureFormat): void;
+}
 /** `[null]` where a fragment shader can read `@builtin(sample_index)`, else each sample index (compatibility level). */
 export function perSample(device: GPUDevice, count: number): (number | null)[];
 export function sceneTarget(context: Context): SceneTarget | undefined;

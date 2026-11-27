@@ -35,6 +35,7 @@
     "test:gpu:ar-extra": "cd ../.. && node packages/xr/tests/ar-extra.browser.mjs",
     "test:gpu:performance": "cd ../.. && node packages/xr/tests/performance.browser.mjs",
     "test:gpu:view-layers": "cd ../.. && node packages/xr/tests/view-layers.browser.mjs",
+    "test:gpu:ar-effects": "cd ../.. && node packages/xr/tests/ar-effects.browser.mjs",
     "test:gpu:occlusion": "cd ../.. && node packages/xr/tests/occlusion.browser.mjs",
     "test:gpu:reflection": "cd ../.. && node packages/xr/tests/reflection.browser.mjs"
   },

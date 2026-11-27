@@ -271,8 +271,11 @@ test('single-sample optional captures allocate no intermediates and never resolv
   target.begin(h.context);
   target.resolve(h.context.encoder, true);
   target.restore(h.context);
-  assert.equal(h.counts.render, 0);
-  assert.equal(h.pipelines.length, 0);
+  // One pass and one pipeline: the capture's depth returns to the attachment it replaced (KB-XR-AREFFECTS1).
+  assert.equal(h.counts.render, 1);
+  assert.equal(h.pipelines.length, 1);
+  assert.equal(h.context.presentation.colorAttachments.length, 0, 'no colour resolve');
+  assert.equal(h.context.presentation.depthStencilAttachment.view, h.originalDepth);
   assert.equal(h.context.color, h.originalColor);
   assert.equal(h.context.depth, h.originalDepth);
   target.dispose();
