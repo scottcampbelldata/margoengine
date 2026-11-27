@@ -10146,7 +10146,13 @@ supersampled view); scenes test/dune-coast-still.mjs camp view on the WebGL2 lay
 180.6 without and 10.5 percent of pixels darker (before: 181.1 against 180.7, 0.4 percent); on native WebGPU
 (2026-11-21, adapter `intel` `xe-2lpg`, once KB-SCENES-DUNE-ARCHANG1 below let it run) 177.2 against 180.6 and 10.2
 percent darker. Missing: other GPUs, the cost of the extra draw (speed phase deferred), and the grass itself darkened
-(it is not in the ambient replay).
+(it is not in the ambient replay).
+
+Grass blade shadows (2026-11-27): `packages/scatter/test/grass-shadow.browser.mjs` reads the shadow `shadows.add(grass)`
+casts from the picture on WebGPU and the WebGL2 layer (RTX A6000): a 2 m and a 4 m blade cast 2.05 m and 4.00 m,
+narrowing 0.607 from 1 m to 3 m out against the blade's own 0.577, and 16 blades a clump shade 1,610 pixels against 91.
+With the blade pose left out of the shadow pass the shadow runs 4.95 m at one width and the test fails. Missing: other
+GPUs, wind-bent and covered-ring shadows, and `VirtualShadows`.
 
 **No submission of the coastal flow's set-up holds the GPU for seconds (KB-SCENES-DUNE-ARCHANG1, 2026-11-21, GPU
 behaviour).** The dune coast hung the device on a laptop GPU (DXGI_ERROR_DEVICE_HUNG within 3 s, three runs of three).

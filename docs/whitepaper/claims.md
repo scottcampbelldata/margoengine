@@ -6695,3 +6695,9 @@ and checks analytic cases, tile seams and a work bound. Distance only; no timing
 `BENTLEY_materials_point_style`. Proof: `packages/exporters/tests/plugin-lines-points.test.js` checks the values, the
 Khronos validator (no errors, the one MULTIPLE_EXTENSIONS warning) and the default. Not tried in CesiumJS or iTwin.js.
 [Limits](../limits.md)
+
+## Grass blade shadows (scatter/grass)
+
+`shadows.add(grass)` casts the blades the GPU draws, tapered and at their height. Proof:
+`packages/scatter/test/grass-shadow.browser.mjs` reads the shadow from the picture on WebGPU and the WebGL2 layer.
+[Limits](../limits.md#procedural-grass-blades-batch-64-job-6)
