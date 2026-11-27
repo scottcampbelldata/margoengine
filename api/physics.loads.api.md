@@ -2018,6 +2018,11 @@ type Vector = readonly [number, number, number];
 
 type Vector = readonly [number, number, number];
 
+interface WakeBreakingOptions {
+    readonly field?: FieldDescriptor;
+    readonly capacity?: number;
+}
+
 type WakeGrid = Readonly<Required<Pick<WakeParams, 'cells' | 'cellSize' | 'centre' | 'depth' | 'density'>>>;
 
 interface WakeParams {
@@ -2025,6 +2030,9 @@ interface WakeParams {
     cellSize?: number;
     centre?: readonly [number, number];
     depth?: number;
+    current?: readonly [number, number];
+    surfaceTension?: number;
+    kinematicViscosity?: number;
     density?: number;
     sponge?: number;
     rate?: RateLevel;
@@ -2040,11 +2048,25 @@ interface WakeSample {
 }
 
 class WakeSolver implements Solver<WakeParams> {
-    constructor(id?: string, sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource);
+    readonly breakingField?: FieldDescriptor;
+    constructor(id?: string, sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource, breaking?: WakeBreakingOptions);
+    static load(options?: {
+        readonly id?: string;
+        readonly sourceField?: FieldDescriptor;
+        readonly submergedSource?: SubmergedWakeSource;
+        readonly breaking?: WakeBreakingOptions;
+        readonly signal?: AbortSignal;
+    }): Promise<WakeSolver>;
     describe(): SolverDescription;
     init(host: SolverHost, params?: WakeParams): void;
     velocityAt(x: number, y: number, z: number, out?: [number, number, number]): [number, number, number];
     step(context: StepContext, dt: number): void;
+    fftWork(): {
+        backend: 'typescript' | 'wasm-simd';
+        forward: number;
+        inverse: number;
+        transferBytes: number;
+    };
     submergedSourceWork(): {
         readonly rows: number;
         readonly transforms: number;

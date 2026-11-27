@@ -55,6 +55,12 @@ import { bagBreakups, sprayFlux } from './spray.js';
 import { bubblePlume, surfaceCurrent } from './plume.js';
 import { HULL_BREACH_WORDS, HULL_BREACHES_FIELD } from '../world/flooding.js';
 import { MargoError } from '@margoengine/math/errors';
+import {
+  WAKE_BREAKING_FIELD,
+  WAKE_BREAKING_HEADER_WORDS,
+  WAKE_BREAKING_LAYOUT,
+  WAKE_BREAKING_WORDS,
+} from '../sea/wake-breaking.js';
 
 export {
   ACTIVE_PERIODS,
@@ -175,6 +181,7 @@ const ORIGIN: Cell = [0, 0, 0];
 /** The sea's foam, a framework solver. `id` is `'foam'` unless a world holds more. */
 export class FoamSolver implements Solver<FoamParams> {
   private readonly id: string;
+  private readonly wakeBreaking?: FieldDescriptor;
   private host!: SolverHost;
   private cell: Cell = ORIGIN;
   private field!: WaveSpectrumField;
@@ -207,8 +214,17 @@ export class FoamSolver implements Solver<FoamParams> {
   private readonly flow: FlowSample = { velocity: [0, 0, 0], density: 0, temperature: 0 };
 
   /** @param id The solver's id (default `'foam'`). */
-  constructor(id = 'foam') {
+  constructor(id = 'foam', wakeBreaking?: FieldDescriptor) {
     this.id = id;
+    if (wakeBreaking) {
+      if (
+        wakeBreaking.quantity !== WAKE_BREAKING_FIELD.quantity ||
+        wakeBreaking.kind !== WAKE_BREAKING_FIELD.kind ||
+        wakeBreaking.unit !== 'SI'
+      )
+        throw new MargoError('state', 'Connect the wake’s SI breaking crest field to FoamSolver.');
+      this.wakeBreaking = Object.freeze({ ...wakeBreaking });
+    }
   }
 
   describe(): SolverDescription {
@@ -216,6 +232,7 @@ export class FoamSolver implements Solver<FoamParams> {
       id: this.id,
       fields: [
         { field: SEA_FOAM_FIELD, access: 'write' },
+        ...(this.wakeBreaking ? [{ field: this.wakeBreaking, access: 'read' as const }] : []),
         // The air leaving damaged hulls, when a hull solver writes it.
         { field: HULL_BREACHES_FIELD, access: 'read', optional: true },
       ],
@@ -308,8 +325,9 @@ export class FoamSolver implements Solver<FoamParams> {
     // Per cell: whiteness, then its decay rate times its whiteness (so mixed foam fades at its mean rate).
     this.foam = host.allocate('foam', count * 2 * 8, 'f64', SEA_FOAM_LAYOUT);
     this.breakers = host.allocate('breakers', capacity * BREAKER * 8, 'f64', SEA_FOAM_LAYOUT);
-    // The live breakers' count and the windrows' age, s.
-    this.clock = host.allocate('clock', 2 * 8, 'f64', SEA_FOAM_LAYOUT);
+    // The live breaker count, the windrow age and, when coupled, the last accepted local crest tick.
+    this.clock = host.allocate('clock', (this.wakeBreaking ? 3 : 2) * 8, 'f64', SEA_FOAM_LAYOUT);
+    if (this.wakeBreaking) this.words(this.clock)[2] = -1;
     this.published = host.allocate('published', count * 2 * 4, 'f32', SEA_FOAM_LAYOUT);
   }
 
@@ -346,6 +364,7 @@ export class FoamSolver implements Solver<FoamParams> {
     this.spawn(context.tick, dt);
     this.sweep(dt, foam, active);
     this.wakes(time, dt, foam);
+    if (this.wakeBreaking) this.localBreakers(context, foam, active);
     if (this.bubbles) this.boils(context, foam);
     this.transport(time, dt, foam, ux, uz, u10, clock[1]!);
     this.fade(dt, foam);
@@ -490,6 +509,44 @@ export class FoamSolver implements Solver<FoamParams> {
       at++;
     }
     clock[0] = live;
+  }
+
+  private localBreakers(context: StepContext, foam: Float64Array, active: Float32Array): void {
+    const port = context.inputs.get(this.wakeBreaking!.name);
+    if (!port) return;
+    const { region } = port;
+    const words = region.byteLength / Float64Array.BYTES_PER_ELEMENT;
+    const capacity = (words - WAKE_BREAKING_HEADER_WORDS) / WAKE_BREAKING_WORDS;
+    if (
+      region.type !== 'f64' ||
+      region.layout !== WAKE_BREAKING_LAYOUT ||
+      !Number.isInteger(capacity) ||
+      capacity < 0 ||
+      context.cell.some((value, i) => value !== port.cell[i])
+    )
+      throw new MargoError('state', 'Connect the layout-1 f64 breaking crest field in the foam grid’s world cell.');
+    const crest = regionWords(region.memory ?? this.host.memory, region) as Float64Array;
+    const [written, detected, spacing] = crest;
+    if (
+      !Number.isInteger(written) ||
+      written! < 0 ||
+      written! > capacity ||
+      !Number.isInteger(detected) ||
+      detected! < written! ||
+      !(spacing! > 0 && Number.isFinite(spacing))
+    )
+      throw new MargoError('state', 'Connect a breaking crest producer with valid row counts and finite cell spacing.');
+    const fraction = Math.min(1, (spacing! / this.h) * (spacing! / this.h));
+    const clock = this.words(this.clock);
+    const newTick = clock[2] !== port.tick;
+    for (let row = 0; row < written!; row++) {
+      const at = WAKE_BREAKING_HEADER_WORDS + row * WAKE_BREAKING_WORDS;
+      const cell = this.cellOf(crest[at]!, crest[at + 1]!);
+      if (cell < 0) continue;
+      active[cell] = Math.min(1, active[cell]! + fraction);
+      if (newTick) deposit(foam, cell, fraction, 1 / this.decay);
+    }
+    clock[2] = port.tick;
   }
 
   /** Calls `visit(cell, along)` for each cell whose centre is within +-half across (dx, dz) and from `back` to `front` along it, from (x, z). */
@@ -892,7 +949,7 @@ export class FoamSolver implements Solver<FoamParams> {
     return k < 0 ? 0 : (regionWords(this.host.memory, this.published) as Float32Array)[2 * k]!;
   }
 
-  /** The active whitecap coverage at (x, z), 0 or 1 in a cell a breaker crosses now. */
+  /** The active whitecap coverage at (x, z), 0 to 1 in a cell a breaker crosses now. */
   activeCoverage(x: number, z: number): number {
     const k = this.cellOf(x, z);
     return k < 0 ? 0 : (regionWords(this.host.memory, this.published) as Float32Array)[2 * k + 1]!;

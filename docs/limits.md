@@ -10806,6 +10806,12 @@ inverse transforms. Submerged source bands and stored water velocities add the t
 reported by `fftWork()`. Rain contact locations and times come from the caller. Each pulse
 models linear impulse and deposition over one wake tick.
 
+The opt-in crest field publishes a resolved onset estimate. It rejects crests without a
+trackable normal direction or displacement, and reports total rows even if the published
+region fills. The wave solve stays linear and supplies onset in the interior away from
+applied pressure, the absorber and untracked boundaries. Foam and spray use the same
+reported area and crest state.
+
 ### Ship motion on the wake grid
 
 `HullSolver` with the wake option publishes two five-word f64 records per reference waterplane station. The stamp uses one longitudinal midpoint and two transverse Gauss samples for a centreline-symmetric waterplane. Volume comes from small heave, pitch and roll about the reference draft. A wholly dry or submerged hull emits no waterplane flux. The model uses a signed surface-volume source. Its finite-depth wave propagation is handled by `WakeSolver`, and the hull's reaction still comes from its seakeeping solver. The projection has no three-dimensional radiation calibration or matched energy exchange with the wake grid.
@@ -10826,7 +10832,7 @@ The independent fixed bare KRISO container-ship (KCS) signed wave cut at 1.09864
 
 At 0.25 m per cell the original stencil gave 14.88 and 14.85 mm of profile RMS error at 14 approach lengths and 60 or 120 Hz. Refining the mesh from 0.025 to 0.0125 m vertically and 96 to 192 stations changed the reconstructed displacement from 1.6412 to 1.6449 m³, closer to the published 1.6490 m³. At eight approach lengths and 60 Hz, this mesh, eight instead of four transfer bands, and a 4 m instead of 2 m numerical sponge gave 15.34, 15.38, and 15.11 mm respectively. The subcell stencil reduced the 60 Hz error from 15.10 to 13.86 mm at eight lengths and from 14.88 to 13.60 mm at 14 lengths. Aft of x/L = 0.75 the corrected signed profile reaches 34.60 mm RMS where the measured profile gives 17.90 mm, with correlation 0.987. This residual persists with fixed physical inputs and no fitting. The linear source does not enforce impermeability of the disturbed flow at the hull. The experiment reports an unsteady wet transom flow that is outside this source model. [NMRI model particulars](https://www.nmri.go.jp/archives/institutes/fluid_performance_evaluation/cfd_rd/cfdws15/kcs_gc.html) · [Kim, Van and Kim, 2001](https://doi.org/10.1007/s003480100332)
 
-The optional sea entry is 11,134 B gzip with a 11,469 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
+The optional sea entry is 12,263 B gzip with a 12,631 B ceiling. The seakeeping entry grows from 37,788 to 39,440 B gzip with a 40,624 B ceiling.
 
 ## Node versions for test and tool scripts (scripts/support/node-compat.mjs, 2026-11-26)
 

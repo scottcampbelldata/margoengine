@@ -12775,6 +12775,27 @@ and the same asset draws on WebGPU and WebGL2.
 [Stockham, 1966](https://doi.org/10.1145/1464182.1464209)
 [WebAssembly SIMD specification](https://www.w3.org/TR/2025/CRD-wasm-core-2-20250616/)
 
+#### SEA-04 breaking crest readback
+
+The local wake estimates the crest along the strongest negative curvature direction, then
+compares fitted crest positions from the last two accepted wave surfaces. It recovers
+the water velocity from the accepted potential at that subcell crest. Both speeds use
+the same water-relative frame. The fixed onset ratio is 0.85 from Barthélemy and
+Derakhti. The estimator declines near-isotropic, unresolved or pressure-forced
+stencils. The foam consumer represents each reported crest sample by its grid cell's
+nominal surface area, limited by the receiving foam cell. This publishes local active and
+residual coverage and feeds the existing spray reader. The wake remains linear and
+the field does not resolve overturning, bubble entrainment or breaker energy loss.
+[Barthélemy et al., 2018](https://doi.org/10.1017/jfm.2018.93)
+[Derakhti et al., 2020](https://doi.org/10.1029/2019JC015886)
+
+Saket's Table 1 supplies independent measured particle and crest velocities with separate
+observed breaker labels. Applying the fixed criterion to those inputs rejects all 13
+recurrent cases and flags 8 of 13 nominal marginal breakers. The other five lie within
+the reported ±0.020 uncertainty on the ratio. The manufactured oblique wave and live
+wake-to-foam test separately measure estimator convergence and verify exact replay.
+[Saket et al., 2018](https://arxiv.org/abs/1703.04354)
+
 ### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
 
 `packages/physics/src/sea/surface.ts` is written from:

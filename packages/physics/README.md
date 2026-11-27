@@ -3598,6 +3598,35 @@ world.advance(4);
 console.log(wake.fftWork().backend); // wasm-simd
 ```
 
+Enable a diagnostic crest field with `WakeSolver.load({ breaking: {} })` or the constructor's
+fourth argument. Pass `wake.breakingField` to `new FoamSolver('foam', wake.breakingField)` to
+feed those crests into local active foam and spray. Both solvers must use the same world cell.
+The layout-1 header holds the written row count, total detected count and wake cell width.
+Increase the optional `capacity` if the written count falls short. The default is up to 4096
+rows, bounded by the grid's cell count. The crest field estimates onset in resolved linear
+waves and preserves the wave state.
+
+```ts
+import { FoamSolver } from 'margoengine/physics/foam';
+import { WakeSolver } from 'margoengine/physics/sea';
+import { PhysicsWorld } from 'margoengine/physics/world';
+
+const wake = await WakeSolver.load({ breaking: {} });
+const foam = new FoamSolver('foam', wake.breakingField);
+const spectrum = {
+  frequencies: Float64Array.of(0.25, 0.5),
+  directions: Float64Array.of(0, Math.PI),
+  energy: new Float64Array(4),
+  depth: 4,
+  density: 1025,
+};
+const world = new PhysicsWorld({ rate: { num: 60, den: 1 } })
+  .add(wake, { depth: 4 })
+  .add(foam, { waves: { cell: [0, 0, 0], sample: () => spectrum } });
+world.advance(1);
+console.log(foam.meanCoverage()); // 0 on still water
+```
+
 ### A hull on the sea (`@margoengine/physics/seakeeping`)
 
 `HullSolver` is the water's load on rigid hulls (SEA-08), for the physics framework's rigid solver.

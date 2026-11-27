@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21036325,
+  "total": 21037939,
   "history": [
     {
       "date": "2026-10-24",
@@ -14758,6 +14758,11 @@
       "date": "2026-11-27",
       "commit": "sea-04-simd-rain-bathymetry",
       "reason": "Physics/sea grows from 9129 to 11134 B gzip and its ceiling from 9403 to 11469 B for the optional SIMD loader, rain pulse adapter and per-step work receipt. The separate Wasm asset is 10832 B gzip. Both paths share the live wake grid, source quadrature and replay state. Splitting the TypeScript binding would require a second setup entry for the same class; the Wasm stays lazy. Physics/loads grows from 63109 to 63177 B gzip to report the local wet depth, within its current 63248 B ceiling. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-04-breaking-crest-field",
+      "reason": "Physics/sea moves from 11134 to 12263 B gzip and cap 11469 to 12631 B. Physics/foam moves from 7418 to 7870 B gzip and cap 7674 to 8126 B. The optional wake-to-foam field uses the accepted wave state and the existing coverage and spray paths. Moving the detector and receiver to a separate public entry would repeat the field wiring and require a second owner for crest state. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15607,7 +15612,7 @@
     "@margoengine/physics/falling": 6163,
     "@margoengine/physics/flight": 7651,
     "@margoengine/physics/flip": 14295,
-    "@margoengine/physics/foam": 7674,
+    "@margoengine/physics/foam": 8126,
     "@margoengine/physics/glacier": 3740,
     "@margoengine/physics/gpu-cloth": 17278,
     "@margoengine/physics/granular-flow": 5830,
@@ -15638,7 +15643,7 @@
     "@margoengine/physics/room-sound": 5606,
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
-    "@margoengine/physics/sea": 11469,
+    "@margoengine/physics/sea": 12631,
     "@margoengine/physics/seakeeping": 43883,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,

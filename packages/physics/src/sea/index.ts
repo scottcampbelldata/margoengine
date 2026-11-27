@@ -8,9 +8,17 @@ export {
   WAKE_SOURCE_LAYOUT,
   WAKE_SOURCE_WORDS,
   WakeSolver,
+  type WakeBreakingOptions,
   type WakeParams,
   type WakeSample,
 } from './wake.js';
+export {
+  WAKE_BREAKING_FIELD,
+  WAKE_BREAKING_HEADER_WORDS,
+  WAKE_BREAKING_LAYOUT,
+  WAKE_BREAKING_THRESHOLD,
+  WAKE_BREAKING_WORDS,
+} from './wake-breaking.js';
 export {
   wakeRainEquivalentDrop,
   wakeRainSource,

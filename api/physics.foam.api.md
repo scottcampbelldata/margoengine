@@ -81,7 +81,7 @@ export interface FoamShip {
 }
 
 export class FoamSolver implements Solver<FoamParams> {
-    constructor(id?: string);
+    constructor(id?: string, wakeBreaking?: FieldDescriptor);
     describe(): SolverDescription;
     init(host: SolverHost, params: FoamParams): void;
     step(context: StepContext, dt: number): void;

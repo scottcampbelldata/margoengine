@@ -38,6 +38,16 @@ export interface SubmergedWakeSource {
     readonly depths: readonly number[];
 }
 
+export const WAKE_BREAKING_FIELD: FieldDescriptor;
+
+export const WAKE_BREAKING_HEADER_WORDS = 3;
+
+export const WAKE_BREAKING_LAYOUT = 1;
+
+export const WAKE_BREAKING_THRESHOLD = 0.85;
+
+export const WAKE_BREAKING_WORDS = 8;
+
 export const WAKE_HEIGHT_FIELD: FieldDescriptor;
 
 export const WAKE_LAYOUT = 1;
@@ -45,6 +55,11 @@ export const WAKE_LAYOUT = 1;
 export const WAKE_SOURCE_LAYOUT = 1;
 
 export const WAKE_SOURCE_WORDS = 5;
+
+export interface WakeBreakingOptions {
+    readonly field?: FieldDescriptor;
+    readonly capacity?: number;
+}
 
 export interface WakeParams {
     cells?: readonly [number, number];
@@ -99,11 +114,13 @@ export interface WakeSample {
 }
 
 export class WakeSolver implements Solver<WakeParams> {
-    constructor(id?: string, sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource);
+    readonly breakingField?: FieldDescriptor;
+    constructor(id?: string, sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource, breaking?: WakeBreakingOptions);
     static load(options?: {
         readonly id?: string;
         readonly sourceField?: FieldDescriptor;
         readonly submergedSource?: SubmergedWakeSource;
+        readonly breaking?: WakeBreakingOptions;
         readonly signal?: AbortSignal;
     }): Promise<WakeSolver>;
     describe(): SolverDescription;

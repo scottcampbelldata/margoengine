@@ -46,11 +46,17 @@ import type {
 } from '../world/solver.js';
 import { rateOf } from '../world/solver.js';
 import { regionWords } from '../world/memory.js';
+import {
+  WAKE_BREAKING_FIELD,
+  WAKE_BREAKING_HEADER_WORDS,
+  WAKE_BREAKING_LAYOUT,
+  WAKE_BREAKING_WORDS,
+  writeWakeBreaking,
+} from './wake-breaking.js';
 import { bindWakeFft, loadWakeFft, type WakeFft } from './wake-fft.js';
 import { WakeModeStep } from './wake-modes.js';
 
 const PI = 3.141592653589793;
-const ORIGIN: Cell = [0, 0, 0];
 
 function wakeFftLength(length: number): boolean {
   if (!Number.isInteger(length) || length < 4 || length > 4096) return false;
@@ -111,6 +117,14 @@ export interface WakeParams {
   waterBelow?: boolean;
 }
 
+/** Opt-in wake crest publication for local foam and spray readers. */
+export interface WakeBreakingOptions {
+  /** Descriptor with wakeBreakingCrest quantity. Defaults to WAKE_BREAKING_FIELD. */
+  readonly field?: FieldDescriptor;
+  /** Number of published crest rows. Default 4096 or the number of grid cells if smaller. */
+  readonly capacity?: number;
+}
+
 /** What {@link WakeSolver.sample} gives at a point. */
 export interface WakeSample {
   /** Height of the wake's surface over the still level, m. */
@@ -129,7 +143,6 @@ export interface WakeSample {
 export class WakeSolver implements Solver<WakeParams> {
   private readonly id: string;
   private host!: SolverHost;
-  private cell: Cell = ORIGIN;
   private nx = 0;
   private nz = 0;
   private dx = 1;
@@ -144,6 +157,11 @@ export class WakeSolver implements Solver<WakeParams> {
   private projected?: ProjectedWakeSource;
   private fft!: WakeFft;
   private fftModule?: WebAssembly.Module;
+  /** Optional descriptor consumed by a FoamSolver or another local crest reader. */
+  readonly breakingField?: FieldDescriptor;
+  private readonly breakingCapacity?: number;
+  private breaking?: Region;
+  private current: readonly [number, number] = [0, 0];
   private height!: Region;
   private potential!: Region;
   private previous!: Region;
@@ -168,11 +186,29 @@ export class WakeSolver implements Solver<WakeParams> {
    * @param id The solver's id, default 'wake'.
    * @param sourceField Optional layout-1 f64 SeaSource rows from a 60 Hz solver in the same world cell.
    * @param submergedSource Optional projected advancing-volume source with shared depth bands.
+   * @param breaking Pass an options object to publish diagnostic breaking crests.
    */
-  constructor(id = 'wake', sourceField?: FieldDescriptor, submergedSource?: SubmergedWakeSource) {
+  constructor(
+    id = 'wake',
+    sourceField?: FieldDescriptor,
+    submergedSource?: SubmergedWakeSource,
+    breaking?: WakeBreakingOptions,
+  ) {
     if (sourceField && (sourceField.quantity !== 'seaSource' || sourceField.unit !== 'SI'))
       throw new MargoError('state', 'Invalid wake source descriptor. Use a seaSource field in SI units.');
     this.id = id;
+    if (breaking) {
+      const { field = WAKE_BREAKING_FIELD, capacity } = breaking;
+      if (
+        field?.quantity !== WAKE_BREAKING_FIELD.quantity ||
+        field.kind !== WAKE_BREAKING_FIELD.kind ||
+        field.unit !== 'SI' ||
+        (capacity !== undefined && !(Number.isSafeInteger(capacity) && capacity > 0))
+      )
+        throw new MargoError('state', 'Use a wake breaking crest field in SI and a positive whole row capacity.');
+      this.breakingField = Object.freeze({ ...field });
+      this.breakingCapacity = capacity;
+    }
     this.sourceField = sourceField ? Object.freeze({ ...sourceField }) : undefined;
     if (submergedSource) {
       const { field, depths } = submergedSource;
@@ -191,11 +227,12 @@ export class WakeSolver implements Solver<WakeParams> {
       readonly id?: string;
       readonly sourceField?: FieldDescriptor;
       readonly submergedSource?: SubmergedWakeSource;
+      readonly breaking?: WakeBreakingOptions;
       readonly signal?: AbortSignal;
     } = {},
   ): Promise<WakeSolver> {
-    const { id, sourceField, submergedSource, signal } = options;
-    const wake = new WakeSolver(id, sourceField, submergedSource);
+    const { id, sourceField, submergedSource, breaking, signal } = options;
+    const wake = new WakeSolver(id, sourceField, submergedSource, breaking);
     wake.fftModule = await loadWakeFft(signal);
     return wake;
   }
@@ -205,6 +242,7 @@ export class WakeSolver implements Solver<WakeParams> {
       id: this.id,
       fields: [
         { field: WAKE_HEIGHT_FIELD, access: 'write' },
+        ...(this.breakingField ? [{ field: this.breakingField, access: 'write' as const }] : []),
         ...(this.sourceField ? [{ field: this.sourceField, access: 'read' as const }] : []),
         ...(this.submergedSource ? [{ field: this.submergedSource.field, access: 'read' as const }] : []),
       ],
@@ -274,6 +312,7 @@ export class WakeSolver implements Solver<WakeParams> {
     this.fft = this.fftModule ? bindWakeFft(this.fftModule, cells[0], cells[1]) : new RealFft2(cells[0], cells[1]);
     [this.nx, this.nz] = cells;
     this.host = host;
+    this.current = [current[0], current[1]];
     this.dx = cellSize;
     this.x0 = centre[0] - (this.nx * cellSize) / 2;
     this.z0 = centre[1] - (this.nz * cellSize) / 2;
@@ -289,6 +328,12 @@ export class WakeSolver implements Solver<WakeParams> {
     this.height = host.allocate(`${this.id}:height`, n * 8, 'f64', WAKE_LAYOUT);
     this.potential = host.allocate(`${this.id}:potential`, n * 8, 'f64', WAKE_LAYOUT);
     this.previous = host.allocate(`${this.id}:previous`, n * 8, 'f64', WAKE_LAYOUT);
+    if (this.breakingField) {
+      const capacity = Math.min(n, this.breakingCapacity ?? 4096);
+      const words = WAKE_BREAKING_HEADER_WORDS + capacity * WAKE_BREAKING_WORDS;
+      this.breaking = host.allocate(this.breakingField.name, words * 8, 'f64', WAKE_BREAKING_LAYOUT);
+      (regionWords(host.memory, this.breaking) as Float64Array)[2] = this.dx;
+    }
     // K = k tanh(k D) for every mode of the half spectrum (deep water: k).
     this.kk = new Float64Array(half * this.nz);
     for (let j = 0; j < this.nz; j++)
@@ -492,7 +537,6 @@ export class WakeSolver implements Solver<WakeParams> {
   }
 
   step(context: StepContext, dt: number): void {
-    this.cell = context.cell;
     const memory = this.host.memory,
       h = regionWords(memory, this.height) as Float64Array,
       phi = regionWords(memory, this.potential) as Float64Array,
@@ -525,6 +569,18 @@ export class WakeSolver implements Solver<WakeParams> {
       phi[i]! *= keep;
     }
     this.updateWaterVelocity();
+    if (this.breaking)
+      writeWakeBreaking(
+        regionWords(memory, this.breaking) as Float64Array,
+        this.grid,
+        previous,
+        h,
+        phi,
+        dt,
+        this.current,
+        press,
+        this.damp,
+      );
   }
 
   private advanceGravityModes(H: Float64Array, F: Float64Array, P: Float64Array): void {
@@ -704,7 +760,11 @@ export class WakeSolver implements Solver<WakeParams> {
   }
 
   exportPorts(tick: number): readonly Port[] {
-    return [{ field: WAKE_HEIGHT_FIELD.name, region: this.height, tick, cell: this.cell }];
+    const cell = this.host.cell;
+    return [
+      { field: WAKE_HEIGHT_FIELD.name, region: this.height, tick, cell },
+      ...(this.breaking ? [{ field: this.breakingField!.name, region: this.breaking, tick, cell }] : []),
+    ];
   }
 
   importPorts(): void {}
@@ -715,6 +775,6 @@ export class WakeSolver implements Solver<WakeParams> {
 
   extraState(): readonly Region[] {
     const velocity = this.below ?? this.surfaceRise;
-    return velocity ? [this.previous, velocity] : [this.previous];
+    return [this.previous, ...(velocity ? [velocity] : []), ...(this.breaking ? [this.breaking] : [])];
   }
 }

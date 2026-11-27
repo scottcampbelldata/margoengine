@@ -1015,15 +1015,15 @@ Count: 3 DONE, 4 PARTIAL, 7 NOT DONE.
 7. Move FFTs to Wasm SIMD and record work counts.
 
 **Upgrade in progress.**
-- Item 5. `b5ce59d479` and `coupling/sea04-bathymetry.test.js` check local bed depth and the live
+- Item 5. `38b0cfd3eb` and `coupling/sea04-bathymetry.test.js` check local bed depth and the live
   4:1 depth step. The reflection and transmission magnitudes are 0.33357 and 1.32693 against
   the long-wave limits 1/3 and 4/3, with 2.29e−12 J energy closure.
-- Item 6 in part. `b5ce59d479` and `sea-wake-rain.test.js` check ATMO-04 contact forcing,
+- Item 6 in part. `38b0cfd3eb` and `sea-wake-rain.test.js` check ATMO-04 contact forcing,
   integrated pressure impulse, retained volume, ring propagation and exact replay.
-- Item 7. `b5ce59d479` and `sea-wake-fft-native.test.js` check exact scalar/SIMD spectra and
+- Item 7. `38b0cfd3eb` and `sea-wake-fft-native.test.js` check exact scalar/SIMD spectra and
   live state, depth queries, replay and transform work. Water’s `wake-agreement.browser.mjs`
   exercises the lazy physical asset and its rendered surface on WebGPU and WebGL2.
-- Items 1 and 4 measured comparisons. `4e255ed41a` preserves the DHI and Rabaud–Moisy
+- Items 1 and 4 measured comparisons. `b5ce59d479` preserves the DHI and Rabaud–Moisy
   protocols and raw hashes in [the measurement record](../packages/physics/scripts/sea04-measured.md).
   The refined DHI case gives 63.95 mm RMS on the nominal archive clock. The circular analytic
   comparison also misses by 61.18 mm. The two photographed wake angles miss by −7.35° and +2.75°.
