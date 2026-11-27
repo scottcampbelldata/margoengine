@@ -223,6 +223,10 @@
       "types": "./dist/audio/stretch.d.ts",
       "import": "./dist/audio/stretch.js"
     },
+    "./audio/vocoder": {
+      "types": "./dist/audio/vocoder.d.ts",
+      "import": "./dist/audio/vocoder.js"
+    },
     "./behavior": {
       "types": "./dist/behavior.d.ts",
       "import": "./dist/behavior.js"

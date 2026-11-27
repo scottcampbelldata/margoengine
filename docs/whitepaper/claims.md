@@ -6673,3 +6673,11 @@ discrete depth mode converges at second order on the flat tank. A partially clos
 through its deep aperture, and a finite face leaves both horizontal tip paths open. The live world test
 accounts for prescribed pressure and displaced volume, accounts for perimeter absorption separately,
 and replays from its initial snapshot. [Coupling test](../../packages/physics/tests/coupling/loads-finite-quay.test.js)
+
+## Audio phase vocoder (audio/vocoder)
+
+Offline time-stretch and pitch shift with transient and formant preservation. Proof: `packages/audio/tests/vocoder.test.js`
+measures pitch, level and residual of stretched and shifted tones (factors 0.25 to 4, -24 to +24 semitones), chord
+partials, inter-channel phase, click placement and pre-echo, a vowel's resonance, determinism and cancellation, all on
+generated signals. No listening test, rival comparison or speed claim.
+[Limits](../limits.md#phase-vocoder-audiovocoder-2026-11-27)

@@ -1,4 +1,5 @@
 import { rangeError, typeError } from '../../shared/errors.js';
+import { sincRenderer } from './sinc.js';
 
 // Offline sample-rate conversion and channel mixing for Node, workers and pages: no Web Audio, no
 // OfflineAudioContext. A file read by `decodeWav` at one rate is converted to the rate of the audio it joins.
@@ -53,36 +54,6 @@ export interface ResampleOptions {
 }
 
 const SQRT_HALF = Math.SQRT1_2;
-/** Samples of the filter table per zero crossing; linear interpolation between them (Smith). */
-const PER_CROSSING = 1024;
-
-/** The zeroth-order modified Bessel function of the first kind, by its power series. */
-function besselI0(x: number): number {
-  let sum = 1,
-    term = 1;
-  const q = (x * x) / 4;
-  for (let k = 1; k < 64; k++) {
-    term *= q / (k * k);
-    sum += term;
-    if (term < sum * 1e-17) break;
-  }
-  return sum;
-}
-
-/** Half of the windowed sinc, sinc(u) w(u / zc) for u = i / PER_CROSSING, plus one zero past the end. */
-function filterTable(zeroCrossings: number, beta: number): Float64Array {
-  const n = zeroCrossings * PER_CROSSING,
-    table = new Float64Array(n + 2),
-    norm = besselI0(beta);
-  table[0] = 1;
-  for (let i = 1; i <= n; i++) {
-    const u = i / PER_CROSSING,
-      r = u / zeroCrossings,
-      window = r < 1 ? besselI0(beta * Math.sqrt(1 - r * r)) / norm : 0;
-    table[i] = (Math.sin(Math.PI * u) / (Math.PI * u)) * window;
-  }
-  return table;
-}
 
 /**
  * Channels mixed to `count` by the Web Audio speaker rules: mono, stereo, quad (L, R, SL, SR) and 5.1 (L, R, C, LFE,
@@ -208,35 +179,8 @@ export function resample(audio: ResampleInput, sampleRate: number, options: Resa
     length = channels[0].length;
   if (from === sampleRate) return { sampleRate, channels };
   const outLength = Math.floor((length * sampleRate + from - 1) / from),
-    // The cutoff in cycles per input sample is s / 2; the sinc's zero crossings are 1 / s input samples apart.
-    s = rolloff * Math.min(1, sampleRate / from),
-    reach = zeroCrossings / s,
-    // Kaiser's beta for the stopband attenuation (Kaiser 1974; Oppenheim and Schafer, section 7.6).
-    beta =
-      attenuation > 50
-        ? 0.1102 * (attenuation - 8.7)
-        : 0.5842 * (attenuation - 21) ** 0.4 + 0.07886 * (attenuation - 21),
-    table = filterTable(zeroCrossings, beta),
-    weights = new Float64Array(Math.ceil(2 * reach) + 2),
     out = channels.map(() => new Float32Array(outLength));
-  for (let n = 0; n < outLength; n++) {
-    // The output sample's time in input samples; n * from is exact, as both are whole numbers below 2^53 / 768000.
-    const t = (n * from) / sampleRate,
-      first = Math.max(0, Math.ceil(t - reach)),
-      last = Math.min(length - 1, Math.floor(t + reach));
-    let count = 0;
-    for (let i = first; i <= last; i++) {
-      const x = Math.abs(t - i) * s * PER_CROSSING,
-        j = Math.floor(x),
-        f = x - j;
-      weights[count++] = j >= table.length - 1 ? 0 : s * (table[j] + (table[j + 1] - table[j]) * f);
-    }
-    for (let c = 0; c < channels.length; c++) {
-      const input = channels[c];
-      let sum = 0;
-      for (let k = 0; k < count; k++) sum += weights[k] * input[first + k];
-      out[c][n] = sum;
-    }
-  }
+  // Output sample n is at n * from / sampleRate input samples.
+  sincRenderer(from, sampleRate, zeroCrossings, rolloff, attenuation)(channels, out, 0, outLength);
   return { sampleRate, channels: out };
 }

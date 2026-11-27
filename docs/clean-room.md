@@ -18000,3 +18000,39 @@ source (MoorDyn, MooDy, OrcaFlex) and no paper's companion code was read; the me
 - Own derivations: the seabed as a floor the node's speed into is taken out of each substep, that taken speed over the
   substep the bed's push, and friction along and across the line each up to its coefficient of it; the substep from one
   segment's axial mode with its damping, 1 / (omega (1 + 2 zeta)); a held end's load as the whole load on its node.
+
+## Audio phase vocoder (2026-11-27)
+
+`@margoengine/audio/vocoder` is written from the papers only; no other library's code and no paper's companion code was
+read. It replaces the "considered and not built" note of the 2026-11-10 spectrogram record.
+
+- Z. Prusa and N. Holighaus, "Phase Vocoder Done Right", EUSIPCO 2017, https://arxiv.org/abs/2202.07382 (read in full):
+  phase integrated over time and frequency, largest magnitude first, trapezoidal steps, the 1e-6 magnitude tolerance
+  with random phase below it. Chosen: no peak picking or transient detector.
+- Z. Prusa and P. L. Sondergaard, "Real-Time Spectrogram Inversion Using Phase Gradient Heap Integration", DAFx 2016,
+  https://dafx.de/paper-archive/details/KyhYU44R13wwkkqNs3bgPw : the heap integration.
+- F. Auger and P. Flandrin, "Improving the readability of time-frequency and time-scale representations by the
+  reassignment method", IEEE Trans. Signal Process. 43(5), 1995, doi:10.1109/78.382394: both phase derivatives from
+  transforms with the derivative window and the time-weighted window. Used in place of Prusa's finite differences: no
+  unwrapping, so it holds when compressing, where the analysis hop is long. Using them here, the rotation form that
+  turns all channels together, and the phase reset for energy new in a frame are Margo's own choices.
+- J. Driedger, M. Mueller and S. Ewert, "Improving Time-Scale Modification of Music Signals Using Harmonic-Percussive
+  Separation", IEEE Signal Processing Letters 21(1), 2014, doi:10.1109/LSP.2013.2294023; D. Fitzgerald,
+  "Harmonic/Percussive Separation Using Median Filtering", DAFx 2010; J. Driedger, M. Mueller and S. Disch, "Extending
+  Harmonic-Percussive Separation of Audio Signals", ISMIR 2014: the split, 200 ms and 500 Hz medians, and a separation
+  factor (2). With a separation factor of 1 a six-note chord lost up to 39 % of a partial to the percussive path. The split is
+  used only when lengthening: compressing measured no better with it and lost noise energy.
+- J. Driedger and M. Mueller, "A Review of Time-Scale Modification of Music Signals", Applied Sciences 6(2):57, 2016,
+  doi:10.3390/app6020057: overlap-add for the percussive part.
+- A. Roebel and X. Rodet, "Efficient Spectral Envelope Estimation and its Application to Pitch Shifting and Envelope
+  Preservation", DAFx 2005: the true envelope.
+- J. Laroche and M. Dolson, "New Phase-Vocoder Techniques for Pitch-Shifting, Harmonizing and Other Exotic Effects",
+  IEEE WASPAA 1999, doi:10.1109/ASPAA.1999.810857: pitch shifting with formants held.
+- Compared and not used: J. Laroche and M. Dolson, "Improved Phase Vocoder Time-Scale Modification of Audio", IEEE
+  TSAP 7(3), 1999, doi:10.1109/89.759041 (phase locking around picked peaks; Prusa and Holighaus compare against the
+  classic vocoder and commercial tools and their method needs no peak picker); A. Roebel, "A New Approach to Transient
+  Processing in the Phase Vocoder", DAFx 2003 (detection and phase reset); L. Fierro and V. Valimaki, "Enhanced Fuzzy
+  Decomposition of Sound into Sines, Transients, and Noise", J. Audio Eng. Soc. 71, 2023,
+  https://arxiv.org/abs/2210.14041 (a three-way split, not built).
+- Foundations: J. L. Flanagan and R. M. Golden, "Phase Vocoder", BSTJ 45(9), 1966,
+  doi:10.1002/j.1538-7305.1966.tb01706.x; M. Portnoff, IEEE TASSP 24(3), 1976 (the FFT phase vocoder).

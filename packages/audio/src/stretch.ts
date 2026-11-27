@@ -18,7 +18,8 @@ import { rangeError, typeError } from '../../shared/errors.js';
 //  - J. L. Flanagan and R. M. Golden, "Phase vocoder", Bell System Technical Journal 45(9), 1966,
 //    doi:10.1002/j.1538-7305.1966.tb01706.x, and J. Laroche and M. Dolson, "Improved phase vocoder time-scale
 //    modification of audio", IEEE Transactions on Speech and Audio Processing 7(3), 1999, doi:10.1109/89.759041:
-//    compared and not used here; for speech they smear transients and add phasiness that WSOLA avoids.
+//    compared and not used here; for speech they smear transients and add phasiness that WSOLA avoids. For music, the
+//    phase vocoder is its own entry (vocoder.ts).
 
 /** Audio as `decodeWav` returns it: a rate and one Float32Array per channel. */
 export interface StretchInput {

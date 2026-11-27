@@ -266,6 +266,12 @@
       <p><strong>Cause.</strong> resample or mixChannels was given audio that is not {sampleRate, channels}, channels that are not Float32Arrays of one length, a sample rate that is not a whole number from 1 to 768000, an output channel count outside 1 to 32, or zeroCrossings (4 to 256), rolloff (0.5 to 1) or attenuation (40 to 160 dB) out of range.</p>
       <p><strong>Fix.</strong> Pass what decodeWav returns, or {sampleRate, channels} with one Float32Array per channel, all one length, and whole sample rates. Leave zeroCrossings, rolloff and attenuation at their defaults unless you need a different filter.</p>
     </section>
+    <section id="audio-vocoder">
+      <h2><a href="#audio-vocoder">@margoengine/audio/vocoder: phase vocoder time-stretch and pitch shift</a></h2>
+      <p class="messages"><code>factor must be from 0.25 to 4; see https://margoengine.com/errors#audio-vocoder</code> <code>semitones must be from -24 to 24; see https://margoengine.com/errors#audio-vocoder</code> <code>Every sample must be a finite number; see https://margoengine.com/errors#audio-vocoder</code></p>
+      <p><strong>Cause.</strong> timeStretch or pitchShift was given audio that is not {sampleRate, channels} with 1 to 32 Float32Arrays of one length and finite samples, a sampleRate that is not a whole number from 1 to 768000, a factor outside 0.25 to 4, or semitones (-24 to 24), envelopeMs (0.2 to 10) or frameMs (20 to 200) out of range.</p>
+      <p><strong>Fix.</strong> Pass what decodeWav returns, a factor such as 1.25 (25 % longer) and semitones such as 3. Replace NaN or infinite samples first, and leave envelopeMs and frameMs at their defaults unless you need otherwise.</p>
+    </section>
     <section id="audio-stretch">
       <h2><a href="#audio-stretch">@margoengine/audio/stretch: time-stretch at the same pitch</a></h2>
       <p class="messages"><code>factor must be from 0.25 to 4; see https://margoengine.com/errors#audio-stretch</code> <code>Every channel must be a Float32Array of the same length; see https://margoengine.com/errors#audio-stretch</code></p>

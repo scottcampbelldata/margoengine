@@ -724,7 +724,7 @@ fit its slot. The mixer's pitch shift is a real-time effect that changes pitch, 
   channel uses the same frame positions, chosen on their mean, so the stereo image stays put.
 - Tested on tones and chords: the pitch stays within 0.2 % and the level within 2 % at factors 0.8 to 1.25, and the
   period of a two-note chord is unchanged (`tests/stretch.test.js`). WSOLA suits speech; for music with strong
-  transients and many voices a phase vocoder can sound better (Driedger and Mueller 2016), and it is not offered here.
+  transients and many voices use the phase vocoder below (Driedger and Mueller 2016).
 - A bad factor or option throws a coded error ([errors#audio-stretch](https://margoengine.com/errors#audio-stretch)).
 - Web rivals: Tone.js `GrainPlayer` and the `playbackRate` of Howler and `<audio>` (with `preservesPitch`) stretch
   while playing, in a page; none returns stretched samples offline in Node. ffmpeg's `atempo` and `rubberband` filters
@@ -733,7 +733,7 @@ fit its slot. The mixer's pitch shift is a real-time effect that changes pitch, 
   time-scale modification of speech", ICASSP 1993, doi:10.1109/ICASSP.1993.319366; S. Roucos and A. M. Wilgus, "High
   quality time-scale modification for speech", ICASSP 1985, doi:10.1109/ICASSP.1985.1168381; J. Driedger and M.
   Mueller, "A Review of Time-Scale Modification of Music Signals", Applied Sciences 6(2):57, 2016,
-  doi:10.3390/app6020057; compared and not used: J. L. Flanagan and R. M. Golden, "Phase vocoder", BSTJ 45(9), 1966,
+  doi:10.3390/app6020057; compared and not used for this entry: J. L. Flanagan and R. M. Golden, "Phase vocoder", BSTJ 45(9), 1966,
   doi:10.1002/j.1538-7305.1966.tb01706.x, and J. Laroche and M. Dolson, "Improved phase vocoder time-scale
   modification of audio", IEEE TSAP 7(3), 1999, doi:10.1109/89.759041.
 
@@ -745,4 +745,52 @@ const rate = 48000;
 const take = { sampleRate: rate, channels: [Float32Array.from({ length: 2 * rate }, (_, i) => 0.5 * Math.sin((2 * Math.PI * 220 * i) / rate))] };
 const fitted = timeStretch(take, 0.95);
 console.log(fitted.channels[0].length / rate); // 1.9
+```
+
+## Phase vocoder: time-stretch and pitch shift for music
+
+`@margoengine/audio/vocoder` changes the length of decoded audio, its pitch, or both, for music and dense mixes where
+WSOLA (above) doubles or smears notes. It takes and returns the same `{ sampleRate, channels }` shape, in Node, a
+worker or a page, and returns promises: the work yields to the event loop as it goes, and an `AbortSignal` stops it.
+
+- `timeStretch(audio, factor, options)` returns `round(length * factor)` samples, `factor` from `0.25` to `4`.
+  `options.semitones` (-24 to 24, default 0) moves the pitch in the same pass.
+- `pitchShift(audio, semitones, options)` moves the pitch and keeps the length.
+- `transients` (default `true`): when lengthening (`factor * 2 ** (semitones / 12)` above 1), attacks such as drum
+  hits are split from the sustained sound and stretched with a 6 ms window, so they stay sharp.
+- `preserveFormants` (default `false`): keeps the spectral envelope in place while the pitch moves, so a shifted voice
+  keeps its character. `envelopeMs` (default 2, 0.2 to 10) sets how much detail the envelope follows.
+- `frameMs` (default 85, 20 to 200; rounded to a power of two in samples): raise it for closely spaced low notes,
+  lower it for fast changes.
+- `signal`: the promise rejects with the signal's reason.
+- Every channel is turned by the same phase in each frequency bin, so level and phase differences between channels are
+  kept. The same input and options give the same output, and the input is not changed.
+- A bad input or option rejects with a coded error ([errors#audio-vocoder](https://margoengine.com/errors#audio-vocoder)).
+
+How it works: synthesis phase is integrated from both derivatives of the short-time phase, loudest bins first (Prusa
+and Holighaus 2017), with the derivatives taken by reassignment operators (Auger and Flandrin 1995) in place of finite
+differences; attacks are separated by median filtering (Fitzgerald 2010; Driedger, Mueller and Ewert 2014; Driedger,
+Mueller and Disch 2014); the formant envelope is the true envelope (Roebel and Rodet 2005); a pitch shift is a stretch
+followed by the windowed-sinc resampler of `/resample`.
+
+Tested on generated signals (`tests/vocoder.test.js`): a stretched or shifted tone is within 0.02 % of its pitch and
+2 % of its level, with everything else at least 40 dB down; chord partials 62 Hz or more apart keep their frequency
+within 0.1 Hz and level within 5 % at factors 0.75 and 1.6; a click lands at its stretched time with over 95 % of its
+energy within 4 ms; noise bursts doubled in length have no pre-echo above -60 dB (above -35 dB with
+`transients: false`). No listening test or comparison with another library has been run. `docs/limits.md` lists what it
+does not do.
+
+Web rivals: Rubber Band and Signalsmith Stretch builds in Wasm, SoundTouchJS (a time-domain method) and Tone.js
+`PitchShift` (a delay line). This entry has no live form: it works on whole signals, offline.
+
+```ts
+import { pitchShift, timeStretch } from '@margoengine/audio/vocoder';
+
+// A second of a two-note chord, made 25 % longer, then moved up a minor third.
+const rate = 48000;
+const note = (hz: number, i: number) => 0.25 * Math.sin((2 * Math.PI * hz * i) / rate);
+const chord = { sampleRate: rate, channels: [Float32Array.from({ length: rate }, (_, i) => note(220, i) + note(330, i))] };
+const slower = await timeStretch(chord, 1.25, { signal: AbortSignal.timeout(60000) });
+const higher = await pitchShift(chord, 3, { preserveFormants: true });
+console.log(slower.channels[0].length, higher.channels[0].length); // 60000 48000
 ```

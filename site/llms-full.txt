@@ -1326,7 +1326,7 @@ console.log(meshes.length);
 ## No bundler: an import map from a CDN
 
 Every entry is a plain ES module, so a page can load Margo straight from a CDN with an import map.
-`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,362 of them) to jsDelivr;
+`margoengine/dist/importmap.json` maps every `margoengine` and `@margoengine/*` entry (3,364 of them) to jsDelivr;
 copy it into the page, or only the lines your imports reach:
 
 ```html
@@ -12988,7 +12988,7 @@ Griffin-Lim (fast variant, random start, 1 s chirp at 48 kHz, 32 iterations), ma
 2048 hop 256 reaches 21.6 dB with momentum 0.99 and 16.8 dB without; 75 percent overlap reaches 18.0 dB (size 1024 hop 256)
 or 19.0 dB (size 2048 hop 512), so the 20 dB bar needs 87.5 percent overlap or more than 32 iterations. Spectral
 convergence never worsens without momentum (tested); with momentum it can rise for an iteration. Memory is about 7 Float64
-arrays of frames x bins values. The phase vocoder (time stretch, pitch shift) is not built. A Rust/Wasm FFT was not
+arrays of frames x bins values. The phase vocoder is the `/vocoder` entry (below). A Rust/Wasm FFT was not
 built: the paired A/B is a timing run and timing runs wait for the speed phase (the speed-phase inventory); the
 TypeScript FFT does 11,264 butterflies per 2048-point frame and 4,121 frames took 132 ms on a busy machine.
 
@@ -13457,8 +13457,8 @@ Audio speaker rules for 1, 2, 4 and 6 channels only; other counts are copied in 
 ## Offline time-stretch (GAP-FILM-STRETCH)
 
 `@margoengine/audio/stretch` is WSOLA, tuned for speech: it keeps pitch by lining up periods, so strongly percussive or
-dense polyphonic music can show doubled or smeared transients at large factors; a phase vocoder, better for such music,
-is not offered. Factors run from 0.25 to 4; the tests pin pitch within 0.2 % and level within 2 % from 0.8 to 1.25.
+dense polyphonic music can show doubled or smeared transients at large factors; use `@margoengine/audio/vocoder`
+(below) for such music. Factors run from 0.25 to 4; the tests pin pitch within 0.2 % and level within 2 % from 0.8 to 1.25.
 It works on whole decoded signals in memory, with no streaming form.
 
 ## Audio clipping and silence scans (KB-FILM-AUDIOSCAN1)
@@ -15639,6 +15639,30 @@ For N panels, the bake assembles N² complex panel influences and uses one parti
 ## Motor joint and extra substeps per island (own solver)
 
 A motor joint's six motors solve one axis at a time, each capped alone, and the sliding three and the turning three are then cut back together to their caps as vectors, as Box2D cuts its motor joint's impulse; within a pass the axes do not see each other's cut until the next. Its spring is per kilogram along each row (the `acceleration` motor model), so a body hangs `g / (2 pi frequency)^2` below its target under gravity, and a pull capped far below what the spring asks cannot brake in time: the body overshoots and swings in. `body.additionalSubsteps` holds from 0 to 1024; an island takes the most its bodies ask, so one fine body makes its whole island fine. Stepped phase by phase (`islandMajor: false`, deprecated) there is one count for the world, so every island takes the most any asks.
+
+## Phase vocoder (audio/vocoder, 2026-11-27)
+
+`@margoengine/audio/vocoder` closes the earlier "phase vocoder is not built" gap (time stretch and pitch shift).
+
+- Offline only: whole decoded signals in memory, with no streaming or live form (the mixer's pitch shift is the live
+  one). Besides the input it holds the percussive part (input size), the stretched signal (input size times
+  `factor * 2 ** (semitones / 12)`) and, with a pitch shift, the result, all as `Float32Array`s.
+- Partials closer than about three window bins (35 Hz at the default 85 ms) are not separated: they are heard as one
+  beating partial whose beat is stretched with it. In a C major seventh chord with notes 15 Hz apart one partial came
+  out at 5 % of its level at the default window; all eight stay within 5 % at `frameMs: 170` with `transients: false`.
+- Attacks: the split works only when lengthening. Overlap-add repeats a hit every few milliseconds, so an isolated
+  click's peak is 0.68 to 0.79 of the input's at factors 1.5 to 3 (over a sustained tone at 1.5 it is still about twice
+  what `transients: false` gives), and noise bursts carry about 1.3 dB less energy than their stretched length would.
+  With nothing else sounding, the vocoder alone can keep a single click's peak higher.
+- Formants: the envelope is a cepstral fit to the spectral peaks, with the correction held within 60 dB. On a test
+  vowel (150 Hz harmonics, one resonance at 900 Hz) shifted by 5 semitones each way, harmonics from 300 to 1800 Hz stay
+  within 4 dB of the original envelope. The percussive part is not corrected.
+- Pitch shifts resample with the `/resample` defaults: shifting down leaves the top of the band empty, and shifting up
+  removes what would pass 0.92 of the Nyquist frequency.
+- Quality is measured on generated signals only (README); no listening test and no rival comparison has been run.
+- TypeScript on one thread. 30 s of stereo at 48 kHz stretched by 1.25 took 5.0 s in Node on a busy workstation (7.5 s
+  with a 3 semitone shift, 8.9 s with formants kept too). A Rust/Wasm version waits for the speed phase's paired runs.
+  The event loop gets a turn, and the signal is checked, every 16 vocoder frames.
 
 === Known bugs and unverified features (docs/known-bugs.md) ===
 

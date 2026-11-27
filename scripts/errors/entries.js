@@ -503,6 +503,19 @@ export const entries = [
     fix: 'Pass what decodeWav returns, or {sampleRate, channels} with one Float32Array per channel, all one length, and whole sample rates. Leave zeroCrossings, rolloff and attenuation at their defaults unless you need a different filter.',
   },
   {
+    id: 'audio-vocoder',
+    title: '@margoengine/audio/vocoder: phase vocoder time-stretch and pitch shift',
+    kind: 'family',
+    messages: [
+      'factor must be from 0.25 to 4; see https://margoengine.com/errors#audio-vocoder',
+      'semitones must be from -24 to 24; see https://margoengine.com/errors#audio-vocoder',
+      'Every sample must be a finite number; see https://margoengine.com/errors#audio-vocoder',
+    ],
+    cause:
+      'timeStretch or pitchShift was given audio that is not {sampleRate, channels} with 1 to 32 Float32Arrays of one length and finite samples, a sampleRate that is not a whole number from 1 to 768000, a factor outside 0.25 to 4, or semitones (-24 to 24), envelopeMs (0.2 to 10) or frameMs (20 to 200) out of range.',
+    fix: 'Pass what decodeWav returns, a factor such as 1.25 (25 % longer) and semitones such as 3. Replace NaN or infinite samples first, and leave envelopeMs and frameMs at their defaults unless you need otherwise.',
+  },
+  {
     id: 'audio-stretch',
     title: '@margoengine/audio/stretch: time-stretch at the same pitch',
     kind: 'family',

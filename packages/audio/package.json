@@ -101,6 +101,10 @@
     "./stretch": {
       "types": "./dist/stretch.d.ts",
       "import": "./dist/stretch.js"
+    },
+    "./vocoder": {
+      "types": "./dist/vocoder.d.ts",
+      "import": "./dist/vocoder.js"
     }
   },
   "files": [

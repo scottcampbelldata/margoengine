@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20902031,
+  "total": 20907092,
   "history": [
     {
       "date": "2026-10-24",
@@ -14577,6 +14577,12 @@
       "commit": "HEAD",
       "reason": "water/liquid 31356 to 35538 B ceiling (built 30442 to 34502 B gzip): GPULiquid gains capsule, plane and triangle-mesh colliders (bakeLiquidMesh: closest-triangle distance and the generalized winding number, a field sampled trilinearly in the WGSL and the CPU twin), link(body, collider) for one-call two-way coupling with physics bodies, the force sums read and cleared in one submit so every impulse reaches a linked body once, and the debug lines of the new shapes (FLUID-02/03, parity bar P13). The mesh bake is the collider's own input and the link drives the same force sums, so a split entry would only re-export the same class. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "03f278d5a9",
+      "reason": "audio/vocoder new at 4805 B: offline phase vocoder time stretch and pitch shift, its own Node-safe entry; resample moved its filter loop into a module both share, root unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -14630,6 +14636,7 @@
     "@margoengine/audio/spectrogram": 5281,
     "@margoengine/audio/sprites": 1764,
     "@margoengine/audio/stretch": 1214,
+    "@margoengine/audio/vocoder": 5061,
     "@margoengine/audio/voices": 2373,
     "@margoengine/audio/wav": 2206,
     "@margoengine/audio/zones": 1395,
