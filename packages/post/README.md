@@ -2307,15 +2307,17 @@ and after the alpha changes (it writes frames only, no committed result yet).
   transform to the straight colour of partly covered pixels: `toDisplay(c / a) * a` (T. Porter and T. Duff,
   "Compositing Digital Images", SIGGRAPH 1984). Encoding the premultiplied colour made a 1 px rim about 36 of 255
   brighter than its alpha allowed (KB-POST-ALPHARIM1). `packages/post/test/alpha-rim-browser.mjs` draws a box with
-  each of 12 effects alone, on WebGPU (within 0.7 of 255, Bloom 1.4) and the WebGL2 layer (the same figures); an opaque
-  canvas keeps its shaders byte for byte (`packages/post/test/straight-display.test.js`).
+  each effect alone, DOF in focus and TAA with its options included, on WebGPU and the WebGL2 layer (within 0.7 of 255,
+  TAA 0.9, TAA without settling and Bloom 1.4); an opaque canvas keeps its shaders byte for byte
+  (`packages/post/test/straight-display.test.js`).
 - **PostStack** adds no pass of its own; its last effect writes the canvas.
 - **SMAA** blends the stored premultiplied colour (alpha valid) and finds edges in alpha too; **Glitch** takes the
   largest alpha of its three reads; **Afterimage** applies its max to alpha too, so trails fade as a premultiplied
   veil. Checked through the stack's values (`scripts/post-looks-gpu-check.js`), not by the TransparentCanvas script.
-- **DOF** (`@margoengine/dof`) keeps the sharp alpha: out-of-focus silhouettes spill colour onto
-  transparent pixels. **TAA** (`@margoengine/taa`) writes opaque alpha. **SceneFade** darkens empty
-  pixels while it fades. Use these on opaque canvases.
+- **DOF** (`@margoengine/dof`) gathers alpha with the same taps and weights as colour, so a blurred edge carries its
+  coverage; **TAA** (`@margoengine/taa`) accumulates linear premultiplied colour with alpha; **SceneFade** dissolves
+  all four premultiplied channels from the captured frame to the new one (the lerp of Porter and Duff 1984). See their
+  READMEs. `TAAUpscale` still writes opaque alpha: use it on opaque canvases.
 
 ## Sliders for the lens and glow: `@margoengine/post/settings`
 

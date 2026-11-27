@@ -13,7 +13,9 @@ import {
 import { invertMatrixStable } from '@margoengine/math/mat4';
 import { meshTriangles } from '../../shared/mesh-source.js';
 import { halton, jitterProjection } from './jitter.js';
-import { Settle, settleResolve } from './settle.js';
+import { Settle, settleDetect, settleResolve } from './settle.js';
+import { premultipliedDetect, premultipliedPresent, premultipliedResolve } from './alpha.js';
+import { premultipliedCanvas } from '../../shared/straight-display.js';
 import {
   fullscreen,
   cameraVelocity,
@@ -213,7 +215,11 @@ const instanceBuffers: GPUVertexBufferLayout[] = [
   {
     arrayStride: 96,
     stepMode: 'instance',
-    attributes: [5, 6, 7, 8, 9, 10].map((shaderLocation, i) => ({ shaderLocation, offset: i * 16, format: 'float32x4' })),
+    attributes: [5, 6, 7, 8, 9, 10].map((shaderLocation, i) => ({
+      shaderLocation,
+      offset: i * 16,
+      format: 'float32x4',
+    })),
   },
   {
     arrayStride: 96,
@@ -665,6 +671,7 @@ export class TAA implements EnginePlugin {
       this.velocityTarget?.width === c.width &&
       this.velocityTarget.height === c.height &&
       this.format === c.format &&
+      this.premultiplied === premultipliedCanvas(this.engine) &&
       (only || this.depth?.format === c.descriptor.depthStencil!.format) &&
       this.samples === samples
     )
@@ -680,6 +687,7 @@ export class TAA implements EnginePlugin {
     this.lockTextures = [];
     this.format = c.format;
     this.samples = samples;
+    this.premultiplied = premultipliedCanvas(this.engine);
     this.coverage = samples === 4 && compatTier(c.device) === 'webgl2';
     this.motionFormat = this.coverage ? 'rgba16float' : 'rg16float';
     // Unorm canvas shaders write sRGB themselves; sRGB attachments and floating-point HDR targets supply linear samples.
@@ -704,11 +712,15 @@ export class TAA implements EnginePlugin {
     if (!only) {
       for (let i = 0; i < 2; i++) {
         this.histories.push(texture('rgba16float', GPUTextureUsage.STORAGE_BINDING));
-        this.historyDepths.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
+        // On a premultiplied canvas the second channel holds the reactive mask's history (./alpha.ts).
+        const depths = this.premultiplied ? 'rg32float' : 'r32float';
+        this.historyDepths.push(texture(depths, GPUTextureUsage.STORAGE_BINDING));
         if (this.locked) this.lockTextures.push(texture('r32float', GPUTextureUsage.STORAGE_BINDING));
       }
       if (this.options.settle ?? true) {
-        this.settle = new Settle(c.device, [c.width, c.height], [c.width, c.height], 8);
+        const size = [c.width, c.height] as const,
+          detect = this.premultiplied ? premultipliedDetect(settleDetect) : settleDetect;
+        this.settle = new Settle(c.device, size, size, 8, detect);
         this.settle.bind(this.resolvePipeline!);
       }
       this.captureTarget = new SceneTarget(c.device, this.scene!, this.depth!, samples);
@@ -775,7 +787,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     }
     if (!only) {
       const step = this.options.present;
-      const module = c.device.createShaderModule({ code: step ? step.code(present) : present });
+      const shown = this.premultiplied ? premultipliedPresent(present) : present;
+      const module = c.device.createShaderModule({ code: step ? step.code(shown) : shown });
       if (step && !this.presentUniform)
         this.presentUniform = c.device.createBuffer({
           size: 16,
@@ -992,6 +1005,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     if (rebind) this.settle?.bind(this.resolvePipeline);
   }
   private manualSRGB = 0;
+  /** The canvas takes premultiplied colour (`TransparentCanvas`): history carries alpha (./alpha.ts). */
+  private premultiplied = false;
   /** Several masks in one frame (a sea and a river, or the option's and Water's): their maximum, in a mask of the
    * frame's size that TAA owns, each read scaled to it as the resolve reads one. */
   private combineMasks(c: Context, masks: GPUTexture[]): GPUTexture {
@@ -1045,7 +1060,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
     const masked = this.masked ? reactiveResolve(code) : code,
       clipped = this.variance ? varianceResolve(masked) : masked;
     const locked = this.locked ? lockResolve(clipped) : clipped;
-    return (this.options.settle ?? true) ? settleResolve(locked, 'p', 'vec2i(size)-1') : locked;
+    const settled = (this.options.settle ?? true) ? settleResolve(locked, 'p', 'vec2i(size)-1') : locked;
+    return this.premultiplied ? premultipliedResolve(settled) : settled;
   }
   /** This frame's reactive mask, or a 1 by 1 black one (nothing reactive). */
   private reactiveView(device: GPUDevice): GPUTextureView {
@@ -1108,7 +1124,8 @@ struct Motion {@location(0) velocity:vec2f,@location(1) depth:f32}
       // A move that reads the graph's uniforms runs again on last frame's.
       before =
         displacement?.move?.some((line) => line.includes('ndu.')) && displacement.program ? displacement : undefined;
-    if (rows && p.stride !== 80) throw new TypeError('Invalid TAA instanced primitive; use a PBR primitive with stride 80');
+    if (rows && p.stride !== 80)
+      throw new TypeError('Invalid TAA instanced primitive; use a PBR primitive with stride 80');
     if ((opacity || animation || displacement || clip) && p.stride !== 80)
       throw new TypeError(
         'Invalid TAA opacity map, UV animation, displacement or clip; use it on a primitive with stride 80.',

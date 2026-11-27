@@ -6769,3 +6769,9 @@ module, in browsers' and Node's module workers or on the calling thread. Proof: 
 `packages/decoders/jpeg2000-kernel`, `packages/decoders/tests/jpeg2000.test.js` and the JPEG 2000 case of
 `packages/compute/tests/onnx-image.test.js`. Not claimed: conformance (the ISO/IEC 15444-4 corpus has not been run,
 see [Limits](../limits.md#jpeg-2000-decoding)) and speed.
+
+Transparent canvas (2026-11-27, threejs-parity row 6): TAA, DOF and SceneFade keep valid premultiplied alpha on a
+`TransparentCanvas`. Real GPU (RTX A6000), WebGPU and the WebGL2 layer, correctness runs with no committed result file:
+`packages/taa/test/alpha-browser.mjs`, `packages/dof/tests/gpu/alpha-check.mjs`,
+`packages/post/test/scene-fade-alpha-browser.mjs`, `packages/post/test/alpha-rim-browser.mjs`. `TAAUpscale` is not
+covered.

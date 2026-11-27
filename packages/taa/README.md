@@ -128,6 +128,24 @@ sharpen.amount = 0.6; // takes effect next frame
 
 `gpuState` exposes velocity, current history color and history depth textures after rendering. `dispose()`/`destroy()` releases owned buffers, textures and source records. Device restoration recreates everything and discards stale history. The package is independent of PBR, animation, shadows, clustered lighting, particles and stage; helper-only imports discard the renderer. It follows the workspace's `@margoengine/*` naming convention.
 
+## Transparent canvas
+
+With `TransparentCanvas` (`@margoengine/environment`) TAA keeps valid premultiplied alpha. A partly covered sample is
+read as linear light times its coverage, history holds that with the coverage in its alpha, and the display pass encodes
+the straight colour and multiplies by the coverage again. Alpha takes the colour's reprojection taps, neighbourhood
+range (variance range with `rejection: 'variance'`), locks, blend weight and settling. The reactive mask's history
+moves to a second channel of the history depth (`rg32float`). `resolved` is then linear premultiplied colour with
+alpha. `Sharpen` leaves a pixel as it is where the coverage differs from a neighbour's. The pipelines follow the canvas,
+so the order of attaching does not matter, and an opaque canvas keeps its shaders. `TAAUpscale` writes opaque alpha.
+Checked by `test/alpha-browser.mjs` (a moving plate, alone and before Tonemap: every pixel within 0.8 of 255 of the
+plate's colour times its alpha) and `../post/test/alpha-rim-browser.mjs`, on WebGPU and the WebGL2 layer. Sources: T.
+Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984,
+<https://graphics.pixar.com/library/Compositing/paper.pdf>; A. R. Smith, "Image Compositing Fundamentals", Microsoft
+Technical Memo 4, 1995, <http://alvyray.com/Memos/CG/Microsoft/4_comp.pdf>; J. Blinn, "Compositing, Part 1: Theory",
+IEEE CG&A 14(5), 1994, <https://doi.org/10.1109/38.310740>; B. Karis, "High Quality Temporal Supersampling", SIGGRAPH
+2014; M. Salvi, "An Excursion in Temporal Supersampling", GDC 2016; L. Yang, S. Liu and M. Salvi, "A Survey of Temporal
+Antialiasing Techniques", Computer Graphics Forum 39(2), 2020, <https://doi.org/10.1111/cgf.14018>.
+
 ## Still views settle
 
 With the camera and the scene still, a jittered resolve keeps blending one of 8 sample positions into its history, so

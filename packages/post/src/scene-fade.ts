@@ -13,6 +13,7 @@ import { alphaBlend } from '../../shared/pass.js';
 import { afterPresented as presented, submitPrincipalScene as submit } from '../../shared/demo-frame.js';
 import { margoError } from '../../shared/errors.js';
 import { applyView } from '../../shared/view-rect.js';
+import { premultipliedCanvas } from '../../shared/straight-display.js';
 /**
  * Resolves once the queue's submitted work is done and the browser has had a presentation opportunity (two animation
  * frames later): use it before revealing a scene. Rejects with `signal.reason` when aborted, or with the queue's error.
@@ -65,6 +66,20 @@ const shader =
  let q=clamp(vec2i(p.xy/settings.xy*vec2f(size)),vec2i(0),size-1);
  return vec4f(textureLoad(previous,q,0).rgb,settings.z);
 }`;
+// On a premultiplied canvas the fade is a dissolve of all four premultiplied channels, new + (snapshot - new) w: the
+// lerp operator of T. Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984
+// (https://graphics.pixar.com/library/Compositing/paper.pdf), with the weight in the blend constant. Blending the
+// snapshot "over" the frame instead keeps whatever the new frame holds where the snapshot is empty, and writing its
+// colour with the weight as alpha filled empty pixels with black.
+const dissolve = {
+  srcFactor: 'constant',
+  dstFactor: 'one-minus-constant',
+  operation: 'add',
+} as const;
+const premultipliedShader = /* @__PURE__ */ shader.replace(
+  'return vec4f(textureLoad(previous,q,0).rgb,settings.z);',
+  'return textureLoad(previous,q,0);',
+);
 
 /** Briefly blends a captured, already-visible scene over its upgraded effects.
  * Attach before the base render, capture immediately after it, then warm before
@@ -86,6 +101,8 @@ export class SceneFade implements EnginePlugin {
   private group?: GPUBindGroup;
   private readonly values = new Float32Array(4);
   private started?: number;
+  /** True when the pipeline was warmed for a premultiplied (transparent) canvas. */
+  private dissolves = false;
   private disposed = false;
   /**
    * @param duration Fade length in milliseconds, 0 to 1000. Default 180.
@@ -167,7 +184,8 @@ export class SceneFade implements EnginePlugin {
         'Capture a scene before warming its fade; call capture() first',
       );
     const device = this.device!,
-      module = device.createShaderModule({ code: shader });
+      dissolves = premultipliedCanvas(this.engine),
+      module = device.createShaderModule({ code: dissolves ? premultipliedShader : shader });
     const pipeline = await device.createRenderPipelineAsync({
       layout: 'auto',
       vertex: { module, entryPoint: 'vertex' },
@@ -177,7 +195,7 @@ export class SceneFade implements EnginePlugin {
         targets: [
           {
             format: this.snapshot.format,
-            blend: alphaBlend,
+            blend: dissolves ? { color: dissolve, alpha: dissolve } : alphaBlend,
           },
         ],
       },
@@ -185,6 +203,7 @@ export class SceneFade implements EnginePlugin {
     });
     if (this.disposed) throw margoError('disposed', 'SceneFade was disposed while warming; create a new SceneFade');
     this.pipeline = pipeline;
+    this.dissolves = dissolves;
     this.group = device.createBindGroup({
       layout: pipeline.getBindGroupLayout(0),
       entries: [
@@ -214,7 +233,8 @@ export class SceneFade implements EnginePlugin {
     if (!this.pipeline || this.disposed) return;
     const t =
       this.started === undefined ? 0 : this.duration ? Math.min(1, (this.clock() - this.started) / this.duration) : 1;
-    this.values.set([c.width, c.height, 1 - t * t * (3 - 2 * t), 0]);
+    const weight = 1 - t * t * (3 - 2 * t);
+    this.values.set([c.width, c.height, weight, 0]);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     if (t === 1) {
       this.finish();
@@ -223,6 +243,7 @@ export class SceneFade implements EnginePlugin {
     const pass = c.encoder.beginRenderPass({ colorAttachments: [{ view: c.color, loadOp: 'load', storeOp: 'store' }] });
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.group!);
+    if (this.dissolves) pass.setBlendConstant([weight, weight, weight, weight]);
     applyView(pass, c);
     pass.draw(3);
     pass.end();

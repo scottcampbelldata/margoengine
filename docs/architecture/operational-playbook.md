@@ -11438,3 +11438,13 @@ three coding passes against a test-side MQ encoder, both wavelets, JP2 boxes, th
 `packages/compute/tests/onnx-image.test.js`. Missing: the ISO/IEC 15444-4 conformance corpus, a browser worker run and
 a fuzz run. Sources: Rec. ITU-T T.800; Taubman and Marcellin (Kluwer, 2002); Taubman (IEEE TIP 9(7), 2000,
 <https://doi.org/10.1109/83.847830>).
+
+Transparent canvas alpha in temporal and lens passes (2026-11-27, KB-ALPHA-TEMPORAL1): every filter on a premultiplied
+canvas works on linear premultiplied RGBA and gives alpha the colour's weights (Porter and Duff 1984; Smith 1995). TAA
+(`taa/src/alpha.ts`) patches the finished resolve, settle hash and present shader, keeps coverage in history alpha and
+the reactive history in `historyDepth.g`. DOF (`dof/src/alpha.ts`) patches the gather, near-chain and join kernels after
+the lens and half-resolution patches. SceneFade lerps with a blend constant. Pipelines follow the canvas mark of
+`shared/straight-display.js`; opaque shaders are unchanged. Evidence (section 5): `taa/test/alpha-browser.mjs`,
+`dof/tests/gpu/alpha-check.mjs`, `post/test/scene-fade-alpha-browser.mjs` and `alpha-rim-browser.mjs` on WebGPU and the
+WebGL2 layer, RTX A6000. Missing: `TAAUpscale`, water's composites (KB-WATER-ALPHARIM1) and engine views on a
+transparent canvas.

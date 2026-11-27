@@ -194,6 +194,21 @@ engine.start();
 - `anamorphic` makes every bokeh an oval that many times taller than wide, as an anamorphic lens's do. Both combine with
   `blades`, tilt and `temporal`, not with an `aperture` image. Fixed at construction.
 
+## Transparent canvas
+
+With `TransparentCanvas` (`@margoengine/environment`) every gather gives alpha the same taps and weights as colour, so
+a blurred edge carries its coverage and shows over the page, for the full and half resolution (`temporal`) gathers and
+every lens shape. The display pass encodes the straight colour of partly covered pixels. `outputTexture` holds linear
+premultiplied colour with alpha. It costs one `r32float` plane at a quarter of the gather's pixels, a second at the
+gather's size with `temporal`, on a transparent canvas only; an opaque canvas keeps its shaders. A canvas made
+transparent after DOF attached switches on the next frame. Checked by `tests/gpu/alpha-check.mjs` on WebGPU and the
+WebGL2 layer: colour equals the blur over black, and boxes of one flat colour keep that colour times alpha within one
+8-bit step in eight cases. The weights come from depth and circle of confusion alone, so colour is unchanged. Where the
+near gather's estimate of the background behind a near edge clamps at zero, the result over a transparent canvas matches
+the blur over black, and can differ slightly from a blur rendered over a light background. Sources: T. Porter and T.
+Duff, "Compositing Digital Images", SIGGRAPH 1984, <https://graphics.pixar.com/library/Compositing/paper.pdf>; J.
+Jimenez, "Next Generation Post Processing in Call of Duty: Advanced Warfare", SIGGRAPH 2014.
+
 ## Cost
 
 GPU time of the DOF passes (CoC, wide-disk 2x2-block gather, bokeh), Intel Arc 140V laptop iGPU, Edge 155, DamagedHelmet scene (the earlier test model) with environment light in a `PostStack` [DOF, Tonemap], median of 6 alternating old/new rounds x 90 frames (`examples/package-benchmarks/gates/dof.mjs`, `results/gates-dof.json`). "Before" is the 64-tap full-resolution gather of `5b9dbbd`.

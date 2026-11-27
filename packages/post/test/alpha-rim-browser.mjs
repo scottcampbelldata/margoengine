@@ -23,6 +23,12 @@ const effects = [
   'Anamorphic',
   'HeatHaze',
   'SelectiveBloom',
+  'DOF',
+  'TAA',
+  'TAA variance with locks',
+  'TAA reactive',
+  'TAA with Sharpen',
+  'TAA without settling',
 ];
 
 await postBrowser(
@@ -38,7 +44,11 @@ await postBrowser(
         { Lens } = await import('/packages/post/dist/lens.js'),
         { Anamorphic } = await import('/packages/post/dist/anamorphic.js'),
         { HeatHaze } = await import('/packages/post/dist/heat-haze.js'),
-        { SelectiveBloom } = await import('/packages/post/dist/selective-bloom.js');
+        { SelectiveBloom } = await import('/packages/post/dist/selective-bloom.js'),
+        { DOF } = await import('/packages/dof/dist/index.js'),
+        { TAA } = await import('/packages/taa/dist/index.js'),
+        { Sharpen } = await import('/packages/taa/dist/sharpen.js');
+      const taa = (options) => ({ attach: (engine) => TAA.attach(engine, options(engine)) });
       const make = {
         ...post,
         Blur: { attach: (engine) => Blur.attach(engine, { kind: 'box', radius: 0 }) },
@@ -46,6 +56,20 @@ await postBrowser(
         Anamorphic: { attach: (engine) => Anamorphic.attach(engine) },
         HeatHaze: { attach: (engine) => HeatHaze.attach(engine) },
         SelectiveBloom: { attach: (engine) => SelectiveBloom.attach(engine, { mask: () => undefined }) },
+        // In focus on the front face, so the silhouette stays sharp.
+        DOF: { attach: (engine) => DOF.attach(engine, { focalDistance: 2.6 }) },
+        TAA: taa(() => ({})),
+        'TAA variance with locks': taa(() => ({ rejection: 'variance', locks: true })),
+        'TAA reactive': taa((engine) => {
+          const mask = engine.gpu.createTexture({
+            size: [1, 1],
+            format: 'r8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING,
+          });
+          return { reactive: () => mask };
+        }),
+        'TAA with Sharpen': taa(() => ({ present: new Sharpen() })),
+        'TAA without settling': taa(() => ({ settle: false })),
       };
       window.t = {
         // Draws one frame with `name` alone (or no effect) and keeps the engine for the shots.
@@ -62,7 +86,8 @@ await postBrowser(
             .setMaterial(new PbrMaterial({ color: '#e0a050', roughness: 1 }))
             .setQuaternion([0, 0, Math.sin(Math.PI / 10), Math.cos(Math.PI / 10)]);
           if (name !== 'none') make[name].attach(engine);
-          engine.render({ delta: 1 / 60 });
+          // TAA accumulates and settles over its jitter cycle; the others draw the same picture every frame.
+          for (let i = 0; i < (name.startsWith('TAA') ? 24 : 1); i++) engine.render({ delta: 1 / 60 });
           await engine.gpu.queue.onSubmittedWorkDone();
           this.engine = engine;
         },

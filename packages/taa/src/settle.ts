@@ -92,7 +92,14 @@ export class Settle {
   /** Jitter phases in one cycle. */
   readonly phases: number;
 
-  constructor(device: GPUDevice, size: readonly [number, number], output: readonly [number, number], phases: number) {
+  /** `detect` replaces the detect pass: TAA on a premultiplied canvas hashes alpha too. */
+  constructor(
+    device: GPUDevice,
+    size: readonly [number, number],
+    output: readonly [number, number],
+    phases: number,
+    detect = settleDetect,
+  ) {
     this.device = device;
     this.size = size;
     this.phases = phases;
@@ -128,7 +135,7 @@ export class Settle {
       made.push(this.uniform);
       this.pipeline = device.createComputePipeline({
         layout: 'auto',
-        compute: { module: device.createShaderModule({ code: settleDetect }), entryPoint: 'main' },
+        compute: { module: device.createShaderModule({ code: detect }), entryPoint: 'main' },
       });
     } catch (error) {
       // A failed allocation leaves nothing behind; the caller retries the whole frame.

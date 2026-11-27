@@ -24,11 +24,13 @@ import {
   nearDownShader,
   NEAR_LEVELS,
 } from './shaders.js';
+import { alphaShaders, type DOFAlphaShaders } from './alpha.js';
+import { displayFor, premultipliedCanvas } from '../../shared/straight-display.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView, viewLoadOp, viewSize } from '../../shared/view-rect.js';
 import { coreShaderRequired, linearShader } from '../../shared/display.js';
 import { loadCompatRoute, requireCompatTier, routeSettled } from '../../shared/compat.js';
-import type { DOFLens } from './lens.js';
+import type { DOFLens, DOFLensShaders } from './lens.js';
 
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: {
@@ -38,6 +40,9 @@ declare const GPUTextureUsage: {
   COPY_SRC: number;
 };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+
+/** The views among `views` that exist: the premultiplied kernels' extra bindings, none on an opaque canvas. */
+const bound = (...views: (GPUTextureView | undefined)[]): GPUTextureView[] => views.filter((v) => v !== undefined);
 
 /** Lens settings, read from `dof.options` every frame. */
 export interface DOFOptions {
@@ -130,6 +135,15 @@ export class DOF implements EnginePlugin {
   private halfTiles?: GPUTexture;
   private blurred?: GPUTexture;
   private turn = 0;
+  // The kernels the pipelines are built from, for a premultiplied canvas with alpha (./alpha.ts), whose extra planes
+  // are the 2x2 block gathers' alpha and, at half resolution, the blurred image's.
+  private alpha = false;
+  private kernels?: DOFLensShaders & DOFAlphaShaders;
+  private compatPipelines?: typeof import('./compat.js').dofCompatPipelines;
+  private coarseAlpha?: GPUTexture;
+  private blurredAlpha?: GPUTexture;
+  private coarseAlphaView?: GPUTextureView;
+  private blurredAlphaView?: GPUTextureView;
   private readonly shaders = new Map<string, string>();
   private readonly attachment: GPURenderPassColorAttachment = { view: undefined!, loadOp: 'clear', storeOp: 'store' };
   private readonly presentation: GPURenderPassDescriptor = { colorAttachments: [this.attachment] };
@@ -227,24 +241,7 @@ export class DOF implements EnginePlugin {
       throw new MargoError('state', 'DOF owns scene capture; attach it before Tonemap, without SSAO or PostProcessing');
     this.engine = engine;
     this.uniform = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    const source = { cocShader, coarseShader, bokehShader, groupMax },
-      lensed = this.options.lens?.shaders(source) ?? source,
-      temporal = this.options.temporal === true,
-      shaders = temporal ? halfShaders(lensed) : lensed;
-    if (temporal) {
-      this.halfUniform = engine.gpu.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-      this.halvePipeline = compute(engine.gpu, halveShader);
-      this.joinPipeline = compute(engine.gpu, joinShader);
-    }
-    this.cocPipeline = engine.gpu.createComputePipeline({
-      layout: 'auto',
-      compute: { module: engine.gpu.createShaderModule({ code: shaders.cocShader }), entryPoint: 'main' },
-    });
-    this.bokehPipeline = compute(engine.gpu, shaders.bokehShader);
-    this.coarsePipeline = compute(engine.gpu, shaders.coarseShader);
-    this.nearPipeline = compute(engine.gpu, nearShader);
-    this.nearDownPipeline = compute(engine.gpu, nearDownShader);
-    this.nearSampler = engine.gpu.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
+    this.build(premultipliedCanvas(engine));
     const uniform = this.uniform,
       route = loadCompatRoute(engine.gpu, () => import('./compat.js'));
     // Alone, DOF skips its CoC and blur until its WebGL2 route has loaded: its WebGPU route there takes the CPU tier,
@@ -255,9 +252,8 @@ export class DOF implements EnginePlugin {
       ({ dofCompatPipelines }) => {
         if (this.uniform !== uniform) return;
         this.waiting = false;
-        const pipelines = dofCompatPipelines(engine.gpu!, shaders, temporal ? halveShader : undefined);
-        ({ coc: this.cocPipeline, tiles: this.tilesPipeline, bokeh: this.bokehPipeline } = pipelines);
-        if (temporal) this.halvePipeline = pipelines.halve;
+        this.compatPipelines = dofCompatPipelines;
+        this.useCompat();
         this.releaseTextures();
       },
       (error) => {
@@ -268,6 +264,42 @@ export class DOF implements EnginePlugin {
     );
     // After the handlers above: by then the route (or, if it failed, the WebGPU route) draws every frame.
     this.routeReady = routeSettled(route);
+  }
+  /** The pipelines for an opaque canvas, or with `alpha` for a premultiplied one (./alpha.ts). */
+  private build(alpha: boolean): void {
+    const device = this.engine!.gpu!,
+      source = { cocShader, coarseShader, bokehShader, groupMax },
+      lensed = this.options.lens?.shaders(source) ?? source,
+      temporal = this.options.temporal === true,
+      plain = { ...(temporal ? halfShaders(lensed) : lensed), nearShader, joinShader },
+      shaders = alpha ? alphaShaders(plain, temporal) : plain;
+    this.alpha = alpha;
+    this.kernels = shaders;
+    if (temporal) {
+      this.halfUniform ??= device.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      this.halvePipeline = compute(device, halveShader);
+      this.joinPipeline = compute(device, shaders.joinShader);
+    }
+    this.cocPipeline = device.createComputePipeline({
+      layout: 'auto',
+      compute: { module: device.createShaderModule({ code: shaders.cocShader }), entryPoint: 'main' },
+    });
+    this.bokehPipeline = compute(device, shaders.bokehShader);
+    this.coarsePipeline = compute(device, shaders.coarseShader);
+    this.nearPipeline = compute(device, shaders.nearShader);
+    this.nearDownPipeline = compute(device, nearDownShader);
+    this.nearSampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' });
+    this.tilesPipeline = undefined;
+    this.useCompat();
+  }
+  /** Swaps in the WebGL2 route's pipelines once it has loaded. */
+  private useCompat(): void {
+    const make = this.compatPipelines;
+    if (!make || !this.kernels) return;
+    const temporal = !!this.halfUniform,
+      pipelines = make(this.engine!.gpu!, this.kernels, temporal ? halveShader : undefined);
+    ({ coc: this.cocPipeline, tiles: this.tilesPipeline, bokeh: this.bokehPipeline } = pipelines);
+    if (temporal) this.halvePipeline = pipelines.halve;
   }
   /**
    * Settles once every frame draws the blur as it will from then on. On the WebGL2 compatibility layer DOF loads its
@@ -328,6 +360,12 @@ export class DOF implements EnginePlugin {
   }
   private capture(c: Context): void {
     this.validate();
+    // A canvas made transparent (or opaque again) after DOF attached takes the other kernels.
+    const alpha = premultipliedCanvas(this.engine);
+    if (alpha !== this.alpha) {
+      this.releaseTextures();
+      this.build(alpha);
+    }
     const o = this.options,
       v = this.values;
     const [viewWidth, viewHeight] = viewSize(c);
@@ -427,7 +465,7 @@ export class DOF implements EnginePlugin {
       outputView = this.outputView!,
       tileView = this.tileView!,
       coarseView = this.coarseView!;
-    const module = c.device.createShaderModule({ code: presentShader });
+    const module = c.device.createShaderModule({ code: displayFor(this.engine, presentShader) });
     this.presentPipeline = c.device.createRenderPipeline({
       layout: 'auto',
       vertex: { module, entryPoint: 'vertex' },
@@ -449,6 +487,10 @@ export class DOF implements EnginePlugin {
               { binding: 5, resource: coarseView },
               { binding: 6, resource: this.nearSampler! },
               ...this.nearViews.map((resource, i) => ({ binding: 7 + i, resource })),
+              ...bound(this.coarseAlphaView, this.blurredAlphaView).map((resource, i) => ({
+                binding: 10 + i,
+                resource,
+              })),
             ],
           }),
       c.device.createBindGroup({
@@ -457,7 +499,13 @@ export class DOF implements EnginePlugin {
       }),
       this.halfUniform
         ? undefined!
-        : group(c.device, this.coarsePipeline!, [{ buffer: this.uniform! }, this.sceneView, cocView, coarseView]),
+        : group(c.device, this.coarsePipeline!, [
+            { buffer: this.uniform! },
+            this.sceneView,
+            cocView,
+            coarseView,
+            ...bound(this.coarseAlphaView),
+          ]),
     ];
     if (!this.halfUniform)
       this.groups[8] = this.nearGroup(c.device, { buffer: this.uniform! }, this.sceneView, cocView);
@@ -479,8 +527,15 @@ export class DOF implements EnginePlugin {
       this.coarseView!,
       this.nearSampler!,
       ...this.nearViews,
+      ...bound(this.coarseAlphaView, this.blurredAlphaView),
     ]);
-    this.groups[3] = group(device, this.coarsePipeline!, [u, scene, coc, this.coarseView!]);
+    this.groups[3] = group(device, this.coarsePipeline!, [
+      u,
+      scene,
+      coc,
+      this.coarseView!,
+      ...bound(this.coarseAlphaView),
+    ]);
     this.groups[8] = this.nearGroup(device, u, scene, coc);
     this.groups[5] = group(device, this.halvePipeline!, [
       input,
@@ -489,7 +544,13 @@ export class DOF implements EnginePlugin {
       coc,
       ...(this.tilesPipeline ? [] : [tiles]),
     ]);
-    this.groups[6] = group(device, this.joinPipeline!, [input, this.cocView!, blurred, this.outputView!]);
+    this.groups[6] = group(device, this.joinPipeline!, [
+      input,
+      this.cocView!,
+      blurred,
+      this.outputView!,
+      ...bound(this.blurredAlphaView),
+    ]);
     if (this.tilesPipeline) this.groups[7] = group(device, this.tilesPipeline, [coc, tiles]);
   }
   /** The near chain's level 0 bind group over the gather's scene and CoC (full or, temporal, half size). */
@@ -594,12 +655,14 @@ export class DOF implements EnginePlugin {
         this.coarseView!,
         this.nearSampler!,
         ...this.nearViews,
+        ...bound(this.coarseAlphaView, this.blurredAlphaView),
       ]);
       this.groups[3] = group(device, this.coarsePipeline!, [
         { buffer: this.uniform! },
         input,
         this.cocView!,
         this.coarseView!,
+        ...bound(this.coarseAlphaView),
       ]);
       this.groups[8] = this.nearGroup(device, { buffer: this.uniform! }, input, this.cocView!);
     }
@@ -608,7 +671,8 @@ export class DOF implements EnginePlugin {
     if (output.hdr) return this.outputView;
     if (this.key !== key) {
       this.key = key;
-      this.presentPipeline = render(device, presentShader, output.format, { multisample: output.multisample });
+      const code = displayFor(this.engine, presentShader);
+      this.presentPipeline = render(device, code, output.format, { multisample: output.multisample });
       this.groups[2] = group(device, this.presentPipeline, [this.outputView!]);
     }
     this.attachment.view = output.view;
@@ -653,6 +717,15 @@ export class DOF implements EnginePlugin {
       });
       this.blurred = device.createTexture({ size: [hw, hh], format: 'rgba16float', usage: storage });
     }
+    if (this.alpha) {
+      const plane = (size: [number, number]) => device.createTexture({ size, format: 'r32float', usage: storage });
+      this.coarseAlpha = plane([Math.ceil(hw / 2), Math.ceil(hh / 2)]);
+      this.coarseAlphaView = this.coarseAlpha.createView();
+      if (this.halfUniform) {
+        this.blurredAlpha = plane([hw, hh]);
+        this.blurredAlphaView = this.blurredAlpha.createView();
+      }
+    }
     // The near tap source at the gather's size, NEAR_LEVELS levels (fewer for a frame under 8 px across).
     const levels = Math.min(NEAR_LEVELS, Math.floor(Math.log2(Math.max(hw, hh))) + 1),
       near = () =>
@@ -689,6 +762,9 @@ export class DOF implements EnginePlugin {
     this.nearTaps?.destroy();
     this.nearShapes?.destroy();
     this.nearScene?.destroy();
+    this.coarseAlpha?.destroy();
+    this.blurredAlpha?.destroy();
+    this.coarseAlpha = this.blurredAlpha = this.coarseAlphaView = this.blurredAlphaView = undefined;
     this.nearTaps = this.nearShapes = this.nearScene = undefined;
     this.nearViews = this.nearBase = [];
     this.nearLevels = [];
@@ -708,6 +784,7 @@ export class DOF implements EnginePlugin {
     this.halvePipeline = this.joinPipeline = undefined;
     this.cocPipeline = this.bokehPipeline = this.coarsePipeline = this.tilesPipeline = undefined;
     this.nearPipeline = this.nearDownPipeline = undefined;
+    this.kernels = this.compatPipelines = undefined;
     this.nearSampler = undefined;
     this.originalColor = this.originalDepth = undefined;
     this.shaders.clear();

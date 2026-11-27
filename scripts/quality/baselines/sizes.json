@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21257975,
+  "total": 21261330,
   "history": [
     {
       "date": "2026-10-24",
@@ -15043,6 +15043,12 @@
       "commit": "lane-e-3mf",
       "reason": "3MF slice stacks: exporters/threemf 35386 to 36665 B (layers, contours, colours, a part under /2D/ and the level-transform rule; the writer is the one function of the format) and the 3MF readers' skip of slice stacks.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "45ad3faad",
+      "reason": "three.js parity row 6, transparent canvas alpha (KB-ALPHA-TEMPORAL1): measured dof 10,849 to 11,945 B, taa 17,765 to 18,689, taa/upscale-velocity 22,662 to 23,588 (it holds taa), post/scene-fade 2,953 to 3,085. The bytes are the shader patches that carry alpha; a lazy split would draw wrong alpha until it loaded, and a separate entry would leave the effects wrong by default.",
+      "grew": 4
     }
   ],
   "items": {
@@ -15362,7 +15368,7 @@
     "@margoengine/decoders/webp-lossless": 3366,
     "@margoengine/decoders/xz": 4503,
     "@margoengine/decoders/zstd": 5305,
-    "@margoengine/dof": 11122,
+    "@margoengine/dof": 12304,
     "@margoengine/dof/autofocus": 2154,
     "@margoengine/dof/lens": 3529,
     "@margoengine/ecs": 4815,
@@ -16018,7 +16024,7 @@
     "@margoengine/post/render-graph": 8004,
     "@margoengine/post/rt-gi": 16063,
     "@margoengine/post/rt-reflections": 16807,
-    "@margoengine/post/scene-fade": 3074,
+    "@margoengine/post/scene-fade": 3341,
     "@margoengine/post/selective-bloom": 11634,
     "@margoengine/post/settings": 5273,
     "@margoengine/post/smaa": 6435,
@@ -16445,10 +16451,10 @@
     "@margoengine/studio/ground": 10534,
     "@margoengine/studio/pathtrace": 1874,
     "@margoengine/studio/pathtrace-materials": 2034,
-    "@margoengine/taa": 18298,
+    "@margoengine/taa": 19250,
     "@margoengine/taa/sharpen": 971,
     "@margoengine/taa/upscale": 9394,
-    "@margoengine/taa/upscale-velocity": 23342,
+    "@margoengine/taa/upscale-velocity": 24296,
     "@margoengine/terrain": 17938,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 7313,
