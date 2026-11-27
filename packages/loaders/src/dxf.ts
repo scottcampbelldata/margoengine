@@ -920,6 +920,40 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
         solids.push({ type: e.type, sat: decodeSAT(lines), transform: [...m], layer: layerName, color });
         return;
       }
+      case 'MLINE': {
+        // WCS points. Each vertex (codes 11, its segment's direction 12, its miter 13) lists, for every element of
+        // the style, a count (74) and that many 41 values: the offset along the miter, then the distances along the
+        // segment where the element starts and, from that start, where it breaks and resumes.
+        const vertices: { v: number[][]; elements: number[][] }[] = [];
+        for (let k = 0; k < e.codes.length; k++) {
+          const c = e.codes[k],
+            axis = Math.floor(c / 10) - 1,
+            part = (c % 10) - 1;
+          if (c === 11) vertices.push({ v: [[], [], []], elements: [] });
+          const vertex = vertices[vertices.length - 1];
+          if (!vertex) continue;
+          if (c === 74) vertex.elements.push([]);
+          else if (c === 41) vertex.elements[vertex.elements.length - 1]?.push(num(e.values[k]));
+          else if (axis >= 0 && axis < 3 && part >= 0 && part < 3) vertex.v[part][axis] = num(e.values[k]);
+        }
+        const count = vertices.length - (n(71) & 2 && vertices.length > 2 ? 0 : 1);
+        for (let i = 0; i < count; i++) {
+          const a = vertices[i],
+            b = vertices[(i + 1) % vertices.length],
+            [from, along, miter] = a.v;
+          a.elements.forEach(([offset, start = 0, ...cuts], element) => {
+            if (offset === undefined) return;
+            const to = b.elements[element]?.[0] ?? offset,
+              at = (t: number) =>
+                world([0, 1, 2].map((x) => (from[x] ?? 0) + (miter[x] ?? 0) * offset + (along[x] ?? 0) * t)),
+              end = world([0, 1, 2].map((x) => (b.v[0][x] ?? 0) + (b.v[2][x] ?? 0) * to)),
+              toggles = [start, ...cuts.map((d) => start + d)];
+            for (let t = 0; t < toggles.length; t += 2)
+              polyline(lineOut(), [at(toggles[t]), t + 1 < toggles.length ? at(toggles[t + 1]) : end], false);
+          });
+        }
+        return;
+      }
       case 'VERTEX':
       case 'SEQEND':
       case 'VIEWPORT':

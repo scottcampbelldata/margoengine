@@ -17692,3 +17692,11 @@ The `ATTRIB` and `ATTDEF` reading and the `%%` control codes of `packages/loader
 
 The `101 Embedded Object` marker of a multiline attribute is not named on that page and is not yet proven on a real
 file. No other project's source was read.
+
+## DXF multilines (2026-11-27)
+
+The `MLINE` reading of `packages/loaders/src/dxf.ts` is written from Autodesk, *DXF Reference*, "MLINE (DXF)" (the
+vertex, segment direction and miter codes and the meaning of the group 41 element parameters),
+https://help.autodesk.com/view/OARX/2024/ENU/?guid=GUID-590E8AE3-C6D9-4641-8485-D7B3693E432C. Break distances are
+read as measured from the element's start, our reading of that page, not yet proven on a real file. No other
+project's source was read.

@@ -131,6 +131,7 @@ From the three.js examples gallery, example by example (names only).
 | City generator: streets, blocks and lots filled with rule-built buildings in one call (`generateBuilding` and road graphs exist separately) | three.js examples (`webgpu_generator_city`) | DONE (`generateCity` and `buildCity` of `@margoengine/procedural/city`: grid, organic and radial streets, land use, lots, a building per lot at a distance level of detail, markings, trees and lamps; flat ground only) | M |  |
 | DXF `HATCH` entities: solid and pattern fills with islands (`parseDXF` skipped them) | web DXF viewers (`dxf-viewer`) | DONE (`readDXFHatch` of `@margoengine/loaders/dxf-hatch`; gradients draw flat; not yet checked on an exporter's file) | S to M | a23ee65f77 |
 | DXF block attributes: `parseDXF` dropped every `ATTRIB` and `ATTDEF` without counting it, and showed `%%c`, `%%d` and `%%p` literally | web DXF viewers (`dxf-viewer`) | DONE (visible attributes in `texts` with their `tag`, control codes resolved; not yet checked on an exporter's file) | S | 9c82f253a5 |
+| DXF `MLINE` multilines (walls in architectural drawings): `parseDXF` counted them in `skipped` | web DXF viewers (`dxf-viewer`) | DONE (element lines with miters, breaks and closed paths; style colours, caps and fill not read; not yet checked on an exporter's file) | S |  |
 
 ## Lane D: tools, runtime and interaction
 

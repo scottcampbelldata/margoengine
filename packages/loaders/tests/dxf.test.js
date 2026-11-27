@@ -431,3 +431,66 @@ test('parseDXF reads attribute definitions, multiline attributes and %% control 
     ['Under 100% A ±2 ∅3 90°', '45°'],
   );
 });
+
+test('parseDXF draws an MLINE: each element along the miters, with its breaks, open and closed', () => {
+  /** A vertex: point, segment direction, miter direction, then each element's 41 values. */
+  const vertex = ([x, y], [dx, dy], [mx, my], ...elements) => [
+    ...point(x, y, 11),
+    ...point(dx, dy, 12),
+    ...point(mx, my, 13),
+    ...elements.flatMap((values) => [[74, values.length], ...values.map((v) => [41, v]), [75, 0]]),
+  ];
+  const mline = (flags, ...vertices) =>
+    parseDXF(
+      new TextEncoder().encode(
+        dxf(
+          section(
+            'ENTITIES',
+            entity(
+              'MLINE',
+              [40, 1],
+              [70, 1],
+              [71, flags],
+              [72, vertices.length],
+              [73, 2],
+              ...point(0, 0),
+              ...vertices.flat(),
+            ),
+          ),
+        ),
+      ),
+    );
+  const segments = (result) => {
+    const p = result.lines.positions,
+      out = [];
+    for (let i = 0; i < p.length; i += 6) out.push([p[i], p[i + 1], p[i + 3], p[i + 4]]);
+    return out;
+  };
+  // A corner: two elements 1 either side of the vertex line, joined on the miters. The first is cut from 3 to 5.
+  const open = mline(
+    1,
+    vertex([0, 0], [1, 0], [0, 1], [1, 0, 3, 5], [-1, 0]),
+    vertex([10, 0], [0, 1], [-1, 1], [1, 0], [-1, 0]),
+    vertex([10, 8], [0, 1], [-1, 0], [1, 0], [-1, 0]),
+  );
+  assert.deepEqual(open.skipped, {});
+  assert.deepEqual(segments(open), [
+    [0, 1, 3, 1],
+    [5, 1, 9, 1],
+    [0, -1, 11, -1],
+    [9, 1, 9, 8],
+    [11, -1, 11, 8],
+  ]);
+  // Closed (flag 2): the last vertex's segment returns to the first. A start distance leaves the corner open.
+  const closed = mline(
+    3,
+    vertex([0, 0], [1, 0], [0, 1], [0, 2]),
+    vertex([4, 0], [0, 1], [0, 1], [0, 0]),
+    vertex([4, 4], [-1, 0], [0, 1], [0, 0]),
+  );
+  assert.deepEqual(segments(closed), [
+    [2, 0, 4, 0],
+    [4, 0, 4, 4],
+    [4, 4, 0, 0],
+  ]);
+});
