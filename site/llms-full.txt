@@ -15474,6 +15474,25 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Owed:** a coded error with an errors-page link that says to add `viewFormats` (a validation error scope around
   that `createView`), with its test.
 
+### Open 2026-11-26: whitecaps on a swell sea break along the long swell crests in soft-edged bands (KB-WATER-WHITECAPBANDS1, water, SEA-13)
+
+- **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, 3.6 m up over the dune coast's sea, wind 12 m/s,
+  `whitecaps` 0.67): the foam lies in pale bands that run the width of the frame along the 72 m and 41 m swell crests,
+  their edges soft over a metre or more, where a 12 m/s sea breaks in short bright patches on the steep wind-sea crests
+  with sharp toes and streaks down-wind.
+- **Not coverage:** in a top-down 200 m view (as `whitecap-coverage.browser.mjs`) the s18 trains with `whitecaps` 0.67
+  cover 0.42% of the sea with foam, against Monahan and O'Muircheartaigh's 1.84% at 12 m/s; the wind sea of 12 m/s
+  covers 1.81%.
+- **Cause:** `whitecap()` in `packages/water/src/index.ts` (SEA-13's drawing) thresholds the crest term summed over every
+  swell train, so the longest trains, with the largest amplitudes, decide where foam forms; the crest term is smooth at
+  a metre's scale, so the threshold's `smoothstep(-0.02,0.07,...)` edge is a metre or more wide.
+- **Before KB-WATER-WHITEWATERLIGHT1:** the bands are in its parent's frame. Over the s18 mid frame's water below a
+  quarter of the way down (stills checked with `scripts/review-png.mjs`, same pixels), the mean run of bright pixels
+  (luma 170 or more) along a row and the rows of the 120 to 170 ramp into them were 84 px and 6.8 rows on the parent,
+  71 px and 6.5 rows with WHITEWATERLIGHT1, and 30 px and 3.3 rows with KB-WATER-NEARDETAIL1 and KB-WATER-TAASMEAR1;
+  the bands themselves remain.
+- **Owner:** SEA-13 (Codex, `docs/physics-work-queue.md`); left for it, not changed by the rendering lane.
+
 ### Open 2026-11-26: `npm run quality` is red on main at 9013114839 in physics entries (SEA-12, K2-09; solver-owned, not touched here)
 
 - **Repro:** `npm run quality` on 9013114839: sizes (the baseline holds the "feat(physics2d) vehicle" history row
@@ -15966,6 +15985,43 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** with a `wetness` record the ripple relief is scaled by one less the record's moisture (`terrainMoisture`),
   so wet and submerged sand is smooth; without a record nothing changes.
 - **Regression:** `packages/terrain/test/colors.test.js` "wet and submerged sand carries no wind ripples".
+
+### Fixed 2026-11-26: TAA averaged the moving sea into a sideways smear (KB-WATER-TAASMEAR1, water)
+
+- **Repro:** the Kitty Hawk film's shot s18 (`examples/kitty-hawk`, 3.6 m up over the sea, TAA on): the near water is
+  smeared sideways, no crisp crest or trough. Its lowest quarter measured 0.52 mean horizontal luma step and 1.50 mean
+  Laplacian (stills at 1920 x 1080); with TAA off, the same frame measured 1.08 and 3.27. Motion blur and depth of field
+  changed nothing (with motion blur off, and at f/8 and f/64, the frames measured the same).
+- **Cause:** Water draws no motion vectors and wrote no reactive mask. Its waves move the surface's look (the
+  reflections, the ripples, the crests) every frame, so TAA reprojected history by the camera alone and blended ten
+  frames of moving waves into one.
+- **Fix:** Water writes TAA's reactive mask, `water.reactiveTexture`: 1 where the fastest train's crests move a pixel
+  or more a frame, falling to 0 under a quarter pixel, 0 where nothing moves or no water is drawn. Water publishes it on
+  the pass context for the frame's encoder and view (`packages/shared/reactive-mask.js`, like the surface depth) and TAA
+  reads every published mask by itself, the maximum of several (a sea and a river, or its own `reactive`), compiling the
+  masked resolve the first frame one appears. No scene wires it.
+- **Regression:** `packages/water/test/near-detail.browser.mjs` (WebGPU and the WebGL2 layer): a plain stage with Water
+  and `TAA.attach(engine)`, nothing wired, after 24 moving frames: the parent kept 0.34 of the near sea's fine relief,
+  the fix keeps 1.0. The mask reads 1 over the moving near sea and 0 above the horizon and with nothing moving;
+  `packages/taa/test/reactive-mask.test.js` covers the registry (encoder and view tags, several publishers).
+
+### Fixed 2026-11-26: the near sea had no ripples finer than 30 cm (KB-WATER-NEARDETAIL1, water)
+
+- **Repro:** the same s18 frame: the water 5 to 9 m from the camera, where a pixel covers a few millimetres, is a
+  smooth wash of sky reflection with no fine ripples, under a 12 m/s wind.
+- **Cause:** Water's shading normal carried its four ripple layers (5 m down to 30 cm) and two short wind-sea bands
+  only, at 0.02 to 0.08 RMS slope, while a 12 m/s sea holds most of its slope (Cox and Munk's 0.064 mean square) in
+  waves of a metre down to a centimetre.
+- **Fix:** with `chop` above 0, five octaves of short-crested gravity-capillary waves (25 cm to 1.8 cm) join the
+  normal, each with the slope variance of Elfouhaily et al.'s short-wave spectrum (1997) at the friction velocity of a
+  16 x `chop` m/s wind, moving at its own phase speed and fading as a pixel covers it; the variance an octave keeps
+  resolved leaves the glint lobe's unresolved share, so the total slope stays Cox and Munk's at every distance.
+- **Regression:** `packages/water/test/near-detail.browser.mjs`: the near sea's 2 to 5 cm relief at chop 0.75 was 1.8
+  luma levels; now 13.7 (bar 6).
+- **Judged:** a fresh s18 still: the near water shows fine bright and dark ripples and glints, darker between them,
+  and its lowest quarter measures 4.12 horizontal step and 17.8 Laplacian (was 0.52 and 1.50). Left: the swell's crest
+  pattern is the four authored trains, long-crested toward the horizon, and the whitecaps lie in soft bands along the
+  swell crests (KB-WATER-WHITECAPBANDS1, SEA-13).
 
 ### Fixed 2026-11-26: white water was lit as a flat grey sheet, and surf foam on a sea without whitecaps took no sky light (KB-WATER-WHITEWATERLIGHT1, water)
 
