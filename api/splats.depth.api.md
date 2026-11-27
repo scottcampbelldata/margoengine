@@ -68,6 +68,7 @@ class Splats implements EnginePlugin {
     setFog(fog: FogLike | null): this;
     static attach(instance: EngineKernel, data: SplatData): Splats;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     setTransparency(hook: SurfaceTransparency, released?: () => void): () => void;
     drawTransparent(c: Context, hook: SurfaceTransparency): void;

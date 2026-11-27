@@ -18,7 +18,7 @@ import { histogram, scan, scanTotals, scatter } from './sort.js';
 import { MargoError } from '@margoengine/math/errors';
 import { applyView } from '../../shared/view-rect.js';
 import { alphaBlend, surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 export { parseSplat, validateSplats, type SplatData } from './data.js';
 export {
   parsePly,
@@ -88,6 +88,7 @@ export class Splats implements EnginePlugin {
   private sortGroups: GPUBindGroup[][] = [];
   // The WebGL2 layer's route (./compat.js): the whole sort as one CPU-tier dispatch.
   private compatSort?: { pipeline: GPUComputePipeline; group: GPUBindGroup };
+  private routeReady: Promise<void> = Promise.resolve();
   private renders = new Map<string, { pipeline: GPURenderPipeline; group: GPUBindGroup }>();
   private disposed = false;
   private mip = false;
@@ -419,10 +420,29 @@ export class Splats implements EnginePlugin {
         bind(this.sortPipelines[3], [parameters, this.keys[front], this.keys[1 - front], offsets, bases]),
       ]);
     }
-    const keys = this.keys;
-    loadCompatRoute(d, () => import('./compat.js'))?.then(({ splatCompatSort }) => {
+    const keys = this.keys,
+      route = loadCompatRoute(d, () => import('./compat.js'));
+    route?.then(({ splatCompatSort }) => {
       if (this.keys === keys) this.compatSort = splatCompatSort(d, settings[0], keys);
     });
+    // After the handler above: by then the route's sort orders the keys.
+    this.routeReady = routeSettled(route);
+  }
+  /**
+   * Settles once every frame orders the splats as it will from then on. On the WebGL2 compatibility layer Splats loads
+   * its sort route (a dynamic import) when it attaches; until it has loaded the WebGPU radix sort runs on the layer's
+   * CPU tier, which orders splats of equal depth its own way. Resolved at once on WebGPU. Read it after attaching, and
+   * await it before a frame that must be exact: a film frame, a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const cloud = Splats.attach(engine, data);
+   * await cloud.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({

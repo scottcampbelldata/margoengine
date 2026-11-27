@@ -162,6 +162,8 @@ window.check = {
     if (o.afterX !== undefined) later({ x: at[0] + o.afterX, size: 3, at });
     if (o.disposeDepth) depth.dispose();
     if (o.disposeCloud) cloud.dispose();
+    // KB-COMPAT-READY1: on the layer the sort route arrives by import(); exact frames wait for it.
+    else await cloud?.ready;
     await waitForPipelines(draw);
   },
   async pixels() {
@@ -284,7 +286,7 @@ window.check.lod = async (o) => {
   engine = await Engine.create(canvas, { backend: 'webgpu', preserveDrawingBuffer: true, camera });
   engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
   if (!source) {
-    Splats.attach(engine, plain);
+    await Splats.attach(engine, plain).ready;
     await waitForPipelines(draw);
     return { url: canvas.toDataURL('image/png') };
   }
@@ -325,7 +327,7 @@ window.check.lod = async (o) => {
     canvas.style.cssText = 'width:256px;height:256px;display:block';
     engine = await Engine.create(canvas, { backend: 'webgpu', preserveDrawingBuffer: true, camera });
     engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
-    Splats.attach(engine, data);
+    await Splats.attach(engine, data).ready;
     await waitForPipelines(draw);
     result.reference = canvas.toDataURL('image/png');
     result.coefficients = source.coefficients;
@@ -400,6 +402,7 @@ window.check.modify = async (real = false) => {
   engine = await Engine.create(canvas, { backend: 'webgpu', preserveDrawingBuffer: true, camera });
   engine.gpu.addEventListener('uncapturederror', (e) => errors.push(e.error.message));
   const cloud = Splats.attach(engine, data);
+  await cloud.ready;
   await waitForPipelines(draw);
   const before = canvas.toDataURL('image/png'),
     modifier = await SplatModifier.attach(engine, cloud, {

@@ -438,6 +438,26 @@ engine.start();
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.
 
+## Exact first frames on the WebGL2 layer
+
+`cloud.ready` is a promise that settles once every frame orders the splats as it will from then on. On the WebGL2
+compatibility layer `Splats` fetches its sort route (`import()`) when it attaches; until it arrives the WebGPU radix sort
+runs on the layer's CPU tier, which orders splats of equal depth its own way. On WebGPU it is already settled. Await it
+before a frame that must be exact, such as a film frame or a pixel comparison:
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Splats} from 'margoengine/splats';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const cloud = Splats.attach(engine, {
+  positions: new Float32Array([0, 0, 0]),
+  covariances: new Float32Array([0.1, 0, 0, 0.1, 0, 0.1]),
+  colors: new Float32Array([1, 0.5, 0.2, 1]),
+});
+await cloud.ready;
+engine.render();
+```
+
 ## Film time
 
 `SplatSequence` and `SplatModifier` move `time` (by `speed`, while `playing`) in the frame update with `advanceTime(delta)`, not in their passes, so `seek` from `@margoengine/cutscene/seek` starts a film scene on the frame a continuous run shows.
