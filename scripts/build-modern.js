@@ -13,6 +13,7 @@ import { packageDeclarations, packageRuntime } from './package-declarations.js';
 import { writeServerEntries } from './react-server-entries.js';
 import { importMap, isInstallKit } from './umbrella.mjs';
 import { copyLegal } from './package-legal.js';
+import { lazyLoaderChunks } from './support/lazy-loader-chunks.mjs';
 import { declarePackageCore } from './core-requirements.mjs';
 import { stripPackageShaderComments } from './shader-comments.mjs';
 import { recordJob, recordScope } from './support/record-reads.mjs';
@@ -138,6 +139,8 @@ async function buildPackage(name, output) {
       return [module, `packages/${name}/src/${module}.ts`];
     }),
   );
+  // A lazy loader gets a dist chunk of its own, so no lazy target imports back the chunk that loads it (KB-INL1b).
+  const codeSplitting = lazyLoaderChunks(`packages/${name}/src`, entry);
   await build({
     configFile: false,
     // Match optional-package builds: emitted assets travel with their installed module.
@@ -201,7 +204,7 @@ async function buildPackage(name, output) {
           '@margoengine/decoders/png',
           '@margoengine/decoders/image',
         ]),
-        output: compactOutput,
+        output: codeSplitting ? { ...compactOutput, codeSplitting } : compactOutput,
       },
     },
   });
