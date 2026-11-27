@@ -826,6 +826,7 @@ a URL to fetch or the file's bytes; a detached `.nhdr` header fetches its data f
 | --- | --- | --- |
 | `frame` | `0` | volume of a time series (axes after the spatial ones) |
 | `component` | `0` | sample of a multi-component voxel (an RGB or vector axis), or `'magnitude'` |
+| `orientation` | `true` (`false` with `bounds` or `transform`) | places the volume by the file's `space directions`, `space origin` and negative `spacings`, so the axes read in its `space` coordinates; `false` draws the voxels axis-aligned from 0 |
 | `resolve` | fetch next to the URL | reads a detached data file by the path the header writes; needed for `.nhdr` bytes |
 | `maxSamples` | `536_870_912` | stops a huge declared size before anything is allocated |
 | `init` | none | request options for every fetch, such as headers |
@@ -846,7 +847,11 @@ console.log(nrrdGrid(volume, { frame: 0 }).dims);
 `loadNRRD(source, options)` reads without drawing, and `nrrdGrid(volume, { frame, component })` picks one scalar grid:
 a single scalar volume keeps the file's sample type, a frame of a series is a view of the file's array, and a chosen
 component or the magnitude is a new `Float32Array`. The colour range spans the grid's samples unless you pass `range`.
-The file's orientation (`volume.matrix`) is not applied to the box: the volume draws axis-aligned in index order.
+A rotated, flipped or sheared file draws in place through the `transform` option of `fig.volume()`: a column-major
+affine 4x4 that places the `bounds` box in data space, which any volume can use. `nrrdTransform(volume)` returns it
+(or `undefined` when the voxels need none), and `layer.slice()`, picking and the quality and cinematic wrappers follow
+it. `fig.isosurface()` takes no transform: pass `orientation: false` to keep a volume lined up with an isosurface of the
+same grid. A `block` file has no numbers to draw: `nrrdGrid` throws, and `loadNRRD` still returns its bytes.
 
 ## Medical and array formats
 

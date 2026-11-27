@@ -413,7 +413,8 @@ export class GpuPicking {
           ny = 1 - (y / height) * 2;
         const w = inv[3] * nx + inv[7] * ny + inv[11] * depth + inv[15];
         position = [0, 1, 2].map((j) => (inv[j] * nx + inv[4 + j] * ny + inv[8 + j] * depth + inv[12 + j]) / w);
-        if (record.kind === 'volume' && 'bounds' in layer)
+        if (record.kind === 'volume' && 'dataPosition' in layer) position = layer.dataPosition(position);
+        else if (record.kind === 'volume' && 'bounds' in layer)
           position = position.map((a, j) => layer.bounds[j * 2] + a * (layer.bounds[j * 2 + 1] - layer.bounds[j * 2]));
       }
       if (record.kind !== 'volume') position = position.map((a, j) => fig.axisScales[j].inverse(a));

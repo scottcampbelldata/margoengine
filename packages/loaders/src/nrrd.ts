@@ -21,7 +21,8 @@ export type NRRDType =
   | 'int64'
   | 'uint64'
   | 'float32'
-  | 'float64';
+  | 'float64'
+  | 'block';
 
 /** Samples in the file's own type; 64-bit integers arrive as `Float64Array`, exact up to 2^53. */
 export type NRRDData =
@@ -45,9 +46,14 @@ export interface NRRDOptions {
 
 /** What {@link parseNRRD} returns. Pass `data`, `dims` and `bounds` to `fig.volume()` of `@margoengine/sciviz`. */
 export interface NRRDVolume {
-  /** Every sample, the first axis fastest. */
+  /**
+   * Every sample, the first axis fastest. For the `block` type, the opaque blocks as stored: `blockSize` bytes each, in
+   * a `Uint8Array`.
+   */
   data: NRRDData;
   type: NRRDType;
+  /** Bytes per sample of a `block` file (its `block size` field); absent for every other type. */
+  blockSize?: number;
   /** The size of every axis in the file, the fastest first. */
   sizes: number[];
   /** Grid size `[nx, ny, nz]` of the spatial axes, padded with 1 for a 1D or 2D file. */
@@ -70,7 +76,10 @@ export interface NRRDVolume {
   meta: Record<string, string>;
 }
 
-const TYPES: Record<string, NRRDType> = Object.create(null);
+/** A numeric sample type: every NRRD type but the opaque `block`. */
+type ElementType = Exclude<NRRDType, 'block'>;
+
+const TYPES: Record<string, ElementType> = Object.create(null);
 for (const [type, names] of [
   ['int8', 'signed char,int8,int8_t'],
   ['uint8', 'uchar,unsigned char,uint8,uint8_t'],
@@ -208,7 +217,7 @@ const PER_AXIS = new Set([
 /** Orientation fields, which only come after `space` or `space dimension` (section 4). */
 const ORIENTATION = new Set(['space units', 'space origin', 'space directions', 'measurement frame']);
 
-const SIZE: Record<NRRDType, number> = {
+const SIZE: Record<ElementType, number> = {
   int8: 1,
   uint8: 1,
   int16: 2,
@@ -221,7 +230,7 @@ const SIZE: Record<NRRDType, number> = {
   float64: 8,
 };
 
-function allocate(type: NRRDType, count: number): NRRDData {
+function allocate(type: ElementType, count: number): NRRDData {
   switch (type) {
     case 'int8':
       return new Int8Array(count);
@@ -472,7 +481,7 @@ function swap(bytes: Uint8Array, size: number): void {
 }
 
 /** Writes `count` samples from native-order `bytes`, which own their buffer, into `out` at `offset`. */
-function store(out: NRRDData, offset: number, bytes: Uint8Array<ArrayBuffer>, type: NRRDType, count: number): void {
+function store(out: NRRDData, offset: number, bytes: Uint8Array<ArrayBuffer>, type: ElementType, count: number): void {
   if (type === 'int64' || type === 'uint64') {
     const wide =
       type === 'int64' ? new BigInt64Array(bytes.buffer, 0, count) : new BigUint64Array(bytes.buffer, 0, count);
@@ -605,7 +614,8 @@ async function inflateMember(data: Uint8Array, out: Uint8Array, length: number, 
 }
 
 interface Encoded {
-  type: NRRDType;
+  /** The element type read: a `block` file is read as bytes. */
+  type: ElementType;
   encoding: 'raw' | 'ascii' | 'hex' | 'gzip' | 'bzip2';
   swapped: boolean;
   lineSkip: number;
@@ -738,13 +748,15 @@ function layout(
  * raw, ascii, hex, gzip and bzip2, with either byte order, `line skip` and `byte skip` (-1 for the end of a raw file)
  * and one or many data files (a printf pattern or a `LIST`, with `subdim`). Data past what the header needs is
  * ignored, and gzip decoding stops there. `space directions`, `space origin`, `spacings` and `kinds` set `dims`, `spacing`, `bounds` and
- * `matrix`; a leading non-spatial axis is `components` and trailing ones are `frames`.
+ * `matrix`; a leading non-spatial axis is `components` and trailing ones are `frames`. A `block` file gives its blocks
+ * as bytes with `blockSize`; its encoding cannot be ascii (the format defines no text form for a block) and its bytes
+ * are never swapped.
  *
  * @param input The file's bytes.
  * @param options A resolver for detached data, the sample limit and an AbortSignal.
  * @returns The samples in the file's own type and where they sit.
- * @throws LoaderError with code `header`, `syntax`, `truncated`, `range`, `limit`, `aborted`, `zip` or `unsupported` (
- * the block type, or detached data without `resolve`).
+ * @throws LoaderError with code `header`, `syntax`, `truncated`, `range`, `limit`, `aborted`, `zip` or `unsupported`
+ * (detached data without `resolve`).
  *
  * @example
  * ```ts
@@ -766,9 +778,8 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
     { fields, known, meta } = header;
   const missing = ['type', 'dimension', 'sizes', 'encoding'].find((name) => !(name in known));
   if (missing) throw new LoaderError(F, 'header', `the required field "${missing}" is missing`);
-  if (fields.type.toLowerCase() === 'block')
-    throw new LoaderError(F, 'unsupported', 'the block type has no array form');
-  const type = TYPES[fields.type.toLowerCase()];
+  const block = fields.type.toLowerCase() === 'block',
+    type = block ? 'uint8' : TYPES[fields.type.toLowerCase()];
   if (!type) throw new LoaderError(F, 'header', `unknown type "${fields.type.slice(0, 32)}"`);
   const named = fields.encoding.toLowerCase();
   const encoding = ENCODINGS[named];
@@ -785,6 +796,16 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
     total *= size;
     if (total > maxSamples) throw new LoaderError(F, 'limit', `the array exceeds the limit of ${maxSamples} samples`);
   }
+  const blockSize = block ? integer(known['block size'], 'block size', 0) : 1;
+  if (block) {
+    if (known['block size'] === undefined)
+      throw new LoaderError(F, 'header', 'the required field "block size" is missing');
+    if (blockSize < 1) throw new LoaderError(F, 'range', `block size ${blockSize} is below 1`);
+    if (encoding === 'ascii') throw new LoaderError(F, 'header', 'block data cannot be ascii');
+    // The same memory bound as the widest numeric type: 8 bytes a sample.
+    if (total * blockSize > maxSamples * 8)
+      throw new LoaderError(F, 'limit', `the blocks exceed ${maxSamples * 8} bytes (8 per sample of maxSamples)`);
+  }
   const endian = fields.endian?.toLowerCase();
   if (endian !== undefined && endian !== 'little' && endian !== 'big')
     throw new LoaderError(F, 'header', `unknown endian "${endian.slice(0, 32)}"`);
@@ -797,17 +818,18 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
     throw new LoaderError(F, 'range', `byte skip ${byteSkip} is not allowed with ${encoding} data`);
   const placed = layout(known, sizes);
 
-  const data = allocate(type, total),
+  const elements = total * blockSize,
+    data = allocate(type, elements),
     how: Encoded = {
       type,
       encoding,
-      swapped: endian !== undefined && (endian === 'little') !== LITTLE,
+      swapped: !block && endian !== undefined && (endian === 'little') !== LITTLE,
       lineSkip,
       byteSkip,
       signal,
     },
     { files, subdim } = dataFiles(header, dimension);
-  if (!files.length) await decode(bytes.subarray(header.end), data, 0, total, how);
+  if (!files.length) await decode(bytes.subarray(header.end), data, 0, elements, how);
   else {
     if (!resolve)
       throw new LoaderError(F, 'unsupported', `the data is in "${files[0].slice(0, 64)}"; pass a resolve option`);
@@ -822,7 +844,7 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
         'range',
         `${files.length} data files do not fit sizes ${sizes.join(' ')} with subdim ${subdim}`,
       );
-    const each = total / files.length;
+    const each = elements / files.length;
     for (let i = 0; i < files.length; i++) {
       throwIfAborted(signal, F);
       const content = await resolve(resolvePath('', files[i]));
@@ -830,5 +852,5 @@ export async function parseNRRD(input: BinaryInput, options: NRRDOptions = {}): 
       await decode(file, data, i * each, each, how);
     }
   }
-  return { data, type, sizes, ...placed, fields, meta };
+  return { data, type: block ? 'block' : type, ...(block ? { blockSize } : {}), sizes, ...placed, fields, meta };
 }

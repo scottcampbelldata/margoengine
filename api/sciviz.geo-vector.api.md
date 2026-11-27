@@ -811,6 +811,7 @@ class VolumeLayer implements Drawable {
     classificationUniforms(): readonly number[];
     restore(): void;
     setModel(figure: Float32Array): void;
+    dataPosition(p: readonly number[]): [number, number, number];
     get model(): Float32Array;
     center(): readonly [number, number, number];
     resources(): {
@@ -832,6 +833,7 @@ class VolumeLayer implements Drawable {
 interface VolumeLayerOptions {
     readonly dims?: readonly [number, number, number];
     readonly bounds?: Bounds;
+    readonly transform?: ArrayLike<number>;
     readonly colormap?: ColormapSource;
     readonly range?: readonly [number, number];
     readonly opacity?: readonly (readonly [number, number])[] | ((t: number) => number);

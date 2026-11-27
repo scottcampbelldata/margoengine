@@ -947,7 +947,7 @@ console.log(data);
 - `bounds` is the box in true proportions from 0. `matrix` takes a voxel index to the file's `space`, with its origin, rotation and flips: use it to line a scan up with other data.
 - `resolve` gets the path as the header writes it, tidied of `.` and `..`. It is your code: keep it inside the folder you trust.
 - The header is checked against the format: the magic is `NRRD0001` to `NRRD0005` alone on its line, a field newer than the magic (key/value pairs before 0002, `kinds` before 0003, `space` fields and several data files before 0004) is a `header` error, as is an unknown `space` or a kind on an axis of the wrong size (`RGB-color` needs 3). ASCII floats follow the format's rule: any word with `nan` is NaN, then `-inf` and `inf`.
-- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated. Data past what the header needs is ignored, as the format says: gzip and bzip2 decoding stop once the samples are out, so a small file never inflates to more than it needs. `bzip2` data needs `@margoengine/decoders`. The `block` type has no array form and is an `unsupported` error.
+- `maxSamples` (default 536,870,912) stops a huge declared size before anything is allocated. Data past what the header needs is ignored, as the format says: gzip and bzip2 decoding stop once the samples are out, so a small file never inflates to more than it needs. `bzip2` data needs `@margoengine/decoders`. A `block` file comes out as `type: 'block'`, its blocks as stored in a `Uint8Array` of `blockSize` (the `block size` field) bytes each: no byte order applies, ascii encoding is a `header` error, and the blocks may take at most 8 bytes per sample of `maxSamples`.
 
 ## LDraw
 

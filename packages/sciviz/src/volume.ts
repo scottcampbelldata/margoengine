@@ -40,6 +40,12 @@ export interface VolumeLayerOptions {
   readonly dims?: readonly [number, number, number];
   /** Data bounds of the box: [xmin, xmax, ymin, ymax, zmin, zmax]. Default the voxel indices [0, n - 1]. */
   readonly bounds?: Bounds;
+  /**
+   * Column-major 4x4 affine (16 numbers, last row 0 0 0 1) that places the `bounds` box in the figure's data space:
+   * rotation, flips, shear and translation, such as a scan's orientation. The layer's `bounds` are then the
+   * axis-aligned box around the placed volume. Default none (the box stays axis-aligned at `bounds`).
+   */
+  readonly transform?: ArrayLike<number>;
   /** Colour map. Default `'aurora'`. */
   readonly colormap?: ColormapSource;
   /** Data range the transfer function spans. Default the data's min and max (required for a GpuArray). */
@@ -392,6 +398,50 @@ export function transferTable(map: Colormap, opacity: VolumeLayerOptions['opacit
   return bytes;
 }
 
+/** A checked copy of a volume `transform`: 16 finite numbers, affine and invertible. */
+function affine(matrix: ArrayLike<number>): Float64Array {
+  const t = Float64Array.from(matrix ?? []);
+  if (
+    t.length !== 16 ||
+    !t.every(Number.isFinite) ||
+    t[3] !== 0 ||
+    t[7] !== 0 ||
+    t[11] !== 0 ||
+    t[15] !== 1 ||
+    !(Math.abs(determinant(t)) > 0)
+  )
+    throw rangeError(
+      'Volume transform must be 16 finite numbers, column-major, affine (last row 0 0 0 1) and invertible',
+      'sciviz',
+    );
+  return t;
+}
+
+/** The determinant of the linear part of a column-major 4x4. */
+const determinant = (m: ArrayLike<number>): number =>
+  m[0] * (m[5] * m[10] - m[6] * m[9]) - m[4] * (m[1] * m[10] - m[2] * m[9]) + m[8] * (m[1] * m[6] - m[2] * m[5]);
+
+/** `a` times `b`, both column-major 4x4, in double precision. */
+function composed(a: Float64Array, b: Float64Array): Float64Array {
+  const out = new Float64Array(16);
+  for (let c = 0; c < 4; c++)
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) out[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  return out;
+}
+
+/** The axis-aligned box around the `bounds` box placed by `t`. */
+function placedBounds(b: Bounds, t: Float64Array): Bounds {
+  const out = [Infinity, -Infinity, Infinity, -Infinity, Infinity, -Infinity];
+  for (let corner = 0; corner < 8; corner++)
+    for (let r = 0; r < 3; r++) {
+      let v = t[12 + r];
+      for (let c = 0; c < 3; c++) v += t[c * 4 + r] * b[2 * c + ((corner >> c) & 1)];
+      out[2 * r] = Math.min(out[2 * r], v);
+      out[2 * r + 1] = Math.max(out[2 * r + 1], v);
+    }
+  return out as unknown as Bounds;
+}
+
 /** A volume layer. Create it with `figure.volume(data, options)`. */
 export class VolumeLayer implements Drawable {
   /** Scalar source in data units, borrowed on CPU or read from the GPU. No transfer-function conversion. */
@@ -459,6 +509,9 @@ export class VolumeLayer implements Drawable {
   readonly #opacity: VolumeLayerOptions['opacity'];
   readonly #values = new Float32Array(80);
   readonly #toBox = this.#values.subarray(16, 32);
+  /** The box in its own data units, and the transform that places it, if any. */
+  readonly #box: Bounds;
+  readonly #place: Float64Array | undefined;
   readonly #normal = this.#values.subarray(32, 48);
   #classification: VolumeClassification | undefined;
   #table = new Uint8Array(0);
@@ -492,7 +545,9 @@ export class VolumeLayer implements Drawable {
         'sciviz',
       );
     this.dims = [dims[0], dims[1], dims[2]];
-    this.bounds = options.bounds ? ([...options.bounds] as Bounds) : [0, dims[0] - 1, 0, dims[1] - 1, 0, dims[2] - 1];
+    this.#box = options.bounds ? ([...options.bounds] as Bounds) : [0, dims[0] - 1, 0, dims[1] - 1, 0, dims[2] - 1];
+    this.#place = options.transform === undefined ? undefined : affine(options.transform);
+    this.bounds = this.#place ? placedBounds(this.#box, this.#place) : this.#box;
     const given = rangeOption(options.range, 'Volume range');
     if (!given && isGpuArray(data))
       throw typeError('A GpuArray volume needs range: [min, max] (read it with data.min().item())', 'sciviz');
@@ -639,7 +694,11 @@ export class VolumeLayer implements Drawable {
           'Classification needs a positive gradientMax, step and density; correct the table metadata',
           'sciviz',
         );
-      if (kind === 'preintegrated' && value.range && (value.range[0] !== this.range[0] || value.range[1] !== this.range[1]))
+      if (
+        kind === 'preintegrated' &&
+        value.range &&
+        (value.range[0] !== this.range[0] || value.range[1] !== this.range[1])
+      )
         throw rangeError(
           `Preintegrated table spans [${value.range.join(', ')}] but the volume range is [${this.range.join(', ')}]; build it with preintegrateTransfer(tf, { range: layer.range })`,
           'sciviz',
@@ -670,14 +729,19 @@ export class VolumeLayer implements Drawable {
   /** @internal Classification uniforms shared with slices. */
   classificationUniforms(): readonly number[] {
     const c = this.#classification,
-      b = this.bounds,
+      b = this.#box,
+      t = this.#place,
       d = this.dims;
     return [
       c ? (c.kind === 'gradient' ? 1 : 2) : 0,
       (this.range[1] - this.range[0]) / (c?.gradientMax ?? 1),
       c?.step ?? 1,
       c?.density ?? 1,
-      ...d.map((n, i) => Math.abs(b[2 * i + 1] - b[2 * i]) / (n - 1)),
+      // The length of each box axis after the transform, per voxel step.
+      ...d.map(
+        (n, i) =>
+          (Math.abs(b[2 * i + 1] - b[2 * i]) * (t ? Math.hypot(t[4 * i], t[4 * i + 1], t[4 * i + 2]) : 1)) / (n - 1),
+      ),
       0,
     ];
   }
@@ -741,11 +805,24 @@ export class VolumeLayer implements Drawable {
   /** @internal The figure's data-to-scene transform. */
   setModel(figure: Float32Array): void {
     this.#figure = figure;
-    // Box [0, 1]^3 to data units, then into the scene.
-    const [x0, x1, y0, y1, z0, z1] = this.bounds,
-      box = [x1 - x0, 0, 0, 0, 0, y1 - y0, 0, 0, 0, 0, z1 - z0, 0, x0, y0, z0, 1];
-    multiplyMatrices(figure, box, this.#model);
+    // Box [0, 1]^3 to data units, through the volume's transform, then into the scene.
+    const [x0, x1, y0, y1, z0, z1] = this.#box,
+      box = new Float64Array([x1 - x0, 0, 0, 0, 0, y1 - y0, 0, 0, 0, 0, z1 - z0, 0, x0, y0, z0, 1]);
+    multiplyMatrices(figure, this.#place ? composed(this.#place, box) : box, this.#model);
     for (const s of this.#slices) s.setModel(this.#model);
+  }
+
+  /** @internal The data-space point at box coordinates `p`, each 0..1. */
+  dataPosition(p: readonly number[]): [number, number, number] {
+    const b = this.#box,
+      q = [0, 1, 2].map((i) => b[2 * i] + p[i] * (b[2 * i + 1] - b[2 * i])),
+      t = this.#place;
+    if (!t) return q as [number, number, number];
+    return [0, 1, 2].map((r) => t[r] * q[0] + t[4 + r] * q[1] + t[8 + r] * q[2] + t[12 + r]) as [
+      number,
+      number,
+      number,
+    ];
   }
 
   /** @internal The box-to-scene transform. */
@@ -823,8 +900,12 @@ export class VolumeLayer implements Drawable {
     const eye = context.camera.position,
       toBox = this.#values.subarray(16, 32),
       p = [0, 1, 2].map((r) => toBox[r] * eye[0] + toBox[4 + r] * eye[1] + toBox[8 + r] * eye[2] + toBox[12 + r]),
-      inside = p.every((c) => c > 0 && c < 1);
-    const pipeline = renderer.pipeline(`volume|${inside}|${!!this.colormap.encoding}`, context, (target) => {
+      inside = p.every((c) => c > 0 && c < 1),
+      // A mirrored box (a flipping transform or reversed bounds) turns the winding of its faces around.
+      mirrored = determinant(this.#model) < 0,
+      cull = inside !== mirrored ? 'front' : 'back';
+    const key = `volume|${inside}|${cull}|${!!this.colormap.encoding}`;
+    const pipeline = renderer.pipeline(key, context, (target) => {
       const module = renderer.device!.createShaderModule({
         code: volumeCode(volumeShader, !!this.colormap.encoding),
         label: 'sciviz volume',
@@ -848,7 +929,7 @@ export class VolumeLayer implements Drawable {
             },
           ],
         },
-        primitive: { topology: 'triangle-list', cullMode: inside ? 'front' : 'back' },
+        primitive: { topology: 'triangle-list', cullMode: cull },
         multisample: target.multisample,
         depthStencil: {
           format: target.depth,

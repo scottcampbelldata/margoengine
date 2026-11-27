@@ -75,6 +75,11 @@ export function nrrdGrid(volume: NRRDVolume, options: NRRDGridOptions = {}): NRR
   const frame = options.frame ?? 0,
     component = options.component ?? 0,
     { components, frames, dims } = volume;
+  if (volume.type === 'block')
+    throw rangeError(
+      `NRRD block data is ${volume.blockSize} opaque bytes per sample; convert volume.data to numbers and pass them to fig.volume()`,
+      'sciviz',
+    );
   if (!Number.isInteger(frame) || frame < 0 || frame >= frames)
     throw rangeError(`NRRD frame ${frame} is outside the file's ${frames} volume(s)`, 'sciviz');
   if (component !== 'magnitude' && (!Number.isInteger(component) || component < 0 || component >= components))
@@ -110,22 +115,45 @@ export function nrrdGrid(volume: NRRDVolume, options: NRRDGridOptions = {}): NRR
   return { data, dims: [...dims], bounds: [...volume.bounds], range: [min, max] };
 }
 
+/** Options of {@link volumeFromNRRD}, beside every load, grid and `fig.volume()` option. */
+export interface VolumeFromNRRDOptions extends LoadNRRDOptions, NRRDGridOptions, VolumeLayerOptions {
+  /**
+   * Places the volume as the file orients it (`space directions` and `space origin`, or negative `spacings`), so the
+   * figure's axes read in the file's `space` coordinates and its rotation and flips show. `false` draws the voxels
+   * axis-aligned from 0. Default true, and false when `bounds` or `transform` is given.
+   */
+  readonly orientation?: boolean;
+}
+
 /**
- * Reads a NRRD file and draws it as a volume in `figure`, in the file's true proportions, with the colour range
- * spanning its samples unless `range` says otherwise. Resolves to the layer and the file it came from.
+ * The `fig.volume()` `transform` that takes a NRRD file's axis-aligned box (`volume.bounds`: voxel index times spacing)
+ * to its `space` coordinates, or undefined when the file places the voxels exactly there already.
+ */
+export function nrrdTransform(volume: NRRDVolume): number[] | undefined {
+  const transform = Array.from(volume.matrix);
+  for (let axis = 0; axis < 3; axis++)
+    for (let row = 0; row < 3; row++) transform[axis * 4 + row] /= volume.spacing[axis];
+  return transform.every((v, i) => Math.abs(v - (i % 5 === 0 ? 1 : 0)) < 1e-12) ? undefined : transform;
+}
+
+/**
+ * Reads a NRRD file and draws it as a volume in `figure`, in the file's true proportions and orientation, with the
+ * colour range spanning its samples unless `range` says otherwise. Resolves to the layer and the file it came from.
  */
 export async function volumeFromNRRD(
   figure: Figure,
   source: NRRDSource,
-  options: LoadNRRDOptions & NRRDGridOptions & VolumeLayerOptions = {},
+  options: VolumeFromNRRDOptions = {},
 ): Promise<{ layer: VolumeLayer; volume: NRRDVolume; grid: NRRDGrid }> {
   const volume = await loadNRRD(source, options),
     grid = nrrdGrid(volume, options);
   options.signal?.throwIfAborted();
+  const oriented = options.orientation ?? (options.bounds === undefined && options.transform === undefined);
   const layer = figure.volume(grid.data, {
     ...options,
     dims: grid.dims,
     bounds: options.bounds ?? grid.bounds,
+    transform: oriented ? (options.transform ?? nrrdTransform(volume)) : options.transform,
     range: options.range ?? (grid.range[0] < grid.range[1] ? grid.range : undefined),
   });
   return { layer, volume, grid };

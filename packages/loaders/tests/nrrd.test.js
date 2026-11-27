@@ -190,7 +190,7 @@ test('bad files are named errors', async () => {
   await refuses(parseNRRD(text('NRRD0004')), 'truncated');
   await refuses(parseNRRD(text(head(ok.slice(1)))), 'header');
   await refuses(parseNRRD(text(head(['type: quaternion', ...ok.slice(1)]))), 'header');
-  await refuses(parseNRRD(text(head(['type: block', ...ok.slice(1)]))), 'unsupported');
+  await refuses(parseNRRD(text(head(['type: block', ...ok.slice(1)]))), 'header');
   await refuses(parseNRRD(text(head(['type: short', ...ok.slice(1)]))), 'header');
   await refuses(parseNRRD(text(head([...ok.slice(0, 3), 'encoding: bzip2']) + 'not bzip2')), 'zip');
   await refuses(parseNRRD(text(head([...ok.slice(0, 3), 'encoding: zstd']))), 'header');
@@ -522,4 +522,38 @@ test('bzip2 data past what the header needs is ignored, and decoding stops at th
     plain = await parseNRRD(readFileSync(new URL('./fixtures/volume-raw.nrrd', import.meta.url)));
   const volume = await parseNRRD(join(short, body.subarray(at)));
   assert.deepEqual([...volume.data], [...plain.data.subarray(0, 8)]);
+});
+
+test('block samples come out as their bytes, unswapped, with the block size', async () => {
+  const fields = ['type: block', 'block size: 3', 'dimension: 2', 'sizes: 2 2', 'endian: big'],
+    bytes = Buffer.from([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  for (const [encoding, body] of [
+    ['raw', bytes],
+    ['gzip', gzipSync(bytes)],
+    ['hex', Buffer.from(bytes.toString('hex'))],
+  ]) {
+    const volume = await parseNRRD(join(head([...fields, `encoding: ${encoding}`]), body));
+    assert.equal(volume.type, 'block', encoding);
+    assert.equal(volume.blockSize, 3);
+    assert.ok(volume.data instanceof Uint8Array);
+    assert.deepEqual([...volume.data], [...bytes], encoding);
+    assert.deepEqual(volume.sizes, [2, 2]);
+  }
+  // The blockSize spelling, detached data in two files, and no endian (the bytes are opaque).
+  const detached = await parseNRRD(
+    text(
+      head(['type: block', 'blocksize: 3', 'dimension: 2', 'sizes: 2 2', 'encoding: raw', 'data file: LIST', 'a', 'b']),
+    ),
+    { resolve: async (path) => bytes.subarray(path === 'a' ? 0 : 6, path === 'a' ? 6 : 12) },
+  );
+  assert.deepEqual([...detached.data], [...bytes]);
+  const plain = ['type: uchar', 'dimension: 1', 'sizes: 1', 'encoding: raw'];
+  assert.equal((await parseNRRD(join(head(plain), Buffer.from([7])))).blockSize, undefined);
+  await refuses(parseNRRD(join(head([...fields, 'encoding: ascii']), '1 2')), 'header');
+  await refuses(parseNRRD(join(head(['type: block', 'block size: 0', ...plain.slice(1)]), bytes)), 'range');
+  await refuses(parseNRRD(join(head([...fields, 'encoding: raw']), bytes.subarray(0, 11))), 'truncated');
+  await refuses(
+    parseNRRD(join(head(['type: block', 'block size: 999999999', ...plain.slice(1)]), bytes), { maxSamples: 10 }),
+    'limit',
+  );
 });

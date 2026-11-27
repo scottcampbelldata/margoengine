@@ -412,6 +412,7 @@
     "test:browser:parcoords": "node scripts/browser-root.mjs tests/parcoords-browser.mjs",
     "test:browser:splom": "node scripts/browser-root.mjs tests/splom-browser.mjs",
     "test:browser:volume-modes": "node scripts/browser-root.mjs tests/volume-modes-browser.mjs",
+    "test:browser:volume-transform": "node scripts/browser-root.mjs tests/volume-transform-browser.mjs",
     "test:browser:volume-physics": "node scripts/browser-root.mjs tests/volume-physics-browser.mjs",
     "test:browser:scene-owner": "node scripts/browser-root.mjs tests/scene-owner-browser.mjs",
     "test:browser:minip-kinds": "node scripts/browser-root.mjs tests/minip-kinds-browser.mjs",

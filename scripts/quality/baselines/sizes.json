@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21082387,
+  "total": 21084730,
   "history": [
     {
       "date": "2026-10-24",
@@ -14869,6 +14869,12 @@
       "commit": "texture-loaders",
       "reason": "Texture loader parity: parseKTX applies KTXorientation; decoders/ktx to 3,381 B gzip measured (the key/value reader, row and column mirroring and the lossless BC1 to BC5 block rewrite, in the one entry that reads KTX 1; a split would cost a second request for a few hundred bytes). New entry tonemap/lut-image, 608 B",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "nrrd-orientation",
+      "reason": "NRRD parity: the volume layer takes a transform (rotated, flipped or sheared scans draw in place, with the mirrored cull side); sciviz root to 67,047 B gzip measured, 331 B over its ceiling. The option lives in VolumeLayer, which Figure.volume() builds, so a split entry could not add it",
+      "grew": 1
     }
   ],
   "items": {
@@ -16033,7 +16039,7 @@
     "@margoengine/scenes/look-family": 809,
     "@margoengine/scenes/shot-settings": 1718,
     "@margoengine/scenes/timber-valley": 5843,
-    "@margoengine/sciviz": 66716,
+    "@margoengine/sciviz": 69059,
     "@margoengine/sciviz dist/workers/readers.js": 60265,
     "@margoengine/sciviz/a11y": 6737,
     "@margoengine/sciviz/aggregate": 30647,
