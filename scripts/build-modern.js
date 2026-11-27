@@ -357,7 +357,10 @@ async function sizeRecords() {
   // measures): a background clears a capture's linear target (a post effect's float capture, an -srgb one) with the
   // colour decoded from sRGB, sharing one decode with core's material colours: core 22,225 -> 22,262 B (+37 B). Strict
   // ceiling one byte above it.
-  const CORE_ONLY_CEILING = 22_263;
+  // 2026-11-26, core bug fix KB-VIEW-SRGB1 under the same rulings: a view's -srgb target is drawn through a view in its
+  // non-srgb twin format, so its colour is encoded once: core 22,262 -> 22,275 B (+13 B). Strict ceiling one byte above
+  // it.
+  const CORE_ONLY_CEILING = 22_276;
   assert.ok(sizes.core.gzip < CORE_ONLY_CEILING, `Core exceeds ${CORE_ONLY_CEILING} B gzip: ${sizes.core.gzip}`);
   assert.ok(sizes.core.gzip + sizes.gltf.gzip < 30 * 1024, 'Core + glTF exceed 30 KiB gzip');
   const { modules, ...baseSize } = await measureCoreStage();

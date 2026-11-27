@@ -139,6 +139,9 @@ const hit = await engine.pick(400, 300);           // CSS pixel; picks through t
   view they draw; `draw()` uses its rectangles by default and effects key per-view history on `id`.
 - `target: {color, depth?}` draws a view into textures (sized by the texture) instead of the canvas. `color` is
   1-sample; `depth`, if given, has the scene's depth format and sample count (core draws into it; another format throws).
+  The texture holds display colour, as the canvas does. An `-srgb` colour texture names its non-srgb twin in
+  `viewFormats` (`device.createTexture({format: 'rgba8unorm-srgb', viewFormats: ['rgba8unorm'], ...})`): core draws
+  through a view in that format, so the colour is encoded once and sampling the texture returns linear light.
 - `layers` draws only the meshes whose render layers (`@margoengine/cameras/layers`) share a bit; default the camera's.
 - Scenes: `engine.createScene()` makes a scene with its own meshes (`scene.createMesh()`), lighting, `background` and
   plugins (`scene.use(plugin)`); a view draws it with `scene`. `engine.scene` is the default scene; while a scene is

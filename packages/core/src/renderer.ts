@@ -150,7 +150,10 @@ export interface RenderView {
   /**
    * Draw into these textures instead of the canvas; the caller owns them and recreates them after device loss.
    * `color`: 1 sample, any renderable colour format, RENDER_ATTACHMENT usage; with 4x MSAA core draws into its own 4x
-   * texture of that format (kept per target size and format) and resolves into it, so edges are antialiased.
+   * texture of that format (kept per target size and format) and resolves into it, so edges are antialiased. The
+   * texture holds display colour, as the canvas does. An `-srgb` format must name its non-srgb twin in `viewFormats`
+   * (`rgba8unorm` for `rgba8unorm-srgb`): core draws through a view in that format, so the colour is encoded once,
+   * the texture stores the same bytes as its twin would, and sampling it returns linear light.
    * `depth` (optional): the size of `color`, in the scene's depth format and sample count (`depth32float-stencil8`
    * when the device has that feature, else `depth32float`; 4 samples with 4x MSAA, else 1); core draws into it. Without
    * it core draws into its own depth. Other shapes throw TypeError. Several views may draw into one target: they stack
@@ -528,7 +531,10 @@ export class GPURenderer implements Renderer {
     if (this.failure) throw this.failure;
     const target = view?.target,
       { width, height } = target?.color ?? this.canvas,
-      format = target?.color.format ?? this.format,
+      // An -srgb target is drawn through a view in its non-srgb twin format (WebGPU "createView()"): core's shader,
+      // its clear colour and every package's pipeline write display colour, as on the canvas, and the attachment
+      // would encode it a second time (KB-VIEW-SRGB1: #808080 stored 188). The bytes stored are the sRGB encoding.
+      format = (target?.color.format.replace('-srgb', '') ?? this.format) as GPUTextureFormat,
       views = this.attach(+!!target, width, height, format),
       samples = this.descriptor.multisample!.count!,
       caller = target?.depth;
@@ -560,7 +566,7 @@ export class GPURenderer implements Renderer {
     // By index: the engine passes an array, and an iterator over it would be garbage every frame.
     for (let i = 0; i < batches.length; i++) drawBatches[i] = batches[i];
     drawBatches.length = batches.length;
-    this.resolveTarget = target?.color.createView() ?? this.context.getCurrentTexture().createView();
+    this.resolveTarget = target?.color.createView({ format }) ?? this.context.getCurrentTexture().createView();
     this.msaa = views.length > 1 ? views[0] : undefined;
     const color = this.msaa ?? this.resolveTarget,
       depth = caller ? caller.createView() : views.at(-1)!;

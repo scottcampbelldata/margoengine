@@ -1,3 +1,19 @@
+### Section 5 evidence: an `-srgb` view target is encoded once (2026-11-26)
+
+Every pass of a frame writes display colour (core's shader, its clear colour, each package's display transform), and
+an `-srgb` attachment encodes what it is given, so a view drawn into an `-srgb` texture stored its colour encoded
+twice (KB-VIEW-SRGB1: #808080 as 188). GPU maths and both backends: core now draws such a target through a view in its
+non-srgb twin format (WebGPU `createView()`, a format of the texture's `viewFormats`); the pass context's `format`,
+core's pipeline and its 4x colour are the twin's, so the texture stores the bytes its twin would and a sampler reads
+them as linear light. The caller names the twin in `viewFormats`; native WebGPU reports a validation error for the
+view otherwise, and the WebGL2 layer, which keeps a twin-format copy of such a texture and copies raw bytes between
+the two, makes the view either way. Evidence: `packages/core/tests/view-srgb.test.js` (CPU) and
+`packages/core/tests/view-srgb.browser.mjs` on native WebGPU and on the WebGL2 layer, Intel Arc 140V: a `rgba8unorm`
+and a `rgba8unorm-srgb` target read back equal byte for byte in 11 cases a backend (4x MSAA and 1 sample; a whole
+view, core's own clear colour, two half views, a package pipeline, an HDR capture, a device restore). Missing: other
+GPUs and browsers; `bgra8unorm-srgb` on a real GPU (the CPU test covers its view and format); the cost on the WebGL2
+layer of sampling such a target each frame (its raw copy into an sRGB texture goes through client memory).
+
 ### Section 5 evidence: a scene's background is linear light in a linear capture (2026-11-26)
 
 Core's clear colour follows a capture's format (KB-CLEAR-CAPTURE1): when a pass has redirected the draw into a float

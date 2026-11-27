@@ -712,19 +712,55 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   round the crest (Ferstl et al. 2016), and a sharper free surface. These are FLUID-03 tiers not yet built. Until then
   `docs/limits.md` and the README give these figures, not a match.
 
-### Open 2026-11-26: a view drawn into an `-srgb` texture stores core's colours encoded twice (KB-VIEW-SRGB1, core)
+### Fixed 2026-11-26: a view drawn into an `-srgb` texture stored core's colours encoded twice (KB-VIEW-SRGB1, core)
 
 - **Repro:** one core mesh (`new PbrMaterial({ color: '#e0a050' })`) and `engine.scene.background = '#808080'`, no
   plugin. `engine.render({ views: [{ camera: engine.camera, viewport: [0, 0, 1, 1], target: { color } }] })` with
   `color` a 64 x 64 texture, read back with `copyTextureToBuffer`. In `rgba8unorm` the background holds 128,128,128
-  and the mesh's centre 182,125,43. In `rgba8unorm-srgb` the background holds 188,188,188 and the centre 220,186,114,
-  the sRGB encoding of those bytes (Intel Arc 140V, Edge 158, WebGPU).
-- **Cause:** core's fragment shader ends with its own tone map and sRGB encoding whatever the target's format
-  (`packages/core/src/shaders.ts`), and core writes a background's bytes as the clear value. An `-srgb` attachment
-  encodes what is written to it once more (WebGPU, GPURenderPassColorAttachment `clearValue` and the fragment output,
-  both converted to the attachment's format). Found while fixing KB-CLEAR-CAPTURE1, which leaves the frame's own
-  target as it was. A fix belongs in core: a view target in an `-srgb` format needs core's output and its clear colour
-  without the encoding. Needs a maintainer decision (frozen core). Use a `rgba8unorm` or `bgra8unorm` target meanwhile.
+  and the mesh's centre 182,125,43. In `rgba8unorm-srgb` the background held 188,188,188 and the centre 220,186,114,
+  the sRGB encoding of those bytes (Intel Arc 140V, Edge 158, WebGPU and the WebGL2 layer).
+- **Cause:** everything that draws a frame writes display colour, already sRGB-encoded: core's fragment shader ends
+  with its tone map and sRGB encoding (`packages/core/src/shaders.ts`), core writes a background's bytes as the clear
+  value, and the packages' own pipelines end with the same display transform. Core handed the pass a default view of
+  the caller's texture, in the texture's own format, and an `-srgb` attachment encodes what is written to it once more
+  (WebGPU, "Render pass color attachments": the clear value and the fragment output are converted to the view's
+  format). The second encode came from the attachment view's format.
+- **Fix (core):** core draws an `-srgb` target through a view in its non-srgb twin format (`rgba8unorm` for
+  `rgba8unorm-srgb`, `bgra8unorm` for `bgra8unorm-srgb`), the one reinterpretation WebGPU's `createView()` allows. The
+  pass context's `format` is the twin, so core's pipeline, its 4x colour (which resolves into that view), both clear
+  paths (the attachment clear of a whole view, the drawn clear of a partial one), core's own clear colour and every
+  package pipeline built for the pass write the target as they write the canvas, at once and with no shader change. The
+  texture stores byte for byte what a `rgba8unorm` target stores, and sampling it returns linear light, which is what
+  an `-srgb` format is for. Nothing is kept per target but the 4x colour, made in the twin format, so a device restore
+  needs nothing more. Any other target and the canvas are drawn as before, byte for byte (their view's format is
+  their own). An engine's canvas is never `-srgb` (`getPreferredCanvasFormat` returns `bgra8unorm` or `rgba8unorm`, on
+  the WebGL2 layer too).
+- **What a caller changes:** WebGPU makes such a view only of a texture that names the twin in `viewFormats`, so an
+  `-srgb` target is created with `viewFormats: ['rgba8unorm']` (or `['bgra8unorm']`). Without it WebGPU reports a
+  validation error for the view and the view draws nothing, where it drew the wrong colours before; the WebGL2 layer
+  makes the view either way. `PassContext.view.target.color` is still the caller's texture, in its own format.
+- **Why core:** core makes the view of a view's target and gives the pass its format; no package sees the target
+  before the pass exists. A package could only draw the frame into a texture of its own and copy it, one more texture
+  and copy for each such view each frame, with a view drawn without that package left wrong. The failure it prevents:
+  wrong colours (every colour too light, #808080 as 188) in every frame drawn into an `-srgb` texture, which is the
+  format a caller picks to sample the frame as linear light.
+- **Packages:** none draws into a view's target except through the pass, and none in the tree passes an `-srgb`
+  target of its own. Five already wrote linear colour when the pass format was `-srgb` (`@margoengine/lines`,
+  `sciviz`'s lines, `shader/raw`, the inspector's mesh debug, `vfx/flame`), and were right alone while core and the
+  rest were not; with the pass in the twin format they write display colour like everything else. Their `-srgb`
+  branch stays for a capture a caller makes in an `-srgb` format of its own.
+- **Regression:** `packages/core/tests/view-srgb.test.js` (the view, the pass format, core's pipeline, the 4x colour
+  and the clear colour for `-srgb` and other formats, and the canvas) and `packages/core/tests/view-srgb.browser.mjs`
+  on WebGPU and the WebGL2 layer: a `rgba8unorm` and a `rgba8unorm-srgb` target read back equal byte for byte with 4x
+  MSAA and with 1 sample, for a background and a mesh, core's own clear colour, two half views with their own clear
+  colours, `ColorBackground`'s own pipeline, `Tonemap`'s capture, and after a device restore (11 cases a backend, Intel
+  Arc 140V). On the code before the fix every case differs and the background reads 188.
+- **Sources:** W3C, "WebGPU" (GPU for the Web working group, Candidate Recommendation 2024), `GPUTexture.createView()`
+  and `GPUTextureDescriptor.viewFormats` (a view's format is the texture's or one of its `viewFormats`, which differ
+  from it only in `-srgb`), https://www.w3.org/TR/webgpu/#dom-gputexture-createview and
+  https://www.w3.org/TR/webgpu/#dom-gputexturedescriptor-viewformats; IEC 61966-2-1:1999, "Multimedia systems and
+  equipment - Colour measurement and management - Part 2-1: Default RGB colour space - sRGB" (IEC, 1999),
+  https://webstore.iec.ch/en/publication/6169.
 
 ### Open 2026-11-26: core's own clear colour comes out lighter and bluer once a post effect captures the scene (KB-CLEAR-DEFAULT1, core)
 
