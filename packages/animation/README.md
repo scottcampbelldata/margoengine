@@ -81,9 +81,11 @@ first query reads the influences and morph deltas from the asset once (32 or 64
 bytes per skinned vertex, 48 bytes per vertex and target). `Skin` and
 `GeometryCachePlayer` do the same from their own CPU data, and so does a
 `MorphWeightPlayer` for the weights it drives (its shader's sampling on the CPU,
-at the copy's time). An `Animation` with a `skinning` mode has no CPU pose:
-those raycasts throw MargoError `unsupported`, and
-`await raycaster.intersectModel(model)` reads the pose back from the GPU.
+at the copy's time). An `Animation` with `dualQuaternionSkinning` or
+`blendSkinning` is posed by the mode's `blend`, the shader's steps on the CPU. A
+`skinning` mode of your own without a `blend` has no CPU pose: those raycasts
+throw MargoError `unsupported`, and `await raycaster.intersectModel(model)`
+reads the pose back from the GPU.
 
 ```ts
 import {Engine} from '@margoengine/core';
@@ -614,6 +616,11 @@ a node without them is all dual quaternion, and a list of the wrong length or a 
 normal and tangent blend between the two skins. `skinDualQuaternion(slots, joints, weights, position, normal, share)` takes
 the share as its sixth argument, and matches the GPU to 7e-6 on a twisted tube (`npm run test:gpu:dqs`).
 
+Synchronous raycasts (`@margoengine/bvh`) hit a model under either mode where the GPU draws it: each `SkinningMode` may
+give `blend(palette, joints, weights, position, normal, share)`, its blend on the CPU, and both modes here do (it is
+`skinDualQuaternion`). `Animation`'s CPU pose runs it after the morph targets, with the palette `encode` wrote and each
+vertex's share; on a real GPU it matches the read-back pose to 1e-6. A mode without `blend` refuses those raycasts.
+
 ```ts
 import {createStage} from 'margoengine';
 import {loadGLTF} from 'margoengine/gltf/pbr';
@@ -623,6 +630,19 @@ const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
 const model = await loadGLTF(stage.engine, '/RobotExpressive.glb'); // an FBX Blend skin: loadFBX with the deformers extension
 const animation = Animation.attach(model, {skinning: blendSkinning});
 animation.play('Walking');
+```
+
+```ts
+import {createStage} from 'margoengine';
+import {loadGLTF} from 'margoengine/gltf/pbr';
+import {Animation} from 'margoengine/animation';
+import {dualQuaternionSkinning} from 'margoengine/animation/dqs';
+import {Raycaster} from 'margoengine/bvh';
+const stage = await createStage('#viewport', {backend:'webgpu',capacity:2048});
+const model = await loadGLTF(stage.engine, '/RobotExpressive.glb');
+Animation.attach(model, {skinning: dualQuaternionSkinning}).play('Walking');
+// Hit at the dual quaternion pose drawn this frame, with no GPU readback.
+const [hit] = new Raycaster([0, 1, 5], [0, 0, -1]).intersectObjects(stage.engine, [model]);
 ```
 
 Only `Animation` has the option: `Skin` on raw data, `bakeVAT` and the bone-texture crowd stay linear.

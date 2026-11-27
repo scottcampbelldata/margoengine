@@ -253,6 +253,10 @@ interface SkinningMode {
     shader(extra: boolean): string;
     encode(palette: Float32Array): void;
     share?(extras: unknown): ArrayLike<number> | undefined;
+    blend?(palette: Float32Array, joints: ArrayLike<number>, weights: ArrayLike<number>, position: ArrayLike<number>, normal: ArrayLike<number>, share: number): {
+        position: ArrayLike<number>;
+        normal: ArrayLike<number>;
+    };
 }
 
 interface Track {

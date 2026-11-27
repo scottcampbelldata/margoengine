@@ -1,6 +1,9 @@
 // Dual quaternion skinning: bones blend as rigid motions, so a twisted joint keeps its volume where blended matrices
 // collapse it (the candy-wrapper at a forearm or shoulder). Kavan, Collins, Zara and O'Sullivan, "Skinning with Dual
-// Quaternions", I3D 2007. A bone's matrix is split exactly into rotation, translation and a symmetric stretch, so scaled
+// Quaternions", I3D 2007, https://doi.org/10.1145/1230100.1230107, and "Geometric skinning with approximate dual
+// quaternion blending", ACM TOG 27(4), 2008, https://doi.org/10.1145/1409625.1409627 (the blend, its antipodality fix by
+// the heaviest influence, and the normal under the blended rigid motion). Each mode's `blend` is the shader's steps on
+// the CPU (skinDualQuaternion), so synchronous raycasts hit the pose the GPU draws (KB-BVH-SYNCPOSE-DQS1). A bone's matrix is split exactly into rotation, translation and a symmetric stretch, so scaled
 // and mirrored bones keep working: the stretch blends linearly and applies first, then the blended rigid motion.
 import { batchedDeformationShader, type SkinningMode } from './shader.js';
 
@@ -245,6 +248,7 @@ export const dualQuaternionSkinning: SkinningMode = {
   encode: (palette) => {
     encodeDualQuaternions(palette);
   },
+  blend: (palette, joints, weights, position, normal) => skinDualQuaternion(palette, joints, weights, position, normal),
 };
 
 /** The first bone matrix a slot encodes, rebuilt: rotation times stretch, then the rigid shift. */
@@ -277,7 +281,8 @@ const mixLines = (extra: boolean) => {
  * does (Autodesk's FbxSkin::eBlend: each control point has its own share of dual quaternion). The share of each vertex
  * comes from the node's `extras.fbxSkinning.blendWeights`, which `@margoengine/fbx/deformers` writes, one number in
  * [0, 1] per vertex of the node's primitive (0 is linear, 1 is all dual quaternion). A node without it is all dual
- * quaternion. Position, normal and tangent blend between the two skins with that share.
+ * quaternion. Position, normal and tangent blend between the two skins with that share. Its `blend` gives the same pose
+ * on the CPU for synchronous raycasts.
  *
  * @example
  * ```ts
@@ -294,6 +299,8 @@ export const blendSkinning: SkinningMode = {
     ${blendLines(extra, true)}${mixLines(extra)}`,
     }),
   encode: dualQuaternionSkinning.encode,
+  blend: (palette, joints, weights, position, normal, share) =>
+    skinDualQuaternion(palette, joints, weights, position, normal, share),
   share: (extras) => {
     const blend = (extras as { fbxSkinning?: { blendWeights?: unknown } } | undefined)?.fbxSkinning?.blendWeights;
     return Array.isArray(blend) || ArrayBuffer.isView(blend) ? (blend as ArrayLike<number>) : undefined;

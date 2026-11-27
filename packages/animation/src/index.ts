@@ -141,6 +141,8 @@ interface Deformation {
     influences: Uint32Array;
     deltas: Float32Array;
     palette: Float32Array;
+    /** `palette` encoded by the skinning mode, when there is one. */
+    encoded: Float32Array;
     weights: Float32Array;
     /** The weights a {@link WeightSource} gives, sampled into here before they are compared with `weights`. */
     sampled: Float32Array;
@@ -678,7 +680,12 @@ export class Animation implements EnginePlugin {
     if (skeleton !== undefined && skeleton.nodes?.length !== this.model.nodes.length)
       throw new TypeError('Invalid skeleton option; pass a model of the same file, with the same nodes');
     const skinning = this.options.skinning;
-    if (skinning !== undefined && (typeof skinning?.shader !== 'function' || typeof skinning.encode !== 'function'))
+    if (
+      skinning !== undefined &&
+      (typeof skinning?.shader !== 'function' ||
+        typeof skinning.encode !== 'function' ||
+        (skinning.blend !== undefined && typeof skinning.blend !== 'function'))
+    )
       throw new TypeError('Invalid skinning option; pass dualQuaternionSkinning from @margoengine/animation/dqs');
     if (this.options.pointers !== undefined && typeof this.options.pointers !== 'function')
       throw new TypeError(
@@ -878,18 +885,30 @@ export class Animation implements EnginePlugin {
           packInfluences(asset, doc, attributes, count, sourceCount, stride, jointCount, vertexMap);
         jointIds = record.influences();
       }
-      const shares = joints.length
-        ? this.options.skinning?.share?.((doc.nodes[p.nodeIndex] as { extras?: unknown } | undefined)?.extras)
-        : undefined;
-      if (shares) {
-        if (shares.length !== sourceCount)
-          throw new RangeError('Invalid skin share count; the node needs one share per vertex of its primitive');
-        const owned = vertexValues(shares, 1, vertexMap);
-        for (let i = 0; i < count; i++) {
-          if (!(owned[i] >= 0 && owned[i] <= 1))
-            throw new RangeError('Invalid skin share; each vertex needs a finite share between 0 and 1');
-          jointIds[i * stride] = (jointIds[i * stride] & 0xffff) | (Math.round(owned[i] * 65535) << 16);
+      const mode = this.options.skinning,
+        shares = joints.length
+          ? mode?.share?.((doc.nodes[p.nodeIndex] as { extras?: unknown } | undefined)?.extras)
+          : undefined;
+      if (joints.length && mode?.share) {
+        // A mode that reads shares reads every vertex's: a node without them is all the mode's own blend (65535).
+        let owned: ArrayLike<number> | undefined;
+        if (shares) {
+          if (shares.length !== sourceCount)
+            throw new RangeError('Invalid skin share count; the node needs one share per vertex of its primitive');
+          owned = vertexValues(shares, 1, vertexMap);
+          for (let i = 0; i < count; i++)
+            if (!(owned[i] >= 0 && owned[i] <= 1))
+              throw new RangeError('Invalid skin share; each vertex needs a finite share between 0 and 1');
         }
+        const pack = (ids: Uint32Array) => {
+          for (let i = 0; i < count; i++)
+            ids[i * stride] = (ids[i * stride] & 0xffff) | ((owned ? Math.round(owned[i] * 65535) : 65535) << 16);
+          return ids;
+        };
+        pack(jointIds);
+        // The CPU pose reads the influences again: with the shares in them, as the GPU has them.
+        const unpacked = record.influences;
+        record.influences = () => pack(unpacked());
       }
       record.joints = joints;
       record.inverseBind = inverseBind;
@@ -950,8 +969,9 @@ export class Animation implements EnginePlugin {
         device.queue.writeBuffer(record.weights, slots[i].weights.offset * 4, weights as Float32Array<ArrayBuffer>);
     });
     this.resources.push(...records);
-    // A skinning mode's blend exists only as WGSL: with one there is no CPU pose, and a synchronous query says so.
-    if (!this.options.skinning)
+    // A skinning mode without a CPU `blend` exists only as WGSL: with one there is no CPU pose, and a synchronous query
+    // says so.
+    if (!this.options.skinning || this.options.skinning.blend)
       for (const record of records) setPoseSource(record.primitive, (record.pose = () => this.cpuPose(record)));
     for (const record of records)
       if (!this.deformedNodes.includes(record.primitive.node)) this.deformedNodes.push(record.primitive.node);
@@ -1168,6 +1188,7 @@ export class Animation implements EnginePlugin {
       influences: r.influences(),
       deltas: r.deltas(),
       palette: new Float32Array(r.joints.length * 16),
+      encoded: this.options.skinning ? new Float32Array(r.joints.length * 16) : noBinds,
       weights: new Float32Array(p.weights.length),
       sampled: new Float32Array(p.weights.length),
     });
@@ -1200,6 +1221,12 @@ export class Animation implements EnginePlugin {
         changed = true;
       }
     if (changed) {
+      const mode = this.options.skinning;
+      if (mode && r.joints.length) {
+        // The mode's shader reads the palette as `encode` rewrites it.
+        posed.encoded.set(posed.palette);
+        mode.encode(posed.encoded);
+      }
       poseVertices(
         posed.bind,
         posed.vertices,
@@ -1207,7 +1234,8 @@ export class Animation implements EnginePlugin {
         posed.weights,
         posed.influences,
         r.slot.extra ? 16 : 8,
-        posed.palette,
+        mode ? posed.encoded : posed.palette,
+        mode,
       );
       posed.revision++;
     }

@@ -74,6 +74,22 @@ export interface SkinningMode {
    * packs it into the upper 16 bits of each vertex's first joint index, so only a mode that masks the index reads it.
    */
   share?(extras: unknown): ArrayLike<number> | undefined;
+  /**
+   * The mode's blend on the CPU: where one vertex goes, the shader's steps in double precision. `palette` is the
+   * encoded palette (after `encode`), `joints` and `weights` the vertex's influences in the shader's order (weights
+   * summing to 1), `position` and `normal` its bind values after the morph targets, and `share` its share from
+   * {@link SkinningMode.share} (1 for a mode without one, or a node without shares). Returns the position and the unit
+   * normal. `Animation` poses synchronous queries (`@margoengine/bvh` raycasts) with it; a mode without it has no CPU
+   * pose, so those queries throw MargoError `unsupported` rather than test the bind pose.
+   */
+  blend?(
+    palette: Float32Array,
+    joints: ArrayLike<number>,
+    weights: ArrayLike<number>,
+    position: ArrayLike<number>,
+    normal: ArrayLike<number>,
+    share: number,
+  ): { position: ArrayLike<number>; normal: ArrayLike<number> };
 }
 
 /** Text a skinning mode puts into the batched shader: module-scope `functions`, and the `blend` that moves `v`. */

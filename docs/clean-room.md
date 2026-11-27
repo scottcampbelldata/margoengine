@@ -17760,3 +17760,20 @@ vortex that turns bodies about a cylinder's axis while pulling them in and lifti
 the step is explicit Euler on the impulse F dt (E. Hairer, S. P. Norsett and G. Wanner, *Solving Ordinary
 Differential Equations I*, Springer 1993, section I.7). No Babylon, Havok, Ammo, three.js or other engine source was
 read; the API names follow the documentation only so that code ports.
+
+## CPU pose of a skinning mode for synchronous raycasts (KB-BVH-SYNCPOSE-DQS1, 2026-11-27)
+
+`SkinningMode.blend` and its use in `packages/animation/src/pose.ts` move each vertex by Margo's own dual quaternion
+blend on the CPU (`skinDualQuaternion` in `packages/animation/src/dqs.ts`, the shader's steps in double precision),
+written from:
+
+- Ladislav Kavan, Steven Collins, Jiri Zara and Carol O'Sullivan, *Skinning with Dual Quaternions*, I3D 2007,
+  https://doi.org/10.1145/1230100.1230107 (dual quaternion linear blending of rigid bone motions, the normal under the
+  blended motion).
+- Ladislav Kavan, Steven Collins, Jiri Zara and Carol O'Sullivan, *Geometric Skinning with Approximate Dual Quaternion
+  Blending*, ACM Transactions on Graphics 27(4), 2008, https://doi.org/10.1145/1409625.1409627 (the approximation's
+  error bounds, the antipodal sign taken from one pivot influence, scale and shear handled apart from the rigid part).
+
+Compared with plain linear blend skinning (N. Magnenat-Thalmann, R. Laperriere and D. Thalmann, *Joint-dependent
+local deformations for hand animation and object grasping*, Graphics Interface 1988), whose collapse at a twisted joint
+the tests measure. No other engine's source was read.

@@ -848,7 +848,7 @@ canvas.addEventListener('click', async event => {
 
 `raycaster.intersectObjects(engine, [mesh, model])` tests a list. A skinned or morphing model is hit at its current
 pose by the same synchronous calls: `Animation` (with `MorphWeightPlayer` weights too), `Skin`, `GeometryCachePlayer`
-and `BatchedMesh` pose it on the CPU for the ray. A deformer with no CPU pose (a `skinning` mode) makes them throw rather than test
+and `BatchedMesh` pose it on the CPU for the ray, dual quaternion skins included. A deformer with no CPU pose (a `skinning` mode of your own with no `blend`) makes them throw rather than test
 the bind pose: `await raycaster.intersectModel(model)` reads the posed surface back, as does GPU picking. Lines are picked by `intersectLines` (`@margoengine/bvh/lines`), or on the GPU after
 `LinePicking.attach(picking, lines)` (`@margoengine/lines/pick`); points have `pointsPlugin.pick(x, y)`.
 
@@ -1282,7 +1282,7 @@ What most often goes wrong in a port, with the fix.
 | Everything attaches at once | `Environment.attach` is asynchronous | `await` it before `EnvironmentLighting.attach`. |
 | `render()` runs your frame code | `onFrame` callbacks run only from the started loop | Call `engine.start()`, or run your update before `render`. |
 | `scene.background` shows as written under post effects | Under a post effect the colour is linear light in the scene, so the effect's tone map darkens it with the meshes (`#808080` shows as 116, not 128); on the bare canvas it shows as written | Pick the colour under the chain you ship. |
-| A raycast on an animated character | Synchronous BVH rays hit the current pose under `Animation` (`MorphWeightPlayer` weights included), `Skin`, `GeometryCachePlayer` and `BatchedMesh`; they throw under a `skinning` mode | `await raycaster.intersectModel(model)` or GPU picking for those. |
+| A raycast on an animated character | Synchronous BVH rays hit the current pose under `Animation` (`MorphWeightPlayer` weights included), `Skin`, `GeometryCachePlayer` and `BatchedMesh`, linear or dual quaternion skins; they throw under a `skinning` mode of your own with no `blend` | `await raycaster.intersectModel(model)` or GPU picking for those. |
 | `mixer.update(delta)` in your loop | An attached mixer is already advanced by the engine; calling it too doubles the speed | Delete the call. |
 | A depth shader with `less` comparisons | WebGPU depth is reversed (near 1, far 0) | Use `greater`, or `DepthTexture`'s `distance`. |
 | `new WebGLRenderer` runs anywhere with WebGL 2 | Core needs WebGPU | `await install()` from `@margoengine/webgl2-compat` first when `navigator.gpu` gives no adapter. |

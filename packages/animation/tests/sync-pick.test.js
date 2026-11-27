@@ -7,7 +7,7 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { Raycaster, getPrimitiveBVH } from '../../bvh/dist/index.js';
 import { Material, createMesh } from '../../materials/dist/index.js';
 import { Animation, Skeleton, Skin } from '../dist/index.js';
-import { dualQuaternionSkinning } from '../dist/dqs.js';
+import { blendSkinning, dualQuaternionSkinning } from '../dist/dqs.js';
 import { MorphWeightPlayer } from '../dist/morph-gpu.js';
 import { GeometryCachePlayer, encodeGeometryCache } from '../dist/geometry-cache.js';
 import { bent, skinnedStrip } from '../test/fixture.js';
@@ -137,15 +137,88 @@ test('eight influences blend all eight joints by their normalised weights', asyn
   near(hit.normal, [0, 0, 1], 1e-6);
 });
 
-test('a skinning mode has no CPU pose, so a synchronous ray refuses rather than test the bind pose', async (t) => {
+// The strip with its middle column (x = 1, the joint) weighed half on each joint: dual quaternion skinning turns it
+// about the joint by half the joint's angle, keeping its distance from the joint, where the linear blend pulls it in.
+const halfway = () => {
+  const fixture = skinnedStrip(),
+    { JOINTS_0, WEIGHTS_0 } = fixture.doc.meshes[0].primitives[0].attributes;
+  for (const vertex of [4, 5]) {
+    fixture.buffers[JOINTS_0].set([0, 1, 0, 0], vertex * 4);
+    fixture.buffers[WEIGHTS_0].set([0.5, 0.5, 0, 0], vertex * 4);
+  }
+  return fixture;
+};
+
+test('dual quaternion skinning reaches a synchronous ray where the mode draws it (KB-BVH-SYNCPOSE-DQS1)', async (t) => {
   const engine = await gpuEngine(t),
-    strip = model(engine, skinnedStrip());
+    strip = model(engine, halfway()),
+    linear = model(engine, halfway());
   engine.use(strip);
-  Animation.attach(strip, { skinning: dualQuaternionSkinning });
+  engine.use(linear);
+  const animation = Animation.attach(strip, { skinning: dualQuaternionSkinning }),
+    straight = Animation.attach(linear),
+    primitive = strip.primitives[0],
+    bind = primitive.vertices.slice();
+  animation.playing = straight.playing = false;
+  animation.seek(0.5);
+  straight.seek(0.5);
+  assert.equal(down(1.7, 0.1).intersectObjects(engine, [strip]).length, 0, 'not the bind pose');
+  const pose = posedVertices(primitive),
+    turned = posedVertices(linear.primitives[0]),
+    a = Math.PI / 4;
+  for (let i = 0; i < bind.length; i += 20) {
+    const x = bind[i],
+      y = bind[i + 1];
+    if (x !== 1) {
+      // One joint each: dual quaternion and linear skinning agree with the closed form.
+      near(pose.vertices.subarray(i, i + 3), bent(x, y, 0.5), 1e-6, `vertex ${i / 20}`);
+      near(pose.vertices.subarray(i + 4, i + 7), [0, 0, 1], 1e-6, `normal ${i / 20}`);
+      continue;
+    }
+    near(pose.vertices.subarray(i, i + 3), [1 - y * Math.sin(a / 2), y * Math.cos(a / 2), 0], 1e-6, `joint ${y}`);
+    near(turned.vertices.subarray(i, i + 3), [1 - (y / 2) * Math.sin(a), y / 2 + (y / 2) * Math.cos(a), 0], 1e-6);
+  }
+  // A ray through the turned joint column hits the dual quaternion pose, and misses the linear pose there.
+  const [x, y] = [1 - 0.19 * Math.sin(a / 2) - 0.002, 0.19 * Math.cos(a / 2)];
+  assert.equal(down(x, y).intersectObjects(engine, [strip])[0].primitive, primitive);
+  assert.deepEqual(down(x, y).intersectObjects(engine, [linear]), []);
+  // A mode with no CPU blend still refuses rather than test the bind pose.
+  const other = model(engine, skinnedStrip());
+  engine.use(other);
+  Animation.attach(other, { skinning: { ...dualQuaternionSkinning, name: 'gpu-only', blend: undefined } });
   assert.throws(
-    () => down(1.7, 0.1).intersectObjects(engine, [strip]),
+    () => down(1.7, 0.1).intersectObjects(engine, [other]),
     (e) => e.code === 'unsupported' && /intersectModel/.test(e.message),
   );
+});
+
+test('blendSkinning poses each vertex by its share, and a node without shares is all dual quaternion', async (t) => {
+  const engine = await gpuEngine(t),
+    pose = (fixture, skinning) => {
+      const m = model(engine, fixture);
+      engine.use(m);
+      const animation = Animation.attach(m, { skinning });
+      animation.playing = false;
+      animation.seek(0.5);
+      // A ray brings the node matrices up to the seek, as any query does.
+      down(0, 0).intersectObjects(engine, [m]);
+      return posedVertices(m.primitives[0]).vertices;
+    },
+    dq = pose(halfway(), dualQuaternionSkinning),
+    linear = pose(halfway()),
+    // Before, a node without shares packed share 0 into its joints, which the shader reads as all linear.
+    unshared = pose(halfway(), blendSkinning),
+    shared = halfway();
+  near(unshared, dq, 1e-6, 'no shares: dual quaternion');
+  shared.doc.nodes[0].extras = { fbxSkinning: { type: 'Blend', blendWeights: [1, 1, 1, 1, 0, 0.25, 1, 1, 1, 1] } };
+  const blended = pose(shared, blendSkinning),
+    a = Math.PI / 4;
+  // Vertex 4 sits on the joint (no lever), vertex 5 at y = 0.2 a quarter of the way from linear to dual quaternion.
+  near(blended.subarray(80, 83), linear.subarray(80, 83), 1e-6, 'share 0 is linear');
+  const l = [1 - 0.1 * Math.sin(a), 0.1 + 0.1 * Math.cos(a)],
+    d = [1 - 0.2 * Math.sin(a / 2), 0.2 * Math.cos(a / 2)];
+  near(blended.subarray(100, 103), [l[0] + (d[0] - l[0]) * 0.25, l[1] + (d[1] - l[1]) * 0.25, 0], 1e-6, 'share 0.25');
+  near(blended.subarray(140, 143), dq.subarray(140, 143), 1e-6, 'share 1');
 });
 
 test('morph weights a MorphWeightPlayer samples on the GPU reach a synchronous ray, and stay as drawn after remove', async (t) => {

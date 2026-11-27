@@ -1284,15 +1284,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   synchronous first hits equal `intersectModel`'s.
 - **Left:** the three open entries below.
 
-### Open 2026-11-26: a synchronous raycast refuses a model skinned with a skinning mode (KB-BVH-SYNCPOSE-DQS1, animation)
+### Fixed 2026-11-27: a synchronous raycast refused a model skinned with a skinning mode (KB-BVH-SYNCPOSE-DQS1, animation)
 
 - **Repro:** `Animation.attach(model, {skinning: dualQuaternionSkinning})`, then `raycaster.intersectEngine(engine)`:
-  MargoError `unsupported` (`packages/animation/tests/sync-pick.test.js` pins the refusal).
-- **Cause:** a `SkinningMode` gives its blend as WGSL only (`shader`, and `encode` for the palette), so `Animation`
-  registers no CPU pose with one. `@margoengine/animation/dqs` already has the blend on the CPU (`skinDualQuaternion`,
-  `blendSkinning`).
-- **Owed:** an optional CPU blend on `SkinningMode` (an API addition), given by `dualQuaternionSkinning`, used by
-  `Animation`'s CPU pose, with the per-vertex `share`; a GPU check against the read-back pose.
+  MargoError `unsupported` (`packages/animation/tests/sync-pick.test.js` pinned the refusal).
+- **Cause:** a `SkinningMode` gave its blend as WGSL only (`shader`, and `encode` for the palette), so `Animation`
+  registered no CPU pose with one.
+- **Fix:** `SkinningMode.blend(palette, joints, weights, position, normal, share)`, optional: the mode's blend on the
+  CPU (`packages/animation/src/shader.ts`). `dualQuaternionSkinning` and `blendSkinning` give it as `skinDualQuaternion`
+  (Kavan, Collins, Zara and O'Sullivan, I3D 2007 and ACM TOG 27(4) 2008, cited in `dqs.ts`). `poseVertices`
+  (`pose.ts`) runs it after the morph targets with the palette `encode` wrote and, for a mode with `share`, the share
+  in the first joint index's upper 16 bits; `Animation` registers a CPU pose for a mode with `blend`. A mode without it
+  still refuses.
+- **Tests:** `sync-pick.test.js`: a joint column weighed half on each bone turns by half the angle about the joint
+  (closed form), a ray there hits the dual quaternion pose and misses the linear one, and a mode without `blend`
+  refuses; `blendSkinning` poses by share (0, 0.25, 1). `scripts/animation-dqs-tests.js` compares `Animation`'s CPU pose
+  with the read-back GPU pose for every tube and pose of both modes (35,640 checks, 9.5e-7 at most, RTX A6000, WebGPU).
+  `Animation` needs WebGPU, so the WebGL2 layer runs no deformation pass to compare.
+
+### Fixed 2026-11-27: blendSkinning drew a node without shares all linear (KB-DQS-NOSHARE1, animation)
+
+- **Repro:** `Animation.attach(model, {skinning: blendSkinning})` on a skinned node with no
+  `extras.fbxSkinning.blendWeights`: the GPU drew the linear skin, though the mode says such a node is all dual
+  quaternion.
+- **Cause:** `Animation` packed shares into the first joint index only when the node had them; without them the upper
+  16 bits stayed 0, which the shader reads as share 0 (linear).
+- **Fix:** a mode with `share` gets every vertex's share packed, 65535 (all dual quaternion) for a node without shares
+  (`packages/animation/src/index.ts`), also in the influences the CPU pose reads.
+- **Tests:** `sync-pick.test.js` (the CPU pose of a share-less `blendSkinning` node equals `dualQuaternionSkinning`'s)
+  and `scripts/animation-dqs-tests.js` (a share-less blend tube read back from the GPU against `skinDualQuaternion`).
 
 ### Fixed 2026-11-27: a synchronous raycast refused a model whose morph weights are sampled on the GPU (KB-BVH-SYNCPOSE-MORPHGPU1, animation)
 

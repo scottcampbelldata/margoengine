@@ -1,11 +1,15 @@
-// The deformation shader's arithmetic (shader.ts, linear blend) on the CPU, for positions and normals only, so a
-// synchronous CPU query tests the pose the GPU pass draws: a GPU buffer cannot be read back synchronously.
+// The deformation shader's arithmetic (shader.ts, linear blend, or a skinning mode's `blend`) on the CPU, for positions
+// and normals only, so a synchronous CPU query tests the pose the GPU pass draws: a GPU buffer cannot be read back
+// synchronously.
+import type { SkinningMode } from './shader.js';
 
 /**
  * Writes the pose of `bind` (20 floats per vertex) into `out`. Morph targets are added first: `deltas` holds 12 floats
  * per vertex and target (position at 0, normal at 4) and `weights` one value per target. Then comes the weighted blend
  * of `palette` (16 floats per bone) by `influences`: `words` per vertex, four joint indices then four float weights,
- * twice for eight influences. Everything but position and normal is copied from `bind`.
+ * twice for eight influences. Everything but position and normal is copied from `bind`. With a skinning `mode`, its
+ * `blend` moves each vertex instead, with `palette` encoded for it; a mode with `share` reads each vertex's share from
+ * the upper 16 bits of its first joint index, as the mode's shader does.
  */
 export function poseVertices(
   bind: Float32Array,
@@ -15,8 +19,13 @@ export function poseVertices(
   influences: Uint32Array,
   words: number,
   palette: Float32Array,
+  mode?: SkinningMode,
 ): void {
-  const count = bind.length / 20,
+  const blend = mode?.blend,
+    shared = !!mode?.share,
+    ids: number[] = [],
+    amounts: number[] = [],
+    count = bind.length / 20,
     targets = count ? deltas.length / (count * 12) : 0,
     shares = new Float32Array(influences.buffer, influences.byteOffset, influences.length),
     m = new Float64Array(16);
@@ -38,7 +47,26 @@ export function poseVertices(
       ny += deltas[d + 5] * w;
       nz += deltas[d + 6] * w;
     }
-    if (influences.length) {
+    if (influences.length && blend) {
+      ids.length = amounts.length = 0;
+      for (let k = i * words, end = k + words; k < end; k += 8)
+        for (let c = 0; c < 4; c++) {
+          ids.push(influences[k + c]);
+          amounts.push(shares[k + 4 + c]);
+        }
+      let share = 1;
+      if (shared) {
+        share = (ids[0] >>> 16) / 65535;
+        ids[0] &= 0xffff;
+      }
+      const moved = blend(palette, ids, amounts, [x, y, z], [nx, ny, nz], share);
+      x = moved.position[0];
+      y = moved.position[1];
+      z = moved.position[2];
+      nx = moved.normal[0];
+      ny = moved.normal[1];
+      nz = moved.normal[2];
+    } else if (influences.length) {
       m.fill(0);
       for (let k = i * words, end = k + words; k < end; k += 8)
         for (let c = 0; c < 4; c++) {

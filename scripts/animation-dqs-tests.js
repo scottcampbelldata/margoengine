@@ -1,7 +1,9 @@
 // Real-GPU check of dual quaternion skinning (packages/animation/src/dqs.ts). A tube twists about its axis under bones
 // blended by smooth weights, four and eight influences, with a morph target under the skin and a scaled bone. Every
 // vertex read back from the GPU must match skinDualQuaternion, the double-precision CPU twin of the shader; the twisted
-// radius must hold where a linear Animation of the same model, deformed in the same frame, pinches.
+// radius must hold where a linear Animation of the same model, deformed in the same frame, pinches. Animation's CPU pose
+// (the mode's `blend`, which synchronous raycasts test, KB-BVH-SYNCPOSE-DQS1) must match the same read-back vertices,
+// for both modes; a Blend skin on a node without shares must be all dual quaternion.
 // Runs as `npm run test:gpu:dqs -w @margoengine/animation` (check:gpu-packages).
 import assert from 'node:assert/strict';
 import { openBrowser } from './browser.js';
@@ -20,6 +22,8 @@ try {
       { parseGLTF } = await import('/packages/gltf/dist/pbr.js'),
       { Animation } = await import('/packages/animation/dist/index.js'),
       { cloneModel } = await import('/packages/animation/dist/skeleton-utils.js'),
+      { Raycaster } = await import('/packages/bvh/dist/index.js'),
+      { posedVertices } = await import('/packages/shared/pose-source.js'),
       { blendSkinning, dualQuaternionSkinning, skinDualQuaternion } = await import('/packages/animation/dist/dqs.js');
     const canvas = document.createElement('canvas');
     canvas.style.cssText = 'width:64px;height:64px';
@@ -150,6 +154,16 @@ try {
       dqRadius: Infinity,
       linearRadius: Infinity,
       failure: null,
+      cpuChecks: 0,
+      worstCpu: 0,
+    };
+    // Animation's CPU pose (posedVertices, what a synchronous ray tests) against the vertices read back from the GPU.
+    const cpuAgainst = (cpu, gpu) => {
+      for (let i = 0; i < gpu.length; i += 20)
+        for (const c of [0, 1, 2, 4, 5, 6]) {
+          report.worstCpu = Math.max(report.worstCpu, Math.abs(cpu[i + c] - gpu[i + c]));
+          report.cpuChecks++;
+        }
     };
     for (const eight of [false, true]) {
       const { doc, buffers } = tube(eight),
@@ -180,6 +194,7 @@ try {
         const r = dq.resources[0],
           p = dqModel.primitives[0],
           actual = await read(p),
+          hit = new Raycaster([1.5, 0, 8], [0, 0, -1]).intersectObjects(engine, [dqModel]),
           straight = await read(linearModel.primitives[0]),
           count = p.vertices.length / 20,
           raw = doc.meshes[0].primitives[0].attributes,
@@ -210,6 +225,8 @@ try {
             report.checks += 2;
           }
         }
+        cpuAgainst(posedVertices(p).vertices, actual);
+        if (!hit.length && !report.failure) report.failure = { eight, pose, missed: 'a synchronous ray at the tube' };
         if (pose.twist === 170 && !pose.weight && !pose.scale && !eight) {
           // The ring halfway through the twist: x=2 is joint 2 itself, so read the rings beside it.
           const radius = (values) => {
@@ -232,13 +249,18 @@ try {
       linearModel.dispose();
       dqModel.dispose();
     }
-    // A Blend skin: each vertex mixes linear and dual quaternion skinning by the share on the node's extras.
+    // A Blend skin: each vertex mixes linear and dual quaternion skinning by the share on the node's extras; a node
+    // without shares is all dual quaternion (it was all linear: Animation packed share 0).
     report.blendChecks = 0;
     report.worstBlend = 0;
-    for (const eight of [false, true]) {
+    for (const [eight, given] of [
+      [false, true],
+      [true, true],
+      [false, false],
+    ]) {
       const { doc, buffers } = tube(eight),
-        shares = Array.from({ length: RINGS * SIDES }, (_, i) => Math.floor(i / SIDES) / (RINGS - 1));
-      doc.nodes[0].extras = { fbxSkinning: { type: 'Blend', blendWeights: shares } };
+        shares = Array.from({ length: RINGS * SIDES }, (_, i) => (given ? Math.floor(i / SIDES) / (RINGS - 1) : 1));
+      if (given) doc.nodes[0].extras = { fbxSkinning: { type: 'Blend', blendWeights: shares } };
       const blendModel = parseGLTF(engine, doc, buffers);
       if (engine.plugins.get(blendModel.name) !== blendModel) engine.use(blendModel);
       const blend = Animation.attach(blendModel, { skinning: blendSkinning });
@@ -249,6 +271,7 @@ try {
       engine.render({ culling: false });
       const p = blendModel.primitives[0],
         actual = await read(p),
+        hit = new Raycaster([1.5, 0, 8], [0, 0, -1]).intersectObjects(engine, [blendModel]),
         palette = blend.resources[0].palette,
         raw = doc.meshes[0].primitives[0].attributes,
         sets = [[raw.JOINTS_0, raw.WEIGHTS_0]];
@@ -273,6 +296,8 @@ try {
           report.blendChecks += 2;
         }
       }
+      cpuAgainst(posedVertices(p).vertices, actual);
+      if (!hit.length && !report.failure) report.failure = { eight, given, missed: 'a synchronous ray at the blend tube' };
       blend.dispose();
       blendModel.dispose();
     }
@@ -286,7 +311,9 @@ try {
   assert.ok(result.checks >= 2 * 5 * 33 * 12 * 6, 'every vertex of every pose checked');
   assert.ok(result.worstPosition <= 2e-5, `GPU positions differ from the CPU twin by ${result.worstPosition}`);
   assert.ok(result.worstNormal <= 2e-5, `GPU normals differ from the CPU twin by ${result.worstNormal}`);
-  assert.ok(result.blendChecks >= 2 * 3 * 33 * 12 * 2, 'every vertex of both blend tubes checked');
+  assert.ok(result.blendChecks >= 2 * 3 * 33 * 12 * 3, 'every vertex of the three blend tubes checked');
+  assert.ok(result.cpuChecks >= 6 * 33 * 12 * (2 * 6 + 3), "Animation's CPU pose checked for every tube and pose");
+  assert.ok(result.worstCpu <= 2e-5, `Animation's CPU pose differs from the GPU's by ${result.worstCpu}`);
   assert.ok(result.worstBlend <= 2e-5, `GPU blend differs from the CPU twin by ${result.worstBlend}`);
   assert.ok(result.dqRadius > 0.97, `the twisted tube's narrowest ring is ${result.dqRadius}`);
   assert.ok(result.linearRadius < 0.6, `the linear tube should pinch, narrowest ring ${result.linearRadius}`);
