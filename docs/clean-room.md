@@ -6782,6 +6782,38 @@ quantization narrowed under the transform maximum; SHA-256
 `tests/layouts.rs`; the module before this rule fails 176 of them. The emitter
 was a session script and is not retained.
 
+### Batch 133 E42 to E47: wide normals, header counts and KD stream ends (2026-11-27)
+
+Method: as E26 to E40, Margo-crafted inputs through the public calls of the
+vendored full decoder (Wasm SHA-256
+`c55a594e8ffd18426d36b27fea9618af3df5e173640a3e56d46f09d76f0574f2`), compared
+with the clean-room Wasm byte for byte (acceptance, points, indices, attribute
+bytes). Inputs were random mutations of the retained fixtures and randomly
+built KD streams. No codec or wrapper source, disassembly or remembered
+internals were used, and no new publication was needed. The emitters were
+session scripts and are not retained.
+
+| Experiment | Distinguishing observation and rule | Confirmation |
+| --- | --- | --- |
+| E42 predictor 6 past int64 | Positions near the int32 and uint32 limits: differences, cross products and their sum wrap in int64. The absolute values are added in component order and the total is int64's maximum as soon as one exceeds the room left, tested in wrapping int64 (the absolute value of the minimum stays negative). The total is compared with 2^29 and divided as uint64. Of the tested sum, compare and divide variants one matches every case. | 8,000 meshes of 14 to 32 bit positions, 30,000 of limit values and 60,000 more over every retained predictor 6 layout, int32 and uint32, versions 1.0 to 2.2. |
+| E43 header vertex count | The EdgeBreaker header's vertex count is not compared with the vertices the symbols make. It may be any value up to three times the face count (binary searched) that meets E44's bound, with unchanged output. | Bounds on retained meshes with and without split symbols, versions 1.0 to 2.2. |
+| E44 header split count | The symbol loop refuses only more created vertices than the header's vertex and split counts together. The split count may be lower than the S symbols made, or than the split events, and at most the symbol count. | Vertex and split grids on split meshes; 60,000 combined header mutations leave the differences listed in docs/known-bugs.md. |
+| E45 KD level 6 ended axis | A node of 64 or more points reads an explicit axis. When that axis has no bits left, the node ends: all its points are the node's base and no remaining bits are read for them. | Remaining-bit changes leave the output unchanged; random level 6 streams. |
+| E46 KD stream ends | A value that would pass the end of the number (levels 0 and 1), axis or half stream reads zero. The remaining-bits stream refuses it. Each stream was made lenient alone to find this. | 90,000 random streams at levels 0 to 6. |
+| E47 KD stream sizes | A raw KD stream whose size is not a non-zero multiple of four bytes is rejected. | Every size from 0 to above the length of one seed's three raw streams; the 90,000 streams of E46, half with ragged sizes. |
+
+E43 to E47 correct Margo refusing inputs the opaque decoder accepts. E45 also
+corrects other output from Margo, and E47 inputs Margo accepted that the opaque
+decoder rejects. The kept inputs and outputs are, in
+`packages/decoders/native/draco/tests/fixtures/`: `normal-wide.bin` (290
+accepted cases, SHA-256
+`5f7a31ef72cee5929da43b210434f45826d36a2c208d85fba17d3333c47d367e`),
+`header-counts.bin` (279 cases, 138 accepted, SHA-256
+`78205ee63b20cc271b82fc5e7902b051b7c120cbf79680155c5dae6fbfcea543`) and
+`kd-streams.bin` (134 cases, 80 accepted, SHA-256
+`bada0a5c9f64f18978d20d72a77236c018776825a2190262f3ebac34e48862be`), checked by
+`tests/layouts.rs`.
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

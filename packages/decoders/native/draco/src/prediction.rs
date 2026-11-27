@@ -410,13 +410,13 @@ impl Mesh<'_, '_> {
             budget.steps(1)?;
             let a = sub(self.position(next(corner), parent)?, position);
             let b = sub(self.position(prev(corner), parent)?, position);
+            // E42: every difference, product and sum wraps in int64.
             for (c, component) in normal.iter_mut().enumerate() {
                 let next = (c + 1) % 3;
                 let prev = (c + 2) % 3;
-                *component = narrow(
-                    i128::from(*component) + i128::from(a[next]) * i128::from(b[prev])
-                        - i128::from(a[prev]) * i128::from(b[next]),
-                )?;
+                *component = component
+                    .wrapping_add(a[next].wrapping_mul(b[prev]))
+                    .wrapping_sub(a[prev].wrapping_mul(b[next]));
             }
             corner = self.swing(corner, left);
             if corner == start {
@@ -427,19 +427,21 @@ impl Mesh<'_, '_> {
                 corner = self.swing(start, false);
             }
         }
-        let mut sum = normal.iter().map(|v| i128::from(*v).abs()).sum::<i128>();
-        if sum > 1 << 29 {
-            let divisor = sum / (1 << 29);
+        // E42: the sum is compared and divided as uint64, since a component
+        // of i64::MIN can leave it negative.
+        let mut sum = absolute_sum(normal);
+        if sum as u64 > 1 << 29 {
+            let divisor = (sum as u64 >> 29) as i64;
             for value in &mut normal {
-                *value = narrow(i128::from(*value) / divisor)?;
+                *value /= divisor;
             }
-            sum = normal.iter().map(|v| i128::from(*v).abs()).sum();
+            sum = absolute_sum(normal);
         }
         if sum == 0 {
             normal = [center, 0, 0];
         } else {
-            normal[0] = narrow(i128::from(normal[0]) * i128::from(center) / sum)?;
-            normal[1] = narrow(i128::from(normal[1]) * i128::from(center) / sum)?;
+            normal[0] = normal[0].wrapping_mul(center).wrapping_div(sum);
+            normal[1] = normal[1].wrapping_mul(center).wrapping_div(sum);
             normal[2] = if normal[2] >= 0 {
                 center - normal[0].abs() - normal[1].abs()
             } else {
@@ -488,8 +490,19 @@ fn round_half_up(value: f32) -> i32 {
         i32::MIN
     }
 }
-fn narrow(value: i128) -> Result<i64> {
-    i64::try_from(value).map_err(|_| Error::Overflow)
+/// E42: the absolute values added in component order. It is i64::MAX as soon
+/// as one exceeds what is left below i64::MAX, tested in wrapping int64: the
+/// absolute value of i64::MIN stays negative and passes that test from zero.
+fn absolute_sum(normal: [i64; 3]) -> i64 {
+    let mut sum = 0_i64;
+    for value in normal {
+        let value = value.wrapping_abs();
+        if value > i64::MAX.wrapping_sub(sum) {
+            return i64::MAX;
+        }
+        sum = sum.wrapping_add(value);
+    }
+    sum
 }
 fn sub(a: [i64; 3], b: [i64; 3]) -> [i64; 3] {
     std::array::from_fn(|i| a[i].wrapping_sub(b[i]))

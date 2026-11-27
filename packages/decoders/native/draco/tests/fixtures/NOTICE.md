@@ -111,3 +111,9 @@ Apache-2.0, like the other Margo specimens.
 `octahedron.bin` contains 186 Margo-crafted inputs (E41) with the full prebuilt
 decoder's public output: unpredicted normal symbols and E35 to E39 mesh layouts
 with a narrowed normal quantization. Apache-2.0.
+
+`normal-wide.bin` (290 cases, E42), `header-counts.bin` (279 cases, E43 and E44)
+and `kd-streams.bin` (134 cases, E45 to E47) contain Margo-crafted inputs, made
+by changing positions or header counts of the specimens above or by building
+random KD streams, with the full prebuilt decoder's public output or rejection.
+Apache-2.0.

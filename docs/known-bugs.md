@@ -16880,6 +16880,24 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/octahedron.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder differed on wide normals, header counts and KD stream ends (batch 133, E42 to E47)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Overflow` on predictor 6 positions near the int32 or uint32 limits
+  (some such meshes also decoded to other normals); refused an EdgeBreaker mesh
+  whose header vertex count is above, or split count below, what its symbols
+  make; answered `Truncated` or other points for a KD level 6 stream naming an
+  axis with no bits left, or whose number, axis or half stream is short; and
+  decoded KD streams of ragged size that the prebuilt rejects.
+- **Cause:** `native/draco/src/prediction.rs` checked the int64 steps instead of
+  wrapping them; `edgebreaker.rs` required both header counts to equal the
+  symbols' results; `kd.rs` read the next axis, refused every read past a
+  stream's end and accepted any non-zero size.
+- **Fix:** the observed rules
+  ([E42 to E47](clean-room.md#batch-133-e42-to-e47-wide-normals-header-counts-and-kd-stream-ends-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/normal-wide.bin`, `header-counts.bin` and `kd-streams.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -16908,21 +16926,6 @@ E26 to E40):
 - Historical KD point clouds (method 1 before version 2.3): Margo answers
   `Unsupported`. The prebuilt rejects every 2.3 body relabelled 1.0 to 2.2, so
   the older layout is unknown and no such file is tracked.
-- KD level 6, explicit split axis naming a dimension with no bits left: the
-  prebuilt decodes, Margo answers `Truncated` because it reads another axis.
-  Cycling to the next axis does not match. No encoder is known to write it.
-  Repro (255 bytes, hex):
-
-  ```text
-  445241434f020300010000be000000010100020300000601000000be000000c603fc163fc603
-  dd5c2fc603c5bd06c603e27022c60340e137c603524314c6034ecb39c603079628c6020040c6
-  020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c60200
-  40c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6020040c6
-  020040c6020040c6020040c6020040c602004038000000000000000000000000000000000000
-  0000000000000000000000000000000000000000000000000000000000000000000000000000
-  000000080000000000000000000000080000000000000000000000
-  ```
-
 - Predictor 6 prediction mode 0 (one triangle, before version 2.2): the
   prebuilt decodes, Margo answers `Unsupported`. It equals the first incident
   triangle's normal on small coordinates; at coordinates near 16,000 and above
@@ -16930,15 +16933,31 @@ E26 to E40):
   `E35 one-triangle normal mode` cases in
   `packages/decoders/native/draco/tests/fixtures/layouts.bin`. Cause: the
   int32 arithmetic of that mode is not established.
-- Predictor 6 with coordinates near the int32 limits, or unsigned 32-bit
-  positions before 2.0 near theirs: the prebuilt decodes, Margo answers
-  `Overflow` where a 64-bit step would overflow.
 - Not probed: position-reading predictors on attribute decoders with seams that
   split vertices, metadata before 2.2, and constrained multi-parallelogram
   before 2.2 beyond the retained cases.
 
-Every difference measured and left open is a refusal by Margo; no probe in
-these classes found it returning different bytes.
+- Damaged EdgeBreaker headers (E44's 60,000 header mutations): with the face
+  and symbol counts raised above what a predictive stream holds, the prebuilt
+  decodes where Margo answers `Truncated`; and Margo decodes one version 2.0
+  stream cut to one symbol and two faces that the prebuilt rejects (it did
+  before E43 too). Repros (hex):
+
+  ```text
+  445241434f02020101000000040500050000011f8002805001ff000003000503000d01090300
+  1d040901002f010300fe00040000000000000000000000000000000000000000000000000000
+  0000000000000000000000000000000000000000000006030001000d1a081503101d7f000000
+  3f000000800380f480000016c2000011c200000cc2000007c207
+  ```
+
+  ```text
+  445241434f020001010000000005020101001c0200000000000000df000100000000000000
+  018004000000009b5f88000000
+  ```
+
+Except for the second damaged-header repro, every difference measured and left
+open is a refusal by Margo; no probe in these classes found it returning
+different bytes.
 
 ### Historical: batch 133 optional landing GPU request (resume 9)
 

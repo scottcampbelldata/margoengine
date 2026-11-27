@@ -426,7 +426,9 @@ pub(crate) fn decode<'a>(
     if symbols > faces || splits > symbols || faces > symbols.saturating_mul(2) {
         return Err(Error::Invalid);
     }
-    if max_vertices > symbols.saturating_mul(3) {
+    // E43: the header vertex count may exceed the vertices the symbols make,
+    // up to one per corner. The excess names no vertex.
+    if vertices > corners {
         return Err(Error::Invalid);
     }
     let mut legacy_traversal = if c.version < 0x202 {
@@ -438,7 +440,8 @@ pub(crate) fn decode<'a>(
         None
     };
     let event_count = c.legacy_count()?;
-    if event_count > splits {
+    // E44: events may outnumber the header split count.
+    if event_count > symbols {
         return Err(Error::Invalid);
     }
     let mut events = budget.vector(event_count, (0_usize, 0_usize, false))?;
@@ -553,7 +556,7 @@ pub(crate) fn decode<'a>(
         1 => connect::<1>,
         _ => connect::<2>,
     };
-    let (created, merged) = connect(
+    let created = connect(
         symbols,
         max_vertices,
         corners,
@@ -568,7 +571,7 @@ pub(crate) fn decode<'a>(
         &mut pending,
         budget,
     )?;
-    if merged != splits || !events.is_empty() || pending.iter().any(|v| *v != NONE) {
+    if !events.is_empty() || pending.iter().any(|v| *v != NONE) {
         return Err(Error::Invalid);
     }
     let mut made_faces = symbols;
@@ -594,7 +597,10 @@ pub(crate) fn decode<'a>(
             topo.hole[vertex] = false;
         }
     }
-    if made_faces != faces || created.checked_sub(merged) != Some(vertices) {
+    // E43/E44: the symbol loop bounds the created vertices by the two header
+    // counts together. Neither the S symbols nor the vertices left after their
+    // merges are compared with a header count.
+    if made_faces != faces {
         return Err(Error::Invalid);
     }
     for v in &mut topo.corners {
@@ -605,7 +611,7 @@ pub(crate) fn decode<'a>(
     Ok(topo)
 }
 
-/// The EdgeBreaker symbol loop of `decode` for traversal `T`; returns the created and merged vertex counts.
+/// The EdgeBreaker symbol loop of `decode` for traversal `T`; returns the created vertex count.
 /// Rare split (S) symbols and split events run out of line, so the loop an engine optimizes stays small.
 #[inline(never)]
 #[allow(clippy::too_many_arguments)]
@@ -623,11 +629,10 @@ fn connect<'a, const T: u8>(
     stack: &mut Vec<usize>,
     pending: &mut [usize],
     budget: &mut Budget,
-) -> Result<(usize, usize)> {
+) -> Result<usize> {
     let mut created = 0_usize;
     let mut active_context = NONE;
     let mut predicted = NONE;
-    let mut merged = 0_usize;
     for id in 0..symbols {
         budget.steps(1)?;
         let predicted_ok = if predicted != NONE {
@@ -705,7 +710,6 @@ fn connect<'a, const T: u8>(
             }
             1 => {
                 (v, n, p) = split(id, nc, topo, parent, valences, stack, pending, budget)?;
-                merged += 1;
             }
             _ => return Err(Error::Invalid),
         }
@@ -749,7 +753,7 @@ fn connect<'a, const T: u8>(
             }
         }
     }
-    Ok((created, merged))
+    Ok(created)
 }
 
 /// Merge step of a split (S) symbol in `connect`; returns the face's (v, n, p).
@@ -782,6 +786,15 @@ fn split(
     topo.pair(b, nc + 1)?;
     parent[removed] = v;
     topo.vertex_corner[removed] = NONE;
+    if topo.isolated.len() == topo.isolated.capacity() {
+        // E44: more merges than the header's split count; one growth to the
+        // symbol count bounds them all.
+        let more = pending.len().saturating_sub(topo.isolated.len()).max(1);
+        budget.charge(more, std::mem::size_of::<usize>())?;
+        topo.isolated
+            .try_reserve_exact(more)
+            .map_err(|_| Error::Limit)?;
+    }
     topo.isolated.push(removed);
     valences[v] += valences[removed];
     valences[n] += 1;

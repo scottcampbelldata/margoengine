@@ -4623,7 +4623,10 @@ The glTF flavor shares these rules and was not compared with the glTF prebuilt
 on them. The Wasm went from 142,749 to 145,234 bytes (54,149 to 54,979 B
 gzip -9). Since 2026-11-27 (E41) it no longer refuses normals outside the stored
 octahedron: their vectors match the full prebuilt bit for bit, and the Wasm is
-145,164 bytes.
+145,164 bytes. Also since 2026-11-27 (E42 to E47) it wraps predictor 6's int64
+steps, accepts the header vertex and split counts the prebuilt accepts and reads
+KD stream ends the same way, so the level 6 and int64 refusals above are gone;
+the Wasm is 143,042 bytes.
 
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes

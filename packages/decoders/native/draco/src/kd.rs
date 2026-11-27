@@ -15,10 +15,19 @@ impl<'a> Raw<'a> {
     fn new(c: &mut Cursor<'a>) -> Result<Self> {
         let size = c.le(4)? as usize;
         let data = c.take(size)?;
-        if size == 0 {
+        // E47: a stream is a whole, non-zero number of 32-bit words.
+        if size == 0 || !size.is_multiple_of(4) {
             return Err(Error::Invalid);
         }
         Ok(Self { data, at: 0 })
+    }
+    /// E46: the number, axis and half streams read zero for a value that
+    /// would pass their end; only the remaining-bits stream refuses it.
+    fn read_or_zero(&mut self, width: u32) -> Result<u32> {
+        if width as usize > self.data.len() * 8 - self.at {
+            return Ok(0);
+        }
+        self.read(width)
     }
     fn read(&mut self, width: u32) -> Result<u32> {
         if width > 32 {
@@ -67,7 +76,7 @@ impl<'a> Numbers<'a> {
     }
     fn read(&mut self, width: u32) -> Result<u32> {
         match self {
-            Self::Raw(raw) => raw.read(width),
+            Self::Raw(raw) => raw.read_or_zero(width),
             Self::Binary(binary) => {
                 let mut n = 0;
                 for _ in 0..width {
@@ -143,7 +152,7 @@ fn tree(c: &mut Cursor, points: usize, dimensions: usize, budget: &mut Budget) -
             let axis = if level < 6 {
                 (last + 1) % dimensions
             } else if n >= 64 {
-                axes.read(4)? as usize
+                axes.read_or_zero(4)? as usize
             } else {
                 let mut best = 0;
                 for i in 1..dimensions {
@@ -157,17 +166,16 @@ fn tree(c: &mut Cursor, points: usize, dimensions: usize, budget: &mut Budget) -
                 return Err(Error::Invalid);
             }
             let exhausted = widths.iter().all(|&width| width == 0);
-            if exhausted || n <= 2 {
+            // E45: at level 6 an explicit axis with no bits left ends the
+            // node: its points are its base and nothing more is read for them.
+            let ended = exhausted || (level == 6 && n > 2 && widths[axis] == 0);
+            if ended || n <= 2 {
                 budget.steps(n.checked_mul(dimensions).ok_or(Error::Overflow)?)?;
                 for _ in 0..n {
                     for j in 0..dimensions {
                         let k = (axis + j) % dimensions;
                         values[output + k] = base[k]
-                            .checked_add(if exhausted {
-                                0
-                            } else {
-                                remaining.read(widths[k])?
-                            })
+                            .checked_add(if ended { 0 } else { remaining.read(widths[k])? })
                             .ok_or(Error::Overflow)?;
                     }
                     output = output.checked_add(dimensions).ok_or(Error::Overflow)?;
@@ -181,7 +189,7 @@ fn tree(c: &mut Cursor, points: usize, dimensions: usize, budget: &mut Budget) -
                     .checked_sub(numbers.read(width)? as usize)
                     .ok_or(Error::Invalid)?;
                 let (mut low, mut high) = (n - small, small);
-                if low != high && halves.read(1)? != 0 {
+                if low != high && halves.read_or_zero(1)? != 0 {
                     std::mem::swap(&mut low, &mut high);
                 }
                 if stack.len() >= max_depth {

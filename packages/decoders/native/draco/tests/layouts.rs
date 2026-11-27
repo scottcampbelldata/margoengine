@@ -98,3 +98,27 @@ fn normals_outside_the_octahedron_match_black_box_outputs() {
     let counts = check(include_bytes!("fixtures/octahedron.bin"));
     assert_eq!(counts, (186, 186, 0, 0));
 }
+
+/// E42: predictor 6 on positions near the int32 and uint32 limits, where the
+/// int64 normal and its absolute sum wrap.
+#[test]
+fn normals_past_int64_match_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/normal-wide.bin"));
+    assert_eq!(counts, (290, 290, 0, 0));
+}
+
+/// E43 and E44: the EdgeBreaker header's vertex and split counts are upper
+/// bounds, accepted and refused at the same values as the opaque decoder.
+#[test]
+fn header_counts_match_black_box_bounds() {
+    let counts = check(include_bytes!("fixtures/header-counts.bin"));
+    assert_eq!(counts, (279, 138, 141, 0));
+}
+
+/// E45 to E47: a KD level 6 axis with no bits left, reads past the end of the
+/// number, axis and half streams, and streams that are not whole words.
+#[test]
+fn kd_stream_ends_match_black_box_outputs_and_rejections() {
+    let counts = check(include_bytes!("fixtures/kd-streams.bin"));
+    assert_eq!(counts, (134, 80, 54, 0));
+}
