@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20929507,
+  "total": 20931664,
   "history": [
     {
       "date": "2026-10-24",
@@ -14612,6 +14612,12 @@
       "commit": "e6722c57b",
       "reason": "SOFT-01 P6: new optional entry @margoengine/physics/gpu-cloth, 16,774 B gzip (budget 17,278): GPUCloth, cloth stepped in compute on WebGPU (seven WGSL passes) with its CPU twin for the WebGL2 layer and Node, pins on points and bodies, sphere, capsule, box, plane and SDF colliders, tethers, wind, snapshot and debug lines; @margoengine/gltf/soft-mesh gains drawGPUCloth and measures 71,622 B, within its 73,133 B budget. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "pending",
+      "reason": "physics/ship 36,294 ceiling to its new size 36,541 (+247 B): the ORC's jib downwind set and the jib's blanketing by its overlap. One sail model; nothing to split. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15491,7 +15497,7 @@
     "@margoengine/physics/seakeeping": 40620,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,
-    "@margoengine/physics/ship": 36294,
+    "@margoengine/physics/ship": 36541,
     "@margoengine/physics/snowpack": 5172,
     "@margoengine/physics/soft": 161433,
     "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 56034,
