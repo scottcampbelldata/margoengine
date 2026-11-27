@@ -163,7 +163,11 @@ test('a surface needs triangles and a body that is still there; particlePosition
   const target = new Float32Array(27);
   assert.equal(cloth.particlePositions(target), target);
   assert.deepEqual([...target], [...cloth.particlePositions()]);
-  assert.throws(() => cloth.particlePositions(new Float32Array(3)), RangeError);
+  // A soft-body refusal is a coded MargoError (7cf7419e0b, physics `softError`).
+  assert.throws(
+    () => cloth.particlePositions(new Float32Array(3)),
+    (error) => error.name === 'MargoError' && error.code === 'unsupported',
+  );
   const surface = new SoftSurface(cloth);
   soft.remove(cloth);
   assert.throws(
