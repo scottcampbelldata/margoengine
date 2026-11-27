@@ -181,6 +181,18 @@ export interface SailOptions {
     drag?: number;
 }
 
+export interface SkinBinding {
+    readonly positions: ArrayLike<number>;
+    readonly normals?: ArrayLike<number> | null;
+    readonly joints: ArrayLike<number>;
+    readonly weights: ArrayLike<number>;
+}
+
+export interface SkinnedVertices {
+    readonly positions: Float32Array;
+    readonly normals: Float32Array | null;
+}
+
 export class SoftBodies implements PhysicsAttachment {
     tethersDirty: boolean;
     steps: number;
@@ -331,6 +343,21 @@ export class SoftBody {
     airDrag: boolean;
     tetherStretch: number | null;
     tetherCount: number;
+    skinMax: Float32Array | null;
+    skinBack: Float32Array | null;
+    skinFrom: Float32Array;
+    skinTo: Float32Array;
+    skinNormal: Float32Array<ArrayBuffer>;
+    skinPins: Uint8Array<ArrayBuffer>;
+    get skinned(): boolean;
+    maxDistance(index: number): number;
+    backstop(index: number): number;
+    skinnedPosition(index: number): Vec3;
+    setSkinConstraints(maxDistance: number | ArrayLike<number> | null, backstop?: number | ArrayLike<number> | null): this;
+    applySkin(max: Float32Array | null, back: Float32Array | null): void;
+    setSkinnedPositions(positions: ArrayLike<number>, normals?: ArrayLike<number> | null, { teleport }?: {
+        teleport?: boolean;
+    }): this;
     get tethers(): number | null;
     get tetheredParticles(): number;
     setTethers(stretch?: number | null): this;
@@ -544,6 +571,9 @@ export class SoftBodyDesc {
     airDrag: boolean;
     setTethers(stretch?: number | null): this;
     tethers: number | null;
+    setSkinConstraints(maxDistance: number | ArrayLike<number> | null, backstop?: number | ArrayLike<number> | null): this;
+    skinMax: Float32Array | null;
+    skinBack: Float32Array | null;
     setDensity(density: number): this;
     density: number | null;
     setTranslation(translation: Vec3): this;
@@ -681,6 +711,11 @@ export function fabricShearStiffness(shear: FabricShear): number;
 export function fabricTensileDamping(tension: FabricTension): number;
 
 export function fabricTensileStiffness(tension: FabricTension): number;
+
+export function skinVertices(binding: SkinBinding, matrices: ArrayLike<number>, target?: {
+    positions: Float32Array;
+    normals?: Float32Array | null;
+}): SkinnedVertices;
 
 // Not exported from this entry, but used by the exports above:
 

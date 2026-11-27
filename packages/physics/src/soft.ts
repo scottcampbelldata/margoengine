@@ -64,6 +64,7 @@ interface SoftExports extends WebAssembly.Exports {
   soft_cloth_enable(triangles: number, thickness: number, friction: number): void;
   soft_attach_reserve(attachments: number): void;
   soft_tether_reserve(tethers: number): void;
+  soft_skin_reserve(skins: number): void;
   soft_face_reserve(faces: number): void;
   soft_volume_reserve(triangles: number): void;
   soft_volume(body: number): number;
@@ -154,6 +155,7 @@ const INTEGER_COLUMNS = new Set([
   'fc_row',
   'tt_p',
   'tt_a',
+  'sk_p',
 ]);
 const TORN_CELL = 1;
 const INTEGER_CELL_COLUMNS = new Set([
@@ -2110,6 +2112,30 @@ export class SoftBodyDesc {
   }
   /** @internal */ tethers: number | null = null;
   /**
+   * Skinned cloth (motion constraints, as character cloth is tied in games and DCC tools): each particle is held within
+   * `maxDistance` metres of where the character's skin carries it ({@link SoftBody.setSkinnedPositions}), and, with a
+   * `backstop`, no more than that far behind the skin along its normal. A particle with 0 rides the skin exactly (it is
+   * pinned to it, and anchors tethers); one with `Infinity` is free. Give one number for every particle or one a particle.
+   * The skinned positions start where the particles are when the body is made. `null` removes the constraints.
+   * @throws RangeError for a negative or NaN distance, or a list that is not one a particle.
+   */
+  setSkinConstraints(
+    maxDistance: number | ArrayLike<number> | null,
+    backstop: number | ArrayLike<number> | null = null,
+  ): this {
+    if (maxDistance === null) {
+      this.skinMax = null;
+      this.skinBack = null;
+      return this;
+    }
+    this.skinMax = skinValues(maxDistance, this.particleCount, 'max distance');
+    this.skinBack = backstop === null ? null : skinValues(backstop, this.particleCount, 'backstop');
+    return this;
+  }
+  /** @internal Each particle's max distance from its skinned point, or null for a body that is not skinned. */
+  skinMax: Float32Array | null = null;
+  /** @internal Each particle's backstop (Infinity: none), or null for none. */ skinBack: Float32Array | null = null;
+  /**
    * The density of the body's material, kg/m^3, for the water it displaces in {@link SoftBodies.water}: each particle
    * displaces its mass over this, so the water holds it up by that volume's weight and its acceleration pushes on it.
    * Left out, the body displaces nothing (a cloth, whose sheet's added mass and drag the water still takes).
@@ -2223,6 +2249,129 @@ export class SoftBody {
     | number
     | null = null;
   /** @internal How many tethers it holds now. */ tetherCount = 0;
+  /** @internal Each particle's max distance from its skinned point (see SoftBodyDesc.setSkinConstraints). */
+  skinMax: Float32Array | null = null;
+  /** @internal Each particle's backstop behind the skin, Infinity for none. */ skinBack: Float32Array | null = null;
+  /** @internal Where the skin held each particle at the end of the last step, and where it holds it at the end of the next. */
+  skinFrom: Float32Array = new Float32Array(0);
+  /** @internal */ skinTo: Float32Array = new Float32Array(0);
+  /** @internal The skin's unit normal at each particle (all zero: no backstop there). */ skinNormal = new Float32Array(
+    0,
+  );
+  /** @internal Which particles the skin pinned (a max distance of 0), so that letting them go leaves the user's pins. */
+  skinPins = new Uint8Array(0);
+  /** Whether the body is tied to a skin ({@link SoftBodyDesc.setSkinConstraints}). */
+  get skinned(): boolean {
+    return this.skinMax !== null;
+  }
+  /** The farthest particle `index` may stray from its skinned point (Infinity when the body is not skinned). */
+  maxDistance(index: number): number {
+    this.check(index);
+    return this.skinMax ? this.skinMax[index]! : Number.POSITIVE_INFINITY;
+  }
+  /** How far particle `index` may go behind the skin along its normal (Infinity: no backstop). */
+  backstop(index: number): number {
+    this.check(index);
+    return this.skinBack ? this.skinBack[index]! : Number.POSITIVE_INFINITY;
+  }
+  /** Where the skin holds particle `index` at the end of the next step. */
+  skinnedPosition(index: number): Vec3 {
+    this.check(index);
+    if (!this.skinMax)
+      throw new MargoError('state', 'The body is not skinned; give it SoftBodyDesc.setSkinConstraints.');
+    return [this.skinTo[3 * index]!, this.skinTo[3 * index + 1]!, this.skinTo[3 * index + 2]!];
+  }
+  /**
+   * Ties the body to a skin, or with `null` lets it go ({@link SoftBodyDesc.setSkinConstraints}): the skinned points start
+   * where the particles are now, unless the body was skinned already.
+   */
+  setSkinConstraints(
+    maxDistance: number | ArrayLike<number> | null,
+    backstop: number | ArrayLike<number> | null = null,
+  ): this {
+    this.check();
+    const max = maxDistance === null ? null : skinValues(maxDistance, this.particles, 'max distance'),
+      back = maxDistance === null || backstop === null ? null : skinValues(backstop, this.particles, 'backstop');
+    this.applySkin(max, back);
+    this.wake();
+    return this;
+  }
+  /** @internal Sets the constraints: pins the particles held at 0 and lets go of those the skin no longer pins. */
+  applySkin(max: Float32Array | null, back: Float32Array | null): void {
+    const n = this.particles;
+    if (max && !this.skinMax) {
+      this.skinFrom = this.particlePositions();
+      this.skinTo = this.skinFrom.slice();
+      this.skinNormal = new Float32Array(3 * n);
+      this.skinPins = new Uint8Array(n);
+    }
+    for (let i = 0; i < n; i++) {
+      const held = max !== null && max[i] === 0;
+      if (held && !this.skinPins[i]) {
+        this.skinPins[i] = 1;
+        if (!this.isParticlePinned(i)) this.setParticlePinned(i, true);
+        else this.skinPins[i] = 2;
+      } else if (!held && this.skinPins[i]) {
+        if (this.skinPins[i] === 1) this.setParticlePinned(i, false);
+        this.skinPins[i] = 0;
+      }
+    }
+    this.skinMax = max;
+    this.skinBack = back;
+  }
+  /**
+   * Where the skin holds each particle at the end of the next step, as flat x, y, z (three numbers a particle), and the skin's
+   * outward normal there for the backstop (unit length is not needed; a zero normal has no backstop). Call it each frame
+   * before the step with the skinned mesh's vertices ({@link skinVertices} skins them from a skeleton). Over the step each
+   * skinned point moves at a steady speed from where it was to these, so a fast arm sweeps its sleeve through the swing, not
+   * to its end. With `teleport` the skin jumps (a cut, a respawn): the particles move with their points and keep their speed.
+   * @throws RangeError for a list that is not three numbers a particle, or a number that is not finite.
+   */
+  setSkinnedPositions(
+    positions: ArrayLike<number>,
+    normals: ArrayLike<number> | null = null,
+    { teleport = false }: { teleport?: boolean } = {},
+  ): this {
+    this.check();
+    if (!this.skinMax)
+      throw new MargoError('state', 'The body is not skinned; give it SoftBodyDesc.setSkinConstraints.');
+    const n = this.particles;
+    if (positions.length !== 3 * n)
+      throw new RangeError(`Give ${3 * n} skinned coordinates, three a particle (got ${positions.length}).`);
+    if (normals !== null && normals.length !== 3 * n)
+      throw new RangeError(`Give ${3 * n} normal coordinates, three a particle (got ${normals.length}).`);
+    let moved = false;
+    for (let k = 0; k < 3 * n; k++) {
+      const v = positions[k]!;
+      if (!Number.isFinite(v)) throw new RangeError(`Skinned coordinate ${k} is ${v}; give finite numbers.`);
+      if (v !== this.skinTo[k]) moved = true;
+    }
+    if (teleport) {
+      const { x, y, z } = this.c;
+      for (let i = 0; i < n; i++) {
+        const row = this.firstParticle + i;
+        x[row] = x[row]! + positions[3 * i]! - this.skinTo[3 * i]!;
+        y[row] = y[row]! + positions[3 * i + 1]! - this.skinTo[3 * i + 1]!;
+        z[row] = z[row]! + positions[3 * i + 2]! - this.skinTo[3 * i + 2]!;
+      }
+      this.skinFrom.set(positions);
+    }
+    this.skinTo.set(positions);
+    if (normals !== null)
+      for (let i = 0; i < n; i++) {
+        const nx = normals[3 * i]!,
+          ny = normals[3 * i + 1]!,
+          nz = normals[3 * i + 2]!,
+          length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (!Number.isFinite(length)) throw new RangeError(`Normal ${i} is not finite; give finite numbers.`);
+        const scale = length > 0 ? 1 / length : 0;
+        this.skinNormal[3 * i] = nx * scale;
+        this.skinNormal[3 * i + 1] = ny * scale;
+        this.skinNormal[3 * i + 2] = nz * scale;
+      }
+    if (moved || teleport) this.wake();
+    return this;
+  }
   /** The stretch its long range attachments allow, or null when it has none ({@link SoftBodyDesc.setTethers}). */
   get tethers(): number | null {
     return this.tetherStretch;
@@ -3019,7 +3168,7 @@ export class SoftBodies implements PhysicsAttachment {
   private readonly listeners = new Set<(event: SoftTearEvent) => void>();
   private view: Columns | null = null;
   private viewBuffer: ArrayBuffer | null = null;
-  private capacity = [0, 0, 0, 0, 0, 0, 0, 0];
+  private capacity = [0, 0, 0, 0, 0, 0, 0, 0, 0];
   /** @internal Whether the long range attachments must be worked out again (a body, a pin or a tear changed the paths). */
   tethersDirty = false;
   private rowGroups: number[] = [];
@@ -3197,7 +3346,7 @@ export class SoftBodies implements PhysicsAttachment {
       throw new MargoError('state', 'SoftBodies was disposed; attach a new one with SoftBodies.attach.');
     const buffer = this.exports.memory.buffer;
     if (this.view && this.viewBuffer === buffer) return this.view;
-    const [particles, edges, bodies, colliders, attachments, volumeTriangles, faces, tethers] = this.capacity,
+    const [particles, edges, bodies, colliders, attachments, volumeTriangles, faces, tethers, skins] = this.capacity,
       view: Columns = {};
     columnNames.forEach((name, id) => {
       const rows = rowsOf(
@@ -3210,6 +3359,7 @@ export class SoftBodies implements PhysicsAttachment {
           volumeTriangles!,
           faces!,
           tethers!,
+          skins!,
         ),
         at = this.exports.soft_column(id);
       view[name] = (
@@ -3287,6 +3437,7 @@ export class SoftBodies implements PhysicsAttachment {
       this.capacity[5]!,
       this.capacity[6]!,
       this.capacity[7]!,
+      this.capacity[8]!,
     ];
     this.view = null;
   }
@@ -3506,6 +3657,13 @@ export class SoftBodies implements PhysicsAttachment {
     body.airDrag = desc.airDrag;
     body.tetherStretch = desc.tethers;
     if (desc.tethers !== null) this.tethersDirty = true;
+    if (desc.skinMax) {
+      if (desc.skinMax.length !== particles || (desc.skinBack && desc.skinBack.length !== particles))
+        throw new RangeError(
+          `The skin constraints hold ${desc.skinMax.length} particles but the body has ${particles}; set them after its particles.`,
+        );
+      body.applySkin(desc.skinMax.slice(), desc.skinBack?.slice() ?? null);
+    }
     body.density = desc.density;
     body.waterRadius = desc.radius ?? null;
     body.grid = desc.grid && { ...desc.grid };
@@ -4636,6 +4794,7 @@ export class SoftBodies implements PhysicsAttachment {
     this.findPlanes(dt, rows, bodies);
     this.takeFromProxies();
     if (this.tethersDirty) this.writeTethers();
+    this.writeSkins(dt);
     this.exports.soft_fem_step_begin();
     this.exports.soft_begin(dt);
     // The passes of the body that asks for the most are the world's (the passes of a coupled island are the largest asked).
@@ -4752,6 +4911,71 @@ export class SoftBodies implements PhysicsAttachment {
    * nearest anchor and its distance through the cloth, and the tie's length is that times the body's stretch. A particle no
    * path reaches (a piece torn off) is tied to nothing.
    */
+  /**
+   * Hands the kernel each skinned particle's point, its speed over the step, its normal and its limits; a particle held at 0
+   * rides its point as a pinned particle with a target. The points are where the skin was at the end of the last step.
+   */
+  private writeSkins(dt: number): void {
+    let count = 0;
+    for (const body of this.bodies) {
+      const max = body.skinMax;
+      if (!max) continue;
+      const back = body.skinBack;
+      for (let i = 0; i < body.particles; i++)
+        if (
+          max[i]! > 0 &&
+          (max[i]! < Number.POSITIVE_INFINITY || (back !== null && back[i]! < Number.POSITIVE_INFINITY))
+        )
+          count++;
+    }
+    if (count > this.capacity[8]!) {
+      this.capacity[8] = count;
+      this.view = null;
+    }
+    this.exports.soft_skin_reserve(count);
+    if (count === 0 && !this.bodies.some((b) => b.skinMax)) return;
+    this.view = null;
+    const c = this.columns();
+    let s = 0;
+    for (const body of this.bodies) {
+      const max = body.skinMax;
+      if (!max) continue;
+      const back = body.skinBack,
+        from = body.skinFrom,
+        to = body.skinTo,
+        normal = body.skinNormal;
+      for (let i = 0; i < body.particles; i++) {
+        const row = body.firstParticle + i;
+        if (max[i] === 0) {
+          if (c.w[row] === 0 && body.skinPins[i]) {
+            c.tx[row] = to[3 * i]!;
+            c.ty[row] = to[3 * i + 1]!;
+            c.tz[row] = to[3 * i + 2]!;
+            c.pflags[row] = c.pflags[row]! | TARGETED;
+          }
+          continue;
+        }
+        const backstop = back === null ? Number.POSITIVE_INFINITY : back[i]!;
+        if (!(max[i]! < Number.POSITIVE_INFINITY) && !(backstop < Number.POSITIVE_INFINITY)) continue;
+        c.sk_p[s] = row;
+        c.sk_x[s] = from[3 * i]!;
+        c.sk_y[s] = from[3 * i + 1]!;
+        c.sk_z[s] = from[3 * i + 2]!;
+        c.sk_vx[s] = (to[3 * i]! - from[3 * i]!) / dt;
+        c.sk_vy[s] = (to[3 * i + 1]! - from[3 * i + 1]!) / dt;
+        c.sk_vz[s] = (to[3 * i + 2]! - from[3 * i + 2]!) / dt;
+        c.sk_nx[s] = normal[3 * i]!;
+        c.sk_ny[s] = normal[3 * i + 1]!;
+        c.sk_nz[s] = normal[3 * i + 2]!;
+        c.sk_max[s] = max[i]!;
+        const facing = normal[3 * i] !== 0 || normal[3 * i + 1] !== 0 || normal[3 * i + 2] !== 0;
+        c.sk_back[s] = facing && backstop < Number.POSITIVE_INFINITY ? backstop : -1;
+        s++;
+      }
+      from.set(to);
+    }
+  }
+
   private writeTethers(): void {
     this.tethersDirty = false;
     let c = this.columns();
@@ -6076,12 +6300,14 @@ function rowsOf(
   volumeTriangles: number,
   faces: number,
   tethers: number,
+  skins: number,
 ): number {
   if (name === 'vtri') return volumeTriangles * 3;
   if (name.startsWith('fc_')) return faces;
   if (/^vb_/.test(name)) return bodies;
   if (/^at_(p|row|r[xyz])$/.test(name)) return attachments;
   if (/^tt_(p|a|len)$/.test(name)) return tethers;
+  if (name.startsWith('sk_')) return skins;
   if (/^(kc|kn[xyz]|kp[xyz]|kv[xyz]|kf|kj|kr)$/.test(name)) return particles * 4;
   if (/^(ea|eb|rest|omega|zeta|lambda|tear|elimit|eflags)$/.test(name)) return edges;
   if (/^(gravity_scale|linear_damping|bsleep|b_on|b_omega|b_zeta|b_first|b_count|bq[xyzw])$/.test(name)) return bodies;
@@ -6116,6 +6342,25 @@ function barycentric(a: [Vec3, Vec3, Vec3, Vec3], p: Vec3): number[] {
 
 // Sails and flags in the wind (AERO-02): the vortex-lattice load on a cloth.
 export { SailForce, type SailOptions } from './sail.js';
+// Skinned cloth: the skinned mesh a cloth is held to, from a skeleton's joint matrices.
+export { type SkinBinding, type SkinnedVertices, skinVertices } from './soft-skinning.js';
+
+/** One skin limit a particle, from one number or a list, each 0 or more (Infinity: no limit). */
+function skinValues(values: number | ArrayLike<number>, particles: number, label: string): Float32Array {
+  const out = new Float32Array(particles);
+  if (typeof values === 'number') out.fill(values);
+  else {
+    if (values.length !== particles)
+      throw new RangeError(`Give one ${label} a particle: ${particles} values (got ${values.length}).`);
+    for (let i = 0; i < particles; i++) out[i] = values[i]!;
+  }
+  for (let i = 0; i < particles; i++)
+    if (!(out[i]! >= 0))
+      throw new RangeError(
+        `A ${label} is 0 or more metres, Infinity for none (got ${typeof values === 'number' ? values : values[i]} at particle ${i}).`,
+      );
+  return out;
+}
 
 function checkedTethers(stretch: number | null): number | null {
   if (stretch === null) return null;

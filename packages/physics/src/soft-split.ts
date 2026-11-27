@@ -165,6 +165,7 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
       desc.selfFriction = body.selfFriction;
     }
     desc.tethers = body.tetherStretch;
+    skinLimitsDesc(desc, body, members);
     const piece = soft.create(desc),
       after = soft.columns(),
       fem = soft.cellColumns(),
@@ -189,6 +190,7 @@ function splitEdges(soft: SoftBodies, body: SoftBody, make: (positions: number[]
       piece,
       members.map((p) => body.firstParticle + p),
     );
+    carrySkinLimits(body, piece, members);
     pieces.push(piece);
     carryCutSurface(soft, body, piece);
   }
@@ -411,6 +413,11 @@ function splitCells(
       desc.selfFriction = body.selfFriction;
     }
     desc.tethers = body.tetherStretch;
+    skinLimitsDesc(
+      desc,
+      body,
+      origin.map((p) => p - body.firstParticle),
+    );
     // Edges: each edge of the body goes to the node pair the cells that hold both of its ends use.
     const byParticle = new Map<number, number[]>();
     for (const t of mine)
@@ -493,6 +500,11 @@ function splitCells(
       desc,
       mine.map((t) => t - first),
     );
+    carrySkinLimits(
+      body,
+      piece,
+      origin.map((p) => p - body.firstParticle),
+    );
     pieces.push(piece);
     carryCutSurface(soft, body, piece);
   }
@@ -539,4 +551,26 @@ export function crossesBlade(
     if (pierces(blade[i]!, blade[(i + 1) % 3]!, face)) return true;
   }
   return false;
+}
+
+/** A piece of a skinned body keeps its particles' limits. */
+function skinLimitsDesc(desc: SoftBodyDesc, body: SoftBody, members: readonly number[]): void {
+  if (!body.skinMax) return;
+  const max = body.skinMax,
+    back = body.skinBack;
+  desc.skinMax = Float32Array.from(members, (p) => max[p]!);
+  desc.skinBack = back && Float32Array.from(members, (p) => back[p]!);
+}
+
+/** ...and where the skin holds them, its normals there and which of them the skin pinned. */
+function carrySkinLimits(body: SoftBody, piece: SoftBody, members: readonly number[]): void {
+  if (!body.skinMax || !piece.skinMax) return;
+  members.forEach((p, k) => {
+    for (let a = 0; a < 3; a++) {
+      piece.skinFrom[3 * k + a] = body.skinFrom[3 * p + a]!;
+      piece.skinTo[3 * k + a] = body.skinTo[3 * p + a]!;
+      piece.skinNormal[3 * k + a] = body.skinNormal[3 * p + a]!;
+    }
+    piece.skinPins[k] = body.skinPins[p]!;
+  });
 }

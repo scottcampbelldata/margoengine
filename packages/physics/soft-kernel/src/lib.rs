@@ -36,6 +36,7 @@ mod fem_api;
 mod heap;
 mod math;
 mod shape;
+mod skin;
 mod tether;
 mod world;
 pub use world::*;

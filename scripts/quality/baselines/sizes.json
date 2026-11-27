@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20865410,
+  "total": 20873705,
   "history": [
     {
       "date": "2026-10-24",
@@ -14496,6 +14496,12 @@
       "commit": "guns",
       "reason": "FIRE-05: gun interior ballistics and recoil (+4132 B)",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "9eabd11265",
+      "reason": "@margoengine/physics/soft: cloth tethers and skinned cloth (setTethers, setSkinConstraints, setSkinnedPositions, skinVertices; long range attachments and motion constraints in the soft kernel): entry 156,167 to 161,433 B gzip budget (measured 156,731 + 3%), base 48,852 to 51,881 (measured 50,369 + 3%): the tether paths (Dijkstra) and the skin rows are written from TypeScript beside the cloth they tie; the kernel blueprint stays within its budget. A split entry would load the same soft kernel for any skinned or tethered cloth.",
+      "grew": 2
     }
   ],
   "items": {
@@ -15375,8 +15381,8 @@
     "@margoengine/physics/seismic": 5266,
     "@margoengine/physics/ship": 35274,
     "@margoengine/physics/snowpack": 5172,
-    "@margoengine/physics/soft": 156167,
-    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 48852,
+    "@margoengine/physics/soft": 161433,
+    "@margoengine/physics/soft base (without soft body kernel (deflated Wasm blueprint and its column table))": 51881,
     "@margoengine/physics/soft lazy soft body kernel (deflated Wasm blueprint and its column table)": 107182,
     "@margoengine/physics/strands": 6171,
     "@margoengine/physics/surf": 7669,

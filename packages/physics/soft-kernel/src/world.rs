@@ -262,6 +262,21 @@ pub struct World {
     pub tt_a: Col<u32>,
     pub tt_len: Col<f32>,
     pub tethers: usize,
+    // Skinned particles (skin.rs): the particle, its skinned point and that point's speed over the step, the skin's normal there,
+    // the max distance and the backstop (below 0: none).
+    pub sk_p: Col<u32>,
+    pub sk_x: Col<f32>,
+    pub sk_y: Col<f32>,
+    pub sk_z: Col<f32>,
+    pub sk_vx: Col<f32>,
+    pub sk_vy: Col<f32>,
+    pub sk_vz: Col<f32>,
+    pub sk_nx: Col<f32>,
+    pub sk_ny: Col<f32>,
+    pub sk_nz: Col<f32>,
+    pub sk_max: Col<f32>,
+    pub sk_back: Col<f32>,
+    pub skins: usize,
 }
 
 fn grow<T: Copy>(v: &mut Col<T>, n: usize) {
@@ -435,6 +450,7 @@ impl World {
         for e in 0..self.edges {
             self.lambda[e] = 0.0;
         }
+        self.advance_skin(h);
         self.fem_implicit(h);
         self.solve_projective(h, iterations);
         let vertex_block = self.prepare_vertex_blocks();
@@ -447,6 +463,7 @@ impl World {
                 self.solve_edge(e, h);
             }
             self.solve_tethers();
+            self.solve_skin();
             self.solve_shape(h);
             self.solve_fem(h);
             if vertex_block {
@@ -458,6 +475,8 @@ impl World {
             self.solve_vertex_block_translation(h);
         }
         self.solve_rigid(h);
+        // The exact solve of the threads may pull a skinned particle past its limits; the skin has the last word before contacts.
+        self.solve_skin();
         self.collide(h);
     }
 

@@ -902,6 +902,36 @@ const curtain = soft.create(
 for (let i = 0; i < 120; i++) physics.step();
 console.log(curtain.tetheredParticles); // 550: every free particle tied to the top row
 ```
+- **Skinned cloth.** `desc.setSkinConstraints(maxDistance, backstop = null)` ties a garment to a character: each particle stays within its max distance (one number, or one a particle) of where the skin carries it, and with a backstop no farther than that behind the skin along its normal, so a cape swings free at its hem and cannot pass into the back. A particle with 0 rides the skin (it is pinned to it, and anchors tethers); `Infinity` is free. Each frame, before the step, hand the body the skinned mesh's vertices and normals with `body.setSkinnedPositions(positions, normals)`; `skinVertices(binding, jointMatrices)` skins them from a skeleton (linear blend skinning, four joints a vertex, column-major joint matrices as glTF uses). Over the step each skinned point moves at a steady speed, so a fast swing drags the cloth through it; `{ teleport: true }` jumps the skin and the cloth with it (a cut). `body.maxDistance(i)`, `body.backstop(i)`, `body.skinnedPosition(i)` read them back, `body.setSkinConstraints(...)` changes them (`null` lets go), and a skinned body that tears keeps its limits in each piece.
+
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc, skinVertices } from '@margoengine/physics/soft';
+
+await Physics.load();
+const physics = new Physics(null);
+const soft = await SoftBodies.attach(physics);
+// A cape 9 by 15 particles: row 0 rides the shoulders, each row below may stray 4 cm more, never 1 cm into the back.
+const desc = SoftBodyDesc.cloth([-0.32, 1.5, 0], [0.08, 0, 0], [0, -0.08, 0], 9, 15);
+const reach = Array.from({ length: 9 * 15 }, (_, p) => 0.04 * (p % 15));
+const cape = soft.create(desc.setSkinConstraints(reach, 0.01));
+// The cape's mesh bound to one joint, the character's root.
+const n = 9 * 15;
+const binding = {
+  positions: cape.particlePositions(),
+  normals: new Float32Array(3 * n).map((_, k) => (k % 3 === 2 ? 1 : 0)),
+  joints: new Uint8Array(4 * n),
+  weights: new Float32Array(4 * n).map((_, k) => (k % 4 === 0 ? 1 : 0)),
+};
+for (let frame = 1; frame <= 60; frame++) {
+  const x = Math.sin(frame / 10); // the character runs left and right
+  const root = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, 0, 0, 1];
+  const skin = skinVertices(binding, root);
+  cape.setSkinnedPositions(skin.positions, skin.normals);
+  physics.step();
+}
+console.log(cape.maxDistance(14)); // 0.56: the hem may swing 56 cm from the skin
+```
 
 Migration: before this, a woven sheet's particles weighed 1 kg each (Rapier's default), its threads and diagonals were rigid edges that the sweep left stretching under load, and it felt no air. A cloth of 10 cm cells then weighed 100 kg/m^2, eight hundred times cotton, which is why it sagged and draped like a heavy blanket. For the old behaviour, give the body `setParticleMass(1)`, set `material.tensile = null` and `material.shear = null` (rigid threads and diagonals, now solved exactly) and `setAirDrag(false)`; `SoftBodyMaterial.uniform(hertz, damping)` (Rapier's material) does all but the air.
 

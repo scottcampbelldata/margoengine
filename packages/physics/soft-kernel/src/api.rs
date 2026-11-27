@@ -25,6 +25,8 @@ static mut WORLD: World = World {
     fc_nx: Col::new(), fc_ny: Col::new(), fc_nz: Col::new(), fc_px: Col::new(), fc_py: Col::new(), fc_pz: Col::new(), fc_vx: Col::new(),
     fc_vy: Col::new(), fc_vz: Col::new(), fc_f: Col::new(), fc_r: Col::new(), fc_j: Col::new(), fc_k: Col::new(), fc_side: Col::new(), faces: 0,
     tt_p: Col::new(), tt_a: Col::new(), tt_len: Col::new(), tethers: 0,
+    sk_p: Col::new(), sk_x: Col::new(), sk_y: Col::new(), sk_z: Col::new(), sk_vx: Col::new(), sk_vy: Col::new(), sk_vz: Col::new(),
+    sk_nx: Col::new(), sk_ny: Col::new(), sk_nz: Col::new(), sk_max: Col::new(), sk_back: Col::new(), skins: 0,
 };
 
 #[allow(static_mut_refs)]
@@ -56,6 +58,7 @@ columns! {
     vtri, vb_on, vb_first, vb_count, vb_target, vb_ambient, vb_omega, vb_zeta, vb_lambda, gs, dom, bsleep, m0x, m0y, m0z, l0x, l0y, l0z, a0x, a0y, a0z, kj, rox, roy, roz,
     fc_a, fc_b, fc_c, fc_wa, fc_wb, fc_wc, fc_row, fc_nx, fc_ny, fc_nz, fc_px, fc_py, fc_pz, fc_vx, fc_vy, fc_vz, fc_f, fc_r, fc_j, fc_k, kr, elimit, bmesh,
     tt_p, tt_a, tt_len,
+    sk_p, sk_x, sk_y, sk_z, sk_vx, sk_vy, sk_vz, sk_nx, sk_ny, sk_nz, sk_max, sk_back,
 }
 
 /// Makes room for rows and says how many are in use. Views over the memory are stale after it.
@@ -85,6 +88,21 @@ pub extern "C" fn soft_tether_reserve(tethers: u32) {
     w.tt_a.resize(tethers as usize);
     w.tt_len.resize(tethers as usize);
     w.tethers = tethers as usize;
+}
+
+/// Makes room for skinned particles and says how many are in use. Views over the memory are stale after it.
+#[unsafe(no_mangle)]
+pub extern "C" fn soft_skin_reserve(skins: u32) {
+    let w = world();
+    let n = skins as usize;
+    w.sk_p.resize(n);
+    for col in [
+        &mut w.sk_x, &mut w.sk_y, &mut w.sk_z, &mut w.sk_vx, &mut w.sk_vy, &mut w.sk_vz, &mut w.sk_nx, &mut w.sk_ny,
+        &mut w.sk_nz, &mut w.sk_max, &mut w.sk_back,
+    ] {
+        col.resize(n);
+    }
+    w.skins = n;
 }
 
 /// Makes room for the face contacts of a step and says how many are in use. Views over the memory are stale after it.

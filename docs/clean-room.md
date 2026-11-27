@@ -12313,6 +12313,16 @@ Written clean room from the paper below: no engine's source and no companion cod
 - T.-Y. Kim, N. Chentanez and M. Müller-Fischer, "Long Range Attachments: A Method to Simulate Inextensible Clothing in Computer Games", ACM SIGGRAPH/Eurographics Symposium on Computer Animation, 2012. https://doi.org/10.2312/SCA/SCA12/305-310
 - E. W. Dijkstra, "A note on two problems in connexion with graphs", Numerische Mathematik 1, 1959 (the geodesic distances).
 
+### Skinned cloth: motion constraints and linear blend skinning (`@margoengine/physics/soft`, 2026-11-27)
+
+Written clean room from the papers and the public glTF specification below; no engine's source and no companion code was read. Each skinned particle has a point on the character's skin (the skinned mesh's vertex, from the skeleton by linear blend skinning), a max distance from it and a backstop behind the skin's plane there. The point moves at a steady speed over the step, carried a piece at a time in the kernel. Once per pass and once after the exact thread solve, a particle outside its sphere is projected onto it, and a particle behind the backstop onto that plane (one-sided position constraints). A max distance of 0 makes the particle a pin with a target, so it rides the skin exactly and anchors the tethers. Rivals' public documentation was read for the feature list only (max distance and backstop, or surface penetration, per vertex).
+
+- M. Müller, B. Heidelberger, M. Hennix and J. Ratcliff, "Position Based Dynamics", J. Visual Communication and Image Representation 18(2), 2007 (one-sided constraint projection). https://doi.org/10.1016/j.jvcir.2007.01.005
+- T.-Y. Kim, N. Chentanez and M. Müller-Fischer, "Long Range Attachments", SCA 2012 (character clothing tied to skinned anchors). https://doi.org/10.2312/SCA/SCA12/305-310
+- T. Jakobsen, "Advanced Character Physics", Game Developers Conference 2001 (projection of particles onto limits).
+- N. Magnenat-Thalmann, R. Laperrière and D. Thalmann, "Joint-dependent local deformations for hand animation and object grasping", Graphics Interface 1988 (linear blend skinning).
+- Khronos Group, glTF 2.0 Specification, section 3.7.3, Skins (joint matrices, JOINTS_0 and WEIGHTS_0). https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+
 ### Shape matching (`@margoengine/physics/soft`, 2026-11-24)
 
 - M. Müller, B. Heidelberger, M. Teschner and M. Gross, "Meshless Deformations Based on Shape Matching", ACM TOG 24(3), 2005.
