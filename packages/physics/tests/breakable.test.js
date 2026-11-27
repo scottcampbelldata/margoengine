@@ -807,6 +807,55 @@ test('the same inputs give the same state hash, and a snapshot and restore step 
   }
 });
 
+test('a truncated or corrupt snapshot is refused whole and leaves the breakable state as it was', () => {
+  // Before the check-then-write restore, a bad pair count looped over the end of the words, and a mismatch found
+  // part-way left the bodies already read half-restored.
+  const physics = new Physics(null);
+  addFloor(physics);
+  const breakable = new BreakableWorld(physics);
+  const a = breakable.add(null, { size: [1, 1, 1], position: [0, 0.5, 0], cellCount: 6, bondStrength: 100 });
+  const b = breakable.add(null, { size: [1, 1, 1], position: [3, 0.5, 0], cellCount: 6, bondStrength: 100 });
+  for (let i = 0; i < 5; i++) physics.step();
+  const good = breakable.takeSnapshot();
+  a.applyImpact([0, 0.5, 0], 30, 2);
+  b.applyImpact([3, 0.5, 0], 30, 2);
+  const now = Array.from(breakable.takeSnapshot().words);
+  assert.ok(a.totalDamage > 0 && b.totalDamage > 0);
+  const refused = (words) => {
+    assert.throws(() => breakable.restoreSnapshot({ islands: good.islands, words }), {
+      name: 'MargoError',
+      code: 'state',
+      message: /other pieces than the snapshot.+#physics-breakable/,
+    });
+    assert.deepEqual(Array.from(breakable.takeSnapshot().words), now, 'nothing changed');
+  };
+  const words = good.words;
+  refused(words.slice(0, words.length - 1));
+  refused(words.slice(0, 12));
+  // The last body's first bond strength made 0, after the first body's words would already have been read.
+  const bad = words.slice();
+  const second = bad.indexOf(b.id, 3 + 7 + 3 * a.bonds.length);
+  bad[second + 1 + 7 + 2] = 0;
+  refused(bad);
+  // A pair count far past the end of the words, and one below 0.
+  const count = findPairCount(words);
+  for (const n of [1e9, -1, 0.5]) {
+    const counted = words.slice();
+    counted[count] = n;
+    refused(counted);
+  }
+  breakable.restoreSnapshot(good);
+  assert.equal(a.totalDamage, 0, 'the good snapshot still restores');
+  breakable.dispose();
+  physics.dispose();
+});
+
+// The index of a breakable snapshot's pair count: the words end with the count and two words a pair.
+function findPairCount(words) {
+  for (let at = words.length - 1; at >= 0; at -= 2) if (words[at] === (words.length - 1 - at) / 2) return at;
+  throw new Error('no pair count');
+}
+
 test('a snapshot before a runtime split puts the bond graph back, and one after makes the same split again', () => {
   const physics = new Physics(null, { gravity: [0, 0, 0] });
   const breakable = new BreakableWorld(physics);

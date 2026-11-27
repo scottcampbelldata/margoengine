@@ -82,7 +82,11 @@ export class BreakableBody {
     applyContactImpact(island: ActiveIsland, worldPoint: Vec3, impulseVec: Vec3, impulseMag: number): readonly BreakableFragment[];
     removeIslandInternal(island: ActiveIsland): void;
     writeState(out: number[]): void;
-    readState(words: Float64Array, at: number): number;
+    checkState(words: Float64Array, at: number): {
+        next: number;
+        graph: BreakableGraph | null | undefined;
+    };
+    readState(words: Float64Array, at: number, graph: BreakableGraph | null | undefined): number;
     islandIds(out: number[]): void;
 }
 
@@ -392,6 +396,29 @@ interface BodyOwner {
 }
 
 type BodyType = 'dynamic' | 'fixed' | 'kinematicPosition' | 'kinematicVelocity';
+
+class BondRecord implements BreakableBond {
+    readonly index: number;
+    readonly cellA: number;
+    readonly cellB: number;
+    readonly area: number;
+    readonly localCentroid: readonly [number, number, number];
+    readonly localNormal: readonly [number, number, number];
+    strength: number;
+    readonly initialStrength: number;
+    damage: number;
+    broken: boolean;
+    constructor(index: number, cellA: number, cellB: number, area: number, localCentroid: readonly [number, number, number], localNormal: readonly [number, number, number], strength: number);
+    get health(): number;
+    reset(): void;
+}
+
+interface BreakableGraph {
+    readonly cells: BreakableCell[];
+    readonly bonds: BondRecord[];
+    readonly flags: Uint8Array;
+    readonly site: [number, number, number] | null;
+}
 
 interface CharacterCollision {
     collider: PhysicsCollider;
@@ -1493,6 +1520,12 @@ class Physics implements EnginePlugin, BodyOwner {
         den: number;
     }): number;
     step(): void;
+    get threadCount(): number;
+    useThreads(count: number, options?: {
+        signal?: AbortSignal;
+    }): Promise<this>;
+    endThreads(): this;
+    stepAsync(): Promise<void>;
     detectCollisions(): void;
     get quarantined(): readonly PhysicsBody[];
     sync(alpha?: number): void;
@@ -2118,6 +2151,7 @@ type ShapeOptions = {
     connectedComponents?: boolean;
     halfEdgeTopology?: boolean;
     deformable?: boolean;
+    massFallback?: 'strict' | 'winding';
 } | {
     shape: 'heightfield';
     rows: number;

@@ -301,6 +301,14 @@ const snapshotMismatch = () =>
     'The breakable world has other pieces than the snapshot: restore it before a break or a removal, or take a new snapshot',
   );
 
+/** A body's split: its cells, the bonds between them, which are anchored, and the impact site of a runtime split. */
+interface BreakableGraph {
+  readonly cells: BreakableCell[];
+  readonly bonds: BondRecord[];
+  readonly flags: Uint8Array;
+  readonly site: [number, number, number] | null;
+}
+
 /** Packs two collider handles into one exact map key (handles stay far below 2^26). */
 const PAIR_KEY = 0x4000000;
 
@@ -900,29 +908,70 @@ export class BreakableBody {
     }
   }
 
-  /** @internal Puts back what {@link BreakableBody.writeState} wrote, from `at`; returns the word after it. */
-  readState(words: Float64Array, at: number): number {
-    this._broken = words[at] === 1;
-    this._intactDamage = words[at + 1]!;
+  /**
+   * @internal Checks the words {@link BreakableBody.writeState} wrote, from `at`, against this body without changing it:
+   * flags 0 or 1, damage finite and at least 0, strengths finite and above 0, and a bond count this body's cells give.
+   * Returns the word after them and the bond graph a runtime split needs made again (undefined for none, null to undo).
+   */
+  checkState(words: Float64Array, at: number): { next: number; graph: BreakableGraph | null | undefined } {
+    if (at + 7 > words.length) throw snapshotMismatch();
+    const broken = words[at]!;
+    const damage = words[at + 1]!;
     const cells = words[at + 2]!;
     const site: Vec3 | null = Number.isNaN(words[at + 3]) ? null : [words[at + 3]!, words[at + 4]!, words[at + 5]!];
+    if (
+      !(broken === 0 || broken === 1) ||
+      !(damage >= 0 && Number.isFinite(damage)) ||
+      !(Number.isInteger(cells) && cells >= 0) ||
+      (site !== null && !site.every(Number.isFinite)) ||
+      (site === null && !(Number.isNaN(words[at + 4]) && Number.isNaN(words[at + 5])))
+    )
+      throw snapshotMismatch();
+    let graph: BreakableGraph | null | undefined;
+    let bondCount = this._bonds.length;
     if (cells !== this._cells.length || (this.fractureMode === 'impact' && !sameSite(site, this._impactSite))) {
-      // A runtime split that came after (or before) the snapshot: undo it, or make it again from the same impact site.
-      const intact = this._islands[0]!;
-      intact.cellIndices.length = 0;
+      // Only a runtime split comes and goes: undo it, or make it again from the same impact site.
+      if (this.fractureMode !== 'impact') throw snapshotMismatch();
       if (cells === 0) {
-        this._cells = [];
-        this._bonds = [];
-        this._anchoredFlags = new Uint8Array(0);
-        this._impactSite = null;
+        if (site !== null) throw snapshotMismatch();
+        graph = null;
+        bondCount = 0;
       } else {
-        this.generateCellsAndGraph(site ?? undefined);
-        for (let i = 0; i < this._cells.length; i++) intact.cellIndices.push(i);
+        if (site === null) throw snapshotMismatch();
+        graph = this.buildGraph(site);
+        if (graph.cells.length !== cells) throw snapshotMismatch();
+        bondCount = graph.bonds.length;
       }
     }
     at += 6;
     const bonds = words[at++]!;
-    if (bonds !== this._bonds.length) throw snapshotMismatch();
+    if (bonds !== bondCount || at + 3 * bonds > words.length) throw snapshotMismatch();
+    for (let i = 0; i < bonds; i++, at += 3) {
+      const bondDamage = words[at]!;
+      const bondBroken = words[at + 1]!;
+      const strength = words[at + 2]!;
+      if (
+        !(bondDamage >= 0 && Number.isFinite(bondDamage)) ||
+        !(bondBroken === 0 || bondBroken === 1) ||
+        !(strength > 0 && Number.isFinite(strength))
+      )
+        throw snapshotMismatch();
+    }
+    return { next: at, graph };
+  }
+
+  /** @internal Puts back words {@link BreakableBody.checkState} passed, with the graph it made; returns the word after. */
+  readState(words: Float64Array, at: number, graph: BreakableGraph | null | undefined): number {
+    this._broken = words[at] === 1;
+    this._intactDamage = words[at + 1]!;
+    if (graph !== undefined) {
+      const intact = this._islands[0]!;
+      intact.cellIndices.length = 0;
+      this.useGraph(graph ?? { cells: [], bonds: [], flags: new Uint8Array(0), site: null });
+      for (let i = 0; i < this._cells.length; i++) intact.cellIndices.push(i);
+    }
+    at += 6;
+    const bonds = words[at++]!;
     for (let i = 0; i < bonds; i++) {
       const bond = this._bonds[i] as BondRecord;
       bond.damage = words[at++]!;
@@ -938,7 +987,19 @@ export class BreakableBody {
   }
 
   private generateCellsAndGraph(localImpact?: Vec3): void {
-    this._impactSite =
+    this.useGraph(this.buildGraph(localImpact));
+  }
+
+  private useGraph(graph: BreakableGraph): void {
+    this._cells = graph.cells;
+    this._bonds = graph.bonds;
+    this._anchoredFlags = graph.flags;
+    this._impactSite = graph.site;
+  }
+
+  /** The cells, bonds and anchors of a split, without changing this body. */
+  private buildGraph(localImpact?: Vec3): BreakableGraph {
+    const site: [number, number, number] | null =
       localImpact && this.fractureMode === 'impact' ? [localImpact[0], localImpact[1], localImpact[2]] : null;
     const sites =
       this.customSites ??
@@ -952,14 +1013,14 @@ export class BreakableBody {
         this.defaultImpactRadius,
       );
     const result = voronoiFracturePolyhedron(this.basePolyhedron, sites, this.density, this.uvScale);
-    this._cells = [...result.cells];
+    const cells = [...result.cells];
 
     // Compute mean cut-face area so areaWeightedStrength keeps average bond strength equal to bondStrength.
     let totalArea = 0;
     for (let i = 0; i < result.adjacencies.length; i++) totalArea += result.adjacencies[i]!.area;
     const meanArea = result.adjacencies.length > 0 ? totalArea / result.adjacencies.length : 1;
 
-    this._bonds = result.adjacencies.map((adj, index) => {
+    const bonds = result.adjacencies.map((adj, index) => {
       let strength = this._bondStrength;
       if (this.bondStrengthFn) {
         strength = this.bondStrengthFn({
@@ -978,11 +1039,11 @@ export class BreakableBody {
       return new BondRecord(index, adj.cellA, adj.cellB, adj.area, adj.centroid, adj.normal, strength);
     });
 
-    this._anchoredFlags = this.computeAnchoredFlags();
+    return { cells, bonds, flags: this.computeAnchoredFlags(cells), site };
   }
 
-  private computeAnchoredFlags(): Uint8Array {
-    const n = this._cells.length;
+  private computeAnchoredFlags(cells: readonly BreakableCell[]): Uint8Array {
+    const n = cells.length;
     const flags = new Uint8Array(n);
     const mode = this.anchorMode;
     if (mode === 'none') return flags;
@@ -997,7 +1058,7 @@ export class BreakableBody {
 
     if (typeof mode === 'function') {
       for (let i = 0; i < n; i++) {
-        const c = this._cells[i]!;
+        const c = cells[i]!;
         if (
           mode({
             index: c.index,
@@ -1026,7 +1087,7 @@ export class BreakableBody {
     if (mode === 'bottom') {
       const cutY = this.boundsMin[1] + tolY;
       for (let i = 0; i < n; i++) {
-        if (this._cells[i]!.boundsMin[1] <= cutY) flags[i] = 1;
+        if (cells[i]!.boundsMin[1] <= cutY) flags[i] = 1;
       }
       return flags;
     }
@@ -1035,7 +1096,7 @@ export class BreakableBody {
       // Anchor the four perimeter edges perpendicular to the thinnest axis (e.g. window glass in a frame).
       const thinAxis = sx <= sy && sx <= sz ? 0 : sy <= sx && sy <= sz ? 1 : 2;
       for (let i = 0; i < n; i++) {
-        const c = this._cells[i]!;
+        const c = cells[i]!;
         const touchX = c.boundsMin[0] <= this.boundsMin[0] + tolX || c.boundsMax[0] >= this.boundsMax[0] - tolX;
         const touchY = c.boundsMin[1] <= this.boundsMin[1] + tolY || c.boundsMax[1] >= this.boundsMax[1] - tolY;
         const touchZ = c.boundsMin[2] <= this.boundsMin[2] + tolZ || c.boundsMax[2] >= this.boundsMax[2] - tolZ;
@@ -1047,7 +1108,7 @@ export class BreakableBody {
 
     // 'all-boundary'
     for (let i = 0; i < n; i++) {
-      const c = this._cells[i]!;
+      const c = cells[i]!;
       if (
         c.boundsMin[0] <= this.boundsMin[0] + tolX ||
         c.boundsMax[0] >= this.boundsMax[0] - tolX ||
@@ -1764,27 +1825,53 @@ export class BreakableWorld implements PhysicsAttachment {
     const words = snapshot?.words;
     if (
       !(words instanceof Float64Array) ||
+      !Array.isArray(snapshot.islands) ||
       islands.length !== snapshot.islands.length ||
-      islands.some((id, i) => id !== snapshot.islands[i])
+      islands.some((id, i) => id !== snapshot.islands[i]) ||
+      words.length < 3
     )
       throw snapshotMismatch();
+    // Every word is checked before any is written, so a refused snapshot leaves the world as it was.
+    for (let i = 0; i < 3; i++) if (!(Number.isInteger(words[i]) && words[i]! >= 1)) throw snapshotMismatch();
     let at = 3;
+    const graphs: (BreakableGraph | null | undefined)[] = [];
     for (const body of this._bodies) {
       if (words[at++] !== body.id) throw snapshotMismatch();
-      at = body.readState(words, at);
+      const { next, graph } = body.checkState(words, at);
+      graphs.push(graph);
+      at = next;
     }
-    if (words[at++] !== this.debrisOrder.length) throw snapshotMismatch();
+    if (words[at++] !== this.debrisOrder.length || at + 3 * this.debrisOrder.length > words.length)
+      throw snapshotMismatch();
+    const debrisAt = at;
     for (const { fragment } of this.debrisOrder) {
-      if (words[at++] !== fragment.id) throw snapshotMismatch();
-      fragment.age = words[at++]!;
-      fragment.slowTime = words[at++]!;
+      const age = words[at + 1]!;
+      const slow = words[at + 2]!;
+      if (words[at] !== fragment.id || !(age >= 0 && Number.isFinite(age)) || !(slow >= 0 && Number.isFinite(slow)))
+        throw snapshotMismatch();
+      at += 3;
+    }
+    const pairs = words[at++];
+    if (!(Number.isInteger(pairs) && pairs! >= 0) || at + 2 * pairs! !== words.length) throw snapshotMismatch();
+    for (let k = at; k < words.length; k += 2)
+      if (!(Number.isInteger(words[k]) && words[k]! >= 0) || !(words[k + 1]! > 0 && Number.isFinite(words[k + 1])))
+        throw snapshotMismatch();
+
+    at = 3;
+    let i = 0;
+    for (const body of this._bodies) at = body.readState(words, at + 1, graphs[i++]);
+    at = debrisAt;
+    for (const { fragment } of this.debrisOrder) {
+      fragment.age = words[at + 1]!;
+      fragment.slowTime = words[at + 2]!;
+      at += 3;
     }
     this.nextBodyCounter = words[0]!;
     this.nextIslandCounter = words[1]!;
     this.nextFragmentCounter = words[2]!;
     this.pairImpulse.clear();
     this.lastPairImpulse.clear();
-    for (let n = words[at++]!; n > 0; n--, at += 2) this.lastPairImpulse.set(words[at]!, words[at + 1]!);
+    for (at = at + 1; at < words.length; at += 2) this.lastPairImpulse.set(words[at]!, words[at + 1]!);
     return this;
   }
 
