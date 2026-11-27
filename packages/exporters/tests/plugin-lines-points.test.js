@@ -182,6 +182,23 @@ test('gltf/pbr draws the widths back with the lines and points plugins, and a se
   }
 });
 
+test('with styleExtensions gltf/pbr draws the exact extras width, not the whole-pixel Bentley style beside it', async () => {
+  const { engine, attached } = await scene();
+  attached.material.width = 2.6;
+  const glb = exportGLB(engine, { styleExtensions: true }),
+    { json } = readGLB(glb),
+    strip = primitivesOf(json).find((p) => p.extras?.lineWidth === 2.6);
+  assert.deepEqual(json.materials[strip.material].extensions.BENTLEY_materials_line_style, { width: 3 });
+  const gpu = mockGPU(),
+    { canvas, restore } = installWebGPU(gpu),
+    fresh = await Engine.create(canvas, { backend: 'webgpu' });
+  restore();
+  await parseGLTFAsync(fresh, glb);
+  const widths = [...fresh.plugins.get('gltf-lines').lines].map((l) => l.material.width).sort((a, b) => a - b);
+  assert.deepEqual(widths, [0.05, 0.1, 2.6]);
+  assert.equal([...fresh.plugins.get('gltf-points').pointClouds][0].material.size, 6);
+});
+
 test('a hidden line or cloud, or one on a hidden mesh, is left out unless onlyVisible is false', async () => {
   const { engine, box, loop, cloud } = await scene(),
     count = (options) => primitivesOf(readGLB(exportGLB(engine, options)).json).filter((p) => p.mode !== 4).length;
