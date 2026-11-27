@@ -10614,7 +10614,9 @@ The same-rate body recipients consume the settled loads in the same tick. It use
 bed and periodic cell images. Each exchange changes only horizontal water momentum and leaves depth
 unchanged. Waders receive buoyancy from the final immersed profile. The water applies paddle exchanges
 first and then wading exchanges in input order. Use the fixed bed origin and unit water time scale.
-The standalone pre-transport adapters require a persistently wet exchange stencil.
+The standalone pre-transport adapters require a persistently wet exchange stencil. The Hydro entry
+grows from 18,846 to 22,061 B gzip. The Loads entry grows from 42,251 to 42,369 B gzip. Water field
+declarations live outside the settlement code, so surge and surf keep their existing size budgets.
 [Labbé et al., Physics of rowing oars (2019), Eq. 3a](https://doi.org/10.1088/1367-2630/ab4226),
 [Orselli and Duarte, Joint forces and torques when walking in shallow water (2011), section 2.4](https://ebm.ufabc.edu.br/publications/md/JB11b.pdf)
 

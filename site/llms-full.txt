@@ -15253,6 +15253,17 @@ rebuilding the exchange. This group needs shallow water without the separate gui
 The depth-averaged grid carries hydrostatic vertical pressure. The Life entry measures 6,884 B gzip, up from 6,645 B. Its optional plain and shared Wasm
 assets are 6,890 and 6,981 B raw. Core and Stage gain zero bytes.
 
+`ShallowWaterSolver.withFloodLoads` settles paddle and wading profiles after finite-volume transport.
+The same-rate body recipients consume the settled loads in the same tick. It uses the final f64 depth,
+bed and periodic cell images. Each exchange changes only horizontal water momentum and leaves depth
+unchanged. Waders receive buoyancy from the final immersed profile. The water applies paddle exchanges
+first and then wading exchanges in input order. Use the fixed bed origin and unit water time scale.
+The standalone pre-transport adapters require a persistently wet exchange stencil. The Hydro entry
+grows from 18,846 to 22,061 B gzip. The Loads entry grows from 42,251 to 42,369 B gzip. Water field
+declarations live outside the settlement code, so surge and surf keep their existing size budgets.
+[Labbé et al., Physics of rowing oars (2019), Eq. 3a](https://doi.org/10.1088/1367-2630/ab4226),
+[Orselli and Duarte, Joint forces and torques when walking in shallow water (2011), section 2.4](https://ebm.ufabc.edu.br/publications/md/JB11b.pdf)
+
 The optional projected rigid drag settlement supports wetting and drying on standard shallow water.
 This raises the Hydro entry from 14,291 to 18,841 B gzip, including periodic stencil handling.
 It resolves the final f64 wetted profile, applies one horizontal impulse exchange per body per tick,
@@ -15325,6 +15336,17 @@ until it is fixed. Entries are newest first. A heading starts with the state (Op
 an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the regression test that keeps it fixed.
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
+
+### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
+
+- **Repro:** Put a moving paddle or legged body over a 2 µm periodic water cell and draw it down to
+  0.5 µm in one step. The body receives a drag impulse while the shallow water drops the staged
+  reaction at its dry threshold.
+- **Cause and fix:** The legacy adapters computed both impulses using the pre-transport water.
+  `ShallowWaterSolver.withFloodLoads` computes the paired exchange after wet/dry transport and
+  publishes only the accepted body reactions. Use this factory for changing wetness.
+  `packages/physics/tests/coupling/loads-paddle.test.js` and `loads-wading.test.js` check wet momentum,
+  drying rejection and replay.
 
 ### Open 2026-11-27: a rope under tension over a bollard blows up, so wrapping cannot be checked against the capstan law (KB-PHYS-RODWRAP1, physics kernel)
 

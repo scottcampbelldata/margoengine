@@ -13,6 +13,19 @@ export const EARTH_ROTATION = 0.00007292115;
 
 export const FORCING_WORDS = 5;
 
+export interface FloodLoadsCoupling {
+    readonly water: ShallowWaterSolver;
+    readonly paddle?: Pick<FloodPaddleSolver, 'readBlade'>;
+    readonly wading?: Pick<FloodWadingSolver, 'readBody'>;
+}
+
+export interface FloodLoadsOptions {
+    readonly id?: string;
+    readonly paddle?: FloodPaddleParams;
+    readonly wading?: FloodWadingParams;
+    readonly signal?: AbortSignal;
+}
+
 export interface ProjectedFloodDragCoupling {
     readonly water: ShallowWaterSolver;
     readonly request: Solver<Record<string, never>>;
@@ -150,6 +163,7 @@ export class ShallowWaterSolver implements Solver<ShallowWaterParams> {
     static withRigidCylinder(cylinder: ShallowMovingCylinder, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
     static withRigidFootprint(footprint: ShallowMovingFootprint, options?: RigidCylinderOptions): Promise<RigidCylinderCoupling>;
     static withProjectedBodyDrag(bodies: readonly FloodBodyDragBody[], options?: ProjectedFloodDragOptions): Promise<ProjectedFloodDragCoupling>;
+    static withFloodLoads(options: FloodLoadsOptions): Promise<FloodLoadsCoupling>;
     describe(): SolverDescription;
     init(host: SolverHost, params: ShallowWaterParams): void;
     get blockageFields(): ShallowBlockageFields | undefined;
@@ -230,6 +244,70 @@ interface FloodBodyDragBody {
     readonly dragCoefficient: number;
 }
 
+interface FloodDragGridParams {
+    readonly bed: Bed;
+    readonly density?: number;
+    readonly cellSize?: number;
+}
+
+interface FloodPaddleBlade {
+    readonly row: number;
+    readonly centre: Vector;
+    readonly normal: Vector;
+    readonly area: number;
+    readonly halfHeight: number;
+    readonly dragCoefficient: number;
+}
+
+interface FloodPaddleParams extends FloodDragGridParams {
+    readonly blades: readonly FloodPaddleBlade[];
+    readonly rate?: RateLevel;
+}
+
+class FloodPaddleSolver implements Solver<FloodPaddleParams> {
+    readonly id: string;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: FloodPaddleParams): void;
+    step(context: StepContext, dt: number): void;
+    settleFlood(context: StepContext, dt: number, water: Float64Array, bottom: Float64Array, periodic: PeriodicDragAxes): void;
+    readBlade(index: number): readonly [number, number, number, number, number, number];
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+interface FloodWadingBody {
+    readonly mass: number;
+    readonly centreOffset: number;
+    readonly halfHeight: number;
+    readonly area: number;
+    readonly volume: number;
+    readonly dragCoefficient: number;
+}
+
+interface FloodWadingParams extends FloodDragGridParams {
+    readonly bodies: readonly (FloodWadingBody | null)[];
+    readonly rate?: RateLevel;
+}
+
+class FloodWadingSolver implements Solver<FloodWadingParams> {
+    readonly id: string;
+    constructor(id?: string);
+    describe(): SolverDescription;
+    init(host: SolverHost, params: FloodWadingParams): void;
+    step(context: StepContext, dt: number): void;
+    settleFlood(context: StepContext, dt: number, water: Float64Array, bottom: Float64Array, periodic: PeriodicDragAxes): void;
+    readBody(index: number): readonly [number, number, number];
+    exportPorts(tick: number): readonly Port[];
+    importPorts(): void;
+    stateRegions(): readonly Region[];
+    extraState(): readonly Region[];
+}
+
+type PeriodicDragAxes = readonly [x: boolean, z: boolean];
+
 interface Port {
     readonly field: string;
     readonly region: Region;
@@ -294,4 +372,6 @@ interface StepContext {
 }
 
 type Vec3 = readonly [number, number, number];
+
+type Vector = readonly [number, number, number];
 ```

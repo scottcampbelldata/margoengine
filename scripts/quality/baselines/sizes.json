@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20751193,
+  "total": 20754672,
   "history": [
     {
       "date": "2026-10-24",
@@ -14293,6 +14293,12 @@
       "commit": "5252425c88",
       "reason": "KB-LOOP-D3D11 and KB-SW2: the WebGL2 layer's GLSL writes a loop whose header ANGLE Direct3D 11 splits with no header when a loop inside it continues, and an empty default clause first (headerless, splitsHeader, nestedContinue, noOp in src/glsl/emit.ts). device 127,245 B from 127,003 B, xr 127,044 B from 126,785 B, tiers 126,884 B from 126,606 B min+gzip. The bytes are the emitter itself, which every entry that translates WGSL to GLSL carries; a lazy split would add a fetch before the first shader of every program on the layer.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-26",
+      "commit": "c80430a84a",
+      "grew": 1,
+      "reason": "@margoengine/physics/hydro 18,846 to 22,061 B gzip, ceiling 19244 to 22723. The optional SEA-12 paddle and wader settlement accepts drag only after wet/dry transport, publishing the opposite impulse in the same tick. Sharing this Hydro state avoids a second transport solver and readback contract. The surface field descriptors stay in a lightweight module for surge and surf."
     }
   ],
   "items": {
@@ -15138,7 +15144,7 @@
     "@margoengine/physics/granular-flow": 5830,
     "@margoengine/physics/granular-mpm": 6045,
     "@margoengine/physics/groundwater": 4158,
-    "@margoengine/physics/hydro": 19244,
+    "@margoengine/physics/hydro": 22723,
     "@margoengine/physics/ice": 3483,
     "@margoengine/physics/iceberg": 4595,
     "@margoengine/physics/landscape": 4538,

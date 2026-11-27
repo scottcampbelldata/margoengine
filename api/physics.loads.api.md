@@ -96,7 +96,8 @@ export class FloodPaddleSolver implements Solver<FloodPaddleParams> {
     constructor(id?: string);
     describe(): SolverDescription;
     init(host: SolverHost, params: FloodPaddleParams): void;
-    step({ inputs, tick }: StepContext, dt: number): void;
+    step(context: StepContext, dt: number): void;
+    settleFlood(context: StepContext, dt: number, water: Float64Array, bottom: Float64Array, periodic: PeriodicDragAxes): void;
     readBlade(index: number): readonly [number, number, number, number, number, number];
     exportPorts(tick: number): readonly Port[];
     importPorts(): void;
@@ -123,7 +124,8 @@ export class FloodWadingSolver implements Solver<FloodWadingParams> {
     constructor(id?: string);
     describe(): SolverDescription;
     init(host: SolverHost, params: FloodWadingParams): void;
-    step({ inputs, tick }: StepContext, dt: number): void;
+    step(context: StepContext, dt: number): void;
+    settleFlood(context: StepContext, dt: number, water: Float64Array, bottom: Float64Array, periodic: PeriodicDragAxes): void;
     readBody(index: number): readonly [number, number, number];
     exportPorts(tick: number): readonly Port[];
     importPorts(): void;
@@ -641,6 +643,8 @@ interface HullPanelSample {
     readonly damping: readonly number[];
     readonly diffraction: readonly number[];
 }
+
+type PeriodicDragAxes = readonly [x: boolean, z: boolean];
 
 interface Port {
     readonly field: string;
