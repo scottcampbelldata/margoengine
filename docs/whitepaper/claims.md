@@ -6773,5 +6773,5 @@ see [Limits](../limits.md#jpeg-2000-decoding)) and speed.
 Transparent canvas (2026-11-27, threejs-parity row 6): TAA, DOF and SceneFade keep valid premultiplied alpha on a
 `TransparentCanvas`. Real GPU (RTX A6000), WebGPU and the WebGL2 layer, correctness runs with no committed result file:
 `packages/taa/test/alpha-browser.mjs`, `packages/dof/tests/gpu/alpha-check.mjs`,
-`packages/post/test/scene-fade-alpha-browser.mjs`, `packages/post/test/alpha-rim-browser.mjs`. `TAAUpscale` is not
-covered.
+`packages/post/test/scene-fade-alpha-browser.mjs`, `packages/post/test/alpha-rim-browser.mjs`. `TAAUpscale` and
+`TAAUpscaleVelocity` are covered by the first.

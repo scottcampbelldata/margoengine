@@ -11216,4 +11216,4 @@ decoder. Core plus stage is unchanged.
 Transparent canvas through TAA, DOF and SceneFade (2026-11-27): by method, on a `TransparentCanvas` TAA's history depth
 is `rg32float` (8 bytes a pixel per history instead of 4) and its resolve reads alpha for the 3x3 neighbourhood and
 history taps; DOF adds an `r32float` plane at a quarter of the gather's pixels and, with `temporal`, one at the gather's
-size. An opaque canvas keeps its shaders and memory. `TAAUpscale` writes opaque alpha. No speed figure.
+size. `TAAUpscale` adds no memory. An opaque canvas keeps its shaders and memory. No speed figure.

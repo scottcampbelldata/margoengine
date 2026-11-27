@@ -2317,7 +2317,7 @@ and after the alpha changes (it writes frames only, no committed result yet).
 - **DOF** (`@margoengine/dof`) gathers alpha with the same taps and weights as colour, so a blurred edge carries its
   coverage; **TAA** (`@margoengine/taa`) accumulates linear premultiplied colour with alpha; **SceneFade** dissolves
   all four premultiplied channels from the captured frame to the new one (the lerp of Porter and Duff 1984). See their
-  READMEs. `TAAUpscale` still writes opaque alpha: use it on opaque canvases.
+  READMEs. `TAAUpscale` and `TAAUpscaleVelocity` keep alpha as TAA does.
 
 ## Sliders for the lens and glow: `@margoengine/post/settings`
 

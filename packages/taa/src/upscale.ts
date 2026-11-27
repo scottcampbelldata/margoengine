@@ -30,7 +30,9 @@ import { halton } from './jitter.js';
 import { color, fullscreen } from './shader.js';
 import { sharpenCode } from './cas.js';
 import { applyView, viewLoadOp } from '../../shared/view-rect.js';
-import { Settle, settleResolve } from './settle.js';
+import { Settle, settleDetect, settleResolve } from './settle.js';
+import { premultipliedDetect, premultipliedPresent, premultipliedSpatial, premultipliedUpscale } from './alpha.js';
+import { premultipliedCanvas } from '../../shared/straight-display.js';
 import { renderSizeView } from '../../shared/render-size-view.js';
 declare const GPUBufferUsage: { UNIFORM: number; COPY_DST: number };
 declare const GPUTextureUsage: { RENDER_ATTACHMENT: number; TEXTURE_BINDING: number; STORAGE_BINDING: number };
@@ -374,7 +376,9 @@ export class TAAUpscale implements EnginePlugin {
 
   private resize(c: Context, width: number, height: number, phases: number): void {
     const device = c.device,
-      formats = `${c.format}:${c.descriptor.depthStencil!.format}:${c.descriptor.multisample?.count ?? 4}`,
+      // A canvas made transparent (or opaque again) takes the other shaders and a new history (./alpha.ts).
+      alpha = premultipliedCanvas(this.engine),
+      formats = `${c.format}:${c.descriptor.depthStencil!.format}:${c.descriptor.multisample?.count ?? 4}:${alpha}`,
       texture = (size: number[], format: GPUTextureFormat, usage: number, into: GPUTexture[]) => {
         const t = device.createTexture({ size, format, usage: usage | GPUTextureUsage.TEXTURE_BINDING });
         into.push(t);
@@ -409,6 +413,7 @@ export class TAAUpscale implements EnginePlugin {
     }
     if (this.manual !== formats) {
       this.manual = formats;
+      this.valid = false;
       const manualSRGB = +(c.format === 'rgba8unorm' || c.format === 'bgra8unorm'),
         compute = (code: string) =>
           device.createComputePipeline({
@@ -416,12 +421,14 @@ export class TAAUpscale implements EnginePlugin {
             compute: { module: device.createShaderModule({ code }), entryPoint: 'main', constants: { manualSRGB } },
           });
       const patched = this.resolveCode(resolve),
-        code = (this.options.settle ?? true) ? settleResolve(patched, 'base', 'top') : patched;
+        settled = (this.options.settle ?? true) ? settleResolve(patched, 'base', 'top') : patched,
+        code = alpha ? premultipliedUpscale(settled) : settled;
       this.resolvePipeline = compute(
         compatTier(device) === 'webgl2' && (c.descriptor.multisample?.count ?? 4) === 4 ? coverageDepth(code) : code,
       );
-      this.spatialPipeline = compute(spatial);
-      const module = device.createShaderModule({ code: present });
+      this.spatialPipeline = compute(alpha ? premultipliedSpatial(spatial) : spatial);
+      const shown = alpha ? premultipliedPresent(present, 'out', 'vec2i(i.clip.xy-sharpen.zw)') : present,
+        module = device.createShaderModule({ code: shown });
       this.presentKey = '';
       this.presentPipeline = device.createRenderPipeline({
         layout: 'auto',
@@ -435,7 +442,8 @@ export class TAAUpscale implements EnginePlugin {
       this.settle?.destroy();
       this.settle = undefined;
       if (this.options.settle ?? true) {
-        this.settle = new Settle(device, [width, height], [c.width, c.height], phases);
+        const detect = premultipliedCanvas(this.engine) ? premultipliedDetect(settleDetect) : settleDetect;
+        this.settle = new Settle(device, [width, height], [c.width, c.height], phases, detect);
         this.settle.bind(this.resolvePipeline!);
       }
     }

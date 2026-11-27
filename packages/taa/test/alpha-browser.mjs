@@ -19,9 +19,11 @@ await postBrowser(
       const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
         { TransparentCanvas } = await import('/packages/environment/dist/index.js'),
         { TAA } = await import('/packages/taa/dist/index.js'),
+        { TAAUpscale } = await import('/packages/taa/dist/upscale.js'),
+        { TAAUpscaleVelocity } = await import('/packages/taa/dist/upscale-velocity.js'),
         { Tonemap } = await import('/packages/tonemap/dist/index.js');
       window.t = {
-        async draw({ taa, tonemap }) {
+        async draw({ taa, upscale, velocity, tonemap }) {
           const engine = await Engine.create(document.querySelector('canvas'), {
             backend: 'webgpu',
             camera: { position: [0, 0, 3.2], target: [0, 0, 0] },
@@ -33,6 +35,7 @@ await postBrowser(
             .setGeometry(box(1, 1, 0.001))
             .setMaterial(new PbrMaterial({ color: '#e0a050', roughness: 1 }));
           if (taa) TAA.attach(engine, taa);
+          if (upscale) (velocity ? TAAUpscaleVelocity : TAAUpscale).attach(engine, upscale);
           if (tonemap) Tonemap.attach(engine);
           for (let i = 0; i < 20; i++) {
             plate.setPosition([-0.5 + i * 0.037, 0, 0]);
@@ -75,12 +78,21 @@ await postBrowser(
     for (const tonemap of [false, true]) {
       const base = await measure({ tonemap });
       assert.ok(base.empty > 50000, `no TAA: ${JSON.stringify(base)}`);
-      for (const [name, taa] of [
-        ['TAA', {}],
-        ['TAA variance with locks', { rejection: 'variance', locks: true }],
-        ['TAA stochastic', { stochastic: true }],
+      for (const [name, options] of [
+        ['TAA', { taa: {} }],
+        ['TAA variance with locks', { taa: { rejection: 'variance', locks: true } }],
+        ['TAA stochastic', { taa: { stochastic: true } }],
+        // TAAUpscale draws the frame itself, so it is not run before Tonemap.
+        ...(tonemap
+          ? []
+          : [
+              ['TAAUpscale', { upscale: {} }],
+              ['TAAUpscale without settling', { upscale: { settle: false } }],
+              ['TAAUpscale spatial', { upscale: { temporal: false } }],
+              ['TAAUpscaleVelocity', { upscale: {}, velocity: true }],
+            ]),
       ]) {
-        const r = await measure({ taa, tonemap }),
+        const r = await measure({ ...options, tonemap }),
           label = `${name}${tonemap ? ' before Tonemap' : ''}`;
         assert.ok(r.empty > 50000 && r.partial > 20, `${label}: ${JSON.stringify(r)}`);
         // The render alone sets the floor (the face's shading across the plate and the multisample resolve).

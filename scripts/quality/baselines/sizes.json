@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21261330,
+  "total": 21263073,
   "history": [
     {
       "date": "2026-10-24",
@@ -15049,6 +15049,12 @@
       "commit": "45ad3faad",
       "reason": "three.js parity row 6, transparent canvas alpha (KB-ALPHA-TEMPORAL1): measured dof 10,849 to 11,945 B, taa 17,765 to 18,689, taa/upscale-velocity 22,662 to 23,588 (it holds taa), post/scene-fade 2,953 to 3,085. The bytes are the shader patches that carry alpha; a lazy split would draw wrong alpha until it loaded, and a separate entry would leave the effects wrong by default.",
       "grew": 4
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a918f9e7a",
+      "reason": "TAAUpscale transparent canvas alpha (KB-ALPHA-TEMPORAL1): measured taa/upscale 9,123 to 10,052 B and taa/upscale-velocity 23,588 to 24,348 B (it holds upscale). The bytes are the resolve, Lanczos and present patches that carry alpha; a lazy split would draw wrong alpha until it loaded.",
+      "grew": 2
     }
   ],
   "items": {
@@ -16453,8 +16459,8 @@
     "@margoengine/studio/pathtrace-materials": 2034,
     "@margoengine/taa": 19250,
     "@margoengine/taa/sharpen": 971,
-    "@margoengine/taa/upscale": 9394,
-    "@margoengine/taa/upscale-velocity": 24296,
+    "@margoengine/taa/upscale": 10354,
+    "@margoengine/taa/upscale-velocity": 25079,
     "@margoengine/terrain": 17938,
     "@margoengine/terrain/blend": 3634,
     "@margoengine/terrain/deform": 7313,

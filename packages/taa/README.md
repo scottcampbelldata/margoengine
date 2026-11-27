@@ -136,9 +136,11 @@ the straight colour and multiplies by the coverage again. Alpha takes the colour
 range (variance range with `rejection: 'variance'`), locks, blend weight and settling. The reactive mask's history
 moves to a second channel of the history depth (`rg32float`). `resolved` is then linear premultiplied colour with
 alpha. `Sharpen` leaves a pixel as it is where the coverage differs from a neighbour's. The pipelines follow the canvas,
-so the order of attaching does not matter, and an opaque canvas keeps its shaders. `TAAUpscale` writes opaque alpha.
-Checked by `test/alpha-browser.mjs` (a moving plate, alone and before Tonemap: every pixel within 0.8 of 255 of the
-plate's colour times its alpha) and `../post/test/alpha-rim-browser.mjs`, on WebGPU and the WebGL2 layer. Sources: T.
+so the order of attaching does not matter, and an opaque canvas keeps its shaders. `TAAUpscale` and
+`TAAUpscaleVelocity` do the same, temporal and Lanczos (`temporal: false`): alpha takes the colour's Gaussian, cubic
+history and Lanczos weights and its own variance range, and their sharpen leaves coverage edges as they are.
+Checked by `test/alpha-browser.mjs` (a moving plate, TAA alone and before Tonemap and the upscalers: every pixel
+within 1.4 of 255 of the plate's colour times its alpha) and `../post/test/alpha-rim-browser.mjs`, on WebGPU and the WebGL2 layer. Sources: T.
 Porter and T. Duff, "Compositing Digital Images", SIGGRAPH 1984,
 <https://graphics.pixar.com/library/Compositing/paper.pdf>; A. R. Smith, "Image Compositing Fundamentals", Microsoft
 Technical Memo 4, 1995, <http://alvyray.com/Memos/CG/Microsoft/4_comp.pdf>; J. Blinn, "Compositing, Part 1: Theory",

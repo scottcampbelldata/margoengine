@@ -11450,5 +11450,5 @@ the reactive history in `historyDepth.g`. DOF (`dof/src/alpha.ts`) patches the g
 the lens and half-resolution patches. SceneFade lerps with a blend constant. Pipelines follow the canvas mark of
 `shared/straight-display.js`; opaque shaders are unchanged. Evidence (section 5): `taa/test/alpha-browser.mjs`,
 `dof/tests/gpu/alpha-check.mjs`, `post/test/scene-fade-alpha-browser.mjs` and `alpha-rim-browser.mjs` on WebGPU and the
-WebGL2 layer, RTX A6000. Missing: `TAAUpscale`, water's composites (KB-WATER-ALPHARIM1) and engine views on a
+WebGL2 layer, RTX A6000, TAAUpscale included. Missing: water's composites (KB-WATER-ALPHARIM1) and engine views on a
 transparent canvas.
