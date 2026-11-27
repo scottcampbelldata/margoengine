@@ -1824,6 +1824,7 @@ type ShapeOptions = {
     connectedComponents?: boolean;
     halfEdgeTopology?: boolean;
     deformable?: boolean;
+    massFallback?: 'strict' | 'winding';
 } | {
     shape: 'heightfield';
     rows: number;

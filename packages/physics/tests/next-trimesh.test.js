@@ -2,7 +2,7 @@
 // are proved in kernel/tests/mesh.rs; here the options have to reach the kernel and mean it.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { KernelWorld, Physics, trianglesAcross } from '../dist/index.js';
+import { estimateMeshMassProperties, KernelWorld, Physics, trianglesAcross } from '../dist/index.js';
 
 await Physics.load();
 
@@ -251,5 +251,49 @@ test('a trimesh with a mass or density must be closed and wound outwards, and sa
     () => physics.addBody(null, { colliders: { shape: 'trimesh', vertices, indices: inside, density: 1 } }),
     /wound outwards/,
   );
+  physics.dispose();
+});
+
+test('estimateMeshMassProperties and massFallback: winding recover inside-out and open trimesh mass in f64 (PA-88)', () => {
+  const lo = [1, 2, 3],
+    hi = [3, 3, 7],
+    { vertices, indices } = cube(lo, hi);
+  const volume = 2 * 1 * 4;
+  // 1. Inside-out closed mesh recovers exact volume, centre and principal inertia via flipped signed tetrahedra.
+  const inside = indices.slice();
+  for (let t = 0; t < inside.length; t += 3) [inside[t + 1], inside[t + 2]] = [inside[t + 2], inside[t + 1]];
+  const flipped = estimateMeshMassProperties(vertices, inside, { density: 500 });
+  assert.equal(flipped.method, 'flipped');
+  assert.ok(Math.abs(flipped.volume - volume) < 1e-9, `flipped volume ${flipped.volume}`);
+  assert.ok(Math.abs(flipped.mass - 500 * volume) < 1e-6, `flipped mass ${flipped.mass}`);
+  for (let k = 0; k < 3; k++)
+    assert.ok(Math.abs(flipped.centerOfMass[k] - (lo[k] + hi[k]) / 2) < 1e-9, `flipped com ${flipped.centerOfMass}`);
+  // 2. Open mesh (top face missing: 10 of 12 triangles) falls back to generalized winding-number voxel solid integration.
+  const openIndices = indices.slice(0, indices.length - 6);
+  const wound = estimateMeshMassProperties(vertices, openIndices, { density: 500, resolution: 16 });
+  assert.equal(wound.method, 'winding');
+  assert.ok(Math.abs(wound.volume - volume) / volume < 0.15, `open cube winding volume ${wound.volume} vs ${volume}`);
+  assert.ok(Math.abs(wound.centerOfMass[0] - 2) < 0.15 && Math.abs(wound.centerOfMass[2] - 5) < 0.15);
+  // 3. Wired directly into Physics trimesh collider with massFallback: 'winding' (dynamic body falls and lands).
+  const physics = new Physics(null);
+  physics.addBody(null, {
+    type: 'fixed',
+    position: [0, -0.5, 0],
+    colliders: { shape: 'box', halfExtents: [20, 0.5, 20] },
+  });
+  const unitOpen = cube([-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]);
+  const body = physics.addBody(null, {
+    position: [0, 2, 0],
+    colliders: {
+      shape: 'trimesh',
+      vertices: unitOpen.vertices,
+      indices: unitOpen.indices.slice(0, unitOpen.indices.length - 3),
+      mass: 10,
+      massFallback: 'winding',
+    },
+  });
+  assert.ok(Math.abs(body.mass - 10) < 0.05, `winding fallback body mass ${body.mass}`);
+  for (let i = 0; i < 180; i++) physics.step();
+  assert.ok(Math.abs(body.position[1] - 0.5) < 0.05, `open trimesh falls and lands: y = ${body.position[1]}`);
   physics.dispose();
 });

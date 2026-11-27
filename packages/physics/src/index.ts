@@ -113,8 +113,21 @@ export type {
 } from './pid.js';
 export type { DebugColor, DebugLines, DebugRenderOptions, DebugStyle } from './debug.js';
 export { cleanTrimesh } from './mesh-clean.js';
-export { convertMesh, meshConnectedComponents, meshHalfEdges, voxelizedMesh, voxelsFromPoints } from './mesh-tools.js';
-export type { HalfEdgeTopology, MeshConversion, VoxelFill } from './mesh-tools.js';
+export {
+  convertMesh,
+  estimateMeshMassProperties,
+  meshConnectedComponents,
+  meshHalfEdges,
+  voxelizedMesh,
+  voxelsFromPoints,
+} from './mesh-tools.js';
+export type {
+  HalfEdgeTopology,
+  MeshConversion,
+  MeshMassFallbackOptions,
+  MeshMassProperties,
+  VoxelFill,
+} from './mesh-tools.js';
 export type { MeshCleanOptions } from './mesh-clean.js';
 export type { HullFaces } from './hull.js';
 export type {

@@ -989,6 +989,21 @@ export interface MeshCleanOptions {
 
 export type MeshConversion = 'trimesh' | 'convexHull' | 'aabb' | 'obb';
 
+export interface MeshMassFallbackOptions {
+    density?: number;
+    mass?: number;
+    resolution?: number;
+}
+
+export interface MeshMassProperties {
+    mass: number;
+    volume: number;
+    centerOfMass: [number, number, number];
+    principalInertia: [number, number, number];
+    inertiaFrame: [number, number, number, number];
+    method: 'exact' | 'flipped' | 'winding';
+}
+
 export interface ModelBodyOptions extends Omit<BodyOptions, 'colliders' | 'position' | 'rotation'> {
     shape?: 'trimesh' | 'convexHull' | 'convexDecomposition';
     perNode?: boolean;
@@ -1921,6 +1936,7 @@ export type ShapeOptions = {
     connectedComponents?: boolean;
     halfEdgeTopology?: boolean;
     deformable?: boolean;
+    massFallback?: 'strict' | 'winding';
 } | {
     shape: 'heightfield';
     rows: number;
@@ -2254,6 +2270,8 @@ export { buildHull as convexHull };
 function buildHull(input: ArrayLike<number>): HullFaces;
 
 export function coupleDofs(physics: Physics, multibody: Multibody, linkA: PhysicsBody, linkB: PhysicsBody, options?: DofCouplingOptions): DofCoupling;
+
+export function estimateMeshMassProperties(vertices: ArrayLike<number>, indices: ArrayLike<number>, options?: MeshMassFallbackOptions): MeshMassProperties;
 
 export const eulerToQuat: (x: number, y: number, z: number) => [number, number, number, number];
 

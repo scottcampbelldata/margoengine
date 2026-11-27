@@ -86,6 +86,12 @@ export type ShapeOptions =
        * moves them, and the tree follows by a refit with no rebuild. A deformable mesh is not shared between colliders.
        */
       deformable?: boolean;
+      /**
+       * How a trimesh with `mass` or `density` handles open or inside-out surfaces (PA-88): `'strict'` (default) requires a
+       * closed outward-wound mesh and throws otherwise; `'winding'` automatically flips inside-out closed meshes and falls back
+       * to f64 generalized winding-number voxel integration (Jacobson et al. 2013) for open meshes.
+       */
+      massFallback?: 'strict' | 'winding';
     }
   | {
       shape: 'heightfield';

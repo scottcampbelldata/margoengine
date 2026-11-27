@@ -1280,7 +1280,15 @@ export class Physics implements EnginePlugin, BodyOwner {
               scale: mesh ? ([mesh.scale.x, mesh.scale.y, mesh.scale.z] as const) : ([1, 1, 1] as const),
             };
     if (body.fitScale && mesh?.geometry) fit.scale = body.fitScale;
-    const { name, shape, size, parts, data, options: placed } = kernelCollider(options, fit, this.hulls),
+    const {
+        name,
+        shape,
+        size,
+        parts,
+        data,
+        fallbackMassProperties,
+        options: placed,
+      } = kernelCollider(options, fit, this.hulls),
       row = parts
         ? this.kernel.addCompound(body.row, parts, placed)
         : this.kernel.addCollider(body.row, shape as KernelShape, size, placed),
@@ -1309,6 +1317,13 @@ export class Physics implements EnginePlugin, BodyOwner {
     if (options.massProperties && !options.massless) {
       const own = options.massProperties;
       collider.setMassProperties(own.mass, own.centerOfMass, own.principalInertia, own.inertiaFrame);
+    } else if (fallbackMassProperties && !options.massless) {
+      collider.setMassProperties(
+        fallbackMassProperties.mass,
+        fallbackMassProperties.centerOfMass,
+        fallbackMassProperties.principalInertia,
+        fallbackMassProperties.inertiaFrame,
+      );
     }
     if (options.modifyContacts) {
       if (!this.hasModifier)

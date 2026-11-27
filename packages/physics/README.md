@@ -1679,6 +1679,18 @@ for (let i = 0; i < 120; i++) physics.step();
 console.log(ball.position[1].toFixed(2)); // 0.50: resting on the mesh
 ```
 
+A `trimesh` with a `density` or `mass` must be a closed surface wound outwards, and throws otherwise. Pass `massFallback: 'winding'` to take the mass of a mesh that is not: a closed mesh wound inside out is flipped (signed tetrahedra, Mirtich 1996), and an open or non-manifold mesh, common in generated models, gets the volume its generalized winding number says is inside (Jacobson et al. 2013, on a voxel grid), all in f64. The collider then has that mass, centre of mass and principal inertia. `estimateMeshMassProperties(vertices, indices, {density, mass, resolution})` gives the same numbers (`mass`, `volume`, `centerOfMass`, `principalInertia`, `inertiaFrame`, and `method`: `'exact'`, `'flipped'` or `'winding'`) without a body; `resolution` (4 to 64, default 16) is the grid for an open mesh.
+
+```js
+import {estimateMeshMassProperties} from 'margoengine/physics';
+
+// A unit cube with its top face missing: ten of its twelve triangles.
+const vertices = [0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1];
+const indices = [0, 2, 1, 0, 3, 2, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7];
+const open = estimateMeshMassProperties(vertices, indices, {density: 1000});
+console.log(open.method, open.volume.toFixed(1), open.mass.toFixed(0)); // winding 1.0 1000
+```
+
 A `trimesh` can be cleaned before it is built, each step off by default: `mergeDuplicateVertices` joins vertices at one position, `deleteDegenerateTriangles` drops triangles with a repeated vertex or no area, `deleteDuplicateTriangles` drops a triangle another repeats, whatever its winding, and `deleteBadTopologyTriangles` drops triangles that would make an edge belong to more than two (later ones first), in that order; a mesh that loses every triangle is refused. `cleanTrimesh(vertices, indices, options)` from this entry runs the same steps for you to see. `oriented: true` says the mesh is a closed surface, so `projectPoint`, `intersectPoint` and a solid ray from inside treat a point inside it as inside (by the parity of the surface crossings of a ray from the point). Contacts are unchanged, except where a soft body's particle or triangle touches the mesh at no distance: it is pushed out along the surface's own normal there, the angle-weighted pseudonormal of the face, edge or corner it is on (Bærentzen and Aanæs 2005). That is how the two halves of a cut body, each on the other's surface, come apart. A `convexHull` also takes a mesh, `vertices` and `indices`, and is the hull of the vertices the triangles use, as Rapier's `convexMesh`.
 
 A `heightfield` takes its options, laid out so: `rows` cells along z and `columns` along x, `(rows + 1) * (columns + 1)` `heights` column major (row r, column c is `heights[r + (rows + 1) * c]`), and `scale`, the whole field's width, height factor and depth, centred on the body. Each cell is two triangles split along the diagonal from row r + 1, column c to row r, column c + 1, the split Rapier makes; a test casts 300 rays at Rapier's field and finds the own field's surface within 2.2e-6 m of it. `fixInternalEdges` works as on a `trimesh` (off by default, as in Rapier) and the root entry takes it too (`cellStatus` below is the own solver's only). Like a trimesh it is a surface with no mass. The kernel keeps only the grid's points, 12 bytes each, and builds no tree, so a field of 500,000 cells is ready in milliseconds; `KernelWorld.addHeightfield(rows, columns, heights, scale, {fixInternalEdges})` is the kernel's view of it.

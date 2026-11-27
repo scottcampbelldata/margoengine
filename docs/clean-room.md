@@ -17388,3 +17388,13 @@ are numbers read from the paper's figures, no data file.
   the swing for the drag growth measured across the water's own flow (across the relative flow it would count the bow);
   the growth as a steady load on the water's speed, not a damping, so a light segment stays stable; the lock-in frequency
   of a bowed cable at its raised tension, T (1 + (8 / 3) (delta / L)^2 / strain) for a parabolic bow delta.
+
+### PA-88 open and inside-out triangle-mesh solid mass fallback (`estimateMeshMassProperties`)
+
+Clean-room TypeScript implementation in `packages/physics/src/mesh-tools.ts`, using only deterministic f64 arithmetic (`+`, `-`, `*`, `/`, `Math.sqrt`, range-reduced odd-series `atan2`):
+
+- B. Mirtich, [*Fast and Accurate Computation of Polyhedral Mass Properties*](https://doi.org/10.1080/10867651.1996.10487458) (Journal of Graphics Tools 1(2), 1996): signed tetrahedron volume, first moment and second-moment covariance integration for closed meshes, automatically flipping sign when a closed surface is wound inside out.
+- A. Van Oosterom and J. Strackee, [*The Solid Angle of a Plane Triangle*](https://doi.org/10.1109/TBME.1983.325207) (IEEE Transactions on Biomedical Engineering 30(2), 1983): exact signed solid angle of a triangle subtended at an arbitrary query point.
+- A. Jacobson, L. Kavan and O. Sorkine-Hornung, [*Robust Inside-Outside Segmentation using Generalized Winding Numbers*](https://doi.org/10.1145/2461912.2461916) (ACM Transactions on Graphics 32(4), 2013): generalized winding-number classification (`|w(p)| >= 0.5`) on a uniform voxel grid for open or non-manifold meshes, followed by parallel-axis voxel inertia accumulation and Jacobi diagonalization.
+
+Only public papers were consulted; no rival or companion implementation source was read.

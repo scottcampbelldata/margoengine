@@ -7,7 +7,9 @@
 // Clean room, from the papers: T. Akenine-Moeller, "Fast 3D Triangle-Box Overlap Testing", Journal of Graphics Tools 6(1), 2001
 // (the thirteen separating axes) for the voxels a triangle touches; flood fill from outside the grid for the inside of a closed
 // surface; J. Jacobi's eigenvalue method (Golub and Van Loan, "Matrix Computations", section 8.5) for the principal axes of a
-// mesh's vertices.
+// mesh's vertices and inertia tensor; A. Van Oosterom and J. Strackee, "The Solid Angle of a Plane Triangle", IEEE Trans. Biomed.
+// Eng. 30(2), 1983, and A. Jacobson et al., "Robust Inside-Outside Segmentation using Generalized Winding Numbers", ACM TOG 32(4),
+// 2013 for open-mesh solid mass estimation; B. Mirtich, "Fast and Accurate Computation of Polyhedral Mass Properties", JGT 1(2), 1996.
 import { MargoError } from '@margoengine/math/errors';
 import type { Vec3 } from './math.js';
 import type { ColliderOptions } from './shapes.js';
@@ -475,5 +477,383 @@ function convertSharp(vertices: ArrayLike<number>, indices: ArrayLike<number>, t
     halfExtents: [(hi[0]! - lo[0]!) / 2, (hi[1]! - lo[1]!) / 2, (hi[2]! - lo[2]!) / 2],
     offset: centre,
     rotation: q,
+  };
+}
+
+/** Options of {@link estimateMeshMassProperties}. */
+export interface MeshMassFallbackOptions {
+  /** Uniform material density in kg/m^3 (default 1). Ignored when `mass` is given. */
+  density?: number;
+  /** Target total mass in kg; overrides `density` when given. */
+  mass?: number;
+  /** Voxel grid resolution along the longest AABB side for open meshes (4..64, default 16). */
+  resolution?: number;
+}
+
+/** Solid mass properties computed from a triangle mesh in f64 (PA-88). */
+export interface MeshMassProperties {
+  mass: number;
+  volume: number;
+  centerOfMass: [number, number, number];
+  principalInertia: [number, number, number];
+  inertiaFrame: [number, number, number, number];
+  /** `'exact'` for closed outward meshes, `'flipped'` for closed inside-out meshes, `'winding'` for open meshes. */
+  method: 'exact' | 'flipped' | 'winding';
+}
+
+const HALF_PI = 1.5707963267948966;
+const PI_64 = 3.141592653589793;
+const SIXTH_PI = 0.5235987755982988;
+const SQRT3 = 1.7320508075688772;
+const TAN_PI_12 = 0.2679491924311227;
+
+/** Deterministic f64 atan(x) for x >= 0 using range reduction to [0, tan(pi/12)] and only + - * /. */
+function atanPos(x: number): number {
+  let invert = false,
+    shift = false,
+    u = x;
+  if (u > 1) {
+    u = 1 / u;
+    invert = true;
+  }
+  if (u > TAN_PI_12) {
+    u = (SQRT3 * u - 1) / (SQRT3 + u);
+    shift = true;
+  }
+  const u2 = u * u;
+  // 12-term odd alternating series on |u| <= 0.268: error < 2e-16.
+  let s = 1 / 23;
+  s = 1 / 21 - u2 * s;
+  s = 1 / 19 - u2 * s;
+  s = 1 / 17 - u2 * s;
+  s = 1 / 15 - u2 * s;
+  s = 1 / 13 - u2 * s;
+  s = 1 / 11 - u2 * s;
+  s = 1 / 9 - u2 * s;
+  s = 1 / 7 - u2 * s;
+  s = 1 / 5 - u2 * s;
+  s = 1 / 3 - u2 * s;
+  let r = u * (1 - u2 * s);
+  if (shift) r += SIXTH_PI;
+  return invert ? HALF_PI - r : r;
+}
+
+/** Deterministic f64 atan2(y, x) using only + - * /. */
+function atan2Pinned(y: number, x: number): number {
+  if (x > 0) return y >= 0 ? atanPos(y / x) : -atanPos(-y / x);
+  if (x < 0) return y >= 0 ? PI_64 - atanPos(y / -x) : atanPos(-y / -x) - PI_64;
+  return y > 0 ? HALF_PI : y < 0 ? -HALF_PI : 0;
+}
+
+/** Diagonalizes a symmetric 3x3 matrix by Jacobi sweeps, returning eigenvalues and a right-handed unit quaternion. */
+function diagonalizeInertia(
+  ixx: number,
+  iyy: number,
+  izz: number,
+  ixy: number,
+  ixz: number,
+  iyz: number,
+): { principal: [number, number, number]; frame: [number, number, number, number] } {
+  const mat = [
+    [ixx, ixy, ixz],
+    [ixy, iyy, iyz],
+    [ixz, iyz, izz],
+  ];
+  const axes = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ];
+  for (let sweep = 0; sweep < 32; sweep++) {
+    let off = 0;
+    for (let p = 0; p < 2; p++) for (let q = p + 1; q < 3; q++) off += Math.abs(mat[p]![q]!);
+    if (off < 1e-14) break;
+    for (let p = 0; p < 2; p++)
+      for (let q = p + 1; q < 3; q++) {
+        if (Math.abs(mat[p]![q]!) < 1e-300) continue;
+        const theta = (mat[q]![q]! - mat[p]![p]!) / (2 * mat[p]![q]!),
+          t = (theta >= 0 ? 1 : -1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1)),
+          c = 1 / Math.sqrt(t * t + 1),
+          s = t * c;
+        for (let k = 0; k < 3; k++) {
+          const a = mat[k]![p]!,
+            b = mat[k]![q]!;
+          mat[k]![p] = c * a - s * b;
+          mat[k]![q] = s * a + c * b;
+        }
+        for (let k = 0; k < 3; k++) {
+          const a = mat[p]![k]!,
+            b = mat[q]![k]!;
+          mat[p]![k] = c * a - s * b;
+          mat[q]![k] = s * a + c * b;
+        }
+        for (let k = 0; k < 3; k++) {
+          const a = axes[k]![p]!,
+            b = axes[k]![q]!;
+          axes[k]![p] = c * a - s * b;
+          axes[k]![q] = s * a + c * b;
+        }
+      }
+  }
+  const ex: Vec3 = [axes[0]![0]!, axes[1]![0]!, axes[2]![0]!],
+    ey: Vec3 = [axes[0]![1]!, axes[1]![1]!, axes[2]![1]!],
+    ez: Vec3 = [ex[1] * ey[2] - ex[2] * ey[1], ex[2] * ey[0] - ex[0] * ey[2], ex[0] * ey[1] - ex[1] * ey[0]];
+  const m = [
+    [ex[0], ey[0], ez[0]],
+    [ex[1], ey[1], ez[1]],
+    [ex[2], ey[2], ez[2]],
+  ];
+  const trace = m[0]![0]! + m[1]![1]! + m[2]![2]!;
+  let q: [number, number, number, number];
+  if (trace > 0) {
+    const w = Math.sqrt(1 + trace) / 2;
+    q = [(m[2]![1]! - m[1]![2]!) / (4 * w), (m[0]![2]! - m[2]![0]!) / (4 * w), (m[1]![0]! - m[0]![1]!) / (4 * w), w];
+  } else if (m[0]![0]! >= m[1]![1]! && m[0]![0]! >= m[2]![2]!) {
+    const x = Math.sqrt(1 + m[0]![0]! - m[1]![1]! - m[2]![2]!) / 2;
+    q = [x, (m[0]![1]! + m[1]![0]!) / (4 * x), (m[0]![2]! + m[2]![0]!) / (4 * x), (m[2]![1]! - m[1]![2]!) / (4 * x)];
+  } else if (m[1]![1]! >= m[2]![2]!) {
+    const y = Math.sqrt(1 + m[1]![1]! - m[0]![0]! - m[2]![2]!) / 2;
+    q = [(m[0]![1]! + m[1]![0]!) / (4 * y), y, (m[1]![2]! + m[2]![1]!) / (4 * y), (m[0]![2]! - m[2]![0]!) / (4 * y)];
+  } else {
+    const z = Math.sqrt(1 + m[2]![2]! - m[0]![0]! - m[1]![1]!) / 2;
+    q = [(m[0]![2]! + m[2]![0]!) / (4 * z), (m[1]![2]! + m[2]![1]!) / (4 * z), z, (m[1]![0]! - m[0]![1]!) / (4 * z)];
+  }
+  const norm = Math.sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
+  return {
+    principal: [Math.max(0, mat[0]![0]!), Math.max(0, mat[1]![1]!), Math.max(0, mat[2]![2]!)],
+    frame: [q[0] / norm, q[1] / norm, q[2] / norm, q[3] / norm],
+  };
+}
+
+/**
+ * Estimates solid mass, centre of mass and principal inertia in f64 for any triangle mesh (PA-88), including inside-out or
+ * open meshes common in AI-generated assets. Closed meshes use exact signed tetrahedra (Mirtich 1996, automatically
+ * flipping inside-out winding); open or non-manifold meshes fall back to a uniform voxel grid classified by the exact
+ * Van Oosterom & Strackee (1983) / Jacobson et al. (2013) generalized winding number (`|w(p)| >= 0.5`).
+ * @throws RangeError for malformed meshes, invalid density/mass/resolution, or zero enclosed volume.
+ */
+export function estimateMeshMassProperties(
+  vertices: ArrayLike<number>,
+  indices: ArrayLike<number>,
+  options: MeshMassFallbackOptions = {},
+): MeshMassProperties {
+  const count = vertices.length / 3;
+  if (!Number.isInteger(count) || indices.length === 0 || indices.length % 3 !== 0)
+    throw new RangeError('estimateMeshMassProperties takes packed x, y, z vertices and whole triangles.');
+  const { density = 1, mass: targetMass, resolution = 16 } = options;
+  if (targetMass !== undefined) {
+    if (!(targetMass > 0) || !Number.isFinite(targetMass))
+      throw new RangeError(`Mass must be positive and finite (got ${targetMass}).`);
+  } else if (!(density > 0) || !Number.isFinite(density)) {
+    throw new RangeError(`Density must be positive and finite (got ${density}).`);
+  }
+  if (!Number.isInteger(resolution) || resolution < 4 || resolution > 64)
+    throw new RangeError(`Resolution must be an integer from 4 to 64 (got ${resolution}).`);
+  for (let i = 0; i < indices.length; i++) {
+    const idx = indices[i]!;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= count)
+      throw new RangeError(`Index ${idx} is out of range for ${count} vertices.`);
+  }
+  for (let i = 0; i < vertices.length; i++)
+    if (!Number.isFinite(vertices[i])) throw new RangeError('Mesh vertices must be finite numbers.');
+
+  const closed = !meshHalfEdges(indices).twin.some((t) => t === 0xffffffff);
+  if (closed) {
+    const r0 = 3 * indices[0]!;
+    const ox = vertices[r0]!,
+      oy = vertices[r0 + 1]!,
+      oz = vertices[r0 + 2]!;
+    let vol = 0,
+      mx = 0,
+      my = 0,
+      mz = 0,
+      cxx = 0,
+      cyy = 0,
+      czz = 0,
+      cxy = 0,
+      cxz = 0,
+      cyz = 0;
+    for (let t = 0; t < indices.length; t += 3) {
+      const ia = 3 * indices[t]!,
+        ib = 3 * indices[t + 1]!,
+        ic = 3 * indices[t + 2]!;
+      const ax = vertices[ia]! - ox,
+        ay = vertices[ia + 1]! - oy,
+        az = vertices[ia + 2]! - oz;
+      const bx = vertices[ib]! - ox,
+        by = vertices[ib + 1]! - oy,
+        bz = vertices[ib + 2]! - oz;
+      const cx = vertices[ic]! - ox,
+        cy = vertices[ic + 1]! - oy,
+        cz = vertices[ic + 2]! - oz;
+      const v = (ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx)) / 6;
+      vol += v;
+      mx += (v / 4) * (ax + bx + cx);
+      my += (v / 4) * (ay + by + cy);
+      mz += (v / 4) * (az + bz + cz);
+      const w = v / 20;
+      cxx += w * (2 * (ax * ax + bx * bx + cx * cx) + 2 * (ax * bx + bx * cx + cx * ax));
+      cyy += w * (2 * (ay * ay + by * by + cy * cy) + 2 * (ay * by + by * cy + cy * ay));
+      czz += w * (2 * (az * az + bz * bz + cz * cz) + 2 * (az * bz + bz * cz + cz * az));
+      cxy +=
+        w * (2 * (ax * ay + bx * by + cx * cy) + ax * by + bx * ay + bx * cy + cx * by + cx * ay + ax * cy);
+      cxz +=
+        w * (2 * (ax * az + bx * bz + cx * cz) + ax * bz + bx * az + bx * cz + cx * bz + cx * az + ax * cz);
+      cyz +=
+        w * (2 * (ay * az + by * bz + cy * cz) + ay * bz + by * az + by * cz + cy * bz + cy * az + ay * cz);
+    }
+    const sign = vol < 0 ? -1 : 1;
+    const absVol = vol * sign;
+    if (absVol > 1e-12) {
+      const sx = (mx * sign) / absVol,
+        sy = (my * sign) / absVol,
+        sz = (mz * sign) / absVol;
+      const scale = targetMass !== undefined ? targetMass / absVol : density;
+      const kxx = cxx * sign - absVol * sx * sx,
+        kyy = cyy * sign - absVol * sy * sy,
+        kzz = czz * sign - absVol * sz * sz,
+        kxy = cxy * sign - absVol * sx * sy,
+        kxz = cxz * sign - absVol * sx * sz,
+        kyz = cyz * sign - absVol * sy * sz;
+      const { principal, frame } = diagonalizeInertia(
+        scale * (kyy + kzz),
+        scale * (kxx + kzz),
+        scale * (kxx + kyy),
+        -scale * kxy,
+        -scale * kxz,
+        -scale * kyz,
+      );
+      return {
+        mass: targetMass ?? absVol * density,
+        volume: absVol,
+        centerOfMass: [ox + sx, oy + sy, oz + sz],
+        principalInertia: principal,
+        inertiaFrame: frame,
+        method: sign < 0 ? 'flipped' : 'exact',
+      };
+    }
+  }
+
+  // Open or non-manifold mesh: generalized winding-number voxel solid integration in f64 (Jacobson et al. 2013).
+  let minX = Infinity,
+    minY = Infinity,
+    minZ = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity,
+    maxZ = -Infinity;
+  const tris: number[] = [];
+  for (let t = 0; t < indices.length; t += 3) {
+    const ia = 3 * indices[t]!,
+      ib = 3 * indices[t + 1]!,
+      ic = 3 * indices[t + 2]!;
+    for (const p of [ia, ib, ic]) {
+      const x = vertices[p]!,
+        y = vertices[p + 1]!,
+        z = vertices[p + 2]!;
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (z < minZ) minZ = z;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+      if (z > maxZ) maxZ = z;
+      tris.push(x, y, z);
+    }
+  }
+  const spanX = maxX - minX,
+    spanY = maxY - minY,
+    spanZ = maxZ - minZ,
+    maxSpan = Math.max(spanX, spanY, spanZ);
+  if (!(spanX > 0 && spanY > 0 && spanZ > 0))
+    throw new RangeError('Mesh encloses no volume along at least one axis; give the body mass with setMassProperties.');
+  const step = maxSpan / resolution;
+  const nx = Math.max(2, Math.round(spanX / step)),
+    ny = Math.max(2, Math.round(spanY / step)),
+    nz = Math.max(2, Math.round(spanZ / step));
+  const hx = spanX / nx,
+    hy = spanY / ny,
+    hz = spanZ / nz,
+    cellVol = hx * hy * hz;
+  const insideCenters: number[] = [];
+  let sumX = 0,
+    sumY = 0,
+    sumZ = 0;
+  const invFourPi = 1 / (4 * PI_64);
+  for (let ix = 0; ix < nx; ix++) {
+    const px = minX + (ix + 0.5) * hx;
+    for (let iy = 0; iy < ny; iy++) {
+      const py = minY + (iy + 0.5) * hy;
+      for (let iz = 0; iz < nz; iz++) {
+        const pz = minZ + (iz + 0.5) * hz;
+        let omega = 0;
+        for (let t = 0; t < tris.length; t += 9) {
+          const ax = tris[t]! - px,
+            ay = tris[t + 1]! - py,
+            az = tris[t + 2]! - pz;
+          const bx = tris[t + 3]! - px,
+            by = tris[t + 4]! - py,
+            bz = tris[t + 5]! - pz;
+          const cx = tris[t + 6]! - px,
+            cy = tris[t + 7]! - py,
+            cz = tris[t + 8]! - pz;
+          const la = Math.sqrt(ax * ax + ay * ay + az * az),
+            lb = Math.sqrt(bx * bx + by * by + bz * bz),
+            lc = Math.sqrt(cx * cx + cy * cy + cz * cz);
+          if (la < 1e-12 || lb < 1e-12 || lc < 1e-12) continue;
+          const num = ax * (by * cz - bz * cy) + ay * (bz * cx - bx * cz) + az * (bx * cy - by * cx);
+          const den =
+            la * lb * lc +
+            (ax * bx + ay * by + az * bz) * lc +
+            (bx * cx + by * cy + bz * cz) * la +
+            (cx * ax + cy * ay + cz * az) * lb;
+          omega += 2 * atan2Pinned(num, den);
+        }
+        if (Math.abs(omega * invFourPi) >= 0.5) {
+          insideCenters.push(px, py, pz);
+          sumX += px;
+          sumY += py;
+          sumZ += pz;
+        }
+      }
+    }
+  }
+  const insideCount = insideCenters.length / 3;
+  if (insideCount === 0)
+    throw new RangeError(
+      'Generalized winding number found no interior volume for this open mesh; close the surface or use setMassProperties.',
+    );
+  const volume = insideCount * cellVol;
+  const cx = sumX / insideCount,
+    cy = sumY / insideCount,
+    cz = sumZ / insideCount;
+  const mass = targetMass ?? volume * density,
+    cellMass = mass / insideCount;
+  const boxIx = (cellMass * (hy * hy + hz * hz)) / 12,
+    boxIy = (cellMass * (hx * hx + hz * hz)) / 12,
+    boxIz = (cellMass * (hx * hx + hy * hy)) / 12;
+  let ixx = 0,
+    iyy = 0,
+    izz = 0,
+    ixy = 0,
+    ixz = 0,
+    iyz = 0;
+  for (let i = 0; i < insideCenters.length; i += 3) {
+    const rx = insideCenters[i]! - cx,
+      ry = insideCenters[i + 1]! - cy,
+      rz = insideCenters[i + 2]! - cz;
+    ixx += boxIx + cellMass * (ry * ry + rz * rz);
+    iyy += boxIy + cellMass * (rx * rx + rz * rz);
+    izz += boxIz + cellMass * (rx * rx + ry * ry);
+    ixy -= cellMass * rx * ry;
+    ixz -= cellMass * rx * rz;
+    iyz -= cellMass * ry * rz;
+  }
+  const { principal, frame } = diagonalizeInertia(ixx, iyy, izz, ixy, ixz, iyz);
+  return {
+    mass,
+    volume,
+    centerOfMass: [cx, cy, cz],
+    principalInertia: principal,
+    inertiaFrame: frame,
+    method: 'winding',
   };
 }

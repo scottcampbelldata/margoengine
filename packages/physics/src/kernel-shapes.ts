@@ -14,7 +14,7 @@ import {
 } from './shapes.js';
 import { buildHull } from './hull.js';
 import { cleanTrimesh, wantsClean } from './mesh-clean.js';
-import { meshHalfEdges } from './mesh-tools.js';
+import { estimateMeshMassProperties, meshHalfEdges, type MeshMassProperties } from './mesh-tools.js';
 
 export const PI = 3.141592653589793;
 /** The square root of a half: the quarter turn about an axis has this for its sine and cosine. */
@@ -124,6 +124,8 @@ export interface KernelCollider {
   data?: { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } };
   /** The collider's volume, for its mass. */
   volume: () => number;
+  /** Optional fallback mass properties computed for open or inside-out trimeshes (`massFallback: 'winding'`). */
+  fallbackMassProperties?: MeshMassProperties;
   options: KernelColliderOptions;
 }
 
@@ -326,6 +328,7 @@ export function kernelCollider(
     data:
       | { vertices: Float32Array; indices?: Uint32Array; reads?: { components: boolean; halfEdges: boolean } }
       | undefined,
+    fallbackMassProperties: MeshMassProperties | undefined,
     border = 0;
   const surface =
     options.shape === 'segment' ||
@@ -398,6 +401,7 @@ export function kernelCollider(
           `Trimesh index ${indexSource[i]} is out of range; keep every index a whole number below the vertex count.`,
         );
     const massive = options.mass !== undefined || options.density !== undefined;
+    let kernelSolid = massive;
     let meshVertices: Float32Array = vertices,
       meshIndices: Uint32Array = Uint32Array.from(indexSource);
     if (wantsClean(options))
@@ -408,30 +412,42 @@ export function kernelCollider(
       );
     if (massive) {
       // A mesh has the mass of the volume it encloses when it is closed (every edge shared by two triangles that run opposite ways)
-      // and wound outwards (its signed volume is positive): Rapier's trimesh mass.
+      // and wound outwards (its signed volume is positive): Rapier's trimesh mass. With `massFallback: 'winding'`, open or
+      // inside-out meshes fall back to f64 generalized winding-number / flipped-solid integration (PA-88).
       const twins = meshHalfEdges(meshIndices);
-      if (twins.twin.some((t) => t === 0xffffffff))
-        throw new RangeError(
-          'A trimesh with a mass or a density must be a closed surface, every edge shared by two triangles that run opposite ways; close it, or give its body mass with setMassProperties, or use convexHull or convexDecomposition.',
-        );
+      const isClosed = !twins.twin.some((t) => t === 0xffffffff);
       let enclosed = 0;
-      for (let t = 0; t < meshIndices.length; t += 3) {
-        const a = 3 * meshIndices[t]!,
-          b = 3 * meshIndices[t + 1]!,
-          c = 3 * meshIndices[t + 2]!;
-        enclosed +=
-          (meshVertices[a]! *
-            (meshVertices[b + 1]! * meshVertices[c + 2]! - meshVertices[b + 2]! * meshVertices[c + 1]!) +
-            meshVertices[a + 1]! * (meshVertices[b + 2]! * meshVertices[c]! - meshVertices[b]! * meshVertices[c + 2]!) +
-            meshVertices[a + 2]! *
-              (meshVertices[b]! * meshVertices[c + 1]! - meshVertices[b + 1]! * meshVertices[c]!)) /
-          6;
+      if (isClosed) {
+        for (let t = 0; t < meshIndices.length; t += 3) {
+          const a = 3 * meshIndices[t]!,
+            b = 3 * meshIndices[t + 1]!,
+            c = 3 * meshIndices[t + 2]!;
+          enclosed +=
+            (meshVertices[a]! *
+              (meshVertices[b + 1]! * meshVertices[c + 2]! - meshVertices[b + 2]! * meshVertices[c + 1]!) +
+              meshVertices[a + 1]! * (meshVertices[b + 2]! * meshVertices[c]! - meshVertices[b]! * meshVertices[c + 2]!) +
+              meshVertices[a + 2]! *
+                (meshVertices[b]! * meshVertices[c + 1]! - meshVertices[b + 1]! * meshVertices[c]!)) /
+            6;
+        }
       }
-      if (!(enclosed > 0))
+      if (isClosed && enclosed > 0) {
+        voxels = enclosed;
+      } else if (options.massFallback === 'winding') {
+        fallbackMassProperties = estimateMeshMassProperties(meshVertices, meshIndices, {
+          density: options.density,
+          mass: options.mass,
+        });
+        kernelSolid = false;
+      } else if (!isClosed) {
         throw new RangeError(
-          'A trimesh with a mass or a density must be wound outwards (counter-clockwise seen from outside); this one encloses no volume, so flip its triangles.',
+          'A trimesh with a mass or a density must be a closed surface, every edge shared by two triangles that run opposite ways; close it, pass massFallback: "winding", or give its body mass with setMassProperties.',
         );
-      voxels = enclosed;
+      } else {
+        throw new RangeError(
+          'A trimesh with a mass or a density must be wound outwards (counter-clockwise seen from outside); this one encloses no volume, so flip its triangles or pass massFallback: "winding".',
+        );
+      }
     }
     size = [
       hulls.addTrimesh(
@@ -440,7 +456,7 @@ export function kernelCollider(
         options.fixInternalEdges ?? false,
         options.oriented ?? false,
         options.deformable ?? false,
-        massive,
+        kernelSolid,
       ),
     ];
     data = {
@@ -561,6 +577,7 @@ export function kernelCollider(
     parts,
     data,
     volume: whole,
+    fallbackMassProperties,
     options: {
       position: [offset[0] + center[0], offset[1] + center[1], offset[2] + center[2]],
       rotation,
