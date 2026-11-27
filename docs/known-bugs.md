@@ -10600,6 +10600,11 @@ Repro: `node scripts/reference-rendering/environment.mjs --decompose`, then with
 - **Next:** a repeat now prints where the images differ (`restored.where`: bounding box, differing pixels per 8-row
   block and the mean luminance ratio; 0.75 in whole 48-row bands would be one missing 4-sample batch of a band, a
   scattered ratio below 1 paths cut short). Keep that line of the log when it happens.
+- **Rechecked 2026-11-27, not reproduced (RTX A6000, ANGLE Vulkan, origin/main 1b7150a95a):** 11 runs of
+  `node packages/voxel-pathtracer/tests/browser-check.mjs --compat viewport`, two beside a WebGPU run of
+  `denoise-diffuse denoise-opaque` and nine as three rounds of three at once; every run gave `restored` 0 differing
+  pixels (case 2.7 to 4.4 s). The row stays open on the one failure of 2026-11-11 and waits for a repeat's
+  `restored.where` line.
 
 ### SSGI multiBounce off does not return the one-bounce frame exactly under MARGO_COMPAT=1 (found 2026-11-11, open)
 
