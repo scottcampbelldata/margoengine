@@ -36,6 +36,7 @@ import {
   IMPULSE_WORDS,
 } from '../world/solvers/rigid.js';
 import { invalidLoad } from './errors.js';
+import type { FiniteQuayWake } from './finite-quay-wake.js';
 import { equivalentEllipsoid } from './shapes.js';
 
 /** A reference hull and the constant-depth dispersive grid it shares with one WakeSolver. */
@@ -64,6 +65,8 @@ export interface SurgeWakeOptions {
   readonly stations?: number;
   /** Lower bound for source radius in metres, default one grid cell. */
   readonly minimumRadius?: number;
+  /** Resolve the finite wake receiving `submergedSource`. Add that wake before the coupling. Default periodic. */
+  readonly finiteReceiver?: () => FiniteQuayWake;
 }
 
 // Rigid publication is f32. Allow rounding of its unit quaternion and of the position of the reference plane.
@@ -92,10 +95,14 @@ export class SurgeWakeCoupling implements Solver<undefined> {
   private readonly centre: readonly [number, number];
   private readonly grid: WakeSourceGrid;
   private readonly nodes: readonly SubmergedWakeNode[];
-  private readonly fft: RealFft2;
-  private readonly projected: ProjectedWakeSource;
-  private readonly spectrum: Float64Array;
-  private readonly profile: Float64Array;
+  private readonly periodic?: {
+    fft: RealFft2;
+    projected: ProjectedWakeSource;
+    spectrum: Float64Array;
+    profile: Float64Array;
+  };
+  private readonly finiteReceiver?: () => FiniteQuayWake;
+  private finite?: FiniteQuayWake;
   private readonly staged: Float64Array;
   private host!: SolverHost;
   private cellWork = 0;
@@ -121,24 +128,30 @@ export class SurgeWakeCoupling implements Solver<undefined> {
       axis = 'x',
       stations = 24,
       minimumRadius = cellSize,
+      finiteReceiver,
     } = options;
     if (!Number.isSafeInteger(row) || row < 0 || !Number.isFinite(waterline) || (axis !== 'x' && axis !== 'z'))
       throw invalidLoad('Pass a nonnegative rigid row, a finite local waterline and the X or Z guide axis.');
+    if (finiteReceiver !== undefined && typeof finiteReceiver !== 'function')
+      throw invalidLoad('Pass finiteReceiver as a function returning the attached FiniteQuayWake.');
     if (
       cells?.length !== 2 ||
-      !cells.every(fftLength) ||
-      cells[0] % 2 !== 0 ||
-      cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS ||
+      (finiteReceiver
+        ? cells.some((count) => !Number.isSafeInteger(count) || count < 1) || cells[0] * cells[1] > 0x1fffffff
+        : !cells.every(fftLength) || cells[0] % 2 !== 0 || cells[0] * cells[1] > SUBMERGED_WAKE_MAX_CELLS) ||
       !(cellSize > 0) ||
       cells.some((count) => !Number.isFinite(count * cellSize)) ||
       centre?.length !== 2 ||
       !centre.every(Number.isFinite)
     )
       throw invalidLoad(
-        'Use a centred FFT grid of up to 1,048,576 cells, even in X, with finite positive metre spacing.',
+        finiteReceiver
+          ? 'Use positive finite wake dimensions, centre and metre spacing.'
+          : 'Use a centred FFT grid of up to 1,048,576 cells, even in X, with finite positive metre spacing.',
       );
     if (
       !(depth > 0) ||
+      (finiteReceiver && !Number.isFinite(depth)) ||
       !(density > 0 && Number.isFinite(density)) ||
       !(minimumRadius >= 0 && Number.isFinite(minimumRadius))
     )
@@ -165,10 +178,14 @@ export class SurgeWakeCoupling implements Solver<undefined> {
     this.centre = [...centre];
     this.nodes = nodes;
     this.grid = { nx, nz, dx: cellSize, x0: centre[0] - 0.5 * nx * cellSize, z0: centre[1] - 0.5 * nz * cellSize };
-    this.fft = new RealFft2(nx, nz);
-    this.projected = new ProjectedWakeSource(this.grid, bands, depth);
-    this.spectrum = new Float64Array(2 * (nx / 2 + 1) * nz);
-    this.profile = new Float64Array(nx * nz);
+    this.finiteReceiver = finiteReceiver;
+    if (!finiteReceiver)
+      this.periodic = {
+        fft: new RealFft2(nx, nz),
+        projected: new ProjectedWakeSource(this.grid, bands, depth),
+        spectrum: new Float64Array(2 * (nx / 2 + 1) * nz),
+        profile: new Float64Array(nx * nz),
+      };
     this.staged = new Float64Array(nodes.length * SUBMERGED_WAKE_WORDS);
     this.submergedSource = Object.freeze({
       depths: bands,
@@ -184,6 +201,8 @@ export class SurgeWakeCoupling implements Solver<undefined> {
 
   /** The receiving WakeSolver's matching grid and density. Periodic waves are evolved without a sponge. */
   wakeParams({ initial, waterBelow }: Pick<WakeParams, 'initial' | 'waterBelow'> = {}): WakeParams {
+    if (this.finiteReceiver)
+      throw invalidLoad('Set the finite wake’s cells, origin, density and layer depths when adding it.');
     const { nx, nz, dx } = this.grid;
     return {
       cells: [nx, nz],
@@ -205,7 +224,7 @@ export class SurgeWakeCoupling implements Solver<undefined> {
       fields: [
         { field: BODIES_FIELD, access: 'read' },
         { field: BODY_MOBILITY_FIELD, access: 'read' },
-        { field: WAKE_HEIGHT_FIELD, access: 'read' },
+        { field: this.receiver()?.heightField ?? WAKE_HEIGHT_FIELD, access: 'read' },
         { field: this.submergedSource.field, access: 'write' },
         { field: BODY_IMPULSES_FIELD, access: 'accumulate' },
       ],
@@ -219,6 +238,22 @@ export class SurgeWakeCoupling implements Solver<undefined> {
       throw invalidLoad('Use gravity straight down along Y for the guided hull and wake.');
     const capacity = host.bodyRows();
     if (this.row >= capacity) throw invalidLoad('Add the RigidSolver first and select a live rigid body row.');
+    const finite = this.receiver();
+    if (finite) {
+      finite.validateSurgeSource(this.submergedSource, this.depth, host.memory);
+      const { cells, cellSize, origin } = finite.grid,
+        { nx, nz, dx, x0, z0 } = this.grid;
+      if (
+        cells[0] !== nx ||
+        cells[1] !== nz ||
+        cellSize !== dx ||
+        origin[0] !== x0 ||
+        origin[1] !== z0 ||
+        finite.density !== this.density
+      )
+        throw invalidLoad('Use the same XZ grid and density for guided surge and its finite wake.');
+    }
+    this.finite = finite;
     this.host = host;
     this.capacity = capacity;
     this.cellWork = cellWork;
@@ -237,7 +272,13 @@ export class SurgeWakeCoupling implements Solver<undefined> {
       1,
       this.capacity * BODY_MOBILITY_WORDS * 4,
     ) as Float32Array;
-    const eta = this.read(context, WAKE_HEIGHT_FIELD, 'f64', WAKE_LAYOUT, this.profile.byteLength) as Float64Array;
+    const eta = this.read(
+      context,
+      this.finite?.heightField ?? WAKE_HEIGHT_FIELD,
+      'f64',
+      WAKE_LAYOUT,
+      8 * this.grid.nx * this.grid.nz,
+    ) as Float64Array;
     const at = this.row * BODY_WORDS,
       m = this.row * BODY_MOBILITY_WORDS;
     const inverseMass = mobility[m + this.axis]!;
@@ -256,16 +297,7 @@ export class SurgeWakeCoupling implements Solver<undefined> {
         'Use a live dynamic hull with only its guide translation unlocked and no velocity on the locked axes.',
       );
     this.stageProfile(bodies, at);
-    this.spectrum.fill(0);
-    this.projected.add(this.staged, this.fft, this.spectrum);
-    this.fft.inverse(this.spectrum, this.profile);
-    let head = 0;
-    let stiffness = 0;
-    for (let i = 0; i < eta.length; i++) {
-      const b = this.profile[i]!;
-      head += b * eta[i]!;
-      stiffness += b * b;
-    }
+    let { head, stiffness } = this.finite ? this.finite.surgeProfile(this.staged, eta, dt) : this.periodicProfile(eta);
     head *= this.cellWork;
     stiffness *= this.cellWork;
     // J = b ds, with ds = dt (u + inverseMass impulse/2). Its source work is
@@ -299,6 +331,28 @@ export class SurgeWakeCoupling implements Solver<undefined> {
 
   extraState(): readonly Region[] {
     return [];
+  }
+
+  private receiver(): FiniteQuayWake | undefined {
+    const finite = this.finiteReceiver?.();
+    if (this.finiteReceiver && !finite)
+      throw invalidLoad('Create the finite wake before adding its guided surge coupling.');
+    return finite;
+  }
+
+  private periodicProfile(eta: Float64Array): { head: number; stiffness: number } {
+    const { fft, projected, spectrum, profile } = this.periodic!;
+    spectrum.fill(0);
+    projected.add(this.staged, fft, spectrum);
+    fft.inverse(spectrum, profile);
+    let head = 0,
+      stiffness = 0;
+    for (let i = 0; i < eta.length; i++) {
+      const b = profile[i]!;
+      head += b * eta[i]!;
+      stiffness += b * b;
+    }
+    return { head, stiffness };
   }
 
   private read(context: StepContext, field: FieldDescriptor, type: ElementType, layout: number, bytes: number) {

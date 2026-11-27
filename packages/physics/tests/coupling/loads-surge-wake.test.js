@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { RealFft2 } from '@margoengine/math/fft';
 import { Physics } from '../../dist/index.js';
-import { SurgeWakeCoupling } from '../../dist/loads.js';
+import { FiniteQuayWake, SurgeWakeCoupling } from '../../dist/loads.js';
 import { SpectralSea, SUBMERGED_WAKE_WORDS, WakeSolver, WAKE_HEIGHT_FIELD } from '../../dist/sea.js';
 import { HullSolver } from '../../dist/seakeeping.js';
 import {
@@ -220,6 +220,112 @@ test('the actual hull and dispersive wake exchange matched energy with free rigi
   assert.equal(disabled.deltaBody, 0);
   assert.ok(disabled.maxResidual > 20, JSON.stringify(disabled));
   t.diagnostic(JSON.stringify({ coupled, disabled }));
+});
+
+test('guided surge closes work against a finite quay with an opening and an active absorber', (t) => {
+  function run(reaction, shared) {
+    const cells = [37, 19],
+      dx = 0.25,
+      bed = 1.5,
+      centre = [0, 0];
+    const origin = [(-cells[0] * dx) / 2, (-cells[1] * dx) / 2];
+    const world = new PhysicsWorld({
+      rate: { num: 60, den: 1 },
+      gravity: [0, -gravity, 0],
+      memory: worldMemory(shared),
+    });
+    using physics = new Physics(null, {
+      arena: world.arena,
+      fixedTimestep: dt,
+      substeps: 1,
+      gravity: [0, -gravity, 0],
+    });
+    const body = physics.addBody(null, {
+      position: [-1.5, 0, 0.5],
+      linearVelocity: [1.25, 0, 0],
+      enabledTranslations: [true, false, false],
+      lockRotations: true,
+      colliders: { shape: 'box', halfExtents: [1, 0.5, 0.5], mass },
+    });
+    let wake;
+    const surge = reaction
+      ? new SurgeWakeCoupling({
+          row: body.row,
+          mesh,
+          waterline: 0,
+          depth: bed,
+          depths,
+          cells,
+          cellSize: dx,
+          centre,
+          density,
+          finiteReceiver: () => wake,
+        })
+      : undefined;
+    const hull = new HullSolver('hull', reaction ? undefined : { minimumRadius: dx, submergedAdvance: depths });
+    wake = new FiniteQuayWake('wake', { submerged: surge?.submergedSource ?? hull.submergedWakeSource });
+    const plane = cells[0] * cells[1];
+    const openZ = new Float64Array(4 * plane).fill(1);
+    for (let x = 9; x < 27; x++) openZ[x + 6 * cells[0]] = openZ[x + 6 * cells[0] + plane] = 0;
+    world
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh }],
+        sea: { density, elevation: () => 0 },
+        addedMass: false,
+        radiation: false,
+        drag: false,
+        diffraction: false,
+        drift: false,
+        slamming: false,
+        greenWater: false,
+        rollDamping: false,
+      })
+      .add(wake, {
+        cells,
+        cellSize: dx,
+        origin,
+        depths: [0, 0.2, 0.5, 0.9, bed],
+        openZ,
+        density,
+        sponge: { cells: 3, rate: 2 },
+      });
+    if (surge) world.add(surge, undefined);
+    world.couple(surge ? ['hull', 'surgeWake', 'wake', 'rigid'] : ['hull', 'wake', 'rigid'], 'staggered');
+    const zero = world.takeSnapshot();
+    const initial = 0.5 * mass * body.linearVelocity[0] ** 2;
+    let maximum = 0,
+      scale = 0;
+    for (let tick = 1; tick <= 48; tick++) {
+      world.advance(tick);
+      const { absorbedJoules, joules } = wake.work();
+      const wave = wake.energy();
+      assert.ok(Math.abs(wave + absorbedJoules - joules) < 1e-8);
+      const total = wave + absorbedJoules + 0.5 * mass * body.linearVelocity[0] ** 2;
+      maximum = Math.max(maximum, Math.abs(total - initial));
+      scale += total;
+    }
+    const hash = world.hash(),
+      accounted = wake.energy() + wake.work().absorbedJoules;
+    world.restoreSnapshot(zero.bytes);
+    world.advance(48);
+    assert.equal(world.hash(), hash);
+    return {
+      hash,
+      maximum,
+      roundoff: 4 * 2 ** -24 * scale,
+      wave: accounted,
+      absorbed: wake.work().absorbedJoules,
+      speed: body.linearVelocity[0],
+    };
+  }
+  const coupled = run(true, false),
+    uncoupled = run(false, false);
+  assert.deepEqual(run(true, true), coupled);
+  assert.ok(coupled.wave > 20 && coupled.absorbed > 0 && coupled.speed < 1.25);
+  assert.ok(coupled.maximum < coupled.roundoff, JSON.stringify(coupled));
+  assert.ok(uncoupled.maximum > 20 && uncoupled.speed === 1.25, JSON.stringify(uncoupled));
+  t.diagnostic(JSON.stringify({ coupled, uncoupled }));
 });
 
 test('a pre-existing wave starts a stationary hull on its negative-facing Z guide', (t) => {

@@ -216,6 +216,8 @@ export class FreeHullWakeCoupling implements Solver<undefined> {
       minimumRadius = dx,
       axis = 'x',
     } = options ?? ({} as FreeHullWakeOptions);
+    if (options?.finiteReceiver !== undefined)
+      throw invalidLoad('Use a periodic WakeSolver for free hull motion or guided surge with a finite wake.');
     if (!body?.valid || !Number.isFinite(waterline) || (axis !== 'x' && axis !== 'z'))
       throw invalidLoad('Pass a live rigid hull, a finite reference waterline and an X or Z guide.');
     if (

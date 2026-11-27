@@ -1422,6 +1422,13 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   4,225 positions and normals on WebGPU and WebGL2 within 1.11×10⁻⁷, including a closed corner ray and
   an open corner ray. The dry in-grid patch matches the no-water reference exactly.
 
+  `coupling/loads-surge-wake.test.js` also exercises a rigid guided hull on a non-periodic 37×19 grid with a
+  finite curtain, a submerged opening and an active absorber. The shared displacement operator and reciprocal
+  surge impulse book 361.314 J into the wave and sponge, with at most 0.000211 J of total energy discrepancy
+  against the f32 rounding bound of 0.00916 J. This closes longitudinal work at fixed draft. The unpaired
+  control generates 468.358 J while retaining its initial speed. The coupled run replays exactly in both
+  memory modes. The full free-motion ship and the resolved First Wake shutters are still open.
+
   The finite receiver was compared with the 26 measured Briggs M4 submerged-lee probes using an incident
   packet at the published period and height and an identical open-water normalization. At the fixed 14 s
   sample, RMS errors in relative wave height for 30°, 60° and 90° are 0.039, 0.030 and 0.056 at 0.50 m.

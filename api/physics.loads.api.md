@@ -27,6 +27,11 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
     describe(): SolverDescription;
     init(host: SolverHost, params: FiniteQuayWakeParams): void;
     step(context: StepContext, dt: number): void;
+    validateSurgeSource(source: SubmergedWakeSource, depth: number, memory: WebAssembly.Memory): void;
+    surgeProfile(rows: Float64Array, eta: Float64Array, dt: number): {
+        head: number;
+        stiffness: number;
+    };
     get grid(): {
         readonly cells: readonly [number, number];
         readonly cellSize: number;
@@ -571,6 +576,7 @@ export interface SurgeWakeOptions {
     readonly axis?: 'x' | 'z';
     readonly stations?: number;
     readonly minimumRadius?: number;
+    readonly finiteReceiver?: () => FiniteQuayWake;
 }
 
 export interface SwayOptions {

@@ -5309,6 +5309,58 @@ and the live heave and angular samples come from the posed hull's waterplane. Th
 the hull has a single convex waterplane. It approximates the swept geometry over each step around the reference
 draft and omits a yaw source. The wave exchange uses transpose work pairing as in [Peskin (2002), §5](https://math.nyu.edu/~peskin/papers/acta_numerica.pdf).
 
+#### Exchange longitudinal work through a finite quay wake
+
+Use the same guided body and ambient-only hull from the free-surge example. Set
+`finiteReceiver: () => wake` on `SurgeWakeCoupling`, where `wake` is a `FiniteQuayWake` created with
+`{ submerged: surge.submergedSource }`. Add the finite wake before the surge coupling so they can check the
+shared field, grid, bed depth, density and world. In the staggered coupling run `hull`, `surgeWake`, `wake`
+and `rigid` in that order. Configure the receiver directly with its origin, layer depths and fixed open faces.
+The receiver must have the guided surge as its only source. Use `wake.work().absorbedJoules` to include
+perimeter losses when checking rigid and wave energy.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {FiniteQuayWake, SurgeWakeCoupling} from 'margoengine/physics/loads';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+using physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60});
+const mesh = {
+  vertices: [-1,-0.5,-0.5, 1,-0.5,-0.5, 1,0.5,-0.5, -1,0.5,-0.5,
+    -1,-0.5,0.5, 1,-0.5,0.5, 1,0.5,0.5, -1,0.5,0.5],
+  indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,1,5, 0,5,4,
+    3,7,6, 3,6,2, 0,4,7, 0,7,3, 1,2,6, 1,6,5],
+};
+const body = physics.addBody(null, {linearVelocity: [1.25, 0, 0], enabledTranslations: [true, false, false],
+  enabledRotations: [false, false, false], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1025}});
+const hull = new HullSolver();
+const cells = [37, 19] as const;
+const cellSize = 0.25;
+const hullDepth = 1.5;
+const plane = cells[0] * cells[1];
+const openX = new Float64Array(4 * plane).fill(1);
+for (let z = 1; z < 6; z++) openX[28 + z * cells[0]] = 0;
+const surge = new SurgeWakeCoupling({
+  row: body.row, mesh, waterline: 0, depths: [0, 0.25, 0.5], depth: hullDepth, cells, cellSize,
+  finiteReceiver: () => wake,
+});
+const wake = new FiniteQuayWake('wake', {submerged: surge.submergedSource});
+world.add(new RigidSolver(), {physics}).add(hull, {
+  hulls: [{row: body.row, mesh}], sea: {density: 1025, elevation: () => 0},
+  drag: false, radiation: false, addedMass: false, rollDamping: false, diffraction: false, drift: false,
+  greenWater: false, slamming: false,
+}).add(wake, {
+  cells, cellSize, origin: [-cells[0] * cellSize / 2, -cells[1] * cellSize / 2],
+  depths: [0, 0.2, 0.5, 0.9, hullDepth], openX, sponge: {cells: 3, rate: 2},
+}).add(surge, undefined)
+  .couple(['hull', 'surgeWake', 'wake', 'rigid'], 'staggered');
+world.advance(48);
+console.log(body.linearVelocity[0] < 1.25, wake.work().joules > 0); // true true
+```
+
 #### Propagate a wake around a finite quay
 
 `FiniteQuayWake` uses a layered water volume with fixed solids. Each horizontal face can be partly or fully

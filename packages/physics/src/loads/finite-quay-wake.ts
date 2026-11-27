@@ -272,7 +272,12 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       throw invalidLoad(
         'Connect the finite quay and hull sources in the same cell with matching layout-1 f64 records.',
       );
-    const rows = regionWords(this.host.memory, region) as Float64Array;
+    const rows = regionWords(port.region.memory ?? this.host.memory, region) as Float64Array;
+    return this.stampRows(rows, below);
+  }
+
+  private stampRows(rows: Float64Array, below: boolean): boolean {
+    const words = below ? SUBMERGED_WAKE_WORDS : WAKE_SOURCE_WORDS;
     let active = false;
     for (let at = 0; at < rows.length; at += words) {
       const x = rows[at]!,
@@ -302,6 +307,47 @@ export class FiniteQuayWake implements Solver<FiniteQuayWakeParams> {
       }
     }
     return active;
+  }
+
+  /** Check that the guided surge will be the only actuator on this wake. Add the finite wake first. */
+  validateSurgeSource(source: SubmergedWakeSource, depth: number, memory: WebAssembly.Memory): void {
+    if (
+      this.host?.memory !== memory ||
+      this.sourceField ||
+      !this.submerged ||
+      this.submerged.field.name !== source.field.name ||
+      this.depths.at(-1) !== depth ||
+      this.submerged.depths.length !== source.depths.length ||
+      this.submerged.depths.some((value, i) => value !== source.depths[i])
+    )
+      throw invalidLoad(
+        'Add the finite wake first with the guided surge as its only source and the same depth bands and bed.',
+      );
+  }
+
+  /** Dot products of the accepted finite displacement operator for the guided surge's work solve. */
+  surgeProfile(rows: Float64Array, eta: Float64Array, dt: number): { head: number; stiffness: number } {
+    if (
+      !this.submerged ||
+      rows.length % SUBMERGED_WAKE_WORDS ||
+      eta.length !== this.operator.surfaceCells ||
+      !(dt > 0 && Number.isFinite(dt))
+    )
+      throw invalidLoad('Use complete finite submerged rows, the prior surface and a positive step for guided surge.');
+    const { bulkKick, mid, rise, sponge } = this;
+    bulkKick.fill(0);
+    mid.fill(0);
+    this.stampRows(rows, true);
+    this.operator.project(mid, rise, bulkKick);
+    let head = 0,
+      stiffness = 0;
+    for (let i = 0; i < rise.length; i++) {
+      const column = rise[i]!;
+      const height = sponge?.[i] ? eta[i]! * exp((-sponge[i]! * dt) / 2) : eta[i]!;
+      head += column * height;
+      stiffness += column * column;
+    }
+    return { head, stiffness };
   }
 
   private scatter(x: number, z: number, radius: number, layer: number, volume: number, pressure?: number): void {
