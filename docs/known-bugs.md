@@ -20,6 +20,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/physics/tests/soft-volume.test.js` ("in water a soft volume floats where Archimedes says"), held by the
   test's own clip of the mesh to |a| / g + 1e-4 at densities 300, 500 and 700.
 
+### Open (below Margo) 2026-11-27: on ANGLE D3D11 a draw into a fresh texture is sometimes lost while the page is captured (KB-ANGLE-CAPTUREDRAW1, browser; webgl2-compat)
+
+- **Repro:** `MARGO_COMPAT=1 node <script>` over a page that makes a 2 x 2 `Texture` from an `ImageBitmap`, a
+  `Material({ map })` and a mesh, renders twice, disposes them and repeats, reading the canvas with a Playwright
+  element screenshot after each cycle (RTX A6000, Edge and Chrome 158, ANGLE D3D11): one cycle in about three runs of
+  ten (the 3rd to the 9th) samples the texture as black (2, 2, 2 where 155, 154, 154 is right), with no error. Native
+  WebGPU is right. Without the screenshots, reading the copy back in the page instead: 0 lost cycles in 120.
+- **Not Margo's GL state:** the copy is `Replayer.copyBitmap` (`packages/webgl2-compat/src/device/render.ts`), whose
+  last draw writes the destination level. In a lost cycle that level reads (0, 0, 0, 0), its cleared value, right
+  after the draw, while the source texture read just before the draw holds the bitmap, and the framebuffer, viewport,
+  masks, program, units, samplers and uniforms read back with `getParameter` match a kept cycle. A trace of every
+  WebGL2 call (names, objects, arguments, all deletes at the prototype, so collected objects too) is the same in lost
+  and kept cycles. Byte uploads in place of the bitmap and canvas uploads are lost too, so the `ImageBitmap` path is
+  not the cause.
+- **Cause, below Margo:** every WebGL2 call of a Margo run, recorded with its payloads and replayed on a bare context
+  with no Margo code, lost the draw in 4 of 4 replays with canvas screenshots between cycles and in 0 of 3 without.
+  `docs/upstream-reports/KB-ANGLE-CAPTUREDRAW1/lost-draw.html` (raw WebGL2, the layer's calls for one copy written by
+  hand) loses 6 of 120 cycles under `node docs/upstream-reports/run-page.mjs docs/upstream-reports/KB-ANGLE-CAPTUREDRAW1/lost-draw.html --browser=edge --shots=30 "--query=cycles=30&shots=1&v=bytes"`
+  (`--shots` screenshots the page's canvas between steps) and 0 of 180 without captures. With a plain `texelFetch`
+  fragment shader in place of the converting one it lost 0 of 180, with a uniform offset or a second sampler added 0
+  of 120 and 0 of 90; the converting shader without its second sampler lost 2 of 90, without the points draw 1 of 90,
+  with nothing deleted 9 of 90, with a flush after the draw 7 of 90, into an RGBA8 target 2 of 50. So the capture,
+  which the GPU process runs between the page's frames, sometimes leaves the page's next draw of that shader without
+  effect; the same class as "ANGLE D3D11 flipped blit left the next draws' fragment uniform blocks reading zero" below.
+  Whether ANGLE's D3D11 state or the NVIDIA driver drops it is not settled; the replay needs an ANGLE report.
+- **Margo:** not worked around. Nothing in the page's call stream decides which cycle loses its draw, so no change to
+  the layer's calls is proven to avoid it, and a redraw or readback after the copy would only hide it. Pages that
+  check pixels on the layer can read them with `readPixels` in the page instead of a screenshot. The recorder,
+  replayer and failing recording stay outside the repository (lane C's `.lane/kbx-rec.js`, `kbx-replay.html`,
+  `kbx-trace-fail.json`).
+
 ### Open 2026-11-27: a soft body's damped springs lose momentum to float32 rounding (KB-SOFT-F32MOMENTUM1, physics soft)
 
 - **Repro:** with no gravity and no air drag, `SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12), {density: 100})` at

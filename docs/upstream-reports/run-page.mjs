@@ -4,6 +4,7 @@
 //
 //   node docs/upstream-reports/run-page.mjs <folder/page.html> [--browser=edge|chrome|chromium|firefox|webkit]
 //        [--query=a=1&b=2] [--luid=high,low (Chromium: use that adapter, decimal LUID)] [--arg=<chromium switch>, repeatable] [--headed] [--timeout=120000]
+//        [--shots=N (screenshots between the page's N steps, for pages that wait on window.go)]
 //
 // Needs Playwright (`npm i playwright-core`; browsers are the system Edge or Chrome, or Playwright's own).
 import { createServer } from 'node:http';
@@ -45,6 +46,15 @@ try {
   page.on('console', (m) => process.stderr.write(`[page ${m.type()}] ${m.text()}\n`));
   page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
   await page.goto(url);
+  // --shots=N: the page stops at window.atStep = 1..N and goes on when window.go reaches it; the driver captures a
+  // screenshot of the page's first canvas before releasing each step after the first.
+  for (let k = 1, n = Number(arg('shots', '0')); k <= n; k++) {
+    await page.waitForFunction((k) => window.atStep === k, k, { timeout });
+    if (k > 1) await page.locator('canvas').first().screenshot();
+    await page.evaluate((k) => {
+      window.go = k;
+    }, k);
+  }
   await page.waitForFunction(() => window.result !== undefined, null, { timeout });
   console.log(JSON.stringify({ browser: browserName, version: browser.version(), url, result: await page.evaluate(() => window.result) }, null, 2));
 } finally {

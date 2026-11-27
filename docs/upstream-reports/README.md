@@ -6,7 +6,7 @@ the owner files them.
 
 Use the known-bugs ID for the folder and both ID cells in the table. IDs can include hyphens.
 
-`run-page.mjs` is an optional Playwright driver for the pages: `node docs/upstream-reports/run-page.mjs docs/upstream-reports/<id>/<page>.html --browser=edge|chrome|firefox|webkit [--query=...] [--luid=high,low]`.
+`run-page.mjs` is an optional Playwright driver for the pages: `node docs/upstream-reports/run-page.mjs docs/upstream-reports/<id>/<page>.html --browser=edge|chrome|firefox|webkit [--query=...] [--luid=high,low] [--shots=N]` (`--shots` screenshots the first canvas between a page's N steps).
 
 | Row | Folder | Goes to | Still reproduces (2026-11-11) |
 |---|---|---|---|
@@ -27,4 +27,5 @@ Use the known-bugs ID for the folder and both ID cells in the table. IDs can inc
 | KB6171a | `KB6171a` | ANGLE, Apple | draft only, needs a Mac |
 | KBL3c | `KBL3c` | Mozilla (Firefox WebGL) | yes, Firefox 157 |
 | KB-WEBKIT-BITMAPALPHA1 | `KB-WEBKIT-BITMAPALPHA1` | WebKit | yes, Playwright WebKit 27.2 on Windows (2026-11-27) |
+| KB-ANGLE-CAPTUREDRAW1 | `KB-ANGLE-CAPTUREDRAW1` | ANGLE, Chromium, NVIDIA | yes, RTX A6000, Edge 158, ANGLE D3D11 (2026-11-27: 6 of 120 cycles with `run-page.mjs --shots=30`, 0 of 180 without captures) |
 | KB-WATER-FLOODFILM-COMPAT1 | `KB-WATER-FLOODFILM-COMPAT1` | ANGLE, Intel | yes, Intel Arc 140V, ANGLE D3D11 (2026-11-21: 6 of 32 launches); draft only, no standalone repro |

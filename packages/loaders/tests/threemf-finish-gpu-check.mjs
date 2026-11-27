@@ -10,11 +10,9 @@ import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 import { openBrowser } from '../../../scripts/browser.js';
 import { compatRun } from '../../../scripts/support/compat-shim.js';
-import { decodePNG } from '../../../tests/support/png.js';
 process.chdir(fileURLToPath(new URL('../../..', import.meta.url)));
 
-const compat = compatRun(),
-  size = 128;
+const compat = compatRun();
 const context = await openBrowser({ startPath: '/packages/loaders/tests/threemf-finish-gpu.html', port: 5361 }),
   { page } = context,
   pageErrors = [];
@@ -22,23 +20,20 @@ page.on('pageerror', (e) => pageErrors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && pageErrors.push(m.text()));
 /** Three pixels in each quadrant, in the order top left, top right, bottom left, bottom right. */
 const pixels = async () => {
-  const shot = await decodePNG(await page.locator('#a').screenshot());
-  assert.equal(shot.width, size);
-  return [
+  const points = [
     [0, 0],
     [1, 0],
     [0, 1],
     [1, 1],
-  ].map(([column, row]) =>
+  ].flatMap(([column, row]) =>
     [
       [20, 20],
       [32, 40],
       [44, 28],
-    ].flatMap(([x, y]) => {
-      const at = ((row * 64 + y) * size + column * 64 + x) * 4;
-      return [...shot.data.slice(at, at + 3)];
-    }),
+    ].map(([x, y]) => [column * 64 + x, row * 64 + y]),
   );
+  const read = await page.evaluate((at) => window.check.pixels(at), points);
+  return [0, 3, 6, 9].map((first) => read.slice(first, first + 3).flat());
 };
 try {
   await page.waitForFunction(() => window.ready, null, { timeout: 30000 });

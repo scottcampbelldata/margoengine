@@ -54,11 +54,17 @@ async function file({ tint, map, textured = true, metalness, roughness }) {
   return export3MF({ nodes: [{ geometry: quad(-1, -1, 1, 1), material }] }, { upAxis: 'z', unit: 'meter' });
 }
 
-let shown;
+let shown, frame;
+// The pixels are copied in the page, in the task that renders: an element screenshot between draws makes ANGLE D3D11
+// drop some of the WebGL2 layer's later draws (docs/known-bugs.md, KB-ANGLE-CAPTUREDRAW1).
 async function show() {
   engine.render();
   await engine.gpu.queue.onSubmittedWorkDone();
   engine.render();
+  const canvas = document.getElementById('a'),
+    copy = new OffscreenCanvas(128, 128).getContext('2d', { willReadFrequently: true });
+  copy.drawImage(canvas, 0, 0, 128, 128);
+  frame = copy.getImageData(0, 0, 128, 128).data;
   await engine.gpu.queue.onSubmittedWorkDone();
 }
 
@@ -94,5 +100,8 @@ async function reference(tint, values) {
   await show();
 }
 
-window.check = { drawn, reference, texels: TEXELS, errors };
+/** The last frame's RGB at each point. */
+const pixels = (points) => points.map(([x, y]) => [...frame.slice((y * 128 + x) * 4, (y * 128 + x) * 4 + 3)]);
+
+window.check = { drawn, reference, pixels, texels: TEXELS, errors };
 window.ready = true;

@@ -1,0 +1,149 @@
+<!doctype html><html><head><meta charset="utf-8"/><title>Lost draw while the page is captured</title></head><body><canvas id="a" width="128" height="128" style="width:128px;height:128px"></canvas><script type="module">
+// Raw WebGL2, no Margo code (KB-ANGLE-CAPTUREDRAW1): the GL calls Margo's WebGL2 layer makes for one ImageBitmap copy,
+// written by hand. Each cycle: a fresh 2 x 2 SRGB8_ALPHA8 texture of 2 levels (`dest`), both levels cleared through one
+// shared framebuffer; (200, 200, 200, 255) uploaded into a fresh RGBA8 texture (`held`: from an ImageBitmap, or from
+// bytes with ?v=bytes), a 2D canvas copy into another (`stored`, premultiplied), a 1 x 1 R8 flag cleared and drawn by
+// points; then one full-target triangle through a fresh framebuffer on level 0 of `dest` that texelFetches `held`
+// (flip, alpha and sRGB conversion in the shader), and a readPixels of level 0. Every cycle should read
+// 200,200,200,255; a lost draw reads 0,0,0,0 (the cleared texture).
+// The loss needs a capture of the page between cycles: with ?shots=1 each cycle waits for window.go, and
+// `run-page.mjs --shots=N` screenshots the canvas between cycles. Without captures no cycle was lost (0 of 180).
+// ?cycles=N (40). Knobs used to narrow it down (results in report.md): ?v= a comma list of bytes, nomark (no points
+// draw), nostored, simple (plain texelFetch shader), simpleo, simpleb, nob (other shaders), rgba8 (RGBA8 dest), flush,
+// keep (delete nothing); ?zero=clear|none|draw (how dest is zeroed); ?present=1 (show a frame on the canvas).
+const q = new URLSearchParams(location.search),
+  cycles = Number(q.get('cycles') ?? 40),
+  zero = q.get('zero') ?? 'clear',
+  levels = Number(q.get('levels') ?? 2);
+const gl = new OffscreenCanvas(1, 1).getContext('webgl2', { alpha: true, antialias: false, depth: false, stencil: false, premultipliedAlpha: true, preserveDrawingBuffer: false, failIfMajorPerformanceCaveat: false });
+const program = (vertex, fragment) => {
+  const p = gl.createProgram();
+  for (const [type, source] of [[gl.VERTEX_SHADER, `#version 300 es\n${vertex}`], [gl.FRAGMENT_SHADER, `#version 300 es\nprecision highp float;\nprecision highp int;\n${fragment}`]]) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    gl.attachShader(p, s);
+  }
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  gl.useProgram(p);
+  const t = gl.getUniformLocation(p, 't'), b = gl.getUniformLocation(p, 'b');
+  if (t) gl.uniform1i(t, 0);
+  if (b) gl.uniform1i(b, 1);
+  return { p, o: gl.getUniformLocation(p, 'o') };
+};
+const TRI = 'void main() { gl_Position = vec4(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0, 0.0, 1.0); }';
+const mark = program(
+  'precision highp float;\nprecision highp int;\nuniform highp sampler2D t;\nuniform highp sampler2D b;\nuniform ivec4 o;\nvoid main() {\n  ivec2 p = ivec2(gl_VertexID % o.x, gl_VertexID / o.x);\n  gl_PointSize = 1.0;\n  gl_Position = texelFetch(t, p, 0) != texelFetch(b, p, 0) ? vec4(0.0, 0.0, 0.0, 1.0) : vec4(2.0, 2.0, 2.0, 1.0);\n}',
+  'out vec4 c;\nvoid main() { c = vec4(1.0); }',
+);
+const copy = program(TRI,
+  'uniform highp sampler2D t;\nuniform highp sampler2D b;\nuniform ivec4 o;\nout highp vec4 c;\nvoid main() {\n  ivec2 p = ivec2(gl_FragCoord.xy) - o.xy;\n  if (o.z > 0) p.y = o.z - 1 - p.y;\n  c = texelFetch(t, p, 0);\n  bool held = texelFetch(b, ivec2(0), 0).r > 0.5, want = (o.w & 1) != 0;\n  if (held && want) c.rgb *= c.a;\n  else if (!held && !want && c.a != 0.0) c.rgb /= c.a;\n  if ((o.w & 2) != 0) c.rgb = mix(c.rgb / 12.92, pow((c.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c.rgb));\n}');
+const simple = program(TRI, 'uniform highp sampler2D t;\nout highp vec4 c;\nvoid main() { c = texelFetch(t, ivec2(gl_FragCoord.xy), 0); }');
+const simpleb = program(TRI, 'uniform highp sampler2D t;\nuniform highp sampler2D b;\nuniform ivec4 o;\nout highp vec4 c;\nvoid main() { c = texelFetch(t, ivec2(gl_FragCoord.xy) - o.xy, 0); if (texelFetch(b, ivec2(0), 0).r > 0.5) c = vec4(1.0, 0.0, 0.0, 1.0); }');
+const nob = program(TRI,
+  'uniform highp sampler2D t;\nuniform ivec4 o;\nout highp vec4 c;\nvoid main() {\n  ivec2 p = ivec2(gl_FragCoord.xy) - o.xy;\n  if (o.z > 0) p.y = o.z - 1 - p.y;\n  c = texelFetch(t, p, 0);\n  bool held = false, want = (o.w & 1) != 0;\n  if (held && want) c.rgb *= c.a;\n  else if (!held && !want && c.a != 0.0) c.rgb /= c.a;\n  if ((o.w & 2) != 0) c.rgb = mix(c.rgb / 12.92, pow((c.rgb + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c.rgb));\n}');
+const simpleo = program(TRI, 'uniform highp sampler2D t;\nuniform ivec4 o;\nout highp vec4 c;\nvoid main() { c = texelFetch(t, ivec2(gl_FragCoord.xy) - o.xy, 0); }');
+const clearer = program(TRI, 'uniform highp vec4 v;\nlayout(location = 0) out highp vec4 c;\nvoid main() { c = v; }');
+const vao = gl.createVertexArray();
+gl.bindVertexArray(vao);
+const sampler = gl.createSampler();
+gl.samplerParameteri(sampler, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.samplerParameteri(sampler, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.bindSampler(0, sampler);
+gl.bindSampler(1, sampler);
+const zeroFbo = gl.createFramebuffer(), readFbo = gl.createFramebuffer();
+const results = [], kept = [];
+const v = new Set((q.get('v') ?? '').split(',').filter(Boolean));
+const bytes = new Uint8Array(16).map((_, i) => (i % 4 === 3 ? 255 : 200));
+window.atStep = 0;
+window.go = 0;
+const shots = q.get('shots') === '1', present = q.get('present') === '1';
+const page = present ? document.getElementById('a').getContext('bitmaprenderer') : null;
+if (present) { gl.canvas.width = 128; gl.canvas.height = 128; }
+for (let k = 0; k < cycles; k++) {
+  if (shots) { window.atStep++; while (window.go < window.atStep) await new Promise((r) => setTimeout(r, 5)); }
+  const source = new OffscreenCanvas(2, 2), sc = source.getContext('2d');
+  sc.fillStyle = '#c8c8c8';
+  sc.fillRect(0, 0, 2, 2);
+  const bitmap = await createImageBitmap(source);
+  gl.activeTexture(gl.TEXTURE0);
+  const dest = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, dest);
+  gl.texStorage2D(gl.TEXTURE_2D, levels, v.has('rgba8') ? gl.RGBA8 : gl.SRGB8_ALPHA8, 2, 2);
+  if (zero !== 'none') {
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, zeroFbo);
+    for (let level = 0; level < levels; level++) {
+      gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dest, level);
+      if (zero === 'draw') {
+        gl.useProgram(clearer.p);
+        gl.viewport(0, 0, 2 >> level, 2 >> level);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+      } else gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
+    }
+    gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
+  }
+  const texture = (internal, w, h, image) => {
+    const t = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texStorage2D(gl.TEXTURE_2D, 1, internal, w, h);
+    if (image) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, image);
+    return t;
+  };
+  const canvas = new OffscreenCanvas(2, 2);
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, 2, 2, 0, 0, 2, 2);
+  const held = v.has('bytes') ? texture(gl.RGBA8, 2, 2) : texture(gl.RGBA8, 2, 2, bitmap);
+  if (v.has('bytes')) gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 2, 2, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+  const stored = v.has('nostored') ? texture(gl.RGBA8, 2, 2) : texture(gl.RGBA8, 2, 2, canvas);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  const straight = texture(gl.R8, 1, 1);
+  const markFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, markFbo);
+  gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, straight, 0);
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+  gl.useProgram(mark.p);
+  gl.viewport(0, 0, 1, 1);
+  gl.clearBufferfv(gl.COLOR, 0, [0, 0, 0, 0]);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, held);
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, stored);
+  gl.uniform4i(mark.o, 2, 0, 0, 0);
+  if (!v.has('nomark')) gl.drawArrays(gl.POINTS, 0, 4);
+  const destFbo = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, destFbo);
+  gl.framebufferTexture2D(gl.DRAW_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dest, 0);
+  gl.drawBuffers([gl.COLOR_ATTACHMENT0]);
+  const cp = v.has('simple') ? simple : v.has('simpleo') ? simpleo : v.has('simpleb') ? simpleb : v.has('nob') ? nob : copy;
+  gl.useProgram(cp.p);
+  gl.viewport(0, 0, 2, 2);
+  gl.bindTexture(gl.TEXTURE_2D, straight);
+  if (cp.o) gl.uniform4i(cp.o, 0, 0, 2, 2);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+  gl.deleteFramebuffer(markFbo);
+  if (v.has('flush')) gl.flush();
+  if (v.has('keep')) kept.push(held, stored, straight); else for (const t of [held, stored, straight]) gl.deleteTexture(t);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, readFbo);
+  gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, dest, 0);
+  const px = new Uint8Array(4);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.framebufferTexture2D(gl.READ_FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, null, 0);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+  results.push([...px].join());
+  if (present) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, 128, 128); gl.clearColor(0.2, 0.3, 0.4, 1); gl.clear(gl.COLOR_BUFFER_BIT); page.transferFromImageBitmap(gl.canvas.transferToImageBitmap()); }
+  gl.deleteFramebuffer(destFbo);
+  gl.deleteTexture(dest);
+  bitmap.close();
+}
+window.result = {
+  renderer: gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL),
+  error: gl.getError(),
+  lost: results.filter((r) => r === '0,0,0,0').length,
+  cycles: results.map((r) => (r === results[0] ? '.' : 'X')).join(''),
+  results,
+};
+</script></body></html>
