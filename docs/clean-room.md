@@ -18412,7 +18412,12 @@ engine's source was read.
   that stays on a portal pays off only through a polygon cheaper than the one just crossed (the travel along edges of
   Mitchell and Papadimitriou). Without these rules relaxed paths slid along touching pieces and the bound stalled. Also
   dropping every piece whose cheapest relaxed path already costs `cost / (1 + tolerance)`; splitting only the pieces
-  left, widest by weight first; and estimating what is left to walk by what the round before proved from the same piece,
+  left, widest first, a width being length times the cube root of the weight (a piece's error grows with weight
+  times length and the arcs with the square of the pieces, so sharing a given error at the least arcs puts lengths in
+  inverse proportion to the cube root: the error equidistribution of adaptive meshing, C. de Boor, "Good approximation
+  by splines with variable knots. II", Lecture Notes in Mathematics 363, 1974, https://doi.org/10.1007/BFb0069121,
+  bibliography checked, text not read; measured against width by weight, its square root, no weight and other split
+  shares); and estimating what is left to walk by what the round before proved from the same piece,
   which a part of it cannot undercut (a heuristic from a coarser graph, admissible because every finer path maps to a
   coarser one that costs no more).
 - Looked at for the tighter bound and not built: potentials with a Lipschitz bound on a triangulation (a certified dual

@@ -451,6 +451,37 @@ test('on hundreds of polygons the default work proves every answer to 5 percent'
   assert.ok(most < 6_000_000, `work ${most}`);
 });
 
+test('on 1,600 polygons the default work proves every answer to 5 percent', () => {
+  // Split by weight times length, only the dearest portals were halved at first: the cheap ones kept touching each other,
+  // relaxed paths ran through them for nothing, and these queries spent 8 million arcs and ended 21 to 44 percent open.
+  const next = random(5),
+    maps = Array.from({ length: 5 }, () => {
+      const patch = Array.from({ length: 200 }, () => '..bcd'[Math.floor(next() * 5)]),
+        rows = randomMap(next, 40, 40, 0.15).map((row, z) =>
+          [...row].map((c, x) => (c === '#' ? c : patch[Math.floor(x / 3) + 14 * Math.floor(z / 3)])).join(''),
+        ),
+        mesh = grid(rows),
+        free = rows.flatMap((row, z) => [...row].flatMap((c, x) => (c === '#' ? [] : [[x, z, c]])));
+      free.forEach(([, , c], p) => mesh.setAreaCost(p, WEIGHTS[c]));
+      return { free, search: new WeightedAnyAngleSearch(mesh) };
+    });
+  let work = 0;
+  for (let query = 0; query < 28; query++) {
+    const { free, search } = maps[query % 5],
+      pick = () => {
+        const [x, z] = free[Math.floor(next() * free.length)];
+        return [x + 0.05 + next() * 0.9, 0, z + 0.05 + next() * 0.9];
+      },
+      start = pick(),
+      end = pick();
+    if (![9, 15, 27].includes(query)) continue;
+    const route = search.route(start, end);
+    assert.ok(route.cost <= route.lowerBound * 1.05 + 1e-8, `query ${query}: ${route.cost / route.lowerBound}`);
+    work += route.work;
+  }
+  assert.ok(work < 18_000_000, `work ${work}`);
+});
+
 test('a spent work budget answers with honest bounds, the same work every time, and bad input is refused', () => {
   const mesh = strips([1, 4, 2, 7, 1.5]),
     search = new WeightedAnyAngleSearch(mesh),

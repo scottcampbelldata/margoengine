@@ -27,8 +27,8 @@ export interface WeightedAnyAngleOptions {
   filter?: NavFilter;
   /**
    * The search stops once `cost <= lowerBound * (1 + tolerance)`: the path is then proved to cost at most this share
-   * more than the best one. Proving a smaller share takes about four times the work for each halving of it. Default
-   * 0.05.
+   * more than the best one. A smaller share takes more work: on seeded maps, 1.3 to 1.7 times as much for each halving
+   * of it. Default 0.05.
    */
   tolerance?: number;
   /**
@@ -787,7 +787,10 @@ export class WeightedAnyAngleSearch {
       work += here.work;
       if (!forward || !backward) break;
       // A piece whose cheapest relaxed path already costs `wanted` has nothing left to prove and goes. The widest of
-      // the others are split.
+      // the others are split, a width being the length times the cube root of the dearest weight beside it: a piece lets
+      // the bound off by up to its weight times its length, and arcs grow with the square of the pieces, so a given
+      // error takes the fewest arcs with lengths in inverse proportion to that cube root. By weight times length, the
+      // cheap portals stayed whole for rounds, touched each other, and the bound did not move.
       const halves: { piece: Node; width: number }[] = [];
       let widest = 0;
       for (let i = fixed; i < here.nodes.length; i++) {
@@ -797,7 +800,8 @@ export class WeightedAnyAngleSearch {
           length = Math.hypot(piece.b[0] - piece.a[0], piece.b[2] - piece.a[2]);
         let width = 0;
         if (length > ON * 2) {
-          for (const p of piece.polygons) if (p !== forbidden) width = Math.max(width, weights.get(p)! * length);
+          for (const p of piece.polygons)
+            if (p !== forbidden) width = Math.max(width, Math.cbrt(weights.get(p)!) * length);
           widest = Math.max(widest, width);
         }
         halves.push({ piece: { ...piece, behind: [backward[2 * i], backward[2 * i + 1]] }, width });

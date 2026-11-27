@@ -316,8 +316,8 @@ console.log(route?.cost, route?.lowerBound); // the path's cost, and the least a
 For mud, roads, water and other ground with its own cost per metre. The path may cross each portal anywhere and bends where the weights pay for it; `route` of a mesh keeps to one corridor of polygons. The least weighted cost cannot be computed exactly (De Carufel and others 2014), so each answer is `{points, offMesh, cost, lowerBound, work}` or null: no path costs less than `lowerBound`.
 
 - The path comes first, from a Dijkstra search between points on the portals pulled tight (Lanthier, Maheshwari and Sack 2001). Where it ends up on a mesh vertex, the other side of the vertex is tried too. On the seeded test maps it is within 1 percent of the least cost.
-- Then the portals are cut into pieces and searched again, finer each round, until `cost <= lowerBound * (1 + tolerance)` or `maxWork` runs out. Check `cost / lowerBound` when you need the proof: at the default work every test query on 400 polygons was proved to 5 percent, but some on 1,600 polygons end short of it, although their paths are close.
-- Each halving of `tolerance` takes about four times the work. `maxWork: 1` asks for the path alone.
+- Then the portals are cut into pieces and searched again, finer each round, until `cost <= lowerBound * (1 + tolerance)` or `maxWork` runs out. Check `cost / lowerBound` when you need the proof: at the default work every seeded test query up to 1,600 polygons was proved to 5 percent; a larger or harder mesh can end short of it, although its path is close.
+- Each halving of `tolerance` took 1.3 to 1.7 times the work on the seeded maps. `maxWork: 1` asks for the path alone.
 - Cost is length in the ground plane (XZ) times area cost times filter weight (1 or more, `Infinity` walls); an off-mesh link adds its `cost`.
 - On unweighted ground use `AnyAngleSearch`, which is exact and does less work.
 
