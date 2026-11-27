@@ -502,10 +502,10 @@ Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wak
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
 | SEA-05 | Nearshore waves and surf zone | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8c7453cd8 |
-| DYN-01 | 3D rigid body and contact | sound | Claude | CLAIMED |
+| DYN-01 | 3D rigid body and contact | sound; P1 work: gravity fields, updrafts and vortices (see physics-parity-bar.md P1) | Claude (laptop), on Scott's order, 2026-11-27 | CLAIMED |
 | DYN-02 | 2D rigid body | sound | Claude | CLAIMED |
 | DYN-03 | Articulated bodies, joints, motors, robots | P3 parity: limits and motors on every free axis, coded errors, joint debug view, quick start, migration note, example page (see physics-parity-bar.md P3) | Claude (laptop), on Scott's order, 2026-11-27 | LANDED 2026-11-27 |
-| DYN-06 | Mass properties and collision geometry | partial | Claude | CLAIMED |
+| DYN-06 | Mass properties and collision geometry | partial (see physics-parity-bar.md P2) | Claude (laptop), on Scott's order, 2026-11-27 | CLAIMED |
 | SOFT-01 | Cloth and thin shells | partial: water as a medium landed 1b7d95a48, curtains in a moving hull 3d1e785d7 | Claude | CLAIMED |
 | SOFT-02 | Rods, ropes, cables, chains (Cosserat) | elastic rods (`@margoengine/physics/rod`: bend, twist and stretch in a multibody's direct solve, pins, cast-off) with water loads per segment (`segmentLoads` in `@margoengine/physics/loads`: buoyancy, Morison drag and inertia, vortex lift); validated against a cantilever in a current, a catenary, a taut cable's frequency and strumming lock-in (`packages/physics/tests/rod.test.js`, `loads-segments.test.js`) | Claude | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 7bcfb11e3 |
 | SEA-01 | Wave spectrum and wave-field evolution | stand-in | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 62fa8c303 |
