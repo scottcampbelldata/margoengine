@@ -24,7 +24,7 @@ sequence operators.
 | 23 | float4e2m1 | two a byte | as 17-20 (QuantizeLinear from opset 23) |
 | 24 | float8e8m0 | one exponent byte | as 17-20 (a quantization scale from opset 24) |
 | 25, 26 | uint2, int2 | four a byte, first in bits 0-1 | as 17-20 (QuantizeLinear from opset 25) |
-| 27, 28 | float6e2m3, float6e3m2 | not built | rejected at load: IR 14, which onnx.proto still marks as to be decided |
+| 27, 28 | float6e2m3, float6e3m2 | little-endian bit stream, four values in three bytes | as 17-20 (QuantizeLinear from opset 28) |
 
 Conversion rules:
 
@@ -32,16 +32,17 @@ Conversion rules:
   infinities included, to that magnitude; `saturate=0` gives infinity for float8e5m2 and NaN for the others.
 - Cast to float8e8m0 follows `round_mode` (`up` default, `down`, `nearest` with ties up). ONNX leaves -0 and negative
   input unspecified: Margo writes the smallest value for -0 when saturating and NaN for negative input.
-- Cast to float4e2m1 saturates at 6. ONNX leaves NaN unspecified: Margo writes +0.
+- Cast to float4e2m1, float6e2m3 and float6e3m2 saturates at 6, 7.5 and 28, `saturate` or not. ONNX leaves NaN
+  unspecified: Margo writes +0.
 - Cast from a float to a 4-bit or 2-bit integer rounds ties to even, then keeps the low bits.
 - Typed protobuf payloads follow onnx.proto: one bit pattern per `int32_data` entry for the 8-bit floats, one packed
-  byte per entry for the 4-bit and 2-bit types, and interleaved `float_data` or `double_data` for complex tensors.
+  byte per entry for the 4-bit and 2-bit types, one 6-bit code per entry for the 6-bit floats, and interleaved `float_data` or `double_data` for complex tensors.
 
 ## Quantized operators (built 2026-11-27)
 
 | Operator | Opsets | Notes |
 | --- | --- | --- |
-| QuantizeLinear | 10, 13, 19, 21, 23, 24, 25, 28 | per-tensor, per-axis (13), blocked and `output_dtype` (21), `precision` (23); float6 outputs are not built |
+| QuantizeLinear | 10, 13, 19, 21, 23, 24, 25, 28 | per-tensor, per-axis (13), blocked and `output_dtype` (21), `precision` (23), 6-bit float outputs (28) |
 | DequantizeLinear | 10, 13, 19, 21, 23, 24, 25, 28 | same layouts; `output_dtype` (23) |
 | DynamicQuantizeLinear | 11 | uint8, float32 arithmetic |
 | ConvInteger, QLinearConv | 10 | int8 and uint8; an accumulator past int32 is an error, not a wrap |
@@ -50,3 +51,13 @@ Conversion rules:
 
 QLinearConv and QLinearMatMul requantize in float64. A runtime that carries the multiplier in float32 can differ by one
 step on values that land near a tie.
+
+## Sequence-model operators (built 2026-11-27)
+
+| Operator | Opsets | Notes |
+| --- | --- | --- |
+| Attention | 23, 24, 25 (and 26-28, which keep 25) | bool, float and integer masks; a shorter last mask axis from 24; `nonpad_kv_seqlen` from 24; windows from 25; all four `qk_matmul_output_mode` values; a query with no visible key gives a zero row |
+| RotaryEmbedding | 23 | both layouts, with and without `position_ids` |
+| TensorScatter | 24 | linear and circular writes, every element type |
+| CausalConvWithState | 27 | the opset 29 `dilation` is not built |
+| LinearAttention | 27 | the four update rules; the recurrence runs in float32; the opset 29 `v_num_heads` and `states` are not built |

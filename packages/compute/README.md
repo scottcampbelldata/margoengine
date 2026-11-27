@@ -686,9 +686,10 @@ console.log(q.data, y.data);
 
 Quantized operators follow the ONNX specification: QuantizeLinear and DequantizeLinear (per-tensor, per-axis and
 blocked), DynamicQuantizeLinear, ConvInteger, MatMulInteger, QLinearConv and QLinearMatMul. Every ONNX tensor element
-type up to int2 loads: the 8-bit floats and float4e2m1 keep their bits (Cast converts them, with `saturate` and
+type through opset 28 loads: the 8-bit, 6-bit and 4-bit floats keep their bits (Cast converts them, with `saturate` and
 `round_mode`), 4-bit and 2-bit values stay packed, and complex tensors are stored and moved but take no arithmetic.
-RegexFullMatch (RE2 syntax, matched without backtracking), TfIdfVectorizer and DeformConv run too.
+RegexFullMatch (RE2 syntax, matched without backtracking), TfIdfVectorizer, DeformConv and the sequence-model
+operators (Attention, RotaryEmbedding, TensorScatter, CausalConvWithState, LinearAttention) run too.
 [Limits](../../docs/limits.md#batch-180-job-5-temporal-analysis) lists what is not built.
 
 ## Errors, waiting and profiling

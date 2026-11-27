@@ -104,6 +104,7 @@ pub fn bits(kind: u32) -> Result<usize> {
     match kind {
         25 | 26 => Ok(2),
         21..=23 => Ok(4),
+        27 | 28 => Ok(6),
         2 | 3 | 8 | 9 | 17..=20 | 24 => Ok(8),
         4 | 5 | 10 | 16 => Ok(16),
         1 | 6 | 12 => Ok(32),
@@ -119,7 +120,7 @@ pub fn byte_len(kind: u32, n: usize) -> Result<usize> {
 }
 /// Real floating storage, including the low-precision ONNX types.
 pub fn is_float(kind: u32) -> bool {
-    matches!(kind, 1 | 10 | 11 | 16..=20 | 23 | 24)
+    matches!(kind, 1 | 10 | 11 | 16..=20 | 23 | 24 | 27 | 28)
 }
 pub fn is_complex(kind: u32) -> bool {
     matches!(kind, 14 | 15)
@@ -226,6 +227,13 @@ impl Tensor {
             22 => Number::I(((((d[i / 2] >> ((i % 2) * 4)) & 15) as i8) << 4 >> 4) as i64),
             17..=20 | 24 => Number::F(lowfloat::decode(self.kind, d[i])),
             23 => Number::F(lowfloat::decode(23, d[i / 2] >> ((i % 2) * 4))),
+            27 | 28 => {
+                // A little-endian bit stream: a code may straddle two bytes.
+                let (byte, shift) = (i * 6 / 8, i * 6 % 8);
+                let high = d.get(byte + 1).map_or(0, |&b| b as u16);
+                let code = (((high << 8) | d[byte] as u16) >> shift) as u8 & 63;
+                Number::F(lowfloat::decode(self.kind, code))
+            }
             25 => Number::U(((d[i / 4] >> ((i % 4) * 2)) & 3) as u64),
             26 => Number::I(((((d[i / 4] >> ((i % 4) * 2)) & 3) as i8) << 6 >> 6) as i64),
             _ => unreachable!("numeric access of a validated string or complex tensor"),
@@ -255,6 +263,16 @@ impl Tensor {
                 let shift = (i % 2) * 4;
                 let code = lowfloat::encode(23, x.f(), true, Round::Up);
                 d[i / 2] = (d[i / 2] & !(15 << shift)) | (code << shift);
+            }
+            27 | 28 => {
+                let code = lowfloat::encode(self.kind, x.f(), true, Round::Up) as u16;
+                let (byte, shift) = (i * 6 / 8, i * 6 % 8);
+                let bits = code << shift;
+                let mask = 63u16 << shift;
+                d[byte] = (d[byte] & !(mask as u8)) | bits as u8;
+                if let Some(next) = d.get_mut(byte + 1) {
+                    *next = (*next & !((mask >> 8) as u8)) | (bits >> 8) as u8;
+                }
             }
             25 | 26 => {
                 let shift = (i % 4) * 2;

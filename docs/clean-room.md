@@ -18864,3 +18864,21 @@ source was read.
 - Jifeng Dai et al., *Deformable Convolutional Networks* (2017), https://arxiv.org/abs/1703.06211 , and Xizhou Zhu et
   al., *Deformable ConvNets v2* (2018), https://arxiv.org/abs/1811.11168 : sampled offsets, bilinear interpolation
   and the modulation mask.
+
+## compute ONNX sequence-model operators and 6-bit floats (2026-11-27)
+
+Written from public specifications and papers only. The specification's pseudocode was read as the normative
+definition of RotaryEmbedding and TensorScatter; no runtime, reference evaluator or model library source was read.
+
+- ONNX contributors, *Attention*, *RotaryEmbedding*, *TensorScatter*, *CausalConvWithState* and *LinearAttention*
+  operator schemas and the *Float stored in 6 bits* page (2026), https://onnx.ai/onnx/operators/ ,
+  https://onnx.ai/onnx/technical/float6.html , and the released opset table,
+  https://onnx.ai/onnx/repo-docs/Versioning.html .
+- Ashish Vaswani et al., *Attention Is All You Need* (2017), https://arxiv.org/abs/1706.03762 ; Joshua Ainslie et al.,
+  *GQA* (2023), https://arxiv.org/abs/2305.13245 ; Noam Shazeer, *Fast Transformer Decoding: One Write-Head is All You
+  Need* (2019), https://arxiv.org/abs/1911.02150 .
+- Jianlin Su et al., *RoFormer: Enhanced Transformer with Rotary Position Embedding* (2021),
+  https://arxiv.org/abs/2104.09864 .
+- Angelos Katharopoulos et al., *Transformers are RNNs* (2020), https://arxiv.org/abs/2006.16236 ; Songlin Yang et al.,
+  *Parallelizing Linear Transformers with the Delta Rule over Sequence Length* (2024),
+  https://arxiv.org/abs/2406.06484 , and *Gated Delta Networks* (2024), https://arxiv.org/abs/2412.06464 .

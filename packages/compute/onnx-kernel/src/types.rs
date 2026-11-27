@@ -43,7 +43,7 @@ pub fn check(op: &str, inputs: &[Option<Tensor>], a: &Attrs) -> Result<()> {
                     "{op} takes no complex input here; ONNX complex tensors are only stored and moved"
                 ));
             }
-        } else if matches!(t.kind, 17..=20 | 23..=26)
+        } else if matches!(t.kind, 17..=20 | 23..=28)
             && !(moves(op)
                 || matches!(
                     op,

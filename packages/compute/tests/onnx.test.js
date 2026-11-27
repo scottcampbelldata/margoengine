@@ -212,10 +212,6 @@ test('ONNX unbuilt operators fail at load with a coded operator and opset diagno
       28,
       [
         'ImageDecoder',
-        'Attention',
-        'RotaryEmbedding',
-        'TensorScatter',
-        'CausalConvWithState',
         'NotARealOperator',
       ],
     ],

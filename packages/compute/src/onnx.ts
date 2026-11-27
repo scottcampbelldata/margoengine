@@ -2,7 +2,8 @@
 import { fault, rangeError, typeError } from '../../shared/errors.js';
 
 /** ONNX's tensor storage types. Half, bfloat16 and the 8-bit floats use raw bits in Uint16 or Uint8 arrays; the 4-bit
- * types pack two elements a byte and the 2-bit types four, first element in the low bits. Complex values interleave
+ * types pack two elements a byte and the 2-bit types four, first element in the low bits; the 6-bit floats are a
+ * little-endian bit stream. Complex values interleave
  * real and imaginary parts. */
 export type OnnxDType =
   | 'float32'
@@ -30,7 +31,9 @@ export type OnnxDType =
   | 'float4e2m1'
   | 'float8e8m0'
   | 'uint2'
-  | 'int2';
+  | 'int2'
+  | 'float6e2m3'
+  | 'float6e3m2';
 /** Host storage accepted and copied by an ONNX tensor. */
 export type OnnxData =
   | Float32Array
@@ -73,9 +76,13 @@ const TYPES = [
   'float8e8m0',
   'uint2',
   'int2',
+  'float6e2m3',
+  'float6e3m2',
 ] as const;
 // Bytes per element.
-const WIDTHS = [0, 4, 1, 1, 2, 2, 4, 8, 0, 1, 2, 8, 4, 8, 8, 16, 2, 1, 1, 1, 1, 0.5, 0.5, 0.5, 1, 0.25, 0.25];
+const WIDTHS = [
+  0, 4, 1, 1, 2, 2, 4, 8, 0, 1, 2, 8, 4, 8, 8, 16, 2, 1, 1, 1, 1, 0.5, 0.5, 0.5, 1, 0.25, 0.25, 0.75, 0.75,
+];
 const CONSTRUCTORS = [
   null,
   Float32Array,
@@ -94,6 +101,8 @@ const CONSTRUCTORS = [
   Float32Array,
   Float64Array,
   Uint16Array,
+  Uint8Array,
+  Uint8Array,
   Uint8Array,
   Uint8Array,
   Uint8Array,

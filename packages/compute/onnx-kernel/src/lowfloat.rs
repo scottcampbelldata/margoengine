@@ -10,6 +10,8 @@ pub const E5M2: u32 = 19;
 pub const E5M2FNUZ: u32 = 20;
 pub const E2M1: u32 = 23;
 pub const E8M0: u32 = 24;
+pub const E2M3: u32 = 27;
+pub const E3M2: u32 = 28;
 
 /// FLOAT8E8M0 rounding named by Cast's `round_mode`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -43,7 +45,29 @@ fn format(kind: u32) -> Format {
     }
 }
 
+/// The 6-bit MX formats: finite only, sign in bit 5, subnormals below the smallest exponent.
+fn six(kind: u32) -> (u32, i32) {
+    if kind == E2M3 {
+        (3, 1)
+    } else {
+        (2, 3)
+    }
+}
+
 pub fn decode(kind: u32, byte: u8) -> f64 {
+    if matches!(kind, E2M3 | E3M2) {
+        let (mantissa, bias) = six(kind);
+        let code = (byte & 31) as u32;
+        let (e, m) = (code >> mantissa, code & ((1 << mantissa) - 1));
+        let step = 2f64.powi(-(mantissa as i32));
+        let sign = if byte & 32 != 0 { -1. } else { 1. };
+        return sign
+            * if e == 0 {
+                m as f64 * step * 2f64.powi(1 - bias)
+            } else {
+                (1. + m as f64 * step) * 2f64.powi(e as i32 - bias)
+            };
+    }
     if kind == E2M1 {
         let code = byte & 15;
         let (exponent, m) = (((code >> 1) & 3) as i32, (code & 1) as f64);
@@ -108,6 +132,23 @@ pub fn encode(kind: u32, x: f64, saturate: bool, round: Round) -> u8 {
             (2 * e + q) as u8
         };
         return sign | code.min(7);
+    }
+    if matches!(kind, E2M3 | E3M2) {
+        // ONNX leaves NaN unspecified for these finite-only formats; it becomes +0.
+        if x.is_nan() {
+            return 0;
+        }
+        let (mantissa, bias) = six(kind);
+        let sign = if x.is_sign_negative() { 32u8 } else { 0 };
+        let a = x.abs().min(64.);
+        let code = if a < 2f64.powi(1 - bias) {
+            (a * 2f64.powi(bias - 1 + mantissa as i32)).round_ties_even() as i64
+        } else {
+            let e = exponent(a);
+            let q = (a / 2f64.powi(e) * (1u32 << mantissa) as f64).round_ties_even() as i64;
+            (((e + bias - 1) as i64) << mantissa) + q
+        };
+        return sign | code.min(31) as u8;
     }
     if kind == E8M0 {
         // ONNX leaves negative inputs and -0 unspecified; negatives become NaN.
@@ -195,6 +236,20 @@ mod tests {
         assert_eq!(decode(E4M3FNUZ, 1), 2f64.powi(-10));
         assert_eq!(decode(E5M2, 1), 2f64.powi(-16));
         assert_eq!(decode(E5M2FNUZ, 1), 2f64.powi(-17));
+    }
+    #[test]
+    fn six_bit_formats_round_trip_and_saturate() {
+        for kind in [E2M3, E3M2] {
+            for byte in 0..64u8 {
+                assert_eq!(encode(kind, decode(kind, byte), true, Round::Up), byte);
+            }
+        }
+        assert_eq!(decode(E2M3, 31), 7.5);
+        assert_eq!(decode(E3M2, 31), 28.);
+        assert_eq!(decode(E2M3, 1), 0.125);
+        assert_eq!(decode(E3M2, 1), 0.0625);
+        assert_eq!(decode(E3M2, encode(E3M2, 25., true, Round::Up)), 24.);
+        assert_eq!(encode(E2M3, f64::INFINITY, false, Round::Up), 31);
     }
     #[test]
     fn saturating_and_non_saturating_casts() {

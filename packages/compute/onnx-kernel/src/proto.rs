@@ -440,7 +440,18 @@ impl<'a> Parser<'a> {
                     Tensor::raw(kind, shape.clone(), p.fixed(field, matches!(kind, 11 | 15))?)?
                 } else {
                     let values = p.integers(field)?;
-                    if matches!(kind, 17..=26) {
+                    if matches!(kind, 27 | 28) {
+                        // One 6-bit code per entry, unlike the packed raw form.
+                        if values.len() != size || values.iter().any(|v| *v > 63) {
+                            return Err("ONNX typed float6 data needs one 6-bit code per entry".into());
+                        }
+                        let mut tensor = Tensor::zeros(kind, shape.clone())?;
+                        for (i, &v) in values.iter().enumerate() {
+                            let code = crate::lowfloat::decode(kind, v as u8);
+                            tensor.set(i, Number::F(code));
+                        }
+                        tensor
+                    } else if matches!(kind, 17..=26) {
                         // 4-bit and 2-bit entries hold one packed byte; 8-bit floats one bit pattern.
                         if values.len() != byte_len(kind, size)? || values.iter().any(|v| *v > 255) {
                             return Err("ONNX typed data for 8-bit floats and packed 4-bit or 2-bit types needs one byte per entry; pack the payload as onnx.proto describes".into());

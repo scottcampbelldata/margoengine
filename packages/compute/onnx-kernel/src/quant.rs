@@ -163,6 +163,7 @@ fn quantized_kind(kind: u32, version: u32) -> bool {
         17..=20 => version >= 19,
         4 | 5 | 21 | 22 => version >= 21,
         23 => version >= 23,
+        27 | 28 => version >= 28,
         25 | 26 => version >= 25,
         _ => false,
     }
@@ -220,8 +221,8 @@ fn quantize(inputs: &[Option<Tensor>], a: &Attrs, version: u32) -> Result<Vec<Te
             }
             None => {
                 let code = lowfloat::encode(kind, q + z, saturate, Round::Up);
-                if kind == 23 {
-                    y.set(i, Number::F(lowfloat::decode(23, code)));
+                if matches!(kind, 23 | 27 | 28) {
+                    y.set(i, Number::F(lowfloat::decode(kind, code)));
                 } else {
                     Arc::make_mut(&mut y.data)[i] = code;
                 }
