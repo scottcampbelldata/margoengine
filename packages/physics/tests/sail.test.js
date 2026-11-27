@@ -147,6 +147,56 @@ test('a sail of real sailcloth weight stays whole in the wind and gains exactly 
     );
 });
 
+test('a sail lashed along its luff to a free hull drives the hull: hull and sail gain exactly the impulse of the load (PA-29)', async () => {
+  // No gravity and no water: a 200 kg hull (a rigid box, the mast between left out) with a 1 m by 6 m sail of sailcloth lashed to it by its leading
+  // column (the luff, seven particles tied to the hull by soft.attachParticle, two way). Whatever the lattice puts on the
+  // sail goes through the lashings into the hull, so the hull moves downwind and the hull's momentum plus the sail's equals
+  // the summed impulse of the sail's load (the attachments and edges are solved with the hull as an unknown).
+  const physics = new Physics(null);
+  physics.gravity = [0, 0, 0];
+  const soft = await SoftBodies.attach(physics),
+    chords = 4,
+    spans = 7,
+    alpha = (10 * Math.PI) / 180,
+    hullMass = 200,
+    body = soft.create(
+      SoftBodyDesc.cloth(
+        [0, 1, 0],
+        [(1 / (chords - 1)) * Math.cos(alpha), (-1 / (chords - 1)) * Math.sin(alpha), 0],
+        [0, 0, 1],
+        chords,
+        spans,
+      ).setFabric(FABRICS.sailcloth),
+    ),
+    hull = physics.addBody(null, {
+      // Below the sail and clear of its particles' contact radius (KB-SOFT-LASHCONTACT1).
+      position: [0, -1, 3],
+      colliders: { shape: 'box', halfExtents: [0.5, 0.25, 3.5], mass: hullMass },
+    }),
+    sail = new SailForce(physics, body, { wind: [SPEED, 0, 0], grid: [chords, spans], density: RHO }),
+    impulse = [0, 0, 0],
+    dt = physics.fixedTimestep;
+  for (let j = 0; j < spans; j++) body.attachParticle(j, hull); // particle (0, j): the luff
+  for (let i = 0; i < 60; i++) {
+    physics.step();
+    for (let k = 0; k < 3; k++) impulse[k] += sail.force[k] * dt;
+  }
+  const v = body.particleVelocities(),
+    momentum = [0, 1, 2].map((k) => {
+      let sum = hullMass * hull.linearVelocity[k];
+      for (let p = 0; p < body.numParticles(); p++) sum += body.masses[p] * v[3 * p + k];
+      return sum;
+    });
+  assert.ok(hull.linearVelocity[0] > 0, `the hull is driven downwind: ${hull.linearVelocity}`);
+  assert.ok(hullMass * hull.linearVelocity[0] > 0.9 * momentum[0], 'the hull, not the sail, carries the momentum');
+  // f32 velocities over 60 steps, as the free sail's bound.
+  for (let k = 0; k < 3; k++)
+    assert.ok(
+      Math.abs(momentum[k] - impulse[k]) <= 1e-3 * Math.hypot(...impulse),
+      `momentum ${momentum} against impulse ${impulse}`,
+    );
+});
+
 test('the same wind and the same sail give the same bits', async () => {
   const a = await flatSail((7 * Math.PI) / 180),
     b = await flatSail((7 * Math.PI) / 180);
