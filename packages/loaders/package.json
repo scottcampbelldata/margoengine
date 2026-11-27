@@ -219,6 +219,10 @@
     "./dae-kinematics": {
       "types": "./dist/dae-kinematics.d.ts",
       "import": "./dist/dae-kinematics.js"
+    },
+    "./dxf-hatch": {
+      "types": "./dist/dxf-hatch.d.ts",
+      "import": "./dist/dxf-hatch.js"
     }
   },
   "files": [

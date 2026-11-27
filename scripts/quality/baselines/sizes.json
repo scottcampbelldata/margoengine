@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20829527,
+  "total": 20832503,
   "history": [
     {
       "date": "2026-10-24",
@@ -14431,6 +14431,12 @@
       "commit": "SEA-12 matched hull wake work",
       "grew": 1,
       "reason": "@margoengine/physics/loads 44,592 to 49,181 B gzip. The optional entry includes the shared depth projection, prescribed wake-work ledger and matched free-surge impulse for body and water. Both paths use the same source geometry as the coupled wake. A split would add another import for deployments that already load the hydrodynamic package. Core and stage are unchanged."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "cd4508a015",
+      "reason": "DXF hatches: new optional entry loaders/dxf-hatch, 0 to 2720 B gzip (ceiling 2976 B). In parseDXF it would have cost every DXF reader those bytes; core plus stage unchanged",
+      "grew": 1
     }
   ],
   "items": {
@@ -15039,6 +15045,7 @@
     "@margoengine/loaders/babylon": 6425,
     "@margoengine/loaders/common": 5070,
     "@margoengine/loaders/dae-kinematics": 19528,
+    "@margoengine/loaders/dxf-hatch": 2976,
     "@margoengine/loaders/font": 9324,
     "@margoengine/loaders/font-opentype": 16470,
     "@margoengine/loaders/font-woff": 22190,

@@ -17582,6 +17582,21 @@ file was too large for the fetch tool, so the prose was not reread for this chan
 value replaces the node transform is this reader's own. No other engine's or library's source was read or copied, and
 no sample file from another project was used: the test documents are written from the schema.
 
+## DXF hatches (2026-11-27)
+
+`packages/loaders/src/dxf-hatch.ts` and the `HATCH` hook of `dxf.ts` are written from:
+
+- Autodesk, *DXF Reference*, "HATCH (DXF)", with its boundary path, pattern data and gradient group codes,
+  https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-DXF/files/GUID-DC5215D6-E73F-4DFF-8BE9-01CA9610FAEE.htm.
+- Two behaviours the table does not state, each known here from a web search summary only (no page or source file of
+  another project was opened): clockwise edges (code 73 = 0) store mirrored angles (public pages of ezdxf and the
+  dxfscan crate), and elliptic edge angles are angles from the major axis, not curve parameters (GDAL ticket 6971,
+  https://trac.osgeo.org/gdal/ticket/6971). The parameter from such an angle is the ellipse's own equation:
+  tan t = tan(angle) / ratio.
+- J. Foley, A. van Dam, S. Feiner and J. Hughes, *Computer Graphics: Principles and Practice*, 2nd ed.,
+  Addison-Wesley, 1990, section 3.6 (scan converting polygons): parity filling and counting a vertex once.
+- Solid fills use `@margoengine/geometry/triangulate` (Eberly's ear clipping, Held's FIST robustness steps).
+
 ## physics debug view, character debug lines and the character-ragdoll bridge (DYN-07, 2026-11-27)
 
 Files: `packages/physics/src/debug-view.ts` (`PhysicsDebugView`), the `debugRender` of `packages/physics/src/character.ts`

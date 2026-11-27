@@ -77,7 +77,18 @@ export { parsePLY, parsePLYHeader } from './ply.js';
 export type { PLYOptions, PLYHeader, PLYElement, PLYProperty } from './ply.js';
 export { parse3MF, THREEMF_UNITS } from './threemf.js';
 export { parseDXF } from './dxf.js';
-export type { DXFOptions, DXFResult, DXFLayer, DXFText, DXFSolid, DXFLines, DXFColor } from './dxf.js';
+export type {
+  DXFOptions,
+  DXFResult,
+  DXFLayer,
+  DXFText,
+  DXFSolid,
+  DXFLines,
+  DXFColor,
+  DXFHatchInput,
+  DXFHatchGeometry,
+  DXFHatchReader,
+} from './dxf.js';
 export type { ThreeMFOptions, ThreeMFResult } from './threemf.js';
 export { parsePCD, parsePCDHeader } from './pcd.js';
 export type { PCDOptions, PCDHeader, PCDField } from './pcd.js';

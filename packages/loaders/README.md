@@ -65,7 +65,7 @@ Every parser returns the same `LoadedGeometry`:
 | `parsePLY` | ASCII, binary little and big endian; x y z, nx ny nz, red green blue (uchar, ushort or float), s/t, u/v, texture_u/texture_v; polygon faces fan-triangulated; `edge` elements (`vertex1`, `vertex2`) as `lineIndices`; files without faces become point clouds; unknown elements and properties skipped |
 | `parseSTL` | See [STL](#stl) |
 | `parse3MF` (async) | Own ZIP reader (stored and deflate through `DecompressionStream('deflate-raw')`, CRC-32 checked); objects, meshes, components, build items, 3x4 transforms; `basematerials` and materials-extension `colorgroup` colors; production-extension `p:path` parts; unit conversion to meters |
-| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
+| `parseDXF` | ASCII and binary DXF, every version: `$INSUNITS` to meters, LAYER colours and off/frozen layers, ACI and true colours (BYLAYER, BYBLOCK), blocks through INSERT (scale, rotation, rows and columns, nested) and DIMENSION; faces from 3DFACE, SOLID, TRACE, polyface and polygon-mesh POLYLINEs and MESH; line segments from LINE, LWPOLYLINE and 2D/3D POLYLINE (bulge arcs), ARC, CIRCLE, ELLIPSE and SPLINE (NURBS), in each entity's object coordinate system; POINT, TEXT and MTEXT (formatting removed); 3DSOLID, BODY and REGION ACIS data decoded to SAT text. `HATCH` with [`readDXFHatch`](#dxf-hatches). Returns `{mesh, lines, points, texts, layers, solids, unit, version, skipped}`; draw `lines` with `@margoengine/lines` (`mode: 'segments'`) and the mesh double-sided (DXF faces have no winding) |
 | `parsePCD` | `DATA ascii`, `binary`, `binary_compressed` (own LZF decompressor); x y z, normal_x/y/z, packed `rgb`/`rgba`, `intensity`, any other field skipped |
 | `parseOFF` | `OFF` with `ST`, `C`, `N` prefixes (texture coordinates, colors 0..1 or 0..255, normals) |
 | `parseXYZ` | xyz, xyz+rgb, xyz+normal, xyz+normal+rgb, xyz+intensity, PTS (xyz+intensity+rgb), chemistry XYZ |
@@ -606,6 +606,37 @@ engine.start();
 - Parameters (`newparam`, `setparam`, `param`, `SIDREF`) resolve through the instance tree, so two instances of one robot keep their own joints. `axis_info` limits replace a joint's own.
 - `poseDAEJoints(dae, values, {clamp})` returns a `DAEPose` like `poseDAE`'s. A bound `<rotate>` becomes a rotation about the joint's axis by the value, and a bound `<translate>` the axis times the value; axes you leave out stand at their `value`. Values are held inside the limits unless `clamp: false`. An unknown name, a value that is not finite or a change to a locked axis throws a `RangeError`. The pose holds joints only: it does not play the file's animations.
 - Not evaluated: `formula` (coupled or mimic joints, reported in `warnings`: pose those axes yourself), closed-loop attachments, tool frames (`frame_tip`, `frame_tcp`) and kinematics held in another file. Inverse kinematics is not part of the format.
+
+## DXF hatches
+
+`readDXFHatch` of `@margoengine/loaders/dxf-hatch` draws the `HATCH` entities of a drawing. Pass it to `parseDXF` as
+`hatch`; without it they are counted in `skipped.HATCH` and their code is not in your bundle.
+
+```ts
+import { parseDXF } from '@margoengine/loaders';
+import { readDXFHatch } from '@margoengine/loaders/dxf-hatch';
+
+// A 4 x 3 area hatched with horizontal lines 0.5 apart.
+const groups = [
+  0, 'SECTION', 2, 'ENTITIES', 0, 'HATCH', 62, 3, 70, 0, 91, 1,
+  92, 3, 72, 0, 73, 1, 93, 4, 10, 0, 20, 0, 10, 4, 20, 0, 10, 4, 20, 3, 10, 0, 20, 3, 97, 0,
+  75, 0, 76, 1, 78, 1, 53, 0, 43, 0, 44, 0.25, 45, 0, 46, 0.5, 79, 0, 0, 'ENDSEC', 0, 'EOF',
+];
+const file = new TextEncoder().encode(groups.join('\n'));
+const drawing = parseDXF(file, { hatch: readDXFHatch });
+console.log(drawing.lines.positions.length / 6); // 6 segments; solid hatches go to drawing.mesh
+```
+
+- **Solid hatches** are triangles in `mesh`, grouped by layer and colour like every face. A gradient hatch is filled
+  with its first gradient colour.
+- **Pattern hatches** are segments in `lines`: every pattern definition line of the file, with its dashes. A dot is a
+  segment of no length, which round caps draw (`cap: 'round'`, the default of `@margoengine/lines`).
+- **Boundaries** may be polylines (with bulges) or edge paths of lines, circular arcs, elliptic arcs and splines.
+  `arcSegments` and `splineSegments` set their sampling.
+- **Islands** follow the file's hatch style: normal (every other ring), outer (the outermost area only) or ignore.
+- **Limits.** Segments and dots count against `maxSegments`, triangles against `maxTriangles` and `maxVertices`; a
+  pattern too fine for them is a `limit` error. At most 10,000 boundary paths per hatch. A fill lies in the same plane
+  as the drawing's lines, so draw lines after the mesh or give them a depth bias. `MPOLYGON` entities are skipped.
 
 ## Motion capture (BVH)
 

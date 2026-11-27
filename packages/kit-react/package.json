@@ -1275,6 +1275,10 @@
       "types": "./dist/loaders/dae-kinematics.d.ts",
       "import": "./dist/loaders/dae-kinematics.js"
     },
+    "./loaders/dxf-hatch": {
+      "types": "./dist/loaders/dxf-hatch.d.ts",
+      "import": "./dist/loaders/dxf-hatch.js"
+    },
     "./lod/msft": {
       "types": "./dist/lod/msft.d.ts",
       "import": "./dist/lod/msft.js"

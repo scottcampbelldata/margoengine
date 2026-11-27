@@ -3,6 +3,7 @@
 // (rows and columns included) and DIMENSION, and the model-space entities a viewer draws. Faces (3DFACE, SOLID, TRACE,
 // polyface and polygon-mesh POLYLINEs, MESH) become one triangle list; curves (LINE, polylines with bulges, ARC,
 // CIRCLE, ELLIPSE, SPLINE) become line segments; ACIS solids (3DSOLID, BODY, REGION) are handed back as SAT text.
+// HATCH is drawn by the optional reader of ./dxf-hatch.ts.
 import { NurbsCurve } from '@margoengine/geometry/nurbs';
 import { LoaderError, type LoadedGeometry, type LoadedGroup, type ParseLimits } from './types.js';
 import { checkCount, latin1, limits, toBytes, type BinaryInput } from './util.js';
@@ -23,7 +24,44 @@ export interface DXFOptions extends ParseLimits {
   maxInserts?: number;
   /** Deepest nesting of block references (default 32). */
   maxDepth?: number;
+  /** Draws HATCH entities: `readDXFHatch` from `@margoengine/loaders/dxf-hatch`. Without it they count in `skipped`. */
+  hatch?: DXFHatchReader;
 }
+
+/** One HATCH entity's group codes and parseDXF's curve samplers, as a {@link DXFHatchReader} gets them. */
+export interface DXFHatchInput {
+  codes: readonly number[];
+  values: readonly (string | number)[];
+  /** The `arcSegments` option: line segments per full turn. */
+  arcSegments: number;
+  /** Points of an arc at height `z`, from angle `a0` through `sweep` (radians, counterclockwise positive). */
+  arc(cx: number, cy: number, z: number, radius: number, a0: number, sweep: number): number[][];
+  /** Polyline vertices with bulges as points at height `z`. */
+  bulged(vertices: { x: number; y: number; bulge: number }[], closed: boolean, z: number): number[][];
+  /** A NURBS curve sampled per knot span; one its numbers cannot make stays its control polygon. */
+  spline(degree: number, knots: number[], control: number[][], weights: number[]): number[][];
+  /** Most boundary points to hold. */
+  maxVertices: number;
+  /** Triangles still allowed by `maxTriangles` and `maxVertices`. */
+  maxTriangles: number;
+  /** Line segments still allowed by `maxSegments`. */
+  maxSegments: number;
+}
+
+/** What a hatch draws, in its object coordinate system. */
+export interface DXFHatchGeometry {
+  /** x, y of each triangle corner. */
+  triangles: number[];
+  /** x0, y0, x1, y1 of each line segment. */
+  segments: number[];
+  /** z of the hatch in its object coordinate system. */
+  elevation: number;
+  /** Replaces the entity's colour (a gradient's first colour). */
+  color?: DXFColor;
+}
+
+/** Turns one HATCH entity into geometry, or `undefined` when it cannot. */
+export type DXFHatchReader = (input: DXFHatchInput) => DXFHatchGeometry | undefined;
 
 /** sRGB in 0..1. */
 export type DXFColor = [number, number, number];
@@ -799,6 +837,32 @@ export function parseDXF(input: BinaryInput, options: DXFOptions = {}): DXFResul
             for (const child of block.entities)
               emit(child, { matrix: mul(m, local), layer: layerName, color, depth: context.depth + 1 });
           }
+        return;
+      }
+      case 'HATCH': {
+        const hatch = options.hatch?.({
+          codes: e.codes,
+          values: e.values,
+          arcSegments,
+          arc,
+          bulged,
+          spline,
+          maxVertices,
+          maxTriangles: Math.floor(Math.min(maxTriangles - faceVertices / 3, (maxVertices - faceVertices) / 3)),
+          maxSegments: maxSegments - segments,
+        });
+        if (!hatch) {
+          skip(e.type);
+          return;
+        }
+        const placed = mul(m, ocs(extrusion)),
+          at = (list: number[], i: number) => apply(placed, list[i], list[i + 1], hatch.elevation),
+          { triangles: t, segments: s } = hatch,
+          fill = hatch.color ?? color;
+        for (let i = 0; i < t.length; i += 6)
+          triangle(group(faceGroups, layerName, fill), at(t, i), at(t, i + 2), at(t, i + 4));
+        for (let i = 0; i < s.length; i += 4)
+          polyline(group(lineGroups, layerName, fill), [at(s, i), at(s, i + 2)], false);
         return;
       }
       case '3DSOLID':

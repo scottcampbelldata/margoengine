@@ -433,6 +433,31 @@ export const DEFAULT_MAX_BYTES: number;
 
 export type DXFColor = [number, number, number];
 
+export interface DXFHatchGeometry {
+    triangles: number[];
+    segments: number[];
+    elevation: number;
+    color?: DXFColor;
+}
+
+export interface DXFHatchInput {
+    codes: readonly number[];
+    values: readonly (string | number)[];
+    arcSegments: number;
+    arc(cx: number, cy: number, z: number, radius: number, a0: number, sweep: number): number[][];
+    bulged(vertices: {
+        x: number;
+        y: number;
+        bulge: number;
+    }[], closed: boolean, z: number): number[][];
+    spline(degree: number, knots: number[], control: number[][], weights: number[]): number[][];
+    maxVertices: number;
+    maxTriangles: number;
+    maxSegments: number;
+}
+
+export type DXFHatchReader = (input: DXFHatchInput) => DXFHatchGeometry | undefined;
+
 export interface DXFLayer {
     name: string;
     color: DXFColor;
@@ -452,6 +477,7 @@ export interface DXFOptions extends ParseLimits {
     maxSegments?: number;
     maxInserts?: number;
     maxDepth?: number;
+    hatch?: DXFHatchReader;
 }
 
 export interface DXFResult {
