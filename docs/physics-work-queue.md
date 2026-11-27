@@ -355,6 +355,13 @@ column autocorrelation in the far quarter of a bare Water view) but still a sum 
 sea unless a `SpectralSea` is passed as `sea`. Recorded as KB-WATER-FARROWS1 in `docs/known-bugs.md`; not changed
 outside SEA-02.
 
+### SEA-01 and SEA-13: `Water`'s refusals have no error code (logged by gap lane B, 2026-11-27)
+
+`new Water({ color: [2, 0, 0] })` and `water.setSeaLevel(NaN)` throw a plain `RangeError`, and
+`new Water({ sea: {} })` a `TypeError`, with no code or help link: about 30 refusals in
+`packages/water/src/index.ts`, a file the SEA-01 and SEA-13 rows list. Recorded as KB-WATER-CODED1 in
+`docs/known-bugs.md`; not changed by lane B.
+
 ## Scope: solvers only (Scott, 2026-11-26)
 
 The physics engine is the whole job. It is built in two stages:
