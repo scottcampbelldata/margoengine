@@ -22,6 +22,7 @@ export type { LoadRadiationMode, LoadRadiationResonance } from './radiation.js';
 export * from './shapes.js';
 export * from './segments.js';
 export * from './solver.js';
+export * from './surge-wake.js';
 export * from './swim-drag.js';
 export * from './taut-mooring.js';
 export { waterAcceleration, waterVelocity } from './water.js';

@@ -5010,6 +5010,55 @@ world.advance(18);
 console.log(meter.work().total > 0); // true
 ```
 
+#### Exchange energy with a free-surging hull
+
+`SurgeWakeCoupling` exchanges signed volume and a reciprocal longitudinal impulse with the finite-depth wake.
+Use a dynamic rigid body at its fixed reference draft, with local X parallel to the unlocked world X or Z guide.
+Keep the other five axes locked. Add the hull with its ambient-only sea and the exchange with its projected
+source. Give the receiving wake the exchange's matching grid from `wakeParams`. Pass no surface-source port.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {SurgeWakeCoupling} from 'margoengine/physics/loads';
+import {WakeSolver} from 'margoengine/physics/sea';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+const physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60});
+const mesh = {
+  vertices: [-1,-0.5,-0.5, 1,-0.5,-0.5, 1,0.5,-0.5, -1,0.5,-0.5,
+    -1,-0.5,0.5, 1,-0.5,0.5, 1,0.5,0.5, -1,0.5,0.5],
+  indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,1,5, 0,5,4,
+    3,7,6, 3,6,2, 0,4,7, 0,7,3, 1,2,6, 1,6,5],
+};
+const body = physics.addBody(null, {linearVelocity: [1.25, 0, 0], enabledTranslations: [true, false, false],
+  enabledRotations: [false, false, false], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1025}});
+const hull = new HullSolver();
+const surge = new SurgeWakeCoupling({
+  row: body.row, mesh, waterline: 0, depths: [0, 0.25, 0.5], depth: 3, cells: [40, 32], cellSize: 0.4,
+});
+const wake = new WakeSolver('wake', undefined, surge.submergedSource);
+world.add(new RigidSolver(), {physics}).add(hull, {
+  hulls: [{row: body.row, mesh}], sea: {density: 1025, elevation: () => 0},
+  drag: false, radiation: false, addedMass: false, rollDamping: false, diffraction: false, drift: false,
+  greenWater: false, slamming: false,
+}).add(surge, undefined).add(wake, surge.wakeParams())
+  .couple(['hull', 'surgeWake', 'wake', 'rigid'], 'staggered');
+world.advance(60);
+console.log(body.linearVelocity[0] < 1.25); // true
+```
+
+The depth-band projection defines the change in wake elevation for each metre of surge over a step. The energy
+of that change sets the opposite impulse from the same midpoint displacement. This also lets a pre-existing
+wave accelerate the hull from rest. Use calm ambient water and keep the source footprint inside the periodic grid.
+This closed-energy tier covers a single free surge degree of freedom. Prescribed motion, heave and roll, guides
+with contact friction, independent longitudinal forces and other sources need a separate work account. For display,
+add the wake to the visible sea. Use the ambient sea for hull pressure to avoid applying the wake twice.
+[Tuck, Scullen and Lazauskas (2000), Eq. 4](https://www.scullen.com.au/DSc/Publications/tuck_scullen_lazauskas_00e.pdf),
+[Dyachenko and Zakharov (2012)](https://zakharov75.itp.ac.ru/static/local/zve75/zakharov/2012/2012-03-1-s2.0-S0997754611000811-main.pdf).
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.
