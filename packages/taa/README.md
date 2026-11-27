@@ -102,6 +102,16 @@ far edge) and keeps its history unclipped for the eight frames of the jitter cyc
 feature the jitter misses on some frames stays on screen instead of flashing; rejected history and reactive pixels drop
 the lock. Both are fixed at construction; depth rejection of disoccluded history applies in every mode.
 
+At silhouettes the resolve takes the motion and expected depth of the nearest surface in the 3x3 neighbourhood and keeps
+history when that depth lies inside the depth range of the 3x3 history footprint round the reprojected point, so the
+jitter moving an edge across a pixel no longer drops its history on alternate frames; history the surface was not part
+of (a disocclusion) is still rejected. A thin post's edge alternates 0.18 sRGB levels a frame round an orbiting camera,
+against 3.26 before (`test/stability-browser.mjs`, WebGPU, RTX A6000; KB-TAA-EDGE1). Sources: B. Karis, "High Quality
+Temporal Supersampling", SIGGRAPH 2014 (closest-depth motion); D. Nehab et al., "Accelerating Real-Time Shading with
+Reverse Reprojection Caching", Graphics Hardware 2007; AMD FidelityFX Super Resolution 2 documentation, 2022 (depth and
+motion dilation). On the WebGL2 layer at 4x the edge still alternates with a fast camera (KB-TAA-COMPATEDGE2 in
+docs/known-bugs.md).
+
 ```ts
 import {EngineKernel} from 'margoengine/core';
 import {TAA} from 'margoengine/taa';

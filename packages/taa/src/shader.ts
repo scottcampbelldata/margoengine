@@ -146,7 +146,7 @@ fn rgb(c:vec3f)->vec3f {return vec3f(c.x+c.y-c.z,c.x+c.z,c.x-c.y-c.z);}`;
 // J. Lawrence and H. Hoppe, "Amortized Supersampling" (ACM TOG 28(5), 2009); unjittered reprojection as in Karis 2014,
 // L. J. F. Pedersen, "Temporal Reprojection Anti-Aliasing in INSIDE" (GDC 2016) and the survey of L. Yang, S. Liu and
 // M. Salvi, "A Survey of Temporal Antialiasing Techniques" (Computer Graphics Forum 39(2), 2020).
-export const resolve =
+const perTap =
   frame +
   color +
   `
@@ -171,10 +171,48 @@ export const resolve =
       if(abs(d-previousDepth)<=max(0.000001,temporal.settings.y*max(d,previousDepth))){old+=textureLoad(history,pixel,0).rgb*weight;total+=weight;}}}
     if(total>0.001){result=mix(current,rgb(clamp(ycocg(old/total),lo,hi)),temporal.settings.x);}}
   textureStore(output,p,vec4f(max(result,vec3f(0)),1));textureStore(outputDepth,p,vec4f(textureLoad(depth,p,0)));}`;
+// Silhouettes (KB-TAA-EDGE1): the motion and the expected depth are those of the nearest surface in the 3x3
+// neighbourhood (closest-depth velocity dilation: B. Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014; the
+// depth and motion dilation stage of AMD's FidelityFX Super Resolution 2 documentation, 2022; the survey of L. Yang,
+// S. Liu and M. Salvi, "A Survey of Temporal Antialiasing Techniques", Computer Graphics Forum 39(2), 2020), and
+// history is kept when that surface's expected depth lies inside the depth range of the 3x3 history footprint round the
+// reprojected point (the footprint test of upscale.ts, after the reverse-reprojection cache test of D. Nehab, P. V.
+// Sander, J. Lawrence, N. Tatarchuk and J. R. Isidoro, "Accelerating Real-Time Shading with Reverse Reprojection
+// Caching", Graphics Hardware 2007). Before, each pixel took its own motion and each bilinear tap was tested against its
+// own expected depth: at a silhouette the jitter moves the edge across the pixel centre, so the pixel's surface, motion
+// and expected depth changed from frame to frame, its history was dropped on alternate frames and the raw jittered
+// sample showed: the edge alternated 3.3 sRGB levels a frame round a thin post (packages/taa/test/stability-browser.mjs,
+// 5.3 on the WebGL2 layer) where TAAUpscale's footprint test alternates 0.2. A disocclusion (the reprojected surface
+// absent from the whole footprint) is still rejected, and the colour clamp then removes what the footprint's other
+// surface brings. Only neighbours whose expected depth is valid (0 to 1) are candidates, so a 4x silhouette pixel whose
+// motion mean is a false depth (skySample) takes its neighbour's surface; with none valid the pixel rejects as before.
+export const resolve = (() => {
+  const own = `  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy+temporal.offset.xy;
+  let previousDepth=textureLoad(expected,p,0).r;var result=current;
+`,
+    tap = 'if(abs(d-previousDepth)<=max(0.000001,temporal.settings.y*max(d,previousDepth))){old+=',
+    read = 'let d=textureLoad(historyDepth,pixel,0).r;';
+  if ([own, tap, read].some((t) => perTap.split(t).length !== 2))
+    throw new MargoError('state', 'TAA silhouette patch target missing; update resolve to the per-tap shader');
+  return perTap
+    .replace(
+      own,
+      `  var moved=p;var near=-1.0;for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){let q=clamp(p+vec2i(x,y),vec2i(0),vec2i(size)-1);
+    let e=textureLoad(expected,q,0).r;if(e>=0&&e<=1&&e>near){near=e;moved=q;}}}
+  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,moved,0).xy+temporal.offset.xy;
+  let previousDepth=textureLoad(expected,moved,0).r;var result=current;
+  var depthLo=1e30;var depthHi=-1e30;{let c=vec2i(floor(uv*vec2f(size)));for(var y=-1;y<=1;y++){for(var x=-1;x<=1;x++){
+    let h=textureLoad(historyDepth,clamp(c+vec2i(x,y),vec2i(0),vec2i(size)-1),0).r;depthLo=min(depthLo,h);depthHi=max(depthHi,h);}}}
+  let footprint=max(depthLo-previousDepth,previousDepth-depthHi)<=max(0.000001,temporal.settings.y*max(depthHi,previousDepth));
+`,
+    )
+    .replace(read, '')
+    .replace(tap, 'if(footprint){old+=');
+})();
 // `stochastic` (TAAOptions): a surface cut by noise holds two depths per pixel, so history is accepted over the 3x3 depth
 // range, and the nearest pixel there gives the motion.
 export const stochasticResolve = () =>
-  resolve
+  perTap
     .replace(
       `  let uv=(vec2f(id.xy)+0.5)/vec2f(size)-textureLoad(velocity,p,0).xy+temporal.offset.xy;
   let previousDepth=textureLoad(expected,p,0).r;var result=current;

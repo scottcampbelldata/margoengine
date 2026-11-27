@@ -4,6 +4,10 @@
 // alternation (per pixel, the part of the second difference in time that a steady change does not explain) is
 // measured round the post. History rejected at the silhouette shows the raw jittered frame there, which alternates
 // with the Halton jitter (KB-OF2 in docs/limits.md, "TAAUpscale temporal stability").
+// TAA at full size is measured on the same path (KB-TAA-EDGE1): before its resolve took the motion of the nearest surface
+// in the 3x3 neighbourhood, each pixel's own motion and per-tap depth test dropped history at the silhouette on
+// alternate frames, 3.26 levels fast and 2.92 slow on WebGPU (RTX A6000). On the WebGL2 layer at 4x the post edge still
+// alternates (KB-TAA-COMPATEDGE2 in docs/known-bugs.md), so the bound is asserted on WebGPU only there.
 import assert from 'node:assert/strict';
 import { launchBrowser } from '../../../scripts/lib/browser.mjs';
 import { createServer } from 'vite';
@@ -39,7 +43,8 @@ try {
   await page.goto('http://127.0.0.1:5383/packages/taa/test/upscale-browser.html');
   await page.evaluate(async () => {
     const { Engine, PbrMaterial, box } = await import('/packages/core/dist/index.js'),
-      { TAAUpscale } = await import('/packages/taa/dist/upscale.js');
+      { TAAUpscale } = await import('/packages/taa/dist/upscale.js'),
+      { TAA } = await import('/packages/taa/dist/index.js');
     const canvas = document.querySelector('canvas');
     // The frame is read from the canvas texture itself, copied in the task that drew it: a canvas read in a later task
     // sees transparent black once the browser has presented it (scripts/support/canvas-frame.js), and a page screenshot
@@ -123,9 +128,9 @@ try {
             }
         return sum / n;
       },
-      async run(options, step) {
+      async run(options, step, plain = false) {
         this.up?.dispose();
-        this.up = options ? TAAUpscale.attach(engine, options) : null;
+        this.up = options ? (plain ? TAA : TAAUpscale).attach(engine, options) : null;
         // Warm-up on the same path, so every measured frame has a full history.
         for (let n = 0; n < 16; n++) await this.orbit(step, n);
         const frames = [];
@@ -140,9 +145,9 @@ try {
       },
       // Disocclusion: a red box crosses the wall at speed, so red may only lie round where it is now (as in
       // upscale-browser.mjs); the wall it uncovers must drop the box's history.
-      async ghost(options) {
+      async ghost(options, plain = false) {
         this.up?.dispose();
-        this.up = TAAUpscale.attach(engine, options);
+        this.up = (plain ? TAA : TAAUpscale).attach(engine, options);
         engine.camera.position = [0, 0.5, 4];
         engine.camera.target = [0, 0.5, 0];
         let pixels;
@@ -164,13 +169,16 @@ try {
       },
     };
   });
-  const run = (options, step) => page.evaluate(([o, s]) => window.t.run(o, s), [options, step]);
+  const run = (options, step, plain) => page.evaluate(([o, s, p]) => window.t.run(o, s, p), [options, step, plain]);
   const taa = { scale: 0.67, sharpen: 0 };
   const fast = await run(taa, 0.01),
     slow = await run(taa, 0.001),
     off = await run(null, 0.01),
-    ghost = await page.evaluate((o) => window.t.ghost(o), taa);
-  const report = { compat: compatRun(), fast, slow, off, ghost, bound: EDGE_BOUND };
+    plainFast = await run({}, 0.01, true),
+    plainSlow = await run({}, 0.001, true),
+    ghost = await page.evaluate((o) => window.t.ghost(o), taa),
+    plainGhost = await page.evaluate(() => window.t.ghost({}, true));
+  const report = { compat: compatRun(), fast, slow, off, plainFast, plainSlow, ghost, plainGhost, bound: EDGE_BOUND };
   console.log(JSON.stringify(report));
   await page.evaluate(() => window.t.engine.dispose());
   assert.deepEqual(errors, []);
@@ -183,6 +191,21 @@ try {
   assert.ok(
     fast.edge <= 2 * slow.edge,
     `a fast camera alternates ${fast.edge.toFixed(3)} levels against ${slow.edge.toFixed(3)} for a slow one`,
+  );
+  if (!compatRun())
+    for (const [name, run] of [
+      ['fast', plainFast],
+      ['slow', plainSlow],
+    ])
+      assert.ok(
+        run.edge <= EDGE_BOUND,
+        `TAA: the post edge alternates ${run.edge.toFixed(3)} levels with a ${name} camera (bound ${EDGE_BOUND})`,
+      );
+  // The footprint test keeps history at silhouettes and still drops it where the wall is uncovered.
+  assert.ok(plainGhost.body > 50, `TAA: the box is drawn: ${plainGhost.body}`);
+  assert.ok(
+    plainGhost.trail < plainGhost.body * 0.15,
+    `TAA: no trail behind the box: ${plainGhost.trail} red pixels against ${plainGhost.body}`,
   );
   assert.ok(ghost.body > 50, `the box is drawn: ${ghost.body}`);
   assert.ok(

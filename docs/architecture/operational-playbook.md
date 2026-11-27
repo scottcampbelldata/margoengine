@@ -11456,6 +11456,14 @@ and DOF in two views and SceneFade over overlapping views keep the alpha; it fou
 alpha apart, now clipped as one 4D point (KB-TAA-ALPHACLIP1; Salvi 2016; Karis 2014). Missing: water's composites
 (KB-WATER-ALPHARIM1) and XR on a transparent canvas.
 
+TAA silhouettes (2026-11-27, KB-TAA-EDGE1): the default resolve takes the motion and expected depth of the nearest
+surface in the 3x3 neighbourhood (closest-depth motion, Karis 2014; FSR2's dilation) and keeps history when that depth
+lies inside the depth range of the 3x3 history footprint (TAAUpscale's test; Nehab et al. 2007), where it took each
+pixel's own motion and tested each tap. Evidence (section 5): `taa/test/stability-browser.mjs`, a thin post round an
+orbiting camera, edge alternation 3.26 to 0.179 sRGB levels fast and 2.92 to 0.225 slow on WebGPU (RTX A6000), bound
+0.25, no trail behind a box crossing the wall on both backends. Missing: the WebGL2 layer at 4x reads 2.89 and 0.335
+(KB-TAA-COMPATEDGE2, open; at 1 sample it matches WebGPU).
+
 JPEG 2000 hostile input (2026-11-27, KB-J2K-HOSTILE1): headers can ask for far more memory and work than their bytes
 carry, so the kernel bounds tile-components (2^20), structures per tile (2^22), packets by header bytes and visits by a
 per-decode budget; coefficient arithmetic wraps. Evidence: `decoders/tests/jpeg2000-fuzz.test.js` drives the shipped

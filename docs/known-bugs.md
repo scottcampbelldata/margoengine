@@ -30,6 +30,45 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   bounded by the bytes that can hold them and a per-decode work budget ([Limits](limits.md#jpeg-2000-decoding)).
   Regression: the fuzz run, `jpeg2000-browser.mjs` and four crate tests.
 
+### Fixed 2026-11-27: TAA dropped history at silhouettes on alternate frames, so edges flickered with the jitter (KB-TAA-EDGE1, taa)
+
+- **Repro (before):** `node packages/taa/test/stability-browser.mjs`, with `TAA` at full size on the path that already
+  measures `TAAUpscale`: a thin bright post 4 m from a camera orbiting it, a wall at 44 m. The post's edge alternated 3.26
+  sRGB levels a pixel and frame with the fast camera and 2.92 with the slow one on WebGPU (RTX A6000); TAAUpscale reads
+  0.19 and 0.13 on the same path, and the bound is 0.25. On the WebGL2 layer: 5.27 and 2.81.
+- **Cause:** the default resolve took each pixel's own motion and expected depth and tested each bilinear history tap
+  against that one depth. At a silhouette the jitter moves the edge across the pixel centre, so the surface a pixel
+  samples, and with it the motion and expected depth, changed from frame to frame; history was dropped on alternate
+  frames and the raw jittered sample showed. TAAUpscale already used closest-depth motion and a footprint test.
+- **Fix:** the default resolve (`packages/taa/src/shader.ts`) takes the motion and expected depth of the nearest surface
+  in the 3x3 neighbourhood (largest valid expected depth, so a 4x silhouette pixel whose motion mean is a false depth
+  takes its neighbour's surface) and keeps history when that depth lies inside the depth range of the 3x3 history
+  footprint round the reprojected point; a disocclusion (the surface absent from the whole footprint) is still
+  rejected, and the colour clamp removes what the footprint's other surface brings. `stochastic` keeps its own range
+  test. Sources: B. Karis, "High Quality Temporal Supersampling", SIGGRAPH 2014 (velocity of the closest depth in a 3x3
+  neighbourhood); M. Salvi, "An Excursion in Temporal Supersampling", GDC 2016; AMD FidelityFX Super Resolution 2
+  documentation, 2022 (depth and motion dilation); D. Nehab et al., "Accelerating Real-Time Shading with Reverse
+  Reprojection Caching", Graphics Hardware 2007 (the depth test against a cached depth); L. Yang, S. Liu and M. Salvi,
+  "A Survey of Temporal Antialiasing Techniques", Computer Graphics Forum 39(2), 2020 (such tests fail at depth edges
+  under subpixel motion).
+- **After:** 0.179 fast and 0.225 slow on WebGPU; a box crossing the wall leaves 0 red pixels behind it (4,139 drawn).
+  On the WebGL2 layer at 4x: 2.89 and 0.335 (see KB-TAA-COMPATEDGE2); with `antialias: false` the layer reads the same
+  as WebGPU, 0.275 and 0.147 on both.
+- **Regression:** `packages/taa/test/stability-browser.mjs` asserts TAA's edge alternation at most 0.25 fast and slow on
+  WebGPU (fails before: 3.26 and 2.92) and no trail behind the box on both backends.
+
+### Open 2026-11-27: on the WebGL2 layer at 4x a TAA silhouette still alternates with a fast camera (KB-TAA-COMPATEDGE2, taa, webgl2-compat)
+
+- **Repro:** `MARGO_COMPAT=1 node packages/taa/test/stability-browser.mjs` (RTX A6000, ANGLE Direct3D 11): TAA's post
+  edge alternates 2.89 sRGB levels with the fast camera and 0.335 with the slow one (bound 0.25; WebGPU 0.179 and
+  0.225). Not asserted on this layer until fixed.
+- **Cause, narrowed:** the 4x route. The same scene at `antialias: false` reads 0.275 and 0.147 on the layer, the same
+  as on WebGPU at 1x. Ruled out on the 4x layer route: the candidate choice (selecting by the current depth or by the
+  expected depth gives 2.89 to 2.93) and the footprint test (accepting every footprint gives 2.62 fast and raises slow to
+  1.14). Left: the layer reads every sample of a 4x texture from its resolved copy, so the motion resolve takes the mean
+  of four samples (KB-TAA-COMPATEDGE1), where two static surfaces in one pixel mix their motions by coverage, and the
+  one-sample depth resolve feeds the camera pass. Next: read back the 4x motion at the post's edge on both routes.
+
 ### Fixed 2026-11-27: TAA variance clipping moved a transparent canvas's colour and alpha apart (KB-TAA-ALPHACLIP1, taa)
 
 - **Repro:** `node packages/post/test/alpha-views-browser.mjs`: `rejection: 'variance'` before Tonemap left a partly
