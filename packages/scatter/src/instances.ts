@@ -13,6 +13,7 @@ import { sameBindings, snapshotBindings } from './bindings.js';
 import { MargoError } from '@margoengine/math/errors';
 import { overlayDepthPass } from '../../shared/pass.js';
 import { unitLight } from '../../shared/unit-light.js';
+import { captureStage, type ScatterCapture } from './capture.js';
 
 declare const GPUBufferUsage: { VERTEX: number; INDEX: number; INDIRECT: number; UNIFORM: number; COPY_DST: number };
 type ScatterPassContext = Extract<PassContext, { backend: 'webgpu' }>;
@@ -144,6 +145,14 @@ export class ScatterInstances implements EnginePlugin {
   private bindings: GPUBindGroupEntry[] = [];
   /** Whether any batch sets `translucency`; otherwise the shader and layout stay as they were without it. */
   private translucent = false;
+  /** `setCapture`'s hook, the dispose listeners, and the capture pipelines with their per-view frame uniforms. */
+  private capture?: ScatterCapture;
+  private readonly disposers = new Set<() => void>();
+  private readonly capturePipelines = new Map<string, GPURenderPipeline>();
+  private readonly captureGroups = new Map<GPURenderPipeline, GPUBindGroup[]>();
+  private captureUniforms: GPUBuffer[] = [];
+  private captureBindings: GPUBindGroupEntry[] = [];
+  private readonly captureValues = new Float32Array(36);
   private readonly presentation = overlayDepthPass();
   private readonly color = this.presentation.colorAttachments[0];
   private readonly depth = this.presentation.depthStencilAttachment;
@@ -284,9 +293,107 @@ export class ScatterInstances implements EnginePlugin {
       name: this.name,
       order: 1,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
+        if (c.backend === 'webgpu') this.drawColour(c);
       },
     });
+  }
+  /**
+   * Lets a capture hook (`@margoengine/post` SSR, SceneTargets, LightBounce: `targets.add(instances)`) draw the
+   * instances' material with `draw(c, 'capture')`: every batch with the colour pass's own stage (wind, sway, vertex
+   * colour and occlusion) ending in the hook's `margoSSR`, depth tested (greater-equal) and written. Returns a remover.
+   * Without a hook the instances draw exactly as before.
+   * @throws TypeError for a bad hook or disposed instances.
+   */
+  setCapture(hook: ScatterCapture): () => void {
+    if (
+      this.disposed ||
+      !hook ||
+      typeof hook.declarations !== 'function' ||
+      typeof hook.begin !== 'function' ||
+      !Array.isArray(hook.targets)
+    )
+      throw new TypeError(
+        'Invalid scatter capture hook; pass an object with declarations() and begin() functions and a targets array to live ScatterInstances.',
+      );
+    this.capture = hook;
+    return () => {
+      if (this.capture === hook) this.capture = undefined;
+    };
+  }
+  /** Calls `callback` once when the instances are disposed; returns a remover. */
+  onDispose(callback: () => void): () => void {
+    if (typeof callback !== 'function') throw new TypeError('ScatterInstances onDispose needs a function');
+    this.disposers.add(callback);
+    return () => this.disposers.delete(callback);
+  }
+  /**
+   * `mode` 'capture': draws every batch into the capture hook's pass (`setCapture`); `color` and `depth` are unused
+   * (the hook's pass has its own). Does nothing without a hook, before setup or after disposal.
+   */
+  draw(c: ScatterPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void {
+    const hook = this.capture;
+    void color;
+    void depth;
+    if (mode !== 'capture' || !hook || this.disposed || !this.engine || !this.uniform) return;
+    const declarations = hook.declarations(c.shader),
+      key =
+        hook.targets.map((t) => t.format).join(',') +
+        ':' +
+        c.descriptor.multisample?.count +
+        ':' +
+        c.descriptor.depthStencil!.format +
+        '\0' +
+        declarations +
+        '\0' +
+        c.shader;
+    let pipeline = this.capturePipelines.get(key);
+    if (!pipeline) {
+      const code = captureStage(positiveColor(this.colourCode(c.shader)), declarations);
+      if (code === undefined)
+        throw new MargoError(
+          'unsupported',
+          "ScatterInstances capture needs core's lit fragment; a plugin replaced it. Remove that plugin or the capture",
+        );
+      const module = c.device.createShaderModule({ code: this.appearanceCode(code, false) });
+      pipeline = c.device.createRenderPipeline({
+        layout: 'auto',
+        vertex: { module, entryPoint: 'vertex', buffers: this.translucent ? translucentLayouts : vertexLayouts },
+        fragment: { module, entryPoint: 'fragment', targets: hook.targets as GPUColorTargetState[] },
+        multisample: c.descriptor.multisample,
+        depthStencil: {
+          format: c.descriptor.depthStencil!.format,
+          depthWriteEnabled: true,
+          depthCompare: 'greater-equal',
+        },
+      });
+      if (this.capturePipelines.size >= 32) {
+        this.capturePipelines.clear();
+        this.captureGroups.clear();
+      }
+      this.capturePipelines.set(key, pipeline);
+    }
+    // Each view its own frame uniform: the colour pass's buffer holds the colour pass's camera in the same submit.
+    const view = c.view?.index ?? 0;
+    const uniform = (this.captureUniforms[view] ??= c.device.createBuffer({
+      size: 144,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    }));
+    this.frameValues(this.captureValues, c);
+    c.device.queue.writeBuffer(uniform, 0, this.captureValues as Float32Array<ArrayBuffer>);
+    if (!sameBindings(this.captureBindings, c.bindings)) {
+      this.captureGroups.clear();
+      this.captureBindings = snapshotBindings(c.bindings);
+    }
+    let groups = this.captureGroups.get(pipeline);
+    if (!groups) this.captureGroups.set(pipeline, (groups = []));
+    groups[view] ??= c.device.createBindGroup({
+      layout: pipeline.getBindGroupLayout(0),
+      entries: [{ binding: 0, resource: { buffer: uniform } }, ...c.bindings],
+    });
+    const pass = hook.begin();
+    pass.setPipeline(pipeline);
+    pass.setBindGroup(0, groups[view]);
+    this.drawBatches(pass, pipeline);
   }
   /** Seconds on the wind clock: the sum of the deltas given to `advanceTime` (each frame update runs it). */
   get time(): number {
@@ -308,55 +415,72 @@ export class ScatterInstances implements EnginePlugin {
   onPreUpdate(delta: number): void {
     this.advanceTime(delta);
   }
-  private draw(c: ScatterPassContext): void {
+  /** The frame uniform: camera, sun, ambient, wind clock and emission intensity. */
+  private frameValues(values: Float32Array, c: ScatterPassContext): void {
     const intensity = typeof this.emissiveIntensity === 'function' ? this.emissiveIntensity() : this.emissiveIntensity;
     if (typeof intensity !== 'number' || !Number.isFinite(Math.fround(intensity)) || intensity < 0)
       throw new RangeError('Invalid scatter emissive intensity; return a finite number of 0 or more.');
+    values.set(c.camera.matrix);
+    values.set(c.camera.position, 16);
+    unitLight(values, 20, this.engine!.lighting.direction);
+    values.set(this.engine!.lighting.radiance, 24);
+    values.fill(1, 28, 31);
+    if (this.engine!.lighting.ambient) values.set(this.engine!.lighting.ambient, 28);
+    values[32] = this.seconds;
+    values[33] = intensity;
+  }
+  /** Core's lit shader with the instances' wind, vertex colour, occlusion, emission and translucency. */
+  private colourCode(shader: string): string {
+    const lucent = this.translucent;
+    return (
+      windShader +
+      (lucent ? translucencyShader : '') +
+      shader
+        .replace(/struct Frame \{[^}]+\}/, (frame) => frame.replace('}', ',windTime:vec4f }'))
+        .replace(/struct Input \{[^}]+\}/, (input) =>
+          input.replace(
+            '}',
+            `,@location(8) vertexColor:vec4f,@location(9) emissive:${lucent ? 'vec4f' : 'vec3f'},@location(10) wind:vec4f,@location(11) sway:vec4f }`,
+          ),
+        )
+        .replace(/struct Output \{[^}]+\}/, (output) => {
+          // After core's own varyings and any another patch added (terrain's mesh id). Vertex colour and occlusion vary
+          // across a triangle: read them inside it (centroid), as for scatter's blades.
+          const at = freeLocation(output);
+          return output
+            .replace('@location(2) color:vec3f', `@location(2) ${centroid} color:vec3f`)
+            .replace(
+              '}',
+              `,@location(${at}) emissive:vec3f,@location(${at + 1}) ${centroid} occlusion:f32${lucent ? `,@location(${at + 2}) @interpolate(flat) translucency:f32` : ''} }`,
+            );
+        })
+        .replace(
+          'let p=model*vec4f(i.position,1);',
+          'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind.xyz,frame.windTime.x);let bend=windDeformation(p.xyz,i.m3.xyz,wind,i.wind.w,vec4f(i.sway.xy,frame.windTime.x,1.0));p=vec4f(p.x+bend.offset.x,p.y-bend.drop.x,p.z+bend.offset.y,1);',
+        )
+        .replace(
+          'o.color=i.color.rgb;',
+          'o.normal=windDetailNormal(o.normal,bend,wind);o.color=i.color.rgb*i.vertexColor.rgb;' +
+            (lucent
+              ? 'o.emissive=i.emissive.rgb*frame.windTime.y;o.translucency=i.emissive.w;'
+              : 'o.emissive=i.emissive*frame.windTime.y;') +
+            'o.occlusion=clamp(i.vertexColor.a,0.0,1.0);',
+        )
+        .replace('i.color*(1.0-i.material.y)*', 'i.color*(1.0-i.material.y)*i.occlusion*')
+        .replace(
+          /let linear=([^;]+);/,
+          lucent
+            ? 'let linear=$1+foliageTranslucency(n,v,l,i.occlusion,i.translucency)*i.color*frame.radiance.xyz*frame.light.w+i.emissive;'
+            : 'let linear=$1+i.emissive;',
+        )
+    );
+  }
+  private drawColour(c: ScatterPassContext): void {
     const changed = !sameBindings(this.bindings, c.bindings);
     const format = c.format + ':' + c.descriptor.multisample?.count + ':' + c.descriptor.depthStencil!.format;
     if (this.shader !== c.shader || this.format !== format) {
       const lucent = this.translucent;
-      const code =
-        windShader +
-        (lucent ? translucencyShader : '') +
-        c.shader
-          .replace(/struct Frame \{[^}]+\}/, (frame) => frame.replace('}', ',windTime:vec4f }'))
-          .replace(/struct Input \{[^}]+\}/, (input) =>
-            input.replace(
-              '}',
-              `,@location(8) vertexColor:vec4f,@location(9) emissive:${lucent ? 'vec4f' : 'vec3f'},@location(10) wind:vec4f,@location(11) sway:vec4f }`,
-            ),
-          )
-          .replace(/struct Output \{[^}]+\}/, (output) => {
-            // After core's own varyings and any another patch added (terrain's mesh id). Vertex colour and occlusion vary
-            // across a triangle: read them inside it (centroid), as for scatter's blades.
-            const at = freeLocation(output);
-            return output
-              .replace('@location(2) color:vec3f', `@location(2) ${centroid} color:vec3f`)
-              .replace(
-                '}',
-                `,@location(${at}) emissive:vec3f,@location(${at + 1}) ${centroid} occlusion:f32${lucent ? `,@location(${at + 2}) @interpolate(flat) translucency:f32` : ''} }`,
-              );
-          })
-          .replace(
-            'let p=model*vec4f(i.position,1);',
-            'var p=model*vec4f(i.position,1);let wind=vec4f(i.wind.xyz,frame.windTime.x);let bend=windDeformation(p.xyz,i.m3.xyz,wind,i.wind.w,vec4f(i.sway.xy,frame.windTime.x,1.0));p=vec4f(p.x+bend.offset.x,p.y-bend.drop.x,p.z+bend.offset.y,1);',
-          )
-          .replace(
-            'o.color=i.color.rgb;',
-            'o.normal=windDetailNormal(o.normal,bend,wind);o.color=i.color.rgb*i.vertexColor.rgb;' +
-              (lucent
-                ? 'o.emissive=i.emissive.rgb*frame.windTime.y;o.translucency=i.emissive.w;'
-                : 'o.emissive=i.emissive*frame.windTime.y;') +
-              'o.occlusion=clamp(i.vertexColor.a,0.0,1.0);',
-          )
-          .replace('i.color*(1.0-i.material.y)*', 'i.color*(1.0-i.material.y)*i.occlusion*')
-          .replace(
-            /let linear=([^;]+);/,
-            lucent
-              ? 'let linear=$1+foliageTranslucency(n,v,l,i.occlusion,i.translucency)*i.color*frame.radiance.xyz*frame.light.w+i.emissive;'
-              : 'let linear=$1+i.emissive;',
-          );
+      const code = this.colourCode(c.shader);
       const module = c.device.createShaderModule({ code: this.appearanceCode(positiveColor(code), false) });
       this.pipeline = c.device.createRenderPipeline({
         layout: 'auto',
@@ -376,14 +500,7 @@ export class ScatterInstances implements EnginePlugin {
       });
       this.bindings = snapshotBindings(c.bindings);
     }
-    this.values.set(c.camera.matrix);
-    this.values.set(c.camera.position, 16);
-    unitLight(this.values, 20, this.engine!.lighting.direction);
-    this.values.set(this.engine!.lighting.radiance, 24);
-    this.values.fill(1, 28, 31);
-    if (this.engine!.lighting.ambient) this.values.set(this.engine!.lighting.ambient, 28);
-    this.values[32] = this.seconds;
-    this.values[33] = intensity;
+    this.frameValues(this.values, c);
     c.device.queue.writeBuffer(this.uniform!, 0, this.values as Float32Array<ArrayBuffer>);
     this.color.view = c.color;
     this.depth.view = c.depth;
@@ -436,6 +553,11 @@ export class ScatterInstances implements EnginePlugin {
       b.command.destroy();
     }
     for (const b of this.shadowUniforms) b.destroy();
+    for (const b of this.captureUniforms) b?.destroy();
+    this.captureUniforms = [];
+    this.capturePipelines.clear();
+    this.captureGroups.clear();
+    this.captureBindings = [];
     this.uniform?.destroy();
     this.resources.length = this.batches.length = this.shadowUniforms.length = this.shadowGroups.length = 0;
     this.uniform = undefined;
@@ -455,6 +577,10 @@ export class ScatterInstances implements EnginePlugin {
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;
+    this.capture = undefined;
+    const listeners = [...this.disposers];
+    this.disposers.clear();
+    for (const listener of listeners) listener();
   }
   declare [Symbol.dispose]: () => void;
   [(Symbol.dispose ?? Symbol()) as symbol](): void {

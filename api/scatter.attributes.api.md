@@ -45,6 +45,12 @@ interface ScatterBatch {
     translucency?: number;
 }
 
+interface ScatterCapture {
+    declarations(code: string): string;
+    readonly targets: readonly GPUColorTargetState[];
+    begin(): GPURenderPassEncoder;
+}
+
 class ScatterInstances implements EnginePlugin {
     readonly name: string;
     readonly batches: {
@@ -60,6 +66,9 @@ class ScatterInstances implements EnginePlugin {
     static attach(engine: EngineKernel, generate: () => readonly ScatterBatch[]): ScatterInstances;
     setup(engine: Engine): void;
     registerPasses(graph: FrameGraph): void;
+    setCapture(hook: ScatterCapture): () => void;
+    onDispose(callback: () => void): () => void;
+    draw(c: ScatterPassContext, mode: 'capture', color?: GPUTextureView, depth?: GPUTextureView): void;
     get time(): number;
     resetTime(): void;
     advanceTime(delta: number): void;

@@ -1204,6 +1204,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Measured again 2026-11-26** after KB-LOOK-TV-BOUNCE1 (the T6 checks read the masks' interiors): calm passes T6;
   blowup reads bounce 72.9 and 86.8 percent and shadowTint 1.91 and 1.04 b*, the light under the pall
   (KB-LOOK-TV-PALL1). `ScatterInstances` capture and the masks check are still owed.
+- **Progress 2026-11-26:** `ScatterInstances.setCapture` landed (scatter), proven by
+  `post/test/scene-targets-scatter-browser.mjs` with instanced plants on WebGPU and the WebGL2 layer. Still owed:
+  `scenes/test/timber-valley-masks-check.mjs`. Measured on the rail-line probes (1920 x 1080, masks at 128): plants
+  34 percent of the frame, lit ground 43 to 44, shaded 0.5 to 0.6; 14,504 to 15,904 pixels are both lit and plant and
+  1,173 to 1,259 both shaded and plant (up to 12 percent of the shaded mask), which the check must explain or fail.
 
 ### Open 2026-11-26: the night sky dome shows clear stars through a smoke pall (KB-SKY-NIGHTPALL1, sky and weather)
 

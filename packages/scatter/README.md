@@ -962,6 +962,11 @@ depth-test against the core replay exactly.
 - `draw(c, 'capture')` draws nothing without a hook, before the first distribute or after `dispose()`;
   `onDispose(callback)` lets an effect forget a disposed Scatter.
 - `ScatterTiles`, textured and states scatters inherit it; WebGPU and the WebGL2 layer.
+- `ScatterInstances` (and `AttributedScatter`) has the same `setCapture`, `draw(c, 'capture')` and `onDispose`
+  (KB-LOOK-MASKOCCLUDE1, 2026-11-26): every fixed batch with the colour pass's own stage (wind, sway, vertex colour and
+  occlusion), each view with its own frame uniform. `post/test/scene-targets-scatter-browser.mjs` runs its plant over
+  shaded ground with both kinds on WebGPU and the WebGL2 layer: added with `{ground: false}`, no lit or shaded ground
+  on the instanced plants (959 plant pixels, 0 and 0).
 
 ```ts
 import { Engine, PbrMaterial, box } from 'margoengine/core';
