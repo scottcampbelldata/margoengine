@@ -6,6 +6,7 @@ export * from './flood-blockage.js';
 export { FloodBodyDragSolver, type FloodBodyDragBody, type FloodBodyDragParams } from './flood-body-drag.js';
 export * from './flood-paddle.js';
 export * from './flood-wading.js';
+export * from './free-hull-wake.js';
 export * from './morison.js';
 export * from './prescribed-wake.js';
 export * from './quay-wake.js';

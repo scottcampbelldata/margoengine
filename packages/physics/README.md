@@ -5061,6 +5061,51 @@ add the wake to the visible sea. Use the ambient sea for hull pressure to avoid 
 [Tuck, Scullen and Lazauskas (2000), Eq. 4](https://www.scullen.com.au/DSc/Publications/tuck_scullen_lazauskas_00e.pdf),
 [Dyachenko and Zakharov (2012)](https://zakharov75.itp.ac.ru/static/local/zve75/zakharov/2012/2012-03-1-s2.0-S0997754611000811-main.pdf).
 
+#### Exchange wave work with a hull that heaves and heels
+
+`FreeHullWakeCoupling` pairs the same advancing source with the live convex waterplane. Its other three
+source columns are heave, roll and pitch about the rigid centre of mass. Connect both ports to one wake.
+Allow all three native rotations and leave gyroscopic forces enabled so anisotropic rotation retains its
+physical kinetic energy. The wave contributes no yaw torque. Lock the unused horizontal translation.
+
+```ts
+import {Physics} from 'margoengine/physics';
+import {FreeHullWakeCoupling} from 'margoengine/physics/loads';
+import {WakeSolver} from 'margoengine/physics/sea';
+import {HullSolver} from 'margoengine/physics/seakeeping';
+import {PhysicsWorld, RigidSolver} from 'margoengine/physics/world';
+
+await Physics.load();
+const world = new PhysicsWorld({rate: {num: 60, den: 1}});
+const physics = new Physics(null, {arena: world.arena, fixedTimestep: 1 / 60, substeps: 1});
+const mesh = {
+  vertices: [-1,-0.5,-0.5, 1,-0.5,-0.5, 1,0.5,-0.5, -1,0.5,-0.5,
+    -1,-0.5,0.5, 1,-0.5,0.5, 1,0.5,0.5, -1,0.5,0.5],
+  indices: [0,2,1, 0,3,2, 4,5,6, 4,6,7, 0,1,5, 0,5,4,
+    3,7,6, 3,6,2, 0,4,7, 0,7,3, 1,2,6, 1,6,5],
+};
+const body = physics.addBody(null, {linearVelocity: [1.25, -0.02, 0], angularVelocity: [0.02, 0, -0.03],
+  enabledTranslations: [true, true, false], colliders: {shape: 'box', halfExtents: [1, 0.5, 0.5], mass: 1025}});
+const exchange = new FreeHullWakeCoupling({
+  body, mesh, waterline: 0, depths: [0, 0.25, 0.5], depth: 3, cells: [40, 32], cellSize: 0.4,
+});
+const wake = new WakeSolver('wake', exchange.surfaceSource, exchange.submergedSource);
+world.add(new RigidSolver(), {physics}).add(new HullSolver(), {
+  hulls: [{row: body.row, mesh}], sea: {density: 1025, elevation: () => 0},
+  addedMass: false, radiation: false, drag: false, rollDamping: false, diffraction: false,
+  drift: false, greenWater: false, slamming: false,
+}).add(exchange, undefined).add(wake, exchange.wakeParams())
+  .couple(['hull', 'freeHullWake', 'wake', 'rigid'], 'staggered');
+world.advance(30);
+console.log(wake.heights().some((height) => Math.abs(height) > 1e-6)); // true
+```
+
+Use the matching unforced periodic wake, ambient-only hull pressure, one rigid substep at 60 Hz, and no body
+damping, speed caps, contacts or prescribed motion in this work test. Surge uses the reference depth bands
+and the live heave and angular samples come from the posed hull's waterplane. The exchange applies only while
+the hull has a single convex waterplane. It approximates the swept geometry over each step around the reference
+draft and omits a yaw source. The wave exchange uses transpose work pairing as in [Peskin (2002), §5](https://math.nyu.edu/~peskin/papers/acta_numerica.pdf).
+
 ### Nonlinear and rogue waves (`@margoengine/physics/rogue`)
 
 `NonlinearSea` is the sea a spectrum describes, to second order, with its rogue waves (SEA-03). From a directional spectrum (a `WaveSolver`'s field, or any `WaveSpectrumSample`) it draws a set of equal-variance components with phases from the counter-based random numbers. Its surface is their sum plus the bound waves each pair makes (Dalzell's finite-depth sum and difference kernels), so crests stand higher and sharper than troughs are deep, and wave groups carry their set-down. It is a `SeaSurface`: hulls, floating bodies, swimmers and spray read its height, slope, orbital motion and pressure as they read any sea's.
