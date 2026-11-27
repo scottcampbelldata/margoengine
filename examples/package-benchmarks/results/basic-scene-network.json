@@ -1,10 +1,10 @@
 {
-  "commit": "63c8b1dbd",
+  "commit": "838534464",
   "dirty": false,
   "browser": "msedge 158.0.4370.33 headless",
   "buildManifest": {
     "../../../packages/animation/dist/index.js": {
-      "file": "assets/dist-vRz1nRPe.js",
+      "file": "assets/dist-Cxl1CEGQ.js",
       "name": "dist",
       "src": "../../../packages/animation/dist/index.js",
       "isDynamicEntry": true,
@@ -398,7 +398,7 @@
       ]
     },
     "index.html": {
-      "file": "assets/index-_6k8hH53.js",
+      "file": "assets/index-D_j_aZvw.js",
       "name": "index",
       "src": "index.html",
       "isEntry": true,
@@ -472,13 +472,13 @@
       "brotli": 1888
     },
     {
-      "path": "assets/index-_6k8hH53.js",
+      "path": "assets/index-D_j_aZvw.js",
       "role": "Entry: core + stage + app",
       "encoding": "gzip",
-      "transferred": 27229,
+      "transferred": 27230,
       "raw": 65102,
-      "gzip": 26847,
-      "brotli": 23720
+      "gzip": 26848,
+      "brotli": 23678
     },
     {
       "path": "assets/node-matrix-R9BipGnp-ERCK1iAW.js",
@@ -537,10 +537,10 @@
   ],
   "total": {
     "requests": 13,
-    "transferred": 46778,
+    "transferred": 46779,
     "raw": 96878,
-    "gzip": 40881,
-    "brotli": 36147
+    "gzip": 40882,
+    "brotli": 36105
   },
   "notFetched": [
     {
@@ -584,12 +584,12 @@
       "raw": 8699
     },
     {
-      "path": "assets/dist-DNsZE5Ax.js",
-      "raw": 27481
+      "path": "assets/dist-Cxl1CEGQ.js",
+      "raw": 80088
     },
     {
-      "path": "assets/dist-vRz1nRPe.js",
-      "raw": 77041
+      "path": "assets/dist-DNsZE5Ax.js",
+      "raw": 27481
     },
     {
       "path": "assets/draco-here-CI7VOHpu.js",
