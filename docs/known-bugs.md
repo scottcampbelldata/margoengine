@@ -329,6 +329,23 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** not established for any of the six; each is owed to its package (core lighting, biomes, oit, materials,
   post, sky), found and fixed with its own regression.
 
+### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
+
+- **Repro:** `node scripts/run-with-timeout.mjs -- node packages/vfx/test/flame-check.mjs --only graded` (and with
+  `MARGO_COMPAT=1`) on an RTX A6000: "the animatedFeature bloom makes the core glow (lit pixels up at least 25%):
+  11048 -> 11679".
+- **Cause:** the check, not the flame. The same step on the built trees of 6a79dc30b (2026-11-25) reads 11,149 to
+  20,165 and on 3b3db1b10 (2026-11-26) 11,048 to 11,679; of the core, post, tonemap and vfx commits between them,
+  583beedbe (KB-CLEAR-DEFAULT1) made a linear capture hold core's clear colour decoded (0.0014, 0.0018, 0.0027) instead
+  of 0.018, 0.023, 0.035. The step sets no background and counts pixels more than 12 codes from the backdrop; AgX draws
+  the new backdrop near black, so the bloom's faint halo fell under the 12 codes. The flame shader, Bloom and the
+  three looks are unchanged in that range, and the core still grades 222, 179, 134 with no white pixel. (The brightest
+  linear channel of the flame is peak (1 - e^(-3/4)), about 2.1 at peak 4 and radiance 0.75, before and after.)
+- **Fix:** both runs of `graded` set `scene.background = '#242a35'`, the backdrop its bar was measured on, as the
+  three backdrop checks of KB-CLEAR-CHECKS1 do. The 25% bar is unchanged: 11,112 to 17,416 on WebGPU and 11,112 to
+  17,415 on the WebGL2 layer.
+- **Regression:** `packages/vfx/test/flame-check.mjs` step `graded`, which fails on main without it.
+
 ### Fixed 2026-11-27: five package GPU checks failed in the rerun made for the clear colour fix (KB-CLEAR-CHECKS1)
 
 - **Repro:** after `npm run build:packages` on c886aef6c, on an Intel Arc 140V (Windows, Edge 158):

@@ -252,10 +252,14 @@ window.check.crown=async function(){
 };
 // - graded: the animatedFeature looks of vfx (with flames.peak 4), post (bloom) and tonemap together: the flame core
 //   passes the bloom threshold so it glows (more lit pixels than the same frame without bloom), keeps a yellow-white
-//   hue through the tonemap and never turns white.
+//   hue through the tonemap and never turns white. Both runs set scene.background '#242a35', whose linear value is the
+//   0.018, 0.023, 0.035 the capture held for core's clear colour when the bars were measured: since KB-CLEAR-DEFAULT1
+//   (583beedbe) a capture holds that colour decoded, which AgX draws near black, and the halo the bar counts (pixels
+//   over 12 codes from the backdrop) fell under it, 11,048 to 11,679, while the flame and bloom drew the same
+//   (KB-FLAME-GRADEDBG1).
 window.check.graded=async function(){
  const run=async(bloomOn)=>{
-  const s=await bigScene(),bloom=new Bloom(),tonemap=new Tonemap(),pick=(look,pre)=>Object.fromEntries(Object.entries(look).filter(([k])=>pre.some(p=>k.startsWith(p))));
+  const s=await bigScene(),bloom=new Bloom(),tonemap=new Tonemap();s.e.scene.background='#242a35';const pick=(look,pre)=>Object.fromEntries(Object.entries(look).filter(([k])=>pre.some(p=>k.startsWith(p))));
   applyPostSettings({bloom},{...pick(POST_LOOKS.animatedFeature,['bloom.']),...(bloomOn?{}:{'bloom.strength':0})});
   applyTonemapSettings({tonemap},pick(TONEMAP_LOOKS.animatedFeature,['tonemap.','vignette.']));
   PostStack.attach(s.e,[bloom,tonemap]);
