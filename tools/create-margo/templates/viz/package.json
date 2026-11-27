@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@margoengine/kit-viz": "^1.0.0"
+    "@margoengine/kit-viz": "^0.1.0"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

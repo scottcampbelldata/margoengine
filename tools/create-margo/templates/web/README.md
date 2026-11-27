@@ -1,7 +1,7 @@
 # Margo app
 
 A studio scene: a gold torus knot, a jade sphere and a white box under image-based lighting, on a slow turntable with
-orbit controls, the stats overlay and quality tiers that keep it at a steady 60 FPS. Needs a browser with WebGPU.
+orbit controls, the stats overlay and quality tiers that keep it at a steady 60 FPS. It draws with WebGPU. If the browser has none, the page says so and links to the browsers that run Margo.
 
 ```sh
 npm install

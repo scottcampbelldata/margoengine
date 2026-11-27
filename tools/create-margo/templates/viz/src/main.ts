@@ -8,9 +8,14 @@ import {
   createStage,
 } from '@margoengine/kit-viz';
 import { Bloom } from '@margoengine/kit-viz/post/bloom';
+import { NO_WEBGPU, hasWebGPU, showStartError } from './browser';
 
 // 300,000 stars in a turning three-armed galaxy over a grid, with bloom and labels. Drag to orbit, scroll to zoom.
 async function start() {
+  if (!(await hasWebGPU())) {
+    showStartError(NO_WEBGPU);
+    return;
+  }
   const stage = await createStage('#viewport', {
     controls: false,
     camera: { position: [0, 5, 11], target: [0, 0, 0] },
@@ -61,5 +66,5 @@ async function start() {
 }
 
 start().catch((error) => {
-  document.querySelector('#error')!.textContent = `Could not start: ${error instanceof Error ? error.message : error}`;
+  showStartError(error instanceof Error ? error.message : String(error));
 });

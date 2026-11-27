@@ -2,7 +2,7 @@
 
 A small third-person game: walk Prototype Pete around a sunny field, knock over a stack of crates and find the six
 glowing orbs. WASD or the arrow keys walk, Shift runs. Built with the `@margoengine/game` kit: a physical sky with sun
-shadows, bloom, physics and an animated glTF character. Needs a browser with WebGPU.
+shadows, bloom, physics and an animated glTF character. It draws with WebGPU. If the browser has none, the page says so and links to the browsers that run Margo.
 
 ```sh
 npm install

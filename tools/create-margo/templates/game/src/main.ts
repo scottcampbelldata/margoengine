@@ -12,11 +12,16 @@ import {
 } from '@margoengine/game';
 import { loadGLTF } from '@margoengine/game/gltf/pbr';
 import { Physics } from '@margoengine/game/physics';
+import { NO_WEBGPU, hasWebGPU, showStartError } from './browser';
 
 // Find the six glowing orbs. WASD or the arrow keys walk, Shift runs; walk into the crates to knock them over.
 const hud = document.querySelector('#hud')!;
 
 async function start() {
+  if (!(await hasWebGPU())) {
+    showStartError(NO_WEBGPU);
+    return;
+  }
   await Physics.load();
   const stage = await createStage('#viewport', { controls: false, camera: { position: [0, 4, 9], target: [0, 1, 0] } });
   const engine = stage.engine;
@@ -147,5 +152,5 @@ async function start() {
 }
 
 start().catch((error) => {
-  document.querySelector('#error')!.textContent = `Could not start: ${error instanceof Error ? error.message : error}`;
+  showStartError(error instanceof Error ? error.message : String(error));
 });

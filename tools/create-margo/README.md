@@ -19,7 +19,7 @@ npm create margo@latest my-game -- --template game
 
 Each template depends on one domain kit, never the full `margoengine`: `@margoengine/kit-web`, `@margoengine/game`,
 `@margoengine/kit-viz`, or `@margoengine/kit-react` (with React) for `react` and `next`. It asks no questions and refuses to
-write into a non-empty directory. No dependencies of its own. It is on npm at 0.1.0.
+write into a non-empty directory. No dependencies of its own. It is on npm. This copy is 0.1.1.
 
 Tests: `node --test tests/create-margo.test.js` from the repository root (scaffolds every template, type-checks and
 builds it against the local packages); `node tools/create-margo/test/browser-check.mjs` renders the default one in a

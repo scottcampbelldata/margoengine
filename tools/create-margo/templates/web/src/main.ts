@@ -6,6 +6,7 @@ import { OrbitControls } from '@margoengine/kit-web/controls/orbit';
 import { Shadows } from '@margoengine/kit-web/shadows';
 import { Stats } from '@margoengine/kit-web/stats';
 import { applyQualityTier, paceEngine, watchQuality } from '@margoengine/kit-web/quality';
+import { NO_WEBGPU, hasWebGPU, showStartError } from './browser';
 
 // A small procedural studio (sky gradient, dark floor, two soft boxes) used for image-based lighting.
 // For a real HDR: Environment.attach(engine, await loadEnvironmentImage('/studio.hdr')).
@@ -25,6 +26,10 @@ function studio(width = 128, height = 64) {
 }
 
 async function start() {
+  if (!(await hasWebGPU())) {
+    showStartError(NO_WEBGPU);
+    return;
+  }
   applyQualityTier(); // before Engine.create: picks MSAA and pixel ratio for this device
 
   const canvas = document.querySelector('canvas')!;
@@ -73,5 +78,5 @@ async function start() {
 }
 
 start().catch((error) => {
-  document.querySelector('#error')!.textContent = `Could not start: ${error instanceof Error ? error.message : error}`;
+  showStartError(error instanceof Error ? error.message : String(error));
 });

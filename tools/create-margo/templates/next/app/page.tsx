@@ -1,5 +1,6 @@
 'use client';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { BROWSER_HELP, NO_WEBGPU, hasWebGPU } from './browser';
 import type { Mesh as MeshHandle } from '@margoengine/kit-react/core';
 import {
   Bloom,
@@ -31,6 +32,32 @@ function Shapes() {
 }
 
 export default function Page() {
+  const [ready, setReady] = useState<'wait' | 'ok' | 'no'>('wait');
+  useEffect(() => {
+    hasWebGPU()
+      .then((ok) => setReady(ok ? 'ok' : 'no'))
+      .catch(() => setReady('no'));
+  }, []);
+  if (ready !== 'ok') {
+    return (
+      <main
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          alignContent: 'center',
+          gap: 12,
+          padding: 32,
+          background: '#f4f7f8',
+          color: '#1c2430',
+          textAlign: 'center',
+        }}
+      >
+        <p>{ready === 'wait' ? 'Starting...' : NO_WEBGPU}</p>
+        {ready === 'no' ? <a href={BROWSER_HELP}>Browsers that run Margo</a> : null}
+      </main>
+    );
+  }
   return (
     <main style={{ height: '100vh' }}>
       <Canvas style={{ height: '100%' }} label="Three shapes in the sun. Drag to orbit, scroll to zoom.">

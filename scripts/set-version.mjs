@@ -1,6 +1,7 @@
-// Sets every published package (packages/*, tools/create-margo, tools/margo-convert, tools/margo-convert-cad and the create-margo template's
-// dependencies) to one version, with every internal range `^<version>`. All packages ship in lockstep, so an app never
-// mixes versions; tests/versions.test.js fails if they drift. Usage: node scripts/set-version.mjs 1.0.0
+// Sets every published engine package (packages/*, tools/margo-convert, tools/margo-convert-cad) to one version,
+// with every internal range `^<version>`. create-margo stays on its own 0.1 line, and its templates keep ^0.1.0 so
+// `npm create margo` can install the packages that are on npm. tests/versions.test.js fails if the rest drift.
+// Usage: node scripts/set-version.mjs 1.0.0
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -21,6 +22,9 @@ const consumers = JSON.parse(readFileSync('package.json', 'utf8'))
   .map((w) => join(w, 'package.json'));
 
 for (const path of [...manifests, ...consumers]) {
+  // create-margo is published as 0.1.x while these packages stay on one version.
+  // Its templates depend on ^0.1.0, the engine release on npm, so a new app can install.
+  if (path === 'tools/create-margo/package.json' || path.includes(`${join('create-margo', 'templates')}`)) continue;
   const text = readFileSync(path, 'utf8'),
     manifest = JSON.parse(text);
   if (manifests.includes(path) && !path.includes('templates')) manifest.version = version;

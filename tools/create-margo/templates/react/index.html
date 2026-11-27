@@ -7,10 +7,14 @@
     <title>Margo React app</title>
     <style>
       html, body, #root { margin: 0; height: 100%; background: #0e1117; color: #e8eeed; font: 16px system-ui, sans-serif; }
+      #error[hidden] { display: none; }
+      #error:not([hidden]) { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center; align-content: center; gap: 12px; margin: 0; padding: 32px; background: #f4f7f8; color: #1c2430; text-align: center; }
+      #error a { color: #0b5cab; }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    <p id="error" role="alert" hidden></p>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -73,9 +73,10 @@ async function load() {
     if (!response.ok) throw new Error('Catalog unavailable');
     const entries = await response.json();
     const published = entries.filter(entry => entry.published).length;
+    const npmRelease = entries.find(entry => entry.npmVersion)?.npmVersion;
     document.querySelector('.eyebrow').textContent = `${entries.length} PACKAGES · ${published} ON NPM`;
     document.querySelector('#publication-note').textContent = published === entries.length
-      ? 'All packages are available on npm.'
+      ? `All packages are on npm${npmRelease ? ` at ${npmRelease}` : ''}.`
       : `${entries.length - published} packages await npm publication. Build packages marked Source from the repository; their install commands and CDN examples will work after publication.`;
     // catalog.json lists packages layer by layer (scripts/build-catalog.js); each layer gets its own headed section.
     const layers = new Map();
@@ -94,12 +95,14 @@ async function load() {
       const card = document.querySelector('#module-template').content.firstElementChild.cloneNode(true);
       card.id = entry.id;
       card.querySelector('h3').textContent = entry.title;
-      card.querySelector('.badge').textContent = `${entry.published ? 'npm' : 'Source'} · ${entry.version}`;
+      const shownVersion = entry.npmVersion || entry.version;
+      const install = entry.npmVersion ? entry.install.replaceAll(`@${entry.version}`, `@${entry.npmVersion}`) : entry.install;
+      card.querySelector('.badge').textContent = `${entry.published ? 'npm' : 'Source'} · ${shownVersion}`;
       card.querySelector('.install-heading').textContent = entry.published ? 'Install' : 'Install after publication';
       card.querySelector('.package').textContent = entry.package;
       card.querySelector('.description').textContent = entry.description;
       card.querySelector('.requirements').textContent = entry.requirements;
-      card.querySelector('.install').textContent = entry.install;
+      card.querySelector('.install').textContent = install;
       card.querySelector('.imports').textContent = entry.imports;
       if (entry.example) {
         card.querySelector('.example-title').textContent = entry.exampleTitle;
@@ -125,7 +128,7 @@ async function load() {
       for (const kind of ['install', 'imports']) {
         const button = card.querySelector(`[data-copy="${kind}"]`);
         button.setAttribute('aria-label', `Copy ${kind} for ${entry.title}`);
-        button.addEventListener('click', () => copy(entry[kind], button, card.querySelector(`.${kind}`)));
+        button.addEventListener('click', () => copy(kind === 'install' ? install : entry[kind], button, card.querySelector(`.${kind}`)));
       }
       card.querySelector('.source').addEventListener('toggle', event => {
         if (event.currentTarget.open) exampleSource(entry, card).catch(() => {});

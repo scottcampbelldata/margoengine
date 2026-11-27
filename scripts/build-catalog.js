@@ -3,6 +3,7 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PACKAGE_LISTS, withPackageList } from './package-lists.js';
+import { publicationFromRegistry } from './support/catalog-publication.mjs';
 import { packageCountFiles, restatePackageCount } from './support/public-truth.mjs';
 
 const existingText = await readFile('docs/catalog.json', 'utf8'),
@@ -153,9 +154,11 @@ for (const id of await readdir('packages')) {
     !response || response.ok || response.status === 404,
     `${manifest.name}: registry returned ${response?.status}`,
   );
-  const published = response
-    ? response.ok && !!(await response.json()).versions?.[manifest.version]
-    : (previous?.published ?? false);
+  const registry = response?.ok ? await response.json() : null;
+  const { published, npmVersion } =
+    response == null
+      ? { published: previous?.published ?? false, npmVersion: previous?.npmVersion }
+      : publicationFromRegistry(manifest.version, registry);
   const core = manifest.peerDependencies?.['@margoengine/core'],
     category = categoryOf(id);
   assert.ok(category, `${manifest.name} has no layer: add it to the layers in scripts/build-catalog.js`);
@@ -170,6 +173,7 @@ for (const id of await readdir('packages')) {
     package: manifest.name,
     version: manifest.version,
     published,
+    npmVersion,
     description: manifest.description,
     requirements: core
       ? `Core ${core} · see the package guide for browser and backend requirements`

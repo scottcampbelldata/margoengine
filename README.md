@@ -2,10 +2,63 @@
 
 A small WebGPU engine for the web, with a Rust/Wasm core.
 
+![A textured crate and a ball with shadows on a checkered floor, rendered by Margo Engine](docs/images/quickstart.webp)
+
+[Live examples](https://margoengine.com/)
+
+## Quick start
+
+You need Node.js 22.12 or newer, and current Chrome or Edge. The packages are on npm at 0.1.0. `npm create margo` runs the [create-margo](tools/create-margo/README.md) package.
+
+```sh
+npm create margo@latest my-app
+cd my-app
+npm install
+npm run dev
+```
+
+Open the address Vite prints, usually <http://localhost:5173>. You should see a gold knot, a jade sphere and a white box on a dark stand, turning slowly. Drag to orbit, scroll to zoom.
+
+If the browser has no WebGPU, the page says so and links to the browsers that run Margo. The picture above is a scene from this repository, with a floor, a crate and a ball.
+
+`npm create margo@latest my-app -- --template game` starts a small game instead of the studio scene.
+
+Or, in an empty folder, install the games package:
+
+```sh
+npm install @margoengine/games vite
+```
+
+Save this as `index.html`:
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Margo</title>
+    <style>html, body, #scene { margin: 0; height: 100%; }</style>
+  </head>
+  <body>
+    <div id="scene"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>
+```
+
+Save this as `main.ts`:
+
+```ts
+import { createStage } from '@margoengine/games';
+
+const stage = await createStage('#scene');
+stage.box({ color: '#84d6bd' });
+```
+
+Then run `npx vite` and open the address it prints. You should see a jade box. Drag to orbit, scroll to zoom. `createStage`, `Shadows`, `OrbitControls`, `Input` and `Tween` are root exports of `@margoengine/games`. Physics is `import { Physics } from '@margoengine/games/physics'`. Textured glTF is `import { loadGLTF } from '@margoengine/games/gltf/pbr'`. `import { createStage } from 'margoengine'` is the same function after `npm install margoengine`. `@margoengine/core` does not export `createStage`.
+
 [![CI](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml/badge.svg)](https://github.com/scottcampbelldata/margoengine/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-
-![A textured crate and a ball with shadows on a checkered floor, rendered by Margo Engine](docs/images/quickstart.webp)
 
 **[Build something in 5 minutes: a textured, lit scene with shadows and picking](#build-something-in-5-minutes)** ·
 [Start here: guides by goal](docs/start-here.md) · [Demos](#demos) ·
@@ -15,45 +68,6 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 
 The core and the stage together are 24,910 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
-
-## Quick start
-
-The packages are on npm at 0.1.0. `npm create margo` runs the [create-margo](tools/create-margo/README.md) package.
-
-```sh
-npm create margo@latest my-app
-cd my-app
-npm install
-npm run dev
-```
-
-The default template is a web app. `npm create margo@latest my-app -- --template game` starts a small game. The starter
-templates run on WebGPU. A WebGL2 fallback in those templates is a later change.
-
-Or install the games package in a Vite app:
-
-```sh
-npm install @margoengine/games vite
-```
-
-`index.html` needs a container and a module script:
-
-```html
-<div id="scene" style="height: 100vh"></div>
-<script type="module" src="/main.ts"></script>
-```
-
-```ts
-import { createStage } from '@margoengine/games';
-
-const stage = await createStage('#scene');
-stage.box({ color: '#84d6bd' });
-```
-
-Then run `npx vite`. `createStage`, `Shadows`, `OrbitControls`, `Input` and `Tween` are root exports of
-`@margoengine/games` at 0.1.0. Physics is `import { Physics } from '@margoengine/games/physics'`. Textured glTF is
-`import { loadGLTF } from '@margoengine/games/gltf/pbr'`. The same `createStage` is also `import { createStage } from 'margoengine'`
-after `npm install margoengine`. `@margoengine/core` does not export `createStage`.
 
 ## Build something in 5 minutes
 

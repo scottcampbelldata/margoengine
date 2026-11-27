@@ -1,6 +1,6 @@
 # Margo Next.js app
 
-Three shapes in afternoon sun with soft shadows, bloom and an orbit turntable, written as JSX with `margoengine/react`. Needs a browser with WebGPU.
+Three shapes in afternoon sun with soft shadows, bloom and an orbit turntable, written as JSX with `@margoengine/kit-react`. It draws with WebGPU. If the browser has none, the page says so and links to the browsers that run Margo.
 
 ```sh
 npm install

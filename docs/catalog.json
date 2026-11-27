@@ -5,7 +5,7 @@
     "category": "Start here",
     "package": "@margoengine/stage",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "The stage: createStage mounts a canvas, camera controls and rendering in five lines. Re-exported by margoengine.",
     "requirements": "See the package guide for requirements",
     "keywords": "stage",
@@ -23,7 +23,8 @@
       "box",
       "createStage",
       "sphere"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "core",
@@ -47,8 +48,9 @@
     "exampleTitle": "A rotating cube",
     "exampleNote": "Create a mesh, give it a material and animate its rotation. Falls back to WebGL2 when needed.",
     "version": "1.0.0",
-    "published": false,
-    "category": "Start here"
+    "published": true,
+    "category": "Start here",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "game",
@@ -56,7 +58,7 @@
     "category": "Start here",
     "package": "@margoengine/game",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Install profile. Games: models, animation, light and shadow, sky, physics, audio, input, effects",
     "requirements": "See the package guide for requirements",
     "keywords": "game",
@@ -101,7 +103,8 @@
       "loadTexture",
       "planeGeometry",
       "sphereGeometry"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "kit-web",
@@ -109,7 +112,7 @@
     "category": "Start here",
     "package": "@margoengine/kit-web",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Install profile. Product viewers and 3D on web pages: a glTF model, studio light, orbit, HTML on top",
     "requirements": "See the package guide for requirements",
     "keywords": "kit web",
@@ -130,7 +133,8 @@
       "Tonemap",
       "Tween",
       "createStage"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "kit-viz",
@@ -138,7 +142,7 @@
     "category": "Start here",
     "package": "@margoengine/kit-viz",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Install profile. Data and scientific visualization: figures and GPU compute, points, lines, splats, terrain, labels and text",
     "requirements": "See the package guide for requirements",
     "keywords": "kit viz",
@@ -177,7 +181,8 @@
       "createFigure",
       "createStage",
       "parseSplat"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "kit-react",
@@ -185,7 +190,7 @@
     "category": "Start here",
     "package": "@margoengine/kit-react",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Install profile. React and Next.js web apps",
     "requirements": "See the package guide for requirements",
     "keywords": "kit react",
@@ -335,14 +340,15 @@
       "useProgress",
       "useScroll",
       "useSurfaceSampler"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "margoengine",
     "title": "Stage facade",
     "package": "margoengine",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Margo Engine in one install: the stage and every package as margoengine/<name> (margoengine/gltf, margoengine/shadows, margoengine/physics, margoengine/react).",
     "requirements": "See the package guide for requirements",
     "keywords": "margoengine",
@@ -361,7 +367,8 @@
       "createStage",
       "sphere"
     ],
-    "category": "Start here"
+    "category": "Start here",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "math",
@@ -369,7 +376,7 @@
     "category": "Setup and diagnostics",
     "package": "@margoengine/math",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Vector, quaternion, matrix, Euler, color, bounds, ray, plane and frustum math, one module per type.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "math",
@@ -419,7 +426,8 @@
       "shBasis",
       "unprojectPoint",
       "worldToScreen"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "quality",
@@ -427,7 +435,7 @@
     "category": "Setup and diagnostics",
     "package": "@margoengine/quality",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Measured quality tiers: start light, time the GPU, remember full 4x quality only where it has headroom.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "quality",
@@ -450,7 +458,8 @@
       "sceneSamples",
       "watchQuality",
       "watchResolution"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "webgl2-compat",
@@ -458,7 +467,7 @@
     "category": "Setup and diagnostics",
     "package": "@margoengine/webgl2-compat",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "WebGL2 compatibility for browsers without WebGPU: install() runs the real renderer with a WebGPU-shaped device, WGSL translation and tiered compute. Optional /preview, /pick, /restore and /auto entries preserve the smaller preview on lower-tier WebGL2; /xr supports WebXR.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "webgl2 compat",
@@ -473,7 +482,8 @@
       "uninstall",
       "waitFor",
       "webgl2Capabilities"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "worker",
@@ -481,7 +491,7 @@
     "category": "Setup and diagnostics",
     "package": "@margoengine/worker",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Runs Margo Engine in a Web Worker on an OffscreenCanvas: canvas transfer, resize, pixel ratio and input forwarding, so heavy scenes never block the page.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "worker",
@@ -491,14 +501,15 @@
       "WorkerCanvas",
       "transferCanvas",
       "workerCanvasSupported"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "stats",
     "title": "Stats",
     "package": "@margoengine/stats",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking, a CPU phase breakdown, leak alerts and field telemetry.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "stats",
@@ -508,14 +519,15 @@
       "GPUProfiler",
       "Stats"
     ],
-    "category": "Setup and diagnostics"
+    "category": "Setup and diagnostics",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "inspector",
     "title": "Inspector",
     "package": "@margoengine/inspector",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Entity hierarchy, live properties, WebGPU wireframe, normal and bounding-box overlays, and a frame debugger.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "inspector",
@@ -529,7 +541,8 @@
       "restoreSnapshot",
       "snapshotMeshes"
     ],
-    "category": "Setup and diagnostics"
+    "category": "Setup and diagnostics",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "gltf",
@@ -549,15 +562,16 @@
     "exampleTitle": "Load a glTF triangle",
     "exampleNote": "Parse a tiny built-in glTF model without downloading an asset. For your own file, use loadGLTF(engine, '/model.glb').",
     "version": "1.0.0",
-    "published": false,
-    "category": "Loading and formats"
+    "published": true,
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "loaders",
     "title": "Loaders",
     "package": "@margoengine/loaders",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "PLY, STL, 3MF, PCD, OFF, XYZ, OBJ/MTL, COLLADA, Tiled TMX, VTK, NRRD, LDraw, Rhino 3DM, 3DS, LWO, AMF, MD2, PDB, KMZ, NURBS, LAS, OpenVDB, MaterialX, Lottie, static USDA/USDZ, SVG and TrueType font loaders for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "loaders",
@@ -626,14 +640,15 @@
       "toGeometry",
       "vmdBezier"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "decoders",
     "title": "Decoders",
     "package": "@margoengine/decoders",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Worker-pooled Draco geometry and KTX2/Basis texture decoding, and synchronous PNG, TGA, TIFF, DDS and KTX reading, for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "decoders",
@@ -651,14 +666,15 @@
       "meshoptDecodeIndexSequence",
       "meshoptDecodeVertexBuffer"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "fbx",
     "title": "Fbx",
     "package": "@margoengine/fbx",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Binary and ASCII FBX conversion into the optional Margo glTF animation pipeline.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "fbx",
@@ -669,14 +685,15 @@
       "loadFBX",
       "parseFBX"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "usdz",
     "title": "Usdz",
     "package": "@margoengine/usdz",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional static USDA, USDC and USDZ ingestion through Margo glTF PBR.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "usdz",
@@ -691,14 +708,15 @@
       "parseUSDC",
       "parseUSDZ"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "exporters",
     "title": "Exporters",
     "package": "@margoengine/exporters",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "glTF/GLB, STL, OBJ, PLY, USDZ, COLLADA and 3MF exporters for Margo Engine scenes and geometry data.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "exporters",
@@ -726,7 +744,8 @@
       "writeOpacityMaps",
       "writeTextures"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "cad",
@@ -734,7 +753,7 @@
     "category": "Loading and formats",
     "package": "@margoengine/cad",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "CAD import for Margo Engine: STL and OBJ parsing with welding and part deduplication, STEP, IGES, ACIS SAT, Parasolid XT and JT through Margo's own B-rep kernel in a worker, and the stage addCAD helper.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "cad step iges sat xt jt stl obj import",
@@ -746,7 +765,8 @@
       "loadCAD",
       "parseCAD",
       "parseCADAsync"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "brep",
@@ -754,7 +774,7 @@
     "category": "Loading and formats",
     "package": "@margoengine/brep",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Margo's own CAD kernel: STEP (ISO 10303-21), IGES 5.3, ACIS SAT, Parasolid XT and JT (ISO 14306) reading, product structure, units and colours, exact B-rep geometry (analytic surfaces and NURBS) and crack-free tessellation.",
     "requirements": "See the package guide for requirements",
     "keywords": "brep b-rep step iges sat xt jt nurbs tessellation kernel",
@@ -785,7 +805,8 @@
       "tessellateSTEP",
       "validateSTEP",
       "xtToSTEP"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "ifc",
@@ -793,7 +814,7 @@
     "category": "Loading and formats",
     "package": "@margoengine/ifc",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "IFC geometry and BIM identifiers for Margo Engine, using an initialized web-ifc runtime.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "ifc",
@@ -805,14 +826,15 @@
       "openIFC",
       "parseIFC",
       "readIFCGeometry"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "blender",
     "title": "Blender",
     "package": "@margoengine/blender",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional offline Blender .margo assets using Margo's WebGPU PBR renderer.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "blender",
@@ -823,7 +845,8 @@
       "loadMargo",
       "parseMargo"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "cache",
@@ -831,7 +854,7 @@
     "category": "Loading and formats",
     "package": "@margoengine/cache",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Opt-in offline asset cache: a fetch-compatible IndexedDB cache for GLB, .bin and texture files with ETag/Last-Modified revalidation, app versioning, range requests, a byte budget with LRU eviction and network fallback.",
     "requirements": "See the package guide for requirements",
     "keywords": "cache",
@@ -840,14 +863,15 @@
     "exports": [
       "AssetCache",
       "cachedFetch"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "splats",
     "title": "Splats",
     "package": "@margoengine/splats",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "splats gaussian splatting 3dgs ply spz sog splat zstandard zstd",
@@ -872,7 +896,8 @@
       "transformSplats",
       "validateSplats"
     ],
-    "category": "Loading and formats"
+    "category": "Loading and formats",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "tiles",
@@ -880,7 +905,7 @@
     "category": "Loading and formats",
     "package": "@margoengine/tiles",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Streaming OGC 3D Tiles 1.1: implicit and explicit tilesets, screen-space-error selection, a fetch queue, a memory budget and glTF tiles drawn through gltf/pbr.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "tiles",
@@ -930,14 +955,15 @@
       "transformDirection",
       "transformPoint",
       "translation"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "materials",
     "title": "Extended PBR materials",
     "package": "@margoengine/materials",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional glTF PBR material lobes, transmission, volume, parallax occlusion, triplanar and subsurface scattering, and typed node graphs through an isolated extension slot.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "materials clearcoat transmission ior volume refraction attenuation KHR_materials_clearcoat KHR_materials_transmission KHR_materials_ior KHR_materials_volume coat factor roughness normal texture pbr gltf sheen specular anisotropy iridescence thinfilm KHR_materials_sheen KHR_materials_specular KHR_materials_anisotropy KHR_materials_iridescence",
@@ -992,7 +1018,8 @@
       "transformUVs",
       "transmission"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "shader",
@@ -1000,7 +1027,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/shader",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Typed shader nodes that compile to readable WGSL: node materials, node post effects and node compute passes, with a visual node editor.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "shader",
@@ -1167,14 +1194,15 @@
       "workgroupBarrier",
       "workgroupCount",
       "workgroupId"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "environment",
     "title": "Environment",
     "package": "@margoengine/environment",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "HDR/EXR/UltraHDR loading, EXR writing, image-based lighting (prefiltered specular, SH irradiance, BRDF LUT), environment backgrounds and scene fog for Margo Engine on WebGPU.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "environment",
@@ -1216,14 +1244,15 @@
       "shBasis",
       "srgbColor"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "clustered",
     "title": "Clustered",
     "package": "@margoengine/clustered",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "WebGPU clustered forward point and spot lighting with optional local shadows.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "clustered point spot lights shadows depth maps",
@@ -1234,14 +1263,15 @@
       "MAX_CLUSTERED_LIGHTS",
       "clusteredSampling"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "shadows",
     "title": "Shadows",
     "package": "@margoengine/shadows",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Four-cascade cached directional shadows with PCSS.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "shadows",
@@ -1252,7 +1282,8 @@
       "cascadeSplits",
       "fitCascades"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "lightmap",
@@ -1260,7 +1291,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/lightmap",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "CPU lightmap atlases with native albedo, emission, normal and ORM textures; triangle meshes at their own UV1 (./mesh), also progressively on the GPU (./gpu), with directional lightmaps (./directional) and irradiance probes from the same scene (./probes); optional area lights, emissive surfaces, bounces and glass (./global), caustics through rough and dispersive glass with bounces (./refracted) and an edge-avoiding a-trous denoiser (./denoise).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "lightmap",
@@ -1269,14 +1300,15 @@
     "exports": [
       "bakeLightmap",
       "lightingAsset"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "sky",
     "title": "Sky",
     "package": "@margoengine/sky",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Procedural atmospheric skies, clouds, sun, moon, stars and weather (rain, snow, lightning), with a moonlit night sky, day presets, preset scenes, scene kits, the Milky Way, aurora and a textured moon.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "sky",
@@ -1304,7 +1336,8 @@
       "twilightIlluminance",
       "twilightLightColor"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "weather",
@@ -1312,7 +1345,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/weather",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Weather over time: a state machine with presets that blends rain, snow, hail, wind and lightning; a deterministic wind field; wet and snowy surface hooks in JavaScript and WGSL; snow avalanches with a powder cloud that run out, entrain the cover, break trees and settle; volcanic eruption columns with an umbrella cloud, ash fall and plume lightning; lava flows that run down the ground and crust over with glowing cracks, fountains, bombs and glow lights; snow that drifts, builds cornices, sloughs and carries a slab's slide state; helpers for the sky's Weather; and bouncing GPU hail.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "weather",
@@ -1412,14 +1445,15 @@
       "windBend",
       "windProfile",
       "wrapAngle"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "toon",
     "title": "Toon",
     "package": "@margoengine/toon",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Stepped diffuse shading and inverted-hull outlines.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "toon",
@@ -1428,7 +1462,8 @@
     "exports": [
       "Toon"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "oit",
@@ -1436,7 +1471,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/oit",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Order-independent transparency for gltf/pbr BLEND primitives and materials transparent meshes: weighted blending, moment-based blending, or exact per-pixel layer lists, with no popping between overlapping transparent parts.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "oit",
@@ -1444,7 +1479,8 @@
     "imports": "import { OIT } from '@margoengine/oit';",
     "exports": [
       "OIT"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "lod",
@@ -1452,7 +1488,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/lod",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Level of detail with hysteresis and screen-size switching for thousands of instances, plus GPU-baked octahedral imposters drawn in one instanced call per atlas.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "lod",
@@ -1472,7 +1508,8 @@
       "normalMatrix",
       "octDecode",
       "octEncode"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "culling",
@@ -1480,7 +1517,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/culling",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "GPU-driven static instances: frustum and Hi-Z occlusion culling in compute, order-preserving compaction and indirect draws, no per-part CPU work per frame.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "culling",
@@ -1489,14 +1526,15 @@
     "exports": [
       "CulledInstances",
       "CulledMeshes"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "points",
     "title": "Points",
     "package": "@margoengine/points",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Large point clouds (PointCloud, PointsMaterial) and instanced sprites (SpriteBatch, SpriteMaterial) for Margo Engine, WebGPU.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "points",
@@ -1537,7 +1575,8 @@
       "screenArea",
       "worldBox"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "sprites",
@@ -1545,7 +1584,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/sprites",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "2D sprites at exact pixels: one instanced draw per layer, atlas rectangles, pivot, flip, rotation, tint, z and y sorting, integer pixel snapping and an optional normal map target, camera-facing billboards in 3D and bone-driven 2D skeletal meshes.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "sprites",
@@ -1559,14 +1598,15 @@
       "packSprites",
       "snapToPixel",
       "sortSprites"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "lines",
     "title": "Lines",
     "package": "@margoengine/lines",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Fat lines (Line, LineMaterial) and debug helpers for Margo Engine, WebGPU.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "lines",
@@ -1603,14 +1643,15 @@
       "segmentIndices",
       "triangleArea"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "text",
     "title": "Text",
     "package": "@margoengine/text",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "GPU signed distance field text for Margo Engine: runtime glyph atlases from any browser font, wrapping, alignment, outlines and shadows, WebGPU.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "text",
@@ -1636,7 +1677,8 @@
       "squaredDistanceTransform",
       "validateLayoutOptions"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "pixel",
@@ -1644,7 +1686,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/pixel",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Pixel art rendering: a pixel camera with integer zoom and parallax, and a layer compositor that scales low-res layers by whole numbers and turns them with every output pixel one source pixel.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "pixel",
@@ -1654,7 +1696,8 @@
       "LayerCompositor",
       "PixelCamera",
       "PixelLayer"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "lighting2d",
@@ -1662,7 +1705,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/lighting2d",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "2D lights for Margo Engine: point, spot and directional lights with normal-mapped shading and hard shadows from occluder edges, for pixel layers.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "lighting2d",
@@ -1676,14 +1719,15 @@
       "lightAffectsLayer",
       "lightAt",
       "occluderEdges"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "labels",
     "title": "Labels",
     "package": "@margoengine/labels",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "HTML labels and CSS 3D objects positioned over a Margo Engine canvas.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "labels",
@@ -1703,14 +1747,15 @@
       "objectCSSTransform",
       "orthographicCSSTransform"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "html",
     "title": "Html",
     "package": "@margoengine/html",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "World-space DOM anchors, CSS3D placement and scene-depth occlusion.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "html",
@@ -1719,14 +1764,15 @@
     "exports": [
       "HTML"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "video",
     "title": "Video",
     "package": "@margoengine/video",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "WebGPU external video textures and optional Web Audio sampling.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "video",
@@ -1736,14 +1782,15 @@
       "Video",
       "objectFit"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "xr",
     "title": "Xr",
     "package": "@margoengine/xr",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional WebGPU WebXR sessions, input poses and stereo rendering for Margo Engine, with real-device runs (./device-check).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "xr",
@@ -1757,7 +1804,8 @@
       "createXREngine",
       "useXRSession"
     ],
-    "category": "Rendering and lighting"
+    "category": "Rendering and lighting",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "headless",
@@ -1765,7 +1813,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/headless",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Render without a browser page: a stand-in canvas for core, GPU globals from the WebGPU binding you pass in, and readback to RGBA pixels or PNG bytes.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "headless",
@@ -1777,7 +1825,8 @@
       "installGPU",
       "readPixels",
       "toPNG"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "studio",
@@ -1785,7 +1834,7 @@
     "category": "Rendering and lighting",
     "package": "@margoengine/studio",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Product-shot studio: soft ground contact shadows (shadow-catcher plane), accumulated and path-traced shots, caustics and a cyclorama backdrop for core meshes and glTF models.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "studio",
@@ -1793,14 +1842,15 @@
     "imports": "import { ContactShadows } from '@margoengine/studio';",
     "exports": [
       "ContactShadows"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "post",
     "title": "Post",
     "package": "@margoengine/post",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "HDR bloom, frame-graph SSAO, GTAO, SSGI and SSR, motion blur, lens flare, SMAA and FXAA, glitch and afterimage, and post-effect stacks for Margo Engine WebGPU.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "post",
@@ -1823,14 +1873,15 @@
       "SceneFade",
       "bloomWeights"
     ],
-    "category": "Post-processing"
+    "category": "Post-processing",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "tonemap",
     "title": "Tonemap",
     "package": "@margoengine/tonemap",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional color grading: Khronos PBR Neutral (the engine default), AgX and ACES fitted curves, 2-65 cube LUTs.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "tonemap",
@@ -1846,14 +1897,15 @@
     "exampleTitle": "Highlights and color",
     "exampleNote": "Run the optional tonemapping package with the current Core 0.1 engine. Compare AgX, ACES fitted and Neutral, exposure, contrast and a local 33-cube LUT.",
     "exampleSource": false,
-    "category": "Post-processing"
+    "category": "Post-processing",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "dof",
     "title": "Dof",
     "package": "@margoengine/dof",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional two-pass WebGPU depth of field with circular bokeh.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "dof",
@@ -1866,14 +1918,15 @@
     "exampleTitle": "Circular bokeh",
     "exampleNote": "Run the optional depth-of-field package with the current Core 0.1 engine. Focus, focal length, aperture and an effect toggle remain interactive.",
     "exampleSource": false,
-    "category": "Post-processing"
+    "category": "Post-processing",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "taa",
     "title": "Taa",
     "package": "@margoengine/taa",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Optional temporal anti-aliasing with motion vectors and YCoCg history clamping.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "taa",
@@ -1884,14 +1937,15 @@
       "halton",
       "jitterProjection"
     ],
-    "category": "Post-processing"
+    "category": "Post-processing",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "transitions",
     "title": "Transitions",
     "package": "@margoengine/transitions",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "WebGPU scene wipes, noise dissolves and chromatic displacement.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "transitions",
@@ -1900,14 +1954,15 @@
     "exports": [
       "Transitions"
     ],
-    "category": "Post-processing"
+    "category": "Post-processing",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "terrain",
     "title": "Terrain",
     "package": "@margoengine/terrain",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Geometry clipmaps and triplanar terrain layers.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "terrain",
@@ -1923,7 +1978,8 @@
       "planRings",
       "wetSandAfter"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "biomes",
@@ -1931,7 +1987,7 @@
     "category": "World and effects",
     "package": "@margoengine/biomes",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Biome maps from a heightmap and a few climate settings: integer fixed-point climate fields, biome classification with smooth ecotones, presets, terrain ground weights and editor hooks, byte-identical on every platform.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "biomes",
@@ -1951,7 +2007,8 @@
       "quantizeClimate",
       "seasonMean",
       "treelineMargin"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "voxel",
@@ -1959,7 +2016,7 @@
     "category": "World and effects",
     "package": "@margoengine/voxel",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Voxel worlds: a block-type registry, 32-cubed palette chunks with light bytes, and a chunked world with dirty tracking and change events.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "voxel",
@@ -1984,7 +2041,8 @@
     "example": "../voxel/",
     "exampleTitle": "Voxel sandbox",
     "exampleNote": "A small block-building game: streamed terrain with caves, trees and plants, sky and torch light, walking, swimming and flying, breaking and placing blocks, saved in the browser.",
-    "exampleSource": false
+    "exampleSource": false,
+    "npmVersion": "0.1.0"
   },
   {
     "id": "voxel-pathtracer",
@@ -1992,7 +2050,7 @@
     "category": "World and effects",
     "package": "@margoengine/voxel-pathtracer",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Progressive WebGPU path tracer for instanced voxel models: diffuse, plastic, metal, glass, emissive, blended and volumetric materials, sun, sky, HDR environment and area lights, depth of field, motion blur, a denoiser and PNG capture.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "voxel path tracer ray tracing render magicavoxel",
@@ -2016,7 +2074,8 @@
       "traceViewportSize",
       "validateTraceMaterial",
       "validateTraceOptions"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "voxel-edit",
@@ -2024,7 +2083,7 @@
     "category": "World and effects",
     "package": "@margoengine/voxel-edit",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Editing voxel models for editors and tools: dense and sparse grids, modeling operations, brushes and selections, picking, export meshing, .vox scene editing and frame animation.",
     "requirements": "See the package guide for requirements",
     "keywords": "voxel edit",
@@ -2058,14 +2117,15 @@
       "stackSlices",
       "turnGrid",
       "wrapGrid"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "water",
     "title": "Water",
     "package": "@margoengine/water",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Gerstner water surfaces, terrain-coupled shallow-water flow, foam and spray.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "water",
@@ -2080,14 +2140,15 @@
       "breakerDepth",
       "contourSegments"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "scatter",
     "title": "Scatter",
     "package": "@margoengine/scatter",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Seeded instancing, distance-based LOD and procedural wind.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "scatter",
@@ -2114,7 +2175,8 @@
       "swayTip",
       "windClockRate"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "scenes",
@@ -2122,7 +2184,7 @@
     "category": "World and effects",
     "package": "@margoengine/scenes",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Ready places built from the engine's packages in one call: a catalogue of scenes, each with documented settings, presets, anchors and camera views.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "scenes",
@@ -2131,14 +2193,15 @@
     "exports": [
       "sceneInfo",
       "scenes"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "road",
     "title": "Road",
     "package": "@margoengine/road",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Arc-length spline road surfaces, raised curbs and tiled UVs.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "road",
@@ -2148,7 +2211,8 @@
       "road",
       "roadPath"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "tilemap",
@@ -2156,7 +2220,7 @@
     "category": "World and effects",
     "package": "@margoengine/tilemap",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "2D tile maps for Margo Engine: the TileMapData format (tilesets, animated tiles, collision shapes, tile and object layers, parallax), a chunked renderer at exact pixels, auto-tiling and the Tiled and LDtk importers.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "tilemap",
@@ -2183,14 +2247,15 @@
       "tilesetForGid",
       "validateTileMap",
       "visibleChunks"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "vfx",
     "title": "Vfx",
     "package": "@margoengine/vfx",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "GPU particle simulation and indirect billboards, with curves over life and sphere, cone and mesh-surface emitters.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "vfx",
@@ -2200,7 +2265,8 @@
       "VFX",
       "VFX_TICK_RATE"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "creative",
@@ -2224,15 +2290,16 @@
     "exampleTitle": "A field of GPU particles",
     "exampleNote": "Run 2,000 particles with wind and curl. This example requires WebGPU; it explains how to proceed when WebGPU is unavailable.",
     "version": "1.0.0",
-    "published": false,
-    "category": "World and effects"
+    "published": true,
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "procedural",
     "title": "Procedural",
     "package": "@margoengine/procedural",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Procedural cabins, foliage, grass, humanoids, Marching Cubes surfaces, seeded 2D/3D/4D noise, L-systems, Voronoi fracture and a bounded voxel expression language.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "procedural",
@@ -2272,14 +2339,15 @@
       "radialAO",
       "ridged"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "wfc",
     "title": "Wfc",
     "package": "@margoengine/wfc",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Seeded wave function collapse: 3D tile adjacency and the 2D overlapping (sample-based) model with backtracking.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "wfc",
@@ -2288,14 +2356,15 @@
     "exports": [
       "WFC"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "splines",
     "title": "Splines",
     "package": "@margoengine/splines",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "3D Catmull-Rom, Bezier, Hermite, B-spline and Kochanek-Bartels curves with arc-length lookup, closest point, stable frames and knot editing.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "splines",
@@ -2304,14 +2373,15 @@
     "exports": [
       "Spline"
     ],
-    "category": "World and effects"
+    "category": "World and effects",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "animation",
     "title": "Animation",
     "package": "@margoengine/animation",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Storage-buffer skinning and compute morph targets for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "animation",
@@ -2333,14 +2403,15 @@
       "sampleTrackInto",
       "segmentTime"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "animator",
     "title": "Animator",
     "package": "@margoengine/animator",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Blend trees, additive layers, animation states, foot IK, CCD IK chains, root motion, and look-at and aim constraints.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "animator",
@@ -2358,14 +2429,15 @@
       "blend2D",
       "solveTwoBoneIK"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "kinematics-constraints",
     "title": "Kinematics constraints",
     "package": "@margoengine/kinematics-constraints",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Standalone analytical capsule, sphere and convex hull constraints for IK target and arm clearance.",
     "requirements": "See the package guide for requirements",
     "keywords": "kinematics constraints inverse kinematics IK avoidance capsule sphere torso elbow pole clearance",
@@ -2380,7 +2452,8 @@
       "closestPointsBetweenSegments",
       "measureSegmentClearance"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "robot-planning",
@@ -2388,7 +2461,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/robot-planning",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Robot arms on kinematics-constraints: a joint tree with collision shapes, swept motion checks, a joint-limit IK solver, sampling planners, URDF loading and a WebGPU clearance batch.",
     "requirements": "See the package guide for requirements",
     "keywords": "robot planning",
@@ -2397,7 +2470,8 @@
     "exports": [
       "Robot",
       "sweepRobot"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "rigging",
@@ -2405,7 +2479,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/rigging",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Rigging and animation authoring: automatic skin weights, weight painting, skin checks, IK chains with poles, retarget presets, spring bones, VRM 1.0 avatars, geodesic voxel weights, corrective shapes, weight transfer, face tracking, automatic rigs from a bare mesh.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "rigging",
@@ -2419,7 +2493,8 @@
       "checkRig",
       "checkSkin",
       "rigJoints"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "humans",
@@ -2427,7 +2502,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/humans",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "People in one call: addPerson dresses a loaded character with skin, eyes and strand hair by material name, an Animator with clip cross-fades, dual quaternion skinning, shadows and natural hand poses; a period cast kit of measured bodies and code-built garments with measured cloth optics, fitted and skinned to any loaded rig in one call.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "humans",
@@ -2438,7 +2513,8 @@
       "eyeLidMargin",
       "personEye",
       "personMaterials"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "horses",
@@ -2446,7 +2522,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/horses",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Horses built in code from published equine measurements: draft, cavalry and riding builds, coats and markings, a mane and tail in strand hair, a 37-joint rig, walk, trot, canter and gallop from equine biomechanics, a rider seat, and crowds of hundreds in one draw.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "horses",
@@ -2456,7 +2532,8 @@
       "HorseMotion",
       "addHorse",
       "blendPoses"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "armies",
@@ -2464,7 +2541,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/armies",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Armies of hundreds: soldiers and riders drawn at every distance (instanced skinning near, a vertex animation of a simplified mesh far, culled and budgeted), following navmesh formations, keeping step, riding horses on the saddle the horse crowd draws; any person source plugs in.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "armies",
@@ -2484,14 +2561,15 @@
       "planCrowd",
       "riderMatrix",
       "stepPose"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "tween",
     "title": "Tween",
     "package": "@margoengine/tween",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Allocation-free numeric tween updates and easing timelines.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "tween",
@@ -2542,14 +2620,15 @@
       "steps",
       "toHexColor"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "cinematic",
     "title": "Cinematic",
     "package": "@margoengine/cinematic",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Virtual cameras with priorities and blends, framing, dolly tracks, group framing, camera noise, confiners and focus tracking, on top of damped follow, look-at and shake.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "cinematic",
@@ -2558,7 +2637,8 @@
     "exports": [
       "Cinematic"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "cutscene",
@@ -2566,7 +2646,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/cutscene",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Cutscene timelines: camera, transform, property, animation, audio, subtitle and event tracks, nested timelines, scrubbing, a player that fires events in order, virtual camera shots with blends, rendering to a video file, a take recorder, dialogue with lip sync, and particle and activation tracks, and a timeline editor panel.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "cutscene",
@@ -2582,14 +2662,15 @@
       "evaluate",
       "parseCutscene",
       "validateCutscene"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "controls",
     "title": "Controls",
     "package": "@margoengine/controls",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "controls",
@@ -2628,7 +2709,8 @@
       "stepLocomotion",
       "tessellate"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "cameras",
@@ -2636,7 +2718,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/cameras",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Orthographic projection and exactly vertical (top-down) views for the core camera, with matching culling and picking.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "cameras",
@@ -2648,14 +2730,15 @@
       "fovToLens",
       "lensToFov",
       "tileOffsets"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "input",
     "title": "Input",
     "package": "@margoengine/input",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Semantic keyboard, pointer, gamepad, touch, gyro and pen actions with haptics, tap, hold, slow tap and double press rules, local multiplayer, and recording and replay.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "input",
@@ -2666,7 +2749,8 @@
       "Input",
       "bindingLabel"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "ui",
@@ -2674,7 +2758,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/ui",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Game UI drawn in the engine: menus, HUDs, health bars, inventories, dialogs and toasts with flex layout, theming, keyboard, gamepad and touch navigation, screen reader support and React components.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "ui",
@@ -2724,7 +2808,8 @@
       "uiActions",
       "validateStyle",
       "withAlpha"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "viewcube",
@@ -2732,7 +2817,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/viewcube",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "CAD view cube: shows the camera orientation and animates to top, front, side and isometric views, with a perspective/orthographic toggle.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "viewcube",
@@ -2741,14 +2826,15 @@
     "exports": [
       "THEMES",
       "ViewCube"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "selection",
     "title": "Selection",
     "package": "@margoengine/selection",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "GPU picking and visible mesh selection outlines.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "selection picking outlines skinned morph deformed",
@@ -2764,14 +2850,15 @@
       "selectInPolygon",
       "selectInRect"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "audio",
     "title": "Audio",
     "package": "@margoengine/audio",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Web Audio listener, global and positional sounds and a frequency analyser for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "audio",
@@ -2790,7 +2877,8 @@
       "loadAudioBuffer",
       "smoothParam"
     ],
-    "category": "Animation and interaction"
+    "category": "Animation and interaction",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "mixer",
@@ -2798,7 +2886,7 @@
     "category": "Animation and interaction",
     "package": "@margoengine/mixer",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Audio mixing and effects: buses with gain, mute, solo, sends and ducking; equaliser, filter, compressor, limiter, delay and reverb on Web Audio; positional emitters; deterministic offline rendering.",
     "requirements": "See the package guide for requirements",
     "keywords": "mixer",
@@ -2824,14 +2912,15 @@
       "rampParam",
       "renderOffline",
       "setListenerPose"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "physics",
     "title": "Physics",
     "package": "@margoengine/physics",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Rigid-body physics for Margo Engine on its own Rust kernel: fixed-step engine plugin with interpolation, colliders, joints, queries, events, a character controller, vehicles and ropes.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "physics",
@@ -2887,14 +2976,15 @@
       "voxelizedMesh",
       "voxelsFromPoints"
     ],
-    "category": "Simulation and games"
+    "category": "Simulation and games",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "physics2d",
     "title": "Physics2d",
     "package": "@margoengine/physics2d",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "2D rigid-body physics for Margo Engine on its own 2D kernel (Rust to Wasm): fixed-step plugin with interpolation, sprite-driven bodies, joints, queries, events, a character controller and tile map colliders.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "physics2d",
@@ -2912,7 +3002,8 @@
       "interactionGroups",
       "tileMapColliders"
     ],
-    "category": "Simulation and games"
+    "category": "Simulation and games",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "ragdoll",
@@ -2920,7 +3011,7 @@
     "category": "Simulation and games",
     "package": "@margoengine/ragdoll",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Ragdolls on Margo physics: capsule bodies from a skeleton, cone and hinge joint limits, kinematic hit boxes, going limp and blending back to the animation.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "ragdoll",
@@ -2928,14 +3019,15 @@
     "imports": "import { Ragdoll } from '@margoengine/ragdoll';",
     "exports": [
       "Ragdoll"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "navmesh",
     "title": "Navmesh",
     "package": "@margoengine/navmesh",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Convex polygon navigation with A*, funnel paths and ORCA avoidance; navmesh generation from triangles (./build) tiled meshes that rebuild at run time (./tiles), baked files (./codec), jump links (./links), long routes (./hierarchy), debug draw (./debug), voxel worlds (./voxel) and flying agents (./volume).",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "navmesh",
@@ -2947,14 +3039,15 @@
       "NavMesh",
       "avoid"
     ],
-    "category": "Simulation and games"
+    "category": "Simulation and games",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "ecs",
     "title": "Ecs",
     "package": "@margoengine/ecs",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Typed-array packed sparse-set entity component storage.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "ecs",
@@ -2968,14 +3061,15 @@
       "Schedule",
       "World"
     ],
-    "category": "Simulation and games"
+    "category": "Simulation and games",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "fsm",
     "title": "Fsm",
     "package": "@margoengine/fsm",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Hierarchical state machines with history, delayed transitions, parallel regions, JSON documents, snapshots and traces.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "fsm",
@@ -2984,7 +3078,8 @@
     "exports": [
       "StateMachine"
     ],
-    "category": "Simulation and games"
+    "category": "Simulation and games",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "behavior",
@@ -2992,7 +3087,7 @@
     "category": "Simulation and games",
     "package": "@margoengine/behavior",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Game AI: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and flocking behaviours, perception (./perception), environment queries (./eqs), a goal planner (./goap), smart objects (./smart-objects), flow fields (./flowfield), a task network planner (./htn), and context steering (./context).",
     "requirements": "See the package guide for requirements",
     "keywords": "behavior",
@@ -3040,7 +3135,8 @@
       "validateTree",
       "wait",
       "wander"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "save",
@@ -3048,7 +3144,7 @@
     "category": "Simulation and games",
     "package": "@margoengine/save",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Save and load: versioned scene and world documents with stable ids, prefabs with overrides, migrations, all-or-nothing loading and storage adapters.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "save",
@@ -3074,7 +3170,8 @@
       "saveGame",
       "validateSave",
       "webStorage"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "netcode",
@@ -3082,7 +3179,7 @@
     "category": "Simulation and games",
     "package": "@margoengine/netcode",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Game networking for any game: schema-first binary codec with delta snapshots, an authoritative fixed-timestep server, client prediction and reconciliation, interpolation and a loopback network for tests.",
     "requirements": "See the package guide for requirements",
     "keywords": "netcode",
@@ -3106,7 +3203,8 @@
       "fnv1a",
       "messages",
       "quantize"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "voxel-net",
@@ -3114,7 +3212,7 @@
     "category": "Simulation and games",
     "package": "@margoengine/voxel-net",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Multiplayer voxel worlds: an authoritative Node server on a hand-written WebSocket, a browser client with prediction and correction, and headless bots for load tests.",
     "requirements": "See the package guide for requirements",
     "keywords": "voxel net",
@@ -3141,7 +3239,8 @@
       "moveIntent",
       "quantizePitch",
       "quantizeYaw"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "machinery",
@@ -3149,7 +3248,7 @@
     "category": "Geometry and spatial",
     "package": "@margoengine/machinery",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Kinematics, sections, metrology, clearance, assemblies, exploded views, feature edges, dimensions, spatial queries, surface transport and telemetry for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "conveyor rollers motor gears piston robot arm industrial kinematics revolute prismatic ik sections caps metrology measurements annotations assembly exploded edges dimensions telemetry",
@@ -3180,14 +3279,15 @@
     ],
     "example": "./examples/machinery.html",
     "exampleTitle": "Drive a bounded joint",
-    "exampleNote": "Animate a revolute joint with Kinematics. CAD files in STEP, IGES, STL and OBJ load through @margoengine/cad; see its guide for formats and CAD asset loading."
+    "exampleNote": "Animate a revolute joint with Kinematics. CAD files in STEP, IGES, STL and OBJ load through @margoengine/cad; see its guide for formats and CAD asset loading.",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "bvh",
     "title": "Bvh",
     "package": "@margoengine/bvh",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Triangle BVH, spatial queries and an engine Raycaster for Margo Engine.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "bvh raycaster raycast skin morph deformation",
@@ -3217,14 +3317,15 @@
       "terminateBVHWorker",
       "worldTriangles"
     ],
-    "category": "Geometry and spatial"
+    "category": "Geometry and spatial",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "geometry",
     "title": "Geometry",
     "package": "@margoengine/geometry",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Pure-CPU, tree-shakable geometry for Margo Engine: primitives, curves, shapes, extrusion, triangulation and mesh utilities.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "geometry",
@@ -3298,7 +3399,8 @@
       "wireframePositions",
       "worldUVs"
     ],
-    "category": "Geometry and spatial"
+    "category": "Geometry and spatial",
+    "npmVersion": "0.1.0"
   },
   {
     "id": "mesh-edit",
@@ -3306,7 +3408,7 @@
     "category": "Geometry and spatial",
     "package": "@margoengine/mesh-edit",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Pure polygon editing with retained corner UVs, explicit topology provenance and conservative cleanup.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "mesh edit",
@@ -3352,7 +3454,8 @@
       "traceMeshQuadRing",
       "transformMeshComponents",
       "transformMeshUVs"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "scene",
@@ -3360,7 +3463,7 @@
     "category": "Geometry and spatial",
     "package": "@margoengine/scene",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Scene graph conveniences for core meshes: children, traverse, userData, lookAt and world position, rotation and scale, as functions or as mesh members.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "scene",
@@ -3376,7 +3479,8 @@
       "traverse",
       "userData",
       "worldMatrix"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "compute",
@@ -3384,7 +3488,7 @@
     "category": "Data and science",
     "package": "@margoengine/compute",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "GPU compute without the WebGPU boilerplate, NumPy style: N-d arrays with views and broadcasting, fused expressions, reductions and statistics, scan, sort, selection, histograms, matmul, FFT, convolution, random numbers, streaming, neural networks, graph algorithms, and WGSL kernels bound by name.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "compute",
@@ -3402,7 +3506,8 @@
       "encode",
       "reflectWGSL",
       "where"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "sciviz",
@@ -3410,7 +3515,7 @@
     "category": "Data and science",
     "package": "@margoengine/sciviz",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "Scientific visualisation for Margo Engine: volume rendering with transfer functions, slices and GPU isosurfaces, million-point scatter plots, surface and line plots with axes, ticks, labels and colour bars, and perceptual colour maps.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "sciviz",
@@ -3442,7 +3547,8 @@
       "niceNumber",
       "ticks",
       "transferTable"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "mcp",
@@ -3450,7 +3556,7 @@
     "category": "AI tools",
     "package": "@margoengine/mcp",
     "version": "1.0.0",
-    "published": false,
+    "published": true,
     "description": "A Model Context Protocol server for Margo Engine: AI coding tools (Claude, Cursor, Copilot) search the docs and API, read a package, list the examples and type-check a snippet against the real package types. Plain stdio JSON-RPC, no dependencies.",
     "requirements": "Core ^1.0.0 · see the package guide for browser and backend requirements",
     "keywords": "mcp model context protocol ai claude cursor copilot llms",
@@ -3472,7 +3578,8 @@
       "runCli",
       "searchCorpus",
       "serveStdio"
-    ]
+    ],
+    "npmVersion": "0.1.0"
   },
   {
     "id": "react",
@@ -3516,7 +3623,8 @@
     "exampleTitle": "A React cube",
     "exampleNote": "Render and animate a cube with Canvas and useFrame. Uses React.createElement so the complete HTML example runs without a JSX build step.",
     "version": "1.0.0",
-    "published": false,
-    "category": "Frameworks"
+    "published": true,
+    "category": "Frameworks",
+    "npmVersion": "0.1.0"
   }
 ]

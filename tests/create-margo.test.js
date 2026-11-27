@@ -57,6 +57,10 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
   const manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
   assert.equal(manifest.name, 'my-app');
   for (const [name, range] of Object.entries(manifest.dependencies)) {
+    if (name.startsWith('@margoengine/')) {
+      assert.equal(range, '^0.1.0', `${name} installs the published 0.1.0 release`);
+      continue;
+    }
     const local = JSON.parse(readFileSync(join(root, 'node_modules', name, 'package.json'), 'utf8'));
     assert.equal(range, `^${local.version}`, `${name} should track the workspace version`);
   }
@@ -68,6 +72,7 @@ test('create-margo scaffolds the template and refuses a non-empty directory', (t
     'OrbitControls.attach(engine)',
     'Stats.attach(engine)',
     'EnvironmentLighting.attach(',
+    'hasWebGPU(',
   ])
     assert.ok(main.includes(call), call);
   assert.ok(main.indexOf('applyQualityTier()') < main.indexOf('Engine.create('), 'quality tier before the engine');

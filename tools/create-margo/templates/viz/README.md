@@ -1,8 +1,8 @@
 # Margo visualization
 
 300,000 points in a turning three-armed galaxy, coloured by radius, glowing with bloom, over a grid with HTML labels.
-Drag to orbit, scroll to zoom; it turns on its own until you do. Built with the `margoengine/viz` kit. Needs a browser
-with WebGPU.
+Drag to orbit, scroll to zoom; it turns on its own until you do. Built with the `@margoengine/kit-viz` kit. It draws
+with WebGPU. If the browser has none, the page says so and links to the browsers that run Margo.
 
 ```sh
 npm install
