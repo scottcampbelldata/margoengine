@@ -1429,6 +1429,7 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   stays about 0.043. The original paddle history is unavailable. The packet window affects the results,
   and the full finite field still needs a converged measured comparison.
   [Briggs, Thompson and Vincent, 1995](https://doi.org/10.1061/%28ASCE%290733-950X%281995%29121%3A1%2823%29)
+  [Opt-in coarse and fine comparison](../packages/physics/scripts/measure-finite-quay-briggs.mjs)
 
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
