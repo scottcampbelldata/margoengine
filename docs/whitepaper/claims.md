@@ -6712,8 +6712,8 @@ Khronos validator (no errors, the one MULTIPLE_EXTENSIONS warning) and the defau
 
 ## Grass blade shadows (scatter/grass)
 
-`shadows.add(grass)` casts the blades the GPU draws, tapered, at their height and bent by the wind, in `Shadows` and in
-`VirtualShadows`. Proof: `packages/scatter/test/grass-shadow.browser.mjs` reads the shadow from the picture on WebGPU and
+`shadows.add(grass)` casts the blades the GPU draws, tapered, at their height and bent by the wind, in every LOD ring, in
+`Shadows` and in `VirtualShadows`. Proof: `packages/scatter/test/grass-shadow.browser.mjs` reads the shadow from the picture on WebGPU and
 the WebGL2 layer.
 [Limits](../limits.md#procedural-grass-blades-batch-64-job-6)
 

@@ -11,6 +11,9 @@
 // 3. Sixteen blades a clump shade far more floor than one.
 // 4. A wind across the sun's way bends the blade, and its shadow bends with it: the shadow lies where the sun throws the
 //    blade's posed spine (read back from the GPU), far from where it lay without wind.
+// 5. The middle and far rings, which GrassScatter draws by coverage, each cast their own ring mesh: from 1 m to 3 m
+//    out the far ring's one segment narrows in a straight line, (1 - 3/4) / (1 - 1/4) = 0.333, and the middle ring's two
+//    (bent at half height, 3 m up) to 0.5 / (1 - 1/6) = 0.6. Thin blades there still shade about the near ring's area.
 import assert from 'node:assert/strict';
 import { writeFile } from 'node:fs/promises';
 import { openBrowser } from '../../../scripts/browser.js';
@@ -25,16 +28,19 @@ page.on('console', (m) => {
   if (m.type() === 'error') pageErrors.push(m.text());
 });
 const luma = (image, k) => 0.2126 * image.data[k * 4] + 0.7152 * image.data[k * 4 + 1] + 0.0722 * image.data[k * 4 + 2];
-const frame = async (grass, cast, wind, time) => {
-  const errors = await page.evaluate(([g, c, w, t]) => window.check.show(g, c, w, t), [grass, cast, wind, time]);
+const frame = async (grass, cast, wind, time, lod) => {
+  const errors = await page.evaluate(
+    ([g, c, w, t, l]) => window.check.show(g, c, w ?? undefined, t ?? undefined, l ?? undefined),
+    [grass, cast, wind, time, lod],
+  );
   assert.deepEqual(errors, [], JSON.stringify({ grass, cast, wind, time }));
   const png = await page.locator('canvas').screenshot();
   return { png, image: await decodePNG(png) };
 };
 /** The shadow the grass casts: its pixel mask, read at floor points, and its area in pixels. */
-const shadow = async (grass, keep, wind, time) => {
-  const lit = await frame(grass, false, wind, time),
-    cast = await frame(grass, true, wind, time);
+const shadow = async (grass, keep, wind, time, lod) => {
+  const lit = await frame(grass, false, wind, time, lod),
+    cast = await frame(grass, true, wind, time, lod);
   if (keep) await writeFile(`test-results/${keep}.png`, cast.png);
   const { width, height } = lit.image,
     mask = new Uint8Array(width * height);
@@ -141,7 +147,27 @@ const check = async (kind) => {
       bent: bent.middle(d),
       thrown: thrown(posed, d),
     }));
+  // Rings: the near one has 16 segments here, the middle one two and the far one a single segment.
+  const ringed = { ...blade, height: 4, segments: [16, 2, 1] },
+    thin = { ...blade, height: 2, width: 0.08, radius: 1, blades: 48, segments: [16, 3, 3] },
+    rings = [];
+  for (const [ring, lod] of [
+    [1, [5, 60, 80]],
+    [2, [5, 8, 80]],
+  ]) {
+    const wide = await shadow(ringed, `grass-shadow-${kind}-ring${ring}`, undefined, undefined, lod),
+      field = await shadow(thin, `grass-shadow-${kind}-thin${ring}`, undefined, undefined, lod);
+    rings.push({
+      ring,
+      reach: +wide.reach.toFixed(2),
+      narrowing: +(wide.across(3) / wide.across(1)).toFixed(3),
+      thin: field.area,
+    });
+  }
+  const nearThin = (await shadow(thin, `grass-shadow-${kind}-thin0`)).area;
   const results = {
+    rings,
+    nearThin,
     reach: [low.reach, tall.reach].map((v) => +v.toFixed(2)),
     across: [near, far].map((v) => +v.toFixed(2)),
     narrowing: +narrowing.toFixed(3),
@@ -158,6 +184,18 @@ const check = async (kind) => {
     `${kind}: width 3 m out over width 1 m out is ${narrowing}, the blade's own ${expected.toFixed(3)}`,
   );
   assert.ok(one.area > 20 && many.area > 4 * one.area, `${kind}: 16 blades shade ${many.area} pixels, one ${one.area}`);
+  for (const { ring, reach, narrowing: ringNarrowing, thin: area } of rings) {
+    assert.ok(reach > 3.4 && reach <= 4.15, `${kind}: ring ${ring} casts the 4 m blade about 4 m (${reach})`);
+    // A pixel on each edge widens the thin far end, so the measured ratios sit a little high: the two are told apart.
+    assert.ok(
+      ring === 2 ? ringNarrowing > 0.25 && ringNarrowing < 0.48 : ringNarrowing > 0.52 && ringNarrowing < 0.72,
+      `${kind}: ring ${ring} narrows by its own mesh (${ring === 2 ? 0.333 : 0.6}), not ${ringNarrowing}`,
+    );
+    assert.ok(
+      area > 0.6 * nearThin && area < 1.6 * nearThin,
+      `${kind}: thin blades in ring ${ring} shade ${area} pixels, in the near ring ${nearThin}`,
+    );
+  }
   const last = at.at(-1),
     moved = last.thrown - last.still;
   assert.ok(Math.abs(moved) > 0.3, `${kind}: the wind moves the shadow ${moved} m`);

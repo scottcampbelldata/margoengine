@@ -10181,7 +10181,11 @@ With the blade pose left out of the shadow pass the shadow runs 4.95 m at one wi
 runs `VirtualShadows` (2.00 m and 4.05 m, narrowing 0.580, 1,501 pixels against 79) and a wind across the sun's way: in
 both, 2.5 m from the root the shadow moves 0.59 m with the wind and lies within 0.02 m of where the sun throws the
 blade's posed spine, read back with `readScatter`. It fails with the wind left out of the shadow pass, and with
-`VirtualShadows` drawing no `drawShadow` caster. Missing: other GPUs and covered-ring shadows.
+`VirtualShadows` drawing no `drawShadow` caster. It also puts the blade in the middle and far rings, which are drawn by
+coverage: each casts its own ring mesh (width 3 m over 1 m out 0.596 for two segments against 0.6, and 0.412 for one
+against 0.333 in `Shadows`; 0.537 and 0.337 in `VirtualShadows`), and 48 thin blades shade 1,856 pixels against the near
+ring's 1,844 (1,726 against 1,709 virtual). It fails with the shadow pass drawing the near ring alone. Missing: other
+GPUs.
 
 **No submission of the coastal flow's set-up holds the GPU for seconds (KB-SCENES-DUNE-ARCHANG1, 2026-11-21, GPU
 behaviour).** The dune coast hung the device on a laptop GPU (DXGI_ERROR_DEVICE_HUNG within 3 s, three runs of three).
