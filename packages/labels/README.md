@@ -1,6 +1,6 @@
 # @margoengine/labels
 
-Import `margoengine/labels` from the `margoengine` package, or `@margoengine/labels` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/labels` from the `margoengine` package, or `@margoengine/labels` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 HTML labels and CSS 3D objects kept in register with a Margo Engine canvas.
 

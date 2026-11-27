@@ -1,6 +1,6 @@
 # @margoengine/tiles
 
-Import `margoengine/tiles` from the `margoengine` package, or `@margoengine/tiles` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/tiles` from the `margoengine` package, or `@margoengine/tiles` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Streaming [OGC 3D Tiles 1.1](https://docs.ogc.org/cs/22-025r4/22-025r4.html) for engineering, GIS and digital-twin scenes: city models, photogrammetry, BIM and scanned sites far bigger than memory. Tiles load by screen-space error as the camera moves, coarse first, from a priority queue with a concurrency limit, and are evicted least recently used past a memory budget. glTF and b3dm tiles are drawn by [`@margoengine/gltf/pbr`](../gltf/README.md), pnts tiles by [`@margoengine/points`](../points/README.md); both are optional peers loaded with `import()` on the first tile that needs them. Core is not changed, and an app that does not import this package ships none of it.
 

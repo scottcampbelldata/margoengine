@@ -48,7 +48,7 @@ to be written.
 - **Small core, optional packages.** The core and the stage together are 24,910 bytes gzip. That is the engine, not
   your whole app: React, models and optional packages add to it (see [limits](limits.md)). Shadows, glTF, physics and
   the rest are packages you import when you need them: `import { Shadows } from 'margoengine/shadows'`.
-- **Not on npm yet.** 1.0.0 is the first planned release. Run examples from a clone until then.
+- **On npm at 0.1.0.** `npm create margo@latest my-app` runs the create-margo package and starts an app. `npm install @margoengine/games` installs the games package. A clone is for working on the engine.
 - **Units are metres, Y is up.** The same as glTF.
 
 ## When not to use Margo

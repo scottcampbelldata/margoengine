@@ -1,6 +1,6 @@
 # @margoengine/core
 
-Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/core` from the `margoengine` package, or `@margoengine/core` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 WebGPU rendering (WebGL2 fallback via the optional `@margoengine/webgl2-compat/preview`), a deterministic Rust/Wasm transform kernel, instanced drawing of one directional GGX light on position and normal, reversed float depth and picking. Materials are color, roughness, and metalness.
 
@@ -32,7 +32,7 @@ Camera `position`, `target` and `up` are tuple values and remain assignable.
 
 Camera controls are not in core: `CADCameraControls` is in `@margoengine/stage` (since 2026-11-07), and `@margoengine/controls` has orbit, map, fly and the rest.
 
-Package name: `@margoengine/core`, version `1.0.0`. Build from source or install a local tarball until the package is published.
+Package name: `@margoengine/core`, version `1.0.0`. npm has this package at 0.1.0.
 
 ```ts
 import { Camera, Engine, box, PbrMaterial } from 'margoengine/core';

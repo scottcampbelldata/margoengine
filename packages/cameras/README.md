@@ -23,7 +23,7 @@ cube.dispose();
 engine.dispose();
 ```
 
-Import `margoengine/cameras` from the `margoengine` package, or `@margoengine/cameras` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/cameras` from the `margoengine` package, or `@margoengine/cameras` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Orthographic projection and exactly vertical (top-down and bottom-up) views for core's camera, for CAD, plans, maps
 and isometric views. Culling, `engine.pick`, selection, bvh rays, TAA and every pass that reads `camera.matrix` see the

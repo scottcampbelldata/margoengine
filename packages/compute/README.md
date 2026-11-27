@@ -1,6 +1,6 @@
 # @margoengine/compute
 
-Import `margoengine/compute` from the `margoengine` package, or `@margoengine/compute` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/compute` from the `margoengine` package, or `@margoengine/compute` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 GPU compute without the WebGPU boilerplate, for data science and for engine work. It feels like NumPy: N-dimensional
 typed arrays with views and broadcasting, element-wise expressions that fuse into a single kernel, reductions and

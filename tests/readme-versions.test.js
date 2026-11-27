@@ -53,5 +53,6 @@ test('the React README keeps its sections in reader order and names only npm scr
   const scripts = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts;
   for (const [, name] of text.matchAll(/npm run ([\w:.-]+)/g))
     assert.ok(scripts[name], `packages/react/README.md names "npm run ${name}", which is not in package.json`);
-  assert.match(text, /\*\*It is not on npm yet\*\*/, 'the install section must say the package is not published');
+  assert.match(text, /on npm at 0\.1\.0/, 'the install section names the published npm release');
+  assert.doesNotMatch(text, /not on npm yet/);
 });

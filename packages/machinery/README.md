@@ -1,10 +1,10 @@
 # @margoengine/machinery
 
-Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/machinery` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/machinery` from the `margoengine` package, or `@margoengine/machinery` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Joints and couplings, bounded IK, Wasm surface transport, binary telemetry, stencil sections, assembly BVH picking and metrology for Margo Engine.
 
-Package name: `@margoengine/machinery`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/machinery`, version `1.0.0`. npm has this package at 0.1.0.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/machinery@1.0.0

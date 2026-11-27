@@ -8,7 +8,7 @@ and engine disposal all release the registration. Repeated disposal preserves
 same-name replacements. Both plugins can attach to another scene after disposal;
 later cleanup follows that new registration.
 
-Import `margoengine/cinematic` from the `margoengine` package, or `@margoengine/cinematic` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/cinematic` from the `margoengine` package, or `@margoengine/cinematic` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 `rig.setOrbitOffset(yaw, pitch, distance, height = 0)` writes the retained camera
 offset in place from orbit angles (no new vector is created). The sandbox uses this

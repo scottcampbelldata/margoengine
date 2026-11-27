@@ -1,6 +1,6 @@
 # @margoengine/points
 
-Import `margoengine/points` from the `margoengine` package, or `@margoengine/points` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/points` from the `margoengine` package, or `@margoengine/points` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Large point clouds and instanced sprites for Margo Engine, WebGPU, built for big scans: the browser test culls and draws a 2,000,000-point cloud under a 500,000-point budget.
 

@@ -2,7 +2,7 @@
 
 Optional Gaussian splats with GPU covariance projection and stable compute radix sorting.
 
-Import `margoengine/splats` from the `margoengine` package, or `@margoengine/splats` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/splats` from the `margoengine` package, or `@margoengine/splats` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Use `@margoengine/splats/data` for `parseSplat`, `validateSplats` and the
 `SplatData` type without loading GPU rendering or radix-sort shaders. Root

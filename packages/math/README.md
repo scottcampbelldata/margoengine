@@ -1,6 +1,6 @@
 # @margoengine/math
 
-Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/math` from the `margoengine` package, or `@margoengine/math` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Vector2, Vector3, Vector4, Quaternion, Euler, Matrix3, Matrix4, Color, Box3, OBB, Line3, Triangle, Capsule, Sphere, Plane, Ray, Frustum, Spherical, Cylindrical, SH3, MathUtils and the project functions. Methods write into `this` (chainable) or an `out` argument instead of returning new objects; only `clone()` and `toArray()` with no target return new ones.
 

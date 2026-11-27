@@ -1,6 +1,6 @@
 # @margoengine/cache
 
-Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cache` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/cache` from the `margoengine` package, or `@margoengine/cache` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Opt-in offline asset cache. Heavy GLB, .bin and texture files are kept in IndexedDB, so repeat visits load them
 from disk and the viewer keeps working with bad or no Wi-Fi (a factory floor). `cache.fetch` is fetch-compatible and

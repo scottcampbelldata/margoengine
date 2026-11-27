@@ -50,7 +50,7 @@
 
     <section id="start" class="start">
       <h2>Five lines to a rendered scene</h2>
-      <p class="section-lede">The <code>margoengine</code> facade mounts a canvas, enables orbit controls and starts rendering.</p>
+      <p class="section-lede">The packages are on npm at 0.1.0. This sample imports <code>createStage</code> from <code>margoengine</code>, so install that package. <code>@margoengine/core</code> does not export <code>createStage</code>.</p>
       <pre tabindex="0"><code>import {createStage} from 'margoengine';
 const app = await createStage('#scene');
 const orb = app.sphere({color: '#84d6bd', roughness: 0.25});
@@ -58,9 +58,17 @@ app.onTick(delta => {orb.rotation.z += delta;});
 window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></pre>
       <div class="two">
         <div>
-          <h3>Install from npm, once published</h3>
-          <pre tabindex="0"><code>npm install @margoengine/core</code></pre>
-          <p>npm publication is pending. Choose core or stage alone, a domain profile (<code>@margoengine/game</code>, <code>@margoengine/kit-web</code>, <code>@margoengine/kit-viz</code> or <code>@margoengine/kit-react</code>), or <code>margoengine</code> for everything. <a href="./llms/docs/guides/kits.md">Compare contents and measured installs</a>. <a href="./catalog/">Browse packages and runnable examples</a></p>
+          <h3>New app with create-margo</h3>
+          <pre tabindex="0"><code>npm create margo@latest my-app
+cd my-app
+npm install
+npm run dev</code></pre>
+          <p><code>npm create margo</code> runs the create-margo package. The default template is web. <code>npm create margo@latest my-app -- --template game</code> starts a game. The templates run on WebGPU. A WebGL2 fallback in those templates is a later change.</p>
+        </div>
+        <div>
+          <h3>Install</h3>
+          <pre tabindex="0"><code>npm install margoengine</code></pre>
+          <p>That matches the sample above. For a game, <code>npm install @margoengine/games</code> and <code>import {createStage} from '@margoengine/games'</code>. That package also exports <code>Shadows</code>, <code>OrbitControls</code>, <code>Input</code> and <code>Tween</code>, plus <code>/physics</code> and <code>/gltf/pbr</code>. <a href="./llms/docs/guides/kits.md">Compare kits</a>. <a href="./catalog/">Browse packages and runnable examples</a></p>
         </div>
       </div>
     </section>
@@ -146,7 +154,7 @@ window.addEventListener('pagehide', () => app.dispose(), {once: true});</code></
 
     <section class="status">
       <h2>Where it stands</h2>
-      <p>Margo Engine is at version 0.1.0 and Apache-2.0 licensed. WebGPU needs a supporting browser on HTTPS or localhost. Particles, image-based lighting and the scenery pack require WebGPU. Its real-GPU test suites run in Edge (Chromium) on a Windows laptop with an Intel Arc 140V; Chrome uses the same engine. Firefox, Safari and mobile GPUs are not yet verified.</p>
+      <p>Margo Engine is on npm at 0.1.0 and Apache-2.0 licensed. WebGPU needs a supporting browser on HTTPS or localhost. Particles, image-based lighting and the scenery pack require WebGPU. Its real-GPU test suites run in Edge (Chromium) on a Windows laptop with an Intel Arc 140V; Chrome uses the same engine. Firefox, Safari and mobile GPUs are not yet verified.</p>
       <p>The <a href="./whitepaper/engine.html">Margo Engine whitepaper</a> gives the design and every measured number behind this page, each with its source and hardware. The <a href="./whitepaper/voxel.html">Margo Voxel whitepaper</a> covers the voxel editor, path tracer and multiplayer packages built on it.</p>
     </section>
   </main>

@@ -115,7 +115,7 @@ Its third axis is daily time, never physical height. Hashes and writer versions 
 [formats.json](../../examples/assets/sciviz/formats.json). Tests cover analytical layouts plus exact cross-format
 agreement of all 200 NOAA samples. No speed claim or Rust/Wasm gain is asserted.
 
-Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/sciviz` from the `margoengine` package, or `@margoengine/sciviz` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Scientific visualisation for Margo Engine, WebGPU:
 

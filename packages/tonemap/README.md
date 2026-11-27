@@ -1,6 +1,6 @@
 # @margoengine/tonemap
 
-Import `margoengine/tonemap` from the `margoengine` package, or `@margoengine/tonemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/tonemap` from the `margoengine` package, or `@margoengine/tonemap` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Optional WebGPU HDR presentation and color grading, separate from core and stage.
 
@@ -230,8 +230,7 @@ The package's `1.0.0` version does not require Engine 1.0. It works with the
 current Core/Stage 0.1.0. `node scripts/build-site.js` assembles its standalone
 demo at `/demos/tonemap/`; the package catalog links to that built route. The demo
 uses the package's built `dist` entry, preserves local LUT loading/controls, and marks
-the complete scene's correlated GPU readiness. npm publication is separate:
-use the workspace or packed local archives until the package is published.
+the complete scene's correlated GPU readiness. npm has this package at 0.1.0.
 
 ## Live grading: `Grade`
 

@@ -1,8 +1,8 @@
 # Kits
 
 Choose one of three ways in: install core or stage alone, install a domain kit, or install everything.
-All packages in a release share one version. npm publication is pending; the checks below use packed private
-repository builds and never the unrelated registry placeholder.
+All packages in a release share one version. They are on npm at 0.1.0. `npm create margo@latest my-app` runs the
+create-margo package. The checks below still install packed builds from a clone.
 
 | Install | What it gives you |
 | --- | --- |
@@ -59,7 +59,7 @@ and builds all five templates, and checks their exact engine dependency closures
 `scripts/template-browser-check.mjs` proves a first frame from each production build, including Next's server.
 
 To add a capability outside a profile, install its package at the same release version, for example
-`npm install @margoengine/xr@1.0.0`. Import it directly from `@margoengine/xr`.
+`npm install @margoengine/xr@0.1.0`. Import it directly from `@margoengine/xr`.
 Optional third-party peers, including React, remain app choices and are never silently installed by a kit. The
 3D solver, Margo's own kernel, comes with `@margoengine/physics`; it has no peer.
 

@@ -2,7 +2,7 @@
 
 Gerstner water surfaces, terrain-coupled shallow-water flow, foam and spray.
 
-Import `margoengine/water` from the `margoengine` package, or `@margoengine/water` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/water` from the `margoengine` package, or `@margoengine/water` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 A separate WebGPU water grid evaluates up to eight swell trains with analytical normals. Each train spreads into three Gerstner components with varied directions, wavelengths and gently bending crests. Advected gradient noise (random unit gradients, Perlin's 2002 quintic fade, analytic derivatives) adds wind agitation and micro-ripples, filtered separately by their screen footprint. Fresnel reflection, sun glints and wavelength-dependent absorption shade the surface. Optional terrain coupling adds conservative GPU shallow-water flow (the momentum-conservative staggered scheme of Stelling and Duinmeijer 2003 with Manning bed friction, its speed capped at half a cell per step, so falls of any height stay bounded and a swash runs up a beach), moving breaker foam and a fixed GPU spray pool.
 

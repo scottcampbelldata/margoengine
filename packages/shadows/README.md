@@ -2,7 +2,7 @@
 
 Four-cascade cached directional shadows with PCSS.
 
-Import `margoengine/shadows` from the `margoengine` package, or `@margoengine/shadows` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/shadows` from the `margoengine` package, or `@margoengine/shadows` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Cascade descriptors, attachments and matrix views are retained between frames.
 Custom `drawShadow` callbacks receive a borrowed context reused for that cascade;

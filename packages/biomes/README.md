@@ -33,8 +33,7 @@ terrain view, editor hooks and the placement of trees, shrubs, rocks and props, 
 ## Install
 
 Import `margoengine/biomes` from the `margoengine` package, or `@margoengine/biomes` from this package alone; the two
-are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that
-work today (run in a clone, or install local tarballs).
+are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 ## Hello world
 

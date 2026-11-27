@@ -21,7 +21,7 @@ console.assert(rendered.length === 4800 && rendered.numberOfChannels === 2);
 listener.dispose();
 ```
 
-Import `margoengine/audio` from the `margoengine` package, or `@margoengine/audio` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/audio` from the `margoengine` package, or `@margoengine/audio` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Web Audio listener, global and positional sounds, encoded-file loading and a frequency analyser for Margo Engine.
 

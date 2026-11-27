@@ -1,6 +1,6 @@
 # @margoengine/netcode
 
-Import `margoengine/netcode` from the `margoengine` package, or `@margoengine/netcode` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/netcode` from the `margoengine` package, or `@margoengine/netcode` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Game networking for any game, not only voxels: one schema describes your state and inputs, an authoritative server
 runs the game at a fixed tick rate, and clients predict their own player, reconcile with the server and draw everyone

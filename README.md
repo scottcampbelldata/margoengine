@@ -16,11 +16,50 @@ A small WebGPU engine for the web, with a Rust/Wasm core.
 The core and the stage together are 24,910 bytes gzip, Wasm kernel and WebGPU backend included. Everything else
 (glTF, shadows, physics, post effects) is a separate package you import only if you use it.
 
+## Quick start
+
+The packages are on npm at 0.1.0. `npm create margo` runs the [create-margo](tools/create-margo/README.md) package.
+
+```sh
+npm create margo@latest my-app
+cd my-app
+npm install
+npm run dev
+```
+
+The default template is a web app. `npm create margo@latest my-app -- --template game` starts a small game. The starter
+templates run on WebGPU. A WebGL2 fallback in those templates is a later change.
+
+Or install the games package in a Vite app:
+
+```sh
+npm install @margoengine/games vite
+```
+
+`index.html` needs a container and a module script:
+
+```html
+<div id="scene" style="height: 100vh"></div>
+<script type="module" src="/main.ts"></script>
+```
+
+```ts
+import { createStage } from '@margoengine/games';
+
+const stage = await createStage('#scene');
+stage.box({ color: '#84d6bd' });
+```
+
+Then run `npx vite`. `createStage`, `Shadows`, `OrbitControls`, `Input` and `Tween` are root exports of
+`@margoengine/games` at 0.1.0. Physics is `import { Physics } from '@margoengine/games/physics'`. Textured glTF is
+`import { loadGLTF } from '@margoengine/games/gltf/pbr'`. The same `createStage` is also `import { createStage } from 'margoengine'`
+after `npm install margoengine`. `@margoengine/core` does not export `createStage`.
+
 ## Build something in 5 minutes
 
 You need git and Node.js 24.18 or newer, nothing else: no Rust, C++ compiler, Python or GPU setup (the Wasm kernel is
 checked in). Node 22.12 or newer also builds the packages and runs the examples (npm prints one engine warning), but
-the tests need 24.18. The packages are not on npm yet, so you start from a clone.
+the tests need 24.18. For an app of your own, use [Quick start](#quick-start). This section runs the examples in the repository, from a clone.
 
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/scottcampbelldata/margoengine.git
@@ -203,9 +242,10 @@ Next: [Start here](docs/start-here.md) lists a guide for each goal: [textures an
 Margo needs WebGPU (see [Browser support](#browser-support)). End users: Node 22.12 or newer (tested on 22.12 and the
 latest 22.x, 24.18 and 26). Contributors: Node 24.18 or newer.
 
-**The packages are not on npm yet.** `npm install margoengine` gets only a name placeholder (0.0.1, no engine) today;
-1.0.0 is the first planned release.
-Two routes work now. Both start from a clone. The quickstart does not need the [Git LFS](https://git-lfs.com) test
+The packages are on npm at 0.1.0. [Quick start](#quick-start) is `npm create margo@latest` (the create-margo package),
+`npm install @margoengine/games`, or `npm install margoengine` for every package, including `createStage`.
+
+To work in this repository, clone it. Two routes start from that clone. The quickstart does not need the [Git LFS](https://git-lfs.com) test
 assets (about 270 MB), so skip them: if Git LFS is installed, set `GIT_LFS_SKIP_SMUDGE=1` for the clone (in PowerShell,
 `$env:GIT_LFS_SKIP_SMUDGE=1`). You need the assets only to run the tests, see [Build from source](#build-from-source).
 
@@ -258,8 +298,6 @@ one folder, `margo-student-kit`, holding every package packed (`margo-packages/*
 game guides use (`examples/assets/`, both CC0, named in its `NOTICE.md`), this README and those guides. Unzipped next to
 `my-scene`, it replaces `../margoengine/test-results/` in the install lines above with
 `../margo-student-kit/margo-packages/`.
-
-**After 1.0.0 is published,** `npm install margoengine vite` in a new folder replaces Route 2 and nothing else changes.
 
 ## Demos
 

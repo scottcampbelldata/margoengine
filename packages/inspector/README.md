@@ -1,6 +1,6 @@
 # @margoengine/inspector
 
-Import `margoengine/inspector` from the `margoengine` package, or `@margoengine/inspector` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/inspector` from the `margoengine` package, or `@margoengine/inspector` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Optional DOM inspector for core entities, including `stage.engine`. The hierarchy
 updates as entities are added, renamed, reparented or disposed. Arrow keys select,

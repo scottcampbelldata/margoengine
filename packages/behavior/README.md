@@ -1,6 +1,6 @@
 # @margoengine/behavior
 
-Import `margoengine/behavior` from the `margoengine` package, or `@margoengine/behavior` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/behavior` from the `margoengine` package, or `@margoengine/behavior` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Game AI for agents: behaviour trees with a typed blackboard and async tasks, utility-AI scoring, steering and
 flocking behaviours, and perception. No rendering, no globals, nothing runs on import; it works the same in the browser, a worker or

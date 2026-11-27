@@ -1,6 +1,6 @@
 # @margoengine/taa
 
-Import `margoengine/taa` from the `margoengine` package, or `@margoengine/taa` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/taa` from the `margoengine` package, or `@margoengine/taa` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Optional WebGPU temporal anti-aliasing. Eight Halton (2,3) projection offsets move raster samples by fractions of a pixel. An `rg16float` velocity buffer stores current minus previous UV coordinates. History is kept at the unjittered pixel centres and reprojected by the motion alone (the velocity minus the jitter difference) with bilinear depth-tested taps, clamped to the current 3×3 neighborhood in YCoCg, and blended in linear RGB. Two HDR color histories and two `r32float` depth histories alternate without GPU readback.
 

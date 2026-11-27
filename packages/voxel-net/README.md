@@ -1,6 +1,6 @@
 # @margoengine/voxel-net
 
-Import `margoengine/voxel-net` from the `margoengine` package, or `@margoengine/voxel-net` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/voxel-net` from the `margoengine` package, or `@margoengine/voxel-net` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Multiplayer for `@margoengine/voxel` worlds: an authoritative Node server, a client that runs in browsers and Node,
 and headless bots for load tests. Clean-room code with no third-party runtime package: the WebSocket server (RFC 6455)

@@ -1,6 +1,6 @@
 # @margoengine/mixer
 
-Import `margoengine/mixer` from the `margoengine` package, or `@margoengine/mixer` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/mixer` from the `margoengine` package, or `@margoengine/mixer` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Audio mixing and effects on Web Audio, as a sibling of `@margoengine/audio`: a tree of buses with fader, mute, solo, sends and ducking; an effects chain (equaliser, filter, compressor, limiter, delay, convolution reverb); positional emitters; and deterministic offline rendering so a chain can be rendered and its numbers compared in a test. Nothing touches `AudioContext` at import time, and the package adds nothing to core.
 

@@ -1,6 +1,6 @@
 # @margoengine/ragdoll
 
-Import `margoengine/ragdoll` from the `margoengine` package, or `@margoengine/ragdoll` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/ragdoll` from the `margoengine` package, or `@margoengine/ragdoll` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Ragdolls for animated characters, on `@margoengine/physics`. Give it the hips of a skeleton and it builds one
 capsule body per bone, joined at the bone origins with swing and twist limits. While the character is animated the

@@ -1,13 +1,13 @@
 # @margoengine/gltf
 
-Import `margoengine/gltf` from the `margoengine` package, or `@margoengine/gltf` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/gltf` from the `margoengine` package, or `@margoengine/gltf` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 glTF 2.0 for Margo Engine in one package: the root is a lazy static glTF/GLB loader (named nodes, shared primitive
 geometry), and [`@margoengine/gltf/pbr`](#pbr-rendering-margoenginegltfpbr) is full metallic-roughness PBR rendering with
 its own entries for workers, streaming, instancing, lights, physics, behaviour graphs and more. Each entry loads only what
 it imports, so a page with the light loader pays nothing for PBR.
 
-Package name: `@margoengine/gltf`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/gltf`, version `1.0.0`. npm has this package at 0.1.0.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/gltf@1.0.0

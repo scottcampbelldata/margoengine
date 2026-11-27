@@ -1,6 +1,6 @@
 # @margoengine/pixel
 
-Import `margoengine/pixel` from the `margoengine` package, or `@margoengine/pixel` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/pixel` from the `margoengine` package, or `@margoengine/pixel` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Pixel art that stays crisp. A `PixelCamera` scrolls by whole low-res pixels with parallax per layer and a whole-number
 zoom. A `LayerCompositor` gives each layer its own low-res target and puts them on the screen with no filtering. Each

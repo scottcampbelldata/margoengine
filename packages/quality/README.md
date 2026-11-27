@@ -1,6 +1,6 @@
 # @margoengine/quality
 
-Import `margoengine/quality` from the `margoengine` package, or `@margoengine/quality` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/quality` from the `margoengine` package, or `@margoengine/quality` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Measured quality tiers. Desktops start on a light tier (single-sampled, pixel ratio capped, paced to an even rate of at
 least 60 FPS) and read the real GPU time of each frame by timestamp queries; a page under the limit gets the full 4× MSAA tier

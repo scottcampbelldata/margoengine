@@ -1,19 +1,17 @@
 // Bug (2026-11-12): docs/guides/imports.md, docs/ai-tools.md and docs/deploying.md told readers to run
-// `npm i margoengine`, `npm i -D @margoengine/mcp` or `npm create margo` while no Margo package is on npm (the name
-// `margoengine` holds a 0.0.1 placeholder), with no word that the command does not work yet. While docs/catalog.json
-// marks any package unpublished, a reader page that shows such a command also says it waits for publication.
+// `npm i margoengine`, `npm i -D @margoengine/mcp` or `npm create margo` while no Margo package was on npm.
+// As of 0.1.0 the packages are on npm, so those commands are the install path. docs/catalog.json still marks
+// entries unpublished: scripts/build-catalog.js compares each package.json version (1.0.0 in this tree) with the
+// registry, and 1.0.0 is not the published release. That file is left unchanged. The pages below must not still
+// say the packages are unpublished.
 // docs/guides/imports.md also gave the CDN import map 568 entries when the build writes 2,623.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { documents } from '../scripts/docs-links.mjs';
 import { IMPORT_MAP_COUNT, importMap, umbrellaFiles } from '../scripts/umbrella.mjs';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-// Internal records and the package READMEs (their own check) are not reader pages for this rule.
-const SKIP =
-  /^(?:docs\/(?:whitepaper|architecture|upstream-reports|research)\/|packages\/|CHANGELOG\.md$|docs\/known-bugs\.md$)/;
 const SHELL = /```(?:sh|bash|shell|console|powershell|ps1)?\r?\n([\s\S]*?)```/g;
 const INSTALL = /\bnpm (?:i|install|add)\b[^\n]*?(?:\bmargoengine\b|@margoengine\/)/;
 const CREATE = /\bnpm create margo\b/;
@@ -38,14 +36,20 @@ test('the rule reads shell blocks and npm create, not prose about installs', () 
   assert.ok(!NOTE.test('npm i margoengine installs every package.'));
 });
 
-test('a page with a Margo install command says the packages are not published yet', () => {
-  const catalog = JSON.parse(read('docs/catalog.json'));
-  if (catalog.every((entry) => entry.published)) return; // after 1.0.0 the note is no longer owed
-  const missing = documents().filter((file) => !SKIP.test(file) && showsInstall(read(file)) && !NOTE.test(read(file)));
+test('the public install pages do not say the packages are unpublished', () => {
+  const stale =
+    /not on npm|publication is pending|name placeholder|0\.0\.1[^\n]{0,40}placeholder|until 1\.0\.0 is published/i;
+  const files = [
+    'README.md',
+    'docs/start-here.md',
+    'docs/guides/kits.md',
+    'packages/margoengine/README.md',
+    'packages/core/README.md',
+    'site/index.html',
+  ];
   assert.deepEqual(
-    missing,
+    files.filter((file) => stale.test(read(file))),
     [],
-    'add a line saying the command works once 1.0.0 is published, and what to do until then',
   );
 });
 

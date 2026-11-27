@@ -1,6 +1,6 @@
 # @margoengine/geometry
 
-Import `margoengine/geometry` from the `margoengine` package, or `@margoengine/geometry` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/geometry` from the `margoengine` package, or `@margoengine/geometry` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 `wireframePositions(data, offsetY = 0)` expands distinct triangle edges into a
 contiguous line-position stream with an optional vertical lift for terrain debug views.

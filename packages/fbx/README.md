@@ -1,6 +1,6 @@
 # @margoengine/fbx
 
-Import `margoengine/fbx` from the `margoengine` package, or `@margoengine/fbx` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/fbx` from the `margoengine` package, or `@margoengine/fbx` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Native binary and ASCII FBX import through Margo's first-party glTF exporter and optional PBR/animation pipeline. Core, stage, and the animation runtime are unchanged.
 

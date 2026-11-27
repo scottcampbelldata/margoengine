@@ -18,7 +18,7 @@ console.assert(engine.sceneOf(heightmap) === product);
 heightmap.dispose(); // Frees its texture and registration; product can register a replacement.
 ```
 
-Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/terrain` from the `margoengine` package, or `@margoengine/terrain` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 `heightfieldGeometry(height, {size, origin?, resolution?})` generates a Y-up mesh
 with recomputed slope normals; `heightfield(height, options)` gives the same grid as a core `Geometry`, ready for

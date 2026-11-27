@@ -45,7 +45,7 @@ stack.dispose();
 engine.dispose();
 ```
 
-Import `margoengine/shader` from the `margoengine` package, or `@margoengine/shader` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/shader` from the `margoengine` package, or `@margoengine/shader` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Typed shader nodes that compile to readable WGSL. One graph API drives three hosts: `NodeMaterial` (a `@margoengine/materials` Material whose colour, normal, roughness, metalness, emissive, opacity and vertex position come from nodes), `NodePass` (a full-screen effect inside `@margoengine/post`'s PostStack) and `ComputePass` (a compute shader over a storage buffer, dispatched by the frame graph). Two more entries skip the graph: `@margoengine/shader/raw` draws your own WGSL with your own vertex layout, and `@margoengine/shader/effects` has ready-made screen effects. Graphs run on native WebGPU and on the full WebGL2 compatibility layer (`@margoengine/webgl2-compat`), which translates their WGSL to GLSL ES 3.00; `@margoengine/shader/glsl` takes GLSL functions in and shows the GLSL a graph becomes.
 

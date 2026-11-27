@@ -1,6 +1,6 @@
 # @margoengine/tilemap
 
-Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/tilemap` from the `margoengine` package, or `@margoengine/tilemap` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 The 2D tile map format every other piece builds on: `TileMapData` holds the tile size, tilesets with per-tile properties, animation and collision shapes, tile layers as `Uint32Array` with Tiled's flip bits, object layers, parallax, offset, opacity and custom properties. The root entry has the types, small helpers and the `TileMap` renderer; auto-tiling and the Tiled importer are their own entries. `TileMap` draws orthogonal maps; `GridTileMap` of the `iso` entry draws isometric, staggered and hexagonal ones. (`@margoengine/tiles` is OGC 3D Tiles; this package is unrelated.)
 

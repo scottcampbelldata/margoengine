@@ -1,6 +1,6 @@
 # @margoengine/robot-planning
 
-Import `margoengine/robot-planning` from the `margoengine` package, or `@margoengine/robot-planning` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/robot-planning` from the `margoengine` package, or `@margoengine/robot-planning` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Robot arms on [`@margoengine/kinematics-constraints`](../kinematics-constraints/README.md): a tree of revolute, prismatic, continuous, fixed and mimic joints with capsule and convex hull collision shapes, a swept check of a whole joint-space motion, inverse kinematics that keeps every joint in range and every link clear, sampling planners (RRT-Connect and a reusable roadmap), a URDF reader, and a WebGPU batch that measures the clearance of thousands of poses at once. Obstacles are the volumes of kinematics-constraints: spheres, capsules, convex hulls, and from its `/sdf` entry meshes and baked distance fields. No renderer, physics or Wasm is needed.
 

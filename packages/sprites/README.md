@@ -1,6 +1,6 @@
 # @margoengine/sprites
 
-Import `margoengine/sprites` from the `margoengine` package, or `@margoengine/sprites` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/sprites` from the `margoengine` package, or `@margoengine/sprites` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 2D sprites that land on exact pixels. A `SpriteLayer` holds any number of `Sprite`s and draws them in one instanced draw
 from a storage buffer. Texels are read with no filtering and no colour conversion, so with one sample per pixel what you

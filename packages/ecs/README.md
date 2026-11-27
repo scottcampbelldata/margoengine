@@ -1,6 +1,6 @@
 # @margoengine/ecs
 
-Import `margoengine/ecs` from the `margoengine` package, or `@margoengine/ecs` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/ecs` from the `margoengine` package, or `@margoengine/ecs` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 A sparse-set ECS with packed Float32, Float64, Int32, Uint32 and Uint8 component fields.
 

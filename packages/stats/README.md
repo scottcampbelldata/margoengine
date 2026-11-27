@@ -2,7 +2,7 @@
 
 Allocation-free frame samples, DOM performance overlay, optional WebGPU timestamp profiling, pipeline compile tracking, a CPU phase breakdown, leak alerts and field telemetry.
 
-Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stats` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/stats` from the `margoengine` package, or `@margoengine/stats` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Depends on `@margoengine/math`, with `@margoengine/core` as a peer. Frame sampling uses a fixed Float64Array ring.
 `tick(milliseconds, drawCalls?, dispatches?)` performs numeric updates only;

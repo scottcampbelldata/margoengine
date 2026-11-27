@@ -1,6 +1,6 @@
 # @margoengine/navmesh
 
-Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/navmesh` from the `margoengine` package, or `@margoengine/navmesh` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Dependency-free navigation: A* chooses a polygon corridor, the funnel algorithm pulls it taut, reciprocal ORCA selects collision-avoiding agent velocities in XZ, a `Crowd` manager walks agents along routes with area costs, off-mesh links and obstacles, `@margoengine/navmesh/build` generates the walkable polygons from level triangles, `@margoengine/navmesh/tiles` cuts big worlds into tiles that rebuild at run time, `@margoengine/navmesh/codec` bakes meshes to bytes, `@margoengine/navmesh/links` finds the jumps a level allows, `@margoengine/navmesh/hierarchy` keeps long routes cheap, `@margoengine/navmesh/debug` draws it all, `@margoengine/navmesh/voxel` builds straight from voxel chunks, and `@margoengine/navmesh/volume` routes flying agents in 3D.
 

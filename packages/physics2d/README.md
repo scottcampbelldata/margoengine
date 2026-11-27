@@ -1,6 +1,6 @@
 # @margoengine/physics2d
 
-Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/physics2d` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/physics2d` from the `margoengine` package, or `@margoengine/physics2d` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 2D rigid-body physics for Margo Engine on its own 2D kernel (Rust compiled to Wasm with SIMD): a fixed-step engine plugin with interpolation, bodies that drive sprites, box, circle, capsule, polygon (convex or concave) and polyline colliders, joints, scene queries, collision and contact force events, sensors, collision groups, continuous collision, a character controller and tile map colliders in one call. Nothing else to install: the kernel's WebAssembly is a file of this package, `dist/physics2d.wasm`.
 

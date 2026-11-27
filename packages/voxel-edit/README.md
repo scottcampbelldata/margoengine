@@ -1,6 +1,6 @@
 # @margoengine/voxel-edit
 
-Import `margoengine/voxel-edit` from the `margoengine` package, or `@margoengine/voxel-edit` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/voxel-edit` from the `margoengine` package, or `@margoengine/voxel-edit` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Editing voxel models for voxel editors and tools: dense and sparse grids, modeling operations, brushes and
 selections, picking, export meshing, `.vox` scene editing and frame animation. CPU only (but `./shaders` and `./gpu`, which run on a GPUDevice), no renderer, no DOM: every

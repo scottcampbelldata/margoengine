@@ -1,6 +1,6 @@
 # @margoengine/weather
 
-Import `margoengine/weather` from the `margoengine` package, or `@margoengine/weather` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/weather` from the `margoengine` package, or `@margoengine/weather` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Weather as a state that changes over time, on top of `@margoengine/sky`'s rain, snow and lightning: a state machine with presets that blends between weathers, follows a schedule or wanders by a seeded chain; a deterministic wind field with gusts and turbulence; ground wetness and snow cover with material hooks in JavaScript and WGSL; helpers that set the sky's `Weather`; and hail drawn as GPU particles that bounce. Rain, snow and lightning stay in `@margoengine/sky/weather`, which this package drives and does not repeat.
 

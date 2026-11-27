@@ -1,6 +1,6 @@
 # @margoengine/sky
 
-Import `margoengine/sky` from the `margoengine` package, or `@margoengine/sky` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/sky` from the `margoengine` package, or `@margoengine/sky` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 WebGPU atmospheric background with an analytical Preetham/Perez daytime sky and an Earth-based Bruneton-style precomputed Rayleigh/Mie model, an optional stylized night (stars, phased moon) and distance or height fog, plus optional weather (rain, snow, lightning and thunder timing). This is Margo's one sky: `SkyMoon` (`@margoengine/sky/night-preset`) is a midnight preset of it. The package also holds
 the day presets, preset scenes, scene kits, the Milky Way, the aurora and a textured moon, each an entry of its own.

@@ -1,6 +1,6 @@
 # @margoengine/road
 
-Import `margoengine/road` from the `margoengine` package, or `@margoengine/road` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/road` from the `margoengine` package, or `@margoengine/road` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 Arc-length spline sweeps generate a road surface, raised curbs, hard cross-section normals and tiled UV coordinates.
 

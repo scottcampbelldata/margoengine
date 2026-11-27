@@ -2,7 +2,7 @@
 
 Orbit, map, trackball, arcball, fly, first-person, pointer-lock and collision-aware walkthrough (/walk) camera controls, a transform gizmo and drag controls for Margo Engine.
 
-Import `margoengine/controls` from the `margoengine` package, or `@margoengine/controls` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/controls` from the `margoengine` package, or `@margoengine/controls` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 `stepLocomotion(state, actions, delta, height, options?)` provides ground-following
 character movement with normalized diagonals, damped speed and heading, and a

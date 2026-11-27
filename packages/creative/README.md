@@ -1,6 +1,6 @@
 # @margoengine/creative
 
-Import `margoengine/creative` from the `margoengine` package, or `@margoengine/creative` from this package alone; the two are the same module. Neither is on npm yet: the [Install](../../README.md#install) section lists the two routes that work today (run in a clone, or install local tarballs).
+Import `margoengine/creative` from the `margoengine` package, or `@margoengine/creative` from this package alone; the two are the same module. Both are on npm at 0.1.0. See [Install](https://github.com/scottcampbelldata/margoengine/blob/main/README.md#install) in the repository README.
 
 WebGPU grass, a planet renderer, a leaf/weather particle preset, toon shading, HDR targets and a grading post effect (fog, god rays, focus blur, ACES, grain) for Margo Engine.
 
@@ -10,7 +10,7 @@ For grass on terrain, use the [scatter heightmap and density-map example](../sca
 Scatter also provides [interaction and trampling](../scatter/README.md#interaction-and-trampling-margoenginescatterinteract)
 and [streamed grass chunks with three LOD meshes](../scatter/README.md#tile-input-storage).
 
-Package name: `@margoengine/creative`, version `1.0.0`. Build from source or install a local tarball until the renamed package is published.
+Package name: `@margoengine/creative`, version `1.0.0`. npm has this package at 0.1.0.
 
 ```sh
 npm install @margoengine/core@1.0.0 @margoengine/creative@1.0.0
