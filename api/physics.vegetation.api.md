@@ -1230,6 +1230,7 @@ class Physics implements EnginePlugin, BodyOwner {
     get maxCcdSubsteps(): number;
     set maxCcdSubsteps(substeps: number);
     get solver(): Required<KernelSolverOptions>;
+    readonly fidelity: 'standard' | 'high';
     setSolver(options: KernelSolverOptions): this;
     get iterations(): number;
     set iterations(iterations: number);
@@ -1721,6 +1722,7 @@ interface PhysicsOptions {
     contactModifier?: (contact: ContactModification) => void;
     predictionDistance?: number;
     lengthUnit?: number;
+    fidelity?: 'standard' | 'high';
 }
 
 interface PhysicsRaycastOptions extends QueryFilter {

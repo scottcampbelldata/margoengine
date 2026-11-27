@@ -211,7 +211,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Kept honest by:** `packages/physics/tests/vehicle-car.test.js` asserts the balance the dampers hold,
   `k (rest - length) - c v = g / 4`, to 1e-5 m, and the length within 5% of the static sag.
 
+### Open 2026-11-27: a domino wave runs slower in a row of small dominoes than in the same row scaled up (KB-PHYS-DOMINOSCALE1, physics)
+
+- **Repro:** `packages/physics/tests/rigid-measured.test.js` `wave(0.33, H)`: the wave speed over sqrt(g H) is 1.32 at H = 48 mm,
+  1.45 at 0.1 m, 1.51 at 0.2 m and 1.55 at 0.5 m. A row that is the same in every dimensionless number should give one
+  speed. The measured speeds (Larham 2008) are matched at 0.2 m; at 48 mm the speed is still inside every published
+  measurement (0.9 to 1.7), which the test holds.
+- **Cause:** not found yet. Ruled out by runs at H = 48 mm: the time step (1/240 s gives 1.30), the substeps (32 give 1.35), the
+  contact frequency and damping (240 Hz, damping 1: 1.32 and 1.35), the length tolerances (`lengthUnit: 0.25` with the step
+  and contact frequency scaled by the time scale: 1.37), adaptive substeps, the block solver, CCD tolerance and island
+  order (no change). Something absolute in metres or seconds that `lengthUnit` does not scale is left; the friction anchor
+  drift and the sleep and wake thresholds are next to check.
+
 ### Fixed 2026-11-27: a strike carried through a ball bounced off both of its contacts and made energy (KB-PHYS-BOUNCECHAIN1, physics)
+
 
 - **Repro:** with no gravity, three spheres of restitution 1 in a row 2 mm apart, the first struck at 1 m/s, left at -0.5,
   0.5 and 1 m/s, 1.5 times the energy (five balls: 4 times).

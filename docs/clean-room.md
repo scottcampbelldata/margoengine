@@ -18311,3 +18311,17 @@ source was read.
   whole pixels of at least 1 on the material.
 - Khronos, glTF 2.0 Specification, https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html, section 3.9.7: points
   and lines have no size.
+
+## physics solver tiers and the measured domino wave (DYN-01, 2026-11-27)
+
+No paper's companion code and no other engine's source was read.
+
+- Miles Macklin, Kier Storey, Michelle Lu, Pierre Terdiman, Nuttapong Chentanez, Stefan Jeschke and Matthias Müller,
+  "Small Steps in Physics Simulation", SCA 2019, https://doi.org/10.1145/3309486.3340247: more, smaller substeps over one
+  collision pass are the stronger use of a fixed budget than more iterations; the `high` tier takes 32 substeps.
+- Erin Catto, "Soft Step" in "Solver2D" (2024), https://box2d.org/posts/2024/02/solver2d/: a soft contact of frequency f;
+  its rest depth under a load W on mass m is W / (m (2 pi f)^2), the bound of `tests/fidelity.test.js`.
+- Ron Larham, "Validation of a Model of the Domino Effect?", arXiv:0803.2898 (2008), https://arxiv.org/abs/0803.2898,
+  appendix A table 1 (measured wave speeds of dominoes standing on end) and the survey of section 5 (0.9 to 1.7 sqrt(g H)),
+  read in full; W. J. Stronge and D. Shu, "The domino effect: successive destabilization by cooperative neighbours",
+  Proc. R. Soc. Lond. A 418 (1988) 155-163, cited there for the limit speed set by inter-domino friction (not read).

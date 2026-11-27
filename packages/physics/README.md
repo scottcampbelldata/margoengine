@@ -51,6 +51,8 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## Rigid bodies quick start
 
+Two solver tiers, one option: `new Physics(engine, {fidelity: 'high'})` runs 32 substeps with contacts at 480 Hz where the default `'standard'` runs 8 at 120 Hz (Macklin et al. 2019, "Small Steps in Physics Simulation"; Catto's soft step), four times the solver work, for heavy loads on light bodies, tall stacks and small parts. A soft contact rests at the allowed penetration plus W / (m (2 pi f)^2), so a 0.5 m box under a box of 1000 times its mass sinks 18 mm at the standard tier and 1.3 mm at the high one (`tests/fidelity.test.js`). Both tiers pass the same exact solutions (`tests/rigid-validation.test.js`) and the measured domino wave of Larham (2008), one friction fitted and four spacings held out within 0.1 sqrt(g H) (`tests/rigid-measured.test.js`). `physics.fidelity` reads the tier; `substeps` and `setSolver` replace what it set.
+
 Densities by name: `density: 'steel'` (or `collider.setDensity('oak')`) takes the material's kg/m³ from `densities`, real values from the CRC Handbook, the USDA Wood Handbook and Callister (air, water, seawater, ice, human, balsa, pine, oak, cork, rubber, plastic, glass, concrete, brick, granite, sand, aluminium, steel, iron, copper, lead, gold); `densityOf(name)` reads one. The default stays 1 kg/m³, Rapier's, so values tuned for Rapier carry over.
 
 A floor, a bouncing ball, two seconds of fixed steps, and the mass the solver computed from the ball's density (kg/m³; 1 by
