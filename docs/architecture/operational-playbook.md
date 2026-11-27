@@ -2248,6 +2248,11 @@ one fails. The WGSL checker types the subgroup built-in functions behind `enable
 refusal is what a page sees, not a type error. Evidence: compute.test.js, glsl-corpus-browser.mjs,
 corpus-draw-browser.mjs; khronos-gallery's material on the layer: scripts/compat-units-gpu-check.js --compat.
 
+Workgroup limits (2026-11-27, KB-COMPAT-WGSIZE1): the layer's createComputePipeline holds `@workgroup_size` (each axis
+and the product, constants applied) and the workgroup variables' bytes to its device limits at creation, as WebGPU
+does; before, only the lazy planner checked the product, at the first dispatch. Evidence: compute-limits.test.js;
+compute.test.js and the browser corpus compute part hold the recorded oversize kernels to that refusal.
+
 ## A new package brings its records (fast gate, 2026-11-16)
 
 `npm run hygiene` (every push) now runs `assertPackageRecordsCurrent` (scripts/support/package-records.mjs): every stated package count matches docs/catalog.json, margoengine.com/sizes.html can be built from entry-sizes.json and basic-scene-network.json (every catalog package measured, both records from one build), THIRD-PARTY-NOTICES.md is what scripts/supply-chain.mjs renders, and every examples/ folder holding TypeScript belongs to a type-check project. Each problem names the command that fixes it. `npm run catalog:build` now restates every package count (restatePackageCount in scripts/support/public-truth.mjs) instead of only the generated lists. Evidence: @margoengine/scenes landed with four pages stating 104 packages, no entry-sizes row, a stale notices file and examples/dune-coast in no project, and only local CI's full root tests failed; tests/package-records.test.js rebuilds that state in a temporary folder and gets the three reports, and the check run on origin/main's files at 3050f3bcc6 reports all of them. The size scan of tests/public-size-claims.test.js now reads meta descriptions and "core plus the high-level stage", which kept the white paper at 24,843 B and 61,059 B after the measured 24,841 B and 61,046 B.

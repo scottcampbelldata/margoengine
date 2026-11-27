@@ -73,6 +73,77 @@ test('explicit compute layouts count unused visible bindings, every resource kin
   assert.match(p.failure, /maxBindGroups/);
 });
 
+// The layer device's compute limits (src/device/device.ts, WebGPU's defaults).
+const workgroupLimits = {
+  ...limits,
+  maxComputeWorkgroupStorageSize: 16384,
+  maxComputeInvocationsPerWorkgroup: 256,
+  maxComputeWorkgroupSizeX: 256,
+  maxComputeWorkgroupSizeY: 256,
+  maxComputeWorkgroupSizeZ: 64,
+};
+const kernel = (code) => ({ ir: checkWGSL(code) });
+const created = (code, constants) => {
+  const d = { ...device(), limits: workgroupLimits };
+  const p = pipeline(d, { layout: 'auto', compute: { module: kernel(code), constants } });
+  return { d, p };
+};
+
+test('a workgroup past a device limit is a validation error at creation (KB-COMPAT-WGSIZE1)', () => {
+  const cases = [
+    ['@workgroup_size(512)', /@workgroup_size x of 'main' exceeds maxComputeWorkgroupSizeX \(256\): 512/],
+    ['@workgroup_size(1, 257)', /maxComputeWorkgroupSizeY \(256\): 257/],
+    ['@workgroup_size(1, 1, 65)', /maxComputeWorkgroupSizeZ \(64\): 65/],
+    ['@workgroup_size(32, 32)', /maxComputeInvocationsPerWorkgroup \(256\): 1024/],
+  ];
+  for (const [size, expected] of cases) {
+    const { d, p } = created(`@compute ${size} fn main() {}`);
+    assert.match(p.failure ?? '', expected, size);
+    assert.deepEqual(d.errors, [p.failure], size);
+    assert.equal(p.ready(), false, 'it never reaches a compute route');
+  }
+  for (const size of ['@workgroup_size(256)', '@workgroup_size(16, 16)', '@workgroup_size(4, 1, 64)'])
+    assert.equal(created(`@compute ${size} fn main() {}`).p.failure, null, size);
+});
+
+test('workgroup limits resolve pipeline constants and count the workgroup variables', () => {
+  const sized = 'override n: u32 = 64; @compute @workgroup_size(n * 2u) fn main() {}';
+  assert.equal(created(sized).p.failure, null);
+  assert.match(created(sized, { n: 129 }).p.failure, /maxComputeWorkgroupSizeX \(256\): 258/);
+  const storage = (type, use) => `var<workgroup> a: ${type}; var<workgroup> b: u32;
+    @compute @workgroup_size(1) fn main() { ${use} b = 1u; }`;
+  assert.equal(created(storage('array<vec4f, 1023>', 'a[0] = vec4f();')).p.failure, null);
+  assert.match(
+    created(storage('array<vec4f, 1024>', 'a[0] = vec4f();')).p.failure,
+    /maxComputeWorkgroupStorageSize \(16384\): 16400/,
+  );
+  const overridden = `override length: u32 = 4; ${storage('array<vec4f, length>', 'a[0] = vec4f();')}`;
+  assert.equal(created(overridden).p.failure, null);
+  assert.match(created(overridden, { length: 2048 }).p.failure, /maxComputeWorkgroupStorageSize \(16384\): 32784/);
+});
+
+test('createComputePipelineAsync rejects a workgroup past a limit without building it', async () => {
+  let builds = 0;
+  const d = {
+    ...device(),
+    limits: workgroupLimits,
+    computeRuntime: {
+      build() {
+        builds++;
+        return {};
+      },
+    },
+  };
+  await assert.rejects(
+    CompatDevice.prototype.createComputePipelineAsync.call(d, {
+      layout: 'auto',
+      compute: { module: kernel('@compute @workgroup_size(512) fn main() {}') },
+    }),
+    { name: 'GPUPipelineError', reason: 'validation', message: /maxComputeWorkgroupSizeX/ },
+  );
+  assert.equal(builds, 0);
+});
+
 test('external textures consume four texture, one sampler and one uniform slot', () => {
   const d = device(),
     entries = Array.from({ length: 5 }, (_, binding) => ({ binding, visibility: 4, externalTexture: {} }));

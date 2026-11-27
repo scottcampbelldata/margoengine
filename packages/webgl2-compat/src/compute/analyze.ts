@@ -11,6 +11,7 @@
 //   of an invocation writes its k-th store.
 // - cpu (B): everything else (atomics, workgroup memory, barriers, unbounded stores), as JavaScript.
 import { fault } from '../../../shared/errors.js';
+import { constantOf } from '../wgsl/override-value.js';
 import type { IREntryPoint, IRExpr, IRFunction, IRGlobalVar, IRModule, IRParam, IRStmt } from '../wgsl/ir.js';
 import type { StructType, TextureType, Type } from '../wgsl/types.js';
 
@@ -83,52 +84,6 @@ const RENDERABLE = new Set([
   'rgb10a2unorm',
   'rg11b10ufloat',
 ]);
-
-/** The numeric value of a constant or override expression (workgroup sizes, loop bounds); undefined if not constant. */
-function constantOf(e: IRExpr, constants: Readonly<Record<string, number | boolean>> = {}): number | undefined {
-  if (typeof e.value === 'number') return e.value;
-  if (typeof e.value === 'boolean') return +e.value;
-  switch (e.kind) {
-    case 'name': {
-      const d = e.decl;
-      if (d.kind === 'override') {
-        const given = constants[d.name] ?? (d.id !== undefined ? constants[String(d.id)] : undefined);
-        if (given !== undefined) return Number(given);
-        return d.init ? constantOf(d.init, constants) : undefined;
-      }
-      if (d.kind === 'const' || d.kind === 'local-const') return typeof d.value === 'number' ? d.value : undefined;
-      return undefined;
-    }
-    case 'convert':
-      return constantOf(e.arg, constants);
-    case 'unary': {
-      const v = constantOf(e.operand, constants);
-      return v === undefined ? undefined : e.op === '-' ? -v : e.op === '~' ? ~v : +!v;
-    }
-    case 'binary': {
-      const a = constantOf(e.left, constants),
-        b = constantOf(e.right, constants);
-      if (a === undefined || b === undefined) return undefined;
-      switch (e.op) {
-        case '+':
-          return a + b;
-        case '-':
-          return a - b;
-        case '*':
-          return a * b;
-        case '/':
-          return b === 0 ? a : Math.trunc(a / b);
-        case '%':
-          return b === 0 ? 0 : a % b;
-        case '<<':
-          return a << b;
-        case '>>':
-          return a >> b;
-      }
-    }
-  }
-  return undefined;
-}
 
 /** `@workgroup_size` of a compute entry point, with pipeline constants applied. */
 function workgroupSizeOf(

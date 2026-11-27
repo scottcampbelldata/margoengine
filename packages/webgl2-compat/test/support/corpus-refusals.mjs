@@ -22,7 +22,8 @@ export const RECORDED_UNMAPPED_ENABLES = {
  * Compute kernels sized past WebGPU's default 256 invocations per workgroup. compute tunes its kernels to the
  * device's maxComputeInvocationsPerWorkgroup (packages/compute/src/context.ts requests the adapter's), the
  * recordings ran on adapters that grant 512 and 1024, and the layer's device offers 256 (src/device/device.ts), so
- * on the layer compute builds its 256 versions; the planner refuses the larger ones by WebGPU's limit.
+ * on the layer compute builds its 256 versions; createComputePipeline and the planner refuse the larger ones by
+ * WebGPU's limits.
  */
 export const RECORDED_OVER_INVOCATIONS = { compute: 12 };
 
@@ -45,7 +46,10 @@ export function assertEnableRefusal(error, name, what) {
 export function assertUnmappedCounts(counts, recorded, what) {
   for (const [name, n] of Object.entries(counts)) {
     assert.ok(name in recorded, `${what}: ${n} refusals of 'enable ${name};', which no recorded count covers`);
-    assert.ok(n <= recorded[name], `${what}: ${n} refusals of 'enable ${name};', more than the recorded ${recorded[name]}`);
+    assert.ok(
+      n <= recorded[name],
+      `${what}: ${n} refusals of 'enable ${name};', more than the recorded ${recorded[name]}`,
+    );
   }
 }
 
@@ -64,11 +68,18 @@ export const RECORDED_OVER_UNITS = {
 
 /** True when `error` is the layer's coded refusal of a pipeline past its texture units (errors#texture-units). */
 export function isUnitsRefusal(error) {
-  return error?.code === 'unsupported' && /texture units/.test(String(error.message)) && /errors#texture-units/.test(String(error.message));
+  return (
+    error?.code === 'unsupported' &&
+    /texture units/.test(String(error.message)) &&
+    /errors#texture-units/.test(String(error.message))
+  );
 }
 
 /** Asserts that every pipeline refused for its units (`[module key, what]`) belongs to a recorded module. */
 export function assertOverUnits(refused, what) {
   for (const [key, id] of refused)
-    assert.ok(key in RECORDED_OVER_UNITS, `${what}: ${id} is refused for its texture units, and no recorded cause covers it`);
+    assert.ok(
+      key in RECORDED_OVER_UNITS,
+      `${what}: ${id} is refused for its texture units, and no recorded cause covers it`,
+    );
 }

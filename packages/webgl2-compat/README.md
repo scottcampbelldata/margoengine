@@ -262,6 +262,10 @@ console.log(depthStencil.depthBiasClamp); // zero works without the clamp extens
     rounds it, on copies of the bound buffers and textures (GPU-written ones are read back, a stall the device counts
     in `stalls`).
 
+  As in WebGPU, `createComputePipeline` reports a validation error (`createComputePipelineAsync` rejects with a
+  `GPUPipelineError`) for a workgroup past the device's limits: `@workgroup_size` per axis (256, 256, 64) and their
+  product (256 invocations), pipeline constants applied, and 16384 bytes of workgroup variables.
+
   Reads see memory as it was before the dispatch, as WGSL allows for invocations that never read back their own
   stores. The CPU tier samples cube textures at a level as WebGPU does (seamless filtering across face edges; at a
   corner the three texels that meet there are averaged) and cannot read multisampled or external textures, a refusal

@@ -111,14 +111,29 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   them is still judged at 180. The rail-line probes read 0.55 and 0.60 percent. Regression:
   `packages/headless/tests/look-clean.test.js` (an 8 sub-frame 180 degree bar passes, one sub-frame and a 90 degree
   bar judged at 180 fail, the probe's own angle applies).
-### Open 2026-11-26: the WebGL2 layer accepts a compute pipeline past maxComputeInvocationsPerWorkgroup at creation (KB-COMPAT-WGSIZE1, webgl2-compat)
+### Fixed 2026-11-27: the WebGL2 layer accepted a compute pipeline past its workgroup limits at creation (KB-COMPAT-WGSIZE1, webgl2-compat)
 
 - **Repro:** on the layer's device (maxComputeInvocationsPerWorkgroup 256), `createComputePipeline` with
-  `@compute @workgroup_size(512) fn main() {}` returns a pipeline with no validation error; the first dispatch's
-  build throws the planner's RangeError ("has more than 256 invocations") out of the submit.
-- **Cause:** `CompatComputePipeline` (src/device/compute.ts) checks binding counts at creation but not the workgroup
-  size; only the planner (src/compute/analyze.ts `workgroupSizeOf`) checks it, at build. WebGPU makes it a validation
-  error at creation. Packages tune to the device's limit, so none reaches it in use; found with KB-COMPAT-CORPUSRED1.
+  `@compute @workgroup_size(512) fn main() {}` returned a pipeline with no validation error; the first dispatch's
+  build threw the planner's RangeError out of the submit. A `@workgroup_size(1, 1, 128)` kernel (Z limit 64) or more
+  than 16384 bytes of workgroup variables were never refused. The browser corpus compute part
+  (`npm run test:browser:compute -w @margoengine/webgl2-compat`) failed on the 12 recorded kernels past 256
+  invocations and did not count its 23 subgroup refusals.
+- **Cause:** `CompatComputePipeline` checked binding counts at creation but no workgroup limit.
+- **Fix:** creation checks each `@workgroup_size` axis, their product and the workgroup variables' bytes (override-sized
+  arrays included) against the device's limits, and reports a validation error (`GPUPipelineError` from the async
+  call). The browser corpus compute part asserts and counts both refusals. Regression:
+  `packages/webgl2-compat/test/compute-limits.test.js`.
+
+### Open 2026-11-27: the browser corpus compute part fails on a recorded kernel that varies by run (KB-COMPAT-CORPUSFBO1, webgl2-compat)
+
+- **Repro:** `npm run test:browser:compute -w @margoengine/webgl2-compat` (Chrome, RTX A6000), two runs of one build
+  of the layer. First run: `sky 8bd2180e7c0c8ef7 main` "The compatibility layer's own masked::texelFetch(t, p, 0)
+  program did not link" (empty driver log) and `compute 8c376d839a33176a main` "The render pass attachments do not
+  form a complete WebGL2 framebuffer (status 0x8cdd) GL error 1282". Second run: only `sky 8bd2180e7c0c8ef7 main`,
+  with the framebuffer message and GL error 0; the other kernel passed. The runs differ only in when the page made a
+  fresh device (the first recreated it after each oversize kernel).
+- **Cause:** not yet established. The failures move with the device's history.
 
 ### Fixed 2026-11-26: the WGSL corpus recorded on 2026-11-26 failed six webgl2-compat tests (KB-COMPAT-CORPUSRED1, webgl2-compat)
 
