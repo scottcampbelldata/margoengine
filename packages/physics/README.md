@@ -5181,6 +5181,70 @@ console.log(ship.water.sample(2, -0.45, -0.7, 1 / 60).velocity[2] < 0); // true,
 
 `LoadSolver` holds rigid bodies in the water through `bodyForces` with the water's loads (SEA-12): divers, debris, buoys, hoses, piles and dolphins. The default `loads` and `rigid` solvers are ordered automatically. If you rename or compose the solvers, put loads before rigid in a staggered group with `world.couple([loadId, rigidId], 'staggered')`.
 
+#### Float any body in one call (`floating`)
+
+`floating(physics, bodies, options?)` reads each body's own colliders and returns the `LoadSolver` bodies that float
+it, so buoyancy, drag and the righting moment come from the same shapes as its contacts and its mass. A boat of a box
+hull and a mast rides at its Archimedes draft:
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { floating, LoadSolver } from '@margoengine/physics/loads';
+import { SpectralSea } from '@margoengine/physics/sea';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+await Physics.load(); const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const boat = physics.addBody(null, { position: [0, 0.04, 0], colliders: [{ shape: 'box', halfExtents: [1, 0.2, 0.5], density: 400 }, { shape: 'cylinder', radius: 0.05, halfHeight: 0.6, offset: [0, 0.8, 0], density: 400 }] });
+const sea = new SpectralSea({ waves: { frequencies: Float64Array.of(1), directions: Float64Array.of(0), energy: new Float64Array(1), depth: 20, density: 1000 } });
+new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(new LoadSolver(), { sea, bodies: floating(physics, boat) }).advance(600);
+console.log(Math.abs(boat.mass / 1000 / 2 - (0.2 - boat.position[1])) < 0.003); physics[Symbol.dispose](); // true: draft = mass / (rho A)
+```
+
+- **Every solid collider:** a sphere, box or capsule (any axis) floats as its analytic shape at the collider's offset
+  and turn; a convex hull (its own faces) and a closed triangle mesh are integrated exactly below the water; a cylinder
+  or a cone is a 64-sided prism or pyramid (`FLOATING_SIDES`) whose radius keeps the circle's area, so its displaced
+  volume is exact and its waterplane's second moment is within 1e-6 of the circle's. A compound (and a convex
+  decomposition) gives one entry a part: the body's buoyancy is the sum of its parts', as its mass is.
+- **Skipped and refused:** sensors and disabled colliders displace nothing. A half space, height field, voxel grid,
+  segment, triangle or polyline has no closed volume, and a rounded collider (border radius above 0) floats only as its
+  core: each is a MargoError `unsupported` ([errors#hydrodynamic-loads](https://margoengine.com/errors#hydrodynamic-loads))
+  naming the fix, as is a body of another `Physics`.
+- **Options:** `drag`, `spinDrag`, `windage` and `addedInertia` go on every entry, as the `LoadBody` fields of the same
+  name (defaults: the shape's own drag by Reynolds number, `spinDrag` 1, the shape's own windage, no rotational added
+  inertia). `pressureModel: 'surface'` (default `'compact'`, the local water plane) integrates the water's incident
+  pressure over every box, hull, mesh, cylinder and cone entry, so a wave shorter than the body heaves and pitches it
+  (spheres and capsules have no surface tier and stay compact; the sea needs a `pressure`). The colliders are read at
+  the call; call `floating` again for a new solver after a collider changes.
+- **No energy from the step:** the displaced water is taken at the pose the rigid step makes energy-neutral, (s - 1) /
+  (2 s) of the step on for its s substeps, so an undamped float heaves and rolls at constant amplitude at 60 steps a
+  second (it grew 20 % a cycle when taken at the step's start, KB-LOADS-HEAVEGAIN1).
+- **Any water:** `sea` is a `SpectralSea`, a flood's surface or, through `seaSurface` from `@margoengine/water/sea-state`,
+  the `Water`, `FFTOcean` or pointer `Ripples` the camera sees.
+- **What it found:** `loads.bodyLoad(i)` gives entry `i`'s last step: `submerged` volume (m³) and `wet` fraction, the
+  shape's `centre`, the `centreOfBuoyancy` (the displaced volume's centroid below the local water plane), `depth` (the
+  water above the centre), `buoyancy` (N) and `force`, the water's other loads before the added-mass hold (Froude-Krylov,
+  the water's acceleration on the added mass, drag and windage).
+- **Debug view:** `loads.debugRender(options)` gives line segments for `PhysicsDebugView.add(loads)`
+  (`@margoengine/physics/debug-view`): each body's edges below the water (blue), its waterline on the water as it is now
+  (white), its centre of buoyancy (magenta cross), its buoyancy (cyan) and the other loads (orange). Options, all default
+  true: `submerged`, `waterline`, `centreOfBuoyancy`, `forces`; `forceScale` in metres per newton (default each body's own,
+  so its full buoyancy draws twice the cube root of its volume long).
+
+```ts
+import { Physics } from '@margoengine/physics';
+import { floating, LoadSolver } from '@margoengine/physics/loads';
+import { SpectralSea } from '@margoengine/physics/sea';
+import { PhysicsWorld, RigidSolver } from '@margoengine/physics/world';
+await Physics.load(); const physics = new Physics(null, { fixedTimestep: 1 / 60 });
+const buoy = physics.addBody(null, { colliders: { shape: 'cylinder', radius: 0.4, halfHeight: 0.5, density: 300 } });
+const sea = new SpectralSea({ waves: { frequencies: Float64Array.of(1), directions: Float64Array.of(0), energy: new Float64Array(1), depth: 20, density: 1000 } });
+const loads = new LoadSolver();
+new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(new RigidSolver(), { physics }).add(loads, { sea, bodies: floating(physics, buoy) }).advance(1);
+console.log(loads.bodyLoad(0).wet, loads.debugRender().vertices.length > 0); physics[Symbol.dispose](); // 0.5 true
+```
+
+A live page floats boxes, a capsule, a hull and a glTF model on the ocean and in pointer ripples, with this debug view:
+[examples/floating.html](../../examples/floating.html).
+
 #### Float a rigid body
 
 Add LoadSolver once to a world with the default RigidSolver, giving each body's row and wetted shape.

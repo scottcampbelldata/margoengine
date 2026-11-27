@@ -7,6 +7,13 @@ export * from './flood-blockage.js';
 export { FloodBodyDragSolver, type FloodBodyDragBody, type FloodBodyDragParams } from './flood-body-drag.js';
 export * from './flood-paddle.js';
 export * from './flood-wading.js';
+export {
+  floating,
+  type FloatingBody,
+  type FloatingOptions,
+  type FloatingWorld,
+  FLOATING_SIDES,
+} from './floating.js';
 export * from './free-hull-wake.js';
 export * from './morison.js';
 export * from './prescribed-wake.js';
@@ -21,6 +28,7 @@ export {
   type LoadCoupledRadiationResonance,
 } from './radiation-coupled-profile.js';
 export * from './radiation-profile.js';
+export type { LoadLines } from './debug-lines.js';
 export type { LoadRadiationMode, LoadRadiationResonance } from './radiation.js';
 export * from './shapes.js';
 export * from './segments.js';

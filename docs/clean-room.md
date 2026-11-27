@@ -18944,3 +18944,27 @@ read as quoted in later work and search summaries, not in the papers themselves.
 - K. N. Singer, B. L. Jolliff and W. B. McKinnon, *Lunar secondary craters and estimated ejecta block sizes reveal a
   scale-dependent fragmentation trend*, JGR Planets 125 (2020), https://arxiv.org/abs/2008.10132 .
 
+## SEA-12 floating from a body's colliders (`floating`, `bodyLoad`, `debugRender`, 2026-11-27)
+
+Margo's own design from the following public sources; no engine's or library's source was read (three.js's GPGPU water
+examples were only run and their pages read, for the migration note).
+
+- Archimedes' principle by the divergence theorem: a closed surface under the gauge pressure (eta - y) takes the
+  displaced volume straight up, and under (eta - y)^2 / 2 the integral of (eta - y), which gives the centroid's height.
+  G. K. Batchelor, *An Introduction to Fluid Dynamics* (Cambridge, 1967), §1.4 (hydrostatics), and any calculus text's
+  Gauss theorem. Used for `bodyLoad`'s centre of buoyancy of a mesh and checked against the hull's triangle centroid.
+- The wall-sided righting arm GZ = sin(phi) (GM + BM tan^2(phi) / 2) and BM = I / V: K. J. Rawson and E. C. Tupper,
+  *Basic Ship Theory*, 5th ed. (Butterworth-Heinemann, 2001), vol. 1, ch. 4 (the wall-sided formula); the test's
+  cylinder moment and GM.
+- A regular n-gon of circumradius R has area (n / 2) R^2 sin(2 pi / n) and, about a centroidal axis, the second moment
+  pi^2 r^4 (2 + cos(2 pi / n)) / (6 n sin(2 pi / n)) when its area is the circle's: the polygon second-moment formula
+  (1/12) sum (x_i y_{i+1} - x_{i+1} y_i)(y_i^2 + y_i y_{i+1} + y_{i+1}^2), from W. D. Pilkey, *Formulas for Stress,
+  Strain, and Structural Matrices*, 2nd ed. (Wiley, 2005), §2.3. The cylinder and cone prisms keep the circle's area.
+- Heave and roll natural periods 2 pi sqrt((m + A33) / (rho g A_wp)) and 2 pi sqrt(I44 / (m g GM)): J. N. Newman,
+  *Marine Hydrodynamics* (MIT Press, 1977), §6.16-6.17; the added mass A33 is Lamb's ellipsoid coefficient the solver
+  already uses (H. Lamb, *Hydrodynamics*, 6th ed., 1932, art. 115).
+- The energy-neutral pose of a held load over s symplectic-Euler substeps, (s - 1) / (2 s) of the step on, is the
+  rigid solver's own derivation (`world/solvers/rigid.ts`, the hull solver's `seakeeping/solver.ts`): the update of
+  a load -k x taken at x + theta v dt has determinant 1 + (omega dt)^2 (1 - theta - (s + 1) / (2 s)). E. Hairer, C.
+  Lubich and G. Wanner, *Geometric Numerical Integration*, 2nd ed. (Springer, 2006), §I.1 and §VI.3 (symplectic Euler
+  and its preserved area), for why the determinant 1 leaves the amplitude unchanged.

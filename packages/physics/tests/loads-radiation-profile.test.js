@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Physics } from '../dist/index.js';
 import { equivalentEllipsoid, LoadSolver, radiationProfile } from '../dist/loads.js';
-import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../dist/world.js';
+import { BODIES_FIELD, BODY_WORDS, FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver } from '../dist/world.js';
 
 const density = 1000;
 
@@ -236,26 +236,37 @@ test('a baked draft profile drives the live TypeScript and SIMD heave force and 
         body.row * FORCE_WORDS,
         (body.row + 1) * FORCE_WORDS,
       );
-    return { world, read };
+    const substeps = () =>
+      regionWords(world.memory, world.fields.port(BODIES_FIELD.name).region)[body.row * BODY_WORDS + 24];
+    return { world, read, substeps };
   }
 
+  // The displaced water is taken (s - 1) / (2 s) of the step on, where the box has risen and rolled (KB-LOADS-HEAVEGAIN1):
+  // a wall-sided box of height 1 has 1/2 - y / cos(phi) of its height below the water at centre height y and roll phi. The
+  // roll is the rigid port's quaternion turned by the spin over that time, q + (h / 2) [w, 0] q made a unit.
+  let wet = profile.immersion;
   // Eliminate all initially empty modes and the new body velocity from the first implicit step.
   function expected(axis, dry, added, speed) {
     const impedance =
-      profile.immersion *
+      wet *
       profile.resonances
         .filter((mode) => mode.axis === axis)
         .reduce(
           (sum, { strength, decayRate, frequency }) => sum + strength / (1 + decayRate * dt + frequency ** 2 * dt ** 2),
           0,
         );
-    return (-impedance * dt * speed * dry) / (dry + added * mass + impedance * dt * dt);
+    return (-impedance * dt * speed * dry) / (dry + (added * mass * wet) / profile.immersion + impedance * dt * dt);
   }
 
   using tsPhysics = new Physics(null, { fixedTimestep: dt, gravity });
   using simdPhysics = new Physics(null, { fixedTimestep: dt, gravity });
   const reference = setup(tsPhysics, new LoadSolver());
   const native = setup(simdPhysics, await LoadSolver.load());
+  const s = reference.substeps(),
+    ahead = ((s - 1) / (2 * s)) * dt,
+    centreY = Math.fround(-profile.waterline) + Math.fround(heaveSpeed) * ahead,
+    phi = 2 * Math.atan((Math.fround(rollSpeed) * ahead) / 2);
+  wet = 0.5 - centreY / Math.cos(phi);
   reference.world.advance(1);
   native.world.advance(1);
   const held = reference.read();

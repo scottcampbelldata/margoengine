@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21424477,
+  "total": 21424697,
   "history": [
     {
       "date": "2026-10-24",
@@ -15121,6 +15121,12 @@
       "commit": "building-windows",
       "reason": "Openings fitted clear of joined blocks (KB-PROC-ROOFWINDOW1): a window or door another block stands against moves, shrinks or goes: procedural/building-plans 29,245 to 30,418 B gzip measured. generateBuildingPlan is synchronous and a window open into a roof space is a defect, so a split entry would need a second import before any joined plan could be built.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea12-floating",
+      "reason": "@margoengine/physics/loads 61,617 to 65,325 B gzip (measured on the same tree), ceiling 63,248 to 67,285 B: SEA-12 floating(physics, bodies), the one call that floats a body from its own colliders (hull faces, closed meshes, cylinder and cone prisms, compound parts), LoadSolver.bodyLoad and debugRender (waterline, submerged edges, centre of buoyancy, load arrows), and buoyancy taken at the energy-neutral pose (KB-LOADS-HEAVEGAIN1). Every floating scene imports LoadSolver with it; a separate entry would add a second import to the quick start for about 1 KB saved in scenes that list shapes by hand. Core and Stage are unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15994,7 +16000,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 67065,
+    "@margoengine/physics/loads": 67285,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

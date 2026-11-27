@@ -38,7 +38,16 @@ import {
   bodyRowsOf,
   FORCE_WORDS,
 } from '../world/solvers/rigid.js';
-import { boxSurface, ellipsoidHydrostatics, meshHydrostatics } from './buoyancy.js';
+import { boxSurface, ellipsoidHydrostatics, meshBuoyancyCentre, meshHydrostatics } from './buoyancy.js';
+import {
+  analyticOutline,
+  BUOYANCY,
+  BUOYANCY_CENTRE,
+  drawWetted,
+  LineSink,
+  LOAD,
+  type LoadLines,
+} from './debug-lines.js';
 import { type CapsuleDimensions, capsuleHydrostatics, capsuleInertiaAxes, capsuleVolume } from './capsule.js';
 import {
   compactDragArea,
@@ -101,6 +110,11 @@ export interface LoadBody {
   readonly shape: LoadShape;
   /** Where the shape's centre is in the body's frame, m (default the body's origin; a mesh's own centroid when a mesh). */
   readonly centre?: readonly [number, number, number];
+  /**
+   * The shape's turn in the body's frame about its centre, a unit quaternion [x, y, z, w] (default none): a box, capsule
+   * or ellipsoid set at an angle on its body, as a collider's `rotation`. A mesh carries its turn in its vertices.
+   */
+  readonly rotation?: readonly [number, number, number, number];
   /** Drag coefficients along the shape's three axes. The default follows Reynolds number and shape. */
   readonly drag?: number | readonly [number, number, number];
   /** Scale the independent rotational viscous torque, default 1. */
@@ -184,6 +198,65 @@ interface BodyRuntime {
   readonly capsule: CapsuleDimensions | undefined;
   /** Body-local pressure integration surface relative to the geometric centre. */
   readonly mesh: HullMesh | undefined;
+  /** What the last step found, for {@link LoadSolver.bodyLoad} and {@link LoadSolver.debugRender}. */
+  readonly last: LastLoad;
+  /** A closed surface to draw an analytic shape with, body frame about its centre (made on first draw). */
+  outline?: HullMesh;
+}
+
+/** The pose and loads of a compact body at the last step, in the solver's origin cell. */
+interface LastLoad {
+  active: boolean;
+  time: number;
+  submerged: number;
+  centre: Vec3;
+  rotation: [number, number, number, number];
+  /** Water height above the shape's centre at the centre, m. */
+  depth: number;
+  /** The centre of buoyancy from the centre, world axes (analytic shapes; NaN for meshes until asked). */
+  offset: Vec3;
+  buoyancy: Vec3;
+  force: Vec3;
+}
+
+/** What the water did to a compact body at the last step: {@link LoadSolver.bodyLoad}. World axes, the solver's origin cell. */
+export interface BodyLoad {
+  /** Whether the body was in the last step (false before the first step or while its row is empty). */
+  readonly active: boolean;
+  /** Displaced volume, m^3. */
+  readonly submerged: number;
+  /** Displaced fraction of the shape's volume, 0 to 1. */
+  readonly wet: number;
+  /** The shape's centre, m. */
+  readonly centre: Vec3;
+  /** The centroid of the displaced volume below the local water plane, m (the shape's centre when dry). */
+  readonly centreOfBuoyancy: Vec3;
+  /** The water's height above the shape's centre at the centre, m: the draft reference of the local plane. */
+  readonly depth: number;
+  /** Buoyancy, N: rho g V up, or the integrated pressure with `pressureModel: 'surface'`. */
+  readonly buoyancy: Vec3;
+  /**
+   * The water's other loads before the added-mass hold, N, through the shape's centre: Froude-Krylov, the water's
+   * acceleration on the added mass, drag and windage.
+   */
+  readonly force: Vec3;
+}
+
+/** What {@link LoadSolver.debugRender} draws; every field has a default. */
+export interface LoadDebugOptions {
+  /** The shape's edges below the water, blue (default true). */
+  readonly submerged?: boolean;
+  /** Where the water's surface cuts the shape, white (default true). */
+  readonly waterline?: boolean;
+  /** A cross at the centre of buoyancy, magenta (default true). */
+  readonly centreOfBuoyancy?: boolean;
+  /** Buoyancy from the centre of buoyancy, cyan, and the other loads from the shape's centre, orange (default true). */
+  readonly forces?: boolean;
+  /**
+   * Arrow length in metres per newton (default: each body's own, so its full-immersion buoyancy draws as long as the
+   * cube root of its volume times 2).
+   */
+  readonly forceScale?: number;
 }
 
 interface BodyLoads {
@@ -485,6 +558,24 @@ export class LoadSolver implements Solver<LoadParams> {
         indices: Uint32Array.from(shape.mesh.indices),
       };
     } else throw invalidLoad('Missing hydrodynamic shape; pass {ellipsoid}, {sphere}, {box}, {capsule} or {mesh}.');
+    if (spec.rotation !== undefined) {
+      const turn = spec.rotation,
+        length = Array.isArray(turn) && turn.length === 4 ? Math.hypot(turn[0], turn[1], turn[2], turn[3]) : NaN;
+      if (!(Math.abs(length - 1) < 1e-5))
+        throw invalidLoad(
+          'Invalid hydrodynamic shape rotation; pass a unit quaternion [x, y, z, w] in the body frame.',
+        );
+      if ('mesh' in shape)
+        throw invalidLoad('A mesh shape carries its turn in its vertices; turn them and leave rotation out.');
+      const q = turn.map((value) => value / length) as [number, number, number, number];
+      frame = frame.map((row) => rotate(q, row)) as [Vec3, Vec3, Vec3];
+      if (mesh) {
+        const v = mesh.vertices,
+          turned = new Float64Array(v.length);
+        for (let i = 0; i < v.length; i += 3) turned.set(rotate(q, [v[i]!, v[i + 1]!, v[i + 2]!]), i);
+        mesh = { vertices: turned, indices: mesh.indices };
+      }
+    }
     if (!axes.every((a) => a > 0 && Number.isFinite(a)))
       throw invalidLoad('Invalid hydrodynamic shape size; pass three positive finite dimensions or a positive radius.');
     volume ??= (4 / 3) * Math.PI * axes[0] * axes[1] * axes[2];
@@ -539,6 +630,17 @@ export class LoadSolver implements Solver<LoadParams> {
       box,
       capsule,
       mesh,
+      last: {
+        active: false,
+        time: 0,
+        submerged: 0,
+        centre: [0, 0, 0],
+        rotation: [0, 0, 0, 1],
+        depth: -Infinity,
+        offset: [0, 0, 0],
+        buoyancy: [0, 0, 0],
+        force: [0, 0, 0],
+      },
     };
   }
 
@@ -595,7 +697,8 @@ export class LoadSolver implements Solver<LoadParams> {
           )
         : undefined;
     for (const b of this.bodies) {
-      if (!bodies) break;
+      b.last.active = false;
+      if (!bodies) continue;
       const at = b.spec.row * BODY_WORDS;
       if (at + BODY_WORDS > bodies.length || bodies[at + 23] !== 1) continue;
       this.loadBody(b, bodies, at, t, dt, rho, history);
@@ -630,28 +733,51 @@ export class LoadSolver implements Solver<LoadParams> {
     if (b.coupledRadiation) validateCoupledCentre(b.coupledRadiation, q, origin, cm);
     const centre = add(origin, rotate(q, b.centre)),
       axesWorld = b.frame.map((d) => rotate(q, d)) as [Vec3, Vec3, Vec3],
-      [ax, ay, az] = b.axes,
-      // The ellipsoid's half-height along the vertical (its support function along up).
-      h0 = ax * axesWorld[0][1],
-      h1 = ay * axesWorld[1][1],
-      h2 = az * axesWorld[2][1],
-      surface = this.sea.elevation(centre[0], centre[2], t),
-      // Vertical support bounds for the compact and ellipsoid calculations.
-      half = b.box
-        ? Math.abs(b.box[0] * axesWorld[0][1]) +
-          Math.abs(b.box[1] * axesWorld[1][1]) +
-          Math.abs(b.box[2] * axesWorld[2][1])
-        : Math.sqrt(h0 * h0 + h1 * h1 + h2 * h2);
+      surface = this.sea.elevation(centre[0], centre[2], t);
     if (!Number.isFinite(surface))
       throw invalidLoad('Non-finite hydrodynamic surface height; return a finite elevation in metres.');
     const depth = surface - centre[1];
+    // The displaced water is taken at the pose (s - 1) / (2 s) of the step on, the body's velocity and spin carried over
+    // it, where a restoring load held through the step neither feeds the motion's energy nor takes it: the rigid step moves
+    // a body by (v + F dt (s + 1) / (2 s m)) dt over its s symplectic-Euler substeps (the port gives s), so a load -k x
+    // taken at x + theta v dt updates with determinant 1 + (w dt)^2 (1 - theta - (s + 1) / (2 s)), 1 at theta =
+    // (s - 1) / (2 s), as the hull solver takes its loads (seakeeping/solver.ts). Taken where the step starts, a floating box
+    // gained 1.8 % of its heave amplitude a cycle at 240 steps a second and 20 % at 60 (KB-LOADS-HEAVEGAIN1). The loads
+    // that follow the velocity (drag, added mass, radiation, wind) stay at the step's start.
+    const substeps = Math.max(1, bodies[at + 24]!),
+      ahead = ((substeps - 1) / (2 * substeps)) * dt,
+      spinning = ahead > 0 && (w[0] !== 0 || w[1] !== 0 || w[2] !== 0),
+      hq = spinning ? turnBy(q, w, ahead) : q,
+      shift: Vec3 = [v[0] * ahead, v[1] * ahead, v[2] * ahead],
+      hcm = add(cm, shift),
+      // The origin rides with the centre of mass and turns about it.
+      horigin = spinning
+        ? add(hcm, rotate(hq, rotate([-q[0], -q[1], -q[2], q[3]], sub(origin, cm))))
+        : add(origin, shift),
+      hcentre = spinning ? add(horigin, rotate(hq, b.centre)) : add(centre, shift),
+      haxes = spinning ? (b.frame.map((d) => rotate(hq, d)) as [Vec3, Vec3, Vec3]) : axesWorld,
+      [ax, ay, az] = b.axes,
+      // The ellipsoid's half-height along the vertical (its support function along up).
+      h0 = ax * haxes[0][1],
+      h1 = ay * haxes[1][1],
+      h2 = az * haxes[2][1],
+      // Vertical support bounds for the compact and ellipsoid calculations.
+      half = b.box
+        ? Math.abs(b.box[0] * haxes[0][1]) + Math.abs(b.box[1] * haxes[1][1]) + Math.abs(b.box[2] * haxes[2][1])
+        : Math.sqrt(h0 * h0 + h1 * h1 + h2 * h2),
+      hsurface = ahead > 0 ? this.sea.elevation(hcentre[0], hcentre[2], t) : surface;
+    if (!Number.isFinite(hsurface))
+      throw invalidLoad('Non-finite hydrodynamic surface height; return a finite elevation in metres.');
+    const hdepth = hsurface - hcentre[1];
     const densityGravity = rho * this.g;
     const surfacePressure = b.spec.pressureModel === 'surface';
     const force: Vec3 = [0, 0, 0];
     let submerged: number;
     let torque: Vec3;
+    // The centre of buoyancy from the centre for the analytic shapes; a mesh's is found when asked (bodyLoad).
+    let analyticOffset: Vec3 = [NaN, NaN, NaN];
     if (surfacePressure) {
-      const pose = { position: centre, rotation: q };
+      const pose = { position: hcentre, rotation: hq };
       wettedLoads(
         b.mesh!,
         pose,
@@ -660,30 +786,42 @@ export class LoadSolver implements Solver<LoadParams> {
           pressure: (x, y, z, time) => Math.max(0, this.sea.elevation(x, z, time) - y),
         },
         t,
-        cm,
+        hcm,
         this.hydrostatic,
       );
       submerged = Math.max(0, Math.min(b.volume, this.hydrostatic.force[1]));
-      wettedLoads(b.mesh!, pose, this.sea, t, cm, this.pressure);
+      wettedLoads(b.mesh!, pose, this.sea, t, hcm, this.pressure);
       torque = [...this.pressure.torque];
       if (!this.pressure.force.every(Number.isFinite) || !torque.every(Number.isFinite))
         throw invalidLoad(
           'Non-finite mesh pressure load; return finite water elevations and gauge pressure in pascals.',
         );
     } else if (b.mesh) {
-      meshHydrostatics(b.mesh, q, depth, sub(cm, centre), this.hydrostatic);
+      meshHydrostatics(b.mesh, hq, hdepth, sub(hcm, hcentre), this.hydrostatic);
       submerged = Math.max(0, Math.min(b.volume, this.hydrostatic.force[1]));
       torque = [densityGravity * this.hydrostatic.torque[0], 0, densityGravity * this.hydrostatic.torque[2]];
     } else {
       const offset: Vec3 = [0, 0, 0];
       submerged = b.capsule
-        ? capsuleHydrostatics(b.capsule, axesWorld[1], depth, b.volume, offset)
-        : b.volume * ellipsoidHydrostatics(b.axes, axesWorld, half, depth, offset);
-      const buoyancyArm = add(sub(centre, cm), offset);
+        ? capsuleHydrostatics(b.capsule, haxes[1], hdepth, b.volume, offset)
+        : b.volume * ellipsoidHydrostatics(b.axes, haxes, half, hdepth, offset);
+      analyticOffset = offset;
+      const buoyancyArm = add(sub(hcentre, hcm), offset);
       torque = cross(buoyancyArm, [0, densityGravity * submerged, 0]);
     }
     const wet = submerged / b.volume;
     const buoyancy = densityGravity * submerged;
+    const last = b.last;
+    last.active = true;
+    last.time = t;
+    last.submerged = submerged;
+    // The pose the displaced water was taken at.
+    last.centre = hcentre;
+    last.rotation = hq;
+    last.depth = hdepth;
+    last.force = force;
+    last.buoyancy = surfacePressure ? [...this.pressure.force] : [0, buoyancy, 0];
+    last.offset = analyticOffset;
     let added: Vec3 = [0, 0, 0];
     const spinInertia: Vec3 = [0, 0, 0];
     if (wet > 0) {
@@ -1124,6 +1262,73 @@ export class LoadSolver implements Solver<LoadParams> {
   }
 
   /** Member `index`'s load from the last step (a fixed pile's is what it holds the water with). */
+  /**
+   * What the water did to compact body `index` (its place in `bodies`) at the last step: displaced volume, centre of
+   * buoyancy, buoyancy and the other loads. A mesh's centre of buoyancy is integrated when asked.
+   * @throws MargoError `unsupported` (errors#hydrodynamic-loads) for an index that names no body.
+   */
+  bodyLoad(index: number): BodyLoad {
+    const b = this.bodies[index];
+    if (!b) throw invalidLoad(`There is no body ${index}; pass 0 to ${this.bodies.length - 1}.`);
+    const l = b.last,
+      offset: Vec3 =
+        l.submerged > 0
+          ? b.mesh
+            ? meshBuoyancyCentre(b.mesh, l.rotation, l.depth, [0, 0, 0])
+            : [l.offset[0], l.offset[1], l.offset[2]]
+          : [0, 0, 0];
+    return {
+      active: l.active,
+      submerged: l.submerged,
+      wet: l.submerged / b.volume,
+      centre: [l.centre[0], l.centre[1], l.centre[2]],
+      centreOfBuoyancy: add(l.centre, offset),
+      depth: l.depth,
+      buoyancy: [l.buoyancy[0], l.buoyancy[1], l.buoyancy[2]],
+      force: [l.force[0], l.force[1], l.force[2]],
+    };
+  }
+
+  /**
+   * The debug view of the compact bodies at the last step, for `PhysicsDebugView.add(loads)`
+   * (`@margoengine/physics/debug-view`): each body's edges below the water (blue), its waterline on the water drawn now
+   * (white), its centre of buoyancy (magenta cross), its buoyancy (cyan) and the water's other loads (orange). In the
+   * solver's origin cell.
+   * @throws MargoError `unsupported` (errors#hydrodynamic-loads) for a `forceScale` that is not positive and finite.
+   */
+  debugRender(options: LoadDebugOptions = {}): LoadLines {
+    const { submerged = true, waterline = true, centreOfBuoyancy = true, forces = true, forceScale } = options;
+    if (forceScale !== undefined && !(forceScale > 0 && Number.isFinite(forceScale)))
+      throw invalidLoad('Invalid debug force scale; pass metres per newton above 0, or leave it out.');
+    const out = new LineSink();
+    this.bodies.forEach((b, index) => {
+      const l = b.last;
+      if (!l.active) return;
+      if (submerged || waterline) {
+        b.outline ??= b.mesh ?? analyticOutline(b.axes, b.frame, b.capsule);
+        drawWetted(
+          out,
+          b.outline,
+          l.centre,
+          l.rotation,
+          (x, z) => this.sea.elevation(x, z, l.time),
+          submerged,
+          waterline,
+        );
+      }
+      if (!(l.submerged > 0)) return;
+      const load = this.bodyLoad(index),
+        size = 2 * Math.cbrt(b.volume),
+        perNewton = forceScale ?? size / (this.sea.density * this.g * b.volume);
+      if (centreOfBuoyancy) out.cross(load.centreOfBuoyancy, 0.08 * size, BUOYANCY_CENTRE);
+      if (forces) {
+        out.arrow(load.centreOfBuoyancy, scale(load.buoyancy, perNewton), BUOYANCY);
+        out.arrow(load.centre, scale(load.force, perNewton), LOAD);
+      }
+    });
+    return out.lines();
+  }
+
   memberLoad(index: number): MemberLoad {
     const load = this.memberLoads[index];
     if (!load) throw invalidLoad(`There is no member ${index}; pass 0 to ${this.memberLoads.length - 1}.`);
@@ -1214,6 +1419,24 @@ function holdTorque(torque: Vec3, added: Float64Array, bodies: Float32Array, at:
   if (!held.every(Number.isFinite))
     throw invalidLoad('Rotational water inertia exceeds numeric range; supply physical SI inertia and torque.');
   return held;
+}
+
+/** The rotation `q` turned by the angular velocity `w` (world axes) for `h` seconds: q + (h / 2) [w, 0] q, made a unit. */
+function turnBy(
+  q: readonly [number, number, number, number],
+  w: readonly number[],
+  h: number,
+): [number, number, number, number] {
+  const [x, y, z, s] = q,
+    a = (w[0]! * h) / 2,
+    b = (w[1]! * h) / 2,
+    c = (w[2]! * h) / 2,
+    nx = x + (s * a + b * z - c * y),
+    ny = y + (s * b + c * x - a * z),
+    nz = z + (s * c + a * y - b * x),
+    ns = s - (a * x + b * y + c * z),
+    length = Math.sqrt(nx * nx + ny * ny + nz * nz + ns * ns);
+  return [nx / length, ny / length, nz / length, ns / length];
 }
 
 function rotate(q: readonly [number, number, number, number], v: readonly number[]): Vec3 {

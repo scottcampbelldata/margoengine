@@ -1764,6 +1764,18 @@ independent KCS stern-flow acceptance remain open.
 | 10. Coded errors | `4195a70985`, `loads.test.js` checks actionable mesh and shape errors. `c8af3a4312`, `coupling/moving-cylinder-blockage.test.js` checks the public factory repair. `16800c8b12`, `loads-coupled-radiation.test.js` checks incompatible profile inputs. `fbee5a3b75`, `loads-quay-wake.test.js` rejects invalid image sources before either field changes. `38af9a2c59`, `water/test/wake.test.js` checks coded renderer and spray input errors. |
 | 11. Native work and origin cells | `1a6c425709`, `loads.test.js` checks independent static origin cells, one SIMD batch and replay. `16800c8b12`, `loads-kernel.test.js` and `loads-coupled-radiation.test.js` check both layouts and memory variants. `13b6c14dd0`, `world.test.js` and `coupling/loads-swim-actuators.test.js` verify both retained mirrors, atomic rebasing and production water–body replay. |
 
+
+**2026-11-27 floating and the step's energy (Claude laptop, P12 on Scott's order).** `floating(physics, bodies)` builds the
+LoadSolver bodies from a body's own colliders (hull faces, closed meshes, cylinder and cone prisms of the circle's area,
+compound parts, turned colliders through the new `LoadBody.rotation`); `bodyLoad` and `debugRender` report and draw the
+displaced volume, centre of buoyancy, waterline and loads (`loads-floating.test.js`). A real defect found on the way:
+the buoyancy was taken where the step starts, so an undamped floating box gained 20 % of its heave amplitude a cycle at
+60 steps a second and 1.8 % at 240 (KB-LOADS-HEAVEGAIN1). It is now taken at the rigid step's energy-neutral pose,
+(s - 1) / (2 s) of the step on, as the hull solver's loads are; the amplitude holds to the sampling bound over 20 s
+(the regression test). `coupling/loads-wake-float.test.js` and `loads-radiation-profile.test.js` take their analytic
+references at that pose. Still open from the list above: radiation damping by default for compact bodies, and decay
+against published floating model tests.
+
 ### SEA-03 Nonlinear and rogue waves (`@margoengine/physics/rogue`, commits 47be5f699, 116edc307), owner Codex: REOPENED
 
 **Checked.** Read `packages/physics/src/rogue/index.ts` (1068 lines) and `groups.ts` (278 lines), plus the row in `docs/physics-solvers.md`, `docs/limits.md`, and the audit rows. Commits since the audit (2026-11-25) are only 47be5f699 and 116edc307 (three sisters); nothing touches a dynamic or high-order spectral tier. Tests run under run-with-timeout: `packages/physics/tests/rogue.test.js` 9 pass / 0 fail; `packages/physics/tests/sisters.test.js` 3 pass / 0 fail. There is no `tests/coupling` file for it, and no GPU or browser test.

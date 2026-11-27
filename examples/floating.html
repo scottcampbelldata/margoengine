@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Floating bodies · Margo Engine</title>
+  <link rel="stylesheet" href="./multi-view.css">
+  <style>
+    .views { height: min(64vh, 600px); }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 14px 0; }
+    .controls label { display: flex; gap: 8px; align-items: center; }
+    button { padding: 6px 12px; cursor: pointer; }
+    output { font-variant-numeric: tabular-nums; }
+    #viewport { cursor: crosshair; touch-action: none; }
+  </style>
+</head>
+<body>
+  <h1>Floating bodies</h1>
+  <p>Two crates, a capsule, an octagonal buoy and a glTF boom box float on an ocean swell, each from its own colliders
+    through one <code>floating()</code> call. Click or drag on the water to push ripples under them.</p>
+  <div class="views">
+    <canvas id="viewport" aria-label="Boxes, a capsule, a hull and a glTF model floating on waves and ripples"></canvas>
+  </div>
+  <div class="controls">
+    <button id="play" type="button" disabled>Pause</button>
+    <button id="reset" type="button" disabled>Reset</button>
+    <label><input id="debug" type="checkbox" disabled> Debug view (waterline, submerged edges, centre of buoyancy, loads)</label>
+  </div>
+  <p><output id="measurement">Each body's displaced fraction appears when the scene is ready.</output></p>
+  <p id="status" data-webgpu-status role="status">Starting the floating scene…</p>
+  <script type="module">
+    import { needsWebGPU } from './needs-webgpu.js';
+    needsWebGPU('#viewport').then((ok) => ok && import('./floating.ts'));
+  </script>
+</body>
+</html>

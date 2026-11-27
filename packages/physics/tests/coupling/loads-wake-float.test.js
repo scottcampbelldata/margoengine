@@ -3,7 +3,15 @@ import test from 'node:test';
 import { Physics } from '../../dist/index.js';
 import { LoadSolver } from '../../dist/loads.js';
 import { SpectralSea, WakeSolver } from '../../dist/sea.js';
-import { FORCE_WORDS, PhysicsWorld, regionWords, RigidSolver, worldMemory } from '../../dist/world.js';
+import {
+  BODIES_FIELD,
+  BODY_WORDS,
+  FORCE_WORDS,
+  PhysicsWorld,
+  regionWords,
+  RigidSolver,
+  worldMemory,
+} from '../../dist/world.js';
 
 await Physics.load();
 
@@ -64,6 +72,10 @@ function makeFloat(withWake) {
     world,
     body,
     sea,
+    /** The substeps the rigid port says the body's last step took. */
+    substeps() {
+      return regionWords(world.arena.memory, world.fields.port(BODIES_FIELD.name).region)[body.row * BODY_WORDS + 24];
+    },
     force() {
       const region = loads.exportPorts(0)[0].region;
       const row = body.row * FORCE_WORDS;
@@ -83,7 +95,12 @@ test('SEA-12 floats on the live SEA-04 spectral wake with the analytic spherical
   let snapshot;
   let initialRise;
   for (let frame = 1; frame <= 42; frame++) {
-    const centre = Math.fround(coupled.body.position[1]); // The rigid bodies port stores the pose as f32.
+    // The rigid bodies port stores the pose as f32. The loads are taken (s - 1) / (2 s) of the step on, the body's velocity
+    // carried over it, where a load held through the s substeps is energy-neutral (KB-LOADS-HEAVEGAIN1).
+    const s = coupled.substeps(),
+      centre =
+        Math.fround(coupled.body.position[1]) +
+        Math.fround(coupled.body.linearVelocity[1]) * (((s - 1) / (2 * s)) * (1 / rate));
     coupled.world.advance(frame);
     control.world.advance(frame);
     const height = amplitude * Math.cos((frequency * frame) / rate);

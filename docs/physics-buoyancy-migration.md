@@ -1,5 +1,29 @@
 # Migrate buoyancy to Margo Physics
 
+## From three.js's floating spheres in one call
+
+The three.js GPGPU water examples (`webgl_gpgpu_water`, `webgpu_compute_water`) read the water's height under each
+sphere back from the GPU and move the sphere toward it by hand: a sphere only, no volume, no righting, no drag, and the
+height a frame late. In Margo the body keeps its own colliders and one call floats it on the water the camera draws:
+
+```ts
+// three.js: per sphere, per frame, the height read back under its centre and the sphere eased toward it.
+// Margo: the body's own colliders, buoyancy from the displaced volume, drag and the righting moment, every step.
+const loads = new LoadSolver();
+world.add(loads, { sea: seaSurface(ripples), bodies: floating(physics, [ball, crate, boat]) });
+```
+
+- `seaSurface` (`@margoengine/water/sea-state`) turns the `Water`, `FFTOcean` or `Ripples` (`cpu: true`) you draw into
+  the water the solver reads, on the CPU this frame with no readback; `ripples.disturbRay` is the pointer push, and
+  `ripples.trackBody(body)` lets each floating body make its own ripples.
+- `floating(physics, bodies)` reads each body's colliders: spheres, boxes, capsules, hulls, closed meshes, cylinders,
+  cones and compounds all float, from their displaced volume, with drag and angular drag.
+- `loads.debugRender()` with `PhysicsDebugView.add(...)` draws the waterline, the submerged edges, the centre of buoyancy
+  and the load arrows. [Live example](../examples/floating.html),
+  [README section](../packages/physics/README.md#float-any-body-in-one-call-floating)
+
+## By hand: rows and shapes
+
 The official three.js GPGPU water demo shows spheres floating on a pointer-disturbed surface.
 Margo puts the buoyant force, righting torque and viscous drag into `LoadSolver`. For a scene
 using Rapier or Ammo, keep the mass and collision dimensions when creating the Margo rigid body.

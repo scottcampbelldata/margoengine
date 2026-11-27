@@ -48,3 +48,29 @@ export function ellipsoidHydrostatics(
   }
   return (cap * cap * (3 - cap)) / 4;
 }
+
+/**
+ * The centroid of a closed mesh's volume below a horizontal level `depth` above its origin, world axes from the origin,
+ * written to `out`; [0, 0, 0] when nothing is below. By the divergence theorem the unit pressure (depth - y) gives the
+ * volume and its horizontal moments, and (depth - y)^2 / 2 gives the integral of (depth - y), so the height.
+ */
+export function meshBuoyancyCentre(
+  mesh: HullMesh,
+  rotation: Quat,
+  depth: number,
+  out: [number, number, number],
+): [number, number, number] {
+  const linear: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 },
+    square: WettedLoads = { force: [0, 0, 0], torque: [0, 0, 0], area: 0 },
+    pose = { position: [0, 0, 0] as Vec3, rotation },
+    elevation = () => depth;
+  wettedLoads(mesh, pose, { elevation, pressure: (_x, y) => Math.max(0, depth - y) }, 0, [0, 0, 0], linear);
+  const volume = linear.force[1];
+  out[0] = out[1] = out[2] = 0;
+  if (!(volume > 0)) return out;
+  wettedLoads(mesh, pose, { elevation, pressure: (_x, y) => 0.5 * Math.max(0, depth - y) ** 2 }, 0, [0, 0, 0], square);
+  out[0] = linear.torque[2] / volume;
+  out[1] = depth - square.force[1] / volume;
+  out[2] = -linear.torque[0] / volume;
+  return out;
+}
