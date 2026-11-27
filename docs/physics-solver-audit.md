@@ -1318,6 +1318,13 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   pressure before changing the ledger and replays exactly. Live free-motion heave and roll reactions and
   the original finite-quay render remain open.
 
+  A continuous prescribed-motion diagnostic takes the corrected archived poses as exact 60 Hz chords. It uses
+  the closed hull proxy and both its live HullSolver ports. On the 240 × 80, 1.2 m straight-wall periodic grid,
+  it advances from vessel time zero to film 1:11 in 4,005 ticks. At that time the separate potential-and-height
+  energy integral differs from the prescribed work by 1.66×10⁻⁶ J. Restoring film 1:07 and re-advancing gives
+  hash `69247bab3a5ca545` both times. This proves time and work accounting across the original departure.
+  The grid does not resolve the short waves, and a straight mirror cannot represent the finite quay ends.
+
   Frame-zero seek, origin rebasing and rigid mobility now pass their framework regressions. On both renderers the
   Flood case restores and exactly replays accepted horizontal momentum while buoyancy is still active. The original
   editable Cyprus raft shot remains unavailable. The original review video identifies only the title and encoder.
