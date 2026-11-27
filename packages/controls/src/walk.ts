@@ -122,7 +122,7 @@ export class WalkControls extends Controls {
   acceleration = 10;
   /**
    * Share of `acceleration` the input has while the walker is in the air, 0 to 1: 0 keeps the speed it left the ground
-   * with, 1 steers as on the ground. Default 0.3, about the share the three.js FPS example (`games_fps`) gives the air.
+   * with, 1 steers as on the ground. Default 0.3, so a jump can be nudged but not steered freely.
    */
   airControl = 0.3;
   /** m/s². Applies whenever the floor drops away by more than `stepHeight`. */

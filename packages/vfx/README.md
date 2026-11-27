@@ -1794,16 +1794,6 @@ A bad option throws `MargoError` `unsupported` naming it, with a link to
 `state`, any call after `dispose()` throws `disposed`. `using flock = GPUFlock.attach(...)` disposes it at the end of
 the scope. The live page is [examples/gpu-flocking.html](../../examples/gpu-flocking.html).
 
-**From three.js.** three.js's `webgl_gpgpu_birds` example keeps the birds' positions and velocities in two float
-textures that `GPUComputationRenderer` updates with fragment shaders you write (the three rules and the mouse predator,
-each bird looking at every other), then draws its own bird geometry whose vertex shader reads those textures;
-`webgpu_compute_birds` does the same work with compute nodes over storage buffers. In Margo that whole page is the quick start
-above: the flock's count is `count` instead of a texture size, the rule sliders become the weights `separation`,
-`alignment` and `cohesion` and the ranges `separationRadius` and `neighborRadius`, the mouse predator becomes
-`setPredators` (see the pointer example), and your own bird is `geometry`. Neighbours come from the hash grid instead of
-every other bird, so the work grows with the boids near each one rather than with the square of the count, and the
-same seed flies the same flock every run.
-
 **Flock or school solver?** `GPUFlock` is the drawn flock: thousands of boids for a shot, in f32 on the GPU.
 `SchoolSolver` in [`@margoengine/physics/schooling`](../physics/README.md) is the physical one: hundreds of members in
 f64 on a physics world, with Couzin's three zones, the nearest neighbours, predicted predators, point-mass locomotion

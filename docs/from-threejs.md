@@ -27,6 +27,8 @@ code that does the same job. Where Margo has no equivalent yet, the section says
 - [LOD and imposters](#lod-and-imposters)
 - [Post-processing](#post-processing)
 - [TSL and node materials](#tsl-and-node-materials)
+- [Water, ocean and liquids](#water-ocean-and-liquids)
+- [Flocks of birds and fish](#flocks-of-birds-and-fish)
 - [Orthographic cameras and top-down views](#orthographic-cameras-and-top-down-views)
 - [Large coordinates (floating origin)](#large-coordinates-floating-origin)
 - [Lines, points, text and labels](#lines-points-text-and-labels)
@@ -813,6 +815,9 @@ ViewCube.attach(engine, {...BLENDER.viewCube});               // clicking the cu
 - `ArcballControls` (`@margoengine/controls/arcball`) rolls the camera and goes over the poles; the other controls do
   not roll it.
 
+`WalkControls` of `@margoengine/controls` takes `airControl` (default 0.3), about the share of acceleration the
+`games_fps` example gives the player in the air.
+
 ## Raycasting and picking
 
 ```js
@@ -1076,6 +1081,54 @@ Most TSL names are the same. Differences: `If`/`Else` is `select(cond, a, b)`; `
 `ComputePass.attach(engine, count, i => buffer.store(i, value))` over `storage(array, 'vec4f')`. Statement-level `If` and `Loop`,
 lighting nodes (`@margoengine/shader/lighting`), noise (`@margoengine/shader/noise`) and GLSL functions as nodes
 (`@margoengine/shader/glsl`) are there too. The package README has the full TSL table. Output on WebGPU is WGSL.
+
+## Water, ocean and liquids
+
+Margo's water is in `@margoengine/water`: each solver is one `attach`, steps itself and runs its examples from that
+package's README.
+
+### Particle liquid (`webgpu_compute_particles_fluid`)
+
+three.js ships the MLS-MPM liquid as an example, `webgpu_compute_particles_fluid`, not as a library: the solver lives
+in the example's own code, as storage buffers and compute passes written in TSL that the page dispatches every frame,
+with the pointer and the drawing wired up by the page. To use it you copy that code into your project and keep it. In
+Margo it is `GPULiquid.attach(engine, {count})` from `@margoengine/water/liquid`: the container is the `box` you pass,
+in metres; the pointer is `setPointer`; rigid bodies are `colliders` and report their `forces`; `debug.particles:
+'speed'` shows the particles as coloured spheres, and with the debug view off they draw as a refracting liquid surface
+(`ParticleLiquid`); `snapshot()` and `restore()` repeat a run exactly; on a browser without WebGPU the WebGL2 layer
+runs it on the CPU instead of failing.
+
+### Ripples (`webgl_gpgpu_water`, `webgpu_compute_water`)
+
+| three.js example | Margo |
+|---|---|
+| A heightmap stepped in the example's own shader (`GPUComputationRenderer` or a compute node) | `Ripples.attach(engine, {surface, size, resolution, speed, damping})`, stepped for you each frame |
+| The mouse writes into the heightmap through a uniform | `ripples.disturbRay(origin, direction, radius, strength)` with the pointer's ray, or `disturb(x, z)` |
+| Spheres float by reading heights back from the GPU | `cpu: true` and `ripples.sampleHeight(x, z)` this frame, or `seaSurface(ripples)` with `LoadSolver` for real buoyancy |
+| Viscosity as one number in the shader | `damping` (per second) and an absorbing strip, so waves leave the grid |
+| Walls by editing the shader | `setObstacles([...])`, and `trackBody(body, {obstacle: true})` for moving ones |
+
+### Ocean (`webgpu_ocean`, `webgl_shaders_ocean`, the Water add-on)
+
+| three.js | Margo |
+|---|---|
+| `new Water(geometry, {waterNormals, sunDirection, distortionScale})` and a `time` uniform you advance | `Water.attach(engine, {size, waves or wind, reflection})`: Gerstner trains, reflection and refraction, its own clock |
+| An FFT ocean written in the example's own compute code | `FFTOcean.attach(engine, {spectrum, windSpeed, fetch, choppiness, cascades})` |
+| Changing the wind rebuilds the example's spectrum by hand | `ocean.setWind({speed, direction, fetch})`, live, no new buffers |
+| Reading a height for a boat means a GPU readback a frame late | `water.sample(x, z)` or `ocean.sample(x, z)` on the CPU now, and `seaSurface(...)` for buoyancy |
+| Debugging by editing the shader | `ocean.setDebug({mode: 'jacobian', wireframe: true, lodRings: true})` |
+
+## Flocks of birds and fish
+
+three.js's `webgl_gpgpu_birds` example keeps the birds' positions and velocities in two float textures that
+`GPUComputationRenderer` updates with fragment shaders you write (the three rules and the mouse predator, each bird
+looking at every other), then draws its own bird geometry whose vertex shader reads those textures;
+`webgpu_compute_birds` does the same work with compute nodes over storage buffers. In Margo that whole page is one
+attach: the flock's count is `count` instead of a texture size, the rule sliders become the weights `separation`,
+`alignment` and `cohesion` and the ranges `separationRadius` and `neighborRadius`, the mouse predator becomes
+`setPredators` (see the pointer example in the `@margoengine/vfx` README), and your own bird is `geometry`. Neighbours
+come from the hash grid instead of every other bird, so the work grows with the boids near each one rather than with
+the square of the count, and the same seed flies the same flock every run.
 
 ## Orthographic cameras and top-down views
 
