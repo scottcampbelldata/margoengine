@@ -679,7 +679,7 @@ console.log(lookReport([{ name: 'hearth', frame, results: rows }]).markdown.spli
 | `colourEdges` | T7: the same on the a* and b* planes: colour edges 4:2:0 smears | 10 | the frame |
 | `chromaSmear` | T7: percent of pixels whose colour moves by CIE76 over 6 when the frame is cut to 4:2:0 chroma (BT.709 Y'CbCr, 2 x 2 averages, bilinear read back), no encoder needed | 2 | the frame |
 | `shimmerMoving` | T4: % of pixels off by over 6 codes once the camera motion is undone | 0.5 | `moving`: the next frame and each pixel's motion (`reprojectionMotion` makes it from depth and the two view-projections) |
-| `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half their travel | 5 | `moving` |
+| `motionBlur` | T8: % of edge centres of pixels moving over 8 pixels a frame whose edge is narrower than half the shutter's smear (`shutter` degrees, default 180, smear `shutter / 360` of the travel; `checkShot` reads the angle from `manifest.render` when the shot drew sub-frames) | 5 | `moving` |
 | `silhouette` | T5: % of the subject's outline with 15 L* or more against what is behind | [80, 100] | the `subject` mask |
 | `silhouetteShape` | T5: % of the subject (at 320 x 180, three L* values) in one value | [70, 100] | the `subject` mask |
 | `bounce` | T6: shadowed ground luminance as a % of the lit ground's, linear light, each over its mask's interior (`GROUND_INSET`, 1/360 of the shorter side, in from every edge, where the frame mixes both sides) | [10, 35] under a clear sun; a probe's `light` moves it (`lightBounds`) | the `lit` and `shadow` masks |

@@ -76,13 +76,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   with round half up); `packages/scenes/test/timber-valley-masks-check.mjs` asserts the rail-line masks disjoint and
   within their coverage bounds (in the scenes `test:gpu`).
 
-### Open 2026-11-26: the rail-line shot's motionBlur reads 60.5 and 46.5 percent (bound 0 to 5) (KB-LOOK-TV-MOTIONBLUR1, shot look checks)
+### Fixed 2026-11-26: the rail-line shot's motionBlur read 60.5 and 46.5 percent (bound 0 to 5) (KB-LOOK-TV-MOTIONBLUR1, shot look checks)
 
 - **Repro:** `node tools/shot/cli.mjs tools/shot/shots/timber-valley-rail-line.json --once --seconds 1.1 --out <dir>`:
-  `look.md` reads motionBlur 60.5 percent early and 46.5 mid, the same before and after KB-LOOK-MASKTIE1.
-- **Cause:** not yet found. Candidates: the moving evidence's depth (exp(-distance / 2000)) on the plants against the
-  8-subframe, 180-degree shutter frame, or the wind's sway, which the camera's motion vectors do not hold, read as
-  missing blur. Measurement only so far.
+  `look.md` read motionBlur 60.5 percent early and 46.5 mid.
+- **Cause:** the check, not the frames. `@margoengine/headless/look` `motionBlur` called an edge sharp when its 10 to
+  90 percent width was under half its travel to the next frame, taking the whole travel as a 180 degree shutter's
+  smear. A shutter of A degrees is open for A / 360 of the frame interval (Potmesil and Chakravarty, "Modeling motion
+  blur in computer-generated images", SIGGRAPH 1983, https://doi.org/10.1145/964967.801169; Cook, Porter and
+  Carpenter, "Distributed ray tracing", SIGGRAPH 1984, https://doi.org/10.1145/964965.808590), so the shot tool's
+  sub-frames (`subframeOffsets`, over shutter / 360 / fps) smear an edge across half its travel at 180 degrees, and
+  every correctly blurred edge (measured 0.3 to 0.5 of the travel, none under 0.1) read as sharp.
+- **Fix:** an edge is sharp under half the shutter's smear (`shutter` option, default 180 degrees: a quarter of the
+  travel); `checkShot` takes the angle from `manifest.render` when the shot drew sub-frames, and a frame drawn without
+  them is still judged at 180. The rail-line probes read 0.55 and 0.60 percent. Regression:
+  `packages/headless/tests/look-clean.test.js` (an 8 sub-frame 180 degree bar passes, one sub-frame and a 90 degree
+  bar judged at 180 fail, the probe's own angle applies).
 
 ### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
 

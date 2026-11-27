@@ -1335,7 +1335,7 @@ export function checkProbe(
     shimmerMoving(frame, probe.moving!, { bound: b('shimmerMoving') }),
   );
   run('motionBlur', probe.moving ? null : 'the next frame and its motion', () =>
-    motionBlur(frame, probe.moving!.motion, { bound: b('motionBlur') }),
+    motionBlur(frame, probe.moving!.motion, { bound: b('motionBlur'), shutter: probe.moving!.shutter }),
   );
   run('silhouette', marked('subject'), () => silhouette(frame, { subject: masks.subject, bound: b('silhouette') }));
   run('silhouetteShape', marked('subject'), () =>
@@ -1639,6 +1639,8 @@ export interface CheckShotOptions extends CheckProbeOptions, LookReportOptions {
   manifest: {
     id?: string;
     header?: { lookBounds?: Record<string, LookBound>; lookFamily?: string | null };
+    /** How the frames were made: a shot drawn with sub-frames over a shutter is judged by `motionBlur` at that angle. */
+    render?: { subframes?: number; shutter?: number };
     probes?: Record<string, ShotManifestProbe>;
   };
   /** Reads a file of the shot folder by its manifest path, for example `(path) => readFile(join(folder, path))`. */
@@ -1678,6 +1680,8 @@ export async function checkShot({
   if (!entries.length) throw rangeError('The manifest has no probes: name probe frames in the shot file', 'headless');
   const bounds = manifest.header?.lookBounds ?? {},
     family = manifest.header?.lookFamily,
+    { subframes = 1, shutter = 0 } = manifest.render ?? {},
+    exposed = subframes > 1 && shutter > 0 ? shutter : undefined,
     png = async (path: string) => decodePNG(await read(path)),
     checked: CheckedProbe[] = [];
   for (const [name, entry] of entries) {
@@ -1703,7 +1707,7 @@ export async function checkShot({
       compat: entry.compat ? await png(entry.compat) : undefined,
       viewProjection: entry.viewProjection,
       still: entry.still ? await Promise.all(entry.still.map(png)) : undefined,
-      moving: entry.moving ? await movingFrames(entry.moving, frame, read, png) : undefined,
+      moving: entry.moving ? { ...(await movingFrames(entry.moving, frame, read, png)), shutter: exposed } : undefined,
       light: entry.light,
     };
     const own = entry.lookBounds ? { ...bounds, ...entry.lookBounds } : bounds;
@@ -2099,6 +2103,11 @@ export interface LookMotion {
 export interface MovingFrames {
   next: LookImage;
   motion: LookMotion;
+  /**
+   * The shutter angle the frame was exposed with, in degrees (more than 0, up to 360), for `motionBlur`. Default 180,
+   * the film standard: a frame drawn without sub-frames is still judged against a 180 degree smear.
+   */
+  shutter?: number;
 }
 
 function sampleLuma(y: Float32Array, width: number, height: number, x: number, v: number): number {
@@ -2296,20 +2305,26 @@ export function depthFromDistance(
 
 /**
  * T8: of the edge centres of pixels moving more than `minimum` (8) pixels a frame, the percent whose edge is narrower
- * than half their travel, where a 180 degree shutter smears it across the whole travel: strobing spray, rain or debris.
+ * than half the smear the shutter gives them: strobing spray, rain or debris. A shutter of `shutter` degrees (default
+ * 180) is open for shutter / 360 of the frame interval, so it smears an edge across that share of its travel to the
+ * next frame: half the travel at 180 degrees, and the check calls an edge sharp under a quarter of it
+ * (KB-LOOK-TV-MOTIONBLUR1: the whole travel was taken as the smear, so a correct 180 degree frame read as sharp).
  * An edge centre is a pixel whose luma profile along its motion (one travel wide, centred on it, spanning over 24 codes)
  * crosses the middle value within one pixel of the pixel itself; the edge's width is the part of the profile between 10
- * and 90 percent of its range. A hard edge is under a pixel wide, a blurred one as wide as its travel.
+ * and 90 percent of its range. A hard edge is under a pixel wide, a blurred one as wide as its smear.
+ * @throws RangeError for a shutter that is not more than 0 and up to 360 degrees.
  */
 export function motionBlur(
   frame: LookImage,
   motion: LookMotion,
-  { mask, bound, minimum = 8 }: FlickerOptions & { minimum?: number } = {},
+  { mask, bound, minimum = 8, shutter = 180 }: FlickerOptions & { minimum?: number; shutter?: number } = {},
 ): LookResult {
   const { width, height } = frame;
   sameSize(frame, motion, 'motion');
   if (motion.data.length !== width * height * 2)
     throw rangeError('The motion holds two floats (x, y) per pixel', 'headless');
+  if (!(shutter > 0 && shutter <= 360)) throw rangeError('The shutter is more than 0 and up to 360 degrees', 'headless');
+  const smear = shutter / 360;
   const y = luma(frame),
     inside = maskBits(frame, mask, 'motionBlur');
   let edges = 0,
@@ -2338,7 +2353,7 @@ export function motionBlur(
       const from = low + 0.1 * (high - low),
         to = high - 0.1 * (high - low),
         between = profile.filter((v) => v > from && v < to).length;
-      if (between * spacing < travel / 2) sharp++;
+      if (between * spacing < (travel * smear) / 2) sharp++;
     }
   return result('motionBlur', percent(sharp, edges), bound, { edges, sharp });
 }

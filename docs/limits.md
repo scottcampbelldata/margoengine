@@ -8737,7 +8737,11 @@ now look for a value between the plateaus (KB-LOOK-STAIRS-REAL1). Storm-light at
 percent, msaa 4 at supersample 1, 1.5 and 2 0.10, 0.00 and 0.01 percent, the 16 sample reference 0.00 percent, against
 the bar of 1. `banding` read 0 to 0.1 percent on every real probe measured (bound 1, family 0.2): it did not misread.
 The flood draft shots are msaa 1 at supersample 1 and read 2.7 to 22.7 percent `stairs`, which is real aliasing. The `motionBlur` allowance of 5 percent is a chosen
-tolerance, not yet measured on a moving probe. `detailKept` (T7) is wired into the family: `detailKeptFloor` gives 0.5 for `natural`, 0.6 for `animatedFeature`, and a
+tolerance. Measured on a moving probe (2026-11-26, KB-LOOK-TV-MOTIONBLUR1): the timber-valley rail-line shot (8 sub-frames,
+180 degrees, 1920 x 1080) reads 0.55 and 0.60 percent; its edges' 10 to 90 percent widths sit at 0.3 to 0.5 of their
+travel and none under 0.1, the smear a 180 degree shutter gives (half the travel). The check calls an edge sharp under
+half the shutter's smear, a quarter of the travel at 180 degrees, and takes the shot's angle from `manifest.render`
+when it drew sub-frames; a frame drawn without them is judged at 180 degrees. `detailKept` (T7) is wired into the family: `detailKeptFloor` gives 0.5 for `natural`, 0.6 for `animatedFeature`, and a
 shot naming a family fails its master below the floor (`tools/shot/encode.mjs`); `natural` keeps the warning.
 
 T1 in penumbras (2026-11-26, KB-LOOK-TV-PENUMBRA2): `penumbra` reads the ground only (the penumbra mask less the page's

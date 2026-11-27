@@ -354,7 +354,7 @@ test('T8 motionBlur: a sharp mover fails and one smeared across its travel passe
     travel = 12,
     motion = { width, height, data: new Float32Array(width * height * 2) };
   for (let i = 0; i < width * height; i++) motion.data[i * 2] = travel;
-  // A bar 24 wide from x = 30: sharp edges, or edges ramped over the whole travel (a 180 degree shutter's smear).
+  // A bar 24 wide from x = 30: sharp edges, or edges ramped over the whole travel (a 360 degree shutter's smear).
   const sharp = image(width, height, (x) => (x >= 30 && x < 54 ? 220 : 30)),
     ramp = (x) => Math.min(1, Math.max(0, x / travel)),
     smeared = image(width, height, (x) => Math.round(30 + 190 * Math.min(ramp(x - 30), 1 - ramp(x - 54)))),
@@ -364,6 +364,45 @@ test('T8 motionBlur: a sharp mover fails and one smeared across its travel passe
   assert.ok(good.detail.edges > 0 && good.value === 0 && good.pass, `smeared ${good.value} of ${good.detail.edges}`);
   const slow = { width, height, data: new Float32Array(width * height * 2).fill(2) };
   assert.equal(motionBlur(sharp, slow).detail.edges, 0, 'a mover under 8 pixels a frame is not judged');
+});
+
+// KB-LOOK-TV-MOTIONBLUR1: a 180 degree shutter is open for half the frame interval, so a frame drawn from sub-frames
+// over it smears an edge across half its travel to the next frame. The check took the whole travel as the smear and
+// read the rail-line shot's correctly blurred frames (8 sub-frames, 180 degrees) as 60.5 and 46.5 percent sharp.
+test('T8 motionBlur: a frame drawn from sub-frames over a 180 degree shutter passes, and the angle is the shot`s', () => {
+  const width = 128,
+    height = 24,
+    travel = 24,
+    motion = { width, height, data: new Float32Array(width * height * 2) };
+  for (let i = 0; i < width * height; i++) motion.data[i * 2] = travel;
+  // The bar [40, 72) drawn at each sub-frame's time ((k + 0.5) / n of the open shutter), each pixel its area's share.
+  const exposed = (shutter, subframes = 8) =>
+    image(width, height, (x) => {
+      let cover = 0;
+      for (let k = 0; k < subframes; k++) {
+        const o = ((k + 0.5) / subframes) * (shutter / 360) * travel;
+        cover += Math.max(0, Math.min(x + 1, 72 + o) - Math.max(x, 40 + o));
+      }
+      return Math.round(30 + 190 * (cover / subframes));
+    });
+  const film = motionBlur(exposed(180), motion);
+  assert.ok(film.detail.edges > 0 && film.value === 0 && film.pass, `180 degrees: ${film.value} of ${film.detail.edges}`);
+  const strobe = motionBlur(exposed(180, 1), motion);
+  assert.ok(strobe.detail.edges > 0 && strobe.value === 100, `one sub-frame: ${strobe.value} of ${strobe.detail.edges}`);
+  // A 90 degree frame smears a quarter of the travel: sharp against the 180 degree standard, clean at its own angle.
+  assert.equal(motionBlur(exposed(90), motion).value, 100);
+  assert.equal(motionBlur(exposed(90), motion, { shutter: 90 }).value, 0);
+  for (const shutter of [0, -10, 400, Number.NaN])
+    assert.throws(() => motionBlur(exposed(180), motion, { shutter }), RangeError, `${shutter}`);
+  // checkProbe judges a moving probe at the shutter it names.
+  const probe = (shutter) => ({
+      name: 'p',
+      frame: exposed(90),
+      moving: { next: exposed(90), motion, shutter },
+    }),
+    row = (shutter) => checkProbe(probe(shutter), {}).find((r) => r.check === 'motionBlur');
+  assert.equal(row(undefined).value, 100);
+  assert.equal(row(90).value, 0);
 });
 
 const disc = (size, r, subjectColour, backColour) => {

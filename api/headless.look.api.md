@@ -36,6 +36,10 @@ export interface CheckShotOptions extends CheckProbeOptions, LookReportOptions {
             lookBounds?: Record<string, LookBound>;
             lookFamily?: string | null;
         };
+        render?: {
+            subframes?: number;
+            shutter?: number;
+        };
         probes?: Record<string, ShotManifestProbe>;
     };
     read: (path: string) => Promise<Uint8Array>;
@@ -220,6 +224,7 @@ export interface LookResult {
 export interface MovingFrames {
     next: LookImage;
     motion: LookMotion;
+    shutter?: number;
 }
 
 export const PENUMBRA_MIN_PIXELS: number;
@@ -347,8 +352,9 @@ export function maskTopEdge(mask: LookMask): Float32Array;
 
 export function missingResult(check: LookCheckName | string, missing: string, bound?: LookBound): LookResult;
 
-export function motionBlur(frame: LookImage, motion: LookMotion, { mask, bound, minimum }?: FlickerOptions & {
+export function motionBlur(frame: LookImage, motion: LookMotion, { mask, bound, minimum, shutter }?: FlickerOptions & {
     minimum?: number;
+    shutter?: number;
 }): LookResult;
 
 export function nan(frame: FloatFrame, { bound }?: {
