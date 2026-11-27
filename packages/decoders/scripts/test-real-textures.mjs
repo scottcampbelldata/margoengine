@@ -1,4 +1,5 @@
-// Reads the real WebP and DDS files of tests/real-files/manifest.json and compares them with what outside decoders gave:
+// Reads the real WebP, DDS and KTX2 files of tests/real-files/manifest.json. KTX2 headers must give the recorded size;
+// WebP and DDS are compared with what outside decoders gave:
 // dwebp's Y, U and V planes byte for byte, its RGBA for lossless files, and the PNG beside each Pillow DDS file. The files
 // are downloaded into a folder given as the first argument and checked by SHA-256; they are never committed.
 // Usage: node packages/decoders/scripts/test-real-textures.mjs <cache folder>
@@ -6,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeImage } from '../dist/image.js';
+import { readKTX2Index } from '../dist/ktx2-file.js';
 import { decodePNG } from '../dist/png.js';
 import { parseWebP } from '../dist/webp.js';
 import { decodeVP8 } from '../dist/vp8.js';
@@ -88,6 +90,11 @@ for (const row of manifest.dds) {
 }
 console.log(`DDS: ${manifest.dds.length} read, ${compared} compared with Pillow's PNG, largest difference ${worst}`);
 if (worst > 1) wrong.push(`DDS differs by ${worst}`);
+for (const row of manifest.ktx2) {
+  const index = readKTX2Index(await fetched(row.file, row.url, row.sha256));
+  if (index.width !== row.width || index.height !== row.height) wrong.push(`${row.file}: size`);
+}
+console.log(`KTX2: ${manifest.ktx2.length} headers read`);
 if (wrong.length) {
   console.error(wrong.join('\n'));
   process.exitCode = 1;
