@@ -6645,7 +6645,7 @@ The optional native panel solve returns six-axis radiation on a hull in deep wat
 
 ### SEA-12 submerged hull sources on a finite-depth wake grid
 
-An opt-in port projects each signed depth band of a guided hull onto the linear wake grid. The modal test checks the finite-depth transfer and checks its deep-water limit on three grids covering the same domain and physical wavelengths. A closed eccentric prism preserves signed volume and first lateral moment to roundoff and reproduces its world hash after a seek from tick zero on both arena layouts. The production First Wake diagnostic and signed measured KCS residuals describe where these checks stop. [Tests and measured limits](../limits.md#ship-motion-on-the-wake-grid)
+An opt-in port projects each signed depth band of a guided hull onto the linear wake grid. The modal test checks the finite-depth transfer and checks its deep-water limit on three grids covering the same domain and physical wavelengths. A closed eccentric prism preserves signed volume and first lateral moment to roundoff and reproduces its world hash after a seek from tick zero on both arena layouts. A narrow source between cell centres retains its volume and horizontal first moments, checked by the signed modes of its wave field. The production First Wake diagnostic and signed measured KCS residuals describe where these checks stop. [Tests and measured limits](../limits.md#ship-motion-on-the-wake-grid)
 
 ### SEA-08 ordinary-strip sway, roll and yaw at forward speed
 

@@ -83,6 +83,53 @@ export function wakePatch(
     );
 }
 
+/**
+ * Translate the centred radial stencil by cloud-in-cell weights. Each tap carries
+ * both its volume and its first horizontal moments as the source crosses a cell.
+ */
+function projectedPatch(
+  grid: WakeSourceGrid,
+  x: number,
+  z: number,
+  radius: number,
+  volume: number,
+  height: Float64Array,
+): void {
+  const { nx, nz, dx, x0, z0 } = grid;
+  const u = (x - x0) / dx - 0.5,
+    v = (z - z0) / dx - 0.5,
+    i0 = Math.floor(u),
+    j0 = Math.floor(v),
+    cells = Math.max(1, radius / dx),
+    reach = Math.ceil(cells) - 1;
+  // A clipped patch at the edge can retain its volume, but has no symmetric support.
+  if (i0 - reach < 0 || i0 + reach + 1 >= nx || j0 - reach < 0 || j0 + reach + 1 >= nz) {
+    wakePatch(grid, x, z, radius, volume, height);
+    return;
+  }
+  const fx = u - i0,
+    fz = v - j0,
+    left = 1 - fx,
+    back = 1 - fz;
+  let sum = 0;
+  for (let pass = 0; pass < 2; pass++)
+    for (let j = -reach; j <= reach; j++)
+      for (let i = -reach; i <= reach; i++) {
+        const r = Math.sqrt(i * i + j * j) / cells;
+        if (r >= 1) continue;
+        const weight = 0.5 * (1 + cos(PI * r));
+        if (pass === 0) sum += weight;
+        else {
+          const h = (volume * weight) / (sum * dx * dx);
+          const k = i + i0 + (j + j0) * nx;
+          height[k]! += h * left * back;
+          height[k + 1]! += h * fx * back;
+          height[k + nx]! += h * left * fz;
+          height[k + nx + 1]! += h * fx * fz;
+        }
+      }
+}
+
 // Apply the no-flux bed Green identity to a vertical Fourier mode with source q. With y up from the
 // still surface, multiply phi''-k^2 phi=q by G=cosh(k(y+D))/cosh(kD) and integrate. The surface's
 // additional normal flux is the integral of G q. The deep-water limit is the exp(k y) in Tuck,
@@ -166,7 +213,7 @@ export class ProjectedWakeSource {
       this.flux.fill(0);
       for (let i = 0; i < rows.length; i += SUBMERGED_WAKE_WORDS)
         if (rows[i + 4] !== 0 && rows[i + 3] === band)
-          wakePatch(this.grid, rows[i]!, rows[i + 1]!, rows[i + 2]!, rows[i + 4]!, this.flux);
+          projectedPatch(this.grid, rows[i]!, rows[i + 1]!, rows[i + 2]!, rows[i + 4]!, this.flux);
       fft.forward(this.flux, this.spectrum);
       const transfer = this.transfers[band]!;
       for (let i = 0; i < transfer.length; i++) {

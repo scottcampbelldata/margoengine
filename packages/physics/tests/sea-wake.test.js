@@ -352,3 +352,68 @@ test('submerged wake flux keeps volume, matches finite and deep modal transfer, 
     }
   }
 });
+
+test('a narrow submerged patch carries its source position continuously between cells', () => {
+  const cells = [32, 16],
+    depth = 3,
+    slab = 0.15,
+    volume = 0.14;
+  const field = {
+    name: 'moving-hull.submerged',
+    kind: 'surfaceSampleSet',
+    quantity: 'submergedSeaSource',
+    unit: 'SI',
+    centring: 'particle',
+  };
+  for (const [u, v] of [
+    [0.25, 0.2],
+    [0.71, 0.63],
+  ]) {
+    const sim = world(),
+      wake = new WakeSolver('wake', undefined, { field, depths: [0, slab] });
+    let region, rows;
+    const source = {
+      describe: () => ({
+        id: 'moving-hull',
+        fields: [{ field, access: 'write' }],
+        rate: 0,
+        stableRate: () => 0,
+      }),
+      init(host) {
+        region = host.allocate('flux', SUBMERGED_WAKE_WORDS * 8, 'f64', SUBMERGED_WAKE_LAYOUT);
+        rows = new Float64Array(host.memory.buffer, region.byteOffset, SUBMERGED_WAKE_WORDS);
+      },
+      step() {
+        rows.set([-0.5 + u, -0.5 + v, 0.74, 0, volume]);
+      },
+      exportPorts: (tick) => [{ field: field.name, region, tick, cell: [0, 0, 0] }],
+      importPorts() {},
+      stateRegions: () => [region],
+      extraState: () => [],
+    };
+    sim.add(source, {}).add(wake, { cells, cellSize: 1, depth, sponge: 0 }).advance(1);
+    const height = wake.heights();
+    assert.ok(Math.abs(height.reduce((sum, h) => sum + h, 0) - volume) < 2e-14);
+
+    // The first two modes see the bilinearly translated source. Depth transfer and
+    // the first step of the linear wave equation are real scalar factors.
+    for (const [axis, fraction] of [u, v].entries()) {
+      const k = (2 * Math.PI) / cells[axis];
+      const transfer = (Math.sinh(k * depth) - Math.sinh(k * (depth - slab))) / (k * slab * Math.cosh(k * depth));
+      const amplitude = volume * transfer * Math.cos(Math.sqrt(G * k * Math.tanh(k * depth)) / 60);
+      let real = 0,
+        imaginary = 0;
+      for (let i = 0; i < height.length; i++) {
+        const cell = axis === 0 ? i % cells[0] : Math.floor(i / cells[0]);
+        const phase = k * (cell + 0.5 - cells[axis] / 2);
+        real += height[i] * Math.cos(phase);
+        imaginary += height[i] * Math.sin(phase);
+      }
+      assert.ok(Math.abs(real - amplitude * Math.cos(k / 2)) < 2e-14, 'the real mode has the transferred volume');
+      assert.ok(
+        Math.abs(imaginary - amplitude * (2 * fraction - 1) * Math.sin(k / 2)) < 2e-14,
+        'the signed mode has the subcell displacement',
+      );
+    }
+  }
+});
