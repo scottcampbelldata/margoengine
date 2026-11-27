@@ -11421,3 +11421,20 @@ Intel and AMD under Direct3D 11, and a corpus record of the guide's program.
 `PlanetTerrain`'s `brightness` uses the spare fourth byte of the snorm8x4 normal, so the vertex stride stays 20 bytes.
 Evidence: `packages/terrain/test/planet-recipes.browser.mjs` on WebGPU and webgl2-compat (RTX A6000): brightness 0 draws
 the same bytes as none, rays only lighten, -1 draws black ground, no validation error. Missing: other hardware tiers.
+
+
+## JPEG 2000 decoding (decoders/jpeg2000)
+
+One clean-room Rust crate, `packages/decoders/jpeg2000-kernel`, builds the committed `src/jpeg2000.wasm`
+(`node packages/decoders/scripts/build-native.mjs jpeg2000`; scalar Wasm, no SIMD until a work count or paired A/B
+shows a gain). Only the optional `decoders/jpeg2000` entry and its worker load it, by
+`new URL('./jpeg2000.wasm', import.meta.url)`; compute's ONNX ImageDecoder imports the entry when a model holds a JPEG
+2000 stream. Each image gets a new instance of the compiled module, so Wasm memory is released with it and a trapped
+instance is never reused. Core and stage are unchanged.
+
+Quality evidence: `cargo test` in the crate (marker syntax, tag trees and packet headers, the five progressions, the
+three coding passes against a test-side MQ encoder, both wavelets, JP2 boxes, the Wasm interface, size limits);
+`packages/decoders/tests/jpeg2000.test.js` (Node, calling thread and workers) and
+`packages/compute/tests/onnx-image.test.js`. Missing: the ISO/IEC 15444-4 conformance corpus, a browser worker run and
+a fuzz run. Sources: Rec. ITU-T T.800; Taubman and Marcellin (Kluwer, 2002); Taubman (IEEE TIP 9(7), 2000,
+<https://doi.org/10.1109/83.847830>).

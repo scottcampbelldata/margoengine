@@ -15,11 +15,13 @@ pub struct Options {
     pub layers: u32,
     /// The most samples, over all components, the image may hold.
     pub max_samples: u64,
+    /// The most pixels (the widest component times the tallest, after `reduce`) the picture may hold.
+    pub max_pixels: u64,
 }
 
 impl Default for Options {
     fn default() -> Options {
-        Options { reduce: 0, layers: 0, max_samples: 1 << 28 }
+        Options { reduce: 0, layers: 0, max_samples: 1 << 28, max_pixels: 1 << 26 }
     }
 }
 
@@ -55,14 +57,22 @@ fn component_rect(image: &Rect, dx: u32, dy: u32, reduce: u32) -> Rect {
 
 /// Decodes a raw codestream (starting at SOC).
 pub fn decode(data: &[u8], opts: &Options) -> Result<Image> {
+    // A component has at most 32 decomposition levels (A.6.1), so more can never be dropped.
+    if opts.reduce > 32 {
+        return Err(Error::Invalid);
+    }
     let cs = codestream::parse(data)?;
     let size = &cs.size;
     let mut planes = Vec::with_capacity(size.components.len());
     let mut total = 0u64;
+    let (mut widest, mut tallest) = (0u64, 0u64);
     for comp in &size.components {
         let rect = component_rect(&size.image, comp.dx as u32, comp.dy as u32, opts.reduce);
         total += rect.area();
-        if total > opts.max_samples {
+        // Subsampling differs by axis between components, so the picture can be far larger than any one plane.
+        widest = widest.max(rect.width() as u64);
+        tallest = tallest.max(rect.height() as u64);
+        if total > opts.max_samples || widest * tallest > opts.max_pixels {
             return Err(Error::Limit);
         }
         planes.push((rect, Plane {
@@ -293,6 +303,30 @@ mod tests {
     fn sample_limit_refuses_large_images() {
         let opts = Options { max_samples: 100, ..Options::default() };
         assert_eq!(decode(&empty_stream(13, 9, 2, true), &opts).unwrap_err(), Error::Limit);
+    }
+
+    #[test]
+    fn a_reduce_past_every_level_is_refused() {
+        for reduce in [33, 64, u32::MAX] {
+            let opts = Options { reduce, ..Options::default() };
+            assert_eq!(decode(&empty_stream(13, 9, 2, true), &opts).unwrap_err(), Error::Invalid);
+        }
+    }
+
+    #[test]
+    fn the_pixel_limit_covers_planes_subsampled_on_different_axes() {
+        // 200 x 200 on the grid: planes of 200 x 1 and 1 x 200 hold 400 samples and make a 40,000 pixel picture.
+        let mut b = Writer(Vec::new());
+        b.marker(0xff4f);
+        b.segment(0xff51, &siz(200, 200, 200, 200, &[(8, false, 1, 200), (8, false, 200, 1)]));
+        b.segment(0xff52, &cod(0, 1, 0, 0, true, None));
+        b.segment(0xff5c, &[0x20, 8 << 3]);
+        // One tile-part with no packet data: Psot counts the SOT segment and the SOD marker.
+        b.segment(0xff90, &[0, 0, 0, 0, 0, 14, 0, 1]);
+        b.marker(0xff93);
+        b.marker(0xffd9);
+        let opts = Options { max_pixels: 39_999, ..Options::default() };
+        assert_eq!(decode(&b.0, &opts).unwrap_err(), Error::Limit);
     }
 
     #[test]

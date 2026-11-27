@@ -221,6 +221,70 @@ console.log(model.primitives.length); // 6
 
 After building a clone and fetching its pinned inputs with `node scripts/reference-rendering/fetch-skip-assets.mjs`, run `node scripts/run-with-timeout.mjs -- node packages/decoders/scripts/test-node-gltf.mjs`. It executes this Node setup and glTF load, checks every decoded mip and the complete geometry counts, and reads back the rendered model without GPU validation errors. This is integration evidence for that asset; it does not compare decoded pixels against an independent Basis decoder or establish rendering quality or speed.
 
+## JPEG 2000 (`@margoengine/decoders/jpeg2000`)
+
+Reads JPEG 2000 Part 1 images, as JP2 files or raw codestreams (`.j2k`, `.j2c`), to straight-alpha RGBA, top row
+first, at 8 or 16 bits per sample. The decoder is Margo's own Rust code, shipped as one Wasm file that loads on the
+first decode, in browsers and Node.
+
+```ts
+import {loadJPEG2000} from 'margoengine/decoders/jpeg2000';
+
+// Normally the bytes of a .jp2 or .j2k file. These are a 3 x 2 grey codestream whose samples are all mid grey.
+const file = Uint8Array.from(
+  atob('/0//UQApAAAAAAADAAAAAgAAAAAAAAAAAAAAAwAAAAIAAAAAAAAAAAABBwEB/1IADAAAAAEAAAQEAAH/XAAEIED/kAAKAAAAAAAPAAH/kwD/2Q=='),
+  (c) => c.charCodeAt(0),
+);
+const read = await loadJPEG2000();
+const {width, height, data, truncated} = read(file);
+console.log(width, height, data[0], data[3], truncated); // 3 2 128 255 false
+```
+
+`loadJPEG2000()` returns a reader that decodes on the calling thread. To keep a page responsive, decode in workers:
+
+```ts
+import {JPEG2000Decoder} from 'margoengine/decoders/jpeg2000';
+
+const decoder = new JPEG2000Decoder({workerLimit: 2});
+
+/** A half-size preview of a file, for example from fetch. Aborting the signal rejects at once. */
+export async function preview(url: string, signal: AbortSignal) {
+  const bytes = await (await fetch(url, {signal})).arrayBuffer();
+  return decoder.decode(bytes, {reduce: 1, transfer: true, signal});
+}
+// decoder.dispose() ends the workers.
+```
+
+`decodeJPEG2000(bytes, options)` is the one-shot form: one worker, released when the decode ends.
+
+| Decode option | Default | Meaning |
+| --- | --- | --- |
+| `reduce` | 0 | Resolution levels to drop, 0 to 32; each halves the width and height (rounding up). More than the stream holds fails |
+| `layers` | 0 | Quality layers to decode, from the first; 0 decodes every layer |
+| `depth` | 8 | Bits per output sample: 8 (`Uint8Array`) or 16 (`Uint16Array`). Source samples are scaled to the full range |
+| `maxPixels` | 2^26 | Largest output `width * height`, checked before the samples are allocated; at most 2^28 |
+| `signal` | none | Rejects with its reason; workers only |
+| `transfer` | false | Moves a whole input `ArrayBuffer` to the worker instead of copying it; workers only |
+
+`JPEG2000Decoder` takes `workerLimit` (hardware threads capped at 4, 1 to 16), `timeout` (10 s plus 4 s per MiB;
+`Infinity` disables it) and `decoderPath` (a folder holding `jpeg2000.wasm`; default the package's own file).
+`loadJPEG2000` takes `decoderPath` and `signal`.
+
+Decoded: every progression order and progression order change, tiles and tile-parts, packed packet headers (PPM, PPT),
+every code-block style, the reversible 5-3 and irreversible 9-7 wavelets, both component transforms, region-of-interest
+Maxshift, subsampled components (resampled to the largest, nearest sample), and the JP2 palette, component mapping,
+channel definition (straight or premultiplied opacity) and greyscale, sRGB or sYCC colour boxes. A raw codestream is
+read by component count: 1 grey, 2 grey and opacity, 3 RGB, 4 RGB and opacity. ICC profiles are not applied. A file
+that stops early gives the picture its packets hold, with `truncated: true`.
+
+Errors: `MargoError` `failed` for a damaged or cut header, `unsupported` for coding outside Part 1 (the HT block coder
+of Part 15, Part 2 extensions), `RangeError` over a limit; each message links to its help.
+[Limits](../../docs/limits.md#jpeg-2000-decoding) records what is still to be verified.
+
+Written from Rec. ITU-T T.800 | ISO/IEC 15444-1; D. S. Taubman and M. W. Marcellin, "JPEG2000: Image Compression
+Fundamentals, Standards and Practice" (Kluwer, 2002); and D. Taubman, "High performance scalable image compression
+with EBCOT" (IEEE Transactions on Image Processing 9(7), 2000, <https://doi.org/10.1109/83.847830>).
+
 ## Texture upload (`@margoengine/decoders/texture`)
 
 `getSupportedTranscodeFormat`, `getBytesPerRow` and `createKTX2Texture` (also on the root) without the transcoder or the

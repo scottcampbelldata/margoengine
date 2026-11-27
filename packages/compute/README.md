@@ -692,11 +692,11 @@ RegexFullMatch (RE2 syntax, matched without backtracking), TfIdfVectorizer, Defo
 operators (Attention, RotaryEmbedding, TensorScatter, CausalConvWithState, LinearAttention) run too.
 [Limits](../../docs/limits.md#batch-180-job-5-temporal-analysis) lists what is not built.
 
-ImageDecoder (opset 20) turns a PNG, JPEG, WebP, BMP, TIFF or PNM file in a `uint8` tensor into
+ImageDecoder (opset 20) turns a PNG, JPEG, JPEG 2000, WebP, BMP, TIFF or PNM file in a `uint8` tensor into
 `[height, width, channels]` bytes, `RGB` (the default), `BGR` or `Grayscale`, with alpha dropped. It reads the files
 through the optional peer `@margoengine/decoders`: install it beside compute for models that use this operator. A
-stream that cannot be decoded gives the empty matrix `[0, 0, channels]`. JPEG 2000 and BigTIFF reject with a
-`MargoError` `unsupported`.
+stream that cannot be decoded gives the empty matrix `[0, 0, channels]`. BigTIFF rejects with a `MargoError`
+`unsupported`.
 
 ```ts
 import {loadOnnx, OnnxTensor} from 'margoengine/compute/onnx';

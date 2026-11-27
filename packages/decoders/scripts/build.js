@@ -31,7 +31,7 @@ await packageDeclarations(root);
 if (process.env.MARGOENGINE_WASM_FROM_SOURCE === '1' || process.argv.includes('--from-source'))
   for (const feature of Object.keys(NATIVE_FEATURES)) await buildNative(feature);
 for (const { file } of Object.values(NATIVE_FEATURES)) await copyFile(resolve(root, 'src', file), resolve(dist, file));
-for (const worker of ['draco-native', 'hdr6', 'avif']) {
+for (const worker of ['draco-native', 'hdr6', 'avif', 'jpeg2000']) {
   await build({
     configFile: false,
     publicDir: false,

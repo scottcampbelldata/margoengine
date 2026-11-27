@@ -715,6 +715,13 @@ export const BLUEPRINTS = [
     args: ['avif'],
   },
   {
+    name: 'jpeg2000',
+    crate: 'packages/decoders/jpeg2000-kernel',
+    blueprint: 'packages/decoders/src/jpeg2000.wasm',
+    script: 'packages/decoders/scripts/build-native.mjs',
+    args: ['jpeg2000'],
+  },
+  {
     name: 'meshopt-simd',
     crate: 'packages/decoders/native/meshopt-simd',
     blueprint: 'packages/decoders/src/meshopt-simd-wasm.ts',

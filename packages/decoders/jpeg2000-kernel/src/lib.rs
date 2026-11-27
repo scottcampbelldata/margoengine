@@ -12,6 +12,8 @@ pub mod recon;
 pub mod t1;
 pub mod tier2;
 pub mod tile;
+#[cfg(any(target_arch = "wasm32", test))]
+mod wasm;
 
 /// Why a stream cannot be decoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

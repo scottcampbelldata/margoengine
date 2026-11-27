@@ -1,8 +1,8 @@
-// Builds the clean-room native decoders (native/draco, native/hdr6, native/avif) from source into their committed
-// blueprints src/draco-native.wasm, src/hdr6.wasm and src/avif.wasm, and writes each record beside it. Run it after
-// changing a crate: `node scripts/build-native.mjs [draco|hdr6|avif ...]` (all three when none is named). Needs cargo and
-// the wasm32-unknown-unknown target; the package build copies the committed files and needs neither
-// (scripts/wasm-blueprints.mjs checks that each record still matches its crate).
+// Builds the clean-room native decoders (native/draco, native/hdr6, native/avif, jpeg2000-kernel) from source into
+// their committed blueprints src/draco-native.wasm, src/hdr6.wasm, src/avif.wasm and src/jpeg2000.wasm, and writes each
+// record beside it. Run it after changing a crate: `node scripts/build-native.mjs [draco|hdr6|avif|jpeg2000 ...]` (all
+// when none is named). Needs cargo and the wasm32-unknown-unknown target; the package build copies the committed files
+// and needs neither (scripts/wasm-blueprints.mjs checks that each record still matches its crate).
 import { spawn } from 'node:child_process';
 import { copyFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -20,6 +20,7 @@ export const NATIVE_FEATURES = {
   draco: { file: 'draco-native.wasm', rustflags: '' },
   hdr6: { file: 'hdr6.wasm', rustflags: '' },
   avif: { file: 'avif.wasm', rustflags: '-C target-feature=+simd128 -C link-arg=--max-memory=1073741824' },
+  jpeg2000: { file: 'jpeg2000.wasm', rustflags: '', dir: 'jpeg2000-kernel' },
 };
 
 /** The first Rust source path with a backslash separator in a module's bytes, or null. */
@@ -27,8 +28,8 @@ export const hostPath = hostSourcePath;
 
 /** Builds one feature's crate and copies the module to its committed blueprint. */
 export async function buildNative(feature) {
-  const { file, rustflags } = NATIVE_FEATURES[feature];
-  const manifest = resolve(root, `native/${feature}/Cargo.toml`);
+  const { file, rustflags, dir = `native/${feature}` } = NATIVE_FEATURES[feature];
+  const manifest = resolve(root, `${dir}/Cargo.toml`);
   const args = [
     'build',
     '--offline',
@@ -42,7 +43,7 @@ export async function buildNative(feature) {
   const native = spawn('cargo', args, {
     windowsHide: true,
     stdio: 'inherit',
-    env: blueprintRustEnv(resolve(root, `native/${feature}`), rustflags),
+    env: blueprintRustEnv(resolve(root, dir), rustflags),
   });
   let nativeTimeout = false,
     nativeEnded = Promise.resolve([]);
@@ -61,7 +62,7 @@ export async function buildNative(feature) {
   } finally {
     clearTimeout(nativeTimer);
   }
-  const built = resolve(root, `native/${feature}/target/wasm32-unknown-unknown/release/margoengine_${feature}.wasm`);
+  const built = resolve(root, `${dir}/target/wasm32-unknown-unknown/release/margoengine_${feature}.wasm`);
   const leak = hostPath(await readFile(built));
   if (leak)
     throw new Error(`Clean-room ${feature} module holds the host path ${leak}; its bytes would differ by system`);

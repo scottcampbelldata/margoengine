@@ -18,7 +18,7 @@ type Reader = (bytes: Uint8Array) => Rgba;
 const unsupported = (what: string) =>
   fault(
     'unsupported',
-    `ONNX ImageDecoder does not read ${what}; convert the image to PNG, JPEG, WebP, BMP, TIFF or PNM`,
+    `ONNX ImageDecoder does not read ${what}; convert the image to PNG, JPEG, JPEG 2000, WebP, BMP, TIFF or PNM`,
     'compute',
   );
 
@@ -54,7 +54,13 @@ async function reader(bytes: Uint8Array): Promise<Reader | undefined> {
   }
   if (bytes[0] === 0x50 && bytes[1] >= 0x31 && bytes[1] <= 0x36)
     return (await import('@margoengine/decoders/pnm')).parsePNM;
-  if (starts(0xff, 0x4f, 0xff, 0x51) || starts(0, 0, 0, 12, 0x6a, 0x50, 0x20, 0x20)) throw unsupported('JPEG 2000');
+  // A raw codestream (SOC then SIZ) or a JP2 file (the signature box).
+  if (starts(0xff, 0x4f, 0xff, 0x51) || starts(0, 0, 0, 12, 0x6a, 0x50, 0x20, 0x20)) {
+    const { loadJPEG2000 } = await import('@margoengine/decoders/jpeg2000');
+    const read = await loadJPEG2000();
+    // The default depth is 8, so the samples are bytes.
+    return (b) => read(b) as Rgba;
+  }
   return undefined;
 }
 

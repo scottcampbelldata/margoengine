@@ -11179,3 +11179,23 @@ A motor joint's six motors solve one axis at a time, each capped alone, and the 
 - The WebGL2 layer needs `WEBGL_blend_func_extended` for the feature; without it the device does not offer it and
   'auto' draws twice.
 - Core + stage stayed at 25,149 B gzip: the feature is requested through `EngineOptions.features`.
+
+## JPEG 2000 decoding
+
+`@margoengine/decoders/jpeg2000` (2026-11-27) reads JPEG 2000 Part 1 (JP2 and raw codestreams) to RGBA8 or RGBA16, in
+module workers or, through `loadJPEG2000`, on the calling thread. Compute's ONNX ImageDecoder uses it.
+
+Limits: output up to `maxPixels` (default 2^26, maximum 2^28) and four times as many samples over all components;
+input up to 1 GiB; 65,535 tiles; 2^24 code-blocks; 31 coded bit-planes a code-block (so component precisions near the
+standard's 38 bits are refused); 1,024 palette entries. Over a limit throws `RangeError`. Wasm memory is 32-bit, so a
+picture near the largest limits can fail to allocate (`MargoError` `failed`).
+
+Not read: the HT block coder of Rec. ITU-T T.814 | ISO/IEC 15444-15 and the Part 2 extensions (`unsupported`); JPX
+files beyond their JP2 boxes. ICC profiles are not applied. Subsampled components are resampled to the largest
+component by nearest sample.
+
+Not yet verified: no ISO/IEC 15444-4 (Rec. ITU-T T.803) conformance codestream or reference output has been run
+against this decoder. The MQ state table (Table C.2), the context tables (Tables D.1 to D.4), the irreversible
+reconstruction midpoint, the component transform constants and the sYCC conversion were written from the standard and
+are checked only by the crate's own tests, which include a test-side MQ encoder. No conformance claim and no speed
+claim is made until that corpus passes.

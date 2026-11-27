@@ -543,6 +543,10 @@
       "types": "./dist/decoders/avif.d.ts",
       "import": "./dist/decoders/avif.js"
     },
+    "./decoders/jpeg2000": {
+      "types": "./dist/decoders/jpeg2000.d.ts",
+      "import": "./dist/decoders/jpeg2000.js"
+    },
     "./environment": {
       "types": "./dist/environment.d.ts",
       "import": "./dist/environment.js"

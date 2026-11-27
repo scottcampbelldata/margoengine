@@ -1046,6 +1046,22 @@ export const LAZY_FILES = [
   },
   {
     package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/jpeg2000.worker.js',
+    label: 'jpeg2000.worker.js',
+    kind: 'Worker',
+    measure: 'file',
+    when: 'First JPEG2000Decoder.decode(): browser or Node module worker, retained until dispose()',
+  },
+  {
+    package: '@margoengine/decoders',
+    file: 'packages/decoders/dist/jpeg2000.wasm',
+    label: 'jpeg2000.wasm',
+    kind: 'Rust JPEG 2000 Part 1 decoder',
+    measure: 'file',
+    when: 'With the JPEG 2000 worker above, once per worker, or the first loadJPEG2000(); decoderPath can relocate it',
+  },
+  {
+    package: '@margoengine/decoders',
     file: 'packages/decoders/dist/hdr6.wasm',
     label: 'hdr6.wasm',
     kind: 'Wasm',

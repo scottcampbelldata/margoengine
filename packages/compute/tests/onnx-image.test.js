@@ -100,6 +100,33 @@ test('ImageDecoder reads WebP: the same pixels as the decoders reader, alpha dro
   assert.deepEqual(Buffer.from(image.data), Buffer.from(expected.data.filter((_, i) => i % 4 !== 3)));
 });
 
+test('ImageDecoder reads JPEG 2000, a raw codestream and a JP2 file', async () => {
+  // A 3 x 2 grey codestream of 8 bits (Rec. ITU-T T.800 Annex A) whose one packet is empty: every sample is 128.
+  const stream = [
+    ...[0xff, 0x4f],
+    ...[0xff, 0x51, 0, 41, 0, 0, 0, 0, 0, 3, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 2],
+    ...[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 1, 1],
+    ...[0xff, 0x52, 0, 12, 0, 0, 0, 1, 0, 0, 4, 4, 0, 1],
+    ...[0xff, 0x5c, 0, 4, 0x20, 0x40],
+    ...[0xff, 0x90, 0, 10, 0, 0, 0, 0, 0, 15, 0, 1, 0xff, 0x93, 0],
+    ...[0xff, 0xd9],
+  ];
+  const box = (type, body) => [0, 0, 0, body.length + 8, ...new TextEncoder().encode(type), ...body];
+  const jp2 = [
+    ...box('jP  ', [0x0d, 0x0a, 0x87, 0x0a]),
+    ...box('ftyp', [...new TextEncoder().encode('jp2 \0\0\0\0jp2 ')]),
+    ...box('jp2h', box('colr', [1, 0, 0, 0, 0, 0, 17])),
+    ...box('jp2c', stream),
+  ];
+  for (const bytes of [stream, jp2]) {
+    const image = await decode(Uint8Array.from(bytes), 'BGR');
+    assert.deepEqual(image.shape, [2, 3, 3]);
+    assert.deepEqual([...image.data], new Array(18).fill(128));
+    // A cut header gives the empty matrix, like every other damaged stream.
+    assert.deepEqual((await decode(Uint8Array.from(bytes.slice(0, 20)))).shape, [0, 0, 3]);
+  }
+});
+
 test('ImageDecoder gives an empty matrix for a stream it cannot decode', async () => {
   const damaged = [
     new Uint8Array(0),
@@ -121,8 +148,6 @@ test('ImageDecoder refuses unread formats, bad attributes, types and old opsets'
       decode(Uint8Array.from(bytes)),
       (error) => error.code === 'unsupported' && pattern.test(error.message),
     );
-  await unsupported([0xff, 0x4f, 0xff, 0x51, 0, 0], /JPEG 2000/);
-  await unsupported([0, 0, 0, 12, 0x6a, 0x50, 0x20, 0x20, 13, 10, 0x87, 10], /JPEG 2000/);
   await unsupported([0x49, 0x49, 43, 0, 8, 0, 0, 0], /BigTIFF/);
   await assert.rejects(decode(files.png, 'rgb'), /pixel_format/);
   await assert.rejects(decode(files.png, 'RGB', 20, [p.attr('extra', 1)]), /pixel_format/);

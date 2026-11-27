@@ -187,6 +187,10 @@
     "./avif": {
       "types": "./dist/avif.d.ts",
       "import": "./dist/avif.js"
+    },
+    "./jpeg2000": {
+      "types": "./dist/jpeg2000.d.ts",
+      "import": "./dist/jpeg2000.js"
     }
   },
   "files": [

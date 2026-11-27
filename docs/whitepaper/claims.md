@@ -6761,3 +6761,11 @@ secondary chains (Singer et al. 2020). Proof: packages/terrain/test/planet-compl
 benches, no step at the transition, ray count and reach, chains on the rays) and test/planet-recipes.browser.mjs (the
 brightness input on both backends). Authored shapes and what is not modelled are in ../limits.md. No claim of
 observational accuracy for the look.
+
+## JPEG 2000 reading (decoders/jpeg2000, 2026-11-27)
+
+Claim: the optional entry reads JPEG 2000 Part 1 JP2 files and raw codestreams to RGBA with one clean-room Rust Wasm
+module, in browsers' and Node's module workers or on the calling thread. Proof: `cargo test` in
+`packages/decoders/jpeg2000-kernel`, `packages/decoders/tests/jpeg2000.test.js` and the JPEG 2000 case of
+`packages/compute/tests/onnx-image.test.js`. Not claimed: conformance (the ISO/IEC 15444-4 corpus has not been run,
+see [Limits](../limits.md#jpeg-2000-decoding)) and speed.
