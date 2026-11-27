@@ -355,7 +355,24 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   attachment added after the world began is refused with a coded error.
 - **Regression:** the test above, which fails without the region, and the frame-rate check beside it.
 
-### Open 2026-11-27: six package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
+### Fixed 2026-11-27: GPU picking hit a one-sided material on instances seen from its culled side (KB-PICK-MIRRORROWS1, selection)
+
+- **Repro:** `node scripts/material-back-side-gpu-check.js` (WebGPU and `MARGO_COMPAT=1`, RTX A6000 and Intel Arc
+  140V): every instanced pick row read `[true,true]` where `[false,false]` is wanted, at 4x and 1x ("front instances
+  back automatic gpu" and the explicit and back-instance rows); the drawn picture of the same rows was right.
+- **Cause:** d31534edc1 (KB-PICK-INSTMOVE1) drew instanced primitives through `PickingPrimitives` and picked one with
+  any mirrored row (the fixture's second row has x scale -1) from both sides, on the reading that the colour pass then
+  draws it unculled. The colour pass does draw it with no pipeline culling, but its shader tests each face against
+  the row's handedness (gltf/pbr `model.ts`, `face`), so a front-only or back-only material stays one-sided on every
+  row; picking took the whole set as double-sided.
+- **Fix:** the instanced pick shader carries each row's handedness (the sign of its matrix determinant, a flat
+  varying) into its face test with the node's, and the `side` of such a primitive is no longer turned to double. One
+  shader serves picking and the selection mask, so both follow.
+- **Regression:** `scripts/material-back-side-gpu-check.js` (840 checks, 0 failures on both back ends; 8 failed
+  before); `packages/selection` CPU tests and `instanced-move`, `picking`, `models` and `hit-details` browser checks
+  pass.
+
+### Open 2026-11-27: five package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
 - **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
   `node scripts/run-with-timeout.mjs --max=4 --`. Each fails the same way with `packages/shared/clear-color.js` put back
@@ -365,13 +382,12 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   - `node packages/biomes/tests/browser-check.mjs`: `requestDevice` fails with DXGI_ERROR_DEVICE_REMOVED, then
     "[Device] is lost" (the parent run); past the 4-minute limit on main.
   - `node packages/oit/test/gpu/real-check.mjs`: "[Invalid CommandBuffer] is invalid due to a previous error".
-  - `node scripts/material-back-side-gpu-check.js`: the 4x instanced back-side rows read `[true,true]` where
-    `[false,false]` is wanted ("4x front instances back automatic gpu", and the explicit and back-instance rows).
   - `node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position along the view: 3 bytes over 2,
     worst 7".
   - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
-- **Cause:** not established for any of the six; each is owed to its package (core lighting, biomes, oit, materials,
-  post, sky), found and fixed with its own regression.
+- **Cause:** not established for any of the five; each is owed to its package (core lighting, biomes, oit, post,
+  sky), found and fixed with its own regression. The sixth, the material back-side check, is KB-PICK-MIRRORROWS1
+  above (fixed). On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
 
 ### Fixed 2026-11-27: flame-check `graded` failed on main on both backends (KB-FLAME-GRADEDBG1, vfx)
 
@@ -1753,7 +1769,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   once over all its rows through the shadow casters' `instancedDepth` transform after the material's vertex move (the
   same order as the shadow passes), with a flat row so row k writes the primitive's first ID + k (the `margoRow` a
   row-reading material plugin already names). Picking reserves one ID run per instanced primitive and decodes the
-  instance from it; a primitive with mirrored rows is picked from both sides, as the colour pass draws it unculled.
+  instance from it; a primitive with mirrored rows was picked from both sides (wrong for one-sided materials, see
+  KB-PICK-MIRRORROWS1: each row's faces now follow its own handedness).
   Hit details read the instance's world matrix for the normal.
 - **Regression:** `packages/selection/test/instanced-move.browser.mjs` (both back ends: the drawn places hit instances
   0 and 1, the unmoved places miss); `packages/materials/test/instance-attributes-browser.mjs` now asserts

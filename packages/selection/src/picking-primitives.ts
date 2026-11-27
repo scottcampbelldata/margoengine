@@ -54,8 +54,9 @@ export interface PickingPrimitive {
   side?: 'front' | 'back' | 'double';
   /**
    * The instances the colour pass draws of this primitive (gltf/pbr `PBRInstances`): one draw of `count` rows from row
-   * 0 through the same instance transform and vertex move as the colour pass. Row k writes the primitive's ID + k. A
-   * primitive with a `mirrored` row is picked from both sides, as the colour pass then draws it without face culling.
+   * 0 through the same instance transform and vertex move as the colour pass. Row k writes the primitive's ID + k. Each
+   * row's faces follow its own handedness (the sign of its matrix determinant), as the colour pass tests a primitive
+   * with a `mirrored` row face by face, so a one-sided material stays one-sided on every row (KB-PICK-MIRRORROWS1).
    */
   instances?: { readonly count: number; readonly mirrored?: boolean; upload(device: GPUDevice): GPUBuffer };
 }
@@ -395,9 +396,8 @@ export class PickingPrimitives {
       );
       values.set(p.alphaTransform ?? identityUV, 36);
       values[44] = ids[index];
-      values[45] = p.instances?.mirrored
-        ? 1
-        : p.side === 'back'
+      values[45] =
+        p.side === 'back'
           ? 2
           : p.side === 'double'
             ? 1
@@ -548,11 +548,20 @@ struct Out {@builtin(position) clip:vec4f,@location(0) uv:vec2f,@location(1) alp
 function instancedPick(code: string, mask: boolean): string {
   const row = '@builtin(instance_index) margoRow:u32';
   let out = instancedDepth(code)
-    .replace('@location(1) alpha:f32}', '@location(1) alpha:f32,@location(2) @interpolate(flat) pickRow:u32}')
-    .replace('var o:Out;', 'var o:Out;o.pickRow=margoRow;');
+    .replace(
+      '@location(1) alpha:f32}',
+      '@location(1) alpha:f32,@location(2) @interpolate(flat) pickRow:u32,@location(7) @interpolate(flat) pickFace:f32}',
+    )
+    // A mirrored row (negative determinant) turns its triangles' winding: its faces are tested the other way round.
+    .replace('var o:Out;', 'var o:Out;o.pickRow=margoRow;o.pickFace=sign(dot(cross(i.m0.xyz,i.m1.xyz),i.m2.xyz));')
+    .replace('let facing=front==(f.settings.w>0.0);', 'let facing=front==(f.settings.w*i.pickFace>0.0);');
   if (!out.includes(row)) out = out.replace('@vertex fn vertex(', `@vertex fn vertex(${row},`);
   if (!mask) out = out.replace('return u32(f.info.x);', 'return u32(f.info.x)+i.pickRow;');
-  if (!out.includes('mat4x4f(i.m0,i.m1,i.m2,i.m3)') || !out.includes('o.pickRow=margoRow;'))
+  if (
+    !out.includes('mat4x4f(i.m0,i.m1,i.m2,i.m3)') ||
+    !out.includes('o.pickRow=margoRow;') ||
+    !out.includes('f.settings.w*i.pickFace')
+  )
     throw new TypeError('Instanced picking needs the 80-byte PBR pick shader; draw instances with it.');
   return out;
 }
