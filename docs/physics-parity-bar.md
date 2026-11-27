@@ -101,7 +101,7 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
   (`@margoengine/ragdoll`, `/hulls`); the bridge from a controller to a ragdoll and back (`@margoengine/ragdoll/character`).
   Quick start, three.js migration note, example page (`examples/character-controller.html`) and the shared debug view
   (`@margoengine/physics/debug-view`) landed. Still open: PA-67 (humans, horses and armies packages do not use the world),
-  PA-77 (foot locking in the animator), PA-78 (the controls walker), and the ragdoll's `fitRagdollShapes` is a call of its
+  PA-77 (foot locking in the animator), PA-78 in part (the controls walker has `airControl` now but no mass), and the ragdoll's `fitRagdollShapes` is a call of its
   own rather than automatic.
 
 ### P5. DYN-04 Wheeled vehicles

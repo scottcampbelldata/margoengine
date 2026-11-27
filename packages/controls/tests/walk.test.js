@@ -619,6 +619,43 @@ test('a jump rises to v0^2 / 2g at any frame rate (exact constant-acceleration s
   near(apex[0], (v0 * v0) / (2 * g), 1e-6, 'apex v0^2 / 2g');
 });
 
+test('PA-78: in the air the input has airControl of the acceleration, so a jump from standing barely drifts', async () => {
+  const drift = async (airControl) => {
+    const { engine } = await world();
+    block(engine, [-20, -0.2, -20], [20, 0, 20]);
+    const walk = new WalkControls(engine);
+    walk.jumpSpeed = 4;
+    walk.airControl = airControl;
+    run(engine, 10);
+    walk.pressed.add('Space');
+    run(engine, 2); // off the ground
+    walk.pressed.delete('Space');
+    walk.axes.x = 1; // strafe while in the air
+    const x0 = engine.camera.position[0];
+    run(engine, 20);
+    const dx = engine.camera.position[0] - x0;
+    assert.equal(walk.grounded, false, 'still in the air');
+    walk.dispose();
+    engine.dispose();
+    return dx;
+  };
+  // From rest the speed follows the input as top (1 - e^(-k n dt)) with k = acceleration x airControl, so 20 frames
+  // drift top dt sum(1 - e^(-k n dt)) (strafing right is -x for this camera).
+  const expected = (k) => {
+    let sum = 0;
+    for (let n = 1; n <= 20; n++) sum += 1 - Math.exp((-k * n) / 60);
+    return (-1.5 * sum) / 60;
+  };
+  near(await drift(0), 0, 1e-12, 'airControl 0 keeps the speed it left the ground with');
+  near(await drift(0.3), expected(10 * 0.3), 1e-9, 'airControl 0.3');
+  near(await drift(1), expected(10), 1e-9, 'airControl 1, as on the ground');
+  const { engine } = await world(),
+    walk = new WalkControls(engine);
+  assert.equal(walk.airControl, 0.3, 'default 0.3');
+  walk.dispose();
+  engine.dispose();
+});
+
 test('keys held when the window loses focus are let go, as a keyup would; dispose removes the blur listener', async () => {
   const finish = async (release) => {
     const { engine, canvas } = await world(),

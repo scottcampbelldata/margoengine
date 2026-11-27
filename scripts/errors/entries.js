@@ -3284,7 +3284,7 @@ export const entries = [
       'Follow turnLag, lookAhead, lead, bank, maxBank, flybyAhead and clearance are finite and 0 or more, cellSize above 0; pass seconds, shares and metres',
       'WalkControls needs an Engine',
       'dollhouseBounds must be 6 finite numbers',
-      'Invalid WalkControls settings (heights, radius and speeds must be finite and >= 0, crouchHeight <= eyeHeight, maxSlope in [0, PI/2], dollhouseElevation in (0, PI/2))',
+      'Invalid WalkControls settings (heights, radius and speeds must be finite and >= 0, crouchHeight <= eyeHeight, maxSlope in [0, PI/2], airControl in [0, 1], dollhouseElevation in (0, PI/2))',
     ],
     cause:
       'A camera controls class (orbit, arcball, trackball, walk, globe, third-person, device orientation, presentation, scroll or path controls, the arcball and box gizmos, orbit collision or locomotion) was given a non-finite or out-of-range option, input or update step, an object from another engine, or was made without the engine it needs. Messages built from the value name it.',

@@ -126,7 +126,8 @@ engine.start();
   triangle it overlaps (exact segment-triangle closest points, up to four passes), so it slides along walls and around
   corners. Movement is split into sub-steps of at most half the radius, so a zero-thickness pane is never crossed.
 - **Input.** WASD/arrows, Shift runs, C crouches (stands up only where there is headroom), Space jumps when
-  `jumpSpeed` > 0; a click locks the pointer for mouse look (`pointerLock = false` to drag-look instead); the first
+  `jumpSpeed` > 0 (in the air the input steers with `airControl` of the `acceleration`, default 0.3: 0 keeps the speed it
+  left the ground with, 1 steers as on the ground); a click locks the pointer for mouse look (`pointerLock = false` to drag-look instead); the first
   connected gamepad (left stick walks, right stick looks, A jumps, B crouches, left stick button runs); on touch, the
   left half of the element is a floating thumbstick and the right half drag-looks. `walk.axes` (stick convention) adds
   any other analog source, for example `@margoengine/input` actions.

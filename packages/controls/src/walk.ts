@@ -120,6 +120,11 @@ export class WalkControls extends Controls {
   runMultiplier = 2.5;
   /** How fast speed follows the input, 1/s (higher is snappier). */
   acceleration = 10;
+  /**
+   * Share of `acceleration` the input has while the walker is in the air, 0 to 1: 0 keeps the speed it left the ground
+   * with, 1 steers as on the ground. Default 0.3, about the share the three.js FPS example (`games_fps`) gives the air.
+   */
+  airControl = 0.3;
   /** m/s². Applies whenever the floor drops away by more than `stepHeight`. */
   gravity = 9.81;
   /** Take-off speed in m/s; 0 (default, walkthroughs) disables jumping. */
@@ -396,7 +401,7 @@ export class WalkControls extends Controls {
       fx = b.forward[0] / h,
       fz = b.forward[2] / h;
     const top = this.speed * (running ? this.runMultiplier : 1) * (crouching ? 0.5 : 1),
-      a = 1 - Math.exp(-this.acceleration * dt),
+      a = 1 - Math.exp(-this.acceleration * (this.grounded_ ? 1 : this.airControl) * dt),
       v = this.velocity;
     v[0] += ((-fz * ix + fx * iz) * top - v[0]) * a;
     v[2] += ((fx * ix + fz * iz) * top - v[2]) * a;
@@ -563,6 +568,8 @@ export class WalkControls extends Controls {
       this.acceleration > 0 &&
       this.gravity >= 0 &&
       this.jumpSpeed >= 0 &&
+      this.airControl >= 0 &&
+      this.airControl <= 1 &&
       Number.isFinite(this.lookSpeed) &&
       this.transitionTime >= 0 &&
       this.dollhouseElevation > 0 &&
@@ -580,7 +587,7 @@ export class WalkControls extends Controls {
       ].every(Number.isFinite);
     if (!ok)
       throw rangeError(
-        'Invalid WalkControls settings (heights, radius and speeds must be finite and >= 0, crouchHeight <= eyeHeight, maxSlope in [0, PI/2], dollhouseElevation in (0, PI/2))',
+        'Invalid WalkControls settings (heights, radius and speeds must be finite and >= 0, crouchHeight <= eyeHeight, maxSlope in [0, PI/2], airControl in [0, 1], dollhouseElevation in (0, PI/2))',
         'controls-arguments',
       );
   }

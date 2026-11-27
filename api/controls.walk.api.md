@@ -119,6 +119,7 @@ export class WalkControls extends Controls {
     speed: number;
     runMultiplier: number;
     acceleration: number;
+    airControl: number;
     gravity: number;
     jumpSpeed: number;
     lookSpeed: number;
