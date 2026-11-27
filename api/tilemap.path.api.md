@@ -22,11 +22,14 @@ export interface FlowField {
 export interface GridPath {
     readonly cells: [number, number][];
     readonly cost: number;
+    readonly searched: number;
+    readonly scanned: number;
 }
 
 export interface PathOptions {
     diagonal?: 'never' | 'always' | 'no-corners';
     maxCells?: number;
+    jumpPoints?: boolean;
 }
 
 export interface TileCostOptions {

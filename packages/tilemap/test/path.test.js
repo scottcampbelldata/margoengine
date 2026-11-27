@@ -29,7 +29,7 @@ test('open grids: 8 steps along the edges without corners, 4 sqrt(2) across them
   near(corner.cost, 4 * Math.SQRT2);
   // (0, 0) to (4, 2): two corner steps and two straight ones.
   near(findPath(g, [0, 0], [4, 2]).cost, 2 + 2 * Math.SQRT2);
-  assert.deepEqual(findPath(g, [2, 2], [2, 2]), { cells: [[2, 2]], cost: 0 });
+  assert.deepEqual(findPath(g, [2, 2], [2, 2]), { cells: [[2, 2]], cost: 0, searched: 1, scanned: 0 });
 });
 
 test('walls: no-corners will not cut past a wall corner, always will, and closed goals give null', () => {
@@ -177,4 +177,93 @@ test('tileCosts reads solid and cost properties; the highest layer cost wins; ga
   assert.deepEqual([...tileCosts(map, { layers: ['top'], empty: Infinity }).cost], [Infinity, 1, Infinity]);
   assert.equal(tileCosts(map).layout, map);
   assert.throws(() => tileCosts(map, { fallback: 0 }), RangeError);
+});
+
+// Jump point search: on grids of one cost with no corner cutting it finds paths as cheap as plain A*'s, legal step by
+// step, visiting fewer cells; elsewhere it is plain A*.
+const random = (seed) => () => (seed = (seed * 1103515245 + 12345) >>> 0) / 2 ** 32;
+const legal = (g, cells) => {
+  for (let i = 1; i < cells.length; i++) {
+    const [ax, ay] = cells[i - 1],
+      [bx, by] = cells[i],
+      dx = bx - ax,
+      dy = by - ay,
+      open = (x, y) => g.cost[y * g.width + x] > 0 && g.cost[y * g.width + x] < Infinity;
+    assert.ok(Math.abs(dx) <= 1 && Math.abs(dy) <= 1 && (dx || dy), `step ${i} is one cell`);
+    assert.ok(open(bx, by), `step ${i} enters an open cell`);
+    if (dx && dy) assert.ok(open(ax + dx, ay) && open(ax, ay + dy), `step ${i} cuts no corner`);
+  }
+};
+
+test('jumpPoints: as cheap as plain A* on 600 random walled grids, every step legal', () => {
+  const next = random(7);
+  let plainSearched = 0,
+    jumpSearched = 0;
+  for (let n = 0; n < 600; n++) {
+    const width = 4 + Math.floor(next() * 40),
+      height = 4 + Math.floor(next() * 40),
+      walls = next() * 0.45,
+      unit = [1, 2.5][n % 2],
+      g = grid(width, height, () => (next() < walls ? Infinity : unit)),
+      start = [Math.floor(next() * width), Math.floor(next() * height)],
+      goal = [Math.floor(next() * width), Math.floor(next() * height)],
+      plain = findPath(g, start, goal),
+      jump = findPath(g, start, goal, { jumpPoints: true });
+    assert.equal(jump === null, plain === null, `grid ${n}: the same goals are reachable`);
+    if (!plain) continue;
+    near(jump.cost, plain.cost);
+    assert.deepEqual(jump.cells[0], start);
+    assert.deepEqual(jump.cells.at(-1), goal);
+    legal(g, jump.cells);
+    // The cells' own costs add up to the reported cost.
+    let sum = 0;
+    for (let i = 1; i < jump.cells.length; i++) {
+      const [ax, ay] = jump.cells[i - 1],
+        [bx, by] = jump.cells[i];
+      sum += unit * (ax !== bx && ay !== by ? Math.SQRT2 : 1);
+    }
+    near(sum, jump.cost);
+    plainSearched += plain.searched;
+    jumpSearched += jump.searched;
+  }
+  // Work counts, deterministic: cells expanded (a heap pop and up to 8 pushes each).
+  assert.ok(jumpSearched * 2 < plainSearched, `${jumpSearched} cells expanded against ${plainSearched}`);
+});
+
+test('jumpPoints: an open 200 x 200 grid corner to corner visits a fraction of the cells', () => {
+  const g = grid(200, 200),
+    plain = findPath(g, [0, 0], [199, 120]),
+    jump = findPath(g, [0, 0], [199, 120], { jumpPoints: true });
+  near(jump.cost, plain.cost);
+  assert.equal(jump.cells.length, 200);
+  assert.ok(jump.searched * 20 < plain.searched, `${jump.searched} cells expanded against ${plain.searched}`);
+  // A wall across most of the room makes plain A* spread.
+  const wall = grid(200, 200, (x, y) => (x === 100 && y > 10 ? Infinity : 1)),
+    a = findPath(wall, [10, 190], [190, 190]),
+    b = findPath(wall, [10, 190], [190, 190], { jumpPoints: true });
+  near(b.cost, a.cost);
+  legal(wall, b.cells);
+  assert.ok(b.searched * 20 < a.searched, `${b.searched} cells expanded against ${a.searched}`);
+  assert.equal(findPath(wall, [10, 190], [190, 190], { jumpPoints: true, maxCells: 50 }), null);
+});
+
+test('jumpPoints: plain A* where pruning is not exact (mixed costs, no diagonals, corner cutting, hex)', () => {
+  const mixed = grid(9, 9, (x, y) => 1 + ((x * 3 + y) % 4)),
+    open = grid(9, 9);
+  for (const [g, options] of [
+    [mixed, {}],
+    [open, { diagonal: 'never' }],
+    [open, { diagonal: 'always' }],
+    [
+      {
+        ...open,
+        layout: { orientation: 'hexagonal', width: 9, height: 9, tileWidth: 14, tileHeight: 16, hexSideLength: 8 },
+      },
+      {},
+    ],
+  ])
+    assert.deepEqual(
+      findPath(g, [0, 0], [8, 5], { ...options, jumpPoints: true }),
+      findPath(g, [0, 0], [8, 5], options),
+    );
 });

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21046190,
+  "total": 21046877,
   "history": [
     {
       "date": "2026-10-24",
@@ -14785,6 +14785,12 @@
       "commit": "terrain-stream-normals-tint",
       "reason": "terrain/stream streams a normal map and a tint with the heights (normals, tint options; LIM-435 gap), after the tile retries: 14,425 -> 14,823 B gzip, ceiling 14,509 -> 15,268. The two textures go through the weights' own scroll, upload and restore path as RGBA8 planes, so they add no second copy of it; a separate entry would have to subclass TerrainStream and repeat the tile check, band upload and window shift for the same tiles. Core and stage unchanged.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "tilemap-path-jump-points",
+      "reason": "tilemap/path gains jump point search (findPath jumpPoints, Harabor and Grastien 2011 and 2014, no corner cutting) and the searched and scanned work counts: about 2,586 -> 3,273 B gzip, ceiling 2,842 -> 3,529. It reuses the entry's heap, grid checks and octile estimate; a separate entry would carry its own copy of them for about 700 B more. Core and stage unchanged.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16231,7 +16237,7 @@
     "@margoengine/tilemap/iso": 6963,
     "@margoengine/tilemap/ldtk": 3070,
     "@margoengine/tilemap/objects": 7723,
-    "@margoengine/tilemap/path": 2842,
+    "@margoengine/tilemap/path": 3529,
     "@margoengine/tilemap/plane": 8167,
     "@margoengine/tilemap/tiled": 7482,
     "@margoengine/tiles": 16680,

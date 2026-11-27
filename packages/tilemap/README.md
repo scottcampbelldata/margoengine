@@ -178,19 +178,40 @@ console.log(followFlow(field, 0, 2).length); // 7
 
 | Piece | What it does |
 | --- | --- |
-| `findPath(grid, start, goal, options)` | `{cells, cost}` from start to goal, both cells included, or null when there is no way |
+| `findPath(grid, start, goal, options)` | `{cells, cost, searched, scanned}` from start to goal, both cells included, or null when there is no way; `searched` cells were expanded, `scanned` passed over by jumps |
 | `flowField(grid, goals, options)` | `{width, height, distance, next}`: each cell's cost to the nearest goal and its next cell (`y * width + x`, -1 at goals and where none is reached) |
 | `followFlow(field, x, y)` | The cells from (`x`, `y`) along a field to its goal |
 | `tileCosts(map, {layers, property, solid, fallback, empty})` | A cost grid from tile properties: `solid: true` blocks (default property names `'solid'` and `'cost'`), a numeric `cost` sets the price, other tiles cost `fallback` (1), cells with no tile `empty` (`fallback`). A cell takes its highest layer cost |
 
 A grid is `{width, height, cost, layout?}`; a step costs the cell it enters times its length, and a cost of 0, below 0
 or Infinity blocks the cell. Options: `diagonal` (`'no-corners'` default: corner steps only when both cells beside them
-are open; `'always'`; `'never'`) and `maxCells` (1,000,000).
+are open; `'always'`; `'never'`), `maxCells` (1,000,000) and `jumpPoints` (false).
 
 - On staggered and hexagonal maps (`layout` set, as `tileCosts` does) steps go to the cells that share an edge and
   `diagonal` does not apply; orthogonal and isometric maps step along rows and columns.
 - A* estimates with the octile (or hex) distance times the lowest cost on the grid, so paths are cheapest ones; equal
   ones are broken by the order cells were found, the same every run.
+- `jumpPoints: true` runs jump point search (Harabor and Grastien, "Online Graph Pruning for Pathfinding on Grid
+  Maps", AAAI 2011, https://doi.org/10.1609/aaai.v25i1.7994, with the no-corner-cutting rules of their "Improving Jump
+  Point Search", ICAPS 2014, https://doi.org/10.1609/icaps.v24i1.13633) where it is exact: an orthogonal or isometric
+  grid whose open cells all cost the same, with `diagonal: 'no-corners'`. Elsewhere `findPath` is plain A* and returns
+  the same result as without it. From each expanded cell the search runs straight and diagonally until a cell where a
+  cheapest path may turn, and queues only those. Costs equal plain A*'s (600 random walled grids in
+  `test/path.test.js`); where several paths tie the cells may differ. Across an open 200 x 200 grid it expands 3 cells
+  against plain A*'s 9,679 (scanning 40,479), and past a wall across the room 6 against 27,208 (scanning 40,449).
+
+```js
+import { findPath } from 'margoengine/tilemap/path';
+const width = 200, height = 200;
+const cost = new Float64Array(width * height).fill(1);
+for (let y = 11; y < height; y++) cost[y * width + 100] = Infinity; // a wall with a gap at the top
+const grid = { width, height, cost };
+const plain = findPath(grid, [10, 190], [190, 190]);
+const jump = findPath(grid, [10, 190], [190, 190], { jumpPoints: true });
+console.log(plain.cost.toFixed(2), jump.cost.toFixed(2)); // 435.73 435.73
+console.log(plain.searched, jump.searched); // 27208 6
+```
+
 - Both run on the calling thread and allocate a few arrays of the grid's size per call.
 
 ## Field of view and fog of war
