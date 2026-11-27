@@ -50,6 +50,10 @@ export class QuayPotential {
   private readonly coarse?: QuayCoarseCorrection;
   private readonly coarseWork?: Float64Array;
   private readonly horizontalCorrection?: Float64Array;
+  private readonly basinOf?: Uint32Array;
+  private readonly basinSurfaceCount: readonly number[];
+  private readonly basinCorrection: Float64Array;
+  private readonly basinSumError: Float64Array;
 
   constructor(grid: QuayPotentialGrid) {
     const { cells, cellSize, depths, wet, openX, openZ, horizontalOrder = 2 } = grid ?? {};
@@ -128,7 +132,11 @@ export class QuayPotential {
     }
     this.nx = nx;
     this.iterationLimit = 8 * (nx + nz + layers) + 64;
-    this.requireSurfaceConnection();
+    const { basinOf, surfaceCounts } = this.connectedBasins();
+    this.basinOf = basinOf;
+    this.basinSurfaceCount = surfaceCounts;
+    this.basinCorrection = new Float64Array(surfaceCounts.length);
+    this.basinSumError = new Float64Array(surfaceCounts.length);
     if (count >= 2048 && (nx > 2 || nz > 2)) {
       const curtainX = new Uint8Array(plane),
         curtainZ = new Uint8Array(plane);
@@ -165,30 +173,42 @@ export class QuayPotential {
   private readonly nx: number;
   private readonly iterationLimit: number;
 
-  private requireSurfaceConnection(): void {
+  private connectedBasins(): { basinOf?: Uint32Array; surfaceCounts: number[] } {
     const { volumeCells: n, surfaceCells: plane, wet, east, north, down, nx } = this;
     const queued = new Uint8Array(n);
     const frontier = new Uint32Array(n);
+    const surfaceCounts: number[] = [];
+    let basinOf: Uint32Array | undefined;
+    let basin = -1;
     let end = 0;
     const enqueue = (i: number) => {
       if (queued[i]) return;
       queued[i] = 1;
       frontier[end++] = i;
+      if (basinOf) basinOf[i] = basin;
+      if (i < plane) surfaceCounts[basin]!++;
     };
-    for (let i = 0; i < plane; i++) if (wet[i]) enqueue(i);
-    if (end === 0) throw invalidLoad('Leave at least one free-surface cell open to the water.');
-    for (let start = 0; start < end; start++) {
-      const i = frontier[start]!;
-      if (east[i]) enqueue(i + 1);
-      if (east[i - 1]) enqueue(i - 1);
-      if (north[i]) enqueue(i + nx);
-      if (north[i - nx]) enqueue(i - nx);
-      if (down[i]) enqueue(i + plane);
-      if (down[i - plane]) enqueue(i - plane);
+    for (let seed = 0; seed < plane; seed++) {
+      if (!wet[seed] || queued[seed]) continue;
+      if (++basin === 1) basinOf = new Uint32Array(n);
+      surfaceCounts.push(0);
+      const begin = end;
+      enqueue(seed);
+      for (let start = begin; start < end; start++) {
+        const i = frontier[start]!;
+        if (east[i]) enqueue(i + 1);
+        if (east[i - 1]) enqueue(i - 1);
+        if (north[i]) enqueue(i + nx);
+        if (north[i - nx]) enqueue(i - nx);
+        if (down[i]) enqueue(i + plane);
+        if (down[i - plane]) enqueue(i - plane);
+      }
     }
+    if (end === 0) throw invalidLoad('Leave at least one free-surface cell open to the water.');
     for (let i = 0; i < n; i++)
       if (wet[i] && !queued[i])
         throw invalidLoad('Connect every wet pocket to the free surface or exclude it from the wave domain.');
+    return { basinOf, surfaceCounts };
   }
 
   /** Solve for the upward derivative of the potential. For potential in m²/s, give bulk fluxes in m³/s.
@@ -264,9 +284,59 @@ export class QuayPotential {
       throw invalidLoad(
         'The quay potential did not converge. Use a better-conditioned grid and consistent open faces.',
       );
-    for (let i = 0; i < plane; i++) out[i] = wet[i] ? (surface[i]! - potential[i]!) / (topDistance + surfaceLength) : 0;
+    this.balanceSurfaceMean(surface, out, source, topDistance + surfaceLength, face);
     bulk?.set(potential);
     return iterations;
+  }
+
+  private balanceSurfaceMean(
+    surface: Float64Array,
+    out: Float64Array,
+    source: Float64Array | undefined,
+    distance: number,
+    face: number,
+  ): void {
+    const {
+      active,
+      basinOf,
+      wet,
+      potential,
+      basinSurfaceCount,
+      basinCorrection: correction,
+      basinSumError: error,
+      surfaceCells: plane,
+    } = this;
+    correction.fill(0);
+    error.fill(0);
+    const add = (basin: number, term: number) => {
+      const value = term - error[basin]!;
+      const previous = correction[basin]!;
+      const next = previous + value;
+      error[basin] = next - previous - value;
+      correction[basin] = next;
+    };
+    const visits = active?.length ?? potential.length;
+    if (source) {
+      for (let at = 0; at < visits; at++) {
+        const i = active ? active[at]! : at;
+        if (source[i]) add(basinOf?.[i] ?? 0, -source[i]! / face);
+      }
+    }
+    for (let i = 0; i < plane; i++) {
+      const difference = wet[i] ? surface[i]! - potential[i]! : 0;
+      out[i] = difference;
+      if (wet[i]) add(basinOf?.[i] ?? 0, difference);
+    }
+    // Summing a basin cancels its internal faces. Solve the remaining uniform potential mode
+    // exactly from the Robin volume balance after the iterative relative-gradient solve.
+    for (let basin = 0; basin < basinSurfaceCount.length; basin++) correction[basin]! /= basinSurfaceCount[basin]!;
+    for (let i = 0; i < plane; i++) if (wet[i]) out[i] = (out[i]! - correction[basinOf?.[i] ?? 0]!) / distance;
+    if (correction.some((value) => value !== 0)) {
+      for (let at = 0; at < visits; at++) {
+        const i = active ? active[at]! : at;
+        if (wet[i]) potential[i]! += correction[basinOf?.[i] ?? 0]!;
+      }
+    }
   }
 
   private clearWet(out: Float64Array): void {

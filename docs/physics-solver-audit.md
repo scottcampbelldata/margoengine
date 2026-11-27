@@ -1492,6 +1492,15 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   the actual incident-only launch gives 11.64% RMS for the reflected return and 24.95% for the off-ray
   trace. These checks cover the local four-second crossing. The full trajectory and its wake remain unresolved.
 
+  The newer 4 m point-source run exposed a small accumulated free-surface volume defect when the net
+  volume crossed zero. The iterative residual retained a constant potential mode. The mean correction
+  in `coupling/loads-quay-mean-mode.test.js` balances the Robin volume independently in two sealed
+  basins, with and without signed sources. The regression fails on the old projection. On the exact
+  archived mask with a frozen diagnostic potential, the previous projection misses the volume sum by
+  8.67×10⁻⁹ m³. The corrected projection misses by at most 4.70×10⁻¹³ m³ in the two controls.
+  `coupling/loads-quay-wet-traversal.test.js` records exact dense versus indexed output and replay for
+  the same masked aperture. Its projection visits 581,952 active entries versus 1,496,448 dense entries.
+
   The 4 m full-history diagnostic used the same archived shutters and quay structure as the 8 m run,
   and both renderers sampled the accepted wave heights within 1.54×10⁻⁶ m. Wall peaks rose to 0.332 m
   and 0.311 m at the 67 and 71 s shutters from 0.200 m and 0.149 m at 8 m. Both stayed below the wall crest

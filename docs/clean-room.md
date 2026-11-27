@@ -18038,7 +18038,11 @@ Using the implicit midpoint update turns the top distance into `halfLayer + g dt
 volume matrix uses equal and opposite face fluxes. The volume kick changes surface potential energy by
 `rho g A delta (height + delta/2)`. The held surface pressure does work `-p A deltaHeight`. Perimeter
 damping removes elevation energy and records that change separately. The bulk and normal velocity at the
-endpoint follow from twice the harmonic midpoint extension minus the old one. Porter and Evans,
+endpoint follow from twice the harmonic midpoint extension minus the old one. Summing the
+finite-volume rows over one connected basin cancels every paired interior face. The remaining
+Robin flux integral equals the sum of its signed volume sources. Recover the uniform potential
+mode from that equation after the relative solve, using a compensated sum over the free surface
+and signed sources. Closed basins have separate means. Porter and Evans,
 *Complementary Approximations to Wave Scattering by Vertical Barriers* (1995), Table 1, is the continuum
 reference for the half-depth plate. No companion code or measured elevation entered these equations.
 [Craig and Sulem](https://doi.org/10.1006/jcph.1993.1164) ·

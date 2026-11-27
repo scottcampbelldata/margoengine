@@ -15420,10 +15420,17 @@ The default 60 Hz midpoint solves a Robin surface condition with preconditioned 
 wave evolution under held pressure. The source kick and forward sponge remain outside the stages. The
 option adds one f64 per surface cell in scratch and reuses the source buffers to publish the full step
 atomically. It retains pressure as the full-tick potential difference. The optional loads entry measures
-62,006 B gzip. Grids with
+62,520 B gzip. Grids with
 at least 2,048 volume cells can use a Galerkin coarse correction. The aggregates follow connected faces in
 each horizontal layer. Protected curtain faces remain distinct on both sides so their lower openings keep
 the original sum of conductances. Smaller grids use the same block-column solve directly.
+When at least half the volume is solid, the hot projection and fine-grid interpolation passes visit
+an ordered list of wet cells. The list adds four bytes per wet cell. Published depth and source
+arrays retain the rectangular layout.
+
+The potential's constant mode is recovered separately for each connected wet basin. The mean
+Robin flux equals the integrated signed source in that basin to floating-point precision. The
+iterative solve supplies the relative potential and interior gradients.
 Each unforced step uses one harmonic volume solve. A tick with submerged displacement uses one extra solve
 to transfer those signed volumes to the surface. The accepted normal flux and depth potential come from the
 same midpoint and previous state. The solver uses f64 for state and arithmetic. It retains the volume

@@ -52,8 +52,8 @@ test('wet-only quay traversals preserve dense projection, source work and byte-e
     assert.deepEqual(result, reference);
     assert.ok(result.iterations > 0 && result.bulk.some((value, i) => wet[i] && value !== 0));
     assert.ok(result.bulk.every((value, i) => wet[i] || Object.is(value, 0)));
-    // Includes setup, matrix clears and scatter, both column sweeps and both coarse transfers.
-    const sweeps = 17 + 18 * result.iterations;
+    // Includes setup, the matrix and column sweeps, coarse transfers and the basin mean recovery.
+    const sweeps = 18 + (forcing ? 1 : 0) + 18 * result.iterations;
     assert.equal(visits, sweeps * wetIndices.length);
     assert.ok(visits < (sweeps * wet.length) / 2);
     if (robin === 0.001)
