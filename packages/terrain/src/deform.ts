@@ -1,6 +1,7 @@
 /// <reference lib="esnext.disposable" preserve="true" />
-// Deformable ground for `Terrain` (entry `@margoengine/terrain/deform`): footprints, tyre tracks and trails pressed
-// into snow, mud and sand, kept in a deformation map that follows the camera and filled back in over time.
+// Deformable ground for `Terrain` and for ground meshes (entry `@margoengine/terrain/deform`): footprints, walking
+// trails, tyre tracks and trails pressed into snow, mud and sand, kept in a deformation map that follows the camera and
+// filled back in over time, or kept for good (`persist`).
 // The map is a square window of texels around the camera addressed toroidally, so a move rewrites only the rows and
 // columns it exposes (the clipmap's update: Tanner, Migdal and Jones 1998, "The Clipmap: A Virtual Mipmap", SIGGRAPH).
 // Prints are pressed on the GPU, the deepest one winning in each texel, and refilled by a fixed depth a second, as
@@ -10,10 +11,16 @@
 // ray down through the prints (parallax occlusion mapping: Tatarchuk 2006, "Dynamic Parallax Occlusion Mapping with
 // Approximate Soft Shadows", I3D, with the lateral reach capped as in Welsh 2004, "Parallax Mapping with Offset
 // Limiting") and shades the ground it meets with the print's slope as its normal, darkened where it is pressed.
-// Our own code from those descriptions. No vertex moves: the clipmap's cells are far wider than a footprint.
-import type { EngineKernel } from '@margoengine/core';
+// A ground mesh drawn by core's standard shader takes the same shading inside the per-pixel block the terrain package's
+// mesh patches share (mesh-patch.ts). Walking prints: step 0.75 m, 0.08 m between the feet's lines and toes out 7
+// degrees, after the means of M. P. Murray, A. B. Drought and R. C. Kory, "Walking patterns of normal men", J. Bone
+// Joint Surg. 46-A, 1964 (step 0.79 m, walking base 0.081 m, foot angle 7 degrees), a little shorter for loose ground.
+// Our own code from those descriptions. No vertex moves: the cells of a clipmap or a ground mesh are far wider than a
+// footprint.
+import type { EngineKernel, Mesh } from '@margoengine/core';
 import {
   engineRuntime,
+  meshRuntime,
   type Engine,
   type EnginePlugin,
   type FrameGraph,
@@ -21,6 +28,7 @@ import {
 } from '@margoengine/core/extension';
 import { MargoError } from '@margoengine/math/errors';
 import type { Terrain, TerrainLighting } from './index.js';
+import { openMeshBlock } from './mesh-patch.js';
 
 type DeformPassContext = Extract<PassContext, { backend: 'webgpu' }>;
 /** The shift of a terrain without a floating origin. */
@@ -60,6 +68,31 @@ export interface TerrainDeformationOptions {
    * `floatingOrigin`. Default the camera's position.
    */
   follow?: () => readonly [number, number];
+  /**
+   * Keeps every print for good: one the window leaves is pressed again when the window comes back to it, so prints
+   * laid once stay under a moving camera. Needs `fade` 0 (its default with `persist`). At most 16,384 prints and track
+   * pieces. Default false.
+   */
+  persist?: boolean;
+}
+/** Settings of {@link TerrainDeformation.walk}. Lengths are world units. */
+export interface TerrainWalk {
+  /** Distance along the path from one footfall to the next, above 0. Default 0.75. */
+  step?: number;
+  /** Distance between the left and the right feet's lines, 0 or more. Default 0.08. */
+  straddle?: number;
+  /** How far each foot turns outward, radians, -1.5 to 1.5. Default 0.12 (7 degrees). */
+  toeOut?: number;
+  /** Length of a foot, above 0. Default 0.28. */
+  length?: number;
+  /** Width of a foot, above 0. Default 0.11. */
+  width?: number;
+  /** Depth, 0 to the deformation's `depth`. Default the deformation's `depth`. */
+  depth?: number;
+  /** How unevenly the walker steps (spacing, line, heading and depth), 0 to 1. Default 0.5. */
+  jitter?: number;
+  /** Seed of the unevenness, an integer. Default 1. */
+  seed?: number;
 }
 /** A footprint: an ellipse pressed at a point. */
 export interface TerrainFootprint {
@@ -170,15 +203,56 @@ fn terrainDeformShift(i:Output)->Output {
   return j;
 }
 `;
+/** The most prints and track pieces `persist` keeps. */
+const KEPT = 16384;
+/** The footprint line of `TerrainColors`' mesh patch, and the end of each of its per-mesh surface calls. */
+const colorsLine = 'let terrainColorFootprint=max(length(dpdx(i.position)),length(dpdy(i.position)));',
+  colorsEnd = 'n=s.normal;}';
+/**
+ * Core's standard shader with mesh `id` shaded over its prints, bindings at `first` and `first + 1` of group 0. The
+ * relief is read with `textureLoad`, so no sampler is added. Colour patches that ran before it keep their colour: the
+ * print darkens it, bends the normal to the print's slope and presses their bumps (sand ripples) flat inside it.
+ */
+function meshShader(source: string, id: number, first: number): string {
+  const opened = openMeshBlock(source);
+  // Silent like the other optional core patches: without the standard shader the mesh keeps its look.
+  if (!opened) return source;
+  const { code } = opened,
+    colored = code.lastIndexOf(colorsEnd),
+    shared = code.indexOf(colorsLine),
+    at = colored >= 0 ? colored + colorsEnd.length : shared >= 0 ? shared + colorsLine.length : opened.at,
+    own = (
+      functions(0, 0)
+        .replace(`@binding(${BINDING})`, `@binding(${first})`)
+        .replace(`@binding(${BINDING + 1})`, `@binding(${first + 1})`)
+        .replace('textureSampleLevel(terrainDeformMap,terrainSampler,xz/f.z,0.0)', 'terrainDeformLoad(xz/f.z)') +
+      `fn terrainDeformLoad(uv:vec2f)->vec4f {
+  let size=vec2i(textureDimensions(terrainDeformMap));let p=fract(uv)*vec2f(size)-0.5;let lo=vec2i(floor(p));let t=p-vec2f(lo);
+  let a=(lo+size)%size;let b=(lo+1)%size;
+  return mix(mix(textureLoad(terrainDeformMap,a,0),textureLoad(terrainDeformMap,vec2i(b.x,a.y),0),t.x),mix(textureLoad(terrainDeformMap,vec2i(a.x,b.y),0),textureLoad(terrainDeformMap,b,0),t.x),t.y);
+}
+`
+    ).replace(/terrainDeform[A-Za-z]*/g, (name) => `${name}_${id}`);
+  const call = `if(i.terrainId==${id + 1}.0){let d=terrainDeformShift_${id}(i);let g=normalize(i.normal);n=normalize(mix(n,g,terrainDeformAt_${id}(d.position.xz).w)+d.normal-g);i.position=d.position;i.color*=terrainDeformTint_${id};}`;
+  return own + code.slice(0, at) + call + code.slice(at);
+}
+/** A repeatable value in -1..1 for step `k` of a walk (lowbias32 hash, C. Wellons, "Prospecting for Hash Functions"). */
+function unevenness(seed: number, k: number, channel: number): number {
+  let h = (Math.imul(seed, 0x9e3779b1) ^ Math.imul(k * 4 + channel + 1, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 0x7fffffff - 1;
+}
 const head = '@fragment fn fragment(i:Output)->@location(0) vec4f {',
   colorHead = 'fn terrainColor(position:vec3f,normal:vec3f)->vec3f {';
 let nextId = 0;
 
 /**
- * Deformable ground: footprints, tyre tracks and trails pressed into a terrain, kept in a deformation map that follows
- * the camera and filling back in over `fade` seconds. Prints are shown by the terrain's lit shader (parallax, the
- * print's slope as normal, darkening); the terrain's geometry, shadow and SSR capture are unchanged.
- * `TerrainDeformation.attach(engine, terrain, options)`, after the terrain's other effects; WebGPU only.
+ * Deformable ground: footprints, walking trails, tyre tracks and trails pressed into a terrain or a ground mesh, kept
+ * in a deformation map that follows the camera and filling back in over `fade` seconds (or kept, `persist`). Prints are
+ * shown by the ground's lit shader (parallax, the print's slope as normal, darkening); its geometry, shadow and SSR
+ * capture are unchanged. `TerrainDeformation.attach(engine, ground, options)`, after the ground's other effects; on a
+ * mesh drawn by core's standard shader (as `TerrainColors` draws one) the prints go over its colours. WebGPU only.
  * @throws RangeError from the constructor when an option is out of range, and from a print with a bad size.
  * @throws MargoError `'unsupported'` on a WebGL engine or a map larger than the device allows, `'disposed'` after
  * `dispose()`.
@@ -206,18 +280,29 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
   /** The shift the window centre was last written with (a floating origin's rebase rewrites it). */
   readonly #shift = new Float64Array(3);
   #pending: number[][] = [];
+  /** Every print so far under `persist`. */
+  readonly #kept: number[][] = [];
+  readonly #terrain?: Terrain;
+  readonly #mesh?: Mesh;
+  #meshSource = '';
+  #meshCode = '';
+  #meshBinding = 0;
   #clear = true;
   readonly #cache = new Map<string, string>();
   readonly #windowData = new ArrayBuffer(48);
   readonly #stampData = new ArrayBuffer(BATCH * 64);
 
   constructor(
-    private readonly terrain: Terrain,
+    ground: Terrain | Mesh,
     readonly options: TerrainDeformationOptions = {},
   ) {
-    const count = terrain?.options?.layers?.length;
-    if (!count || typeof terrain.addLighting !== 'function')
-      throw new TypeError('Invalid terrain deformation; pass a Terrain');
+    const mesh = typeof (ground as Partial<Mesh> | undefined)?.setGeometry === 'function',
+      terrain = mesh ? undefined : (ground as Terrain | undefined),
+      count = mesh ? 0 : (terrain?.options?.layers?.length ?? 0);
+    if (!mesh && (!count || typeof terrain!.addLighting !== 'function'))
+      throw new TypeError('Invalid terrain deformation; pass a Terrain or a ground Mesh');
+    this.#terrain = terrain;
+    this.#mesh = mesh ? (ground as Mesh) : undefined;
     const o = options ?? {},
       unit = (v: unknown) => typeof v === 'number' && v >= 0 && v <= 1,
       positive = (v: unknown) => typeof v === 'number' && v > 0 && Number.isFinite(v);
@@ -229,6 +314,8 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
       !positive(o.depth ?? 0.15) ||
       !unit(o.rim ?? 0.25) ||
       !(typeof (o.fade ?? 120) === 'number' && (o.fade ?? 120) >= 0 && Number.isFinite(o.fade ?? 120)) ||
+      !(o.persist === undefined || typeof o.persist === 'boolean') ||
+      (o.persist === true && (o.fade ?? 0) !== 0) ||
       !unit(o.softness ?? 1) ||
       !(o.layers === undefined || (Array.isArray(o.layers) && o.layers.length <= count && o.layers.every(unit))) ||
       !unit(o.darken ?? 0.25) ||
@@ -239,21 +326,25 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
       !(o.follow === undefined || typeof o.follow === 'function')
     )
       throw new RangeError(
-        'Invalid terrain deformation; give size 64..2048, texel, depth and distance above 0, rim, softness, darken and each layers entry 0..1 (at most one per terrain layer), fade 0 or more, steps 4..32 and follow as a function.',
+        'Invalid terrain deformation; give size 64..2048, texel, depth and distance above 0, rim, softness, darken and each layers entry 0..1 (at most one per terrain layer), fade 0 or more, steps 4..32 and follow as a function; persist needs fade 0.',
       );
     this.size = o.size ?? 1024;
     // With a floating origin the window's period (size times texel) must be the float32 the shader divides by, so the
     // texel is snapped to it (a relative change below 1e-7): CPU texel indices and GPU coordinates then agree at any
     // distance from zero.
-    this.texel = terrain.options.floatingOrigin
+    this.texel = terrain?.options.floatingOrigin
       ? Math.fround(this.size * (o.texel ?? 0.025)) / this.size
       : (o.texel ?? 0.025);
     this.depth = o.depth ?? 0.15;
   }
 
-  /** Attaches deformation to `terrain`, after its other effects. `dispose()` removes it. */
-  static attach(engine: EngineKernel, terrain: Terrain, options: TerrainDeformationOptions = {}): TerrainDeformation {
-    const deformation = new TerrainDeformation(terrain, options);
+  /** Attaches deformation to a terrain or a ground mesh, after its other effects. `dispose()` removes it. */
+  static attach(
+    engine: EngineKernel,
+    ground: Terrain | Mesh,
+    options: TerrainDeformationOptions = {},
+  ): TerrainDeformation {
+    const deformation = new TerrainDeformation(ground, options);
     engineRuntime(engine).use(deformation);
     return deformation;
   }
@@ -337,9 +428,79 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
     return this;
   }
 
-  /** Smooths every print away at the next frame. Returns this. */
+  /**
+   * Footprints of someone walking through each world (x, z) point in turn: left and right feet in turn, a heel and a
+   * forefoot each, toes turned out, unevenly spaced. Returns this.
+   * @throws RangeError for fewer than two points or a setting out of range.
+   */
+  walk(points: readonly (readonly [number, number])[], walk: TerrainWalk = {}): this {
+    const step = walk.step ?? 0.75,
+      straddle = walk.straddle ?? 0.08,
+      toeOut = walk.toeOut ?? 0.12,
+      length = walk.length ?? 0.28,
+      width = walk.width ?? 0.11,
+      jitter = walk.jitter ?? 0.5,
+      seed = walk.seed ?? 1;
+    if (
+      !Array.isArray(points) ||
+      points.length < 2 ||
+      !points.every((p) => Number.isFinite(p?.[0]) && Number.isFinite(p?.[1])) ||
+      !(step > 0 && Number.isFinite(step)) ||
+      !(straddle >= 0 && Number.isFinite(straddle)) ||
+      !(Math.abs(toeOut) <= 1.5) ||
+      !(jitter >= 0 && jitter <= 1) ||
+      !Number.isInteger(seed)
+    )
+      throw new RangeError(
+        'Invalid terrain walk; pass two or more finite [x, z] points, step above 0, straddle 0 or more, toeOut -1.5 to 1.5, jitter 0 to 1 and an integer seed.',
+      );
+    this.#check([toeOut], length, width, walk.depth);
+    const depth = this.#depthOf(walk.depth);
+    // The distance to the next footfall, carried from segment to segment.
+    let next = step / 2,
+      k = 0;
+    for (let i = 1; i < points.length; i++) {
+      const [ax, az] = points[i - 1]!,
+        [bx, bz] = points[i]!,
+        run = Math.hypot(bx - ax, bz - az);
+      if (!run) continue;
+      const along = Math.atan2(bz - az, bx - ax),
+        fx = Math.cos(along),
+        fz = Math.sin(along);
+      for (; next <= run; k++) {
+        // Left is -z for a walker heading +x, seen from above.
+        const side = k % 2 ? 1 : -1,
+          off = side * (straddle / 2) + 0.04 * jitter * unevenness(seed, k, 0),
+          x = ax + fx * next - fz * off,
+          z = az + fz * next + fx * off,
+          angle = along + side * toeOut + 0.1 * jitter * unevenness(seed, k, 1),
+          d = depth * (1 - 0.35 * jitter * Math.abs(unevenness(seed, k, 2))),
+          cx = Math.cos(angle),
+          cz = Math.sin(angle);
+        // The heel and the ball of the foot, the heel a little shallower than the push off.
+        this.footprint(x - cx * length * 0.31, z - cz * length * 0.31, {
+          angle,
+          length: length * 0.38,
+          width: width * 0.8,
+          depth: d * 0.85,
+        });
+        this.footprint(x + cx * length * 0.18, z + cz * length * 0.18, {
+          angle,
+          length: length * 0.64,
+          width,
+          depth: d,
+        });
+        next += step * (1 + 0.12 * jitter * unevenness(seed, k, 3));
+      }
+      next -= run;
+    }
+    return this;
+  }
+
+  /** Smooths every print away at the next frame, kept ones too. Returns this. */
   clear(): this {
     this.#pending = [];
+    this.#kept.length = 0;
     this.#clear = true;
     return this;
   }
@@ -378,7 +539,29 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
   }
 
   #queue(record: number[]): void {
+    if (this.options.persist) {
+      if (this.#kept.length >= KEPT)
+        throw new RangeError(`Terrain deformation keeps at most ${KEPT} prints under persist; clear() or lay fewer`);
+      this.#kept.push(record);
+    }
     this.#pending.push(record);
+  }
+
+  /** Queues again each kept print the window at `origin` reaches that the window at `previous` did not hold whole. */
+  #restore(origin: readonly number[], previous?: readonly number[]): void {
+    const n = this.size,
+      waiting = new Set(this.#pending);
+    for (const r of this.#kept) {
+      const [x, z, w, h] = [r[12]!, r[13]!, r[14]!, r[15]!],
+        reaches = x < origin[0]! + n && x + w > origin[0]! && z < origin[1]! + n && z + h > origin[1]!,
+        held =
+          !!previous &&
+          x >= previous[0]! &&
+          x + w <= previous[0]! + n &&
+          z >= previous[1]! &&
+          z + h <= previous[1]! + n;
+      if (reaches && !held && !waiting.has(r)) this.#pending.push(r);
+    }
   }
 
   setup(engine: Engine): void {
@@ -426,7 +609,7 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
     // Until the first frame places the window, the frame's extent puts every fragment outside it.
     const o = this.options,
       frame = new Float32Array(44),
-      layers = this.terrain.options.layers.length;
+      layers = this.#terrain?.options.layers.length ?? 0;
     frame.set([1e30, 1e30, n * this.texel, n], 0);
     frame.set([o.distance ?? 40, o.steps ?? 12, o.darken ?? 0.25, this.depth], 4);
     frame.set([this.depth * (o.rim ?? 0.25), o.softness ?? 1, 0, 0], 8);
@@ -441,7 +624,10 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
       { binding: BINDING, resource: { buffer: this.#frame } },
       { binding: BINDING + 1, resource: this.#relief.createView() },
     ];
-    this.#remove ??= this.terrain.addLighting(this);
+    if (this.#terrain) this.#remove ??= this.#terrain.addLighting(this);
+    else if (meshRuntime(this.#mesh!).engine !== engine)
+      throw new MargoError('attached', "The ground mesh belongs to another engine; attach to the mesh's engine");
+    this.#meshSource = '';
   }
 
   registerPasses(graph: FrameGraph): void {
@@ -453,13 +639,34 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
         if (c.backend === 'webgpu' && !(c.view?.index ?? 0)) this.#run(c);
       },
     });
+    if (!this.#mesh) return;
+    graph.add({
+      name: this.name + ':mesh',
+      // After TerrainColors (-1), so the prints go over its colours; before the shadow and lighting patches.
+      order: -0.5,
+      execute: (c) => {
+        if (c.backend !== 'webgpu' || this.disposed || !this.#entries.length) return;
+        const mesh = meshRuntime(this.#mesh!);
+        mesh.check();
+        if (this.#meshSource !== c.shader) {
+          let first = 44;
+          while (c.bindings.some((e) => e.binding === first || e.binding === first + 1)) first++;
+          this.#meshSource = c.shader;
+          this.#meshBinding = first;
+          this.#meshCode = meshShader(c.shader, mesh.id, first);
+        }
+        if (this.#meshCode === c.shader) return;
+        this.#entries.forEach((e, i) => c.bindings.push({ binding: this.#meshBinding + i, resource: e.resource }));
+        c.shader = this.#meshCode;
+      },
+    });
   }
 
   #run(c: DeformPassContext): void {
     if (this.disposed || !this.#pipelines) return;
     const n = this.size,
-      floating = !!this.terrain.options.floatingOrigin,
-      shift = floating ? this.terrain.shift : NO_SHIFT,
+      floating = !!this.#terrain?.options.floatingOrigin,
+      shift = floating ? this.#terrain!.shift : NO_SHIFT,
       // `follow` gives world XZ; the camera is local to a floating origin.
       centre =
         this.options.follow?.() ??
@@ -475,9 +682,12 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
       first = this.#clear,
       rebased = floating && (this.#shift[0] !== shift[0] || this.#shift[2] !== shift[2]),
       moved = previous[0] !== origin[0] || previous[1] !== origin[1] || !this.#origin,
-      fade = this.options.fade ?? 120,
-      fill = fade > 0 ? (this.depth * Math.max(c.delta, 0)) / fade : 0,
-      count = Math.min(this.#pending.length, BATCH);
+      fade = this.options.fade ?? (this.options.persist ? 0 : 120),
+      fill = fade > 0 ? (this.depth * Math.max(c.delta, 0)) / fade : 0;
+    // A cleared map takes every kept print in reach; a move takes the ones it exposes. Pressing one twice changes
+    // nothing: each texel keeps the deepest.
+    if (this.options.persist && (first || moved)) this.#restore(origin, first ? undefined : previous);
+    const count = Math.min(this.#pending.length, BATCH);
     if (rebased || (moved && floating)) {
       // The window's centre as a local point, and the shift modulo the window's period: the shader reads the relief at
       // (local + wrap) / period, the world texel's slot.
@@ -558,7 +768,7 @@ export class TerrainDeformation implements EnginePlugin, TerrainLighting {
     if (code.split(colorHead).length === 2)
       code = code.replace(colorHead, 'fn terrainColorUndeformed(position:vec3f,normal:vec3f)->vec3f {');
     code =
-      (this.terrain.options.floatingOrigin
+      (this.#terrain!.options.floatingOrigin
         ? functions(group, painted).replace('xz/f.z,0.0)', '(xz+terrainDeform.extra.zw)/f.z,0.0)')
         : functions(group, painted)) +
       code +

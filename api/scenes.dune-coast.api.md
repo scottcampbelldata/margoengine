@@ -8,6 +8,7 @@ import { GTAO } from "@margoengine/post";
 import { GrassScatter } from "@margoengine/scatter/grass";
 import { Shadows } from "@margoengine/shadows";
 import { PresetScene } from "@margoengine/sky/scenes";
+import { TerrainDeformation } from "@margoengine/terrain/deform";
 import { BlownSand } from "@margoengine/vfx/blown-sand";
 import { Water } from "@margoengine/water";
 
@@ -42,6 +43,7 @@ export interface DuneCoastScene extends Disposable {
         readonly shadows: Shadows;
         readonly grass?: GrassScatter;
         readonly occlusion?: GTAO;
+        readonly footprints?: TerrainDeformation;
         readonly blownSand?: BlownSand;
     };
     dispose(): void;
@@ -74,6 +76,7 @@ export interface DuneCoastSettings {
     readonly shedWeathering?: number;
     readonly shedWindows?: boolean;
     readonly occlusion?: number;
+    readonly footprints?: number;
     readonly heights?: DuneCoastHeights;
     readonly blownSand?: number;
     readonly quality?: 'film' | 'preview';

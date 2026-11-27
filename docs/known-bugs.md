@@ -5604,6 +5604,21 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **After:** GTAO 0.999 mean, 0.995 least; SSAO 0.823 and 0.797 (its range check still counts the slats a little).
 - **Regression:** `packages/post/test/ssao-silhouette-browser.mjs`, WebGPU and the WebGL2 layer.
 
+### Fixed 2026-11-27: the dune coast's sand carried no footprints (KB-SCENES-PRINTS1, terrain and scenes)
+
+- **Repro (before):** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --views=camp-buildings`: the
+  sand between the camp and the rail was untrodden, where LC-W86-15 and LC-W86-38 show it walked over.
+- **Cause:** `TerrainDeformation` took only a clipmap `Terrain`; the scene's ground is a mesh with `TerrainColors`, its
+  cells 2.15 m wide, so no print could be pressed in it.
+- **Fix:** `TerrainDeformation` attaches to a ground mesh (core's standard shader, `openMeshBlock`), lays walking
+  trails (`walk`) and keeps prints under a moving camera (`persist`); the dune coast's `footprints` setting (default 1)
+  treads them between the sheds, to the rail and along it. Parallax occlusion mapping after Tatarchuk, I3D 2006
+  (https://doi.org/10.1145/1111411.1111423); gait means of Murray, Drought and Kory, J. Bone Joint Surg. 46-A, 1964, as
+  tabled at https://ouhsc.edu/bserdac/dthompso/web/gait/KNMATICS/stride.htm.
+- **Weak spots:** prints are shading, with no shadow of their own and no broken sand round them; the ripples' colour
+  bands still cross a print (their relief does not); at 20 m and eye height a print is about a pixel tall.
+- **Regression:** `packages/terrain/test/deform-mesh.browser.mjs` and `packages/terrain/test/deform.test.js`.
+
 ### Open 2026-11-16: the dune-coast scene does not yet look like the 1903 photographs (KB-SKY-OVERCAST1, KB-SCENES-GRASS1, KB-TERRAIN-SAND2, KB-WATER-SURF1; sky, scenes, terrain, water)
 
 - **Repro:** `node packages/scenes/test/dune-coast-still.mjs --w=1920 --h=1080 --out=<folder>` and compare the seven
@@ -5611,7 +5626,8 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **What differs:** (1) fixed 2026-11-17 (KB-SKY-OVERCAST1): the overcast sky was a 2D cloud sheet with dark holes, an
   orange glow toward the sun and the sun disc showing, with a dark brown band at the horizon, where the photographs show
   an even pale grey deck and a pale haze; (2) fixed 2026-11-16: no grass blade rendered on the hummocks; (3) fixed 2026-11-16: the sand was smooth mottled colour with no ripples or
-  wind streaks (footprints and scour stay open); (4) the sea is flat grey with a white band at the waterline and no breaking lines;
+  wind streaks; fixed 2026-11-27: footprints trodden round the camp and the rail (`footprints`, KB-SCENES-PRINTS1); wind scour
+  stays open; (4) the sea is flat grey with a white band at the waterline and no breaking lines;
   (5) fixed 2026-11-27 (KB-SCENES-SHEDBOX1): the sheds read as plain boxes at 60 m (no wood texture, no dark interior
   through the open door).
 - **Cause:** (1) at full cover the sheet was still its shape noise (holes), its opacity let the disc and Preetham's

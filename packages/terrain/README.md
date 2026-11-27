@@ -1152,6 +1152,34 @@ snow.trail([[0, -3], [1, -3.5], [2, -3.2]], {width: 0.5, depth: 0.04});  // a sl
 engine.start();
 ```
 
+**Ground meshes, walking and kept prints.** `TerrainDeformation.attach(engine, mesh, options)` shades a ground mesh
+drawn by core's standard shader the same way, over `TerrainColors` if it has them (attach it after them): the print
+darkens their colour, takes its own slope as normal and presses their ripples flat. `walk(points, options)` lays the
+footprints of someone walking through the points: left and right in turn, a heel and a forefoot each, `step` 0.75 m,
+`straddle` 0.08 m between the feet's lines, `toeOut` 0.12 radians, feet `length` 0.28 by `width` 0.11 m, unevenly by
+`jitter` 0.5 from `seed` 1 (the means of Murray, Drought and Kory, J. Bone Joint Surg. 46-A, 1964, a little shorter
+for loose ground). `persist: true` keeps every print: one the map leaves is pressed again when the map returns (needs
+`fade` 0, its default then; at most 16,384 prints and track pieces). Real-GPU check, WebGPU and the WebGL2 layer:
+`node packages/terrain/test/deform-mesh.browser.mjs`.
+
+```ts
+import {Engine, PbrMaterial} from 'margoengine/core';
+import {heightfield, TerrainColors} from 'margoengine/terrain';
+import {TerrainDeformation} from 'margoengine/terrain/deform';
+
+const engine = await Engine.create(document.querySelector('canvas')!, {
+  camera: {position: [0, 1.6, 4], target: [0, 0, -2]},
+});
+const ground = engine
+  .createMesh()
+  .setGeometry(heightfield((x, z) => 0.1 * Math.sin(x / 3) * Math.cos(z / 4), {size: [40, 40]}))
+  .setMaterial(new PbrMaterial({color: [0.52, 0.46, 0.35], roughness: 0.92}));
+TerrainColors.attach(engine, ground, {sand: [0.52, 0.46, 0.35], shore: [80, 90]});
+const prints = TerrainDeformation.attach(engine, ground, {depth: 0.045, darken: 0.22, persist: true});
+prints.walk([[0.5, 3], [-0.5, -2], [1.5, -8]], {seed: 7});
+engine.start();
+```
+
 - A print is pressed on the GPU at the next frame: a footprint is an ellipse (`length` 0.28 and `width` 0.11 by
   default, turned by `angle`), a track a band of `width` with round ends; the full depth reaches 55% of the way to
   the edge and falls smoothly to 0 there, and the rim peaks at 1.2 times the half size. Each texel keeps the deepest

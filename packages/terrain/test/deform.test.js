@@ -190,3 +190,92 @@ test('a map larger than the device allows is refused, and a WebGL engine', () =>
   assert.throws(() => new TerrainDeformation(terrain, {}).setup({ gpu: gpu.device }), /larger than this device/);
   assert.throws(() => new TerrainDeformation(terrain, {}).setup({}), /requires WebGPU/);
 });
+
+test('a walk presses a heel and a forefoot for each step, left and right in turn', () => {
+  const r = rig({ persist: true, depth: 0.04 });
+  r.frame();
+  r.deformation.walk(
+    [
+      [0, 0],
+      [7.5, 0],
+    ],
+    { step: 0.75, straddle: 0.1, toeOut: 0.12, jitter: 0 },
+  );
+  // Ten footfalls at 0.375, 1.125, ... 7.125 m, two ellipses each.
+  assert.equal(r.deformation.pending, 20);
+  const stamps = writes(r.frame()).find((b) => b.length === 20 * 64),
+    word = (k, i) => stamps.readFloatLE(k * 64 + i * 4),
+    box = (k, i) => stamps.readInt32LE(k * 64 + 48 + i * 4),
+    centre = (k) => [box(k, 0) * 0.025 + word(k, 4), box(k, 1) * 0.025 + word(k, 5)],
+    near = (a, b) => assert.ok(Math.abs(a - b) < 1e-4, `${a} against ${b}`);
+  for (let step = 0; step < 10; step++) {
+    const left = step % 2 === 0,
+      angle = left ? -0.12 : 0.12,
+      z = left ? -0.05 : 0.05,
+      heel = step * 2;
+    for (const [k, along, depth] of [
+      [heel, -0.31 * 0.28, 0.034],
+      [heel + 1, 0.18 * 0.28, 0.04],
+    ]) {
+      near(centre(k)[0], 0.375 + 0.75 * step + along * Math.cos(angle));
+      near(centre(k)[1], z + along * Math.sin(angle));
+      near(word(k, 1), depth);
+      near(word(k, 8), Math.cos(angle));
+      near(word(k, 9), Math.sin(angle));
+    }
+  }
+  for (const bad of [
+    [[[0, 0]]],
+    [
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      { step: 0 },
+    ],
+    [
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      { toeOut: 2 },
+    ],
+    [
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      { jitter: 2 },
+    ],
+    [
+      [
+        [0, 0],
+        [1, 0],
+      ],
+      { seed: 0.5 },
+    ],
+  ])
+    assert.throws(() => r.deformation.walk(...bad), RangeError, JSON.stringify(bad));
+});
+
+test('persist presses a kept print again when the window comes back to it, and needs no fading', () => {
+  const terrain = new Terrain(terrainOptions(false));
+  assert.throws(() => new TerrainDeformation(terrain, { persist: true, fade: 10 }), RangeError);
+  assert.throws(() => new TerrainDeformation(terrain, { persist: 1 }), RangeError);
+  const r = rig({ persist: true, size: 64, texel: 0.025 });
+  r.deformation.footprint(0, 0);
+  r.frame();
+  assert.equal(r.deformation.pending, 0);
+  const stamped = (log) => writes(log).filter((b) => b.length === 64).length;
+  r.camera.position = [0.1, 2, 0];
+  assert.equal(stamped(r.frame()), 0, 'a print the window kept whole is not pressed again');
+  r.camera.position = [40, 2, 0];
+  assert.equal(stamped(r.frame()), 0, 'out of reach');
+  r.camera.position = [0, 2, 0];
+  assert.equal(stamped(r.frame()), 1, 'back in the window');
+  r.deformation.clear();
+  r.camera.position = [40, 2, 0];
+  r.frame();
+  r.camera.position = [0, 2, 0];
+  assert.equal(stamped(r.frame()), 0, 'cleared');
+});

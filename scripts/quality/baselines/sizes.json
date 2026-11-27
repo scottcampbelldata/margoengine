@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21064306,
+  "total": 21066973,
   "history": [
     {
       "date": "2026-10-24",
@@ -14827,6 +14827,12 @@
       "commit": "tilemap-replan-hpa",
       "reason": "new entries @margoengine/tilemap/replan (D* Lite replanning, 2,560 B gzip, ceiling 2,816) and /hpa (hierarchical paths, 4,222 B, ceiling 4,478). The grid helpers moved to a module the three search entries share (tilemap/path 3,273 -> 3,279 B). Inside path they would have put both searches in every app that asks for one path. Core and stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "kb-scenes-prints1",
+      "reason": "terrain/deform shades a ground mesh as well as a terrain, lays walking trails (walk) and keeps prints (persist): 5,233 to 7,057 B gzip; scenes/dune-coast treads footprints round the camp and the rail (KB-SCENES-PRINTS1): 6,507 to 6,914 B. One class serves both grounds, sharing the map, its compute steps and the shading; a separate mesh entry would have shipped them twice",
+      "grew": 2
     }
   ],
   "items": {
@@ -15982,7 +15988,7 @@
     "@margoengine/scene/mesh": 2123,
     "@margoengine/scene/tags": 2932,
     "@margoengine/scenes": 4642,
-    "@margoengine/scenes/dune-coast": 6742,
+    "@margoengine/scenes/dune-coast": 7170,
     "@margoengine/scenes/fauld-blast": 10004,
     "@margoengine/scenes/fauld-countryside": 8214,
     "@margoengine/scenes/fauld-crater": 8214,
@@ -16231,7 +16237,7 @@
     "@margoengine/taa/upscale-velocity": 22375,
     "@margoengine/terrain": 17938,
     "@margoengine/terrain/blend": 3634,
-    "@margoengine/terrain/deform": 5488,
+    "@margoengine/terrain/deform": 7313,
     "@margoengine/terrain/displace": 4701,
     "@margoengine/terrain/dunes": 2250,
     "@margoengine/terrain/far": 3798,

@@ -137,6 +137,13 @@ test('grass colour, height, clump and variety, crest sharpness and sand bands ar
   assert.ok(fuller > 0.4, `sharp brink adds ${fuller} m over the crest`);
 });
 
+// KB-SCENES-PRINTS1: the sand round the camp is trodden by default; 0 leaves it untouched.
+test('footprints is a setting from 0 to 1, trodden by default', () => {
+  assert.equal(info.settings.footprints.default, 1);
+  assert.throws(() => attach({}, { footprints: 2 }), RangeError);
+  assert.throws(() => attach({}, { footprints: -0.1 }), RangeError);
+});
+
 test('the shed overhang, weathering and windows are settings with the old sheds as default', () => {
   assert.equal(info.settings.shedOverhang.default, 0.2);
   assert.equal(info.settings.shedWeathering.default, 0.5);

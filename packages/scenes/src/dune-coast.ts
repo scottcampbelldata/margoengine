@@ -12,6 +12,7 @@ import { generateLaunchRail, generatePlankShed, shedBoardMap } from '@margoengin
 import { createMesh, Material, Texture } from '@margoengine/materials';
 import { weatheredWood } from '@margoengine/materials/presets';
 import { heightfieldGeometry, TerrainColors, TerrainHeightmap } from '@margoengine/terrain';
+import { TerrainDeformation } from '@margoengine/terrain/deform';
 import { duneField, duneHill } from '@margoengine/terrain/dunes';
 import { DAY_PRESETS } from '@margoengine/sky/day-presets';
 import { PresetScene, SCENE_PRESETS } from '@margoengine/sky/scenes';
@@ -102,6 +103,12 @@ export interface DuneCoastSettings {
    * once registered: `scene.parts.occlusion?.add(model)`.
    */
   readonly occlusion?: number;
+  /**
+   * Footprints trodden into the sand with the camp: between the sheds, to and fro between the camp and the launch rail
+   * and along the rail (`TerrainDeformation` of @margoengine/terrain/deform), 0 (none) to 1 their depth, 4.5 cm at 1.
+   * Needs `camp`. They show within 45 m of the camera. Default 1.
+   */
+  readonly footprints?: number;
   /** Real ground heights in place of the built landform. */
   readonly heights?: DuneCoastHeights;
   /**
@@ -152,6 +159,8 @@ export interface DuneCoastScene extends Disposable {
     readonly grass?: GrassScatter;
     /** The ambient occlusion pass, first in `preset.post`; absent when `occlusion` is 0. */
     readonly occlusion?: GTAO;
+    /** The trodden footprints, absent without `camp` or with `footprints` 0; `walk` lays more. */
+    readonly footprints?: TerrainDeformation;
     /** The wind-blown sand, when `blownSand` is above 0, once `ready` has settled. */
     readonly blownSand?: BlownSand;
   };
@@ -164,6 +173,65 @@ export const info = duneCoastInfo;
 let clockId = 0;
 const SHORE_X = 900;
 const GROUND = { origin: [-900, -800] as const, size: [2200, 2000] as const };
+/**
+ * Where the camp's people walked, world (x, z): between the sheds' doors, out to the rail and back by another way, up
+ * both sides of the rail and in from the south along the flight line.
+ */
+const TRAILS: readonly (readonly (readonly [number, number])[])[] = [
+  [
+    [-86.9, 27],
+    [-79, 24.5],
+    [-71, 27.2],
+  ],
+  [
+    [-69.5, 27],
+    [-52, 17],
+    [-31, 8.5],
+    [-11, 2.5],
+    [-1.6, 0.8],
+  ],
+  [
+    [-1.4, -2.4],
+    [-13, 3.6],
+    [-33, 12],
+    [-56, 20.5],
+    [-71, 26.4],
+  ],
+  [
+    [-68, 25.5],
+    [-45, 6],
+    [-22, -6],
+    [-2.2, -9],
+  ],
+  [
+    [1.2, 2.5],
+    [1.5, -7],
+    [1.1, -19.5],
+    [-1.1, -20.5],
+    [-1.3, -9],
+    [-1.6, 1.5],
+  ],
+  [
+    [-2.5, -46],
+    [-1.4, -31],
+    [-1.2, -21],
+  ],
+  [
+    [-0.4, -20],
+    [-3.5, -12],
+    [-2.8, -4],
+    [3.5, 3],
+    [6.5, 5.5],
+  ],
+  // From the camp to the flight line, past the north-east side of the yard.
+  [
+    [-70, 26],
+    [-55, 9],
+    [-43.5, -7],
+    [-30, -14],
+    [-6, -15.5],
+  ],
+];
 
 function check(settings: DuneCoastSettings): DuneCoastScene['settings'] {
   if (typeof settings !== 'object' || settings === null) throw new TypeError('dune-coast: pass settings as an object.');
@@ -594,6 +662,28 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
       else stop();
     });
   }
+  // Trodden sand: the prints stay as the camera moves, the map reaching ahead of it.
+  let footprints: TerrainDeformation | undefined;
+  if (s.camp && s.footprints > 0) {
+    footprints = TerrainDeformation.attach(engine, ground, {
+      size: film ? 2048 : 1024,
+      depth: 0.045 * s.footprints,
+      rim: 0.3,
+      darken: 0.22,
+      distance: 45,
+      persist: true,
+      follow: () => {
+        const [x, , z] = engine.camera.position,
+          [tx, , tz] = engine.camera.target,
+          d = Math.hypot(tx - x, tz - z),
+          k = d > 0 ? Math.min(1, (film ? 20 : 10) / d) : 0;
+        return [x + (tx - x) * k, z + (tz - z) * k];
+      },
+    });
+    const prints = footprints;
+    disposers.push(() => prints.dispose());
+    TRAILS.forEach((trail, i) => prints.walk(trail, { seed: s.seed + i }));
+  }
   // The camp: the 1903 hangar (44 by 16 ft, horizontal boards, awning doors) and the 1901 shed (25 by 16 ft, vertical
   // boards, steeper roof) side by side 70 m west of the rail; the rail runs north from (0, 0) into the wind.
   if (s.camp) {
@@ -781,6 +871,7 @@ export function attach(engine: EngineKernel, settings: DuneCoastSettings = {}): 
       shadows,
       grass,
       occlusion,
+      footprints,
       get blownSand() {
         return blownSand;
       },

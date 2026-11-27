@@ -112,6 +112,7 @@ The page `examples/dune-coast/index.html` shows the scene and is ready for the s
 | `shedWindows` | false | | two windows in the hangar's back wall and one in each shed's end wall |
 | `occlusion` | 1.5 | 0 to 10 m | reach of the ambient occlusion (`GTAO` of `@margoengine/post`, first in the post stack; 0 for none): the eaves, battens, rail and grass feet shut out the grey sky's light |
 | `heights` | built landform | `{samples, width, depth, cellSize, origin, sea}` | real heights, such as a USGS 3DEP 1 m bare-earth grid (heights at or below `sea` are lowered under the water) |
+| `footprints` | 1 | 0 to 1 | footprints trodden between the sheds, to the launch rail and along it, 4.5 cm deep at 1 (`TerrainDeformation` of `@margoengine/terrain/deform` on the ground mesh; they show within 45 m of the camera and need `camp`; `scene.parts.footprints?.walk(points)` lays more) |
 | `blownSand` | 0 | 0 to 1 | sand blowing off the crests and over the dry sand (`BlownSand` from `@margoengine/vfx/blown-sand`), wherever the wind with its gusts is over 6.6 m/s; none on the wet beach or in the grass |
 | `quality` | `'film'` | `'film'`, `'preview'` | ground cells, sea segments, shadow map and grass count |
 | `seed` | 1903 | | seed of the hummocks and small dunes |
