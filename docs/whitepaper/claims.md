@@ -6693,7 +6693,8 @@ Claim: `WeightedAnyAngleSearch` returns a path over weighted ground with its cos
 under; on the seeded test maps the path is within 1 percent of the least cost, and on 400 polygon maps the default work
 proves every answer to 5 percent. On larger meshes the bound is not always close: its limits
 row gives the measured gaps.
-Proof: `packages/navmesh/test/weighted-any-angle.test.js` checks both against convex descent (Snell's law strips), a
+Proof: `packages/navmesh/test/weighted-any-angle.test.js` checks both against convex descent (Snell's law strips and a
+bend close by a vertex), a
 dense Steiner graph oracle and the exact search on even ground.
 
 ## Exact any-angle navmesh paths (navmesh/any-angle)

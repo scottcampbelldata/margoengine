@@ -61,6 +61,9 @@ const ON = 1e-6;
 /** Where on each portal the first search for a path stands, as fractions of it. */
 const SAMPLES = Array.from({ length: 17 }, (_, i) => i / 16);
 
+/** How many chain points on each side of a vertex move with it while its other side is tried. */
+const NEAR_BY = 8;
+
 /** Squared XZ distance from (x, z) to the segment from (ax, az) to (bx, bz). */
 function gap2(x: number, z: number, ax: number, az: number, bx: number, bz: number): number {
   const dx = bx - ax,
@@ -118,12 +121,15 @@ class Ground {
       let portal = this.known.get(key);
       if (portal === undefined) {
         portal = this.portals.length;
-        this.portals.push({ a: left, b: right, sides: [] });
+        // Ends in one order whichever side found it first, so an answer does not hang on what was searched before.
+        const turned = (right[0] - left[0] || right[2] - left[2] || right[1] - left[1]) < 0;
+        this.portals.push({ a: turned ? right : left, b: turned ? left : right, sides: [] });
         this.known.set(key, portal);
       }
       const { sides } = this.portals[portal];
       if (open && !sides.includes(p)) sides.push(p);
       if (!sides.includes(link.to)) sides.push(link.to);
+      sides.sort((x, y) => x - y);
       doors.push({ portal, to: link.to });
     }
     this.doors.set(p, doors);
@@ -146,6 +152,35 @@ class Ground {
           seen.add(to);
           found.push(to);
         }
+    return found;
+  }
+
+  /**
+   * The ways from polygon `from` to polygon `to` through portals that hold the point `at`, no polygon twice: each is
+   * the portals crossed and the polygon each one leads into. A mesh vertex has one such way round each of its sides.
+   */
+  ways(at: Vec3, from: number, to: number): { portal: number; to: number }[][] {
+    const found: { portal: number; to: number }[][] = [],
+      way: { portal: number; to: number }[] = [],
+      seen = new Set([from]);
+    // A fan has two ways; the budget only stops a heap of sheets meeting in one point.
+    let budget = 256;
+    const walk = (p: number) => {
+      if (p === to) {
+        found.push([...way]);
+        return;
+      }
+      for (const door of this.doorsOf(p)) {
+        const { a, b } = this.portals[door.portal];
+        if (seen.has(door.to) || !touches(at, a, b) || budget-- <= 0) continue;
+        seen.add(door.to);
+        way.push(door);
+        walk(door.to);
+        way.pop();
+        seen.delete(door.to);
+      }
+    };
+    walk(from);
     return found;
   }
 
@@ -190,10 +225,24 @@ interface Jump {
   cost: number;
 }
 
-/** A feasible path: its corners, the crossings among them and what it costs. */
+/** One point of a chain to pull tight: a fixed point (`portal` -1) or a place on a portal. */
+interface Step {
+  portal: number;
+  a: Vec3;
+  b: Vec3;
+  /** Where on the portal it starts from, 0 at `a` and 1 at `b`. */
+  t: number;
+  /** The polygon walked to reach it, or -1: the start and an off-mesh crossing. */
+  through: number;
+}
+
+/** A feasible path: a chain pulled tight and what it costs, off-mesh crossings included. */
 interface Walk {
-  points: Vec3[];
-  offMesh: number[];
+  steps: Step[];
+  /** Where each step ended up, as a point and as a place on its portal. */
+  at: Vec3[];
+  t: Float64Array;
+  crossings: number;
   cost: number;
 }
 
@@ -456,60 +505,110 @@ class Round {
     const states: number[] = [];
     for (let at = 2; at >= 0; at = parent[at]) states.push(at);
     states.reverse();
-    const chain = states.map((state) => state >> 1);
-    const a: Vec3[] = [],
-      b: Vec3[] = [],
-      weight: number[] = [],
-      t = new Float64Array(chain.length);
     let crossings = 0;
-    chain.forEach((id, i) => {
-      const node = this.nodes[id],
-        portal = node.portal < 0 ? null : portals[node.portal];
-      a.push(portal ? portal.a : node.a);
-      b.push(portal ? portal.b : node.a);
-      t[i] = portal ? (node.low + node.high) / 2 : 0;
-      const p = i ? through[states[i]] : -1;
-      weight.push(i && p >= 0 ? (p === this.forbidden ? 1 : this.weights.get(p)!) : 0);
+    const steps: Step[] = states.map((state, i) => {
+      const id = state >> 1,
+        node = this.nodes[id],
+        portal = node.portal < 0 ? null : portals[node.portal],
+        p = i ? through[state] : -1;
       // An off-mesh leg costs what its cheapest link between these two nodes says.
       if (i && p < 0)
         crossings += Math.min(
           ...this.out
-            .get(chain[i - 1])!
+            .get(states[i - 1] >> 1)!
             .filter((j) => j.to === id)
             .map((j) => j.cost),
         );
+      return {
+        portal: node.portal,
+        a: portal ? portal.a : node.a,
+        b: portal ? portal.b : node.a,
+        t: portal ? (node.low + node.high) / 2 : 0,
+        through: p,
+      };
     });
+    return this.tighten(steps, crossings);
+  }
+
+  /**
+   * The path `walk` with the other side of each mesh vertex it ends up on tried too, and kept where that costs less. The
+   * first search stands on points of the portals, so it cannot tell the sides of a vertex apart when the best path
+   * passes it nearer than those points are spaced, and pulling tight never changes sides.
+   */
+  otherSides(ground: Ground, walk: Walk): Walk {
+    let tight = walk;
+    // Every change makes the path cheaper, so this ends; the count is a second stop against rounding.
+    for (let i = 1, changes = tight.steps.length * 2; i < tight.steps.length - 1 && changes > 0; i++) {
+      const { steps } = tight,
+        here = steps[i],
+        vertex = tight.at[i];
+      if (here.portal < 0 || here.through < 0 || !(near(vertex, here.a) || near(vertex, here.b))) continue;
+      let after = i + 1;
+      while (after < steps.length - 1 && steps[after].portal >= 0 && near(tight.at[after], vertex)) after++;
+      const to = steps[after].through;
+      if (to < 0) continue;
+      for (const way of ground.ways(vertex, here.through, to)) {
+        if (way.length === after - i && way.every((door, k) => door.portal === steps[i + k].portal)) continue;
+        const round = way.map((door, k): Step => {
+            const { a, b } = ground.portals[door.portal];
+            const dx = b[0] - a[0],
+              dz = b[2] - a[2];
+            return {
+              portal: door.portal,
+              a,
+              b,
+              t: Math.max(0, Math.min(1, ((vertex[0] - a[0]) * dx + (vertex[2] - a[2]) * dz) / (dx * dx + dz * dz))),
+              through: k ? way[k - 1].to : here.through,
+            };
+          }),
+          // The rest keep the places they were pulled to. A short stretch with its ends held is pulled first: it costs
+          // little, and only a way round that is cheaper there is pulled with the whole chain.
+          kept = steps.map((step, k) => ({ ...step, t: tight.t[k] })),
+          first = Math.max(0, i - NEAR_BY),
+          last = Math.min(steps.length - 1, after + NEAR_BY),
+          held = (k: number): Step => ({ ...kept[k], a: tight.at[k], b: tight.at[k] }),
+          stretch = this.tighten(
+            [held(first), ...kept.slice(first + 1, i), ...round, ...kept.slice(after, last), held(last)],
+            0,
+          );
+        let now = 0;
+        for (let k = first + 1; k <= last; k++) now += this.leg(steps[k].through, tight.at[k - 1], tight.at[k]);
+        if (!(stretch.cost < now - tight.cost * 1e-12)) continue;
+        const other = [...kept.slice(0, i), ...round, ...kept.slice(after)];
+        for (let k = first + 1; k < first + stretch.t.length - 1; k++)
+          other[k] = { ...other[k], t: stretch.t[k - first] };
+        const next = this.tighten(other, tight.crossings);
+        if (!(next.cost < tight.cost * (1 - 1e-12))) continue;
+        tight = next;
+        changes--;
+        i = Math.max(0, i - 2);
+        break;
+      }
+    }
+    return tight;
+  }
+
+  /** The least-cost places on a chain's portals, and what its walked legs cost there. */
+  private tighten(steps: Step[], crossings: number): Walk {
+    const a = steps.map((step) => step.a),
+      b = steps.map((step) => step.b),
+      weight = steps.map((step) => (step.through < 0 ? 0 : this.weight(step.through))),
+      t = Float64Array.from(steps, (step) => step.t);
     pull(a, b, weight, t);
-    const all = a.map((p, i) => {
+    const at = a.map((p, i) => {
       const length = Math.hypot(b[i][0] - p[0], b[i][2] - p[2]);
       if (t[i] * length <= ON) return p;
       if ((1 - t[i]) * length <= ON) return b[i];
       return between(p, b[i], t[i]);
     });
     let cost = crossings;
-    for (let i = 1; i < all.length; i++)
-      cost += weight[i] * Math.hypot(all[i][0] - all[i - 1][0], all[i][2] - all[i - 1][2]);
-    const points: Vec3[] = [copy(all[0])],
-      offMesh: number[] = [];
-    for (let i = 1; i < all.length; i++) {
-      const jump = !weight[i] && through[states[i]] < 0,
-        p = all[i];
-      if (jump) offMesh.push(points.length - 1);
-      else {
-        // Drop a point met twice, and one in the middle of a straight stretch.
-        const last = points[points.length - 1];
-        if (near(last, p)) {
-          if (i === all.length - 1 && points.length > 1 && !offMesh.includes(points.length - 2))
-            points[points.length - 1] = copy(p);
-          else if (i === all.length - 1) points.push(copy(p));
-          continue;
-        }
-        const n = points.length;
-        if (n > 1 && !offMesh.includes(n - 2) && straight(points[n - 2], last, p)) points.pop();
-      }
-      points.push(copy(p));
-    }
-    return { points, offMesh, cost };
+    for (let i = 1; i < at.length; i++) cost += this.leg(steps[i].through, at[i - 1], at[i]);
+    return { steps, at, t, crossings, cost };
+  }
+
+  /** What a leg walked through polygon `p` costs; an off-mesh crossing (-1) is priced apart. */
+  private leg(p: number, from: Vec3, to: Vec3): number {
+    return p < 0 ? 0 : this.weight(p) * Math.hypot(to[0] - from[0], to[2] - from[2]);
   }
 }
 
@@ -521,6 +620,31 @@ function straight(a: Vec3, b: Vec3, c: Vec3): boolean {
   if (!length2) return false;
   const t = ((b[0] - a[0]) * d[0] + (b[1] - a[1]) * d[1] + (b[2] - a[2]) * d[2]) / length2;
   return t >= 0 && t <= 1 && near(b, between(a, c, t));
+}
+
+/** The waypoints of a walk, and which of its legs are off-mesh crossings. */
+function corners({ steps, at: all }: Walk): { points: Vec3[]; offMesh: number[] } {
+  const points: Vec3[] = [copy(all[0])],
+    offMesh: number[] = [];
+  for (let i = 1; i < all.length; i++) {
+    const jump = steps[i].through < 0,
+      p = all[i];
+    if (jump) offMesh.push(points.length - 1);
+    else {
+      // Drop a point met twice, and one in the middle of a straight stretch.
+      const last = points[points.length - 1];
+      if (near(last, p)) {
+        if (i === all.length - 1 && points.length > 1 && !offMesh.includes(points.length - 2))
+          points[points.length - 1] = copy(p);
+        else if (i === all.length - 1) points.push(copy(p));
+        continue;
+      }
+      const n = points.length;
+      if (n > 1 && !offMesh.includes(n - 2) && straight(points[n - 2], last, p)) points.pop();
+    }
+    points.push(copy(p));
+  }
+  return { points, offMesh };
 }
 
 /**
@@ -610,11 +734,15 @@ export class WeightedAnyAngleSearch {
       const leaves = forbidden >= 0 && ground.doorsOf(forbidden).some((d) => d.portal === portal);
       return { portal, low: 0, high: 1, a, b, polygons: leaves ? [...sides, forbidden] : sides };
     });
-    let best: Walk = { points: [], offMesh: [], cost: Infinity };
+    let best: Walk | null = null,
+      cost = Infinity;
     /** Takes the real path along a relaxed one when it is the cheapest yet; `stop` ends the search there. */
     const keep = (round: Round, stop: boolean) => (parent: Int32Array, through: Int32Array) => {
       const walk = round.realise(ground.portals, parent, through);
-      if (walk.cost < best.cost) best = walk;
+      if (walk.cost < cost) {
+        best = walk;
+        cost = walk.cost;
+      }
       return stop;
     };
     // First a real path: Dijkstra between points on the portals (Lanthier, Maheshwari and Sack 2001), then pulled tight
@@ -633,14 +761,16 @@ export class WeightedAnyAngleSearch {
       Infinity,
       keep(seed, true),
     );
-    if (best.cost === Infinity) return null;
+    if (!best) return null;
+    best = seed.otherSides(ground, best);
+    cost = best.cost;
     // No path costs less than the straight line, scaled for cheap off-mesh links.
     let lower = seed.ahead[0],
       work = seed.work,
       round = new Round([...nodes, ...pieces], jumps, weights, forbidden, scale);
     // The bound still to be proved. Whatever is shown to cost this much or more can be left out of the search.
-    const wanted = () => best.cost / (1 + tolerance);
-    while (work < maxWork && best.cost - lower > tolerance * lower + 1e-9) {
+    const wanted = () => cost / (1 + tolerance);
+    while (work < maxWork && cost - lower > tolerance * lower + 1e-9) {
       const here = round,
         // The round before bounds what is left to walk far better than the straight line does.
         left = (state: number) => {
@@ -652,7 +782,7 @@ export class WeightedAnyAngleSearch {
       if (forward) lower = Math.max(lower, Math.min(forward[2], wanted()));
       const backward =
         forward &&
-        best.cost - lower > tolerance * lower + 1e-9 &&
+        cost - lower > tolerance * lower + 1e-9 &&
         here.search(true, wanted, (state) => forward[state], maxWork - work);
       work += here.work;
       if (!forward || !backward) break;
@@ -685,6 +815,8 @@ export class WeightedAnyAngleSearch {
       });
       round = new Round([...nodes, ...pieces], jumps, weights, forbidden, scale);
     }
-    return { ...best, lowerBound: Math.min(lower, best.cost), work };
+    // The rounds' best may sit on the far side of a vertex too.
+    best = round.otherSides(ground, best);
+    return { ...corners(best), cost: best.cost, lowerBound: Math.min(lower, best.cost), work };
   }
 }

@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21031283,
+  "total": 21031986,
   "history": [
     {
       "date": "2026-10-24",
@@ -14730,6 +14730,12 @@
       "commit": "a8b9ca4e4e",
       "reason": "@margoengine/vfx/smoke 3933 B gzip (ceiling 3302 to 4189): KB-VFX-SMOKEROOF1, the ceiling option (the roof's obstacle box, the layer's node graph under it, Alpert's ceiling jet speed and their errors); without it smoke indoors veils its own fire. vfx/over-life 1833 B (ceiling 1831 to 2089): KB-VFX-NODESLIFE1, the slot load matched whatever it reads. cameras/clearance 1742 B, new entry of KB-SHOT-FAULDSIGHT1 (f08ca2a9fa), recorded late. A split would put the roof behind an import() inside a synchronous attach. Core and stage unchanged.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "lane-d",
+      "reason": "navmesh/weighted-any-angle 4333 to 4968 B (ceiling 4521 to 5224): where a path ends up on a mesh vertex the other side of the vertex is tried too, and a portal reads the same whichever polygon found it first, so no path of the 150 seeded queries costs more than before the bound was tightened (30 cost less) and an answer no longer hangs on earlier queries. The step is part of every route call, so a second entry would save nothing; no other entry grows.",
+      "grew": 1
     }
   ],
   "items": {
@@ -15524,7 +15530,7 @@
     "@margoengine/navmesh/volume": 4975,
     "@margoengine/navmesh/voxel": 16957,
     "@margoengine/navmesh/wasm": 18664,
-    "@margoengine/navmesh/weighted-any-angle": 4521,
+    "@margoengine/navmesh/weighted-any-angle": 5224,
     "@margoengine/netcode": 13578,
     "@margoengine/netcode/extrapolate": 799,
     "@margoengine/netcode/generate": 5154,
@@ -15650,6 +15656,7 @@
     "@margoengine/points": 25641,
     "@margoengine/points/clip": 7387,
     "@margoengine/points/copc": 16182,
+    "@margoengine/points/copc-write": 12845,
     "@margoengine/points/depth-video": 7391,
     "@margoengine/points/e57": 7231,
     "@margoengine/points/las": 14148,
@@ -15657,7 +15664,6 @@
     "@margoengine/points/las lazy LAZ decoder": 8776,
     "@margoengine/points/laz": 8872,
     "@margoengine/points/laz-write": 10166,
-    "@margoengine/points/copc-write": 12845,
     "@margoengine/points/octree": 9474,
     "@margoengine/points/pick": 5471,
     "@margoengine/points/potree": 17694,

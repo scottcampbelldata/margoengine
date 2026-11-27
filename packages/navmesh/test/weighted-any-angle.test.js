@@ -282,6 +282,50 @@ test('on even ground the bounds hold the exact length, whatever the polygons and
   assert.ok(found > 180, `found ${found}`);
 });
 
+test('a path passing close by a vertex is found on its cheaper side, whichever side that is', () => {
+  // Four cells round (1, 1). The least path rounds the vertex a few hundredths off it through the cheaper side cell,
+  // nearer than the first search's points are spaced, so those points cannot tell the two sides apart.
+  for (const mirror of [false, true]) {
+    const swap = ([x, y, z]) => (mirror ? [z, y, x] : [x, y, z]),
+      mesh = grid(['ab', 'cd']);
+    (mirror ? [3, 2, 5, 1] : [3, 5, 2, 1]).forEach((weight, p) => mesh.setAreaCost(p, weight));
+    // Solved on the side with the cheaper cell below the start: across z = 1, then across x = 1.
+    const start = [0.7, 0, 0.7],
+      end = [1.8, 0, 1.3],
+      path = (x, z) => 3 * flat(start, [x, 0, 1]) + 2 * flat([x, 0, 1], [1, 0, z]) + flat([1, 0, z], end),
+      inner = (x) =>
+        path(
+          x,
+          minimise((z) => path(x, z), 1, 2),
+        ),
+      x = minimise(inner, 0, 1),
+      least = inner(x);
+    assert.ok(x > 15 / 16 && x < 1, `the bend is nearer the vertex than a point's spacing: ${x}`);
+    const route = new WeightedAnyAngleSearch(mesh).route(swap(start), swap(end), { maxWork: 1 });
+    near(route.cost, least, mirror ? 'mirrored' : 'cheap side below', 1e-7);
+  }
+});
+
+test('an answer does not hang on what was searched before', () => {
+  const next = random(5),
+    rows = randomMap(next, 12, 12, 0.15),
+    mesh = grid(rows),
+    cells = rows.join('').replaceAll('#', '').length,
+    weights = Array.from({ length: cells }, () => [1, 2, 5, 20][Math.floor(next() * 4)]);
+  weights.forEach((weight, p) => mesh.setAreaCost(p, weight));
+  const free = rows.flatMap((row, z) => [...row].flatMap((cell, x) => (cell === '#' ? [] : [[x, z]]))),
+    pick = () => {
+      const [x, z] = free[Math.floor(next() * free.length)];
+      return [x + 0.05 + next() * 0.9, 0, z + 0.05 + next() * 0.9];
+    },
+    used = new WeightedAnyAngleSearch(mesh);
+  for (let query = 0; query < 40; query++) {
+    const start = pick(),
+      end = pick();
+    assert.deepEqual(used.route(start, end), new WeightedAnyAngleSearch(mesh).route(start, end), `query ${query}`);
+  }
+});
+
 test('filters weigh and forbid ground, and a changed cost is read again', () => {
   const mesh = grid(['.....', '.mmm.', '.....'], { areas: { m: 1 } }),
     search = new WeightedAnyAngleSearch(mesh),

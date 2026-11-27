@@ -18398,6 +18398,14 @@ engine's source was read.
 - D. P. Bertsekas, "Projected Newton methods for optimization problems with simple constraints", SIAM J. Control and
   Optimization 20 (2), 1982, https://doi.org/10.1137/0320018: pulls a path tight inside its portals (a convex problem
   with a tridiagonal Hessian).
+- S.-Q. Xin and G.-J. Wang, "Efficiently determining a locally exact shortest path on polyhedral surfaces",
+  Computer-Aided Design 39 (12), 2007, https://doi.org/10.1016/j.cad.2007.08.001 (abstract only): an approximate path
+  is made locally exact by changing which faces it goes through, pass by pass. Margo's own for weighted ground: where a
+  pulled path ends up on a vertex, the faces round the vertex's other side replace those it used, a short stretch with
+  held ends is pulled first, and the change stays only if the whole path costs less. Done on the first and final paths.
+- N. Sharp and K. Crane, "You can find geodesic paths in triangle meshes by just flipping edges", ACM Trans. Graph. 39
+  (6), 2020, https://arxiv.org/abs/2011.01270: shortens a path at a vertex by taking the other side of its wedge. Not
+  used: it rests on unweighted angles and changes the triangulation.
 - Margo's own: the lower bound from pieces of portals (an arc costs the least distance between two pieces times the
   polygon's weight, so no real path costs less than its relaxed one). A piece has a state for each side it is reached
   across and is left through the other: two legs in a row through one convex polygon are never shortest, and the one leg
