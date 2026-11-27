@@ -2759,7 +2759,7 @@ canvas.addEventListener('click', async event => {
 
 `raycaster.intersectObjects(engine, [mesh, model])` tests a list. A skinned or morphing model is hit at its current
 pose by the same synchronous calls: `Animation` (with `MorphWeightPlayer` weights too), `Skin`, `GeometryCachePlayer`
-and `BatchedMesh` pose it on the CPU for the ray. A deformer with no CPU pose (a `skinning` mode) makes them throw rather than test
+and `BatchedMesh` pose it on the CPU for the ray, dual quaternion skins included. A deformer with no CPU pose (a `skinning` mode of your own with no `blend`) makes them throw rather than test
 the bind pose: `await raycaster.intersectModel(model)` reads the posed surface back, as does GPU picking. Lines are picked by `intersectLines` (`@margoengine/bvh/lines`), or on the GPU after
 `LinePicking.attach(picking, lines)` (`@margoengine/lines/pick`); points have `pointsPlugin.pick(x, y)`.
 
@@ -3193,7 +3193,7 @@ What most often goes wrong in a port, with the fix.
 | Everything attaches at once | `Environment.attach` is asynchronous | `await` it before `EnvironmentLighting.attach`. |
 | `render()` runs your frame code | `onFrame` callbacks run only from the started loop | Call `engine.start()`, or run your update before `render`. |
 | `scene.background` shows as written under post effects | Under a post effect the colour is linear light in the scene, so the effect's tone map darkens it with the meshes (`#808080` shows as 116, not 128); on the bare canvas it shows as written | Pick the colour under the chain you ship. |
-| A raycast on an animated character | Synchronous BVH rays hit the current pose under `Animation` (`MorphWeightPlayer` weights included), `Skin`, `GeometryCachePlayer` and `BatchedMesh`; they throw under a `skinning` mode | `await raycaster.intersectModel(model)` or GPU picking for those. |
+| A raycast on an animated character | Synchronous BVH rays hit the current pose under `Animation` (`MorphWeightPlayer` weights included), `Skin`, `GeometryCachePlayer` and `BatchedMesh`, linear or dual quaternion skins; they throw under a `skinning` mode of your own with no `blend` | `await raycaster.intersectModel(model)` or GPU picking for those. |
 | `mixer.update(delta)` in your loop | An attached mixer is already advanced by the engine; calling it too doubles the speed | Delete the call. |
 | A depth shader with `less` comparisons | WebGPU depth is reversed (near 1, far 0) | Use `greater`, or `DepthTexture`'s `distance`. |
 | `new WebGLRenderer` runs anywhere with WebGL 2 | Core needs WebGPU | `await install()` from `@margoengine/webgl2-compat` first when `navigator.gpu` gives no adapter. |
@@ -6090,7 +6090,7 @@ in `packages/cad/test/cad-limits.test.js`).
 | Fitting (`fitSpline` in `@margoengine/splines/fit`) | Enforced: 2 to 10,000,000 points, a `tolerance` above 0. By method: the error is measured at each point's own curve parameter (an upper bound on the true nearest distance); pieces are cut at the worst point, so a curve can use a piece or two more than the fewest possible. | Cutting at the worst point is the usual way to keep fitting linear in the points. | Output may have more control points than a hand-placed curve. | Raise `tolerance`, or run the result through `KnotPath` and remove knots. |
 | GPU BVH traversal (`GPUMeshBVH` in `@margoengine/bvh/gpu`) | Enforced: the tree, the rays and the hits each fit `maxStorageBufferBindingSize`, a tree at most 64 deep, `far` finite. By method: float32 queries, so a float64 source rounds on upload; `any` answers a hit, not the nearest; the tree is built on the CPU. | WGSL has no doubles, and the stack is a fixed array per thread. | Past those sizes the call throws a RangeError; distances differ from the CPU tree by float32 rounding. | Request a higher limit or split the mesh and the rays; use the CPU tree where float64 matters. |
 | Scene BVH (`SceneBVH` in `@margoengine/bvh/scene`) | Enforced: `rebuildThreshold` at least 1; a mesh under GPU deformation whose deformer has no CPU pose throws, as `intersectEngine` does. By method: a deforming mesh sits in the tree at its CPU pose, so `update()` poses every such primitive, hidden ones included; `update()` reads every object's world matrix once, so its cost grows with the object count; with `{refresh: false}` objects moved since the last update are found at their old place; instances cost one tree entry each. | `update()` reads every object's world matrix once, and a tree built before a move holds objects at their old place. | Picks work as with `intersectEngine`, with fewer objects visited per ray; a stale tree misses a moved object until the next update. | Leave `refresh` on, or call `update()` once a frame; use `intersectModel` for a mesh whose deformer has no CPU pose. |
-| Synchronous raycasts on skinned and morphed meshes (`Raycaster`, `SceneBVH`, `RaycastSnapshot` in `@margoengine/bvh`, 2026-11-26) (LIM-672) | Enforced: a mesh under GPU deformation is tested at the pose its deformer evaluates on the CPU, and one whose deformer has none throws MargoError `unsupported`; the bind pose is never tested in its place. By method: `Animation` (linear blend of four or eight influences, morph targets), `Skin` and `GeometryCachePlayer` give a CPU pose; `BatchedMesh` (its items through their matrices, since 2026-11-27) gives one too, and so does an `Animation` whose weights a `MorphWeightPlayer` drives (the player's samples at the copy's time, since 2026-11-27; within 1.9e-6 of the GPU's weights on WebGPU); an `Animation` with a `skinning` mode and custom deformers do not (docs/known-bugs.md). `AssemblyBVH` of machinery holds a deformed part at the same pose and builds its BVH again at `rebuild()` after a new pose. The pose is the one of the node matrices and weights at the call, in float64 rounded to float32: within 1 float32 step of the GPU's on the Fox (RTX A6000), not bit-equal. Positions and normals are posed, tangents are not. The tree keeps its first pose's topology and is refitted per pose (each node once); no rebuild test or tree rotation runs. | A GPU buffer cannot be read back synchronously, so the pose is computed twice, once in WGSL and once on the CPU. | A ray grazing a triangle edge may differ from the drawn pixel by float32 rounding; rays through a pose far from the first get slower, never wrong. A posed copy of the vertices, and for `Animation` its influences (32 or 64 bytes a skinned vertex) and morph deltas (48 bytes a vertex and target), stay in memory from the first query. | Use `await raycaster.intersectModel(model)` for the GPU's own vertices or a deformer with no CPU pose. |
+| Synchronous raycasts on skinned and morphed meshes (`Raycaster`, `SceneBVH`, `RaycastSnapshot` in `@margoengine/bvh`, 2026-11-26) (LIM-672) | Enforced: a mesh under GPU deformation is tested at the pose its deformer evaluates on the CPU, and one whose deformer has none throws MargoError `unsupported`; the bind pose is never tested in its place. By method: `Animation` (linear blend of four or eight influences, morph targets), `Skin` and `GeometryCachePlayer` give a CPU pose; `BatchedMesh` (its items through their matrices, since 2026-11-27) gives one too, and so does an `Animation` whose weights a `MorphWeightPlayer` drives (the player's samples at the copy's time, since 2026-11-27; within 1.9e-6 of the GPU's weights on WebGPU); an `Animation` with `dualQuaternionSkinning` or `blendSkinning` is posed by the mode's CPU `blend` (since 2026-11-27; within 9.5e-7 of the read-back GPU pose on WebGPU); a `skinning` mode without a `blend` and custom deformers do not. `AssemblyBVH` of machinery holds a deformed part at the same pose and builds its BVH again at `rebuild()` after a new pose. The pose is the one of the node matrices and weights at the call, in float64 rounded to float32: within 1 float32 step of the GPU's on the Fox (RTX A6000), not bit-equal. Positions and normals are posed, tangents are not. The tree keeps its first pose's topology and is refitted per pose (each node once); no rebuild test or tree rotation runs. | A GPU buffer cannot be read back synchronously, so the pose is computed twice, once in WGSL and once on the CPU. | A ray grazing a triangle edge may differ from the drawn pixel by float32 rounding; rays through a pose far from the first get slower, never wrong. A posed copy of the vertices, and for `Animation` its influences (32 or 64 bytes a skinned vertex) and morph deltas (48 bytes a vertex and target), stay in memory from the first query. | Use `await raycaster.intersectModel(model)` for the GPU's own vertices or a deformer with no CPU pose. |
 | Point and sprite picking (`PointRaycaster` in `@margoengine/bvh/points`) | Enforced: `threshold` finite and at least 0. By method: a sprite's whole quad hits, its texture's alpha is not read; a cloud or batch that follows no mesh has no layers or filter to test; `SceneBVH.intersect` answers meshes only; sizes in pixels need the engine camera, so a ray not cast from it reads them from that camera all the same. | A cloud that follows no mesh has no layers or filter for the pick to use. | A pick lands on a point within the threshold of the ray, sorted with the mesh hits. | Attach the cloud to a mesh to use layers and filter; `@margoengine/points` `PointPicking` tests depth on the GPU. |
 | Mesh distance fields (`bakeSDF` in `@margoengine/bvh/sdf`) | Enforced: 2 to 2048 samples per axis, a finite box with thickness, and a texture within `maxTextureDimension3D`. By method: the field is linear between samples, so detail under a cell is lost; a bake costs one closest-point and one winding query per sample, on the CPU; `r16float` keeps about three decimal digits, and `r32float` needs `float32-filterable` to filter. | The field is linear between samples, and a bake runs a closest-point and a winding query per sample on the CPU. | Samples negative inside and positive outside; a large grid takes seconds. | Raise `resolution`, bake only the part you need with `bounds`, use `bakeSDFAsync` to keep the page drawing, or `signed: false` for open meshes. |
 | Inside test and mesh distance (`@margoengine/bvh/inside`) | Enforced: `accuracy` above 0, `maxDistance` and `minDistance` at least 0, a 16 number matrix. | Inside answers survive small holes and flipped patches; clearance answers come with both closest points. | By method: the winding number is an estimate at `accuracy` below `Infinity`, measured under 0.03 at the default; `pointInside` on a large hole or a surface with no inside answers by a one half cut; `meshDistance` measures surfaces, so a mesh inside another answers the gap, not 0, and a matrix with shear keeps its answer exact but loosens its box tests. | Pass `accuracy: Infinity` for the exact sum; combine `meshDistance` with `pointInside` to detect a mesh held wholly inside another. |
@@ -6341,6 +6341,33 @@ layer could answer null right after the first frame, while the layer's CPU culli
 (Playwright's command line is ignored there) and that its cases assumed a native adapter; both are fixed in the script,
 which now drives Chrome through its own DevTools socket and runs the layer's probes alone (in
 [known-bugs.md](known-bugs.md)).
+
+### Rerun 2026-11-27 (Windows 11, packages built at b958f1a9b6)
+
+The same script on the workstation (Ryzen 9 9950X with its integrated AMD Radeon graphics, and an RTX A6000). Results
+only: no timings.
+
+| Browser | GPU (as the browser reports it) | Rows | Bugs |
+| --- | --- | --- | --- |
+| Firefox 157.0 (Playwright's build) | NVIDIA RTX A6000 | 95: native 48 pass; layer 44 pass, 1 refusal, 2 differences | 0 |
+| Edge 158.0.4370.33, `MARGO_GPU=amd` | AMD Radeon integrated (`amd`, `rdna-2`; ANGLE Direct3D 11) | 95: native 48 pass; layer 43 pass, 4 differences | 0 |
+| WebKit 27.2, Playwright's Windows build (not Safari; no WebGPU, no `OffscreenCanvas`) | not reported | 81: native 8 refusals, 33 unmeasured; layer 37 pass | 3 reported, below |
+
+- Firefox: `msaaAspects` refuses (`compatibility-layer`, no `WEBGL_stencil_texturing`); `bitmapCopies` differs in the
+  same 1,521 values as on 2026-11-15 (the layer keeps both copy rules, Firefox's native copy breaks one); GTAO creases
+  differ by at most 0.046 (mean gap 0.00084), against 0.0225 and 0.00056 on 2026-11-15. The cause of that growth was
+  not traced; the row has no bar beyond 1/255 for a pass.
+- AMD integrated: `implicitFootprint` and `mipFiltering` differ by the driver's compressed mip blend (accepted
+  2026-11-10; `features-browser.mjs` holds the layer to native's LOD there), `derivativeBranch` by native's own error
+  (KB-AMD-HELPERDERIV1), GTAO creases by at most 0.047 (mean gap 0.00083). Every step of the package's `test:gpu`
+  (32 steps, WebGPU against the layer on the same GPU) passes on this GPU, at d88c50b716.
+- WebKit, Windows build: `external` needs `VideoFrame` and the materials video case needs `captureStream`, which this
+  build lacks. `bitmapCopies` is a wrong result on the layer there: uploading a 2D canvas with
+  `UNPACK_PREMULTIPLY_ALPHA_WEBGL` returns straight colour in this build (read back with raw WebGL2), and the layer
+  tells a straight bitmap from a premultiplied one by that upload, so a straight bitmap copied into a premultiplied
+  destination keeps its colour. Safari 27.2 on macOS kept both copy rules on 2026-11-15.
+- Still not measured: real phones, Safari's feature rows after `canvasRead` with an unlocked screen, the iOS
+  Simulator, a headset, and the integrated-GPU frame budget (timing, deferred by the build phase).
 
 ## Platform
 
@@ -16771,15 +16798,35 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   synchronous first hits equal `intersectModel`'s.
 - **Left:** the three open entries below.
 
-### Open 2026-11-26: a synchronous raycast refuses a model skinned with a skinning mode (KB-BVH-SYNCPOSE-DQS1, animation)
+### Fixed 2026-11-27: a synchronous raycast refused a model skinned with a skinning mode (KB-BVH-SYNCPOSE-DQS1, animation)
 
 - **Repro:** `Animation.attach(model, {skinning: dualQuaternionSkinning})`, then `raycaster.intersectEngine(engine)`:
-  MargoError `unsupported` (`packages/animation/tests/sync-pick.test.js` pins the refusal).
-- **Cause:** a `SkinningMode` gives its blend as WGSL only (`shader`, and `encode` for the palette), so `Animation`
-  registers no CPU pose with one. `@margoengine/animation/dqs` already has the blend on the CPU (`skinDualQuaternion`,
-  `blendSkinning`).
-- **Owed:** an optional CPU blend on `SkinningMode` (an API addition), given by `dualQuaternionSkinning`, used by
-  `Animation`'s CPU pose, with the per-vertex `share`; a GPU check against the read-back pose.
+  MargoError `unsupported` (`packages/animation/tests/sync-pick.test.js` pinned the refusal).
+- **Cause:** a `SkinningMode` gave its blend as WGSL only (`shader`, and `encode` for the palette), so `Animation`
+  registered no CPU pose with one.
+- **Fix:** `SkinningMode.blend(palette, joints, weights, position, normal, share)`, optional: the mode's blend on the
+  CPU (`packages/animation/src/shader.ts`). `dualQuaternionSkinning` and `blendSkinning` give it as `skinDualQuaternion`
+  (Kavan, Collins, Zara and O'Sullivan, I3D 2007 and ACM TOG 27(4) 2008, cited in `dqs.ts`). `poseVertices`
+  (`pose.ts`) runs it after the morph targets with the palette `encode` wrote and, for a mode with `share`, the share
+  in the first joint index's upper 16 bits; `Animation` registers a CPU pose for a mode with `blend`. A mode without it
+  still refuses.
+- **Tests:** `sync-pick.test.js`: a joint column weighed half on each bone turns by half the angle about the joint
+  (closed form), a ray there hits the dual quaternion pose and misses the linear one, and a mode without `blend`
+  refuses; `blendSkinning` poses by share (0, 0.25, 1). `scripts/animation-dqs-tests.js` compares `Animation`'s CPU pose
+  with the read-back GPU pose for every tube and pose of both modes (35,640 checks, 9.5e-7 at most, RTX A6000, WebGPU).
+  `Animation` needs WebGPU, so the WebGL2 layer runs no deformation pass to compare.
+
+### Fixed 2026-11-27: blendSkinning drew a node without shares all linear (KB-DQS-NOSHARE1, animation)
+
+- **Repro:** `Animation.attach(model, {skinning: blendSkinning})` on a skinned node with no
+  `extras.fbxSkinning.blendWeights`: the GPU drew the linear skin, though the mode says such a node is all dual
+  quaternion.
+- **Cause:** `Animation` packed shares into the first joint index only when the node had them; without them the upper
+  16 bits stayed 0, which the shader reads as share 0 (linear).
+- **Fix:** a mode with `share` gets every vertex's share packed, 65535 (all dual quaternion) for a node without shares
+  (`packages/animation/src/index.ts`), also in the influences the CPU pose reads.
+- **Tests:** `sync-pick.test.js` (the CPU pose of a share-less `blendSkinning` node equals `dualQuaternionSkinning`'s)
+  and `scripts/animation-dqs-tests.js` (a share-less blend tube read back from the GPU against `skinDualQuaternion`).
 
 ### Fixed 2026-11-27: a synchronous raycast refused a model whose morph weights are sampled on the GPU (KB-BVH-SYNCPOSE-MORPHGPU1, animation)
 
