@@ -213,6 +213,7 @@ async function buildPackage(name, output) {
           '@margoengine/decoders/bc',
           '@margoengine/geometry/optimize',
           '@margoengine/bvh/gpu',
+          '@margoengine/physics/decomposition',
         ]),
         output: codeSplitting ? { ...compactOutput, codeSplitting } : compactOutput,
       },

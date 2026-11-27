@@ -6,7 +6,7 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
-### Open 2026-11-27: gltf's dist carries its own copy of physics/decomposition (KB-BUILD-INLINE2, package build; gltf/physics)
+### Fixed 2026-11-27: gltf's dist carried its own copy of physics/decomposition (KB-BUILD-INLINE2, package build; gltf/physics)
 
 - **Repro:** `npm run build:packages`, `npm run quality -- --gate=sizes`: `@margoengine/gltf/physics` reads 19,953 B
   gzip against 9,449 B, and `packages/gltf/dist` holds a `decomposition-*.js` chunk.
@@ -14,6 +14,11 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   same fault as KB-BUILD-INLINE1: the lazy `import()` in `packages/gltf/src/physics.ts` is resolved in the workspace and
   copied. Owner: physics. The fix is that one list line and taking the row out of `open` in
   `tests/no-inlined-packages.test.js`.
+- **Fix:** `@margoengine/physics/decomposition` is on the external list in `scripts/build-modern.js`; the open row is
+  gone from `tests/no-inlined-packages.test.js`. `packages/gltf/dist` holds no decomposition chunk and
+  `@margoengine/gltf/physics` measures 9,401 B gzip (19,953 B before, ceiling 9,449 B; `bundleBytes` of
+  scripts/measure-size.js). Nothing under packages/physics changed.
+- **Regression test:** `tests/no-inlined-packages.test.js` ("no built package carries a copy of a package it declares").
 
 ### Fixed 2026-11-27: package builds copied packages they declare into their own dists (KB-BUILD-INLINE1, package build; blender, controls, gltf, shadows, text)
 

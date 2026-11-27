@@ -12,7 +12,7 @@ import { parseSync } from 'rolldown/utils';
 
 const root = resolve(import.meta.dirname, '..');
 // Open, with its docs/known-bugs.md row: `<package> <specifier>`. A row that is fixed must leave this list.
-const open = new Set(['gltf @margoengine/physics/decomposition']);
+const open = new Set([]);
 
 const files = (dir, keep) =>
   existsSync(dir)
