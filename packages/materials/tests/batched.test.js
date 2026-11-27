@@ -6,6 +6,8 @@ import { Engine, TransformStore } from '../../core/dist/extension.js';
 import { Material } from '../dist/index.js';
 import { BatchedMesh, batchShader } from '../dist/batched.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { Raycaster } from '../../bvh/dist/index.js';
+import { posedVertices } from '../../shared/pose-source.js';
 
 async function world() {
   const h = optionalGPU(),
@@ -186,6 +188,66 @@ test('argument errors name the fix; dispose frees the GPU buffers, the mesh and 
   assert.ok(mesh.disposed);
   assert.equal(engine.hasPlugin(batch.name), false);
   assert.throws(() => batch.add(triangle), { name: 'MargoError', code: 'disposed' });
+});
+
+// KB-BVH-SYNCPOSE-BATCHED1: the compute pass places the items, so the primitive is `deformed` and a synchronous raycast
+// threw MargoError 'unsupported'. The batch now gives its CPU pose (packages/shared/pose-source.js), the pass's
+// arithmetic term for term, so the raycast tests each item where its matrix draws it.
+test('a synchronous raycast hits batch items where their matrices draw them (KB-BVH-SYNCPOSE-BATCHED1)', async () => {
+  const { engine } = await world();
+  engine.store.tick(false);
+  const batch = BatchedMesh.attach(engine, new Material(), { maxItems: 4, maxVertices: 16, maxIndices: 24 }),
+    hits = (x, y) => {
+      const ray = new Raycaster([x, y, 5], [0, 0, -1]);
+      ray.side = 'double';
+      return ray.intersectObjects(engine, [batch.mesh]);
+    };
+  const a = batch.add(quad),
+    b = batch.add(quad, { matrix: translate(5, 0, 0) });
+  assert.ok(batch.mesh.primitives[0].deformed, 'the compute pass writes the primitive');
+  assert.equal(hits(0.5, 0.5).length, 1);
+  const [hit] = hits(5.5, 0.5);
+  assert.ok(hit && Math.abs(hit.distance - 5) < 1e-6, 'item b is hit at its matrix');
+  assert.deepEqual(hits(3.5, 0.5), [], 'nothing between the items');
+  batch.setMatrix(b, translate(-4, 0, 0));
+  assert.deepEqual(hits(5.5, 0.5), [], 'a moved item is not hit where it was');
+  assert.equal(hits(-3.5, 0.5).length, 1, 'and is hit where it went');
+  batch.setVisible(a, false);
+  assert.deepEqual(hits(0.5, 0.5), [], 'a hidden item is collapsed, as the pass draws it');
+  batch.setVisible(a, true);
+  batch.remove(a);
+  assert.deepEqual(hits(0.5, 0.5), [], 'a removed item is gone');
+  batch.dispose();
+});
+
+test('the batch pose is the compute pass term for term: mirror, normal, tangent sign and tint', async () => {
+  const { engine } = await world(),
+    batch = BatchedMesh.attach(engine, new Material(), { maxItems: 2, maxVertices: 8 }),
+    // Mirrored in x, stretched 2 in y, moved (1, 2, 3): handedness -1.
+    id = batch.add(quad, { matrix: [-1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 1, 2, 3, 1], color: [0.5, 1, 0.25] }),
+    primitive = batch.mesh.primitives[0],
+    source = primitive.vertices,
+    pose = posedVertices(primitive);
+  assert.ok(pose, 'the batch registers a pose source');
+  // + 0: a zero term of the matrix gives -0, which the pass writes too.
+  const at = (i, from, n) => Array.from(pose.vertices.subarray(i * 20 + from, i * 20 + from + n), (v) => v + 0);
+  // Vertex 3 of the quad is (2, 2, 0): mirrored x, doubled y, then moved.
+  assert.deepEqual(at(3, 0, 4), [-1, 6, 3, 1]);
+  // The normal matrix is the cofactor matrix times the handedness: +z stays +z for this matrix.
+  assert.deepEqual(at(3, 4, 4), [0, 0, 1, 0]);
+  const tangent = Array.from(source.subarray(3 * 20 + 8, 3 * 20 + 12));
+  assert.deepEqual(at(3, 8, 4), [-tangent[0] + 0, 2 * tangent[1] + 0, tangent[2] + 0, -tangent[3] + 0], 'tangent w flips');
+  assert.deepEqual(at(3, 12, 4), Array.from(source.subarray(3 * 20 + 12, 3 * 20 + 16)), 'uv kept');
+  assert.deepEqual(at(0, 16, 4), [0.5, 0, 0, 1], 'vertex colour times the tint, alpha kept');
+  assert.equal(posedVertices(primitive), pose, 'unchanged: the same pose');
+  const revision = pose.revision;
+  batch.setColor(id, [1, 1, 1]);
+  assert.notEqual(posedVertices(primitive).revision, revision, 'a change gives a new revision');
+  batch.setVisible(id, false);
+  assert.equal(posedVertices(primitive), pose, 'evaluated on demand, into the same array');
+  assert.deepEqual(at(3, 0, 12), [0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1], 'hidden: the pass collapses it');
+  batch.dispose();
+  assert.equal(posedVertices(primitive), undefined, 'a disposed batch gives no pose');
 });
 
 test('the batch shader reads each vertex owner and item record', () => {

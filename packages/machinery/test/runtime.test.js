@@ -11,6 +11,8 @@ import {
   edgeAnchor,
   ExplodedView,
 } from '../dist/index.js';
+import { setMeshSource } from '../../shared/mesh-source.js';
+import { setPoseSource, clearPoseSource } from '../../shared/pose-source.js';
 async function scene(capacity = 16) {
   return new Engine(
     { width: 200, height: 200, clientWidth: 200, clientHeight: 200 },
@@ -306,6 +308,45 @@ test('Assembly BVH ray picking and vertex/edge snapping agree with translated mi
     assert.equal(bvh.raycast([0, 2, 4], [0, 0, -1]), null);
     bvh.dispose();
     assert.throws(() => bvh.raycast([0, 0, 4], [0, 0, -1]), /disposed/);
+  } finally {
+    e.dispose();
+  }
+});
+// KB-BVH-SYNCPOSE-BATCHED1: AssemblyBVH read `primitive.vertices` and refused every mesh deformed on the GPU, an
+// Animation's or a BatchedMesh's included. It now holds the CPU pose the deformer gives (packages/shared/pose-source.js)
+// and treats a new pose as a move: rebuild() builds that BVH again, and a raycast before it throws 'state'.
+test('Assembly BVH holds a GPU-deformed part at its CPU pose and rebuilds it when the pose changes', async () => {
+  const e = await scene();
+  try {
+    // A gltf/pbr-style primitive (20 floats a vertex) whose drawn pose a deformer writes on the GPU.
+    const triangle = (x) => {
+        const v = new Float32Array(60);
+        v.set([x, 0, 0], 0);
+        v.set([x + 1, 0, 0], 20);
+        v.set([x, 1, 0], 40);
+        return v;
+      },
+      primitive = { vertices: triangle(0), indices: new Uint32Array([0, 1, 2]), deformed: {} },
+      node = e.createMesh(),
+      pose = { vertices: triangle(10), revision: 1 },
+      source = () => pose;
+    setMeshSource(node, { model: { disposed: false }, primitives: [primitive] });
+    e.render();
+    await assert.rejects(AssemblyBVH.create([node]), { code: 'unsupported' }, 'no CPU pose: refused, never the bind pose');
+    setPoseSource(primitive, source);
+    const bvh = await AssemblyBVH.create([node]);
+    assert.equal(bvh.raycast([0.2, 0.2, 4], [0, 0, -1]), null, 'the bind pose is not what is drawn');
+    near(bvh.raycast([10.2, 0.2, 4], [0, 0, -1]).distance, 4);
+    // The deformer rewrites its pose in place with a new revision.
+    pose.vertices.set(triangle(20));
+    pose.revision = 2;
+    assert.throws(() => bvh.raycast([20.2, 0.2, 4], [0, 0, -1]), { code: 'state' });
+    bvh.rebuild();
+    assert.equal(bvh.raycast([10.2, 0.2, 4], [0, 0, -1]), null, 'the old pose is gone');
+    near(bvh.raycast([20.2, 0.2, 4], [0, 0, -1]).distance, 4);
+    clearPoseSource(primitive, source);
+    assert.throws(() => bvh.rebuild(), { code: 'unsupported' });
+    bvh.dispose();
   } finally {
     e.dispose();
   }

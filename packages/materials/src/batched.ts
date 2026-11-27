@@ -9,6 +9,7 @@ import type { PBRDeformationContext } from '@margoengine/gltf/pbr';
 import { MargoError } from '@margoengine/math/errors';
 import { parseColor, type ColorInput } from '@margoengine/math/color';
 import { Material, createMesh, packGeometry, type MaterialMesh, type MeshGeometry } from './built-material.js';
+import { clearPoseSource, setPoseSource, type PoseSource } from '../../shared/pose-source.js';
 declare const GPUBufferUsage: { STORAGE: number; VERTEX: number; COPY_DST: number; COPY_SRC: number; UNIFORM: number };
 
 /** Capacity of a {@link BatchedMesh}, fixed at creation. */
@@ -35,6 +36,8 @@ export interface BatchedItemOptions {
 // Per item on the GPU: matrix (16 floats), then linear rgb tint and a visible flag.
 const ITEM = 20;
 const NONE = 0xffffffff;
+// What the compute pass writes for a hidden or free slot: position at the origin, normal +z, tangent +x.
+const COLLAPSED = [0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1];
 /** @internal The batch compute pass: one invocation per vertex slot, reading its item's matrix and tint. */
 export const batchShader = /* wgsl */ `
 struct Vertex {position:vec4f,normal:vec4f,tangent:vec4f,uv:vec4f,color:vec4f}
@@ -109,6 +112,66 @@ export class BatchedMesh implements EnginePlugin {
   };
   private unsubscribe?: () => void;
   private readonly prepare = (context: PBRDeformationContext) => this.update(context);
+  /** Bumped by every change the compute pass would draw (items, vertices, owners). */
+  private revision = 0;
+  private posed?: { vertices: Float32Array; revision: number };
+  /**
+   * The batch's CPU pose (packages/shared/pose-source.js), so a synchronous raycast or an AssemblyBVH tests the items
+   * where they are drawn: the compute pass's arithmetic term for term (batchShader), each vertex through its item's
+   * matrix, hidden and free slots collapsed to the origin. Evaluated on demand, once per change.
+   */
+  private readonly pose: PoseSource = () => {
+    const gpu = this.gpu,
+      primitive = this.mesh.primitives[0];
+    if (!gpu || this.disposed || primitive.deformed !== gpu.output) return undefined;
+    const posed = (this.posed ??= { vertices: new Float32Array(primitive.vertices.length), revision: -1 });
+    if (posed.revision === this.revision) return posed;
+    const out = posed.vertices,
+      source = primitive.vertices,
+      items = this.items;
+    for (let i = 0; i < this.nextVertex; i++) {
+      const v = i * 20,
+        k = this.owner[i],
+        q = k * ITEM;
+      out.set(source.subarray(v + 12, v + 20), v + 12);
+      if (k === NONE || items[q + 19] < 0.5) {
+        out.set(COLLAPSED, v);
+        continue;
+      }
+      const m = items.subarray(q, q + 16),
+        // Normal matrix columns: the cross products of the matrix columns (its cofactors, as the shader builds them).
+        c0x = m[5] * m[10] - m[6] * m[9],
+        c0y = m[6] * m[8] - m[4] * m[10],
+        c0z = m[4] * m[9] - m[5] * m[8],
+        c1x = m[9] * m[2] - m[10] * m[1],
+        c1y = m[10] * m[0] - m[8] * m[2],
+        c1z = m[8] * m[1] - m[9] * m[0],
+        c2x = m[1] * m[6] - m[2] * m[5],
+        c2y = m[2] * m[4] - m[0] * m[6],
+        c2z = m[0] * m[5] - m[1] * m[4],
+        hand = m[0] * c0x + m[1] * c0y + m[2] * c0z >= 0 ? 1 : -1,
+        [px, py, pz] = [source[v], source[v + 1], source[v + 2]],
+        [nx, ny, nz] = [source[v + 4], source[v + 5], source[v + 6]],
+        [tx, ty, tz] = [source[v + 8], source[v + 9], source[v + 10]],
+        bx = (c0x * nx + c1x * ny + c2x * nz) * hand,
+        by = (c0y * nx + c1y * ny + c2y * nz) * hand,
+        bz = (c0z * nx + c1z * ny + c2z * nz) * hand,
+        length = Math.hypot(bx, by, bz);
+      out[v] = m[0] * px + m[4] * py + m[8] * pz + m[12];
+      out[v + 1] = m[1] * px + m[5] * py + m[9] * pz + m[13];
+      out[v + 2] = m[2] * px + m[6] * py + m[10] * pz + m[14];
+      out[v + 3] = 1;
+      if (length > 0) out.set([bx / length, by / length, bz / length, 0], v + 4);
+      else out.set([0, 1, 0, 0], v + 4);
+      out[v + 8] = m[0] * tx + m[4] * ty + m[8] * tz;
+      out[v + 9] = m[1] * tx + m[5] * ty + m[9] * tz;
+      out[v + 10] = m[2] * tx + m[6] * ty + m[10] * tz;
+      out[v + 11] = source[v + 11] * hand;
+      for (let c = 0; c < 3; c++) out[v + 16 + c] = source[v + 16 + c] * items[q + 16 + c];
+    }
+    posed.revision = this.revision;
+    return posed;
+  };
 
   private constructor(engine: EngineKernel, material: Material, o: BatchedMeshOptions) {
     const { maxItems, maxVertices } = o,
@@ -390,7 +453,10 @@ export class BatchedMesh implements EnginePlugin {
     this.mark(this.dirtyItems, 0, this.ranges.length);
     this.mark(this.dirtyVertices, 0, this.nextVertex);
     this.mark(this.dirtyIndices, 0, this.nextIndex);
-    for (const p of this.mesh.primitives) p.deformed = output;
+    for (const p of this.mesh.primitives) {
+      p.deformed = output;
+      setPoseSource(p, this.pose);
+    }
     this.mesh.prepareDeformation = this.prepare;
   }
   registerPasses(graph: FrameGraph): void {
@@ -444,6 +510,7 @@ export class BatchedMesh implements EnginePlugin {
     }
   }
   private mark(range: [number, number], from: number, to: number): void {
+    this.revision++;
     range[0] = Math.min(range[0], from);
     range[1] = Math.max(range[1], to);
   }
@@ -461,7 +528,10 @@ export class BatchedMesh implements EnginePlugin {
     const gpu = this.gpu;
     if (!gpu) return;
     if (this.mesh.prepareDeformation === this.prepare) this.mesh.prepareDeformation = undefined;
-    for (const p of this.mesh.primitives) if (p.deformed === gpu.output) p.deformed = undefined;
+    for (const p of this.mesh.primitives) {
+      if (p.deformed === gpu.output) p.deformed = undefined;
+      clearPoseSource(p, this.pose);
+    }
     for (const b of gpu.buffers) b.destroy();
     this.gpu = undefined;
   }

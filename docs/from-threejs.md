@@ -1282,7 +1282,7 @@ What most often goes wrong in a port, with the fix.
 | Everything attaches at once | `Environment.attach` is asynchronous | `await` it before `EnvironmentLighting.attach`. |
 | `render()` runs your frame code | `onFrame` callbacks run only from the started loop | Call `engine.start()`, or run your update before `render`. |
 | `scene.background` shows as written under post effects | Under a post effect the colour is linear light in the scene, so the effect's tone map darkens it with the meshes (`#808080` shows as 116, not 128); on the bare canvas it shows as written | Pick the colour under the chain you ship. |
-| A raycast on an animated character | Synchronous BVH rays hit the current pose under `Animation`, `Skin` and `GeometryCachePlayer`; they throw under a `skinning` mode, `MorphWeightPlayer` or `BatchedMesh` | `await raycaster.intersectModel(model)` or GPU picking for those. |
+| A raycast on an animated character | Synchronous BVH rays hit the current pose under `Animation`, `Skin`, `GeometryCachePlayer` and `BatchedMesh`; they throw under a `skinning` mode or `MorphWeightPlayer` | `await raycaster.intersectModel(model)` or GPU picking for those. |
 | `mixer.update(delta)` in your loop | An attached mixer is already advanced by the engine; calling it too doubles the speed | Delete the call. |
 | A depth shader with `less` comparisons | WebGPU depth is reversed (near 1, far 0) | Use `greater`, or `DepthTexture`'s `distance`. |
 | `new WebGLRenderer` runs anywhere with WebGL 2 | Core needs WebGPU | `await install()` from `@margoengine/webgl2-compat` first when `navigator.gpu` gives no adapter. |
