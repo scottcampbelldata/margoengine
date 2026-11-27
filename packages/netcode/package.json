@@ -134,7 +134,7 @@
   "scripts": {
     "build": "node ../../scripts/build-optional.js netcode",
     "test": "npm run build && node --test tests/*.test.js",
-    "test:browser": "npm run build && node tests/browser/signal.mjs",
+    "test:browser": "npm run build && node tests/browser/signal.mjs && node tests/browser/media.mjs",
     "prepack": "npm run build"
   }
 }

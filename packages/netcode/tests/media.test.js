@@ -157,7 +157,10 @@ test('media: voice tracks go on every link and renegotiate, late links get them,
     audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
     video: false,
   });
-  assert.deepEqual(offerer.log.filter((l) => l.startsWith('add')), ['add audio']);
+  assert.deepEqual(
+    offerer.log.filter((l) => l.startsWith('add')),
+    ['add audio'],
+  );
   await until(() => offers() === before + 1);
   assert.equal(offerer.senders[0].track, d.streams[0].tracks[0]);
   await offerer.setRemoteDescription({ type: 'answer' }); // the far end answers, so the link is stable again
@@ -325,6 +328,116 @@ test('media: remote voice and screen arrive, play through volume and spatial nod
   await reader;
   assert.equal(media.remotes.has(3), false);
   media.dispose();
+});
+
+/** Sets browser globals for one test and puts back what was there. */
+function globals(t, values) {
+  for (const [name, value] of Object.entries(values)) {
+    const before = Object.getOwnPropertyDescriptor(globalThis, name);
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+    t.after(() => (before ? Object.defineProperty(globalThis, name, before) : delete globalThis[name]));
+  }
+}
+
+const arrive = (peer, stream) => {
+  const event = new Event('track');
+  Object.assign(event, { streams: [stream], track: stream.tracks[0] });
+  peer.dispatchEvent(event);
+};
+
+test('media: a muted element plays each remote voice, so the browser decodes it (KB-NETCODE-VOICESILENT1)', async (t) => {
+  const elements = [];
+  let refuse = false;
+  globals(t, {
+    Audio: class {
+      muted = false;
+      srcObject = null;
+      playing = false;
+      constructor() {
+        elements.push(this);
+      }
+      play() {
+        this.playing = true;
+        return refuse ? Promise.reject(new Error('cannot play')) : Promise.resolve();
+      }
+      pause() {
+        this.playing = false;
+      }
+    },
+  });
+  const peers = new Map(),
+    mesh = { peerConnections: peers, onlink: null, onunlink: null },
+    media = new MediaSession(mesh, { mediaDevices: devices(), pollMs: 0, audioContext: audio() }),
+    errors = [];
+  media.addEventListener('error', (e) => errors.push([e.detail.peer, e.detail.error.message]));
+  const peer = new Peer();
+  peers.set(3, peer);
+  mesh.onlink(3, peer);
+  const voice = new Stream([new Track('audio')]);
+  arrive(peer, voice);
+  arrive(peer, new Stream([new Track('video')]));
+  assert.equal(elements.length, 1, 'the screen needs no sink');
+  assert.deepEqual([elements[0].muted, elements[0].srcObject, elements[0].playing], [true, voice, true]);
+  mesh.onunlink(3, peer);
+  assert.deepEqual([elements[0].srcObject, elements[0].playing], [null, false]);
+  // A play() that a leaving voice interrupted says nothing; one that fails while the voice is on is an error.
+  refuse = true;
+  mesh.onlink(3, peer);
+  arrive(peer, new Stream([new Track('audio')]));
+  mesh.onunlink(3, peer);
+  await new Promise((r) => setTimeout(r, 1));
+  assert.deepEqual(errors, []);
+  mesh.onlink(3, peer);
+  arrive(peer, new Stream([new Track('audio')]));
+  await until(() => errors.length === 1);
+  assert.deepEqual(errors, [[3, 'cannot play']]);
+  media.dispose();
+  assert.ok(elements.every((e) => !e.playing && e.srcObject === null));
+});
+
+test('media: the context a session makes resumes on a gesture and closes with it (KB-NETCODE-VOICEGESTURE1)', async (t) => {
+  const page = new EventTarget(),
+    made = [];
+  globals(t, {
+    document: page,
+    AudioContext: function () {
+      const context = Object.assign(audio(), {
+        state: 'suspended',
+        resumed: 0,
+        closed: false,
+        async resume() {
+          context.resumed++;
+          context.state = 'running';
+        },
+        async close() {
+          context.closed = true;
+        },
+      });
+      made.push(context);
+      return context;
+    },
+  });
+  const mesh = { peerConnections: new Map(), onlink: null, onunlink: null },
+    media = new MediaSession(mesh, { mediaDevices: devices(), pollMs: 0 });
+  await media.startVoice();
+  assert.equal(made[0].resumed, 0, 'nothing resumes before a gesture');
+  page.dispatchEvent(new Event('pointerdown'));
+  await new Promise((r) => setTimeout(r, 1));
+  page.dispatchEvent(new Event('keydown'));
+  assert.equal(made[0].resumed, 1, 'once running, the listeners are gone');
+  media.dispose();
+  assert.equal(made[0].closed, true);
+  // A session disposed while still suspended leaves no listener behind.
+  const second = new MediaSession(mesh, { mediaDevices: devices(), pollMs: 0 });
+  await second.startVoice();
+  second.dispose();
+  page.dispatchEvent(new Event('pointerdown'));
+  assert.equal(made[1].resumed, 0);
+  // A context passed in stays the caller's.
+  const own = Object.assign(audio(), { state: 'suspended', close: () => assert.fail('closed a passed context') }),
+    third = new MediaSession(mesh, { mediaDevices: devices(), pollMs: 0, audioContext: own });
+  await third.startVoice();
+  third.dispose();
 });
 
 test('speaking detector: hysteresis and range check', () => {

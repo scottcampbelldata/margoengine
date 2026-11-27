@@ -14,7 +14,9 @@ export interface MediaSessionOptions {
   /** The `navigator.mediaDevices` to use (default the global one, in a browser). */
   mediaDevices?: Pick<MediaDevices, 'getUserMedia' | 'getDisplayMedia'>;
   /**
-   * The Web Audio context that plays remote voices and measures levels (default: one is made on first use). Without
+   * The Web Audio context that plays remote voices and measures levels (default: one is made on first use, resumed on
+   * the page's first click or key press if the browser starts it suspended, and closed by `dispose()`; resume and close
+   * one you pass yourself). Without
    * Web Audio (no `AudioContext` and none passed) voices are not played or measured: remote streams are still given on
    * `peer.stream` for your own `<audio>` element.
    */
@@ -102,8 +104,7 @@ export class SpeakingDetector {
     readonly off = 0.02,
     readonly hangMs = 250,
   ) {
-    if (!(off >= 0 && on > off))
-      throw new RangeError(`SpeakingDetector needs 0 <= off < on; got off ${off}, on ${on}`);
+    if (!(off >= 0 && on > off)) throw new RangeError(`SpeakingDetector needs 0 <= off < on; got off ${off}, on ${on}`);
   }
   /** Feeds one level at time `now` (ms); returns true when `speaking` changed. */
   update(level: number, now: number): boolean {
@@ -141,6 +142,8 @@ interface Meter {
 interface Voice {
   source: MediaStreamAudioSourceNode;
   volume: GainNode;
+  /** The muted media element that plays the stream, so the browser decodes it; undefined without `Audio`. */
+  sink: HTMLAudioElement | undefined;
 }
 
 interface Sent {
@@ -169,6 +172,8 @@ export class MediaSession extends EventTarget {
   readonly remotes = new Map<number, RemoteMedia>();
   private readonly devices: Pick<MediaDevices, 'getUserMedia' | 'getDisplayMedia'> | undefined;
   private context: AudioContext | undefined;
+  /** True when this session made `context`, so it unlocks and closes it. */
+  private ownsContext = false;
   private readonly options: MediaSessionOptions;
   private readonly now: () => number;
   private readonly sent = new Map<'voice' | 'screen', Sent>();
@@ -192,7 +197,10 @@ export class MediaSession extends EventTarget {
     this.options = options;
     this.devices = options.mediaDevices ?? globalThis.navigator?.mediaDevices;
     if (!this.devices)
-      throw fault('unsupported', 'MediaSession needs navigator.mediaDevices; run it in a browser (HTTPS) or pass mediaDevices');
+      throw fault(
+        'unsupported',
+        'MediaSession needs navigator.mediaDevices; run it in a browser (HTTPS) or pass mediaDevices',
+      );
     this.context = options.audioContext;
     this.now = options.now ?? (() => performance.now());
     this.ptt = options.pushToTalk ?? false;
@@ -220,7 +228,10 @@ export class MediaSession extends EventTarget {
   }
 
   /** Events of one type as an async iterator; it ends when `signal` aborts or the session is disposed. */
-  async *events<K extends keyof MediaEventMap>(type: K, { signal }: { signal?: AbortSignal } = {}): AsyncGenerator<MediaEventMap[K]> {
+  async *events<K extends keyof MediaEventMap>(
+    type: K,
+    { signal }: { signal?: AbortSignal } = {},
+  ): AsyncGenerator<MediaEventMap[K]> {
     const queue: Array<MediaEventMap[K]> = [];
     let wake: (() => void) | undefined;
     const push = (event: Event) => {
@@ -246,7 +257,30 @@ export class MediaSession extends EventTarget {
   private audio(): AudioContext | undefined {
     if (this.context) return this.context;
     const Context = (globalThis as { AudioContext?: typeof AudioContext }).AudioContext;
-    return Context ? (this.context = new Context()) : undefined;
+    if (!Context) return undefined;
+    this.context = new Context();
+    this.ownsContext = true;
+    this.unlock(this.context);
+    return this.context;
+  }
+
+  /**
+   * A context made before the page's first click, tap or key press starts suspended and stays silent until `resume()`
+   * runs after one (HTML user activation), so resume it on the first.
+   */
+  private unlock(context: AudioContext): void {
+    const page = (globalThis as { document?: Document }).document;
+    if (context.state !== 'suspended' || !page) return;
+    const gestures = ['pointerdown', 'pointerup', 'keydown', 'touchend'];
+    const resume = () =>
+      void context.resume().then(stop, (error: unknown) => {
+        if (!this.disposed) this.emit('error', { peer: 'self', error });
+      });
+    const stop = () => {
+      for (const type of gestures) page.removeEventListener(type, resume, true);
+    };
+    for (const type of gestures) page.addEventListener(type, resume, true);
+    this.cleanup.push(stop);
   }
 
   private meter(peer: MediaPeer, node: AudioNode): void {
@@ -280,10 +314,7 @@ export class MediaSession extends EventTarget {
 
   // ---- sending ----
 
-  private async capture(
-    get: () => Promise<MediaStream>,
-    signal: AbortSignal | undefined,
-  ): Promise<MediaStream> {
+  private async capture(get: () => Promise<MediaStream>, signal: AbortSignal | undefined): Promise<MediaStream> {
     if (this.disposed) throw fault('disposed', 'MediaSession is disposed; create a new one');
     signal?.throwIfAborted();
     const pending = get();
@@ -297,7 +328,10 @@ export class MediaSession extends EventTarget {
       return stream;
     } catch (error) {
       // The capture that finishes after the abort must not leave the microphone or screen open.
-      void pending.then((late) => late.getTracks().forEach((track) => track.stop()), () => {});
+      void pending.then(
+        (late) => late.getTracks().forEach((track) => track.stop()),
+        () => {},
+      );
       throw error;
     } finally {
       if (abort) signal?.removeEventListener('abort', abort);
@@ -362,7 +396,9 @@ export class MediaSession extends EventTarget {
     );
     if (this.sent.has('voice') || this.disposed) {
       for (const track of stream.getTracks()) track.stop();
-      throw this.disposed ? fault('disposed', 'MediaSession is disposed; create a new one') : fault('state', 'Voice is already on; call stopVoice first');
+      throw this.disposed
+        ? fault('disposed', 'MediaSession is disposed; create a new one')
+        : fault('state', 'Voice is already on; call stopVoice first');
     }
     this.send('voice', stream);
     this.applyOpen();
@@ -403,12 +439,17 @@ export class MediaSession extends EventTarget {
    * @throws MargoError `state` when a share is already on; the signal's reason when `signal` aborts; the browser's
    * error (a `NotAllowedError` when the user declines) otherwise.
    */
-  async startScreenShare({ signal, constraints = { video: true, audio: false } }: ScreenShareOptions = {}): Promise<void> {
+  async startScreenShare({
+    signal,
+    constraints = { video: true, audio: false },
+  }: ScreenShareOptions = {}): Promise<void> {
     if (this.sent.has('screen')) throw fault('state', 'A screen is already shared; call stopScreenShare first');
     const stream = await this.capture(() => this.devices!.getDisplayMedia(constraints), signal);
     if (this.sent.has('screen') || this.disposed) {
       for (const track of stream.getTracks()) track.stop();
-      throw this.disposed ? fault('disposed', 'MediaSession is disposed; create a new one') : fault('state', 'A screen is already shared; call stopScreenShare first');
+      throw this.disposed
+        ? fault('disposed', 'MediaSession is disposed; create a new one')
+        : fault('state', 'A screen is already shared; call stopScreenShare first');
     }
     const ended = () => {
       if (this.sent.get('screen')?.stream !== stream) return;
@@ -449,7 +490,11 @@ export class MediaSession extends EventTarget {
 
   private remote(id: number): RemoteMedia {
     let remote = this.remotes.get(id);
-    if (!remote) this.remotes.set(id, (remote = { peer: id, voice: null, screen: null, volume: 1, muted: false, speaking: false }));
+    if (!remote)
+      this.remotes.set(
+        id,
+        (remote = { peer: id, voice: null, screen: null, volume: 1, muted: false, speaking: false }),
+      );
     return remote;
   }
 
@@ -489,14 +534,33 @@ export class MediaSession extends EventTarget {
     const context = this.audio();
     if (!context) return;
     this.unplay(id);
-    const source = context.createMediaStreamSource(stream),
+    const sink = this.sink(id, stream),
+      source = context.createMediaStreamSource(stream),
       volume = context.createGain();
     source.connect(volume);
     // Level is read before the volume node, so a muted peer still shows as speaking.
     this.meter(id, source);
-    this.voices.set(id, { source, volume });
+    this.voices.set(id, { source, volume, sink });
     this.applyVolume(id);
     volume.connect(this.options.spatial?.(id, volume, context) ?? context.destination);
+  }
+
+  /**
+   * Chromium decodes a remote WebRTC voice only while a media element plays it: until then
+   * `createMediaStreamSource` gives silence (Chromium issue 933677). A muted element, which autoplay policies let
+   * play without a gesture, pulls the voice; the sound still comes from the Web Audio graph alone.
+   */
+  private sink(id: number, stream: MediaStream): HTMLAudioElement | undefined {
+    const Element = (globalThis as { Audio?: typeof Audio }).Audio;
+    if (!Element) return undefined;
+    const sink = new Element();
+    sink.muted = true;
+    sink.srcObject = stream;
+    sink.play().catch((error: unknown) => {
+      // A voice that went meanwhile interrupts its own play(); only a voice still on has failed.
+      if (this.voices.get(id)?.sink === sink) this.emit('error', { peer: id, error });
+    });
+    return sink;
   }
 
   private unplay(id: number): void {
@@ -504,6 +568,10 @@ export class MediaSession extends EventTarget {
     if (!voice) return;
     voice.source.disconnect();
     voice.volume.disconnect();
+    if (voice.sink) {
+      voice.sink.pause();
+      voice.sink.srcObject = null;
+    }
     this.voices.delete(id);
     this.meters.delete(id);
     const remote = this.remotes.get(id);
@@ -520,7 +588,10 @@ export class MediaSession extends EventTarget {
     this.remotes.delete(id);
   }
 
-  /** Stops every track this end sends, leaves the mesh's hooks and ends event iterators. The mesh and its links stay. */
+  /**
+   * Stops every track this end sends, leaves the mesh's hooks, closes the audio context the session made and ends event
+   * iterators. The mesh, its links and a context you passed stay.
+   */
   dispose(): void {
     if (this.disposed) return;
     this.stopVoice();
@@ -531,6 +602,7 @@ export class MediaSession extends EventTarget {
     for (const undo of this.cleanup.splice(0)) undo();
     this.mesh.onlink = this.before;
     this.mesh.onunlink = this.beforeUnlink;
+    if (this.ownsContext) void this.context!.close();
     this.dispatchEvent(new Event('dispose'));
   }
   /** Same as {@link MediaSession.dispose}, for `using`. */

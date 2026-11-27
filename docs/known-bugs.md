@@ -6,6 +6,31 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a remote voice was silent in Chromium (KB-NETCODE-VOICESILENT1, netcode)
+
+- **Repro (before):** two pages joined by `PeerMesh` and `MediaSession` in Edge 158, A with `startVoice()`: B got the
+  `remote` event and the packets (8,353 bytes in 2 s), but its meter read 0, no `speaking` event came, the inbound RTP
+  report said audio level 0 and nothing could be heard. The same stream on a media element read 0.354 for A's tone.
+- **Cause:** Chromium decodes a remote WebRTC voice only while a media element plays it; a
+  `MediaStreamAudioSourceNode` alone gets silence (Chromium issue 933677). `MediaSession` played voices through Web
+  Audio only (`packages/netcode/src/media.ts`), and its tests used stand-in streams.
+- **Fix:** each remote voice is also held by a muted `Audio` element, released when the voice goes. Sound still comes
+  from the Web Audio graph alone, so volume, mute and `spatial` work as before.
+- **Regression:** `packages/netcode/tests/browser/media.mjs` (real Chromium, fake microphone: "B hears A speaking"
+  failed before) and `packages/netcode/tests/media.test.js` "KB-NETCODE-VOICESILENT1".
+
+### Fixed 2026-11-27: a listener who had not clicked yet never heard anything (KB-NETCODE-VOICEGESTURE1, netcode)
+
+- **Repro (before):** a page that joins a room and makes a `MediaSession` without an `audioContext` before any click or
+  key press: when a voice arrived, the session's own context started `suspended` and stayed so after later clicks. The
+  context is private, so the app could not resume it. `dispose()` also left that context open.
+- **Cause:** browsers start an `AudioContext` made without user activation suspended until `resume()` runs after a
+  gesture; nothing called it, and nothing closed the context.
+- **Fix:** a context the session makes is resumed on the first `pointerdown`, `pointerup`, `keydown` or `touchend` of
+  the page and closed by `dispose()`; a context passed in stays the caller's.
+- **Regression:** `packages/netcode/tests/browser/media.mjs` (the untouched listener, strict autoplay policy) and
+  `packages/netcode/tests/media.test.js` "KB-NETCODE-VOICEGESTURE1".
+
 ### Open 2026-11-27: a resting vehicle's dampers read the end-of-step velocity of a substepped body (KB-PHYS-VEHICLEREST1, physics)
 
 - **Repro:** `Vehicle.car(physics, chassis)` on a floor (the quick start of `packages/physics/README.md`), 300 steps:

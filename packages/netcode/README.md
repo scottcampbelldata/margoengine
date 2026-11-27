@@ -1260,6 +1260,8 @@ reliable.
 
 `@margoengine/netcode/media` adds microphone and screen tracks to the WebRTC links of a `PeerMesh`. Starting or stopping one renegotiates over the same signalling (the mesh runs the W3C "perfect negotiation" pattern: the peer with the higher room id is polite and gives way when both offer at once). A remote stream with video is a screen; one with only audio is a voice. Any number of peers may share a screen at once.
 
+Remote voices play through Web Audio (volume, per-peer mute, the `spatial` hook and the speaking lights). The session also holds each voice in a muted media element, because Chromium decodes a remote voice only while one plays it. An `AudioContext` the session makes is resumed on the page's first click or key press if the browser starts it suspended, and closed by `dispose()`. Resume and close a context you pass yourself, from a click handler for example.
+
 ```ts
 import type { PeerMesh } from '@margoengine/netcode/signal';
 import { MediaSession, type MediaSessionEvent } from '@margoengine/netcode/media';
