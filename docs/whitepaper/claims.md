@@ -6786,5 +6786,7 @@ and DOF with two views, with and without Tonemap, and SceneFade over overlapping
 Claim: a furnished multi-storey building from the rules has a stair, stair hall, spiral or ladder to every storey, and
 joined plans open into each other on every floor. Proof: `packages/procedural/test/building-reach.test.js` walks 1,500
 random buildings and 500 random plans, and `packages/procedural/test/buildings-browser.mjs` draws cutaways on WebGPU
-and the WebGL2 layer. Not claimed: compliance with a building code as a whole (the figures kept are each stair's own),
-or wings whose floor levels differ from the main block's.
+and the WebGL2 layer. Wings with their own floor levels are joined by steps or walled off with their own door: the same
+test walks 300 random ones on their meshes, to every room and past no open ledge. Not claimed: compliance with a
+building code as a whole (the figures kept are each stair's own), or steps at every pair of unequal floors (a pair with
+too little headroom or no clear floor is walled off).

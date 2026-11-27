@@ -1221,8 +1221,24 @@ stair tower, entered from the main block, with the whole stack of its flights in
 floors the main block lacks, or stands apart from it, gets its own stair (a wing's own `stairs` option overrides
 this). Where every ground floor door is inside another block, the tower or a wing gets a door.
 
-It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, stairs, roofHeight(x, z),
-insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding`; `roofHeight` is the upper envelope of
+A wing given by hand with its own `plinth` or `storeys` may stand at other floor levels than the main block. A change of
+one riser or less stays an open step. A larger one is walled, with a doorway and a flight of steps at the join wherever
+one fits under the ceiling (`joinSteps`): risers at most 7 3/4 in, treads at least 10 in and 36 in wide in the western
+sets (International Residential Code 2021, R311.7, with a handrail from four risers and a guard over 30 in), and at
+most 23 cm, 15 cm and 75 cm or more in the Japanese ones (Order art. 23), the house and concrete sets using their own
+narrower limits. Between two ground floors a flight is sunk into the higher floor where the lower ceiling is too low to
+climb under. Where no flight fits, the join is walled off and the wing gets its own door, so no floor ends in an open
+ledge. Furniture keeps off the steps and their landings.
+
+```ts
+import {generateBuildingPlan} from 'margoengine/procedural/building-plans';
+const split = generateBuildingPlan({style: 'western-1910-house', width: 12, depth: 8, storeys: [3.2, 3.2],
+  wings: [{at: [6.5, 0], width: 5, depth: 6, plinth: 0.2, storeys: [2.9, 2.9]}]});
+console.log(split.joinSteps.map((s) => `${s.risers} risers to ${s.to.toFixed(2)} m`)); // [ '3 risers to 0.60 m' ]
+```
+
+It returns `{parts, palette, blocks, top, openings, dormers, rooms, furniture, doorways, stairs, joinSteps,
+roofHeight(x, z), insideBlock(i, x, y, z)}` with the same parts and palette as `generateBuilding`; `roofHeight` is the upper envelope of
 the blocks' roofs. `BUILDING_PLAN_SETTINGS` and `buildingPlanOptionsFromSettings` in
 `@margoengine/procedural/building-settings` are its slider rows.
 

@@ -194,6 +194,20 @@ try {
       [generateBuilding, { style: 'western-1910-house', width: 3.2, depth: 3.6 }],
       [generateBuilding, { style: 'japan-2011-house', width: 3, depth: 3, wall: 0.7 }],
       [generateBuildingPlan, { style: 'western-1910-house', plan: 'L', tower: 'front-left', towerSize: 4 }],
+      // Wings at other floor levels: steps up to the main block, and a flight sunk into its ground floor.
+      ...[
+        { storeys: [3.2, 3.2], wing: [2.9, 2.9], plinth: 0.2 },
+        { storeys: [2.9, 2.9], wing: [2.5, 2.5], plinth: 0.15 },
+      ].map(({ storeys, wing, plinth }) => [
+        generateBuildingPlan,
+        {
+          style: 'western-1910-house',
+          width: 12,
+          depth: 8,
+          storeys,
+          wings: [{ at: [6.5, 0], width: 5, depth: 6, plinth, storeys: wing }],
+        },
+      ]),
     ]) {
       const at = [cuts.length * 40, 0, -600];
       const b = make({ ...options, origin: at, detail: 'near' });
@@ -201,14 +215,31 @@ try {
       const lo = Math.min(...b.rooms.map((r) => r.level)) - 0.01;
       for (const name of [...indoor, ...(b.blocks ? ['walls'] : [])]) {
         if (!b.parts[name]) continue;
-        const g = slice(b.parts[name], lo - (name === 'interior' ? 0.2 : 0), lo + (b.blocks ? 2.4 : 4));
+        // Steps start a little under their floor; a join is cut below the lower ceiling so it shows.
+        const under = name === 'interior' ? 0.2 : b.joinSteps?.length ? 0.2 : 0,
+          g = slice(b.parts[name], lo - under, lo + (b.joinSteps?.length ? 1.9 : b.blocks ? 2.4 : 4));
         if (g.indices.length) add(g, b.palette[name]);
       }
-      const r = b.blocks ? 14 : 5.5;
-      cuts.push([
-        [at[0] + r * 0.25, lo + r, at[2] + r * 0.75],
-        [at[0], lo + 1, at[2]],
-      ]);
+      const r = b.blocks ? 14 : 5.5,
+        flight = b.joinSteps?.[0];
+      if (flight) {
+        // Close over the steps at the join.
+        const x = at[0] + (flight.min[0] + flight.max[0]) / 2,
+          z = at[2] + (flight.min[1] + flight.max[1]) / 2;
+        // From the side the flight stands on, a little to one side of it.
+        const dx = flight.head[0] - flight.foot[0],
+          dz = flight.head[1] - flight.foot[1],
+          // Nearly overhead for a sunk flight, so its well shows past the wall.
+          d = (flight.sunken ? 0.7 : -1.8) / Math.hypot(dx, dz);
+        cuts.push([
+          [x + dx * d - dz * d * 0.5, flight.to + (flight.sunken ? 3.4 : 2.4), z + dz * d + dx * d * 0.5],
+          [x, flight.from, z],
+        ]);
+      } else
+        cuts.push([
+          [at[0] + r * 0.25, lo + r, at[2] + r * 0.75],
+          [at[0], lo + 1, at[2]],
+        ]);
     }
     const views = [
       [

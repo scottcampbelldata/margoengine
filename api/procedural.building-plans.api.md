@@ -12,6 +12,21 @@ export interface BuildingDormer {
 
 export type BuildingDormerKind = 'gable' | 'shed' | 'hip';
 
+export interface BuildingJoinStep {
+    readonly floor: number;
+    readonly from: number;
+    readonly to: number;
+    readonly min: readonly [number, number];
+    readonly max: readonly [number, number];
+    readonly foot: readonly [number, number];
+    readonly head: readonly [number, number];
+    readonly risers: number;
+    readonly rise: number;
+    readonly tread: number;
+    readonly width: number;
+    readonly sunken: boolean;
+}
+
 export interface BuildingPlanBlock {
     readonly kind: 'main' | 'wing' | 'tower' | 'dormer';
     readonly footprint: readonly (readonly [number, number])[];
@@ -57,6 +72,7 @@ export interface PlannedBuilding {
     readonly furniture: readonly BuildingFurniture[];
     readonly doorways: readonly BuildingDoorway[];
     readonly stairs: readonly BuildingStair[];
+    readonly joinSteps: readonly BuildingJoinStep[];
     roofHeight(x: number, z: number): number;
     insideBlock(index: number, x: number, y: number, z: number): boolean;
 }

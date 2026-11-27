@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21410381,
+  "total": 21416775,
   "history": [
     {
       "date": "2026-10-24",
@@ -15097,6 +15097,12 @@
       "commit": "lane-e",
       "reason": "parse3MFDisplacement tessellates and moves displacement meshes (the 3MF Displacement Extension: sampling, tile styles, per-edge subdivision, joins of section 5.2): loaders/threemf-displacement 13,066 to 15,806 B gzip; the PNG reader stays the optional decoders peer behind import(). A separate entry would only move the same code behind a second import that every caller of this entry needs by default.",
       "grew": 1
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "building-joins",
+      "reason": "Joined plans with unequal floors (KB-PROC-JOINLEVEL1): doorways, code flights of steps, sunk wells and walls at the join: procedural/building-plans 25,876 to 29,214 B gzip measured. generateBuildingPlan is synchronous and an unjoined floor is a defect, so a split entry would need a second import before a split-level house could be walked.",
+      "grew": 1
     }
   ],
   "items": {
@@ -16089,7 +16095,7 @@
     "@margoengine/post/trail": 3766,
     "@margoengine/post/upscale": 5068,
     "@margoengine/procedural": 18709,
-    "@margoengine/procedural/building-plans": 26653,
+    "@margoengine/procedural/building-plans": 30091,
     "@margoengine/procedural/building-rules": 20923,
     "@margoengine/procedural/building-settings": 5862,
     "@margoengine/procedural/buildings": 1758,

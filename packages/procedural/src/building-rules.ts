@@ -40,6 +40,8 @@ import {
   CURTAINS,
   type CurtainRun,
   type StairAvoid,
+  KEEP_CLEAR,
+  type KeepClear,
 } from './building-interiors.js';
 
 /** The style sets. Each is a full set of defaults; any option given overrides it. */
@@ -990,6 +992,7 @@ export function generateBuilding(options: BuildingRuleOptions = {}): Building {
     eaves,
     !flat,
     (options as { [STAIR_AVOID]?: StairAvoid })[STAIR_AVOID],
+    (options as { [KEEP_CLEAR]?: KeepClear })[KEEP_CLEAR],
   );
   // Base: the foundation from below the ground to the floor, slightly proud of the walls: a ring under the walls and,
   // inside it, a fill that stops under the ground floor's slab, so no face of it shares the floor's plane.

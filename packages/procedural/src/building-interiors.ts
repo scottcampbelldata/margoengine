@@ -70,6 +70,13 @@ export const STAIR_AVOID: unique symbol = Symbol('stairAvoid');
 export interface StairAvoid {
   readonly rects: readonly { x0: number; x1: number; z0: number; z1: number }[];
   readonly required: boolean;
+  /** Floor the stair also keeps out of where it can: before steps to a joined block of other floor levels. */
+  readonly soft?: StairAvoid['rects'];
+  /**
+   * Floor a wall at a join takes from this block (a block of other floor levels comes first there): partition doorways
+   * stay on this side of it where the partition leaves room.
+   */
+  readonly hidden?: StairAvoid['rects'];
   /** Where given, the stair's feet and heads stand in here: a tower's side that opens into the main block. */
   readonly from?: { x0: number; x1: number; z0: number; z1: number };
 }
@@ -83,6 +90,12 @@ export const WALL_LINING: unique symbol = Symbol('wallLining');
  * wall (local), so building-plans.ts can take them down with a window another block covers.
  */
 export const CURTAINS: unique symbol = Symbol('curtains');
+/**
+ * Floor (building-local) furniture keeps off, by storey: building-plans.ts sets it on a block's options where steps to
+ * a joined block stand or land.
+ */
+export const KEEP_CLEAR: unique symbol = Symbol('keepClear');
+export type KeepClear = readonly { floor: number; x0: number; x1: number; z0: number; z1: number }[];
 export interface CurtainRun {
   readonly part: 'fabric' | 'metalwork';
   readonly from: number;
@@ -129,7 +142,9 @@ const box = (b: MeshBuilder, x0: number, x1: number, y0: number, y1: number, z0:
 // Partition walls are 0.1 m (shoji and fusuma frames) and 0.12 m (a 2 by 4 stud wall with lath and plaster); doorways
 // are 0.86 by 1.8 m (fusuma opening) and 32 by 80 in (0.81 by 2.03 m).
 const ROOM_WIDTH = { japan: 3.64, western: 3.66 } as const;
-const SLAB = 0.2;
+export const SLAB = 0.2;
+/** Height of a doorway through a wall: a fusuma opening, 1.8 m, or an 80 in door. */
+export const doorHeight = (style: BuildingStyle) => (style.startsWith('japan') ? 1.8 : 2.03);
 
 interface Opening {
   axis: 'x' | 'z';
@@ -175,7 +190,7 @@ interface StairRule {
   handrail: number;
   solid: boolean;
 }
-function stairRule(style: BuildingStyle, area: number): StairRule {
+export function stairRule(style: BuildingStyle, area: number): StairRule {
   // Order art. 23: a stair under more than 200 square metres of rooms is at least 1.2 m wide, a smaller one 0.75 m.
   if (style === 'japan-2011-concrete')
     return {
@@ -364,7 +379,13 @@ function divides(room: Rect, body: Rect, pass: number) {
   return [0, 1].some((a) => low[a] < pass && high[a] < pass && low[1 - a] >= pass - 1e-9 && high[1 - a] >= pass - 1e-9);
 }
 
-type KeepOut = Pick<StairAvoid, 'rects' | 'from'>;
+type KeepOut = Pick<StairAvoid, 'rects' | 'from' | 'hidden'>;
+/** What a join leaves of a room: the largest part of it clear of every hidden rectangle. */
+const visible = (room: Rect, hidden: KeepOut['hidden'] = []) =>
+  hidden.reduce((r, h) => {
+    const area = (q: Rect) => (q.x1 - q.x0) * (q.z1 - q.z0);
+    return without(r, h).sort((a, b) => area(b) - area(a))[0] ?? r;
+  }, room);
 /** Whether every flight's foot and head stand within `from`. */
 const entered = (plan: StairPlan, from?: StairAvoid['from']) =>
   !from ||
@@ -415,7 +436,11 @@ function planStair(
                 entered({ ...shape, place }, keepOut.from) &&
                 layout.every(
                   (f) =>
-                    f.rooms.some((r) => within(whole, r) && !divides(r, body, pass)) &&
+                    f.rooms.some((q) => {
+                      // The way past is judged on what of the room a join leaves.
+                      const r = visible(q, keepOut.hidden);
+                      return within(whole, r) && !divides(r, body, pass);
+                    }) &&
                     !(doorways && f.doors.some((d) => overlaps(body, doorZone(d)))) &&
                     !f.openings.some((s) => gapTo(body, s) < (s.door ? byDoor : byWindow)),
                 );
@@ -496,7 +521,7 @@ function placeStair(
 }
 
 /** Posts, a top rail and balusters under a 4 in sphere along a straight edge, level or sloped. */
-function railing(
+export function railing(
   posts: MeshBuilder,
   a: V3,
   b: V3,
@@ -790,6 +815,7 @@ export function buildInterior(
   eaves: number,
   pitched: boolean,
   avoid?: StairAvoid,
+  clear?: KeepClear,
 ): Interior {
   const out: Interior = { curtains: [], rooms: [], furniture: [], doorways: [], stairs: [] };
   const W = o.width,
@@ -815,7 +841,7 @@ export function buildInterior(
     levels = pitched ? [...floors, eaves] : floors;
   const pt = japan ? 0.1 : 0.12,
     dw = japan ? 0.86 : 0.81,
-    dh = japan ? 1.8 : 2.03,
+    dh = doorHeight(o.style),
     bays = Math.max(1, Math.round(W / o.bayWidth)),
     bw = W / bays;
   // Each opening on the inner wall face, in local terms: the wall plane and the span along it.
@@ -868,6 +894,18 @@ export function buildInterior(
     columns = columnLines.length - 1,
     rowLines = clearOfJoins(z1 - z0 > 6 ? [z1 - 0.55 * (z1 - z0)] : [], 'x', z0, z1);
   type Wall = [number, number, number, number, number, number];
+  // The longest stretch from `lo` to `hi` of the partition at `line` that no join takes, if a doorway fits in it.
+  const shown = (axis: Opening['axis'], line: number, lo: number, hi: number): [number, number] => {
+    let out: [number, number] = [lo, hi];
+    for (const r of avoid?.hidden ?? []) {
+      const [at0, at1, h0, h1] = axis === 'z' ? [r.z0, r.z1, r.x0, r.x1] : [r.x0, r.x1, r.z0, r.z1];
+      if (line <= at0 || line >= at1 || h0 >= out[1] || h1 <= out[0]) continue;
+      const below = h0 - out[0],
+        above = out[1] - h1;
+      if (Math.max(below, above) >= dw + 0.1) out = below > above ? [out[0], h0] : [h1, out[1]];
+    }
+    return out;
+  };
   const floorPlan = (fy: number, k: number, walls: Wall[], hall?: Hall): Floor => {
     const cy = ceilingOf(k),
       xs = open(k) ? [x0, x1] : columnLines,
@@ -906,7 +944,8 @@ export function buildInterior(
         }
         // Too short for a door and its jambs: no partition, so no room is shut off.
         if (zb - za < dw + 0.1) continue;
-        const d0 = za + Math.min(0.3, (zb - za - dw) / 2),
+        const [va, vb] = shown('x', x, za, zb),
+          d0 = va + Math.min(0.3, (vb - va - dw) / 2),
           d1 = d0 + dw;
         walls.push([x - pt / 2, x + pt / 2, fy, cy, za, d0]);
         walls.push([x - pt / 2, x + pt / 2, fy, cy, d1, zb]);
@@ -935,7 +974,8 @@ export function buildInterior(
         }
         // Too short for a door and its jambs: no partition.
         if (xb - xa < dw + 0.1) continue;
-        const c = (xa + xb) / 2;
+        const [va, vb] = shown('z', z, xa, xb),
+          c = (va + vb) / 2;
         walls.push([xa, c - dw / 2, fy, cy, z - pt / 2, z + pt / 2]);
         walls.push([c + dw / 2, xb, fy, cy, z - pt / 2, z + pt / 2]);
         walls.push([c - dw / 2, c + dw / 2, fy + dh, cy, z - pt / 2, z + pt / 2]);
@@ -986,7 +1026,10 @@ export function buildInterior(
   if (o.interior === 'rooms' && o.stairs && floors.length > 1) {
     const find = (keepOut: KeepOut) =>
       placeStair(o.style, rule, floors, columns, rowLines.length - 1, (hall) => planFloors([], hall), keepOut);
-    chosen = find(avoid ?? { rects: [] }) ?? (avoid?.required ? find({ rects: [] }) : undefined);
+    chosen =
+      (avoid?.soft?.length ? find({ ...avoid, rects: [...avoid.rects, ...avoid.soft] }) : undefined) ??
+      find(avoid ?? { rects: [] }) ??
+      (avoid?.required ? (find({ rects: [], hidden: avoid.hidden }) ?? find({ rects: [] })) : undefined);
   }
   const walls: Wall[] = [],
     layout = planFloors(walls, chosen?.hall),
@@ -1023,6 +1066,7 @@ export function buildInterior(
   }
   for (const [a, b, c, d, e, g] of walls) box(m, a, b, c, d, e, g);
   assignUses(o, layout, use, plan);
+  for (const r of clear ?? []) layout[r.floor]?.keep.push(r);
   if (plan) {
     buildStair(parts, plan, floors, layout, o.detail);
     const whole = planRect(plan.place, -plan.before, plan.length + plan.after, 0, plan.breadth);

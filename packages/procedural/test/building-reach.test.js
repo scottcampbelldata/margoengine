@@ -283,9 +283,10 @@ test('partitions that cross meet in a post', () => {
 
 /**
  * Walks floor level `y` of a plan on its own meshes: floor where an upward face of the `interior` part lies at `y`,
- * less everything within `r` of a wall face at 1 m up and the stairs' footprints. Floods from `seeds`.
+ * less everything within `r` of a wall face at 1 m up and the stairs' footprints. Floods from `seeds` and the grid
+ * cells `entries`.
  */
-function walkMesh(b, y, seeds, solids, r) {
+function walkMesh(b, y, seeds, solids, r, entries = [], up = 1) {
   const meshes = [b.parts.interior, b.parts.walls].filter(Boolean),
     xs = b.blocks.flatMap((q) => q.footprint.map((c) => c[0])),
     zs = b.blocks.flatMap((q) => q.footprint.map((c) => c[1])),
@@ -302,7 +303,7 @@ function walkMesh(b, y, seeds, solids, r) {
         for (let j = Math.max(0, Math.floor((az - z0) / CELL)); j <= j1; j++)
           f(i + j * nx, x0 + (i + 0.5) * CELL, z0 + (j + 0.5) * CELL);
     },
-    H = y + 1;
+    H = y + up;
   for (const g of meshes) {
     const { positions: p, indices, normals } = g;
     for (let t = 0; t < indices.length; t += 3) {
@@ -357,6 +358,11 @@ function walkMesh(b, y, seeds, solids, r) {
       return best;
     },
     stack = [];
+  for (const c of entries)
+    if (free[c] && !seen[c]) {
+      seen[c] = 1;
+      stack.push(c);
+    }
   for (const s of seeds) {
     const c = near(s);
     if (c >= 0 && !seen[c]) {
@@ -374,6 +380,12 @@ function walkMesh(b, y, seeds, solids, r) {
       }
   }
   return {
+    nx,
+    x0,
+    z0,
+    floor,
+    wall,
+    seen,
     reaches: (p) => near(p) >= 0 && seen[near(p)] === 1,
     /** A room with floor to stand on, none of it reached. */
     shut: (q) => {
@@ -570,4 +582,215 @@ test('a front door in front of a partition opens into an entry, and the result l
     );
   }
   assert.ok(!('curtains' in b));
+});
+
+/** Random plans with a wing given by hand whose plinth and storey heights are its own. */
+function randomUneven(i) {
+  seed(i + 9001);
+  const style = pick(['japan-2011-house', 'japan-2011-concrete', 'western-1910-house', 'western-1910-brick']),
+    storey = range(2.6, 3.4),
+    levels = 1 + Math.floor(next() * 3),
+    o = { style, interior: 'rooms', width: range(8, 18), depth: range(7, 12), storeys: Array(levels).fill(storey) },
+    wide = range(4, 7.5),
+    deep = range(5, 9),
+    tall = range(2.5, 3.5),
+    plinth = generateBuilding({ style }).floors[0],
+    // Steps of one riser up to most of a metre, either way, and some wings level at the ground.
+    other = next() < 0.2 ? plinth : Math.max(0, Math.min(2, plinth + (next() < 0.5 ? -1 : 1) * range(0.05, 0.9))),
+    side = pick(['right', 'left', 'back']),
+    overlap = range(1.4, 2.6),
+    at =
+      side === 'back'
+        ? [range(-1, 1), -(o.depth / 2 + deep / 2 - overlap)]
+        : [(side === 'right' ? 1 : -1) * (o.width / 2 + wide / 2 - overlap), 0];
+  o.wings = [{ at, width: wide, depth: deep, plinth: other, storeys: Array(1 + Math.floor(next() * 3)).fill(tall) }];
+  return o;
+}
+
+/** A walker's riser, going, width and headroom for a style, metres (IRC R311.7; Order art. 23 and a fusuma opening). */
+const limits = (style) =>
+  style === 'japan-2011-concrete'
+    ? { rise: 0.18, tread: 0.26, width: 0.9, head: 1.8 }
+    : style.startsWith('japan')
+      ? { rise: 0.21, tread: 0.23, width: 0.75, head: 1.8 }
+      : { rise: 7.75 * IN, tread: 10 * IN, width: 36 * IN, head: 80 * IN };
+
+/** Heights of the level faces of a plan's parts over `[x, z]`. */
+function surfaces(b, names, x, z) {
+  const out = [];
+  for (const name of names) {
+    const g = b.parts[name];
+    if (!g) continue;
+    const { positions: p, indices, normals } = g;
+    for (let t = 0; t < indices.length; t += 3) {
+      const v = [0, 1, 2].map((q) => indices[t + q] * 3);
+      if (Math.abs(normals[v[0] + 1]) < 0.99) continue;
+      const xs = v.map((q) => p[q]),
+        zs = v.map((q) => p[q + 2]);
+      if (covers(xs, zs, x, z)) out.push({ y: p[v[0] + 1], up: normals[v[0] + 1] > 0, name });
+    }
+  }
+  return out;
+}
+
+const inBox = (s, x, z, e) => x > s.min[0] - e && x < s.max[0] + e && z > s.min[1] - e && z < s.max[1] + e;
+
+/** Everything a walker from the outer doors cannot reach, and every floor edge one could fall from. */
+function unevenFaults(b, o, label) {
+  const wrong = [],
+    code = limits(o.style),
+    steps = b.joinSteps ?? [],
+    levels = [...new Set(b.rooms.map((r) => Math.round(r.level * 1000) / 1000))].sort((a, c) => a - c),
+    at = (y) => levels.findIndex((v) => Math.abs(v - y) < 0.0011),
+    holds = (q, [x, z]) => x > q.min[0] - 1e-6 && x < q.max[0] + 1e-6 && z > q.min[1] - 1e-6 && z < q.max[1] + 1e-6,
+    // Each flight between two levels, storey stairs and join steps alike.
+    flights = [
+      ...b.stairs.flatMap((s) =>
+        b.rooms
+          .filter((r) => r.floor === s.floor && holds(r, s.foot))
+          .flatMap((r) => {
+            const to = r.level + s.risers * s.rise;
+            return at(to) < 0 ? [] : [{ ...s, from: r.level, to }];
+          }),
+      ),
+      ...steps,
+    ],
+    r = b.stairs.some((s) => s.kind === 'ladder') ? 0.12 : 0.18,
+    seeds = levels.map((y) =>
+      b.openings.filter((d) => d.kind === 'door' && Math.abs(d.centre[1] - d.height / 2 - y) < 0.05).flatMap(inward),
+    ),
+    entries = levels.map(() => new Set()),
+    walk = (k) => {
+      const solids = flights.filter((s) => at(s.from) === k || at(s.to) === k);
+      return walkMesh(b, levels[k], seeds[k], solids, r, [...entries[k]]);
+    };
+  let walks = levels.map((_, k) => walk(k)),
+    count = -1;
+  for (;;) {
+    for (const s of flights) {
+      const a = at(s.from),
+        c = at(s.to);
+      if (a < 0 || c < 0) continue;
+      if (walks[a].reaches(s.foot) && !seeds[c].includes(s.head)) seeds[c].push(s.head);
+      if (walks[c].reaches(s.head) && !seeds[a].includes(s.foot)) seeds[a].push(s.foot);
+    }
+    // One riser between two floors is a step: from a reached cell to one a little way beside it.
+    walks.forEach((w, a) => {
+      levels.forEach((y, c) => {
+        if (c === a || Math.abs(y - levels[a]) > code.rise + 1e-3) return;
+        w.seen.forEach((v, i) => {
+          if (v) for (const d of [1, 2, 3]) for (const n of [d, -d, d * w.nx, -d * w.nx]) entries[c].add(i + n);
+        });
+      });
+    });
+    const total = seeds.flat().length + entries.reduce((n, e) => n + e.size, 0);
+    if (total === count) break;
+    count = total;
+    walks = levels.map((_, k) => walk(k));
+  }
+  for (const q of b.rooms)
+    if (walks[at(q.level)].shut(q))
+      wrong.push(`${label}: a ${q.use} at ${q.level.toFixed(2)} by ${q.min.map((v) => v.toFixed(1))} is cut off`);
+  // Open ledges: floor beside no floor and no wall, over floor more than one riser down.
+  // Walls 0.35 m up: under any window sill, and at a ledge there is none.
+  const open = levels.map((y) => walkMesh(b, y, [], [], 0.09, [], 0.35));
+  open.forEach((w, k) => {
+    let edges = 0,
+      first = '';
+    w.floor.forEach((f, c) => {
+      if (!f || w.wall[c]) return;
+      for (const n of [c - 1, c + 1, c - w.nx, c + w.nx]) {
+        if (w.floor[n] || w.wall[n]) continue;
+        const x = w.x0 + ((n % w.nx) + 0.5) * CELL,
+          z = w.z0 + (Math.floor(n / w.nx) + 0.5) * CELL;
+        if (flights.some((s) => inBox(s, x, z, 0.15))) continue;
+        // A window down to the floor is an opening in its own wall, not an edge of this floor.
+        const glazed = b.openings.some(
+          (q) =>
+            q.kind !== 'door' &&
+            Math.hypot(q.centre[0] - x, q.centre[2] - z) < q.width / 2 + 0.3 &&
+            Math.abs(q.centre[1] - levels[k] - 0.35) < q.height / 2,
+        );
+        if (glazed) continue;
+        const gap = levels.map((v) => levels[k] - v),
+          near = open.some((q, j) => Math.abs(gap[j]) <= code.rise + 1e-3 && q.floor[n]),
+          below = open.some((q, j) => gap[j] > code.rise + 1e-3 && gap[j] < 3.6 && q.floor[n]);
+        // Only a room's own floor: a window's sill lies at a storey's height too.
+        const own = [w.x0 + ((c % w.nx) + 0.5) * CELL, w.z0 + (Math.floor(c / w.nx) + 0.5) * CELL],
+          room = b.rooms.some((q) => at(q.level) === k && holds(q, own));
+        if (below && !near && room) {
+          edges++;
+          first ||= `${x.toFixed(2)}, ${z.toFixed(2)}`;
+        }
+      }
+    });
+    if (edges > 2)
+      wrong.push(`${label}: an open ledge of ${edges} cells at ${levels[k].toFixed(2)}, the first at ${first}`);
+  });
+  for (const s of steps) {
+    const name = `${label}: steps ${s.from.toFixed(2)} to ${s.to.toFixed(2)}${s.sunken ? ' sunk' : ''}`;
+    if (Math.abs(s.risers * s.rise - (s.to - s.from)) > 1e-6) wrong.push(`${name}: risers do not climb the change`);
+    if (s.rise > code.rise + 1e-6 || s.tread < code.tread - 1e-6 || s.width < code.width - 1e-6)
+      wrong.push(`${name}: rise ${s.rise} tread ${s.tread} width ${s.width}`);
+    // Every tread is there, from the foot to the head, with headroom over it and over both landings.
+    const along = Math.abs(s.head[0] - s.foot[0]) > Math.abs(s.head[1] - s.foot[1]) ? 0 : 1,
+      dir = Math.sign(s.head[along] - s.foot[along]),
+      start = dir > 0 ? s.min[along] : s.max[along],
+      mid = (s.min[1 - along] + s.max[1 - along]) / 2 + 0.013,
+      point = (u) => (along ? [mid, start + dir * u] : [start + dir * u, mid]);
+    if (Math.abs(s.max[along] - s.min[along] - (s.risers - 1) * s.tread) > 1e-6) wrong.push(`${name}: run`);
+    const stand = [
+      [s.foot, s.from],
+      [s.head, s.to],
+    ];
+    for (let k = 1; k < s.risers; k++) {
+      const p = point((k - 0.5) * s.tread),
+        y = s.from + k * s.rise;
+      if (!surfaces(b, ['stairs'], ...p).some((f) => f.up && Math.abs(f.y - y) < 1e-3))
+        wrong.push(`${name}: no tread ${k}`);
+      stand.push([p, y]);
+    }
+    // Headroom too where the flight passes through the join: at its first tread when sunk, else at its top.
+    const run = (s.risers - 1) * s.tread,
+      through = s.sunken ? [point(0.004), s.from + s.rise] : [point(run - 0.004), s.to];
+    for (const [p, y] of [...stand, through]) {
+      const low = surfaces(b, ['interior', 'walls', 'roof', 'mats', 'fabric', 'furniture', 'fixtures'], ...p).find(
+        (f) => f.y > y + 0.02 && f.y < y + code.head - 0.005,
+      );
+      if (low) wrong.push(`${name}: ${low.name} at ${(low.y - y).toFixed(2)} m over it`);
+    }
+    for (const [p, y] of stand.slice(0, 2))
+      if (!surfaces(b, ['interior', 'stairs'], ...p).some((f) => f.up && Math.abs(f.y - y) < 1e-3))
+        wrong.push(`${name}: no floor at an end`);
+    // No furniture stands on the flight or its landings.
+    for (const q of b.furniture)
+      for (const [[x, z], y] of stand)
+        if (x > q.min[0] && x < q.max[0] && z > q.min[2] && z < q.max[2] && q.max[1] > y + 0.05 && q.min[1] < y + 1)
+          wrong.push(`${name}: a ${q.kind} stands in the way`);
+  }
+  return wrong;
+}
+
+test('wings whose floors differ from the main block are joined by steps, and no floor ends in a ledge', () => {
+  const wrong = [];
+  let steps = 0,
+    sunk = 0,
+    climbed = 0;
+  for (let i = 0; i < Number(process.env.UNEVEN ?? 300); i++) {
+    const o = randomUneven(i),
+      b = generateBuildingPlan(o),
+      w = o.wings[0],
+      label = [
+        `#${i} ${o.style} ${o.width.toFixed(2)} x ${o.depth.toFixed(2)} wing at ${w.at.map((v) => v.toFixed(2))}`,
+        `${w.width.toFixed(2)} x ${w.depth.toFixed(2)} plinth ${w.plinth.toFixed(2)} storeys ${w.storeys.length}`,
+      ].join(' ');
+    wrong.push(...unevenFaults(b, o, label));
+    steps += (b.joinSteps ?? []).length;
+    sunk += (b.joinSteps ?? []).filter((s) => s.sunken).length;
+    // A change of floor of more than a riser at the ground, joined by its steps.
+    const change = Math.abs(w.plinth - generateBuilding({ style: o.style }).floors[0]);
+    if (change > limits(o.style).rise && (b.joinSteps ?? []).some((s) => s.floor === 0)) climbed++;
+  }
+  assert.deepEqual(wrong.slice(0, 25), [], `${wrong.length} failures`);
+  assert.ok(steps > 100 && sunk > 5 && climbed > 80, `${steps} flights, ${sunk} sunk, ${climbed} ground joins climbed`);
 });

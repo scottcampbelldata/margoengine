@@ -31,12 +31,22 @@ import {
   type BuildingRoom,
   type BuildingRuleOptions,
   type BuildingStair,
+  type BuildingStyle,
   generateBuilding,
   resolveBuildingOptions,
 } from './building-rules.js';
-import { CURTAINS, type CurtainRun, STAIR_AVOID, type StairAvoid, WALL_LINING } from './building-interiors.js';
+import {
+  CURTAINS,
+  type CurtainRun,
+  KEEP_CLEAR,
+  STAIR_AVOID,
+  type StairAvoid,
+  WALL_LINING,
+} from './building-interiors.js';
+import { type Joins, type BuildingJoinStep, planJoins } from './building-joins.js';
 import { MeshBuilder, type V3 } from './mesh-builder.js';
 
+export type { BuildingJoinStep } from './building-joins.js';
 /** The plan of the whole: `rect` (one block), `L` (a wing at the left end), `T` (a wing at the middle), `U` (wings at both ends) or `cross` (wings at the middle, front and back). */
 export type BuildingPlanShape = 'rect' | 'L' | 'T' | 'U' | 'cross';
 /** Where a corner tower stands on the main block, seen from the street. */
@@ -115,6 +125,8 @@ export interface PlannedBuilding {
   readonly furniture: readonly BuildingFurniture[];
   readonly doorways: readonly BuildingDoorway[];
   readonly stairs: readonly BuildingStair[];
+  /** Steps through the joins of blocks whose floors differ, in plan-local metres (`doorways` has their openings). */
+  readonly joinSteps: readonly BuildingJoinStep[];
   /** Roof covering height of the whole at plan-local `[x, z]` (NaN off every roof): the upper envelope of the blocks. */
   roofHeight(x: number, z: number): number;
   /** Whether plan-local point `[x, y, z]` is inside block `index`'s solid, the space its parts were cut by. */
@@ -172,7 +184,15 @@ function planStairs(specs: BlockSpec[], given: readonly BuildingWing[]) {
       first[j] = j - specs.length;
     }
   }
-  const keepOut = (j: number, others: number[], required: boolean, enter?: number) => {
+  // Wings whose floors do not run level with the main block's: steps stand at their join, so stairs stay back from it
+  // where there is room.
+  const uneven = new Set(
+      [...joined].filter((j) =>
+        all[j].floors.some((y, k) => k < main.floors.length && Math.abs(main.floors[k] - y) >= 0.01),
+      ),
+    ),
+    REACH = 1.8;
+  const keepOut = (j: number, others: number[], required: boolean, enter?: number, near: number[] = []) => {
     const sp = specs[j],
       yaw = (sp.turn * Math.PI) / 2,
       c = Math.round(Math.cos(yaw)),
@@ -195,15 +215,17 @@ function planStairs(specs: BlockSpec[], given: readonly BuildingWing[]) {
       };
     const avoid: StairAvoid = {
       rects: others.map((i) => turned(i, 0)),
+      soft: near.map((i) => turned(i, -REACH)),
+      hidden: j > 0 ? near.map((i) => turned(i, 0)) : [],
       required,
       // Just inside the other block's walls.
       from: enter === undefined ? undefined : turned(enter, all[enter].wall + 0.1),
     };
     specs[j] = { ...sp, opts: Object.assign({}, sp.opts, { [STAIR_AVOID]: avoid }) };
   };
-  if (towers.length) keepOut(0, towers, false);
+  if (towers.length || uneven.size) keepOut(0, towers, !towers.length, undefined, [...uneven]);
   // A tower is entered from the main block, so its stair starts on that side.
-  for (const j of towers) keepOut(j, [], true, 0);
+  for (const j of towers) keepOut(j, [], true, 0, uneven.has(j) ? [0] : []);
   // Any other block with a stair of its own keeps it out of the insides that come before it.
   for (let j = 1; j < specs.length; j++)
     if (joined.has(j) && !towers.includes(j))
@@ -211,6 +233,8 @@ function planStairs(specs: BlockSpec[], given: readonly BuildingWing[]) {
         j,
         specs.map((_, i) => i).filter((i) => first[i] < first[j] && joined.has(i)),
         true,
+        undefined,
+        uneven.has(j) ? [0] : [],
       );
   return { first, joined };
 }
@@ -230,12 +254,12 @@ function openDoor(specs: BlockSpec[], built: Building[], j: number) {
   );
 }
 /**
- * Where every ground floor door of the blocks joined to the main one is inside another block (a tower over the only
- * one), one of them, the last first, gets one.
+ * Where every ground floor door of a group of connected blocks is inside another block (a tower over the only one, or a
+ * wing no steps reach), one of them, the last first, gets one. Returns whether a block was rebuilt.
  */
-function openAWayIn(specs: BlockSpec[], built: Building[], joined: ReadonlySet<number>) {
-  const group = [...joined].sort((a, b) => b - a);
-  if (group.some((j) => openDoor(specs, built, j))) return;
+function openAWayIn(specs: BlockSpec[], built: Building[], blocks: readonly number[]) {
+  const group = [...blocks].sort((a, b) => b - a);
+  if (group.some((j) => openDoor(specs, built, j))) return false;
   for (const j of group) {
     const sp = specs[j],
       yaw = (sp.turn * Math.PI) / 2;
@@ -247,10 +271,70 @@ function openAWayIn(specs: BlockSpec[], built: Building[], joined: ReadonlySet<n
       if (openDoor(specs, trial, j)) {
         specs[j] = { ...sp, opts };
         built[j] = b;
-        return;
+        return true;
       }
     }
   }
+  return false;
+}
+
+/**
+ * Builds the steps and walls of every join between unequal floors, gives each group of blocks they leave connected a
+ * way in, and rebuilds the blocks whose furniture stood where steps now do.
+ */
+function joinFloors(
+  specs: BlockSpec[],
+  built: Building[],
+  first: readonly number[],
+  joined: ReadonlySet<number>,
+  style: BuildingStyle,
+): Joins {
+  const plan = () =>
+    planJoins(
+      specs.map((sp, j) => ({ building: built[j], at: sp.at, turn: sp.turn, rank: first[j] })),
+      style,
+    );
+  let joins = plan(),
+    changed = true;
+  // A new door moves partitions off it, so the steps are placed again; a block gains doors at most once.
+  while (changed) {
+    changed = false;
+    const group = new Map([...joined].map((j) => [j, j])),
+      root = (j: number): number => (group.get(j) === j ? j : root(group.get(j)!));
+    for (const [a, b] of joins.linked) if (group.has(a) && group.has(b)) group.set(root(a), root(b));
+    for (const r of new Set([...joined].map(root))) {
+      const members = [...joined].filter((j) => root(j) === r);
+      if (openAWayIn(specs, built, members)) changed = true;
+    }
+    if (changed) joins = plan();
+  }
+  specs.forEach((sp, j) => {
+    const yaw = (sp.turn * Math.PI) / 2,
+      c = Math.round(Math.cos(yaw)),
+      s = Math.round(Math.sin(yaw)),
+      local = (x: number, z: number) => {
+        const dx = x - sp.at[0],
+          dz = z - sp.at[2];
+        return [dx * c - dz * s, dx * s + dz * c];
+      },
+      clear = joins.keep
+        .filter((k) => k.block === j)
+        .map(({ floor, rect }) => {
+          const a = local(rect.x0, rect.z0),
+            b = local(rect.x1, rect.z1);
+          return {
+            floor,
+            x0: Math.min(a[0], b[0]),
+            x1: Math.max(a[0], b[0]),
+            z0: Math.min(a[1], b[1]),
+            z1: Math.max(a[1], b[1]),
+          };
+        });
+    if (!clear.length) return;
+    const opts = Object.assign({}, sp.opts, { [KEEP_CLEAR]: clear });
+    built[j] = generateBuilding({ ...opts, origin: sp.at, yaw });
+  });
+  return joins;
 }
 
 /** The parts behind the walls, which only an earlier block cuts. */
@@ -283,6 +367,20 @@ interface Block {
   };
   readonly building?: Building;
 }
+
+/** A box as a solid to cut by. */
+const boxSolid = (lo: V3, hi: V3): Solid => ({
+  halves: [
+    [1, 0, 0, hi[0]],
+    [-1, 0, 0, -lo[0]],
+    [0, 1, 0, hi[1]],
+    [0, -1, 0, -lo[1]],
+    [0, 0, 1, hi[2]],
+    [0, 0, -1, -lo[2]],
+  ],
+  lo,
+  hi,
+});
 
 const PLANS: readonly BuildingPlanShape[] = ['rect', 'L', 'T', 'U', 'cross'];
 const CORNERS: readonly BuildingTowerCorner[] = ['none', 'front-left', 'front-right', 'back-left', 'back-right'];
@@ -411,6 +509,12 @@ function shrunk(s: Solid, wall: number): Solid {
     hi: [s.hi[0] - wall, s.hi[1], s.hi[2] - wall],
   };
 }
+/** A solid with nothing above `top`. */
+const capped = (s: Solid, top: number): Solid => ({
+  halves: [...s.halves, [0, 1, 0, top]],
+  lo: s.lo,
+  hi: [s.hi[0], Math.min(s.hi[1], top), s.hi[2]],
+});
 const inside = (s: Solid, p: V3, eps: number) =>
   s.halves.every((h) => h[0] * p[0] + h[1] * p[1] + h[2] * p[2] <= h[3] + eps);
 
@@ -913,7 +1017,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
   }
   const { first, joined } = planStairs(specs, Array.isArray(raw.wings) ? (raw.wings as BuildingWing[]) : []);
   const built = specs.map((sp) => generateBuilding({ ...sp.opts, origin: sp.at, yaw: (sp.turn * Math.PI) / 2 }));
-  openAWayIn(specs, built, joined);
+  const joins = joinFloors(specs, built, first, joined, o.style);
   const blocks: Block[] = specs.map((sp, j) => {
     const yawB = (sp.turn * Math.PI) / 2,
       b = built[j],
@@ -926,7 +1030,8 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
       kind: sp.kind,
       parts: { ...b.parts },
       solids: local,
-      inner: [placeSolid(shrunk(solid[0], b.options.wall), sp.at, yawB)],
+      // The rooms end at the eaves: what another block has up in this one's roof space keeps its walls and floors.
+      inner: [placeSolid(capped(shrunk(solid[0], b.options.wall), b.eaves), sp.at, yawB)],
       lining: (b as Building & { [WALL_LINING]: number })[WALL_LINING],
       curtains: (b as Building & { [CURTAINS]: CurtainRun[] })[CURTAINS].map((run) => {
         const [x, y, z] = run.window,
@@ -1063,10 +1168,23 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
               eps: indoor ? 0 : i < j ? EPS : -EPS,
             })),
       );
+      // A sunk flight's well opens the floor and base it stands in.
+      if (name === 'base' || (name === 'interior' && !lining))
+        for (const w of joins.wells) if (w.block === j) cutters.push({ s: boxSolid(w.min, w.max), eps: 0 });
       const cut = subtract(g, cutters);
       if (cut.indices!.length) (merged[name] ??= []).push(cut);
     }
   });
+  const add = (name: BuildingPart, g: GeometryData) => {
+    if (g.indices!.length) (merged[name] ??= []).push(g);
+  };
+  // The joins' walls give way to rooms that come before theirs.
+  for (const w of joins.walls) {
+    const before = blocks.flatMap((q, i) => (first[i] < first[w.first] ? q.inner.map((s) => ({ s, eps: 0 })) : []));
+    add('interior', subtract(w.mesh.finish(), before));
+  }
+  if (joins.steps.triangles) add('stairs', joins.steps.finish());
+  if (joins.rails.triangles) add('metalwork', joins.rails.finish());
   const parts: Partial<Record<BuildingPart, GeometryData>> = {};
   for (const [name, list] of Object.entries(merged) as [BuildingPart, GeometryData[]][])
     parts[name] = concat(list, origin, yaw);
@@ -1102,7 +1220,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     return { window, roofAtFace: dm.roofAtFace };
   });
   const earlier = (j: number, p: V3) =>
-    blocks.some((_, i) => first[i] < first[j] && insideBlock(i, p[0], p[1], p[2], EPS));
+    blocks.some((q, i) => first[i] < first[j] && p[1] < q.info.eaves && insideBlock(i, p[0], p[1], p[2], EPS));
   const rooms: BuildingRoom[] = [],
     furniture: BuildingFurniture[] = [],
     doorways: BuildingDoorway[] = [],
@@ -1120,7 +1238,15 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
         e = plan2(r.max[0], r.max[1]),
         min: [number, number] = [Math.min(a[0], e[0]), Math.min(a[1], e[1])],
         max: [number, number] = [Math.max(a[0], e[0]), Math.max(a[1], e[1])];
-      if (earlier(j, [(min[0] + max[0]) / 2, r.level + 0.5, (min[1] + max[1]) / 2])) continue;
+      // A room goes only where nothing of it shows: it lies wholly within a room of a block that comes first.
+      const gone = blocks.some(
+        (q, i) =>
+          first[i] < first[j] &&
+          [min[0], max[0]].every((x) =>
+            [min[1], max[1]].every((z) => q.inner.some((s) => inside(s, [x, r.level + 0.5, z], EPS))),
+          ),
+      );
+      if (gone) continue;
       rooms.push({ ...r, min, max });
     }
     for (const f of b.furniture) {
@@ -1155,6 +1281,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
       return world(x, z);
     }),
   }));
+  doorways.push(...joins.doorways);
   return {
     parts,
     palette: main.palette,
@@ -1166,6 +1293,7 @@ export function generateBuildingPlan(options: BuildingPlanOptions = {}): Planned
     furniture,
     doorways,
     stairs,
+    joinSteps: joins.joinSteps,
     roofHeight(x: number, z: number) {
       let best = -Infinity;
       for (const blk of blocks) {

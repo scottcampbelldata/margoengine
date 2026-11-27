@@ -4057,6 +4057,12 @@ Fixed the missing clock-driven celestial fields used by the sea, boundary layer 
 - **Cause:** a stair was placed only inside a room the partition grid happened to make, with no fallback. The same walk found that partitions stopped short of their crossings (a see-through square of wall thickness), a partition too short for a doorway was built solid and shut its room off, and a partition could run into an outer door.
 - **Fixed:** a stair hall is made by taking partitions down, else a spiral, else a fixed ladder; a stair never divides a room; crossings have a post; too short a partition is left out; a partition stops 1.2 m short of an outer door.
 
+### Fixed 2026-11-27: wings at other floor levels met the main block with open ledges and no steps (KB-PROC-JOINLEVEL1, procedural, building plans)
+
+- **Repro:** `generateBuildingPlan({style: 'western-1910-house', width: 12, depth: 8, storeys: [3.2, 3.2], wings: [{at: [6.5, 0], width: 5, depth: 6, plinth: 0.2, storeys: [2.9, 2.9]}]})`: floors at 0.2 and 0.6 m met with nothing between them. The walk over 300 such plans in `packages/procedural/test/building-reach.test.js` found 722 rooms cut off or open ledges.
+- **Cause:** joined blocks were cut into each other with no regard to their floor levels; a block's rooms were taken to run to the top of its roof, so a lower block's attic opened the higher floors of the other; partition doorways and stairs of a wing took no account of the part of it the main block covers.
+- **Fixed:** unequal floors get a doorway and steps within the stair code's figures, or a wall and the wing its own door; rooms end at the eaves; a wing's stair and doorways keep to the part of it that shows; a room is listed while any of it shows.
+
 ### Fixed 2026-11-27: joined building plans left wing and tower storeys cut off (KB-PROC-PLANREACH1, procedural, building plans)
 
 - **Repro:** the walk over 500 random plans in `packages/procedural/test/building-reach.test.js` (before the fix most failed): the default L plan's wing was walled off from the main block, upper floors had a slot at each join, a tower's extra storeys had no stair, and a tower over the only front door left no way in.
