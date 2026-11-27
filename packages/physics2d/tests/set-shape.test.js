@@ -32,25 +32,121 @@ test('setShape turns a box into a circle: it rests on its radius, with the circl
   physics.dispose();
 });
 
-test('setShape refuses an outline of several shapes and a removed collider, naming the fix', () => {
-  const physics = new Physics2D(null, { pixelsPerMeter: 1 });
-  const body = physics.addBody(null, { colliders: { shape: 'circle', radius: 0.5 } }),
-    [collider] = body.colliders;
-  assert.throws(
-    () =>
-      collider.setShape({
-        shape: 'polygon',
-        points: [
-          [0, 0],
-          [2, 0],
-          [2, 2],
-          [1, 0.5],
-          [0, 2],
-        ],
-      }),
-    /remove this collider and add a new one/,
-  );
+test('setShape replaces multi-shape outlines in place and preserves settings, mass mode and touching state (C2-09, KB-PHYSICS2D-SETSHAPE1)', () => {
+  const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, 9.81] });
+  const floor = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0.5],
+    colliders: { shape: 'box', width: 20, height: 1 },
+  });
+  const body = physics.addBody(null, {
+    position: [0, -0.5],
+    colliders: { shape: 'circle', radius: 0.5, density: 2, friction: 0.8 },
+  });
+  const [collider] = body.colliders;
+  collider.setMass(7);
+  let starts = 0,
+    ends = 0;
+  physics.on('contactstart', () => starts++);
+  physics.on('contactend', () => ends++);
+  run(physics, 30);
+  assert.equal(starts, 1, 'initial landing emits one contactstart');
+  // Replace convex circle with a concave L-shaped polygon (multiple kernel shapes).
+  collider.setShape({
+    shape: 'polygon',
+    points: [
+      [-1, -1],
+      [1, -1],
+      [1, 0.5],
+      [0, 0],
+      [-1, 0.5],
+    ],
+  });
+  assert.ok(collider.shapes.length > 1, 'concave polygon splits into multiple kernel shapes');
+  assert.ok(Math.abs(body.mass - 7) < 1e-4, `explicit mass preserved across multi-shape setShape: ${body.mass}`);
+  // Stepping while still touching the floor does not emit a duplicate contactstart.
+  run(physics, 30);
+  assert.equal(starts, 1, 'ongoing contact carried across multi-shape setShape');
+  assert.equal(ends, 0, 'no spurious contactend while still touching');
+  // Swap to a compound collider, then a trimesh, then back to a convex box.
+  collider.setShape({
+    shape: 'compound',
+    shapes: [
+      { shape: 'box', width: 0.6, height: 0.6, offset: [-0.4, 0] },
+      { shape: 'box', width: 0.6, height: 0.6, offset: [0.4, 0] },
+    ],
+  });
+  assert.equal(collider.shapes.length, 2);
+  assert.ok(Math.abs(body.mass - 7) < 1e-4, 'explicit mass holds on compound');
+  const floorCol = floor.colliders[0];
+  floorCol.setShape({
+    shape: 'trimesh',
+    vertices: [
+      [-10, 0],
+      [0, 0],
+      [10, 0],
+      [-10, 1],
+      [0, 1],
+      [10, 1],
+    ],
+    indices: [0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2],
+    fixInternalEdges: true,
+  });
+  assert.equal(floorCol.shapes.length, 4);
+  const hit = physics.raycast([0.4, -5], [0, 1], { maxDistance: 10 });
+  assert.ok(hit && hit.collider === collider, 'ray hits the compound collider');
+  collider.setShape({ shape: 'box', width: 1, height: 1 });
+  assert.equal(collider.shapes.length, 1);
+  // Removed collider is still refused.
   physics.removeCollider(collider);
   assert.throws(() => collider.setShape({ shape: 'circle', radius: 1 }), /was removed/);
+  physics.dispose();
+});
+
+test('multi-shape colliders aggregate contact events and contactPair per collider pair (KB-PHYSICS2D-PAIRS1)', () => {
+  const physics = new Physics2D(null, { pixelsPerMeter: 1, gravity: [0, 9.81] });
+  const strip = physics.addBody(null, {
+    type: 'fixed',
+    position: [0, 0],
+    colliders: {
+      shape: 'trimesh',
+      vertices: [
+        [-4, 0],
+        [0, 0],
+        [4, 0],
+        [-4, 1],
+        [0, 1],
+        [4, 1],
+      ],
+      indices: [0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2],
+      fixInternalEdges: true,
+      friction: 0,
+    },
+  });
+  const ball = physics.addBody(null, {
+    position: [-2, -0.5],
+    linearVelocity: [4, 0],
+    colliders: { shape: 'circle', radius: 0.5, friction: 0 },
+  });
+  let starts = 0,
+    ends = 0;
+  physics.on('contactstart', () => starts++);
+  physics.on('contactend', () => ends++);
+  // Roll across the seam at x = 0 from the left half of the trimesh to the right half.
+  for (let i = 0; i < 60; i++) {
+    physics.step();
+    if (i >= 5) {
+      const pair = physics.contactPair(ball.colliders[0], strip.colliders[0]);
+      assert.ok(pair && pair.touching, `step ${i}: contactPair stays touching across piece seam`);
+      assert.equal(
+        physics.contactPairs(ball.colliders[0]).length,
+        1,
+        `step ${i}: one aggregated ContactPair2D per collider pair`,
+      );
+    }
+  }
+  assert.ok(ball.position[0] > 0.5, `ball crossed the seam to x = ${ball.position[0]}`);
+  assert.equal(starts, 1, 'crossing triangles emits only one contactstart');
+  assert.equal(ends, 0, 'crossing triangles emits no spurious contactend');
   physics.dispose();
 });

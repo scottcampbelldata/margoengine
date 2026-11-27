@@ -525,29 +525,30 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   frame of a moving camera draws the image of the camera one frame before, a batch for a camera that was left is not
   added, a scene change drops both), and the `denoisemoving` case of `tests/browser-check.mjs` in `test:gpu:denoise`.
 
-### Open 2026-11-26: a collider of several kernel shapes raises its events and contact pairs once for each piece (KB-PHYSICS2D-PAIRS1, physics2d)
+### Fixed 2026-11-26: a collider of several kernel shapes raises its events and contact pairs once for each piece (KB-PHYSICS2D-PAIRS1, physics2d)
 
 - **Repro:** a ball rolling along a `trimesh`, `polyline`, concave `polygon`, `compound` or `heightfield` collider in
-  `@margoengine/physics2d`. It raises `contactstart` and `contactend` each time it crosses from one piece (triangle,
+  `@margoengine/physics2d`. It raised `contactstart` and `contactend` each time it crossed from one piece (triangle,
   segment or convex part) to the next, where Rapier raises one `contactstart` while the two colliders touch at all.
-  `physics.contactPairs(collider)` lists one pair for each pair of pieces, and `contactPair(a, b)` returns the first
-  of them, so `contactPair(a, b).touching` and `intersectionPair(a, b)` can read false while another piece touches.
-- **Cause:** the facade (`src/physics.ts`, `collectEvents` and `contactPairs`) passes on the kernel's events and
-  contacts, which belong to pairs of kernel shapes, with each shape mapped to its collider but never gathered per pair
-  of colliders.
-- **Fix (drafted, not landed):** count the touching pairs of shapes per pair of colliders and raise the event only when
-  the count leaves or returns to 0, counted again from the kernel after a restore. Give `ContactPair2D` one entry per
-  collider pair, with a manifold for each pair of shapes.
+  `physics.contactPairs(collider)` listed one pair for each pair of pieces, and `contactPair(a, b)` returned the first
+  of them, so `contactPair(a, b).touching` and `intersectionPair(a, b)` could read false while another piece touched.
+- **Cause:** the facade (`src/physics.ts`, `collectEvents` and `contactPairs`) passed on the kernel's events and
+  contacts per kernel shape without aggregating by unordered collider pair.
+- **Fix:** `Physics2D` tracks active shape-pair touch counts per unordered `Collider2D` pair (rebuilt on `restore`),
+  emitting start only when count rises from 0 and end only when count drops to 0, and `contactPairs` aggregates all
+  shape manifolds for each `other` collider into a single `ContactPair2D`.
+- **Regression:** `packages/physics2d/tests/set-shape.test.js` "multi-shape colliders aggregate contact events and contactPair per collider pair (KB-PHYSICS2D-PAIRS1)".
 
-### Open 2026-11-26: `Collider2D.setShape` refuses an outline of several kernel shapes (KB-PHYSICS2D-SETSHAPE1, physics2d)
+### Fixed 2026-11-26: `Collider2D.setShape` refuses an outline of several kernel shapes (KB-PHYSICS2D-SETSHAPE1, physics2d)
 
-- **Repro:** `collider.setShape({ shape: 'trimesh', ... })`, or any concave polygon, polyline or compound, throws
+- **Repro:** `collider.setShape({ shape: 'trimesh', ... })`, or any concave polygon, polyline or compound, threw
   `RangeError`. Rapier's `setShape` takes any shape.
-- **Cause:** `setShape` uses the kernel's `set_shape_core`, which replaces one convex core in place. An outline of
-  several pieces needs its kernel shapes replaced, with the touching pairs carried across so the change raises no
-  events of its own (this waits on KB-PHYSICS2D-PAIRS1).
-- **Fix (not started):** replace the collider's kernel shapes under the same `Collider2D`, re-apply its mass mode and
-  seams, and carry its touching pairs across the swap. Parity row C2-09 records the gap.
+- **Cause:** `setShape` only used the kernel's `set_shape_core`, which replaces one convex core in place.
+- **Fix:** single-convex-to-single-convex keeps the in-place `shape_set_core` fast path; multi-shape or non-convex
+  outlines atomically replace the collider's kernel shapes under the same `Collider2D` via `Physics2D.replaceColliderShapes`,
+  preserving settings, seams, explicit mass / mass properties, and carrying active touching pairs across the swap without
+  raising duplicate start events. Parity row C2-09 is now DONE.
+- **Regression:** `packages/physics2d/tests/set-shape.test.js` "setShape replaces multi-shape outlines in place and preserves settings, mass mode and touching state (C2-09, KB-PHYSICS2D-SETSHAPE1)".
 
 ### Fixed 2026-11-26: a long thin body that hit a wall hard and spinning swung through it after the first contact (KB-PHYSICS2D-CCD-SPIN1, physics2d)
 

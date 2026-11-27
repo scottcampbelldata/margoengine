@@ -265,11 +265,11 @@ console.log(disc.linearVelocity, disc.angularVelocity);
 physics.dispose();
 ```
 
-A collider's outline can change after it is made: `collider.setShape(shape)` takes any one convex outline a collider is
-made with (`circle`, `box`, `capsule`, `segment`, `triangle`, a convex `polygon`), at the collider's own offset and turn.
-Its material, density and filtering stay, the body's mass follows the new area, and the next step builds its contacts
-from the new outline, as Rapier's `setShape` does. An outline of several kernel shapes (a concave polygon, a polyline,
-a trimesh) is refused: remove the collider and add a new one.
+A collider's outline can change after it is made: `collider.setShape(shape)` takes any shape a collider is
+made with (`circle`, `box`, `capsule`, `segment`, `triangle`, convex or concave `polygon`, `polyline`, `trimesh`,
+`heightfield`, `compound`, `voxels` or `halfspace`), at the collider's own offset and turn. Its material, density, mass mode
+and filtering stay, the body's mass follows the new outline, and active contact pairs are carried across the swap without
+raising a duplicate start event, as Rapier's `setShape` does.
 
 ```ts
 import { Physics2D } from '@margoengine/physics2d';

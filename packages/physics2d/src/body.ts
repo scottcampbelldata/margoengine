@@ -74,6 +74,7 @@ export interface BodyOwner2D {
   readonly scale: number;
   addCollider(body: Body2D, options: ColliderOptions2D): Collider2D;
   removeCollider(collider: Collider2D): void;
+  replaceColliderShapes(collider: Collider2D, shape: ShapeOptions2D, parts: Described[]): void;
   removeBody(body: Body2D): void;
   lockTranslation(body: Body2D, x: boolean, y: boolean): void;
   retype(body: Body2D, type: BodyType2D): void;
@@ -91,6 +92,8 @@ const encode = (value: number, what: string): number => {
 export class Collider2D {
   /** The kernel shapes this collider is made of. @internal */
   readonly shapes: number[];
+  /** Stable identifier for collider-pair tracking across multi-shape swaps. @internal */
+  readonly uid: number;
   /** The shape as the kernel was given it, for the queries a character controller makes. @internal */
   described: Described | null = null;
   /** The options it was made with (its shape and settings), to describe it again where it moves. @internal */
@@ -98,6 +101,7 @@ export class Collider2D {
   private removed = false;
   private enabled = true;
   private savedGroups = 0;
+  private explicitMass: number | null = null;
   /** @internal */
   constructor(
     private readonly owner: BodyOwner2D,
@@ -106,8 +110,19 @@ export class Collider2D {
     private readonly settings: Uint32Array,
     private offset: readonly [number, number],
     private turn: number,
+    uid = 0,
   ) {
     this.shapes = shapes;
+    this.uid = uid;
+  }
+  /** @internal Current settings words shared across all kernel shapes of this collider. */
+  get rawSettings(): Uint32Array {
+    return this.settings;
+  }
+  /** @internal Re-applies explicit mass or mass properties after kernel shapes are replaced. */
+  reapplyMass(): void {
+    if (this.massProps) this.setMassProperties(this.massProps.mass, this.massProps.centre, this.massProps.inertia);
+    else if (this.explicitMass !== null) this.setMass(this.explicitMass);
   }
   /** The kernel's handle of its first shape: unique among live colliders. */
   get handle(): number {
@@ -135,27 +150,27 @@ export class Collider2D {
     }
   }
   /**
-   * Changes the collider's outline after it is made (Rapier's `setShape`): any one convex outline a collider takes
-   * (`circle`, `box`, `capsule`, `segment`, `triangle`, a convex `polygon`), placed at the collider's own offset and
-   * turn. Its material, density, filtering and flags stay; the body's mass follows the new area, and the next step builds
-   * its contacts from the new outline (a pair already touching stays one: no collision event from the change alone).
-   * @throws RangeError for an outline of several kernel shapes (a concave polygon, polyline, trimesh, heightfield, compound
-   * or voxels) or a collider made of several; MargoError (state) once the collider was removed.
+   * Changes the collider's outline after it is made (Rapier's `setShape`): any shape a collider takes
+   * (`circle`, `box`, `capsule`, `segment`, `triangle`, convex or concave `polygon`, `polyline`, `trimesh`,
+   * `heightfield`, `compound`, `voxels` or `halfspace`), placed at the collider's own offset and turn.
+   * Its material, density, mass mode, filtering and flags stay; the body's mass follows the new outline, and
+   * pairs already touching are carried across the swap without raising a duplicate start event.
+   * @throws RangeError for an invalid shape description; MargoError (state) once the collider was removed.
    */
   setShape(shape: ShapeOptions2D): void {
     if (this.removed)
       throw new MargoError('state', 'Collider2D was removed; add a new collider with Body2D.addCollider.');
     const { kernel, handle, scale } = this.owner,
       parts = describeShapes({ ...shape, offset: this.offset, rotation: this.turn } as ColliderOptions2D, scale);
-    if (this.shapes.length !== 1 || parts.length !== 1 || parts[0].kind > 4)
-      throw new RangeError(
-        'setShape changes one convex outline (circle, box, capsule, segment, triangle or convex polygon); remove this collider and add a new one for any other.',
-      );
-    const io = kernel.io(parts[0].geometry.length);
-    io.u.set(parts[0].geometry, 0);
-    kernel.ok(kernel.exports.shape_set_core(handle, this.shapes[0], parts[0].kind));
-    this.described = { ...parts[0], settings: this.settings };
-    if (this.options) this.options = { ...this.options, ...shape } as ColliderOptions2D;
+    if (this.shapes.length === 1 && parts.length === 1 && parts[0].kind <= 4) {
+      const io = kernel.io(parts[0].geometry.length);
+      io.u.set(parts[0].geometry, 0);
+      kernel.ok(kernel.exports.shape_set_core(handle, this.shapes[0], parts[0].kind));
+      this.described = { ...parts[0], settings: this.settings };
+      if (this.options) this.options = { ...this.options, ...shape } as ColliderOptions2D;
+      return;
+    }
+    this.owner.replaceColliderShapes(this, shape, parts);
   }
   isSensor(): boolean {
     return (this.settings[5] & (1 << 16)) !== 0;
@@ -215,6 +230,7 @@ export class Collider2D {
     this.push();
     // A density set takes the collider back from a set mass to its density, as Rapier's does.
     this.massProps = null;
+    this.explicitMass = null;
     const { kernel, handle } = this.owner;
     for (const shape of this.shapes) kernel.ok(kernel.exports.shape_set_mass(handle, shape, 0));
   }
@@ -237,6 +253,7 @@ export class Collider2D {
       }),
       total = areas.reduce((a, b) => a + b, 0);
     this.massProps = null;
+    this.explicitMass = kilograms;
     this.shapes.forEach((shape, i) => {
       const io = kernel.io(1);
       io.f[0] = total > 0 ? (kilograms * areas[i]) / total : kilograms / this.shapes.length;
@@ -263,6 +280,7 @@ export class Collider2D {
     const { kernel, handle, scale } = this.owner,
       c = Math.cos(this.turn),
       s = Math.sin(this.turn);
+    this.explicitMass = null;
     this.massProps = { mass, centre: [centre[0], centre[1]], inertia };
     this.shapes.forEach((shape, i) => {
       const io = kernel.io(4);

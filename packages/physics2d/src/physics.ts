@@ -410,6 +410,9 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   private readonly bodies = new Set<Body2D>();
   private movers: Body2D[] | null = null;
   private readonly byShape = new Map<number, Collider2D>();
+  private nextColliderUid = 1;
+  private readonly touchingPairs = new Map<string, { count: number; sensor: boolean; a: Collider2D; b: Collider2D }>();
+  private readonly carriedPairs = new Map<string, { sensor: boolean; a: Collider2D; b: Collider2D }>();
   private readonly joints = new Set<Joint2D>();
   private readonly controllers = new Set<CharacterController2D>();
   private readonly listeners = new Map<keyof Physics2DEventMap, Set<(event: never) => void>>();
@@ -761,6 +764,31 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       movers[i].store(out[n + 4 * i], out[n + 4 * i + 1], out[n + 4 * i + 2], out[n + 4 * i + 3], k);
   }
 
+  private pairKey(a: Collider2D, b: Collider2D): string {
+    return a.uid < b.uid ? `${a.uid}:${b.uid}` : `${b.uid}:${a.uid}`;
+  }
+
+  private pushCollisionEvent(
+    into: Array<[keyof Physics2DEventMap, unknown]>,
+    colliderA: Collider2D,
+    colliderB: Collider2D,
+    started: boolean,
+    sensor: boolean,
+  ): void {
+    const type = sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend';
+    into.push([
+      type,
+      {
+        type,
+        bodyA: colliderA.body,
+        bodyB: colliderB.body,
+        colliderA,
+        colliderB,
+        sensor,
+      },
+    ]);
+  }
+
   private collectEvents(into: Array<[keyof Physics2DEventMap, unknown]>): void {
     const { kernel } = this;
     const count = kernel.ok(kernel.exports.events_read(this.handle));
@@ -769,28 +797,41 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       for (let i = 0; i < count; i++) {
         const colliderA = this.byShape.get(u[3 * i]),
           colliderB = this.byShape.get(u[3 * i + 1]);
-        if (!colliderA || !colliderB) continue;
+        if (!colliderA || !colliderB || colliderA === colliderB) continue;
         const flags = u[3 * i + 2],
           started = (flags & 3) === 1,
-          sensor = (flags & 4) !== 0;
-        into.push([
-          sensor ? (started ? 'intersectionstart' : 'intersectionend') : started ? 'contactstart' : 'contactend',
-          {
-            type: sensor
-              ? started
-                ? 'intersectionstart'
-                : 'intersectionend'
-              : started
-                ? 'contactstart'
-                : 'contactend',
-            bodyA: colliderA.body,
-            bodyB: colliderB.body,
-            colliderA,
-            colliderB,
-            sensor,
-          },
-        ]);
+          sensor = (flags & 4) !== 0,
+          key = this.pairKey(colliderA, colliderB);
+        if (started) {
+          if (this.carriedPairs.delete(key)) {
+            this.touchingPairs.set(key, { count: 1, sensor, a: colliderA, b: colliderB });
+            continue;
+          }
+          const entry = this.touchingPairs.get(key);
+          if (entry) {
+            entry.count++;
+          } else {
+            this.touchingPairs.set(key, { count: 1, sensor, a: colliderA, b: colliderB });
+            this.pushCollisionEvent(into, colliderA, colliderB, true, sensor);
+          }
+        } else {
+          const entry = this.touchingPairs.get(key);
+          if (entry) {
+            entry.count--;
+            if (entry.count <= 0) {
+              this.touchingPairs.delete(key);
+              this.pushCollisionEvent(into, colliderA, colliderB, false, sensor);
+            }
+          } else if (!this.carriedPairs.has(key)) {
+            this.pushCollisionEvent(into, colliderA, colliderB, false, sensor);
+          }
+        }
       }
+    }
+    if (this.carriedPairs.size) {
+      for (const carried of this.carriedPairs.values())
+        this.pushCollisionEvent(into, carried.a, carried.b, false, carried.sensor);
+      this.carriedPairs.clear();
     }
     const forces = kernel.ok(kernel.exports.force_events_read(this.handle));
     if (forces) {
@@ -964,7 +1005,15 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       throw error;
     }
     const settings = Uint32Array.from(parts[0].settings);
-    const collider = new Collider2D(this, body, ids, settings, options.offset ?? [0, 0], options.rotation ?? 0);
+    const collider = new Collider2D(
+      this,
+      body,
+      ids,
+      settings,
+      options.offset ?? [0, 0],
+      options.rotation ?? 0,
+      this.nextColliderUid++,
+    );
     collider.described = parts[0];
     collider.options = options;
     // A mass given when the collider is made is its own, as a later setMass is: it holds through a new outline.
@@ -972,6 +1021,45 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     for (const id of ids) this.byShape.set(id, collider);
     body.colliders.push(collider);
     return collider;
+  }
+  /** @internal Replaces a collider's kernel shapes in place for multi-shape or non-convex `setShape`. */
+  replaceColliderShapes(collider: Collider2D, shape: ShapeOptions2D, parts: Described[]): void {
+    this.live();
+    const { body } = collider,
+      settings = collider.rawSettings,
+      ids: number[] = [];
+    try {
+      const seams: number[] = [];
+      for (const d of parts) {
+        const made = this.createShapes(body, { ...d, settings });
+        ids.push(...made);
+        if (d.seam) seams.push(...made);
+      }
+      if (seams.length > 1) {
+        const { kernel } = this;
+        kernel.io(seams.length).u.set(seams, 0);
+        kernel.ok(kernel.exports.shapes_join_seams(this.handle, seams.length));
+      }
+    } catch (error) {
+      for (const id of ids) this.kernel.exports.shape_remove(this.handle, id);
+      throw error;
+    }
+    // Carry any active collider-pair contacts across the swap so an ongoing touch raises no duplicate start event.
+    for (const [key, entry] of this.touchingPairs) {
+      if (entry.a === collider || entry.b === collider) {
+        this.carriedPairs.set(key, { a: entry.a, b: entry.b, sensor: entry.sensor });
+        this.touchingPairs.delete(key);
+      }
+    }
+    for (const oldId of collider.shapes) {
+      this.byShape.delete(oldId);
+      this.kernel.exports.shape_remove(this.handle, oldId);
+    }
+    collider.shapes.splice(0, collider.shapes.length, ...ids);
+    for (const id of ids) this.byShape.set(id, collider);
+    collider.described = { ...parts[0], settings };
+    if (collider.options) collider.options = { ...collider.options, ...shape } as ColliderOptions2D;
+    collider.reapplyMass();
   }
   private createShapes(body: Body2D, d: Described): number[] {
     const { kernel } = this;
@@ -984,6 +1072,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
   /** @internal */
   removeCollider(collider: Collider2D): void {
     if (collider.isRemoved) return;
+    for (const [key, entry] of this.touchingPairs)
+      if (entry.a === collider || entry.b === collider) this.touchingPairs.delete(key);
+    for (const [key, entry] of this.carriedPairs)
+      if (entry.a === collider || entry.b === collider) this.carriedPairs.delete(key);
     for (const id of collider.shapes) {
       this.byShape.delete(id);
       this.kernel.exports.shape_remove(this.handle, id);
@@ -997,6 +1089,10 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     for (const joint of [...this.joints]) if (joint.bodyA === body || joint.bodyB === body) this.removeJoint(joint);
     for (const controller of [...this.controllers]) if (controller.body === body) controller.dispose();
     for (const collider of body.colliders) {
+      for (const [key, entry] of this.touchingPairs)
+        if (entry.a === collider || entry.b === collider) this.touchingPairs.delete(key);
+      for (const [key, entry] of this.carriedPairs)
+        if (entry.a === collider || entry.b === collider) this.carriedPairs.delete(key);
       for (const id of collider.shapes) this.byShape.delete(id);
       collider.markRemoved();
     }
@@ -1129,34 +1225,47 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
     this.live();
     if (collider.isRemoved)
       throw new MargoError('state', 'Collider2D was removed; ask for the contacts of a live collider.');
-    const out: ContactPair2D[] = [];
+    const byOther = new Map<Collider2D, ContactPair2D>();
     const k = 1 / this.scale;
     for (const shape of collider.shapes) {
       const count = this.kernel.ok(this.kernel.exports.contacts_of(this.handle, shape));
       const { f, u } = this.kernel.io(11 * count);
       for (let i = 0; i < count; i++) {
         const other = this.byShape.get(u[11 * i]);
-        if (!other) continue;
+        if (!other || other === collider) continue;
         const flags = u[11 * i + 1],
-          n = flags >> 2;
+          n = flags >> 2,
+          solverActive = (flags & 1) !== 0,
+          touching = (flags & 2) !== 0,
+          impulse = f[11 * i + 10],
+          normal: [number, number] = [f[11 * i + 2], f[11 * i + 3]];
         const points: Array<{ point: [number, number]; distance: number }> = [];
         for (let j = 0; j < n; j++)
           points.push({
             point: [f[11 * i + 4 + 3 * j] * k, f[11 * i + 5 + 3 * j] * k],
             distance: f[11 * i + 6 + 3 * j] * k,
           });
-        out.push({
-          collider,
-          other,
-          normal: [f[11 * i + 2], f[11 * i + 3]],
-          points,
-          impulse: f[11 * i + 10],
-          solverActive: (flags & 1) !== 0,
-          touching: (flags & 2) !== 0,
-        });
+        const existing = byOther.get(other);
+        if (!existing) {
+          byOther.set(other, {
+            collider,
+            other,
+            normal,
+            points,
+            impulse,
+            solverActive,
+            touching,
+          });
+        } else {
+          existing.points.push(...points);
+          if ((!existing.touching && touching) || (touching && impulse > existing.impulse)) existing.normal = normal;
+          existing.impulse += impulse;
+          existing.solverActive = existing.solverActive || solverActive;
+          existing.touching = existing.touching || touching;
+        }
       }
     }
-    return out;
+    return [...byOther.values()];
   }
 
   /**
@@ -1516,6 +1625,33 @@ export class Physics2D implements EnginePlugin, BodyOwner2D {
       body.pose.copyWithin(0, 3, 6);
       body.dirty = true;
       body.restoreAdditionalMass(header.extra[index++] ?? 0);
+    }
+    this.resyncTouchingPairs();
+  }
+  private resyncTouchingPairs(): void {
+    this.touchingPairs.clear();
+    this.carriedPairs.clear();
+    for (const [shape, collider] of this.byShape) {
+      const count = this.kernel.ok(this.kernel.exports.contacts_of(this.handle, shape));
+      const { u } = this.kernel.io(11 * count);
+      for (let i = 0; i < count; i++) {
+        const otherShape = u[11 * i];
+        if (shape >= otherShape) continue;
+        const flags = u[11 * i + 1];
+        if ((flags & 2) === 0) continue;
+        const other = this.byShape.get(otherShape);
+        if (!other || other === collider) continue;
+        const key = this.pairKey(collider, other);
+        const entry = this.touchingPairs.get(key);
+        if (entry) entry.count++;
+        else
+          this.touchingPairs.set(key, {
+            count: 1,
+            sensor: collider.isSensor() || other.isSensor(),
+            a: collider,
+            b: other,
+          });
+      }
     }
   }
 
