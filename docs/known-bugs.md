@@ -2048,13 +2048,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Fix:** the yard is bare sand in `coverOf`; the flights ease up to a nearly level band and down again. Regression:
   packages/scenes/test/scenes.test.js, packages/procedural/test/flyer.test.js. Ported from the unlanded `kitty` branch.
 
-### Open 2026-11-27: a Fauld tunnel shot stops on a GPU error (KB-SCENES-TUNNELGPU1, owner to be found)
+### Fixed 2026-11-27: a Fauld tunnel shot stopped on a GPU error (KB-SCENES-TUNNELGPU1, vfx)
 
 - **Repro:** `MARGO_ASSET_LIBRARY=<library> node tools/shot/cli.mjs tools/shot/shots/fauld-fr091.json --stills --out <dir>`
-  (state `fire`, NVIDIA Ampere, WebGPU): the page reports `[Invalid CommandBuffer] is invalid due to a previous error`
-  (`gpu-lost`) after its probe frame, with all 35 WGSL modules compiling. Same on main without this day's lamp change.
-- **Cause:** not yet found; the first validation error is not printed.
-- **Owed:** capture the first uncaptured error, fix it in the owning package, with a test.
+  (state `fire`, NVIDIA Ampere, WebGPU): the page reported `[Invalid CommandBuffer] is invalid due to a previous error`
+  after its probe frame, with all 35 WGSL modules compiling.
+- **Cause:** the first error was WebGPU's refusal of a texture used as a writable depth attachment and as a sampled
+  texture in one pass: a `Flame` with `depth: () => stack.depthTexture` (the scene's own capture, as the tunnel fire
+  gives it) bound that depth in its depth pass, which writes it. With `fog` as well, the depth pass's bind group also
+  named the fog its shader never reads.
+- **Fix:** the depth pass has its own module that samples no scene depth (its depth test keeps what stands in front) and
+  binds the flame's uniform alone. The shot renders its still.
+- **Regression:** `packages/vfx/test/flame.test.js` (the depth pass's shader and bindings) and
+  `packages/vfx/test/flame-check.mjs` step `scene` (a real GPU, WebGPU and WebGL2: no error over a captured depth in
+  fog, and a wall hides the flame).
 
 ### Fixed 2026-11-27: the firelit smoke pall at night glowed evenly (KB-SKY-PALLFALLOFF1, sky and weather)
 

@@ -356,11 +356,14 @@ let nextId = 0;
  */
 const ATTACHED = new WeakMap<object, number>();
 
-const shader = (samples: number, fogged: boolean, encode: boolean, depth: boolean): string => /* wgsl */ `
+// `depth` picks the face of the box that marches (the far one over a scene depth); `clip` samples that scene depth to end
+// the ray at it. The depth pass takes no clip: it writes the very depth a `depth()` option may hand back, which WebGPU
+// refuses to sample in the same pass (KB-SCENES-TUNNELGPU1), and its depth test keeps what stands in front.
+const shader = (samples: number, fogged: boolean, encode: boolean, depth: boolean, clip = depth): string => /* wgsl */ `
 struct F {camera:mat4x4f,eye:vec4f,base:vec4f,shape:vec4f,turn:vec4f,motion:vec4f,look:vec4f,box:vec4f,forward:vec4f,ramp:array<vec4f,${TABLE}>,extra:vec4f,ground:vec4f,glow:vec4f,outer:vec4f}
 @group(0) @binding(0) var<uniform> u:F;
 ${fogged ? fogWgsl(0, 5) : ''}
-${depth ? softDepthWgsl(samples) : ''}
+${clip ? softDepthWgsl(samples) : ''}
 struct Out {@builtin(position) clip:vec4f,@location(0) world:vec3f}
 // Local space: the footprint's axes, sheared by the lean and by the ground's slope, so y is the height over the ground
 // plane through the base.
@@ -467,7 +470,7 @@ fn rayOf(i:Out,margin:f32,top:f32,glow:bool)->Ray {
   // also takes the far face when the camera stands inside its box (its depth is then the camera's, which passes).
   ${depth ? 'let mine=!(abs(along-leave)>abs(along-max(enter,0.0))&&enter>0.0);' : 'let mine=select(!(abs(along-enter)>abs(along-leave)||enter<0.0),abs(along-leave)<=abs(along-enter),glow&&enter<0.0);'}
   var end=leave;
-  ${depth ? 'if(textureLoad(sceneDepth,vec2i(i.clip.xy),0)>0.0){end=min(end,softGap(i.clip,0.0)/max(dot(r.rd,u.forward.xyz),1e-4));}' : ''}
+  ${clip ? 'if(textureLoad(sceneDepth,vec2i(i.clip.xy),0)>0.0){end=min(end,softGap(i.clip,0.0)/max(dot(r.rd,u.forward.xyz),1e-4));}' : ''}
   // The ground plane ends the ray: the flame stands on it and its glow lights it. It is local y = 0 under a surface
   // fire; a crown fire's position is the canopy's base, so its ground lies 0.3 flame lengths below the box's bottom.
   var ground=-1.0;
@@ -1053,6 +1056,10 @@ export class Flame implements EnginePlugin {
     let set = shared.get(key);
     if (!set) {
       const module = device.createShaderModule({ code: shader(samples, !!fog, encode, !!depth) }),
+        // The depth pass's own: over a scene depth it must not sample it (it writes the depth).
+        written = depth
+          ? device.createShaderModule({ code: shader(samples, !!fog, encode, true, false) })
+          : module,
         // Premultiplied over (Porter and Duff 1984): the flame covers what is behind it by its opacity; the glow (alpha 0) adds.
         blend: GPUBlendState = {
           color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' },
@@ -1063,11 +1070,12 @@ export class Flame implements EnginePlugin {
           fragment: string,
           target: GPUColorTargetState,
           depthStencil: Omit<GPUDepthStencilState, 'format'>,
+          code = module,
         ) =>
           device.createRenderPipeline({
             layout: 'auto',
-            vertex: { module, entryPoint: vertex },
-            fragment: { module, entryPoint: fragment, targets: [target] },
+            vertex: { module: code, entryPoint: vertex },
+            fragment: { module: code, entryPoint: fragment, targets: [target] },
             primitive: { topology: 'triangle-list' },
             multisample: c.descriptor.multisample,
             depthStencil: { format: depthFormat, ...depthStencil },
@@ -1092,6 +1100,7 @@ export class Flame implements EnginePlugin {
           'depthFragment',
           { format: c.format, writeMask: 0 },
           { depthWriteEnabled: true, depthCompare: 'greater-equal' },
+          written,
         ),
         // The coverage into the reactive mask, tested as the flame is; the most over a pixel is kept.
         make(
@@ -1110,10 +1119,11 @@ export class Flame implements EnginePlugin {
           pipeline,
           device.createBindGroup({
             layout: pipeline.getBindGroupLayout(0),
+            // The depth pass reads the uniform alone: no fog, no scene depth.
             entries: [
               { binding: 0, resource: { buffer: this.uniform } },
-              ...(fog ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
-              ...(samples ? this.softRuntime!.entries : []),
+              ...(fog && pipeline !== set[2] ? [{ binding: 5, resource: { buffer: this.fogBuffer! } }] : []),
+              ...(samples && pipeline !== set[2] ? this.softRuntime!.entries : []),
             ],
           }),
         );

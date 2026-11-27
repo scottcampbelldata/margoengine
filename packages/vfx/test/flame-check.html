@@ -311,6 +311,18 @@ window.check.stand=async function(){
  const level=await run(0),slope=await run(0.3);
  return {level:level.pixels,slope:slope.pixels,errors:[...level.errors,...slope.errors]};
 };
+// - scene: a flame over the scene's own captured depth (PostStack.depthTexture) and in fog draws with no GPU error, its
+//   depth pass included (KB-SCENES-TUNNELGPU1), and a wall between the camera and the flame still hides it.
+window.check.scene=async function(){
+ const run=async(wall)=>{
+  const s=await bigScene({position:[0,4,22],target:[0,3,0]},256,192,true),stack=PostStack.attach(s.e,[new Tonemap()]);
+  if(wall){const m=createMesh(s.e,boxGeometry(60,40,0.4),new Material({color:[0.02,0.02,0.02],roughness:1}));m.root.setPosition([0,0,8]);}
+  Big.attach(s.e,{position:[0,0,0],length:6,footprint:[6,4],depth:()=>stack.depthTexture,fog:{color:[0.05,0.05,0.06],near:10,far:300}});
+  await frames(s,30);const out={pixels:flamePixels(s),errors:s.errs};s.e.dispose();return out;
+ };
+ const open=await run(false),hidden=await run(true);
+ return {open:open.pixels,hidden:hidden.pixels,errors:[...open.errors,...hidden.errors]};
+};
 window.check.glow=async function(){
  const run=async(glow)=>{
   const s=await bigScene({position:[0,6,22],target:[0,2,0]},256,192,true),

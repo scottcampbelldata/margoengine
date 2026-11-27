@@ -43,6 +43,13 @@ try {
     assert.ok(d.lit > 100, `the fire shows: ${JSON.stringify(d)}`);
     console.log(`ok flame defaults frame exact; the fire covers ${d.lit} pixels`);
   });
+  await step('scene', async () => {
+    const r = await page.evaluate(() => window.check.scene());
+    assert.deepEqual(r.errors, []);
+    assert.ok(r.open > 500, `the flame shows over the captured depth: ${JSON.stringify(r)}`);
+    assert.ok(r.hidden < 0.05 * r.open, `a wall in front hides it: ${JSON.stringify(r)}`);
+    console.log(`ok flame over a captured depth in fog: ${r.open} flame pixels, ${r.hidden} behind a wall`);
+  });
   await step('look', async () => {
     const l = await page.evaluate(() => window.check.look());
     assert.deepEqual(l.errors, []);

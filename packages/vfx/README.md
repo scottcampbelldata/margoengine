@@ -1239,7 +1239,9 @@ console.log(Math.round(flameLuminousFlux(1e6, 1760))); // about 150,000 lm from 
   footprint a third of the flame up, their rate and launch speed growing as sqrt(L / 20) (embers loft with the plume,
   Sardoy et al. 2007), carried ahead of the front by the open wind; the ember rows of `FLAME_SETTINGS` scale them.
 - Pass the scene `depth` (`DepthTexture` of `@margoengine/post/depth`) so the march stops at a house inside its own
-  flames and the camera may stand in the fire; without it the volume's box is depth-tested against the scene.
+  flames and the camera may stand in the fire; without it the volume's box is depth-tested against the scene. It may be
+  the capture the flame draws into (`depth: () => stack.depthTexture` of a `PostStack`): the colour passes read it and
+  the pass that writes the flame's depth does not (KB-SCENES-TUNNELGPU1).
 - Limits: a flame is a procedural volume, not a fluid simulation; it has no soot of its own (a `Fire` adds `Smoke`), its
   light does not cast shadows, the glow lights a plane (the ground under the flame), not the scene's own surfaces, unless
   `depth` is given, and there is no heat shimmer (refraction needs the scene's colour, which a frame pass cannot read;

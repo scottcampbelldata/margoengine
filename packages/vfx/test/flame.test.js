@@ -731,3 +731,30 @@ test('Flame refuses the small WebGL2 preview before it is built and stays off th
     preview.dispose();
   }
 });
+
+// KB-SCENES-TUNNELGPU1: the depth pass bound the scene depth it was writing (a `depth()` of the scene's own capture, as
+// PostStack.depthTexture), which WebGPU refuses, and the whole frame's commands were lost. It also bound the fog its
+// shader never reads, which an automatic layout refuses.
+test('Flame over a scene depth and in fog: the depth pass writes the depth and binds neither it nor the fog', () => {
+  const h = optionalGPU(),
+    depth = Object.assign(
+      h.engine.gpu.createTexture({ size: [128, 96], format: 'depth32float', usage: GPUTextureUsage.TEXTURE_BINDING }),
+      { depthOrArrayLayers: 1 },
+    ),
+    flame = Flame.attach(h.engine, {
+      position: [0, 0, 0],
+      length: 4,
+      depth: () => depth,
+      fog: { color: [0.1, 0.1, 0.1], near: 10, far: 200 },
+    });
+  h.frame();
+  const code = (entry) => h.pipelines.findLast((p) => p.fragment?.entryPoint === entry).fragment.module.code;
+  for (const entry of ['fragment', 'glowFragment', 'reactiveFragment'])
+    assert.match(code(entry), /var sceneDepth:texture_depth/, entry + ' ends its ray at the scene depth');
+  assert.doesNotMatch(code('depthFragment'), /sceneDepth|binding\(11\)/, 'the depth pass samples no depth');
+  assert.match(code('depthFragment'), /let mine=!\(abs\(along-leave\)/, 'it marches from the face the colour pass does');
+  const bound = h.groups.map((g) => g.entries.map((e) => e.binding).join()).sort();
+  assert.deepEqual(bound, ['0', '0,5,11,12', '0,5,11,12', '0,5,11,12'], 'the depth pass binds the uniform alone');
+  flame.dispose();
+  depth.destroy();
+});
