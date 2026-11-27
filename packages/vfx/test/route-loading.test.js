@@ -1,8 +1,8 @@
 // KB-VFX-EMBERCPU1: on the WebGL2 layer a VFX encoded its steps before its compatibility route had loaded, so the
 // layer ran the WebGPU kernels of every step (a prewarm is hundreds) on its CPU tier: 95 s over the ember effects of one
 // FireFront. The steps of an effect with a prewarm now wait for the route and run, in order, on its draws; an effect
-// with no prewarm keeps simulating on its WebGPU kernels until then (the `loadCompatRoute` contract, which the WebGL2
-// run of features-check.mjs holds it to: no frame is drawn differently while the route loads).
+// with no prewarm keeps simulating on its WebGPU kernels until then (measured by the WebGL2 run of features-check.mjs, which waits
+// for `ready` before its exact frames).
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VFX } from '../dist/index.js';
@@ -37,8 +37,11 @@ test('on the WebGL2 layer a prewarm is not simulated before the route loads, and
   h.frame();
   h.frame();
   assert.deepEqual(budgets, [], 'no step is simulated while the route loads');
-  for (let i = 0; i < 100 && !effect.route; i++) await new Promise((resolve) => setImmediate(resolve));
-  assert.ok(effect.route, 'the route loaded');
+  // KB-COMPAT-READY1: those frames show no prewarm, so ready waits for the route and settles with it.
+  const pending = Symbol('pending');
+  assert.equal(await Promise.race([effect.ready, Promise.resolve(pending)]), pending, 'ready waits for the route');
+  await effect.ready;
+  assert.ok(effect.route, 'the route is in place once ready settles');
   h.frame();
   assert.deepEqual(
     budgets,
@@ -85,12 +88,11 @@ test('on a native WebGPU device a step is simulated in the first frame', () => {
 // KB-VFX-EMBERCPU1, the second half: over-life read `particles` and `lifeBirth` back after the kernel had stored to them,
 // which the layer puts on its CPU tier (the route's `update` kernel of an effect with over-life ran there, 22 s of the
 // 25 s that were left once the steps waited for the route). No route kernel may land on the CPU tier.
-import { readdirSync } from 'node:fs';
 import { planCompute } from '../../webgl2-compat/dist/compute.js';
 import { checkWGSL } from '../../webgl2-compat/dist/wgsl.js';
+import { compatChunk } from '../../../tests/support/compat-chunk.js';
 
-const compatChunk = readdirSync(new URL('../dist/', import.meta.url)).find((name) => /^compat-.*\.js$/.test(name));
-const { routeShaders } = await import(`../dist/${compatChunk}`);
+const { routeShaders } = await compatChunk(new URL('../dist/', import.meta.url), 'routeShaders');
 
 for (const [name, options] of [
   ['a plain effect', {}],
@@ -163,3 +165,13 @@ for (const on of ['death', 'collision']) {
     effect.dispose();
   });
 }
+
+test('VFX.ready is settled at once on WebGPU (KB-COMPAT-READY1)', async () => {
+  const h = optionalGPU();
+  h.engine.stats = { drawCalls: 0 };
+  const effect = new VFX({ capacity: 64, rate: 0 }),
+    pending = Symbol('pending');
+  h.engine.use(effect);
+  assert.notEqual(await Promise.race([effect.ready, Promise.resolve(pending)]), pending);
+  effect.dispose();
+});

@@ -419,6 +419,7 @@ class VFX implements EnginePlugin {
     resetTime(): void;
     setWind(wind: VFXWind | undefined): this;
     setup(engine: Engine): void;
+    get ready(): Promise<void>;
     registerPasses(graph: FrameGraph): void;
     get time(): number;
     advanceTime(delta: number): void;

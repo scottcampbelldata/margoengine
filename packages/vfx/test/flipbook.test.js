@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { VFX } from '../dist/index.js';
 import { VFX as Base } from '../dist/base.js';
 import { flipbook } from '../dist/flipbook.js';
@@ -10,6 +9,7 @@ import { textureFeature } from '../dist/texture.js';
 import { lit } from '../dist/lit.js';
 import { translateWGSL } from '../../webgl2-compat/dist/glsl.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { compatChunk } from '../../../tests/support/compat-chunk.js';
 
 const pixels = new Uint8Array(8 * 8 * 4);
 const lifetime = { width: 8, height: 8, data: pixels, atlas: { columns: 2, rows: 2, frames: 'lifetime' } };
@@ -75,8 +75,7 @@ test('the WebGL2 route still wraps the blended billboard, and the blend translat
   h.frame();
   const code = h.pipelines.map((p) => p.vertex?.module.code).find((c) => c?.includes(mix));
   const dist = join(dirname(fileURLToPath(import.meta.url)), '../dist');
-  const compat = readdirSync(dist).find((name) => /^compat-.*\.js$/.test(name));
-  const { countedBillboard } = await import(pathToFileURL(join(dist, compat)).href);
+  const { countedBillboard } = await compatChunk(dist, 'countedBillboard');
   const wrapped = countedBillboard(code);
   assert.match(wrapped, /if\(instance>=drawn\[1\]\)/);
   assert.ok(wrapped.includes(mix));

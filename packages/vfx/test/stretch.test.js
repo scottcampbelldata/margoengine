@@ -1,14 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
 import { VFX } from '../dist/index.js';
 import { VFX as Base } from '../dist/base.js';
 import { stretch } from '../dist/stretch.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { compatChunk } from '../../../tests/support/compat-chunk.js';
 
-const compatChunk = readdirSync(new URL('../dist/', import.meta.url)).find((name) => /^compat-.*\.js$/.test(name));
-assert.ok(compatChunk, 'the private compatibility route chunk');
-const { routeShaders, SimulationRoute } = await import(`../dist/${compatChunk}`);
+const { routeShaders, SimulationRoute } = await compatChunk(new URL('../dist/', import.meta.url), 'routeShaders');
 
 const attach = (options, features) => {
   const h = optionalGPU();

@@ -5,13 +5,12 @@
 // uses; the oracle here is the layer's own WGSL front end, the one that makes its auto layouts.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync } from 'node:fs';
 import { VFX } from '../dist/index.js';
 import { checkWGSL } from '../../webgl2-compat/dist/wgsl.js';
 import { optionalGPU } from '../../../tests/support/optional-gpu.js';
+import { compatChunk } from '../../../tests/support/compat-chunk.js';
 
-const compatChunk = readdirSync(new URL('../dist/', import.meta.url)).find((name) => /^compat-.*\.js$/.test(name));
-const { SimulationRoute, routeShaders } = await import(`../dist/${compatChunk}`);
+const { SimulationRoute, routeShaders } = await compatChunk(new URL('../dist/', import.meta.url), 'routeShaders');
 
 // The bindings of group 0 that the entry point `main` of `code` reaches, as the layer's auto layout holds them.
 const reached = (code) => {

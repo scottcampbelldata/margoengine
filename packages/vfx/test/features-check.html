@@ -23,7 +23,7 @@ async function run(effect,{frames,dt=0.1,samples=1,before=()=>{},setup=()=>{},re
  effect.setup({gpu:device,stats:{drawCalls:0},removePlugin(){},sceneOf(){return this},lighting});
  // `route`: on the WebGL2 layer, simulate on the compatibility route (it loads by import() after setup), not on the
  // WebGPU kernels the layer also runs until then.
- if(route&&globalThis.__margoCompat){for(let i=0;i<1000&&!effect.route;i++)await new Promise(r=>setTimeout(r,10));if(!effect.route)throw Error('compat route did not load');}
+ if(route&&globalThis.__margoCompat){await effect.ready;if(!effect.route)throw Error('compat route did not load');}
  setup();
  const target=(format,count,usage)=>device.createTexture({size:[size,size],format,sampleCount:count,usage});
  const color=target('rgba8unorm',samples,GPUTextureUsage.RENDER_ATTACHMENT|(samples===1?GPUTextureUsage.COPY_SRC:0)),

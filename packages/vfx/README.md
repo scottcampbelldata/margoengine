@@ -1809,6 +1809,22 @@ same seed flies the same flock every run.
 f64 on a physics world, with Couzin's three zones, the nearest neighbours, predicted predators, point-mass locomotion
 and the intent ports LIFE-03's swimmers read. Limits are in `docs/limits.md` and sources in `docs/clean-room.md`.
 
+## Exact first frames on the WebGL2 layer
+
+`effect.ready` is a promise that settles once every frame simulates and draws the effect as it will from then on. On
+the WebGL2 compatibility layer a `VFX` fetches its compatibility route (`import()`) when it attaches; until it arrives
+an effect with a prewarm holds its steps and runs them once it has, so those first frames differ. On WebGPU it is
+already settled. Await it before a frame that must be exact, such as a film frame or a pixel comparison:
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {VFX} from 'margoengine/vfx';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const sparks = VFX.attach(engine, {capacity:1000, schedule:{prewarm:1}});
+await sparks.ready;
+engine.render();
+```
+
 ## Preview tier contract
 
 GPU-only attachments refuse the small WebGL2 preview during setup with `MargoError` code `unsupported` and a help link. Native WebGPU and the full WebGL2 compatibility layer expose the WebGPU-shaped device these passes need. Use [automatic escalation](../webgl2-compat/README.md#automatic-escalation) with awaited setup to load the full layer when required. Existing real preview routes remain available.

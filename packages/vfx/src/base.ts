@@ -25,7 +25,7 @@ import { checkFog, FOG_BYTES, writeFog, type FogLike } from '../../shared/fog.js
 export type { FogLike } from '../../shared/fog.js';
 import { applyView } from '../../shared/view-rect.js';
 import { reactiveBlend, reactiveMaskWanted, reactiveTarget } from '../../shared/reactive-mask.js';
-import { loadCompatRoute } from '../../shared/compat.js';
+import { loadCompatRoute, routeSettled } from '../../shared/compat.js';
 import { surfacePass, transparencySlot, type SurfaceTransparency } from '../../shared/pass.js';
 declare const GPUBufferUsage: {
   UNIFORM: number;
@@ -795,6 +795,7 @@ export class VFX implements EnginePlugin {
   /** Steps taken while the WebGL2 route is still loading, run in order when it resolves (KB-VFX-EMBERCPU1). */
   private held: Tick[] = [];
   private routeLoading = false;
+  private routeReady: Promise<void> = Promise.resolve();
   private disposed = false;
   constructor(
     readonly options: VFXOptions = {},
@@ -1171,6 +1172,24 @@ export class VFX implements EnginePlugin {
       .finally(() => {
         if (this.particles === particles) this.routeLoading = false;
       });
+    // After the handlers above: by then the route (or, if it failed, the WebGPU kernels) simulates every step.
+    this.routeReady = routeSettled(loading);
+  }
+  /**
+   * Settles once every frame simulates and draws the effect as it will from then on. On the WebGL2 compatibility layer
+   * a VFX loads its route (a dynamic import) when it attaches; until it has loaded an effect with a prewarm holds its
+   * steps, and one without runs its WebGPU kernels on the layer's CPU tier. Resolved at once on WebGPU. Read it after
+   * attaching, and await it before a frame that must be exact: a film frame, a pixel comparison (KB-COMPAT-READY1).
+   *
+   * @example
+   * ```ts
+   * const sparks = VFX.attach(engine, { capacity: 1000 });
+   * await sparks.ready;
+   * engine.render();
+   * ```
+   */
+  get ready(): Promise<void> {
+    return this.routeReady;
   }
   registerPasses(graph: FrameGraph): void {
     graph.add({
