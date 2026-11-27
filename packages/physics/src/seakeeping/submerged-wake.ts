@@ -1,5 +1,4 @@
 import { MargoError } from '@margoengine/math/errors';
-import { hypot } from '@margoengine/math/pinned';
 import { hullSectionMoments, type Section } from './strips.js';
 import type { HullMesh } from './wetted.js';
 
@@ -52,7 +51,9 @@ export function submergedWakeNodes(
         next = spans[i] ?? EMPTY;
       const x = start + i * width,
         breadth = Math.max(sections[i - 1]?.breadth ?? 0, sections[i]?.breadth ?? 0);
-      const radius = Math.max(minimumRadius, 0.5 * hypot(width, breadth));
+      // The Gauss points already integrate the lateral span. Let numerical smoothing shrink with the
+      // longitudinal station interval, independently of the beam already represented in the quadrature.
+      const radius = Math.max(minimumRadius, 0.5 * width);
       function sample(left: number, right: number, sign: number): void {
         // Adjacent clips of a prismatic span may differ by arithmetic roundoff.
         const span = right - left;

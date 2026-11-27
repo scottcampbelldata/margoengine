@@ -2702,6 +2702,89 @@ test('hull strips integrate the same closed section regardless of each triangleâ
   }
 });
 
+test('a boat built in code and its imported GLB hull have identical buoyancy, righting and wake', async () => {
+  const { exportGLB, splitGLB, readAccessor } = await import('@margoengine/exporters');
+  const codeHull = boxMesh([4, 1, 2], [0, 0, 0], 2);
+  for (let i = 0; i < codeHull.vertices.length; i += 3) {
+    const [x, y] = codeHull.vertices.subarray(i, i + 2);
+    // Flare the sides and taper the forward end of the closed displacement mesh.
+    codeHull.vertices[i + 2] *= (0.875 + 0.25 * y) * (1 - Math.max(0, x) / 8);
+  }
+  const glb = splitGLB(
+    exportGLB({
+      nodes: [
+        { name: 'Workboat displacement hull', geometry: { positions: codeHull.vertices, indices: codeHull.indices } },
+      ],
+    }),
+  );
+  const primitive = glb.json.meshes[0].primitives[0];
+  const importedHull = {
+    vertices: readAccessor(glb, primitive.attributes.POSITION).values,
+    indices: readAccessor(glb, primitive.indices).values,
+  };
+
+  function run(mesh) {
+    const density = 1025,
+      depth = 3,
+      world = new PhysicsWorld({ rate: { num: 60, den: 1 }, memory: worldMemory(false) });
+    using physics = new Physics(null, { arena: world.arena, fixedTimestep: 1 / 60, substeps: 1 });
+    const body = physics.addBody(null, {
+      rotation: [Math.sin(0.06), 0, 0, Math.cos(0.06)],
+      linearVelocity: [1.25, 0, 0],
+      colliders: { shape: 'convexHull', points: mesh.vertices, mass: 2400 },
+    });
+    const hull = new HullSolver('hull', { minimumRadius: 0.25, submergedAdvance: [0, 0.25, 0.55] });
+    const wake = new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
+    const sea = new SpectralSea({
+      waves: {
+        frequencies: Float64Array.of(0.5),
+        directions: Float64Array.of(0),
+        energy: Float64Array.of(0),
+        depth,
+        density,
+      },
+      patches: [wake],
+    });
+    world
+      .add(new RigidSolver(), { physics })
+      .add(hull, {
+        hulls: [{ row: body.row, mesh }],
+        sea,
+        radiation: false,
+        addedMass: false,
+        rollDamping: false,
+        drag: false,
+        diffraction: false,
+        drift: false,
+        greenWater: false,
+        slamming: false,
+      })
+      .add(wake, { cells: [48, 32], cellSize: 0.25, depth, sponge: 0, density })
+      .couple(['hull', 'wake', 'rigid'], 'staggered');
+
+    const zero = world.takeSnapshot();
+    world.advance(1);
+    assert.ok(body.linearVelocity[1] > 0, 'buoyancy lifts the initially immersed boat');
+    assert.ok(body.angularVelocity[0] < 0, 'buoyancy rights the initially heeled boat');
+    world.advance(40);
+    assert.ok(
+      wake.heights().some((height) => Math.abs(height) > 1e-4),
+      'the moving hull leaves a physical wake',
+    );
+    const hash = world.hash();
+    world.restoreSnapshot(zero.bytes);
+    world.advance(40);
+    assert.equal(world.hash(), hash);
+    return {
+      hash,
+      height: Float64Array.from(wake.heights()),
+      rigid: [...body.position, ...body.rotation, ...body.linearVelocity, ...body.angularVelocity],
+    };
+  }
+
+  assert.deepEqual(run(importedHull), run(codeHull));
+});
+
 test('submerged HullSolver wake preserves an eccentric waterplane, fixed work and a real frame-zero replay', async () => {
   await Physics.load({ threads: true });
   for (const shared of [false, true]) {
@@ -2715,7 +2798,10 @@ test('submerged HullSolver wake preserves an eccentric waterplane, fixed work an
       lockRotations: true,
       colliders: { shape: 'convexHull', points: mesh.vertices, mass: density },
     });
-    const hull = new HullSolver('hull', { minimumRadius: 0.35, submergedAdvance: [0, 0.125, 0.5] });
+    const dx = 0.25,
+      depth = 2,
+      cells = [48, 32];
+    const hull = new HullSolver('hull', { minimumRadius: dx, submergedAdvance: [0, 0.125, 0.5] });
     const wake = new WakeSolver('wake', hull.wakeSourceField, hull.submergedWakeSource);
     sim
       .add(new RigidSolver(), { physics })
@@ -2729,7 +2815,7 @@ test('submerged HullSolver wake preserves an eccentric waterplane, fixed work an
         greenWater: false,
         slamming: false,
       })
-      .add(wake, { cells: [48, 32], cellSize: 0.25, depth: 2, sponge: 0, density })
+      .add(wake, { cells, cellSize: dx, depth, sponge: 0, density })
       .couple(['hull', 'wake', 'rigid'], 'staggered');
 
     const zero = sim.takeSnapshot();
@@ -2764,6 +2850,22 @@ test('submerged HullSolver wake preserves an eccentric waterplane, fixed work an
       0,
     );
     assert.ok(wake.heights().some((h) => h > 0) && wake.heights().some((h) => h < 0));
+
+    // A rectangular hull has uniform flux over its two submerged end faces. For a longitudinal
+    // mode both faces lie halfway between grid centres. Their bilinear scatter adds cos(k dx/2),
+    // and integration from the surface to draft adds the exact vertical Green transfer.
+    const waveNumber = Math.PI / 2;
+    const projectedDraft =
+      (Math.sinh(waveNumber * depth) - Math.sinh(waveNumber * (depth - 0.5))) /
+      (waveNumber * Math.cosh(waveNumber * depth));
+    const omega = Math.sqrt(-sim.gravity[1] * waveNumber * Math.tanh(waveNumber * depth));
+    const expectedMode = 2 * (1.5 / 60) * projectedDraft * Math.cos((waveNumber * dx) / 2) * Math.cos(omega / 60);
+    const longitudinalMode = wake.heights().reduce((sum, h, i) => {
+      const x = ((i % cells[0]) + 0.5 - cells[0] / 2) * dx;
+      return sum + h * dx * dx * Math.sin(waveNumber * x);
+    }, 0);
+    nearWake(longitudinalMode, expectedMode);
+
     sim.advance(17);
     const expected = sim.hash();
     sim.restoreSnapshot(zero.bytes);
