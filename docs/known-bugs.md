@@ -6,6 +6,18 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Fixed 2026-11-27: a weight on a rope's end was thrown off, or blew the world up (KB-PHYS-PINFREE1, physics kernel)
+
+- **Repro:** `packages/physics/tests/rod.test.js`, "a weight on a rope's end hangs still": a rope pinned at the top with a
+  free 2 kg body on its end. The weight went 19 m up in 3 s; a 50 g weight blew the world up at once.
+- **Cause:** a rod's end is pinned to the body in the multibody's tree solve, a stiff implicit spring (PIN_STIFFNESS times
+  the link's mass) to the body's anchor taken as moving at its speed. That is right for a fixed or massive body. A free
+  body took the whole spring back explicitly afterwards, so stiff pins to light bodies gained energy every substep.
+- **Fix:** for a dynamic body, the pin's spring eliminates the body's velocity within the step. With W the body's
+  mobility at its anchor, C and the pull are taken through (I + C W)^-1, and the body takes the same impulse back. A fixed
+  or kinematic body keeps C as it was.
+- **Regression:** the test above, at 2 kg and 50 g.
+
 ### Fixed 2026-11-27: a rod in a PhysicsWorld lost its wake state on a seek (KB-PHYS-RODSEEK1, physics)
 
 - **Repro:** `packages/physics/tests/coupling/rod.test.js`, "a seek equals a continuous run": a riser in a current with

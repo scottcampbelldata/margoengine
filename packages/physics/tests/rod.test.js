@@ -520,3 +520,32 @@ test('a quarter ring clamped at one end and loaded across its plane bends and tw
   assert.ok(errors[1] < 5e-3, `64 links: ${errors[1]} off Castigliano`);
   assert.ok(errors[1] < 0.6 * errors[0], `first order in the links: ${errors}`);
 });
+
+test("a weight on a rope's end hangs still at the rope's length, light or heavy", () => {
+  // A rope pinned at the top with a free body on its end: the pin to the body is a spring between two bodies, and the body
+  // must answer it in the same step. Treated as moving at its speed, a 2 kg weight was thrown 19 m up in 3 s and a 50 g one
+  // blew the world up. At rest the rope stretches W L / EA, about 2e-5 m here, so the weight hangs within 1e-3 m of it.
+  for (const mass of [0.05, 2]) {
+    const physics = new Physics(null, { gravity: [0, -9.81, 0] });
+    const weight = physics.addBody(null, { position: [0, -1, 0], colliders: [] });
+    weight.setAdditionalMass(mass, [1e-3, 1e-3, 1e-3]);
+    new Rod(physics, {
+      start: [0, 0, 0],
+      end: [0, -1, 0],
+      segments: 30,
+      radius: 0.01,
+      density: 7800,
+      bendStiffness: 1e-3,
+      twistStiffness: 1e-3,
+      attachStart: 'fixed',
+      attachEnd: weight,
+    });
+    for (let i = 0; i < 240; i++) physics.step(1 / 60);
+    assert.ok(Math.abs(weight.position[1] + 1) < 1e-3, `a ${mass} kg weight hangs at ${weight.position[1]} m`);
+    assert.ok(
+      Math.hypot(...weight.linearVelocity) < 1e-3,
+      `a ${mass} kg weight still moves at ${weight.linearVelocity}`,
+    );
+    physics.dispose();
+  }
+});

@@ -436,7 +436,7 @@ impl World {
     fn add_pins(&self, body: usize, h: f64, m: &mut M6, r: &mut V6) {
         self.each_pin(body, |w, joint, other| {
             let (gap, speed, arm) = w.pin_geometry(joint, body, other);
-            let (c, pull) = w.pin_terms(joint, body, h, gap);
+            let (c, pull) = w.pin_terms(joint, body, other, h, gap);
             let jac = point_jacobian(arm);
             // C J, then J^T C J and J^T (C v_other - pull).
             let mut cj = [[0.0f64; 6]; 3];
@@ -473,7 +473,60 @@ impl World {
     /// h k_pin (I - t t^T) gap + h k (t . gap) t: stiff across, and along the link's own +Y axis t the pin's spring of
     /// JOINT_STIFFNESS_1 and JOINT_DAMPING_1 when it has JOINT_PIN_ALONG, else stiff that way too. h^2 k_pin is
     /// PIN_STIFFNESS times the link's mass.
-    fn pin_terms(&self, joint: usize, body: usize, h: f64, gap: D3) -> ([[f64; 3]; 3], D3) {
+    ///
+    /// A pin to a dynamic body is a spring between two bodies, and that body answers its impulse within the same step. With
+    /// P = C (v_other' - v_p') - pull the impulse on the link and v_other' = v_other - W P, W the other body's mobility at its
+    /// anchor (its inverse mass, and its inverse inertia through the arm), P = A^-1 C (v_other - v_p') - A^-1 pull with
+    /// A = I + C W: the same spring as to a body that cannot move, with C and pull taken through A^-1. Treated as moving at its
+    /// speed instead, a light body on a stiff pin took the whole spring back explicitly and was thrown off (a 2 kg weight on a
+    /// rope's end went 19 m up in 3 s). A body still or fixed has W = 0 and keeps C and pull as they are.
+    fn pin_terms(&self, joint: usize, body: usize, other: usize, h: f64, gap: D3) -> ([[f64; 3]; 3], D3) {
+        let (c, pull) = self.pin_spring(joint, body, h, gap);
+        if self.flags(other) & KIND != DYNAMIC {
+            return (c, pull);
+        }
+        let on_a = self.uu(JOINT_A, joint) as usize == other;
+        let theirs = if on_a { JOINT_ANCHOR_A_X } else { JOINT_ANCHOR_B_X };
+        let there = self.pose_position(other).add(self.pose_rotation(other).rotate(self.v(theirs, joint)));
+        let arm = there.sub(self.pose_center(other));
+        let frame = self.pose_rotation(other).mul(self.q(INERTIA_FRAME_X, other));
+        let (inverse_mass, inverse_inertia) = (self.s(INVERSE_MASS, other) as f64, self.v(INVERSE_INERTIA_X, other));
+        // W e_j: the anchor's change of velocity for a unit impulse e_j there, m^-1 e_j + (I^-1 (r x e_j)) x r.
+        let mut w_ = [[0.0f64; 3]; 3];
+        for j in 0..3 {
+            let mut e = [0.0f32; 3];
+            e[j] = 1.0;
+            let unit = v3(e[0], e[1], e[2]);
+            let turn = crate::integrate::apply_inverse_inertia(inverse_inertia, frame, arm.cross(unit)).cross(arm);
+            let column = [turn.x as f64, turn.y as f64, turn.z as f64];
+            for i in 0..3 {
+                w_[i][j] = column[i] + if i == j { inverse_mass } else { 0.0 };
+            }
+        }
+        let mut a = [[0.0f64; 3]; 3];
+        for i in 0..3 {
+            for j in 0..3 {
+                a[i][j] = if i == j { 1.0 } else { 0.0 };
+                for k in 0..3 {
+                    a[i][j] += c[i][k] * w_[k][j];
+                }
+            }
+        }
+        let inverse = invert3(a);
+        let (mut c_out, mut pull_out) = ([[0.0f64; 3]; 3], [0.0f64; 3]);
+        for i in 0..3 {
+            for j in 0..3 {
+                for k in 0..3 {
+                    c_out[i][j] += inverse[i][k] * c[k][j];
+                }
+                pull_out[i] += inverse[i][j] * pull[j];
+            }
+        }
+        (c_out, pull_out)
+    }
+
+    /// The pin's spring to an anchor that moves as it moves now: its stiffness C over the substep and its pull C gap / h.
+    fn pin_spring(&self, joint: usize, body: usize, h: f64, gap: D3) -> ([[f64; 3]; 3], D3) {
         let stiff = PIN_STIFFNESS / self.s(INVERSE_MASS, body) as f64;
         let (mut c, mut pull) = ([[0.0f64; 3]; 3], [0.0f64; 3]);
         if self.uu(JOINT_ELASTIC, joint) & JOINT_PIN_ALONG == 0 {
@@ -507,7 +560,7 @@ impl World {
                 return;
             }
             let (gap, speed, arm) = w.pin_geometry(joint, body, other);
-            let (c, pull) = w.pin_terms(joint, body, h, gap);
+            let (c, pull) = w.pin_terms(joint, body, other, h, gap);
             let jac = point_jacobian(arm);
             let mut slip = [0.0; 3];
             for i in 0..3 {
@@ -1101,4 +1154,23 @@ impl World {
             self.set_v(CENTER_X, body, center);
         }
     }
+}
+
+/// The inverse of a 3 by 3 matrix by its adjugate; A = I + C W is a positive definite C times a positive semidefinite W plus
+/// I, whose determinant is at least 1.
+fn invert3(a: [[f64; 3]; 3]) -> [[f64; 3]; 3] {
+    let cof = |r0: usize, r1: usize, c0: usize, c1: usize| a[r0][c0] * a[r1][c1] - a[r0][c1] * a[r1][c0];
+    let adj = [
+        [cof(1, 2, 1, 2), -cof(0, 2, 1, 2), cof(0, 1, 1, 2)],
+        [-cof(1, 2, 0, 2), cof(0, 2, 0, 2), -cof(0, 1, 0, 2)],
+        [cof(1, 2, 0, 1), -cof(0, 2, 0, 1), cof(0, 1, 0, 1)],
+    ];
+    let det = a[0][0] * adj[0][0] + a[0][1] * adj[1][0] + a[0][2] * adj[2][0];
+    let mut out = [[0.0f64; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            out[i][j] = adj[i][j] / det;
+        }
+    }
+    out
 }
