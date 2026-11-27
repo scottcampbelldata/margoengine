@@ -18030,6 +18030,27 @@ Compared with plain linear blend skinning (N. Magnenat-Thalmann, R. Laperriere a
 local deformations for hand animation and object grasping*, Graphics Interface 1988), whose collapse at a twisted joint
 the tests measure. No other engine's source was read.
 
+### SEA-12 eighth-order horizontal quay dispersion
+
+The dimensionless uniform-grid symbol of the nearest-face horizontal graph is
+`s = 4 sin²(k dx / 2)`. The expansion of `4 asin²(sqrt(s)/2)` gives
+`s + s²/12 + s³/90 + s⁴/560` through degree four. This agrees with the
+centred stencil from Bengt Fornberg (1988), *Generation of Finite Difference
+Formulas on Arbitrarily Spaced Grids*, Table 1. See also Wim A. Mulder (2024), *Temporal dispersion correction
+for wave-propagation modelling with a series approach*, the spatial symbol
+expansion. [Fornberg](https://doi.org/10.1090/S0025-5718-1988-0935077-0) ·
+[Series expansion](https://doi.org/10.1111/1365-2478.13411)
+
+For each axis let `D` be the oriented face difference and `W` the face openings.
+With `L = Dᵀ W D`, apply that polynomial as the divergence of a shared flux.
+Starting from `W D u`, apply `I + A/12 + A²/90 + A³/560` with
+`A = W D Dᵀ`, then multiply by the layer thickness. The symmetric volume
+operator is positive semidefinite because `L` is and every polynomial
+coefficient is positive. A closed face keeps zero flux in each pass. The
+same polynomial supplies the normal velocity query and the projection.
+The layered mixed-aperture regression checks local volume balance, work
+and replay. The uniform carrier test holds vertical resolution fixed.
+
 ### SEA-12 finite quay wake
 
 Craig and Sulem, *Numerical Simulation of Gravity Waves* (1993), express the gravity-wave variables as

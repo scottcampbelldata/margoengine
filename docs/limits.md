@@ -10697,11 +10697,11 @@ carry zero normal flow. Adjacent wet cells exchange a shared conductance times t
 The base and outside faces are closed. The optional perimeter sponge damps elevation and books the absorbed
 energy and signed volume. Size its width and run a domain comparison before treating it as an open sea.
 
-`horizontalOrder: 4` uses a wider horizontal stencil along open faces and stores one additional f64
-coefficient per layer. The default uses the two-point flux. The wider stencil reduces open-water phase
-error without changing the vertical approximation or resolving sharp corners beyond the given geometry.
-Its fourth-order accuracy applies to the uniform horizontal interior. Test vertical and temporal
-dispersion independently.
+`horizontalOrder: 4` and `8` use wider horizontal stencils along open faces and each stores one
+additional f64 coefficient per layer. The default uses the two-point flux. The wider stencils reduce
+open-water phase error on the fixed grid. The eighth-order option reads up to four neighbours
+per side and axis. The stated orders apply to the uniform horizontal interior.
+The vertical grid, time step and sharp-corner geometry have their own accuracy bounds.
 
 The default 60 Hz midpoint solves a Robin surface condition with preconditioned conjugate gradients.
 `temporalOrder: 4` composes three signed midpoint solves per tick for a better phase in the conservative

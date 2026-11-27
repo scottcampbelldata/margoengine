@@ -5688,8 +5688,9 @@ console.log(wake.sample(2.25, 1).height, wake.velocityAt(1.875, -0.5, 1));
 ```
 
 The model is linear, with a conservative pressure and volume work ledger. It resolves waves under a fixed
-apron where the geometry and layered grid leave a wet opening. Set `horizontalOrder: 4` to reduce the spatial
-phase error of short waves in open, uniform layers. The default is 2. Both orders follow the same wet faces.
+apron where the geometry and layered grid leave a wet opening. Set `horizontalOrder: 4` or `8`
+to reduce the spatial phase error of short waves in open, uniform layers. The default is 2.
+All orders follow the same wet faces. The wider stencil reads up to four neighbouring cells on each side.
 Use a domain, layer and grid refinement check for wave scattering. See the [finite quay limits](../../docs/limits.md#finite-quay-wake-and-under-apron-flow-sea-12).
 
 #### Send a submerged wake source at its own depth

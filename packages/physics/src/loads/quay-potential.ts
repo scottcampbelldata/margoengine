@@ -13,8 +13,8 @@ export interface QuayPotentialGrid {
   readonly openX?: ArrayLike<number>;
   /** Open fraction toward +Z at each cell. Faces at the grid edge are always closed. Default 1. */
   readonly openZ?: ArrayLike<number>;
-  /** Fourth-order horizontal dispersion on open, uniform layers. Default 2. */
-  readonly horizontalOrder?: 2 | 4;
+  /** Horizontal dispersion order on open, uniform layers. Default 2. */
+  readonly horizontalOrder?: 2 | 4 | 8;
 }
 
 // A horizontal layer's graph Laplacian L has the same open-face boundaries as its gradient.
@@ -28,6 +28,76 @@ function axisDifference(u: Float64Array, faces: Float64Array, i: number, stride:
 function correctedGradient(u: Float64Array, faces: Float64Array, i: number, stride: number, scale: number): number {
   const j = i + stride;
   return u[i]! - u[j]! + scale * (axisDifference(u, faces, i, stride) - axisDifference(u, faces, j, stride));
+}
+
+function baseFlux(u: Float64Array, faces: Float64Array, i: number, stride: number): number {
+  return faces[i] ? faces[i]! * (u[i]! - u[i + stride]!) : 0;
+}
+
+function fluxCorrection(
+  base: number,
+  left: number,
+  middle: number,
+  right: number,
+  opening: number,
+  factor: number,
+): number {
+  return opening ? base + opening * factor * (2 * middle - left - right) : 0;
+}
+
+// Write L = Dᵀ W D, with D the nearest-face difference and W the opening.
+// The eighth-order symbol is L + L²/12 + L³/90 + L⁴/560 on a uniform layer.
+// Apply the polynomial on faces so that a closed face never carries flux.
+function eighthOrderFlux(
+  u: Float64Array,
+  faces: Float64Array,
+  i: number,
+  stride: number,
+  inverseThickness: number,
+): number {
+  const left = i - stride,
+    right = i + stride,
+    farLeft = left - stride,
+    farRight = right + stride;
+  const leftOpen = (faces[left] ?? 0) * inverseThickness,
+    centreOpen = faces[i]! * inverseThickness,
+    rightOpen = (faces[right] ?? 0) * inverseThickness;
+  const leftBase = baseFlux(u, faces, left, stride),
+    centreBase = baseFlux(u, faces, i, stride),
+    rightBase = baseFlux(u, faces, right, stride),
+    farLeftBase = baseFlux(u, faces, farLeft, stride),
+    farRightBase = baseFlux(u, faces, farRight, stride);
+  // Horner factors are the ratios of consecutive coefficients.
+  const first = 1 / 12,
+    second = 1 / 90 / first,
+    third = 1 / 560 / (1 / 90);
+  const outerLeft = fluxCorrection(
+    farLeftBase,
+    baseFlux(u, faces, farLeft - stride, stride),
+    farLeftBase,
+    leftBase,
+    (faces[farLeft] ?? 0) * inverseThickness,
+    third,
+  );
+  const innerLeft = fluxCorrection(leftBase, farLeftBase, leftBase, centreBase, leftOpen, third);
+  const centre = fluxCorrection(centreBase, leftBase, centreBase, rightBase, centreOpen, third);
+  const innerRight = fluxCorrection(rightBase, centreBase, rightBase, farRightBase, rightOpen, third);
+  const outerRight = fluxCorrection(
+    farRightBase,
+    rightBase,
+    farRightBase,
+    baseFlux(u, faces, farRight + stride, stride),
+    (faces[farRight] ?? 0) * inverseThickness,
+    third,
+  );
+  return fluxCorrection(
+    centreBase,
+    fluxCorrection(leftBase, outerLeft, innerLeft, centre, leftOpen, second),
+    fluxCorrection(centreBase, innerLeft, centre, innerRight, centreOpen, second),
+    fluxCorrection(rightBase, centre, innerRight, outerRight, rightOpen, second),
+    centreOpen,
+    first,
+  );
 }
 
 /** Finite-volume harmonic extension for a fixed, impermeable quay in a linear free surface. */
@@ -50,6 +120,7 @@ export class QuayPotential {
   private readonly coarse?: QuayCoarseCorrection;
   private readonly coarseWork?: Float64Array;
   private readonly horizontalCorrection?: Float64Array;
+  private readonly eighthOrder: boolean;
   private readonly basinOf?: Uint32Array;
   private readonly basinSurfaceCount: readonly number[];
   private readonly basinCorrection: Float64Array;
@@ -57,8 +128,8 @@ export class QuayPotential {
 
   constructor(grid: QuayPotentialGrid) {
     const { cells, cellSize, depths, wet, openX, openZ, horizontalOrder = 2 } = grid ?? {};
-    if (horizontalOrder !== 2 && horizontalOrder !== 4)
-      throw invalidLoad('Set horizontalOrder to 2 or 4 for the finite quay.');
+    if (horizontalOrder !== 2 && horizontalOrder !== 4 && horizontalOrder !== 8)
+      throw invalidLoad('Set horizontalOrder to 2, 4 or 8 for the finite quay.');
     if (
       cells?.length !== 2 ||
       cells.some((count) => !Number.isSafeInteger(count) || count < 1) ||
@@ -79,7 +150,8 @@ export class QuayPotential {
     this.cellArea = cellSize * cellSize;
     this.topDistance = depths[1]! / 2;
     this.wet = new Uint8Array(count);
-    if (horizontalOrder === 4) this.horizontalCorrection = new Float64Array(layers);
+    this.eighthOrder = horizontalOrder === 8;
+    if (horizontalOrder !== 2) this.horizontalCorrection = new Float64Array(layers);
     this.diagonal = new Float64Array(count);
     this.columnInverse = new Float64Array(count);
     this.east = new Float64Array(count);
@@ -109,9 +181,9 @@ export class QuayPotential {
     for (let y = 0; y < layers; y++) {
       const thickness = depths[y + 1]! - depths[y]!;
       if (this.horizontalCorrection) {
-        const scale = 1 / 12 / thickness;
+        const scale = (this.eighthOrder ? 1 : 1 / 12) / thickness;
         if (!(scale > 0 && Number.isFinite(scale)))
-          throw invalidLoad('Use finite layer thicknesses for fourth-order horizontal flux.');
+          throw invalidLoad('Use finite layer thicknesses for high-order horizontal flux.');
         this.horizontalCorrection[y] = scale;
       }
       const vertical = y + 1 < layers ? (2 * this.cellArea) / (depths[y + 2]! - depths[y]!) : 0;
@@ -419,14 +491,14 @@ export class QuayPotential {
       const correction = horizontalCorrection?.[Math.floor(i / plane)];
       if (east[i]) {
         const difference = value - u[i + 1]!;
-        const flux = east[i]! * (correction ? correctedGradient(u, east, i, 1, correction) : difference);
+        const flux = correction ? this.horizontalFlux(u, east, i, 1, correction) : east[i]! * difference;
         out[i]! += flux;
         out[i + 1]! -= flux;
         work += flux * difference;
       }
       if (north[i]) {
         const difference = value - u[i + nx]!;
-        const flux = north[i]! * (correction ? correctedGradient(u, north, i, nx, correction) : difference);
+        const flux = correction ? this.horizontalFlux(u, north, i, nx, correction) : north[i]! * difference;
         out[i]! += flux;
         out[i + nx]! -= flux;
         work += flux * difference;
@@ -444,6 +516,11 @@ export class QuayPotential {
       }
     }
     return work;
+  }
+
+  private horizontalFlux(u: Float64Array, faces: Float64Array, index: number, stride: number, scale: number): number {
+    if (this.eighthOrder) return eighthOrderFlux(u, faces, index, stride, scale);
+    return faces[index]! * correctedGradient(u, faces, index, stride, scale);
   }
 
   /** Whether the volume cell is wet. Out-of-grid indices are dry. */
@@ -508,9 +585,8 @@ export class QuayPotential {
       axis === 'x' ? [this.east, 1] : axis === 'z' ? [this.north, this.nx] : [this.down, this.surfaceCells];
     if (!faces[index]) return 0;
     const correction = axis === 'down' ? undefined : this.horizontalCorrection?.[Math.floor(index / this.surfaceCells)];
-    const gradient = correction
-      ? -correctedGradient(bulk, faces, index, offset, correction)
-      : bulk[index + offset]! - bulk[index]!;
-    return faces[index]! * gradient;
+    return correction
+      ? -this.horizontalFlux(bulk, faces, index, offset, correction)
+      : faces[index]! * (bulk[index + offset]! - bulk[index]!);
   }
 }

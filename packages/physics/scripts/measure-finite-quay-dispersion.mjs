@@ -64,7 +64,8 @@ function horizontal(kx, kz, dx, order) {
   return Math.sqrt(
     [kx, kz].reduce((sum, k) => {
       const symbol = (2 * Math.sin((k * dx) / 2)) ** 2;
-      return sum + (symbol + (order === 4 ? symbol ** 2 / 12 : 0)) / dx ** 2;
+      const correction = order === 8 ? symbol ** 3 / 90 + symbol ** 4 / 560 : 0;
+      return sum + (symbol + (order > 2 ? symbol ** 2 / 12 : 0) + correction) / dx ** 2;
     }, 0),
   );
 }
@@ -178,10 +179,11 @@ console.log(
         live(0.15, profiles[0].faces),
         live(0.075, profiles[0].faces),
         live(0.15, profiles[1].faces, 4, 4),
+        live(0.15, profiles[1].faces, 4, 8),
       ],
       phase: profiles.map(({ name, faces }) => ({
         name,
-        cases: [2, 4].flatMap((order) => [0.15, 0.075, 0.05, 0.035].map((dx) => phase(dx, faces, order))),
+        cases: [2, 4, 8].flatMap((order) => [0.15, 0.075, 0.05, 0.035].map((dx) => phase(dx, faces, order))),
       })),
       narrowBand: {
         minimumDepth,

@@ -1452,6 +1452,12 @@ validation, roll decay, hydrodynamic radiation, reciprocal water coupling and na
   The same test checks the reciprocal flux and conservation through a partial lower opening, zero
   cross-wall flux at a closed face and exact replay with the absorber active.
 
+  The eighth-order option in `coupling/loads-quay-space-order.test.js` reduces the same carrier's
+  horizontal-rate error at 0.15 m from 0.009739 to 0.00009570 m⁻¹. This is under one fifth of the
+  fourth-order error at 0.075 m with one quarter of its horizontal cells. The aperture test checks
+  reciprocal flux, zero flow at every closed face, volume balance, sponge work and exact replay.
+  These controls isolate horizontal error. They do not establish convergence of the original shot.
+
   The opt-in fourth-order time step in `coupling/loads-finite-quay.test.js` checks held pressure, the single
   volume kick, the finite-domain absorber and failure before publication. The free-hull regression transfers
   1,144.557 J with a maximum closure error of 0.000308 J and exact replay. The original 22.63 m wave ray in
