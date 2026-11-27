@@ -1722,11 +1722,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   - `node packages/sky/test/features-check.mjs sleet astro hillaire`: "sleet off by more than one half-float step".
     Reproduced on AMD RDNA2 (worst 0.1): the worst pixel was a rain pixel below 0, which the relative step measure
     blows up near 0. Rain and hail went below 0 at 4x on every GPU (7 pixels here, the RTX A6000 too), fixed 2026-11-27
-    (KB-SKY-STREAKCENTROID1 below). After it AMD still fails the check's one-step budget at 4x: 131 one-step pixels
-    against 1 % of 9,055 (90), 127 of them rain pixels a faint flake tips in sleet; the RTX A6000 reads 64 of 13,129.
-    Open: whether a flake in front of a streak should count as a mismatch at all (it is visible there and not over the
-    bare frame), or why AMD draws 40 % more of them; the budget is not raised.
-- **Cause:** not established for any of the four; each is owed to its package (core lighting, biomes, post, sky),
+    (KB-SKY-STREAKCENTROID1 below). After it AMD still failed the check's one-step budget at 4x: 131 one-step pixels
+    against 1 % of 9,055 (90), 127 of them rain pixels a faint flake tips in sleet; the RTX A6000 read 64 of 13,129.
+    Fixed 2026-11-27, a fault of the check: it took "the snow touched this pixel" from the snow frame differing from the
+    bare one, and that depends on how the GPU rounds a blend to half floats, which Vulkan and D3D leave to the vendor.
+    A probe on rgba16float over 0.3 shows it: the RTX A6000 rounds to nearest (+0.6 step gives +1), AMD RDNA2 toward
+    zero (+0.9 gives 0, -0.3 gives -1). The flakes are the same: at 1x AMD's changed snow pixels are a strict subset
+    of the A6000's (6,487 shared, 0 AMD only, 3,663 A6000 only, bright ones within 1 to 5 %), so AMD did not draw more
+    rain (rain alone touched 3,989 against 3,795 pixels), it saw half the snow. Under round-toward-zero a flake under one
+    step leaves the darker sky alone and takes a step off a brighter streak, so those pixels counted as rain only. The
+    check (`packages/sky/test/sleet-check.html`) now takes where each kind draws from the same particles at
+    `brightness: 1e6` (colour only), which shows any coverage of 6e-8 or more on every GPU; where both draw but one too
+    faintly to move the frame, sleet must stay within one step of the other (`worstFaint`, 1,803 rain pixels on the
+    A6000 and 2,677 on AMD). Both GPUs and the WebGL2 layer now read 560 to 562 rain-only pixels, 0 mismatches; the 1 %
+    budget is unchanged. Regression: `node packages/sky/test/features-check.mjs sleet` under `MARGO_GPU=amd` (failed
+    before: 131 against 90).
+- **Cause:** sleet's is above (the check); the sphere light's and the biomes check's wait for the Arc; each is owed to its package (core lighting, biomes, post, sky),
   found and fixed with its own regression. Two more were fixed: the material back-side check (KB-PICK-MIRRORROWS1)
   and the OIT real-file check (KB-OIT-BLENDTHICK1), both above. On an RTX A6000 (2026-11-27) the SSAO check and sleet pass.
 

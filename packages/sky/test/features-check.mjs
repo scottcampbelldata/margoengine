@@ -548,12 +548,16 @@ const checks = {
     console.log(`  sleet ${samples}x ${JSON.stringify(r)}`);
     assert.equal(r.error, null);
     assert.deepEqual(r.errors, []);
-    // Sleet is the rain drawn alone and the snow drawn alone: where only one of them touched the frame, sleet matches
-    // it, and it touches nothing either leaves alone.
+    // Sleet is the rain drawn alone and the snow drawn alone: where only one of them draws (its particles' coverage,
+    // read at a million times their brightness), sleet matches it, and it touches nothing either leaves alone. Where a
+    // flake too faint to move the frame lies over a streak (or a faint streak over a flake), the blend's rounding may
+    // take one step: the RTX A6000 rounds to nearest and AMD RDNA2 toward zero (KB-GPU-PRECHECKS1).
     assert.ok(r.rainOnly > 100 && r.snowOnly > 100, `both kinds drawn: ${JSON.stringify(r)}`);
     // A flake too faint to move the bare frame by a half-float step can still tip the rain's own value by one step
     // (2^-10 relative, the 10-bit mantissa of the HDR target): no pixel may differ by more, and few by that.
     assert.ok(r.worst <= 2 ** -10, `sleet off by more than one half-float step: ${JSON.stringify(r)}`);
+    assert.ok(r.rainUnderFlake > 100, `rain under faint flakes compared: ${JSON.stringify(r)}`);
+    assert.ok(r.worstFaint <= 2 ** -10, `sleet under a faint particle off by more than one step: ${JSON.stringify(r)}`);
     assert.ok(
       r.rainMismatch + r.snowMismatch + r.faint <= 0.01 * (r.rainOnly + r.snowOnly),
       `too many steps: ${JSON.stringify(r)}`,
@@ -775,10 +779,7 @@ checks.look = async (page, samples) => {
     lum(r.nightFireSight.horizon) > 0.6 * lum(r.nightGlow.horizon),
     `the sight holds a low ray near: ${show('nightFireSight')}`,
   );
-  assert.ok(
-    Math.abs(lum(r.nightFireTwo.high) / lum(fire.high) - 2) < 0.04,
-    `two spots add: ${show('nightFireTwo')}`,
-  );
+  assert.ok(Math.abs(lum(r.nightFireTwo.high) / lum(fire.high) - 2) < 0.04, `two spots add: ${show('nightFireTwo')}`);
   // The haze 2 km ahead of the eye, its spot 500 m wide under that point: with 2 / density = 2 km its light is the
   // exact mean along the whole path, 500 / sqrt(500^2 + 2000^2); with 2 / density = 1 km the mean over the near half,
   // 500 (2000 / sqrt(500^2 + 2000^2) - 1000 / sqrt(500^2 + 1000^2)) / 1000; each times the fog's opacity.
@@ -798,7 +799,10 @@ checks.look = async (page, samples) => {
   const hf = r.heightFog;
   assert.ok(Math.abs(hf.share - hf.want) < 0.01 && hf.share < 0.3 * hf.even, `the height fog: ${JSON.stringify(hf)}`);
   assert.ok(lum(r.nightCloud.all) > 0, 'the night clouds draw');
-  assert.ok(lum(r.nightCloudPall.all) < 1e-4 * lum(r.nightCloud.all), `clouds above the pall go out: ${show('nightCloudPall')}`);
+  assert.ok(
+    lum(r.nightCloudPall.all) < 1e-4 * lum(r.nightCloud.all),
+    `clouds above the pall go out: ${show('nightCloudPall')}`,
+  );
   const b = r.bruneton;
   // The air under the Bruneton model: a green Rayleigh spectrum, thin and thick air, heavy and coloured haze, ozone.
   assert.ok(r.rayleighGreen.high[1] > 2.5 * r.rayleighGreen.high[2], `green Rayleigh: ${show('rayleighGreen')}`);

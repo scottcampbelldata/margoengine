@@ -27,7 +27,7 @@ async function read(texture){
 }
 // Every frame at weather time 0 (delta 0), so each kind's particles stand where they would in sleet.
 const frame=async()=>{engine.render({delta:0});await device.queue.onSubmittedWorkDone();return read(post.sceneTexture);};
-const set=(options)=>Object.assign(weather.options,{lightning:undefined,snowShare:undefined},options);
+const set=(options)=>Object.assign(weather.options,{lightning:undefined,snowShare:undefined,brightness:undefined},options);
 window.check={samples:sceneSamples,
  async run(){
   device.pushErrorScope('validation');
@@ -36,14 +36,26 @@ window.check={samples:sceneSamples,
   set({precipitation:'sleet',intensity:0.6,snowShare:0.5});await waitForPipelines(frame);const sleet=await frame();
   set({precipitation:'rain',intensity:0.3});await waitForPipelines(frame);const rain=await frame();
   set({precipitation:'snow',intensity:0.3,lightning:{rate:0,seed:1+0x51ed27}});await waitForPipelines(frame);const snow=await frame();
-  // Where only the rain alone changed the frame, sleet must equal it (worst: the largest relative step where it does
-  // not); where only the snow did, likewise; where neither did, sleet must leave the frame as it was.
+  // Where each kind draws, from the same particles at a million times their brightness (colour only: places, sizes and
+  // coverage are the same). The blend's rounding to half floats is the GPU's own (Vulkan and D3D leave it open): the
+  // RTX A6000 rounds to nearest, AMD RDNA2 toward zero, where a flake under one step leaves the darker bare frame alone
+  // and still takes a step off a brighter rain streak. Judged by its effect at brightness 1, such a flake made the pixel
+  // rain only and sleet a mismatch there (127 of 9,055 on AMD, KB-GPU-PRECHECKS1). Any flake with coverage of 6e-8 or
+  // more (where 1 - alpha drops below 1 in f32) shows at this brightness on every GPU.
+  set({precipitation:'rain',intensity:0.3,brightness:1e6});await waitForPipelines(frame);const rainCover=await frame();
+  set({precipitation:'snow',intensity:0.3,lightning:{rate:0,seed:1+0x51ed27},brightness:1e6});await waitForPipelines(frame);const snowCover=await frame();
+  // Where only the rain draws, sleet must equal the rain alone (worst: the largest relative step where it does not);
+  // where only the snow does, likewise; where neither does, sleet must leave the frame as it was. Where both draw but
+  // one of them too faintly to move the frame alone, sleet must stay within one step of the other (worstFaint).
   const differs=(a,b,p)=>a[p]!==b[p]||a[p+1]!==b[p+1]||a[p+2]!==b[p+2];
-  const out={rainOnly:0,snowOnly:0,both:0,rainMismatch:0,snowMismatch:0,extra:0,faint:0,worst:0,negative:0};
+  const out={rainOnly:0,snowOnly:0,both:0,rainUnderFlake:0,snowUnderStreak:0,worstFaint:0,rainMismatch:0,snowMismatch:0,extra:0,faint:0,worst:0,negative:0};
   const step=(a,b,p)=>{let w=0;for(let k=0;k<3;k++)w=Math.max(w,Math.abs(a[p+k]-b[p+k])/Math.max(Math.abs(b[p+k]),6.1e-5));return w;};
   for(let p=0;p<bare.length;p+=4){
-   const r=differs(rain,bare,p),s=differs(snow,bare,p);
-   if(r&&s)out.both++;
+   const r=differs(rainCover,bare,p),s=differs(snowCover,bare,p);
+   if(r&&s){out.both++;
+    const r1=differs(rain,bare,p),s1=differs(snow,bare,p);
+    if(r1&&!s1){out.rainUnderFlake++;out.worstFaint=Math.max(out.worstFaint,step(sleet,rain,p));}
+    else if(s1&&!r1){out.snowUnderStreak++;out.worstFaint=Math.max(out.worstFaint,step(sleet,snow,p));}}
    else if(r){out.rainOnly++;if(differs(sleet,rain,p)){out.rainMismatch++;out.worst=Math.max(out.worst,step(sleet,rain,p));}}
    else if(s){out.snowOnly++;if(differs(sleet,snow,p)){out.snowMismatch++;out.worst=Math.max(out.worst,step(sleet,snow,p));}}
    // At 4x a pixel each kind alone moves by less than a half-float step in the resolved mean can tip by one step when
