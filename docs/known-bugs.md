@@ -1614,6 +1614,22 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `packages/gltf/scripts/test-native-volume.mjs` and `packages/oit/test/gpu/blending-check.mjs` pass. gltf/pbr is
   91,150 B gzip.
 
+### Fixed 2026-11-27: a radius-0 light beside a sized light shaded 13 to 16 ulps off on AMD (KB-CLUSTERED-SIZEDZERO1, clustered)
+
+- **Repro (before):** `MARGO_GPU=amd node scripts/clustered-sphere-light-gpu-check.js` (workstation AMD RDNA2 iGPU,
+  WebGPU): "roughness 0.05: radius 0 beside a sized light shades as before, bit for bit: {"ulps":16}" and the same at
+  roughness 0.5 with 13. The RTX A6000 and the WebGL2 layer passed. Found working KB-GPU-PRECHECKS1.
+- **Cause:** the sized shader (some light has a `radius`) wrote each point-light term as a `select` between the point's
+  and the sphere's value (`nl`, `sl`, `sh`, `norm`), so a radius-0 light computed the same values through different
+  expression graphs (`dot(n, sl)` for `nl` in G, `ggxDOf(n, sh) * norm`). WGSL lets a compiler contract and reorder float
+  arithmetic, and AMD's did so differently in the two graphs.
+- **Fix:** `packages/clustered/src/shader.ts` keeps the plain loop's statements as they are (`nl`, `d`, `g` and
+  `fresnel` become `var`) and overwrites them only inside `if(rs>0.0){...}`, with the same sphere terms as before
+  (Karis 2013; Snyder 1996), so a radius-0 light runs the plain shader's own text.
+- **Regression:** `packages/clustered/tests/sized-radius-zero.test.js` (the sized loop holds every plain statement in
+  order and no select on the radius; fails before) and the GPU check above, which passes after on AMD, the RTX A6000 and
+  `MARGO_COMPAT=1`.
+
 ### Open 2026-11-27: four package GPU checks fail on main and failed before the clear colour fix too (KB-GPU-PRECHECKS1, split from KB-CLEAR-CHECKS1)
 
 - **Repro:** `npm run build:packages` on c886aef6c, Intel Arc 140V (Windows, Edge 158), each under
@@ -1621,6 +1637,9 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   to its state before 583beedbe, so none comes from KB-CLEAR-DEFAULT1:
   - `node scripts/clustered-sphere-light-gpu-check.js`: the sphere-light diffuse rows ("E = the sphere's cap form
     factor, horizon included") miss, error 0.0025 to 0.011 at radius 0.02 and the r 0.634 rows.
+    On the workstation's AMD RDNA2 iGPU (`MARGO_GPU=amd`) the same check failed another way, "radius 0 beside a sized
+    light shades as before, bit for bit", 16 and 13 ulps: fixed 2026-11-27 (KB-CLUSTERED-SIZEDZERO1 below). The Arc's
+    diffuse rows still wait for a run on that laptop; AMD and the RTX A6000 pass them.
   - `node packages/biomes/tests/browser-check.mjs`: `requestDevice` fails with DXGI_ERROR_DEVICE_REMOVED, then
     "[Device] is lost" (the parent run); past the 4-minute limit on main.
   - `node scripts/ssao-gpu-check.js`: "orthographic SSAO depends on the eye position along the view: 3 bytes over 2,

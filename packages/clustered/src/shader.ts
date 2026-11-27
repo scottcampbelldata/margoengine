@@ -84,30 +84,32 @@ export const sizedCullingShader = culling(true);
 // pi sin^2 sigma (0 to 1; exactly the clamped centre cosine above the horizon outside the sphere), times d^2 / r^2 inside
 // it, so nl times the falloff's 1 / d^2 is the sphere's irradiance per unit intensity. Every BRDF that multiplies the
 // loop's nl (this one, materials' Lambert and Phong) gets it; the specular's nl / (4 nl nv) still cancels, and its
-// Smith G takes the representative point's cosine. A light of radius 0 takes the centre's terms exactly (select), so a
-// radius-0 light in such a shader shades as before.
+// Smith G takes the representative point's cosine. A light of radius 0 skips the block (`if(rs>0.0)`) and keeps the
+// point light's own statements, the same text as the plain shader's, so it shades bit for bit as before: written as
+// selects over both terms, AMD's compiler fused the point light's arithmetic differently, 13 to 16 ulps off
+// (KB-GPU-PRECHECKS1).
 const sphereTerms = (head: string) =>
   head
-    .replace(
-      'let nl=clamp(dot(n,l),0.0,1.0);',
-      'let rs=light.size.x;let sfc=clamp(dot(n,l),-1.0,1.0);let sfs=min(rs*rs/max(distance*distance,0.000001),1.0);var sfg=max(sfc,0.0);\n    ' +
-        'if(sfc*sfc<sfs){let sft=sqrt(max(1.0-sfc*sfc,0.0));let sfx=sqrt(max(1.0/sfs-1.0,0.0));let sfy=clamp(-sfx*sfc/max(sft,0.000001),-1.0,1.0);' +
-        'let sfq=sft*sqrt(1.0-sfy*sfy);sfg=clamp(((sfc*acos(sfy)-sfx*sfq)*sfs+atan2(sfq,sfx))/(3.14159265*sfs),0.0,1.0);}\n    ' +
-        'let nl=select(clamp(dot(n,l),0.0,1.0),sfg*select(1.0,max(distance*distance,0.000244140625)/(rs*rs),distance<rs),rs>0.0);',
-    )
-    .replace(
-      'let d=',
-      'let rr=reflect(-v,n);let ray=dot(delta,rr)*rr-delta;let sp=delta+ray*clamp(rs/max(length(ray),0.000001),0.0,1.0);' +
-        'let sl=select(l,sp/max(length(sp),0.0001),rs>0.0);let sh=select(h,(v+sl)/max(length(v+sl),0.0001),rs>0.0);' +
-        'let snl=clamp(dot(n,sl),0.0,1.0);let snh=clamp(dot(n,sh),0.0,1.0);let svh=clamp(dot(v,sh),0.0,1.0);' +
-        'let spread=rs/(2.0*max(distance,0.0001));let along=spread/max(svh,0.0001);let ax=max(min(a+spread,1.0),spread);' +
-        'let ay=max(min(a+along,1.0),along);let norm=select(1.0,(a/ax)*(a/ay),rs>0.0);\n    let d=',
-    )
-    .replace(`let d=${ggxD};`, `let d=${ggxDOf('n', 'sh').replace(/\bnh\b/g, 'snh')}*norm;`)
+    .replace('let nl=clamp(dot(n,l),0.0,1.0);', 'var nl=clamp(dot(n,l),0.0,1.0);')
+    .replace(`let d=${ggxD};`, `var d=${ggxD};`)
     // The search key is concatenated, not a template: tests/smith-shaders.test.js counts every g template in this file
     // as a declaration of the light loop, and a search key is none.
-    .replace('let g=' + smithGCorrelated + ';', `let g=${smithGCorrelated.replace(/\bnl\b/g, 'snl')};`)
-    .replace('pow(1-vh,5.0);', 'pow(1-svh,5.0);');
+    .replace('let g=' + smithGCorrelated + ';', 'var g=' + smithGCorrelated + ';')
+    .replace('let fresnel=', 'var fresnel=')
+    .replace(
+      'pow(1-vh,5.0);',
+      'pow(1-vh,5.0);\n    let rs=light.size.x;if(rs>0.0){\n    ' +
+        'let sfc=clamp(dot(n,l),-1.0,1.0);let sfs=min(rs*rs/max(distance*distance,0.000001),1.0);var sfg=max(sfc,0.0);\n    ' +
+        'if(sfc*sfc<sfs){let sft=sqrt(max(1.0-sfc*sfc,0.0));let sfx=sqrt(max(1.0/sfs-1.0,0.0));let sfy=clamp(-sfx*sfc/max(sft,0.000001),-1.0,1.0);' +
+        'let sfq=sft*sqrt(1.0-sfy*sfy);sfg=clamp(((sfc*acos(sfy)-sfx*sfq)*sfs+atan2(sfq,sfx))/(3.14159265*sfs),0.0,1.0);}\n    ' +
+        'nl=sfg*select(1.0,max(distance*distance,0.000244140625)/(rs*rs),distance<rs);\n    ' +
+        'let rr=reflect(-v,n);let ray=dot(delta,rr)*rr-delta;let sp=delta+ray*clamp(rs/max(length(ray),0.000001),0.0,1.0);' +
+        'let sl=sp/max(length(sp),0.0001);let sh=(v+sl)/max(length(v+sl),0.0001);' +
+        'let snl=clamp(dot(n,sl),0.0,1.0);let snh=clamp(dot(n,sh),0.0,1.0);let svh=clamp(dot(v,sh),0.0,1.0);' +
+        'let spread=rs/(2.0*max(distance,0.0001));let along=spread/max(svh,0.0001);let ax=max(min(a+spread,1.0),spread);' +
+        `let ay=max(min(a+along,1.0),along);\n    d=${ggxDOf('n', 'sh').replace(/\bnh\b/g, 'snh')}*((a/ax)*(a/ay));` +
+        `g=${smithGCorrelated.replace(/\bnl\b/g, 'snl')};fresnel=f0+(mix(dielectricF90,1.0,metal)-f0)*pow(1-svh,5.0);}`,
+    );
 // Extra directional lights (Clustered.directional): the point loop's BRDF text, so materials' Lambert and Phong (litShader)
 // and the shadow catcher (catcherLit) rewrite and measure them too. `toLight` is the unit vector toward the light.
 // `shadow` (LocalShadows' clusterDirectionalShadow factor) darkens each light; empty, the text is the original.
