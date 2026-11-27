@@ -76,6 +76,20 @@ export interface WaterClock {
 export interface WaterSea {
   waveComponents(t: number, out: Float32Array): number;
 }
+/**
+ * Synchronous CPU sample of the analytical Water surface (Gerstner swell trains, `options.sea`, and incoming far-field
+ * profile) at world `(x, z)` and wave-clock time `time`. Units are metres and seconds.
+ */
+export interface WaterSample {
+  /** World-space Y height of the water surface in metres. */
+  height: number;
+  /** Unit macro surface normal pointing up; excludes shading-only micro ripples. */
+  normal: [number, number, number];
+  /** Surface-particle velocity in m/s. */
+  velocity: [number, number, number];
+  /** Evaluation time in seconds on the wave clock. */
+  time: number;
+}
 /** One swell train: three Gerstner components around this direction and wavelength. Invalid values throw RangeError. */
 export interface Wave {
   /** Travel direction in the XZ plane (any nonzero length). */
@@ -283,6 +297,16 @@ const SWELL_COMPONENTS = [
   [0.35, 0.84],
   [0.25, 1.18],
 ] as const;
+// Exact CPU twin of swellComponent() in swell-wgsl.ts: (cos(turn), sin(turn), kScale, sqrt(kScale), ampShare, phase).
+const CPU_SWELL = [
+  [Math.cos(0), Math.sin(0), 1, 1, 0.4, 0],
+  [Math.cos(-0.64), Math.sin(-0.64), 0.84, Math.sqrt(0.84), 0.35, 2.17],
+  [Math.cos(0.81), Math.sin(0.81), 1.18, Math.sqrt(1.18), 0.25, 4.91],
+] as const;
+function cpuSwellFilter(k: number, sampleWidth: number): number {
+  const t = Math.max(0, Math.min(1, (6.2831853 / (k * 1.114) / Math.max(0.0001, sampleWidth) - 2) * 0.5));
+  return t * t * (3 - 2 * t);
+}
 /** The score y with a standard normal above it for a share p in (0, 1): Abramowitz and Stegun 26.2.23 (error under 5e-4). */
 function upperScore(p: number): number {
   if (p > 0.5) return -upperScore(1 - p);
@@ -1132,6 +1156,13 @@ export class Water implements EnginePlugin {
   private readonly horizon: boolean;
   // Regular cell width and depth: the step a horizon grid follows the camera in.
   private readonly cell: readonly [number, number];
+  private readonly sampleWidth: number;
+  // Retained CPU cache for `options.sea` synchronous sampling (allocated lazily on first `sample()` call).
+  private cpuSeaTime = NaN;
+  private cpuSeaCount = 0;
+  private cpuSeaWaves?: Float32Array;
+  private cpuSeaNext?: Float32Array;
+  private cpuSeaRates?: Float32Array;
   constructor(readonly options: WaterOptions = {}) {
     const {
       size = [100, 100],
@@ -1212,6 +1243,7 @@ export class Water implements EnginePlugin {
     this.validateLights();
     this.horizon = options.horizon ?? false;
     this.cell = [size[0] / segments, size[1] / segments];
+    this.sampleWidth = Math.hypot(this.cell[0], this.cell[1]);
     this.values[98] = this.values[99] = 1;
     const terrain = options.terrain;
     if (terrain) {
@@ -2497,6 +2529,228 @@ export class Water implements EnginePlugin {
     this.seconds = seconds;
     return this;
   }
+  private farIncoming(x: number, z: number): number {
+    const v = this.values;
+    if (v[FAR_AT + 7]! < 0.5) return 0;
+    const loX = v[96]!,
+      loZ = v[97]!,
+      hiX = loX + v[98]!,
+      hiZ = loZ + v[99]!;
+    const r = Math.max(
+      0,
+      (loX - x) * v[FAR_AT]!,
+      (x - hiX) * v[FAR_AT + 1]!,
+      (loZ - z) * v[FAR_AT + 2]!,
+      (z - hiZ) * v[FAR_AT + 3]!,
+    );
+    const count = v[FAR_AT + 5]!;
+    const s = Math.max(0, Math.min(1, r / Math.max(v[FAR_AT + 4]!, 0.001))) * (count - 1);
+    const i = Math.min(Math.floor(s), count - 1),
+      j = Math.min(i + 1, count - 1);
+    const a = v[FAR_AT + 8 + i]!,
+      b = v[FAR_AT + 8 + j]!;
+    return a + (b - a) * (s - i);
+  }
+  private syncCpuSea(t: number): void {
+    const sea = this.options.sea!;
+    if (this.cpuSeaTime === t) return;
+    const waves = (this.cpuSeaWaves ??= new Float32Array(WATER_SEA_WAVES * 4));
+    const next = (this.cpuSeaNext ??= new Float32Array(WATER_SEA_WAVES * 4));
+    const rates = (this.cpuSeaRates ??= new Float32Array(WATER_SEA_WAVES));
+    const count = sea.waveComponents(t, waves);
+    if (!Number.isInteger(count) || count < 0 || count > WATER_SEA_WAVES)
+      throw fault('unsupported',
+        `Water draws 0 to ${WATER_SEA_WAVES} sea waves; the sea gave ${count}. Give the wave spectrum fewer frequencies or directions`,
+        'ocean',
+      );
+    const dt = 1e-3;
+    const nextCount = sea.waveComponents(t + dt, next);
+    const tau = 2 * Math.PI;
+    for (let n = 0; n < count; n++) {
+      if (n < nextCount) {
+        let dp = next[n * 4 + 3]! - waves[n * 4 + 3]!;
+        dp -= tau * Math.round(dp / tau);
+        rates[n] = dp / dt;
+      } else {
+        rates[n] = -Math.sqrt(9.81 * Math.hypot(waves[n * 4]!, waves[n * 4 + 1]!));
+      }
+    }
+    this.cpuSeaCount = count;
+    this.cpuSeaTime = t;
+  }
+  /**
+   * Synchronously evaluates the analytical water surface (Gerstner swell trains, wind sea, `options.sea`, and incoming
+   * far-field profile) at world `(x, z)` and wave-clock time `time` (default `water.time`), with zero GPU readback.
+   * Horizontal Gerstner displacement is inverted by 2D Newton-Raphson so the returned height, unit normal and
+   * surface-particle velocity match the displaced mesh at world `(x, z)`.
+   * @throws MargoError `'unsupported'` (errors#ocean) for non-finite coordinates or a time outside 0..1e9; `'disposed'` after `dispose()`.
+   */
+  sample(x: number, z: number, time?: number): WaterSample {
+    if (this.disposed) throw new MargoError('disposed', 'Water disposed; create a new Water');
+    if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z))
+      throw fault('unsupported', 'Invalid water sample coordinates; pass finite world XZ metres', 'ocean');
+    const t = time ?? this.seconds;
+    if (typeof t !== 'number' || !Number.isFinite(t) || t < 0 || t > 1e9)
+      throw fault('unsupported', 'Invalid water sample time; pass finite seconds from 0 to 1e9', 'ocean');
+    const vals = this.values,
+      waveCount = vals[23]!,
+      width = this.sampleWidth;
+    // Invert (u, v) + D_h(u, v) = (x, z) via Newton-Raphson using the exact horizontal Jacobian (non-folding guarantees det > 0).
+    let u = x,
+      v = z;
+    if (waveCount > 0) {
+      for (let iter = 0; iter < 6; iter++) {
+        let px = u,
+          pz = v,
+          tx = 1,
+          tz = 0,
+          bx = 0,
+          bz = 1;
+        for (let j = 0; j < waveCount; j++) {
+          const o = 32 + j * 8,
+            wx = vals[o]!,
+            wz = vals[o + 1]!,
+            amp = vals[o + 2]!,
+            kw = vals[o + 3]!,
+            q = vals[o + 4]! * 0.9,
+            speed0 = vals[o + 5]!,
+            phase0 = vals[o + 6]!,
+            wFilter = vals[o + 7]!;
+          if (amp === 0 || q === 0) continue;
+          for (let c = 0; c < 3; c++) {
+            const comp = CPU_SWELL[c]!,
+              dx = wx * comp[0] - wz * comp[1],
+              dz = wx * comp[1] + wz * comp[0],
+              ax = -dz,
+              az = dx,
+              k = kw * comp[2],
+              speed = speed0 * comp[3],
+              a = amp * comp[4] * Math.min(wFilter, cpuSwellFilter(k, width));
+            if (a === 0) continue;
+            const bend = k * 0.35 * (ax * u + az * v) - speed * t * 0.12 + phase0 + comp[5],
+              cosB = Math.cos(bend),
+              gx = k * (dx + ax * 0.49 * cosB),
+              gz = k * (dz + az * 0.49 * cosB),
+              phase = k * (dx * u + dz * v) - speed * t + phase0 + comp[5] + 1.4 * Math.sin(bend),
+              s = Math.sin(phase),
+              co = Math.cos(phase);
+            px += q * a * dx * co;
+            pz += q * a * dz * co;
+            const dpx = -q * a * dx * s,
+              dpz = -q * a * dz * s;
+            tx += dpx * gx;
+            tz += dpz * gx;
+            bx += dpx * gz;
+            bz += dpz * gz;
+          }
+        }
+        const rx = px - x,
+          rz = pz - z;
+        if (rx * rx + rz * rz <= 1e-16) break;
+        const det = tx * bz - bx * tz;
+        if (Math.abs(det) < 1e-9) break;
+        u -= (bz * rx - bx * rz) / det;
+        v -= (-tz * rx + tx * rz) / det;
+      }
+    }
+    const far = this.farIncoming(u, v);
+    let py = vals[21]! + far,
+      tx = 1,
+      ty = 0,
+      tz = 0,
+      bx = 0,
+      by = 0,
+      bz = 1,
+      vx = 0,
+      vy = 0,
+      vz = 0;
+    if (vals[FAR_AT + 7]! > 0.5) {
+      ty = (this.farIncoming(u + 0.5, v) - far) * 2;
+      by = (this.farIncoming(u, v + 0.5) - far) * 2;
+    }
+    for (let j = 0; j < waveCount; j++) {
+      const o = 32 + j * 8,
+        wx = vals[o]!,
+        wz = vals[o + 1]!,
+        amp = vals[o + 2]!,
+        kw = vals[o + 3]!,
+        q = vals[o + 4]! * 0.9,
+        speed0 = vals[o + 5]!,
+        phase0 = vals[o + 6]!,
+        wFilter = vals[o + 7]!;
+      if (amp === 0) continue;
+      for (let c = 0; c < 3; c++) {
+        const comp = CPU_SWELL[c]!,
+          dx = wx * comp[0] - wz * comp[1],
+          dz = wx * comp[1] + wz * comp[0],
+          ax = -dz,
+          az = dx,
+          k = kw * comp[2],
+          speed = speed0 * comp[3],
+          a = amp * comp[4] * Math.min(wFilter, cpuSwellFilter(k, width));
+        if (a === 0) continue;
+        const bend = k * 0.35 * (ax * u + az * v) - speed * t * 0.12 + phase0 + comp[5],
+          cosB = Math.cos(bend),
+          gx = k * (dx + ax * 0.49 * cosB),
+          gz = k * (dz + az * 0.49 * cosB),
+          phase = k * (dx * u + dz * v) - speed * t + phase0 + comp[5] + 1.4 * Math.sin(bend),
+          s = Math.sin(phase),
+          co = Math.cos(phase);
+        py += a * s;
+        const dpx = -q * a * dx * s,
+          dpy = a * co,
+          dpz = -q * a * dz * s;
+        tx += dpx * gx;
+        ty += dpy * gx;
+        tz += dpz * gx;
+        bx += dpx * gz;
+        by += dpy * gz;
+        bz += dpz * gz;
+        const rate = -speed * (1 + 0.168 * cosB);
+        vx += -q * dx * s * a * rate;
+        vy += co * a * rate;
+        vz += -q * dz * s * a * rate;
+      }
+    }
+    if (this.options.sea) {
+      this.syncCpuSea(t);
+      const seaWaves = this.cpuSeaWaves!,
+        rates = this.cpuSeaRates!;
+      for (let n = 0; n < this.cpuSeaCount; n++) {
+        const o = n * 4,
+          kx = seaWaves[o]!,
+          kz = seaWaves[o + 1]!,
+          amp = seaWaves[o + 2]!,
+          ph = seaWaves[o + 3]!;
+        const a = amp * cpuSwellFilter(Math.hypot(kx, kz), width);
+        if (a === 0) continue;
+        const theta = kx * u + kz * v + ph,
+          s = Math.sin(theta),
+          co = Math.cos(theta);
+        py += a * co;
+        ty -= a * kx * s;
+        by -= a * kz * s;
+        vy -= a * s * rates[n]!;
+      }
+    }
+    const nx = by * tz - bz * ty,
+      ny = bz * tx - bx * tz,
+      nz = bx * ty - by * tx,
+      nLen = Math.hypot(nx, ny, nz);
+    return {
+      height: py,
+      normal: nLen > 0 ? [nx / nLen, ny / nLen, nz / nLen] : [0, 1, 0],
+      velocity: [vx, vy, vz],
+      time: t,
+    };
+  }
+  /**
+   * Convenience synchronous CPU height query at world `(x, z)` and wave-clock time `time` (default `water.time`).
+   * Equivalent to `water.sample(x, z, time).height`, with zero GPU readback.
+   */
+  sampleHeight(x: number, z: number, time?: number): number {
+    return this.sample(x, z, time).height;
+  }
   /**
    * Releases the foam of engine views that were not drawn in the last frame (once per frame, not on picks). The view
    * drawn last stays readable for WaveQuery until the next draw.
@@ -2512,6 +2766,9 @@ export class Water implements EnginePlugin {
     this.disposed = true;
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
+    this.cpuSeaWaves = this.cpuSeaNext = this.cpuSeaRates = undefined;
+    this.cpuSeaTime = NaN;
+    this.cpuSeaCount = 0;
     this.capture = undefined;
     this.engine = undefined;
     const disposers = [...this.disposers];

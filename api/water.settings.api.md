@@ -1004,6 +1004,8 @@ class Water implements EnginePlugin {
     resetTime(): void;
     advanceTime(delta: number): void;
     setTime(seconds: number): this;
+    sample(x: number, z: number, time?: number): WaterSample;
+    sampleHeight(x: number, z: number, time?: number): number;
     onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -1068,6 +1070,13 @@ interface WaterOptions {
     shadows?: WaterShadowSource;
     whitecaps?: number;
     chop?: number;
+}
+
+interface WaterSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: [number, number, number];
+    time: number;
 }
 
 interface WaterSea {

@@ -3,7 +3,7 @@ import type { EngineKernel } from '@margoengine/core';
 import { engineRuntime, type Engine, type EnginePlugin, type PassContext } from '@margoengine/core/extension';
 import type { Water } from './index.js';
 import { addSurfaceEffect, surfaceEffects } from './surface-effects.js';
-import { fault, rangeError } from '../../shared/errors.js';
+import { fault } from '../../shared/errors.js';
 import { WATER_FLOW_TICKS_PER_FRAME } from './film.js';
 
 declare const GPUBufferUsage: {
@@ -15,6 +15,93 @@ declare const GPUBufferUsage: {
 };
 declare const GPUMapMode: { READ: number };
 type Context = Extract<PassContext, { backend: 'webgpu' }>;
+
+/** Maximum number of solid reflecting obstacles supported simultaneously in a {@link Ripples} field. */
+export const MAX_RIPPLE_OBSTACLES = 32;
+
+/** A spherical solid obstacle that reflects ripples where it intersects the water plane. */
+export interface RippleSphereObstacle {
+  readonly kind: 'sphere';
+  /** World-space centre [x, y, z] (or [x, z] at the water plane) in metres. */
+  readonly center: readonly [number, number, number] | readonly [number, number];
+  /** Sphere radius in metres, > 0. */
+  readonly radius: number;
+}
+/** A vertical cylindrical solid obstacle (pier piling, buoy, post) that reflects ripples. */
+export interface RippleCylinderObstacle {
+  readonly kind: 'cylinder';
+  /** World-space centre [x, z] or [x, y, z] in metres. */
+  readonly center: readonly [number, number] | readonly [number, number, number];
+  /** Cylinder radius in metres, > 0. */
+  readonly radius: number;
+  /** Optional lower Y bound in metres. Default -Infinity. */
+  readonly minY?: number;
+  /** Optional upper Y bound in metres. Default Infinity. */
+  readonly maxY?: number;
+}
+/** An oriented rectangular box obstacle (hull, dock, pier) that reflects ripples. */
+export interface RippleBoxObstacle {
+  readonly kind: 'box';
+  /** World-space centre [x, z] or [x, y, z] in metres. */
+  readonly center: readonly [number, number] | readonly [number, number, number];
+  /** Half-extents [hx, hz] or [hx, hy, hz] in metres, each > 0. */
+  readonly halfExtents: readonly [number, number] | readonly [number, number, number];
+  /** Y-axis yaw rotation in radians. Default 0. */
+  readonly rotation?: number;
+}
+/** A solid wall segment in world XZ that reflects ripples without leakage. */
+export interface RippleWallObstacle {
+  readonly kind: 'wall';
+  /** Start point [x, z] in metres. */
+  readonly from: readonly [number, number];
+  /** End point [x, z] in metres. */
+  readonly to: readonly [number, number];
+  /** Wall thickness in metres, > 0. Default 1.5 ripple cells. */
+  readonly thickness?: number;
+}
+/** Solid obstacle in a {@link Ripples} field (sphere, cylinder, box, or wall segment). */
+export type RippleObstacle =
+  | RippleSphereObstacle
+  | RippleCylinderObstacle
+  | RippleBoxObstacle
+  | RippleWallObstacle;
+
+/** World position accepted by {@link Ripples.trackBody}: array-like [x, y, z] or `{ x, y, z }`. */
+export type RipplePosition =
+  | readonly [number, number, number]
+  | ArrayLike<number>
+  | { readonly x: number; readonly y: number; readonly z: number };
+
+/** Any moving object with a world `position` (physics rigid body, Floater, core mesh, or custom object). */
+export interface RippleTrackedBody {
+  readonly position: RipplePosition;
+}
+/** Per-body coupling settings for {@link Ripples.trackBody}. */
+export interface RippleTrackOptions {
+  /** Disturbance radius in metres (at least one ripple cell). Default max(1, cell). */
+  radius?: number;
+  /** Wake and splash amplitude scale in signed metres, -100..100. Default 0.08. */
+  strength?: number;
+  /** Vertical half-height around `position.y` that counts as intersecting the surface, > 0. Default radius. */
+  halfHeight?: number;
+  /** Multiplier applied to entry and exit splashes, 0..10. Default 2.5. */
+  splashStrength?: number;
+  /** Minimum horizontal displacement in metres per update to emit a wake, 0..100. Default 0.02. */
+  minSpeed?: number;
+  /** Reflect ripples off this body as a moving solid obstacle while it intersects the surface. Default false. */
+  obstacle?: boolean;
+}
+/** Debug visualization channel for {@link Ripples.setDebug}. */
+export type RippleDebugMode = 'height' | 'velocity' | 'obstacles';
+/** Debug visualization settings for {@link Ripples.setDebug}. */
+export interface RippleDebugOptions {
+  /** Enable or disable the debug overlay on the water surface. Default true when passing an options object. */
+  enabled?: boolean;
+  /** Field channel to show: 'height', 'velocity', or 'obstacles'. Default 'height'. */
+  mode?: RippleDebugMode;
+  /** Highlight the active scroll-grid border and 8-cell absorbing sponge margin. Default true. */
+  bounds?: boolean;
+}
 
 /** Camera-centred local wave simulation. Construction settings are copied. Distances are metres. */
 export interface RippleOptions {
@@ -30,6 +117,8 @@ export interface RippleOptions {
   damping?: number;
   /** Centre on camera XZ in whole cells. Default true. False centres at [0,0]. */
   followCamera?: boolean;
+  /** Optional initial solid obstacles that reflect ripples. */
+  obstacles?: readonly RippleObstacle[];
 }
 /** Last submitted GPU height/vertical-velocity field, row-major, two floats per cell. */
 export interface RippleFrame {
@@ -43,8 +132,24 @@ export interface RippleFrame {
   readonly data: Float32Array;
 }
 
+interface TrackedState {
+  radius: number;
+  strength: number;
+  halfHeight: number;
+  splashStrength: number;
+  minSpeed: number;
+  obstacle: boolean;
+  initialized: boolean;
+  prevX: number;
+  prevY: number;
+  prevZ: number;
+  wasInWater: boolean;
+}
+
+const DEBUG_MODE_INDEX: Record<RippleDebugMode, number> = { height: 0, velocity: 1, obstacles: 2 };
+
 const compute = `
-struct Params { grid:vec4f, step:vec4f, shift:vec4i, hits:array<vec4f,128> }
+struct Params { grid:vec4f, step:vec4f, shift:vec4i, solids:vec4u, hits:array<vec4f,128>, obstacles:array<vec4f,64> }
 @group(0) @binding(0) var<uniform> u:Params;
 @group(0) @binding(1) var<storage,read> source:array<vec2f>;
 @group(0) @binding(2) var<storage,read_write> outputField:array<vec2f>;
@@ -52,15 +157,46 @@ fn at(p:vec2i)->vec2f {
  if(any(p<vec2i(0))||any(p>=vec2i(i32(u.grid.w)))){return vec2f(0);}
  return source[u32(p.y)*u32(u.grid.w)+u32(p.x)];
 }
+// Packed obstacles, two vec4 each: kind 1 a disc (centre, radius), 2 a box (centre, half sizes, yaw cosine and sine),
+// 3 a wall segment (its two ends, half thickness).
+fn isObstacle(world:vec2f)->bool {
+ for(var i=0u;i<u.solids.x;i++){
+  let o0=u.obstacles[i*2u];let o1=u.obstacles[i*2u+1u];
+  if(o1.z<1.5){
+   let d=world-o0.xy;if(dot(d,d)<=o0.z*o0.z){return true;}
+  }else if(o1.z<2.5){
+   let d=world-o0.xy;let lx=d.x*o1.x+d.y*o1.y;let lz=-d.x*o1.y+d.y*o1.x;
+   if(abs(lx)<=o0.z&&abs(lz)<=o0.w){return true;}
+  }else{
+   let seg=o0.zw-o0.xy;let t=clamp(dot(world-o0.xy,seg)/max(dot(seg,seg),0.000001),0.0,1.0);
+   let diff=world-o0.xy-t*seg;if(dot(diff,diff)<=o1.x*o1.x){return true;}
+  }
+ }
+ return false;
+}
 @compute @workgroup_size(8,8) fn main(@builtin(global_invocation_id) id:vec3u) {
  let n=u32(u.grid.w);if(id.x>=n||id.y>=n){return;}
- let p=vec2i(id.xy);let old=p+u.shift.xy;let v=at(old);
- let lap=at(old+vec2i(1,0)).x+at(old-vec2i(1,0)).x+at(old+vec2i(0,1)).x+at(old-vec2i(0,1)).x-4.0*v.x;
+ let p=vec2i(id.xy);let old=p+u.shift.xy;let c=u.grid.z;
+ let world=u.grid.xy+(vec2f(id.xy)+0.5)*c;
+ // Solid cells stay at rest.
+ if(u.solids.x>0u&&isObstacle(world)){outputField[id.y*n+id.x]=vec2f(0.0,0.0);return;}
+ let v=at(old);
+ var hE=at(old+vec2i(1,0)).x;var hW=at(old-vec2i(1,0)).x;
+ var hN=at(old+vec2i(0,1)).x;var hS=at(old-vec2i(0,1)).x;
+ // A solid neighbour reads this cell's own height: a mirrored face, the homogeneous Neumann wall dh/dn = 0.
+ if(u.solids.x>0u){
+  if(isObstacle(world+vec2f(c,0.0))){hE=v.x;}
+  if(isObstacle(world-vec2f(c,0.0))){hW=v.x;}
+  if(isObstacle(world+vec2f(0.0,c))){hN=v.x;}
+  if(isObstacle(world-vec2f(0.0,c))){hS=v.x;}
+ }
+ let lap=hE+hW+hN+hS-4.0*v.x;
+ // The outer 8 cells damp at up to 12 /s more (a sponge layer), so waves leave the grid instead of reflecting.
  let edge=f32(min(min(id.x,id.y),min(n-1u-id.x,n-1u-id.y)));
  let decay=exp(-(u.step.z+12.0*(1.0-smoothstep(0.0,8.0,edge)))*u.step.x);
- let velocity=(v.y+lap*u.step.y*u.step.x/(u.grid.z*u.grid.z))*decay;
+ let velocity=(v.y+lap*u.step.y*u.step.x/(c*c))*decay;
  var h=v.x+velocity*u.step.x;
- let world=u.grid.xy+(vec2f(id.xy)+0.5)*u.grid.z;
+ // Drops and swept wakes born this step: the zero-mean profile (1-q)^2 (1-4q) around each event's segment.
  for(var i=0u;i<u32(u.step.w);i++){
   let a=u.hits[i*2u];let b=u.hits[i*2u+1u];let d=a.zw-a.xy;
   let t=clamp(dot(world-a.xy,d)/max(dot(d,d),0.000001),0.0,1.0);
@@ -71,13 +207,98 @@ fn at(p:vec2i)->vec2f {
 }`;
 
 let sequence = 0;
+/** A refusal of bad ripple input: a MargoError `unsupported` whose message names the fix and links to errors#ripples. */
+const rippleError = (message: string) => fault('unsupported', message, 'ripples');
 function finite(value: number, low: number, high: number, name: string): number {
-  if (!Number.isFinite(value) || value < low || value > high)
-    throw rangeError(`Invalid ripple ${name}; pass a finite value in ${low}..${high}`, 'geometry');
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < low || value > high)
+    throw rippleError(`Invalid ripple ${name}; pass a finite value in ${low}..${high}`);
   return value;
 }
 
-/** GPU wave equation with drops, swept object wakes, world-preserving scrolling and absorbing borders. */
+function readXYZ(pos: RipplePosition): [number, number, number] | null {
+  if (!pos || typeof pos !== 'object') return null;
+  if ('x' in pos && 'y' in pos && 'z' in pos) {
+    const { x, y, z } = pos;
+    return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) ? [x, y, z] : null;
+  }
+  const arr = pos as ArrayLike<number>;
+  if (typeof arr.length === 'number' && arr.length >= 3) {
+    const x = arr[0]!,
+      y = arr[1]!,
+      z = arr[2]!;
+    return Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) ? [x, y, z] : null;
+  }
+  return null;
+}
+
+function cloneObstacle(obs: RippleObstacle): RippleObstacle {
+  if (!obs || typeof obs !== 'object')
+    throw rippleError('Invalid ripple obstacle; pass sphere, cylinder, box, or wall objects');
+  switch (obs.kind) {
+    case 'sphere': {
+      const c = obs.center;
+      if (!Array.isArray(c) || (c.length !== 2 && c.length !== 3))
+        throw rippleError('Invalid sphere obstacle center; pass [x, z] or [x, y, z]');
+      for (const v of c) finite(v, -1e7, 1e7, 'obstacle center');
+      const radius = finite(obs.radius, 1e-4, 1e6, 'obstacle radius');
+      return Object.freeze({
+        kind: 'sphere' as const,
+        center: Object.freeze([...c]) as readonly [number, number] | readonly [number, number, number],
+        radius,
+      });
+    }
+    case 'cylinder': {
+      const c = obs.center;
+      if (!Array.isArray(c) || (c.length !== 2 && c.length !== 3))
+        throw rippleError('Invalid cylinder obstacle center; pass [x, z] or [x, y, z]');
+      for (const v of c) finite(v, -1e7, 1e7, 'obstacle center');
+      const radius = finite(obs.radius, 1e-4, 1e6, 'obstacle radius');
+      const minY = obs.minY === undefined ? -Infinity : finite(obs.minY, -1e7, 1e7, 'obstacle minY');
+      const maxY = obs.maxY === undefined ? Infinity : finite(obs.maxY, -1e7, 1e7, 'obstacle maxY');
+      if (minY > maxY) throw rippleError('Invalid cylinder obstacle Y range; ensure minY <= maxY');
+      return Object.freeze({
+        kind: 'cylinder' as const,
+        center: Object.freeze([...c]) as readonly [number, number] | readonly [number, number, number],
+        radius,
+        ...(obs.minY !== undefined ? { minY } : {}),
+        ...(obs.maxY !== undefined ? { maxY } : {}),
+      });
+    }
+    case 'box': {
+      const c = obs.center,
+        h = obs.halfExtents;
+      if (!Array.isArray(c) || (c.length !== 2 && c.length !== 3))
+        throw rippleError('Invalid box obstacle center; pass [x, z] or [x, y, z]');
+      if (!Array.isArray(h) || (h.length !== 2 && h.length !== 3))
+        throw rippleError('Invalid box obstacle halfExtents; pass [hx, hz] or [hx, hy, hz]');
+      for (const v of c) finite(v, -1e7, 1e7, 'obstacle center');
+      for (const v of h) finite(v, 1e-4, 1e6, 'obstacle halfExtent');
+      const rotation = obs.rotation === undefined ? 0 : finite(obs.rotation, -1e6, 1e6, 'obstacle rotation');
+      return Object.freeze({
+        kind: 'box' as const,
+        center: Object.freeze([...c]) as readonly [number, number] | readonly [number, number, number],
+        halfExtents: Object.freeze([...h]) as readonly [number, number] | readonly [number, number, number],
+        rotation,
+      });
+    }
+    case 'wall': {
+      if (!Array.isArray(obs.from) || obs.from.length !== 2 || !Array.isArray(obs.to) || obs.to.length !== 2)
+        throw rippleError('Invalid wall obstacle endpoints; pass from and to [x, z] pairs');
+      for (const v of [...obs.from, ...obs.to]) finite(v, -1e7, 1e7, 'obstacle endpoint');
+      const thickness = obs.thickness === undefined ? undefined : finite(obs.thickness, 1e-4, 1e6, 'obstacle thickness');
+      return Object.freeze({
+        kind: 'wall' as const,
+        from: Object.freeze([obs.from[0], obs.from[1]]) as readonly [number, number],
+        to: Object.freeze([obs.to[0], obs.to[1]]) as readonly [number, number],
+        ...(thickness !== undefined ? { thickness } : {}),
+      });
+    }
+    default:
+      throw rippleError("Invalid ripple obstacle kind; use 'sphere', 'cylinder', 'box', or 'wall'");
+  }
+}
+
+/** GPU wave equation with drops, swept object wakes, solid obstacle reflections, body coupling, world-preserving scrolling and debug view. */
 export class Ripples implements EnginePlugin {
   readonly name = `water:ripples-${sequence++}`;
   private readonly surface: Water;
@@ -89,7 +310,15 @@ export class Ripples implements EnginePlugin {
   private readonly pending: number[] = [];
   /** The clock tick each queued event falls due on (-1 without a film clock: the next step). */
   private readonly due: number[] = [];
-  private readonly parameters = new Float32Array(524);
+  // 16 header floats + 512 hit floats + 256 obstacle floats = 784 floats (3,136 bytes).
+  private readonly parameters = new Float32Array(784);
+  // Surface uniform: grid (4) + debug (4) + obstacles (256) = 264 floats (1,056 bytes).
+  private readonly surfaceUniformData = new Float32Array(264);
+  private readonly packedObstacles = new Float32Array(MAX_RIPPLE_OBSTACLES * 8);
+  private packedObstacleCount = 0;
+  private obstacleList: RippleObstacle[] = [];
+  private readonly tracked = new Map<RippleTrackedBody, TrackedState>();
+  private debugState: Required<RippleDebugOptions> = { enabled: false, mode: 'height', bounds: true };
   private readonly origin: [number, number] = [0, 0];
   private engine?: Engine;
   private buffers: GPUBuffer[] = [];
@@ -105,6 +334,7 @@ export class Ripples implements EnginePlugin {
   /** Ticks stepped since the field started, when the surface has a film clock. */
   private done = 0;
   private dirty = true;
+  private surfaceDirty = true;
   private rendered = false;
   private disposed = false;
   private generation = 0;
@@ -117,17 +347,16 @@ export class Ripples implements EnginePlugin {
     this.size = finite(options.size ?? 64, 1, 10000, 'size');
     this.resolution = finite(options.resolution ?? 128, 16, 512, 'resolution');
     if (!Number.isInteger(this.resolution))
-      throw rangeError('Ripple resolution must be an integer; use 16..512', 'geometry');
+      throw rippleError('Ripple resolution must be an integer; use 16..512');
     this.speed = finite(options.speed ?? 3, 0.01, 100, 'speed');
     this.damping = finite(options.damping ?? 0.6, 0, 100, 'damping');
     this.follow = options.followCamera ?? true;
-    if (typeof this.follow !== 'boolean') throw rangeError('Invalid followCamera; pass a boolean', 'geometry');
+    if (typeof this.follow !== 'boolean') throw rippleError('Invalid followCamera; pass a boolean');
     // A quarter-second stall must remain bounded in both work and numerical stability.
     if (Math.ceil((0.25 * this.speed) / (0.45 * this.cell)) > 512)
-      throw rangeError(
-        'Ripple grid needs too many stable substeps; increase size or reduce resolution or speed',
-        'geometry',
-      );
+      throw rippleError('Ripple grid needs too many stable substeps; increase size or reduce resolution or speed');
+    this.origin[0] = this.origin[1] = -this.size / 2;
+    if (options.obstacles !== undefined) this.setObstacles(options.obstacles);
   }
   /** Attach after the Water surface. */
   static attach(engine: EngineKernel, options: RippleOptions): Ripples {
@@ -137,6 +366,325 @@ export class Ripples implements EnginePlugin {
   }
   private get cell(): number {
     return this.size / this.resolution;
+  }
+  /** Active static solid obstacles. A frozen copy. */
+  get obstacles(): readonly RippleObstacle[] {
+    return Object.freeze([...this.obstacleList]);
+  }
+  /** Number of moving bodies currently tracked by {@link trackBody}. */
+  get trackedCount(): number {
+    return this.tracked.size;
+  }
+  /** Current debug visualization settings. A copy. */
+  get debug(): Readonly<Required<RippleDebugOptions>> {
+    return Object.freeze({ ...this.debugState });
+  }
+  /**
+   * Set solid obstacles (spheres, cylinders, oriented boxes, and walls; up to 32) that mask cells and reflect
+   * incoming ripples cleanly using homogeneous Neumann boundary conditions. Replaces any previous static obstacles.
+   */
+  setObstacles(obstacles: readonly RippleObstacle[]): this {
+    this.live();
+    if (!Array.isArray(obstacles))
+      throw rippleError('Invalid ripple obstacles; pass an array of obstacle descriptors');
+    if (obstacles.length > MAX_RIPPLE_OBSTACLES)
+      throw rippleError(`Too many ripple obstacles; pass at most ${MAX_RIPPLE_OBSTACLES} obstacles`);
+    const validated = obstacles.map((obs) => cloneObstacle(obs));
+    this.obstacleList = validated;
+    this.dirty = true;
+    this.surfaceDirty = true;
+    return this;
+  }
+  /**
+   * Synchronously test whether world `(x, z)` lies inside an active solid obstacle at the current water level.
+   */
+  isObstacle(x: number, z: number): boolean {
+    this.live();
+    finite(x, -1e7, 1e7, 'position');
+    finite(z, -1e7, 1e7, 'position');
+    this.packObstacles();
+    const data = this.packedObstacles;
+    for (let i = 0; i < this.packedObstacleCount; i++) {
+      const o = i * 8;
+      const kind = data[o + 6]!;
+      if (kind < 1.5) {
+        const dx = x - data[o]!,
+          dz = z - data[o + 1]!,
+          r = data[o + 2]!;
+        if (dx * dx + dz * dz <= r * r) return true;
+      } else if (kind < 2.5) {
+        const dx = x - data[o]!,
+          dz = z - data[o + 1]!,
+          co = data[o + 4]!,
+          si = data[o + 5]!;
+        const lx = dx * co + dz * si,
+          lz = -dx * si + dz * co;
+        if (Math.abs(lx) <= data[o + 2]! && Math.abs(lz) <= data[o + 3]!) return true;
+      } else {
+        const x0 = data[o]!,
+          z0 = data[o + 1]!,
+          sx = data[o + 2]! - x0,
+          sz = data[o + 3]! - z0;
+        const lenSq = Math.max(sx * sx + sz * sz, 1e-6);
+        const t = Math.max(0, Math.min(1, ((x - x0) * sx + (z - z0) * sz) / lenSq));
+        const dx = x - x0 - t * sx,
+          dz = z - z0 - t * sz,
+          ht = data[o + 4]!;
+        if (dx * dx + dz * dz <= ht * ht) return true;
+      }
+    }
+    return false;
+  }
+  /**
+   * Track any moving object with `{ position }` (`[x, y, z]` or `{ x, y, z }`, e.g. a physics rigid body, Floater,
+   * core mesh, or custom object) to automatically generate entry/exit splashes and swept wakes every frame.
+   */
+  trackBody(body: RippleTrackedBody, options: RippleTrackOptions = {}): this {
+    this.live();
+    if (!body || typeof body !== 'object' || readXYZ(body.position) === null)
+      throw rippleError('Invalid tracked body; pass an object with a finite position [x, y, z] or { x, y, z }');
+    const radius = finite(options.radius ?? Math.max(1, this.cell), this.cell, this.size / 2, 'track radius');
+    const strength = finite(options.strength ?? 0.08, -100, 100, 'track strength');
+    const halfHeight = finite(options.halfHeight ?? radius, 1e-4, 1e5, 'track halfHeight');
+    const splashStrength = finite(options.splashStrength ?? 2.5, 0, 10, 'track splashStrength');
+    const minSpeed = finite(options.minSpeed ?? 0.02, 0, 100, 'track minSpeed');
+    const obstacle = options.obstacle ?? false;
+    if (typeof obstacle !== 'boolean')
+      throw rippleError('Invalid track obstacle flag; pass true or false');
+    const existing = this.tracked.get(body);
+    if (existing) {
+      existing.radius = radius;
+      existing.strength = strength;
+      existing.halfHeight = halfHeight;
+      existing.splashStrength = splashStrength;
+      existing.minSpeed = minSpeed;
+      existing.obstacle = obstacle;
+    } else {
+      const p = readXYZ(body.position)!;
+      const surfaceY = this.waterLevelAt(p[0], p[2]);
+      const inWater = Math.abs(p[1] - surfaceY) <= halfHeight;
+      this.tracked.set(body, {
+        radius,
+        strength,
+        halfHeight,
+        splashStrength,
+        minSpeed,
+        obstacle,
+        initialized: true,
+        prevX: p[0],
+        prevY: p[1],
+        prevZ: p[2],
+        wasInWater: inWater,
+      });
+    }
+    this.dirty = true;
+    this.surfaceDirty = true;
+    return this;
+  }
+  /** Stop tracking a previously registered body. Safe to call if not tracked. */
+  untrackBody(body: RippleTrackedBody): this {
+    this.live();
+    if (this.tracked.delete(body)) {
+      this.dirty = true;
+      this.surfaceDirty = true;
+    }
+    return this;
+  }
+  /**
+   * Configure the GPU debug visualization overlay on the water surface (height or velocity heatmap, solid obstacle
+   * masks, active scroll grid outline, and 8-cell absorbing sponge border). Pass `false` to turn off.
+   */
+  setDebug(options: boolean | RippleDebugOptions): this {
+    this.live();
+    if (typeof options !== 'boolean' && (typeof options !== 'object' || options === null))
+      throw rippleError('Invalid ripple debug options; pass a boolean or { enabled?, mode?, bounds? }');
+    const cfg: RippleDebugOptions = typeof options === 'boolean' ? { enabled: options } : options;
+    const enabled = cfg.enabled ?? true;
+    if (typeof enabled !== 'boolean') throw rippleError('Invalid ripple debug enabled; pass true or false');
+    const mode: RippleDebugMode = cfg.mode ?? this.debugState.mode;
+    if (!(mode in DEBUG_MODE_INDEX))
+      throw rippleError("Invalid ripple debug mode; use 'height', 'velocity', or 'obstacles'");
+    const bounds = cfg.bounds ?? this.debugState.bounds;
+    if (typeof bounds !== 'boolean') throw rippleError('Invalid ripple debug bounds; pass true or false');
+    this.debugState = { enabled, mode, bounds };
+    this.surfaceDirty = true;
+    return this;
+  }
+  /**
+   * Intersect a world-space ray `(origin, direction)` with the water plane (`surface.seaLevel`) and queue a circular
+   * ripple at the hit point. Returns the world hit `[x, y, z]`, or `null` if parallel, behind the ray, or outside the
+   * active ripple grid.
+   */
+  disturbRay(
+    origin: readonly [number, number, number],
+    direction: readonly [number, number, number],
+    radius = Math.max(1, this.cell),
+    strength = 0.1,
+  ): [number, number, number] | null {
+    this.live();
+    if (!Array.isArray(origin) || origin.length !== 3 || !Array.isArray(direction) || direction.length !== 3)
+      throw rippleError('Invalid ripple ray; pass 3D origin [x, y, z] and direction [dx, dy, dz]');
+    for (const v of origin) finite(v, -1e7, 1e7, 'ray origin');
+    for (const v of direction) finite(v, -1e7, 1e7, 'ray direction');
+    if (Math.hypot(direction[0], direction[1], direction[2]) === 0)
+      throw rippleError('Invalid ripple ray direction; pass a nonzero [dx, dy, dz] vector');
+    finite(radius, this.cell, this.size / 2, 'radius');
+    finite(strength, -100, 100, 'strength');
+    if (Math.abs(direction[1]) < 1e-8) return null;
+    const planeY = this.surface.seaLevel;
+    const t = (planeY - origin[1]) / direction[1];
+    if (t < 0 || !Number.isFinite(t)) return null;
+    const hx = origin[0] + direction[0] * t;
+    const hz = origin[2] + direction[2] * t;
+    if (
+      hx < this.origin[0] ||
+      hx > this.origin[0] + this.size ||
+      hz < this.origin[1] ||
+      hz > this.origin[1] + this.size
+    )
+      return null;
+    if (this.pending.length < 64 * 8) this.disturb(hx, hz, radius, strength);
+    return [hx, planeY, hz];
+  }
+  private waterLevelAt(x: number, z: number): number {
+    return this.surface.sampleHeight(x, z);
+  }
+  private packObstacles(): void {
+    const out = this.packedObstacles;
+    out.fill(0);
+    const seaY = this.surface.seaLevel;
+    const minWallHalf = this.cell * 0.72;
+    let count = 0;
+    const push = (
+      a0: number,
+      a1: number,
+      a2: number,
+      a3: number,
+      b0: number,
+      b1: number,
+      b2: number,
+      b3: number,
+    ) => {
+      if (count >= MAX_RIPPLE_OBSTACLES) return;
+      const o = count++ * 8;
+      out[o] = a0;
+      out[o + 1] = a1;
+      out[o + 2] = a2;
+      out[o + 3] = a3;
+      out[o + 4] = b0;
+      out[o + 5] = b1;
+      out[o + 6] = b2;
+      out[o + 7] = b3;
+    };
+    for (const obs of this.obstacleList) {
+      if (count >= MAX_RIPPLE_OBSTACLES) break;
+      if (obs.kind === 'sphere') {
+        const cx = obs.center[0]!;
+        const cz = obs.center.length === 3 ? obs.center[2]! : obs.center[1]!;
+        const dy = obs.center.length === 3 ? obs.center[1]! - seaY : 0;
+        const r2 = obs.radius * obs.radius - dy * dy;
+        if (r2 > 1e-8) push(cx, cz, Math.sqrt(r2), 0, 0, 0, 1, 0);
+      } else if (obs.kind === 'cylinder') {
+        const minY = obs.minY ?? -Infinity,
+          maxY = obs.maxY ?? Infinity;
+        if (seaY >= minY && seaY <= maxY) {
+          const cx = obs.center[0]!;
+          const cz = obs.center.length === 3 ? obs.center[2]! : obs.center[1]!;
+          push(cx, cz, obs.radius, 0, 0, 0, 1, 0);
+        }
+      } else if (obs.kind === 'box') {
+        const cx = obs.center[0]!;
+        const cz = obs.center.length === 3 ? obs.center[2]! : obs.center[1]!;
+        const hx = obs.halfExtents[0]!;
+        const hz = obs.halfExtents.length === 3 ? obs.halfExtents[2]! : obs.halfExtents[1]!;
+        if (obs.center.length === 3 && obs.halfExtents.length === 3) {
+          if (Math.abs(obs.center[1]! - seaY) > obs.halfExtents[1]!) continue;
+        }
+        const rot = obs.rotation ?? 0;
+        push(cx, cz, hx, hz, Math.cos(rot), Math.sin(rot), 2, 0);
+      } else {
+        const halfT = Math.max((obs.thickness ?? this.cell * 1.5) * 0.5, minWallHalf);
+        push(obs.from[0], obs.from[1], obs.to[0], obs.to[1], halfT, 0, 3, 0);
+      }
+    }
+    for (const [body, state] of this.tracked) {
+      if (!state.obstacle || count >= MAX_RIPPLE_OBSTACLES) continue;
+      const p = readXYZ(body.position);
+      if (!p) continue;
+      if (Math.abs(p[1] - seaY) <= state.halfHeight) push(p[0], p[2], state.radius, 0, 0, 0, 1, 0);
+    }
+    this.packedObstacleCount = count;
+  }
+  private sampleTrackedBodies(dt: number): boolean {
+    if (!this.tracked.size) return false;
+    let emitted = false;
+    const safeDt = Math.max(dt, 1 / 120);
+    for (const [body, state] of this.tracked) {
+      const p = readXYZ(body.position);
+      if (!p) continue;
+      const [x, y, z] = p;
+      const surfaceY = this.waterLevelAt(x, z);
+      const inWater = Math.abs(y - surfaceY) <= state.halfHeight;
+      if (!state.initialized) {
+        state.prevX = x;
+        state.prevY = y;
+        state.prevZ = z;
+        state.wasInWater = inWater;
+        state.initialized = true;
+        continue;
+      }
+      const crossed = (state.prevY - surfaceY) * (y - surfaceY) < 0;
+      const entered = (!state.wasInWater && inWater) || (!state.wasInWater && !inWater && crossed);
+      const exited = state.wasInWater && !inWater;
+      const dx = x - state.prevX,
+        dy = y - state.prevY,
+        dz = z - state.prevZ;
+      if ((entered || exited) && state.splashStrength > 0 && this.pending.length < 64 * 8) {
+        const vy = Math.abs(dy) / safeDt;
+        const speedFactor = Math.min(2, 0.4 + vy * 0.25);
+        const sign = entered ? (dy <= 0 ? -1 : 1) : 0.6;
+        const amp = Math.max(-100, Math.min(100, sign * Math.abs(state.strength) * state.splashStrength * speedFactor));
+        if (Math.abs(amp) > 1e-6) {
+          this.disturb(x, z, state.radius, amp);
+          emitted = true;
+        }
+      }
+      if (inWater && this.pending.length < 64 * 8) {
+        const dist = Math.hypot(dx, dz);
+        if (dist >= state.minSpeed) {
+          const horizSpeed = dist / safeDt;
+          const speedScale = Math.min(1.5, 0.25 + horizSpeed * 0.35);
+          const amp = Math.max(-100, Math.min(100, -Math.abs(state.strength) * speedScale));
+          if (Math.abs(amp) > 1e-6) {
+            this.wake([state.prevX, state.prevZ], [x, z], state.radius, amp);
+            emitted = true;
+          }
+        }
+      }
+      if (state.obstacle && (dx !== 0 || dy !== 0 || dz !== 0)) {
+        this.dirty = true;
+        this.surfaceDirty = true;
+      }
+      state.prevX = x;
+      state.prevY = y;
+      state.prevZ = z;
+      state.wasInWater = inWater;
+    }
+    return emitted;
+  }
+  private writeSurfaceUniform(device: GPUDevice, origin: readonly [number, number]): void {
+    const out = this.surfaceUniformData;
+    out[0] = origin[0];
+    out[1] = origin[1];
+    out[2] = this.cell;
+    out[3] = this.resolution;
+    out[4] = this.debugState.enabled ? 1 : 0;
+    out[5] = DEBUG_MODE_INDEX[this.debugState.mode];
+    out[6] = this.debugState.bounds ? 1 : 0;
+    out[7] = this.packedObstacleCount;
+    out.set(this.packedObstacles, 8);
+    device.queue.writeBuffer(this.uniform!, 0, out as Float32Array<ArrayBuffer>);
+    this.surfaceDirty = false;
   }
   /** The field's tick rate on a film clock and its substeps a tick: the dyadic rate its stability limit needs. */
   private tickRate(): { rate: number; substeps: number; limit: number } {
@@ -183,7 +731,7 @@ export class Ripples implements EnginePlugin {
   /** Queue a swept capsule from the object's previous XZ to current XZ. Up to 64 events per rendered update. */
   wake(from: readonly [number, number], to: readonly [number, number], radius = 1, strength = 0.1): this {
     this.live();
-    if (from.length !== 2 || to.length !== 2) throw rangeError('Invalid wake path; pass two XZ pairs', 'geometry');
+    if (from.length !== 2 || to.length !== 2) throw rippleError('Invalid wake path; pass two XZ pairs');
     for (const v of [...from, ...to]) finite(v, -1e7, 1e7, 'position');
     finite(radius, this.cell, this.size / 2, 'radius');
     finite(strength, -100, 100, 'strength');
@@ -215,7 +763,7 @@ export class Ripples implements EnginePlugin {
     this.fields = Array.from({ length: 3 }, () =>
       make(this.resolution ** 2 * 8, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST),
     );
-    this.uniform = make(16, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    this.uniform = make(this.surfaceUniformData.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
     this.configs = Array.from({ length: 2 }, () =>
       make(this.parameters.byteLength, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST),
     );
@@ -250,6 +798,7 @@ export class Ripples implements EnginePlugin {
     this.removeDispose = this.surface.onDispose(() => this.dispose());
     this.origin[0] = this.origin[1] = -this.size / 2;
     this.dirty = true;
+    this.surfaceDirty = true;
   }
   onPreUpdate(delta: number): void {
     this.delta += Math.max(0, delta);
@@ -258,7 +807,12 @@ export class Ripples implements EnginePlugin {
   private update(c: Context): void {
     if (c.device !== this.engine?.gpu)
       throw fault('state', 'Ripples and Water must use the same engine; attach both to one engine');
-    if (!this.dirty) return;
+    if (this.sampleTrackedBodies(this.delta)) this.dirty = true;
+    this.packObstacles();
+    if (!this.dirty) {
+      if (this.surfaceDirty) this.writeSurfaceUniform(c.device, this.origin);
+      return;
+    }
     const cell = this.cell;
     const next: [number, number] = this.follow
       ? [
@@ -266,25 +820,17 @@ export class Ripples implements EnginePlugin {
           Math.round(c.camera.position[2] / cell) * cell - this.size / 2,
         ]
       : [-this.size / 2, -this.size / 2];
-    // The surface's film clock (WaterOptions.clock): the field steps in fixed ticks at the dyadic rate its stability limit
-    // needs (60 * 2^k Hz, up to 7,680; above that a whole number of substeps a tick), as many as the clock owes, so the
-    // same shot at any frame rate ripples alike. Without one, the frame's delta in steps that keep that limit.
     const clock = this.surface.options.clock,
       { rate, substeps, limit } = this.tickRate(),
-      // Each queued event's step in this update: [step, event index]; an event due after it stays queued.
       born: [number, number][] = [],
       later: number[] = [];
     let steps: number, step: number;
     if (clock) {
       const target = clock.ticks(rate);
       if (!Number.isSafeInteger(target) || target < 0)
-        throw rangeError(
-          `A Ripples clock gives whole ticks from 0; got ${target}. Pass a FilmClock to the Water.`,
-          'geometry',
-        );
+        throw rippleError(`A Ripples clock gives whole ticks from 0; got ${target}. Pass a FilmClock to the Water.`);
       if (target < this.done) {
         this.restart(c.device);
-        // Events queued on the old run's later ticks are not part of the replay.
         for (let e = this.due.length - 1; e >= 0; e--)
           if (this.due[e]! > target) {
             this.due.splice(e, 1);
@@ -292,10 +838,10 @@ export class Ripples implements EnginePlugin {
           }
       }
       const owed = Math.min(WATER_FLOW_TICKS_PER_FRAME, target - this.done);
-      // No tick owed: the field and the queued drops wait for the next one.
-      if (!(owed > 0)) return;
-      // An event due at tick T is born in the step that starts at T / rate, the first at or after its time (one due
-      // earlier, in the first step).
+      if (!(owed > 0)) {
+        if (this.surfaceDirty) this.writeSurfaceUniform(c.device, this.origin);
+        return;
+      }
       for (let e = 0; e < this.due.length; e++) {
         const k = this.due[e]! - this.done;
         if (k >= owed) later.push(e);
@@ -310,19 +856,20 @@ export class Ripples implements EnginePlugin {
       step = total / steps;
       for (let e = 0; e < this.due.length; e++) born.push([0, e]);
     }
-    // Config 0: the first step, with the scroll to the new origin and the events born in it; config 1: a plain step;
-    // configs 2 on: one for each later step with events born in it.
     const write = (index: number, shift: boolean, at: number) => {
       this.parameters.fill(0);
       let count = 0;
       for (const [s, e] of born)
-        if (s === at) this.parameters.set(this.pending.slice(e * 8, e * 8 + 8), 12 + 8 * count++);
+        if (s === at) this.parameters.set(this.pending.slice(e * 8, e * 8 + 8), 16 + 8 * count++);
       this.parameters.set([...next, cell, this.resolution, step, this.speed ** 2, this.damping, count]);
       if (shift)
         new Int32Array(this.parameters.buffer).set(
           [Math.round((next[0] - this.origin[0]) / cell), Math.round((next[1] - this.origin[1]) / cell)],
           8,
         );
+      new Uint32Array(this.parameters.buffer)[12] = this.packedObstacleCount;
+      if (this.packedObstacleCount > 0)
+        this.parameters.set(this.packedObstacles.subarray(0, this.packedObstacleCount * 8), 528);
       this.configGroups(c.device, index);
       c.device.queue.writeBuffer(this.configs[index]!, 0, this.parameters);
     };
@@ -335,21 +882,19 @@ export class Ripples implements EnginePlugin {
         write(extra.get(s)!, false, s);
       }
     let input = 0;
-    for (let step = 0; step < steps; step++) {
+    for (let s = 0; s < steps; s++) {
       const pass = c.encoder.beginComputePass();
       pass.setPipeline(this.pipeline!);
-      pass.setBindGroup(0, this.groups[step === 0 ? 0 : (extra.get(step) ?? 1)]![input]!);
+      pass.setBindGroup(0, this.groups[s === 0 ? 0 : (extra.get(s) ?? 1)]![input]!);
       pass.dispatchWorkgroups(Math.ceil(this.resolution / 8), Math.ceil(this.resolution / 8));
       pass.end();
       input = 1 - input;
     }
-    // Stable published buffer keeps all surface and query bindings valid across ping-pong steps.
     c.encoder.copyBufferToBuffer(this.fields[input], 0, this.fields[2], 0, this.resolution ** 2 * 8);
     if (input !== 0) c.encoder.copyBufferToBuffer(this.fields[input], 0, this.fields[0], 0, this.resolution ** 2 * 8);
-    c.device.queue.writeBuffer(this.uniform!, 0, new Float32Array([...next, cell, this.resolution]));
+    this.writeSurfaceUniform(c.device, next);
     this.origin[0] = next[0];
     this.origin[1] = next[1];
-    // The events due after this update stay queued, with their ticks.
     const kept = later.flatMap((e) => this.pending.slice(e * 8, e * 8 + 8)),
       keptDue = later.map((e) => this.due[e]!);
     this.pending.length = this.due.length = 0;
@@ -361,21 +906,76 @@ export class Ripples implements EnginePlugin {
   }
   private shader(code: string, binding: number): string {
     const prefix = `
-@group(0) @binding(${binding}) var<uniform> rippleGrid:vec4f;
+struct RippleSurface { grid:vec4f, debug:vec4f, obstacles:array<vec4f,64> }
+@group(0) @binding(${binding}) var<uniform> rippleSurface:RippleSurface;
 @group(0) @binding(${binding + 1}) var<storage,read> rippleField:array<vec2f>;
-fn rippleAt(p:vec2i)->vec2f {let n=i32(rippleGrid.w);if(any(p<vec2i(0))||any(p>=vec2i(n))){return vec2f(0);}return rippleField[u32(p.y*n+p.x)];}
-fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleGrid.xy)/rippleGrid.z-0.5;let a=vec2i(floor(p));let t=fract(p);return mix(mix(rippleAt(a),rippleAt(a+vec2i(1,0)),t.x),mix(rippleAt(a+vec2i(0,1)),rippleAt(a+vec2i(1,1)),t.x),t.y);}
+fn rippleAt(p:vec2i)->vec2f {let n=i32(rippleSurface.grid.w);if(any(p<vec2i(0))||any(p>=vec2i(n))){return vec2f(0);}return rippleField[u32(p.y*n+p.x)];}
+fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleSurface.grid.xy)/rippleSurface.grid.z-0.5;let a=vec2i(floor(p));let t=fract(p);return mix(mix(rippleAt(a),rippleAt(a+vec2i(1,0)),t.x),mix(rippleAt(a+vec2i(0,1)),rippleAt(a+vec2i(1,1)),t.x),t.y);}
+// The same obstacle test as the step, on the surface's copy of the packed obstacles, for the debug hatching.
+fn rippleSurfaceObstacle(world:vec2f)->bool {
+ let count=u32(round(rippleSurface.debug.w));
+ for(var i=0u;i<count;i++){
+  let o0=rippleSurface.obstacles[i*2u];let o1=rippleSurface.obstacles[i*2u+1u];
+  if(o1.z<1.5){let d=world-o0.xy;if(dot(d,d)<=o0.z*o0.z){return true;}}
+  else if(o1.z<2.5){let d=world-o0.xy;let lx=d.x*o1.x+d.y*o1.y;let lz=-d.x*o1.y+d.y*o1.x;if(abs(lx)<=o0.z&&abs(lz)<=o0.w){return true;}}
+  else{let seg=o0.zw-o0.xy;let t=clamp(dot(world-o0.xy,seg)/max(dot(seg,seg),0.000001),0.0,1.0);let diff=world-o0.xy-t*seg;if(dot(diff,diff)<=o1.x*o1.x){return true;}}
+ }
+ return false;
+}
+// Debug view: a signed heat map of the ripple height (0), its vertical velocity (1) or its magnitude (2), with obstacles hatched.
+fn rippleDebugOverlay(xz:vec2f,baseColor:vec3f)->vec3f {
+ let n=rippleSurface.grid.w;let cell=rippleSurface.grid.z;
+ let p=(xz-rippleSurface.grid.xy)/cell;
+ if(p.x<0.0||p.y<0.0||p.x>n||p.y>n){return baseColor*0.55;}
+ let s=rippleSample(xz);let mode=u32(round(rippleSurface.debug.y));
+ var c=baseColor;
+ if(mode==0u){
+  let v=clamp(s.x*6.0,-1.0,1.0);
+  let heat=select(mix(vec3f(0.05,0.16,0.24),vec3f(0.18,0.88,1.0),v),mix(vec3f(0.05,0.16,0.24),vec3f(0.04,0.15,0.85),-v),v<0.0);
+  let peak=smoothstep(0.65,1.0,abs(v));
+  c=mix(heat,vec3f(1.0,0.96,0.55),peak*0.7);
+ }else if(mode==1u){
+  let v=clamp(s.y*1.2,-1.0,1.0);
+  let heat=select(mix(vec3f(0.07,0.1,0.16),vec3f(0.25,0.95,0.35),v),mix(vec3f(0.07,0.1,0.16),vec3f(0.9,0.18,0.75),-v),v<0.0);
+  c=mix(heat,vec3f(1.0,0.98,0.6),smoothstep(0.7,1.0,abs(v))*0.6);
+ }else{
+  let mag=clamp(abs(s.x)*8.0,0.0,1.0);
+  c=mix(vec3f(0.04,0.09,0.14),vec3f(0.28,0.75,0.95),mag);
+ }
+ if(rippleSurfaceObstacle(xz)){
+  let stripe=step(0.5,fract((p.x+p.y)*0.5));
+  c=mix(vec3f(0.85,0.22,0.12),vec3f(1.0,0.58,0.18),stripe*0.55);
+ }
+ // Bounds: the 8-cell absorbing strip tinted magenta, its inner edge and the grid's outer edge drawn as lines.
+ if(rippleSurface.debug.z>0.5){
+  let edge=min(min(p.x,p.y),min(n-p.x,n-p.y));
+  if(edge<8.0){
+   let sponge=1.0-edge/8.0;
+   c=mix(c,vec3f(0.85,0.22,0.75),sponge*0.32);
+  }
+  let innerLine=1.0-smoothstep(0.0,0.32,abs(edge-8.0));
+  c=mix(c,vec3f(1.0,0.52,0.92),innerLine*0.85);
+  let outerLine=1.0-smoothstep(0.0,0.55,edge);
+  c=mix(c,vec3f(0.3,0.98,1.0),outerLine*0.95);
+ }
+ return c;
+}
 `;
-    return (
+    const withVertex =
       prefix +
       code.replace(
         'return Surface(p,normalize(cross(binormal,tangent)),crest);',
         `
- let rh=rippleSample(xz).x;let rc=rippleGrid.z;
+ let rh=rippleSample(xz).x;let rc=rippleSurface.grid.z;
  p.y+=rh;tangent.y+=(rippleSample(xz+vec2f(rc,0)).x-rippleSample(xz-vec2f(rc,0)).x)/(2.0*rc);
  binormal.y+=(rippleSample(xz+vec2f(0,rc)).x-rippleSample(xz-vec2f(0,rc)).x)/(2.0*rc);
  return Surface(p,normalize(cross(binormal,tangent)),crest);`,
-      )
+      );
+    const displayAnchor = 'if(frame.cameraData.w<0.5){color=toDisplay(color);}';
+    if (!withVertex.includes(displayAnchor)) return withVertex;
+    return withVertex.replace(
+      displayAnchor,
+      `if(rippleSurface.debug.x>0.5){color=rippleDebugOverlay(i.xz,color);}\n ${displayAnchor}`,
     );
   }
   /** Read the submitted GPU field without advancing it. Supports cancellation and one pending read. */
@@ -387,7 +987,6 @@ fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleGrid.xy)/rippleGrid.z-0.5;let 
     const device = this.engine.gpu,
       generation = this.generation,
       origin = Object.freeze([...this.origin]) as readonly [number, number];
-    // Pending only once the buffer exists: a refused allocation throws here and leaves the next read free.
     const buffer = device.createBuffer({
       size: this.resolution ** 2 * 8,
       usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
@@ -447,6 +1046,8 @@ fn rippleSample(xz:vec2f)->vec2f {let p=(xz-rippleGrid.xy)/rippleGrid.z-0.5;let 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.tracked.clear();
+    this.obstacleList = [];
     this.engine?.sceneOf(this)?.removePlugin(this.name);
     this.release();
     this.engine = undefined;

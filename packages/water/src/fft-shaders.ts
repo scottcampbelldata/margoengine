@@ -141,7 +141,7 @@ export function oceanSurface(resolution: number, cascades: number): string {
 const N=${resolution}u;
 const CELLS=N*N;
 const CASCADES=${cascades}u;
-struct SurfaceConfig { camera:mat4x4f, eye:vec4f, light:vec4f, radiance:vec4f, ambient:vec4f, water:vec4f, grid:vec4f, lengths:vec4f, color:vec4f }
+struct SurfaceConfig { camera:mat4x4f, eye:vec4f, light:vec4f, radiance:vec4f, ambient:vec4f, water:vec4f, grid:vec4f, lengths:vec4f, color:vec4f, debug:vec4f, points:array<vec4f,8> }
 @group(0) @binding(0) var<uniform> frame:SurfaceConfig;
 @group(0) @binding(1) var<storage,read> surface:array<vec4f>;
 struct SurfaceSample { displacement:vec3f, foam:f32, normal:vec3f }
@@ -176,6 +176,12 @@ struct SurfaceVertex { @builtin(position) clip:vec4f, @location(0) world:vec3f, 
  let position=vec3f(base.x,frame.water.x,base.y)+wave.displacement;
  return SurfaceVertex(frame.camera*vec4f(position,1),position,base);
 }
+ // Jacobian colour key: magenta folded (J < 0), red to amber compressed (J < 0.7, foam), teal to green stretched.
+fn debugJacobianColor(j:f32)->vec3f {
+ if(j<0.0){return vec3f(1.0,0.1,0.85);}
+ if(j<0.7){return mix(vec3f(0.95,0.15,0.1),vec3f(1.0,0.78,0.12),clamp(j/0.7,0.0,1.0));}
+ return mix(vec3f(0.08,0.55,0.65),vec3f(0.15,0.85,0.45),clamp((j-0.7)/0.8,0.0,1.0));
+}
 @fragment fn fragment(input:SurfaceVertex,@builtin(front_facing) front:bool)->@location(0) vec4f {
  let wave=oceanAt(input.base);
  let normal=select(-wave.normal,wave.normal,front);
@@ -200,6 +206,51 @@ struct SurfaceVertex { @builtin(position) clip:vec4f, @location(0) world:vec3f, 
  if(!front){
   let internal=1.333*1.333*(1.0-cosine*cosine)>1.0;
   color=mix(sky,body,select(0.15,0.85,internal));
+ }
+ // Debug shading replaces the lit colour: 1 normals as RGB, 2 the retained foam, 3 the smallest cascade Jacobian.
+ let debugMode=u32(round(frame.debug.x));
+ if(debugMode==1u){
+  color=normal*0.5+0.5;
+ }else if(debugMode==2u){
+  color=mix(vec3f(0.03,0.08,0.16),vec3f(0.95,0.98,1.0),wave.foam);
+ }else if(debugMode==3u){
+  var minJ=2.0;
+  for(var c=0u;c<CASCADES;c++){minJ=min(minJ,sampleSurface(input.base,c,1u).w);}
+  color=debugJacobianColor(minJ);
+ }
+ // Wireframe: distance to the nearest edge of the draw grid's triangles in screen-space derivatives, so lines stay one pixel wide.
+ if(frame.debug.y>0.5){
+  let cellSize=frame.grid.xy/max(frame.grid.z,1.0);
+  let g=(input.base-frame.water.zw)/cellSize;
+  let f=fract(g);
+  let df=max(fwidth(g),vec2f(0.0001));
+  let ex=min(f.x,1.0-f.x)/df.x;
+  let ey=min(f.y,1.0-f.y)/df.y;
+  let ed=abs(f.x+f.y-1.0)/max(df.x+df.y,0.0001);
+  let line=1.0-smoothstep(0.0,1.35,min(min(ex,ey),ed*1.4));
+  color=mix(color,vec3f(0.25,0.92,1.0),line*0.75);
+ }
+ // Cascade rings: one coloured circle per cascade at half its periodic patch length around the grid centre.
+ if(frame.debug.z>0.5){
+  let r=length(input.base-frame.water.zw);
+  let dr=max(fwidth(r),0.05);
+  let ringColors=array<vec3f,4>(vec3f(1.0,0.82,0.2),vec3f(0.35,0.95,0.45),vec3f(1.0,0.42,0.32),vec3f(0.75,0.45,1.0));
+  for(var c=0u;c<CASCADES;c++){
+   let ringR=frame.lengths[c]*0.5;
+   let band=1.0-smoothstep(0.0,dr*2.4,abs(r-ringR));
+   color=mix(color,ringColors[c],band*0.9);
+  }
+ }
+ // Sample markers: a filled dot and a 1.35 m ring around each world XZ point the caller queries.
+ let pointCount=u32(round(frame.debug.w));
+ for(var pi=0u;pi<pointCount;pi++){
+  let packed=frame.points[pi/2u];
+  let pt=select(packed.xy,packed.zw,(pi&1u)==1u);
+  let dist=length(input.world.xz-pt);
+  let dd=max(fwidth(dist),0.04);
+  let ring=1.0-smoothstep(0.18,0.18+dd*1.5,abs(dist-1.35));
+  let dotFill=1.0-smoothstep(0.3,0.3+dd*1.5,dist);
+  color=mix(color,vec3f(1.0,0.85,0.15),max(ring,dotFill)*0.95);
  }
  return vec4f(surfaceDisplay(color),1);
 }

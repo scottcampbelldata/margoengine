@@ -76,6 +76,16 @@
       <p><strong>Cause.</strong> The load solver or a hydrodynamic helper received an unsupported geometry, flow, state or parameter.</p>
       <p><strong>Fix.</strong> Use finite SI inputs. Supply a water field and positive density, a closed outward-wound mesh or positive shape dimensions, and valid rigid rows. Omit the force capacity to use the world capacity. The error names the rejected input and the change to make.</p>
     </section>
+    <section id="ocean">
+      <h2><a href="#ocean">@margoengine/water/fft and Water.sample: the ocean surface and its height query</a></h2>
+      <p><strong>Cause.</strong> An <code>FFTOcean</code> option or setter (<code>setWind</code>, <code>setChoppiness</code>, <code>setFoamThreshold</code>, <code>setColor</code>, <code>setDebug</code>) or a height query (<code>FFTOcean.sample</code>, <code>Water.sample</code>) got a value it cannot use: a resolution that is not a power of two from 16 to 512, more than four cascades or overlapping wavelength bands, a wind speed outside 0.1..100 m/s, a zero or non-finite wind direction, a fetch outside 1..1e7 m, a choppiness outside 0..5, a colour channel outside 0..1, an unknown debug mode, more than 16 debug points, non-finite query coordinates or a time below 0. The message names the value and its range.</p>
+      <p><strong>Fix.</strong> Pass finite SI values inside the range the message gives: for example <code>ocean.setWind({speed: 12, direction: [1, 0]})</code>, <code>ocean.setChoppiness(1)</code>, <code>ocean.setDebug({mode: 'jacobian'})</code> and <code>ocean.sample(x, z)</code> with world metres.</p>
+    </section>
+    <section id="ripples">
+      <h2><a href="#ripples">@margoengine/water/ripples: interactive ripples</a></h2>
+      <p><strong>Cause.</strong> A <code>Ripples</code> option, obstacle, tracked body, ray or event got a value it cannot use: a size outside 1..10000 m, a resolution that is not a whole number from 16 to 512, a speed outside 0.01..100 m/s, a grid that would need more than 512 stable substeps, an obstacle kind other than sphere, cylinder, box or wall, more than 32 obstacles, a radius smaller than one cell, a strength outside -100..100 m, a body without a finite <code>position</code>, a zero ray direction, or an unknown debug mode. The message names the value and its range.</p>
+      <p><strong>Fix.</strong> Pass finite values inside the range the message gives: a <code>Water</code> surface, <code>size</code> and <code>resolution</code> that keep a cell above <code>speed / 7680 / 0.45</code> metres, obstacles as <code>{kind: 'cylinder', center: [x, z], radius}</code>, bodies as <code>{position: [x, y, z]}</code>, and a radius of at least <code>size / resolution</code> metres.</p>
+    </section>
     <section id="rods">
       <h2><a href="#rods">@margoengine/physics/rod inputs</a></h2>
       <p><strong>Cause.</strong> A rod, rope, cable or chain received a centre line, option, buffer or state it cannot use.</p>

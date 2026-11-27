@@ -7,12 +7,39 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph, PassContext } from "@margoengine/core/extension";
 import { ColorInput } from "@margoengine/math";
 
+export const MAX_RIPPLE_OBSTACLES = 32;
+
+export interface RippleBoxObstacle {
+    readonly kind: 'box';
+    readonly center: readonly [number, number] | readonly [number, number, number];
+    readonly halfExtents: readonly [number, number] | readonly [number, number, number];
+    readonly rotation?: number;
+}
+
+export interface RippleCylinderObstacle {
+    readonly kind: 'cylinder';
+    readonly center: readonly [number, number] | readonly [number, number, number];
+    readonly radius: number;
+    readonly minY?: number;
+    readonly maxY?: number;
+}
+
+export type RippleDebugMode = 'height' | 'velocity' | 'obstacles';
+
+export interface RippleDebugOptions {
+    enabled?: boolean;
+    mode?: RippleDebugMode;
+    bounds?: boolean;
+}
+
 export interface RippleFrame {
     readonly origin: readonly [number, number];
     readonly resolution: number;
     readonly cellSize: number;
     readonly data: Float32Array;
 }
+
+export type RippleObstacle = RippleSphereObstacle | RippleCylinderObstacle | RippleBoxObstacle | RippleWallObstacle;
 
 export interface RippleOptions {
     surface: Water;
@@ -21,6 +48,39 @@ export interface RippleOptions {
     speed?: number;
     damping?: number;
     followCamera?: boolean;
+    obstacles?: readonly RippleObstacle[];
+}
+
+export type RipplePosition = readonly [number, number, number] | ArrayLike<number> | {
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+};
+
+export interface RippleSphereObstacle {
+    readonly kind: 'sphere';
+    readonly center: readonly [number, number, number] | readonly [number, number];
+    readonly radius: number;
+}
+
+export interface RippleTrackOptions {
+    radius?: number;
+    strength?: number;
+    halfHeight?: number;
+    splashStrength?: number;
+    minSpeed?: number;
+    obstacle?: boolean;
+}
+
+export interface RippleTrackedBody {
+    readonly position: RipplePosition;
+}
+
+export interface RippleWallObstacle {
+    readonly kind: 'wall';
+    readonly from: readonly [number, number];
+    readonly to: readonly [number, number];
+    readonly thickness?: number;
 }
 
 export class Ripples implements EnginePlugin {
@@ -28,6 +88,15 @@ export class Ripples implements EnginePlugin {
     constructor(options: RippleOptions);
     static attach(engine: EngineKernel, options: RippleOptions): Ripples;
     private get cell();
+    get obstacles(): readonly RippleObstacle[];
+    get trackedCount(): number;
+    get debug(): Readonly<Required<RippleDebugOptions>>;
+    setObstacles(obstacles: readonly RippleObstacle[]): this;
+    isObstacle(x: number, z: number): boolean;
+    trackBody(body: RippleTrackedBody, options?: RippleTrackOptions): this;
+    untrackBody(body: RippleTrackedBody): this;
+    setDebug(options: boolean | RippleDebugOptions): this;
+    disturbRay(origin: readonly [number, number, number], direction: readonly [number, number, number], radius?: number, strength?: number): [number, number, number] | null;
     disturb(x: number, z: number, radius?: number, strength?: number): this;
     wake(from: readonly [number, number], to: readonly [number, number], radius?: number, strength?: number): this;
     setup(engine: Engine): void;
@@ -95,6 +164,8 @@ class Water implements EnginePlugin {
     resetTime(): void;
     advanceTime(delta: number): void;
     setTime(seconds: number): this;
+    sample(x: number, z: number, time?: number): WaterSample;
+    sampleHeight(x: number, z: number, time?: number): number;
     onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -152,6 +223,13 @@ interface WaterOptions {
     shadows?: WaterShadowSource;
     whitecaps?: number;
     chop?: number;
+}
+
+interface WaterSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: [number, number, number];
+    time: number;
 }
 
 interface WaterSea {

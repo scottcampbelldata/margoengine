@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 20837504,
+  "total": 20844687,
   "history": [
     {
       "date": "2026-10-24",
@@ -14377,6 +14377,12 @@
       "commit": "46d930c1a5",
       "grew": 2,
       "reason": "SEA-12 optional depth and lateral span wake transfer: physics/sea grows from 6405 to 7624 B gzip, ceiling 6661 to 7880 B. physics/seakeeping grows from 37788 to 39436 B gzip, ceiling 38618 to 40620 B. Projection uses the existing wake spectrum and source normalization; the hull uses its existing strip geometry and tick. A split would have to expose those internals and require the caller to wire a second source stage. The core and stage entries have no added imports."
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "256a80a04",
+      "reason": "SEA-02 and SEA-04 taken over from Gemini (2026-11-27): water/fft 7,704 to 11,826 budget for FFTOcean.sample (the CPU twin of the GPU spectrum and its inverse FFTs), setWind and the debug view; water/ripples 4,307 to 8,124 for obstacles, tracked bodies, disturbRay and the debug view; water root 37,193 to 37,677 for Water.sample. A height query must answer in the frame it is asked, so the CPU twin cannot hide behind import(); the obstacle walls and debug shading are the field's own pass.",
+      "grew": 3
     }
   ],
   "items": {
@@ -16011,11 +16017,11 @@
     "@margoengine/voxel/ticks": 2801,
     "@margoengine/voxel/vox": 13460,
     "@margoengine/voxel/wind": 3422,
-    "@margoengine/water": 38433,
+    "@margoengine/water": 37677,
     "@margoengine/water/bodies": 4379,
     "@margoengine/water/breaking": 3538,
     "@margoengine/water/caustics": 6651,
-    "@margoengine/water/fft": 7704,
+    "@margoengine/water/fft": 11826,
     "@margoengine/water/flood": 17569,
     "@margoengine/water/flood-bake": 4359,
     "@margoengine/water/flow": 3158,
@@ -16024,7 +16030,7 @@
     "@margoengine/water/query": 4677,
     "@margoengine/water/rain": 2757,
     "@margoengine/water/reflector": 3988,
-    "@margoengine/water/ripples": 4307,
+    "@margoengine/water/ripples": 8124,
     "@margoengine/water/rivers": 4402,
     "@margoengine/water/scatter": 2320,
     "@margoengine/water/sea-state": 1380,

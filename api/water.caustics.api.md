@@ -42,6 +42,23 @@ class FFTOcean implements EnginePlugin {
     constructor(options?: FFTOceanOptions);
     static attach(engine: EngineKernel, options?: FFTOceanOptions): FFTOcean;
     get time(): number;
+    get wind(): Readonly<Required<OceanWind>>;
+    get choppiness(): number;
+    get foamThreshold(): number;
+    get debug(): Readonly<{
+        enabled: boolean;
+        mode: OceanDebugMode;
+        wireframe: boolean;
+        lodRings: boolean;
+        samplePoints: readonly (readonly [number, number])[];
+    }>;
+    setWind(wind: number | OceanWind): this;
+    setChoppiness(choppiness: number): this;
+    setFoamThreshold(threshold: number): this;
+    setColor(color: readonly [number, number, number]): this;
+    setDebug(options: boolean | OceanDebugOptions): this;
+    sample(x: number, z: number, time?: number): OceanSample;
+    sampleHeight(x: number, z: number, time?: number): number;
     setTime(seconds: number): this;
     resetTime(): void;
     advanceTime(delta: number): void;
@@ -92,12 +109,38 @@ interface OceanCascade {
     minWavelength?: number;
 }
 
+type OceanDebugMode = 'off' | 'normals' | 'foam' | 'jacobian' | 'wireframe';
+
+interface OceanDebugOptions {
+    enabled?: boolean;
+    mode?: OceanDebugMode;
+    wireframe?: boolean;
+    lodRings?: boolean;
+    samplePoints?: readonly (readonly [number, number])[];
+}
+
 interface OceanFrame {
     readonly time: number;
     readonly height: number;
     readonly resolution: number;
     readonly lengths: readonly number[];
     readonly data: Float32Array;
+}
+
+interface OceanSample {
+    height: number;
+    displacement: [number, number, number];
+    normal: [number, number, number];
+    velocity: [number, number, number];
+    jacobian: number;
+    foam: number;
+    time: number;
+}
+
+interface OceanWind {
+    speed: number;
+    fetch?: number;
+    direction?: readonly [number, number];
 }
 
 interface TerrainHeights {
@@ -143,6 +186,8 @@ class Water implements EnginePlugin {
     resetTime(): void;
     advanceTime(delta: number): void;
     setTime(seconds: number): this;
+    sample(x: number, z: number, time?: number): WaterSample;
+    sampleHeight(x: number, z: number, time?: number): number;
     onPreUpdate(delta: number): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -200,6 +245,13 @@ interface WaterOptions {
     shadows?: WaterShadowSource;
     whitecaps?: number;
     chop?: number;
+}
+
+interface WaterSample {
+    height: number;
+    normal: [number, number, number];
+    velocity: [number, number, number];
+    time: number;
 }
 
 interface WaterSea {

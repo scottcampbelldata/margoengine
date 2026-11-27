@@ -148,6 +148,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   `test/corpus.test.js` "re-recording keeps an owner", `test/compute.test.js` corpus tier test. khronos-gallery's
   full material on the layer: `scripts/compat-units-gpu-check.js --compat` (all 13 maps, image light, both shadow
   kinds, clustered light, bounce) passes.
+### Open 2026-11-27: `Water` still refuses bad options with plain RangeError and TypeError (KB-WATER-CODED1, water)
+
+- **Repro:** `new Water({ color: [2, 0, 0] })` or `water.setSeaLevel(NaN)` throws a `RangeError` with no `code` and no
+  help link; `new Water({ sea: {} })` a `TypeError`.
+- **Cause:** the `Water` class predates the coded-error convention, and about 30 of its constructor and setter refusals
+  (`packages/water/src/index.ts`) and the package tests that expect `RangeError` were never moved. The SEA-02 and SEA-04
+  entries are: `FFTOcean`, `Ripples` and `Water.sample` refuse with MargoError `unsupported` linking to errors#ocean and
+  errors#ripples (`packages/water/test/fft.test.js`, `ripples.test.js`, `sync-sample.test.js`).
+- **Fix:** move each `Water` refusal to `fault('unsupported', ..., 'ocean')` and its test to the coded form, in one pass.
 
 ### Fixed 2026-11-26: paddle and wading loads settle with the final wet cells (KB-LOADS-ACTUATORDRY)
 

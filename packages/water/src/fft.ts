@@ -7,12 +7,14 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import { fault, rangeError } from '../../shared/errors.js';
+import { fault } from '../../shared/errors.js';
 import { group } from '../../shared/gpu.js';
 import { displayShader } from '../../shared/display.js';
 import { applyView } from '../../shared/view-rect.js';
 import { resolveMSAA } from '../../shared/msaa.js';
 import { oceanCompute, oceanSurface } from './fft-shaders.js';
+import { CpuOceanEvaluator, type OceanSample } from './fft-cpu.js';
+export type { OceanSample } from './fft-cpu.js';
 import { queryStates, surfacePasses } from './query-state.js';
 import { unitLight } from '../../shared/unit-light.js';
 import { linearHdr } from '../../shared/hdr-format.js';
@@ -85,12 +87,41 @@ export interface OceanFrame {
   /** Twelve floats per point: displacement XYZ/foam, velocity XYZ/Jacobian, normal XYZ/unused. Cascade-major. */
   readonly data: Float32Array;
 }
+/** Wind settings for {@link FFTOcean.setWind}. Omitted optional fields keep their current values. */
+export interface OceanWind {
+  /** Wind speed at ten metres, 0.1..100 m/s. */
+  speed: number;
+  /** Fetch for JONSWAP, 1..1e7 metres. Omitted keeps the current fetch. */
+  fetch?: number;
+  /** Normalised internally; nonzero XZ direction. Omitted keeps the current direction. */
+  direction?: readonly [number, number];
+}
+/** Surface shading mode for {@link FFTOcean.setDebug}. */
+export type OceanDebugMode = 'off' | 'normals' | 'foam' | 'jacobian' | 'wireframe';
+/** Debug visualization settings for {@link FFTOcean.setDebug}. */
+export interface OceanDebugOptions {
+  /** Enable or disable debug visualization. Default true when passing an options object. */
+  enabled?: boolean;
+  /** Shading overlay: 'off', 'normals', 'foam', 'jacobian', or 'wireframe'. Default 'normals'. */
+  mode?: OceanDebugMode;
+  /** Draw anti-aliased mesh wireframe lines. Default false (true when mode === 'wireframe'). */
+  wireframe?: boolean;
+  /** Draw concentric cascade patch-domain LOD rings. Default true when enabled. */
+  lodRings?: boolean;
+  /** World-space [x, z] sample points to mark on the surface (up to 16). */
+  samplePoints?: readonly (readonly [number, number])[];
+}
+/** Maximum number of sample points rendered by {@link FFTOcean.setDebug}. */
+export const MAX_OCEAN_DEBUG_POINTS = 16;
+const DEBUG_MODES: Record<OceanDebugMode, number> = { off: 0, normals: 1, foam: 2, jacobian: 3, wireframe: 0 };
 type OceanContext = Extract<PassContext, { backend: 'webgpu' }>;
 type ComputeStep = { pipeline: GPUComputePipeline; bind: GPUBindGroup; count: number };
 let sequence = 0;
+/** A refusal of bad ocean input: a MargoError `unsupported` whose message names the fix and links to errors#ocean. */
+const oceanError = (message: string) => fault('unsupported', message, 'ocean');
 const positive = (value: number, min: number, max: number, name: string) => {
-  if (!Number.isFinite(value) || value < min || value > max)
-    throw rangeError(`Invalid ocean ${name}; pass a finite value in ${min}..${max}`, 'geometry');
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min || value > max)
+    throw oceanError(`Invalid ocean ${name}; pass a finite value in ${min}..${max}`);
   return value;
 };
 
@@ -108,7 +139,7 @@ export class FFTOcean implements EnginePlugin {
   private readonly segments: number;
   private readonly follow: boolean;
   private readonly config = new Float32Array(28);
-  private readonly frame = new Float32Array(48);
+  private readonly frame = new Float32Array(84);
   private readonly indices: Uint32Array;
   private engine?: Engine;
   private buffers: GPUBuffer[] = [];
@@ -122,6 +153,16 @@ export class FFTOcean implements EnginePlugin {
   private drawBind?: GPUBindGroup;
   private drawKey = '';
   private initialized = false;
+  private spectrumDirty = true;
+  private spectrumVersion = 0;
+  private cpu?: CpuOceanEvaluator;
+  private debugState: {
+    enabled: boolean;
+    mode: OceanDebugMode;
+    wireframe: boolean;
+    lodRings: boolean;
+    samplePoints: [number, number][];
+  } = { enabled: false, mode: 'off', wireframe: false, lodRings: false, samplePoints: [] };
   private dirty = true;
   private disposed = false;
   private generation = 0;
@@ -138,7 +179,7 @@ export class FFTOcean implements EnginePlugin {
       this.resolution > 512 ||
       this.resolution & (this.resolution - 1)
     )
-      throw rangeError('Invalid ocean resolution; pass a power of two from 16 to 512', 'geometry');
+      throw oceanError('Invalid ocean resolution; pass a power of two from 16 to 512');
     const n = this.resolution;
     const cascades = options.cascades ?? [
       { length: 512, minWavelength: 64, maxWavelength: 512 },
@@ -146,31 +187,28 @@ export class FFTOcean implements EnginePlugin {
       { length: 8, minWavelength: 16 / n, maxWavelength: 8 },
     ];
     if (cascades.length < 1 || cascades.length > 4)
-      throw rangeError('Invalid ocean cascades; pass one to four wavelength bands', 'geometry');
+      throw oceanError('Invalid ocean cascades; pass one to four wavelength bands');
     const bands = cascades.map((cascade) => {
       const length = positive(cascade.length, 0.01, 1000000, 'patch length');
       const min = positive(cascade.minWavelength ?? (2 * length) / n, (2 * length) / n, length, 'minimum wavelength');
       const max = positive(cascade.maxWavelength ?? length, min, length, 'maximum wavelength');
-      if (min === max) throw rangeError('Empty ocean wavelength band; use minimum below maximum', 'geometry');
+      if (min === max) throw oceanError('Empty ocean wavelength band; use minimum below maximum');
       return { length, min, max };
     });
     for (let i = 0; i < bands.length; i++)
       for (let j = 0; j < i; j++)
         if (Math.max(bands[i].min, bands[j].min) < Math.min(bands[i].max, bands[j].max))
-          throw rangeError(
-            'Overlapping ocean cascade bands double wave energy; use disjoint wavelength ranges',
-            'geometry',
-          );
+          throw oceanError('Overlapping ocean cascade bands double wave energy; use disjoint wavelength ranges');
     this.lengths = Object.freeze(bands.map((band) => Math.fround(band.length)));
     const spectrum = options.spectrum ?? 'jonswap';
     if (spectrum !== 'jonswap' && spectrum !== 'phillips')
-      throw rangeError("Invalid ocean spectrum; use 'jonswap' or 'phillips'", 'geometry');
+      throw oceanError("Invalid ocean spectrum; use 'jonswap' or 'phillips'");
     const direction = options.windDirection ?? [1, 0.3];
     const length = Math.hypot(...direction);
     if (direction.length !== 2 || !length || !Number.isFinite(length))
-      throw rangeError('Invalid ocean wind direction; pass a finite nonzero XZ pair', 'geometry');
+      throw oceanError('Invalid ocean wind direction; pass a finite nonzero XZ pair');
     const seed = positive(options.seed ?? 234, 0, 16777215, 'seed');
-    if (!Number.isInteger(seed)) throw rangeError('Invalid ocean seed; pass an integer from 0 to 16777215', 'geometry');
+    if (!Number.isInteger(seed)) throw oceanError('Invalid ocean seed; pass an integer from 0 to 16777215');
     this.config.set([
       0,
       0,
@@ -198,13 +236,13 @@ export class FFTOcean implements EnginePlugin {
     this.size = positive(options.size ?? 1024, 0.01, 1e6, 'size');
     this.segments = positive(options.segments ?? 256, 1, 1024, 'segments');
     if (!Number.isInteger(this.segments))
-      throw rangeError('Invalid ocean segments; pass an integer from 1 to 1024', 'geometry');
+      throw oceanError('Invalid ocean segments; pass an integer from 1 to 1024');
     if (options.followCamera !== undefined && typeof options.followCamera !== 'boolean')
-      throw rangeError('Invalid ocean followCamera; pass true or false', 'geometry');
+      throw oceanError('Invalid ocean followCamera; pass true or false');
     this.follow = options.followCamera ?? true;
     const color = options.color ?? [0.01, 0.18, 0.25];
     if (color.length !== 3)
-      throw rangeError('Invalid ocean color; pass three linear RGB values from 0 to 1', 'geometry');
+      throw oceanError('Invalid ocean color; pass three linear RGB values from 0 to 1');
     color.forEach((v) => positive(v, 0, 1, 'color'));
     this.frame.set([this.height, 0, 0, 0], 32);
     this.frame.set([this.size, this.size, this.segments, 0], 36);
@@ -243,6 +281,186 @@ export class FFTOcean implements EnginePlugin {
   /** Evaluated time; setTime selects an absolute time for deterministic simulation and captures. */
   get time(): number {
     return this.elapsed;
+  }
+  /** Current wind settings (`speed` in m/s, `fetch` in m, normalised `direction` XZ). A copy. */
+  get wind(): Readonly<Required<OceanWind>> {
+    return Object.freeze({
+      speed: this.config[6]!,
+      fetch: this.config[10]!,
+      direction: Object.freeze([this.config[4]!, this.config[5]!]) as readonly [number, number],
+    });
+  }
+  /** Current horizontal choppiness multiplier (0..5). */
+  get choppiness(): number {
+    return this.config[2]!;
+  }
+  /** Current Jacobian compression foam threshold (0..1). */
+  get foamThreshold(): number {
+    return this.config[15]!;
+  }
+  /** Current debug visualization settings. A copy. */
+  get debug(): Readonly<{
+    enabled: boolean;
+    mode: OceanDebugMode;
+    wireframe: boolean;
+    lodRings: boolean;
+    samplePoints: readonly (readonly [number, number])[];
+  }> {
+    return Object.freeze({
+      enabled: this.debugState.enabled,
+      mode: this.debugState.mode,
+      wireframe: this.debugState.wireframe,
+      lodRings: this.debugState.lodRings,
+      samplePoints: Object.freeze(this.debugState.samplePoints.map((p) => Object.freeze([p[0], p[1]]) as readonly [number, number])),
+    });
+  }
+  /**
+   * Retune the ocean spectrum live without recreating the ocean or allocating new GPU buffers.
+   * Accepts a wind speed in m/s (0.1..100) or `{ speed, fetch?, direction? }` (omitted fields keep their current
+   * values). Rebuilds the GPU seed spectrum on the next render while preserving foam history and device-restore state.
+   * @throws MargoError `'disposed'` after disposal; MargoError `'unsupported'` (errors#ocean) for invalid input.
+   */
+  setWind(wind: number | OceanWind): this {
+    this.live();
+    if (typeof wind !== 'number' && (typeof wind !== 'object' || wind === null))
+      throw oceanError('Invalid ocean wind; pass a wind speed in 0.1..100 m/s or { speed, fetch?, direction? }');
+    const input: OceanWind = typeof wind === 'number' ? { speed: wind } : wind;
+    const speed = positive(input.speed, 0.1, 100, 'wind speed');
+    const fetch = input.fetch !== undefined ? positive(input.fetch, 1, 1e7, 'fetch') : this.config[10]!;
+    let dirX = this.config[4]!,
+      dirZ = this.config[5]!;
+    if (input.direction !== undefined) {
+      if (
+        !Array.isArray(input.direction) ||
+        input.direction.length !== 2 ||
+        typeof input.direction[0] !== 'number' ||
+        typeof input.direction[1] !== 'number'
+      )
+        throw oceanError('Invalid ocean wind direction; pass a finite nonzero XZ pair');
+      const length = Math.hypot(input.direction[0], input.direction[1]);
+      if (!length || !Number.isFinite(length))
+        throw oceanError('Invalid ocean wind direction; pass a finite nonzero XZ pair');
+      dirX = input.direction[0] / length;
+      dirZ = input.direction[1] / length;
+    }
+    const nextDirX = Math.fround(dirX),
+      nextDirZ = Math.fround(dirZ),
+      nextSpeed = Math.fround(speed),
+      nextFetch = Math.fround(fetch);
+    if (
+      nextDirX !== this.config[4] ||
+      nextDirZ !== this.config[5] ||
+      nextSpeed !== this.config[6] ||
+      nextFetch !== this.config[10]
+    ) {
+      this.config[4] = nextDirX;
+      this.config[5] = nextDirZ;
+      this.config[6] = nextSpeed;
+      this.config[10] = nextFetch;
+      this.spectrumDirty = true;
+      this.spectrumVersion++;
+      this.dirty = true;
+    }
+    return this;
+  }
+  /** Set horizontal displacement choppiness (0..5) live without rebuilding the spectrum. */
+  setChoppiness(choppiness: number): this {
+    this.live();
+    const next = Math.fround(positive(choppiness, 0, 5, 'choppiness'));
+    if (next !== this.config[2]) {
+      this.config[2] = next;
+      this.dirty = true;
+    }
+    return this;
+  }
+  /** Set the Jacobian compression threshold below which whitecap foam forms (0..1) live. */
+  setFoamThreshold(threshold: number): this {
+    this.live();
+    const next = Math.fround(positive(threshold, 0, 1, 'foam threshold'));
+    if (next !== this.config[15]) {
+      for (let i = 0; i < this.lengths.length; i++) this.config[15 + i * 4] = next;
+      this.dirty = true;
+    }
+    return this;
+  }
+  /** Set the linear RGB water body colour (0..1 per channel) live. */
+  setColor(color: readonly [number, number, number]): this {
+    this.live();
+    if (!Array.isArray(color) || color.length !== 3)
+      throw oceanError('Invalid ocean color; pass three linear RGB values from 0 to 1');
+    const r = positive(color[0], 0, 1, 'color'),
+      g = positive(color[1], 0, 1, 'color'),
+      b = positive(color[2], 0, 1, 'color');
+    this.frame[44] = r;
+    this.frame[45] = g;
+    this.frame[46] = b;
+    return this;
+  }
+  /**
+   * Configure the GPU debug visualization overlay: mesh wireframe, cascade LOD rings, wave normals,
+   * Jacobian foam mask, and up to 16 world XZ sample-point markers. Pass `false` to disable all overlays.
+   */
+  setDebug(options: boolean | OceanDebugOptions): this {
+    this.live();
+    if (typeof options !== 'boolean' && (typeof options !== 'object' || options === null))
+      throw oceanError('Invalid ocean debug options; pass a boolean or { enabled?, mode?, wireframe?, lodRings?, samplePoints? }');
+    const cfg: OceanDebugOptions = typeof options === 'boolean' ? { enabled: options } : options;
+    const enabled = cfg.enabled ?? true;
+    if (typeof enabled !== 'boolean')
+      throw oceanError('Invalid ocean debug enabled; pass true or false');
+    const mode: OceanDebugMode = cfg.mode ?? (enabled ? (cfg.wireframe ? 'wireframe' : 'normals') : 'off');
+    if (!(mode in DEBUG_MODES))
+      throw oceanError("Invalid ocean debug mode; use 'off', 'normals', 'foam', 'jacobian', or 'wireframe'");
+    const wireframe = cfg.wireframe ?? mode === 'wireframe';
+    if (typeof wireframe !== 'boolean')
+      throw oceanError('Invalid ocean debug wireframe; pass true or false');
+    const lodRings = cfg.lodRings ?? enabled;
+    if (typeof lodRings !== 'boolean')
+      throw oceanError('Invalid ocean debug lodRings; pass true or false');
+    const points: [number, number][] = [];
+    if (cfg.samplePoints !== undefined) {
+      if (!Array.isArray(cfg.samplePoints) || cfg.samplePoints.length > MAX_OCEAN_DEBUG_POINTS)
+        throw oceanError(`Invalid ocean debug samplePoints; pass an array of at most ${MAX_OCEAN_DEBUG_POINTS} [x, z] pairs`);
+      for (const pt of cfg.samplePoints) {
+        if (!Array.isArray(pt) || pt.length !== 2 || !Number.isFinite(pt[0]) || !Number.isFinite(pt[1]))
+          throw oceanError('Invalid ocean debug sample point; pass finite [x, z] coordinates');
+        points.push([pt[0], pt[1]]);
+      }
+    }
+    this.debugState = {
+      enabled,
+      mode: enabled ? mode : 'off',
+      wireframe: enabled && wireframe,
+      lodRings: enabled && lodRings,
+      samplePoints: enabled ? points : [],
+    };
+    this.frame[48] = this.debugState.enabled ? DEBUG_MODES[this.debugState.mode] : 0;
+    this.frame[49] = this.debugState.wireframe ? 1 : 0;
+    this.frame[50] = this.debugState.lodRings ? 1 : 0;
+    this.frame[51] = this.debugState.samplePoints.length;
+    this.frame.fill(0, 52, 84);
+    for (let i = 0; i < this.debugState.samplePoints.length; i++) {
+      this.frame[52 + i * 2] = this.debugState.samplePoints[i]![0];
+      this.frame[52 + i * 2 + 1] = this.debugState.samplePoints[i]![1];
+    }
+    return this;
+  }
+  /**
+   * Synchronously evaluates the FFT ocean surface (height, displacement, unit normal, velocity, Jacobian and
+   * instantaneous foam) at world `(x, z)` and time `time` (default `ocean.time`), using a cached CPU spectral
+   * 2D IFFT evaluator with zero async GPU readback.
+   */
+  sample(x: number, z: number, time?: number): OceanSample {
+    this.live();
+    if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z))
+      throw oceanError('Invalid ocean sample coordinates; pass finite world XZ metres');
+    const t = time !== undefined ? positive(time, 0, 1e7, 'time') : this.elapsed;
+    this.cpu ??= new CpuOceanEvaluator(this.resolution, this.lengths.length);
+    return this.cpu.sample(this.config, this.spectrumVersion, this.lengths, this.height, x, z, Math.fround(t));
+  }
+  /** Convenience synchronous CPU height query at world `(x, z)` and time `time` (default `ocean.time`). */
+  sampleHeight(x: number, z: number, time?: number): number {
+    return this.sample(x, z, time).height;
   }
   /** Select absolute seconds. Foam history resets when seeking backwards; forward seeks decay over the full interval. */
   setTime(seconds: number): this {
@@ -344,6 +562,7 @@ export class FFTOcean implements EnginePlugin {
       }
     this.steps.push({ pipeline: finish, bind: stepGroup(finish, input, this.result), count });
     this.initialized = false;
+    this.spectrumDirty = true;
     this.dirty = true;
   }
   registerPasses(graph: FrameGraph): void {
@@ -361,17 +580,17 @@ export class FFTOcean implements EnginePlugin {
       this.config[0] = this.elapsed;
       this.config[1] = this.pendingDelta;
       c.device.queue.writeBuffer(this.configBuffer!, 0, this.config);
-      const pass = c.encoder.beginComputePass();
       if (!this.initialized) {
-        // clearBuffer also resets retained foam after a backwards seek.
-        pass.end();
+        // clearBuffer also resets retained foam after a backwards seek or fresh setup.
         c.encoder.clearBuffer(this.result!);
+      }
+      if (!this.initialized || this.spectrumDirty) {
         const initPass = c.encoder.beginComputePass();
         initPass.setPipeline(this.initial!.pipeline);
         initPass.setBindGroup(0, this.initial!.bind);
         initPass.dispatchWorkgroups(Math.ceil(this.initial!.count / 64));
         initPass.end();
-      } else pass.end();
+      }
       for (const step of this.steps) {
         const compute = c.encoder.beginComputePass();
         compute.setPipeline(step.pipeline);
@@ -380,6 +599,7 @@ export class FFTOcean implements EnginePlugin {
         compute.end();
       }
       this.initialized = true;
+      this.spectrumDirty = false;
       this.dirty = false;
       this.renderedTime = this.config[0];
       this.pendingDelta = 0;
@@ -493,6 +713,7 @@ export class FFTOcean implements EnginePlugin {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.cpu = undefined;
     this.release();
     const engine = this.engine;
     this.engine = undefined;

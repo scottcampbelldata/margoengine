@@ -77,6 +77,70 @@ try {
     following.onDeviceRestored(engine);
     engine.render({ delta: 0 });
     const restored = await following.readFrame();
+    following.dispose();
+
+    // Solid obstacle masking & wave reflection test (wall along x = 0).
+    const obsField = Ripples.attach(engine, {
+      surface: water,
+      size: 32,
+      resolution: 32,
+      followCamera: false,
+      speed: 3,
+      damping: 0.4,
+      obstacles: [{ kind: 'wall', from: [0, -16], to: [0, 16], thickness: 2 }],
+    });
+    engine.render({ delta: 0 });
+    obsField.disturb(-5.5, 0.5, 2.5, 0.25);
+    engine.render({ delta: 0 });
+    const obsImpulse = await obsField.readFrame();
+    // Advance enough frames for the wavefront to hit the wall at x = 0 and reflect back.
+    for (let stepIdx = 0; stepIdx < 30; stepIdx++) engine.render({ delta: 1 / 120 });
+    const obsAfter = await obsField.readFrame();
+    // Verify other obstacle primitives + debug modes render cleanly.
+    obsField.setObstacles([
+      { kind: 'sphere', center: [4, 0, 0], radius: 2 },
+      { kind: 'cylinder', center: [-4, 4], radius: 1.5 },
+      { kind: 'box', center: [0, -5], halfExtents: [2, 1], rotation: 0.4 },
+    ]);
+    for (const cfg of [
+      { enabled: true, mode: 'height', bounds: true },
+      { enabled: true, mode: 'velocity', bounds: true },
+      { enabled: true, mode: 'obstacles', bounds: false },
+      false,
+    ]) {
+      obsField.setDebug(cfg);
+      engine.render({ delta: 1 / 120 });
+    }
+    const obsPrimitives = await obsField.readFrame();
+    obsField.dispose();
+
+    // Moving-body coupling (trackBody) + disturbRay test.
+    const bodyField = Ripples.attach(engine, {
+      surface: water,
+      size: 32,
+      resolution: 32,
+      followCamera: false,
+      speed: 3,
+      damping: 0.6,
+    });
+    const body = { position: [0, 3, 0] };
+    bodyField.trackBody(body, { radius: 2, strength: 0.12 });
+    engine.render({ delta: 0 });
+    // Plunge into water -> automatic entry splash.
+    body.position[1] = 0;
+    engine.render({ delta: 1 / 60 });
+    const afterSplash = await bodyField.readFrame();
+    // Sweep horizontally -> automatic wake.
+    body.position[0] = 3.5;
+    engine.render({ delta: 1 / 60 });
+    const afterWake = await bodyField.readFrame();
+    bodyField.untrackBody(body);
+    // Ray click disturbance.
+    const rayHit = bodyField.disturbRay([-6.5, 10, -6.5], [0, -1, 0], 2, 0.2);
+    engine.render({ delta: 0 });
+    const afterRay = await bodyField.readFrame();
+    bodyField.dispose();
+
     const validation = await gpu.popErrorScope();
     engine.dispose();
     return {
@@ -90,6 +154,13 @@ try {
       moved: { origin: moved.origin, data: Array.from(moved.data) },
       teleported: Array.from(teleported.data),
       restored: Array.from(restored.data),
+      obsImpulse: Array.from(obsImpulse.data),
+      obsAfter: Array.from(obsAfter.data),
+      obsPrimitives: Array.from(obsPrimitives.data),
+      afterSplash: Array.from(afterSplash.data),
+      afterWake: Array.from(afterWake.data),
+      rayHit,
+      afterRay: Array.from(afterRay.data),
       validation: validation?.message,
     };
   }, observation);
@@ -138,12 +209,83 @@ try {
         );
   assert.ok(result.teleported.every((v) => v === 0));
   assert.ok(result.restored.every((v) => v === 0));
+
+  // Verify solid wall reflection against an independent CPU Neumann finite-difference stepper.
+  const isWall = (ix, iz) => Math.abs(-16 + (ix + 0.5)) <= 1.0 && iz >= 0 && iz < n;
+  let cpuH = new Float64Array(n * n),
+    cpuV = new Float64Array(n * n);
+  for (let i = 0; i < n * n; i++) {
+    cpuH[i] = result.obsImpulse[i * 2];
+    cpuV[i] = result.obsImpulse[i * 2 + 1];
+  }
+  for (let s = 0; s < 30; s++) {
+    const nextH = new Float64Array(n * n),
+      nextV = new Float64Array(n * n);
+    for (let z = 0; z < n; z++) {
+      for (let x = 0; x < n; x++) {
+        if (isWall(x, z)) continue;
+        const idx = z * n + x,
+          h = cpuH[idx],
+          v = cpuV[idx];
+        const sample = (nx, nz) => {
+          if (nx < 0 || nz < 0 || nx >= n || nz >= n) return 0;
+          return isWall(nx, nz) ? h : cpuH[nz * n + nx];
+        };
+        const lap = sample(x + 1, z) + sample(x - 1, z) + sample(x, z + 1) + sample(x, z - 1) - 4 * h;
+        const edge = Math.min(x, z, n - 1 - x, n - 1 - z),
+          t = Math.min(1, edge / 8),
+          smooth = t * t * (3 - 2 * t);
+        const nv = (v + lap * 9 * dt) * Math.exp(-(0.4 + 12 * (1 - smooth)) * dt);
+        nextV[idx] = nv;
+        nextH[idx] = h + nv * dt;
+      }
+    }
+    cpuH = nextH;
+    cpuV = nextV;
+  }
+  let reflectionError = 0,
+    wallLeak = 0,
+    farSideLeak = 0,
+    leftEnergy = 0;
+  for (let z = 0; z < n; z++) {
+    for (let x = 0; x < n; x++) {
+      const idx = z * n + x;
+      const gh = result.obsAfter[idx * 2],
+        gv = result.obsAfter[idx * 2 + 1];
+      reflectionError = Math.max(reflectionError, Math.abs(gh - cpuH[idx]), Math.abs(gv - cpuV[idx]));
+      const wx = -16 + (x + 0.5);
+      if (isWall(x, z)) wallLeak = Math.max(wallLeak, Math.abs(gh), Math.abs(gv));
+      if (wx > 1.5) farSideLeak = Math.max(farSideLeak, Math.abs(gh), Math.abs(gv));
+      if (wx < -1.5) leftEnergy += gh * gh;
+    }
+  }
+  assert.equal(wallLeak, 0, 'solid wall cells must remain strictly zero');
+  assert.equal(farSideLeak, 0, 'waves must not leak across a solid wall');
+  assert.ok(leftEnergy > 1e-4, 'reflected wave energy remains on incident side');
+  assert.ok(reflectionError < 1e-5, `Neumann reflection PDE error ${reflectionError}`);
+
+  // Verify sphere center cell inside obsPrimitives stays zero.
+  assert.equal(result.obsPrimitives[(16 * n + 20) * 2], 0, 'sphere obstacle center stays zero');
+
+  // Verify automatic trackBody entry splash, swept wake, and disturbRay.
+  const splashPeak = result.afterSplash.reduce((m, v, i) => (i % 2 === 0 ? Math.max(m, Math.abs(v)) : m), 0);
+  assert.ok(splashPeak > 0.01, `trackBody entry splash peak ${splashPeak}`);
+  const wakeDiff = result.afterWake.some((v, i) => i % 2 === 0 && Math.abs(v - result.afterSplash[i]) > 0.005);
+  assert.ok(wakeDiff, 'trackBody horizontal motion generates a swept wake');
+  assert.deepEqual(result.rayHit, [-6.5, 0, -6.5]);
+  // Cell for (-6.5, -6.5) is x = 9, z = 9.
+  assert.ok(Math.abs(result.afterRay[(9 * n + 9) * 2] - result.afterWake[(9 * n + 9) * 2]) > 0.05, 'disturbRay injects impulse at hit cell');
+
   assert.equal(result.validation, undefined);
   assert.deepEqual(errors, []);
   const report = {
     hardware,
     impulseError,
     stepError,
+    reflectionError,
+    wallLeak,
+    farSideLeak,
+    splashPeak,
     queryHeight: result.height,
     scroll: true,
     teleport: true,

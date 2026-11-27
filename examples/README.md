@@ -50,6 +50,8 @@ backend can run it.
 | [texture-formats.html](texture-formats.html) | TGA, TIFF, KTX and DDS textures |
 | [weather.html](weather.html) | Weather presets that blend: rain, snow, hail, lightning, wind and wet or snowy ground |
 | [windy-meadow.html](windy-meadow.html) | Grass, wind and a changing sky |
+| [ocean.html](ocean.html) | Spectral FFT ocean with live `setWind`, `WATER_LOOKS`, chop/whitecaps sliders, dive-underwater camera, synchronous CPU `sample()` buoy and debug overlays |
+| [water-ripples.html](water-ripples.html) | Interactive ripple pond with click/drag `disturbRay`, `trackBody` moving boat wakes, reflecting obstacle pillars/walls, rain toggle and debug heatmaps |
 | [orrery/](orrery/index.html) | A brass orrery under a glass dome: any date puts the planets at their real heliocentric longitudes ([details](orrery/README.md)) |
 | [cabin-hearth/](cabin-hearth/index.html) | A snowbound log cabin at night: one lit window in falling snow, a fire in the hearth and a kettle steaming ([details](cabin-hearth/README.md)) |
 | [whiteout-pass/](whiteout-pass/index.html) | A blizzard at dusk on a mountain pass: snow streams past a log hut with one warm lit window, and the storm eases into a lull ([details](whiteout-pass/README.md)) |
