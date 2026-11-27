@@ -4638,6 +4638,9 @@ prebuilt and not in `draco-native`. Regression:
 `packages/decoders/native/draco/tests/layouts.rs` (`E54 refused index past
 points`).
 
+With E58 and E59 (several KD decoders and repeated ids, 2026-11-27), which drop
+the id sort, the Wasm is 137,361 bytes (52,199 B gzip -9).
+
 Optimizing-compiler memory (bug sweep L5b, 2026-11-11, KB4824a): hot loops of
 the clean-room decoder live in small functions, so an engine that optimizes
 hot Wasm functions (V8 TurboFan) compiles only the loop a stream uses. On the

@@ -6854,6 +6854,21 @@ point count and indices matched on the whole probe.
 | E56 clouds without decoders | A KD cloud with no attributes decoder is its point count at every version, with no attributes. | Versions 1.0 to 2.3. |
 | E57 bit readers | The raw symbol bits and the pre-2.2 start-face bits are not bounded by their blob's size: reads continue through the input and give zero past its end. | 200,000 streams with either blob cut short. |
 
+### Batch 133 E58 and E59: several KD decoders and repeated ids (2026-11-27)
+
+Method: as E26 to E40, public calls of the opaque full decoder only; its source
+was not read. Retained one-decoder KD clouds of equal point count were joined
+(4,000 seeded joins of two to four, then crafted variants: up to 255 decoders,
+signed minima, empty decoders, short and mismatched trees). Repeated ids were
+hand-built sequential clouds and meshes; the opaque glTF build was checked on
+the meshes. Each rule was kept only when acceptance and every output byte
+matched.
+
+| # | Rule | Probe |
+| --- | --- | --- |
+| E58 several KD decoders | In a version 2.3 KD cloud every decoder's attribute list (count and descriptors) comes first, then for each decoder in the same order its tree and its own transforms. Each tree states the header's point count. Attributes come out in decoder order. | All 4,000 joins accepted by the opaque decoder equal the single clouds' attributes in order. |
+| E59 repeated ids | Attribute unique ids may repeat, within a decoder and across decoders, in sequential and KD streams; every attribute is kept in file order and a lookup by id returns the first. | Versions 1.1 and 2.0 to 2.3. |
+
 ### Batch 133 resources and E22 historical inventory
 
 Sources compared: Node.js contributors, *Process* (2026),

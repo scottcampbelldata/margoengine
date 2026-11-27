@@ -144,8 +144,10 @@ fn output_limits_and_indices_validate_before_allocation() {
     assert_eq!(decode(&b, Limits::default()).unwrap_err(), Error::Invalid);
 }
 
+// E59: the opaque decoder accepts a repeated unique id (tests/layouts.rs holds
+// its outputs); both attributes keep it, in file order.
 #[test]
-fn duplicate_ids_are_refused_across_attribute_groups() {
+fn repeated_ids_decode_across_attribute_groups() {
     let seed = triangle();
     let mut b = seed[..17].to_vec();
     b.push(2); // Two decoder groups, each with one attribute of unique ID zero.
@@ -155,7 +157,12 @@ fn duplicate_ids_are_refused_across_attribute_groups() {
     for _ in 0..6 {
         b.extend_from_slice(&1_f32.to_le_bytes());
     }
-    assert_eq!(decode(&b, Limits::default()).unwrap_err(), Error::Invalid);
+    let g = decode(&b, Limits::default()).unwrap();
+    assert_eq!(g.attributes.len(), 2);
+    for (attribute, first) in g.attributes.iter().zip([0, 12]) {
+        assert_eq!(attribute.unique_id, 0);
+        assert_eq!(attribute.data, b[b.len() - 24 + first..][..12]);
+    }
 }
 #[test]
 fn malformed_streams_never_panic_and_repeat_deterministically() {

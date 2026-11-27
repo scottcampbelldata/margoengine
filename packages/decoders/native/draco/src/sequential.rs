@@ -407,7 +407,6 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
         }
     }
     let mut attributes = Vec::new();
-    let mut unique_ids = Vec::new();
     let mut ranges = budget.vector(groups, (0_usize, 0_usize))?;
     for range in &mut ranges {
         let n = if c.version < 0x200 {
@@ -424,14 +423,11 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
             return Err(Error::Truncated);
         }
         budget.charge(n, std::mem::size_of::<Attribute>())?;
-        budget.charge(n, 4)?;
-        unique_ids.try_reserve_exact(n).map_err(|_| Error::Limit)?;
         attributes.try_reserve_exact(n).map_err(|_| Error::Limit)?;
         let first = attributes.len();
+        // E59: unique ids may repeat, within a decoder and across them.
         for _ in 0..n {
-            let attribute = descriptor(&mut c)?;
-            unique_ids.push(attribute.unique_id);
-            attributes.push(attribute);
+            attributes.push(descriptor(&mut c)?);
         }
         for attr in &mut attributes[first..] {
             attr.encoding = c.byte()?;
@@ -440,15 +436,6 @@ fn decode_flavor(bytes: &[u8], limits: Limits, gltf_compat: bool) -> Result<Geom
             }
         }
         *range = (first, first + n);
-    }
-    budget.steps(
-        unique_ids
-            .len()
-            .saturating_mul(unique_ids.len().max(1).ilog2() as usize + 1),
-    )?;
-    unique_ids.sort_unstable();
-    if c.version >= 0x200 && unique_ids.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(Error::Invalid);
     }
     let mut output_bytes = nindices
         .checked_mul(if points < 65536 { 2 } else { 4 })

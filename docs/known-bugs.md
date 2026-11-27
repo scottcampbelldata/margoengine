@@ -16993,6 +16993,20 @@ teardown fix or busy-machine exemption was applied in this lane.
   Regression: `packages/decoders/native/draco/tests/layouts.rs` with
   `fixtures/damaged.bin`.
 
+### Fixed 2026-11-27: optional Draco decoder refused several KD decoders and repeated ids (batch 133, E58 and E59)
+
+- **Repro:** against the full prebuilt, `@margoengine/decoders/draco-native`
+  answered `Unsupported` for a version 2.3 KD cloud with two or more attributes
+  decoders, and `Invalid` for a version 2 stream in which two attributes share a
+  unique id (the glTF prebuilt accepts that too).
+- **Cause:** `native/draco/src/kd.rs` read one decoder only and refused a
+  repeated id; `sequential.rs` refused repeated ids from version 2.0, a rule no
+  probe had established.
+- **Fix:** the observed layout and rule
+  ([E58 and E59](clean-room.md#batch-133-e58-and-e59-several-kd-decoders-and-repeated-ids-2026-11-27)).
+  Regression: `packages/decoders/native/draco/tests/layouts.rs` with
+  `fixtures/kd-decoders.bin`.
+
 ### Open: batch 133 optional decoder replacement gaps
 
 The default entries still use the prebuilt: `packages/decoders/src/draco.ts`
@@ -17036,9 +17050,12 @@ E26 to E40):
   other output, so the layout is not established. Repro: any `E56 no decoder`
   cloud with minor version 3, for example hex
   `445241434f0103000000000000000000`.
-- KD clouds of version 2.3 with two or more attributes decoders: Margo answers
-  `Unsupported`; the prebuilt reads all decoder attribute lists, then each
-  decoder's data in order.
+- Damaged KD clouds (found 2026-11-27 by changing single bytes of retained
+  one-decoder streams): some that the prebuilt decodes Margo refuses, and some
+  decode to other values. A refusal repro, a level 3 stream whose number
+  probability byte is 0:
+  `445241434f020300010000ae000000010100020100000307000000ae0000000006244e363c820614000000d3591f17174c1a89e9023259a4007f8a6ec439b3040000000000000008000000a46a6b1e34593001`.
+  Valid streams are not known to differ. Cause: not yet established.
 - A version 2.2 standard EdgeBreaker mesh of `tests/fixtures/multi.bin` with the
   header faces lowered from 12 to 11, symbols from 11 to 10 and splits 0: the
   prebuilt decodes 12 points, Margo answers `Invalid` (as before E50).

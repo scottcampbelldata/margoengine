@@ -140,3 +140,9 @@ fn metadata_headers_match_black_box_outputs_and_rejections() {
     let counts = check(include_bytes!("fixtures/metadata-header.bin"));
     assert_eq!(counts, (101, 46, 55, 0));
 }
+
+#[test]
+fn several_kd_decoders_and_repeated_ids_match_black_box_outputs() {
+    let counts = check(include_bytes!("fixtures/kd-decoders.bin"));
+    assert_eq!(counts, (95, 89, 6, 0));
+}

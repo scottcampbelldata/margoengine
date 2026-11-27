@@ -249,50 +249,72 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
             metadata: None,
         });
     }
-    if c.version != 0x203 || decoders != 1 {
+    if c.version != 0x203 {
         return Err(Error::Unsupported);
     }
-    let count = c.count()?;
-    // E55: a decoder holds at least one attribute.
-    if count == 0 {
-        return Err(Error::Invalid);
-    }
-    if count > (c.data.len() - c.at) / 5 {
-        return Err(Error::Truncated);
-    }
-    budget.charge(count, std::mem::size_of::<crate::Attribute>())?;
+    // E58: every decoder's attribute list comes first, then each decoder's
+    // tree and transforms in the same order.
     let mut attributes = Vec::new();
-    attributes
-        .try_reserve_exact(count)
-        .map_err(|_| Error::Limit)?;
-    let mut dimensions = 0_usize;
+    let mut lengths = budget.vector(usize::from(decoders), 0_usize)?;
     let mut output_bytes = 0_usize;
-    for _ in 0..count {
-        let attr = descriptor(c)?;
-        if ![1, 2, 3, 4, 5, 6, 9].contains(&attr.data_type) {
-            return Err(Error::Unsupported);
+    for length in &mut lengths {
+        let count = c.count()?;
+        // E55: a decoder holds at least one attribute.
+        if count == 0 {
+            return Err(Error::Invalid);
         }
+        if count > (c.data.len() - c.at) / 5 {
+            return Err(Error::Truncated);
+        }
+        budget.charge(count, std::mem::size_of::<crate::Attribute>())?;
+        attributes
+            .try_reserve_exact(count)
+            .map_err(|_| Error::Limit)?;
+        for _ in 0..count {
+            let attr = descriptor(c)?;
+            if ![1, 2, 3, 4, 5, 6, 9].contains(&attr.data_type) {
+                return Err(Error::Unsupported);
+            }
+            let size = points
+                .checked_mul(usize::from(attr.components))
+                .and_then(|n| n.checked_mul(scalar_bytes(attr.data_type).ok()?))
+                .ok_or(Error::Overflow)?;
+            output_bytes = output_bytes.checked_add(size).ok_or(Error::Overflow)?;
+            if output_bytes > limits.bytes {
+                return Err(Error::Limit);
+            }
+            attributes.push(attr);
+        }
+        *length = count;
+    }
+    let mut rest = attributes.as_mut_slice();
+    for length in lengths {
+        let (group, tail) = rest.split_at_mut(length);
+        decoder(c, points, group, budget)?;
+        rest = tail;
+    }
+    Ok(Geometry {
+        points,
+        mesh: false,
+        indices: Vec::new(),
+        attributes,
+        metadata: None,
+    })
+}
+
+/// One attributes decoder: its tree, its transforms and its attributes' bytes.
+fn decoder(
+    c: &mut Cursor,
+    points: usize,
+    attributes: &mut [crate::Attribute],
+    budget: &mut Budget,
+) -> Result<()> {
+    let count = attributes.len();
+    let mut dimensions = 0_usize;
+    for attr in attributes.iter() {
         dimensions = dimensions
             .checked_add(usize::from(attr.components))
             .ok_or(Error::Overflow)?;
-        let size = points
-            .checked_mul(usize::from(attr.components))
-            .and_then(|n| n.checked_mul(scalar_bytes(attr.data_type).ok()?))
-            .ok_or(Error::Overflow)?;
-        output_bytes = output_bytes.checked_add(size).ok_or(Error::Overflow)?;
-        if output_bytes > limits.bytes {
-            return Err(Error::Limit);
-        }
-        attributes.push(attr);
-    }
-    let mut ids = budget.vector(count, 0_u32)?;
-    for (id, attr) in ids.iter_mut().zip(&attributes) {
-        *id = attr.unique_id;
-    }
-    budget.steps(count.saturating_mul(count.max(1).ilog2() as usize + 1))?;
-    ids.sort_unstable();
-    if ids.windows(2).any(|p| p[0] == p[1]) {
-        return Err(Error::Invalid);
     }
     let values = tree(c, points, dimensions, budget)?;
     let mut transforms = budget.vector(count, Transform::Unsigned)?;
@@ -352,13 +374,7 @@ pub(crate) fn decode(c: &mut Cursor, limits: Limits, budget: &mut Budget) -> Res
         );
         offset += components;
     }
-    Ok(Geometry {
-        points,
-        mesh: false,
-        indices: Vec::new(),
-        attributes,
-        metadata: None,
-    })
+    Ok(())
 }
 
 /// The per-point output loop of `decode`, out of line (KB4824a): an engine
