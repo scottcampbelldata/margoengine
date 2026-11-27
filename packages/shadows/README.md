@@ -345,6 +345,9 @@ A point keeps `mix(floor, 1, visibility)` of the light per channel, where `floor
 
 ## Ray traced shadows
 
+`shadows/rt`, `shadows/rt-alpha` and `shadows/ibl` import the optional `@margoengine/bvh` peer, so an app that uses
+one installs it too; no other shadows entry needs it.
+
 `@margoengine/shadows/rt` replaces the map filter with rays against a BVH of the scene: each lit pixel asks the tree whether the sun is in sight. Edges are exact, with no texels and no bias to tune against a map, and a sun of some size gives a true penumbra.
 
 ```ts

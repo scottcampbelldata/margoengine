@@ -45,6 +45,8 @@ await build({
         '@margoengine/core/extension',
         '@margoengine/decoders/png',
         '@margoengine/loaders/font-woff',
+        '@margoengine/loaders/font',
+        '@margoengine/loaders/font-opentype',
       ]),
     },
   },

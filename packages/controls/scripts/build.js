@@ -42,7 +42,12 @@ await build({
       fileName: (_, name) => `${name}.js`,
     },
     rollupOptions: {
-      external: packageExternal(root, ['@margoengine/core', '@margoengine/core/extension', '@margoengine/bvh']),
+      external: packageExternal(root, [
+        '@margoengine/core',
+        '@margoengine/core/extension',
+        '@margoengine/bvh',
+        '@margoengine/tween',
+      ]),
     },
   },
 });

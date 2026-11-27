@@ -205,6 +205,14 @@ async function buildPackage(name, output) {
           '@margoengine/clustered/ies',
           '@margoengine/decoders/png',
           '@margoengine/decoders/image',
+          // A declared peer or dependency left off this list is copied into the dist (KB-BUILD-INLINE1: blender shipped
+          // its own gltf/physics). tests/no-inlined-packages.test.js fails on one.
+          '@margoengine/gltf/physics',
+          '@margoengine/gltf/extended-materials',
+          '@margoengine/decoders/dds',
+          '@margoengine/decoders/bc',
+          '@margoengine/geometry/optimize',
+          '@margoengine/bvh/gpu',
         ]),
         output: codeSplitting ? { ...compactOutput, codeSplitting } : compactOutput,
       },

@@ -333,10 +333,6 @@
   <caption class="sr-only">Entries measured as a base and a lazy part, in bytes</caption>
   <thead><tr><th scope="col">Package</th><th scope="col">Part</th><th scope="col" class="num">Raw (B)</th><th scope="col" class="num">Min+gzip (B)</th><th scope="col">Note</th></tr></thead>
 <tbody>
-<tr><th scope="row"><code>@margoengine/text/outline</code></th><td>Base: everything a TrueType font at its default instance loads, without the lazy part</td><td class="num">54,407</td><td class="num">21,540</td><td></td></tr>
-<tr><th scope="row"><code>@margoengine/text/outline</code></th><td>Lazy: CFF, CFF2 and variation readers</td><td class="num">20,567</td><td class="num">7,751</td><td>the first GlyphFieldFont.load of a CFF file or a variable instance (import() in outline.ts); new GlyphFieldFont(bytes, {openType}) takes them from the caller</td></tr>
-<tr><th scope="row"><code>@margoengine/text/vector</code></th><td>Base: everything a TrueType font at its default instance loads, without the lazy part</td><td class="num">85,733</td><td class="num">33,265</td><td></td></tr>
-<tr><th scope="row"><code>@margoengine/text/vector</code></th><td>Lazy: CFF, CFF2 and variation readers</td><td class="num">20,567</td><td class="num">7,751</td><td>the first VectorFont.load of a CFF file or a variable instance (import() in outline.ts); new VectorFont(bytes, {openType}) takes them from the caller</td></tr>
 <tr><th scope="row"><code>@margoengine/webgl2-compat</code></th><td>Base: everything the first call of <code>install()</code> loads, without the lazy part</td><td class="num">310,594</td><td class="num">94,084</td><td>Limit 73,000 B</td></tr>
 <tr><th scope="row"><code>@margoengine/webgl2-compat</code></th><td>Lazy: compute runtime and read-back</td><td class="num">102,802</td><td class="num">33,087</td><td>the first compute pipeline or texture read-back on the layer (import() in device/device.ts)</td></tr>
 <tr><th scope="row"><code>@margoengine/points/las</code></th><td>Base: everything a plain <code>.las</code> file loads, without the lazy part</td><td class="num">14,564</td><td class="num">5,975</td><td></td></tr>

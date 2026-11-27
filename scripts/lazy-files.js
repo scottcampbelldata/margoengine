@@ -1380,28 +1380,6 @@ export const LAZY_FILES = [
  */
 export const LAZY_SPLITS = [
   {
-    package: 'text',
-    entry: './outline',
-    specifier: '@margoengine/text/outline',
-    dist: 'packages/text/dist/outline.js',
-    chunk: /^font-opentype-/,
-    lazyLabel: 'CFF, CFF2 and variation readers',
-    source: 'packages/loaders/src/font-opentype.ts',
-    baseLabel: 'everything a TrueType font at its default instance loads',
-    when: 'the first GlyphFieldFont.load of a CFF file or a variable instance (import() in outline.ts); new GlyphFieldFont(bytes, {openType}) takes them from the caller',
-  },
-  {
-    package: 'text',
-    entry: './vector',
-    specifier: '@margoengine/text/vector',
-    dist: 'packages/text/dist/vector.js',
-    chunk: /^font-opentype-/,
-    lazyLabel: 'CFF, CFF2 and variation readers',
-    source: 'packages/loaders/src/font-opentype.ts',
-    baseLabel: 'everything a TrueType font at its default instance loads',
-    when: 'the first VectorFont.load of a CFF file or a variable instance (import() in outline.ts); new VectorFont(bytes, {openType}) takes them from the caller',
-  },
-  {
     package: 'webgl2-compat',
     entry: '.',
     specifier: '@margoengine/webgl2-compat',

@@ -6,6 +6,31 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: gltf's dist carries its own copy of physics/decomposition (KB-BUILD-INLINE2, package build; gltf/physics)
+
+- **Repro:** `npm run build:packages`, `npm run quality -- --gate=sizes`: `@margoengine/gltf/physics` reads 19,953 B
+  gzip against 9,449 B, and `packages/gltf/dist` holds a `decomposition-*.js` chunk.
+- **Cause:** `@margoengine/physics/decomposition` is missing from the external list in `scripts/build-modern.js`, the
+  same fault as KB-BUILD-INLINE1: the lazy `import()` in `packages/gltf/src/physics.ts` is resolved in the workspace and
+  copied. Owner: physics. The fix is that one list line and taking the row out of `open` in
+  `tests/no-inlined-packages.test.js`.
+
+### Fixed 2026-11-27: package builds copied packages they declare into their own dists (KB-BUILD-INLINE1, package build; blender, controls, gltf, shadows, text)
+
+- **Repro:** `npm run build:packages`, `npm run quality -- --gate=sizes`: `@margoengine/blender/components` read 28,139 B
+  gzip against 16,677 B. `packages/blender/dist` held its own `gltf/physics` and `physics/decomposition` chunks, so an
+  app that also imported `@margoengine/gltf/physics` had two copies.
+- **Cause:** each package build keeps only the specifiers on its external list as imports. Nine imports of declared
+  peers or dependencies were on no list: gltf/physics and gltf/extended-materials (blender), tween
+  (controls/presentation), geometry/optimize, decoders/dds and decoders/bc (gltf), bvh/gpu (shadows/ibl and rt),
+  loaders/font and loaders/font-opentype (text).
+- **Fix:** all nine are external (`scripts/build-modern.js`, the controls and text build scripts).
+  `shadows/rt`, `rt-alpha` and `ibl` now need the optional bvh peer installed, as their README says. Measured gzip, before
+  and after: blender/components 28,139 to 7,757 B; blender/pbr-ext to 5,005 B; gltf/dds to 941 B; gltf/pbr to 85,684 B;
+  shadows/rt to 1,222 B; text/vector to 27,014 B; text/outline to 15,449 B (each app still loads the shared package once).
+- **Regression test:** `tests/no-inlined-packages.test.js` fails on any value import of a declared package that a built
+  dist no longer imports.
+
 ### Fixed 2026-11-27: a closed soft body floated by its wetted area, not its displaced volume (KB-SOFT-CLOSEDBUOY1, physics soft)
 
 - **Repro:** `soft.water = {density: 1025}` and a `SoftBodyDesc.volume` ball of density 300: each particle under the water

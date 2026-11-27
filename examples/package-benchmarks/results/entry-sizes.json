@@ -19370,32 +19370,6 @@
     }
   },
   "splits": {
-    "@margoengine/text/outline": {
-      "entry": "./outline",
-      "base": {
-        "raw": 54407,
-        "gzip": 21540
-      },
-      "lazy": {
-        "name": "CFF, CFF2 and variation readers",
-        "raw": 20567,
-        "gzip": 7751,
-        "loadedBy": "the first GlyphFieldFont.load of a CFF file or a variable instance (import() in outline.ts); new GlyphFieldFont(bytes, {openType}) takes them from the caller"
-      }
-    },
-    "@margoengine/text/vector": {
-      "entry": "./vector",
-      "base": {
-        "raw": 85733,
-        "gzip": 33265
-      },
-      "lazy": {
-        "name": "CFF, CFF2 and variation readers",
-        "raw": 20567,
-        "gzip": 7751,
-        "loadedBy": "the first VectorFont.load of a CFF file or a variable instance (import() in outline.ts); new VectorFont(bytes, {openType}) takes them from the caller"
-      }
-    },
     "@margoengine/webgl2-compat": {
       "entry": ".",
       "base": {

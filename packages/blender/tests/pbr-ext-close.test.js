@@ -8,7 +8,7 @@ import { moduleHooks } from '../../../scripts/support/node-compat.mjs';
 // The rule's message reaching the caller shows the shader import went through the failing hook.
 await moduleHooks([
   {
-    pattern: String.raw`^\./extended(-[\w-]+)?\.js$`,
+    pattern: String.raw`^@margoengine/gltf/extended-materials$`,
     parent: '/dist/pbr-ext.js',
     error: 'shader chunk failed to load',
   },
