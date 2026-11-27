@@ -31,4 +31,30 @@ Pixel-only black-box results (2026-11-10, RTX A6000, Edge 157, 256 x 256, same f
 | regl-scatterplot 1.16.0, 1-pixel squares, alpha blending enabled | 20,000,000 2MASS | 0.1480712891 | 246 | 0.2227783203% |
 | deck.gl 9.4.1 ScatterplotLayer, 1-pixel circles, antialiasing off, alpha 20/255 | 10,000,000 TLC | 0.0787353516 | 255 | 0.1724243164% |
 
-These are retained non-parity results, including maximum differences; Margo does not claim byte-identical rival images. Margo's captured count-opacity image has zero red-byte difference from its independent analytical count-opacity image in both cases. Point raster edge/coverage rules and float projection rounding are expected contributors to the square-point differences; that attribution is an inference, not an isolated causal measurement. Circle coverage and u8 alpha additionally differ in the deck.gl configuration. Margo retains 41,420 occupied pixels for the 2MASS window and 113 for TLC; the rivals show 41,427 and 95. This compares actual images, not an analytical substitute for the Margo capture. Full hardware, versions, histogram counts and policies: [frozen evidence](whitepaper/results/batch181-density.json). Timed comparison and isolated raster-policy attribution remain owed; no speed winner is asserted.
+These are retained non-parity results, including maximum differences; Margo does not claim byte-identical rival images. Margo's captured count-opacity image has zero red-byte difference from its independent analytical count-opacity image in both cases. Margo retains 41,420 occupied pixels for the 2MASS window and 113 for TLC; the rivals show 41,427 and 95. This compares actual images, not an analytical substitute for the Margo capture. Full hardware, versions, histogram counts and policies: [frozen evidence](whitepaper/results/batch181-density.json). Timed comparison remains owed; no speed winner is asserted.
+
+## Why the pixels differ
+
+Measured on 2026-11-27 on the same device (RTX A6000, Edge, ANGLE Direct3D 11) with `node scripts/sciviz-density-attribution.mjs`: both rivals are driven only through their public APIs and probed with coincident points and with single points at 324 sub-pixel positions in two parts of the target, and their images of the real data are then rebuilt from the measured rules one cause at a time. The rules (`scripts/support/density-raster-model.mjs`) predict all 100 stack bytes and all 648 positions of each rival. Report: [attribution evidence](whitepaper/results/density-attribution-2026-11-27.json).
+
+| Renderer | Pixel a point is drawn in | Opacity of n coincident points |
+| --- | --- | --- |
+| Margo density | the pixel containing the position; every point votes | exact u32 count, then `1 - (1 - a)^n` once |
+| regl-scatterplot 1.16.0, squares | position snapped to 1/256 pixel; on a boundary, the left pixel and the lower pixel | matches `1 - (1 - a)^n` rounded once, up to white |
+| deck.gl 9.4.1, circles, no antialiasing | the same pixel, only if its centre is within half a pixel of the snapped position | alpha 20/255, rounded to a byte after every point: stops at 249 |
+
+| Compared with the rival's image | Differing pixels of 65,536 | Mean red-byte difference | Maximum |
+| --- | ---: | ---: | ---: |
+| regl-scatterplot: Margo as drawn | 236 | 0.1480712891 | 246 |
+| regl-scatterplot: after its coverage rule | 7 | 0.0034942627 | 207 |
+| deck.gl: Margo as drawn | 113 | 0.0787353516 | 255 |
+| deck.gl: after its coverage rule | 95 | 0.0086975098 | 6 |
+| deck.gl: after coverage and 8-bit accumulation | 0 | 0 | 0 |
+
+- regl-scatterplot: the coverage rule accounts for 229 of the 236 differing pixels. The opacity law changes no pixel. Each of the 7 left over lies next to an observation within 0.000028 pixel of the 1/256 grid's tie, where rounding in the renderer's transform decides the pixel; the largest, 207 bytes, is the size of one star's 20 repeats landing in another pixel.
+- deck.gl: the disc covers pi/4 of a pixel, so 2,363,292 of the 10,000,000 points (23.6%) light nothing. That is the whole difference in the 18 pixels Margo lights and deck.gl leaves black. The other 95 are dense pixels where accumulating in 8 bits stops 6 bytes short of white (Williams, Frank and LaMar, 2003). The opacity byte alone changes no pixel at these counts. The rebuilt image equals deck.gl's in every pixel.
+- Margo: its float32 projection puts 9 of the 1,000,000 2MASS observations in another pixel than a binary64 binning of the same float32 positions (18 pixels differ in count; in the image one pixel differs, by 2 bytes), each within 0.000011 pixel of a boundary. WGSL has no 64-bit float. The TLC bins agree exactly.
+
+No Margo defect was found: Margo counts every point in the pixel that contains it, to float32 precision, so these differences are kept. The 1/256 grid and its tie direction are measurements on this device, not a promise about other drivers: OpenGL ES 3.0.6 fixes only the square a point covers (3.4.1) and allows either neighbouring byte in the fixed-point conversion (2.1.6.2).
+
+Sources: [OpenGL ES 3.0.6](https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf) (Khronos, 2019); [Direct3D 11 rasterization rules](https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-rasterizer-stage-rules) (Microsoft); P. L. Williams, R. J. Frank and E. C. LaMar, *Alpha Dithering to Correct Low-Opacity 8 Bit Compositing Errors* (Lawrence Livermore National Laboratory, 2003); T. Porter and T. Duff, [*Compositing Digital Images*](https://doi.org/10.1145/800031.808606) (SIGGRAPH 1984).

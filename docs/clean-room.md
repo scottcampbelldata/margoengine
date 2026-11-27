@@ -18882,3 +18882,20 @@ definition of RotaryEmbedding and TensorScatter; no runtime, reference evaluator
 - Angelos Katharopoulos et al., *Transformers are RNNs* (2020), https://arxiv.org/abs/2006.16236 ; Songlin Yang et al.,
   *Parallelizing Linear Transformers with the Delta Rule over Sequence Length* (2024),
   https://arxiv.org/abs/2406.06484 , and *Gated Delta Networks* (2024), https://arxiv.org/abs/2412.06464 .
+
+## sciviz density pixel attribution (2026-11-27)
+
+The causes of the density pixel differences were found by running regl-scatterplot 1.16.0 and deck.gl 9.4.1 from their
+folder outside this repository, through their public APIs only, and comparing the pixels they draw with rules written
+from public specifications. No rival source file was opened, read or copied.
+
+- Khronos Group, *OpenGL ES 3.0.6* (2019), 2.1.6.2 fixed-point conversion, 3.4.1 point rasterization, 4.1.7 blending,
+  https://registry.khronos.org/OpenGL/specs/es/3.0/es_spec_3.0.pdf .
+- Microsoft, *Rasterization Rules* (Direct3D 11),
+  https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-rasterizer-stage-rules .
+- P. L. Williams, R. J. Frank and E. C. LaMar, *Alpha Dithering to Correct Low-Opacity 8 Bit Compositing Errors*,
+  Lawrence Livermore National Laboratory, UCRL-ID-153185 (2003),
+  https://typeset.io/pdf/alpha-dithering-to-correct-low-opacity-8-bit-compositing-2xk1oeemu9.pdf .
+- T. Porter and T. Duff, *Compositing Digital Images*, SIGGRAPH (1984), https://doi.org/10.1145/800031.808606 .
+- J. A. Cottam, A. Lumsdaine and P. Wang, *Overplotting: Unified Solutions under Abstract Rendering*, IEEE Big Data
+  (2013), pp. 9-16.
