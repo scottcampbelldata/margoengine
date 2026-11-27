@@ -506,6 +506,8 @@ Film solvers are split so both sides finish them at once (Scott, 2026-11-26: "ge
 
 Claimed by Claude: the framework's foundation, the ship at sea (hull, ocean, wakes, spray, wind, rain) and the rigid core. Do not start these.
 
+KB2161 (docs/known-bugs.md, "A chain laid out level under a 1000:1 end mass stretches once it is taut") is taken by Claude (workstation, branch `claude/kb2161-chain-61b47e`) on Scott's order, 2026-11-27: the geometric stiffness of the joint locks in the kernel's path solve (`packages/physics/kernel/src/joints.rs` and what it calls), nothing else of DYN-01 or DYN-03.
+
 | ID | Solver | State today | Owner | Status |
 | --- | --- | --- | --- | --- |
 | SEA-05 | Nearshore waves and surf zone | partial | Codex | REOPENED (see [physics-solver-audit.md](physics-solver-audit.md)), landed 8c7453cd8 |
