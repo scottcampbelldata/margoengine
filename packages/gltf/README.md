@@ -585,7 +585,7 @@ viewGLTFCamera(model, 0); // the animated yfov
 applyGLTFLights(model); // the animated sun; pass {clustered} for point and spot lights
 ```
 
-`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy, diffuse transmission, volume scatter or a bump map with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf/extended-materials` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
+`loadGLTF` and `parseGLTFAsync` shade a file that uses clearcoat, transmission, IOR, volume, dispersion, sheen, specular, iridescence, anisotropy, diffuse transmission, volume scatter or a bump map with the physical renderer by default: they import `extendedMaterials` from `@margoengine/gltf/extended-materials` on first need, so an app whose files never use those extensions ships none of its WGSL. Pass `{decoders: {materials: false}}` to keep the base shader (the extensions are then ignored, as glTF allows), or your own `extendedMaterials`. For synchronous parsing, pass `{materials: extendedMaterials}` as `parseGLTF`'s fifth argument. A file whose materials declare `KHR_materials_transmission` (factor 0 included, for pointer animation) also gets the screen-space transmission pass by default: they import `screenTransmission` from `@margoengine/gltf/transmission`, one pass per scene shared by its glass models (depth writes on, gone with the last of them), so glass refracts and blurs what is behind it. A file that also uses `KHR_materials_volume` keeps the tinted blend for now: the pass would take `thicknessFactor` as the path length, which drew AttenuationTest further from the Cycles reference than the tint does (`docs/known-bugs.md`, KB4000); pass `screenTransmission` yourself to use it there. `{decoders: {transmission: false}}` keeps the tinted blend; synchronous `parseGLTF` takes `{materials: extendedMaterials, transmission: screenTransmission}`. The imported metadata also stays available for explicit `@margoengine/materials` installation, whose lobes replace the physical renderer for the materials they cover. Constructed `@margoengine/materials` meshes retain their live material and UV-transform layout automatically.
 
 `KHR_materials_dispersion` is accepted when required. Its factor is validated and
 retained as `primitive.material.dispersion` even without a materials decoder;
@@ -599,7 +599,9 @@ refraction output. Native transmission's volume tint reads
 `@margoengine/materials` installation route samples it for refraction too.
 
 The scene-copy refraction pass is `Transmission` from `@margoengine/gltf/transmission`, its own entry so a load without
-glass never downloads it; `@margoengine/materials/transmission` re-exports the same class. It copies the scene into a
+glass never downloads it; `@margoengine/materials/transmission` re-exports the same class. `loadGLTF` and
+`parseGLTFAsync` attach one for glass files on their own (above); attach your own to choose its options, and adding a
+model to it replaces that model's default pass. It copies the scene into a
 mip chain on frames where a hooked surface draws and refracts, blurs by roughness and attenuates through the volume
 behind each transmissive primitive of the models it is given:
 
@@ -619,6 +621,17 @@ display transform, Khronos PBR Neutral then sRGB, so the copy holds scene light 
 exactly what is behind it. Display white reads as the least light that shows as white (`neutralWhite` in
 `shared/display-inverse.js`, about 13.5), so rough glass over a clipped white background blurs it brighter than an HDR capture
 would. A view with no capture (an environment probe face, a `createRenderer` pass) keeps the tinted blend.
+
+The default pass, and the opt-out for one load:
+
+```js
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+await loadGLTF(engine, '/glass.glb'); // refracts and blurs: the default screen-space pass
+await loadGLTF(engine, '/glass.glb', { decoders: { transmission: false } }); // the tinted blend
+```
 
 `Transmission.attach(engine, {depthWrite: true})` draws OPAQUE and MASK glass as a surface: unblended, writing depth,
 so a glass surface hides the glass behind it (a solid sphere's back faces and their highlights) in any draw order, and

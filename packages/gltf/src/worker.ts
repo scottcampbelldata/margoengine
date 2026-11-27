@@ -9,6 +9,7 @@ import { PBRModel, loadGLTF, parseGLTFAsync, type GLTFLoadOptions } from './pbr.
 import { packed } from './pack.js';
 import { partLimit } from './parts.js';
 import { withDecoders } from './decoder-default.js';
+import { withTransmission } from './default-transmission.js';
 import { prepareAsset, type PreparedGLTF } from './prepare.js';
 import type { PreparedGeometry } from './pbr.js';
 export type { PreparedGLTF } from './prepare.js';
@@ -34,7 +35,7 @@ function preparedModel(
   instance: EngineKernel,
   prepared: PreparedGLTF,
   signal: AbortSignal | undefined,
-  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'strokes'>,
+  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'strokes' | 'transmission'>,
 ): PBRModel {
   let model: PBRModel | undefined;
   try {
@@ -106,7 +107,7 @@ async function finishPrepared(
     }
   }
   // Points and lines that ask for a width are drawn wide on this thread, as loadGLTF draws them.
-  const given = options.decoders ?? {},
+  const given = await withTransmission(prepared.doc, options.decoders ?? {}),
     decoders =
       given.strokes === undefined && hasStrokes(prepared.doc)
         ? { ...given, strokes: (await import('./strokes.js')).wideStrokes }

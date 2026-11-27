@@ -1,9 +1,9 @@
 <!doctype html><html><head><meta charset="utf-8"><style>canvas{width:128px;height:128px}</style></head><body><script type="module">
 // KB4000: gltf's screen-space Transmission pass on a display target (no HDR PostStack), read from the native glass capture.
 import {Engine} from '/packages/core/dist/index.js';
-import {parseGLTF} from '/packages/gltf/dist/pbr.js';
+import {parseGLTF,parseGLTFAsync} from '/packages/gltf/dist/pbr.js';
 import {extendedMaterials} from '/packages/gltf/dist/extended.js';
-import {Transmission} from '/packages/gltf/dist/transmission.js';
+import {Transmission,screenTransmission} from '/packages/gltf/dist/transmission.js';
 import {instancedGLTF} from '/tests/support/instanced-gltf.js';
 import {waitForPipelines} from '/scripts/support/gpu-ready.js';
 // 16 x 16 texel checker, one texel per square, sampled nearest: hard edges behind the glass.
@@ -43,6 +43,14 @@ window.screenTransmission=async()=>{
   {name:'stack-blend-near-first',pass:true,stack:true,nearFirst:true},
   {name:'stack-write-near-first',pass:true,stack:true,nearFirst:true,depthWrite:true},
   {name:'stack-write-far-first',pass:true,stack:true,nearFirst:false,depthWrite:true},
+  // KB4000 step 4: parseGLTFAsync adds the pass on its own for a file with KHR_materials_transmission; false keeps the tint.
+  {name:'default-ior15-rough06',roughness:0.6,ior:1.5,load:'async'},
+  {name:'default-two',roughness:0,ior:1,two:true,load:'async'},
+  {name:'default-off',roughness:0.6,ior:1.5,load:'async',decoders:{transmission:false}},
+  {name:'sync-ior15-rough06',roughness:0.6,ior:1.5,load:'sync'},
+  {name:'default-stack-far-first',stack:true,nearFirst:false,load:'async'},
+  // A caller's Transmission.add replaces the default pass: one pass, one copy chain, no second draw.
+  {name:'default-then-explicit',roughness:0.6,ior:1.5,load:'async',pass:true},
  ];
  for(const antialias of [false,true])for(const k of cases){
   const canvas=document.body.appendChild(document.createElement('canvas'));
@@ -53,19 +61,26 @@ window.screenTransmission=async()=>{
    const b=background();
    models.push(parseGLTF(engine,b.doc,b.buffers,[checker],{materials:extendedMaterials}));
    for(const g of k.stack?[stack(k.nearFirst)]:k.two?[glass(k.roughness,k.ior,-0.22,0.4),glass(k.roughness,k.ior,0.22,0.4)]:[glass(k.roughness,k.ior)])
-    models.push(parseGLTF(engine,g.doc,g.buffers,[],{materials:extendedMaterials}));
+    models.push(k.load==='async'?await parseGLTFAsync(engine,g.doc,g.buffers,[],{decoders:k.decoders??{}})
+     :parseGLTF(engine,g.doc,g.buffers,[],k.load==='sync'?{materials:extendedMaterials,transmission:screenTransmission}:{materials:extendedMaterials}));
    let transmission;
+   // default-then-explicit: one frame with the default pass first, so the explicit hook replaces a live one.
+   if(k.pass&&k.load){engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();}
    if(k.pass){transmission=Transmission.attach(engine,{depthWrite:!!k.depthWrite});for(const m of models.slice(1))transmission.add(m);}
    const frame=async()=>{engine.render({culling:false});await engine.gpu.queue.onSubmittedWorkDone();};
    await waitForPipelines(frame);
+   const passes=()=>[...engine.scene.plugins.keys()].filter((n)=>n.startsWith('transmission:')).length;
    // Count the scene copies of one steady frame: one mip chain per frame, not one per glass model.
    const device=engine.gpu,create=device.createCommandEncoder;let copies=0;
    device.createCommandEncoder=function(...a){const e=create.apply(this,a),begin=e.beginRenderPass;
     e.beginRenderPass=function(d){if(d?.label==='transmission:copy')copies++;return begin.call(this,d);};return e;};
    await frame();
    device.createCommandEncoder=create;
-   rows.push({name:k.name,antialias,copies,width:canvas.width,height:canvas.height,png:canvas.toDataURL('image/png')});
+   const row={name:k.name,antialias,copies,passes:passes(),width:canvas.width,height:canvas.height,png:canvas.toDataURL('image/png')};
    transmission?.dispose();
+   // The default pass goes with the last glass model.
+   if(k.load){models.at(-1).dispose();row.passesAfterOne=passes();for(const m of models.slice(1))m.dispose();await frame();row.passesAfterAll=passes();}
+   rows.push(row);
   }finally{for(const m of models)m.dispose();engine.dispose();canvas.remove();}
  }
  return rows;

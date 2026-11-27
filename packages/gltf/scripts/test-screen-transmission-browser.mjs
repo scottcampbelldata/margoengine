@@ -82,6 +82,36 @@ await runSuite(
       assert.ok(at('stack-blend-near-first').row.greenMean < white / 4, `blended: the later red glass covers (${antialias})`);
       for (const name of ['stack-write-near-first', 'stack-write-far-first'])
         assert.ok(Math.abs(at(name).row.greenMean - white) < 1, `${name}: the front glass hides the red (${antialias})`);
+      // KB4000 step 4: parseGLTFAsync wires the pass for a file that declares KHR_materials_transmission (and the
+      // synchronous parse when passed `screenTransmission`): the same pixels as the attached pass, with depth writes.
+      for (const name of ['default-ior15-rough06', 'sync-ior15-rough06']) {
+        const row = at(name);
+        let worst = 0;
+        for (let i = 0; i < rough.red.length; i++) worst = Math.max(worst, Math.abs(row.red[i] - rough.red[i]));
+        assert.ok(worst <= 1, `${name} matches the attached pass (worst ${worst} levels, ${antialias})`);
+        assert.equal(row.row.copies, levels, `${name}: one copy chain (${antialias})`);
+        assert.equal(row.row.passes, 1, `${name}: one pass in the scene (${antialias})`);
+        assert.equal(row.row.passesAfterAll, 0, `${name}: the pass goes with the model (${antialias})`);
+      }
+      const explicit = at('default-then-explicit');
+      assert.equal(explicit.row.passes, 1, `an explicit Transmission replaces the default pass (${antialias})`);
+      assert.equal(explicit.row.copies, levels, `default-then-explicit: one copy chain (${antialias})`);
+      let drift = 0;
+      for (let i = 0; i < rough.red.length; i++) drift = Math.max(drift, Math.abs(explicit.red[i] - rough.red[i]));
+      assert.ok(drift <= 1, `default-then-explicit draws the glass once (worst ${drift} levels, ${antialias})`);
+      const shared = at('default-two').row;
+      assert.equal(shared.passes, 1, `two default-loaded glass models share one pass (${antialias})`);
+      assert.equal(shared.copies, levels, `default-two: one copy chain (${antialias})`);
+      assert.equal(shared.passesAfterOne, 1, `the pass stays while a glass model remains (${antialias})`);
+      assert.equal(shared.passesAfterAll, 0, `the pass goes with the last glass model (${antialias})`);
+      const off = at('default-off').row;
+      assert.equal(off.passes, 0, `transmission: false adds no pass (${antialias})`);
+      assert.equal(off.copies, 0, `transmission: false copies nothing (${antialias})`);
+      assert.ok(off.spread > 60, `transmission: false keeps the unblurred tint (${off.spread}, ${antialias})`);
+      assert.ok(
+        Math.abs(at('default-stack-far-first').row.greenMean - white) < 1,
+        `the default pass writes depth: the front glass hides the red (${antialias})`,
+      );
     }
     console.log('screen transmission:', rows.length, 'frames passed', context.hardware.compat ? '(compat)' : '');
   },

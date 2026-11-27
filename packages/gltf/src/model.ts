@@ -91,6 +91,7 @@ import {
   type GLTFExtendedMaterials,
 } from './asset.js';
 import { withMaterials } from './default-materials.js';
+import { addTransmission } from './default-transmission.js';
 import { isSplatPrimitive } from './splat-state.js';
 import {
   pbrShader,
@@ -2298,6 +2299,8 @@ export type ModelNode = Mesh & PublicMesh;
  */
 export class PBRModel implements EnginePlugin {
   private releaseNativeGlass?: () => void;
+  /** Remover of the default screen-space transmission pass (`decoders.transmission`), set once the model joins a graph. */
+  private releaseTransmission?: () => void;
   /** True while an acquisition asked for during a frame waits for the frame to end (`wantGlass`). */
   private glassQueued = false;
   /** Optional scene-wide opaque phase, used by caller-owned color captures. */
@@ -3432,6 +3435,16 @@ export class PBRModel implements EnginePlugin {
       this.materials.some((m) => m.tint || m.attenuation || linearBlends(m))
     )
       this.releaseNativeGlass = acquireNativeGlass(this.engine, () => this.glassActive());
+    // KB4000: the default transmission pass (one per frame graph, shared by its models) unless a hook is already set.
+    const pass = this.asset.hooks.transmission;
+    if (
+      pass &&
+      !this.releaseTransmission &&
+      !this.transmission &&
+      this.engine.gpu &&
+      this.asset.doc.materials?.some((m) => !!m?.extensions && 'KHR_materials_transmission' in m.extensions)
+    )
+      this.releaseTransmission = pass.attach(this, this.engine, graph);
     models.revision = graph.revision;
   }
   /**
@@ -3728,6 +3741,12 @@ export class PBRModel implements EnginePlugin {
       !Array.isArray(hook.targets)
     )
       throw new TypeError('Invalid PBR transmission hook; pass a function, or null to remove the hook');
+    // A caller's hook replaces the default pass (KB4000), which would otherwise draw this model a second time.
+    const fallback = this.releaseTransmission;
+    if (fallback && this.transmission !== hook) {
+      this.releaseTransmission = undefined;
+      fallback();
+    }
     this.transmission = hook;
     return () => {
       if (this.transmission === hook) this.transmission = undefined;
@@ -6024,6 +6043,8 @@ export class PBRModel implements EnginePlugin {
     const cleanup = new Cleanup();
     cleanup.run(() => this.releaseNativeGlass?.());
     this.releaseNativeGlass = undefined;
+    cleanup.run(() => this.releaseTransmission?.());
+    this.releaseTransmission = undefined;
     for (const node of this.created) {
       clearMeshSource(node);
       Reflect.deleteProperty(node, cpuSource);
@@ -6060,13 +6081,13 @@ function capturePublicShadowGetter(model: typeof PBRModel): () => unknown {
   return Object.getOwnPropertyDescriptor(model.prototype, 'shadowPrimitives')!.get!;
 }
 const publicShadowGetter = /* @__PURE__ */ capturePublicShadowGetter(PBRModel);
-/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder and `materials` shaders; `maxNodes` and `maxPartVertices` as for loadGLTF. */
+/** Synchronous parse of in-memory JSON/GLB with decoded `images`; `decoders` takes only the synchronous `instancing` reader, `meshopt` decoder, `materials` shaders and `transmission` pass; `maxNodes` and `maxPartVertices` as for loadGLTF. */
 export function parseGLTF(
   instance: EngineKernel,
   input: string | object | ArrayBuffer | ArrayBufferView,
   buffers: Array<ArrayBuffer | ArrayBufferView> = [],
   images: readonly GLTFImage[] = [],
-  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'> = {},
+  decoders: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt' | 'transmission'> = {},
   { maxNodes, maxPartVertices }: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'> = {},
 ): PBRModel {
   const partVertices = partLimit(maxPartVertices);
@@ -6186,6 +6207,7 @@ export async function parseGLTFAsync(
       options.maxNodes,
     );
   asset.partVertices = partLimit(options.maxPartVertices);
+  await addTransmission(asset);
   if (options.optimize) asset.reorder = await triangleOrder();
   await asset.prepareMeshopt();
   // The Draco module (and its decoder) loads only for files that use KHR_draco_mesh_compression.
@@ -6309,6 +6331,7 @@ async function withSplats(
   signal: AbortSignal | undefined,
   scope: SceneScope,
 ): Promise<PBRModel> {
+  await addTransmission(loaded.asset);
   // Both steps run after the awaits of the load: they go in the scene the load started in.
   const model = scope.run(() => attach(instance, loaded, signal));
   try {

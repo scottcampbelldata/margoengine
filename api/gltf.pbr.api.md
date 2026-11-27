@@ -106,6 +106,7 @@ export interface GLTFDecoderHooks {
     materials?: GLTFExtendedMaterials | false;
     splats?: GLTFSplatReader | false;
     strokes?: GLTFStrokeReader | false;
+    transmission?: GLTFTransmissionPass | false;
 }
 
 export interface GLTFDocument extends GLTFProperty {
@@ -620,7 +621,7 @@ export function closeImages(images: readonly GLTFImage[]): void;
 
 export function loadGLTF(instance: EngineKernel, url: string | URL, options?: GLTFLoadOptions): Promise<PBRModel>;
 
-export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly GLTFImage[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt'>, { maxNodes, maxPartVertices }?: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'>): PBRModel;
+export function parseGLTF(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffers?: Array<ArrayBuffer | ArrayBufferView>, images?: readonly GLTFImage[], decoders?: Pick<GLTFDecoderHooks, 'instancing' | 'materials' | 'meshopt' | 'transmission'>, { maxNodes, maxPartVertices }?: Pick<AssetOptions, 'maxNodes' | 'maxPartVertices'>): PBRModel;
 
 export function parseGLTFAsync(instance: EngineKernel, input: string | object | ArrayBuffer | ArrayBufferView, buffersOrOptions?: Array<ArrayBuffer | ArrayBufferView> | (AssetOptions & CompressionOptions), images?: readonly GLTFImage[], options?: GLTFLoadOptions): Promise<PBRModel>;
 
@@ -1191,6 +1192,10 @@ interface GLTFTextureTransform {
   rotation?: number;
   scale?: readonly [number, number];
   texCoord?: number;
+}
+
+interface GLTFTransmissionPass {
+    attach(model: import('./model.js').PBRModel, engine: Engine, graph: import('@margoengine/core/extension').FrameGraph): () => void;
 }
 
 interface MaterialCoatLayer {

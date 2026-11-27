@@ -795,6 +795,10 @@ export function transmissionPBR(code: string, declarations: string): string {
   out =
     '@group(0) @binding(1) var<uniform> margoVolume:vec4f;\n' +
     declarations +
+    // The hook's volume path reads the thickness map through margoVolumeThickness (extendedShader's slot 20) in this
+    // entry only: surface() keeps s.th at 1, so the beauty and OIT entries bind no thickness map. Elsewhere it reads 1
+    // (a materials mesh sets s.th from its own map).
+    (code.includes('fn margoVolumeThickness(') ? '' : 'fn margoVolumeThickness(i:Out)->f32 {return 1.0;}\n') +
     code.replace(base, '  color=layers(s,v,l,color+margoTransmission(s,v,i));');
   if (!cache) {
     if (transmitted.size >= 8) transmitted.clear();
@@ -1010,9 +1014,6 @@ export function extendedShader(plan: ExtendedPlan): string {
   out =
     patch(extendedPBRShader, [
       ...physicalEdits(sampleOf, bindings),
-      // KHR_materials_volume thickness map (G) scales thicknessFactor for the transmission pass's volume path, as it
-      // does for the native tint (margoThickness); unbound it reads 1.
-      ['s.th=1;', `s.th=${sampleOf('thickness')}.g;`],
       ['uvt:array<vec4f,26>', `uvt:array<vec4f,${plan.slots.length * 2}>`],
       [
         'sheen:vec4f\n}',
@@ -1048,6 +1049,8 @@ ${plan.scatter ? scatterEdit(sampleOf) : ''}${plan.diffuseRoughness ? `  s.dr=ve
     ]) +
     // KHR_materials_volume thickness map (G), 1 when unbound: the native volume tint's share of thicknessFactor.
     `fn margoThickness(i:Out)->f32 {return ${sampleOf('thickness')}.g;}` +
+    // The same map for gltf/transmission's volume path (transmissionPBR), apart from materials' subsurface margoThickness.
+    `fn margoVolumeThickness(i:Out)->f32 {return ${sampleOf('thickness')}.g;}` +
     `fn margoTintFresnel(s:Surface,nv:f32)->vec3f {return ${
       plan.iridescence
         ? 'mix(margoDielectricFresnel(s.f0,s.sw,nv),s.ir.rgb,s.ir.w)'

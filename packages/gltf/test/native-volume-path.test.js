@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { extendedPlan, extendedShader, physicalShader, surfaceTintPBR, transmissiveShader } from '../src/shader.ts';
+import {
+  extendedPlan,
+  extendedShader,
+  physicalShader,
+  surfaceTintPBR,
+  transmissionPBR,
+  transmissiveShader,
+} from '../src/shader.ts';
 import { extendedMaterials } from '../dist/extended.js';
 import { instancedShader, rowsShader } from '../src/instanced-shader.ts';
 import { wgslFunction } from '../../../tests/support/wgsl-eval.js';
@@ -139,10 +146,13 @@ test('a transmissive volume with a thicknessTexture binds slot 20 and the native
   assert.match(wgslFunction(source, 'margoThickness'), /return 1\.0;/);
   // KB4000 step 4: the transmission pass's volume path (thicknessFactor x s.th) takes the map's G too; s.th was fixed at 1,
   // so the pass absorbed through the whole factor where the map thins it (AttenuationTest's Thickness Texture row).
-  assert.ok(
-    extendedShader(plan).includes(`s.th=textureSample(margoMap${slot},margoSampler${slot},uv(i,20)).g;`),
-    'the surface thickness reads the map',
-  );
-  const unmapped = extendedPlan([], { iridescence: true });
-  assert.ok(extendedShader(unmapped).includes('s.th=vec4f(1).g;'), 'without a map the thickness is 1');
+  // It reads the map in the transmission entry only (margoVolumeThickness); surface() keeps s.th at 1, so the beauty and OIT
+  // entries bind no thickness map (static-bindings.test.js).
+  const hook = 'fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {return vec3f(margoVolumeThickness(i));}\n';
+  const through = transmissionPBR(extendedShader(plan), hook);
+  assert.match(wgslFunction(through, 'margoVolumeThickness'), new RegExp(`margoMap${slot},margoSampler${slot}`));
+  assert.ok(extendedShader(plan).includes('s.th=1;'), 'surface() reads no thickness map');
+  const plain = transmissionPBR(physicalShader(), hook);
+  assert.match(wgslFunction(plain, 'margoVolumeThickness'), /return 1\.0;/, 'without a map the thickness is 1');
+  assert.equal(plain.split('fn margoVolumeThickness(').length, 2);
 });

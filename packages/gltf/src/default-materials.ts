@@ -25,7 +25,8 @@ const physical = [
  * Decoders with the physical material shader added when the file uses a physical material extension and the caller
  * did not choose (`materials` undefined): imported on first need, so apps that never load such a file ship none of its
  * WGSL. `materials: false` is kept as no shader. The same goes for `splats`, added when the file holds Gaussian splats,
- * and `strokes`, added when a point or line asks for a width.
+ * and `strokes`, added when a point or line asks for a width. The transmission pass is added on the main thread
+ * (default-transmission.ts), since the parsing workers bundle this file.
  */
 export async function withMaterials(doc: GLTFDocument, decoders: GLTFDecoderHooks = {}): Promise<GLTFDecoderHooks> {
   if (decoders.dds === undefined && doc.textures?.some((t) => t?.extensions?.MSFT_texture_dds !== undefined))

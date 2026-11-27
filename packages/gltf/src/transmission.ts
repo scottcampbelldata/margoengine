@@ -12,6 +12,7 @@ import {
   type PassContext,
 } from '@margoengine/core/extension';
 import type { PBRModel, PBRTransmission } from './model.js';
+import type { GLTFTransmissionPass } from './asset.js';
 import { sceneTarget } from '../../shared/msaa.js';
 import { linearHdr } from '../../shared/hdr-format.js';
 import { neutralInverseShader } from '../../shared/display-inverse.js';
@@ -79,7 +80,7 @@ fn margoTransmission(s:Surface,v:vec3f,i:Out)->vec3f {
   let ior=select(max(f.ext.y,1.0),1e30,f.ext.y==0.0);
   // Node transforms scale the thickness (KHR_materials_volume): the mean of the model axis lengths.
   let scale=(length(f.model[0].xyz)+length(f.model[1].xyz)+length(f.model[2].xyz))/3.0;
-  let path=max(margoVolume.x*s.th*scale,0.0);
+  let path=max(margoVolume.x*s.th*margoVolumeThickness(i)*scale,0.0);
   var behind=margoTransmissionBehind(i,s.n,v,ior,path,margoTransmissionLevel(s.roughness,ior,path));
   if(f.ext.w>0.0&&path>0.0){
     // KHR_materials_dispersion: IOR spread (IOR-1)*0.025*dispersion; red and blue each read on their own ray.
@@ -356,3 +357,34 @@ export class Transmission implements EnginePlugin, PBRTransmission {
     this.dispose();
   }
 }
+// One default pass per frame graph, shared by the models in it and disposed with the last of them.
+const shared = new WeakMap<FrameGraph, { pass: Transmission; users: Set<PBRModel> }>();
+/**
+ * The default screen-space transmission of `loadGLTF` and `parseGLTFAsync` (`decoders.transmission`): every model
+ * whose file declares KHR_materials_transmission joins one `Transmission` per scene, created with `depthWrite: true`,
+ * which goes away with the last such model. Pass it to synchronous `parseGLTF` as
+ * `{materials: extendedMaterials, transmission: screenTransmission}`; `{transmission: false}` keeps the tinted blend.
+ */
+export const screenTransmission: GLTFTransmissionPass = {
+  attach(model, engine, graph) {
+    let entry = shared.get(graph);
+    if (!entry) {
+      const pass = new Transmission({ depthWrite: true });
+      let scene;
+      for (const s of engine.scenes) if (s.frameGraph === graph) scene = s;
+      if (scene) engine.use(pass, scene);
+      else engine.use(pass);
+      shared.set(graph, (entry = { pass, users: new Set() }));
+    }
+    const own = entry,
+      remove = own.pass.add(model);
+    own.users.add(model);
+    return () => {
+      remove();
+      if (own.users.delete(model) && !own.users.size) {
+        if (shared.get(graph) === own) shared.delete(graph);
+        own.pass.dispose();
+      }
+    };
+  },
+};

@@ -16827,7 +16827,16 @@ capture as linear blends do. Regression: packages/gltf/scripts/test-screen-trans
 (2026-11-27): `TransmissionPassOptions.depthWrite` / `PBRTransmission.depthWrite` draw OPAQUE and MASK glass unblended
 with depth writes (BLEND glass unchanged), so glass in front hides glass behind in either draw order; regression: the
 stack cases of the same browser test (green mean 115.5 with it in both orders, 3.5 blended) and physical.test.js
-"depthWrite". Step 4 (default wiring, proofs) remains, so KB4000 stays open.
+"depthWrite". Step 4 (2026-11-27, manager's ruling): loadGLTF, parseGLTFAsync, the worker and progressive loaders
+attach the pass by default (`screenTransmission`, one per scene, depth writes) for a file with KHR_materials_transmission
+and no KHR_materials_volume. TransmissionTest proof, native: viewer 1,590,949 -> 1,407,924, Cycles full 4,164,104 ->
+3,992,253, direct 2,632,781 -> 2,388,408 (compat 1,408,047 / 3,992,260 / 2,388,419); (284,240) red 248 -> 95 (viewer
+94), (198,241) blue 110 -> 18 (viewer 24). Regression: packages/gltf/test/default-transmission.test.js and the default-*
+cases of test-screen-transmission-browser.mjs. Still open: volume files stay on the tint. Through the pass AttenuationTest
+moved nearer the viewer (1,450,312 -> 1,289,588) but away from Cycles (direct 1,744,201 -> 1,981,171, full 13,834,286
+-> 13,886,432): red inside the cubes is 0 to 3 where Cycles keeps 19 to 33, because the pass takes thicknessFactor as
+the path length while Cycles crosses the real volume. Next: a back-face depth prepass for the real per-pixel length,
+thicknessFactor only where no closed back face exists; switch volume files once both Cycles rows beat the tint.
 
 ### Fixed 2026-11-27: the transmission proof's viewer row was 2 levels over its exact budget (KB-REF-TRANS-VIEWER1, gltf)
 

@@ -39,6 +39,7 @@ export interface GLTFDecoderHooks {
     materials?: GLTFExtendedMaterials | false;
     splats?: GLTFSplatReader | false;
     strokes?: GLTFStrokeReader | false;
+    transmission?: GLTFTransmissionPass | false;
 }
 
 export interface GLTFImageReport {
@@ -520,6 +521,10 @@ interface GLTFTextureTransform {
   rotation?: number;
   scale?: readonly [number, number];
   texCoord?: number;
+}
+
+interface GLTFTransmissionPass {
+    attach(model: import('./model.js').PBRModel, engine: Engine, graph: import('@margoengine/core/extension').FrameGraph): () => void;
 }
 
 class PBRInstances {

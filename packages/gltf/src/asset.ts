@@ -206,6 +206,17 @@ export interface GLTFDecoderHooks {
    * draws them 1 px wide.
    */
   strokes?: GLTFStrokeReader | false;
+  /**
+   * Screen-space transmission (`screenTransmission` from @margoengine/gltf/transmission): `loadGLTF` and
+   * `parseGLTFAsync` import it on their own when a material declares KHR_materials_transmission, so glass refracts and
+   * blurs the scene behind it; `false` keeps the tinted blend. Synchronous `parseGLTF` uses it only when passed.
+   */
+  transmission?: GLTFTransmissionPass | false;
+}
+/** What gltf/pbr needs to refract the scene through a model (`screenTransmission` from @margoengine/gltf/transmission implements it). */
+export interface GLTFTransmissionPass {
+  /** Draws `model`'s transmissive primitives from a scene copy in the scene whose frame graph is `graph`. Returns a remover. */
+  attach(model: import('./model.js').PBRModel, engine: Engine, graph: import('@margoengine/core/extension').FrameGraph): () => void;
 }
 /** One POINTS or LINES primitive that asks for a width, as gltf/pbr hands it to `GLTFStrokeReader.attach`. */
 export interface GLTFStrokeItem {

@@ -20,6 +20,7 @@ import {
 } from './asset.js';
 import { withDecoders } from './decoder-default.js';
 import { withMaterials } from './default-materials.js';
+import { withTransmission } from './default-transmission.js';
 import { decoded } from './draco-state.js';
 import { levelOrder } from './progressive-lod.js';
 import { PBRModel, loadGLTF, type GLTFLoadOptions, type PBRMaterial, type PBRPrimitive } from './pbr.js';
@@ -560,7 +561,11 @@ export function loadGLTFProgressive(
       if (scheduled) pump();
     }
   };
-  const build = (d: GLTFDocument, materials?: GLTFDecoderHooks['materials']) => {
+  const build = (
+    d: GLTFDocument,
+    materials?: GLTFDecoderHooks['materials'],
+    transmission?: GLTFDecoderHooks['transmission'],
+  ) => {
     doc = d;
     const defs = primitiveDefs(doc),
       keyOf = new Map(defs.map((p, k) => [p, k]));
@@ -572,6 +577,7 @@ export function loadGLTFProgressive(
     });
     if (decoders.instancing) hooks.instancing = { read: () => undefined };
     if (materials) hooks.materials = materials;
+    if (transmission) hooks.transmission = transmission;
     if (decoders.meshopt) hooks.meshopt = decoders.meshopt;
     // Placeholder buffers at their declared sizes: checked against the budget before they are allocated. A meshopt
     // fallback buffer is never read, so it gets none.
@@ -674,8 +680,9 @@ export function loadGLTFProgressive(
         held = [];
         // As loadGLTF: a file with physical or specular-glossiness materials draws them with no option passed.
         void withMaterials(m.doc, decoders)
+          .then((found) => withTransmission(m.doc, found))
           .then((found) => {
-            if (!finished) scope.run(() => build(m.doc, found.materials));
+            if (!finished) scope.run(() => build(m.doc, found.materials, found.transmission));
           })
           .catch(fail)
           .then(() => {
