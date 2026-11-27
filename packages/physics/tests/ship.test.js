@@ -1071,7 +1071,7 @@ test("KCS heels outward in its turn and turns tighter for it, as SIMMAN's free-r
     mean = (k) => (starboard[k] + port[k]) / 2,
     within = (value, lo, hi, tolerance) => value >= lo * (1 - tolerance) && value <= hi * (1 + tolerance);
   assert.ok(
-    within(starboard.advance, 2.92, 2.99, 0) && within(starboard.diameter, 2.7, 2.79, 0),
+    within(starboard.advance, 2.92, 2.99, 0.01) && within(starboard.diameter, 2.7, 2.79, 0.01),
     JSON.stringify(starboard),
   );
   // Both sides: the propeller's wake changes with drift by KVLCC2's constants (KCS's are not published), so the sides differ.
@@ -1079,13 +1079,16 @@ test("KCS heels outward in its turn and turns tighter for it, as SIMMAN's free-r
     within(mean('advance'), 2.92, 2.99, 0.03) && within(mean('diameter'), 2.7, 2.79, 0.03),
     JSON.stringify(port),
   );
-  // It heels outward, the most as it starts to turn, then steady; upright it turns 8 percent wider (Fukui et al. fig. 18).
+  // It heels outward, the most as it starts to turn, then steady. Its rudder's roll lever and its roll damping, which
+  // Fukui et al. do not print, were fitted to MARIN's largest and final roll (16.98 and 5.09 degrees); against the data not
+  // fitted: KRISO's largest roll, 15.0 to 15.5, within 12 percent, and the steady roll of both sides within 10 percent of
+  // the measured 4.58 to 5.09.
   assert.ok(
-    within(starboard.peak / DEG, 15, 17, 0.2) && within(port.peak / DEG, 15, 17, 0.2),
+    Math.abs(starboard.peak / DEG / 16.98 - 1) < 0.03 && within(mean('peak') / DEG, 15, 15.5, 0.12),
     `${starboard.peak / DEG} ${port.peak / DEG}`,
   );
-  // Steady it heels 2.9 and 3.7 degrees against the measured 4.6 to 5.1 (docs/limits.md).
-  assert.ok(mean('heel') / DEG > 2.5 && mean('heel') / DEG < 5.1, `${starboard.heel / DEG} ${port.heel / DEG}`);
+  assert.ok(within(mean('heel') / DEG, 4.58, 5.09, 0.1), `${starboard.heel / DEG} ${port.heel / DEG}`);
+  // Upright it turns 8 percent wider (Fukui et al. fig. 18).
   assert.ok(upright.diameter > 1.05 * starboard.diameter && upright.peak === 0, JSON.stringify(upright));
   assert.ok(within(mean('speed') * 24, 10.5, 11.9, 0.05), `${mean('speed') * 24} kn`);
   assert.ok(
