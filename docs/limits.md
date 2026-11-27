@@ -10816,6 +10816,11 @@ reported area and crest state.
 The optional prescribed mean hull closes the solid faces and uses the second-order
 midpoint solve for the normal motion and pressure exchange. Its mask stays at the
 reference shape. It represents small displacements and rotations about that shape.
+`bakeWakeHullMask` samples a closed, consistently wound triangle mesh at the physical center
+of each cell, respecting existing dry cells and exact seam copies. The shoreline and submerged
+solid are resolved at grid spacing. Refine the grid to resolve narrow features. Give the baker
+a non-self-intersecting mesh. Enclosed cavities follow even–odd fill.
+The optional sea entry grows from 12,263 to 14,183 B gzip with a 14,609 B ceiling.
 Freely advancing geometry and the held-out Wigley stem elevation remain open. The optional loads entry is 65,111 B gzip with a 67,065 B ceiling.
 
 ### Ship motion on the wake grid

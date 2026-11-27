@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21043453,
+  "total": 21045431,
   "history": [
     {
       "date": "2026-10-24",
@@ -14774,6 +14774,11 @@
       "commit": "kb-scenes-shedbox1",
       "reason": "KB-SCENES-SHEDBOX1: @margoengine/procedural/sheds to 3862 B gzip (ceiling 2691 to 4118) for the board map, board UVs, the interior and floor parts and the daylight factor, which belong to the shed they texture and light; @margoengine/scenes/dune-coast to 6486 B (6475 to 6742) and its textured boards through @margoengine/materials (which loads gltf's PBR model), as every other scene loads the packages it draws with. Core and stage are unchanged.",
       "grew": 5
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "sea-04-mean-hull-mask",
+      "reason": "Physics/sea moves from 12263 to 14183 B gzip and its ceiling from 12631 to 14609 B. The optional mesh bake validates and converts a closed hull to the finite wake mask, including target placement and shared edges. A separate entry would require another import and its own mask and hull type documentation for the same wake setup. Named imports tree-shake the bake when unused. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15654,7 +15659,7 @@
     "@margoengine/physics/room-sound": 5606,
     "@margoengine/physics/runoff": 4125,
     "@margoengine/physics/schooling": 5102,
-    "@margoengine/physics/sea": 12631,
+    "@margoengine/physics/sea": 14609,
     "@margoengine/physics/seakeeping": 43883,
     "@margoengine/physics/sediment": 4657,
     "@margoengine/physics/seismic": 5266,

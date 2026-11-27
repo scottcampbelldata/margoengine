@@ -3633,23 +3633,27 @@ angular pressure impulse, cumulative joules and displaced cubic metres. Use the 
 step, and for an in-progress world set `hull.startTime` to `world.time` before adding
 the prescribed hull. A fixed hull omits `velocity`. The mask represents the mean pose over
 the run, so this setup is for fixed hulls and small motion about that pose.
+Use `bakeWakeHullMask` with a closed, consistently wound mesh. Imported meshes and code-built hulls
+use the same indexed vertex input. Pass an optional column-major hull-to-wake affine matrix for a
+mesh in local coordinates. The baker closes solid cell centers at the grid's actual layer depths.
 
 ```ts
 import { FiniteQuayWake } from 'margoengine/physics/loads';
+import { bakeWakeHullMask } from 'margoengine/physics/sea';
 import { PhysicsWorld } from 'margoengine/physics/world';
 
-const cells = [16, 8] as const;
-const mask = new Uint8Array(cells[0] * cells[1] * 2);
-for (let row = 0; row < cells[1] * 2; row++) mask[7 + cells[0] * row] = 1;
+const grid = { cells: [16, 8] as const, cellSize: 0.25, depths: [0, 0.5, 1] };
+const hull = {
+  vertices: [2, -0.75, 1, 2, 0.25, 0, 3, 0.25, 1, 2, 0.25, 2],
+  indices: [0, 1, 2, 0, 2, 3, 0, 3, 1, 1, 3, 2],
+};
 const wake = new FiniteQuayWake();
 const world = new PhysicsWorld({ rate: { num: 60, den: 1 } }).add(wake, {
-  cells,
-  cellSize: 0.25,
-  depths: [0, 0.5, 1],
+  ...grid,
   pressureAtDepth: true,
   hull: {
-    mask,
-    centre: [1.875, -0.5, 1],
+    mask: bakeWakeHullMask(hull, grid),
+    centre: [2.125, -0.125, 1],
     velocity: (t) => [t < 0.1 ? 0.01 : 0, 0, 0, 0, 0, 0],
   },
 });

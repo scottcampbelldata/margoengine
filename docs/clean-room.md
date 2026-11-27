@@ -12839,6 +12839,14 @@ volume and exact seek. A fixed or oscillating mask is distinct from a translatin
 hull that changes the wetted geometry.
 [Cummins, The Impulse Response Function and Ship Motions, 1962](https://dome.mit.edu/server/api/core/bitstreams/4a239966-bc09-4811-8917-d152923c167f/content)
 
+`bakeWakeHullMask` pairs triangle crossings along each cell-center ray and uses even–odd fill
+for solids and enclosed cavities. The projected edge sign is evaluated in a canonical direction
+with half-open ties so both triangles agree on every shared diagonal. A box and a polygonal
+cylinder supply independent volume bounds. Reindexing, seam copies and live pressure replay
+exercise the same public bake as imported and procedural hulls.
+[Nooruddin and Turk, Simplification and Repair of Polygonal Models Using Volumetric Techniques, 2003, §3.2](https://faculty.cc.gatech.edu/~turk/my_papers/volumetric_simp.pdf)
+[Woop, Benthin and Wald, Watertight Ray/Triangle Intersection, 2013](https://jcgt.org/published/0002/01/05/)
+
 ### The sea's surface and water (`@margoengine/physics/sea`, 2026-11-25, SEA-02)
 
 `packages/physics/src/sea/surface.ts` is written from:

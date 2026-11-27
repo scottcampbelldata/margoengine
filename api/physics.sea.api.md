@@ -61,6 +61,10 @@ export interface WakeBreakingOptions {
     readonly capacity?: number;
 }
 
+export interface WakeHullMaskGrid extends Pick<QuayPotentialGrid, 'cells' | 'cellSize' | 'depths' | 'wet'> {
+    readonly origin?: readonly [number, number];
+}
+
 export interface WakeParams {
     cells?: readonly [number, number];
     cellSize?: number;
@@ -150,6 +154,8 @@ export class WakeSolver implements Solver<WakeParams> {
     extraState(): readonly Region[];
 }
 
+export function bakeWakeHullMask(mesh: HullMesh, grid: WakeHullMaskGrid, transform?: ArrayLike<number>): Uint8Array;
+
 export function wakeRainEquivalentDrop(x: number, z: number, { rate, impactRate, energyFlux }: Pick<HydrometeorSample, 'rate' | 'impactRate' | 'energyFlux'>): WakeRainDrop | undefined;
 
 export function wakeRainSource(drop: WakeRainDrop, grid: WakeRainGrid, dt: number): SeaSource;
@@ -182,11 +188,26 @@ interface FieldUse {
     readonly optional?: boolean;
 }
 
+interface HullMesh {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+}
+
 interface Port {
     readonly field: string;
     readonly region: Region;
     readonly tick: number;
     readonly cell: Cell;
+}
+
+interface QuayPotentialGrid {
+    readonly cells: readonly [number, number];
+    readonly cellSize: number;
+    readonly depths: readonly number[];
+    readonly wet?: ArrayLike<number>;
+    readonly openX?: ArrayLike<number>;
+    readonly openZ?: ArrayLike<number>;
+    readonly horizontalOrder?: 2 | 4 | 8;
 }
 
 type RateLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
