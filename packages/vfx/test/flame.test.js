@@ -767,6 +767,60 @@ test('Flame over a scene depth and in fog: the depth pass writes the depth and b
   depth.destroy();
 });
 
+// KB-VFX-FIRESHADOW1: a large fire's light cast no shadows (Flame had no option and Fire passed none), so it lit the
+// aisle round a corner through the piers.
+test("a large fire's light casts shadows: one point at the footprint's middle holds all of it, in one shadow slot", async (t) => {
+  const e = await engine(t);
+  stubDevice(e.gpu);
+  const clustered = Clustered.attach(e);
+  assert.throws(() => Fire.attach(e, { position: [0, 0, 0], flameLength: 4, lights: clustered }), {
+    code: 'state',
+  });
+  assert.throws(() => Flame.attach(e, { position: [0, 0, 0], length: 4, lights: clustered, castShadow: true }), {
+    code: 'state',
+  });
+  assert.throws(() => Flame.attach(e, { position: [0, 0, 0], length: 4, castShadow: 1 }), TypeError);
+  LocalShadows.attach(e, { lights: clustered });
+  const groups = LightGroups.attach(e, clustered),
+    shape = { position: [10, 0, -4], footprint: [12, 3] },
+    open = Flame.attach(e, { ...shape, length: 4, lights: groups, flicker: 0 }),
+    fire = Fire.attach(e, {
+      position: shape.position,
+      flameLength: 4,
+      width: 12,
+      breadth: 3,
+      lights: groups,
+      smoke: false,
+    }),
+    unshadowed = Fire.attach(e, {
+      position: [0, 0, 0],
+      flameLength: 4,
+      width: 12,
+      lights: groups,
+      castShadow: false,
+      smoke: false,
+    });
+  for (const flame of [open, fire.flame, unshadowed.flame]) flame.onPreUpdate(1 / 30);
+  const sum = (flame) => flame.steadyIntensities.reduce((a, b) => a + b, 0),
+    on = (flame) => flame.lights.filter((l) => l.intensity > 0);
+  assert.equal(fire.flame.lights.length, 1, 'one light, one shadow slot');
+  const light = fire.flame.lights[0];
+  assert.equal(light.castShadow, true);
+  assert.deepEqual([...light.position], [10, 0.35 * 4, -4], "at the footprint's middle");
+  assert.ok(light.radius > 0, 'its source radius softens the shadow');
+  near(sum(fire.flame), sum(open), 1e-9, 'and it carries all the light of the open flame');
+  assert.equal(on(open).length, 3);
+  assert.ok(
+    open.lights.every((l) => !l.castShadow),
+    'a bare Flame casts none by default',
+  );
+  assert.equal(on(unshadowed.flame).length, 3);
+  assert.ok(unshadowed.flame.lights.every((l) => !l.castShadow));
+  fire.dispose();
+  open.dispose();
+  unshadowed.dispose();
+});
+
 // KB-FAULD-FIREDIM1: the light of a large fire follows its displayed brightness, so a tunnel exposed on what the fire
 // lights was nearly black beside it; keyDistance meters the light on a white card.
 test('keyDistance meters the firelight: a white card that far reads 1, the flames unchanged (E = I / d^2, L = E / pi)', () => {
@@ -780,6 +834,7 @@ test('keyDistance meters the firelight: a white card that far reads 1, the flame
       keyDistance: 2,
       power: 1,
       lights: clustered,
+      castShadow: false,
       smoke: false,
     });
   h.frame();

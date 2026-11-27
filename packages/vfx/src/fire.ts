@@ -49,7 +49,8 @@ export interface FireOptions {
   lights?: Clustered | LightGroups;
   /**
    * The firelight's soft shadows (`LocalShadows` from `@margoengine/clustered/shadows`, attached to the same
-   * `Clustered` first). Default true.
+   * `Clustered` first). With a `flameLength` the flame's light is then one point that takes one shadow slot
+   * (`FlameOptions.castShadow`). Default true.
    */
   castShadow?: boolean;
   /** Points on the flame line (`lineLights` samples), 1 to 8. Default 2. */
@@ -210,7 +211,7 @@ export class Fire implements EnginePlugin {
       clustered = groups ? groups.clustered : lights && 'maxLights' in lights ? lights : undefined;
     if (lights && !clustered)
       throw new TypeError('Invalid Fire lights; pass a Clustered from @margoengine/clustered or its LightGroups');
-    if (flameLength === undefined && castShadow && clustered && !clustered.shadow)
+    if (castShadow && clustered && !clustered.shadow)
       throw new MargoError(
         'state',
         'Fire casts soft shadows through LocalShadows; attach LocalShadows to its Clustered first, or pass castShadow: false',
@@ -237,6 +238,7 @@ export class Fire implements EnginePlugin {
         footprint: [width, breadth],
         yaw: Math.atan2(-axis[2], axis[0]),
         lightPower: power,
+        castShadow,
         ...(options.keyDistance === undefined ? {} : { keyDistance: options.keyDistance }),
         ...(options.wind ? { wind: options.wind } : {}),
         ...(options.depth ? { depth: options.depth } : {}),

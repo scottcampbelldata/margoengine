@@ -12,6 +12,7 @@ import {FLAME_LIVE_SETTINGS,FLAME_LOOKS,applyFlameSettings,flameSettingDefaults}
 import {isCompatDevice} from '/packages/webgl2-compat/dist/device.js';
 import {Clustered} from '/packages/clustered/dist/index.js';
 import {LightGroups} from '/packages/clustered/dist/groups.js';
+import {LocalShadows} from '/packages/clustered/dist/shadows.js';
 import {Material,createMesh} from '/packages/materials/dist/index.js';
 import {boxGeometry} from '/packages/geometry/dist/index.js';
 import {Bloom} from '/packages/post/dist/bloom.js';
@@ -172,7 +173,7 @@ function counted(s){
  return made;
 }
 window.check.rows=async function(){
- const s=await bigScene(),lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
+ const s=await bigScene(),lights=Clustered.attach(s.e),shadows=LocalShadows.attach(s.e,{lights}),groups=LightGroups.attach(s.e,lights),
   flame=Big.attach(s.e,{position:[0,0,0],length:8,footprint:[14,8],lights:groups}),
   fire=Fire.attach(s.e,{position:[20,0,0],flameLength:6,width:8,lights:groups});
  await frames(s,3);
@@ -278,8 +279,8 @@ window.check.graded=async function(){
 window.check.veil=async function(){
  const bright=(s)=>{const d=pixels(s);let n=0;for(let i=0;i<d.length;i+=4)if(Math.max(d[i],d[i+1],d[i+2])>128)n++;return n;};
  const run=async(behind)=>{
-  const s=await bigScene({position:[-4,6,26],target:[2,5,0]},320,180,true),lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
-   part=(size,at)=>{const m=createMesh(s.e,boxGeometry(...size),new Material({color:[0.42,0.36,0.3],roughness:0.9}));m.root.setPosition(at);lights.add(m);};
+  const s=await bigScene({position:[-4,6,26],target:[2,5,0]},320,180,true),lights=Clustered.attach(s.e),shadows=LocalShadows.attach(s.e,{lights}),groups=LightGroups.attach(s.e,lights),
+   part=(size,at)=>{const m=createMesh(s.e,boxGeometry(...size),new Material({color:[0.42,0.36,0.3],roughness:0.9}));m.root.setPosition(at);lights.add(m);shadows.add(m);};
   part([400,0.2,400],[0,-0.1,0]);part([0.3,6,10],[7,3,-2]);part([10,6,0.3],[2,3,-7]);
   const fire=Fire.attach(s.e,{position:[-2,0,1.5],flameLength:9,width:6,breadth:5,lights:groups,...(behind?{smoke:false}:{})}),
    smoke=behind?Smoke.attach(s.e,{position:[-2,0,-30],heat:5e6,radius:4,lifetime:6,color:[0.02,0.02,0.02],opacity:1}):fire.smoke;
@@ -349,6 +350,24 @@ window.check.order=async function(){
  const clear=await run(null),front=await run(15),behind=await run(-15);
  return {clear:clear.pixels,front:front.pixels,behind:behind.pixels,errors:[...clear.errors,...front.errors,...behind.errors]};
 };
+// - shadow (KB-VFX-FIRESHADOW1): a wall between a large Fire and the ground behind it. The fire's light stops at the
+//   wall: the ground behind it is far darker than with castShadow false, which lights it through the wall, while the
+//   wall's own side toward the fire stays lit.
+window.check.shadow=async function(){
+ const run=async(castShadow)=>{
+  const s=await bigScene({position:[7,16,14],target:[7,0,0]},256,192,true),lights=Clustered.attach(s.e),shadows=LocalShadows.attach(s.e,{lights}),groups=LightGroups.attach(s.e,lights),
+   part=(size,at)=>{const m=createMesh(s.e,boxGeometry(...size),new Material({color:[0.5,0.45,0.4],roughness:0.9}));m.root.setPosition(at);lights.add(m);shadows.add(m);};
+  part([200,0.2,200],[0,-0.1,0]);part([0.4,6,60],[0,3,0]);
+  const fire=Fire.attach(s.e,{position:[-5,0,0],flameLength:3,width:2,lights:groups,castShadow,keyDistance:10,smoke:false,embers:false});
+  fire.flame.options.flicker=0;fire.flame.options.glow=0;
+  await frames(s,30);const d=pixels(s);let behind=0,n=0;
+  // The middle of the frame looks at the ground 3 to 11 m beyond the wall.
+  for(let y=80;y<130;y++)for(let x=100;x<190;x++){behind+=d[(y*256+x)*4];n++;}
+  const out={behind:behind/n,lights:fire.flame.lights.length,errors:s.errs};s.e.dispose();return out;
+ };
+ const open=await run(false),shadowed=await run(true);
+ return {open:open.behind,shadowed:shadowed.behind,lights:[open.lights,shadowed.lights],errors:[...open.errors,...shadowed.errors]};
+};
 // Pictures of the large flames for a person to look at (not a check): flame-check.mjs --shot <dir> saves them. A night
 // scene at 1280 by 720: ground, walls and trunks that the flames light (receivers of the Clustered).
 async function picture(s){
@@ -362,7 +381,7 @@ window.check.shot=async function(kind){
   s=await bigScene(cams[kind],1280,720,true),lights=Clustered.attach(s.e),groups=LightGroups.attach(s.e,lights),
   part=(size,at,color)=>{const m=createMesh(s.e,boxGeometry(...size),new Material({color,roughness:0.9}));m.root.setPosition(at);lights.add(m);return m;};
  part([400,0.2,400],[0,-0.1,0],[0.2,0.17,0.14]);
- if(kind==='house'){part([0.3,6,10],[7,3,-2],[0.42,0.36,0.3]);part([10,6,0.3],[2,3,-7],[0.42,0.36,0.3]);Fire.attach(s.e,{position:[-2,0,1.5],flameLength:9,width:6,breadth:5,lights:groups});}
+ if(kind==='house'){part([0.3,6,10],[7,3,-2],[0.42,0.36,0.3]);part([10,6,0.3],[2,3,-7],[0.42,0.36,0.3]);Fire.attach(s.e,{position:[-2,0,1.5],flameLength:9,width:6,breadth:5,lights:groups,castShadow:false});}
  if(kind==='crown'){for(let i=-4;i<=4;i++)part([0.7,16,0.7],[i*8,8,-6+(i%2)*8],[0.22,0.16,0.11]);Big.attach(s.e,{position:[0,14,0],length:22,footprint:[44,10],wind:[3,0],crowns:8,lights:groups});}
  if(kind==='grazing')Big.attach(s.e,{position:[0,0,0],length:4,footprint:[60,4],lights:groups});
  if(kind==='front'){

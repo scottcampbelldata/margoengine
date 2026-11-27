@@ -4,6 +4,7 @@
 
 ```ts
 import { Clustered, PointLight, SpotLight } from "@margoengine/clustered";
+import { ShadowBudgetOptions } from "@margoengine/clustered/budget";
 import { LightGroups } from "@margoengine/clustered/groups";
 import { LocalShadows } from "@margoengine/clustered/shadows";
 import { EngineKernel, Vec3 } from "@margoengine/core";
@@ -125,6 +126,8 @@ export function fauldRoofHeight(x: number): number;
 
 export { fauldTunnelsInfo as info };
 const fauldTunnelsInfo: SceneInfo;
+
+export function lampShadowBudget(fires: number, film: boolean, viewer: ArrayLike<number>): ShadowBudgetOptions;
 
 export function linePoints(row: LineRow): {
     x: number;

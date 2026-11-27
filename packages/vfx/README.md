@@ -1037,7 +1037,8 @@ console.log(fire.lights.length); // 2
   size does not change with it.
 - Options: `position` (required, the fuel top), `power` (default 1: light intensity and the flames' and embers'
   radiance), `width` (default `light.length`; the shadow radius scales with it) and `axis` (default [1, 0, 0]) of the
-  flame line, `samples` (default 2), `castShadow` (default true), `depth` (the scene depth: the flames, embers and steam
+  flame line, `samples` (default 2), `castShadow` (default true; a large fire's light is then one point, one shadow
+  slot), `depth` (the scene depth: the flames, embers and steam
   fade 0.08 m before the logs; default none, hard-edged particles), `embers` (default true) and `steam` (a point; default no steam).
   `wind` (`[x, z]` m/s or a field; the flames, embers and steam lean with it, see Wind above; default none) and `fire.setWind`.
 - `lights`: a `LightGroups` (the fire takes a group of its own, `fire`, `fire 2`, ...) or a `Clustered`, whose whole
@@ -1281,7 +1282,9 @@ console.log(Math.round(flameLuminousFlux(1e6, 1760))); // about 150,000 lm from 
   the capture the flame draws into (`depth: () => stack.depthTexture` of a `PostStack`): the colour passes read it and
   the pass that writes the flame's depth does not (KB-SCENES-TUNNELGPU1).
 - Limits: a flame is a procedural volume, not a fluid simulation; it has no soot of its own (a `Fire` adds `Smoke`), its
-  light does not cast shadows, the glow lights a plane (the ground under the flame), not the scene's own surfaces, unless
+  light casts shadows only with `castShadow: true` (default false for a bare `Flame`, true through `Fire`; needs
+  `LocalShadows`): the light is then one point at the footprint's middle in one shadow slot, so a footprint much longer
+  than its flames lights from the middle, the glow lights a plane (the ground under the flame), not the scene's own surfaces, unless
   `depth` is given, and there is no heat shimmer (refraction needs the scene's colour, which a frame pass cannot read;
   KB-FLAME-HEATHAZE1).
 

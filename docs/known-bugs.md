@@ -2230,17 +2230,37 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   the exposure value and the lamps were not the cause: scaling only the firelight lit the same frames.
 - **Fix:** `keyDistance` on `Flame` and `Fire` meters the light on a white card (intensity pi d^2); the Fauld
   tunnels' fire and after states use 2 m (`FIRE_KEY_DISTANCE`). Real frames fr091 to fr096: mean luma 19 to 43. Weak
-  spots left: KB-VFX-FIRESHADOW1 and fr096's smoke reading flat black. Regression:
+  spots left then: KB-VFX-FIRESHADOW1 (fixed) and fr096's smoke reading flat black. Regression:
   packages/vfx/test/flame.test.js.
 
-### Open 2026-11-27: a large fire's light passes through walls (KB-VFX-FIRESHADOW1, vfx)
+### Open 2026-11-27: the Fauld fire state has a burning heap inside a bomb stack (KB-FAULD-FIREINSTACK1, scenes and film layout)
 
-- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr095.json --stills --out <folder>`: the aisle round the
-  corner from the fire is lit evenly, the brick wall and the stacks with no shadow of the piers between.
-- **Cause:** `Fire` passes `castShadow` (default true) to its hearth lights only; the volume of a fire with a
-  `flameLength` makes up to four `Flame` lights with no `castShadow`, and `Flame` has no such option.
-- **Owed in vfx:** one shadowed light per large fire (the points share its map or the strongest casts), within
-  `LocalShadows`' slots beside a scene's lamps, with a test and a real frame.
+- **Repro:** `node tools/shot/cli.mjs tools/shot/shots/fauld-fr095.json --stills --out <folder>`: mean 8-bit luma 1.6,
+  the frame nearly black (38.3 while the fire's light passed through walls, before KB-VFX-FIRESHADOW1).
+- **Cause:** the layout's lamp marked `fire` at plan (61, -9, 0.6) stands inside the `tn_stack_a` casings at world
+  (61.5, 9.45), which span x 60.1 to 62.9 and z 8.77 to 10.16, so its shadow map holds the casings on every side; the
+  stacks also stand between `fireB` and the shot's aisle. `stateLights` also puts the heap on the floor, dropping the
+  lamp's 0.6 m height.
+- **Owed:** the film layout (`tunnels_places.json` in channel-films, which generates `fauld-tunnels-plan.ts`) gives the
+  heap a clear place that lights fd095 from round the corner, or the shot is exposed for the spill. A trial at plan
+  (66, -11.2) behind the camera read mean 5.3, still too dark, so a move alone is not enough. Then a test that no fire
+  of any state stands inside a casing stack.
+
+### Fixed 2026-11-27: a large fire's light passed through walls (KB-VFX-FIRESHADOW1, vfx and scenes)
+
+- **Repro:** the same fr095 still before the fix: the aisle round the corner from the fire lit evenly, the brick wall
+  and the stacks with no shadow of the piers between.
+- **Cause:** `Fire` passed `castShadow` (default true) to its hearth lights only; the volume of a fire with a
+  `flameLength` made up to four `Flame` lights with no `castShadow`, and `Flame` had no such option. In the Fauld
+  scene the lamps also took every shadow slot.
+- **Fix:** `FlameOptions.castShadow` (default false for a bare `Flame`): the light is one point at the footprint's
+  middle that casts through `LocalShadows`, so one slot holds all of it; `Fire` passes its `castShadow`, and a large
+  fire that casts now needs `LocalShadows` attached, as documented for every `Fire`. `lampShadowBudget` in the Fauld
+  tunnels leaves each fire its slot and texels. Real frames: fr091, fr092 and fr094 show the posts', bomb's and
+  rubble's shadows (mean 14.7, 20.3, 11.2, before 21.9, 43.4, 19.1); fr093 35.2 (43.1); fr096 unchanged; fr095 is
+  KB-FAULD-FIREINSTACK1. GPU: flame-check passes on WebGPU and the WebGL2 layer, and its `shadow` step reads 71.7
+  unshadowed and 23.0 shadowed on the ground behind a wall. Regression: packages/vfx/test/flame.test.js,
+  packages/vfx/test/flame-check.mjs, packages/scenes/test/fauld-tunnels.test.js.
 
 ### Fixed 2026-11-27: a fire's sparks drew white under a tungsten white balance (KB-VFX-EMBERWHITE1, vfx)
 

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { shadowBudget } from '../../clustered/dist/budget.js';
 
 const m = await import('../dist/fauld-tunnels.js');
 
@@ -236,6 +237,22 @@ test('fauld-tunnels: smoke underground stops at the roof, over every fire of the
     assert.ok(z + Math.min(3, 1.6 * scale) < smoke.ceiling, 'every flame stands under its roof');
     assert.ok(Math.max(...smoke.color) < 0.1, 'sooty smoke');
   }
+});
+
+// KB-VFX-FIRESHADOW1: the lamps took every shadow slot, and the fires' lights come after them in the light list.
+test('fauld-tunnels: the lamps leave a shadow slot and its texels for every fire of a state', () => {
+  const { lamps } = m.stateLights('fire'),
+    fires = m.dressState('fire').fx.filter((f) => f[1] === 'fire').length + m.stateLights('fire').fires.length;
+  assert.ok(fires >= 3);
+  for (const film of [true, false]) {
+    const slots = film ? 16 : 8,
+      budget = m.lampShadowBudget(fires, film, [0, 1.7, 0]),
+      casting = shadowBudget(lamps, budget).filter((l) => l.castShadow),
+      faces = casting.reduce((sum, l) => sum + (l.direction ? 1 : 6) * l.shadow.resolution ** 2, 0);
+    assert.equal(casting.length, slots - fires, 'the lamps keep the other slots');
+    assert.ok(faces + fires * 6 * budget.resolution ** 2 <= slots * 6 * budget.resolution ** 2);
+  }
+  assert.equal(m.lampShadowBudget(40, true, [0, 0, 0]).maxLights, 1);
 });
 
 // KB-VFX-ROOFDOTS1: each fire's smoke runs along its own gallery, so every fire stands between that gallery's walls.

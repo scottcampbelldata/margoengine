@@ -55,10 +55,12 @@
 // above, so the pixel is never brighter than the hottest gas it crosses, then goes through a camera's per-channel
 // shoulder, peak (1 - e^(-gain c / peak)): a hot core saturates red, then green, and reads yellow-white while blue stays
 // low, so it never blows out to white. The flame lights its surroundings with point lights over its footprint whose
-// intensity follows the puffing of the tongues above them.
+// intensity follows the puffing of the tongues above them. A light that casts shadows is one such point at the
+// footprint's middle: one shadow map holds all of the flame's light, so no part of it passes a wall.
 import type { EngineKernel } from '@margoengine/core';
 import type { Engine, EnginePlugin, FrameGraph, PassContext } from '@margoengine/core/extension';
 import { finiteVector } from '@margoengine/math/validate';
+import { MargoError } from '@margoengine/math/errors';
 import type { Clustered, PointLight } from '@margoengine/clustered';
 import type { LightGroup, LightGroups } from '@margoengine/clustered/groups';
 import { viewMatrix } from '../../shared/view.js';
@@ -328,6 +330,14 @@ export interface FlameOptions extends FlameRampOptions {
    * none: the silhouette light.
    */
   keyDistance?: number;
+  /**
+   * The light casts soft shadows (`LocalShadows` from `@margoengine/clustered/shadows`, attached to the same
+   * `Clustered` first, which also takes the casters): all of it is then one point at the footprint's middle, a third of
+   * the flame up, with the source radius as the penumbra's, so it takes one of `LocalShadows`' `maxLights` slots (six
+   * cube faces) and walls and piers stop it. Without `lights` it does nothing. Read at attach. Default false: up to four
+   * points over the footprint that light through everything.
+   */
+  castShadow?: boolean;
   /** Fog over the flames (`Fog` of `@margoengine/environment` or any `FogLike`). Default none. */
   fog?: FogLike | null;
   /**
@@ -616,7 +626,7 @@ export class Flame implements EnginePlugin {
   private readonly seed: number;
   /** Read every frame; see {@link FlameOptions}. */
   readonly options: FlameOptions;
-  /** The light's points (empty without `lights`), their intensities as of the last frame. */
+  /** The light's points (empty without `lights`; one with `castShadow`), their intensities as of the last frame. */
   readonly lights: readonly PointLight[];
   private engine?: Engine;
   private disposed = false;
@@ -659,10 +669,16 @@ export class Flame implements EnginePlugin {
       clustered = groups ? groups.clustered : lights && 'maxLights' in lights ? lights : undefined;
     if (lights && !clustered)
       throw new TypeError('Invalid Flame lights; pass a Clustered from @margoengine/clustered or its LightGroups');
+    const castShadow = options.castShadow === true;
+    if (castShadow && clustered && !clustered.shadow)
+      throw new MargoError(
+        'state',
+        'A Flame that casts shadows needs LocalShadows attached to its Clustered first; attach it, or pass castShadow: false',
+      );
     const list: PointLight[] = [];
     if (clustered) {
-      for (let i = 0; i < 4; i++)
-        list.push({ position: [0, -1e6, 0], range: 1, intensity: 0, color: [1, 0.5, 0.2], radius: 0 });
+      for (let i = 0; i < (castShadow ? 1 : 4); i++)
+        list.push({ position: [0, -1e6, 0], range: 1, intensity: 0, color: [1, 0.5, 0.2], radius: 0, castShadow });
       if (groups) {
         let name = 'flame';
         for (let n = 2; groups.names.includes(name); n++) name = `flame ${n}`;
@@ -702,6 +718,8 @@ export class Flame implements EnginePlugin {
       rampIn(o.slope[1], 'slope z', -10, 10);
     }
     rampIn(o.glow ?? 1, 'glow', 0, 8);
+    if (o.castShadow !== undefined && typeof o.castShadow !== 'boolean')
+      throw new TypeError('Flame castShadow must be true or false; pass a boolean');
     if (o.reactive !== undefined && typeof o.reactive !== 'boolean')
       throw new TypeError('Flame reactive must be true or false; pass a boolean');
     rampIn(o.haze ?? DEFAULT_HAZE, 'haze', 0, 1);
@@ -1001,7 +1019,8 @@ export class Flame implements EnginePlugin {
       lights = this.lights as PointLight[],
       longX = fp[0] >= fp[1],
       span = longX ? fp[0] : fp[1],
-      n = Math.min(4, Math.max(1, Math.round(span / Math.max(L, 1e-3)))),
+      // One point per flame length along the footprint, up to the points made at attach (one while it casts shadows).
+      n = Math.min(lights.length, Math.max(1, Math.round(span / Math.max(L, 1e-3)))),
       on = this.current > 0,
       look = this.lookOf(),
       total = on ? this.lightTotal(L, fp, look) : 0,

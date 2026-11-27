@@ -223,6 +223,15 @@ try {
       `ok animatedFeature graded: lit ${g.plain.lit} -> ${g.glow.lit} with bloom, core ${g.glow.core}, no white`,
     );
   });
+  await step('shadow', async () => {
+    const r = await page.evaluate(() => window.check.shadow());
+    assert.deepEqual(r.errors, [], 'no GPU error');
+    assert.deepEqual(r.lights, [4, 1], 'one shadowed light');
+    assert.ok(r.open > r.shadowed + 20, `the wall stops the shadowed fire's light: ${JSON.stringify(r)}`);
+    console.log(
+      `ok fire shadow: ground behind the wall ${r.open.toFixed(1)} unshadowed, ${r.shadowed.toFixed(1)} shadowed`,
+    );
+  });
   await step('veil', async () => {
     const v = await page.evaluate(() => window.check.veil());
     assert.deepEqual(v.errors, []);

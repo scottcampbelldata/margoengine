@@ -19,7 +19,7 @@ import { Clustered, type PointLight, type SpotLight } from '@margoengine/cluster
 import { LocalShadows } from '@margoengine/clustered/shadows';
 import { LightGroups } from '@margoengine/clustered/groups';
 import { LightBounce } from '@margoengine/clustered/bounce';
-import { shadowBudget } from '@margoengine/clustered/budget';
+import { shadowBudget, type ShadowBudgetOptions } from '@margoengine/clustered/budget';
 import { lumensToCandela, exposureFromEV100 } from '@margoengine/clustered/units';
 import { flameEmission } from '@margoengine/clustered/flicker';
 import { VolumetricFog } from '@margoengine/environment/volumetric';
@@ -491,6 +491,18 @@ export function paintTone(x: number, z: number): [number, number, number] {
   return [tone * (1 + warm), tone, tone * (1 - warm)];
 }
 
+/**
+ * The lamps' share of the shadow maps beside `fires` large fires: each fire's light casts through one slot of six faces
+ * (`FlameOptions.castShadow`), taken after the lamps in the light list, so the lamps leave that many slots and their
+ * texels free (KB-VFX-FIRESHADOW1). At least one lamp keeps casting.
+ */
+export function lampShadowBudget(fires: number, film: boolean, viewer: ArrayLike<number>): ShadowBudgetOptions {
+  const slots = film ? 16 : 8,
+    resolution = film ? 1024 : 512,
+    lamps = Math.max(1, slots - fires);
+  return { viewer, texels: resolution ** 2 * 6 * lamps, resolution, maxLights: lamps };
+}
+
 const lensFov = (focal: number) => (2 * Math.atan(20.25 / (2 * focal))) / D; // 36 x 20.25 mm (16:9 full frame)
 
 /**
@@ -564,14 +576,10 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   );
   const viewer = () => engine.camera.position as unknown as Vec3;
   const bulbs = groups.group('bulbs');
+  const burning = [...fx, ...fireSpots.map((f) => ['', 'fire', f.at[0], f.at[1], f.at[2], f.scale] as const)] as const;
   const budget = () =>
     bulbs.setLights(
-      shadowBudget(lampLights, {
-        viewer: viewer(),
-        texels: (film ? 1024 : 512) ** 2 * 6 * (film ? 16 : 8),
-        resolution: film ? 1024 : 512,
-        maxLights: film ? 16 : 8,
-      }),
+      shadowBudget(lampLights, lampShadowBudget(burning.filter(([, kind]) => kind === 'fire').length, film, viewer())),
     );
   budget();
   // One bounce of every shadowed lamp: the lit floor, stacks and whitewash light the arch, the rock and the undersides,
@@ -603,10 +611,7 @@ export async function attach(engine: EngineKernel, settings: FauldTunnelsSetting
   // Fire and smoke of the state.
   const fires: Fire[] = [],
     smokes: Smoke[] = [];
-  for (const [, kind, x, y, z, scale] of [
-    ...fx,
-    ...fireSpots.map((f) => ['', 'fire', f.at[0], f.at[1], f.at[2], f.scale] as const),
-  ]) {
+  for (const [, kind, x, y, z, scale] of burning) {
     const p = toWorld(x, y, z);
     // A burning store: flames about 1.6 m long a unit of scale (a crate and its packing, about 1 MW by Heskestad's
     // length), held under the 3.6 m arch, with their own light and smoke on the lamps' groups.
