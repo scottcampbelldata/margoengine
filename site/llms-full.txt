@@ -15991,12 +15991,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Cause:** `BiomeView`'s horizon terrain copies each far corner's weights from the nearest edge texel
   (`#horizonTerrain`), so one edge texel's material runs the whole 12 km.
 
-### Open 2026-11-27: volumetric clouds draw full white through a smoke pall (KB-SKY-PALLCLOUD1, sky)
+### Fixed 2026-11-27: volumetric clouds drew full white through a smoke pall (KB-SKY-PALLCLOUD1, sky)
 
-- **Repro:** timber-valley `weather=smoke&date=1910-08-22&hour=10`, view `aftermath`: a cumulus low on the left is the
-  brightest thing in the frame, white against the orange pall; `VolumetricClouds.dispose()` removes it.
-- **Cause (not traced past this):** the day sky takes the smoke layer through `atmosphere.sunColor` and
-  `scatteredLight`; the volumetric clouds are not dimmed or veiled by it.
+- **Repro (before):** timber-valley `weather=smoke&fire=none&date=1910-08-22&hour=10`, view `aftermath`: a cumulus low
+  on the left was the brightest thing in the frame, code (251, 246, 250) against the pall's (206, 155, 134).
+- **Cause:** the day sky takes the smoke layer through `atmosphere.sunColor` and `scatteredLight`, and the night sky
+  sees what is above the layer through `layerTransmittance`; `VolumetricClouds` composite over the sky after it and
+  read none of the three, so they drew as on a clear day.
+- **Fix:** the clouds stand above the layer and are seen through it: their light times `layerTransmittance` to the
+  power 1 / sin e along each ray (floored at 3 degrees, as the sky's own), times the sky's `sunIntensity`, plus the
+  layer's glow (`scatteredLight` in sky units, through the new `Sky.zenithSun`) over their opacity, in the picture and
+  both deck maps (`packages/sky/src/volumetric-clouds.ts`, `writeVeil`). The same cloud now draws (221, 151, 69), a
+  little darker than the sky beside it (RTX A6000, WebGPU, 960 x 540).
+- **Regression test:** `packages/sky/test/volumetric-clouds.test.js` (a low haze layer in the sky dims and veils the
+  clouds seen through it).
 
 ### Fixed 2026-11-27: TAA gave instanced primitives camera motion only (KB-TAA-INSTMOTION1, taa, gltf)
 
@@ -16059,8 +16067,8 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   orange-grey sky with the ridges visible (RTX A6000, WebGPU, 960 x 540).
 - **Regression test:** `packages/scenes/test/timber-valley.test.js` (the smoke day is daylight; fails on 0.6).
 - **Still open on this view:** the distant haze is much darker than the sky behind it (KB-SKY-PALLHAZE1), dark beaded
-  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and a cloud low on the left draws white through
-  the pall (KB-SKY-PALLCLOUD1).
+  trails cross the upper left at film quality (KB-VFX-DARKTRAILS1), and a cloud low on the left drew white through
+  the pall (KB-SKY-PALLCLOUD1, fixed).
 
 ### Open 2026-11-27: under a smoke load the ground haze is far darker than the sky behind it (KB-SKY-PALLHAZE1, weather and sky)
 
