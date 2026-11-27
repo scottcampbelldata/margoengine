@@ -16162,9 +16162,15 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 - **Ruled out (2026-11-27):** the drag's damping outside the lock-in span (a mean drag of 0.5 or 0.25 in place of 1 leaves
   the swing at 0.27 D and 0.24 D, so the swing is short of excitation, not over-damped); locking each wake's frequency to its
   segment's own cross-flow frequency within a band of the local shedding (30 %: 0.246 D; 60 %: the third mode, 0.11 D).
-- **Open:** an excitation model that feeds a strongly sheared span as measured, from the published time-domain VIV load
-  models (the excitation force synchronised to the cross-flow velocity, Thorsen, Saevik and Larsen 2014 and 2016), checked
-  on this case and on the paper's bidirectionally sheared cases with no new fitting.
+- **Tried (2026-11-27), not landed:** the synchronization model of Thorsen, Saevik and Larsen (2016, its open preprint and
+  Thorsen's 2016 thesis): an excitation 1/2 rho D U^2 C_v(y0 / D) cos phi whose phase locks to the velocity across within
+  f D / U of 0.10 to 0.26, with their C_v (optimised on the NDP riser, read from their Fig. 7) and synchronization function
+  (their Fig. 4), no new fitting. With their damping in place of the drag's across, it takes this case to 0.453 D (+11 %),
+  but the towed pipe at 1.6 m/s swings 1.4 D in its first mode, and the 0.4 m/s and 0.6 m/s shear cases run 42 % and 128 %
+  high. With the drag's damping kept beside theirs: -6 % and +14 % on the towed pipe, but +45 % on the 0.6 m/s shear and
+  -35 % here. Their excitation was fitted to a different riser; no variant without new fitting matches all four cases.
+- **Open:** fitting an excitation model across the measured cases (calibrated on some, checked on the rest), or a model of
+  the wake along a sheared span.
 
 ### Fixed 2026-11-27: a pinned rod blew up at coarse steps under high tension, and at fine steps when stretched (KB-PHYS-RODSTRING1, physics rod)
 
