@@ -56,6 +56,7 @@ export class VATCrowd implements EnginePlugin {
         matrix: Float32Array;
         cascade: number;
     }): void;
+    draw(c: Context, mode: 'gbuffer' | 'ambient' | 'occlusion', _color?: GPUTextureView, _depth?: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: VATOcclusionPass): void;
     onDeviceRestored(): void;
     dispose(): void;
     [Symbol.dispose]: () => void;
@@ -105,6 +106,12 @@ export interface VATLightingHooks {
 
 export interface VATMap {
     bind(device: GPUDevice, srgb: boolean): [GPUTextureView, GPUSampler] | undefined;
+}
+
+export interface VATOcclusionPass {
+    readonly pass: GPURenderPassEncoder;
+    readonly view: ArrayLike<number>;
+    readonly depthCompare: GPUCompareFunction;
 }
 
 export const VAT_STRIDE = 24;

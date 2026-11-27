@@ -348,13 +348,54 @@ function litShader(vertex: string): string {
   if (!code) lit.set(vertex, (code = buildLit(vertex)));
   return code;
 }
+// SSAO's G-buffer fragment (`ssao.add(crowd)`): the composed lit shader with only its return replaced, so every
+// binding the effects read stays statically used and their bind group fits the pipeline's layout. Location 0 is the
+// view-space normal and -viewZ, location 1 the ambient light the beauty pass added (hemisphere fill, or an IBL
+// effect's `margoAmbient`), which SSAO takes out where it is occluded.
+// Ambient-only occlusion as in M. Mittring, "Finding Next Gen: CryEngine 2", SIGGRAPH 2007 course notes, and
+// L. Bavoil and M. Sainz, "Screen Space Ambient Occlusion", NVIDIA, 2008: direct light is never darkened.
+const occlusionCode = new Map<string, string>();
+function occlusionShader(code: string): string {
+  let out = occlusionCode.get(code);
+  if (out) return out;
+  const signature = '@fragment fn fragment(i:Out,@builtin(front_facing) front:bool)->@location(0) vec4f {',
+    end = 'return vec4f(color,1.0);\n}',
+    ambient = code.includes('let margoAmbient=') ? 'ambient(s)+margoAmbient' : 'ambient(s)';
+  if (!code.includes(signature) || !code.includes(end))
+    throw new MargoError(
+      'unsupported',
+      'VAT crowd SSAO: a lighting effect replaced the crowd fragment; use matching package versions',
+    );
+  out = code
+    .replace(
+      signature,
+      'struct MargoOcclusionOut {@location(0) normal:vec4f,@location(1) ambient:vec4f}\n' +
+        '@group(2) @binding(0) var<uniform> occlusionView:mat4x4f;\n' +
+        signature.replace('@location(0) vec4f', 'MargoOcclusionOut'),
+    )
+    .replace(
+      end,
+      'return MargoOcclusionOut(vec4f(normalize((occlusionView*vec4f(s.n,0.0)).xyz),' +
+        `-(occlusionView*vec4f(i.position,1.0)).z),vec4f(${ambient},1.0));\n}`,
+    );
+  if (occlusionCode.size >= 64) occlusionCode.clear();
+  occlusionCode.set(code, out);
+  return out;
+}
+/** What SSAO hands a source's `draw` in `'occlusion'` mode (`@margoengine/post` `SSAOSource`), declared here so the VAT entry does not import post. */
+export interface VATOcclusionPass {
+  readonly pass: GPURenderPassEncoder;
+  readonly view: ArrayLike<number>;
+  readonly depthCompare: GPUCompareFunction;
+}
 let serial = 0;
 /**
  * Draws any number of copies of baked VAT data in one instanced call: each instance has its own matrix, clip, time
  * offset, speed and atlas region, and the CPU does no per-instance work per frame (instance data uploads only when
  * changed). Opaque; the GPU clips off-screen instances (no CPU culling). `shadows.add(crowd)` casts the posed crowd
  * into `@margoengine/shadows` and shadows it; `lighting.add(crowd)` lights it with an EnvironmentLighting (IBL);
- * `lights.add(crowd)` lights it with `@margoengine/clustered` point, spot and area lights. No SSAO.
+ * `lights.add(crowd)` lights it with `@margoengine/clustered` point, spot and area lights; `ssao.add(crowd)` lets
+ * `@margoengine/post` SSAO darken its ambient light where it is occluded.
  */
 export class VATCrowd implements EnginePlugin {
   readonly name = 'vat:' + serial++;
@@ -391,6 +432,17 @@ export class VATCrowd implements EnginePlugin {
   private readonly lighting = new Set<VATLighting>();
   private code: string;
   private light?: { group: GPUBindGroup; bound: unknown[] };
+  private occlusion?: {
+    key: string;
+    code: string;
+    pipeline: GPURenderPipeline;
+    /** The view matrix SSAO passes; core submits each view's frame on its own, so one buffer serves every view. */
+    view: GPUBuffer;
+    viewGroup: GPUBindGroup;
+    values: Float32Array;
+    groups: GPUBindGroup[];
+    bound: unknown[];
+  };
   private shadow?: {
     pipeline: GPURenderPipeline;
     frames: GPUBuffer;
@@ -513,7 +565,7 @@ export class VATCrowd implements EnginePlugin {
       name: this.name,
       order: 1,
       execute: (c) => {
-        if (c.backend === 'webgpu') this.draw(c);
+        if (c.backend === 'webgpu') this.drawBeauty(c);
       },
     });
   }
@@ -659,15 +711,9 @@ export class VATCrowd implements EnginePlugin {
     }
     return g;
   }
-  private draw(c: Context): void {
-    const e = this.engine;
-    if (!this.n || !e) return;
-    const device = c.device,
-      g = this.upload(device),
-      samples = c.descriptor.multisample?.count ?? 1,
-      depth = c.descriptor.depthStencil!.format;
-    // Effects compose into the lit shader (group 1); without any (or none ready) the crowd keeps the unlit shader and its exact calls.
-    let code = this.plain;
+  /** The shader with every ready effect composed in (group 1) and their bindings; `lit` starts from the lit shader even with none. */
+  private composed(lit: boolean): { code: string; entries: GPUBindGroupEntry[] } {
+    let code = lit ? litShader(this.layout.vertex) : this.plain;
     const entries: GPUBindGroupEntry[] = [];
     for (const effect of this.lighting) {
       const hooks = effect.pbr!(1);
@@ -676,6 +722,104 @@ export class VATCrowd implements EnginePlugin {
         entries.push(...effect.bindings());
       }
     }
+    return { code, entries };
+  }
+  /**
+   * `@margoengine/post` SSAO's source call (`ssao.add(crowd)`): in `'occlusion'` mode the posed crowd writes its
+   * view-space normal and depth and its ambient light into SSAO's open G-buffer pass, depth-tested against the depth
+   * the crowd drew this frame. Other modes draw nothing.
+   */
+  draw(
+    c: Context,
+    mode: 'gbuffer' | 'ambient' | 'occlusion',
+    _color?: GPUTextureView,
+    _depth?: GPUTextureView,
+    _phase?: 'all' | 'opaque' | 'blend',
+    external?: VATOcclusionPass,
+  ): void {
+    if (mode !== 'occlusion' || !external || !this.n || !this.engine || this.disposed) return;
+    const device = c.device,
+      g = this.upload(device),
+      { code: lit, entries } = this.composed(true),
+      code = occlusionShader(lit),
+      samples = c.descriptor.multisample?.count ?? 1,
+      format = c.descriptor.depthStencil!.format,
+      key = `${samples}${format}${external.depthCompare}`;
+    let o = this.occlusion;
+    if (!o || o.key !== key || o.code !== code) {
+      const module = device.createShaderModule({ code });
+      o?.view.destroy();
+      const pipeline = device.createRenderPipeline({
+          layout: 'auto',
+          vertex: { module, entryPoint: 'vertex', buffers: this.vertexLayout() },
+          fragment: {
+            module,
+            entryPoint: 'fragment',
+            targets: [{ format: 'rgba16float' }, { format: 'rgba16float' }],
+          },
+          primitive: { cullMode: 'back' },
+          depthStencil: { format, depthWriteEnabled: false, depthCompare: external.depthCompare },
+          multisample: { count: samples },
+        }),
+        buffer = device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+      o = this.occlusion = {
+        key,
+        code,
+        pipeline,
+        view: buffer,
+        viewGroup: device.createBindGroup({
+          layout: pipeline.getBindGroupLayout(2),
+          entries: [{ binding: 0, resource: { buffer } }],
+        }),
+        values: new Float32Array(16),
+        groups: [],
+        bound: [],
+      };
+    }
+    o.values.set(external.view);
+    device.queue.writeBuffer(o.view, 0, o.values);
+    const [view, sampler] = this.map?.bind(device, true) ?? g.blank,
+      bound = [
+        g.instances,
+        view,
+        sampler,
+        ...entries.map((x) => ('buffer' in x.resource ? x.resource.buffer : x.resource)),
+      ];
+    if (!o.groups.length || bound.length !== o.bound.length || bound.some((x, i) => x !== o!.bound[i])) {
+      const layout = (i: number) => o!.pipeline.getBindGroupLayout(i);
+      o.bound = bound;
+      o.groups = [
+        device.createBindGroup({
+          layout: layout(0),
+          entries: [g.frame, g.instances!, g.clips]
+            .map((buffer, binding) => ({ binding, resource: { buffer } }) as GPUBindGroupEntry)
+            .concat(
+              { binding: 3, resource: g.vat.createView() },
+              { binding: 4, resource: view },
+              { binding: 5, resource: sampler },
+            ),
+        }),
+        ...(entries.length ? [device.createBindGroup({ layout: layout(1), entries })] : []),
+      ];
+    }
+    const pass = external.pass;
+    pass.setPipeline(o.pipeline);
+    pass.setBindGroup(0, o.groups[0]!);
+    if (entries.length) pass.setBindGroup(1, o.groups[1]!);
+    pass.setBindGroup(2, o.viewGroup);
+    this.bindVertices(pass, g);
+    pass.setIndexBuffer(g.index, 'uint32');
+    pass.drawIndexed(this.vat.indices.length, this.n);
+  }
+  private drawBeauty(c: Context): void {
+    const e = this.engine;
+    if (!this.n || !e) return;
+    const device = c.device,
+      g = this.upload(device),
+      samples = c.descriptor.multisample?.count ?? 1,
+      depth = c.descriptor.depthStencil!.format;
+    // Effects compose into the lit shader (group 1); without any (or none ready) the crowd keeps the unlit shader and its exact calls.
+    const { code, entries } = this.composed(false);
     const f = this.frame;
     f.set(c.camera.matrix);
     f.set(c.camera.position, 16);
@@ -767,9 +911,10 @@ export class VATCrowd implements EnginePlugin {
         g.clips,
         g.instances,
         this.shadow?.frames,
+        this.occlusion?.view,
       ])
         r?.destroy();
-    this.gpu = this.pipeline = this.group = this.light = this.shadow = undefined;
+    this.gpu = this.pipeline = this.group = this.light = this.shadow = this.occlusion = undefined;
     this.key = '';
     this.code = this.plain;
     this.bound = [];
