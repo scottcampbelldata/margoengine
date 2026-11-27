@@ -99,6 +99,21 @@ build", 069f20095) and used by `docs/physics-solver-audit.md`:
 - **Rapier parity:** every row of `docs/physics-collision-parity.md` DONE. Today 234 DONE, 10 PARTIAL, 4 MISSING of
   254.
 
+Status 2026-11-27 (Claude, laptop). Met: every checklist row above but Rapier parity, now with `contactcontinue`
+(e09ecb054), `InstancedBodies` (03f278d5a), coded errors on every rigid input (e4b589866), the example page
+`examples/physics-rigid.html` (b8fe55d3e), the quick start and three.js note (014efc5eb), and the exact-solution suite
+`tests/rigid-validation.test.js` with the restitution chain fix (03202202a). Open, so the row stays CLAIMED:
+- Rapier parity: the three PARTIAL rows of `docs/physics-collision-parity.md` (2D soft builders, dihedral and wire
+  elements, soft recovery settings) belong to SOFT-01, SOFT-02 and SOFT-04.
+- Point 1: one solver tier; no separate high-fidelity tier (for example a direct or block solver for whole stacks) behind
+  an option.
+- Point 2: checked against exact solutions only; no published measured experiment (restitution or friction of real
+  materials) yet.
+- Point 4: the couplings the catalog row names are not each re-proved for this item.
+- Point 6: four-wide solver batches and parallel broad and narrow phases (islands already solve on threads, 684c99009);
+  B-02 64-bit builds.
+- A touching Newton's cradle shares the strike out (docs/limits.md), as every sequential-impulse rival does.
+
 ### P2. DYN-06 Mass properties and collision geometry
 
 - **Shapes:** sphere, box, capsule, cylinder, cone, convex hull, triangle mesh, heightfield, compound/container,
@@ -107,6 +122,13 @@ build", 069f20095) and used by `docs/physics-solver-audit.md`:
   (Rapier has it); trimesh from any glTF mesh with no extra work; scaled shapes.
 - **Robustness:** open and non-manifold meshes refused or repaired with a coded error, never NaN. PA-88 (repair) and
   PA-09 (decomposition bounded by work, not the clock) are fixed; PA-87 is open.
+
+Status 2026-11-27 (Claude, laptop). Met: every shape with its mass and inertia from density (the example page shows each
+against the closed form, and a rolling ball checks the inertia at 5/7 g sin t), convex decomposition with a deterministic
+bound (PA-09, 7f4117272), trimesh from any glTF mesh (`addModel`), scaled shapes, and coded errors linking
+errors#physics-meshes for every bad mesh (e4b589866). Open: PA-87 (Blender-tagged bodies get only box, sphere, capsule
+and cylinder fitted to the bounds, with no hull, mesh or decomposition tag and no density or material preset); the
+default density is 1 kg/m³ as in Rapier, not a real material's.
 
 ### P3. DYN-03 Joints and motors
 
