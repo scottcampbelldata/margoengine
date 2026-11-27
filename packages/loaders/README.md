@@ -163,7 +163,7 @@ try {
 
 - Core `Geometry` holds positions and normals only, at most 11,184,810 vertices (`CORE_MAX_VERTICES`): UVs and vertex colors are kept in `LoadedGeometry` but not rendered. `toGeometries` and `createMeshes` split a larger mesh into consecutive triangle ranges of at most that many vertices (or `maxPartVertices`) and 67,108,864 indices each; smooth normals are computed over the whole mesh first, so the parts meet without seams, and a vertex on a cut is stored in both parts. Point clouds render as octahedron markers (subsampled past `maxPoints`) because core has no point primitive.
 - PLY face colors and other per-face scalar properties become per-face groups (`group.color`, `group.properties`). OFF reads ASCII and big-endian binary files and keeps each face's color or colormap index in its group. `parseVTK` reads legacy POLYDATA surfaces only; `parseVTKLegacy` (`/vtk-legacy`) reads every legacy dataset type with VERTICES and LINES cells and cell data, and `parseVTKXML` (`/vtk-xml`) the XML files. PCD ignores fields other than position, normal, rgb/rgba and intensity.
-- 3MF: `parse3MF` reads the core format and base materials; textures, composite materials and multi-properties come from `parse3MFMaterials` (`/threemf-materials`), beam lattices and slices from `parse3MFLattice` (`/threemf-lattice`). ZIP64 and encrypted packages are refused; meshes of type `other` are skipped, however the build reaches them, and the type of an object of components is ignored (core specification). A group of another type than `model` says so in `objectType`, and `partNumber` and `itemPartNumber` carry the `partnumber` of its mesh object and build item. The production extension is read under whatever prefix a file declares: `buildUUID` on the result, `itemUUID`, `componentUUID`, `uuid` and `alternativeUUID` on each group, and `modelPath` for a mesh from a part other than the root. As the extension asks, only the root part may name another part, and another part's build is ignored.
+- 3MF: `parse3MF` reads the core format and base materials; textures, composite materials and multi-properties come from `parse3MFMaterials` (`/threemf-materials`), beam lattices and slices from `parse3MFLattice` (`/threemf-lattice`), volumetric and implicit data from `parse3MFVolumetric` (`/threemf-volumetric`) and displacement maps from `parse3MFDisplacement` (`/threemf-displacement`). `parse3MF` reads a displacement mesh as its base triangles, in groups marked `displaced`, and refuses a level set object (`unsupported`), as it has no triangles. ZIP64 and encrypted packages are refused; meshes of type `other` are skipped, however the build reaches them, and the type of an object of components is ignored (core specification). A group of another type than `model` says so in `objectType`, and `partNumber` and `itemPartNumber` carry the `partnumber` of its mesh object and build item. The production extension is read under whatever prefix a file declares: `buildUUID` on the result, `itemUUID`, `componentUUID`, `uuid` and `alternativeUUID` on each group, and `modelPath` for a mesh from a part other than the root. As the extension asks, only the root part may name another part, and another part's build is ignored.
 - glTF lives in gltf and gltf/pbr.
 
 ## STL
@@ -1012,6 +1012,45 @@ for (const { positions, indices, groups, matrices } of model.instances) {
     mesh = createInstancedMesh(stage.engine, geometry, materials, matrices.length / 16);
   for (let i = 0; i < matrices.length / 16; i++) mesh.instances.setMatrixAt(i, matrices.subarray(i * 16, i * 16 + 16));
 }
+```
+
+## 3MF volumes and displacement
+
+`parse3MFVolumetric` returns the meshes as `parse3MF` does, with `images` (PNG sheets), `functions` (image samplers and node graphs), `volumes` and the built `objects` that have volume data or a level set, each with its placements and a level set's bounding mesh. References, graph order and types are checked. `parse3MFDisplacement` returns `maps`, `displacementGroups` (coordinates, factors and unit vectors) and `meshes` (base triangles, each corner's coordinate and the placements). Neither evaluates a function, meshes a level set or moves a surface.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import { parse3MFVolumetric } from 'margoengine/loaders/threemf-volumetric';
+
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+const height = {
+  nodes: [{ id: 'axes', op: 'decomposevector', in: { A: 'inputs.pos' } }],
+  outputs: { z: 'axes.z' },
+};
+const file = await export3MF(
+  { nodes: [{ name: 'Block', geometry }] },
+  { objectInfo: () => ({ levelSet: { function: height } }) },
+);
+const { functions, objects } = await parse3MFVolumetric(file);
+console.log(functions.length, objects[0].levelSet?.channel);
+```
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+import { parse3MFDisplacement } from 'margoengine/loaders/threemf-displacement';
+
+const image = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAAAAABX3VL4AAAADklEQVR4nGNg+M/wnwEABgAB/4/x/JoAAAAASUVORK5CYII='), (c) => c.charCodeAt(0));
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  uvs: new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+const file = await export3MF({ nodes: [{ geometry }] }, { objectInfo: () => ({ displacement: { image, height: 0.001 } }) });
+const { displacementGroups, meshes } = await parse3MFDisplacement(file);
+console.log(displacementGroups[0].height, meshes[0].triangleGroups.length);
 ```
 
 ## 3MF textures and colour groups

@@ -23,6 +23,8 @@ export interface LoadedGroup {
   /** The UUID of the alternative read in the object's place (3MF production extension). */
   alternativeUUID?: string;
   /** The model part the mesh came from, when it is not the root model part (3MF production extension). */
+  /** 3MF: the triangles are the base of a displacement mesh, whose surface the file moves. */
+  displaced?: boolean;
   modelPath?: string;
   /** Uniform sRGB color in [0,1], `[r, g, b, a]`, when the file gives this group one color. */
   color?: [number, number, number, number];

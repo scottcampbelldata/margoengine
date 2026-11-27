@@ -63,6 +63,10 @@ interface ObjectData {
   pid?: string;
   pindex?: number;
   mesh?: MeshData;
+  /** The mesh is a `displacementmesh`: these are its base triangles. */
+  displaced?: boolean;
+  /** The object's shape is a volumetric level set, which has no triangles. */
+  levelSet?: boolean;
   components: { objectId: string; path?: string; uuid?: string; transform: Float64Array }[];
   alternatives: { objectId: string; path?: string; uuid?: string; resolution: string }[];
 }
@@ -86,6 +90,8 @@ export type ThreeMFModel = Model;
 export interface ThreeMFReadContext {
   models: ReadonlyMap<string, ThreeMFModel>;
   loadModelPart(path: string): Promise<ThreeMFModel>;
+  /** The package path of a model part, or undefined for the root. */
+  partPath(model: ThreeMFModel): string | undefined;
 }
 
 /** What the materials entry adds to the 3MF reader: more elements, and one call per written triangle corner. */
@@ -96,6 +102,13 @@ export interface ThreeMFExtension {
   instance?(model: ThreeMFModel, object: ObjectData, transform: Float64Array, scale: number, depth: number): void;
   /** True only when a built native primitive provides geometry despite an empty triangle fallback. */
   hasGeometry?(): boolean;
+  /** The elements of volumetric and displacement resources, whose names the core format and other extensions reuse. */
+  field?: {
+    open(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
+    close(model: ThreeMFModel, name: string): void;
+  };
+  /** The extension reads level set objects, which the core reader otherwise refuses. */
+  levelSets?: boolean;
   /** An element the reader does not know, with its attributes. */
   open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
   /** The end of any element. */
@@ -111,6 +124,16 @@ export interface ThreeMFExtension {
 }
 
 const IDENTITY = new Float64Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]);
+/** Resource elements whose content only an extension reads (volumetric, implicit and displacement extensions). */
+const FIELDS = new Set([
+  'image3d',
+  'functionfromimage3d',
+  'implicitfunction',
+  'volumedata',
+  'displacement2d',
+  'normvectorgroup',
+  'disp2dgroup',
+]);
 
 function parseColor(value: string | undefined): Color {
   const rgba = hexColor(value?.trim() ?? '');
@@ -185,7 +208,9 @@ function parseModel(
     // the model, so only top-level entries reach the model metadata.
     metadataGroups = 0,
     /** Inside a slice stack, whose vertices are the layers' 2D points and no mesh's. */
-    sliceStacks = 0;
+    sliceStacks = 0,
+    /** The depth inside a resource of `FIELDS`. */
+    field = 0;
   let vertexCount = 0,
     triangleCount = 0,
     sawModel = false;
@@ -194,6 +219,11 @@ function parseModel(
     {
       open(name, a) {
         for (const key in a) if (key.startsWith('xmlns:')) prefixes.set(key.slice(6), a[key]);
+        if (field || FIELDS.has(name)) {
+          field++;
+          extension?.field?.open(model, name, a);
+          return;
+        }
         if (extension?.element?.(model, name, a)) return;
         if (name === 'slicestack') sliceStacks++;
         if (sliceStacks) return;
@@ -243,8 +273,15 @@ function parseModel(
             break;
           }
           case 'mesh':
-            if (!object) throw new LoaderError(F, 'syntax', '<mesh> outside <object>');
+          case 'displacementmesh':
+            if (!object) throw new LoaderError(F, 'syntax', `<${name}> outside <object>`);
             object.mesh = { vertices: floats(), triangles: uints(), pid: uints(), p: uints() };
+            if (name === 'displacementmesh') object.displaced = true;
+            break;
+          case 'levelset':
+            if (!object) throw new LoaderError(F, 'syntax', '<levelset> outside <object>');
+            object.levelSet = true;
+            extension?.open?.(model, name, a);
             break;
           case 'vertex': {
             const mesh = object?.mesh;
@@ -328,6 +365,11 @@ function parseModel(
         }
       },
       close(name) {
+        if (field) {
+          field--;
+          extension?.field?.close(model, name);
+          return;
+        }
         extension?.close?.(model, name);
         if (name === 'slicestack') sliceStacks--;
         if (name === 'object') object = undefined;
@@ -376,7 +418,9 @@ const normalizePath = (path: string): string => path.replace(/\\/g, '/').replace
  * Parses a 3MF package (core specification, plus basematerials and the materials extension colorgroup, and the
  * production extension: items and components in other model parts, UUIDs and alternative representations). Build item
  * and component transforms are baked into the positions, which are converted to meters by default. The result has one
- * group per build item object and color; `colors` is present only when some triangle has per-corner colors.
+ * group per build item object and color; `colors` is present only when some triangle has per-corner colors. A
+ * displacement mesh gives its base triangles, in groups marked `displaced`; a volumetric level set throws
+ * `unsupported`.
  */
 export async function parse3MF(input: BinaryInput, options: ThreeMFOptions = {}): Promise<ThreeMFResult> {
   return read3MF(input, options);
@@ -450,7 +494,8 @@ export async function read3MF(
         'syntax',
         `${partPaths.get(model)!.slice(0, 128)}: only the root model part may name another part (production extension 3.2)`,
       );
-  await extension?.ready?.(read, { models, loadModelPart: load });
+  const partPath = (model: Model): string | undefined => (model === root ? undefined : partPaths.get(model));
+  await extension?.ready?.(read, { models, loadModelPart: load, partPath });
   throwIfAborted(options.signal, F);
 
   const scale = options.units === 'file' ? 1 : THREEMF_UNITS[root.unit];
@@ -567,6 +612,7 @@ export async function read3MF(
       if (o.name) group.name = o.name;
       if (o.type !== 'model') group.objectType = o.type;
       if (o.partNumber !== undefined) group.partNumber = o.partNumber;
+      if (o.displaced) group.displaced = true;
       if (itemPartNumber !== undefined) group.itemPartNumber = itemPartNumber;
       if (itemUUID !== undefined) group.itemUUID = itemUUID;
       if (identity.uuid !== undefined) group.uuid = identity.uuid;
@@ -611,6 +657,12 @@ export async function read3MF(
     }
     // Core 3MF: an `other` mesh is never output, however it is reached; the type of an object of components is ignored.
     if (shown.mesh && shown.type === 'other') return;
+    if (shown.levelSet && !extension?.levelSets)
+      throw new LoaderError(
+        F,
+        'unsupported',
+        `object ${shown.id.slice(0, 32)} is a volumetric level set; read the package with parse3MFVolumetric from @margoengine/loaders/threemf-volumetric`,
+      );
     visiting.add(o);
     extension?.instance?.(source, shown, m, scale, depth);
     identity = { uuid: o.uuid, componentUUID, alternativeUUID: alternative?.uuid };

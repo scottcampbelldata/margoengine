@@ -58,10 +58,53 @@ export interface ThreeMFCustomMetadata {
     preserve?: boolean;
 }
 
+export interface ThreeMFDisplacement {
+    image: Uint8Array;
+    height: number;
+    offset?: number;
+    channel?: 'R' | 'G' | 'B' | 'A';
+    tile?: ThreeMFTileStyle | 'none' | readonly [ThreeMFTileStyle | 'none', ThreeMFTileStyle | 'none'];
+    filter?: 'auto' | 'linear' | 'nearest';
+    texCoord?: 0 | 1 | 2 | 3;
+    vectors?: 'smooth' | 'normals';
+    factor?: (position: [number, number, number]) => number;
+}
+
 export interface ThreeMFElement {
     element: 'build' | 'item' | 'object' | 'component' | 'alternative';
     name?: string;
     index: number;
+}
+
+export interface ThreeMFField {
+    function: ThreeMFFunction;
+    channel?: string;
+    transform?: ArrayLike<number>;
+    minFeatureSize?: number;
+    fallback?: number;
+}
+
+export type ThreeMFFunction = ThreeMFImageFunction | ThreeMFImplicitFunction;
+
+export interface ThreeMFImageFunction {
+    image: ThreeMFImageStack;
+    filter?: 'linear' | 'nearest';
+    tile?: ThreeMFTileStyle | readonly [ThreeMFTileStyle, ThreeMFTileStyle, ThreeMFTileStyle];
+    offset?: number;
+    scale?: number;
+    name?: string;
+}
+
+export interface ThreeMFImageStack {
+    sheets: readonly Uint8Array[];
+    name?: string;
+}
+
+export interface ThreeMFImplicitFunction {
+    inputs?: Readonly<Record<string, ThreeMFValueType>>;
+    nodes: readonly ThreeMFNode[];
+    outputs: Readonly<Record<string, string>>;
+    name?: string;
 }
 
 export interface ThreeMFLattice {
@@ -97,6 +140,10 @@ export interface ThreeMFLatticeBeam {
     color?: string | readonly [string, string];
 }
 
+export interface ThreeMFLevelSet extends ThreeMFField {
+    boundingBoxOnly?: boolean;
+}
+
 export interface ThreeMFMeshReport {
     name?: string;
     openEdges: number;
@@ -119,6 +166,21 @@ export interface ThreeMFMetadata {
 
 export type ThreeMFModelResolution = (typeof RESOLUTIONS)[number];
 
+export interface ThreeMFNode {
+    id: string;
+    op: string;
+    in?: Readonly<Record<string, string>>;
+    value?: number | ArrayLike<number> | ThreeMFFunction | ExportNode | {
+        node: ExportNode;
+        lattice: ThreeMFLattice;
+    };
+    outputs?: Readonly<Record<string, ThreeMFValueType>>;
+    scalarOutput?: string;
+    vectorInput?: string;
+    accurateRange?: number;
+    name?: string;
+}
+
 export interface ThreeMFObjectInfo {
     type?: ThreeMFObjectType;
     partNumber?: string;
@@ -128,6 +190,9 @@ export interface ThreeMFObjectInfo {
     alternatives?: readonly ThreeMFAlternative[];
     lattice?: ThreeMFLattice;
     slices?: ThreeMFSlices;
+    volume?: ThreeMFVolume;
+    levelSet?: ThreeMFLevelSet;
+    displacement?: ThreeMFDisplacement;
 }
 
 export type ThreeMFObjectType = (typeof TYPES)[number];
@@ -151,7 +216,23 @@ export interface ThreeMFSlices {
     separatePart?: boolean;
 }
 
+export type ThreeMFTileStyle = 'wrap' | 'mirror' | 'clamp';
+
 export type ThreeMFUnit = keyof typeof UNITS;
+
+export type ThreeMFValueType = 'scalar' | 'vector' | 'matrix' | 'resourceid';
+
+export interface ThreeMFVolume {
+    color?: ThreeMFField;
+    composite?: readonly (ThreeMFConstituent & ThreeMFField)[];
+    properties?: readonly ThreeMFVolumeProperty[];
+}
+
+export interface ThreeMFVolumeProperty extends ThreeMFField {
+    namespace: string;
+    name: string;
+    required?: boolean;
+}
 
 export function export3MF(source: ExportSource | Uint8Array, options?: Export3MFOptions): Promise<Uint8Array>;
 

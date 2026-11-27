@@ -1624,6 +1624,52 @@ const file = await export3MF(
 console.log(`${file.length} bytes`);
 ```
 
+### Volumes and level sets
+
+The [3MF Volumetric and Implicit Extensions](https://github.com/3MFConsortium/spec_volumetric) describe what fills a part. A function is a stack of PNG slices (`{ image: { sheets } }`, with `filter`, `tile`, `offset` and `scale`) or a graph of native nodes (`{ inputs, nodes, outputs }`, the extension's node names). `objectInfo`'s `volume` samples functions into a node's `color`, `composite` mixture and vendor `properties`; `levelSet` makes the node's shape the region where a function's scalar output is zero, inside the node's mesh. A field's `channel`, `transform` (a 4 x 4 matrix from geometry to function coordinates), `minFeatureSize` and `fallback` are optional: an image function spans the geometry's bounding box and a graph reads geometry coordinates. Both need an object of the node's own (`assembly: false` or `'components'`, or one node). A level set, or a function that names a mesh, makes the file require the extension; volume data alone does not. The writer checks node names, input types and that a node reads only earlier ones. It does not evaluate functions or mesh level sets. `parse3MFVolumetric` (`@margoengine/loaders/threemf-volumetric`) reads it all back.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+// A tetrahedron 40 mm on a side, which bounds the region the function is evaluated in.
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+// A sphere of 15 mm radius: length(pos) - radius.
+const sphere = {
+  nodes: [
+    { id: 'radius', op: 'constant', value: 0.015 },
+    { id: 'distance', op: 'length', in: { A: 'inputs.pos' } },
+    { id: 'shape', op: 'subtraction', in: { A: 'distance.result', B: 'radius.value' } },
+  ],
+  outputs: { shape: 'shape.result' },
+};
+const file = await export3MF({ nodes: [{ name: 'Ball', geometry }] }, { objectInfo: () => ({ levelSet: { function: sphere } }) });
+console.log(`${file.length} bytes`);
+```
+
+### Displaced surfaces
+
+The [3MF Displacement Extension](https://github.com/3MFConsortium/spec_displacement) keeps fine relief as a height map over a coarse mesh. `objectInfo`'s `displacement` takes a PNG `image` and a `height` in geometry units, with optional `offset`, `channel` (default `'G'`), `tile` (`'wrap'`, `'mirror'`, `'clamp'` or `'none'`), `filter`, `texCoord`, a per-vertex `factor` and `vectors`: `'smooth'` (default) moves each welded vertex along the mean of its triangles' normals, so the surface stays closed, and `'normals'` uses the geometry's. Where a vector would point into its triangle, the triangle's normal is used. The node needs UVs, four triangles or more, a `model` type and an object of its own; the file requires the extension. Margo writes the map and its coordinates; it does not move or tessellate the surface. `parse3MFDisplacement` (`@margoengine/loaders/threemf-displacement`) reads it back.
+
+```ts
+import { export3MF } from 'margoengine/exporters/threemf';
+
+// A 2 x 2 greyscale PNG.
+const image = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAAAAABX3VL4AAAADklEQVR4nGNg+M/wnwEABgAB/4/x/JoAAAAASUVORK5CYII='), (c) => c.charCodeAt(0));
+const geometry = {
+  positions: new Float32Array([0, 0, 0, 0.04, 0, 0, 0, 0.04, 0, 0, 0, 0.04]),
+  uvs: new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]),
+  indices: [0, 2, 1, 0, 1, 3, 1, 2, 3, 0, 3, 2],
+};
+const file = await export3MF(
+  { nodes: [{ name: 'Rough', geometry }] },
+  { objectInfo: () => ({ displacement: { image, height: 0.001 } }) },
+);
+console.log(`${file.length} bytes`);
+```
+
 ## Collision and UV animation per engine
 
 Name nodes with the `-col`, `-convcol`, `-colonly` and `-convcolonly` suffixes and author `materialAnimations` once; each

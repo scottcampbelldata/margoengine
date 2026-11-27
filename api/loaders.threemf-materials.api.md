@@ -105,6 +105,7 @@ interface LoadedGroup {
     itemUUID?: string;
     componentUUID?: string;
     alternativeUUID?: string;
+    displaced?: boolean;
     modelPath?: string;
     color?: [number, number, number, number];
     properties?: Record<string, number | number[]>;
@@ -142,6 +143,8 @@ interface ObjectData {
     pid?: string;
     pindex?: number;
     mesh?: MeshData;
+    displaced?: boolean;
+    levelSet?: boolean;
     components: {
         objectId: string;
         path?: string;
@@ -165,6 +168,11 @@ interface ThreeMFExtension {
     element?(model: ThreeMFModel, name: string, attributes: Record<string, string>): boolean | void;
     instance?(model: ThreeMFModel, object: ObjectData, transform: Float64Array, scale: number, depth: number): void;
     hasGeometry?(): boolean;
+    field?: {
+        open(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
+        close(model: ThreeMFModel, name: string): void;
+    };
+    levelSets?: boolean;
     open?(model: ThreeMFModel, name: string, attributes: Record<string, string>): void;
     close?(model: ThreeMFModel, name: string): void;
     ready?(read: (path: string) => Promise<Uint8Array>, context: ThreeMFReadContext): Promise<void>;
@@ -185,6 +193,7 @@ interface ThreeMFOptions extends ParseLimits, XMLExternalOptions, Pick<ZipOption
 interface ThreeMFReadContext {
     models: ReadonlyMap<string, ThreeMFModel>;
     loadModelPart(path: string): Promise<ThreeMFModel>;
+    partPath(model: ThreeMFModel): string | undefined;
 }
 
 interface ThreeMFResult extends LoadedGeometry {

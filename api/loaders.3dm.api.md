@@ -146,6 +146,7 @@ interface LoadedGroup {
     itemUUID?: string;
     componentUUID?: string;
     alternativeUUID?: string;
+    displaced?: boolean;
     modelPath?: string;
     color?: [number, number, number, number];
     properties?: Record<string, number | number[]>;

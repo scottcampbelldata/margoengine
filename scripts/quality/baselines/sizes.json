@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21271841,
+  "total": 21305913,
   "history": [
     {
       "date": "2026-10-24",
@@ -15061,6 +15061,12 @@
       "commit": "building-reach",
       "reason": "KB-PROC-NOSTAIR1 and KB-PROC-PLANREACH1: every storey of rules buildings and joined plans is reached (stair halls, spiral and ladder stairs, tower and wing stairs, joins that open on every floor): procedural/building-rules 17,904 to 20,313 B gzip measured, building-plans 22,260 to 25,876, city 33,677 from 31,190 (it builds with the rules). The fallbacks run inside the synchronous generators, so a split entry would leave a house with unreachable storeys until a second import.",
       "grew": 3
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "a918f9e7a6",
+      "reason": "3MF volumetric, implicit and displacement extensions: exporters/threemf 36665 to 42752 B gzip with its lazy chunk; 37842 B load with the entry and the 5481 B writer of the three extensions loads by import() only for a file that asks for one. New optional entries loaders/threemf-volumetric (14055 B) and threemf-displacement (12936 B), each holding the shared 3MF reader. Core/stage untouched.",
+      "grew": 3
     }
   ],
   "items": {
@@ -15459,7 +15465,7 @@
     "@margoengine/exporters/sparse": 26469,
     "@margoengine/exporters/splats": 3056,
     "@margoengine/exporters/textures": 11643,
-    "@margoengine/exporters/threemf": 37765,
+    "@margoengine/exporters/threemf": 44035,
     "@margoengine/exporters/unity": 51540,
     "@margoengine/exporters/unity-2d": 7589,
     "@margoengine/exporters/unity-pixel-art": 931,
@@ -15704,9 +15710,11 @@
     "@margoengine/loaders/svg": 15333,
     "@margoengine/loaders/tds": 3642,
     "@margoengine/loaders/textures": 702,
+    "@margoengine/loaders/threemf-displacement": 13325,
     "@margoengine/loaders/threemf-lattice": 19099,
     "@margoengine/loaders/threemf-materials": 14883,
     "@margoengine/loaders/threemf-mesh": 4316,
+    "@margoengine/loaders/threemf-volumetric": 14477,
     "@margoengine/loaders/tilt": 5045,
     "@margoengine/loaders/usd": 9148,
     "@margoengine/loaders/vdb": 6406,

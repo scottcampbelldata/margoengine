@@ -23,6 +23,22 @@ import {
   type SceneOptions,
   type ExportWarning,
 } from './scene.js';
+import type { FieldContext, ThreeMFDisplacement, ThreeMFLevelSet, ThreeMFVolume } from './threemf-fields.js';
+
+export type {
+  ThreeMFDisplacement,
+  ThreeMFField,
+  ThreeMFFunction,
+  ThreeMFImageFunction,
+  ThreeMFImageStack,
+  ThreeMFImplicitFunction,
+  ThreeMFLevelSet,
+  ThreeMFNode,
+  ThreeMFTileStyle,
+  ThreeMFValueType,
+  ThreeMFVolume,
+  ThreeMFVolumeProperty,
+} from './threemf-fields.js';
 
 /** Metres in each unit 3MF names. */
 const UNITS = {
@@ -82,6 +98,23 @@ export interface ThreeMFObjectInfo {
    * (`assembly` `false` or `'components'`, or a single node) that neither tilts it nor scales its height. Default none.
    */
   slices?: ThreeMFSlices;
+  /**
+   * Colour, material mixtures and other properties that vary through the node's volume (volumetric extension). It needs
+   * a build item or component of the node's own (`assembly` `false` or `'components'`, or a single node). Default none.
+   */
+  volume?: ThreeMFVolume;
+  /**
+   * Bounds the node's shape where a function is zero (volumetric extension): its mesh becomes the region the function
+   * is evaluated in, and the file requires the extension. It needs a build item or component of the node's own, and no
+   * lattice, slices or displacement. Default none.
+   */
+  levelSet?: ThreeMFLevelSet;
+  /**
+   * Moves the node's surface by a height map (displacement extension), which the file then requires. It needs a build
+   * item or component of the node's own, a `model` type, UVs, four triangles or more, and no lattice, slices, volume
+   * or level set. Default none.
+   */
+  displacement?: ThreeMFDisplacement;
 }
 
 /** One closed contour of a layer, or in a `support` object one open path, with colours. */
@@ -599,6 +632,8 @@ interface Shape {
   /** For each corner of each triangle, the index in `palette` of its colour, or when textured of its `u v tint`. */
   corners?: number[];
   palette?: string[];
+  /** When asked for, the source vertex of each corner. */
+  from?: number[];
 }
 
 /** The positions moved by `transform`, a column-major 4 x 4 matrix. */
@@ -621,6 +656,7 @@ function shapeOf(
   colors: ((vertex: number) => string) | undefined,
   scale: number,
   mirrored: boolean,
+  traced = false,
 ): Shape {
   const { known, vertices } = weld,
     welded = new Uint32Array(positions.length / 3);
@@ -641,6 +677,7 @@ function shapeOf(
   }
   const triangles: number[] = [],
     corners: number[] = [],
+    from: number[] = [],
     palette = new Map<string, number>(),
     paletteIndex = (color: string): number => {
       let at = palette.get(color);
@@ -653,9 +690,11 @@ function shapeOf(
       c = welded[indices[i + 2]];
     if (a === b || b === c || a === c) continue;
     triangles.push(a, mirrored ? c : b, mirrored ? b : c);
-    if (colors) for (const k of mirrored ? [0, 2, 1] : [0, 1, 2]) corners.push(paletteIndex(colors(indices[i + k])));
+    const order = mirrored ? [0, 2, 1] : [0, 1, 2];
+    if (colors) for (const k of order) corners.push(paletteIndex(colors(indices[i + k])));
+    if (traced) for (const k of order) from.push(indices[i + k]);
   }
-  return colors ? { weld, triangles, corners, palette: [...palette.keys()] } : { weld, triangles };
+  return { weld, triangles, ...(colors && { corners, palette: [...palette.keys()] }), ...(traced && { from }) };
 }
 
 /** Counts how the triangles' edges pair up: each edge of a solid is run once in each direction. */
@@ -1107,6 +1146,10 @@ export async function export3MF(
     files: { name: string; data: Uint8Array }[] = [],
     build: string[] = [],
     components: string[] = [],
+    /** Volumetric resources and the meshes they name, in the order they are defined. */
+    fieldXml: string[] = [],
+    /** The pictures volumetric and displacement resources sample. */
+    fieldFiles: { name: string; data: Uint8Array }[] = [],
     /** With `assembly: true`, one mesh for each object type and part number. */
     merged = new Map<string, Merged>(),
     /** The object types the build references, for the format's rule about support. */
@@ -1370,6 +1413,8 @@ export async function export3MF(
     base: Base;
     /** For a graded mixture, the composite group that `colors` indexes. */
     mixture?: number;
+    /** Keeps each corner's source vertex, which displacement needs. */
+    traced?: boolean;
   }
   type Welded = { part: Part; shape: Shape }[];
   /**
@@ -1378,7 +1423,7 @@ export async function export3MF(
    */
   const weldParts = (parts: readonly Part[], mirrored: boolean): Welded => {
     const shapeInto = (weld: Weld, part: Part): Shape =>
-        shapeOf(weld, part.positions, part.geometry.indices, part.colors, scale, mirrored),
+        shapeOf(weld, part.positions, part.geometry.indices, part.colors, scale, mirrored, part.traced),
       out = parts.map((part) => ({ part, shape: shapeInto({ vertices: [], known: new Map() }, part) })),
       open = out.length > 1 ? out.filter(({ shape }) => edgesOf(shape.triangles).open > 0) : [];
     if (open.length > 1) {
@@ -1448,7 +1493,7 @@ export async function export3MF(
     base: Base,
     name: string | undefined,
     { type = 'model', partNumber, modelResolution }: ThreeMFObjectInfo,
-    { alternatives = '', lattice = '', slices = '', rooted = false } = {},
+    { alternatives = '', lattice = '', slices = '', rooted = false, volume = '', shape = '' } = {},
   ): number => {
     const at = id++,
       resolution = (modelResolution === undefined ? '' : ` pa:modelresolution="${modelResolution}"`) + slices,
@@ -1464,7 +1509,7 @@ export async function export3MF(
       part,
       xml:
         `<object id="${at}" type="${type}"${resolution} pid="${base.group}" pindex="${base.index}"${named(name)}${numberedPart(partNumber)}${unique('object', name)}>` +
-        `<mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles>${lattice}</mesh>${alternatives}</object>`,
+        `${shape || `<mesh${volume}><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles>${lattice}</mesh>`}${alternatives}</object>`,
     });
     return at;
   };
@@ -1486,8 +1531,10 @@ export async function export3MF(
     );
   };
   /** What `objectInfo` says of a node, checked. */
+  /** `objectInfo`'s answer for each node, asked once each before writing, as it decides which writers to load. */
+  const answers = new Map<Mesh | ExportNode, ThreeMFObjectInfo>();
   const infoOf = (source: Mesh | ExportNode): Described => {
-    const given = objectInfo?.(source) ?? {},
+    const given: ThreeMFObjectInfo = answers.get(source) ?? {},
       type = given.type ?? 'model',
       info = {
         type,
@@ -1500,8 +1547,22 @@ export async function export3MF(
         checked: given.lattice && checkLattice(given.lattice),
         slices: given.slices,
         layered: given.slices && checkSlices(given.slices, type === 'support'),
+        volume: given.volume,
+        levelSet: given.levelSet,
+        displacement: given.displacement,
       };
     if (!TYPES.includes(type)) throw new RangeError(`3MF object type must be one of ${TYPES.join(', ')}`);
+    if ((info.volume || info.levelSet || info.displacement) && together)
+      throw new RangeError(
+        "3MF writes a volume, level set or displacement for a node's own object; use assembly: false or 'components'",
+      );
+    if (info.displacement) {
+      if (type !== 'model') throw new RangeError('3MF displaces only a model object');
+      if (info.volume || info.levelSet || info.lattice || info.slices)
+        throw new RangeError('3MF displacement takes no volume, level set, lattice or slices on the same node');
+    }
+    if (info.levelSet && (info.lattice || info.slices))
+      throw new RangeError('3MF level sets take no lattice or slices on the same node');
     if (info.slices && together)
       throw new RangeError("3MF writes slices for a node's own object; use assembly: false or 'components'");
     if (info.lattice) {
@@ -1681,6 +1742,7 @@ export async function export3MF(
     vertices: string[],
     info: ReturnType<typeof infoOf>,
     name: string | undefined,
+    perUnit = scale,
   ): string => {
     const { positions, beams, balls, sets, clipping, representation, ballMode, ballRadius, cap } = lattice,
       // A mesh named by a lattice is a model with no lattice of its own.
@@ -1691,7 +1753,7 @@ export async function export3MF(
       shown = representation && referred(representation),
       first = vertices.length,
       length = (value: number | undefined, attribute: string): string =>
-        value === undefined ? '' : ` ${attribute}="${num(value * scale)}"`,
+        value === undefined ? '' : ` ${attribute}="${num(value * perUnit)}"`,
       colors = new Map<string, number>(),
       colorIndex = (color: string): number => {
         const key = color.toUpperCase();
@@ -1701,7 +1763,7 @@ export async function export3MF(
       };
     const placedAt = framed(positions, mirrored, turned);
     for (let i = 0; i < positions.length; i += 3) {
-      const [x, y, z] = [0, 1, 2].map((k) => Math.fround(placedAt[i + k] * scale));
+      const [x, y, z] = [0, 1, 2].map((k) => Math.fround(placedAt[i + k] * perUnit));
       if (!Number.isFinite(x + y + z))
         throw new RangeError('3MF position exceeds Float32 range in this unit; pick a larger unit or lower the scale');
       vertices.push(`<vertex x="${num(x)}" y="${num(y)}" z="${num(z)}"/>`);
@@ -1738,10 +1800,10 @@ export async function export3MF(
     lattices.add('b');
     if (ballMode !== 'none') lattices.add('b2');
     return (
-      `<b:beamlattice radius="${num(lattice.radius * scale)}" minlength="${num(lattice.minLength * scale)}" cap="${cap}"` +
+      `<b:beamlattice radius="${num(lattice.radius * perUnit)}" minlength="${num(lattice.minLength * perUnit)}" cap="${cap}"` +
       (clip === undefined ? '' : ` clippingmode="${clipping!.mode}" clippingmesh="${clip}"`) +
       (shown === undefined ? '' : ` representationmesh="${shown}"`) +
-      (ballMode === 'none' ? '' : ` b2:ballmode="${ballMode}" b2:ballradius="${num(ballRadius! * scale)}"`) +
+      (ballMode === 'none' ? '' : ` b2:ballmode="${ballMode}" b2:ballradius="${num(ballRadius! * perUnit)}"`) +
       `><b:beams>${beamXml.join('')}</b:beams>` +
       (setXml.length ? `<b:beamsets>${setXml.join('')}</b:beamsets>` : '') +
       (ballXml.length ? `<b2:balls>${ballXml.join('')}</b2:balls>` : '') +
@@ -1765,6 +1827,103 @@ export async function export3MF(
       return `<pa:alternative objectid="${at}"${pathOf(at, 'path')}${unique('alternative', own, 'UUID')} modelresolution="${resolution}"/>`;
     });
     return `<pa:alternatives>${listed.join('')}</pa:alternatives>`;
+  };
+  /**
+   * A mesh that a volumetric function names, in the function's coordinates, which no unit, turn or build transform
+   * touches. It is written among the volumetric resources, before the function.
+   */
+  const functionMesh = (node: ExportNode, lattice: ThreeMFLattice | undefined): number => {
+    const checked = lattice && checkLattice(lattice),
+      drawn = drawables(collect({ nodes: [node] }, options, undefined, 'shape', [], !!lattice)),
+      vertices: string[] = [],
+      faces: string[] = [];
+    if (checked && (checked.clipping || checked.representation))
+      throw new RangeError('3MF a lattice that a function names takes no clipping or representation mesh');
+    for (const { geometry, world } of drawn) {
+      const weld: Weld = { vertices: [], known: new Map() },
+        first = vertices.length,
+        { triangles } = shapeOf(
+          weld,
+          moved(geometry.positions, world),
+          geometry.indices,
+          undefined,
+          1,
+          determinant3(world) < 0,
+        );
+      for (let v = 0; v < weld.vertices.length; v += 3) {
+        const [x, y, z] = weld.vertices.slice(v, v + 3);
+        vertices.push(`<vertex x="${num(x)}" y="${num(y)}" z="${num(z)}"/>`);
+      }
+      for (let t = 0; t < triangles.length; t += 3)
+        faces.push(
+          `<triangle v1="${triangles[t] + first}" v2="${triangles[t + 1] + first}" v3="${triangles[t + 2] + first}"/>`,
+        );
+    }
+    if (!faces.length && !checked) throw new RangeError('3MF a mesh that a function names needs triangles');
+    const body = checked ? latticeOf(checked, false, vertices, { type: 'model' }, node.name, 1) : '',
+      at = id++;
+    fieldXml.push(
+      `<object id="${at}" type="model"${named(node.name)}${unique('object', node.name)}><mesh><vertices>${vertices.join('')}</vertices><triangles>${faces.join('')}</triangles>${body}</mesh></object>`,
+    );
+    return at;
+  };
+  let fields: ReturnType<typeof import('./threemf-fields.js').fieldWriter> | undefined;
+  /** Takes the file's object coordinates, or a normal, between the node's geometry frame and its object's. */
+  const framing = (mirrored: boolean, turned: boolean) => {
+    // Columns of the matrices from the object frame back to the geometry frame, and of normals the other way.
+    const back = [0, 1, 2].map((axis) => {
+        const p = [0, 0, 0];
+        p[axis] = 1 / scale;
+        const q = turned ? [p[0], p[2], -p[1]] : p;
+        return [mirrored ? -q[0] : q[0], q[1], q[2], 0];
+      }),
+      forward = [0, 1, 2].map((axis) => {
+        const p = [0, 0, 0];
+        p[axis] = axis === 0 && mirrored ? -1 : 1;
+        return [...(turned ? [p[0], -p[2], p[1]] : p), 0];
+      });
+    return { toGeometry: [...back.flat(), 0, 0, 0, 1], turn: [...forward.flat(), 0, 0, 0, 1] };
+  };
+  /** The bounds of a node's geometry, minimum then maximum. */
+  const boundsOf = (drawn: readonly Drawable[]): number[] => {
+    const box = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+    for (const { geometry } of drawn)
+      for (let i = 0; i < geometry.positions.length; i++) {
+        const k = i % 3;
+        box[k] = Math.min(box[k], geometry.positions[i]);
+        box[k + 3] = Math.max(box[k + 3], geometry.positions[i]);
+      }
+    return box;
+  };
+  /** Turns an object's faces into a displacement mesh element. */
+  const displacedShape = (
+    given: ThreeMFDisplacement,
+    welded: Welded,
+    vertices: string[],
+    faces: string[],
+    turn: number[],
+  ): string => {
+    // The same order as `append` writes the vertices and faces in.
+    const firsts = new Map<Weld, number>(),
+      points: number[] = [],
+      triangles: number[] = [],
+      sources: [Geo, number][] = [];
+    for (const { part, shape } of welded) {
+      let first = firsts.get(shape.weld);
+      if (first === undefined) {
+        firsts.set(shape.weld, (first = points.length / 3));
+        for (const value of shape.weld.vertices) points.push(value);
+      }
+      for (let i = 0; i < shape.triangles.length; i++) {
+        triangles.push(shape.triangles[i] + first);
+        sources.push([part.geometry, shape.from![i]]);
+      }
+    }
+    const { group, corners } = fields!.displacement(given, points, triangles, sources, turn),
+      prefixed = (xml: string): string => xml.replace('<', '<d:');
+    return `<d:displacementmesh><d:vertices>${vertices.map(prefixed).join('')}</d:vertices><d:triangles did="${group}">${faces
+      .map((face, i) => prefixed(face).replace('/>', `${corners[i]}/>`))
+      .join('')}</d:triangles></d:displacementmesh>`;
   };
   const placed = (drawn: readonly Drawable[]): void => {
     const { name, world: matrix } = drawn[0],
@@ -1798,7 +1957,7 @@ export async function export3MF(
     const parts = drawn.map((item): Part => {
       const { positions } = item.geometry,
         placedAt = together ? moved(positions, upright(matrix, zUp)) : framed(positions, mirrored, turned);
-      return partOf(item, placedAt, info, keys);
+      return { ...partOf(item, placedAt, info, keys), traced: !!info.displacement };
     });
     if (together) {
       const welded = weldParts(parts, mirrored);
@@ -1816,7 +1975,8 @@ export async function export3MF(
     const others = info.alternatives && numbered(info.alternatives),
       beamed = info.lattice && numbered(info.lattice),
       layered = info.slices && numbered(info.slices),
-      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed, layered])} ${keys.join('|')}`;
+      fielded = [info.volume, info.levelSet, info.displacement].map((value) => value && numbered(value)),
+      key = `${mirrored} ${JSON.stringify([info.type, info.partNumber, info.modelResolution, others, beamed, layered, fielded])} ${keys.join('|')}`;
     let at = shared.get(key);
     if (at === undefined) {
       const welded = weldParts(parts, mirrored);
@@ -1833,7 +1993,21 @@ export async function export3MF(
         slices =
           info.layered &&
           ` s:slicestackid="${sliceStack(info.layered, mirrored)}"${info.layered.meshResolution === 'lowres' ? ' s:meshresolution="lowres"' : ''}`;
-      shared.set(key, (at = object(vertices, faces, base, name, info, { alternatives, lattice, slices })));
+      let shape: string | undefined, volume: string | undefined;
+      if (info.volume || info.levelSet || info.displacement) {
+        const { toGeometry, turn } = framing(mirrored, turned),
+          box = boundsOf(drawn),
+          filled = info.volume && fields!.volume(info.volume, toGeometry, box);
+        if (info.displacement) shape = displacedShape(info.displacement, welded, vertices, faces, turn);
+        if (info.levelSet) {
+          // The node's mesh bounds the region the function is evaluated in, as an object the build does not place.
+          const domain = object(vertices, faces, base, name, { type: 'model' }, { rooted: true });
+          shape = fields!.levelSet(info.levelSet, domain, filled, toGeometry, box);
+        } else if (filled !== undefined) volume = ` v:volumeid="${filled}"`;
+      }
+      const rooted = !!(shape || volume),
+        written = object(vertices, faces, base, name, info, { alternatives, lattice, slices, shape, volume, rooted });
+      shared.set(key, (at = written));
     }
     if (info.type === 'other') return;
     const transform = ` transform="${itemTransform(placement, scale)}"`;
@@ -1841,6 +2015,25 @@ export async function export3MF(
     if (!ownItems && assembly === 'components') components.push(component(at, name, transform));
     else item(at, info.itemPartNumber ?? itemNumber, name, transform);
   };
+  for (const drawn of nodes.values()) {
+    const source = drawn[0].source!,
+      answer = objectInfo?.(source);
+    if (answer) answers.set(source, answer);
+  }
+  if ([...answers.values()].some(({ volume, levelSet, displacement }) => volume || levelSet || displacement)) {
+    const context: FieldContext = {
+      id: () => id++,
+      escaped,
+      scale,
+      group: (xml) => groups.push(xml),
+      resource: (xml) => fieldXml.push(xml),
+      file: (name, data) => fieldFiles.push({ name, data }),
+      mesh: functionMesh,
+    };
+    // Loaded only for a file that asks for these extensions.
+    fields = (await import('./threemf-fields.js')).fieldWriter(context);
+    signal?.throwIfAborted();
+  }
   for (const drawn of nodes.values()) {
     signal?.throwIfAborted();
     placed(drawn);
@@ -1904,17 +2097,24 @@ export async function export3MF(
     elsewhere = new Set(apart.flatMap(({ needs }) => needs)),
     rootResources = resources.filter((xml) => rootNeeds.has(xml) || !elsewhere.has(xml)),
     alternatives = rooted.some((xml) => xml.includes('<pa:alternatives>') || xml.includes(' pa:modelresolution="')),
+    declared = fields?.declarations() ?? { namespaces: '', required: [] },
     namespaces =
       ` xmlns="${CORE}" xmlns:m="${MATERIAL}"` +
       (production ? ` xmlns:p="${PRODUCTION}"` : '') +
       (alternatives ? ` xmlns:pa="${ALTERNATIVES}"` : '') +
       (lattices.size ? ` xmlns:b="${BEAMS}"` : '') +
       (lattices.has('b2') ? ` xmlns:b2="${BALLS}"` : '') +
-      (sliced.size ? ` xmlns:s="${SLICE}"` : ''),
+      (sliced.size ? ` xmlns:s="${SLICE}"` : '') +
+      declared.namespaces,
     // A package whose model parts refer to others must require the production extension (its chapter 1), and one with
     // beam lattices theirs (beam lattice extension chapter 1).
     // A file whose mesh is too coarse without its layers requires the slice extension (its chapter 2).
-    extensions = [...(apart.length ? ['p', ...pathed] : []), ...lattices, ...(sliced.has('lowres') ? ['s'] : [])],
+    extensions = [
+      ...(apart.length ? ['p', ...pathed] : []),
+      ...lattices,
+      ...(sliced.has('lowres') ? ['s'] : []),
+      ...declared.required,
+    ],
     required = extensions.length ? ` requiredextensions="${extensions.join(' ')}"` : '',
     modelOf = (head: string, body: string, own: readonly string[], items: string): string =>
       '<?xml version="1.0" encoding="UTF-8"?>\n' +
@@ -1922,7 +2122,7 @@ export async function export3MF(
     model = modelOf(
       `${namespaces}${required}${described.namespaces}`,
       described.xml,
-      [...rootResources, ...rooted],
+      [...rootResources, ...fieldXml, ...rooted],
       `<build${unique('build', title === undefined ? undefined : String(title))}>${build.join('')}</build>`,
     ),
     encoder = new TextEncoder(),
@@ -1940,6 +2140,7 @@ export async function export3MF(
       files.filter((_, i) => own.has(textureXml[i])).map(({ name }) => [name, `${RELATIONSHIP}3dtexture`] as const),
     rootRelations = [
       ...sampled(new Set(rootResources)),
+      ...fieldFiles.map(({ name }) => [name, `${RELATIONSHIP}3dtexture`] as const),
       ...[...apart, ...layerParts].map(({ part }) => [part, `${RELATIONSHIP}3dmodel`] as const),
     ],
     parts = apart.flatMap(({ part, xml, needs }) => {
@@ -1964,6 +2165,7 @@ export async function export3MF(
               ? `<Default Extension="${preview}" ContentType="image/${preview === 'png' ? 'png' : 'jpeg'}"/>`
               : '') +
             files.map(({ name }) => `<Override PartName="/${name}" ContentType="${TEXTURE_PART}"/>`).join('') +
+            fieldFiles.map(({ name }) => `<Override PartName="/${name}" ContentType="image/png"/>`).join('') +
             '</Types>\n',
         ),
       },
@@ -1982,6 +2184,7 @@ export async function export3MF(
         data: encoder.encode(modelOf(namespaces, '', own, '<build/>')),
       })),
       ...files,
+      ...fieldFiles,
       ...pictures,
     ],
     { signal, compress },

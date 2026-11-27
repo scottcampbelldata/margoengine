@@ -2555,6 +2555,14 @@
       "types": "./dist/loaders/geo.d.ts",
       "import": "./dist/loaders/geo.js"
     },
+    "./loaders/threemf-displacement": {
+      "types": "./dist/loaders/threemf-displacement.d.ts",
+      "import": "./dist/loaders/threemf-displacement.js"
+    },
+    "./loaders/threemf-volumetric": {
+      "types": "./dist/loaders/threemf-volumetric.d.ts",
+      "import": "./dist/loaders/threemf-volumetric.js"
+    },
     "./loaders/threemf-lattice": {
       "types": "./dist/loaders/threemf-lattice.d.ts",
       "import": "./dist/loaders/threemf-lattice.js"
