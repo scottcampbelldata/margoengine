@@ -14443,6 +14443,11 @@
       "commit": "cbe4dc9be4",
       "reason": "@margoengine/weather/drive: 7,481 B (at the 7737 B ceiling's measurement, cb04a8f5cf) to 7,744 B gzip, ceiling 7737 to 8000 B: 8baf3f7935 (KB-SKY-NIGHTPALL1) adds the night sky seen through a smoke pall, its moon, twilight and fire light and the two-stream reflectance (7,781 B, 7,744 after the shared mixing cbe4dc9be4). A split would only move the same night light behind another import. @margoengine/webgl2-compat: 125,619 B at e2177dc6e5 to 128,114 B gzip, ceiling 127852 to 131958 B (all lazy chunks counted). Fixes and limits that cannot be dropped: texture units past 16 on ANGLE Direct3D 11 (7545434ce1 +313, af7a2e9a65 +634), loops and lone cases ANGLE compiled wrong (d4b49e227d +328), subgroup built-ins in the WGSL checker (af98405e0b +601), workgroup limits (ed3163e5af +379), loss reports (7e10f55b18 +95) and warm draws and map errors (+145). A split would add a boundary without removing a byte the layer loads. Core and stage unchanged.",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "1e6935bbdd",
+      "reason": "SEA-12 free heave, roll and pitch work move @margoengine/physics/loads from 49458 to 52122 B gzip and its ceiling from 50657 to 53686 B. The optional exchange shares source projection and body ports with the existing wake coupling. Splitting it would require coupled callers to import the same geometry and projection separately. @margoengine/physics/seakeeping moves from 39443 to 39460 B, below its 40620 B ceiling, to integrate wet hull sections consistently. Core and stage are unchanged."
     }
   ],
   "items": {
@@ -15300,7 +15305,7 @@
     "@margoengine/physics/legged": 10415,
     "@margoengine/physics/life": 6901,
     "@margoengine/physics/lightning": 4606,
-    "@margoengine/physics/loads": 50657,
+    "@margoengine/physics/loads": 53686,
     "@margoengine/physics/locomotion": 6808,
     "@margoengine/physics/meshfiles": 2857,
     "@margoengine/physics/modal-sound": 9489,

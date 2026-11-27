@@ -120,8 +120,20 @@ new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
   Over 60 ticks the free rigid hull lost 451.938 J while the wake gained 226.089 J with feedback enabled.
 - **Cause:** The triangle pressure uses the local surface rise through depth. The projected volume uses a
   finite-depth modal transfer and normalized grid support. The pressure return is not the adjoint of that
-  source. The prescribed work meter and the opt-in guided surge coupling match the kick in their tested
-  ranges. The conventional arbitrary-motion return pressure and original-shot verification remain open.
+  source. The prescribed work meter and the optional `SurgeWakeCoupling` and `FreeHullWakeCoupling` match
+  the kick on their supported guides. The ordinary hull solver's return pressure for arbitrary motion and
+  original-shot verification remain open.
+
+### Fixed 2026-11-27: reindexing hull triangles reversed wet section segments (KB-LOADS-STRIPWINDING)
+
+- **Repro:** Cyclically rotate each triangle's indices on an outward-wound, eccentric box. One slice returned
+  0.3583 m² for a 0.975 m² section. The closed First Wake render-derived hull put a submerged wave source
+  38.02 m off its centreline, outside its 7.75 m half-beam.
+- **Cause and fix:** Each sliced triangle's starting index set the direction of its cut segment. This could
+  reverse individual terms in the Green area and first moments although the mesh still wound outward.
+  Use the direction of the oriented edge crossing to order the two cut endpoints.
+- **Regression:** `packages/physics/tests/coupling/seakeeping.test.js` checks all cyclic triangle variants
+  against exact rectangular sections and checks the signed wake volume and first moment on both arena layouts.
 
 ### Open 2026-11-27: First Wake’s authored stern sweeps into the quay (KB-LOADS-FIRSTWAKEQUAY, First Wake)
 

@@ -10534,8 +10534,19 @@ The optional seakeeping entry is 24,518 B gzip with a 25,254 B ceiling. Core and
   before the meter and the receiving wake after it. Separate pressure forcing and additional height sources,
   downstream sponge loss and other rigid or actuator work remain outside this ledger.
   Set `mirrored` only on a symmetric straight-quay grid with mirrored state and forcing. The ledger uses one
-  forward transform per occupied depth band and one inverse transform on an active tick. The loads entry
-  measures 49,458 B gzip with both wake work paths.
+  forward transform per occupied depth band and one inverse transform on an active tick.
+
+### Free heave and angular wake work (SEA-12)
+
+`FreeHullWakeCoupling` advances one free horizontal translation and heave with native anisotropic rigid
+rotation. Wave work includes surge, heave, roll and pitch. The wet waterplane must be a single convex contour.
+The submerged source uses the reference draft and the other columns use the current waterplane about the live
+centre of mass. Use one undamped rigid substep at 60 Hz with gyroscopic forces enabled and the unused horizontal
+translation locked. The wake is periodic, with uniform depth, zero sponge and no independent sources, and the
+wave model supplies zero yaw torque. Contact, wake reflection, sway and nonlinear wetted geometry evolution
+within a time step are outside this work bound. The three waterplane modes and one advancing mode share the
+same normalized source projection. The optional loads entry measures 52,122 B gzip. Correcting the shared wet
+strip integral takes the seakeeping entry from 39,443 to 39,460 B gzip.
 
 ### Straight quay reflection and spray (SEA-12)
 

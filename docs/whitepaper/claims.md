@@ -6650,3 +6650,11 @@ An opt-in port projects each signed depth band of a guided hull onto the linear 
 ### SEA-08 ordinary-strip sway, roll and yaw at forward speed
 
 The fixed-heading force port follows all five retained ordinary-strip cross terms within 0.33 percent. The same solver drives and restores the live wake on both renderers. [Clean-room record](../clean-room.md#sea-08-lateral-course-radiation)
+
+### SEA-12 free heave and angular wake work
+
+An optional solver exchanges work between the live hull and a periodic dispersive wake through one guided
+horizontal translation, heave, roll and pitch. The regression compares independently evaluated native rigid
+kinetic energy and wave energy in a live anisotropic body. The water gains 1,097.17 J with a maximum residual
+of 0.00083 J against a 0.0311 J f32 roundoff bound. Turning feedback off gives a 2,719.02 J imbalance. Both
+arena layouts replay exactly. This is an energy check for the stated model. [Test](../../packages/physics/tests/coupling/loads-free-hull-wake.test.js)
