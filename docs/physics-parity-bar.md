@@ -192,6 +192,14 @@ build", 069f20095) and used by `docs/physics-solver-audit.md`:
   with rigid bodies and the ground, and takes impulses (Babylon V1 soft bodies cannot take forces; Margo must).
 - Anchoring and stiffness options.
 - **Today:** both are landed and REOPENED. Fracture, FEM tissue and bursting are beyond parity.
+- **Today (2026-11-27, Claude laptop):** `SoftBodyDesc.volume(mesh, options)` makes one from any closed mesh (a geometry
+  primitive, a core `Geometry`, a loaded glTF primitive), welded at its seams, holding its volume or a sealed gas;
+  impulses and forces move it at J / M and F t, it trades momentum with rigid boxes, anchors by pinned particles,
+  targets and `attachParticle`, and draws through `drawSoftBody` with its own UVs; quick start, migration note,
+  example page (`examples/test-pages/soft-volumes.html`) and debug view (`PhysicsDebugView.add(body)`) in
+  `packages/physics/README.md`. Open: a rubber ball's restitution and Hertz contact and a pressurised ball's stiffness
+  against measurements; the surface and cell tiers behind one option; venting and bursting (SOFT-06's audit list); the
+  float32 momentum loss (KB-SOFT-F32MOMENTUM1).
 
 ### P9. BREAK-01 Breakable objects
 

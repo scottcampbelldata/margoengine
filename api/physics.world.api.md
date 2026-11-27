@@ -2321,6 +2321,10 @@ class SoftBodies implements PhysicsAttachment {
         vertices: Float32Array;
         colors: Float32Array;
     };
+    debugLines(bodies: readonly SoftBody[], options: SoftDebugOptions): {
+        vertices: Float32Array;
+        colors: Float32Array;
+    };
     get alpha(): number;
     list(): readonly SoftBody[];
     onTear(listener: (event: SoftTearEvent) => void): () => void;
@@ -2482,12 +2486,17 @@ class SoftBody {
         readonly nv: number;
         readonly wrap: boolean;
     } | null;
+    sourceMesh: SoftSourceMesh | null;
     additionalIterations: number;
     oriented: boolean | undefined;
     selfContacts: boolean;
     selfFriction: number;
     selfThickness: number;
     get valid(): boolean;
+    debugRender(options?: SoftDebugOptions): {
+        vertices: Float32Array;
+        colors: Float32Array;
+    };
     belongsTo(soft: SoftBodies): boolean;
     private get c();
     numParticles(): number;
@@ -2611,6 +2620,7 @@ class SoftBodyDesc {
     massGiven: boolean;
     skin: Skin | null;
     solver: SoftSolver;
+    sourceMesh: SoftSourceMesh | null;
     constructor(positions: ArrayLike<number> | readonly Vec3[]);
     get particleCount(): number;
     static rope(start: Vec3, end: Vec3, particles: number, { bending }?: {
@@ -2630,6 +2640,7 @@ class SoftBodyDesc {
     static sphere(center: Vec3, radius: number, options?: number | {
         detail?: number;
     }): SoftBodyDesc;
+    static volume(mesh: SoftVolumeMesh, options?: SoftVolumeOptions): SoftBodyDesc;
     setVolumeFactor(factor: number | null): this;
     setGasPressure(options: SoftGasPressure): this;
     setTensionOnly(edges?: boolean | readonly number[]): this;
@@ -2727,6 +2738,14 @@ interface SoftContact {
     enabled: boolean;
 }
 
+interface SoftDebugOptions {
+    readonly edges?: boolean;
+    readonly stress?: boolean;
+    readonly stressRange?: number;
+    readonly particles?: boolean;
+    readonly contacts?: boolean;
+}
+
 interface SoftDestination {
     body: SoftBody;
     particle: number;
@@ -2801,6 +2820,12 @@ interface SoftSoftness {
 
 type SoftSolver = 'constraints' | 'fem' | 'vertex-block' | 'projective';
 
+interface SoftSourceMesh {
+    readonly particles: Uint32Array;
+    readonly indices: Uint32Array;
+    readonly uvs: Float32Array | null;
+}
+
 interface SoftTearEvent {
     body: SoftBody;
     edges: number[];
@@ -2815,6 +2840,26 @@ interface SoftTensileSeam {
     readonly openingStrain: number;
     readonly slidingStrain?: number;
     readonly tearingStrain?: number;
+}
+
+type SoftVolumeMesh = {
+    readonly vertices: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+    readonly stride?: number;
+} | {
+    readonly positions: ArrayLike<number>;
+    readonly indices: ArrayLike<number>;
+    readonly uvs?: ArrayLike<number>;
+};
+
+interface SoftVolumeOptions {
+    readonly weld?: number;
+    readonly stiffness?: number;
+    readonly damping?: number;
+    readonly density?: number;
+    readonly radius?: number;
+    readonly pressure?: number;
+    readonly ambientPressure?: number;
 }
 
 type Triangle = readonly [Vec3, Vec3, Vec3];

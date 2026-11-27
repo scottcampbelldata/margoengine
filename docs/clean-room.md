@@ -1,5 +1,31 @@
 # Clean room
 
+### Soft volumes from a mesh (P8, SOFT-04 and SOFT-06, 2026-11-27)
+
+`SoftBodyDesc.volume` (`packages/physics/src/soft.ts`, `weldMesh` in `soft-volume.ts`) welds a mesh's split vertices
+into particles by a spatial hash of cubes one weld tolerance across, each vertex compared with the 27 cubes around it,
+as Matthias Teschner, Bruno Heidelberger, Matthias Müller, Danat Pomeranets and Markus Gross, "Optimized Spatial
+Hashing for Collision Detection of Deformable Objects" (VMV 2003), hash points into a uniform grid. The surface is
+held by the XPBD distance springs of Miles Macklin, Matthias Müller and Nuttapong Chentanez, "XPBD: Position-Based
+Simulation of Compliant Constrained Dynamics" (MIG 2016), whose compliance and damping a natural frequency and damping
+ratio set, and keeps its volume by the closed-mesh volume constraint of Matthias Müller, Bruno Heidelberger, Marcus
+Hennix and John Ratcliff, "Position Based Dynamics" (VRIPHYS 2006; JVCIR 18(2), 2007, section 4.4), the same volume
+energy Teschner, Heidelberger, Müller and Gross give in "A Versatile and Robust Model for Geometrically Complex
+Deformable Solids" (CGI 2004). With `pressure` the shell holds an ideal gas at fixed temperature, p V = n R T, as the
+pressure soft bodies of Maciej Matyka and Mark Ollila, "Pressure Model of Soft Body Simulation" (SIGRAD 2003); the
+survey of Andrew Nealen, Matthias Müller, Richard Keiser, Eddy Boxerman and Mark Carlson, "Physically Based
+Deformable Models in Computer Graphics" (Computer Graphics Forum 25(4), 2006) places the three models. A closed body's
+air load takes each windward face at a cube face's pressure coefficient, 1.05 (Sighard F. Hoerner, *Fluid-Dynamic
+Drag*, 1965, chapter 3), checked against Elmar Achenbach, "Experiments on the flow past spheres at very high Reynolds
+numbers" (Journal of Fluid Mechanics 54(3), 1972), 0.47 below the drag crisis. Written from the papers; no engine's
+source was read. [Teschner et al. 2003](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf),
+[Macklin et al. 2016](https://doi.org/10.1145/2994258.2994272),
+[Müller et al. 2007](https://doi.org/10.1016/j.jvcir.2007.01.005),
+[Teschner et al. 2004](https://doi.org/10.1109/CGI.2004.1309199),
+[Matyka and Ollila 2003](https://arxiv.org/abs/physics/0407003),
+[Nealen et al. 2006](https://doi.org/10.1111/j.1467-8659.2006.01000.x),
+[Achenbach 1972](https://doi.org/10.1017/S0022112072000807).
+
 ### Breakable objects and Voronoi fracture (BREAK-01)
 
 Saty Raghavachary, “Fracture Generation on Polygonal Meshes Using Voronoi Polygons” (ACM SIGGRAPH 2002 Conference

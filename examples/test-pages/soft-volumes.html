@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Soft volumes - Margo Engine Test</title>
+<style>
+  body { margin: 0; background: #0d1117; color: #c9d1d9; font: 14px system-ui, sans-serif; }
+  canvas { display: block; width: 100%; height: 70vh; outline: none; cursor: crosshair; touch-action: none; }
+  #controls { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; }
+  button { font: inherit; padding: 6px 10px; }
+  #status, #help { padding: 0 8px 8px; }
+  output { font-variant-numeric: tabular-nums; }
+</style>
+<canvas id="view" tabindex="0" aria-label="Soft balls, a gas-filled ball and a soft cube dropped on the ground and on rigid crates"></canvas>
+<div id="controls">
+  <button id="btnDrop">Drop them again</button>
+  <button id="btnPush">Push the red ball</button>
+  <button id="btnPress">Press the cube down 1 s</button>
+  <button id="btnPump">Pump the gas ball to 1.4 atm</button>
+  <button id="btnDebug">Debug view: off</button>
+</div>
+<p id="help">Click a soft body to push it where you click. The red ball holds its volume, the blue one is a sealed shell of gas, the green cube is a soft box, and the crates are rigid. The debug view colours each edge by its strain (green at rest, red stretched, blue squeezed), ticks each contact, and puts a cross at each body's centre, white at its rest volume.</p>
+<p><output id="readout">The readout appears when the scene is ready.</output></p>
+<div id="status" role="status">Starting the soft volumes scene…</div>
+<script type="module" src="./soft-volumes.ts"></script></html>

@@ -700,7 +700,8 @@ export interface KernelSoftContacts {
   /**
    * The collider's radius of curvature at each slot's point: the radius of the sphere that fits its surface there, whose centre
    * (`point - curvature * normal`) is fixed in the body: a ball's or capsule's radius, the rounding of a rounded shape, the
-   * distance to the axis on the side of a cylinder or cone, 0 on a flat face or a corner.
+   * distance to the axis on the side of a cylinder or cone, 0 at a sharp corner or edge, and -1 on a flat face (the kernel's
+   * `contact_feature`).
    */
   curvature: Float32Array;
 }

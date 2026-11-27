@@ -26,6 +26,15 @@ export const entries = [
     fix: 'Pass a live `Physics`, attach it with `await PhysicsDebugView.attach(engine, physics)` after `new Physics(engine)`, give a positive `width` or leave it out, add objects with `debugRender()` or functions returning `{vertices, colors}`, pass another `name` for a second view in one scene, and attach a new view after dispose.',
   },
   {
+    id: 'soft-volumes',
+    title: '@margoengine/physics/soft: soft volumes from a mesh (SoftBodyDesc.volume) and their debug lines',
+    kind: 'family',
+    messages: [],
+    cause:
+      'SoftBodyDesc.volume was given no mesh, vertices that are not whole vertices of the stride or not finite, indices that are not triangles or not vertices of the mesh, a mesh that is open or wound inward after welding, or an option out of range (a negative weld, stiffness, damping or radius, a density that is not above 0); or a soft debugRender was given a stress range that is not a positive fraction.',
+    fix: 'Pass a closed mesh: a `@margoengine/geometry` primitive `{positions, indices}`, a core `Geometry`, or `{vertices, indices, stride}` with the position first; triangles wound counter-clockwise seen from outside; raise `weld` (metres) until the seams close, or close the holes; keep `stiffness` (Hz), `damping` and `radius` (metres) 0 or more and `density` (kg/m^3) above 0; pass a `stressRange` such as 0.2.',
+  },
+  {
     id: 'characters',
     title: '@margoengine/physics: character controllers and dynamic characters',
     kind: 'family',

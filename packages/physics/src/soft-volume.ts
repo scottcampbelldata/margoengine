@@ -293,6 +293,73 @@ export function boundaryTriangles(cells: ArrayLike<number>, positions: ArrayLike
   return out;
 }
 
+/** A mesh welded into particles: see {@link weldMesh}. */
+export interface WeldedMesh {
+  /** The particles, flat x, y, z: the first vertex of each group that was welded. */
+  positions: number[];
+  /** For each vertex of the source mesh, the particle it became. */
+  particleOf: Uint32Array;
+  /** The source triangles over particles, without those that welding collapsed. */
+  triangles: number[];
+}
+
+/**
+ * Welds the vertices of a triangle mesh that lie within `tolerance` metres of each other into one particle, in vertex
+ * order, so a mesh that splits a vertex where its normals or texture coordinates change (a glTF mesh, a box with flat
+ * faces) becomes one closed surface. Vertices are hashed into cubes of side `tolerance` and each is compared with the
+ * particles of the 27 cubes around it, so two vertices within the tolerance always meet (0 welds exact copies only).
+ * `stride` floats a vertex, the position first.
+ */
+export function weldMesh(
+  vertices: ArrayLike<number>,
+  indices: ArrayLike<number>,
+  stride: number,
+  tolerance: number,
+): WeldedMesh {
+  const count = vertices.length / stride,
+    positions: number[] = [],
+    particleOf = new Uint32Array(count),
+    cells = new Map<string, number[]>(),
+    size = tolerance > 0 ? tolerance : 1,
+    key = (x: number, y: number, z: number): string => `${x},${y},${z}`;
+  for (let v = 0; v < count; v++) {
+    const x = vertices[v * stride]!,
+      y = vertices[v * stride + 1]!,
+      z = vertices[v * stride + 2]!,
+      ix = Math.floor(x / size),
+      iy = Math.floor(y / size),
+      iz = Math.floor(z / size);
+    let found = -1;
+    for (let dx = -1; dx <= 1 && found < 0; dx++)
+      for (let dy = -1; dy <= 1 && found < 0; dy++)
+        for (let dz = -1; dz <= 1 && found < 0; dz++)
+          for (const p of cells.get(key(ix + dx, iy + dy, iz + dz)) ?? [])
+            if (
+              Math.hypot(positions[p * 3]! - x, positions[p * 3 + 1]! - y, positions[p * 3 + 2]! - z) <= tolerance
+            ) {
+              found = p;
+              break;
+            }
+    if (found < 0) {
+      found = positions.length / 3;
+      positions.push(x, y, z);
+      const id = key(ix, iy, iz),
+        list = cells.get(id);
+      if (list) list.push(found);
+      else cells.set(id, [found]);
+    }
+    particleOf[v] = found;
+  }
+  const triangles: number[] = [];
+  for (let t = 0; t + 2 < indices.length; t += 3) {
+    const a = particleOf[indices[t]!]!,
+      b = particleOf[indices[t + 1]!]!,
+      c = particleOf[indices[t + 2]!]!;
+    if (a !== b && b !== c && a !== c) triangles.push(a, b, c);
+  }
+  return { positions, particleOf, triangles };
+}
+
 /**
  * Whether triangles (three particle indices each) close a surface wound one way: every edge is met once each way round, by
  * the two triangles either side of it. A body of cells has such a surface (`setSurface`, and each piece of a cut), so its

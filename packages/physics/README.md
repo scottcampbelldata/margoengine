@@ -1751,6 +1751,61 @@ console.log(shell.gasState());
 Keep the shell watertight and outward-wound. The model treats the chamber as one region of uniform pressure at
 constant temperature. Each independently filled region is a separate soft body.
 
+### Soft volumes from any mesh (`SoftBodyDesc.volume`)
+
+A soft ball, a jelly or a balloon straight from a mesh, as three.js's `physics_ammo_volume` makes one with Ammo's
+`CreateFromTriMesh`. It squashes and bounces on the ground, trades momentum with rigid bodies both ways, keeps its
+volume (or a sealed gas), and takes `applyImpulse`, `applyImpulseAtPoint`, `applyRadialImpulse`, `addForce` and
+`addParticleForce` as a body of its mass would.
+
+<!-- example:node -->
+```js
+import { Physics } from '@margoengine/physics';
+import { SoftBodies, SoftBodyDesc } from '@margoengine/physics/soft';
+import { sphereGeometry } from '@margoengine/geometry/primitives';
+
+await Physics.load();
+const physics = new Physics(null);
+physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [5, 0.5, 5] } });
+const soft = await SoftBodies.attach(physics);
+const ball = soft.create(SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12)).setTranslation([0, 1.5, 0]));
+for (let i = 0; i < 120; i++) physics.step();
+console.log(ball.centerOfMass(), ball.surfaceVolume());
+```
+
+- **The mesh.** A `@margoengine/geometry` primitive (`{positions, indices, uvs}`), a core `Geometry` (6 floats a vertex),
+  a loaded glTF primitive (`model.primitives[i]` of `@margoengine/gltf/pbr`, 20 floats a vertex, in its node's own space),
+  or `{vertices, indices, stride}` with the position first. It must be closed and wound counter-clockwise seen from
+  outside once welded. Vertices within `weld` metres become one particle, so a sphere split at its UV seam and poles, or
+  a box with a vertex per face, is one surface. `body.sourceMesh` keeps each source vertex's particle and texture
+  coordinates: `drawSoftBody(engine, ball, {material})` from `@margoengine/gltf/soft-mesh` draws the source mesh,
+  seams and texture kept.
+- **Options**, all with defaults: `weld` 1e-5 m; `stiffness` 20 Hz, the natural frequency of its edge and bend springs
+  (lower is softer, 0 holds them rigid); `damping` 0.1, their damping ratio (1 lands dead); `density` 1000 kg/m^3, so its
+  mass is density times its volume (and it floats at that density in `SoftBodies.water`); `radius` 0.01 m, the contact
+  thickness of its surface; `pressure`, an absolute fill pressure in Pa that makes it a sealed shell of gas (see below)
+  in place of a held volume, with `ambientPressure` (default 101,325 Pa) outside.
+- **Anchoring.** Every `SoftBodyDesc` setting applies to the description it returns: `setPinnedParticles([i])` pins a
+  particle, `setParticleKinematicTarget(i, position)` on the body drags one, `attachParticle(i, rigidBody)` ties
+  one to a rigid body; `setMass`, `setVolumeFactor` (inflate or deflate), `setGravityScale`, `setAirDrag` (default on:
+  a closed body takes the air's pressure on its windward faces, a sphere's drag coefficient 0.525 against the 0.47
+  measured, Achenbach 1972) and the rest.
+- **Debug view.** `PhysicsDebugView.add(ball)` (`@margoengine/physics/debug-view`) draws its edges coloured by strain
+  (green at rest, red stretched, blue squeezed), a tick at each contact, and a cross at its centre of mass, white at its
+  rest volume and redder as it swells, bluer as it is squeezed (full colour 20% off). `ball.debugRender(options)` gives
+  the same lines.
+- **Errors.** A mesh that is missing, open, wound inward, not triangles or not finite, or an option out of range, throws
+  `MargoError` code `unsupported` with the fix and a link to [soft-volumes](https://margoengine.com/errors#soft-volumes).
+- **From three.js.** `physics_ammo_volume` builds an `Ammo.btSoftBody` from a `BufferGeometry` after merging its
+  vertices by hand, sets `kPR` (pressure) or `kVC` (volume conservation) and the spring `kLST` on its config, adds it
+  with `addSoftBody`, and copies `m_nodes` back into the geometry with its normals every frame. In Margo the same is
+  `soft.create(SoftBodyDesc.volume(geometry, {stiffness, pressure}))` and `drawSoftBody(engine, body)`: the welding,
+  the volume or gas, the mass from density and the drawing with normals are done for you, and the pressure is a real
+  absolute pressure in Pa against the air outside, not a unitless coefficient.
+- **Limits.** The soft kernel keeps positions in float32: damped springs lose up to about 1e-3 of the body's momentum
+  over a few seconds near the origin, and more far from it (KB-SOFT-F32MOMENTUM1, `docs/known-bugs.md`). A gas shell is
+  isothermal and sealed: no venting, bursting or orifice flow yet (`docs/limits.md`).
+
 ## How it works
 
 Static meshes loaded by `@margoengine/gltf/pbr` or `@margoengine/fbx` support fitted colliders without attaching core geometry. `physics.addBody(model.root)` gathers the static core/PBR triangles beneath a geometry-free root into one fitted box, preserving the loaded hierarchy. Each descendant's world transform contributes its translation, rotation and scale; the collider uses the body's rotation/translation frame, retaining root scale exactly once because a body has no scale. A node with its own geometry fits only that node, with its scale applied once. Hidden descendants still contribute collision geometry.

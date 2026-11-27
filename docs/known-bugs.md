@@ -6,6 +6,43 @@ an entry gives the **Repro**, the **Cause** and, once fixed, the commit and the 
 "Needs a maintainer decision" marks a fix that would change what a check accepts or touch the frozen core. Report a
 new bug as [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) describes.
 
+### Open 2026-11-27: a soft body's damped springs lose momentum to float32 rounding (KB-SOFT-F32MOMENTUM1, physics soft)
+
+- **Repro:** with no gravity and no air drag, `SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12), {density: 100})` at
+  the origin, `applyImpulse([0, 3, 0])`, 120 steps of 1/60 s: the centre of mass carries 2.99758 N s, not 3 (8e-4
+  lost). With `damping: 0` it carries 3.00037; moved to y = 3, where every particle's y lies in one binade [2, 4), it
+  carries 3.00054 with the default damping; at y = 100 it carries 2.99177.
+- **Cause:** the soft kernel (`packages/physics/soft-kernel/src/world.rs`, `solve_edge`) stores particle positions as
+  absolute float32. Each damped edge correction moves its two particles by equal and opposite amounts far below a
+  position's ulp; rounding keeps the move on a particle in a finer binade and drops it on one in a coarser one, so the
+  pair's momentum no longer cancels, and the loss runs one way while the body moves. Far from the origin the integration
+  step itself loses digits. The cure is positions relative to each body's own origin (a floating origin a body), which
+  every soft solve, contact and the GPU handoff read, so it is its own change.
+- **Kept honest by:** `packages/physics/tests/soft-volume.test.js` ("an impulse moves a soft volume at J / M") holds
+  momentum to 1e-3 of the impulse, the measured loss, and `docs/limits.md` states it.
+
+### Fixed 2026-11-27: a soft body on flat ground kept a face contact its corners already held (KB-SOFT-FACEROWS1, physics soft)
+
+- **Repro:** `SoftBodyDesc.volume(sphereGeometry(0.4, 16, 12))` dropped from 1.5 m on a box floor: 240 steps took about
+  40 s, steps at rest up to 0.8 s, with 150 to 340 face-contact rows (480 at most) on a ball of 352 triangles.
+- **Cause:** a face contact on a flat face is held by its corners' particle contacts (the distance to a plane is affine
+  over the triangle), so `SoftBodies` drops it; the check compared the contact's curvature with 0, but the kernel marks
+  a flat face -1 (`kernel/src/face.rs`, `contact_feature`; 0 is a sharp edge or corner), and the documentation of
+  `KernelFaceContacts.curvature` said 0. Every lower triangle kept its row, and the exact contact and friction solves
+  grow with the square of the rows.
+- **Fix:** the check takes curvature below 0 on the face and on each corner's contact; the documentation says -1. The
+  same drop takes 1.1 s, 48 rows at rest and 105 at most. Regression: `packages/physics/tests/soft-volume.test.js`
+  ("a ball on flat ground keeps no face contact its corners already hold"), at most one row a lower triangle.
+
+### Fixed 2026-11-27: a closed soft body felt a flat plate's air drag on both sides of every face (KB-SOFT-CLOSEDDRAG1, physics soft)
+
+- **Repro:** a ball of `SoftBodyDesc.volume` coasting at 5 m/s with `setAirDrag` on slowed as a drag coefficient of
+  1.17, 2.5 times the 0.47 measured for a sphere below the drag crisis (Achenbach 1972).
+- **Cause:** `SoftBodies.airDrag` gave every face a flat plate's 1.17 whichever way it moved, leeward faces in the wake
+  included.
+- **Fix:** a body that holds a volume or a gas takes the air on its windward faces only, at a cube face's 1.05 (Hoerner
+  1965), which sums to 0.525 on a sphere. Regression: `packages/physics/tests/soft-volume.test.js` ("a closed volume
+  feels the air on its windward side").
 ### Open 2026-11-27: packages that load a WebGL2 route by import() draw their first frames differently until it arrives (KB-COMPAT-READY1, culling, dof, sky, splats, vfx, compute, voxel-pathtracer, scatter)
 
 - **Repro:** the class KB-SCATTER-ATTRCOMPAT1 found in shadows. On the WebGL2 layer each of these packages fetches its

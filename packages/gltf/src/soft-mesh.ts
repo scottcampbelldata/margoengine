@@ -21,7 +21,8 @@ export type SoftMeshMaterial = NonNullable<GLTFDocument['materials']>[number];
 /** Options for {@link SoftSurface}. */
 export interface SoftSurfaceOptions {
   /**
-   * Texture coordinates, two a particle (two a skin vertex for a skinned body). Default: the grid of a body built by
+   * Texture coordinates, two a particle (two a skin vertex for a skinned body, two a vertex of the source mesh for a body
+   * made by `SoftBodyDesc.volume`). Default: a `volume` body's own (its mesh's `uvs` or `TEXCOORD_0`), the grid of a body built by
    * `cloth`, `clothAnisotropic` or `clothTube` (particle (i, j) at (i / (nu - 1), j / (nv - 1)), a tube's seam doubled so
    * u runs 0 to 1 around it), else the body's shape where the surface is made, laid flat on the plane of its two largest
    * extents and scaled to 0..1.
@@ -46,6 +47,8 @@ export class SoftSurface {
   /** Pairs of vertices that are one particle (a tube's first ring and its seam copy). */
   private readonly twins: Uint32Array;
   private readonly skinned: boolean;
+  /** For a body made by `SoftBodyDesc.volume`, each particle's normal: the copies of a welded vertex share it. */
+  private readonly particleNormals: Float32Array | null;
   private readonly scratch: Float32Array;
   private readonly normal: Float32Array;
   private readonly tangent: Float32Array;
@@ -53,7 +56,7 @@ export class SoftSurface {
 
   constructor(
     readonly body: SoftBody,
-    { uvs }: SoftSurfaceOptions = {},
+    { uvs: given }: SoftSurfaceOptions = {},
   ) {
     if (!body.valid) throw new MargoError('state', 'Soft body was removed; draw a body that is still in its world.');
     this.skinned = body.meshIndices().length > 0;
@@ -62,8 +65,11 @@ export class SoftSurface {
       throw new TypeError(
         'This soft body has no triangles to draw (a rope or a bare particle set); draw a rope with @margoengine/lines, or build the body with cloth, trimesh, sphere or setSkin.',
       );
-    const count = this.skinned ? body.meshVertices().length / 3 : body.numParticles(),
-      grid = this.skinned || uvs ? null : body.grid;
+    // A body made by SoftBodyDesc.volume draws the mesh it came from: each vertex follows its welded particle.
+    const welded = this.skinned ? null : body.sourceMesh,
+      uvs = given ?? welded?.uvs ?? undefined,
+      count = this.skinned ? body.meshVertices().length / 3 : welded ? welded.particles.length : body.numParticles(),
+      grid = this.skinned || uvs || welded ? null : body.grid;
     let source: Uint32Array, indices: Uint32Array, flat: Float32Array;
     if (grid?.wrap) {
       // A tube: the seam column (i = nu) is a second copy of column 0, so u runs from 0 to 1 around without wrapping back.
@@ -85,8 +91,12 @@ export class SoftSurface {
           indices[t + k] = crosses && columns[k] === 0 ? nu * nv + (triangles[t + k]! % nv) : triangles[t + k]!;
       }
     } else {
-      source = this.skinned ? new Uint32Array(0) : Uint32Array.from({ length: count }, (_, i) => i);
-      indices = triangles;
+      source = this.skinned
+        ? new Uint32Array(0)
+        : welded
+          ? welded.particles.slice()
+          : Uint32Array.from({ length: count }, (_, i) => i);
+      indices = welded ? welded.indices.slice() : triangles;
       if (uvs) {
         if (uvs.length !== count * 2)
           throw new RangeError(`Soft surface uvs need two numbers a vertex: ${count * 2}, not ${uvs.length}.`);
@@ -99,9 +109,13 @@ export class SoftSurface {
             flat[(i * grid.nv + j) * 2] = i / (grid.nu - 1);
             flat[(i * grid.nv + j) * 2 + 1] = j / (grid.nv - 1);
           }
-      } else flat = planarUVs(this.skinned ? body.meshVertices() : body.particlePositions());
+      } else {
+        const p = this.skinned ? body.meshVertices() : body.particlePositions();
+        flat = planarUVs(welded ? Float32Array.from({ length: count * 3 }, (_, i) => p[source[(i / 3) | 0]! * 3 + (i % 3)]!) : p);
+      }
     }
     this.source = source;
+    this.particleNormals = welded ? new Float32Array(body.numParticles() * 3) : null;
     const twins: number[] = [];
     if (grid?.wrap) for (let j = 0; j < grid.nv; j++) twins.push(j, grid.nu * grid.nv + j);
     this.twins = Uint32Array.from(twins);
@@ -115,7 +129,7 @@ export class SoftSurface {
       vertices[o + 13] = vertices[o + 15] = flat[v * 2 + 1]!;
       vertices[o + 16] = vertices[o + 17] = vertices[o + 18] = vertices[o + 19] = 1;
     }
-    this.scratch = new Float32Array(count * 3);
+    this.scratch = new Float32Array((this.skinned ? count : body.numParticles()) * 3);
     this.normal = new Float32Array((flat.length / 2) * 3);
     this.tangent = new Float32Array(this.normal.length);
     this.bitangent = new Float32Array(this.normal.length);
@@ -196,6 +210,16 @@ export class SoftSurface {
       const a = this.twins[s]! * 3,
         c = this.twins[s + 1]! * 3;
       for (const sum of [n, t, b]) for (let k = 0; k < 3; k++) sum[a + k] = sum[c + k] = sum[a + k]! + sum[c + k]!;
+    }
+    // The copies of a welded vertex are one point of the surface, as the solver sees it: each takes the normal summed over
+    // every triangle round its particle, so the light does not break along the source mesh's seams. Tangents stay each
+    // vertex's own, as its texture coordinates are.
+    const shared = this.particleNormals;
+    if (shared) {
+      shared.fill(0);
+      for (let v = 0; v < count; v++)
+        for (let k = 0; k < 3; k++) shared[this.source[v]! * 3 + k] = shared[this.source[v]! * 3 + k]! + n[v * 3 + k]!;
+      for (let v = 0; v < count; v++) for (let k = 0; k < 3; k++) n[v * 3 + k] = shared[this.source[v]! * 3 + k]!;
     }
     for (let v = 0; v < count; v++) {
       const o = v * STRIDE;

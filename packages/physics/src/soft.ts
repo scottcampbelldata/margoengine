@@ -23,6 +23,7 @@ import {
   reaches,
   type Skin,
   tetDeterminant,
+  weldMesh,
 } from './soft-volume.js';
 import { adaptiveTear } from './soft-adaptive-tear.js';
 import { crossesBlade, type SoftDestination, type SoftSplit, splitBody } from './soft-split.js';
@@ -129,6 +130,12 @@ const GF_PER_CM = 9.80665e-3 / 0.01;
  * chapter 3), the value `WindForce` and `SailForce` take for a surface the air meets square.
  */
 const PLATE_DRAG = 1.17;
+/**
+ * The pressure coefficient of a closed body's face moving square into the air, taken on its windward faces only: a cube's
+ * drag face-on, 1.05 (Hoerner, *Fluid-Dynamic Drag*, 1965, chapter 3). Summed over a sphere's windward half it gives a
+ * drag coefficient of 0.525, against the 0.47 measured below the drag crisis (Achenbach 1972).
+ */
+const CLOSED_DRAG = 1.05;
 /** A circular cylinder's drag across the flow below the drag crisis (Hoerner, Fluid-Dynamic Drag, 1965), for Morison's drag. */
 const MORISON_DRAG = 1.2;
 /** A circular cylinder's added-mass coefficient across the flow (potential flow), for Morison's inertia. */
@@ -1024,6 +1031,77 @@ export interface SoftGasState {
   readonly ambientPressure: number;
 }
 
+/**
+ * A closed triangle mesh for {@link SoftBodyDesc.volume}: a `@margoengine/geometry` primitive (`{positions, indices}`),
+ * a core `Geometry` (position and normal, 6 floats a vertex), a loaded glTF primitive (`model.primitives[i]`, 20 floats a vertex),
+ * or flat x, y, z `vertices` (`stride` 3, the default).
+ */
+export type SoftVolumeMesh =
+  | {
+      /** Floats of the vertices, `stride` a vertex, the position first. */
+      readonly vertices: ArrayLike<number>;
+      /** Three vertex indices a triangle, wound counter-clockwise seen from outside. */
+      readonly indices: ArrayLike<number>;
+      /** Floats a vertex (default 6 for a core `Geometry`, 20 for a loaded glTF primitive (`model.primitives[i]`), else 3). */
+      readonly stride?: number;
+    }
+  | {
+      /** Flat x, y, z positions, three a vertex. */
+      readonly positions: ArrayLike<number>;
+      /** Three vertex indices a triangle, wound counter-clockwise seen from outside. */
+      readonly indices: ArrayLike<number>;
+      /** Texture coordinates, two a vertex (a geometry primitive's `uvs`): kept for drawing in {@link SoftSourceMesh.uvs}. */
+      readonly uvs?: ArrayLike<number>;
+    };
+
+/** The mesh a body made by {@link SoftBodyDesc.volume} came from, for a renderer to draw it (`@margoengine/gltf/soft-mesh`). */
+export interface SoftSourceMesh {
+  /** For each vertex of the source mesh, the particle it follows. */
+  readonly particles: Uint32Array;
+  /** The source triangles, three vertex indices each. */
+  readonly indices: Uint32Array;
+  /**
+   * The source vertices' texture coordinates, two a vertex: a geometry primitive's `uvs` or a glTF primitive's
+   * `TEXCOORD_0`; null when the mesh had none.
+   */
+  readonly uvs: Float32Array | null;
+}
+
+/** Options of {@link SoftBodyDesc.volume}; every one has a default. */
+export interface SoftVolumeOptions {
+  /** Vertices this close, in metres, become one particle (default 1e-5); 0 welds only exact copies. */
+  readonly weld?: number;
+  /** The natural frequency of its edge and bend springs, in Hz (default 20): lower is softer, 0 holds them rigid. */
+  readonly stiffness?: number;
+  /** The damping ratio of those springs (default 0.1, so it bounces; 1 lands dead). */
+  readonly damping?: number;
+  /** kg/m^3 (default 1000, a water balloon or a jelly): its mass is this times its volume, and it displaces water at it. */
+  readonly density?: number;
+  /** Contact thickness of its surface in metres (default 0.01): how far it keeps from what it touches. */
+  readonly radius?: number;
+  /** Absolute fill pressure in Pa: a sealed shell of gas (see {@link SoftBodyDesc.setGasPressure}) in place of a held volume (default none). */
+  readonly pressure?: number;
+  /** Absolute pressure outside a gas shell, in Pa (default 101,325). */
+  readonly ambientPressure?: number;
+}
+
+/** What `debugRender` draws of soft bodies (see {@link SoftBodies.debugRender} and {@link SoftBody.debugRender}). */
+export interface SoftDebugOptions {
+  /** Each structural edge that has not torn (default true). */
+  readonly edges?: boolean;
+  /** Colour the edges by strain: green at rest, red stretched, blue squeezed (default false; true for one body's lines). */
+  readonly stress?: boolean;
+  /** The strain of full colour, a fraction of the rest length (default 0.2). */
+  readonly stressRange?: number;
+  /** A small cross at each particle (default false). */
+  readonly particles?: boolean;
+  /** A tick along the normal of each particle's contact with a collider (default false; true for one body's lines). */
+  readonly contacts?: boolean;
+}
+
+const VOLUME_HELP = ' See https://margoengine.com/errors#soft-volumes';
+const volumeError = (message: string): MargoError => new MargoError('unsupported', message + VOLUME_HELP);
+
 const GAS_VOLUME_MODE = 2;
 const STANDARD_ATMOSPHERE = 101325;
 
@@ -1111,6 +1189,8 @@ export class SoftBodyDesc {
   /** @internal Whether a mass was given, so the cells' density does not set one. */ massGiven = false;
   /** @internal A mesh that rides in the cells. */ skin: Skin | null = null;
   /** @internal */ solver: SoftSolver = 'constraints';
+  /** @internal The mesh `volume` welded: each source vertex's particle, and the source triangles. */
+  sourceMesh: SoftSourceMesh | null = null;
 
   /** Raw particles from flat x, y, z numbers or a list of points; add the elements with `setEdges`. */
   constructor(positions: ArrayLike<number> | readonly Vec3[]) {
@@ -1492,6 +1572,89 @@ export class SoftBodyDesc {
       );
     }
     return SoftBodyDesc.trimesh(vertices, faces).setShapeMatching(false).setVolumeFactor(1);
+  }
+
+  /**
+   * A soft volume from any closed triangle mesh (three.js `physics_ammo_volume`, Ammo's `CreateFromTriMesh`): a
+   * `@margoengine/geometry` primitive (`sphereGeometry(0.5)`), a core `Geometry`, a loaded glTF primitive
+   * (`model.primitives[i]` of `@margoengine/gltf/pbr`, in its node's own space) or flat positions with indices. Vertices within
+   * `weld` metres become one particle, so a mesh split at its normal or UV seams is one closed surface; its edges are
+   * springs of `stiffness` Hz and `damping`, so it squashes and bounces, and it holds its volume, or, given `pressure`, is a
+   * sealed shell of gas at that absolute pressure. It weighs `density` times its volume (and displaces water at that
+   * density) unless `setMass` says otherwise. `body.sourceMesh` keeps each source vertex's particle and texture
+   * coordinates, so `drawSoftBody(engine, body, {material})` (`@margoengine/gltf/soft-mesh`) draws the mesh, seams and
+   * texture kept.
+   * @throws MargoError (`unsupported`) for a mesh that is empty, not triangles, open or wound inward after welding, or an
+   * option out of range.
+   */
+  static volume(mesh: SoftVolumeMesh, options: SoftVolumeOptions = {}): SoftBodyDesc {
+    const {
+      weld = 1e-5,
+      stiffness = 20,
+      damping = 0.1,
+      density = 1000,
+      radius = 0.01,
+      pressure,
+      ambientPressure,
+    } = options;
+    const flat = mesh && 'positions' in mesh,
+      vertices = flat ? mesh.positions : mesh?.vertices,
+      indices = mesh?.indices,
+      stride = flat ? 3 : (mesh?.stride ?? (mesh && 'bounds' in mesh ? 6 : mesh && 'definition' in mesh ? 20 : 3));
+    if (!vertices || !indices || typeof vertices.length !== 'number' || typeof indices.length !== 'number')
+      throw volumeError(
+        'SoftBodyDesc.volume needs a mesh: a geometry primitive {positions, indices}, a Geometry or {vertices, indices, stride}.',
+      );
+    if (!Number.isInteger(stride) || stride < 3 || vertices.length === 0 || vertices.length % stride !== 0)
+      throw volumeError(
+        `The mesh's vertices must be whole vertices of ${stride} floats, the position first; pass the stride it has.`,
+      );
+    const count = vertices.length / stride;
+    if (indices.length === 0 || indices.length % 3 !== 0)
+      throw volumeError('The mesh needs triangles: indices, three a triangle.');
+    for (let i = 0; i < indices.length; i++)
+      if (!Number.isInteger(indices[i]) || indices[i]! < 0 || indices[i]! >= count)
+        throw volumeError(`Triangle index ${indices[i]} is not a vertex of the mesh (0 to ${count - 1}).`);
+    for (let v = 0; v < count; v++)
+      for (let a = 0; a < 3; a++)
+        if (!Number.isFinite(vertices[v * stride + a]))
+          throw volumeError(`Vertex ${v} of the mesh is not three finite numbers.`);
+    const positive = (value: number, name: string, zero = false): void => {
+      if (!(zero ? value >= 0 : value > 0) || !Number.isFinite(value))
+        throw volumeError(`${name} must be a finite number ${zero ? 'of 0 or more' : 'above 0'} (got ${value}).`);
+    };
+    positive(weld, 'weld (metres)', true);
+    positive(stiffness, 'stiffness (Hz)', true);
+    positive(damping, 'damping (a ratio)', true);
+    positive(density, 'density (kg/m^3)');
+    positive(radius, 'radius (metres)', true);
+    const welded = weldMesh(vertices, indices, stride, weld);
+    if (!closedSurface(welded.triangles))
+      throw volumeError(
+        'A soft volume needs a closed mesh, each edge shared by two triangles wound one way; weld its seams (raise weld) or close its holes.',
+      );
+    const volume = meshVolume(welded.positions, welded.triangles);
+    if (!(volume > 0))
+      throw volumeError("The mesh's triangles face inward (its volume is negative); reverse their winding.");
+    const desc = SoftBodyDesc.trimesh(welded.positions, welded.triangles)
+      .setShapeMatching(false)
+      .setSoftness(stiffness, damping)
+      .setParticleRadius(radius)
+      .setDensity(density)
+      .setMass(density * volume);
+    // Texture coordinates to draw it with: a geometry primitive's uvs, or TEXCOORD_0 at floats 12 and 13 of a glTF primitive's
+    // packed vertex (position and 1, normal, tangent, uv0, uv1, colour).
+    const given = flat ? mesh.uvs : undefined,
+      uvs =
+        given && given.length === count * 2 && Array.from(given).every(Number.isFinite)
+          ? Float32Array.from(given)
+          : !flat && 'definition' in mesh && stride === 20
+            ? Float32Array.from({ length: count * 2 }, (_, i) => vertices[((i / 2) | 0) * 20 + 12 + (i % 2)]!)
+            : null;
+    desc.sourceMesh = { particles: welded.particleOf, indices: Uint32Array.from(indices), uvs };
+    return pressure === undefined
+      ? desc.setVolumeFactor(1)
+      : desc.setGasPressure({ pressure, ...(ambientPressure === undefined ? {} : { ambientPressure }) });
   }
 
   /**
@@ -2451,6 +2614,12 @@ export class SoftBody {
    * renderer reads its texture coordinates from it (`@margoengine/gltf/soft-mesh`).
    */
   grid: { readonly nu: number; readonly nv: number; readonly wrap: boolean } | null = null;
+  /**
+   * The mesh a body built by `SoftBodyDesc.volume` came from: for each of its vertices the particle it follows
+   * (`particles`), and its triangles over those vertices (`indices`); null for any other body, a piece of a split one
+   * included. A renderer draws the source mesh, seams and texture coordinates kept, from it (`@margoengine/gltf/soft-mesh`).
+   */
+  sourceMesh: SoftSourceMesh | null = null;
   /** @internal */ additionalIterations = 0;
   /** @internal */ oriented: boolean | undefined = undefined;
   /** @internal Whether its triangles are in the cloth contact search, and how rough the cloth is. */ selfContacts = false;
@@ -2461,6 +2630,30 @@ export class SoftBody {
   /** False once the body was removed. */
   get valid(): boolean {
     return !this.removed;
+  }
+  /**
+   * This body's debug lines, for `PhysicsDebugView.add(body)` (`@margoengine/physics/debug-view`): its edges coloured by
+   * strain and its contacts (the options of {@link SoftBodies.debugRender}, `stress` and `contacts` on by default), and,
+   * for a body that holds a volume or a gas, a cross at its centre of mass, white at its rest volume, towards red as it
+   * swells and towards blue as it is squeezed (full colour 20 percent off).
+   */
+  debugRender(options: SoftDebugOptions = {}): { vertices: Float32Array; colors: Float32Array } {
+    this.check();
+    const lines = this.owner.debugLines([this], { stress: true, contacts: true, ...options });
+    if (!this.volumeOn) return lines;
+    const [x, y, z] = this.centerOfMass(),
+      ratio = this.owner.surfaceVolume(this) / this.surfaceRest,
+      k = Math.min(1, Math.abs(ratio - 1) / 0.2),
+      color = ratio >= 1 ? [1, 1 - k, 1 - k, 1] : [1 - k, 1 - k, 1, 1],
+      r = 0.05,
+      cross = [x - r, y, z, x + r, y, z, x, y - r, z, x, y + r, z, x, y, z - r, x, y, z + r],
+      vertices = new Float32Array(lines.vertices.length + cross.length),
+      colors = new Float32Array(lines.colors.length + (cross.length / 3) * 4);
+    vertices.set(lines.vertices);
+    vertices.set(cross, lines.vertices.length);
+    colors.set(lines.colors);
+    for (let i = lines.colors.length; i < colors.length; i += 4) colors.set(color, i);
+    return { vertices, colors };
   }
   /** @internal Whether an optional soft solver may step this body. */
   belongsTo(soft: SoftBodies): boolean {
@@ -3315,6 +3508,14 @@ export class SoftBodies implements PhysicsAttachment {
   debugRender(
     options: { edges?: boolean; stress?: boolean; stressRange?: number; particles?: boolean; contacts?: boolean } = {},
   ): { vertices: Float32Array; colors: Float32Array } {
+    return this.debugLines(this.bodies, options);
+  }
+
+  /** @internal The debug lines of some of its bodies (see {@link SoftBodies.debugRender}). */
+  debugLines(
+    bodies: readonly SoftBody[],
+    options: SoftDebugOptions,
+  ): { vertices: Float32Array; colors: Float32Array } {
     const { edges = true, stress = false, stressRange = 0.2, particles = false, contacts = false } = options,
       positions: number[] = [],
       colors: number[] = [],
@@ -3323,11 +3524,9 @@ export class SoftBodies implements PhysicsAttachment {
         colors.push(...color, ...color);
       };
     if (!(stressRange > 0) || !Number.isFinite(stressRange))
-      throw new RangeError(
-        `The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`,
-      );
+      throw volumeError(`The stress range is a positive fraction of the rest length (got ${stressRange}); pass 0.2, say.`);
     const c = this.columns();
-    for (const body of this.bodies) {
+    for (const body of bodies) {
       const at = (row: number): [number, number, number] => [c.x![row]!, c.y![row]!, c.z![row]!];
       if (edges)
         for (let e = 0; e < body.structuralEdges(); e++) {
@@ -3710,6 +3909,11 @@ export class SoftBodies implements PhysicsAttachment {
     body.density = desc.density;
     body.waterRadius = desc.radius ?? null;
     body.grid = desc.grid && { ...desc.grid };
+    body.sourceMesh = desc.sourceMesh && {
+      particles: desc.sourceMesh.particles.slice(),
+      indices: desc.sourceMesh.indices.slice(),
+      uvs: desc.sourceMesh.uvs && desc.sourceMesh.uvs.slice(),
+    };
     if (desc.skin) {
       body.skin = desc.skin;
       body.skinCells = Uint32Array.from(desc.cells);
@@ -5263,6 +5467,56 @@ export class SoftBodies implements PhysicsAttachment {
       friction?: number;
     }
     const faces: FoundFace[] = [];
+    // The particle contacts by particle row, to leave out a face contact its corners' contacts already hold: three corners
+    // held a radius above one flat face of a collider hold every point of the triangle between them (the face's point is a
+    // convex combination of the corners, and the distance to a plane is affine), so its row would only repeat theirs. On a
+    // ball resting on the ground nearly every lower triangle has such a contact, and the repeated rows made the exact contact
+    // and friction solves grow with their square (KB-SOFT-FACEROWS1). A curved surface, a contact hook, a pinned corner or a
+    // corner of another radius keeps its face contact.
+    const byRow = new Map<number, Found[]>();
+    for (const f of found) {
+      const list = byRow.get(f.row);
+      if (list) list.push(f);
+      else byRow.set(f.row, [f]);
+    }
+    const hooked = new Map<number, boolean>(),
+      asksHook = (collider: number): boolean => {
+        let on = hooked.get(collider);
+        if (on === undefined) {
+          on = !!this.contactHook && !!this.physics.colliderOf(collider)?.activeHooks().modifyContacts;
+          hooked.set(collider, on);
+        }
+        return on;
+      },
+      heldByCorners = (
+        rows: readonly number[],
+        collider: number,
+        normal: Vec3,
+        point: Vec3,
+        curvature: number,
+        thickness: number,
+      ): boolean => {
+        // The kernel marks a flat face -1 (`contact_feature`); 0 is a sharp edge or corner, above 0 a curved surface.
+        if (!(curvature < 0) || asksHook(collider)) return false;
+        for (const row of rows) {
+          if (!(c.w[row]! > 0) || c.radius[row]! < thickness) return false;
+          const held = byRow
+            .get(row)
+            ?.some(
+              (f) =>
+                f.collider === collider &&
+                f.curvature < 0 &&
+                f.normal[0] * normal[0] + f.normal[1] * normal[1] + f.normal[2] * normal[2] >= 1 - 1e-6 &&
+                Math.abs(
+                  (f.point[0] - point[0]) * normal[0] +
+                    (f.point[1] - point[1]) * normal[1] +
+                    (f.point[2] - point[2]) * normal[2],
+                ) <= 1e-6,
+            );
+          if (!held) return false;
+        }
+        return true;
+      };
     for (const soft of this.bodies) {
       const list = soft.triangleList,
         count = list.length / 3;
@@ -5317,6 +5571,17 @@ export class SoftBodies implements PhysicsAttachment {
             Math.hypot(hit.velocity[at * 3]!, hit.velocity[at * 3 + 1]!, hit.velocity[at * 3 + 2]!) > 0.05
           )
             soft.wake();
+          if (
+            heldByCorners(
+              [0, 1, 2].map((k) => soft.firstParticle + list[t * 3 + k]!),
+              hit.collider[at]!,
+              [hit.normal[at * 3]!, hit.normal[at * 3 + 1]!, hit.normal[at * 3 + 2]!],
+              [hit.point[at * 3]!, hit.point[at * 3 + 1]!, hit.point[at * 3 + 2]!],
+              hit.curvature[at]!,
+              thickness[t]!,
+            )
+          )
+            continue;
           faces.push({
             corners: [list[t * 3]!, list[t * 3 + 1]!, list[t * 3 + 2]!],
             weights: [hit.weights[at * 3]!, hit.weights[at * 3 + 1]!, hit.weights[at * 3 + 2]!],
@@ -5823,8 +6088,26 @@ export class SoftBodies implements PhysicsAttachment {
       // Under the water's surface the water takes the face instead (waterLoads).
       const dry = this.water ? 1 - this.submerged(middle[0], middle[1], middle[2], 0, time) : 1;
       if (!(speed > 0) || !(dry > 0)) continue;
-      const un = rx * n[0] + ry * n[1] + rz * n[2],
-        tx = rx - un * n[0],
+      const un = rx * n[0] + ry * n[1] + rz * n[2];
+      // A closed surface is one side of a body, not a sheet in the air on both sides: only the faces moving out into the
+      // air take its pressure, at a cube face's coefficient along the normal, and its leeward faces lie in the wake
+      // (KB-SOFT-CLOSEDDRAG1).
+      if (body.volumeOn) {
+        if (!(un > 0)) continue;
+        const k = 0.5 * rho * CLOSED_DRAG * area * w * dry,
+          jn = (un / (1 + k * un * dt) - un) / w / 3;
+        for (const [row, wr] of [
+          [a, wa],
+          [b, wb],
+          [d, wd],
+        ] as const) {
+          c.vx[row] = c.vx[row]! + wr * jn * n[0];
+          c.vy[row] = c.vy[row]! + wr * jn * n[1];
+          c.vz[row] = c.vz[row]! + wr * jn * n[2];
+        }
+        continue;
+      }
+      const tx = rx - un * n[0],
         ty = ry - un * n[1],
         tz = rz - un * n[2],
         sine = Math.min(1, Math.abs(un) / speed),
