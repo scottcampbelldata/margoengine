@@ -153,10 +153,14 @@ test('no package source writes the cancelling GGX denominator nh^2 (a2 - 1) + 1'
     'packages/environment/src/shaders.ts',
     'packages/voxel-pathtracer/src/shaders.ts',
     'packages/water/src/index.ts',
-    'packages/water/src/ships.ts',
     'packages/water/src/fft-shaders.ts',
   ])
     assert.match(read(file), /ggxDenominatorOf\(\s*'[^']+',\s*'[^']+'/, `${file} passes n and h`);
+  // Ship lamps glitter through the sun's lobe (KB-SHIPLAMP1, e2efb48e53): ships.ts writes no GGX D of its own and
+  // calls index.ts seaGlint, which passes n and h above.
+  const ships = read('packages/water/src/ships.ts');
+  assert.match(ships, /seaGlint\(\s*n\s*,\s*v\s*,\s*l\s*,\s*rough\s*\)/, 'ships.ts lamps call seaGlint');
+  assert.doesNotMatch(ships, /ggxDenominator|3\.14159265\s*\*/, 'ships.ts computes no GGX D of its own');
   assert.match(
     read('packages/materials/src/lobe-shader.ts'),
     /ggxNamed\(\s*'materialA2',\s*'materialNH',\s*'materialNV',\s*'materialNL',\s*'s\.n',\s*'materialH',?\s*\)/,
