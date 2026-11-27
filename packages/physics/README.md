@@ -51,6 +51,10 @@ engine.start(); // each frame's delta drives the accumulator
 
 ## Character controller quick start
 
+A kinematic capsule that walks, climbs slopes up to 45 degrees and slides off steeper ones, steps up 0.3 m ledges, snaps
+down stairs, rides what it stands on, pushes crates and jumps. `walk(velocity)` takes a speed in m/s and adds the world's
+gravity and the jump itself, once per fixed step:
+
 ```ts
 import { Physics } from '@margoengine/physics';
 await Physics.load();
@@ -58,9 +62,62 @@ const physics = new Physics(null);
 physics.addBody(null, { type: 'fixed', position: [0, -0.5, 0], colliders: { shape: 'box', halfExtents: [20, 0.5, 20] } });
 const body = physics.addBody(null, { type: 'kinematicPosition', position: [0, 0.9, 0], colliders: { shape: 'capsule', halfHeight: 0.5, radius: 0.3 } });
 const controller = physics.createCharacterController(body, { applyImpulsesToDynamicBodies: true, characterMass: 70 });
-const step = controller.move([0.08, -0.16, 0]);
-console.log(step.grounded, controller.debugRender().vertices.length);
+physics.on('beforestep', () => controller.walk([1.5, 0, 0]));
+for (let i = 0; i < 120; i++) physics.step();
+console.log(controller.grounded, controller.jump(5), body.position);
 ```
+
+- `walk(velocity, filter?)` moves at `velocity` (m/s; its part along `up` is ignored) for one `fixedTimestep`, falling
+  under the world's gravity from where it leaves the ground: the height along `up` changes by v dt - g dt^2 / 2 and the
+  speed by -g dt each step, so a jump at v rises v^2 / 2g whatever the step. Landing, or a ceiling met while rising, sets
+  the speed along `up` to 0. It is `move` with that translation, so every option below applies.
+- `jump(speed)` leaves the ground at `speed` m/s on the next `walk`, and returns false (doing nothing) in the air.
+  `verticalSpeed` reads the speed along `up`.
+- `move(desired)` is Rapier's `computeColliderMovement`: a translation for this step, gravity included by you.
+- Ground and support: `grounded`, `platform` (the body stood on), `groundNormal`, `slopeAngle` (radians, 0 in the air),
+  `platformVelocity` (m/s inherited from it) and `isSlidingDownSlope`.
+- `takeState()` and `restoreState(state)` hold what the controller carries between steps (grounded, sliding, the speed
+  along `up`, the last movement) as six numbers, so a `physics.takeSnapshot()` restore with them replays bit for bit.
+- `debugRender(options?)` gives its debug lines for `@margoengine/physics/debug-view`: the collider tinted green on the
+  ground, orange sliding, blue in the air; the ground normal and slope arc; the last step probe; the platform's velocity;
+  the contacts of the last move.
+
+Bad input is a `MargoError` linked to [its help entry](https://margoengine.com/errors#characters).
+
+### From three.js and Rapier
+
+The three.js example `physics_rapier_character_controller` drives Rapier's `KinematicCharacterController` by hand:
+
+```javascript
+const controller = world.createCharacterController(0.01);
+controller.enableAutostep(0.3, 0.2, false);
+controller.enableSnapToGround(0.2);
+controller.setApplyImpulsesToDynamicBodies(true);
+// every frame: gravity and the jump are yours to integrate, and the mesh is yours to move
+velocityY = grounded ? (jump ? 5 : 0) : velocityY - 9.81 * dt;
+controller.computeColliderMovement(collider, { x: vx * dt, y: velocityY * dt, z: vz * dt });
+const m = controller.computedMovement(), p = body.translation();
+body.setNextKinematicTranslation({ x: p.x + m.x, y: p.y + m.y, z: p.z + m.z });
+grounded = controller.computedGrounded();
+mesh.position.copy(body.translation());
+```
+
+In Margo the same options are one object, the step is one call, and a body made with a mesh moves it (the quick start above is the whole program):
+
+```typescript
+const controller = physics.createCharacterController(body, { offset: 0.01, autostep: { maxHeight: 0.3, minWidth: 0.2 }, snapToGround: 0.2, applyImpulsesToDynamicBodies: true });
+physics.on('beforestep', () => {
+  if (jumpPressed) controller.jump(5);
+  controller.walk([vx, 0, vz]);
+});
+```
+
+`move(desired)` and Rapier's read-backs (`computedMovement()`, `computedGrounded()`, `numComputedCollisions()`,
+`computedCollision(i)`) are there under the same names for code that keeps its own integration. Babylon's
+`PhysicsCharacterController` is velocity-driven like `walk`: its `setVelocity` and `integrate(dt, support, gravity)` are
+`walk(velocity)`, and its `checkSupport` is `grounded`, `groundNormal` and `platform`. A character that is a dynamic body,
+pushed by the world, is `createDynamicCharacter`; a ragdoll that
+takes over from either on a hit is `@margoengine/ragdoll/character`. A live page: `examples/character-controller.html`.
 
 ## Debug view (`@margoengine/physics/debug-view`)
 

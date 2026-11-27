@@ -15,6 +15,7 @@ export const demoPages = [
   'hud-preview',
   'batched-mesh',
   'buoyancy',
+  'character-controller',
   'cyprus-raft',
   'ocean',
   'water-ripples',

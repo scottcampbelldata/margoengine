@@ -61,7 +61,7 @@ export interface CharacterContact extends CharacterCollision {
 
 export class CharacterController {
     readonly body: PhysicsBody;
-    constructor(owner: Pick<Physics, 'shapeCast' | 'fixedTimestep'> & {
+    constructor(owner: Pick<Physics, 'shapeCast' | 'fixedTimestep' | 'gravity'> & {
         removeController(controller: CharacterController): void;
     }, body: PhysicsBody, options?: CharacterControllerOptions);
     get platform(): PhysicsBody | null;
@@ -78,6 +78,11 @@ export class CharacterController {
     numComputedCollisions(): number;
     computedCollision(i: number): CharacterCollision | undefined;
     move(desired: Vec3, filter?: CharacterMoveFilter): CharacterMoveResult;
+    get verticalSpeed(): number;
+    jump(speed: number): boolean;
+    walk(velocity: Vec3, filter?: CharacterMoveFilter): CharacterMoveResult;
+    takeState(): Float64Array;
+    restoreState(state: ArrayLike<number>): this;
     debugRender(options?: CharacterDebugOptions): DebugLines;
     dispose(): void;
     [Symbol.dispose]: () => void;

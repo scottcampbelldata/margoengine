@@ -3,7 +3,7 @@ import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsCollider } from './collider.js';
 import type { PhysicsBody, BodyOptions } from './body.js';
 import type { Physics, QueryFilter, ShapeCastHit } from './physics.js';
-import { checkVec, type Vec3 } from './math.js';
+import type { Vec3 } from './math.js';
 import type { ShapeOptions } from './shapes.js';
 import { DebugLineWriter, drawPrimitiveOutline, type DebugLines } from './debug.js';
 
@@ -125,6 +125,16 @@ export interface CharacterMoveFilter {
   predicate?: (collider: PhysicsCollider) => boolean;
 }
 
+/** @internal A coded error for bad input to a character controller or dynamic character, linked to its help entry. */
+export const characterError = (message: string): MargoError =>
+  new MargoError('unsupported', `${message}; see https://margoengine.com/errors#characters`);
+/** @internal Asserts three finite numbers, or throws a coded error naming `label`. */
+export function characterVec(value: unknown, label: string): asserts value is Vec3 {
+  const v = value as ArrayLike<number> | null;
+  if (!v || v.length !== 3 || !Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2]))
+    throw characterError(`${label} must be three finite numbers [x, y, z]`);
+}
+
 const EPS = 1e-6;
 /** How much of a unit motion may point into a surface for the motion to count as along it. */
 const GRAZE = 1e-3;
@@ -229,21 +239,23 @@ export class CharacterController {
   private lastSlopeAngle = 0;
   private lastPlatformVelocity: V = [0, 0, 0];
   private lastAutostepProbe: { start: V; raised: V; over: V; land: V | null; ok: boolean } | null = null;
+  private vertical = 0;
 
   /** @internal */
   constructor(
-    private readonly owner: Pick<Physics, 'shapeCast' | 'fixedTimestep'> & {
+    private readonly owner: Pick<Physics, 'shapeCast' | 'fixedTimestep' | 'gravity'> & {
       removeController(controller: CharacterController): void;
     },
     readonly body: PhysicsBody,
     options: CharacterControllerOptions = {},
   ) {
-    if (body.type !== 'kinematicPosition') throw new TypeError('A character controller needs a kinematicPosition body');
-    if (!body.colliders.length) throw new TypeError('A character controller body needs a collider');
+    if (body.type !== 'kinematicPosition')
+      throw characterError('A character controller needs a kinematicPosition body');
+    if (!body.colliders.length) throw characterError('A character controller body needs a collider');
     const up = options.up ?? [0, 1, 0];
-    checkVec(up, 'Up');
+    characterVec(up, 'Up');
     const upLength = length(up);
-    if (!(upLength > 0)) throw new RangeError('Up must not be the zero vector');
+    if (!(upLength > 0)) throw characterError('Up must not be the zero vector');
     this.up = scale(up, 1 / upLength);
     this.offsetLength = options.offset ?? 0.01;
     for (const [name, l] of [
@@ -254,12 +266,12 @@ export class CharacterController {
     ] as const) {
       const value = typeof l === 'number' ? l : l.relative;
       if (!(value >= 0))
-        throw new RangeError(
+        throw characterError(
           `${name} must be zero or more, in metres or as {relative: a share of the character's height}`,
         );
     }
     this.nudge = options.normalNudgeFactor ?? 1e-4;
-    if (!(this.nudge >= 0)) throw new RangeError('normalNudgeFactor must be zero or more');
+    if (!(this.nudge >= 0)) throw characterError('normalNudgeFactor must be zero or more');
     this.maxClimb = options.maxSlopeClimbAngle ?? Math.PI / 4;
     this.minSlide = options.minSlopeSlideAngle ?? Math.PI / 6;
     const step =
@@ -281,7 +293,7 @@ export class CharacterController {
       ['maxPushStrength', this.maxStrength],
       ['maxPushMassRatio', this.maxRatio],
     ] as const)
-      if (!(value > 0)) throw new RangeError(`${name} must be more than zero (omit it for no limit)`);
+      if (!(value > 0)) throw characterError(`${name} must be more than zero (omit it for no limit)`);
     this.inherits = options.inheritPlatformVelocity ?? true;
     this.inner = options.innerBody
       ? (owner as unknown as BodyHost).addBody(null, {
@@ -365,7 +377,7 @@ export class CharacterController {
       );
     if (!this.body.valid)
       throw new MargoError('state', 'Character body was removed; create a new body and controller.');
-    checkVec(desired, 'Desired movement');
+    characterVec(desired, 'Desired movement');
     const body = this.body,
       collider = body.colliders[0]!,
       shape = colliderShape(collider),
@@ -612,6 +624,68 @@ export class CharacterController {
     this.sliding = slidingDown;
     this.lastMovement = movement;
     return { movement, grounded, collisions: this.hits.length, slidingDownSlope: slidingDown };
+  }
+
+  /** The character's speed along `up`, m/s: set by {@link jump}, changed by gravity in {@link walk}, 0 while it stands. */
+  get verticalSpeed(): number {
+    return this.vertical;
+  }
+
+  /**
+   * Leaves the ground at `speed` m/s along `up` on the next {@link walk}. Returns false, and does nothing, unless the last
+   * move ended grounded.
+   * @throws MargoError (`unsupported`) for a speed that is not a positive number.
+   */
+  jump(speed: number): boolean {
+    if (!(speed > 0) || !Number.isFinite(speed))
+      throw characterError(`A jump speed must be a positive number of metres per second (got ${speed})`);
+    if (!this.lastGrounded) return false;
+    this.vertical = speed;
+    return true;
+  }
+
+  /**
+   * One fixed step at `velocity` (m/s; its part along `up` is ignored), falling under the world's gravity and rising after
+   * a {@link jump}: the height along `up` changes by v dt - g dt^2 / 2 and the speed by -g dt (exact for constant g, so a
+   * jump at v rises v^2 / 2g whatever the step). Landing, or a ceiling met while rising, sets the speed along `up` to 0.
+   * It is {@link move} with that translation, so every option and the platform carry apply.
+   * @throws MargoError (`unsupported`) unless `velocity` is three finite numbers; as {@link move} otherwise.
+   */
+  walk(velocity: Vec3, filter?: CharacterMoveFilter): CharacterMoveResult {
+    characterVec(velocity, 'Walk velocity');
+    const dt = this.owner.fixedTimestep,
+      up = this.up,
+      g = -dot(this.owner.gravity, up),
+      rise = this.vertical * dt - 0.5 * g * dt * dt,
+      flat = axpy(velocity, -dot(velocity, up), up),
+      result = this.move(axpy(scale(flat, dt), rise, up), filter);
+    this.vertical -= g * dt;
+    // Landed, or rising and stopped short by a ceiling: no speed along up is left.
+    if ((result.grounded && this.vertical <= 0) || (rise > 0 && dot(result.movement, up) < rise - 1e-6))
+      this.vertical = 0;
+    return result;
+  }
+
+  /**
+   * What the controller carries from step to step outside the world (grounded, sliding, the speed along `up` and the last
+   * movement), as six numbers: with `physics.takeSnapshot()`, what a restore needs to replay bit for bit.
+   */
+  takeState(): Float64Array {
+    const m = this.lastMovement;
+    return Float64Array.of(+this.lastGrounded, +this.sliding, this.vertical, m[0], m[1], m[2]);
+  }
+  /**
+   * Puts back what {@link takeState} gave.
+   * @throws MargoError (`unsupported`) for anything but six finite numbers.
+   */
+  restoreState(state: ArrayLike<number>): this {
+    if (state?.length !== 6 || !Array.from(state).every(Number.isFinite))
+      throw characterError('A character state is the six numbers takeState() gives');
+    this.lastGrounded = state[0] !== 0;
+    this.sliding = state[1] !== 0;
+    this.vertical = state[2]!;
+    this.lastMovement = [state[3]!, state[4]!, state[5]!];
+    return this;
   }
 
   /**

@@ -94,6 +94,15 @@ These are what three.js and Babylon users reach for first. "Perfect" means: ever
   hit or death and back; sizes computed automatically from the skin (Babylon does not do this, but setup must not be
   manual).
 - **Today:** PA-67, PA-77 and PA-78 are open, and "characters never enter the world".
+- **2026-11-27 (Claude, laptop):** controller complete against the list: slopes, slide, autostep, snap, platforms, pushing,
+  ground and support readings (`grounded`, `platform`, `groundNormal`, `slopeAngle`, `platformVelocity`), and `walk`/`jump`
+  with gravity (a jump rises v^2 / 2g, `tests/character-walk.test.js`); coded errors and a state for snapshot replay. Ragdoll
+  from a skeleton with per-bone shapes, limits, kinematic to limp and back, partial limbs and shapes from the skin
+  (`@margoengine/ragdoll`, `/hulls`); the bridge from a controller to a ragdoll and back (`@margoengine/ragdoll/character`).
+  Quick start, three.js migration note, example page (`examples/character-controller.html`) and the shared debug view
+  (`@margoengine/physics/debug-view`) landed. Still open: PA-67 (humans, horses and armies packages do not use the world),
+  PA-77 (foot locking in the animator), PA-78 (the controls walker), and the ragdoll's `fitRagdollShapes` is a call of its
+  own rather than automatic.
 
 ### P5. DYN-04 Wheeled vehicles
 

@@ -6,9 +6,9 @@
 // controller with a limit on how fast the velocity may change, over what the ground under it does.
 import { MargoError } from '@margoengine/math/errors';
 import type { PhysicsBody } from './body.js';
-import { colliderPose, colliderShape, type CharacterDebugOptions } from './character.js';
+import { characterError, characterVec, colliderPose, colliderShape, type CharacterDebugOptions } from './character.js';
 import { DebugLineWriter, drawPrimitiveOutline, type DebugLines } from './debug.js';
-import { checkVec, type Vec3 } from './math.js';
+import type { Vec3 } from './math.js';
 import type { Physics, ShapeCastHit } from './physics.js';
 
 /** Options of a dynamic character; every field has a default. */
@@ -118,12 +118,12 @@ export class DynamicCharacter {
     readonly body: PhysicsBody,
     options: DynamicCharacterOptions = {},
   ) {
-    if (body.type !== 'dynamic') throw new TypeError('A dynamic character needs a dynamic body');
-    if (!body.colliders.length) throw new TypeError('A dynamic character body needs a collider');
+    if (body.type !== 'dynamic') throw characterError('A dynamic character needs a dynamic body');
+    if (!body.colliders.length) throw characterError('A dynamic character body needs a collider');
     const unit = (v: Vec3, name: string): [number, number, number] => {
-      checkVec(v, name);
+      characterVec(v, name);
       const l = len(v);
-      if (!(l > 0)) throw new RangeError(`${name} must not be the zero vector`);
+      if (!(l > 0)) throw characterError(`${name} must not be the zero vector`);
       return scale(v, 1 / l);
     };
     this.up = unit(options.up ?? [0, 1, 0], 'Up');
@@ -143,7 +143,7 @@ export class DynamicCharacter {
       ['airAcceleration', this.airAcceleration],
       ['facingFrequency', this.facingFrequency],
     ] as const)
-      if (!(value > 0)) throw new RangeError(`${name} must be more than zero`);
+      if (!(value > 0)) throw characterError(`${name} must be more than zero`);
     const hover = options.hover;
     this.hoverSpring = hover
       ? {
@@ -155,17 +155,17 @@ export class DynamicCharacter {
       : null;
     if (this.hoverSpring) {
       const { height, frequency, damping, maxForce } = this.hoverSpring;
-      if (!(height >= 0)) throw new RangeError('hover height must be zero or more metres');
+      if (!(height >= 0)) throw characterError('hover height must be zero or more metres');
       if (!(frequency > 0) || !(maxForce > 0))
-        throw new RangeError('hover frequency and maxForce must be more than zero');
-      if (!(damping >= 0)) throw new RangeError('hover damping must be zero or more');
+        throw characterError('hover frequency and maxForce must be more than zero');
+      if (!(damping >= 0)) throw characterError('hover damping must be zero or more');
     }
     const stairs = options.stairs;
     this.stairs = stairs ? { maxHeight: stairs.maxHeight, minDepth: stairs.minDepth ?? 0.1 } : null;
     if (this.stairs && !(this.stairs.maxHeight > 0 && this.stairs.minDepth >= 0))
-      throw new RangeError('stairs maxHeight must be more than zero and minDepth zero or more');
-    if (!(this.damping >= 0)) throw new RangeError('uprightDamping must be zero or more');
-    if (!(this.probe >= 0)) throw new RangeError('groundProbe must be zero or more');
+      throw characterError('stairs maxHeight must be more than zero and minDepth zero or more');
+    if (!(this.damping >= 0)) throw characterError('uprightDamping must be zero or more');
+    if (!(this.probe >= 0)) throw characterError('groundProbe must be zero or more');
   }
 
   /** Whether the last `update` found ground it can stand on within the probe distance. */
@@ -192,10 +192,10 @@ export class DynamicCharacter {
   /**
    * The velocity it is to walk at, in the world's frame, relative to the ground under it. The part along `up` is ignored; on a
    * slope the velocity is turned to follow it. Zero to stand still.
-   * @throws TypeError unless three finite numbers.
+   * @throws MargoError (`unsupported`) unless three finite numbers.
    */
   setTargetVelocity(velocity: Vec3): this {
-    checkVec(velocity, 'Velocity');
+    characterVec(velocity, 'Velocity');
     this.wish = [velocity[0], velocity[1], velocity[2]];
     return this;
   }
@@ -203,7 +203,7 @@ export class DynamicCharacter {
   setFacing(direction: Vec3 | null): this {
     if (direction === null) this.facing = null;
     else {
-      checkVec(direction, 'Facing');
+      characterVec(direction, 'Facing');
       this.facing = [direction[0], direction[1], direction[2]];
     }
     return this;
@@ -213,7 +213,7 @@ export class DynamicCharacter {
    * `speed` = sqrt(2 g h) reaches a height `h`. Returns whether it was grounded and so will jump.
    */
   jump(speed: number): boolean {
-    if (!(speed > 0)) throw new RangeError('A jump speed must be more than zero metres per second.');
+    if (!(speed > 0)) throw characterError('A jump speed must be more than zero metres per second.');
     if (!this.isGrounded) return false;
     this.jumpSpeed = speed;
     return true;

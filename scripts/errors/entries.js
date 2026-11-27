@@ -17,6 +17,15 @@ export const entries = [
     fix: 'Pass a live `Physics`, attach it with `await PhysicsDebugView.attach(engine, physics)` after `new Physics(engine)`, give a positive `width` or leave it out, add objects with `debugRender()` or functions returning `{vertices, colors}`, pass another `name` for a second view in one scene, and attach a new view after dispose.',
   },
   {
+    id: 'characters',
+    title: '@margoengine/physics: character controllers and dynamic characters',
+    kind: 'family',
+    messages: [],
+    cause:
+      'A character controller or dynamic character was given a body of the wrong type (a controller needs a kinematicPosition body, a dynamic character a dynamic one) or with no collider, an up vector that is zero or not three finite numbers, a negative length, mass, strength, ratio, nudge, hover or stairs setting, a walk velocity or desired movement that is not three finite numbers, a jump speed that is not positive, or a state that is not the six numbers takeState() gives.',
+    fix: 'Make the body with `type: kinematicPosition` (or a dynamic body for `createDynamicCharacter`) and a sphere, box, capsule, cylinder or cone collider, pass finite numbers in metres, seconds and kilograms, a positive jump speed in m/s, and restore only a state the controller took.',
+  },
+  {
     id: 'ragdolls',
     title: '@margoengine/ragdoll: ragdolls, their debug lines and the character bridge',
     kind: 'family',
