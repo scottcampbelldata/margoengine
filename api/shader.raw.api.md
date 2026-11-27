@@ -35,6 +35,7 @@ export interface RawLocalShadowDraw {
     pass: GPURenderPassEncoder;
     matrix: Float32Array;
     layer: number;
+    depthCompare?: 'greater' | 'less-equal';
 }
 
 export class RawMesh<M extends AnyRawShaderMaterial = AnyRawShaderMaterial> {
@@ -229,7 +230,7 @@ export class RawShaders implements EnginePlugin {
     cameraBlock(camera: PassContext['camera'], m: ArrayLike<number>, width: number, height: number, delta: number, encoding: number, view?: ArrayLike<number>): Float32Array<ArrayBuffer>;
     nextPass(): number;
     shadow(mesh: RawMesh, { context: c, pass, matrix, cascade }: RawShadowContext): void;
-    localShadow(mesh: RawMesh, { context: c, pass, matrix }: RawLocalShadowDraw): void;
+    localShadow(mesh: RawMesh, { context: c, pass, matrix, depthCompare }: RawLocalShadowDraw): void;
     draw(context: PassContext, mode: 'gbuffer' | 'ambient' | 'occlusion', _color: GPUTextureView, _depth: GPUTextureView, _phase?: 'all' | 'opaque' | 'blend', external?: {
         pass: GPURenderPassEncoder;
         view: ArrayLike<number>;

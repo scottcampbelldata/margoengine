@@ -985,8 +985,9 @@ console.log(picking.rawOf(hit) === mesh);
   the material's `cull`, as in the depth pass of every other caster. Your fragment stage runs
   too when its code holds `discard`, so a cut-out shape casts a cut-out shadow. Transparent materials cast none.
   `virtualShadows.add(mesh)` (`@margoengine/shadows/virtual`) and `localShadows.add(mesh)`
-  (`@margoengine/clustered/shadows`, point, spot, extra directional and area lights) cast the same way; Clustered's
-  integrated `shadows` maps take only `shadowPrimitives` casters, so use `LocalShadows` for raw ones. `LocalShadows`
+  (`@margoengine/clustered/shadows`, point, spot, extra directional and area lights) cast the same way, and so does
+  Clustered's `addShadowCaster(mesh)` for its integrated `shadows` maps, which call the hook with forward depth
+  (`depthCompare: 'less-equal'`) and redraw every frame. `LocalShadows`
   and `{static: true}` keep a raw caster's maps until `mesh.shadowVersion` changes: new attributes or indices, a newly
   compiled pipeline, another material, new uniform values, or a moved mesh (its `matrix` or the core mesh it follows).
   A vertex stage that moves points by `camera.time`, a texture or a storage buffer needs `mesh.invalidateShadow()` when

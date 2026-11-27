@@ -1332,12 +1332,17 @@ export interface RawShadowContext {
 /** What `RawMesh.drawLocalShadow` receives: the `LocalShadowDraw` of `@margoengine/clustered/shadows`. */
 export interface RawLocalShadowDraw {
   context: RawPassContext;
-  /** The layer's open depth pass (reversed depth: near 1, far 0). */
+  /** The layer's open depth pass (reversed depth, near 1 and far 0, unless `depthCompare` is `less-equal`). */
   pass: GPURenderPassEncoder;
   /** The layer's world to clip matrix. */
   matrix: Float32Array;
   /** The layer index. */
   layer: number;
+  /**
+   * The layer's depth test: `greater` for reversed depth (`LocalShadows`, and the default when left out) or
+   * `less-equal` for Clustered's integrated `shadows` maps (near 0, far 1).
+   */
+  depthCompare?: 'greater' | 'less-equal';
 }
 /** Any raw material: a RawShaderMaterial or a subclass such as ShaderMaterial. */
 export type AnyRawShaderMaterial = RawShaderMaterial<{ value: unknown }>;
@@ -2112,7 +2117,9 @@ export class RawShaders implements EnginePlugin {
     this.depthCaster(mesh, c, pass, matrix, cascade, this.shadowCameras, this.shadowWritten, 'less-equal');
   }
   /** @internal Draws `mesh` into one `LocalShadows` layer, whose depth is reversed. */
-  localShadow(mesh: RawMesh, { context: c, pass, matrix }: RawLocalShadowDraw): void {
+  localShadow(mesh: RawMesh, { context: c, pass, matrix, depthCompare = 'greater' }: RawLocalShadowDraw): void {
+    if (depthCompare !== 'greater' && depthCompare !== 'less-equal')
+      throw new RangeError("Invalid local shadow depthCompare; pass 'greater' or 'less-equal'");
     // One camera block per layer pass of this frame's encoder, so two shadow plugins' layers never share one.
     if (this.localEncoder !== c.encoder) {
       this.localEncoder = c.encoder;
@@ -2120,7 +2127,7 @@ export class RawShaders implements EnginePlugin {
     }
     let slot = this.localSlots.get(pass);
     if (slot === undefined) this.localSlots.set(pass, (slot = this.localSlots.size));
-    this.depthCaster(mesh, c, pass, matrix, slot, this.localCameras, this.localWritten, 'greater');
+    this.depthCaster(mesh, c, pass, matrix, slot, this.localCameras, this.localWritten, depthCompare);
   }
   private depthCaster(
     mesh: RawMesh,

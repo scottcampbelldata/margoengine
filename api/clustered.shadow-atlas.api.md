@@ -204,6 +204,10 @@ type Context = Extract<PassContext, {
     backend: 'webgpu';
 }>;
 
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
 interface DirectionalShadowLight {
     readonly index: number;
     readonly direction: readonly [number, number, number];
@@ -215,6 +219,14 @@ interface DirectionalShadowLight {
     readonly distance: number;
     readonly width: number;
     readonly height: number;
+}
+
+interface IntegratedShadowDraw {
+    readonly context: Context;
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly layer: number;
+    readonly depthCompare: 'less-equal';
 }
 
 interface LocalLightShadow {
@@ -231,6 +243,7 @@ interface LocalShadowDraw {
     readonly pass: GPURenderPassEncoder;
     readonly matrix: Float32Array;
     readonly layer: number;
+    readonly depthCompare: 'greater' | 'less-equal';
 }
 
 interface LocalShadowMap {
@@ -334,6 +347,7 @@ interface LocalShadowPrimitive {
 
 interface LocalShadowSource {
     shadowPrimitives?: readonly LocalShadowPrimitive[];
+    drawLocalShadow?(draw: IntegratedShadowDraw): void;
     disposed?: boolean;
     drawShadow?: unknown;
 }

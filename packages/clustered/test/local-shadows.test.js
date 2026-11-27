@@ -997,3 +997,55 @@ test('integrated maps: a shadow radius turns on the shared PCSS kernel; radius 0
     assertDisposed(h);
   }
 });
+
+test('integrated maps call a drawLocalShadow hook per active layer with forward depth, after its primitives', () => {
+  const h = harness(),
+    effect = new Clustered({ grid: [1, 1, 1], shadows: { resolution: 16, maxLights: 2 } }),
+    calls = [];
+  // A RawMesh (shader/raw) or clipmap terrain: no shadowPrimitives, a hook that honours the draw's depthCompare.
+  const hook = {
+    drawLocalShadow(draw) {
+      calls.push({ ...draw, drawn: h.counts.indexed, matrix: Array.from(draw.matrix) });
+    },
+  };
+  effect.setLights([spot(), point()]);
+  h.engine.use(effect);
+  const primitive = caster(h),
+    remove = effect.addShadowCaster(hook);
+  effect.addShadowCaster({ shadowPrimitives: [primitive] });
+  try {
+    assert.throws(() => effect.addShadowCaster(hook), /duplicate|caster/i);
+    // Another system's drawShadow alone still casts nothing here, so it is refused.
+    assert.throws(() => effect.addShadowCaster({ drawShadow() {} }), /drawLocalShadow/);
+    assert.throws(() => effect.addShadowCaster({ drawLocalShadow() {}, shadowPrimitives: 'x' }), TypeError);
+    h.frame();
+    // One spot face and six point faces, each drawn once, every one after the primitives of its pass.
+    assert.equal(calls.length, 7);
+    assert.deepEqual(
+      calls.map((c) => c.layer),
+      [...new Set(calls.map((c) => c.layer))],
+    );
+    for (const c of calls) {
+      assert.equal(c.depthCompare, 'less-equal');
+      assert.ok(c.pass && c.context, 'the open pass and the frame context');
+      assert.equal(c.matrix.length, 16);
+    }
+    assert.ok(calls.every((c, i) => c.drawn === i + 1), 'each layer draws the primitive before the hook');
+    assert.notDeepEqual(calls[0].matrix, calls[1].matrix);
+    // Redrawn every frame: a moved or re-materialled caster shows at once.
+    h.frame();
+    assert.equal(calls.length, 14);
+    remove();
+    h.frame();
+    assert.equal(calls.length, 14, 'a removed hook is not called');
+    // A disposed hook source drops out.
+    const gone = { disposed: false, drawLocalShadow: () => calls.push('gone') };
+    effect.addShadowCaster(gone);
+    gone.disposed = true;
+    h.frame();
+    assert.ok(!calls.includes('gone'));
+  } finally {
+    effect.dispose();
+    assertDisposed(h);
+  }
+});

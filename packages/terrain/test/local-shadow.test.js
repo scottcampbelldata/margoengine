@@ -97,3 +97,29 @@ test('terrain casts into clustered local shadow maps: reversed depth, one unifor
   terrain.drawLocalShadow({ context: view.c, pass: after, matrix: matrix(0), layer: 0 });
   assert.equal(after.calls.length, 0, 'a disposed terrain draws nothing');
 });
+
+test("terrain casts into Clustered's integrated maps with forward depth, apart from LocalShadows' layer of the same index", () => {
+  const { gpu, terrain, view } = rig();
+  const matrix = (k) => Float32Array.from({ length: 16 }, (_, i) => i + k);
+  const draw = (layer, k, depthCompare) => {
+    const p = pass();
+    const log = gpu.record(() =>
+      terrain.drawLocalShadow({ context: view.c, pass: p, matrix: matrix(k), layer, depthCompare }),
+    );
+    return { p, log };
+  };
+  const reversed = draw(0, 100, 'greater'),
+    forward = draw(0, 200, 'less-equal');
+  const pipelines = forward.log.filter((e) => e[0] === 'renderPipeline');
+  assert.equal(pipelines.length, 1, 'the forward pipeline is its own');
+  assert.equal(pipelines[0][2].depthStencil.depthCompare, 'less-equal');
+  const ids = (log, kind) => log.filter((e) => e[0] === kind).map((e) => e[1]);
+  assert.equal(ids(forward.log, 'buffer').length, 2, 'one uniform per ring for the integrated layer 0');
+  // Both layers 0 of one frame keep their own buffers, so LocalShadows' matrix survives until the encoder runs.
+  assert.ok(!ids(forward.log, 'writeBuffer').some((id) => ids(reversed.log, 'writeBuffer').includes(id)));
+  const setPipeline = (p) => p.calls.find((c) => c[0] === 'setPipeline')[1];
+  assert.notEqual(setPipeline(forward.p), setPipeline(reversed.p));
+  // Left out, the compare is reversed (LocalShadows' convention); anything else is refused.
+  assert.equal(draw(0, 300).log.filter((e) => e[0] === 'renderPipeline').length, 0);
+  assert.throws(() => draw(0, 0, 'less'), RangeError);
+});

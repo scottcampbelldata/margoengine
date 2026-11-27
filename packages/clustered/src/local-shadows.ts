@@ -135,13 +135,33 @@ export interface LocalShadowPrimitive {
   clipHardware?: boolean;
   hashed?: (code: string) => string;
 }
+/** What a caster's `drawLocalShadow` receives for one layer of Clustered's integrated maps. Borrowed: use it synchronously. */
+export interface IntegratedShadowDraw {
+  /** The frame's WebGPU pass context (device and encoder). */
+  readonly context: Context;
+  /** The open depth pass of this layer: a `depth32float` attachment with no colour target, cleared to 1. */
+  readonly pass: GPURenderPassEncoder;
+  /** World to clip matrix of this layer (column major). Depth is forward: near maps to 0 and far to 1. */
+  readonly matrix: Float32Array;
+  /** Index of the layer (0 up). A caster that writes per-draw uniforms keeps one set per layer. */
+  readonly layer: number;
+  /** Always `less-equal` here; `LocalShadows` calls the same hook with `greater` (reversed depth). */
+  readonly depthCompare: 'less-equal';
+}
 /**
  * A caster `Clustered.addShadowCaster` takes besides a core mesh: an object with `shadowPrimitives` (gltf/pbr models,
- * materials meshes). A source with only a custom `drawShadow` is rejected with TypeError.
+ * materials meshes), or with a `drawLocalShadow` hook that honours the draw's `depthCompare` (a RawMesh of
+ * `@margoengine/shader/raw`, clipmap terrain). A source with only another system's `drawShadow` is rejected with
+ * TypeError.
  */
 export interface LocalShadowSource {
   /** Casters drawn into each shadowed light's maps. */
   shadowPrimitives?: readonly LocalShadowPrimitive[];
+  /**
+   * A custom caster's draw hook: called once per active layer each frame, after the primitives. The integrated maps
+   * redraw every face each frame, so a moved, re-materialled or re-uniformed caster shows at once.
+   */
+  drawLocalShadow?(draw: IntegratedShadowDraw): void;
   /** True once disposed; such a source is rejected, or dropped once added. */
   disposed?: boolean;
   /** Another shadow system's draw hook; not supported here. */
@@ -401,7 +421,7 @@ export class LocalShadowMaps {
   add(source: MeshHandle | LocalShadowSource): () => void {
     if (this.disposed || !source || typeof source !== 'object')
       throw new TypeError(
-        'Invalid local shadow source; add a core mesh or a model with shadowPrimitives, and only before dispose()',
+        'Invalid local shadow source; add a core mesh, a model with shadowPrimitives or a source with drawLocalShadow, and only before dispose()',
       );
     const runtime = 'id' in source ? meshRuntime(source as MeshHandle) : (source as LocalShadowSource);
     this.validateSource(runtime, this.engine);
@@ -429,9 +449,12 @@ export class LocalShadowMaps {
         );
       return;
     }
-    if (!Array.isArray(source.shadowPrimitives))
-      throw new TypeError('Local shadows require shadowPrimitives; custom drawShadow sources are unsupported');
-    for (const primitive of source.shadowPrimitives) {
+    const hook = typeof source.drawLocalShadow === 'function';
+    if (!Array.isArray(source.shadowPrimitives) && !(hook && source.shadowPrimitives === undefined))
+      throw new TypeError(
+        'Local shadows require shadowPrimitives or drawLocalShadow; sources with only drawShadow are unsupported',
+      );
+    for (const primitive of source.shadowPrimitives ?? emptyPrimitives) {
       if (!primitive?.node || typeof primitive.node.check !== 'function')
         throw new TypeError(
           'Invalid local shadow primitive; give every shadowPrimitives entry a shader node with check()',
@@ -565,6 +588,7 @@ export class LocalShadowMaps {
         if (width) pass.setViewport(0, 0, width, this.viewports[layer * 2 + 1], 0, 1);
         this.stats.passes++;
         const submitted = new Map<Mesh, Set<object>>();
+        let hooked = false;
         try {
           for (const record of this.sources) {
             const source = record.source;
@@ -615,7 +639,22 @@ export class LocalShadowMaps {
               this.draw(pass, primitive, layer);
               this.stats.draws++;
             }
+            if (!('id' in source) && typeof source.drawLocalShadow === 'function') hooked = true;
           }
+          // Hooks set their own pipeline and groups, so they draw last.
+          if (hooked)
+            for (const record of this.sources) {
+              const source = record.source;
+              if ('id' in source || typeof source.drawLocalShadow !== 'function') continue;
+              source.drawLocalShadow({
+                context,
+                pass,
+                matrix: this.matrices[layer],
+                layer,
+                depthCompare: 'less-equal',
+              });
+              this.stats.draws++;
+            }
         } finally {
           pass.end();
         }

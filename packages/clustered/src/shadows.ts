@@ -156,6 +156,11 @@ export interface LocalShadowDraw {
    * writes land before the encoder runs.
    */
   readonly layer: number;
+  /**
+   * The layer's depth test, always `greater` here (reversed depth). Clustered's integrated `shadows` maps call the same
+   * hook with `less-equal` (near 0, far 1, cleared to 1), so a caster that honours it casts into both.
+   */
+  readonly depthCompare: 'greater' | 'less-equal';
 }
 /**
  * One layer of the shadow maps, as `LocalShadows.shadowMap` gives it for `ShadowMapViewer` (`@margoengine/shadows/viewer`).
@@ -1195,7 +1200,13 @@ export class LocalShadows implements EnginePlugin, ClusteredShadow {
         }
         // Hooks set their own pipeline and groups, so they draw last.
         for (const h of hooks) {
-          h.drawLocalShadow!({ context: c, pass, matrix: this.matrices.subarray(l * 64, l * 64 + 16), layer: l });
+          h.drawLocalShadow!({
+            context: c,
+            pass,
+            matrix: this.matrices.subarray(l * 64, l * 64 + 16),
+            layer: l,
+            depthCompare: 'greater',
+          });
           this.stats.draws++;
         }
       } catch (error) {

@@ -59,11 +59,12 @@ export class Terrain implements EnginePlugin {
         matrix: Float32Array;
         cascade: number;
     }): void;
-    drawLocalShadow({ context, pass, matrix, layer }: {
+    drawLocalShadow({ context, pass, matrix, layer, depthCompare }: {
         context: TerrainPassContext;
         pass: GPURenderPassEncoder;
         matrix: Float32Array;
         layer: number;
+        depthCompare?: 'greater' | 'less-equal';
     }): void;
     onDeviceRestored(engine: Engine): void;
     dispose(): void;

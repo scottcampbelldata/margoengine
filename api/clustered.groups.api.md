@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface LightGroup {
     readonly name: string;
@@ -182,6 +182,10 @@ interface ClusteredStochastic {
     bindings(): GPUBindGroupEntry[];
 }
 
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
 interface DirectionalShadowLight {
     readonly index: number;
     readonly direction: readonly [number, number, number];
@@ -207,6 +211,14 @@ class Group implements LightGroup {
     commit(): void;
     dispose(): void;
     [Symbol.dispose](): void;
+}
+
+interface IntegratedShadowDraw {
+    readonly context: Context;
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly layer: number;
+    readonly depthCompare: 'less-equal';
 }
 
 type Light = PointLight | SpotLight;
@@ -263,6 +275,7 @@ interface LocalShadowPrimitive {
 
 interface LocalShadowSource {
     shadowPrimitives?: readonly LocalShadowPrimitive[];
+    drawLocalShadow?(draw: IntegratedShadowDraw): void;
     disposed?: boolean;
     drawShadow?: unknown;
 }

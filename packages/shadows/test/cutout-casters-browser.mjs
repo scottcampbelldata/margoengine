@@ -2,8 +2,8 @@ import { deferSpeed } from '../../../scripts/support/speed-phase.mjs';
 // Real-GPU regression test: a materials mesh with a base colour map or alphaMap and `alphaTest` casts the cut-out shape,
 // not its whole quad, into every shadow pass (`Shadows`, `LocalShadows` spot and point, Clustered's integrated local
 // maps). Without the fix each of those passes shaded the floor under the cut-out half. A RawMesh casts its vertex
-// stage's shape, cut by its fragment's discard, into Shadows, VirtualShadows and LocalShadows spot and point maps, and
-// LocalShadows' cached maps follow its moves and uniform changes. With `?hardware` the page asks for 'clip-distances',
+// stage's shape, cut by its fragment's discard, into Shadows, VirtualShadows, LocalShadows spot and point maps and
+// Clustered's integrated spot and point maps, and every map follows its moves, uniform changes and material swaps. With `?hardware` the page asks for 'clip-distances',
 // and clipped casters must cast the same through the rasterizer's clip distances in every pass.
 // Run from the repository root after `npm run build:packages`: node packages/shadows/test/cutout-casters-browser.mjs
 // `--cost` measures frame cost instead and asserts nothing about it.
@@ -73,7 +73,7 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
   };
   // RawMesh casters (@margoengine/shader/raw) in the passes that take a drawShadow or drawLocalShadow source.
   const rawExpected = { raw: { solid: true, cut: true }, rawCut: { solid: true, cut: false } },
-    rawPasses = ['directional', 'virtual', 'spot', 'point'];
+    rawPasses = ['directional', 'virtual', 'spot', 'point', 'integratedSpot', 'integratedPoint'];
   try {
     await page.waitForFunction(() => window.ready, null, { timeout: 120000 });
     if (measuringCost) {
@@ -128,6 +128,8 @@ if (!(measuringCost && deferSpeed('shadows cutout caster paired cost'))) {
           ['rawMove', false],
           ['rawBack', true],
           ['rawLift', false],
+          ['rawBack', true],
+          ['rawSwap', false],
           ['rawBack', true],
         ]) {
           assert.deepEqual(await page.evaluate((n) => window.check.edit(n), name), []);

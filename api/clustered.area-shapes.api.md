@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 import { AreaLightShadow } from "@margoengine/math";
 
 export class AreaShapes extends ShapeLights {
@@ -167,6 +167,10 @@ interface ClusteredStochastic {
     bindings(): GPUBindGroupEntry[];
 }
 
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
+
 interface DirectionalShadowLight {
     readonly index: number;
     readonly direction: readonly [number, number, number];
@@ -186,6 +190,14 @@ interface DiscLight extends ShapeLightBase {
     direction: Vec3;
     radius: number;
     twoSided?: boolean;
+}
+
+interface IntegratedShadowDraw {
+    readonly context: Context;
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly layer: number;
+    readonly depthCompare: 'less-equal';
 }
 
 interface LocalLightShadow {
@@ -240,6 +252,7 @@ interface LocalShadowPrimitive {
 
 interface LocalShadowSource {
     shadowPrimitives?: readonly LocalShadowPrimitive[];
+    drawLocalShadow?(draw: IntegratedShadowDraw): void;
     disposed?: boolean;
     drawShadow?: unknown;
 }

@@ -18,7 +18,13 @@ import {
 export { clusteredSampling, type ClusteredSamplingHooks } from './shader.js';
 export type { DirectionalShadowLight, AreaShadowLight } from './light-shadow-math.js';
 import type { DirectionalShadowLight, AreaShadowLight } from './light-shadow-math.js';
-export type { LocalShadowOptions, LocalLightShadow, LocalShadowSource, LocalShadowPrimitive } from './local-shadows.js';
+export type {
+  LocalShadowOptions,
+  LocalLightShadow,
+  LocalShadowSource,
+  LocalShadowPrimitive,
+  IntegratedShadowDraw,
+} from './local-shadows.js';
 declare const GPUBufferUsage: { UNIFORM: number; STORAGE: number; COPY_DST: number; COPY_SRC: number };
 /** A local point light for `setLights`. Invalid values throw RangeError or TypeError (the list is unchanged). */
 export interface PointLight {

@@ -4,7 +4,7 @@
 
 ```ts
 import { EngineKernel, Mesh, Vec3 } from "@margoengine/core";
-import { Engine, EnginePlugin, FrameGraph, Mesh } from "@margoengine/core/extension";
+import { Engine, EnginePlugin, FrameGraph, Mesh, PassContext } from "@margoengine/core/extension";
 
 export interface AreaShadowLight {
     readonly index: number;
@@ -191,6 +191,14 @@ export interface DirectionalShadowLight {
     readonly height: number;
 }
 
+export interface IntegratedShadowDraw {
+    readonly context: Context;
+    readonly pass: GPURenderPassEncoder;
+    readonly matrix: Float32Array;
+    readonly layer: number;
+    readonly depthCompare: 'less-equal';
+}
+
 export interface LocalLightShadow {
     near?: number;
     far?: number;
@@ -243,6 +251,7 @@ export interface LocalShadowPrimitive {
 
 export interface LocalShadowSource {
     shadowPrimitives?: readonly LocalShadowPrimitive[];
+    drawLocalShadow?(draw: IntegratedShadowDraw): void;
     disposed?: boolean;
     drawShadow?: unknown;
 }
@@ -277,4 +286,10 @@ export function clusteredSampling(group: number, shadow?: boolean | {
 }, area?: {
     declarations(group: number, shadow?: string): string;
 }, integratedShadows?: boolean, decay?: boolean, receive?: boolean, { directional, terms, shapes, stochastic, contact, sized, bounce, softMaps }?: ClusteredSamplingHooks): string;
+
+// Not exported from this entry, but used by the exports above:
+
+type Context = Extract<PassContext, {
+    backend: 'webgpu';
+}>;
 ```

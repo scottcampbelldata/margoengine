@@ -253,7 +253,8 @@ export class Terrain implements EnginePlugin {
   private layout?: GPUBindGroupLayout;
   private shadowPipeline?: GPURenderPipeline;
   /** Reversed-depth variant of the shadow pipeline for local light maps, built on first use. */
-  private localShadowPipeline?: GPURenderPipeline;
+  /** The local shadow pipelines: reversed depth (`greater`) at 0, forward (`less-equal`) at 1. */
+  private localShadowPipelines: (GPURenderPipeline | undefined)[] = [];
   private shadowModule?: GPUShaderModule;
   private ringGroup?: (buffer: GPUBuffer) => GPUBindGroup;
   private occluder?: { samples: number; pipeline: GPURenderPipeline };
@@ -1008,25 +1009,34 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
   }
   /**
    * Casts the terrain into a point, spot, directional or area light's map of clustered `LocalShadows` (pass the
-   * terrain to `LocalShadows.add`). Reversed depth (`greater`), one uniform set per ring and layer, made on first use.
+   * terrain to `LocalShadows.add`) or of Clustered's integrated `shadows` maps (`addShadowCaster`). The depth test is
+   * the draw's `depthCompare`: `greater` (reversed depth, LocalShadows and the default) or `less-equal` (the integrated
+   * maps). One uniform set per ring, layer and depth convention, made on first use, so both systems' layers of one
+   * frame never share one.
    */
   drawLocalShadow({
     context,
     pass,
     matrix,
     layer,
+    depthCompare = 'greater',
   }: {
     context: TerrainPassContext;
     pass: GPURenderPassEncoder;
     matrix: Float32Array;
     layer: number;
+    depthCompare?: 'greater' | 'less-equal';
   }): void {
     if (this.disposed || !this.shadowModule || !this.ringGroup) return;
     if (!Number.isInteger(layer) || layer < 0)
       throw new RangeError('Invalid local shadow layer; pass the integer layer index LocalShadows gives');
-    const device = context.device;
-    const module = this.shadowModule;
-    this.localShadowPipeline ??= device.createRenderPipeline({
+    if (depthCompare !== 'greater' && depthCompare !== 'less-equal')
+      throw new RangeError("Invalid local shadow depthCompare; pass 'greater' or 'less-equal'");
+    const device = context.device,
+      module = this.shadowModule,
+      forward = depthCompare === 'less-equal',
+      slot = layer * 2 + (forward ? 1 : 0);
+    const pipeline = (this.localShadowPipelines[forward ? 1 : 0] ??= device.createRenderPipeline({
       layout: device.createPipelineLayout({ bindGroupLayouts: [this.layout!] }),
       vertex: {
         module,
@@ -1034,24 +1044,24 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
         buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
       },
       fragment: { module, entryPoint: 'outside', targets: [] },
-      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare: 'greater' },
-    });
-    pass.setPipeline(this.localShadowPipeline);
+      depthStencil: { format: 'depth32float', depthWriteEnabled: true, depthCompare },
+    }));
+    pass.setPipeline(pipeline);
     pass.setVertexBuffer(0, this.vertex!);
     for (let i = 0; i < this.rings.length; i++) {
       const r = this.rings[i];
-      let buffer = r.localUniforms[layer];
+      let buffer = r.localUniforms[slot];
       if (!buffer) {
-        buffer = r.localUniforms[layer] = device.createBuffer({
+        buffer = r.localUniforms[slot] = device.createBuffer({
           size: r.values.length * 4,
           usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
         });
-        r.localGroups[layer] = this.ringGroup(buffer);
+        r.localGroups[slot] = this.ringGroup(buffer);
       }
       r.shadowValues.set(r.values);
       r.shadowValues.set(matrix);
       this.upload(device.queue, buffer, r.shadowValues);
-      pass.setBindGroup(0, r.localGroups[layer]);
+      pass.setBindGroup(0, r.localGroups[slot]);
       pass.setIndexBuffer(i ? this.ring! : this.center!, 'uint32');
       pass.drawIndexed(i ? this.ringCount : this.centerCount);
     }
@@ -1098,7 +1108,8 @@ ${code.split(terrainOutside).join(terrainOutside + terrainHole)}`;
     this.pipelines.clear();
     this.occluder = undefined;
     this.lightingGroups.clear();
-    this.shadowPipeline = this.localShadowPipeline = this.shadowModule = this.ringGroup = undefined;
+    this.localShadowPipelines = [];
+    this.shadowPipeline = this.shadowModule = this.ringGroup = undefined;
     this.layout = undefined;
     this.sampler = undefined;
   }

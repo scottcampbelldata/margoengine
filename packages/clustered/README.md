@@ -1040,8 +1040,32 @@ including glTF PBR models and their current deformed vertex buffers. Overlapping
 honor alpha, vertex alpha, UV0/UV1 and texture transforms; blended PBR primitives
 are excluded. Hidden ancestors and disposed sources stop casting. Register a
 model with both `addShadowCaster(model)` and `add(model)` when it also receives
-local lighting. Custom-only `drawShadow()` sources such as clipmap terrain are
-not casters of these integrated maps; add them to `LocalShadows`, which calls their `drawLocalShadow`.
+local lighting. A source with a `drawLocalShadow` hook (a `RawMesh` of `@margoengine/shader/raw`, clipmap
+terrain) casts here too: each active layer calls it after the primitives with `depthCompare: 'less-equal'`, since
+these maps hold forward depth (near 0, far 1, cleared to 1), where `LocalShadows` calls the same hook with
+`'greater'`. The maps redraw every face each frame, so a moved caster, a new material or new uniform values show at
+once. A source with only another system's `drawShadow()` is refused with TypeError.
+
+```ts
+import {EngineKernel} from 'margoengine/core';
+import {Clustered} from 'margoengine/clustered';
+import {RawShaders, RawShaderMaterial, RawMesh} from 'margoengine/shader/raw';
+const engine = await EngineKernel.create(document.querySelector<HTMLCanvasElement>('#viewport')!, {backend:'webgpu'});
+const raw = RawShaders.attach(engine);
+const lights = Clustered.attach(engine, {shadows: {maxLights: 2}});
+const vertexShader = `
+struct Out { @builtin(position) clip:vec4f }
+@vertex fn vertex(a:Attributes)->Out { return Out(camera.viewProjection * mesh.world * vec4f(a.position, 1.0)); }
+@fragment fn fragment(i:Out)->@location(0) vec4f { return margoDisplay(vec4f(1.0)); }`;
+const quad = raw.add(new RawMesh({
+  material: new RawShaderMaterial({vertexShader}),
+  attributes: {position: {data: new Float32Array([-1,1,-1, 1,1,-1, 1,1,1, -1,1,1]), type: 'vec3f'}},
+  index: new Uint32Array([0,1,2, 0,2,3]),
+}));
+lights.addShadowCaster(quad); // drawn with depthCompare 'less-equal' into each shadowed light's maps
+lights.setLights([{position:[0,4,0], range:10, direction:[0,-1,0], outerAngle:0.6, intensity:30, shadow:true}]);
+engine.start();
+```
 
 Local depth passes run before clustered culling and main shading, redraw active
 faces each frame, and use a fixed 3×3 comparison filter (`LocalShadows` lights with a `shadow.radius` filter by PCSS,
