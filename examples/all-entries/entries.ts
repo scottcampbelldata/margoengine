@@ -782,6 +782,7 @@ export * as e_margoengine_game_gltf_scene_data from '@margoengine/game/gltf/scen
 export * as e_margoengine_game_gltf_textured from '@margoengine/game/gltf/textured';
 export * as e_margoengine_game_gltf_pbr from '@margoengine/game/gltf/pbr';
 export * as e_margoengine_game_gltf_pbr_model from '@margoengine/game/gltf/pbr-model';
+export * as e_margoengine_game_gltf_transmission from '@margoengine/game/gltf/transmission';
 export * as e_margoengine_game_gltf_asset from '@margoengine/game/gltf/asset';
 export * as e_margoengine_game_gltf_scene from '@margoengine/game/gltf/scene';
 export * as e_margoengine_game_gltf_extended_materials from '@margoengine/game/gltf/extended-materials';
@@ -1552,6 +1553,7 @@ export * as e_margoengine_gltf_scene_data from '@margoengine/gltf/scene-data';
 export * as e_margoengine_gltf_textured from '@margoengine/gltf/textured';
 export * as e_margoengine_gltf_pbr from '@margoengine/gltf/pbr';
 export * as e_margoengine_gltf_pbr_model from '@margoengine/gltf/pbr-model';
+export * as e_margoengine_gltf_transmission from '@margoengine/gltf/transmission';
 export * as e_margoengine_gltf_asset from '@margoengine/gltf/asset';
 export * as e_margoengine_gltf_scene from '@margoengine/gltf/scene';
 export * as e_margoengine_gltf_extended_materials from '@margoengine/gltf/extended-materials';
@@ -1878,6 +1880,7 @@ export * as e_margoengine_kit_react_gltf_scene_data from '@margoengine/kit-react
 export * as e_margoengine_kit_react_gltf_textured from '@margoengine/kit-react/gltf/textured';
 export * as e_margoengine_kit_react_gltf_pbr from '@margoengine/kit-react/gltf/pbr';
 export * as e_margoengine_kit_react_gltf_pbr_model from '@margoengine/kit-react/gltf/pbr-model';
+export * as e_margoengine_kit_react_gltf_transmission from '@margoengine/kit-react/gltf/transmission';
 export * as e_margoengine_kit_react_gltf_asset from '@margoengine/kit-react/gltf/asset';
 export * as e_margoengine_kit_react_gltf_scene from '@margoengine/kit-react/gltf/scene';
 export * as e_margoengine_kit_react_gltf_extended_materials from '@margoengine/kit-react/gltf/extended-materials';
@@ -2511,6 +2514,7 @@ export * as e_margoengine_kit_viz_gltf_scene_data from '@margoengine/kit-viz/glt
 export * as e_margoengine_kit_viz_gltf_textured from '@margoengine/kit-viz/gltf/textured';
 export * as e_margoengine_kit_viz_gltf_pbr from '@margoengine/kit-viz/gltf/pbr';
 export * as e_margoengine_kit_viz_gltf_pbr_model from '@margoengine/kit-viz/gltf/pbr-model';
+export * as e_margoengine_kit_viz_gltf_transmission from '@margoengine/kit-viz/gltf/transmission';
 export * as e_margoengine_kit_viz_gltf_asset from '@margoengine/kit-viz/gltf/asset';
 export * as e_margoengine_kit_viz_gltf_scene from '@margoengine/kit-viz/gltf/scene';
 export * as e_margoengine_kit_viz_gltf_extended_materials from '@margoengine/kit-viz/gltf/extended-materials';
@@ -3081,6 +3085,7 @@ export * as e_margoengine_kit_web_gltf_scene_data from '@margoengine/kit-web/glt
 export * as e_margoengine_kit_web_gltf_textured from '@margoengine/kit-web/gltf/textured';
 export * as e_margoengine_kit_web_gltf_pbr from '@margoengine/kit-web/gltf/pbr';
 export * as e_margoengine_kit_web_gltf_pbr_model from '@margoengine/kit-web/gltf/pbr-model';
+export * as e_margoengine_kit_web_gltf_transmission from '@margoengine/kit-web/gltf/transmission';
 export * as e_margoengine_kit_web_gltf_asset from '@margoengine/kit-web/gltf/asset';
 export * as e_margoengine_kit_web_gltf_scene from '@margoengine/kit-web/gltf/scene';
 export * as e_margoengine_kit_web_gltf_extended_materials from '@margoengine/kit-web/gltf/extended-materials';
@@ -3957,6 +3962,7 @@ export * as e_margoengine_gltf_scene_data_2 from 'margoengine/gltf/scene-data';
 export * as e_margoengine_gltf_textured_2 from 'margoengine/gltf/textured';
 export * as e_margoengine_gltf_pbr_2 from 'margoengine/gltf/pbr';
 export * as e_margoengine_gltf_pbr_model_2 from 'margoengine/gltf/pbr-model';
+export * as e_margoengine_gltf_transmission_2 from 'margoengine/gltf/transmission';
 export * as e_margoengine_gltf_asset_2 from 'margoengine/gltf/asset';
 export * as e_margoengine_gltf_scene_2 from 'margoengine/gltf/scene';
 export * as e_margoengine_gltf_extended_materials_2 from 'margoengine/gltf/extended-materials';

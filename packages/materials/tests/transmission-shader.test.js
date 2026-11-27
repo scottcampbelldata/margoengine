@@ -502,7 +502,7 @@ test('pass hook: blur grows with roughness, Beer uses margoVolume per world unit
 });
 
 test('mip chain: level0 copies texel for texel, every next level is the shared area filter', () => {
-  const source = readFileSync(new URL('../src/transmission-pass.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n'),
+  const source = readFileSync(new URL('../../gltf/src/transmission.ts', import.meta.url), 'utf8').replace(/\r\n/g, '\n'),
     copy = /const copy = \/\* wgsl \*\/ `([\s\S]*?)`;/.exec(source)[1];
   assert.ok(/@vertex fn vertex\(/.test(copy) && /@fragment fn level0\(/.test(copy));
   // The reduction is shared/mipmaps.js's area filter (each source texel weighted by its overlap with the destination

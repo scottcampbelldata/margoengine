@@ -7,6 +7,7 @@ import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
 import { MaterialExtension, MaterialExtensionTexture, PBRMaterial, PBRModel, PBRPrimitive, PreparedGeometry } from "@margoengine/gltf/pbr";
 import { PBRInstances } from "@margoengine/gltf/pbr-instancing";
+import { TransmissionPassOptions } from "@margoengine/gltf/transmission";
 import { ColorInput } from "@margoengine/math";
 
 export interface AddNode {
@@ -1150,10 +1151,6 @@ type Pixels = {
 };
 
 type SubsurfaceKeys = 'subsurface' | 'subsurfaceMode' | 'subsurfaceColor' | 'subsurfaceThickness' | 'subsurfaceThicknessMap' | 'subsurfaceDistortion' | 'subsurfacePower' | 'subsurfaceWrap';
-
-interface TransmissionPassOptions {
-    order?: number;
-}
 
 type Update = (view: GPUTextureView) => void;
 

@@ -90,6 +90,10 @@
       "types": "./dist/model-entry.d.ts",
       "import": "./dist/model-entry.js"
     },
+    "./transmission": {
+      "types": "./dist/transmission.d.ts",
+      "import": "./dist/transmission.js"
+    },
     "./asset": {
       "types": "./dist/asset-entry.d.ts",
       "import": "./dist/asset-entry.js"

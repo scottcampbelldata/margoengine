@@ -11,7 +11,7 @@ import {
   type FrameGraph,
   type PassContext,
 } from '@margoengine/core/extension';
-import type { PBRModel, PBRTransmission } from '@margoengine/gltf/pbr';
+import type { PBRModel, PBRTransmission } from './model.js';
 import { sceneTarget } from '../../shared/msaa.js';
 import { applyView } from '../../shared/view-rect.js';
 import { currentFrame, retire } from '../../shared/frame-resources.js';

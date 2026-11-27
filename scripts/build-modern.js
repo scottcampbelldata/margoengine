@@ -209,6 +209,7 @@ async function buildPackage(name, output) {
           // its own gltf/physics). tests/no-inlined-packages.test.js fails on one.
           '@margoengine/gltf/physics',
           '@margoengine/gltf/extended-materials',
+          '@margoengine/gltf/transmission',
           '@margoengine/decoders/dds',
           '@margoengine/decoders/bc',
           '@margoengine/geometry/optimize',

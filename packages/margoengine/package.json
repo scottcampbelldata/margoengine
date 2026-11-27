@@ -1835,6 +1835,10 @@
       "types": "./dist/gltf/pbr-model.d.ts",
       "import": "./dist/gltf/pbr-model.js"
     },
+    "./gltf/transmission": {
+      "types": "./dist/gltf/transmission.d.ts",
+      "import": "./dist/gltf/transmission.js"
+    },
     "./gltf/asset": {
       "types": "./dist/gltf/asset.d.ts",
       "import": "./dist/gltf/asset.js"

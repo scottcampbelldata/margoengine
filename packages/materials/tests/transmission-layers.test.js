@@ -287,7 +287,7 @@ test('the surface tint draw multiplies by the sampled base colour and transmissi
 });
 
 test('each dispersed ray reads its own blur level', () => {
-  const pass = readFileSync(new URL('../src/transmission-pass.ts', import.meta.url), 'utf8');
+  const pass = readFileSync(new URL('../../gltf/src/transmission.ts', import.meta.url), 'utf8');
   assert.ok(pass.includes('margoTransmissionLevel(s.roughness,red,path)'));
   assert.ok(pass.includes('margoTransmissionLevel(s.roughness,blue,path)'));
   assert.ok(pass.includes('margoTransmissionLevel(s.roughness,ior,path)'));

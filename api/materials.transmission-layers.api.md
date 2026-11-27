@@ -5,7 +5,8 @@
 ```ts
 import { EngineKernel } from "@margoengine/core";
 import { Engine, EnginePlugin, FrameGraph } from "@margoengine/core/extension";
-import { PBRModel, PBRTransmission } from "@margoengine/gltf/pbr";
+import { PBRModel } from "@margoengine/gltf/pbr";
+import { Transmission, TransmissionPassOptions } from "@margoengine/gltf/transmission";
 
 export interface TransmissionBackgroundOIT {
     readonly order: number;
@@ -34,28 +35,5 @@ export class TransmissionLayers implements EnginePlugin {
 export interface TransmissionLayersOptions extends TransmissionPassOptions {
     layerOrder?: number;
     weighted?: TransmissionBackgroundOIT;
-}
-
-// Not exported from this entry, but used by the exports above:
-
-class Transmission implements EnginePlugin, PBRTransmission {
-    readonly name: string;
-    readonly order: number;
-    targets: readonly GPUColorTargetState[];
-    static attach(engine: EngineKernel, options?: TransmissionPassOptions): Transmission;
-    constructor({ order }?: TransmissionPassOptions);
-    add(model: PBRModel): () => void;
-    setup(engine: Engine): void;
-    registerPasses(graph: FrameGraph): void;
-    declarations(group: number): string;
-    bindings(): GPUBindGroupEntry[];
-    begin(): GPURenderPassEncoder;
-    onDeviceRestored(engine: Engine): void;
-    dispose(): void;
-    [Symbol.dispose]: () => void;
-}
-
-interface TransmissionPassOptions {
-    order?: number;
 }
 ```

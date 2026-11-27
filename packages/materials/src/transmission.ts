@@ -1,6 +1,7 @@
 import type { Borrowable } from '../../shared/borrowed.js';
-import type { TransmissionPassOptions } from './transmission-pass.js';
-export { Transmission, type TransmissionPassOptions } from './transmission-pass.js';
+// The scene-copy pass lives in gltf (its default load refracts through it, KB4000); materials re-exports it.
+import type { TransmissionPassOptions } from '@margoengine/gltf/transmission';
+export { Transmission, type TransmissionPassOptions } from '@margoengine/gltf/transmission';
 import type { MaterialExtension } from '@margoengine/gltf/pbr';
 import { textureCoordinates } from '@margoengine/gltf/texture-coordinates';
 import { coordinateSlot, coordinateWGSL } from './coordinates.js';

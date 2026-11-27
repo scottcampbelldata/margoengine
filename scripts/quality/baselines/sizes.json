@@ -1,7 +1,7 @@
 {
   "gate": "sizes",
   "about": "gzip budget per entry/worker (measured + max(3%, 256 B)); leak items: static loads of another package heavy entry",
-  "total": 21137285,
+  "total": 21141663,
   "history": [
     {
       "date": "2026-10-24",
@@ -14971,6 +14971,12 @@
       "commit": "30c26e36a9",
       "reason": "KB-TAA-INSTMOTION1 (about +610 to +720 B) and KB-TAA-COMPATEDGE1 (about +170 B): taa 16,969 to 17,765 B gzip measured, taa/upscale-velocity 21,723 to 22,662 (per-instance motion vectors for PBRInstances and whole object motion on silhouette pixels of the WebGL2 layer); both are in the velocity pass every moving frame draws, so a split would ghost until it loaded",
       "grew": 2
+    },
+    {
+      "date": "2026-11-27",
+      "commit": "90f54f5672",
+      "reason": "KB-TAA-COMPATEDGE1 coverage route on the WebGL2 layer (coverage resolve shader, 1x camera pipeline and rgba16float 4x target): taa +162 B and taa/upscale-velocity +184 B gzip (17,530 to 17,692 and 22,348 to 22,532 at gzip -9 on the built entries); both were already over their ceilings (17,479, 22,375) by the gate measure before it, at about 17,603 and 22,478. KB4000 step 1: new optional entry @margoengine/gltf/transmission (4,122 B), the Transmission scene-copy pass moved from materials, which re-exports it",
+      "grew": 3
     }
   ],
   "items": {
@@ -15456,6 +15462,7 @@
     "@margoengine/gltf/strokes": 2304,
     "@margoengine/gltf/texture-coordinates": 824,
     "@margoengine/gltf/textured": 9754,
+    "@margoengine/gltf/transmission": 4378,
     "@margoengine/gltf/worker": 96392,
     "@margoengine/headless": 3309,
     "@margoengine/headless/accumulate": 4620,

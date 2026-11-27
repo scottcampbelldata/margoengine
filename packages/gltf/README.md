@@ -598,6 +598,24 @@ refraction output. Native transmission's volume tint reads
 `KHR_materials_volume.thicknessTexture` (green channel) with `thicknessFactor`; the explicit
 `@margoengine/materials` installation route samples it for refraction too.
 
+The scene-copy refraction pass is `Transmission` from `@margoengine/gltf/transmission`, its own entry so a load without
+glass never downloads it; `@margoengine/materials/transmission` re-exports the same class. It copies the scene into a
+mip chain on frames where a hooked surface draws and refracts, blurs by roughness and attenuates through the volume
+behind each transmissive primitive of the models it is given:
+
+```js
+import { Engine } from '@margoengine/core';
+import { loadGLTF } from '@margoengine/gltf/pbr';
+import { Transmission } from '@margoengine/gltf/transmission';
+import { PostStack } from '@margoengine/post';
+import { Tonemap } from '@margoengine/tonemap';
+
+const engine = await Engine.create(document.querySelector('canvas'));
+PostStack.attach(engine, [new Tonemap()]);
+const glass = Transmission.attach(engine);
+glass.add(await loadGLTF(engine, '/glass.glb'));
+```
+
 `loadGLTF(engine, url, {optimize: true})` runs the import step of `@margoengine/geometry/optimize` on each opaque primitive
 as it packs: the same triangles in the order the vertex cache and early depth test read fastest, with `BLEND` primitives
 left in the file's order. It needs `@margoengine/geometry`, takes load time, and keeps a load on the main thread. A

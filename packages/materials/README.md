@@ -889,7 +889,8 @@ transmission resources. Combinations exceeding those limits throw a descriptive 
 or share packed textures. `Texture.options.colorSpace` overrides the defaults in the table.
 
 These maps work with geometry groups, instancing, glTF export and device restoration. Glass uses the maps in both
-the tinted-background path and the optional `Transmission` refraction pass. Disposing the last mesh using a
+the tinted-background path and the optional `Transmission` refraction pass (the class of
+`@margoengine/gltf/transmission`, re-exported here). Disposing the last mesh using a
 material releases its map uniform buffers; textures remain caller-owned.
 
 ## Dispersion
